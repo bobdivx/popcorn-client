@@ -1,0 +1,236 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Tableau de bord - Popcorn Vercel">
+  <div class="min-h-screen bg-black text-white">
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-16">
+      <h1 class="text-4xl md:text-5xl font-bold mb-8">Tableau de bord</h1>
+
+      <!-- User Info Card -->
+      <div class="bg-white/5 border border-white/10 rounded-lg p-6 mb-8">
+        <h2 class="text-2xl font-bold mb-4">Informations du compte</h2>
+        <div id="user-info" class="text-gray-300">
+          <p>Chargement...</p>
+        </div>
+      </div>
+
+      <!-- Connect Instance Section -->
+      <div class="bg-white/5 border border-white/10 rounded-lg p-6 mb-8">
+        <h2 class="text-2xl font-bold mb-4">🔗 Connecter votre instance locale</h2>
+        <p class="text-gray-300 mb-4">Générez un QR code pour connecter votre instance Popcorn Torrent locale à votre compte cloud.</p>
+        <button id="generate-qr-btn" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded transition-colors mb-4">
+          Générer un QR code
+        </button>
+        <div id="qr-code-section" class="hidden">
+          <div class="bg-black/50 border border-white/10 rounded-lg p-6 mb-4">
+            <div class="flex flex-col items-center gap-4">
+              <img id="qr-code-image" src="" alt="QR Code" class="mx-auto bg-white p-4 rounded-lg" style="display: none; max-width: 256px;" />
+              <p class="text-gray-300 text-sm text-center">Scannez ce QR code avec votre instance locale pour vous connecter</p>
+              <p class="text-gray-400 text-xs text-center">Le QR code expire dans 5 minutes</p>
+              <button id="refresh-qr-btn" class="text-red-400 hover:text-red-300 text-sm transition-colors">
+                Générer un nouveau QR code
+              </button>
+            </div>
+          </div>
+          <div id="qr-status" class="text-gray-300 text-sm"></div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        <a href="/docs/api" class="bg-white/5 border border-white/10 rounded-lg p-6 hover:bg-white/10 transition-colors">
+          <h3 class="text-xl font-bold mb-2">📚 Documentation API</h3>
+          <p class="text-gray-300 text-sm">Consultez la documentation complète de l'API REST</p>
+        </a>
+
+        <a href="/docs/docker" class="bg-white/5 border border-white/10 rounded-lg p-6 hover:bg-white/10 transition-colors">
+          <h3 class="text-xl font-bold mb-2">🐳 Guide Docker</h3>
+          <p class="text-gray-300 text-sm">Découvrez comment déployer avec Docker</p>
+        </a>
+
+        <div class="bg-white/5 border border-white/10 rounded-lg p-6">
+          <h3 class="text-xl font-bold mb-2">☁️ Synchronisation</h3>
+          <p class="text-gray-300 text-sm mb-4">Synchronisez votre configuration cloud</p>
+          <button id="sync-status-btn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded transition-colors">
+            Vérifier le statut
+          </button>
+        </div>
+      </div>
+
+      <!-- Sync Status -->
+      <div id="sync-status" class="bg-white/5 border border-white/10 rounded-lg p-6 hidden">
+        <h2 class="text-2xl font-bold mb-4">Statut de synchronisation</h2>
+        <div id="sync-status-content" class="text-gray-300">
+          <!-- Contenu dynamique -->
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // Récupérer le token depuis le localStorage
+    const accessToken = localStorage.getItem('accessToken');
+
+    if (!accessToken) {
+      // Rediriger vers login si pas de token
+      window.location.href = '/login';
+    }
+
+    // Charger les informations utilisateur
+    async function loadUserInfo() {
+      try {
+        const response = await fetch('/api/v1/auth/me', {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        });
+
+        if (response.status === 401) {
+          // Token expiré, rediriger vers login
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          window.location.href = '/login';
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error('Erreur lors du chargement des informations');
+        }
+
+        const data = await response.json();
+        
+        if (data.success && data.data.user) {
+          const user = data.data.user;
+          const userInfoEl = document.getElementById('user-info');
+          if (userInfoEl) {
+            userInfoEl.innerHTML = `
+              <p><strong>Email:</strong> ${user.email}</p>
+              <p><strong>ID:</strong> ${user.id}</p>
+              <p><strong>Compte créé le:</strong> ${new Date(user.created_at).toLocaleDateString('fr-FR')}</p>
+            `;
+          }
+        }
+      } catch (error) {
+        console.error('Erreur:', error);
+        document.getElementById('user-info')!.innerHTML = '<p class="text-red-400">Erreur lors du chargement des informations</p>';
+      }
+    }
+
+    // Vérifier le statut de synchronisation
+    async function checkSyncStatus() {
+      try {
+        const response = await fetch('/api/v1/sync/status', {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        });
+
+        if (response.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error('Erreur lors de la vérification du statut');
+        }
+
+        const data = await response.json();
+        const syncStatusEl = document.getElementById('sync-status');
+        const syncStatusContentEl = document.getElementById('sync-status-content');
+
+        if (data.success && data.data && syncStatusEl && syncStatusContentEl) {
+          const status = data.data;
+          syncStatusContentEl.innerHTML = `
+            <p><strong>Dernière synchronisation:</strong> ${status.last_sync_at ? new Date(status.last_sync_at).toLocaleString('fr-FR') : 'Jamais'}</p>
+            <p><strong>Indexers configurés:</strong> ${status.indexers_count}</p>
+            <p><strong>Paramètres utilisateur:</strong> ${status.settings_count}</p>
+            <p><strong>Configuration backend:</strong> ${status.has_backend_config ? 'Oui' : 'Non'}</p>
+            <p><strong>Statut:</strong> <span class="${status.status === 'synced' ? 'text-green-400' : 'text-yellow-400'}">${status.status === 'synced' ? 'Synchronisé' : 'Non synchronisé'}</span></p>
+          `;
+          syncStatusEl.classList.remove('hidden');
+        }
+      } catch (error) {
+        console.error('Erreur:', error);
+        alert('Erreur lors de la vérification du statut de synchronisation');
+      }
+    }
+
+
+    // Générer un QR code pour connecter l'instance
+    async function generateQRCode() {
+      try {
+        const response = await fetch('/api/v1/qr/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Erreur lors de la génération du QR code');
+        }
+
+        const data = await response.json();
+        
+        if (data.success && data.data) {
+          const qrData = data.data.qrData;
+          
+          // Afficher la section QR code
+          const qrSection = document.getElementById('qr-code-section');
+          const qrImage = document.getElementById('qr-code-image');
+          const qrStatus = document.getElementById('qr-status');
+          
+          if (qrSection && qrImage) {
+            qrSection.classList.remove('hidden');
+            if (qrStatus) qrStatus.innerHTML = '';
+            
+            // Utiliser une API en ligne pour générer le QR code
+            // Encoder les données en URL-safe base64
+            const encodedData = encodeURIComponent(qrData);
+            const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=256x256&data=${encodedData}`;
+            
+            qrImage.src = qrCodeUrl;
+            qrImage.style.display = 'block';
+            qrImage.onerror = () => {
+              console.error('Erreur lors du chargement du QR code');
+              if (qrStatus) {
+                qrStatus.innerHTML = '<p class="text-red-400">Erreur lors de la génération du QR code</p>';
+              }
+            };
+          }
+        }
+      } catch (error) {
+        console.error('Erreur:', error);
+        const qrStatus = document.getElementById('qr-status');
+        if (qrStatus) {
+          qrStatus.innerHTML = '<p class="text-red-400">Erreur lors de la génération du QR code</p>';
+        }
+      }
+    }
+
+
+
+    // Boutons QR code
+    const generateQRBtn = document.getElementById('generate-qr-btn');
+    const refreshQRBtn = document.getElementById('refresh-qr-btn');
+    
+    if (generateQRBtn) {
+      generateQRBtn.addEventListener('click', generateQRCode);
+    }
+    
+    if (refreshQRBtn) {
+      refreshQRBtn.addEventListener('click', generateQRCode);
+    }
+
+    // Bouton de vérification du statut
+    const syncStatusBtn = document.getElementById('sync-status-btn');
+    if (syncStatusBtn) {
+      syncStatusBtn.addEventListener('click', checkSyncStatus);
+    }
+
+    // Charger les informations au chargement de la page
+    loadUserInfo();
+  </script>
+</Layout>

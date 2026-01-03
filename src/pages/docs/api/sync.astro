@@ -1,0 +1,166 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import DocNav from '../../../components/DocNav';
+---
+
+<Layout title="Documentation API - Synchronisation">
+  <div class="min-h-screen bg-black text-white">
+    <DocNav client:load currentPath="/docs/api/sync" />
+    
+    <div class="container mx-auto px-4 py-16 max-w-4xl">
+      <h1 class="text-4xl md:text-5xl font-bold mb-6">
+        Synchronisation
+      </h1>
+      
+      <div class="prose prose-invert max-w-none">
+        <p class="text-xl text-gray-300 mb-8">
+          Synchronisez votre configuration (indexers, settings, backend config) entre le cloud et vos instances locales.
+        </p>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">GET /api/v1/sync/pull</h2>
+        <p class="text-gray-300 mb-4">Récupérer la configuration depuis le cloud.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>GET /api/v1/sync/pull
+Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{
+  "success": true,
+  "data": {
+    "indexers": [
+      {
+        "id": "indexer-id",
+        "name": "YGG",
+        "base_url": "https://ygg.com",
+        "api_key": "...",
+        "is_enabled": true,
+        "is_default": true,
+        "priority": 10,
+        ...
+      }
+    ],
+    "settings": [
+      {
+        "user_id": "user-id",
+        "tmdb_api_key": "...",
+        "updated_at": 1234567890
+      }
+    ],
+    "backend_config": {
+      "backend_url": "http://localhost:3000",
+      "updated_at": 1234567890
+    },
+    "synced_at": 1234567890
+  }
+}</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">POST /api/v1/sync/push</h2>
+        <p class="text-gray-300 mb-4">Envoyer la configuration vers le cloud.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>POST /api/v1/sync/push
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+  "indexers": [
+    {
+      "id": "indexer-id",
+      "name": "YGG",
+      "base_url": "https://ygg.com",
+      "api_key": "...",
+      "is_enabled": true,
+      "is_default": true,
+      "priority": 10
+    }
+  ],
+  "settings": [
+    {
+      "user_id": "user-id",
+      "tmdb_api_key": "..."
+    }
+  ],
+  "backend_config": {
+    "backend_url": "http://localhost:3000"
+  }
+}</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{
+  "success": true,
+  "data": {
+    "message": "Configuration synchronisée avec succès",
+    "synced_at": 1234567890
+  }
+}</code></pre>
+        </div>
+
+        <div class="bg-blue-900/20 border border-blue-600/50 rounded-lg p-6 mt-8 mb-8">
+          <h3 class="text-xl font-bold mb-2 text-blue-300">💡 Note</h3>
+          <p class="text-gray-300">
+            Les indexers sont remplacés complètement lors d'un push. Les sections optionnelles (indexers, settings, backend_config) peuvent être omises.
+          </p>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">GET /api/v1/sync/status</h2>
+        <p class="text-gray-300 mb-4">Récupérer le statut de synchronisation.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>GET /api/v1/sync/status
+Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{
+  "success": true,
+  "data": {
+    "last_sync_at": 1234567890,
+    "account_created_at": 1234567890,
+    "account_updated_at": 1234567890,
+    "indexers_count": 3,
+    "settings_count": 1,
+    "has_backend_config": true,
+    "status": "synced"
+  }
+}</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Exemple d'utilisation</h2>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-green-400 overflow-x-auto"><code># Récupérer la configuration
+curl -X GET https://popcorn-vercel.vercel.app/api/v1/sync/pull \
+  -H "Authorization: Bearer YOUR_TOKEN"
+
+# Synchroniser la configuration
+curl -X POST https://popcorn-vercel.vercel.app/api/v1/sync/push \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"indexers":[...],"settings":[...]}'
+
+# Vérifier le statut
+curl -X GET https://popcorn-vercel.vercel.app/api/v1/sync/status \
+  -H "Authorization: Bearer YOUR_TOKEN"</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Codes d'erreur</h2>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <ul class="list-none text-gray-300 space-y-2">
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">400</code> - ValidationError : Données invalides</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">401</code> - Unauthorized : Token invalide</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">500</code> - InternalServerError : Erreur serveur</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>

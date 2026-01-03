@@ -1,19 +1,27 @@
 import type { APIRoute } from 'astro';
-import { getTursoClient } from '../../../lib/db/turso';
-import { generateAccessToken, generateRefreshToken } from '../../../lib/auth/jwt';
-import { comparePassword } from '../../../lib/auth/password';
+import { getTursoClient } from '../../../../lib/db/turso';
+import { generateAccessToken, generateRefreshToken } from '../../../../lib/auth/jwt';
+import { comparePassword } from '../../../../lib/auth/password';
+import { z } from 'zod';
 
 export const prerender = false;
 
+const loginSchema = z.object({
+  email: z.string().email('Email invalide'),
+  password: z.string().min(1, 'Mot de passe requis'),
+});
+
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
-    const { email, password } = await request.json();
+    const body = await request.json();
+    const validation = loginSchema.safeParse(body);
 
-    if (!email || !password) {
+    if (!validation.success) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: 'Email et mot de passe requis',
+          error: 'ValidationError',
+          message: validation.error.errors[0].message,
         }),
         {
           status: 400,
@@ -23,6 +31,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         }
       );
     }
+
+    const { email, password } = validation.data;
 
     const client = getTursoClient();
 
@@ -36,6 +46,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       return new Response(
         JSON.stringify({
           success: false,
+          error: 'InvalidCredentials',
           message: 'Email ou mot de passe incorrect',
         }),
         {
@@ -58,6 +69,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       return new Response(
         JSON.stringify({
           success: false,
+          error: 'InvalidCredentials',
           message: 'Email ou mot de passe incorrect',
         }),
         {
@@ -69,11 +81,11 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       );
     }
 
-    // Générer les tokens JWT
+    // Générer les tokens
     const accessToken = generateAccessToken(userId, email);
     const refreshToken = generateRefreshToken(userId, email);
 
-    // Définir le cookie refresh token
+    // Définir les cookies (optionnel, pour les applications web)
     cookies.set('refresh_token', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -85,13 +97,14 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Connexion réussie',
-        user: {
-          id: userId,
-          email: email,
+        data: {
+          user: {
+            id: userId,
+            email: email,
+          },
+          accessToken,
+          refreshToken,
         },
-        accessToken,
-        refreshToken,
       }),
       {
         status: 200,
@@ -103,7 +116,6 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   } catch (error) {
     console.error('Erreur lors de la connexion:', error);
     
-    // Message d'erreur plus spécifique
     let errorMessage = 'Une erreur est survenue lors de la connexion';
     if (error instanceof Error) {
       if (error.message.includes('TURSO_DATABASE_URL') || error.message.includes('TURSO_AUTH_TOKEN')) {
@@ -116,6 +128,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     return new Response(
       JSON.stringify({
         success: false,
+        error: 'InternalServerError',
         message: errorMessage,
       }),
       {

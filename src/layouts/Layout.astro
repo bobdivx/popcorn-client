@@ -1,5 +1,6 @@
 ---
 import '../styles/global.css';
+import Header from '../components/Header';
 
 interface Props {
   title?: string;
@@ -21,6 +22,7 @@ const { title = 'Popcorn Vercel' } = Astro.props;
     <title>{title}</title>
   </head>
   <body class="min-h-screen bg-black text-white flex flex-col overflow-x-hidden">
+    <Header client:load />
     <main class="flex-1 w-full overflow-x-hidden">
       <slot />
     </main>

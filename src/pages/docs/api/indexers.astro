@@ -1,0 +1,156 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import DocNav from '../../../components/DocNav';
+---
+
+<Layout title="Documentation API - Indexers">
+  <div class="min-h-screen bg-black text-white">
+    <DocNav client:load currentPath="/docs/api/indexers" />
+    
+    <div class="container mx-auto px-4 py-16 max-w-4xl">
+      <h1 class="text-4xl md:text-5xl font-bold mb-6">
+        Gestion des Indexers
+      </h1>
+      
+      <div class="prose prose-invert max-w-none">
+        <p class="text-xl text-gray-300 mb-8">
+          Gérer vos indexers (Jackett, YGG, etc.) via l'API.
+        </p>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">GET /api/v1/indexers</h2>
+        <p class="text-gray-300 mb-4">Récupérer la liste de tous les indexers.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>GET /api/v1/indexers
+Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{
+  "success": true,
+  "data": {
+    "indexers": [
+      {
+        "id": "indexer-id",
+        "name": "YGG",
+        "base_url": "https://ygg.com",
+        "api_key": "...",
+        "jackett_indexer_name": null,
+        "is_enabled": true,
+        "is_default": true,
+        "priority": 10,
+        "fallback_indexer_id": null,
+        "created_at": 1234567890,
+        "updated_at": 1234567890
+      }
+    ]
+  }
+}</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">POST /api/v1/indexers</h2>
+        <p class="text-gray-300 mb-4">Créer un nouvel indexer.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>POST /api/v1/indexers
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+  "name": "YGG",
+  "base_url": "https://ygg.com",
+  "api_key": "your-api-key",
+  "jackett_indexer_name": null,
+  "is_enabled": true,
+  "is_default": false,
+  "priority": 10,
+  "fallback_indexer_id": null
+}</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (201 Created)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{
+  "success": true,
+  "data": {
+    "id": "generated-id",
+    "name": "YGG",
+    "base_url": "https://ygg.com",
+    ...
+    "created_at": 1234567890,
+    "updated_at": 1234567890
+  }
+}</code></pre>
+        </div>
+
+        <div class="bg-blue-900/20 border border-blue-600/50 rounded-lg p-6 mt-8 mb-8">
+          <h3 class="text-xl font-bold mb-2 text-blue-300">💡 Note</h3>
+          <p class="text-gray-300">
+            Si vous définissez <code class="bg-black/50 px-2 py-1 rounded">is_default: true</code>, tous les autres indexers auront <code class="bg-black/50 px-2 py-1 rounded">is_default: false</code>.
+          </p>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">GET /api/v1/indexers/:id</h2>
+        <p class="text-gray-300 mb-4">Récupérer un indexer spécifique.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>GET /api/v1/indexers/{id}
+Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">PUT /api/v1/indexers/:id</h2>
+        <p class="text-gray-300 mb-4">Mettre à jour un indexer existant.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>PUT /api/v1/indexers/{id}
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+  "name": "YGG Updated",
+  "is_enabled": false,
+  "priority": 20
+}</code></pre>
+        </div>
+
+        <p class="text-gray-300 mb-4">
+          Tous les champs sont optionnels. Seuls les champs fournis seront mis à jour.
+        </p>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">DELETE /api/v1/indexers/:id</h2>
+        <p class="text-gray-300 mb-4">Supprimer un indexer.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>DELETE /api/v1/indexers/{id}
+Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{
+  "success": true,
+  "data": {
+    "message": "Indexer supprimé avec succès"
+  }
+}</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Codes d'erreur</h2>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <ul class="list-none text-gray-300 space-y-2">
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">400</code> - ValidationError : Données invalides</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">401</code> - Unauthorized : Token invalide</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">404</code> - NotFound : Indexer non trouvé</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">500</code> - InternalServerError : Erreur serveur</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>

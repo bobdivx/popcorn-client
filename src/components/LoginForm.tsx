@@ -30,7 +30,15 @@ export default function LoginForm() {
         return;
       }
 
-      // Connexion réussie
+      // Connexion réussie - sauvegarder les tokens
+      if (data.accessToken) {
+        localStorage.setItem('accessToken', data.accessToken);
+      }
+      if (data.refreshToken) {
+        localStorage.setItem('refreshToken', data.refreshToken);
+      }
+
+      // Rediriger vers le dashboard
       window.location.href = '/dashboard';
     } catch (err) {
       setError('Erreur de connexion. Vérifiez votre connexion réseau.');

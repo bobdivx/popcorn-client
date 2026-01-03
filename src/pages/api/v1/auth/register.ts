@@ -1,25 +1,33 @@
 import type { APIRoute } from 'astro';
-import { getTursoClient } from '../../../lib/db/turso';
-import { hashPassword } from '../../../lib/auth/password';
+import { getTursoClient } from '../../../../lib/db/turso';
+import { hashPassword } from '../../../../lib/auth/password';
+import { z } from 'zod';
 import { randomBytes } from 'crypto';
 
-// Générer un ID unique (comme dans popcorn)
+export const prerender = false;
+
+// Générer un ID unique
 function generateId(): string {
   return randomBytes(16).toString('hex');
 }
 
-export const prerender = false;
+const registerSchema = z.object({
+  email: z.string().email('Email invalide'),
+  password: z.string().min(8, 'Le mot de passe doit contenir au moins 8 caractères'),
+  inviteCode: z.string().min(1, 'Code d\'invitation requis'),
+});
 
 export const POST: APIRoute = async ({ request }) => {
   try {
-    const { email, password, inviteCode } = await request.json();
+    const body = await request.json();
+    const validation = registerSchema.safeParse(body);
 
-    // Validation des données
-    if (!email || !password || !inviteCode) {
+    if (!validation.success) {
       return new Response(
         JSON.stringify({
           success: false,
-          message: 'Tous les champs sont requis',
+          error: 'ValidationError',
+          message: validation.error.errors[0].message,
         }),
         {
           status: 400,
@@ -30,20 +38,7 @@ export const POST: APIRoute = async ({ request }) => {
       );
     }
 
-    if (password.length < 8) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: 'Le mot de passe doit contenir au moins 8 caractères',
-        }),
-        {
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-    }
+    const { email, password, inviteCode } = validation.data;
 
     const client = getTursoClient();
 
@@ -57,6 +52,7 @@ export const POST: APIRoute = async ({ request }) => {
       return new Response(
         JSON.stringify({
           success: false,
+          error: 'InvalidInviteCode',
           message: 'Code de parrainage invalide ou déjà utilisé',
         }),
         {
@@ -80,6 +76,7 @@ export const POST: APIRoute = async ({ request }) => {
       return new Response(
         JSON.stringify({
           success: false,
+          error: 'EmailAlreadyExists',
           message: 'Cet email est déjà utilisé',
         }),
         {
@@ -104,36 +101,22 @@ export const POST: APIRoute = async ({ request }) => {
       args: [accountId, email, hashedPassword, now, now],
     });
 
-    const userId = accountId;
-
-    if (!userId) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          message: 'Erreur lors de la création du compte',
-        }),
-        {
-          status: 500,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-    }
-
     // Marquer le code de parrainage comme utilisé
     await client.execute({
       sql: 'UPDATE invitations SET used_by = ?, used_at = ? WHERE id = ?',
-      args: [userId, Date.now(), inviteId],
+      args: [accountId, now, inviteId],
     });
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: 'Inscription réussie',
+        data: {
+          message: 'Inscription réussie',
+          userId: accountId,
+        },
       }),
       {
-        status: 200,
+        status: 201,
         headers: {
           'Content-Type': 'application/json',
         },
@@ -142,7 +125,6 @@ export const POST: APIRoute = async ({ request }) => {
   } catch (error) {
     console.error('Erreur lors de l\'inscription:', error);
     
-    // Message d'erreur plus spécifique
     let errorMessage = 'Une erreur est survenue lors de l\'inscription';
     if (error instanceof Error) {
       if (error.message.includes('TURSO_DATABASE_URL') || error.message.includes('TURSO_AUTH_TOKEN')) {
@@ -155,6 +137,7 @@ export const POST: APIRoute = async ({ request }) => {
     return new Response(
       JSON.stringify({
         success: false,
+        error: 'InternalServerError',
         message: errorMessage,
       }),
       {
