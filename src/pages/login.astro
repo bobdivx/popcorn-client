@@ -1,0 +1,18 @@
+---
+import Layout from '../layouts/Layout.astro';
+import LoginForm from '../components/LoginForm';
+---
+
+<Layout title="Connexion - Popcorn Vercel">
+  <div class="flex flex-col justify-center items-center min-h-screen bg-black px-4 py-16">
+    <div class="mb-8 animate-fade-in">
+      <img 
+        src="/popcorn_logo.png" 
+        alt="Popcorn Vercel" 
+        class="w-20 h-20 sm:w-24 sm:h-24 object-contain mx-auto"
+        loading="eager"
+      />
+    </div>
+    <LoginForm client:load />
+  </div>
+</Layout>
