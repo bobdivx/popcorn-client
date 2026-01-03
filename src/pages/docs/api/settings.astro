@@ -28,18 +28,18 @@ Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
 
         <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
         <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
-          <pre class="text-gray-300 overflow-x-auto"><code>{
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`&#123;
   "success": true,
-  "data": {
+  "data": &#123;
     "settings": [
-      {
+      &#123;
         "user_id": "user-id",
         "tmdb_api_key": "your-tmdb-key",
         "updated_at": 1234567890
-      }
+      &#125;
     ]
-  }
-}</code></pre>
+  &#125;
+&#125;`}></code></pre>
         </div>
 
         <h2 class="text-3xl font-bold mt-12 mb-6">PUT /api/v1/settings</h2>
@@ -47,26 +47,26 @@ Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
         
         <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
         <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
-          <pre class="text-gray-300 overflow-x-auto"><code>PUT /api/v1/settings
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`PUT /api/v1/settings
 Authorization: Bearer YOUR_ACCESS_TOKEN
 Content-Type: application/json
 
-{
+&#123;
   "user_id": "user-id",
   "tmdb_api_key": "your-new-tmdb-key"
-}</code></pre>
+&#125;`}></code></pre>
         </div>
 
         <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
         <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
-          <pre class="text-gray-300 overflow-x-auto"><code>{
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`&#123;
   "success": true,
-  "data": {
+  "data": &#123;
     "user_id": "user-id",
     "tmdb_api_key": "your-new-tmdb-key",
     "updated_at": 1234567890
-  }
-}</code></pre>
+  &#125;
+&#125;`}></code></pre>
         </div>
 
         <h2 class="text-3xl font-bold mt-12 mb-6">GET /api/v1/settings/tmdb</h2>
@@ -80,13 +80,13 @@ Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
 
         <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
         <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
-          <pre class="text-gray-300 overflow-x-auto"><code>{
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`&#123;
   "success": true,
-  "data": {
+  "data": &#123;
     "tmdb_api_key": "your-tmdb-key",
     "updated_at": 1234567890
-  }
-}</code></pre>
+  &#125;
+&#125;`}></code></pre>
         </div>
 
         <h2 class="text-3xl font-bold mt-12 mb-6">PUT /api/v1/settings/tmdb</h2>
@@ -94,26 +94,26 @@ Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
         
         <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
         <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
-          <pre class="text-gray-300 overflow-x-auto"><code>PUT /api/v1/settings/tmdb
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`PUT /api/v1/settings/tmdb
 Authorization: Bearer YOUR_ACCESS_TOKEN
 Content-Type: application/json
 
-{
+&#123;
   "user_id": "user-id",
   "tmdb_api_key": "your-new-tmdb-key"
-}</code></pre>
+&#125;`}></code></pre>
         </div>
 
         <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
         <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
-          <pre class="text-gray-300 overflow-x-auto"><code>{
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`&#123;
   "success": true,
-  "data": {
+  "data": &#123;
     "user_id": "user-id",
     "tmdb_api_key": "your-new-tmdb-key",
     "updated_at": 1234567890
-  }
-}</code></pre>
+  &#125;
+&#125;`}></code></pre>
         </div>
 
         <h2 class="text-3xl font-bold mt-12 mb-6">GET /api/v1/backend/config</h2>
@@ -127,13 +127,13 @@ Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
 
         <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
         <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
-          <pre class="text-gray-300 overflow-x-auto"><code>{
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`&#123;
   "success": true,
-  "data": {
+  "data": &#123;
     "backend_url": "http://localhost:3000",
     "updated_at": 1234567890
-  }
-}</code></pre>
+  &#125;
+&#125;`}></code></pre>
         </div>
 
         <h2 class="text-3xl font-bold mt-12 mb-6">PUT /api/v1/backend/config</h2>
@@ -141,13 +141,13 @@ Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
         
         <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
         <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
-          <pre class="text-gray-300 overflow-x-auto"><code>PUT /api/v1/backend/config
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`PUT /api/v1/backend/config
 Authorization: Bearer YOUR_ACCESS_TOKEN
 Content-Type: application/json
 
-{
+&#123;
   "backend_url": "http://localhost:3000"
-}</code></pre>
+&#125;`}></code></pre>
         </div>
 
         <h2 class="text-3xl font-bold mt-12 mb-6">Codes d'erreur</h2>

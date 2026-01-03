@@ -38,14 +38,14 @@ Content-Type: application/json</code></pre>
 
         <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
         <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
-          <pre class="text-gray-300 overflow-x-auto"><code>{
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`&#123;
   "success": true,
-  "data": {
+  "data": &#123;
     "token": "qr-token-123",
-    "qrData": "{\"type\":\"popcorn-cloud-login-request\",\"token\":\"...\",\"submitUrl\":\"...\"}",
+    "qrData": "&#123;&quot;type&quot;:&quot;popcorn-cloud-login-request&quot;,&quot;token&quot;:&quot;...&quot;,&quot;submitUrl&quot;:&quot;...&quot;&#125;",
     "expiresAt": 1234567890
-  }
-}</code></pre>
+  &#125;
+&#125;`}></code></pre>
         </div>
 
         <p class="text-gray-300 mb-4">
@@ -57,24 +57,24 @@ Content-Type: application/json</code></pre>
         
         <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
         <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
-          <pre class="text-gray-300 overflow-x-auto"><code>POST /api/v1/qr/submit
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`POST /api/v1/qr/submit
 Authorization: Bearer YOUR_ACCESS_TOKEN
 Content-Type: application/json
 
-{
+&#123;
   "token": "qr-token-123"
-}</code></pre>
+&#125;`}></code></pre>
         </div>
 
         <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
         <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
-          <pre class="text-gray-300 overflow-x-auto"><code>{
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`&#123;
   "success": true,
-  "data": {
+  "data": &#123;
     "message": "QR code vérifié avec succès",
     "token": "qr-token-123"
-  }
-}</code></pre>
+  &#125;
+&#125;`}></code></pre>
         </div>
 
         <h2 class="text-3xl font-bold mt-12 mb-6">POST /api/v1/qr/verify</h2>
@@ -82,25 +82,25 @@ Content-Type: application/json
         
         <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
         <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
-          <pre class="text-gray-300 overflow-x-auto"><code>POST /api/v1/qr/verify
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`POST /api/v1/qr/verify
 Content-Type: application/json
 
-{
+&#123;
   "token": "qr-token-123"
-}</code></pre>
+&#125;`}></code></pre>
         </div>
 
         <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
         <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
-          <pre class="text-gray-300 overflow-x-auto"><code>{
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`&#123;
   "success": true,
-  "data": {
+  "data": &#123;
     "accountId": "account-id",
     "email": "user@example.com",
     "accessToken": "eyJhbGci...",
     "refreshToken": "eyJhbGci..."
-  }
-}</code></pre>
+  &#125;
+&#125;`}></code></pre>
         </div>
 
         <div class="bg-yellow-900/20 border border-yellow-600/50 rounded-lg p-6 mt-8 mb-8">
