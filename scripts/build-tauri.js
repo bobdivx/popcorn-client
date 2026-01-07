@@ -5,7 +5,7 @@
  */
 
 import { execSync } from 'child_process';
-import { existsSync, renameSync, rmSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, renameSync, rmSync, readFileSync, writeFileSync, cpSync } from 'fs';
 import { join } from 'path';
 import { config } from 'dotenv';
 
@@ -21,6 +21,33 @@ const configBackup = join(process.cwd(), 'astro.config.mjs.backup');
 
 let apiBackedUp = false;
 let configBackedUp = false;
+
+// Fonction helper pour copier récursivement (plus fiable sur Windows)
+const copyRecursive = (src, dest) => {
+  if (existsSync(dest)) {
+    rmSync(dest, { recursive: true, force: true });
+  }
+  cpSync(src, dest, { recursive: true, force: true });
+};
+
+// Fonction helper pour supprimer avec retry (gère les verrous Windows)
+const removeWithRetry = async (path, maxRetries = 3, delay = 1000) => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      if (existsSync(path)) {
+        rmSync(path, { recursive: true, force: true });
+      }
+      return;
+    } catch (error) {
+      if (i < maxRetries - 1) {
+        console.log(`⚠️  Tentative ${i + 1}/${maxRetries} échouée, nouvelle tentative dans ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        throw error;
+      }
+    }
+  }
+};
 
 (async () => {
   try {
@@ -44,10 +71,18 @@ let configBackedUp = false;
     // Déplacer l'ancien backup s'il existe dans src/pages (Astro le détecte !)
     if (existsSync(apiBackupOld)) {
       console.log('📦 Déplacement de l\'ancien backup hors de src/pages...');
-      if (existsSync(apiBackupPath)) {
-        rmSync(apiBackupPath, { recursive: true, force: true });
+      try {
+        // Essayer d'abord avec rename (plus rapide)
+        if (existsSync(apiBackupPath)) {
+          rmSync(apiBackupPath, { recursive: true, force: true });
+        }
+        renameSync(apiBackupOld, apiBackupPath);
+      } catch (error) {
+        // Si rename échoue (verrouillage Windows), utiliser copie + suppression
+        console.log('⚠️  Rename échoué, utilisation de la copie...');
+        copyRecursive(apiBackupOld, apiBackupPath);
+        rmSync(apiBackupOld, { recursive: true, force: true });
       }
-      renameSync(apiBackupOld, apiBackupPath);
       apiBackedUp = true;
       console.log('✅ Ancien backup déplacé\n');
     }
@@ -55,10 +90,19 @@ let configBackedUp = false;
     // Déplacer les routes API COMPLÈTEMENT hors de src/pages
     if (existsSync(apiPath)) {
       console.log('📦 Déplacement des routes API hors de src/pages...');
-      if (existsSync(apiBackupPath)) {
-        rmSync(apiBackupPath, { recursive: true, force: true });
+      try {
+        // Essayer d'abord avec rename (plus rapide)
+        if (existsSync(apiBackupPath)) {
+          rmSync(apiBackupPath, { recursive: true, force: true });
+        }
+        renameSync(apiPath, apiBackupPath);
+      } catch (error) {
+        // Si rename échoue (verrouillage Windows), utiliser copie + suppression
+        console.log('⚠️  Rename échoué, utilisation de la copie...');
+        copyRecursive(apiPath, apiBackupPath);
+        // Attendre un peu avant de supprimer pour laisser Windows libérer les verrous
+        await removeWithRetry(apiPath);
       }
-      renameSync(apiPath, apiBackupPath);
       apiBackedUp = true;
       console.log('✅ Routes API déplacées\n');
       
@@ -94,23 +138,26 @@ let configBackedUp = false;
       // dotenv n'est pas installé, continuer sans
     });
 
+    // Détecter la plateforme (desktop ou android)
+    const platform = process.env.TAURI_PLATFORM || 'desktop';
+    const platformName = platform === 'android' ? 'Android' : 'Desktop';
+    
     // Lancer le build Astro en mode static
-    console.log('🏗️  Build Astro en mode static (Tauri)...\n');
-    process.env.TAURI_PLATFORM = 'desktop';
+    console.log(`🏗️  Build Astro en mode static (Tauri ${platformName})...\n`);
     
     try {
       execSync('npx astro build', {
         stdio: 'inherit',
         env: { 
           ...process.env, 
-          TAURI_PLATFORM: 'desktop',
+          TAURI_PLATFORM: platform,
           NODE_ENV: 'production'
         },
         cwd: process.cwd(),
       });
-      console.log('\n✅ Build Astro terminé avec succès!\n');
+      console.log(`\n✅ Build Astro terminé avec succès pour ${platformName}!\n`);
     } catch (buildError) {
-      console.error('\n❌ Erreur lors du build Astro');
+      console.error(`\n❌ Erreur lors du build Astro pour ${platformName}`);
       throw buildError;
     }
   } catch (error) {
@@ -132,10 +179,17 @@ let configBackedUp = false;
     // Restaurer les routes API
     if (apiBackedUp && existsSync(apiBackupPath)) {
       console.log('🔄 Restauration des routes API...');
-      if (existsSync(apiPath)) {
-        rmSync(apiPath, { recursive: true, force: true });
+      try {
+        if (existsSync(apiPath)) {
+          rmSync(apiPath, { recursive: true, force: true });
+        }
+        renameSync(apiBackupPath, apiPath);
+      } catch (error) {
+        // Si rename échoue, utiliser copie + suppression
+        console.log('⚠️  Rename échoué, utilisation de la copie...');
+        copyRecursive(apiBackupPath, apiPath);
+        await removeWithRetry(apiBackupPath);
       }
-      renameSync(apiBackupPath, apiPath);
       console.log('✅ Routes API restaurées\n');
     }
   }

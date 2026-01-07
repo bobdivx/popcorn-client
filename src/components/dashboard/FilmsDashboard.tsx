@@ -30,7 +30,7 @@ export default function FilmsDashboard() {
   };
 
   const handlePlay = (film: FilmData) => {
-    window.location.href = `/player?contentId=${film.id}`;
+    window.location.href = `/player/${film.id}`;
   };
 
   if (loading) {

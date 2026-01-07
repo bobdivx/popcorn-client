@@ -355,9 +355,63 @@ class ServerApiClient {
 
   /**
    * Récupère l'URL de stream pour un contenu
+   * Le contentId peut être un slug (ex: "une-zone-a-defendre-2023") ou un infoHash
    */
   async getStream(contentId: string): Promise<ApiResponse<StreamResponse>> {
-    return this.request<StreamResponse>(`/api/v1/stream/${contentId}`);
+    try {
+      // D'abord, essayer de récupérer le torrent groupé par slug
+      // Cela nous donnera l'infoHash du torrent
+      const baseUrl = this.getServerUrl();
+      
+      // Essayer de récupérer le torrent groupé
+      const groupResponse = await fetch(`${baseUrl}/api/torrents/group/${encodeURIComponent(contentId)}`, {
+        headers: {
+          'Authorization': `Bearer ${this.getAccessToken()}`,
+        },
+      });
+
+      if (groupResponse.ok) {
+        const groupData = await groupResponse.json();
+        if (groupData.success && groupData.data) {
+          // Extraire l'infoHash du premier variant disponible
+          const variants = groupData.data.variants || [];
+          if (variants.length > 0) {
+            // Prendre le premier variant disponible
+            const firstVariant = variants[0];
+            const infoHash = firstVariant.infoHash || firstVariant.info_hash;
+            
+            if (infoHash) {
+              // Construire l'URL HLS
+              const hlsUrl = `${baseUrl}/api/media/hls/${infoHash}/master.m3u8`;
+              
+              return {
+                success: true,
+                data: {
+                  streamUrl: hlsUrl,
+                  hlsUrl: hlsUrl,
+                },
+              };
+            }
+          }
+        }
+      }
+
+      // Si le slug ne fonctionne pas, essayer directement avec l'infoHash
+      // (au cas où contentId est déjà un infoHash)
+      const hlsUrl = `${baseUrl}/api/media/hls/${contentId}/master.m3u8`;
+      return {
+        success: true,
+        data: {
+          streamUrl: hlsUrl,
+          hlsUrl: hlsUrl,
+        },
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Erreur lors de la récupération du stream',
+      };
+    }
   }
 
   // ==================== BIBLIOTHÈQUE ====================
@@ -521,6 +575,36 @@ class ServerApiClient {
   async deleteIndexer(id: string): Promise<ApiResponse<void>> {
     return this.request<void>(`/api/v1/setup/indexers/${id}`, {
       method: 'DELETE',
+    });
+  }
+
+  /**
+   * Teste la connexion à un indexer
+   */
+  async testIndexer(id: string): Promise<ApiResponse<{
+    success: boolean;
+    message?: string;
+    totalResults?: number;
+    resultsCount?: number;
+    successfulQueries?: number;
+    failedQueries?: Array<[string, string]>;
+    testQueries?: string[];
+    categoriesFound?: string[];
+    sampleResults?: Array<{
+      title?: string;
+      size?: number;
+      seeders?: number;
+      peers?: number;
+      leechers?: number;
+      category?: string;
+      tmdbId?: number;
+      slug?: string;
+    }>;
+    sampleResult?: any;
+  }>> {
+    return this.request(`/api/v1/indexers/test`, {
+      method: 'POST',
+      body: JSON.stringify({ id }),
     });
   }
 

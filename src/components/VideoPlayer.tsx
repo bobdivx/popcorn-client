@@ -7,18 +7,59 @@ interface VideoPlayerProps {
   onClose?: () => void;
 }
 
-export default function VideoPlayer({ contentId, title, onClose }: VideoPlayerProps) {
+export default function VideoPlayer({ contentId: contentIdProp, title, onClose }: VideoPlayerProps) {
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [subtitles, setSubtitles] = useState<Array<{ lang: string; url: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Extraire contentId depuis la prop, les query params, ou le pathname
+  const getContentId = (): string => {
+    if (contentIdProp) return contentIdProp;
+    
+    // Essayer depuis les query params
+    const urlParams = new URLSearchParams(window.location.search);
+    const fromQuery = urlParams.get('contentId') || urlParams.get('id');
+    if (fromQuery) return fromQuery;
+    
+    // Essayer depuis le pathname (pour compatibilité avec /player/${id})
+    const pathname = window.location.pathname;
+    const playerMatch = pathname.match(/\/player\/(.+)$/);
+    if (playerMatch && playerMatch[1]) {
+      return playerMatch[1];
+    }
+    
+    return '';
+  };
+
   useEffect(() => {
-    loadStream();
-  }, [contentId]);
+    const currentContentId = getContentId();
+    if (currentContentId) {
+      loadStream();
+    } else {
+      setError('Aucun ID de contenu fourni');
+      setLoading(false);
+    }
+    // Écouter les changements de navigation (pour Tauri/SPA)
+    const handlePopState = () => {
+      const newId = getContentId();
+      if (newId) {
+        loadStream();
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [contentIdProp]);
 
   const loadStream = async () => {
+    const currentContentId = getContentId();
+    if (!currentContentId) {
+      setError('Aucun ID de contenu fourni');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -29,7 +70,7 @@ export default function VideoPlayer({ contentId, title, onClose }: VideoPlayerPr
         return;
       }
 
-      const response = await serverApi.getStream(contentId);
+      const response = await serverApi.getStream(currentContentId);
 
       if (!response.success) {
         setError(response.message || 'Erreur lors du chargement du stream');

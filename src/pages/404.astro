@@ -1,8 +1,17 @@
 ---
 import ErrorPage from '../components/errors/ErrorPage';
+import '../styles/global.css';
 
-// Ne pas utiliser le Layout normal pour la page 404
-// pour avoir un contrôle total sur le design
+// Détecter si c'est une route /player/* pour réécrire vers /player avec l'ID
+// Utiliser Astro.rewrite() pour servir /player avec l'ID en query param
+// sans rediriger le navigateur (l'URL reste /player/${id})
+const pathname = Astro.url.pathname;
+if (pathname.startsWith('/player/') && pathname !== '/player/') {
+  const playerId = pathname.replace('/player/', '');
+  return Astro.rewrite(`/player?id=${encodeURIComponent(playerId)}`);
+}
+
+// Sinon, afficher la page 404 normale
 ---
 <!DOCTYPE html>
 <html lang="fr" data-theme="dark" class="overflow-hidden">

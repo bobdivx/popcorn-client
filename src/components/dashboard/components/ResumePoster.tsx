@@ -20,7 +20,7 @@ export function ResumePoster({ item }: ResumePosterProps) {
   const handleClick = (e: MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    window.location.href = `/player?contentId=${item.id}`;
+    window.location.href = `/player/${item.id}`;
   };
 
   const progress = item.progress || 0;

@@ -11,7 +11,7 @@ export default function Dashboard() {
   const { resumeWatching } = useResumeWatching();
 
   const handlePlay = (item: ContentItem) => {
-    window.location.href = `/player?contentId=${item.id}`;
+    window.location.href = `/player/${item.id}`;
   };
 
   if (loading) {

@@ -21,6 +21,12 @@ interface SyncProgress {
   errors: string[];
 }
 
+interface TmdbStats {
+  with_tmdb: number;
+  without_tmdb: number;
+  missing_tmdb: Array<[string, string]>; // [name, category]
+}
+
 interface SyncStatus {
   sync_in_progress: boolean;
   last_sync_date: number | null;
@@ -28,6 +34,7 @@ interface SyncStatus {
   stats: Record<string, number>;
   sync_start_time?: number | null;
   progress?: SyncProgress;
+  tmdb_stats?: TmdbStats;
 }
 
 interface Indexer {
@@ -656,6 +663,104 @@ export default function TorrentSyncManager() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+
+              {/* Statistiques TMDB */}
+              {status.tmdb_stats && totalTorrents > 0 && (
+                <div class="bg-gradient-to-br from-blue-900/30 to-purple-900/30 rounded-xl p-6 border-2 border-blue-500/50">
+                  <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Enrichissement TMDB
+                  </h3>
+                  
+                  <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="bg-green-900/30 rounded-lg p-4 border border-green-500/30">
+                      <div class="text-green-400 text-sm font-semibold mb-1">Avec ID TMDB</div>
+                      <div class="text-white font-bold text-2xl">{status.tmdb_stats.with_tmdb.toLocaleString()}</div>
+                      <div class="text-gray-400 text-xs mt-1">
+                        {totalTorrents > 0 
+                          ? `${Math.round((status.tmdb_stats.with_tmdb / totalTorrents) * 100)}% des torrents`
+                          : '0%'}
+                      </div>
+                    </div>
+                    
+                    <div class={`rounded-lg p-4 border ${
+                      status.tmdb_stats.without_tmdb > 0 
+                        ? 'bg-yellow-900/30 border-yellow-500/30' 
+                        : 'bg-gray-900/30 border-gray-700'
+                    }`}>
+                      <div class={`text-sm font-semibold mb-1 ${
+                        status.tmdb_stats.without_tmdb > 0 ? 'text-yellow-400' : 'text-gray-400'
+                      }`}>
+                        Sans ID TMDB
+                      </div>
+                      <div class={`font-bold text-2xl ${
+                        status.tmdb_stats.without_tmdb > 0 ? 'text-yellow-300' : 'text-gray-300'
+                      }`}>
+                        {status.tmdb_stats.without_tmdb.toLocaleString()}
+                      </div>
+                      <div class="text-gray-400 text-xs mt-1">
+                        {totalTorrents > 0 
+                          ? `${Math.round((status.tmdb_stats.without_tmdb / totalTorrents) * 100)}% des torrents`
+                          : '0%'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Liste des torrents sans TMDB ID */}
+                  {status.tmdb_stats.without_tmdb > 0 && (
+                    <div class="mt-4">
+                      <div class="flex items-center justify-between mb-3">
+                        <p class="text-yellow-400 text-sm font-semibold">
+                          Torrents sans ID TMDB ({status.tmdb_stats.missing_tmdb.length > 0 ? status.tmdb_stats.missing_tmdb.length : status.tmdb_stats.without_tmdb})
+                        </p>
+                        {status.tmdb_stats.without_tmdb > 50 && (
+                          <p class="text-gray-400 text-xs">
+                            (Affichage des 50 premiers)
+                          </p>
+                        )}
+                      </div>
+                      <div class="bg-gray-900/50 rounded-lg p-3 max-h-64 overflow-y-auto">
+                        <div class="space-y-2">
+                          {status.tmdb_stats.missing_tmdb.length > 0 ? (
+                            status.tmdb_stats.missing_tmdb.map(([name, category], idx) => (
+                              <div key={idx} class="flex items-center gap-2 text-sm">
+                                <span class="text-gray-400 text-xs w-16 capitalize truncate">
+                                  {category === 'films' ? '🎬' : category === 'series' ? '📺' : '📦'} {category}
+                                </span>
+                                <span class="text-gray-300 flex-1 truncate" title={name}>{name}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <p class="text-gray-400 text-sm text-center py-2">
+                              Aucun torrent sans ID TMDB trouvé
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {status.tmdb_stats.without_tmdb > 0 && (
+                        <p class="text-gray-400 text-xs mt-2">
+                          💡 Ces torrents n'ont pas pu être enrichis avec les métadonnées TMDB. 
+                          Vérifiez que la clé API TMDB est configurée et relancez une synchronisation.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Message de succès si tous les torrents ont un ID TMDB */}
+                  {status.tmdb_stats.without_tmdb === 0 && status.tmdb_stats.with_tmdb > 0 && (
+                    <div class="mt-4 bg-green-900/20 border border-green-500/30 rounded-lg p-3">
+                      <p class="text-green-400 text-sm font-semibold flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        ✓ Tous les torrents ont un ID TMDB et sont enrichis avec les métadonnées
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 

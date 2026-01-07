@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import type { Indexer, IndexerFormData } from '../../lib/client/types';
+import { IndexerCard } from './IndexerCard';
 
 export default function IndexersManager() {
   const [indexers, setIndexers] = useState<Indexer[]>([]);
@@ -18,6 +19,18 @@ export default function IndexersManager() {
     priority: 0,
   });
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<Record<string, {
+    success: boolean;
+    message?: string;
+    totalResults?: number;
+    resultsCount?: number;
+    successfulQueries?: number;
+    failedQueries?: Array<[string, string]>;
+    testQueries?: string[];
+    sampleResults?: Array<any>;
+    sampleResult?: any;
+  }>>({});
 
   useEffect(() => {
     loadIndexers();
@@ -106,6 +119,52 @@ export default function IndexersManager() {
     }
   };
 
+  const handleTest = async (id: string) => {
+    try {
+      setTesting(id);
+      setError(null);
+      
+      const response = await serverApi.testIndexer(id);
+      
+      if (response.success && response.data) {
+        // La réponse du backend peut avoir success dans data ou directement
+        const testData = response.data;
+        setTestResults(prev => ({
+          ...prev,
+          [id]: {
+            success: testData.success !== false, // Par défaut true si non spécifié
+            message: testData.message,
+            totalResults: testData.totalResults,
+            resultsCount: testData.resultsCount,
+            successfulQueries: testData.successfulQueries,
+            failedQueries: testData.failedQueries,
+            testQueries: testData.testQueries,
+            sampleResults: testData.sampleResults,
+            sampleResult: testData.sampleResult,
+          },
+        }));
+      } else {
+        setTestResults(prev => ({
+          ...prev,
+          [id]: {
+            success: false,
+            message: response.message || 'Erreur lors du test de connexion',
+          },
+        }));
+      }
+    } catch (err) {
+      setTestResults(prev => ({
+        ...prev,
+        [id]: {
+          success: false,
+          message: err instanceof Error ? err.message : 'Erreur lors du test de connexion',
+        },
+      }));
+    } finally {
+      setTesting(null);
+    }
+  };
+
   if (loading) {
     return (
       <div class="flex justify-center items-center min-h-[400px]">
@@ -138,41 +197,21 @@ export default function IndexersManager() {
           ) : (
             <div class="space-y-4">
               {indexers.map((indexer) => (
-                <div key={indexer.id} class="card bg-gray-800 shadow-xl border border-gray-700">
-                  <div class="card-body">
-                    <div class="flex justify-between items-start">
-                      <div>
-                        <h3 class="card-title text-white">
-                          {indexer.name}
-                          {indexer.isDefault && (
-                            <span class="badge badge-primary">Par défaut</span>
-                          )}
-                          {!indexer.isEnabled && (
-                            <span class="badge badge-error">Désactivé</span>
-                          )}
-                        </h3>
-                        <p class="text-sm text-gray-400">{indexer.baseUrl}</p>
-                        <p class="text-xs text-gray-500">
-                          Priorité: {indexer.priority}
-                        </p>
-                      </div>
-                      <div class="flex gap-2">
-                        <button
-                          class="btn btn-sm btn-outline"
-                          onClick={() => handleEdit(indexer)}
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          class="btn btn-sm btn-error"
-                          onClick={() => handleDelete(indexer.id)}
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <IndexerCard
+                  key={indexer.id}
+                  name={indexer.name}
+                  baseUrl={indexer.baseUrl}
+                  isEnabled={indexer.isEnabled}
+                  isDefault={indexer.isDefault}
+                  priority={indexer.priority}
+                  indexerId={indexer.id}
+                  categoryMapping={undefined} // TODO: Récupérer depuis la définition si disponible
+                  onEdit={() => handleEdit(indexer)}
+                  onDelete={() => handleDelete(indexer.id)}
+                  onTest={() => handleTest(indexer.id)}
+                  isTesting={testing === indexer.id}
+                  testResult={testResults[indexer.id]}
+                />
               ))}
             </div>
           )}

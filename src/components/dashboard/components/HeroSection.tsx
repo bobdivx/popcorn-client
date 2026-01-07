@@ -78,7 +78,7 @@ export function HeroSection({ items, onPlay }: HeroSectionProps) {
   }, []);
 
   const handleMoreInfo = (item: ContentItem) => {
-    window.location.href = `/player?contentId=${item.id}`;
+    window.location.href = `/player/${item.id}`;
   };
 
   const handlePlay = () => {

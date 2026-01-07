@@ -30,7 +30,7 @@ export default function SeriesDashboard() {
   };
 
   const handlePlay = (serie: SeriesData) => {
-    window.location.href = `/player?contentId=${serie.id}`;
+    window.location.href = `/player/${serie.id}`;
   };
 
   if (loading) {

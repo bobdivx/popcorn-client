@@ -28,6 +28,23 @@ const { title = 'Popcorn Client' } = Astro.props;
     <main class="flex-1 w-full overflow-x-hidden pt-16 sm:pt-18 md:pt-20 lg:pt-24">
       <slot />
     </main>
+    <script is:inline>
+      // Intercepter les routes /player/* et rediriger vers /player avec l'ID en query param
+      // Cela permet de gérer les routes dynamiques en mode static
+      (function() {
+        if (typeof window !== 'undefined') {
+          const pathname = window.location.pathname;
+          const playerMatch = pathname.match(/^\/player\/(.+)$/);
+          if (playerMatch && playerMatch[1]) {
+            const id = playerMatch[1];
+            // Rediriger vers /player avec l'ID en query param (sans recharger si déjà sur /player)
+            if (!window.location.search.includes('id=') && !window.location.search.includes('contentId=')) {
+              window.location.replace('/player?id=' + encodeURIComponent(id));
+            }
+          }
+        }
+      })();
+    </script>
   </body>
 </html>
 

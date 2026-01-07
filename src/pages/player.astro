@@ -2,7 +2,8 @@
 import '../styles/global.css';
 import VideoPlayer from '../components/VideoPlayer';
 
-const contentId = Astro.url.searchParams.get('id') || '';
+// Route statique simple qui lit l'ID depuis les query params ou le pathname
+const contentId = Astro.url.searchParams.get('contentId') || Astro.url.searchParams.get('id') || '';
 ---
 
 <!doctype html>

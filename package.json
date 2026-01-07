@@ -15,7 +15,9 @@
     "tauri:build:windows": "cross-env TAURI_PLATFORM=desktop tauri build --target x86_64-pc-windows-msvc",
     "tauri:build:android": "cross-env TAURI_PLATFORM=android tauri build --target aarch64-linux-android",
     "tauri:build:android-tv": "cross-env TAURI_PLATFORM=android tauri build --target aarch64-linux-android --config src-tauri/tauri.android.conf.json",
-    "tauri:build:android-mobile": "cross-env TAURI_PLATFORM=android tauri build --target aarch64-linux-android --config src-tauri/tauri.android.mobile.conf.json"
+    "tauri:build:android-mobile": "cross-env TAURI_PLATFORM=android tauri build --target aarch64-linux-android --config src-tauri/tauri.android.mobile.conf.json",
+    "android:setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-android.ps1",
+    "android:check": "powershell -ExecutionPolicy Bypass -File scripts/check-android.ps1"
   },
   "dependencies": {
     "@astrojs/preact": "^4.1.3",
