@@ -164,6 +164,11 @@ class ServerApiClient {
     
     const url = `${baseUrl}${endpoint}`;
     
+    // S'assurer que les tokens sont à jour avant de faire la requête
+    if (typeof window !== 'undefined') {
+      this.loadTokens();
+    }
+
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...options.headers,
@@ -351,11 +356,29 @@ class ServerApiClient {
     return this.request<SearchResult[]>(`/api/v1/search?${queryParams.toString()}`);
   }
 
+  // ==================== TORRENTS ====================
+
+  /**
+   * Récupère un torrent groupé par slug
+   */
+  async getTorrentGroup(slug: string): Promise<ApiResponse<any>> {
+    return this.request(`/api/torrents/group/${encodeURIComponent(slug)}`);
+  }
+
+  /**
+   * Récupère un torrent par ID
+   */
+  async getTorrentById(id: string): Promise<ApiResponse<any>> {
+    return this.request(`/api/torrents/${encodeURIComponent(id)}`);
+  }
+
   // ==================== STREAMING ====================
 
   /**
    * Récupère l'URL de stream pour un contenu
    * Le contentId peut être un slug (ex: "une-zone-a-defendre-2023") ou un infoHash
+   * Note: Cette méthode est conservée pour compatibilité avec VideoPlayer.tsx
+   * Le nouveau système utilise MediaDetailPage avec WebTorrent
    */
   async getStream(contentId: string): Promise<ApiResponse<StreamResponse>> {
     try {
@@ -381,7 +404,7 @@ class ServerApiClient {
             const infoHash = firstVariant.infoHash || firstVariant.info_hash;
             
             if (infoHash) {
-              // Construire l'URL HLS
+              // Construire l'URL HLS (pour compatibilité, mais le nouveau système utilise WebTorrent)
               const hlsUrl = `${baseUrl}/api/media/hls/${infoHash}/master.m3u8`;
               
               return {
@@ -748,6 +771,10 @@ class ServerApiClient {
    * Vérifie si l'utilisateur est authentifié
    */
   isAuthenticated(): boolean {
+    // Recharger les tokens au cas où ils ont changé
+    if (typeof window !== 'undefined') {
+      this.loadTokens();
+    }
     return !!this.accessToken;
   }
 
@@ -785,8 +812,13 @@ class ServerApiClient {
 
   /**
    * Récupère le token d'accès (pour usage interne dans les endpoints API)
+   * Recharge les tokens depuis localStorage si nécessaire
    */
   getAccessToken(): string | null {
+    // Recharger les tokens depuis localStorage au cas où ils ont changé
+    if (typeof window !== 'undefined') {
+      this.loadTokens();
+    }
     return this.accessToken;
   }
 }

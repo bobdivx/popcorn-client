@@ -2,16 +2,9 @@
 import ErrorPage from '../components/errors/ErrorPage';
 import '../styles/global.css';
 
-// Détecter si c'est une route /player/* pour réécrire vers /player avec l'ID
-// Utiliser Astro.rewrite() pour servir /player avec l'ID en query param
-// sans rediriger le navigateur (l'URL reste /player/${id})
-const pathname = Astro.url.pathname;
-if (pathname.startsWith('/player/') && pathname !== '/player/') {
-  const playerId = pathname.replace('/player/', '');
-  return Astro.rewrite(`/player?id=${encodeURIComponent(playerId)}`);
-}
-
-// Sinon, afficher la page 404 normale
+// IMPORTANT (site statique):
+// Aucune logique serveur au runtime. On gère donc les "routes dynamiques"
+// via une redirection côté navigateur (JS) depuis la 404.
 ---
 <!DOCTYPE html>
 <html lang="fr" data-theme="dark" class="overflow-hidden">
@@ -24,6 +17,29 @@ if (pathname.startsWith('/player/') && pathname !== '/player/') {
     <link rel="preconnect" href="https://fonts.googleapis.com" />
   </head>
   <body class="min-h-screen bg-black text-white overflow-hidden">
+    <script is:inline>
+      (function () {
+        try {
+          var pathname = window.location.pathname || '';
+
+          // /player/<id>  -> /torrents?slug=<id>
+          var mPlayer = pathname.match(/^\/player\/(.+)$/);
+          if (mPlayer && mPlayer[1]) {
+            window.location.replace('/torrents?slug=' + encodeURIComponent(mPlayer[1]));
+            return;
+          }
+
+          // /torrents/<slug> -> /torrents?slug=<slug>
+          var mTorrents = pathname.match(/^\/torrents\/(.+)$/);
+          if (mTorrents && mTorrents[1]) {
+            window.location.replace('/torrents?slug=' + encodeURIComponent(mTorrents[1]));
+            return;
+          }
+        } catch (e) {
+          // noop
+        }
+      })();
+    </script>
     <ErrorPage 
       client:load
       code={404}

@@ -3,6 +3,7 @@ import preact from '@astrojs/preact';
 import tailwind from '@astrojs/tailwind';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -25,6 +26,32 @@ export default defineConfig({
     assets: '_assets',
   },
   vite: {
+    plugins: [
+      nodePolyfills({
+        // Inclure explicitement tous les polyfills nécessaires pour webtorrent
+        include: [
+          'events',
+          'buffer',
+          'util',
+          'stream',
+          'crypto',
+          'process',
+          'path',
+          'os',
+          'url',
+          'string_decoder',
+          'punycode',
+          'querystring',
+        ],
+        globals: {
+          Buffer: true,
+          global: true,
+          process: true,
+        },
+        // Utiliser protocolImports pour inclure automatiquement d'autres polyfills
+        protocolImports: true,
+      }),
+    ],
     resolve: {
       extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
       // Ignorer les modules Tauri en mode dev/web
@@ -43,9 +70,30 @@ export default defineConfig({
       rollupOptions: {
         // Ne pas externaliser - utiliser les alias à la place
       },
+      commonjsOptions: {
+        transformMixedEsModules: true,
+      },
     },
     optimizeDeps: {
       exclude: ['@tauri-apps/plugin-dialog', '@tauri-apps/api'],
+      include: [
+        'events',
+        'buffer',
+        'util',
+        'stream',
+        'crypto',
+        'string_decoder',
+        'readable-stream',
+        'process',
+      ],
+      esbuildOptions: {
+        // S'assurer que les polyfills sont traités correctement
+        target: 'es2020',
+      },
+    },
+    define: {
+      global: 'globalThis',
+      'process.env': {},
     },
   },
 });

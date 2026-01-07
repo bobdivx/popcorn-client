@@ -1,0 +1,57 @@
+export interface MediaDetailPageProps {
+  torrent: {
+    id: string;
+    slug?: string | null;
+    infoHash: string | null;
+    name: string;
+    cleanTitle?: string; // Titre nettoyé parsé par le backend
+    description?: string | null;
+    category?: string;
+    imageUrl?: string | null;
+    heroImageUrl?: string | null;
+    trailerKey?: string | null;
+    fileSize: number;
+    seedCount: number;
+    leechCount: number;
+    uploader?: string;
+    createdAt?: number;
+    _externalLink?: string;
+    _externalMagnetUri?: string | null;
+    _externalGuid?: string | number;
+    indexerId?: string | null;
+    indexerName?: string | null;
+    quality?: {
+      resolution?: string;
+      source?: string;
+      codec?: string;
+      audio?: string;
+      language?: string;
+      full?: string;
+    };
+    language?: string; // Langue parsée par le backend
+    format?: string; // Format parsé par le backend
+    codec?: string; // Codec parsé par le backend
+    // Données TMDB
+    synopsis?: string | null;
+    releaseDate?: string | null;
+    genres?: string[] | null;
+    voteAverage?: number | null;
+    runtime?: number | null;
+    tmdbId?: number | null;
+    tmdbType?: string | null;
+    // État du torrent depuis le client WebTorrent (si disponible)
+    clientState?: 'queued' | 'downloading' | 'seeding' | 'paused' | 'completed' | 'error';
+    clientProgress?: number; // 0.0 à 1.0
+  };
+}
+
+export type PlayStatus = 'idle' | 'adding' | 'downloading' | 'buffering' | 'ready' | 'error';
+
+export type DebugLogType = 'info' | 'success' | 'error' | 'warning';
+
+export interface DebugLog {
+  time: string;
+  type: DebugLogType;
+  message: string;
+  data?: any;
+}
