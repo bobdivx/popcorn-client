@@ -1,0 +1,196 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Avertissement et Clause de Non-Responsabilité - Popcorn Client">
+  <div class="min-h-screen bg-base-100 text-base-content p-4 sm:p-6 lg:p-8">
+    <div class="max-w-4xl mx-auto">
+      <h1 class="text-4xl font-bold mb-8 text-center">Avertissement et Clause de Non-Responsabilité</h1>
+      
+      <div class="bg-base-200 rounded-lg p-6 sm:p-8 mb-6 border border-base-300">
+        <p class="text-sm text-base-content/70 mb-6 italic">
+          Dernière mise à jour : {new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
+        </p>
+
+        <div class="space-y-6 text-base-content/90">
+          <div>
+            <h2 class="text-2xl font-bold text-base-content mb-3">1. Nature de l'Application</h2>
+            <p class="leading-relaxed">
+              Popcorn Client est un outil technique permettant de se connecter à un serveur distant 
+              pour la recherche, le téléchargement et la lecture de contenu multimédia via le protocole 
+              BitTorrent. Cette application est fournie "en l'état" à des fins éducatives et techniques uniquement.
+            </p>
+            <p class="leading-relaxed mt-2">
+              Cette application fonctionne comme un client léger qui se connecte à un serveur distant. 
+              Elle ne stocke pas de contenu, ne gère pas de torrents directement, et agit uniquement 
+              comme une interface utilisateur pour interagir avec un serveur sous le contrôle de l'utilisateur.
+            </p>
+          </div>
+
+          <div>
+            <h2 class="text-2xl font-bold text-base-content mb-3">2. Responsabilité de l'Utilisateur</h2>
+            <p class="leading-relaxed mb-3">
+              <strong class="text-base-content">L'utilisateur est entièrement et exclusivement responsable</strong> 
+              de tous les contenus qu'il recherche, télécharge, stocke, ou consulte via cette application. 
+              L'utilisateur reconnaît qu'il est de sa seule responsabilité de :
+            </p>
+            <ul class="list-disc list-inside ml-4 space-y-2">
+              <li>Respecter toutes les lois et réglementations applicables dans sa juridiction, y compris mais sans s'y limiter, les lois sur le droit d'auteur, la propriété intellectuelle, et la protection des données</li>
+              <li>Respecter les droits de propriété intellectuelle (droits d'auteur, marques déposées, brevets, secrets commerciaux, etc.) de tous les tiers</li>
+              <li>Vérifier la légalité du téléchargement et de la consultation de tout contenu avant d'effectuer ces actions</li>
+              <li>Obtenir les autorisations nécessaires, licences, ou permissions appropriées avant de télécharger, stocker, ou consulter du contenu protégé</li>
+              <li>Respecter les conditions d'utilisation de tous les services tiers utilisés via cette application</li>
+              <li>Assurer la sécurité de son système et de ses données personnelles</li>
+            </ul>
+          </div>
+
+          <div>
+            <h2 class="text-2xl font-bold text-base-content mb-3">3. Non-Responsabilité du Développeur</h2>
+            <p class="leading-relaxed mb-3">
+              Le développeur de cette application (ci-après "le Développeur") décline expressément toute responsabilité 
+              concernant :
+            </p>
+            <ul class="list-disc list-inside ml-4 space-y-2">
+              <li>Le contenu téléchargé, stocké, ou consulté par l'utilisateur, y compris mais sans s'y limiter, la légalité, la qualité, l'exactitude, ou la pertinence de ce contenu</li>
+              <li>La légalité des actions effectuées par l'utilisateur via cette application dans toute juridiction</li>
+              <li>Les violations de droits d'auteur, de propriété intellectuelle, ou de toute autre loi résultant de l'utilisation de l'application par l'utilisateur</li>
+              <li>Les dommages directs, indirects, consécutifs, accessoires, spéciaux, ou punitifs résultant de l'utilisation ou de l'impossibilité d'utiliser cette application</li>
+              <li>La perte de données, les interruptions de service, les erreurs techniques, ou les problèmes de compatibilité</li>
+              <li>Les dommages causés à des tiers par l'utilisation de cette application par l'utilisateur</li>
+              <li>Les coûts de réparation, de remplacement, ou de services nécessaires pour corriger tout problème résultant de l'utilisation de l'application</li>
+            </ul>
+            <p class="leading-relaxed mt-3">
+              Le Développeur ne garantit pas que l'application fonctionnera de manière ininterrompue, sans erreur, 
+              ou que les défauts seront corrigés. L'application est fournie "TEL QUELLE" sans aucune garantie.
+            </p>
+          </div>
+
+          <div>
+            <h2 class="text-2xl font-bold text-base-content mb-3">4. Protection des Données et Confidentialité</h2>
+            <p class="leading-relaxed mb-3">
+              Cette application utilise un chiffrement end-to-end (E2E) pour protéger les données utilisateur. 
+              Le Développeur n'a <strong class="text-base-content">aucun accès</strong> aux données personnelles, 
+              aux préférences, aux bibliothèques de contenu, ou à toute autre information stockée par l'utilisateur.
+            </p>
+            <p class="leading-relaxed mb-3">
+              Toutes les communications entre le client et le serveur sont chiffrées, et les données sensibles 
+              sont stockées localement sur l'appareil de l'utilisateur ou sur un serveur sous le contrôle exclusif 
+              de l'utilisateur. Le Développeur ne collecte, ne stocke, ni ne transmet aucune donnée personnelle 
+              ou information sur l'utilisation de l'application.
+            </p>
+            <p class="leading-relaxed">
+              L'utilisateur est seul responsable de la sécurité de ses données, de son serveur, et de la 
+              configuration de son environnement. Le Développeur ne peut être tenu responsable de toute perte 
+              ou divulgation de données résultant d'une mauvaise configuration, d'une faille de sécurité, 
+              ou d'une utilisation inappropriée de l'application.
+            </p>
+          </div>
+
+          <div>
+            <h2 class="text-2xl font-bold text-base-content mb-3">5. Avertissement Légal</h2>
+            <div class="bg-warning/20 border border-warning rounded-lg p-4 mb-3">
+              <p class="leading-relaxed font-semibold text-warning-content">
+                <strong>ATTENTION :</strong> Le téléchargement et la consultation de contenu protégé par le droit 
+                d'auteur sans autorisation peut constituer une violation de la loi dans de nombreuses juridictions, 
+                y compris mais sans s'y limiter :
+              </p>
+              <ul class="list-disc list-inside ml-4 mt-2 space-y-1">
+                <li>Les violations du droit d'auteur (Copyright Act aux États-Unis, Code de la propriété intellectuelle en France, etc.)</li>
+                <li>Les violations de lois sur la propriété intellectuelle</li>
+                <li>Les violations de lois sur la protection des données</li>
+                <li>Les violations de conditions d'utilisation de services tiers</li>
+              </ul>
+            </div>
+            <p class="leading-relaxed">
+              L'utilisateur est seul responsable de s'assurer que ses actions sont légales dans sa juridiction. 
+              Le Développeur ne peut être tenu responsable des conséquences légales, financières, ou pénales 
+              résultant de l'utilisation de cette application, y compris mais sans s'y limiter :
+            </p>
+            <ul class="list-disc list-inside ml-4 mt-2 space-y-1">
+              <li>Les poursuites judiciaires intentées par des tiers</li>
+              <li>Les amendes ou pénalités imposées par des autorités</li>
+              <li>Les dommages-intérêts réclamés par des titulaires de droits</li>
+              <li>Les coûts juridiques et de défense</li>
+            </ul>
+          </div>
+
+          <div>
+            <h2 class="text-2xl font-bold text-base-content mb-3">6. Utilisation à Vos Risques</h2>
+            <p class="leading-relaxed mb-3">
+              Cette application est fournie "TEL QUELLE", sans garantie d'aucune sorte, expresse ou implicite, 
+              y compris mais sans s'y limiter :
+            </p>
+            <ul class="list-disc list-inside ml-4 space-y-2">
+              <li>Les garanties de qualité marchande</li>
+              <li>Les garanties d'adéquation à un usage particulier</li>
+              <li>Les garanties de non-contrefaçon</li>
+              <li>Les garanties de sécurité ou de protection contre les virus, malwares, ou autres composants nuisibles</li>
+              <li>Les garanties de disponibilité, de fiabilité, ou de performance</li>
+            </ul>
+            <p class="leading-relaxed mt-3">
+              L'utilisateur utilise cette application à ses propres risques. Le Développeur ne garantit pas 
+              que l'application répondra aux exigences de l'utilisateur, qu'elle fonctionnera de manière 
+              ininterrompue ou sans erreur, ou que les défauts seront corrigés.
+            </p>
+          </div>
+
+          <div>
+            <h2 class="text-2xl font-bold text-base-content mb-3">7. Limitation de Responsabilité</h2>
+            <p class="leading-relaxed mb-3">
+              Dans toute la mesure permise par la loi applicable, le Développeur ne pourra en aucun cas être 
+              tenu responsable de :
+            </p>
+            <ul class="list-disc list-inside ml-4 space-y-2">
+              <li>Tout dommage direct, indirect, consécutif, accessoire, spécial, ou punitif</li>
+              <li>La perte de profits, de revenus, de données, d'opportunités commerciales, ou de bonne volonté</li>
+              <li>Les coûts de remplacement de biens ou services</li>
+              <li>Les dommages résultant de l'utilisation ou de l'impossibilité d'utiliser l'application</li>
+            </ul>
+            <p class="leading-relaxed mt-3">
+              Cette limitation de responsabilité s'applique même si le Développeur a été informé de la 
+              possibilité de tels dommages et même si un recours prévu dans le présent accord échoue dans 
+              son objet essentiel.
+            </p>
+          </div>
+
+          <div>
+            <h2 class="text-2xl font-bold text-base-content mb-3">8. Acceptation des Conditions</h2>
+            <p class="leading-relaxed mb-3">
+              En utilisant cette application, l'utilisateur reconnaît avoir lu, compris et accepté 
+              les termes de ce disclaimer dans leur intégralité. Si l'utilisateur n'accepte pas ces conditions, 
+              il ne doit pas utiliser cette application et doit immédiatement cesser toute utilisation.
+            </p>
+            <p class="leading-relaxed">
+              L'utilisation continue de l'application après la modification de ce disclaimer constitue 
+              une acceptation des termes modifiés. Il est de la responsabilité de l'utilisateur de consulter 
+              régulièrement cette page pour prendre connaissance des éventuelles modifications.
+            </p>
+          </div>
+
+          <div>
+            <h2 class="text-2xl font-bold text-base-content mb-3">9. Droit Applicable et Juridiction</h2>
+            <p class="leading-relaxed">
+              Ce disclaimer est régi par les lois applicables dans la juridiction du Développeur. 
+              Tout litige découlant de ou en relation avec ce disclaimer ou l'utilisation de l'application 
+              sera soumis à la juridiction exclusive des tribunaux compétents dans cette juridiction.
+            </p>
+          </div>
+
+          <div>
+            <h2 class="text-2xl font-bold text-base-content mb-3">10. Contact</h2>
+            <p class="leading-relaxed">
+              Pour toute question concernant ce disclaimer, l'utilisateur peut consulter la documentation 
+              de l'application ou se référer aux canaux de communication officiels du projet.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="text-center mt-8">
+        <a href="/" class="btn btn-primary">
+          Retour à l'application
+        </a>
+      </div>
+    </div>
+  </div>
+</Layout>

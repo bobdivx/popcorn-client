@@ -1,102 +1,82 @@
-import type { APIRoute } from 'astro';
-import { requireAuth } from '../../../../lib/auth/middleware';
-import { getTursoClient } from '../../../../lib/db/turso';
-
 export const prerender = false;
 
-export const GET: APIRoute = async (context) => {
-  const authResult = await requireAuth(context);
+import type { APIRoute } from 'astro';
+import { serverApi } from '../../../../lib/client/server-api';
 
-  // Si requireAuth retourne une Response, c'est une erreur
-  if (authResult instanceof Response) {
-    return authResult;
-  }
-
+/**
+ * Récupère le statut de la synchronisation des torrents
+ * Fait un proxy vers le backend Rust du serveur popcorn
+ */
+export const GET: APIRoute = async ({ request }) => {
   try {
-    const { userId } = authResult.user;
-    const client = getTursoClient();
-
-    // Récupérer les informations de synchronisation
-    const accountResult = await client.execute({
-      sql: 'SELECT last_sync_at, created_at, updated_at FROM cloud_accounts WHERE id = ?',
-      args: [userId],
-    });
-
-    if (accountResult.rows.length === 0) {
+    // Vérifier l'authentification via serverApi
+    const meResponse = await serverApi.getMe();
+    if (!meResponse.success) {
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'AccountNotFound',
-          message: 'Compte non trouvé',
-        }),
-        {
-          status: 404,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
+        JSON.stringify({ success: false, error: 'Non authentifié' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    const account = accountResult.rows[0];
-    const lastSyncAt = account.last_sync_at as number | null;
+    // Récupérer l'URL du serveur depuis serverApi
+    const serverUrl = serverApi.getServerUrl();
+    if (!serverUrl) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'URL du serveur non configurée' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
 
-    // Compter les indexers
-    const indexersCountResult = await client.execute({
-      sql: 'SELECT COUNT(*) as count FROM cloud_indexers WHERE account_id = ?',
-      args: [userId],
+    // Récupérer le token d'accès
+    const accessToken = serverApi.getAccessToken();
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
+    // Faire un appel direct au backend Rust du serveur popcorn
+    const response = await fetch(`${serverUrl}/api/sync/status`, {
+      method: 'GET',
+      headers,
     });
-    const indexersCount = indexersCountResult.rows[0].count as number;
 
-    // Compter les settings
-    const settingsCountResult = await client.execute({
-      sql: 'SELECT COUNT(*) as count FROM cloud_user_settings WHERE account_id = ?',
-      args: [userId],
-    });
-    const settingsCount = settingsCountResult.rows[0].count as number;
-
-    // Vérifier si la config backend existe
-    const backendConfigResult = await client.execute({
-      sql: 'SELECT COUNT(*) as count FROM cloud_backend_config WHERE account_id = ?',
-      args: [userId],
-    });
-    const hasBackendConfig = (backendConfigResult.rows[0].count as number) > 0;
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        data: {
-          last_sync_at: lastSyncAt,
-          account_created_at: account.created_at,
-          account_updated_at: account.updated_at,
-          indexers_count: indexersCount,
-          settings_count: settingsCount,
-          has_backend_config: hasBackendConfig,
-          status: lastSyncAt ? 'synced' : 'never_synced',
-        },
-      }),
-      {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorMessage = `Erreur HTTP ${response.status}`;
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMessage = errorData.error || errorMessage;
+      } catch {
+        errorMessage = errorText || errorMessage;
       }
-    );
-  } catch (error) {
-    console.error('[Sync Status] Erreur:', error);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: errorMessage,
+        }),
+        { status: response.status, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const data = await response.json();
     
     return new Response(
       JSON.stringify({
-        success: false,
-        error: 'InternalServerError',
-        message: 'Erreur lors de la récupération du statut de synchronisation',
+        success: true,
+        data: data,
       }),
-      {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
+      { status: 200, headers: { 'Content-Type': 'application/json' } }
+    );
+  } catch (error) {
+    console.error('[SYNC STATUS] Exception:', error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur lors de la récupération du statut',
+      }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 };

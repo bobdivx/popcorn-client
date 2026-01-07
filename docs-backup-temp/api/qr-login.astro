@@ -1,0 +1,144 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import DocNav from '../../../components/DocNav';
+---
+
+<Layout title="Documentation API - Connexion QR Code">
+  <div class="min-h-screen bg-black text-white">
+    <DocNav client:load currentPath="/docs/api/qr-login" />
+    
+    <div class="container mx-auto px-4 py-16 max-w-4xl">
+      <h1 class="text-4xl md:text-5xl font-bold mb-6">
+        Connexion QR Code
+      </h1>
+      
+      <div class="prose prose-invert max-w-none">
+        <p class="text-xl text-gray-300 mb-8">
+          Système de connexion sécurisé via QR code pour connecter vos instances locales au cloud.
+        </p>
+
+        <div class="bg-blue-900/20 border border-blue-600/50 rounded-lg p-6 mb-8">
+          <h3 class="text-xl font-bold mb-2 text-blue-300">💡 Comment ça fonctionne</h3>
+          <ol class="list-decimal list-inside text-gray-300 space-y-2">
+            <li>L'instance locale génère un QR code</li>
+            <li>L'utilisateur scanne le QR code avec son appareil mobile (déjà connecté au cloud)</li>
+            <li>L'appareil mobile soumet les credentials via l'API</li>
+            <li>L'instance locale vérifie le QR code et obtient les tokens JWT</li>
+          </ol>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">POST /api/v1/qr/generate</h2>
+        <p class="text-gray-300 mb-4">Générer un QR code de connexion (appelé par l'instance locale).</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>POST /api/v1/qr/generate
+Content-Type: application/json</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`{
+  "success": true,
+  "data": {
+    "token": "qr-token-123",
+    "qrData": "{\"type\":\"popcorn-cloud-login-request\",\"token\":\"...\",\"submitUrl\":\"...\"{'}'}",
+    "expiresAt": 1234567890
+  }
+}`}></code></pre>
+        </div>
+
+        <p class="text-gray-300 mb-4">
+          Le <code class="bg-black/50 px-2 py-1 rounded">qrData</code> est une chaîne JSON à encoder en QR code.
+        </p>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">POST /api/v1/qr/submit</h2>
+        <p class="text-gray-300 mb-4">Soumettre les credentials depuis l'appareil mobile (nécessite authentification).</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>POST /api/v1/qr/submit
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{'{'{'}'}
+  "token": "qr-token-123"
+}</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`{
+  "success": true,
+  "data": {
+    "message": "QR code vérifié avec succès",
+    "token": "qr-token-123"
+  {'}'}
+}`}></code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">POST /api/v1/qr/verify</h2>
+        <p class="text-gray-300 mb-4">Vérifier le QR code et obtenir les tokens JWT (appelé par l'instance locale).</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>POST /api/v1/qr/verify
+Content-Type: application/json
+
+{'{'{'}'}
+  "token": "qr-token-123"
+}</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{'{'{'}'}'{'}
+  "success": true,
+  "data": {'{'}
+    "accountId": "account-id",
+    "email": "user@example.com",
+    "accessToken": "eyJhbGci...",
+    "refreshToken": "eyJhbGci..."
+  {'}'}
+{'}'}</code></pre>
+        </div>
+
+        <div class="bg-yellow-900/20 border border-yellow-600/50 rounded-lg p-6 mt-8 mb-8">
+          <h3 class="text-xl font-bold mb-2 text-yellow-300">⚠️ Important</h3>
+          <p class="text-gray-300">
+            Les tokens QR sont à usage unique et expirent après 5 minutes. Une fois vérifié, le token ne peut plus être utilisé.
+          </p>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Flux complet</h2>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>1. Instance locale : POST /api/v1/qr/generate
+   → Reçoit token et qrData
+   
+2. Instance locale : Affiche le QR code (encode qrData)
+
+3. Utilisateur : Scanne le QR code avec l'app mobile
+
+4. App mobile : POST /api/v1/qr/submit (avec auth token)
+   → Valide le QR token
+   
+5. Instance locale : POST /api/v1/qr/verify (polling)
+   → Reçoit les tokens JWT
+   
+6. Instance locale : Utilise accessToken pour les requêtes API</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Codes d'erreur</h2>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <ul class="list-none text-gray-300 space-y-2">
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">400</code> - ValidationError : Données invalides</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">401</code> - InvalidToken : Token QR invalide, expiré ou déjà utilisé</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">401</code> - Unauthorized : Non authentifié (pour submit)</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">403</code> - AccountMismatch : Le compte ne correspond pas</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">404</code> - AccountNotFound : Compte non trouvé</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>

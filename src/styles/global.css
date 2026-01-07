@@ -2,6 +2,16 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Masquer la scrollbar mais garder le scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE et Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari et Opera */
+}
+
 /* Animations globales */
 @keyframes fadeIn {
   from {

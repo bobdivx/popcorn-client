@@ -1,0 +1,27 @@
+---
+import ErrorPage from '../components/errors/ErrorPage';
+
+// Ne pas utiliser le Layout normal pour la page 404
+// pour avoir un contrôle total sur le design
+---
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark" class="overflow-hidden">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Page non trouvée - Popcorn Torrent" />
+    <link rel="icon" type="image/png" href="/popcorn_logo.png" />
+    <title>404 - Page non trouvée - Popcorn Torrent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+  </head>
+  <body class="min-h-screen bg-black text-white overflow-hidden">
+    <ErrorPage 
+      client:load
+      code={404}
+      title="Page non trouvée"
+      message="Désolé, la page que vous recherchez n'existe pas ou a été déplacée."
+      showHomeButton={true}
+      showBackButton={true}
+    />
+  </body>
+</html>

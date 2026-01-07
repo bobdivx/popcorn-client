@@ -6,13 +6,23 @@ export default function Header() {
 
   useEffect(() => {
     // Vérifier si l'utilisateur est connecté
-    const accessToken = localStorage.getItem('accessToken');
+    const accessToken = localStorage.getItem('access_token') || localStorage.getItem('accessToken');
     setIsLoggedIn(!!accessToken);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Utiliser le client API pour la déconnexion
+    try {
+      const { serverApi } = await import('../lib/client/server-api');
+      await serverApi.logout();
+    } catch (error) {
+      console.error('Erreur lors de la déconnexion:', error);
+    }
+    // Nettoyer le stockage local
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     window.location.href = '/login';
   };
 
@@ -31,6 +41,9 @@ export default function Header() {
           <a href="/docs" className="text-gray-300 hover:text-white transition-colors">Documentation</a>
           {isLoggedIn ? (
             <>
+              <a href="/search" className="text-gray-300 hover:text-white transition-colors">Recherche</a>
+              <a href="/library" className="text-gray-300 hover:text-white transition-colors">Bibliothèque</a>
+              <a href="/settings" className="text-gray-300 hover:text-white transition-colors">Paramètres</a>
               <a href="/dashboard" className="text-gray-300 hover:text-white transition-colors">Tableau de bord</a>
               <button 
                 onClick={handleLogout}
@@ -92,6 +105,27 @@ export default function Header() {
             </a>
             {isLoggedIn ? (
               <>
+                <a 
+                  href="/search" 
+                  className="text-gray-300 hover:text-white transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Recherche
+                </a>
+                <a 
+                  href="/library" 
+                  className="text-gray-300 hover:text-white transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Bibliothèque
+                </a>
+                <a 
+                  href="/settings" 
+                  className="text-gray-300 hover:text-white transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Paramètres
+                </a>
                 <a 
                   href="/dashboard" 
                   className="text-gray-300 hover:text-white transition-colors"

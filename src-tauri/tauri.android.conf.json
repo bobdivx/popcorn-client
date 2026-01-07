@@ -1,0 +1,44 @@
+{
+  "productName": "Popcorn TV",
+  "version": "0.1.0",
+  "identifier": "com.popcorn.client.tv",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:4326",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Popcorn TV",
+        "width": 1920,
+        "height": 1080,
+        "fullscreen": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png"
+    ],
+    "resources": [],
+    "externalBin": [],
+    "copyright": "",
+    "category": "Utility",
+    "shortDescription": "Client léger Popcorn pour Android TV",
+    "longDescription": "Client léger pour Android TV - se connecte au serveur Popcorn distant",
+    "android": {
+      "versionCode": 1,
+      "autoIncrementVersionCode": false
+    }
+  },
+  "plugins": {}
+}

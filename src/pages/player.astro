@@ -1,0 +1,20 @@
+---
+import '../styles/global.css';
+import VideoPlayer from '../components/VideoPlayer';
+
+const contentId = Astro.url.searchParams.get('id') || '';
+---
+
+<!doctype html>
+<html lang="fr" data-theme="dark" class="overflow-x-hidden">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content="Lecteur vidéo - Popcorn" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/popcorn_logo.png" />
+    <title>Lecteur vidéo - Popcorn</title>
+  </head>
+  <body class="min-h-screen bg-black text-white">
+    <VideoPlayer contentId={contentId} client:only="preact" />
+  </body>
+</html>

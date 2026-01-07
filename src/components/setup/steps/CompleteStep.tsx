@@ -1,0 +1,50 @@
+interface CompleteStepProps {
+  focusedButtonIndex: number;
+  buttonRefs: { current: (HTMLButtonElement | null)[] };
+  onComplete: () => void;
+}
+
+export function CompleteStep({ focusedButtonIndex, buttonRefs, onComplete }: CompleteStepProps) {
+  return (
+    <div className="space-y-6 text-center">
+      <div className="flex justify-center">
+        <div className="w-24 h-24 rounded-full bg-green-600 flex items-center justify-center">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="h-12 w-12 text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
+        </div>
+      </div>
+
+      <h3 className="text-3xl font-bold text-white">Configuration terminée !</h3>
+      
+      <p className="text-lg text-gray-400">
+        Votre client Popcorn est maintenant configuré et prêt à l'emploi.
+      </p>
+
+      <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
+        <p className="text-white">
+          Vous pouvez maintenant commencer à utiliser Popcorn pour rechercher et regarder vos contenus préférés.
+        </p>
+      </div>
+
+      <button
+        ref={(el) => { buttonRefs.current[0] = el; }}
+        className="px-8 py-4 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors text-lg"
+        onClick={onComplete}
+      >
+        Accéder au dashboard
+      </button>
+    </div>
+  );
+}

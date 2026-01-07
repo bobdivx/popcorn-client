@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { serverApi } from '../lib/client/server-api';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
@@ -12,36 +13,29 @@ export default function LoginForm() {
     setIsLoading(true);
 
     try {
-      // TODO: Implémenter l'authentification complète
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ email, password }),
-      });
+      const response = await serverApi.login(email, password);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || 'Erreur de connexion');
+      if (!response.success) {
+        // Messages d'erreur plus explicites
+        let errorMessage = response.message || response.error || 'Erreur de connexion';
+        
+        if (response.error === 'DatabaseError' || errorMessage.includes('Base de données non configurée')) {
+          errorMessage = 'Le serveur n\'a pas de base de données configurée. Veuillez contacter l\'administrateur du serveur.';
+        } else if (response.error === 'InvalidCredentials') {
+          errorMessage = 'Email ou mot de passe incorrect';
+        } else if (errorMessage.includes('500') || errorMessage.includes('Internal Server Error')) {
+          errorMessage = 'Erreur serveur. Le serveur n\'est peut-être pas correctement configuré.';
+        }
+        
+        setError(errorMessage);
         setIsLoading(false);
         return;
       }
 
-      // Connexion réussie - sauvegarder les tokens
-      if (data.accessToken) {
-        localStorage.setItem('accessToken', data.accessToken);
-      }
-      if (data.refreshToken) {
-        localStorage.setItem('refreshToken', data.refreshToken);
-      }
-
-      // Rediriger vers le dashboard
+      // Connexion réussie - rediriger vers le dashboard
       window.location.href = '/dashboard';
     } catch (err) {
-      setError('Erreur de connexion. Vérifiez votre connexion réseau.');
+      setError('Erreur de connexion. Vérifiez votre connexion réseau et l\'URL du serveur dans les paramètres.');
       console.error('Erreur:', err);
     } finally {
       setIsLoading(false);
@@ -69,6 +63,7 @@ export default function LoginForm() {
             placeholder="votre@email.com"
             required
             autoFocus
+            autocomplete="email"
           />
         </div>
         <div className="mb-4 sm:mb-6">
@@ -82,6 +77,7 @@ export default function LoginForm() {
             onInput={(e) => setPassword((e.target as HTMLInputElement).value)}
             placeholder="Votre mot de passe"
             required
+            autocomplete="current-password"
           />
         </div>
         <button

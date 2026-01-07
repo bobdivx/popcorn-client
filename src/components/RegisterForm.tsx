@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { serverApi } from '../lib/client/server-api';
 
 interface RegisterFormData {
   email: string;
@@ -37,24 +38,24 @@ export default function RegisterForm() {
     setIsLoading(true);
 
     try {
-      // Inscription avec validation du code de parrainage
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-          inviteCode: formData.inviteCode,
-        }),
-      });
+      // Inscription via l'API serveur
+      const response = await serverApi.register(
+        formData.email,
+        formData.password,
+        formData.inviteCode
+      );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || 'Erreur lors de l\'inscription');
+      if (!response.success) {
+        // Messages d'erreur plus explicites
+        let errorMessage = response.message || response.error || 'Erreur lors de l\'inscription';
+        
+        if (response.error === 'DatabaseError' || errorMessage.includes('Base de données non configurée')) {
+          errorMessage = 'Le serveur n\'a pas de base de données configurée. Veuillez contacter l\'administrateur du serveur.';
+        } else if (errorMessage.includes('500') || errorMessage.includes('Internal Server Error')) {
+          errorMessage = 'Erreur serveur. Le serveur n\'est peut-être pas correctement configuré.';
+        }
+        
+        setError(errorMessage);
         setIsLoading(false);
         return;
       }
@@ -65,7 +66,7 @@ export default function RegisterForm() {
         window.location.href = '/login';
       }, 1500);
     } catch (err) {
-      setError('Une erreur est survenue. Veuillez réessayer.');
+      setError('Erreur de connexion. Vérifiez votre connexion réseau et l\'URL du serveur dans les paramètres.');
       console.error('Erreur:', err);
     } finally {
       setIsLoading(false);
@@ -119,6 +120,7 @@ export default function RegisterForm() {
             onInput={(e) => handleChange('email')(e)}
             placeholder="votre@email.com"
             required
+            autocomplete="email"
           />
         </div>
         <div className="mb-3 sm:mb-4">
@@ -132,6 +134,7 @@ export default function RegisterForm() {
             onInput={(e) => handleChange('password')(e)}
             placeholder="Au moins 8 caractères"
             required
+            autocomplete="new-password"
           />
         </div>
         <div className="mb-4 sm:mb-6">
@@ -145,6 +148,7 @@ export default function RegisterForm() {
             onInput={(e) => handleChange('confirmPassword')(e)}
             placeholder="Confirmez votre mot de passe"
             required
+            autocomplete="new-password"
           />
         </div>
         <button

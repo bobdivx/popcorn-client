@@ -1,88 +1,141 @@
-# popcorn-vercel
+# Popcorn Client - Application Client Léger
 
-Application d'authentification basique pour Popcorn, déployée sur Vercel.
+Application client légère pour se connecter au serveur Popcorn distant. **Aucun backend intégré, aucune dépendance Docker.**
 
-## Description
+## 🎯 Architecture
 
-Application Astro avec Preact pour la gestion de l'authentification via codes de parrainage. Utilise Turso (LibSQL) comme base de données.
+Cette application est un **client léger pur** qui :
 
-## Fonctionnalités
+- ✅ Affiche l'interface utilisateur (Astro + Preact)
+- ✅ Communique avec le serveur Popcorn via API REST
+- ✅ Gère l'authentification et les tokens JWT
+- ✅ Chiffre/déchiffre les métadonnées sensibles (E2E côté client)
+- ❌ **NE contient PAS** de logique métier (torrents, indexers, streaming)
+- ❌ **NE contient PAS** de backend intégré
+- ❌ **NE nécessite PAS** Docker
 
-- Page de login avec formulaire (email, password, code de parrainage)
-- Validation du code de parrainage via API
-- Connexion à Turso pour valider les codes
-- Design moderne avec Tailwind CSS
+Toute la logique métier est gérée par le serveur `popcorn` distant.
 
-## Installation
+## 📦 Formats de déploiement
+
+- **Desktop** : Application Tauri (Windows, Linux, macOS)
+- **Web** : Site Astro déployable sur Vercel
+- **Android** : Application Tauri (TV et Mobile)
+
+## 🚀 Installation
 
 ```bash
 npm install
 ```
 
-## Configuration
+## 🔧 Configuration
 
-Créez un fichier `.env` à la racine du projet avec les variables suivantes :
+### Variables d'environnement
+
+Créez un fichier `.env` à la racine :
 
 ```env
-TURSO_DATABASE_URL=libsql://votre-database-url.turso.io
-TURSO_AUTH_TOKEN=votre-auth-token
-JWT_SECRET=votre-jwt-secret-optionnel
+# URL du serveur Popcorn (OBLIGATOIRE)
+PUBLIC_SERVER_URL=http://10.1.0.86:8080
 ```
 
-**Important :**
-- Le fichier `.env` doit être à la racine du projet (`D:\Github\popcorn-vercel\.env`)
-- Pas d'espaces autour du signe `=`
-- Pas de guillemets autour des valeurs
-- Redémarrez le serveur de développement après avoir créé/modifié le fichier `.env`
+**Note** : Vous pouvez aussi configurer l'URL du serveur dans l'interface (page Paramètres).
 
-## Développement
+### Ports par défaut
+
+- **Serveur Popcorn (backend)** : Port `8080` (par défaut)
+- **Client Astro (dev web)** : Port `4321` (uniquement pour le développement web)
+
+## 💻 Développement
+
+### Mode développement web
 
 ```bash
 npm run dev
 ```
 
-L'application sera accessible sur `http://localhost:4321`
+Ouvre `http://localhost:4321`
 
-## Build
+### Mode développement desktop (Tauri)
+
+```bash
+npm run tauri:dev
+```
+
+Ouvre l'application desktop avec hot reload.
+
+## 🏗️ Build
+
+### Desktop (Windows)
+
+```bash
+npm run tauri:build:windows
+```
+
+L'application sera générée dans :
+- `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/`
+- `src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/`
+
+### Web (Vercel)
 
 ```bash
 npm run build
 ```
 
-## Déploiement
+Déployez le dossier `dist/` sur Vercel.
 
-L'application est configurée pour être déployée sur Vercel avec l'adapter serverless.
+### Android
 
-## Structure
+```bash
+# Android TV
+npm run tauri:build:android-tv
+
+# Android Mobile
+npm run tauri:build:android-mobile
+```
+
+## 📁 Structure
 
 ```
 popcorn-vercel/
-├── public/
-│   └── favicon.svg            # Favicon de l'application
+├── src-tauri/          # Configuration Tauri (desktop/mobile)
+│   ├── src/main.rs     # Point d'entrée Rust (minimal)
+│   └── tauri.conf.json # Configuration Tauri
 ├── src/
-│   ├── components/
-│   │   └── LoginForm.tsx      # Composant Preact pour le formulaire de login
-│   ├── layouts/
-│   │   └── Layout.astro       # Layout de base
 │   ├── lib/
-│   │   └── db/
-│   │       └── turso.ts       # Connexion à Turso
-│   └── pages/
-│       ├── index.astro        # Redirige vers /login
-│       ├── login.astro        # Page de login
-│       └── api/
-│           └── invites/
-│               └── validate.ts  # API de validation du code de parrainage
-├── astro.config.mjs          # Configuration Astro avec adapter Vercel
-├── package.json              # Dépendances et scripts
-├── tailwind.config.mjs       # Configuration Tailwind CSS
-└── tsconfig.json             # Configuration TypeScript
+│   │   ├── client/     # Client API REST (server-api.ts)
+│   │   ├── encryption/ # Chiffrement E2E (e2e.ts)
+│   │   └── storage/    # Stockage local (storage.ts)
+│   ├── components/     # Composants Preact
+│   └── pages/          # Pages Astro
+└── package.json
 ```
 
-## Technologies
+## 🔐 Sécurité
 
-- [Astro](https://astro.build/) - Framework web
-- [Preact](https://preactjs.com/) - Framework UI
-- [Tailwind CSS](https://tailwindcss.com/) - Framework CSS
-- [Turso](https://turso.tech/) - Base de données LibSQL
-- [Vercel](https://vercel.com/) - Plateforme de déploiement
+- **Authentification** : JWT (access + refresh tokens)
+- **Chiffrement E2E** : WebCrypto API pour les métadonnées sensibles
+- **Stockage local** : localStorage pour les tokens et préférences
+
+## ⚠️ Important
+
+- **Connexion serveur requise** : L'application doit se connecter au serveur `popcorn` distant
+- **Pas de backend** : Aucune logique serveur dans ce projet
+- **Taille réduite** : ~30-50MB (vs ~100MB+ pour le serveur complet)
+
+## 📚 Documentation
+
+- [Configuration des variables d'environnement](./README-ENV.md)
+- [Instructions de build desktop](./BUILD_INSTRUCTIONS.md)
+- [Guide de démarrage rapide desktop](./QUICK_START_DESKTOP.md)
+
+## 🆚 Différences avec popcorn (serveur)
+
+| Aspect | popcorn (serveur) | popcorn-vercel (client) |
+|--------|-------------------|-------------------------|
+| Backend intégré | ✅ Oui (librqbit) | ❌ Non |
+| Docker requis | ✅ Oui | ❌ Non |
+| Base de données | ✅ Turso/SQLite | ❌ Non |
+| Authentification serveur | ✅ Oui | ❌ Non |
+| Taille | ~100MB+ | ~30-50MB |
+| Usage | Serveur complet | Client léger uniquement |

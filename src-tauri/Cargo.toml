@@ -1,0 +1,26 @@
+[package]
+name = "popcorn-vercel-client"
+version = "0.1.0"
+description = "Popcorn Client Léger - Application Tauri"
+authors = ["you"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.70"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-process = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-http = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[features]
+# Cette fonctionnalité est utilisée pour la production ou quand `devPath` n'est pas défini
+custom-protocol = ["tauri/custom-protocol"]

@@ -1,0 +1,23 @@
+---
+import '../styles/global.css';
+import Header from '../components/Header';
+import Search from '../components/Search';
+---
+
+<!doctype html>
+<html lang="fr" data-theme="dark" class="overflow-x-hidden">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content="Recherche - Popcorn" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/popcorn_logo.png" />
+    <title>Recherche - Popcorn</title>
+  </head>
+  <body class="min-h-screen bg-black text-white flex flex-col">
+    <Header client:load />
+    <main class="flex-1 container mx-auto px-4 py-8">
+      <h1 class="text-3xl font-bold mb-6">Rechercher</h1>
+      <Search client:only="preact" />
+    </main>
+  </body>
+</html>

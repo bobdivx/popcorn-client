@@ -1,0 +1,25 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ServerSettings from '../../components/settings/ServerSettings';
+---
+
+<Layout title="Configuration du Serveur - Popcorn Client">
+  <div class="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
+    <div class="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-8 sm:py-10 md:py-12">
+      <div class="mb-6 sm:mb-8 md:mb-10">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-6 mb-4 sm:mb-6">
+          <h1 class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white">Configuration du Serveur</h1>
+          <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4 w-full sm:w-auto">
+            <a href="/settings/account" class="btn btn-ghost text-xs sm:text-sm md:text-base lg:text-lg px-3 sm:px-4 md:px-6 py-2 sm:py-3 min-h-[44px] sm:min-h-[48px] focus:outline-none focus:ring-4 focus:ring-red-500 focus:ring-opacity-50 hover:bg-base-200 transition-colors">👤 Mon compte</a>
+            <a href="/settings" class="btn btn-ghost text-xs sm:text-sm md:text-base lg:text-lg px-3 sm:px-4 md:px-6 py-2 sm:py-3 min-h-[44px] sm:min-h-[48px] focus:outline-none focus:ring-4 focus:ring-red-500 focus:ring-opacity-50 hover:bg-base-200 transition-colors">← Retour</a>
+          </div>
+        </div>
+        <p class="text-gray-400 text-xs sm:text-sm md:text-base lg:text-lg">Configurez l'URL du serveur Popcorn auquel se connecter</p>
+      </div>
+
+      <div class="space-y-8 sm:space-y-10 md:space-y-12">
+        <ServerSettings client:only="preact" />
+      </div>
+    </div>
+  </div>
+</Layout>

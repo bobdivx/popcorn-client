@@ -1,0 +1,8 @@
+---
+import Layout from '../layouts/Layout.astro';
+import FilmsDashboard from '../components/dashboard/FilmsDashboard';
+---
+
+<Layout title="Films - Popcorn Client">
+  <FilmsDashboard client:only="preact" />
+</Layout>

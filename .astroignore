@@ -1,0 +1,6 @@
+# Fichiers à ignorer pour le build Astro
+# En mode Tauri, les routes API ne sont pas nécessaires car le client communique directement avec le serveur distant
+
+# Routes API (uniquement pour le build Tauri)
+# Ces routes sont utilisées pour Vercel mais pas pour Tauri
+# Note: Cette exclusion est gérée par astro.config.mjs en mode Tauri
