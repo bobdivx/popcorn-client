@@ -50,6 +50,8 @@ export default defineConfig({
         },
         // Utiliser protocolImports pour inclure automatiquement d'autres polyfills
         protocolImports: true,
+        // Inclure les dépendances de readable-stream
+        excludeAliases: [],
       }),
     ],
     resolve: {
@@ -58,6 +60,12 @@ export default defineConfig({
       alias: {
         '@tauri-apps/plugin-dialog': path.resolve(__dirname, 'src/lib/stubs/tauri-dialog.ts'),
         '@tauri-apps/api': path.resolve(__dirname, 'src/lib/stubs/tauri-api.ts'),
+                // Stub pour fs dans le navigateur
+                'fs': path.resolve(__dirname, 'src/lib/torrent/stubs/fs.ts'),
+                // Stub pour bittorrent-dht (non disponible dans le navigateur)
+                'bittorrent-dht': path.resolve(__dirname, 'src/lib/torrent/stubs/bittorrent-dht.ts'),
+                // Stub pour net (non disponible dans le navigateur)
+                'net': path.resolve(__dirname, 'src/lib/torrent/stubs/net.ts'),
       },
     },
     // Exclure explicitement les routes API si elles existent encore
@@ -68,7 +76,8 @@ export default defineConfig({
     },
     build: {
       rollupOptions: {
-        // Ne pas externaliser - utiliser les alias à la place
+        // Ne pas externaliser fs - utiliser le stub à la place
+        external: [],
       },
       commonjsOptions: {
         transformMixedEsModules: true,
@@ -93,7 +102,8 @@ export default defineConfig({
     },
     define: {
       global: 'globalThis',
-      'process.env': {},
+      'process.env': '{}',
+      'process.browser': 'true',
     },
   },
 });

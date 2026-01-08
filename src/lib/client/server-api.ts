@@ -238,9 +238,45 @@ class ServerApiClient {
       };
     }
 
+    // Log pour debug : voir la structure de la réponse AVANT transformation
+    if (typeof window !== 'undefined' && response.url?.includes('/api/torrents/group/')) {
+      console.log('[server-api] handleResponse AVANT transformation pour /api/torrents/group:', {
+        url: response.url,
+        originalData: data,
+        hasData: !!data.data,
+        hasSuccess: !!data.success,
+        dataType: typeof data.data,
+        dataKeys: data.data ? Object.keys(data.data) : [],
+        originalDataKeys: Object.keys(data),
+        fullOriginalData: JSON.stringify(data, null, 2),
+      });
+    }
+
+    // Gérer la double imbrication : si data.data existe et contient success, utiliser data.data
+    // Sinon, utiliser data directement
+    let responseData = data.data || data;
+    
+    // Si responseData contient success et data, c'est une double imbrication
+    if (responseData && typeof responseData === 'object' && 'success' in responseData && 'data' in responseData) {
+      responseData = responseData.data || responseData;
+    }
+    
+    // Log pour debug : voir la structure de la réponse APRÈS transformation
+    if (typeof window !== 'undefined' && response.url?.includes('/api/torrents/group/')) {
+      console.log('[server-api] handleResponse APRÈS transformation pour /api/torrents/group:', {
+        responseData,
+        hasVariants: !!(responseData as any)?.variants,
+        hasTorrents: !!(responseData as any)?.torrents,
+        variantsCount: (responseData as any)?.variants?.length,
+        torrentsCount: (responseData as any)?.torrents?.length,
+        responseDataKeys: responseData ? Object.keys(responseData) : [],
+        fullResponseData: JSON.stringify(responseData, null, 2),
+      });
+    }
+
     return {
       success: true,
-      data: data.data || data,
+      data: responseData,
     };
   }
 

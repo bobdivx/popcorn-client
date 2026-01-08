@@ -143,6 +143,16 @@ export default function Navbar() {
                 Séries
               </a>
               <a 
+                href="/downloads" 
+                className={`text-base lg:text-lg xl:text-xl font-medium transition-all duration-300 hover:text-white focus:outline-none rounded-lg px-4 lg:px-6 py-2 lg:py-3 relative ${
+                  isActive('/downloads') 
+                    ? 'text-white font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-1 after:bg-red-600 after:rounded-full' 
+                    : 'text-gray-300 hover:text-white'
+                } focus:ring-4 focus:ring-red-600 focus:ring-opacity-50 focus:bg-white/10`}
+              >
+                Téléchargements
+              </a>
+              <a 
                 href="/settings" 
                 className={`text-base lg:text-lg xl:text-xl font-medium transition-all duration-300 hover:text-white focus:outline-none rounded-lg px-4 lg:px-6 py-2 lg:py-3 relative ${
                   isActive('/settings') 
@@ -254,6 +264,17 @@ export default function Navbar() {
                           }`}
                         >
                           <span className="font-medium">Séries</span>
+                        </a>
+                      </li>
+                      <li>
+                        <a
+                          href="/downloads"
+                          onClick={closeMenu}
+                          className={`flex items-center gap-3 px-4 py-3 text-white transition-colors hover:bg-gray-900 ${
+                            isActive('/downloads') ? 'bg-gray-900 border-l-4 border-red-600' : ''
+                          }`}
+                        >
+                          <span className="font-medium">Téléchargements</span>
                         </a>
                       </li>
                       <li>

@@ -31,20 +31,47 @@ function pickBestTorrentFromGroupPayload(payload: any): Torrent | null {
   // - { success, torrents: [...] }
   // - { success, data: { torrents: [...] } }
   // - { success, data: { variants: [...] } }
+  // - { success, data: { success, data: { torrents: [...] } } } (double imbrication)
+  // - { success, data: { success, data: { variants: [...] } } } (double imbrication)
+  
+  // Gérer la double imbrication (data.data)
+  let data = payload?.data;
+  if (data && data.success && data.data) {
+    data = data.data;
+  }
+  
   const torrents =
     payload?.torrents ??
-    payload?.data?.torrents ??
-    payload?.data?.variants ??
-    payload?.data?.items ??
-    payload?.data;
+    data?.torrents ??
+    data?.variants ??
+    data?.items ??
+    data;
 
   if (Array.isArray(torrents) && torrents.length > 0) {
-    return torrents.slice().sort((a: any, b: any) => normalizeSeedCount(b) - normalizeSeedCount(a))[0] as Torrent;
+    const best = torrents.slice().sort((a: any, b: any) => normalizeSeedCount(b) - normalizeSeedCount(a))[0] as Torrent;
+    // Log pour debug
+    console.log('[MediaDetailRoute] Meilleur torrent sélectionné:', {
+      id: best.id,
+      name: best.name,
+      hasExternalLink: !!(best as any)._externalLink,
+      externalLink: (best as any)._externalLink,
+      hasExternalMagnetUri: !!(best as any)._externalMagnetUri,
+    });
+    return best;
   }
 
   // Si la donnée est déjà un torrent unique
   if (torrents && typeof torrents === 'object' && (torrents.infoHash || torrents.info_hash || torrents.id)) {
-    return torrents as Torrent;
+    const torrent = torrents as Torrent;
+    // Log pour debug
+    console.log('[MediaDetailRoute] Torrent unique:', {
+      id: torrent.id,
+      name: torrent.name,
+      hasExternalLink: !!(torrent as any)._externalLink,
+      externalLink: (torrent as any)._externalLink,
+      hasExternalMagnetUri: !!(torrent as any)._externalMagnetUri,
+    });
+    return torrent;
   }
 
   return null;
@@ -73,9 +100,26 @@ export default function MediaDetailRoute() {
       try {
         // 1) Essayer group/<slug> via serverApi (gère automatiquement l'auth et le refresh token)
         const groupResponse = await serverApi.getTorrentGroup(contentId);
+        console.log('[MediaDetailRoute] Réponse getTorrentGroup complète:', JSON.stringify(groupResponse, null, 2));
         if (groupResponse.success && groupResponse.data) {
+          const data = groupResponse.data as any;
+          console.log('[MediaDetailRoute] Structure data:', {
+            hasVariants: !!data.variants,
+            variantsCount: data.variants?.length,
+            variants: data.variants,
+            variantCount: data.variant_count,
+            slug: data.slug,
+            mainTitle: data.main_title,
+          });
           const best = pickBestTorrentFromGroupPayload(groupResponse);
           if (best && !cancelled) {
+            console.log('[MediaDetailRoute] Torrent final sélectionné:', {
+              id: best.id,
+              name: best.name,
+              hasExternalLink: !!(best as any)._externalLink,
+              externalLink: (best as any)._externalLink,
+              hasExternalMagnetUri: !!(best as any)._externalMagnetUri,
+            });
             setTorrent(best);
             setLoading(false);
             return;

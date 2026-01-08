@@ -1,4 +1,5 @@
 import { webtorrentClient } from '../../../../../lib/torrent/webtorrent-client';
+import { serverApi } from '../../../../../lib/client/server-api';
 import { PROGRESS_POLL_INTERVAL_MS } from '../../utils/constants';
 import type { PlayHandlerContext } from './types';
 
@@ -35,8 +36,350 @@ export function createHandlePlay(context: PlayHandlerContext) {
       hasMagnetLink,
     });
 
-    // Si on a déjà un infoHash, vérifier d'abord si les fichiers vidéo existent
-    if (hasInfoHash && torrent.infoHash) {
+    // Pour un torrent externe avec infoHash, prioriser le fichier .torrent s'il est disponible
+    // car il contient tous les trackers (important pour les trackers privés comme C411)
+    if (isExternal && hasInfoHash && torrent.infoHash) {
+      addDebugLog('info', '🔍 Vérification des liens disponibles', {
+        hasExternalLink: !!torrent._externalLink,
+        externalLink: torrent._externalLink ? (torrent._externalLink.substring(0, 100) + '...') : null,
+        hasExternalMagnetUri: !!torrent._externalMagnetUri,
+        isMagnet: torrent._externalLink?.startsWith('magnet:') || false,
+      });
+      
+      // PRIORITÉ 1: Vérifier si on a un fichier .torrent disponible (_externalLink qui n'est pas un magnet link)
+      if (torrent._externalLink && torrent._externalLink.trim() && !torrent._externalLink.startsWith('magnet:')) {
+        addDebugLog('info', '📥 Téléchargement du fichier .torrent depuis l\'API (contient les trackers)', {
+          externalLink: torrent._externalLink,
+          infoHash: torrent.infoHash,
+        });
+        
+        setPlayStatus('adding');
+        setProgressMessage('Téléchargement du fichier torrent...');
+
+        try {
+          // Télécharger le fichier .torrent via le backend comme proxy
+          // (pour éviter les problèmes CORS avec les trackers externes comme C411)
+          const baseUrl = serverApi.getServerUrl();
+          const token = serverApi.getAccessToken();
+          const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+          
+          // Toujours utiliser le backend comme proxy pour éviter les problèmes CORS
+          // Le backend fera la requête côté serveur et renverra le fichier .torrent
+          // Passer indexerId et indexerName si disponibles pour que le backend utilise Jackett correctement
+          const indexerId = (torrent as any).indexerId || (torrent as any).indexer_id;
+          const indexerName = (torrent as any).indexerName || (torrent as any).indexer_name;
+          const indexerIdParam = indexerId ? `&indexerId=${encodeURIComponent(indexerId)}` : '';
+          const indexerNameParam = indexerName ? `&indexerName=${encodeURIComponent(indexerName)}` : '';
+          const downloadUrl = `${baseUrl}/api/torrents/external/download?url=${encodeURIComponent(torrent._externalLink)}&torrentName=${encodeURIComponent(torrent.name)}${indexerIdParam}${indexerNameParam}`;
+          
+          addDebugLog('info', '📥 URL de téléchargement via proxy backend:', { 
+            downloadUrl, 
+            originalUrl: torrent._externalLink,
+            indexerId,
+            indexerName,
+          });
+          const response = await fetch(downloadUrl, { headers });
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            // Si l'API retourne un magnet link en cas d'erreur, l'utiliser
+            if (errorData.isMagnet && errorData.magnetUri) {
+              addDebugLog('info', '📥 L\'API a retourné un magnet link (fallback)', { magnetUri: errorData.magnetUri });
+              const addResult = await webtorrentClient.addMagnetLink(errorData.magnetUri, torrent.name);
+              if (addResult.info_hash) {
+                setPlayStatus('adding');
+                setProgressMessage('Récupération des métadonnées...');
+                addDebugLog('info', '✅ Torrent ajouté via magnet link, attente des métadonnées...', {
+                  infoHash: addResult.info_hash,
+                });
+
+                let retryCount = 0;
+                const maxRetries = 30;
+                
+                const checkMetadata = async () => {
+                  try {
+                    const stats = await webtorrentClient.getTorrent(addResult.info_hash);
+                    const hasMetadata = stats && stats.total_bytes > 0;
+                    const files = webtorrentClient.getTorrentFiles(addResult.info_hash);
+                    const hasFiles = files.length > 0;
+                    
+                    if (hasMetadata || hasFiles) {
+                      addDebugLog('success', '✅ Métadonnées disponibles', {
+                        total_bytes: stats?.total_bytes || 0,
+                        files_count: files.length,
+                      });
+                      
+                      setPlayStatus('downloading');
+                      setProgressMessage('Recherche de peers...');
+                      
+                      const videos = await loadVideoFiles(addResult.info_hash);
+                      if (videos.length > 0) {
+                        addDebugLog('success', '✅ Fichiers vidéo trouvés', { files_count: videos.length });
+                        setVideoFiles(videos);
+                        setSelectedFile(videos[0]);
+                      }
+                      
+                      progressPollIntervalRef.current = window.setInterval(() => {
+                        pollTorrentProgress(addResult.info_hash);
+                      }, PROGRESS_POLL_INTERVAL_MS);
+                      pollTorrentProgress(addResult.info_hash);
+                    } else if (retryCount < maxRetries) {
+                      retryCount++;
+                      setProgressMessage(`Récupération des métadonnées... (${retryCount}/${maxRetries})`);
+                      setTimeout(checkMetadata, 1000);
+                    } else {
+                      addDebugLog('warning', '⚠️ Timeout: Métadonnées non disponibles après 30 secondes');
+                      setPlayStatus('downloading');
+                      setProgressMessage('Recherche de peers...');
+                      progressPollIntervalRef.current = window.setInterval(() => {
+                        pollTorrentProgress(addResult.info_hash);
+                      }, PROGRESS_POLL_INTERVAL_MS);
+                      pollTorrentProgress(addResult.info_hash);
+                    }
+                  } catch (err) {
+                    console.error('Erreur lors de la vérification des métadonnées:', err);
+                    if (retryCount < maxRetries) {
+                      retryCount++;
+                      setTimeout(checkMetadata, 1000);
+                    } else {
+                      setPlayStatus('downloading');
+                      setProgressMessage('Recherche de peers...');
+                      progressPollIntervalRef.current = window.setInterval(() => {
+                        pollTorrentProgress(addResult.info_hash);
+                      }, PROGRESS_POLL_INTERVAL_MS);
+                      pollTorrentProgress(addResult.info_hash);
+                    }
+                  }
+                };
+                
+                setTimeout(checkMetadata, 500);
+                return;
+              }
+            }
+            throw new Error(errorData.error || `Erreur ${response.status} lors du téléchargement du fichier torrent`);
+          }
+
+          // Télécharger le fichier .torrent et l'ajouter
+          const blob = await response.blob();
+          
+          // Vérifier que c'est un fichier torrent valide avant de l'ajouter
+          const arrayBuffer = await blob.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          
+          addDebugLog('info', '📄 Vérification du fichier téléchargé:', {
+            fileSize: blob.size,
+            firstByte: uint8Array[0],
+            firstBytes: Array.from(uint8Array.slice(0, 10)),
+            contentType: response.headers.get('content-type'),
+            expectedFirstByte: 0x64, // 'd' pour Bencode dictionary
+            isTorrent: uint8Array.length > 0 && uint8Array[0] === 0x64,
+          });
+          
+          // Vérifier que c'est un fichier torrent valide
+          if (uint8Array.length === 0 || uint8Array[0] !== 0x64) {
+            const firstBytes = String.fromCharCode(...uint8Array.slice(0, Math.min(100, uint8Array.length)));
+            addDebugLog('error', '❌ Fichier téléchargé n\'est pas un torrent valide:', {
+              size: uint8Array.length,
+              firstByte: uint8Array[0],
+              firstChars: firstBytes.substring(0, 100),
+              isHTML: firstBytes.includes('<html') || firstBytes.includes('<!DOCTYPE'),
+            });
+            
+            if (firstBytes.includes('<html') || firstBytes.includes('<!DOCTYPE')) {
+              throw new Error('La réponse est une page HTML, pas un fichier torrent. L\'URL nécessite probablement une authentification C411 via l\'API Torznab.');
+            } else {
+              throw new Error(`Le fichier téléchargé n'est pas un fichier torrent valide. Premier octet: ${uint8Array[0]} (0x${uint8Array[0].toString(16)}), attendu: 100 (0x64, 'd' pour Bencode).`);
+            }
+          }
+          
+          const torrentFile = new File([blob], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
+          
+          addDebugLog('success', '✅ Fichier .torrent téléchargé et validé, ajout au client...', {
+            fileSize: blob.size,
+            infoHash: torrent.infoHash,
+            firstByte: uint8Array[0],
+          });
+          
+          setPlayStatus('adding');
+          setProgressMessage('Ajout du fichier torrent...');
+          
+          const addResult = await webtorrentClient.addTorrentFile(torrentFile);
+          if (addResult.info_hash) {
+            setPlayStatus('downloading');
+            setProgressMessage('Recherche de peers...');
+            addDebugLog('success', '✅ Fichier .torrent ajouté avec succès', {
+              infoHash: addResult.info_hash,
+              note: 'Le fichier .torrent contient tous les trackers (y compris privés comme C411)',
+            });
+            
+            // Les métadonnées sont généralement immédiatement disponibles avec un fichier .torrent
+            const videos = await loadVideoFiles(addResult.info_hash);
+            if (videos.length > 0) {
+              addDebugLog('success', '✅ Fichiers vidéo trouvés', {
+                files_count: videos.length,
+              });
+              setVideoFiles(videos);
+              setSelectedFile(videos[0]);
+            } else {
+              // Même avec un fichier .torrent, parfois les fichiers ne sont pas immédiatement disponibles
+              addDebugLog('info', '⏳ Fichiers vidéo non encore disponibles, démarrage du polling...');
+            }
+            
+            progressPollIntervalRef.current = window.setInterval(() => {
+              pollTorrentProgress(addResult.info_hash);
+            }, PROGRESS_POLL_INTERVAL_MS);
+            pollTorrentProgress(addResult.info_hash);
+            
+            return;
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          addDebugLog('warning', '⚠️ Erreur lors du téléchargement du fichier .torrent, tentative avec magnet link...', {
+            error: errorMsg,
+          });
+          // Continuer avec le magnet link en fallback
+        }
+      }
+      
+      // PRIORITÉ 2: Vérifier si on a un magnet link (direct ou dans _externalLink)
+      const magnetUri = torrent._externalMagnetUri || 
+        (torrent._externalLink && torrent._externalLink.startsWith('magnet:') 
+          ? torrent._externalLink 
+          : null);
+      
+      if (magnetUri) {
+        addDebugLog('info', '🔨 Construction du magnet link à partir de l\'infoHash (fallback)', {
+          infoHash: torrent.infoHash,
+          note: '⚠️ Les trackers peuvent ne pas être disponibles dans le magnet link construit',
+        });
+        const constructedMagnet = `magnet:?xt=urn:btih:${torrent.infoHash}&dn=${encodeURIComponent(torrent.name)}`;
+        
+        setPlayStatus('adding');
+        setProgressMessage('Ajout du torrent via infoHash...');
+
+        try {
+          const addResult = await webtorrentClient.addMagnetLink(constructedMagnet, torrent.name);
+          if (addResult.info_hash) {
+            setPlayStatus('adding');
+            setProgressMessage('Récupération des métadonnées...');
+            addDebugLog('info', '✅ Torrent ajouté, attente des métadonnées...', {
+              infoHash: addResult.info_hash,
+            });
+
+            // Attendre que les métadonnées soient disponibles avant de démarrer le polling
+            // Réessayer toutes les secondes jusqu'à ce que les fichiers soient disponibles
+            let retryCount = 0;
+            const maxRetries = 30; // 30 secondes maximum
+            
+            const checkMetadata = async () => {
+              try {
+                const stats = await webtorrentClient.getTorrent(addResult.info_hash);
+                
+                // Vérifier si les métadonnées sont disponibles (total_bytes > 0 ou fichiers disponibles)
+                const hasMetadata = stats && stats.total_bytes > 0;
+                const files = webtorrentClient.getTorrentFiles(addResult.info_hash);
+                const hasFiles = files.length > 0;
+                
+                if (hasMetadata || hasFiles) {
+                  // Les métadonnées sont disponibles, essayer de charger les fichiers
+                  addDebugLog('success', '✅ Métadonnées disponibles', {
+                    total_bytes: stats?.total_bytes || 0,
+                    files_count: files.length,
+                    hasMetadata,
+                    hasFiles,
+                  });
+                  
+                  setPlayStatus('downloading');
+                  setProgressMessage('Recherche de peers...');
+                  
+                  // Essayer de charger les fichiers (peut prendre un peu de temps si pas encore prêts)
+                  const videos = await loadVideoFiles(addResult.info_hash);
+                  if (videos.length > 0) {
+                    addDebugLog('success', '✅ Fichiers vidéo trouvés', {
+                      files_count: videos.length,
+                    });
+                    setVideoFiles(videos);
+                    setSelectedFile(videos[0]);
+                  } else if (hasFiles) {
+                    // On a des fichiers mais pas encore de vidéo, réessayer après 1 seconde
+                    addDebugLog('info', '⏳ Fichiers disponibles mais pas encore de vidéo, réessai...', {
+                      files_count: files.length,
+                    });
+                    if (retryCount < maxRetries) {
+                      retryCount++;
+                      setTimeout(checkMetadata, 1000);
+                      return;
+                    }
+                  }
+                  
+                  // Démarrer le polling
+                  progressPollIntervalRef.current = window.setInterval(() => {
+                    pollTorrentProgress(addResult.info_hash);
+                  }, PROGRESS_POLL_INTERVAL_MS);
+                  pollTorrentProgress(addResult.info_hash);
+                } else if (retryCount < maxRetries) {
+                  // Pas encore de métadonnées, réessayer
+                  retryCount++;
+                  const remaining = maxRetries - retryCount;
+                  setProgressMessage(`Récupération des métadonnées... (${retryCount}/${maxRetries})`);
+                  addDebugLog('info', `⏳ En attente des métadonnées... (${retryCount}/${maxRetries})`, {
+                    infoHash: addResult.info_hash,
+                    peers: stats?.peers_connected || 0,
+                  });
+                  setTimeout(checkMetadata, 1000);
+                } else {
+                  // Timeout après 30 secondes
+                  addDebugLog('warning', '⚠️ Timeout: Métadonnées non disponibles après 30 secondes, démarrage du polling quand même', {
+                    infoHash: addResult.info_hash,
+                    total_bytes: stats?.total_bytes || 0,
+                    peers: stats?.peers_connected || 0,
+                  });
+                  setPlayStatus('downloading');
+                  setProgressMessage('Recherche de peers...');
+                  // Démarrer le polling quand même, il pourra récupérer les fichiers plus tard
+                  progressPollIntervalRef.current = window.setInterval(() => {
+                    pollTorrentProgress(addResult.info_hash);
+                  }, PROGRESS_POLL_INTERVAL_MS);
+                  pollTorrentProgress(addResult.info_hash);
+                }
+              } catch (err) {
+                console.error('Erreur lors de la vérification des métadonnées:', err);
+                if (retryCount < maxRetries) {
+                  retryCount++;
+                  setProgressMessage(`Récupération des métadonnées... (${retryCount}/${maxRetries})`);
+                  setTimeout(checkMetadata, 1000);
+                } else {
+                  // En cas d'erreur, démarrer le polling quand même
+                  addDebugLog('warning', '⚠️ Erreur après 30 secondes, démarrage du polling quand même', {
+                    error: err instanceof Error ? err.message : String(err),
+                  });
+                  setPlayStatus('downloading');
+                  setProgressMessage('Recherche de peers...');
+                  progressPollIntervalRef.current = window.setInterval(() => {
+                    pollTorrentProgress(addResult.info_hash);
+                  }, PROGRESS_POLL_INTERVAL_MS);
+                  pollTorrentProgress(addResult.info_hash);
+                }
+              }
+            };
+            
+            // Démarrer la vérification des métadonnées
+            setTimeout(checkMetadata, 500);
+            
+            return;
+          }
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          addDebugLog('error', 'Erreur lors de l\'ajout du torrent via infoHash', errorMsg);
+          setPlayStatus('error');
+          setErrorMessage(errorMsg);
+          return;
+        }
+      }
+    }
+
+    // Si on a déjà un infoHash (torrent local ou déjà ajouté), vérifier d'abord si les fichiers vidéo existent
+    if (hasInfoHash && torrent.infoHash && !isExternal) {
       addDebugLog('info', '✅ InfoHash disponible, vérification des fichiers vidéo...');
       
       const videos = await loadVideoFiles(torrent.infoHash);
@@ -119,15 +462,106 @@ export function createHandlePlay(context: PlayHandlerContext) {
       try {
         const addResult = await webtorrentClient.addMagnetLink(torrent._externalMagnetUri, torrent.name);
         if (addResult.info_hash) {
-          setPlayStatus('downloading');
-          setProgressMessage('Recherche de peers...');
+          setPlayStatus('adding');
+          setProgressMessage('Récupération des métadonnées...');
+          addDebugLog('info', '✅ Torrent ajouté, attente des métadonnées...', {
+            infoHash: addResult.info_hash,
+          });
 
-          loadVideoFiles(addResult.info_hash).catch(() => {});
-
-          progressPollIntervalRef.current = window.setInterval(() => {
-            pollTorrentProgress(addResult.info_hash);
-          }, PROGRESS_POLL_INTERVAL_MS);
-          pollTorrentProgress(addResult.info_hash);
+          // Attendre que les métadonnées soient disponibles
+          let retryCount = 0;
+          const maxRetries = 30;
+          
+          const checkMetadata = async () => {
+            try {
+              const stats = await webtorrentClient.getTorrent(addResult.info_hash);
+              
+              // Vérifier si les métadonnées sont disponibles (total_bytes > 0 ou fichiers disponibles)
+              const hasMetadata = stats && stats.total_bytes > 0;
+              const files = webtorrentClient.getTorrentFiles(addResult.info_hash);
+              const hasFiles = files.length > 0;
+              
+              if (hasMetadata || hasFiles) {
+                // Les métadonnées sont disponibles, essayer de charger les fichiers
+                addDebugLog('success', '✅ Métadonnées disponibles', {
+                  total_bytes: stats?.total_bytes || 0,
+                  files_count: files.length,
+                  hasMetadata,
+                  hasFiles,
+                });
+                
+                setPlayStatus('downloading');
+                setProgressMessage('Recherche de peers...');
+                
+                // Essayer de charger les fichiers (peut prendre un peu de temps si pas encore prêts)
+                const videos = await loadVideoFiles(addResult.info_hash);
+                if (videos.length > 0) {
+                  addDebugLog('success', '✅ Fichiers vidéo trouvés', {
+                    files_count: videos.length,
+                  });
+                  setVideoFiles(videos);
+                  setSelectedFile(videos[0]);
+                } else if (hasFiles) {
+                  // On a des fichiers mais pas encore de vidéo, réessayer après 1 seconde
+                  addDebugLog('info', '⏳ Fichiers disponibles mais pas encore de vidéo, réessai...', {
+                    files_count: files.length,
+                  });
+                  if (retryCount < maxRetries) {
+                    retryCount++;
+                    setTimeout(checkMetadata, 1000);
+                    return;
+                  }
+                }
+                
+                progressPollIntervalRef.current = window.setInterval(() => {
+                  pollTorrentProgress(addResult.info_hash);
+                }, PROGRESS_POLL_INTERVAL_MS);
+                pollTorrentProgress(addResult.info_hash);
+              } else if (retryCount < maxRetries) {
+                // Pas encore de métadonnées, réessayer
+                retryCount++;
+                setProgressMessage(`Récupération des métadonnées... (${retryCount}/${maxRetries})`);
+                addDebugLog('info', `⏳ En attente des métadonnées... (${retryCount}/${maxRetries})`, {
+                  infoHash: addResult.info_hash,
+                  peers: stats?.peers_connected || 0,
+                });
+                setTimeout(checkMetadata, 1000);
+              } else {
+                // Timeout après 30 secondes
+                addDebugLog('warning', '⚠️ Timeout: Métadonnées non disponibles après 30 secondes, démarrage du polling quand même', {
+                  infoHash: addResult.info_hash,
+                  total_bytes: stats?.total_bytes || 0,
+                  peers: stats?.peers_connected || 0,
+                });
+                setPlayStatus('downloading');
+                setProgressMessage('Recherche de peers...');
+                progressPollIntervalRef.current = window.setInterval(() => {
+                  pollTorrentProgress(addResult.info_hash);
+                }, PROGRESS_POLL_INTERVAL_MS);
+                pollTorrentProgress(addResult.info_hash);
+              }
+            } catch (err) {
+              console.error('Erreur lors de la vérification des métadonnées:', err);
+              if (retryCount < maxRetries) {
+                retryCount++;
+                setProgressMessage(`Récupération des métadonnées... (${retryCount}/${maxRetries})`);
+                setTimeout(checkMetadata, 1000);
+              } else {
+                // En cas d'erreur, démarrer le polling quand même
+                addDebugLog('warning', '⚠️ Erreur après 30 secondes, démarrage du polling quand même', {
+                  error: err instanceof Error ? err.message : String(err),
+                });
+                setPlayStatus('downloading');
+                setProgressMessage('Recherche de peers...');
+                progressPollIntervalRef.current = window.setInterval(() => {
+                  pollTorrentProgress(addResult.info_hash);
+                }, PROGRESS_POLL_INTERVAL_MS);
+                pollTorrentProgress(addResult.info_hash);
+              }
+            }
+          };
+          
+          setTimeout(checkMetadata, 500);
         } else {
           throw new Error('Aucun infoHash retourné après ajout du magnet link');
         }

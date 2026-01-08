@@ -24,17 +24,18 @@ export function useVideoFiles({ torrentName, onError, filePath }: UseVideoFilesO
   const loadingCacheRef = useRef<Map<string, Promise<TorrentFile[]>>>(new Map());
   const filesCacheRef = useRef<Map<string, TorrentFile[]>>(new Map());
 
-  const loadVideoFiles = async (infoHash: string): Promise<TorrentFile[]> => {
+  const loadVideoFiles = async (infoHash: string, retryCount: number = 0): Promise<TorrentFile[]> => {
     if (!infoHash) return [];
 
     console.log('[useVideoFiles] 🔍 Chargement des fichiers vidéo pour infoHash:', {
       infoHash,
       torrentName,
       filePath,
+      retryCount,
     });
 
-    // Vérifier le cache
-    if (filesCacheRef.current.has(infoHash)) {
+    // Vérifier le cache (mais ne pas utiliser le cache si c'est vide et qu'on réessaie)
+    if (filesCacheRef.current.has(infoHash) && retryCount === 0) {
       const cached = filesCacheRef.current.get(infoHash)!;
       if (cached.length > 0) {
         console.log('[useVideoFiles] ✅ Utilisation du cache pour', infoHash);
@@ -42,8 +43,8 @@ export function useVideoFiles({ torrentName, onError, filePath }: UseVideoFilesO
       }
     }
 
-    // Éviter les appels simultanés pour le même infoHash
-    if (loadingCacheRef.current.has(infoHash)) {
+    // Éviter les appels simultanés pour le même infoHash (mais permettre les réessais)
+    if (loadingCacheRef.current.has(infoHash) && retryCount === 0) {
       console.log('[useVideoFiles] ⏳ Appel en cours pour', infoHash, ', attente...');
       return loadingCacheRef.current.get(infoHash)!;
     }
@@ -51,11 +52,43 @@ export function useVideoFiles({ torrentName, onError, filePath }: UseVideoFilesO
     const loadPromise = (async () => {
       setLoadingFiles(true);
       try {
+        // Vérifier d'abord si le torrent existe et est prêt
+        const torrentStats = await webtorrentClient.getTorrent(infoHash);
+        if (!torrentStats) {
+          console.warn('[useVideoFiles] ⚠️ Torrent non trouvé dans le client');
+          if (retryCount < 5) {
+            // Réessayer après 1 seconde
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return loadVideoFiles(infoHash, retryCount + 1);
+          }
+          setLoadingFiles(false);
+          return [];
+        }
+        
         // Récupérer les fichiers depuis WebTorrent
         const webtorrentFiles = webtorrentClient.getTorrentFiles(infoHash);
         
         if (webtorrentFiles.length === 0) {
-          console.warn('[useVideoFiles] ⚠️ Aucun fichier trouvé dans le torrent (peut être en cours de chargement)');
+          console.warn('[useVideoFiles] ⚠️ Aucun fichier trouvé dans le torrent', {
+            infoHash,
+            retryCount,
+            total_bytes: torrentStats.total_bytes,
+            state: torrentStats.state,
+          });
+          
+          // Si le torrent a des métadonnées (total_bytes > 0) mais pas de fichiers,
+          // cela signifie que les fichiers n'ont pas encore été chargés
+          // Réessayer jusqu'à 10 fois (10 secondes)
+          if (torrentStats.total_bytes > 0 && retryCount < 10) {
+            console.log('[useVideoFiles] 🔄 Réessai dans 1 seconde...', {
+              retryCount: retryCount + 1,
+              maxRetries: 10,
+            });
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            setLoadingFiles(false);
+            return loadVideoFiles(infoHash, retryCount + 1);
+          }
+          
           setLoadingFiles(false);
           return [];
         }
