@@ -17,7 +17,8 @@ export interface MediaDetailPageProps {
     createdAt?: number;
     _externalLink?: string;
     _externalMagnetUri?: string | null;
-    _externalGuid?: string | number;
+    _guid?: string | null; // GUID Torznab pour téléchargement via API
+    _externalGuid?: string | number; // Alias pour compatibilité
     indexerId?: string | null;
     indexerName?: string | null;
     quality?: {
@@ -39,7 +40,7 @@ export interface MediaDetailPageProps {
     runtime?: number | null;
     tmdbId?: number | null;
     tmdbType?: string | null;
-    // État du torrent depuis le client WebTorrent (si disponible)
+    // État du torrent depuis le backend Rust (si disponible)
     clientState?: 'queued' | 'downloading' | 'seeding' | 'paused' | 'completed' | 'error';
     clientProgress?: number; // 0.0 à 1.0
   };

@@ -1,11 +1,19 @@
 import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
+import { Search } from 'lucide-preact';
 
 interface IndexerCategoriesSelectorProps {
   indexerId: string;
-  availableCategories: Record<string, any>; // categoryMapping depuis la définition
+  availableCategories?: Record<string, any>; // categoryMapping depuis la définition (optionnel)
   onUpdate?: () => void;
 }
+
+// Catégories standard disponibles
+const STANDARD_CATEGORIES = [
+  { id: 'films', label: 'Films', icon: '🎬' },
+  { id: 'series', label: 'Séries', icon: '📺' },
+  { id: 'autres', label: 'Autres', icon: '📦' },
+];
 
 export default function IndexerCategoriesSelector({
   indexerId,
@@ -17,9 +25,22 @@ export default function IndexerCategoriesSelector({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Récupérer les catégories disponibles depuis categoryMapping
-  const categories = Object.keys(availableCategories || {});
+  // Récupérer les catégories disponibles depuis categoryMapping ou utiliser les catégories standard
+  const availableFromMapping = availableCategories ? Object.keys(availableCategories) : [];
+  const allAvailableCategories = availableFromMapping.length > 0 
+    ? availableFromMapping.map(id => {
+        const standard = STANDARD_CATEGORIES.find(c => c.id === id);
+        return standard || { id, label: id.charAt(0).toUpperCase() + id.slice(1), icon: '📁' };
+      })
+    : STANDARD_CATEGORIES;
+  
+  // Filtrer les catégories selon la recherche
+  const filteredCategories = allAvailableCategories.filter(cat =>
+    cat.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    cat.id.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   useEffect(() => {
     loadCategories();
@@ -63,10 +84,7 @@ export default function IndexerCategoriesSelector({
     setSuccess('');
     
     try {
-      const response = await serverApi.request(`/api/v1/indexers/${indexerId}/categories`, {
-        method: 'PUT',
-        body: JSON.stringify({ categories: newSelected }),
-      });
+      const response = await serverApi.updateIndexerCategories(indexerId, newSelected);
       
       if (response.success) {
         setSuccess('Catégories mises à jour avec succès');
@@ -96,7 +114,7 @@ export default function IndexerCategoriesSelector({
     );
   }
 
-  if (categories.length === 0) {
+  if (allAvailableCategories.length === 0) {
     return (
       <div class="text-gray-400 text-sm">
         Aucune catégorie disponible pour cet indexer
@@ -133,41 +151,69 @@ export default function IndexerCategoriesSelector({
         </div>
       )}
 
-      <div class="space-y-2">
-        {categories.map((category) => {
-          const isSelected = selectedCategories.includes(category);
-          const categoryLabel = category === 'films' ? 'Films' : category === 'series' ? 'Séries' : category;
-          
-          return (
-            <label
-              key={category}
-              class={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                isSelected
-                  ? 'bg-green-900/30 border-green-600'
-                  : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
-              }`}
-            >
-              <input
-                type="checkbox"
-                class="checkbox checkbox-primary"
-                checked={isSelected}
-                onChange={() => handleToggleCategory(category)}
-                disabled={saving}
-              />
-              <span class={`text-base font-medium ${isSelected ? 'text-green-300' : 'text-gray-300'}`}>
-                {categoryLabel}
-              </span>
-              {isSelected && (
-                <span class="ml-auto text-green-400 text-sm">✓ Activé</span>
-              )}
-            </label>
-          );
-        })}
+      {/* Barre de recherche */}
+      {allAvailableCategories.length > 3 && (
+        <div class="form-control">
+          <div class="relative">
+            <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Rechercher une catégorie..."
+              class="input input-bordered bg-gray-800 border-gray-700 text-white pl-10 w-full"
+              value={searchQuery}
+              onInput={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
+            />
+          </div>
+        </div>
+      )}
+
+      <div class="space-y-2 max-h-96 overflow-y-auto">
+        {filteredCategories.length === 0 ? (
+          <div class="text-center py-8 text-gray-400">
+            <p>Aucune catégorie trouvée pour "{searchQuery}"</p>
+          </div>
+        ) : (
+          filteredCategories.map((category) => {
+            const isSelected = selectedCategories.includes(category.id);
+            
+            return (
+              <label
+                key={category.id}
+                class={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  isSelected
+                    ? 'bg-green-900/30 border-green-600'
+                    : 'bg-gray-800/50 border-gray-700 hover:border-gray-600'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-primary"
+                  checked={isSelected}
+                  onChange={() => handleToggleCategory(category.id)}
+                  disabled={saving}
+                />
+                <span class="text-2xl">{category.icon}</span>
+                <span class={`text-base font-medium flex-1 ${isSelected ? 'text-green-300' : 'text-gray-300'}`}>
+                  {category.label}
+                </span>
+                {isSelected && (
+                  <span class="ml-auto text-green-400 text-sm">✓ Activé</span>
+                )}
+              </label>
+            );
+          })
+        )}
       </div>
 
       {selectedCategories.length === 0 && (
         <div class="alert alert-warning">
           <span>⚠️ Aucune catégorie sélectionnée. Aucun torrent ne sera synchronisé pour cet indexer.</span>
+        </div>
+      )}
+
+      {selectedCategories.length > 0 && (
+        <div class="text-sm text-gray-400">
+          {selectedCategories.length} catégorie{selectedCategories.length > 1 ? 's' : ''} sélectionnée{selectedCategories.length > 1 ? 's' : ''}
         </div>
       )}
     </div>

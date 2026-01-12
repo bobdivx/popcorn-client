@@ -220,6 +220,31 @@ export default function TorrentSyncManager() {
     }
   };
 
+  const stopSync = async () => {
+    try {
+      setSyncing(true);
+      setError('');
+      setSuccess('');
+      
+      const response = await serverApi.stopSync();
+      
+      if (response.success) {
+        setSuccess('Synchronisation arrêtée avec succès');
+        setTimeout(() => {
+          loadStatus();
+          loadIndexers();
+        }, 1000);
+      } else {
+        setError(response.message || 'Erreur lors de l\'arrêt de la synchronisation');
+      }
+    } catch (err) {
+      console.error('Erreur lors de l\'arrêt de la synchronisation:', err);
+      setError(err instanceof Error ? err.message : 'Erreur lors de l\'arrêt de la synchronisation');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const updateSettings = async (updates: Partial<SyncSettings>) => {
     try {
       setError('');
@@ -595,6 +620,38 @@ export default function TorrentSyncManager() {
                     </div>
                   );
                 })}
+                
+                {/* Carte TMDB - Ratio enrichi */}
+                {status.tmdb_stats && (() => {
+                  const tmdbTotal = status.tmdb_stats.with_tmdb + status.tmdb_stats.without_tmdb;
+                  const tmdbPercentage = tmdbTotal > 0 ? Math.round((status.tmdb_stats.with_tmdb / tmdbTotal) * 100) : 0;
+                  return tmdbTotal > 0 && (
+                    <div 
+                      class="bg-gradient-to-br from-blue-800/50 to-purple-900/50 rounded-xl p-6 border-2 border-blue-500/50 hover:border-blue-400 transition-all duration-300 transform hover:scale-105"
+                    >
+                      <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span class="text-white font-semibold text-sm">TMDB</span>
+                        </div>
+                        {tmdbPercentage === 100 && (
+                          <span class="badge badge-success badge-sm">100%</span>
+                        )}
+                      </div>
+                      <div class="text-4xl font-bold text-blue-400 mb-2">
+                        {status.tmdb_stats.with_tmdb.toLocaleString()}
+                      </div>
+                      <div class="text-xs text-gray-400 mb-1">
+                        sur {tmdbTotal.toLocaleString()} torrents
+                      </div>
+                      <div class="text-xs font-semibold text-blue-300">
+                        {tmdbPercentage}% enrichis
+                      </div>
+                    </div>
+                  );
+                })()}
                 {Object.keys(status.stats || {}).length === 0 && (
                   <div class="col-span-full">
                     <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-6 text-center">
@@ -663,6 +720,28 @@ export default function TorrentSyncManager() {
                       </div>
                     );
                   })}
+                  
+                  {/* Carte TMDB - Ratio enrichi (section inactive) */}
+                  {status.tmdb_stats && (() => {
+                    const tmdbTotal = status.tmdb_stats.with_tmdb + status.tmdb_stats.without_tmdb;
+                    const tmdbPercentage = tmdbTotal > 0 ? Math.round((status.tmdb_stats.with_tmdb / tmdbTotal) * 100) : 0;
+                    return tmdbTotal > 0 && (
+                      <div class="bg-gradient-to-br from-blue-800/50 to-purple-900/50 rounded-lg p-4 text-center border-2 border-blue-500/50">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto mb-1 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div class="text-white font-bold text-xl mb-1">
+                          {status.tmdb_stats.with_tmdb.toLocaleString()}
+                        </div>
+                        <div class="text-gray-300 text-xs mb-1">
+                          sur {tmdbTotal.toLocaleString()}
+                        </div>
+                        <div class="text-blue-300 font-semibold text-xs">
+                          {tmdbPercentage}% avec TMDB
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -802,28 +881,46 @@ export default function TorrentSyncManager() {
 
           {/* Actions */}
           <div class="flex flex-wrap gap-3 mt-6">
-            <button
-              class="btn btn-primary flex-1 sm:flex-none"
-              onClick={startSync}
-              disabled={syncing || status.sync_in_progress}
-            >
-              {syncing ? (
-                <>
-                  <span class="loading loading-spinner loading-sm"></span>
-                  Démarrage...
-                </>
-              ) : status.sync_in_progress ? (
-                <>
-                  <RefreshCw class="w-4 h-4 animate-spin" />
-                  Synchronisation en cours...
-                </>
-              ) : (
-                <>
-                  <RefreshCw class="w-4 h-4" />
-                  Lancer une synchronisation
-                </>
-              )}
-            </button>
+            {status.sync_in_progress ? (
+              <button
+                class="btn btn-error flex-1 sm:flex-none"
+                onClick={stopSync}
+                disabled={syncing}
+              >
+                {syncing ? (
+                  <>
+                    <span class="loading loading-spinner loading-sm"></span>
+                    Arrêt en cours...
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                    </svg>
+                    Arrêter la synchronisation
+                  </>
+                )}
+              </button>
+            ) : (
+              <button
+                class="btn btn-primary flex-1 sm:flex-none"
+                onClick={startSync}
+                disabled={syncing}
+              >
+                {syncing ? (
+                  <>
+                    <span class="loading loading-spinner loading-sm"></span>
+                    Démarrage...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw class="w-4 h-4" />
+                    Lancer une synchronisation
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </div>

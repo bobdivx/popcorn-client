@@ -49,6 +49,9 @@ export function YouTubeVideoPlayer({
   params.append('modestbranding', '1');
   params.append('playsinline', '1');
   params.append('enablejsapi', '1');
+  params.append('origin', typeof window !== 'undefined' ? window.location.origin : '');
+  params.append('iv_load_policy', '3'); // Ne pas afficher les annotations
+  params.append('cc_load_policy', '0'); // Pas de sous-titres par défaut
   
   const youtubeUrl = `https://www.youtube.com/embed/${youtubeKey}?${params.toString()}`;
 

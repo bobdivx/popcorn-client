@@ -88,19 +88,38 @@ export interface ContentItem {
   releaseDate?: string;
   // Pour les séries
   firstAirDate?: string;
+  // Genres (depuis TMDB)
+  genres?: string[];
   // Pour "Reprendre la lecture"
   progress?: number; // Pourcentage de progression (0-100)
   lastWatched?: string; // Date ISO
+  // Stats temps réel pour améliorations "Mieux que Netflix"
+  seeds?: number; // Nombre de seeds du torrent
+  peers?: number; // Nombre de peers du torrent
+  codec?: 'x264' | 'x265' | 'AV1'; // Codec vidéo
+  quality?: 'Remux' | '4K' | '1080p' | '720p' | '480p'; // Qualité vidéo
+  fileSize?: number; // Taille du fichier en bytes
+  downloadSpeed?: number; // Vitesse de téléchargement en bytes/s (pour barre de santé)
+  isDownloading?: boolean; // Indique si le téléchargement est actif (pour afficher barre de santé)
+  sources?: Array<{
+    tracker: string; // Nom du tracker
+    seeds: number;
+    peers: number;
+    quality?: 'Remux' | '4K' | '1080p' | '720p' | '480p';
+    codec?: 'x264' | 'x265' | 'AV1';
+    fileSize?: number;
+  }>; // Multi-sources : agrégation de plusieurs trackers
+  trailerUrl?: string; // URL du trailer pour animation immersive
 }
 
 export interface FilmData extends ContentItem {
   type: 'movie';
-  releaseDate: string;
+  releaseDate?: string; // Rendre optionnel pour éviter les erreurs si absent
 }
 
 export interface SeriesData extends ContentItem {
   type: 'tv';
-  firstAirDate: string;
+  firstAirDate?: string; // Rendre optionnel pour éviter les erreurs si absent
   numberOfSeasons?: number;
   numberOfEpisodes?: number;
 }
@@ -152,4 +171,44 @@ export interface User {
   id: string;
   email: string;
   createdAt?: string;
+}
+
+// ==================== CLIENT TORRENT API ====================
+
+export interface ClientTorrentStats {
+  info_hash: string;
+  name: string;
+  state: 'queued' | 'downloading' | 'seeding' | 'paused' | 'completed' | 'error';
+  downloaded_bytes: number;
+  uploaded_bytes: number;
+  total_bytes: number;
+  progress: number;
+  download_speed: number; // bytes/s
+  upload_speed: number;   // bytes/s
+  peers_connected: number;
+  peers_total: number;
+  seeders: number;
+  leechers: number;
+  eta_seconds: number | null;
+  download_dir?: string;
+  files_size?: number;
+  status_reason?: string;
+  is_private?: boolean; // Indique si le torrent est privé (private=1 ou tracker avec passkey)
+}
+
+export interface AddTorrentResponse {
+  info_hash: string;
+}
+
+export interface AddMagnetRequest {
+  magnet_uri: string;
+  name: string;
+  for_streaming?: boolean;
+}
+
+// Types pour les logs de torrent (réexport depuis api/torrents.ts pour compatibilité)
+export interface TorrentLogEntry {
+  timestamp: number;
+  level: string;
+  message: string;
 }

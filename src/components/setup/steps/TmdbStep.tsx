@@ -9,6 +9,7 @@ interface TmdbStepProps {
   onPrevious: () => void;
   onNext: () => void;
   onSave: (key: string) => Promise<void>;
+  onStatusChange?: () => void;
 }
 
 export function TmdbStep({
@@ -18,6 +19,7 @@ export function TmdbStep({
   onPrevious,
   onNext,
   onSave,
+  onStatusChange,
 }: TmdbStepProps) {
   const [tmdbKey, setTmdbKey] = useState('');
   const [saving, setSaving] = useState(false);
@@ -66,6 +68,10 @@ export function TmdbStep({
         setSuccess('Clé TMDB sauvegardée avec succès');
         // Recharger la clé masquée après sauvegarde
         await loadTmdbKey();
+        // Mettre à jour le statut du setup (comme dans IndexersStep)
+        if (onStatusChange) {
+          onStatusChange();
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');

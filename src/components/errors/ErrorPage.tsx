@@ -107,13 +107,15 @@ export default function ErrorPage({
         </div>
 
         {/* Boutons d'action */}
-        <div className="flex flex-col sm:flex-row gap-4 items-center">
+        <div className="flex flex-col sm:flex-row gap-4 tv:gap-6 items-center">
           {showBackButton && (
             <button
               onClick={() => window.history.back()}
-              className="px-8 py-4 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white font-bold text-lg rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 border-2 border-gray-600/50 hover:border-gray-500/50 flex items-center gap-2"
+              className="px-8 py-4 tv:px-12 tv:py-5 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-white font-bold text-lg tv:text-2xl rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 focus:scale-105 border-2 border-gray-600/50 hover:border-gray-500/50 focus:border-primary-500 flex items-center gap-2 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[56px] tv:min-h-[64px]"
+              tabIndex={0}
+              data-focusable
             >
-              <span className="text-2xl">←</span>
+              <span className="text-2xl tv:text-3xl">←</span>
               <span>Retour</span>
             </button>
           )}
@@ -121,7 +123,9 @@ export default function ErrorPage({
           {showHomeButton && (
             <a
               href="/dashboard"
-              className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold text-lg rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+              className="px-8 py-4 tv:px-12 tv:py-5 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-bold text-lg tv:text-2xl rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 focus:scale-105 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[56px] tv:min-h-[64px]"
+              tabIndex={0}
+              data-focusable
             >
               Accueil
             </a>

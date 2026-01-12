@@ -13,11 +13,72 @@ export default function CarouselRow({ title, children, className = '' }: Carouse
   const scroll = useCallback((direction: 'left' | 'right') => {
     if (!scrollContainerRef.current) return;
     const scrollAmount = scrollContainerRef.current.clientWidth * 0.75;
+    
+    // Utiliser courbe de Bézier organique pour défilement fluide
     scrollContainerRef.current.scrollBy({
       left: direction === 'left' ? -scrollAmount : scrollAmount,
       behavior: 'smooth',
     });
   }, []);
+
+  // Gestion Focus Pinned Left - glissement magnétique vers la gauche
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      
+      // Vérifier si l'élément focusé est dans ce carrousel
+      if (!container.contains(target)) return;
+      
+      // Trouver la carte (element avec data-torrent-card ou parent proche)
+      const card = target.closest('[data-torrent-card]') || target.closest('.torrent-poster');
+      if (!card) return;
+
+      // Attendre un court délai pour que le focus soit stable
+      setTimeout(() => {
+        // Scroll vers la gauche pour ancrer la carte (Pinned Left)
+        card.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'start', // Ancrage à gauche - comportement "Pinned Left"
+        });
+
+        // Appliquer transition avec courbe de Bézier organique
+        (card as HTMLElement).style.transition = 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+      }, 50);
+    };
+
+    // Écouter les événements focusin sur le conteneur
+    container.addEventListener('focusin', handleFocusIn);
+
+    return () => {
+      container.removeEventListener('focusin', handleFocusIn);
+    };
+  }, []);
+
+  // Navigation clavier pour défilement horizontal dans le carrousel
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Navigation horizontale uniquement dans le carrousel
+      if (e.key === 'ArrowLeft' && container.contains(document.activeElement as HTMLElement)) {
+        e.preventDefault();
+        scroll('left');
+      } else if (e.key === 'ArrowRight' && container.contains(document.activeElement as HTMLElement)) {
+        e.preventDefault();
+        scroll('right');
+      }
+    };
+
+    container.addEventListener('keydown', handleKeyDown);
+    return () => {
+      container.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [scroll]);
 
   const [isHovered, setIsHovered] = useState(false);
 
@@ -60,29 +121,31 @@ export default function CarouselRow({ title, children, className = '' }: Carouse
   return (
     <div 
       ref={containerRef}
-      className={`mb-8 sm:mb-10 md:mb-12 ${className} opacity-0`}
+      className={`mb-8 sm:mb-10 md:mb-12 tv:mb-16 ${className} opacity-0`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="flex items-center mb-2 sm:mb-3 px-3 sm:px-4 md:px-6 lg:px-8">
-        <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">{title}</h2>
+      <div className="flex items-center mb-2 sm:mb-3 tv:mb-4 px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16">
+        <h2 className="text-lg sm:text-xl md:text-2xl tv:text-3xl font-bold text-white">{title}</h2>
         {(isHovered || (scrollContainerRef.current?.scrollLeft || 0) > 0) && (
-          <div className="hidden xs:flex gap-1.5 sm:gap-2 ml-auto">
+          <div className="hidden xs:flex gap-1.5 sm:gap-2 tv:gap-4 ml-auto">
             <button
               onClick={() => scroll('left')}
-              className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 rounded-full bg-black/80 hover:bg-black border border-white/30 flex items-center justify-center text-white transition-all hover:scale-110 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-white/50"
+              className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 tv:w-14 tv:h-14 rounded-full glass-panel hover:bg-glass-hover border border-white/30 flex items-center justify-center text-white transition-all hover:scale-110 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[28px] tv:min-h-[56px]"
               aria-label="Défiler vers la gauche"
+              tabIndex={0}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 tv:h-7 tv:w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
             <button
               onClick={() => scroll('right')}
-              className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 rounded-full bg-black/80 hover:bg-black border border-white/30 flex items-center justify-center text-white transition-all hover:scale-110 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-white/50"
+              className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 tv:w-14 tv:h-14 rounded-full glass-panel hover:bg-glass-hover border border-white/30 flex items-center justify-center text-white transition-all hover:scale-110 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[28px] tv:min-h-[56px]"
               aria-label="Défiler vers la droite"
+              tabIndex={0}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 tv:h-7 tv:w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
             </button>
@@ -91,10 +154,12 @@ export default function CarouselRow({ title, children, className = '' }: Carouse
       </div>
       <div
         ref={scrollContainerRef}
-        className="flex gap-1 sm:gap-1.5 md:gap-2 overflow-x-auto overflow-y-hidden scrollbar-hide px-3 sm:px-4 md:px-6 lg:px-8"
+        data-carousel
+        className="flex gap-1 sm:gap-1.5 md:gap-2 lg:gap-4 xl:gap-6 tv:gap-8 overflow-x-auto overflow-y-hidden scrollbar-hide px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 scroll-smooth carousel-container"
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
+          scrollBehavior: 'smooth',
         }}
       >
         {childrenArray.map((child, index) => (

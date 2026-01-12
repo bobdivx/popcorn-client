@@ -1,4 +1,4 @@
-import { webtorrentClient } from '../../../../../lib/torrent/webtorrent-client';
+import { clientApi } from '../../../../../lib/client/api';
 import { serverApi } from '../../../../../lib/client/server-api';
 import { PROGRESS_POLL_INTERVAL_MS } from '../../utils/constants';
 import type { PlayHandlerContext } from './types';
@@ -36,6 +36,97 @@ export function createHandlePlay(context: PlayHandlerContext) {
       hasMagnetLink,
     });
 
+    // PRIORITÉ 0: Vérifier si le torrent existe déjà dans le client (même pour les torrents externes)
+    // Si le torrent est déjà téléchargé, l'utiliser directement
+    if (hasInfoHash && torrent.infoHash) {
+      try {
+        const stats = await clientApi.getTorrent(torrent.infoHash);
+        if (stats) {
+          addDebugLog('info', '✅ Torrent déjà présent dans le client, vérification des fichiers vidéo...', {
+            state: stats.state,
+            progress: `${(stats.progress * 100).toFixed(1)}%`,
+          });
+          
+          const isCompleted = stats.state === 'completed' || stats.state === 'seeding' || stats.progress >= 0.95;
+          
+          // Si le torrent est complété, essayer de charger les fichiers avec plusieurs tentatives
+          if (isCompleted) {
+            let videos: any[] = [];
+            let retryCount = 0;
+            const maxRetries = 10;
+            
+            // Essayer de charger les fichiers plusieurs fois (les fichiers peuvent ne pas être immédiatement disponibles)
+            while (videos.length === 0 && retryCount < maxRetries) {
+              videos = await loadVideoFiles(torrent.infoHash, retryCount);
+              if (videos.length > 0) {
+                break;
+              }
+              if (retryCount < maxRetries - 1) {
+                addDebugLog('info', `🔄 Fichiers non disponibles, réessai ${retryCount + 1}/${maxRetries}...`, {
+                  state: stats.state,
+                  progress: `${(stats.progress * 100).toFixed(1)}%`,
+                });
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              }
+              retryCount++;
+            }
+            
+            if (videos.length > 0) {
+              addDebugLog('success', '✅ Fichiers vidéo trouvés, démarrage direct de la lecture', {
+                files_count: videos.length,
+                retries: retryCount,
+              });
+              setVideoFiles(videos);
+              setSelectedFile(videos[0]);
+              setPlayStatus('ready');
+              setProgressMessage('Lancement de la lecture...');
+              setIsPlaying(true);
+              setShowInfo(false);
+              stopProgressPolling();
+              setTorrentStats(stats);
+              return;
+            } else {
+              // Si le torrent est complété mais qu'aucun fichier n'est trouvé après plusieurs tentatives,
+              // démarrer le polling pour attendre que les fichiers soient disponibles
+              addDebugLog('warning', '⚠️ Torrent complété mais fichiers non disponibles, attente...', {
+                state: stats.state,
+                progress: `${(stats.progress * 100).toFixed(1)}%`,
+              });
+              setPlayStatus('downloading');
+              setProgressMessage('Attente des fichiers...');
+              setTorrentStats(stats);
+              
+              progressPollIntervalRef.current = window.setInterval(() => {
+                pollTorrentProgress(torrent.infoHash!);
+              }, PROGRESS_POLL_INTERVAL_MS);
+              pollTorrentProgress(torrent.infoHash);
+              return;
+            }
+          }
+          
+          // Si le torrent est en cours de téléchargement, démarrer le polling
+          if (stats.state !== 'completed' && stats.progress < 0.95) {
+            addDebugLog('info', '⏳ Torrent en cours de téléchargement, démarrage du polling...', {
+              state: stats.state,
+              progress: `${(stats.progress * 100).toFixed(1)}%`,
+            });
+            setPlayStatus('downloading');
+            setProgressMessage('Recherche de peers...');
+            setTorrentStats(stats);
+            
+            progressPollIntervalRef.current = window.setInterval(() => {
+              pollTorrentProgress(torrent.infoHash!);
+            }, PROGRESS_POLL_INTERVAL_MS);
+            pollTorrentProgress(torrent.infoHash);
+            return;
+          }
+        }
+      } catch (err) {
+        // Le torrent n'existe pas encore, continuer avec le téléchargement
+        addDebugLog('info', 'ℹ️ Torrent non trouvé dans le client, téléchargement nécessaire');
+      }
+    }
+
     // Pour un torrent externe avec infoHash, prioriser le fichier .torrent s'il est disponible
     // car il contient tous les trackers (important pour les trackers privés comme C411)
     if (isExternal && hasInfoHash && torrent.infoHash) {
@@ -68,15 +159,18 @@ export function createHandlePlay(context: PlayHandlerContext) {
           // Passer indexerId et indexerName si disponibles pour que le backend utilise Jackett correctement
           const indexerId = (torrent as any).indexerId || (torrent as any).indexer_id;
           const indexerName = (torrent as any).indexerName || (torrent as any).indexer_name;
+          const guid = torrent._guid || (torrent as any)._externalGuid || null; // GUID Torznab stocké lors de la synchronisation
           const indexerIdParam = indexerId ? `&indexerId=${encodeURIComponent(indexerId)}` : '';
           const indexerNameParam = indexerName ? `&indexerName=${encodeURIComponent(indexerName)}` : '';
-          const downloadUrl = `${baseUrl}/api/torrents/external/download?url=${encodeURIComponent(torrent._externalLink)}&torrentName=${encodeURIComponent(torrent.name)}${indexerIdParam}${indexerNameParam}`;
+          const guidParam = guid ? `&guid=${encodeURIComponent(guid)}` : '';
+          const downloadUrl = `${baseUrl}/api/torrents/external/download?url=${encodeURIComponent(torrent._externalLink)}&torrentName=${encodeURIComponent(torrent.name)}${indexerIdParam}${indexerNameParam}${guidParam}`;
           
           addDebugLog('info', '📥 URL de téléchargement via proxy backend:', { 
             downloadUrl, 
             originalUrl: torrent._externalLink,
             indexerId,
             indexerName,
+            guid,
           });
           const response = await fetch(downloadUrl, { headers });
 
@@ -85,7 +179,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
             // Si l'API retourne un magnet link en cas d'erreur, l'utiliser
             if (errorData.isMagnet && errorData.magnetUri) {
               addDebugLog('info', '📥 L\'API a retourné un magnet link (fallback)', { magnetUri: errorData.magnetUri });
-              const addResult = await webtorrentClient.addMagnetLink(errorData.magnetUri, torrent.name);
+              // Toujours télécharger dans downloads/media, pas en streaming
+              const forStreaming = false;
+              const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+              const addResult = await clientApi.addMagnetLink(errorData.magnetUri, torrent.name, forStreaming, downloadType);
               if (addResult.info_hash) {
                 setPlayStatus('adding');
                 setProgressMessage('Récupération des métadonnées...');
@@ -98,9 +195,9 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 
                 const checkMetadata = async () => {
                   try {
-                    const stats = await webtorrentClient.getTorrent(addResult.info_hash);
+                    const stats = await clientApi.getTorrent(addResult.info_hash);
                     const hasMetadata = stats && stats.total_bytes > 0;
-                    const files = webtorrentClient.getTorrentFiles(addResult.info_hash);
+                    const files = await clientApi.getTorrentFiles(addResult.info_hash);
                     const hasFiles = files.length > 0;
                     
                     if (hasMetadata || hasFiles) {
@@ -169,10 +266,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
           addDebugLog('info', '📄 Vérification du fichier téléchargé:', {
             fileSize: blob.size,
             firstByte: uint8Array[0],
-            firstBytes: Array.from(uint8Array.slice(0, 10)),
             contentType: response.headers.get('content-type'),
             expectedFirstByte: 0x64, // 'd' pour Bencode dictionary
             isTorrent: uint8Array.length > 0 && uint8Array[0] === 0x64,
+            note: 'Le backend Rust gère tous les trackers (HTTP/HTTPS/WebSocket)',
           });
           
           // Vérifier que c'est un fichier torrent valide
@@ -194,7 +291,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
           
           const torrentFile = new File([blob], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
           
-          addDebugLog('success', '✅ Fichier .torrent téléchargé et validé, ajout au client...', {
+          addDebugLog('success', '✅ Fichier .torrent téléchargé et validé, ajout au backend...', {
             fileSize: blob.size,
             infoHash: torrent.infoHash,
             firstByte: uint8Array[0],
@@ -203,13 +300,16 @@ export function createHandlePlay(context: PlayHandlerContext) {
           setPlayStatus('adding');
           setProgressMessage('Ajout du fichier torrent...');
           
-          const addResult = await webtorrentClient.addTorrentFile(torrentFile);
+          // Toujours télécharger dans downloads/media, pas en streaming
+          const forStreaming = false;
+          const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+          const addResult = await clientApi.addTorrentFile(torrentFile, forStreaming, downloadType);
           if (addResult.info_hash) {
             setPlayStatus('downloading');
             setProgressMessage('Recherche de peers...');
-            addDebugLog('success', '✅ Fichier .torrent ajouté avec succès', {
+            addDebugLog('success', '✅ Fichier .torrent ajouté avec succès au backend', {
               infoHash: addResult.info_hash,
-              note: 'Le fichier .torrent contient tous les trackers (y compris privés comme C411)',
+              note: 'Le backend Rust gère tous les trackers (HTTP/HTTPS/WebSocket)',
             });
             
             // Les métadonnées sont généralement immédiatement disponibles avec un fichier .torrent
@@ -258,7 +358,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
         setProgressMessage('Ajout du torrent via infoHash...');
 
         try {
-          const addResult = await webtorrentClient.addMagnetLink(constructedMagnet, torrent.name);
+          // Toujours télécharger dans downloads/media, pas en streaming
+          const forStreaming = false;
+          const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+          const addResult = await clientApi.addMagnetLink(constructedMagnet, torrent.name, forStreaming, downloadType);
           if (addResult.info_hash) {
             setPlayStatus('adding');
             setProgressMessage('Récupération des métadonnées...');
@@ -273,11 +376,11 @@ export function createHandlePlay(context: PlayHandlerContext) {
             
             const checkMetadata = async () => {
               try {
-                const stats = await webtorrentClient.getTorrent(addResult.info_hash);
+                const stats = await clientApi.getTorrent(addResult.info_hash);
                 
                 // Vérifier si les métadonnées sont disponibles (total_bytes > 0 ou fichiers disponibles)
                 const hasMetadata = stats && stats.total_bytes > 0;
-                const files = webtorrentClient.getTorrentFiles(addResult.info_hash);
+                const files = await clientApi.getTorrentFiles(addResult.info_hash);
                 const hasFiles = files.length > 0;
                 
                 if (hasMetadata || hasFiles) {
@@ -396,7 +499,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
         stopProgressPolling();
         
         try {
-          const stats = await webtorrentClient.getTorrent(torrent.infoHash);
+          const stats = await clientApi.getTorrent(torrent.infoHash);
           if (stats) {
             setTorrentStats(stats);
           }
@@ -409,7 +512,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
       
       // Si pas de fichiers, vérifier l'état du torrent
       try {
-        const stats = await webtorrentClient.getTorrent(torrent.infoHash);
+        const stats = await clientApi.getTorrent(torrent.infoHash);
         if (stats) {
           addDebugLog('success', '✅ Torrent trouvé dans le client', {
             state: stats.state,
@@ -460,7 +563,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
       addDebugLog('info', 'Utilisation du magnet link direct');
 
       try {
-        const addResult = await webtorrentClient.addMagnetLink(torrent._externalMagnetUri, torrent.name);
+        // Toujours télécharger dans downloads/media, pas en streaming
+        const forStreaming = false;
+        const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+        const addResult = await clientApi.addMagnetLink(torrent._externalMagnetUri, torrent.name, forStreaming, downloadType);
         if (addResult.info_hash) {
           setPlayStatus('adding');
           setProgressMessage('Récupération des métadonnées...');
@@ -474,11 +580,11 @@ export function createHandlePlay(context: PlayHandlerContext) {
           
           const checkMetadata = async () => {
             try {
-              const stats = await webtorrentClient.getTorrent(addResult.info_hash);
+              const stats = await clientApi.getTorrent(addResult.info_hash);
               
               // Vérifier si les métadonnées sont disponibles (total_bytes > 0 ou fichiers disponibles)
               const hasMetadata = stats && stats.total_bytes > 0;
-              const files = webtorrentClient.getTorrentFiles(addResult.info_hash);
+              const files = await clientApi.getTorrentFiles(addResult.info_hash);
               const hasFiles = files.length > 0;
               
               if (hasMetadata || hasFiles) {

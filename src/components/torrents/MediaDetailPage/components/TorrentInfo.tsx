@@ -6,9 +6,17 @@ interface TorrentInfoProps {
   seedCount: number;
   leechCount: number;
   fileSize: number;
+  sources?: Array<{
+    tracker: string;
+    seeds: number;
+    peers: number;
+    quality?: 'Remux' | '4K' | '1080p' | '720p' | '480p';
+    codec?: 'x264' | 'x265' | 'AV1';
+    fileSize?: number;
+  }>;
 }
 
-export function TorrentInfo({ torrent, seedCount, leechCount, fileSize }: TorrentInfoProps) {
+export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, sources }: TorrentInfoProps) {
   // Utiliser le synopsis TMDB si disponible, sinon la description
   const description = torrent.synopsis || torrent.description;
 
@@ -41,8 +49,24 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize }: Torren
     return `${minutes}min`;
   };
 
+  // Récupérer l'indexer depuis le torrent
+  const indexerName = (torrent as any).indexerName || (torrent as any).indexer_name || null;
+
   return (
     <div className="space-y-4">
+      {/* Indexer - Affiché en premier pour les torrents externes */}
+      {indexerName && (
+        <div className="mb-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/20 border border-primary-600/30 text-primary-300 rounded-lg text-sm font-semibold glass-panel">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+            </svg>
+            <span>Indexer:</span>
+            <span className="text-primary-200 font-bold">{indexerName}</span>
+          </div>
+        </div>
+      )}
+
       {/* Statistiques */}
       <div className="flex flex-wrap gap-6 text-sm mb-4">
         <div className="flex items-center gap-2">
@@ -111,12 +135,70 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize }: Torren
         </div>
       )}
 
+      {/* Multi-Sources - Agrégation de Trackers */}
+      {sources && sources.length > 1 && (
+        <div className="mt-6 p-4 tv:p-6 glass-panel rounded-lg border border-white/10">
+          <h3 className="text-lg tv:text-xl font-semibold mb-4 text-white">Sources Multiples</h3>
+          <div className="space-y-3">
+            {sources
+              .sort((a, b) => {
+                // Trier par qualité (Remux > 4K > 1080p)
+                const qualityOrder: Record<string, number> = { Remux: 1000, '4K': 500, '1080p': 300, '720p': 100, '480p': 50 };
+                const aQuality = qualityOrder[a.quality || ''] || 0;
+                const bQuality = qualityOrder[b.quality || ''] || 0;
+                return bQuality - aQuality || b.seeds - a.seeds;
+              })
+              .map((source, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between p-3 tv:p-4 bg-glass hover:bg-glass-hover rounded-lg border border-white/10 transition-all duration-200 glass-panel"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="px-3 py-1 tv:px-4 tv:py-2 bg-primary/20 border border-primary-600/30 text-primary-300 rounded-lg text-xs tv:text-sm font-semibold glass-panel">
+                        {source.tracker || torrent.indexerName || 'Tracker'}
+                      </span>
+                      {source.quality && (
+                        <span className="px-3 py-1 tv:px-4 tv:py-2 bg-glass glass-panel border border-white/20 text-white rounded-lg text-xs tv:text-sm font-semibold">
+                          {source.quality}
+                        </span>
+                      )}
+                      {source.codec && (
+                        <span className="px-3 py-1 tv:px-4 tv:py-2 bg-glass glass-panel border border-white/20 text-white rounded-lg text-xs tv:text-sm font-semibold">
+                          {source.codec === 'x265' ? 'H.265' : source.codec === 'x264' ? 'H.264' : source.codec}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 text-xs tv:text-sm text-gray-300">
+                      <span className="flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {source.seeds}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        {source.peers}
+                      </span>
+                      {source.fileSize && (
+                        <span>{formatSize(source.fileSize)}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
       {/* Métadonnées techniques */}
-      {(torrent.uploader || torrent.createdAt) && (
+      {(torrent.uploader || torrent.indexerName || torrent.createdAt) && (
         <div className="text-sm text-white/70 space-y-2">
-          {torrent.uploader && (
+          {(torrent.uploader || torrent.indexerName) && (
             <div>
-              <span className="font-semibold">Source:</span> {torrent.uploader}
+              <span className="font-semibold">Source:</span> {torrent.indexerName || torrent.uploader}
             </div>
           )}
           {torrent.createdAt && (

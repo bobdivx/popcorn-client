@@ -1,4 +1,4 @@
-import type { ClientTorrentStats } from '../../../../../lib/torrent/webtorrent-client';
+import type { ClientTorrentStats } from '../../../../../lib/client/types';
 import type { PlayStatus } from '../../types';
 
 export function stopProgressPolling(
@@ -45,9 +45,9 @@ export async function handleClosePlayer(
   // pour libérer l'espace mémoire (optionnel)
   if (isExternal && infoHash) {
     try {
-      const { webtorrentClient } = await import('../../../../../lib/torrent/webtorrent-client');
+      const { clientApi } = await import('../../../../../lib/client/api');
       addDebugLog('info', '🗑️ Suppression automatique du torrent de streaming externe', { infoHash });
-      await webtorrentClient.removeTorrent(infoHash, true); // deleteFiles = true pour nettoyer
+      await clientApi.removeTorrent(infoHash, true); // deleteFiles = true pour nettoyer
       addDebugLog('success', '✅ Torrent de streaming supprimé (nettoyé)');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);

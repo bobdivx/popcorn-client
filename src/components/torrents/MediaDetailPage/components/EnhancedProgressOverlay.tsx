@@ -1,5 +1,5 @@
 import type { PlayStatus, DebugLog } from '../types';
-import type { ClientTorrentStats } from '../../../../lib/torrent/webtorrent-client';
+import type { ClientTorrentStats } from '../../../../lib/client/types';
 import { DebugConsole } from './DebugConsole';
 
 interface EnhancedProgressOverlayProps {
@@ -11,6 +11,7 @@ interface EnhancedProgressOverlayProps {
   showDebug: boolean;
   debugLogs: DebugLog[];
   onCancel: () => void;
+  onContinueInBackground?: () => void;
   onRetry: () => void;
   onToggleDebug: () => void;
   onCopyLogs: () => void;
@@ -50,6 +51,7 @@ export function EnhancedProgressOverlay({
   showDebug,
   debugLogs,
   onCancel,
+  onContinueInBackground,
   onRetry,
   onToggleDebug,
   onCopyLogs,
@@ -82,10 +84,10 @@ export function EnhancedProgressOverlay({
         {playStatus === 'error' && (
           <div className="flex flex-col items-center mb-8">
             <div className="relative w-24 h-24 mb-6">
-              <div className="absolute inset-0 bg-red-600/20 rounded-full animate-pulse"></div>
+              <div className="absolute inset-0 bg-primary-600/20 rounded-full animate-pulse"></div>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                className="absolute inset-0 w-full h-full text-red-600 p-5"
+                className="absolute inset-0 w-full h-full text-primary-600 p-5"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -106,7 +108,7 @@ export function EnhancedProgressOverlay({
               </button>
               <button
                 onClick={onRetry}
-                className="px-8 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-all duration-200 font-medium"
+                className="px-8 py-3 bg-primary hover:bg-primary-700 text-white rounded-lg transition-all duration-200 font-medium focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 shadow-primary hover:shadow-primary-lg"
               >
                 Réessayer
               </button>
@@ -118,11 +120,11 @@ export function EnhancedProgressOverlay({
         {playStatus !== 'error' && (
           <div className="flex flex-col items-center">
             <div className="relative w-28 h-28 mb-8">
-              <div className="absolute inset-0 border-4 border-red-600/20 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-transparent border-t-red-600 border-r-red-600 rounded-full animate-spin" style={{ animationDuration: '1s' }}></div>
+              <div className="absolute inset-0 border-4 border-primary-600/20 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-transparent border-t-primary-600 border-r-primary-600 rounded-full animate-spin" style={{ animationDuration: '1s' }}></div>
               {(playStatus === 'downloading' || playStatus === 'buffering' || playStatus === 'adding') && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-red-600 text-3xl font-bold drop-shadow-lg">
+                  <span className="text-primary-600 text-3xl font-bold drop-shadow-lg">
                     {progressPercentage.toFixed(0)}%
                   </span>
                 </div>
@@ -169,7 +171,7 @@ export function EnhancedProgressOverlay({
                 {/* Barre de progression */}
                 <div className="mb-6 w-full bg-white/10 rounded-full h-3 overflow-hidden shadow-inner">
                   <div
-                    className="bg-gradient-to-r from-red-600 to-red-500 h-full rounded-full transition-all duration-300 ease-out shadow-lg shadow-red-600/50"
+                    className="bg-gradient-to-r from-primary-600 to-primary-500 h-full rounded-full transition-all duration-300 ease-out shadow-primary shadow-primary-600/50"
                     style={{ width: `${progressPercentage}%` }}
                   />
                 </div>
@@ -207,12 +209,22 @@ export function EnhancedProgressOverlay({
 
             {/* Boutons */}
             <div className="mt-10 flex flex-col items-center gap-4">
-              <button
-                onClick={onCancel}
-                className="px-10 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all duration-200 border border-white/20 hover:border-white/30 font-medium"
-              >
-                Annuler
-              </button>
+              <div className="flex gap-4">
+                {onContinueInBackground && (playStatus === 'downloading' || playStatus === 'buffering' || playStatus === 'adding') && (
+                  <button
+                    onClick={onContinueInBackground}
+                    className="px-8 py-3 bg-green-600/80 hover:bg-green-600 text-white rounded-lg transition-all duration-200 font-medium shadow-lg shadow-green-600/30"
+                  >
+                    Continuer en arrière-plan
+                  </button>
+                )}
+                <button
+                  onClick={onCancel}
+                  className="px-10 py-3 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-all duration-200 border border-white/20 hover:border-white/30 font-medium"
+                >
+                  Annuler
+                </button>
+              </div>
 
               <button
                 onClick={onToggleDebug}

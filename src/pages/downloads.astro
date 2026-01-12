@@ -3,9 +3,6 @@ import Layout from '../layouts/Layout.astro';
 import DownloadsList from '../components/downloads/DownloadsList';
 ---
 
-<Layout title="Téléchargements - Popcorn">
-  <div class="container mx-auto px-4 py-8">
-    <h1 class="text-3xl font-bold mb-6">Mes Téléchargements</h1>
-    <DownloadsList client:only="preact" />
-  </div>
+<Layout title="Téléchargements - Popcorn Client">
+  <DownloadsList client:only="preact" />
 </Layout>

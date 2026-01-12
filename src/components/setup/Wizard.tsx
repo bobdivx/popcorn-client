@@ -33,14 +33,27 @@ export default function Wizard() {
     completeSetup,
   } = useWizardActions();
 
-  // Rafraîchir le statut périodiquement
+  // Rafraîchir le statut périodiquement uniquement si le setup n'est pas terminé
+  // et seulement sur certaines étapes qui nécessitent une vérification
   useEffect(() => {
+    // Ne pas poller si le setup est terminé
+    if (setupStatus && !setupStatus.needsSetup) {
+      return;
+    }
+
+    // Ne poller que sur les étapes qui nécessitent une vérification (indexers, TMDB, etc.)
+    const stepsThatNeedPolling = [4, 5, 6]; // Indexers, TMDB, DownloadLocation
+    if (!stepsThatNeedPolling.includes(currentStep)) {
+      return;
+    }
+
+    // Poller toutes les 15 secondes au lieu de 3 secondes
     const interval = setInterval(() => {
       checkSetupStatus();
-    }, 3000);
+    }, 15000);
     
     return () => clearInterval(interval);
-  }, [currentStep, checkSetupStatus]);
+  }, [currentStep, checkSetupStatus, setupStatus]);
 
   if (loading) {
     return (
@@ -145,6 +158,7 @@ export default function Wizard() {
             onPrevious={() => setCurrentStep(4)}
             onNext={() => setCurrentStep(6)}
             onSave={handleSaveTmdb}
+            onStatusChange={checkSetupStatus}
           />
         )}
 

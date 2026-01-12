@@ -7,9 +7,8 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Configuration spécifique pour Tauri - mode static uniquement
-// Cette config est utilisée uniquement pour le build Tauri
-// Les routes API sont déplacées hors de src/pages avant le build
+// Configuration pour le développement web avec routes API
+// Pour le build Tauri, utiliser astro.config.tauri.mjs (mode static)
 // https://astro.build/config
 export default defineConfig({
   integrations: [
@@ -18,8 +17,9 @@ export default defineConfig({
       applyBaseStyles: false,
     }),
   ],
-  // Mode static pour Tauri (pas de routes serveur, pas d'adapter)
-  output: 'static',
+  // Mode server pour permettre les routes API (nécessaire pour /api/v1/*)
+  // En mode développement web, on a besoin des routes serveur pour les proxies
+  output: 'server',
   logLevel: 'info',
   build: {
     inlineStylesheets: 'auto',
@@ -28,44 +28,30 @@ export default defineConfig({
   vite: {
     plugins: [
       nodePolyfills({
-        // Inclure explicitement tous les polyfills nécessaires pour webtorrent
+        // Polyfills minimaux pour le client Astro
+        // Note: crypto, fs, path sont stubés via alias pour éviter les erreurs dans Tauri
         include: [
-          'events',
-          'buffer',
-          'util',
-          'stream',
-          'crypto',
           'process',
-          'path',
-          'os',
-          'url',
-          'string_decoder',
-          'punycode',
-          'querystring',
         ],
         globals: {
-          Buffer: true,
-          global: true,
           process: true,
         },
-        // Utiliser protocolImports pour inclure automatiquement d'autres polyfills
-        protocolImports: true,
-        // Inclure les dépendances de readable-stream
-        excludeAliases: [],
+        // Exclure les modules qui sont stubés
+        exclude: ['crypto', 'fs', 'path'],
       }),
     ],
     resolve: {
       extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
       // Ignorer les modules Tauri en mode dev/web
+      // Stubs pour les modules Node.js (utilisés uniquement dans les routes API qui sont exclues du build Tauri)
       alias: {
+        '@': path.resolve(__dirname, 'src'),
         '@tauri-apps/plugin-dialog': path.resolve(__dirname, 'src/lib/stubs/tauri-dialog.ts'),
         '@tauri-apps/api': path.resolve(__dirname, 'src/lib/stubs/tauri-api.ts'),
-                // Stub pour fs dans le navigateur
-                'fs': path.resolve(__dirname, 'src/lib/torrent/stubs/fs.ts'),
-                // Stub pour bittorrent-dht (non disponible dans le navigateur)
-                'bittorrent-dht': path.resolve(__dirname, 'src/lib/torrent/stubs/bittorrent-dht.ts'),
-                // Stub pour net (non disponible dans le navigateur)
-                'net': path.resolve(__dirname, 'src/lib/torrent/stubs/net.ts'),
+        // Stubs pour éviter les erreurs d'import dans Tauri (les routes API sont exclues du build)
+        'crypto': path.resolve(__dirname, 'src/lib/stubs/node-crypto.ts'),
+        'fs': path.resolve(__dirname, 'src/lib/stubs/node-fs.ts'),
+        'path': path.resolve(__dirname, 'src/lib/stubs/node-path.ts'),
       },
     },
     // Exclure explicitement les routes API si elles existent encore
@@ -86,13 +72,6 @@ export default defineConfig({
     optimizeDeps: {
       exclude: ['@tauri-apps/plugin-dialog', '@tauri-apps/api'],
       include: [
-        'events',
-        'buffer',
-        'util',
-        'stream',
-        'crypto',
-        'string_decoder',
-        'readable-stream',
         'process',
       ],
       esbuildOptions: {

@@ -56,10 +56,10 @@ export default function SettingsMenu() {
 
   const colorClasses: Record<string, { border: string; bg: string; text: string; shadow: string }> = {
     'red-500': {
-      border: 'hover:border-red-500 focus:ring-red-500',
-      bg: 'bg-red-500/20 group-hover:bg-red-500/30',
-      text: 'text-red-500 group-hover:text-red-500',
-      shadow: 'hover:shadow-red-500/20',
+      border: 'hover:border-primary-500 focus:ring-primary-500',
+      bg: 'bg-primary-500/20 group-hover:bg-primary-500/30',
+      text: 'text-primary-500 group-hover:text-primary-500',
+      shadow: 'hover:shadow-primary-500/20',
     },
     'blue-500': {
       border: 'hover:border-blue-500 focus:ring-blue-500',
@@ -68,10 +68,10 @@ export default function SettingsMenu() {
       shadow: 'hover:shadow-blue-500/20',
     },
     'purple-500': {
-      border: 'hover:border-purple-500 focus:ring-purple-500',
-      bg: 'bg-purple-500/20 group-hover:bg-purple-500/30',
-      text: 'text-purple-500 group-hover:text-purple-500',
-      shadow: 'hover:shadow-purple-500/20',
+      border: 'hover:border-primary-500 focus:ring-primary-500',
+      bg: 'bg-primary-500/20 group-hover:bg-primary-500/30',
+      text: 'text-primary-500 group-hover:text-primary-500',
+      shadow: 'hover:shadow-primary-500/20',
     },
     'green-500': {
       border: 'hover:border-green-500 focus:ring-green-500',
@@ -103,7 +103,7 @@ export default function SettingsMenu() {
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
         {cards.map((card) => {
           const IconComponent = card.icon;
-          const colors = colorClasses[card.color] || colorClasses['red-500'];
+          const colors = colorClasses[card.color] || colorClasses['red-500']; // red-500 mappe maintenant vers violet
           
           return (
             <a

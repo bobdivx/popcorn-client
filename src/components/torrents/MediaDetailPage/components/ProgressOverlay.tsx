@@ -1,5 +1,5 @@
 import type { PlayStatus, DebugLog } from '../types';
-import type { ClientTorrentStats } from '../../../../lib/torrent/webtorrent-client';
+import type { ClientTorrentStats } from '../../../../lib/client/types';
 import { DebugConsole } from './DebugConsole';
 
 interface ProgressOverlayProps {
@@ -76,7 +76,7 @@ export function ProgressOverlay({
               </button>
               <button
                 onClick={onRetry}
-                className="px-8 py-3 bg-red-600 hover:bg-red-700 text-white rounded-md transition-all duration-200 font-medium"
+                className="px-8 py-3 bg-primary hover:bg-primary-700 text-white rounded-md transition-all duration-200 font-medium focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 shadow-primary hover:shadow-primary-lg"
               >
                 Réessayer
               </button>
@@ -90,13 +90,13 @@ export function ProgressOverlay({
             {/* Spinner rouge Netflix */}
             <div className="relative w-24 h-24 mb-6">
               {/* Cercle de fond */}
-              <div className="absolute inset-0 border-4 border-red-600/20 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-primary-600/20 rounded-full"></div>
               {/* Cercle animé */}
-              <div className="absolute inset-0 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+              <div className="absolute inset-0 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
               {/* Pourcentage au centre */}
               {(playStatus === 'downloading' || playStatus === 'buffering' || playStatus === 'adding') && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-red-600 text-2xl font-bold">{progressPercentage.toFixed(1)}%</span>
+                  <span className="text-primary-600 text-2xl font-bold">{progressPercentage.toFixed(1)}%</span>
                 </div>
               )}
             </div>

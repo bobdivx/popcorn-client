@@ -13,6 +13,7 @@ import type {
   FilmData,
   SeriesData,
 } from './types';
+import { getClientUrl } from '../client-url.js';
 
 // Ré-exporter les types pour compatibilité
 export type { ApiResponse } from './types';
@@ -67,48 +68,64 @@ class ServerApiClient {
   private refreshToken: string | null = null;
 
   constructor(baseUrl?: string) {
-    // Initialiser avec une valeur par défaut pour éviter undefined
-    this.baseUrl = 'http://localhost:4321';
+    // Initialiser baseUrl à vide
+    this.baseUrl = '';
     
-    // Récupérer l'URL du serveur depuis l'environnement ou le localStorage
+    // Si une URL explicite est fournie (pour override en développement), l'utiliser
+    // Sinon, getServerUrl() sera appelé à chaque fois et retournera window.location.origin dans le navigateur
     if (baseUrl && baseUrl.trim() && baseUrl !== 'undefined') {
       this.baseUrl = baseUrl.trim();
-    } else {
-      const url = this.getServerUrl();
-      if (url && url !== 'undefined') {
-        this.baseUrl = url;
-      }
     }
+    // Note: On n'appelle pas getServerUrl() dans le constructeur car window.location.origin
+    // pourrait ne pas être disponible encore. On l'appellera à chaque fois qu'on en a besoin.
     
     this.loadTokens();
   }
 
   /**
-   * Récupère l'URL du serveur depuis l'environnement ou le localStorage
+   * Récupère l'URL du serveur (client Astro)
+   * Le client se connecte toujours à lui-même via window.location.origin
+   * Les routes /api/v1/* du client Astro font ensuite le proxy vers le backend Rust
+   * dont l'URL est stockée dans la base de données (table app_config)
+   * 
+   * Priorité:
+   * 1. window.location.origin (dans le navigateur - TOUJOURS utilisé dans le navigateur)
+   * 2. Variables d'environnement (PUBLIC_SERVER_URL, PUBLIC_CLIENT_URL) - pour override en SSR uniquement
+   * 3. getClientUrl() (fallback - retourne window.location.origin ou port par défaut)
    */
-  private getServerUrl(): string {
-    // D'abord, essayer de récupérer depuis localStorage si disponible
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('server_url');
-      if (stored && stored.trim() && stored !== 'undefined') {
-        return stored.trim();
+  getServerUrl(): string {
+    // 1. Si on est dans le navigateur, TOUJOURS utiliser window.location.origin
+    // Le client doit toujours se connecter à lui-même, peu importe les variables d'environnement
+    if (typeof window !== 'undefined' && window.location && window.location.origin) {
+      const currentOrigin = window.location.origin;
+      // Toujours réinitialiser pour garantir que le client se connecte à lui-même
+      // Ignorer toute valeur stockée précédemment ou dans les variables d'environnement
+      if (this.baseUrl !== currentOrigin) {
+        if (typeof console !== 'undefined' && console.log) {
+          console.log(`[server-api] Réinitialisation de baseUrl: "${this.baseUrl}" -> "${currentOrigin}"`);
+        }
+        this.baseUrl = currentOrigin;
+      }
+      return this.baseUrl;
+    }
+    
+    // 2. Si pas dans le navigateur (SSR), utiliser les variables d'environnement
+    if (!this.baseUrl || this.baseUrl === 'undefined' || this.baseUrl.trim() === '') {
+      try {
+        const envUrl = import.meta.env.PUBLIC_SERVER_URL || import.meta.env.PUBLIC_CLIENT_URL;
+        if (envUrl && envUrl !== 'undefined' && envUrl.trim()) {
+          this.baseUrl = envUrl.trim();
+        } else {
+          // 3. Utiliser getClientUrl() comme fallback
+          this.baseUrl = getClientUrl();
+        }
+      } catch (e) {
+        // En cas d'erreur, utiliser getClientUrl() comme fallback
+        this.baseUrl = getClientUrl();
       }
     }
     
-    // Ensuite, essayer depuis les variables d'environnement (.env)
-    // Le client se connecte au frontend Astro du serveur (port 4321 par défaut)
-    // qui fait office d'API gateway et expose les routes /api/v1/
-    try {
-      const envUrl = import.meta.env.PUBLIC_SERVER_URL;
-      if (envUrl && envUrl !== 'undefined' && envUrl.trim()) {
-        return envUrl.trim();
-      }
-    } catch (e) {
-      // Ignorer les erreurs d'accès à import.meta.env côté serveur
-    }
-    
-    // Retourner une valeur par défaut
-    return 'http://localhost:4321';
+    return this.baseUrl;
   }
 
   /**
@@ -153,13 +170,14 @@ class ServerApiClient {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     // S'assurer que baseUrl est défini avant de faire la requête
-    // Utiliser getServerUrl() qui réinitialise l'URL si nécessaire
-    let baseUrl = this.getServerUrl();
+    // Utiliser getServerUrl() qui FORCE l'utilisation de window.location.origin dans le navigateur
+    const baseUrl = this.getServerUrl();
     
     // Vérification de sécurité supplémentaire
     if (!baseUrl || baseUrl === 'undefined' || baseUrl.trim() === '') {
-      baseUrl = 'http://localhost:4321';
-      this.baseUrl = baseUrl;
+      // En dernier recours, utiliser getClientUrl() qui retourne window.location.origin
+      this.baseUrl = getClientUrl();
+      return this.request(endpoint, options); // Réessayer avec la nouvelle URL
     }
     
     const url = `${baseUrl}${endpoint}`;
@@ -287,7 +305,10 @@ class ServerApiClient {
     if (!this.refreshToken) return false;
 
     try {
-      const response = await fetch(`${this.baseUrl}/api/v1/auth/refresh`, {
+      // S'assurer d'utiliser la bonne URL (window.location.origin dans le navigateur)
+      const serverUrl = this.getServerUrl();
+      
+      const response = await fetch(`${serverUrl}/api/v1/auth/refresh`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -414,7 +435,7 @@ class ServerApiClient {
    * Récupère l'URL de stream pour un contenu
    * Le contentId peut être un slug (ex: "une-zone-a-defendre-2023") ou un infoHash
    * Note: Cette méthode est conservée pour compatibilité avec VideoPlayer.tsx
-   * Le nouveau système utilise MediaDetailPage avec WebTorrent
+   * Le nouveau système utilise MediaDetailPage avec le backend Rust
    */
   async getStream(contentId: string): Promise<ApiResponse<StreamResponse>> {
     try {
@@ -440,7 +461,7 @@ class ServerApiClient {
             const infoHash = firstVariant.infoHash || firstVariant.info_hash;
             
             if (infoHash) {
-              // Construire l'URL HLS (pour compatibilité, mais le nouveau système utilise WebTorrent)
+              // Construire l'URL HLS (pour compatibilité, mais le nouveau système utilise le backend Rust)
               const hlsUrl = `${baseUrl}/api/media/hls/${infoHash}/master.m3u8`;
               
               return {
@@ -552,8 +573,11 @@ class ServerApiClient {
    */
   async checkServerHealth(): Promise<ApiResponse<{ status: string }>> {
     try {
-      // Le frontend Astro expose /api/v1/health qui fait un proxy vers le backend
-      const response = await fetch(`${this.baseUrl}/api/v1/health`, {
+      // S'assurer d'utiliser la bonne URL (window.location.origin dans le navigateur)
+      const serverUrl = this.getServerUrl();
+      
+      // La route /api/v1/health dans le client fait un proxy vers /api/client/health du backend Rust
+      const response = await fetch(`${serverUrl}/api/v1/health`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -634,6 +658,23 @@ class ServerApiClient {
   async deleteIndexer(id: string): Promise<ApiResponse<void>> {
     return this.request<void>(`/api/v1/setup/indexers/${id}`, {
       method: 'DELETE',
+    });
+  }
+
+  /**
+   * Récupère les catégories configurées pour un indexer
+   */
+  async getIndexerCategories(indexerId: string): Promise<ApiResponse<string[]>> {
+    return this.request<string[]>(`/api/v1/indexers/${indexerId}/categories`);
+  }
+
+  /**
+   * Met à jour les catégories configurées pour un indexer
+   */
+  async updateIndexerCategories(indexerId: string, categories: string[]): Promise<ApiResponse<void>> {
+    return this.request<void>(`/api/v1/indexers/${indexerId}/categories`, {
+      method: 'PUT',
+      body: JSON.stringify({ categories }),
     });
   }
 
@@ -721,6 +762,15 @@ class ServerApiClient {
   }
 
   /**
+   * Arrête la synchronisation en cours
+   */
+  async stopSync(): Promise<ApiResponse<void>> {
+    return this.request<void>('/api/v1/sync/stop', {
+      method: 'POST',
+    });
+  }
+
+  /**
    * Récupère les paramètres de synchronisation
    */
   async getSyncSettings(): Promise<ApiResponse<any>> {
@@ -772,10 +822,23 @@ class ServerApiClient {
   // ==================== CONFIGURATION ====================
 
   /**
-   * Définit l'URL du serveur
-   * Normalise l'URL (supprime le port pour les domaines HTTPS, conserve pour HTTP local)
+   * Définit l'URL du serveur (client Astro)
+   * Note: Dans le navigateur, cette méthode est ignorée car le client doit toujours se connecter à lui-même
+   * via window.location.origin. Cette méthode est utile uniquement en SSR ou pour les tests.
+   * L'URL du backend Rust est stockée dans localStorage (côté client) via backend-config.ts
    */
   setServerUrl(url: string): void {
+    // Dans le navigateur, ignorer cette méthode car le client doit toujours se connecter à lui-même
+    // via window.location.origin (géré par getServerUrl())
+    if (typeof window !== 'undefined' && window.location && window.location.origin) {
+      // Ne pas mettre à jour baseUrl dans le navigateur - getServerUrl() utilisera toujours window.location.origin
+      if (typeof console !== 'undefined' && console.warn) {
+        console.warn('[server-api] setServerUrl() appelé dans le navigateur - ignoré. Le client se connecte toujours à lui-même via window.location.origin');
+      }
+      return;
+    }
+    
+    // En SSR uniquement, permettre de définir une URL personnalisée
     let normalizedUrl = url.trim();
     
     // Normaliser l'URL : supprimer le port pour les domaines HTTPS
@@ -797,10 +860,8 @@ class ServerApiClient {
       // URL invalide, on garde tel quel
     }
     
+    // Mettre à jour l'URL en mémoire (SSR uniquement)
     this.baseUrl = normalizedUrl;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('server_url', normalizedUrl);
-    }
   }
 
   /**
@@ -814,37 +875,6 @@ class ServerApiClient {
     return !!this.accessToken;
   }
 
-  /**
-   * Récupère l'URL du serveur (pour usage interne dans les endpoints API)
-   * Réinitialise l'URL si elle n'est pas définie
-   */
-  getServerUrl(): string {
-    // S'assurer que baseUrl est défini et valide
-    if (!this.baseUrl || this.baseUrl === 'undefined' || this.baseUrl.trim() === '') {
-      // Récupérer depuis localStorage si disponible
-      if (typeof window !== 'undefined') {
-        const stored = localStorage.getItem('server_url');
-        if (stored && stored.trim() && stored !== 'undefined') {
-          this.baseUrl = stored.trim();
-          return this.baseUrl;
-        }
-      }
-      // Sinon utiliser l'URL de l'environnement ou la valeur par défaut
-      try {
-        const envUrl = import.meta.env.PUBLIC_SERVER_URL;
-        if (envUrl && envUrl !== 'undefined' && envUrl.trim()) {
-          this.baseUrl = envUrl.trim();
-        } else {
-          this.baseUrl = 'http://localhost:4321';
-        }
-      } catch (e) {
-        // En cas d'erreur, utiliser la valeur par défaut
-        this.baseUrl = 'http://localhost:4321';
-      }
-    }
-    // S'assurer qu'on retourne toujours une valeur valide
-    return this.baseUrl || 'http://localhost:4321';
-  }
 
   /**
    * Récupère le token d'accès (pour usage interne dans les endpoints API)

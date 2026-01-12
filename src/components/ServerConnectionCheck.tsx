@@ -1,12 +1,15 @@
 /**
  * Composant de vérification de connexion serveur
  * Affiche une animation pendant la vérification et redirige selon le résultat
+ * Réessaie automatiquement en cas d'erreur
  */
 
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
 
 type ConnectionStatus = 'checking' | 'connecting' | 'connected' | 'error';
+
+const RETRY_INTERVAL = 3000; // Réessayer toutes les 3 secondes
 
 export default function ServerConnectionCheck() {
   const [status, setStatus] = useState<ConnectionStatus>('checking');
@@ -14,6 +17,8 @@ export default function ServerConnectionCheck() {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [isVisible, setIsVisible] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
+  const retryIntervalRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Ne pas bloquer l'accès aux pages de configuration
@@ -27,6 +32,13 @@ export default function ServerConnectionCheck() {
     }
 
     checkConnection();
+
+    // Nettoyer le timeout lors du démontage
+    return () => {
+      if (retryIntervalRef.current !== null) {
+        clearTimeout(retryIntervalRef.current);
+      }
+    };
   }, []);
 
   const checkConnection = async () => {
@@ -47,6 +59,12 @@ export default function ServerConnectionCheck() {
       const response = await serverApi.checkServerHealth();
 
       if (response.success) {
+        // Nettoyer le timeout si la connexion réussit
+        if (retryIntervalRef.current !== null) {
+          clearTimeout(retryIntervalRef.current);
+          retryIntervalRef.current = null;
+        }
+        setRetryCount(0);
         setProgress(100);
         setStatus('connected');
         setMessage('Connexion réussie !');
@@ -91,40 +109,55 @@ export default function ServerConnectionCheck() {
           }
         }, 500);
       } else {
-        setStatus('error');
-        setError(response.message || 'Impossible de se connecter au serveur');
-        setMessage('Erreur de connexion');
+        // En cas d'erreur, continuer à réessayer automatiquement
+        setStatus('connecting');
+        setError(response.message || 'Serveur non disponible');
+        setMessage('En attente du serveur...');
         setProgress(0);
+        setRetryCount(prev => prev + 1);
         
         // Ne pas bloquer l'accès aux pages de configuration en cas d'erreur
         const currentPath = window.location.pathname;
         const allowedPaths = ['/settings/server', '/setup', '/disclaimer', '/login', '/register'];
         if (allowedPaths.some(path => currentPath.startsWith(path))) {
           setIsVisible(false);
+          return;
         }
+
+        // Programmer un nouveau réessai
+        if (retryIntervalRef.current !== null) {
+          clearTimeout(retryIntervalRef.current);
+        }
+        retryIntervalRef.current = window.setTimeout(() => {
+          checkConnection();
+        }, RETRY_INTERVAL);
       }
     } catch (err) {
-      setStatus('error');
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
-      setMessage('Erreur de connexion');
+      // En cas d'erreur réseau, continuer à réessayer automatiquement
+      setStatus('connecting');
+      setError(err instanceof Error ? err.message : 'Erreur de connexion');
+      setMessage('En attente du serveur...');
       setProgress(0);
+      setRetryCount(prev => prev + 1);
       
       // Ne pas bloquer l'accès aux pages de configuration en cas d'erreur
       const currentPath = window.location.pathname;
       const allowedPaths = ['/settings/server', '/setup', '/disclaimer', '/login', '/register'];
       if (allowedPaths.some(path => currentPath.startsWith(path))) {
         setIsVisible(false);
+        return;
       }
+
+      // Programmer un nouveau réessai
+      if (retryIntervalRef.current !== null) {
+        clearTimeout(retryIntervalRef.current);
+      }
+      retryIntervalRef.current = window.setTimeout(() => {
+        checkConnection();
+      }, RETRY_INTERVAL);
     }
   };
 
-  const handleRetry = () => {
-    checkConnection();
-  };
-
-  const handleConfigure = () => {
-    window.location.href = '/settings/server';
-  };
 
   // Ne jamais afficher sur les pages de configuration
   const currentPath = window.location.pathname;
@@ -164,69 +197,59 @@ export default function ServerConnectionCheck() {
           </div>
         </div>
 
-        {/* Titre */}
-        <div className="text-center space-y-4">
-          <h1 className="text-3xl md:text-5xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-pulse">
-            Popcorn Torrent
-          </h1>
-          
-          {/* Message de statut */}
-          <p className={`text-lg md:text-xl font-medium ${
-            status === 'error' 
-              ? 'text-red-400' 
-              : status === 'starting' || status === 'connecting'
+          {/* Titre */}
+          <div className="text-center space-y-4 tv:space-y-6">
+            <h1 className="text-3xl md:text-5xl tv:text-6xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-pulse">
+              Popcorn Torrent
+            </h1>
+            
+            {/* Message de statut */}
+            <p className={`text-lg md:text-xl tv:text-2xl font-medium ${
+              status === 'connecting' && retryCount > 0
                 ? 'text-yellow-300' 
-                : 'text-gray-300'
-          }`}>
-            {message}
-          </p>
-        </div>
+                : status === 'starting' || status === 'connecting'
+                  ? 'text-yellow-300' 
+                  : 'text-gray-300'
+            }`}>
+              {message}
+            </p>
+          </div>
 
         {/* Barre de progression */}
-        {status !== 'error' && (
-          <div className="w-full max-w-md space-y-2">
-            <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-500 ease-out relative"
-                style={{ width: `${progress}%` }}
-              >
-                <div className="absolute inset-0 bg-white/30 animate-shimmer"></div>
-              </div>
+        <div className="w-full max-w-md space-y-2">
+          <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-500 ease-out relative"
+              style={{ width: `${progress > 0 ? progress : 30}%` }}
+            >
+              <div className="absolute inset-0 bg-white/30 animate-shimmer"></div>
             </div>
-            <div className="text-center text-sm text-gray-400">
-              {Math.round(progress)}%
-            </div>
+          </div>
+          <div className="text-center text-sm text-gray-400">
+            {progress > 0 ? `${Math.round(progress)}%` : 'Connexion en cours...'}
+          </div>
+        </div>
+
+        {/* Message d'erreur si disponible */}
+        {error && (
+          <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-red-400 text-center max-w-md">
+            {error}
           </div>
         )}
 
-        {/* Message d'erreur ou points de chargement */}
-        {status === 'error' ? (
-          <div className="space-y-6 w-full max-w-md">
-            <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-red-400 text-center">
-              {error}
-            </div>
-            <div className="flex gap-4 justify-center">
-              <button
-                onClick={handleRetry}
-                className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
-              >
-                Réessayer
-              </button>
-              <button
-                onClick={handleConfigure}
-                className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
-              >
-                Configurer l'URL
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex space-x-2">
-            <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-            <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-            <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+        {/* Indicateur de réessai */}
+        {retryCount > 0 && (
+          <div className="text-center text-sm text-gray-500">
+            Tentative {retryCount}... Réessai automatique dans quelques secondes
           </div>
         )}
+
+        {/* Points de chargement */}
+        <div className="flex space-x-2">
+          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+          <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+        </div>
       </div>
 
       {/* Styles CSS pour l'animation shimmer */}

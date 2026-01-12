@@ -1,6 +1,9 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useMemo } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import type { FilmData } from '../../lib/client/types';
+import { HeroSection } from './components/HeroSection';
+import CarouselRow from '../torrents/CarouselRow';
+import { TorrentPoster } from './components/TorrentPoster';
 
 export default function FilmsDashboard() {
   const [films, setFilms] = useState<FilmData[]>([]);
@@ -18,7 +21,13 @@ export default function FilmsDashboard() {
       const response = await serverApi.getFilmsData();
       
       if (response.success && response.data) {
-        setFilms(response.data);
+        // Trier par date de sortie (les plus récents en premier)
+        const sortedFilms = [...response.data].sort((a, b) => {
+          const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+          const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+          return dateB - dateA; // Plus récent en premier
+        });
+        setFilms(sortedFilms);
       } else {
         setError(response.message || 'Erreur lors du chargement des films');
       }
@@ -33,17 +42,66 @@ export default function FilmsDashboard() {
     window.location.href = `/player/${film.id}`;
   };
 
+  // Grouper les films par genre
+  const filmsByGenre = useMemo(() => {
+    const grouped: Record<string, FilmData[]> = {};
+    
+    films.forEach(film => {
+      if (film.genres && film.genres.length > 0) {
+        film.genres.forEach(genre => {
+          if (!grouped[genre]) {
+            grouped[genre] = [];
+          }
+          // Éviter les doublons
+          if (!grouped[genre].find(f => f.id === film.id)) {
+            grouped[genre].push(film);
+          }
+        });
+      } else {
+        // Films sans genre dans une catégorie "Autres"
+        if (!grouped['Autres']) {
+          grouped['Autres'] = [];
+        }
+        if (!grouped['Autres'].find(f => f.id === film.id)) {
+          grouped['Autres'].push(film);
+        }
+      }
+    });
+
+    // Trier chaque groupe par date (plus récent en premier)
+    Object.keys(grouped).forEach(genre => {
+      grouped[genre].sort((a, b) => {
+        const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+        const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+        return dateB - dateA;
+      });
+    });
+
+    return grouped;
+  }, [films]);
+
+  // Préparer les données pour le hero (les 3 films les plus récents avec poster)
+  const heroFilms = useMemo(() => {
+    return films
+      .filter(f => f.poster || f.backdrop)
+      .slice(0, 3)
+      .map(f => ({
+        ...f,
+        type: 'movie' as const,
+      }));
+  }, [films]);
+
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-base-100">
-        <span className="loading loading-spinner loading-lg text-primary"></span>
+      <div className="flex justify-center items-center min-h-screen bg-black">
+        <span className="loading loading-spinner loading-lg text-white"></span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-base-100 px-4">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white px-4">
         <div className="alert alert-error max-w-2xl">
           <span>{error}</span>
         </div>
@@ -51,46 +109,48 @@ export default function FilmsDashboard() {
     );
   }
 
+  if (films.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white px-4">
+        <div className="text-center max-w-2xl">
+          <h2 className="text-3xl font-bold text-white mb-4">
+            Aucun film disponible
+          </h2>
+          <p className="text-gray-400 text-lg">
+            Aucun film n'est disponible pour le moment.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Trier les genres par ordre alphabétique
+  const sortedGenres = Object.keys(filmsByGenre).sort();
+
   return (
-    <div className="min-h-screen bg-base-100 text-base-content p-4 sm:p-6 lg:p-8">
-      <h1 className="text-3xl sm:text-4xl font-bold mb-6 sm:mb-8">Films</h1>
-      
-      {films.length === 0 ? (
-        <div className="text-center py-12">
-          <p className="text-base-content/70 text-lg">Aucun film disponible</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-6">
-          {films.map((film) => (
-            <div
-              key={film.id}
-              className="cursor-pointer group"
-              onClick={() => handlePlay(film)}
-            >
-              <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-base-200 mb-2 group-hover:scale-105 transition-transform">
-                {film.poster ? (
-                  <img
-                    src={film.poster}
-                    alt={film.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-base-content/50 text-2xl">
-                    {film.title.charAt(0)}
-                  </div>
-                )}
-              </div>
-              <p className="text-sm font-medium text-base-content truncate">{film.title}</p>
-              {film.year && (
-                <p className="text-xs text-base-content/60">{film.year}</p>
-              )}
-              {film.rating && (
-                <p className="text-xs text-primary">⭐ {film.rating.toFixed(1)}</p>
-              )}
-            </div>
-          ))}
-        </div>
+    <div className="min-h-screen bg-black text-white">
+      {/* Section Hero avec carousel */}
+      {heroFilms.length > 0 && (
+        <HeroSection items={heroFilms} onPlay={handlePlay} />
       )}
+
+      <div className="pb-8">
+        {/* Afficher une ligne par genre */}
+        {sortedGenres.map(genre => {
+          const genreFilms = filmsByGenre[genre];
+          if (genreFilms.length === 0) return null;
+
+          return (
+            <CarouselRow key={genre} title={genre}>
+              {genreFilms.map((film) => (
+                <div key={film.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px]">
+                  <TorrentPoster item={{ ...film, type: 'movie' }} />
+                </div>
+              ))}
+            </CarouselRow>
+          );
+        })}
+      </div>
     </div>
   );
 }

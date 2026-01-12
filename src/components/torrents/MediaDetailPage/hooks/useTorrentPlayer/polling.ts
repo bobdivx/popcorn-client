@@ -1,4 +1,5 @@
-import { webtorrentClient, type ClientTorrentStats } from '../../../../../lib/torrent/webtorrent-client';
+import { clientApi } from '../../../../../lib/client/api';
+import type { ClientTorrentStats } from '../../../../../lib/client/types';
 import { QUEUED_TIMEOUT_MS, QUEUED_LOG_INTERVAL_MS, QUEUED_RETRY_RESUME_MS } from '../../utils/constants';
 import type { PollingContext } from './types';
 
@@ -27,7 +28,8 @@ export function createPollTorrentProgress(context: PollingContext) {
   } = context;
 
   return async (infoHash: string) => {
-    // Ne pas poller si la lecture est déjà en cours
+    // Ne pas poller si la lecture est déjà en cours (pour le streaming)
+    // Mais permettre le polling pendant le téléchargement (isPlaying = false)
     if (isPlaying) {
       stopProgressPolling();
       if (playStatus !== 'ready' && playStatus !== 'error') {
@@ -42,8 +44,9 @@ export function createPollTorrentProgress(context: PollingContext) {
     }
 
     try {
-      const stats = await webtorrentClient.getTorrent(infoHash);
+      const stats = await clientApi.getTorrent(infoHash);
       if (stats) {
+        // Mettre à jour les stats (utilisé pour afficher le statut de téléchargement sur la page détail)
         setTorrentStats(stats);
 
         const progress = stats.progress || 0;
@@ -176,7 +179,7 @@ async function handleQueuedState(
         addDebugLog('info', '🔄 Tentative de reprise du torrent...', {
           peers: stats.peers_connected,
         });
-        webtorrentClient.resumeTorrent(infoHash).catch((err: any) => {
+        clientApi.resumeTorrent(infoHash).catch((err: any) => {
           addDebugLog('warning', 'Impossible de reprendre le torrent', { 
             error: err instanceof Error ? err.message : String(err),
           });
@@ -189,50 +192,22 @@ async function handleQueuedState(
       }
     }
 
-    // Vérifier périodiquement si les fichiers sont maintenant disponibles
-    if (videoFiles.length === 0 && !isPlaying) {
-      loadVideoFiles(infoHash)
-        .then((videos) => {
-          if (isPlaying) return;
-          if (videos.length > 0) {
-            addDebugLog('success', '✅ Fichiers vidéo trouvés après attente', {
-              files_count: videos.length,
-            });
-            setVideoFiles(videos);
-            setSelectedFile(videos[0]);
-            setPlayStatus('downloading');
-            setProgressMessage('Fichiers identifiés, téléchargement en cours...');
-            webtorrentClient.resumeTorrent(infoHash).catch(() => {});
-          }
-        })
-        .catch(() => {});
-    }
+    // Ne pas charger les fichiers vidéo pendant le téléchargement (isPlaying = false)
+    // Les fichiers seront chargés uniquement quand l'utilisateur clique sur "Lire"
+    // Cela évite de déclencher le lecteur HLS pendant le téléchargement
   } else {
     // Métadonnées disponibles mais torrent toujours en queue
     setProgressMessage('En attente de téléchargement...');
     
-    // Charger les fichiers si pas encore fait
-    if (videoFiles.length === 0 && !isPlaying) {
-      loadVideoFiles(infoHash)
-        .then((videos) => {
-          if (videos.length > 0) {
-            addDebugLog('success', '✅ Fichiers vidéo chargés', {
-              files_count: videos.length,
-            });
-            setVideoFiles(videos);
-            setSelectedFile(videos[0]);
-            setPlayStatus('downloading');
-            setProgressMessage('Téléchargement en cours...');
-          }
-        })
-        .catch(() => {});
-    }
+    // Ne pas charger les fichiers vidéo pendant le téléchargement (isPlaying = false)
+    // Les fichiers seront chargés uniquement quand l'utilisateur clique sur "Lire"
+    // Cela évite de déclencher le lecteur HLS pendant le téléchargement
 
     // Essayer de reprendre le torrent périodiquement
     const shouldRetryResume = lastResumeAttemptRef.current === null || now - lastResumeAttemptRef.current >= QUEUED_RETRY_RESUME_MS;
     if (shouldRetryResume) {
       lastResumeAttemptRef.current = now;
-      webtorrentClient.resumeTorrent(infoHash).then(() => {
+      clientApi.resumeTorrent(infoHash).then(() => {
         addDebugLog('info', '🔄 Tentative de reprise du torrent');
       }).catch(() => {});
     }
@@ -266,9 +241,10 @@ async function handleDownloadingState(
     }
   }
 
-  // Charger les fichiers vidéo s'ils ne sont pas encore disponibles
-  // Vérifier périodiquement (toutes les 5 secondes) si les fichiers sont maintenant disponibles
-  if (videoFiles.length === 0) {
+  // Charger les fichiers vidéo UNIQUEMENT si on est en mode streaming (isPlaying = true)
+  // Pendant le téléchargement (isPlaying = false), ne pas charger les fichiers pour éviter de déclencher le lecteur HLS
+  // Les fichiers seront chargés uniquement quand l'utilisateur clique sur "Lire"
+  if (videoFiles.length === 0 && isPlaying) {
     loadVideoFiles(infoHash).then((videos) => {
       if (videos.length > 0) {
         addDebugLog('success', '✅ Fichiers vidéo chargés en préparation', {
@@ -295,35 +271,9 @@ async function handleDownloadingState(
     });
   }
   
-  // Si on a des fichiers et assez de données téléchargées (>10%), on peut lancer la lecture
-  // Cela permet de commencer à regarder pendant que le reste se télécharge
-  if (videoFiles.length > 0 && progress >= 0.10 && progress < 0.95 && !isPlaying) {
-    // Essayer de démarrer la lecture automatiquement si on a assez de données
-    // Pour WebTorrent, on peut généralement commencer avec 10-20% téléchargé
-    const { setIsPlaying, setShowInfo, setPlayStatus, stopProgressPolling } = context;
-    
-    // Vérifier que le fichier a assez de données (au moins 50 MB ou 10% du fichier)
-    const selectedFile = videoFiles[0];
-    if (selectedFile) {
-      const minBytes = Math.min(50 * 1024 * 1024, selectedFile.size * 0.1);
-      const downloadedBytes = stats.downloaded_bytes || 0;
-      
-      if (downloadedBytes >= minBytes) {
-        addDebugLog('success', '✅ Suffisamment de données téléchargées, lancement de la lecture', {
-          downloaded_mb: (downloadedBytes / (1024 * 1024)).toFixed(2),
-          file_size_mb: (selectedFile.size / (1024 * 1024)).toFixed(2),
-          progress: (progress * 100).toFixed(1) + '%',
-        });
-        setPlayStatus('ready');
-        setProgressMessage('Lancement de la lecture...');
-        stopProgressPolling();
-        setTimeout(() => {
-          setIsPlaying(true);
-          setShowInfo(false);
-        }, 500);
-      }
-    }
-  }
+  // Ne pas lancer automatiquement la lecture pendant le téléchargement
+  // La lecture ne sera lancée que quand l'utilisateur clique explicitement sur "Lire"
+  // (via handlePlay qui vérifie si le torrent est disponible)
 }
 
 async function handleCompletedState(
@@ -332,10 +282,17 @@ async function handleCompletedState(
   progress: number,
   context: PollingContext
 ) {
-  const { setPlayStatus, setProgressMessage, addDebugLog, loadVideoFiles, setVideoFiles, setSelectedFile, setIsPlaying, setShowInfo, stopProgressPolling } = context;
+  const { setPlayStatus, setProgressMessage, addDebugLog, loadVideoFiles, setVideoFiles, setSelectedFile, setIsPlaying, setShowInfo, setIsAvailableLocally, stopProgressPolling } = context;
 
   setPlayStatus('ready');
   setProgressMessage('Téléchargement terminé !');
+  
+  // Marquer le torrent comme disponible localement
+  setIsAvailableLocally(true);
+  addDebugLog('success', '📚 Torrent marqué comme disponible localement', {
+    state: stats.state,
+    progress: `${(progress * 100).toFixed(1)}%`,
+  });
   
   try {
     const videos = await loadVideoFiles(infoHash);
@@ -348,15 +305,16 @@ async function handleCompletedState(
       setVideoFiles(videos);
       setSelectedFile(fileToUse);
       
-      addDebugLog('success', '✅ Démarrage de la lecture', {
+      addDebugLog('success', '✅ Démarrage de la lecture (torrent completed par libtorrent)', {
         selected_file: fileToUse.path,
       });
       
       stopProgressPolling();
-      setTimeout(() => {
-        setIsPlaying(true);
-        setShowInfo(false);
-      }, 300);
+      
+      // Lancer la lecture immédiatement quand le torrent est marqué "completed" par libtorrent
+      // Le lecteur HLS gérera les erreurs et réessayera automatiquement si le fichier n'est pas encore prêt
+      setIsPlaying(true);
+      setShowInfo(false);
     } else {
       setPlayStatus('error');
       addDebugLog('error', '❌ Aucun fichier vidéo trouvé dans le torrent terminé');
@@ -374,7 +332,7 @@ async function handlePausedState(infoHash: string, context: PollingContext) {
   setPlayStatus('downloading');
   setProgressMessage('Torrent en pause. Reprise...');
   try {
-    await webtorrentClient.resumeTorrent(infoHash);
+    await clientApi.resumeTorrent(infoHash);
   } catch (err) {
     console.error('Erreur lors de la reprise:', err);
   }

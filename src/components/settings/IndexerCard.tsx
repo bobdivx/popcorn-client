@@ -74,7 +74,7 @@ export function IndexerCard({
             Actif
           </span>
         ) : (
-          <span class="px-4 py-2 bg-red-900/30 border border-red-600 text-red-300 rounded-lg text-base sm:text-lg font-semibold">
+          <span class="px-4 py-2 bg-primary-900/30 border border-primary-600 text-primary-300 rounded-lg text-base sm:text-lg font-semibold glass-panel">
             Inactif
           </span>
         )}
@@ -107,7 +107,7 @@ export function IndexerCard({
         <div class={`mb-4 p-4 sm:p-6 rounded-lg border ${
           testResult.success 
             ? 'bg-green-900/30 border-green-600 text-green-300' 
-            : 'bg-red-900/30 border-red-600 text-red-300'
+            : 'bg-primary-900/30 border-primary-600 text-primary-300 glass-panel'
         }`}>
           <div class="flex items-start gap-3">
             <span class="text-2xl sm:text-3xl">
@@ -253,42 +253,83 @@ export function IndexerCard({
                               )}
                             </div>
                             
-                            {/* Informations sur le téléchargement selon la spécification Torznab */}
-                            <div class="mt-2 pt-2 border-t border-gray-700/50">
-                              <p class="text-xs font-semibold mb-1 text-gray-400">📥 Format de téléchargement (Torznab) :</p>
-                              <div class="flex flex-wrap gap-2 mb-2">
-                                {(result as any)._externalMagnetUri ? (
-                                  <span class="inline-flex items-center gap-1 px-2 py-1 bg-purple-900/30 border border-purple-600 text-purple-300 rounded text-xs" title="Magnet link depuis l'attribut Torznab magneturl ou enclosure">
-                                    <span>🔗</span>
-                                    <span>Magnet link (magneturl/enclosure)</span>
-                                  </span>
-                                ) : (result as any)._externalLink && (result as any)._externalLink.startsWith('magnet:') ? (
-                                  <span class="inline-flex items-center gap-1 px-2 py-1 bg-purple-900/30 border border-purple-600 text-purple-300 rounded text-xs" title="Magnet link depuis _externalLink">
-                                    <span>🔗</span>
-                                    <span>Magnet link</span>
-                                  </span>
-                                ) : (result as any)._externalLink && !(result as any)._externalLink.startsWith('magnet:') ? (
-                                  <span class="inline-flex items-center gap-1 px-2 py-1 bg-green-900/30 border border-green-600 text-green-300 rounded text-xs" title="Fichier .torrent depuis enclosure, link ou guid">
-                                    <span>📄</span>
-                                    <span>Fichier .torrent</span>
-                                  </span>
-                                ) : (result as any).downloadUrl && !(result as any).downloadUrl.startsWith('magnet:') ? (
-                                  <span class="inline-flex items-center gap-1 px-2 py-1 bg-green-900/30 border border-green-600 text-green-300 rounded text-xs" title="Fichier .torrent depuis downloadUrl">
-                                    <span>📄</span>
-                                    <span>Fichier .torrent</span>
-                                  </span>
-                                ) : (result as any).downloadUrl && (result as any).downloadUrl.startsWith('magnet:') ? (
-                                  <span class="inline-flex items-center gap-1 px-2 py-1 bg-purple-900/30 border border-purple-600 text-purple-300 rounded text-xs" title="Magnet link depuis downloadUrl">
-                                    <span>🔗</span>
-                                    <span>Magnet link</span>
-                                  </span>
-                                ) : (
-                                  <span class="inline-flex items-center gap-1 px-2 py-1 bg-yellow-900/30 border border-yellow-600 text-yellow-300 rounded text-xs" title="Aucun lien de téléchargement disponible">
-                                    <span>⚠️</span>
-                                    <span>Aucun lien disponible</span>
-                                  </span>
+                              {/* Informations sur le GUID */}
+                              {(result as any)._guid && (
+                                <div class="mt-2 pt-2 border-t border-gray-700/50">
+                                  <p class="text-xs font-semibold mb-1 text-gray-400 flex items-center gap-1">
+                                    <span>🔑</span>
+                                    <span>GUID Torznab (pour téléchargement via API)</span>
+                                  </p>
+                                  <code class="block text-xs bg-gray-900/70 p-2 rounded break-all text-gray-400 mt-1 font-mono">
+                                    {(result as any)._guid}
+                                  </code>
+                                  <p class="text-xs text-gray-500 mt-1 italic">
+                                    ℹ️ Le GUID est utilisé avec l'API Torznab pour télécharger le fichier .torrent
+                                  </p>
+                                </div>
+                              )}
+                              
+                              {/* Informations sur le téléchargement selon la spécification Torznab */}
+                              <div class="mt-2 pt-2 border-t border-gray-700/50">
+                                <p class="text-xs font-semibold mb-1 text-gray-400">📥 Format de téléchargement (Torznab) :</p>
+                                <div class="flex flex-wrap gap-2 mb-2">
+                                  {(result as any)._externalMagnetUri ? (
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 bg-purple-900/30 border border-purple-600 text-purple-300 rounded text-xs" title="Magnet link depuis l'attribut Torznab magneturl ou enclosure">
+                                      <span>🔗</span>
+                                      <span>Magnet link (magneturl/enclosure)</span>
+                                    </span>
+                                  ) : (result as any)._externalLink && (result as any)._externalLink.startsWith('magnet:') ? (
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 bg-purple-900/30 border border-purple-600 text-purple-300 rounded text-xs" title="Magnet link depuis _externalLink">
+                                      <span>🔗</span>
+                                      <span>Magnet link</span>
+                                    </span>
+                                  ) : (result as any)._externalLink && !(result as any)._externalLink.startsWith('magnet:') ? (
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 bg-green-900/30 border border-green-600 text-green-300 rounded text-xs" title="Fichier .torrent depuis enclosure, link ou guid">
+                                      <span>📄</span>
+                                      <span>Fichier .torrent</span>
+                                    </span>
+                                  ) : (result as any).downloadUrl && !(result as any).downloadUrl.startsWith('magnet:') ? (
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 bg-green-900/30 border border-green-600 text-green-300 rounded text-xs" title="Fichier .torrent depuis downloadUrl">
+                                      <span>📄</span>
+                                      <span>Fichier .torrent</span>
+                                    </span>
+                                  ) : (result as any).downloadUrl && (result as any).downloadUrl.startsWith('magnet:') ? (
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 bg-purple-900/30 border border-purple-600 text-purple-300 rounded text-xs" title="Magnet link depuis downloadUrl">
+                                      <span>🔗</span>
+                                      <span>Magnet link</span>
+                                    </span>
+                                  ) : (
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 bg-yellow-900/30 border border-yellow-600 text-yellow-300 rounded text-xs" title="Aucun lien de téléchargement disponible">
+                                      <span>⚠️</span>
+                                      <span>Aucun lien disponible</span>
+                                    </span>
+                                  )}
+                                </div>
+                                
+                                {/* Résultat du test de téléchargement */}
+                                {(result as any).downloadTest && (
+                                  <div class={`mt-2 p-2 rounded border ${
+                                    (result as any).downloadTest.success
+                                      ? 'bg-green-900/20 border-green-600/30'
+                                      : 'bg-primary-900/20 border-primary-600/30 glass-panel'
+                                  }`}>
+                                    <p class={`text-xs font-semibold mb-1 flex items-center gap-1 ${
+                                      (result as any).downloadTest.success ? 'text-green-300' : 'text-red-300'
+                                    }`}>
+                                      <span>{(result as any).downloadTest.success ? '✅' : '❌'}</span>
+                                      <span>Test de téléchargement du fichier .torrent</span>
+                                    </p>
+                                    <p class="text-xs text-gray-400 mb-1">
+                                      {(result as any).downloadTest.message}
+                                    </p>
+                                    {(result as any).downloadTest.guidUsed && (
+                                      <p class="text-xs text-gray-500 mt-1">
+                                        <span class="font-semibold">GUID utilisé:</span>{' '}
+                                        <code class="bg-gray-900/70 px-1 rounded">{(result as any).downloadTest.guidUsed}</code>
+                                      </p>
+                                    )}
+                                  </div>
                                 )}
-                              </div>
                               {/* Détails du lien selon la spécification Torznab */}
                               <div class="mt-2 pt-2 border-t border-gray-700/50">
                                 <p class="text-xs font-semibold text-gray-400 mb-2 flex items-center gap-1">
@@ -409,7 +450,7 @@ export function IndexerCard({
           )}
           {onDelete && (
             <button
-              class="bg-red-600 hover:bg-red-700 text-white font-semibold py-4 px-6 sm:py-5 sm:px-8 md:py-5 md:px-10 rounded-lg text-lg sm:text-xl md:text-2xl transition-all duration-200 min-h-[56px] sm:min-h-[64px] md:min-h-[72px] focus:outline-none focus:ring-4 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-gray-900 flex-1"
+              class="bg-primary hover:bg-primary-700 text-white font-semibold py-4 px-6 sm:py-5 sm:px-8 md:py-5 md:px-10 rounded-lg text-lg sm:text-xl md:text-2xl transition-all duration-200 min-h-[56px] sm:min-h-[64px] md:min-h-[72px] focus:outline-none focus:ring-4 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 flex-1 shadow-primary hover:shadow-primary-lg"
               onClick={onDelete}
             >
               🗑️ Supprimer

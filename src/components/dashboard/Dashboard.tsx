@@ -66,12 +66,12 @@ export default function Dashboard() {
         <HeroSection items={heroItems} onPlay={handlePlay} />
       )}
 
-      <div className="pb-8">
+      <div className="pb-8 tv:pb-12">
         {/* Section Reprendre la lecture */}
         {(resumeWatching.length > 0 || (data.continueWatching && data.continueWatching.length > 0)) && (
           <CarouselRow title="Reprendre la lecture">
             {(resumeWatching.length > 0 ? resumeWatching : data.continueWatching || []).map((item) => (
-              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] relative">
+              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px] relative">
                 <ResumePoster item={item} />
               </div>
             ))}
@@ -82,7 +82,7 @@ export default function Dashboard() {
         {data.popularMovies && data.popularMovies.length > 0 && (
           <CarouselRow title="Films populaires">
             {data.popularMovies.map((item) => (
-              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px]">
+              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                 <TorrentPoster item={item} />
               </div>
             ))}
@@ -93,7 +93,7 @@ export default function Dashboard() {
         {data.popularSeries && data.popularSeries.length > 0 && (
           <CarouselRow title="Séries populaires">
             {data.popularSeries.map((item) => (
-              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px]">
+              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                 <TorrentPoster item={item} />
               </div>
             ))}
@@ -104,7 +104,7 @@ export default function Dashboard() {
         {data.recentAdditions && data.recentAdditions.length > 0 && (
           <CarouselRow title="Ajouts récents">
             {data.recentAdditions.map((item) => (
-              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px]">
+              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                 <TorrentPoster item={item} />
               </div>
             ))}

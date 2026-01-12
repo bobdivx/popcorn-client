@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'preact/hooks';
-import type { ClientTorrentStats } from '../../../../../lib/torrent/webtorrent-client';
+import type { ClientTorrentStats } from '../../../../../lib/client/types';
 import type { PlayStatus } from '../../types';
 import type { UseTorrentPlayerOptions, PollingContext, PlayHandlerContext } from './types';
 import { stopProgressPolling as stopProgressPollingUtil, handleClosePlayer as handleClosePlayerUtil } from './utils';
@@ -60,6 +60,7 @@ export function useTorrentPlayer(options: UseTorrentPlayerOptions) {
     setShowInfo,
     setVideoFiles,
     setSelectedFile,
+    setIsAvailableLocally,
     addDebugLog,
     playStatus,
     isPlaying,

@@ -1,4 +1,4 @@
-import type { ClientTorrentStats } from '../../../../../lib/torrent/webtorrent-client';
+import type { ClientTorrentStats } from '../../../../../lib/client/types';
 import type { PlayStatus } from '../../types';
 
 export interface UseTorrentPlayerOptions {
@@ -36,6 +36,7 @@ export interface PollingContext {
   setShowInfo: (show: boolean) => void;
   setVideoFiles: (files: any[]) => void;
   setSelectedFile: (file: any) => void;
+  setIsAvailableLocally: (value: boolean) => void;
   addDebugLog: (type: 'info' | 'success' | 'error' | 'warning', message: string, data?: any) => void;
   playStatus: PlayStatus;
   isPlaying: boolean;

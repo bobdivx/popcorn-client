@@ -1,23 +1,24 @@
-import { webtorrentClient } from '../torrent/webtorrent-client';
+import { clientApi } from '../client/api';
+import { serverApi } from '../client/server-api';
 import type { TorrentFile } from '../../components/torrents/MediaDetailPage/hooks/useVideoFiles';
 
 /**
- * Récupère la liste de tous les fichiers vidéo depuis WebTorrent
+ * Récupère la liste de tous les fichiers vidéo depuis le backend
  */
 export async function getLocalFiles(): Promise<TorrentFile[]> {
   try {
-    // Récupérer tous les torrents depuis WebTorrent
-    const torrents = await webtorrentClient.listTorrents();
+    // Récupérer tous les torrents depuis le backend
+    const torrents = await clientApi.listTorrents();
     const allFiles: TorrentFile[] = [];
 
     for (const torrent of torrents) {
-      const files = webtorrentClient.getTorrentFiles(torrent.info_hash);
+      const files = await clientApi.getTorrentFiles(torrent.info_hash);
       for (const file of files) {
         if (file.is_video) {
           allFiles.push({
-            path: file.path || file.name,
-            name: file.name,
-            size: file.length,
+            path: file.path,
+            name: file.path.split('/').pop() || file.path,
+            size: file.size,
             mime_type: file.mime_type,
             is_video: true,
           });
@@ -33,14 +34,17 @@ export async function getLocalFiles(): Promise<TorrentFile[]> {
 }
 
 /**
- * Construit une Blob URL pour un fichier du torrent depuis WebTorrent
+ * Construit une URL HLS pour un fichier du torrent depuis le backend
  */
 export async function getLocalHlsPlaylistUrl(filePath: string, infoHash: string, fileIndex: number): Promise<string | null> {
   try {
-    const blobUrl = await webtorrentClient.createBlobUrl(infoHash, fileIndex);
-    return blobUrl;
+    const baseUrl = serverApi.getServerUrl();
+    // Le backend attend /api/local/stream/{filePath}/playlist.m3u8
+    const encodedPath = encodeURIComponent(filePath);
+    const hlsUrl = `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8`;
+    return hlsUrl;
   } catch (error) {
-    console.error('Erreur lors de la création de la Blob URL:', error);
+    console.error('Erreur lors de la création de l\'URL HLS:', error);
     return null;
   }
 }
@@ -64,13 +68,12 @@ export function extractFileIdFromHlsUrl(hlsUrl: string): string | null {
  * Enregistre une vidéo comme active (pour compatibilité)
  */
 export async function registerActiveVideo(fileId: string): Promise<void> {
-  // Pas de gestion de cache côté serveur avec WebTorrent
-  // Les fichiers sont en mémoire
+  // Le backend gère le cache HLS automatiquement
 }
 
 /**
  * Désenregistre une vidéo (pour compatibilité)
  */
 export async function unregisterActiveVideo(fileId: string): Promise<void> {
-  // Pas de nettoyage nécessaire avec WebTorrent
+  // Le backend gère le nettoyage du cache HLS automatiquement
 }

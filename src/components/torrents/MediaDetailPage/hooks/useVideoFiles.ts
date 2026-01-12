@@ -1,5 +1,5 @@
 import { useState, useRef } from 'preact/hooks';
-import { webtorrentClient, type WebTorrentFile } from '../../../../lib/torrent/webtorrent-client';
+import { clientApi } from '../../../../lib/client/api';
 
 export interface TorrentFile {
   path: string;
@@ -23,9 +23,24 @@ export function useVideoFiles({ torrentName, onError, filePath }: UseVideoFilesO
   // Cache pour éviter les appels multiples pour le même infoHash
   const loadingCacheRef = useRef<Map<string, Promise<TorrentFile[]>>>(new Map());
   const filesCacheRef = useRef<Map<string, TorrentFile[]>>(new Map());
+  // Garder une trace du dernier infoHash utilisé pour invalider le cache si nécessaire
+  const lastInfoHashRef = useRef<string | null>(null);
 
   const loadVideoFiles = async (infoHash: string, retryCount: number = 0): Promise<TorrentFile[]> => {
     if (!infoHash) return [];
+
+    // Si l'infoHash a changé, invalider le cache pour éviter d'utiliser les fichiers d'un autre torrent
+    if (lastInfoHashRef.current && lastInfoHashRef.current !== infoHash) {
+      console.warn('[useVideoFiles] ⚠️ InfoHash changé, invalidation du cache:', {
+        previous: lastInfoHashRef.current,
+        current: infoHash,
+      });
+      filesCacheRef.current.clear();
+      loadingCacheRef.current.clear();
+      setVideoFiles([]);
+      setSelectedFile(null);
+    }
+    lastInfoHashRef.current = infoHash;
 
     console.log('[useVideoFiles] 🔍 Chargement des fichiers vidéo pour infoHash:', {
       infoHash,
@@ -35,11 +50,44 @@ export function useVideoFiles({ torrentName, onError, filePath }: UseVideoFilesO
     });
 
     // Vérifier le cache (mais ne pas utiliser le cache si c'est vide et qu'on réessaie)
+    // IMPORTANT: Vérifier que le cache correspond bien à l'infoHash demandé
     if (filesCacheRef.current.has(infoHash) && retryCount === 0) {
       const cached = filesCacheRef.current.get(infoHash)!;
       if (cached.length > 0) {
-        console.log('[useVideoFiles] ✅ Utilisation du cache pour', infoHash);
-        return cached;
+        // Vérifier que les fichiers en cache correspondent bien à cet infoHash
+        // En vérifiant que le chemin ne contient pas un autre infoHash
+        const cacheValid = cached.every(file => {
+          const pathLower = file.path.toLowerCase();
+          // Le chemin ne doit pas contenir un autre infoHash (format session_XXXXX ou XXXXX)
+          // On vérifie que le chemin ne contient pas un infoHash différent
+          const otherInfoHashPattern = /session_[a-f0-9]{40}|[a-f0-9]{40}/;
+          const matches = pathLower.match(otherInfoHashPattern);
+          if (matches) {
+            // Extraire l'infoHash trouvé dans le chemin
+            for (const match of matches) {
+              const foundHash = match.replace('session_', '').toLowerCase();
+              // Si l'infoHash trouvé ne correspond pas à celui demandé, le cache est invalide
+              if (foundHash.length === 40 && foundHash !== infoHash.toLowerCase()) {
+                console.warn('[useVideoFiles] ⚠️ Cache invalide détecté:', {
+                  requestedInfoHash: infoHash,
+                  foundInfoHash: foundHash,
+                  filePath: file.path,
+                });
+                return false;
+              }
+            }
+          }
+          return true;
+        });
+        
+        if (cacheValid) {
+          console.log('[useVideoFiles] ✅ Utilisation du cache pour', infoHash);
+          return cached;
+        } else {
+          // Cache invalide, le supprimer
+          console.warn('[useVideoFiles] 🗑️ Suppression du cache invalide pour', infoHash);
+          filesCacheRef.current.delete(infoHash);
+        }
       }
     }
 
@@ -53,9 +101,9 @@ export function useVideoFiles({ torrentName, onError, filePath }: UseVideoFilesO
       setLoadingFiles(true);
       try {
         // Vérifier d'abord si le torrent existe et est prêt
-        const torrentStats = await webtorrentClient.getTorrent(infoHash);
+        const torrentStats = await clientApi.getTorrent(infoHash);
         if (!torrentStats) {
-          console.warn('[useVideoFiles] ⚠️ Torrent non trouvé dans le client');
+          console.warn('[useVideoFiles] ⚠️ Torrent non trouvé dans le backend');
           if (retryCount < 5) {
             // Réessayer après 1 seconde
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -65,10 +113,41 @@ export function useVideoFiles({ torrentName, onError, filePath }: UseVideoFilesO
           return [];
         }
         
-        // Récupérer les fichiers depuis WebTorrent
-        const webtorrentFiles = webtorrentClient.getTorrentFiles(infoHash);
+        // Récupérer les fichiers depuis le backend
+        const backendFiles = await clientApi.getTorrentFiles(infoHash);
         
-        if (webtorrentFiles.length === 0) {
+        // Vérifier que les fichiers retournés correspondent bien à l'infoHash demandé
+        // Filtrer les fichiers qui contiennent un autre infoHash dans leur chemin
+        const infoHashLower = infoHash.toLowerCase();
+        const validBackendFiles = backendFiles.filter(f => {
+          const pathLower = f.path.toLowerCase();
+          // Vérifier si le chemin contient un infoHash différent
+          const otherInfoHashPattern = /session_([a-f0-9]{40})|([a-f0-9]{40})/;
+          const matches = pathLower.match(otherInfoHashPattern);
+          if (matches) {
+            for (const match of matches) {
+              const foundHash = match.replace('session_', '').toLowerCase();
+              // Si l'infoHash trouvé ne correspond pas à celui demandé, exclure ce fichier
+              if (foundHash.length === 40 && foundHash !== infoHashLower) {
+                console.warn('[useVideoFiles] ⚠️ Fichier exclu (infoHash différent dans le chemin):', {
+                  filePath: f.path,
+                  requestedInfoHash: infoHash,
+                  foundInfoHash: foundHash,
+                });
+                return false;
+              }
+            }
+          }
+          return true;
+        });
+        
+        console.log('[useVideoFiles] Fichiers filtrés par infoHash:', {
+          total: backendFiles.length,
+          valides: validBackendFiles.length,
+          exclus: backendFiles.length - validBackendFiles.length,
+        });
+        
+        if (validBackendFiles.length === 0) {
           console.warn('[useVideoFiles] ⚠️ Aucun fichier trouvé dans le torrent', {
             infoHash,
             retryCount,
@@ -94,16 +173,27 @@ export function useVideoFiles({ torrentName, onError, filePath }: UseVideoFilesO
         }
 
         // Convertir en format TorrentFile
-        let files: TorrentFile[] = webtorrentFiles
+        console.log('[useVideoFiles] Fichiers bruts du backend (après filtrage infoHash):', validBackendFiles.map(f => ({
+          path: f.path,
+          size: f.size,
+          is_video: f.is_video,
+        })));
+        
+        let files: TorrentFile[] = validBackendFiles
           .filter((f) => f.is_video)
           .map((f, index) => ({
-            path: f.path || f.name,
-            name: f.name,
-            size: f.length,
+            path: f.path,
+            name: f.path.split('/').pop() || f.path.split('\\').pop() || f.path,
+            size: f.size,
             mime_type: f.mime_type,
             is_video: true,
             index,
           }));
+        
+        console.log('[useVideoFiles] Fichiers convertis:', files.map(f => ({
+          path: f.path,
+          name: f.name,
+        })));
 
         // Si un filePath spécifique est fourni (torrent multi-épisodes), l'utiliser directement
         if (filePath && files.length > 1) {

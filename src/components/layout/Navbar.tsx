@@ -84,83 +84,106 @@ export default function Navbar() {
   }
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 w-full z-50 transition-all duration-300 ${
-      isScrolled ? 'bg-black/80 backdrop-blur-md' : 'bg-black/40 backdrop-blur-sm'
+    <nav className={`fixed top-0 left-0 right-0 w-full z-50 transition-all duration-300 glass-panel border-b border-white/10 ${
+      isScrolled ? 'bg-glass-active' : 'bg-glass'
     }`}>
-      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
-        <div className="flex items-center justify-between h-16 sm:h-18 md:h-20 lg:h-24">
+      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 tv:px-24">
+        <div className="flex items-center justify-between h-16 sm:h-18 md:h-20 lg:h-24 tv:h-28">
           {/* Logo à gauche */}
           <div className="flex items-center flex-shrink-0">
             <a 
               href="/dashboard" 
-              className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-red-600 focus:ring-offset-2 focus:ring-offset-black rounded-lg py-1"
+              className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 focus:ring-offset-2 focus:ring-offset-black rounded-lg py-1 tv:py-2"
+              tabIndex={0}
+              data-focusable
             >
               <img 
                 src="/popcorn_logo.png" 
                 alt="Popcorn Client" 
-                className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 object-contain"
+                className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 tv:w-16 tv:h-16 object-contain"
                 loading="eager"
               />
-              <span className="hidden sm:inline text-xl sm:text-2xl md:text-3xl font-bold text-white">Popcorn</span>
+              <span className="hidden sm:inline text-xl sm:text-2xl md:text-3xl tv:text-4xl font-bold text-white">Popcorn</span>
             </a>
           </div>
           
-          {/* Navigation principale au centre */}
+          {/* Navigation principale au centre - Onglets horizontaux */}
           {user && (
             <nav 
-              className="hidden md:flex items-center gap-4 lg:gap-6 xl:gap-8 flex-1 justify-center" 
-              role="navigation" 
+              className="hidden md:flex items-center gap-2 lg:gap-3 xl:gap-4 tv:gap-6 flex-1 justify-center" 
+              role="tablist" 
               aria-label="Navigation principale"
+              data-focusable-container
             >
               <a 
                 href="/dashboard" 
-                className={`text-base lg:text-lg xl:text-xl font-medium transition-all duration-300 hover:text-white focus:outline-none rounded-lg px-4 lg:px-6 py-2 lg:py-3 relative ${
-                  isActive('/dashboard') 
-                    ? 'text-white font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-1 after:bg-red-600 after:rounded-full' 
+                className={`nav-tab text-base lg:text-lg xl:text-xl tv:text-2xl font-medium transition-all duration-300 hover:text-white focus:outline-none ${
+                  isActive('/dashboard') || isActive('/torrents') || isActive('/films') || isActive('/series')
+                    ? 'nav-tab-active text-white font-bold' 
                     : 'text-gray-300 hover:text-white'
-                } focus:ring-4 focus:ring-red-600 focus:ring-opacity-50 focus:bg-white/10`}
+                }`}
+                role="tab"
+                aria-selected={isActive('/dashboard') || isActive('/torrents') || isActive('/films') || isActive('/series')}
+                tabIndex={0}
+                data-focusable
               >
-                Accueil
+                Torrents
               </a>
               <a 
-                href="/films" 
-                className={`text-base lg:text-lg xl:text-xl font-medium transition-all duration-300 hover:text-white focus:outline-none rounded-lg px-4 lg:px-6 py-2 lg:py-3 relative ${
-                  isActive('/films') 
-                    ? 'text-white font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-1 after:bg-red-600 after:rounded-full' 
+                href="/library" 
+                className={`nav-tab text-base lg:text-lg xl:text-xl tv:text-2xl font-medium transition-all duration-300 hover:text-white focus:outline-none ${
+                  isActive('/library') 
+                    ? 'nav-tab-active text-white font-bold' 
                     : 'text-gray-300 hover:text-white'
-                } focus:ring-4 focus:ring-red-600 focus:ring-opacity-50 focus:bg-white/10`}
+                }`}
+                role="tab"
+                aria-selected={isActive('/library')}
+                tabIndex={0}
+                data-focusable
               >
-                Films
+                Library
               </a>
               <a 
-                href="/series" 
-                className={`text-base lg:text-lg xl:text-xl font-medium transition-all duration-300 hover:text-white focus:outline-none rounded-lg px-4 lg:px-6 py-2 lg:py-3 relative ${
-                  isActive('/series') 
-                    ? 'text-white font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-1 after:bg-red-600 after:rounded-full' 
+                href="/search" 
+                className={`nav-tab text-base lg:text-lg xl:text-xl tv:text-2xl font-medium transition-all duration-300 hover:text-white focus:outline-none ${
+                  isActive('/search') 
+                    ? 'nav-tab-active text-white font-bold' 
                     : 'text-gray-300 hover:text-white'
-                } focus:ring-4 focus:ring-red-600 focus:ring-opacity-50 focus:bg-white/10`}
+                }`}
+                role="tab"
+                aria-selected={isActive('/search')}
+                tabIndex={0}
+                data-focusable
               >
-                Séries
+                Search
               </a>
               <a 
                 href="/downloads" 
-                className={`text-base lg:text-lg xl:text-xl font-medium transition-all duration-300 hover:text-white focus:outline-none rounded-lg px-4 lg:px-6 py-2 lg:py-3 relative ${
+                className={`nav-tab text-base lg:text-lg xl:text-xl tv:text-2xl font-medium transition-all duration-300 hover:text-white focus:outline-none ${
                   isActive('/downloads') 
-                    ? 'text-white font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-1 after:bg-red-600 after:rounded-full' 
+                    ? 'nav-tab-active text-white font-bold' 
                     : 'text-gray-300 hover:text-white'
-                } focus:ring-4 focus:ring-red-600 focus:ring-opacity-50 focus:bg-white/10`}
+                }`}
+                role="tab"
+                aria-selected={isActive('/downloads')}
+                tabIndex={0}
+                data-focusable
               >
-                Téléchargements
+                Transfers
               </a>
               <a 
                 href="/settings" 
-                className={`text-base lg:text-lg xl:text-xl font-medium transition-all duration-300 hover:text-white focus:outline-none rounded-lg px-4 lg:px-6 py-2 lg:py-3 relative ${
+                className={`nav-tab text-base lg:text-lg xl:text-xl tv:text-2xl font-medium transition-all duration-300 hover:text-white focus:outline-none ${
                   isActive('/settings') 
-                    ? 'text-white font-bold after:absolute after:bottom-0 after:left-0 after:right-0 after:h-1 after:bg-red-600 after:rounded-full' 
+                    ? 'nav-tab-active text-white font-bold' 
                     : 'text-gray-300 hover:text-white'
-                } focus:ring-4 focus:ring-red-600 focus:ring-opacity-50 focus:bg-white/10`}
+                }`}
+                role="tab"
+                aria-selected={isActive('/settings')}
+                tabIndex={0}
+                data-focusable
               >
-                Paramètres
+                Settings
               </a>
             </nav>
           )}
@@ -170,9 +193,11 @@ export default function Navbar() {
             <div className="md:hidden">
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="p-2 text-white hover:text-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50 rounded"
+                className="p-2 text-white hover:text-gray-300 transition-colors focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 rounded min-h-[48px] min-w-[48px]"
                 aria-label="Menu"
                 aria-expanded={isMenuOpen}
+                tabIndex={0}
+                data-focusable
               >
                 {isMenuOpen ? (
                   <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -221,8 +246,10 @@ export default function Navbar() {
                     </div>
                     <button
                       onClick={closeMenu}
-                      className="p-2 text-white hover:text-gray-300 transition-colors rounded focus:outline-none focus:ring-2 focus:ring-white/50"
+                      className="p-2 text-white hover:text-gray-300 transition-colors rounded focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] min-w-[48px]"
                       aria-label="Fermer le menu"
+                      tabIndex={0}
+                      data-focusable
                     >
                       <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -237,55 +264,66 @@ export default function Navbar() {
                         <a
                           href="/dashboard"
                           onClick={closeMenu}
-                          className={`flex items-center gap-3 px-4 py-3 text-white transition-colors hover:bg-gray-900 ${
-                            isActive('/dashboard') ? 'bg-gray-900 border-l-4 border-red-600' : ''
+                          className={`flex items-center gap-3 px-4 py-3 text-white transition-colors hover:bg-glass-hover focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] ${
+                            isActive('/dashboard') || isActive('/torrents') || isActive('/films') || isActive('/series') 
+                              ? 'bg-glass-active border-l-4 border-primary-600' : ''
                           }`}
+                          tabIndex={0}
+                          data-focusable
                         >
-                          <span className="font-medium">Accueil</span>
+                          <span className="font-medium">Torrents</span>
                         </a>
                       </li>
                       <li>
                         <a
-                          href="/films"
+                          href="/library"
                           onClick={closeMenu}
-                          className={`flex items-center gap-3 px-4 py-3 text-white transition-colors hover:bg-gray-900 ${
-                            isActive('/films') ? 'bg-gray-900 border-l-4 border-red-600' : ''
+                          className={`flex items-center gap-3 px-4 py-3 text-white transition-colors hover:bg-glass-hover focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] ${
+                            isActive('/library') ? 'bg-glass-active border-l-4 border-primary-600' : ''
                           }`}
+                          tabIndex={0}
+                          data-focusable
                         >
-                          <span className="font-medium">Films</span>
+                          <span className="font-medium">Library</span>
                         </a>
                       </li>
                       <li>
                         <a
-                          href="/series"
+                          href="/search"
                           onClick={closeMenu}
-                          className={`flex items-center gap-3 px-4 py-3 text-white transition-colors hover:bg-gray-900 ${
-                            isActive('/series') ? 'bg-gray-900 border-l-4 border-red-600' : ''
+                          className={`flex items-center gap-3 px-4 py-3 text-white transition-colors hover:bg-glass-hover focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] ${
+                            isActive('/search') ? 'bg-glass-active border-l-4 border-primary-600' : ''
                           }`}
+                          tabIndex={0}
+                          data-focusable
                         >
-                          <span className="font-medium">Séries</span>
+                          <span className="font-medium">Search</span>
                         </a>
                       </li>
                       <li>
                         <a
                           href="/downloads"
                           onClick={closeMenu}
-                          className={`flex items-center gap-3 px-4 py-3 text-white transition-colors hover:bg-gray-900 ${
-                            isActive('/downloads') ? 'bg-gray-900 border-l-4 border-red-600' : ''
+                          className={`flex items-center gap-3 px-4 py-3 text-white transition-colors hover:bg-glass-hover focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] ${
+                            isActive('/downloads') ? 'bg-glass-active border-l-4 border-primary-600' : ''
                           }`}
+                          tabIndex={0}
+                          data-focusable
                         >
-                          <span className="font-medium">Téléchargements</span>
+                          <span className="font-medium">Transfers</span>
                         </a>
                       </li>
                       <li>
                         <a
                           href="/settings"
                           onClick={closeMenu}
-                          className={`flex items-center gap-3 px-4 py-3 text-white transition-colors hover:bg-gray-900 ${
-                            isActive('/settings') ? 'bg-gray-900 border-l-4 border-red-600' : ''
+                          className={`flex items-center gap-3 px-4 py-3 text-white transition-colors hover:bg-glass-hover focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] ${
+                            isActive('/settings') ? 'bg-glass-active border-l-4 border-primary-600' : ''
                           }`}
+                          tabIndex={0}
+                          data-focusable
                         >
-                          <span className="font-medium">Paramètres</span>
+                          <span className="font-medium">Settings</span>
                         </a>
                       </li>
                     </ul>
@@ -295,7 +333,7 @@ export default function Navbar() {
                   <div className="border-t border-gray-800 p-4 flex-shrink-0">
                     <button
                       onClick={handleLogout}
-                      className="flex items-center gap-3 w-full px-4 py-3 text-red-500 hover:bg-gray-900 transition-colors rounded"
+                      className="flex items-center gap-3 w-full px-4 py-3 text-primary-400 hover:bg-glass-hover transition-colors rounded focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-opacity-50"
                     >
                       <span className="font-medium">Déconnexion</span>
                     </button>
@@ -308,34 +346,35 @@ export default function Navbar() {
           {/* Profil utilisateur à droite */}
           {user && (
             <div className="flex items-center gap-3 sm:gap-4 md:gap-6 flex-shrink-0">
-              <div className="dropdown dropdown-end">
+                  <div className="dropdown dropdown-end">
                 <div
                   tabIndex={0}
                   role="button"
-                  className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg bg-red-600 text-white flex items-center justify-center font-bold text-sm sm:text-base md:text-lg hover:bg-red-700 transition-all duration-300 cursor-pointer focus:outline-none focus:ring-4 focus:ring-red-600 focus:ring-opacity-50 shadow-lg"
+                  className="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 tv:w-16 tv:h-16 rounded-lg bg-primary text-white flex items-center justify-center font-bold text-sm sm:text-base md:text-lg tv:text-xl hover:bg-primary-700 transition-all duration-300 cursor-pointer focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 shadow-primary min-h-[36px] tv:min-h-[64px]"
+                  data-focusable
                 >
                   {user.email ? user.email.charAt(0).toUpperCase() : 'U'}
                 </div>
                 <ul
                   tabIndex={0}
-                  className="menu menu-sm dropdown-content mt-3 z-[1] p-3 shadow-2xl bg-black/98 backdrop-blur-md rounded-xl w-64 border border-gray-800"
+                  className="menu menu-sm dropdown-content mt-3 z-[1] p-3 shadow-2xl glass-panel-lg rounded-xl w-64 border border-white/10"
                 >
                   <li className="menu-title">
                     <span className="text-white font-bold text-lg">{user.email || 'Utilisateur'}</span>
                   </li>
                   <li>
-                    <a href="/dashboard" className="text-white hover:bg-gray-800 text-base py-3 px-4 rounded-lg transition-colors">
+                    <a href="/dashboard" className="text-white hover:bg-glass-hover text-base py-3 px-4 rounded-lg transition-colors">
                       Tableau de bord
                     </a>
                   </li>
                   <li>
-                    <a href="/settings" className="text-white hover:bg-gray-800 text-base py-3 px-4 rounded-lg transition-colors">
+                    <a href="/settings" className="text-white hover:bg-glass-hover text-base py-3 px-4 rounded-lg transition-colors">
                       Paramètres
                     </a>
                   </li>
-                  <li><hr className="my-2 border-gray-800" /></li>
+                  <li><hr className="my-2 border-white/10" /></li>
                   <li>
-                    <a onClick={handleLogout} className="text-red-500 hover:bg-gray-800 text-base py-3 px-4 rounded-lg transition-colors">
+                    <a onClick={handleLogout} className="text-primary-400 hover:bg-glass-hover text-base py-3 px-4 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-opacity-50">
                       Déconnexion
                     </a>
                   </li>
@@ -348,13 +387,17 @@ export default function Navbar() {
             <div className="flex gap-3 sm:gap-4">
               <a 
                 href="/login" 
-                className="text-white hover:text-gray-300 transition-all duration-300 text-base sm:text-lg md:text-xl px-4 sm:px-6 py-2 sm:py-3 rounded-lg focus:outline-none focus:ring-4 focus:ring-red-600 focus:ring-opacity-50 focus:bg-white/10"
+                className="text-white hover:text-gray-300 transition-all duration-300 text-base sm:text-lg md:text-xl tv:text-2xl px-4 sm:px-6 tv:px-8 py-2 sm:py-3 tv:py-4 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 focus:bg-glass-hover glass-panel min-h-[48px] tv:min-h-[56px]"
+                tabIndex={0}
+                data-focusable
               >
                 Connexion
               </a>
               <a 
                 href="/register" 
-                className="bg-red-600 hover:bg-red-700 text-white px-4 sm:px-6 md:px-8 py-2 sm:py-3 md:py-4 rounded-lg text-base sm:text-lg md:text-xl font-semibold transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-red-600 focus:ring-opacity-50 shadow-lg"
+                className="bg-primary hover:bg-primary-700 text-white px-4 sm:px-6 md:px-8 tv:px-12 py-2 sm:py-3 md:py-4 tv:py-5 rounded-lg text-base sm:text-lg md:text-xl tv:text-2xl font-semibold transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 shadow-primary min-h-[48px] tv:min-h-[56px]"
+                tabIndex={0}
+                data-focusable
               >
                 Inscription
               </a>

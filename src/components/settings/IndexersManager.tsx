@@ -205,7 +205,7 @@ export default function IndexersManager() {
                   isDefault={indexer.isDefault}
                   priority={indexer.priority}
                   indexerId={indexer.id}
-                  categoryMapping={undefined} // TODO: Récupérer depuis la définition si disponible
+                  categoryMapping={{ films: {}, series: {}, autres: {} }} // Catégories standard disponibles
                   onEdit={() => handleEdit(indexer)}
                   onDelete={() => handleDelete(indexer.id)}
                   onTest={() => handleTest(indexer.id)}
