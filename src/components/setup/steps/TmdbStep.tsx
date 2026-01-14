@@ -114,7 +114,7 @@ export function TmdbStep({
           href="https://www.themoviedb.org/settings/api"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-red-600 hover:text-red-500 transition-colors"
+          className="text-primary-600 hover:text-primary-500 transition-colors"
         >
           Obtenir une clé API TMDB gratuite →
         </a>
@@ -139,7 +139,7 @@ export function TmdbStep({
         <div className="flex gap-4">
           <input
             type="text"
-            className="flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent"
+            className="flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
             placeholder={hasExistingKey ? "Entrez une nouvelle clé pour remplacer" : "Entrez votre clé API TMDB"}
             value={tmdbKey}
             onInput={(e) => setTmdbKey((e.target as HTMLInputElement).value)}
@@ -147,7 +147,7 @@ export function TmdbStep({
           />
           <button
             ref={(el) => { buttonRefs.current[0] = el; }}
-            className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleSave}
             disabled={saving || !tmdbKey.trim() || tmdbKey.includes('*')}
           >
@@ -178,7 +178,7 @@ export function TmdbStep({
         </button>
         <button
           ref={(el) => { buttonRefs.current[2] = el; }}
-          className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
+          className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors"
           onClick={onNext}
         >
           Suivant →

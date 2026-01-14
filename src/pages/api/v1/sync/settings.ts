@@ -32,7 +32,9 @@ export const GET: APIRoute = async ({ request }) => {
     console.log('[SYNC SETTINGS GET] 📋 Récupération des paramètres de synchronisation...');
     
     // Récupérer l'URL du backend Rust depuis la base de données
-    const backendUrl = await getBackendUrlAsync();
+    // Utiliser un import dynamique pour éviter les erreurs de chargement
+    const { getBackendUrlAsync: getBackendUrl } = await import('../../../../lib/backend-url.js');
+    const backendUrl = await getBackendUrl();
     const backendApiUrl = `${backendUrl}/api/sync/settings`;
     
     console.log(`[SYNC SETTINGS GET] 📡 Proxy vers: ${backendApiUrl}`);

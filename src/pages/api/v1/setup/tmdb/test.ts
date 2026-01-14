@@ -1,7 +1,6 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import { getDb } from '../../../../../lib/db/client.js';
 import { z } from 'zod';
 
 const testTmdbKeySchema = z.object({

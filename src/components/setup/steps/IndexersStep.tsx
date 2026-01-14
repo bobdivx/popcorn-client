@@ -40,6 +40,45 @@ export function IndexersStep({
     loadIndexers();
   }, []);
 
+  // La config peut être importée en arrière-plan depuis AuthStep.
+  // On re-tente quelques fois si la liste est vide (évite l'impression "rien ne se passe").
+  useEffect(() => {
+    if (loading) return;
+    if (indexers.length > 0) return;
+
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 15; // ~30s (15 * 2s)
+
+    const interval = setInterval(async () => {
+      if (cancelled) return;
+      attempts += 1;
+      if (attempts > maxAttempts) {
+        clearInterval(interval);
+        return;
+      }
+
+      try {
+        const res = await serverApi.getIndexers();
+        if (res.success && Array.isArray(res.data)) {
+          const newIndexers = res.data;
+          if (newIndexers.length > 0) {
+            setIndexers(newIndexers);
+            onStatusChange();
+            clearInterval(interval);
+          }
+        }
+      } catch {
+        // ignore (on retentera)
+      }
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [loading, indexers.length]);
+
   const loadIndexers = async () => {
     try {
       setLoading(true);
@@ -105,7 +144,37 @@ export function IndexersStep({
         response = await serverApi.createIndexer(formData);
       }
 
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'IndexersStep.tsx:108',message:'Wizard response received',data:{success:response.success,isEdit:!!editingIndexer,hasData:!!response.data},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       if (response.success) {
+        // Si c'est une création (pas une édition), synchroniser les catégories avec le backend Rust
+        if (!editingIndexer && response.data) {
+          const indexerId = response.data.id;
+          // #region agent log
+          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'IndexersStep.tsx:112',message:'Wizard categories sync start (CREATE)',data:{indexerId,isEdit:false},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
+          try {
+            // Activer par défaut les catégories "films" et "séries" dans le backend Rust
+            const defaultCategories = ['films', 'series'];
+            await serverApi.updateIndexerCategories(indexerId, defaultCategories);
+            console.log('[WIZARD] ✅ Catégories par défaut activées pour l\'indexer:', indexerId);
+            // #region agent log
+            fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'IndexersStep.tsx:116',message:'Wizard categories sync success (CREATE)',data:{indexerId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+            // #endregion
+          } catch (catError) {
+            console.warn('[WIZARD] ⚠️ Erreur lors de l\'activation des catégories par défaut:', catError);
+            // #region agent log
+            fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'IndexersStep.tsx:119',message:'Wizard categories sync error (CREATE)',data:{indexerId,error:catError instanceof Error ? catError.message : String(catError)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+            // #endregion
+            // Ne pas bloquer si la synchronisation des catégories échoue
+          }
+        } else if (editingIndexer && response.data) {
+          // #region agent log
+          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'IndexersStep.tsx:123',message:'Wizard UPDATE - no categories sync',data:{indexerId:editingIndexer.id,isEdit:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
+        }
+        
         setShowForm(false);
         setEditingIndexer(null);
         setFormData({
@@ -152,17 +221,23 @@ export function IndexersStep({
     );
   }
 
+  const hasIndexers = indexers.length > 0;
+
   return (
     <div className="space-y-6">
       <h3 className="text-2xl font-bold text-white">Configuration des indexers</h3>
       
-      {setupStatus?.hasIndexers ? (
+      {hasIndexers ? (
         <div className="bg-green-900/30 border border-green-700 rounded-lg p-4 text-green-300">
           <span>Au moins un indexer est configuré</span>
         </div>
       ) : (
         <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 text-yellow-300">
-          <span>Aucun indexer configuré. Veuillez en ajouter au moins un.</span>
+          <span>
+            Aucun indexer configuré. Veuillez en ajouter au moins un.
+            {' '}
+            <span className="text-yellow-200/80">(si tu viens de te connecter, l'import automatique peut prendre quelques secondes)</span>
+          </span>
         </div>
       )}
 
@@ -184,7 +259,7 @@ export function IndexersStep({
                         <div className="flex items-center gap-3 mb-2">
                           <h4 className="text-lg font-semibold text-white">{indexer.name}</h4>
                           {indexer.isDefault && (
-                            <span className="px-2 py-1 bg-red-600 text-white text-xs font-semibold rounded">Par défaut</span>
+                            <span className="px-2 py-1 bg-primary-600 text-white text-xs font-semibold rounded">Par défaut</span>
                           )}
                           {!indexer.isEnabled && (
                             <span className="px-2 py-1 bg-gray-700 text-gray-300 text-xs font-semibold rounded">Désactivé</span>
@@ -204,7 +279,7 @@ export function IndexersStep({
                           Éditer
                         </button>
                         <button
-                          className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+                          className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
                           onClick={() => handleDelete(indexer.id)}
                           disabled={deleting === indexer.id}
                         >
@@ -225,7 +300,7 @@ export function IndexersStep({
           </div>
 
           <button
-            className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
+            className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors"
             onClick={() => {
               setShowForm(true);
               setEditingIndexer(null);
@@ -255,7 +330,7 @@ export function IndexersStep({
             <label className="block text-sm font-semibold text-white">Nom</label>
             <input
               type="text"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent"
+              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
               value={formData.name}
               onInput={(e) => setFormData({ ...formData, name: (e.target as HTMLInputElement).value })}
               required
@@ -266,7 +341,7 @@ export function IndexersStep({
             <label className="block text-sm font-semibold text-white">URL de base</label>
             <input
               type="url"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent"
+              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
               value={formData.baseUrl}
               onInput={(e) => setFormData({ ...formData, baseUrl: (e.target as HTMLInputElement).value })}
               required
@@ -277,7 +352,7 @@ export function IndexersStep({
             <label className="block text-sm font-semibold text-white">Clé API</label>
             <input
               type="text"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent"
+              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
               value={formData.apiKey}
               onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })}
               required
@@ -288,7 +363,7 @@ export function IndexersStep({
             <label className="block text-sm font-semibold text-white">Nom de l'indexer Jackett (optionnel)</label>
             <input
               type="text"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent"
+              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
               value={formData.jackettIndexerName}
               onInput={(e) => setFormData({ ...formData, jackettIndexerName: (e.target as HTMLInputElement).value })}
             />
@@ -298,7 +373,7 @@ export function IndexersStep({
             <label className="block text-sm font-semibold text-white">Priorité</label>
             <input
               type="number"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent"
+              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
               value={formData.priority}
               onInput={(e) => setFormData({ ...formData, priority: parseInt((e.target as HTMLInputElement).value) || 0 })}
               min="0"
@@ -309,7 +384,7 @@ export function IndexersStep({
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                className="w-4 h-4 text-red-600 bg-gray-900 border-gray-700 rounded focus:ring-red-600"
+                className="w-4 h-4 text-primary-600 bg-gray-900 border-gray-700 rounded focus:ring-primary-600"
                 checked={formData.isEnabled}
                 onChange={(e) => setFormData({ ...formData, isEnabled: (e.target as HTMLInputElement).checked })}
               />
@@ -318,7 +393,7 @@ export function IndexersStep({
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                className="w-4 h-4 text-red-600 bg-gray-900 border-gray-700 rounded focus:ring-red-600"
+                className="w-4 h-4 text-primary-600 bg-gray-900 border-gray-700 rounded focus:ring-primary-600"
                 checked={formData.isDefault}
                 onChange={(e) => setFormData({ ...formData, isDefault: (e.target as HTMLInputElement).checked })}
               />
@@ -336,7 +411,7 @@ export function IndexersStep({
             </button>
             <button
               type="submit"
-              className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={saving}
             >
               {saving ? (
@@ -362,9 +437,9 @@ export function IndexersStep({
         </button>
         <button
           ref={(el) => { buttonRefs.current[1] = el; }}
-          className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={onNext}
-          disabled={!setupStatus?.hasIndexers}
+          disabled={!hasIndexers}
         >
           Suivant →
         </button>

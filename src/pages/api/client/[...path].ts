@@ -21,7 +21,7 @@ async function proxyRequest(
   // Récupérer l'URL du backend Rust (utilise env vars ou valeur par défaut côté serveur)
   // Note: Cette route s'exécute côté serveur Astro, localStorage n'est pas disponible
   // backend-config.ts utilisera les variables d'environnement ou la valeur par défaut
-  let backendBaseUrl: string = 'http://127.0.0.1:4327'; // Valeur par défaut
+  let backendBaseUrl: string = 'http://127.0.0.1:3000'; // Valeur par défaut
   try {
     backendBaseUrl = await getBackendUrlAsync();
     // S'assurer que baseUrl ne se termine pas par un slash et que path ne commence pas par un slash
@@ -129,9 +129,9 @@ async function proxyRequest(
   } catch (error) {
     console.error('Erreur lors du proxy vers le backend Rust:', error);
     const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue';
-    const defaultUrl = backendBaseUrl || 'http://127.0.0.1:4327';
+    const defaultUrl = backendBaseUrl || 'http://127.0.0.1:3000';
     const detailedMessage = errorMessage.includes('ECONNREFUSED') || errorMessage.includes('Timeout')
-      ? `Le backend Rust n'est pas accessible sur ${defaultUrl}. Vérifiez que :\n1. Le backend Rust est démarré\n2. Le backend Rust écoute sur le port correct (${defaultUrl.split(':').pop() || '4327'})\n3. Aucun firewall ne bloque la connexion`
+      ? `Le backend Rust n'est pas accessible sur ${defaultUrl}. Vérifiez que :\n1. Le backend Rust est démarré\n2. Le backend Rust écoute sur le port correct (${defaultUrl.split(':').pop() || '3000'})\n3. Aucun firewall ne bloque la connexion`
       : `Erreur lors de la connexion au backend Rust sur ${defaultUrl}: ${errorMessage}`;
     
     return new Response(

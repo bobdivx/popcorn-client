@@ -30,7 +30,7 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext }: Server
     } catch (err) {
       console.error('Erreur lors du chargement de l\'URL du backend:', err);
       // Valeur par défaut en cas d'erreur
-      setBackendUrl('http://127.0.0.1:4327');
+      setBackendUrl('http://127.0.0.1:3000');
     } finally {
       setLoading(false);
     }
@@ -150,8 +150,8 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext }: Server
         </label>
         <input
           type="url"
-          className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-600 focus:border-transparent"
-          placeholder="http://127.0.0.1:4327"
+          className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+          placeholder="http://127.0.0.1:3000"
           value={backendUrl}
           onInput={(e) => {
             setBackendUrl((e.target as HTMLInputElement).value);
@@ -161,10 +161,10 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext }: Server
           disabled={testing || loading}
         />
         <p className="text-sm text-gray-500">
-          Format: http://ip:4327 (local) ou http://192.168.1.100:4327 (réseau local)
+          Format: http://ip:3000 (local) ou http://192.168.1.100:3000 (réseau local)
         </p>
         <p className="text-xs text-gray-600">
-          💡 Cette URL est stockée dans localStorage et utilisée par les routes API du client Astro pour faire le proxy vers le backend Rust. Le backend Rust utilise le port 4327 par défaut.
+          💡 Cette URL est stockée dans localStorage et utilisée par les routes API du client Astro pour faire le proxy vers le backend Rust. Le backend Rust utilise le port 3000 par défaut.
         </p>
       </div>
 
@@ -186,7 +186,7 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext }: Server
         </button>
         <button
           ref={(el) => { buttonRefs.current[1] = el; }}
-          className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={handleNext}
           disabled={testing || loading || !backendUrl.trim()}
         >

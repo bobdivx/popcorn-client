@@ -7,6 +7,23 @@ export default function IndexRedirect() {
   useEffect(() => {
     const checkAndRedirect = async () => {
       try {
+        // D'abord vérifier le statut du setup pour savoir si la DB est vide
+        const setupResponse = await serverApi.getSetupStatus();
+        
+        console.log('[IndexRedirect] Setup response:', setupResponse);
+        
+        if (setupResponse.success && setupResponse.data) {
+          console.log('[IndexRedirect] hasUsers:', setupResponse.data.hasUsers);
+          // Si pas d'utilisateurs dans la DB (première installation), rediriger vers setup
+          if (setupResponse.data.hasUsers === false) {
+            console.log('[IndexRedirect] DB vide, redirection vers /setup');
+            window.location.href = '/setup';
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Si la DB contient des utilisateurs, vérifier l'authentification
         // Ne vérifier l'authentification que si on a un token
         if (!serverApi.isAuthenticated()) {
           window.location.href = '/login';
@@ -19,10 +36,10 @@ export default function IndexRedirect() {
         
         if (meResponse.success) {
           // Utilisateur connecté, vérifier le setup
-          const setupResponse = await serverApi.getSetupStatus();
+          const setupResponse2 = await serverApi.getSetupStatus();
           
-          if (setupResponse.success && setupResponse.data) {
-            if (setupResponse.data.needsSetup) {
+          if (setupResponse2.success && setupResponse2.data) {
+            if (setupResponse2.data.needsSetup) {
               window.location.href = '/setup';
             } else {
               window.location.href = '/dashboard';
@@ -36,8 +53,19 @@ export default function IndexRedirect() {
           window.location.href = '/login';
         }
       } catch (error) {
-        // Les erreurs 401 sont normales, on redirige simplement vers login
-        window.location.href = '/login';
+        // En cas d'erreur, vérifier si on peut accéder au setup
+        // Si setup accessible, rediriger vers setup (DB peut être vide)
+        // Sinon, rediriger vers login
+        try {
+          const setupResponse = await serverApi.getSetupStatus();
+          if (setupResponse.success && setupResponse.data?.hasUsers === false) {
+            window.location.href = '/setup';
+          } else {
+            window.location.href = '/login';
+          }
+        } catch {
+          window.location.href = '/login';
+        }
       } finally {
         setLoading(false);
       }

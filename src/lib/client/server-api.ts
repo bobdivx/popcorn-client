@@ -14,6 +14,7 @@ import type {
   SeriesData,
 } from './types';
 import { getClientUrl } from '../client-url.js';
+import { getBackendUrl } from '../backend-config.js';
 
 // Ré-exporter les types pour compatibilité
 export type { ApiResponse } from './types';
@@ -25,6 +26,8 @@ export interface AuthResponse {
   };
   accessToken: string;
   refreshToken: string;
+  cloudAccessToken?: string;
+  cloudRefreshToken?: string;
 }
 
 export interface SearchParams {
@@ -66,6 +69,16 @@ class ServerApiClient {
   private baseUrl: string;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
+
+  private getTimeoutMs(endpoint: string): number {
+    // Valeurs conservatrices pour éviter les "spinners infinis"
+    if (endpoint.includes('/torrents/magnet')) return 60000;
+    if (endpoint.includes('/api/media/') || endpoint.includes('/api/torrents/')) return 30000;
+    // Le setup peut impliquer des écritures DB + détection/validation indexer -> parfois lent
+    if (endpoint.startsWith('/api/v1/setup/')) return 60000;
+    if (endpoint.startsWith('/api/v1/sync/')) return 60000;
+    return 15000;
+  }
 
   constructor(baseUrl?: string) {
     // Initialiser baseUrl à vide
@@ -192,19 +205,62 @@ class ServerApiClient {
       ...options.headers,
     };
 
+    // Transmettre l'URL du backend configurée côté client aux routes API Astro (SSR).
+    // Sinon, côté serveur Astro on retombe sur BACKEND_URL / valeur par défaut, ce qui peut viser une autre DB/port.
+    try {
+      if (typeof window !== 'undefined') {
+        const backendUrl = getBackendUrl();
+        if (backendUrl && backendUrl !== 'undefined' && backendUrl.trim()) {
+          (headers as any)['X-Popcorn-Backend-Url'] = backendUrl.trim();
+        }
+      }
+    } catch {
+      // Ignorer: on garde les fallbacks côté serveur.
+    }
+
+    // Endpoints qui NE doivent PAS envoyer de token local
+    // et ne doivent pas déclencher de refresh automatique.
+    // Ex: login/register (sinon boucle refresh + message trompeur).
+    const isAuthBootstrapEndpoint =
+      endpoint === '/api/v1/auth/login' ||
+      endpoint === '/api/v1/auth/register' ||
+      endpoint === '/api/v1/auth/login-cloud' ||
+      endpoint === '/api/v1/auth/register-cloud';
+
     // Ajouter le token d'accès si disponible
-    if (this.accessToken) {
+    if (this.accessToken && !isAuthBootstrapEndpoint) {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
     }
 
     try {
+      const controller = new AbortController();
+      const timeoutMs = this.getTimeoutMs(endpoint);
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      // Si un signal existe déjà, on essaie de le combiner (si supporté),
+      // sinon on privilégie le signal existant et on ne force pas le timeout.
+      let signalToUse: AbortSignal | undefined = controller.signal;
+      if (options.signal) {
+        // @ts-expect-error AbortSignal.any pas toujours typé selon TS/DOM libs
+        const anyFn = (AbortSignal as any)?.any;
+        if (typeof anyFn === 'function') {
+          signalToUse = anyFn([options.signal, controller.signal]);
+        } else {
+          // fallback: on respecte le signal existant (pas de timeout côté client)
+          signalToUse = options.signal;
+          clearTimeout(timeoutId);
+        }
+      }
+
       const response = await fetch(url, {
         ...options,
         headers,
+        signal: signalToUse,
       });
+      clearTimeout(timeoutId);
 
-      // Si token expiré, essayer de le rafraîchir
-      if (response.status === 401 && this.refreshToken) {
+      // Si token expiré, essayer de le rafraîchir (sauf endpoints d'auth bootstrap)
+      if (!isAuthBootstrapEndpoint && response.status === 401 && this.refreshToken) {
         const refreshed = await this.refreshAccessToken();
         if (refreshed) {
           // Réessayer la requête avec le nouveau token
@@ -212,6 +268,7 @@ class ServerApiClient {
           const retryResponse = await fetch(url, {
             ...options,
             headers,
+            signal: signalToUse,
           });
           return await this.handleResponse<T>(retryResponse);
         }
@@ -219,6 +276,13 @@ class ServerApiClient {
 
       return await this.handleResponse<T>(response);
     } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return {
+          success: false,
+          error: 'Timeout',
+          message: 'Timeout: le serveur ne répond pas (backend probablement non accessible).',
+        };
+      }
       // Ne pas logger les erreurs réseau comme des erreurs critiques
       // (peut être une erreur 401 normale si l'utilisateur n'est pas connecté)
       if (error instanceof Error && !error.message.includes('401')) {
@@ -239,13 +303,16 @@ class ServerApiClient {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      // Les erreurs 401 (Unauthorized) sont normales si l'utilisateur n'est pas connecté
-      // On ne les log pas comme des erreurs critiques
+      // 401:
+      // - Sur les endpoints protégés, c'est "normal" si l'utilisateur n'est pas connecté
+      // - Sur les endpoints d'auth (login/register/refresh), on veut afficher le vrai message (ex: mauvais mot de passe)
       if (response.status === 401) {
+        const err = (data && typeof data === 'object' ? (data as any).error : undefined) as string | undefined;
+        const msg = (data && typeof data === 'object' ? (data as any).message : undefined) as string | undefined;
         return {
           success: false,
-          error: 'Unauthorized',
-          message: 'Non authentifié',
+          error: err || 'Unauthorized',
+          message: msg || err || 'Non authentifié',
         };
       }
 
@@ -362,6 +429,48 @@ class ServerApiClient {
 
     if (response.success && response.data) {
       this.saveTokens(response.data.accessToken, response.data.refreshToken);
+    }
+
+    return response;
+  }
+
+  /**
+   * Connexion avec compte cloud (popcorn-web)
+   */
+  async loginCloud(email: string, password: string): Promise<ApiResponse<AuthResponse>> {
+    const response = await this.request<AuthResponse>('/api/v1/auth/login-cloud', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (response.success && response.data) {
+      this.saveTokens(response.data.accessToken, response.data.refreshToken);
+      // Sauvegarder aussi les tokens cloud pour les appels à popcorn-web
+      if (response.data.cloudAccessToken && response.data.cloudRefreshToken) {
+        const { TokenManager } = await import('./storage.js');
+        TokenManager.setCloudTokens(response.data.cloudAccessToken, response.data.cloudRefreshToken);
+      }
+    }
+
+    return response;
+  }
+
+  /**
+   * Inscription avec compte cloud (popcorn-web)
+   */
+  async registerCloud(email: string, password: string, inviteCode: string): Promise<ApiResponse<AuthResponse>> {
+    const response = await this.request<AuthResponse>('/api/v1/auth/register-cloud', {
+      method: 'POST',
+      body: JSON.stringify({ email, password, inviteCode }),
+    });
+
+    if (response.success && response.data) {
+      this.saveTokens(response.data.accessToken, response.data.refreshToken);
+      // Sauvegarder aussi les tokens cloud pour les appels à popcorn-web
+      if (response.data.cloudAccessToken && response.data.cloudRefreshToken) {
+        const { TokenManager } = await import('./storage.js');
+        TokenManager.setCloudTokens(response.data.cloudAccessToken, response.data.cloudRefreshToken);
+      }
     }
 
     return response;
@@ -572,38 +681,10 @@ class ServerApiClient {
    * Vérifie la santé du serveur
    */
   async checkServerHealth(): Promise<ApiResponse<{ status: string }>> {
-    try {
-      // S'assurer d'utiliser la bonne URL (window.location.origin dans le navigateur)
-      const serverUrl = this.getServerUrl();
-      
-      // La route /api/v1/health dans le client fait un proxy vers /api/client/health du backend Rust
-      const response = await fetch(`${serverUrl}/api/v1/health`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        return {
-          success: false,
-          error: 'ServerError',
-          message: `Serveur non disponible (${response.status})`,
-        };
-      }
-
-      const data = await response.json().catch(() => ({}));
-      return {
-        success: true,
-        data: data.data || data || { status: 'ok' },
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: 'NetworkError',
-        message: error instanceof Error ? error.message : 'Erreur réseau',
-      };
-    }
+    // Passer par request() pour bénéficier:
+    // - du header X-Popcorn-Backend-Url (backend configuré dans localStorage)
+    // - des timeouts (évite les spinners infinis)
+    return this.request<{ status: string }>('/api/v1/health', { method: 'GET' });
   }
 
   // ==================== SETUP WIZARD ====================
@@ -679,6 +760,13 @@ class ServerApiClient {
   }
 
   /**
+   * Récupère les catégories disponibles depuis l'indexer (via Torznab caps)
+   */
+  async getIndexerAvailableCategories(indexerId: string): Promise<ApiResponse<Array<{ id: string; name: string; description?: string }>>> {
+    return this.request<Array<{ id: string; name: string; description?: string }>>(`/api/v1/indexers/${indexerId}/categories/available`);
+  }
+
+  /**
    * Teste la connexion à un indexer
    */
   async testIndexer(id: string): Promise<ApiResponse<{
@@ -743,6 +831,35 @@ class ServerApiClient {
     });
   }
 
+  /**
+   * Récupère la configuration du client torrent (download_dir, etc.)
+   */
+  async getClientTorrentConfig(): Promise<ApiResponse<{
+    config: {
+      download_dir: string;
+      max_downloads: number;
+      max_upload_slots: number;
+      librqbit_api_url: string;
+    };
+    download_paths: {
+      films_path: string;
+      films_exists: boolean;
+      films_subdirs_count: number;
+      series_path: string;
+      series_exists: boolean;
+      series_subdirs_count: number;
+      stream_temp_path: string;
+      stream_temp_exists: boolean;
+    };
+    subdirectory_creation: {
+      enabled: boolean;
+      description: string;
+      example: string;
+    };
+  }>> {
+    return this.request('/api/v1/admin/client-torrent/config');
+  }
+
   // ==================== SYNCHRONISATION TORRENTS ====================
 
   /**
@@ -782,7 +899,7 @@ class ServerApiClient {
    */
   async updateSyncSettings(settings: any): Promise<ApiResponse<void>> {
     return this.request<void>('/api/v1/sync/settings', {
-      method: 'POST',
+      method: 'PUT',
       body: JSON.stringify(settings),
     });
   }
@@ -790,8 +907,8 @@ class ServerApiClient {
   /**
    * Supprime tous les torrents synchronisés
    */
-  async clearSyncTorrents(): Promise<ApiResponse<void>> {
-    return this.request<void>('/api/v1/sync/clear-torrents', {
+  async clearSyncTorrents(): Promise<ApiResponse<number>> {
+    return this.request<number>('/api/v1/sync/clear-torrents', {
       method: 'POST',
     });
   }

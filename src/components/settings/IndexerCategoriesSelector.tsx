@@ -21,30 +21,82 @@ export default function IndexerCategoriesSelector({
   onUpdate,
 }: IndexerCategoriesSelectorProps) {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [availableCategoriesList, setAvailableCategoriesList] = useState<Array<{ id: string; label: string; icon: string }>>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingAvailable, setLoadingAvailable] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Récupérer les catégories disponibles depuis categoryMapping ou utiliser les catégories standard
-  const availableFromMapping = availableCategories ? Object.keys(availableCategories) : [];
-  const allAvailableCategories = availableFromMapping.length > 0 
-    ? availableFromMapping.map(id => {
-        const standard = STANDARD_CATEGORIES.find(c => c.id === id);
-        return standard || { id, label: id.charAt(0).toUpperCase() + id.slice(1), icon: '📁' };
-      })
-    : STANDARD_CATEGORIES;
+  useEffect(() => {
+    loadCategories();
+    loadAvailableCategories();
+  }, [indexerId]);
+
+  const loadAvailableCategories = async () => {
+    if (!indexerId) return;
+    
+    try {
+      setLoadingAvailable(true);
+      setError('');
+      
+      // Essayer d'abord de récupérer les catégories depuis l'indexer
+      const response = await serverApi.getIndexerAvailableCategories(indexerId);
+      
+      if (response.success && response.data && response.data.length > 0) {
+        // Utiliser les catégories récupérées depuis l'indexer
+        // Dédupliquer par ID pour éviter les clés dupliquées
+        const seenIds = new Set<string>();
+        const categories = response.data
+          .filter(cat => {
+            if (seenIds.has(cat.id)) {
+              return false;
+            }
+            seenIds.add(cat.id);
+            return true;
+          })
+          .map(cat => {
+            const standard = STANDARD_CATEGORIES.find(c => c.id === cat.id);
+            return standard || {
+              id: cat.id,
+              label: cat.name || cat.id.charAt(0).toUpperCase() + cat.id.slice(1),
+              icon: '📁'
+            };
+          });
+        setAvailableCategoriesList(categories);
+      } else {
+        // Fallback: utiliser categoryMapping ou catégories standard
+        const availableFromMapping = availableCategories ? Object.keys(availableCategories) : [];
+        const categories = availableFromMapping.length > 0 
+          ? availableFromMapping.map(id => {
+              const standard = STANDARD_CATEGORIES.find(c => c.id === id);
+              return standard || { id, label: id.charAt(0).toUpperCase() + id.slice(1), icon: '📁' };
+            })
+          : STANDARD_CATEGORIES;
+        setAvailableCategoriesList(categories);
+      }
+    } catch (err) {
+      console.error('Erreur lors du chargement des catégories disponibles:', err);
+      // En cas d'erreur, utiliser categoryMapping ou catégories standard
+      const availableFromMapping = availableCategories ? Object.keys(availableCategories) : [];
+      const categories = availableFromMapping.length > 0 
+        ? availableFromMapping.map(id => {
+            const standard = STANDARD_CATEGORIES.find(c => c.id === id);
+            return standard || { id, label: id.charAt(0).toUpperCase() + id.slice(1), icon: '📁' };
+          })
+        : STANDARD_CATEGORIES;
+      setAvailableCategoriesList(categories);
+    } finally {
+      setLoadingAvailable(false);
+    }
+  };
   
   // Filtrer les catégories selon la recherche
-  const filteredCategories = allAvailableCategories.filter(cat =>
+  const filteredCategories = availableCategoriesList.filter(cat =>
     cat.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
     cat.id.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  useEffect(() => {
-    loadCategories();
-  }, [indexerId]);
 
   const loadCategories = async () => {
     if (!indexerId) return;
@@ -106,7 +158,7 @@ export default function IndexerCategoriesSelector({
     }
   };
 
-  if (loading) {
+  if (loading || loadingAvailable) {
     return (
       <div class="flex justify-center items-center py-4">
         <span class="loading loading-spinner loading-sm"></span>
@@ -114,7 +166,7 @@ export default function IndexerCategoriesSelector({
     );
   }
 
-  if (allAvailableCategories.length === 0) {
+  if (availableCategoriesList.length === 0) {
     return (
       <div class="text-gray-400 text-sm">
         Aucune catégorie disponible pour cet indexer
@@ -152,7 +204,7 @@ export default function IndexerCategoriesSelector({
       )}
 
       {/* Barre de recherche */}
-      {allAvailableCategories.length > 3 && (
+      {availableCategoriesList.length > 3 && (
         <div class="form-control">
           <div class="relative">
             <Search class="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />

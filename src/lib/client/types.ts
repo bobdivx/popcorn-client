@@ -14,6 +14,7 @@ export interface ApiResponse<T = any> {
 
 export interface SetupStatus {
   needsSetup: boolean;
+  hasUsers?: boolean;   // Nouveau : des utilisateurs existent dans la DB locale
   hasIndexers: boolean;
   hasBackendConfig?: boolean;
   hasTmdbKey: boolean;

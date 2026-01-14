@@ -2,8 +2,6 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../../lib/auth/jwt.js';
-import { getTursoClient } from '../../../../lib/db/turso-client.js';
-import { getDb } from '../../../../lib/db/client.js';
 
 /**
  * API pour récupérer les informations de l'utilisateur connecté
@@ -46,43 +44,37 @@ export const GET: APIRoute = async ({ request }) => {
       );
     }
 
-    // Récupérer les informations utilisateur depuis la base de données
-    // Essayer d'abord Turso, puis fallback sur la base locale
-    const tursoClient = getTursoClient();
-    let userResult;
-    
-    if (tursoClient) {
-      // Utiliser Turso si disponible
-      userResult = await tursoClient.execute({
-        sql: 'SELECT id, email FROM cloud_accounts WHERE id = ?',
-        args: [userId],
-      });
-    } else {
-      // Fallback sur la base locale SQLite
-      const localDb = getDb();
-      userResult = await localDb.execute({
-        sql: 'SELECT id, email FROM users WHERE id = ?',
-        args: [userId],
-      });
-    }
+    // Récupérer l'utilisateur depuis le backend (DB backend uniquement)
+    try {
+      const { getBackendUrlAsync } = await import('../../../../lib/backend-url.js');
+      const backendUrl = await getBackendUrlAsync();
+      const backendApiUrl = `${backendUrl}/api/client/auth/users/${encodeURIComponent(userId)}`;
 
-    if (userResult && userResult.rows.length > 0) {
-      const user = userResult.rows[0];
-      return new Response(
-        JSON.stringify({
-          success: true,
-          data: {
-            user: {
-              id: user.id as string,
-              email: user.email as string,
-            },
-          },
-        }),
-        {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
+      const backendResponse = await fetch(backendApiUrl, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (backendResponse.ok) {
+        const backendData = await backendResponse.json().catch(() => ({}));
+        const backendUser = backendData?.data;
+        if (backendUser?.id) {
+          return new Response(
+            JSON.stringify({
+              success: true,
+              data: {
+                user: {
+                  id: backendUser.id,
+                  email: backendUser.email ?? null,
+                },
+              },
+            }),
+            { status: 200, headers: { 'Content-Type': 'application/json' } }
+          );
         }
-      );
+      }
+    } catch {
+      // fallback plus bas
     }
 
     // Si pas de client ou utilisateur non trouvé, retourner les infos du token

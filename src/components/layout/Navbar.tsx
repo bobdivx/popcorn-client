@@ -372,6 +372,11 @@ export default function Navbar() {
                       Paramètres
                     </a>
                   </li>
+                  <li>
+                    <a href="/installation" className="text-white hover:bg-glass-hover text-base py-3 px-4 rounded-lg transition-colors">
+                      Installation
+                    </a>
+                  </li>
                   <li><hr className="my-2 border-white/10" /></li>
                   <li>
                     <a onClick={handleLogout} className="text-primary-400 hover:bg-glass-hover text-base py-3 px-4 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-opacity-50">

@@ -16,9 +16,10 @@ export default function ServerConnectionCheck() {
   const [message, setMessage] = useState('Vérification de la connexion au serveur...');
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [isVisible, setIsVisible] = useState(true);
+  const [isVisible, setIsVisible] = useState(false); // Commencer invisible pour éviter l'affichage lors du hot-reload
   const [retryCount, setRetryCount] = useState(0);
   const retryIntervalRef = useRef<number | null>(null);
+  const checkStartTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     // Ne pas bloquer l'accès aux pages de configuration
@@ -31,7 +32,8 @@ export default function ServerConnectionCheck() {
       return;
     }
 
-    checkConnection();
+    // Vérifier rapidement si le serveur est accessible avant d'afficher l'animation
+    checkConnectionQuick();
 
     // Nettoyer le timeout lors du démontage
     return () => {
@@ -40,6 +42,71 @@ export default function ServerConnectionCheck() {
       }
     };
   }, []);
+
+  // Vérification rapide sans afficher l'animation si le serveur répond rapidement
+  const checkConnectionQuick = async () => {
+    checkStartTimeRef.current = Date.now();
+    
+    try {
+      const response = await serverApi.checkServerHealth();
+      
+      if (response.success) {
+        // Si le serveur répond rapidement (moins de 500ms), ne pas afficher l'animation
+        const elapsed = Date.now() - (checkStartTimeRef.current || 0);
+        if (elapsed < 500) {
+          setIsVisible(false);
+          handleConnectionSuccess(response);
+          return;
+        }
+      }
+      
+      // Si le serveur ne répond pas rapidement ou en cas d'erreur, afficher l'animation
+      setIsVisible(true);
+      checkConnection();
+    } catch (err) {
+      // En cas d'erreur, afficher l'animation et réessayer
+      setIsVisible(true);
+      checkConnection();
+    }
+  };
+
+  const handleConnectionSuccess = async (response: any) => {
+    setRetryCount(0);
+    setStatus('connected');
+    
+    // Vérifier si l'utilisateur est authentifié
+    if (!serverApi.isAuthenticated()) {
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/setup') {
+        window.location.href = '/login';
+      }
+      return;
+    }
+
+    const meResponse = await serverApi.getMe();
+    if (meResponse.success) {
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/setup' && !currentPath.startsWith('/setup')) {
+        const setupResponse = await serverApi.getSetupStatus();
+        if (setupResponse.success && setupResponse.data) {
+          if (setupResponse.data.needsSetup) {
+            window.location.href = '/setup';
+            return;
+          }
+        }
+      }
+      
+      const currentPath2 = window.location.pathname;
+      if (currentPath2 === '/' || currentPath2 === '/login' || currentPath2 === '/register') {
+        window.location.href = '/dashboard';
+      }
+    } else {
+      const currentPath = window.location.pathname;
+      if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/setup') {
+        window.location.href = '/login';
+      }
+    }
+  };
 
   const checkConnection = async () => {
     setStatus('checking');
@@ -72,41 +139,7 @@ export default function ServerConnectionCheck() {
         // Vérifier si l'utilisateur est authentifié
         setTimeout(async () => {
           setIsVisible(false);
-          
-          // Ne vérifier l'authentification que si on a un token
-          if (!serverApi.isAuthenticated()) {
-            const currentPath = window.location.pathname;
-            if (currentPath !== '/login' && currentPath !== '/register') {
-              window.location.href = '/login';
-            }
-            return;
-          }
-
-          const meResponse = await serverApi.getMe();
-          if (meResponse.success) {
-            // Vérifier le statut du setup uniquement si on n'est pas déjà sur la page setup
-            const currentPath = window.location.pathname;
-            if (currentPath !== '/setup' && !currentPath.startsWith('/setup')) {
-              const setupResponse = await serverApi.getSetupStatus();
-              if (setupResponse.success && setupResponse.data) {
-                if (setupResponse.data.needsSetup) {
-                  window.location.href = '/setup';
-                  return;
-                }
-              }
-            }
-            
-            // Ne rediriger vers le dashboard que depuis la page d'accueil, login ou register
-            const currentPath2 = window.location.pathname;
-            if (currentPath2 === '/' || currentPath2 === '/login' || currentPath2 === '/register') {
-              window.location.href = '/dashboard';
-            }
-          } else {
-            const currentPath = window.location.pathname;
-            if (currentPath !== '/login' && currentPath !== '/register') {
-              window.location.href = '/login';
-            }
-          }
+          handleConnectionSuccess(response);
         }, 500);
       } else {
         // En cas d'erreur, continuer à réessayer automatiquement

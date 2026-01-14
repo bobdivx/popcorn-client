@@ -32,7 +32,7 @@ export default function ServerSettings() {
       }
     } catch (err) {
       console.error('Erreur lors du chargement de l\'URL du backend:', err);
-      const defaultUrl = 'http://127.0.0.1:4327';
+      const defaultUrl = 'http://127.0.0.1:3000';
       setBackendUrl(defaultUrl);
       setSavedBackendUrl(null);
     } finally {
@@ -143,7 +143,7 @@ export default function ServerSettings() {
       setError('');
       
       // Réinitialiser à la valeur par défaut
-      const defaultUrl = 'http://127.0.0.1:4327';
+      const defaultUrl = 'http://127.0.0.1:3000';
       clearBackendUrl();
       setBackendUrl(defaultUrl);
       setSavedBackendUrl(null);
@@ -206,15 +206,15 @@ export default function ServerSettings() {
                 setError('');
                 setSuccess('');
               }}
-              placeholder="http://127.0.0.1:4327"
+              placeholder="http://127.0.0.1:3000"
               class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
               disabled={saving || testing || loading}
             />
             <p class="mt-2 text-sm text-gray-400">
-              Exemples: http://127.0.0.1:4327 (local) ou http://192.168.1.100:4327 (réseau local)
+              Exemples: http://127.0.0.1:3000 (local) ou http://192.168.1.100:3000 (réseau local)
             </p>
             <p class="mt-1 text-xs text-gray-500">
-              💡 Cette URL est stockée dans localStorage et utilisée par les routes API du client Astro pour faire le proxy vers le backend Rust. Le backend Rust utilise le port 4327 par défaut.
+              💡 Cette URL est stockée dans localStorage et utilisée par les routes API du client Astro pour faire le proxy vers le backend Rust. Le backend Rust utilise le port 3000 par défaut.
             </p>
           </div>
 
@@ -278,7 +278,7 @@ export default function ServerSettings() {
             • Assurez-vous que le backend Rust est démarré et accessible sur cette URL
           </p>
           <p>
-            • Le backend Rust utilise le port 4327 par défaut (configurable via BACKEND_PORT)
+            • Le backend Rust utilise le port 3000 par défaut (configurable via BACKEND_PORT)
           </p>
         </div>
       </div>

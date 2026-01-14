@@ -1,0 +1,385 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Installation - Popcorn Client">
+  <div class="min-h-screen bg-[#121212] text-white py-8 px-4">
+    <div class="container mx-auto max-w-6xl">
+      <div class="mb-8">
+        <h1 class="text-4xl font-bold mb-2">Installation avec Docker</h1>
+        <p class="text-gray-400">Guide d'installation de Popcorn avec Docker Compose</p>
+      </div>
+
+      <!-- Prérequis -->
+      <div class="bg-gray-900 rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold mb-4">Prérequis</h2>
+        <ul class="list-disc list-inside space-y-2 text-gray-300">
+          <li>Docker et Docker Compose installés</li>
+          <li>Un compte cloud Popcorn (inscription sur <a href="https://popcorn-web-five.vercel.app" target="_blank" class="text-primary-400 hover:underline">popcorn-web-five.vercel.app</a>)</li>
+          <li>Un code d'invitation (obtenu depuis votre compte cloud)</li>
+        </ul>
+      </div>
+
+      <!-- Docker Compose complet -->
+      <div class="bg-gray-900 rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold mb-4">Docker Compose complet (Client + Serveur)</h2>
+        <p class="text-gray-400 mb-4">
+          Ce fichier docker-compose.yml contient les deux services : le client web (frontend) et le serveur backend.
+        </p>
+        
+        <div class="bg-black rounded-lg p-4 overflow-x-auto">
+          <pre class="text-sm text-gray-300"><code>name: popcorn
+services:
+  client:
+    # image: docker.io/bobdivx/popcorn-client:latest  # Commenté pour développement local
+    build:
+      context: ../popcorn-client
+      dockerfile: Dockerfile
+      pull: false
+    command: []
+    container_name: popcorn-client
+    cpu_shares: 100
+    depends_on:
+      server:
+        condition: service_started
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=4321
+      - BACKEND_URL=http://server:3000
+      - PUBLIC_BACKEND_URL=http://server:3000
+      - PUBLIC_CLIENT_URL=http://client:4321
+      - TZ=${TZ:-Europe/Paris}
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      # Variables Turso en lecture seule pour valider les codes d'invitation
+      # Ces variables permettent uniquement de LIRE les codes d'invitation depuis Turso
+      # Les données utilisateur restent dans SQLite local
+      - TURSO_READONLY_DATABASE_URL=${TURSO_READONLY_DATABASE_URL:-libsql://popcorn-bobdivx.aws-eu-west-1.turso.io}
+      - TURSO_READONLY_AUTH_TOKEN=${TURSO_READONLY_AUTH_TOKEN:-eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicm8iLCJpYXQiOjE3Njc0NTE3MzMsImlkIjoiZTVmMGZiZjAtZTEzMS00MTY2LTgyYmEtMmEwYjZiNWQ3ZTA3IiwicmlkIjoiOGM2NmRlMjctYjkxMy00ZWNjLTlmZDQtYjhmNzRkZDhhODMyIn0.H27fjXjDdIoWLbJ7q-ejckjuD8iVz6CzyN4vBxq7lZJZ7d6RoxZAeBSLk0W2Ax6jnjV8d8EIV0CgO7BSxuRuBg}
+    labels:
+      icon: https://raw.githubusercontent.com/bobdivx/popcorn/main/public/favicon.svg
+    ports:
+      - target: 4321
+        published: "4325"
+        protocol: tcp
+    privileged: false
+    restart: unless-stopped
+    networks:
+      - popcorn-network
+    deploy:
+      resources:
+        limits:
+          memory: "1G"
+        reservations:
+          memory: "256M"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:4321/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    cap_add: []
+  server:
+    # image: docker.io/bobdivx/popcorn-server:latest  # Commenté pour développement local
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      pull: false
+    command: []
+    container_name: popcorn-server
+    cpu_shares: 100
+    # Note: TMDB, Jackett et les indexers sont configurés par l'utilisateur via l'interface web
+    # et stockés dans la base de données SQLite. Aucune variable d'environnement nécessaire.
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=3000
+      - DOWNLOAD_DIR=/app/downloads
+      - API_BASE_URL=${API_BASE_URL:-http://client:4321}
+      - API_USERNAME=${API_USERNAME:-admin}
+      - API_PASSWORD=${API_PASSWORD:-admin123}
+      - MAX_DOWNLOADS=${MAX_DOWNLOADS:-5}
+      - MAX_UPLOAD_SLOTS=${MAX_UPLOAD_SLOTS:-4}
+      - LIBRQBIT_API_URL=${LIBRQBIT_API_URL:-http://127.0.0.1:3030}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - RUST_LOG=${RUST_LOG:-info}
+      - ANNOUNCE_INTERVAL=${ANNOUNCE_INTERVAL:-1800}
+      - TZ=${TZ:-Europe/Paris}
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+    labels:
+      icon: https://raw.githubusercontent.com/bobdivx/popcorn/main/public/favicon.svg
+    ports:
+      - target: 3000
+        published: "3000"
+        protocol: tcp
+    privileged: false
+    restart: unless-stopped
+    volumes:
+      - ./data/.data:/app/.data
+      # Répertoire de téléchargement à la racine du projet
+      # Pour développement local, utiliser: ./downloads:/app/downloads
+      - ./data/downloads:/app/downloads
+      - ./data/transcode_cache:/app/downloads/transcode_cache
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/client/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    cap_add: []
+    networks:
+      - popcorn-network
+    deploy:
+      resources:
+        limits:
+          memory: "2G"
+        reservations:
+          memory: "512M"
+networks:
+  popcorn-network:
+    name: popcorn-network
+    driver: bridge</code></pre>
+        </div>
+        
+        <button
+          id="copy-full-compose-btn"
+          class="mt-4 bg-primary hover:bg-primary-700 text-white px-6 py-3 rounded-lg transition-colors shadow-primary font-semibold"
+        >
+          Copier le docker-compose.yml complet
+        </button>
+      </div>
+
+      <!-- Instructions -->
+      <div class="bg-gray-900 rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold mb-4">Instructions d'installation</h2>
+        <ol class="list-decimal list-inside space-y-4 text-gray-300">
+          <li>
+            <strong class="text-white">Créez un répertoire pour votre installation :</strong>
+            <pre class="bg-black rounded p-3 mt-2 text-sm overflow-x-auto"><code>mkdir popcorn
+cd popcorn</code></pre>
+          </li>
+          <li>
+            <strong class="text-white">Créez le fichier docker-compose.yml :</strong>
+            <p class="text-gray-400 mt-1">Copiez le contenu ci-dessus dans un fichier nommé <code class="bg-gray-800 px-2 py-1 rounded">docker-compose.yml</code></p>
+          </li>
+          <li>
+            <strong class="text-white">Créez les répertoires nécessaires :</strong>
+            <pre class="bg-black rounded p-3 mt-2 text-sm overflow-x-auto"><code>mkdir -p data/.data data/downloads data/transcode_cache</code></pre>
+          </li>
+          <li>
+            <strong class="text-white">Démarrez les services :</strong>
+            <pre class="bg-black rounded p-3 mt-2 text-sm overflow-x-auto"><code>docker-compose up -d</code></pre>
+          </li>
+          <li>
+            <strong class="text-white">Initialisez la base de données :</strong>
+            <pre class="bg-black rounded p-3 mt-2 text-sm overflow-x-auto"><code>docker-compose exec server cargo run --bin init-db-local</code></pre>
+          </li>
+          <li>
+            <strong class="text-white">Accédez à l'interface web :</strong>
+            <p class="text-gray-400 mt-1">
+              Ouvrez votre navigateur à l'adresse <a href="http://localhost:4325" target="_blank" class="text-primary-400 hover:underline">http://localhost:4325</a>
+            </p>
+          </li>
+          <li>
+            <strong class="text-white">Configurez votre compte cloud :</strong>
+            <p class="text-gray-400 mt-1">
+              Utilisez votre code d'invitation pour créer votre compte local et le synchroniser avec votre compte cloud.
+            </p>
+          </li>
+        </ol>
+      </div>
+
+      <!-- Variables d'environnement -->
+      <div class="bg-gray-900 rounded-lg p-6 mb-6">
+        <h2 class="text-2xl font-bold mb-4">Variables d'environnement optionnelles</h2>
+        <p class="text-gray-400 mb-4">
+          Vous pouvez créer un fichier <code class="bg-gray-800 px-2 py-1 rounded">.env</code> pour personnaliser la configuration :
+        </p>
+        <div class="bg-black rounded-lg p-4 overflow-x-auto">
+          <pre class="text-sm text-gray-300"><code># Fuseau horaire
+TZ=Europe/Paris
+
+# Identifiants utilisateur/groupe (pour les permissions de fichiers)
+PUID=1000
+PGID=1000
+
+# Configuration API
+API_USERNAME=admin
+API_PASSWORD=admin123
+
+# Limites de téléchargement
+MAX_DOWNLOADS=5
+MAX_UPLOAD_SLOTS=4
+
+# Niveau de log
+LOG_LEVEL=info
+RUST_LOG=info</code></pre>
+        </div>
+      </div>
+
+      <!-- Commandes utiles -->
+      <div class="bg-gray-900 rounded-lg p-6">
+        <h2 class="text-2xl font-bold mb-4">Commandes utiles</h2>
+        <div class="space-y-3">
+          <div>
+            <strong class="text-white">Voir les logs :</strong>
+            <pre class="bg-black rounded p-3 mt-2 text-sm overflow-x-auto"><code>docker-compose logs -f</code></pre>
+          </div>
+          <div>
+            <strong class="text-white">Arrêter les services :</strong>
+            <pre class="bg-black rounded p-3 mt-2 text-sm overflow-x-auto"><code>docker-compose down</code></pre>
+          </div>
+          <div>
+            <strong class="text-white">Redémarrer les services :</strong>
+            <pre class="bg-black rounded p-3 mt-2 text-sm overflow-x-auto"><code>docker-compose restart</code></pre>
+          </div>
+          <div>
+            <strong class="text-white">Voir le statut des conteneurs :</strong>
+            <pre class="bg-black rounded p-3 mt-2 text-sm overflow-x-auto"><code>docker-compose ps</code></pre>
+          </div>
+          <div>
+            <strong class="text-white">Mettre à jour les images :</strong>
+            <pre class="bg-black rounded p-3 mt-2 text-sm overflow-x-auto"><code>docker-compose pull
+docker-compose up -d</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Vérifier l'authentification
+    const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
+    if (!token) {
+      window.location.href = '/login';
+    }
+
+    // Copier le docker-compose complet
+    const fullCompose = `name: popcorn
+services:
+  client:
+    # image: docker.io/bobdivx/popcorn-client:latest  # Commenté pour développement local
+    build:
+      context: ../popcorn-client
+      dockerfile: Dockerfile
+      pull: false
+    command: []
+    container_name: popcorn-client
+    cpu_shares: 100
+    depends_on:
+      server:
+        condition: service_started
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=4321
+      - BACKEND_URL=http://server:3000
+      - PUBLIC_BACKEND_URL=http://server:3000
+      - PUBLIC_CLIENT_URL=http://client:4321
+      - TZ=\${TZ:-Europe/Paris}
+      - PUID=\${PUID:-1000}
+      - PGID=\${PGID:-1000}
+      # Variables Turso en lecture seule pour valider les codes d'invitation
+      # Ces variables permettent uniquement de LIRE les codes d'invitation depuis Turso
+      # Les données utilisateur restent dans SQLite local
+      - TURSO_READONLY_DATABASE_URL=\${TURSO_READONLY_DATABASE_URL:-libsql://popcorn-bobdivx.aws-eu-west-1.turso.io}
+      - TURSO_READONLY_AUTH_TOKEN=\${TURSO_READONLY_AUTH_TOKEN:-eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicm8iLCJpYXQiOjE3Njc0NTE3MzMsImlkIjoiZTVmMGZiZjAtZTEzMS00MTY2LTgyYmEtMmEwYjZiNWQ3ZTA3IiwicmlkIjoiOGM2NmRlMjctYjkxMy00ZWNjLTlmZDQtYjhmNzRkZDhhODMyIn0.H27fjXjDdIoWLbJ7q-ejckjuD8iVz6CzyN4vBxq7lZJZ7d6RoxZAeBSLk0W2Ax6jnjV8d8EIV0CgO7BSxuRuBg}
+    labels:
+      icon: https://raw.githubusercontent.com/bobdivx/popcorn/main/public/favicon.svg
+    ports:
+      - target: 4321
+        published: "4325"
+        protocol: tcp
+    privileged: false
+    restart: unless-stopped
+    networks:
+      - popcorn-network
+    deploy:
+      resources:
+        limits:
+          memory: "1G"
+        reservations:
+          memory: "256M"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:4321/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    cap_add: []
+  server:
+    # image: docker.io/bobdivx/popcorn-server:latest  # Commenté pour développement local
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      pull: false
+    command: []
+    container_name: popcorn-server
+    cpu_shares: 100
+    # Note: TMDB, Jackett et les indexers sont configurés par l'utilisateur via l'interface web
+    # et stockés dans la base de données SQLite. Aucune variable d'environnement nécessaire.
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=3000
+      - DOWNLOAD_DIR=/app/downloads
+      - API_BASE_URL=\${API_BASE_URL:-http://client:4321}
+      - API_USERNAME=\${API_USERNAME:-admin}
+      - API_PASSWORD=\${API_PASSWORD:-admin123}
+      - MAX_DOWNLOADS=\${MAX_DOWNLOADS:-5}
+      - MAX_UPLOAD_SLOTS=\${MAX_UPLOAD_SLOTS:-4}
+      - LIBRQBIT_API_URL=\${LIBRQBIT_API_URL:-http://127.0.0.1:3030}
+      - LOG_LEVEL=\${LOG_LEVEL:-info}
+      - RUST_LOG=\${RUST_LOG:-info}
+      - ANNOUNCE_INTERVAL=\${ANNOUNCE_INTERVAL:-1800}
+      - TZ=\${TZ:-Europe/Paris}
+      - PUID=\${PUID:-1000}
+      - PGID=\${PGID:-1000}
+    labels:
+      icon: https://raw.githubusercontent.com/bobdivx/popcorn/main/public/favicon.svg
+    ports:
+      - target: 3000
+        published: "3000"
+        protocol: tcp
+    privileged: false
+    restart: unless-stopped
+    volumes:
+      - ./data/.data:/app/.data
+      # Répertoire de téléchargement à la racine du projet
+      # Pour développement local, utiliser: ./downloads:/app/downloads
+      - ./data/downloads:/app/downloads
+      - ./data/transcode_cache:/app/downloads/transcode_cache
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/client/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    cap_add: []
+    networks:
+      - popcorn-network
+    deploy:
+      resources:
+        limits:
+          memory: "2G"
+        reservations:
+          memory: "512M"
+networks:
+  popcorn-network:
+    name: popcorn-network
+    driver: bridge`;
+
+    document.getElementById('copy-full-compose-btn')?.addEventListener('click', () => {
+      navigator.clipboard.writeText(fullCompose).then(() => {
+        const btn = document.getElementById('copy-full-compose-btn');
+        const originalText = btn.textContent;
+        btn.textContent = 'Copié !';
+        btn.classList.add('bg-green-700');
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.classList.remove('bg-green-700');
+        }, 2000);
+      });
+    });
+  </script>
+</Layout>

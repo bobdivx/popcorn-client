@@ -205,9 +205,11 @@ export class CacheManager {
 export class TokenManager {
   private static readonly ACCESS_TOKEN_KEY = 'access_token';
   private static readonly REFRESH_TOKEN_KEY = 'refresh_token';
+  private static readonly CLOUD_ACCESS_TOKEN_KEY = 'cloud_access_token';
+  private static readonly CLOUD_REFRESH_TOKEN_KEY = 'cloud_refresh_token';
 
   /**
-   * Stocke les tokens
+   * Stocke les tokens locaux
    */
   static setTokens(accessToken: string, refreshToken: string): void {
     if (typeof window === 'undefined') return;
@@ -216,7 +218,16 @@ export class TokenManager {
   }
 
   /**
-   * Récupère le token d'accès
+   * Stocke les tokens cloud (de popcorn-web)
+   */
+  static setCloudTokens(accessToken: string, refreshToken: string): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(this.CLOUD_ACCESS_TOKEN_KEY, accessToken);
+    localStorage.setItem(this.CLOUD_REFRESH_TOKEN_KEY, refreshToken);
+  }
+
+  /**
+   * Récupère le token d'accès local
    */
   static getAccessToken(): string | null {
     if (typeof window === 'undefined') return null;
@@ -224,7 +235,15 @@ export class TokenManager {
   }
 
   /**
-   * Récupère le token de rafraîchissement
+   * Récupère le token d'accès cloud (pour les appels à popcorn-web)
+   */
+  static getCloudAccessToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(this.CLOUD_ACCESS_TOKEN_KEY);
+  }
+
+  /**
+   * Récupère le token de rafraîchissement local
    */
   static getRefreshToken(): string | null {
     if (typeof window === 'undefined') return null;
@@ -232,11 +251,21 @@ export class TokenManager {
   }
 
   /**
-   * Supprime les tokens
+   * Récupère le token de rafraîchissement cloud
+   */
+  static getCloudRefreshToken(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(this.CLOUD_REFRESH_TOKEN_KEY);
+  }
+
+  /**
+   * Supprime tous les tokens (locaux et cloud)
    */
   static clearTokens(): void {
     if (typeof window === 'undefined') return;
     localStorage.removeItem(this.ACCESS_TOKEN_KEY);
     localStorage.removeItem(this.REFRESH_TOKEN_KEY);
+    localStorage.removeItem(this.CLOUD_ACCESS_TOKEN_KEY);
+    localStorage.removeItem(this.CLOUD_REFRESH_TOKEN_KEY);
   }
 }

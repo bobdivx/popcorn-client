@@ -62,9 +62,19 @@ export const POST: APIRoute = async ({ request }) => {
     // Utiliser un import dynamique pour éviter les erreurs de chargement
     const { getBackendUrlAsync: getBackendUrl } = await import('../../../../lib/backend-url.js');
     const backendUrl = await getBackendUrl();
+    
+    // Plus besoin de synchroniser le token TMDB : il est déjà dans le backend
+    // Le token TMDB est maintenant géré directement dans le backend via les routes API
+    console.log('[SYNC START] ℹ️ Le token TMDB est déjà dans le backend, pas besoin de synchronisation');
+    
+    // Plus besoin de synchroniser les indexers : ils sont déjà dans le backend
+    // Les indexers sont maintenant gérés directement dans le backend via les routes API
+    console.log('[SYNC START] ℹ️ Les indexers sont déjà dans le backend, pas besoin de synchronisation');
+    
     const backendApiUrl = `${backendUrl}/api/sync/start`;
     
     console.log(`[SYNC START] 📡 Proxy vers: ${backendApiUrl}`);
+    console.log(`[SYNC START] 📋 Body de la requête:`, { user_id: userId });
     
     // Copier les headers pertinents
     const headers: HeadersInit = {
@@ -90,6 +100,7 @@ export const POST: APIRoute = async ({ request }) => {
     
     let response: Response;
     try {
+      console.log(`[SYNC START] 🔄 Envoi de la requête au backend...`);
       response = await fetch(backendApiUrl, {
         method: 'POST',
         headers,
@@ -98,6 +109,29 @@ export const POST: APIRoute = async ({ request }) => {
       });
       clearTimeout(timeoutId);
       console.log(`[SYNC START] ✅ Réponse du backend: ${response.status}`);
+      
+      // Récupérer le body de la réponse
+      const responseBody = await response.text();
+      console.log(`[SYNC START] 📄 Body de la réponse:`, responseBody.substring(0, 500)); // Limiter à 500 caractères pour les logs
+      const responseData = responseBody ? JSON.parse(responseBody) : {};
+      
+      // Si erreur 400, améliorer le message d'erreur
+      if (response.status === 400) {
+        console.error('[SYNC START] ❌ Erreur 400 du backend:', responseData);
+        // Le message d'erreur du backend est déjà dans responseData.error ou responseData.message
+      } else if (!response.ok) {
+        console.error('[SYNC START] ❌ Erreur du backend (status non-OK):', response.status, responseData);
+      } else {
+        console.log('[SYNC START] ✅ Synchronisation démarrée avec succès:', responseData);
+      }
+      
+      // Retourner la réponse du backend
+      return new Response(JSON.stringify(responseData), {
+        status: response.status,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
     } catch (fetchError) {
       clearTimeout(timeoutId);
       console.error(`[SYNC START] ❌ Erreur lors de la requête vers le backend:`, fetchError);
@@ -106,7 +140,7 @@ export const POST: APIRoute = async ({ request }) => {
           JSON.stringify({
             success: false,
             error: 'Timeout',
-            message: 'Le backend Rust ne répond pas dans les 10 secondes.',
+            message: 'Le backend Rust ne répond pas dans les 10 secondes. Vérifiez qu\'il est démarré.',
           }),
           {
             status: 504,
@@ -118,18 +152,6 @@ export const POST: APIRoute = async ({ request }) => {
       }
       throw fetchError;
     }
-    
-    // Récupérer le body de la réponse
-    const responseBody = await response.text();
-    const responseData = responseBody ? JSON.parse(responseBody) : {};
-    
-    // Retourner la réponse du backend
-    return new Response(JSON.stringify(responseData), {
-      status: response.status,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
   } catch (error) {
     console.error('[SYNC START] ❌ Erreur:', error);
     

@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
 
 export default function LoginForm() {
@@ -6,6 +6,27 @@ export default function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [checkingUsers, setCheckingUsers] = useState(true);
+
+  // Vérifier si la DB est vide (pas d'utilisateurs) et rediriger vers setup
+  useEffect(() => {
+    const checkUsers = async () => {
+      try {
+        const setupResponse = await serverApi.getSetupStatus();
+        if (setupResponse.success && setupResponse.data?.hasUsers === false) {
+          // DB vide, rediriger vers setup
+          window.location.href = '/setup';
+          return;
+        }
+      } catch (error) {
+        console.error('Erreur lors de la vérification des utilisateurs:', error);
+      } finally {
+        setCheckingUsers(false);
+      }
+    };
+
+    checkUsers();
+  }, []);
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -41,6 +62,18 @@ export default function LoginForm() {
       setIsLoading(false);
     }
   };
+
+  // Afficher un loader pendant la vérification
+  if (checkingUsers) {
+    return (
+      <div className="w-full max-w-md bg-black/80 backdrop-blur-sm border border-white/20 rounded-lg p-4 sm:p-6 md:p-8 shadow-2xl mx-3 sm:mx-4">
+        <div className="text-center">
+          <span className="loading loading-spinner loading-lg text-red-600"></span>
+          <p className="mt-4 text-white">Vérification...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-md bg-black/80 backdrop-blur-sm border border-white/20 rounded-lg p-4 sm:p-6 md:p-8 shadow-2xl mx-3 sm:mx-4">

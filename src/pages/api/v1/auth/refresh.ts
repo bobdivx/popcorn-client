@@ -2,8 +2,6 @@ export const prerender = false;
 
 import type { APIRoute } from 'astro';
 import { verifyToken, generateAccessToken, generateRefreshToken } from '../../../../lib/auth/jwt.js';
-import { getTursoClient } from '../../../../lib/db/turso-client.js';
-import { getDb } from '../../../../lib/db/client.js';
 import { z } from 'zod';
 
 const refreshSchema = z.object({
@@ -83,59 +81,34 @@ export const POST: APIRoute = async ({ request }) => {
       );
     }
 
-    // Vérifier que l'utilisateur existe toujours
-    // Essayer d'abord Turso, puis fallback sur la base locale
-    const tursoClient = getTursoClient();
-    let userResult;
+    // Récupérer l'utilisateur depuis le backend (DB backend uniquement)
     let userEmail = email || '';
-    
-    if (tursoClient) {
-      // Utiliser Turso si disponible
-      userResult = await tursoClient.execute({
-        sql: 'SELECT id, email FROM cloud_accounts WHERE id = ?',
-        args: [userId],
+    try {
+      const { getBackendUrlAsync } = await import('../../../../lib/backend-url.js');
+      const backendUrl = await getBackendUrlAsync();
+      const backendApiUrl = `${backendUrl}/api/client/auth/users/${encodeURIComponent(userId)}`;
+      const backendResponse = await fetch(backendApiUrl, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
       });
-    } else {
-      // Fallback sur la base locale SQLite
-      const localDb = getDb();
-      userResult = await localDb.execute({
-        sql: 'SELECT id, email FROM users WHERE id = ?',
-        args: [userId],
-      });
-    }
-
-    if (userResult && userResult.rows.length > 0) {
-      const user = userResult.rows[0];
-      userEmail = (user.email as string) || email || '';
-    } else if (!tursoClient) {
-      // Si pas de Turso et pas trouvé dans la base locale, générer quand même les tokens
-      // (pour permettre le refresh même si l'utilisateur n'est pas dans la DB)
-    } else {
-      // Si Turso est disponible mais utilisateur non trouvé
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'UserNotFound',
-          message: 'Utilisateur non trouvé',
-        }),
-        {
-          status: 404,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      if (backendResponse.ok) {
+        const backendData = await backendResponse.json().catch(() => ({}));
+        const backendUser = backendData?.data;
+        userEmail = backendUser?.email || userEmail;
+      }
+    } catch {
+      // fallback to token payload
     }
 
     // Générer de nouveaux tokens avec durées différentes
     const newAccessToken = generateAccessToken({
       userId: userId,
-      username: email || '',
+      username: userEmail || '',
     });
 
     const newRefreshToken = generateRefreshToken({
       userId: userId,
-      username: email || '',
+      username: userEmail || '',
     });
 
     console.log('[REFRESH] ✅ Token rafraîchi pour User ID:', userId, 'Email:', email || 'N/A', 'IP:', clientIp);

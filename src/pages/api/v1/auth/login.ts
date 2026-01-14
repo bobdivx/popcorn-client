@@ -1,10 +1,22 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import { getDb } from '../../../../lib/db/client.js';
-import { verifyPassword } from '../../../../lib/auth/password.js';
 import { generateAccessToken, generateRefreshToken } from '../../../../lib/auth/jwt.js';
 import { z } from 'zod';
+
+function getBackendUrlOverrideFromRequest(request: Request): string | null {
+  const raw = request.headers.get('x-popcorn-backend-url') || request.headers.get('X-Popcorn-Backend-Url');
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === 'undefined') return null;
+  try {
+    const u = new URL(trimmed);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    return trimmed.replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
 
 const loginSchema = z.object({
   email: z.string().min(1, 'Email ou nom d\'utilisateur requis'),
@@ -48,113 +60,68 @@ export const POST: APIRoute = async ({ request }) => {
     const { email: emailOrUsername, password } = validation.data;
 
     console.log('[LOGIN] 🔐 Tentative de connexion pour:', emailOrUsername, 'IP:', clientIp);
-    
-    // Détecter si l'input ressemble à un email
-    const isEmailFormat = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailOrUsername);
-    console.log('[LOGIN] Format détecté:', isEmailFormat ? 'email' : 'username');
-    
-    // Utiliser la base de données du serveur (popcorn-server/.data/local.db)
-    const db = getDb();
-    let userResult;
-    
-    if (isEmailFormat) {
-      // Chercher d'abord par email, puis par username si pas trouvé
-      userResult = await db.execute({
-        sql: 'SELECT id, email, username, password_hash FROM users WHERE email = ? AND password_hash IS NOT NULL',
-        args: [emailOrUsername],
-      });
-      
-      // Si pas trouvé par email, essayer par username
-      if (userResult.rows.length === 0) {
-        userResult = await db.execute({
-          sql: 'SELECT id, email, username, password_hash FROM users WHERE username = ? AND password_hash IS NOT NULL',
-          args: [emailOrUsername],
-        });
-      }
-    } else {
-      // Chercher par username uniquement
-      userResult = await db.execute({
-        sql: 'SELECT id, email, username, password_hash FROM users WHERE username = ? AND password_hash IS NOT NULL',
-        args: [emailOrUsername],
-      });
-    }
-    
-    console.log('[LOGIN] Résultat DB:', userResult.rows.length, 'utilisateur(s) trouvé(s)');
-    
-    if (userResult.rows.length === 0) {
-      console.log('[LOGIN] ❌ Aucun utilisateur trouvé avec cet identifiant:', emailOrUsername, 'IP:', clientIp);
+
+    // Auth via backend (plus aucun accès DB depuis le client)
+    const { getBackendUrlAsync } = await import('../../../../lib/backend-url.js');
+    const backendUrl =
+      getBackendUrlOverrideFromRequest(request) ||
+      (await getBackendUrlAsync());
+    const backendApiUrl = `${backendUrl}/api/client/auth/login`;
+
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth/login.ts:58',message:'LOGIN proxy -> backend',data:{backendApiUrl,hasPassword:!!password,emailLen:emailOrUsername.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'AUTH'})}).catch(()=>{});
+    // #endregion
+
+    const backendResponse = await fetch(backendApiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email: emailOrUsername, password }),
+    });
+
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth/login.ts:71',message:'LOGIN backend response',data:{status:backendResponse.status,ok:backendResponse.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'AUTH'})}).catch(()=>{});
+    // #endregion
+
+    if (!backendResponse.ok) {
+      const errorText = await backendResponse.text().catch(() => '');
+      let errorData: any = {};
+      try { errorData = errorText ? JSON.parse(errorText) : {}; } catch { errorData = {}; }
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'InvalidCredentials',
-          message: 'Email ou mot de passe incorrect',
+          error: errorData.error || 'InvalidCredentials',
+          message: errorData.message || errorData.error || 'Email ou mot de passe incorrect',
         }),
-        {
-          status: 401,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
+        { status: backendResponse.status, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    const user = userResult.rows[0];
-    const passwordHash = user.password_hash as string;
-    const userId = user.id as string;
-    const userEmail = (user.email as string) || emailOrUsername;
-    const username = (user as any).username || emailOrUsername;
+    const backendData = await backendResponse.json().catch(() => ({}));
+    const backendUser = backendData?.data?.user;
+    const userId = backendUser?.id as string | undefined;
+    const userEmail = (backendUser?.email as string | undefined) || null;
+    const username = (backendUser?.username as string | undefined) || userEmail || emailOrUsername;
 
-    // Vérifier le mot de passe
-    console.log('[LOGIN] Vérification du mot de passe pour:', emailOrUsername);
-    
-    if (!passwordHash) {
-      console.log('[LOGIN] ❌ Aucun hash de mot de passe trouvé pour cet utilisateur');
+    if (!userId) {
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'InvalidCredentials',
-          message: 'Email ou mot de passe incorrect',
-        }),
-        {
-          status: 401,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
+        JSON.stringify({ success: false, error: 'InvalidResponse', message: 'Réponse backend invalide' }),
+        { status: 502, headers: { 'Content-Type': 'application/json' } }
       );
     }
-    
-    const isPasswordValid = await verifyPassword(password, passwordHash);
-    console.log('[LOGIN] Mot de passe valide:', isPasswordValid);
 
-    if (!isPasswordValid) {
-      console.log('[LOGIN] ❌ Mot de passe invalide pour:', emailOrUsername);
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'InvalidCredentials',
-          message: 'Email ou mot de passe incorrect',
-        }),
-        {
-          status: 401,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
-    }
-    
-    console.log('[LOGIN] ✅ Connexion réussie pour:', emailOrUsername, 'User ID:', userId, 'IP:', clientIp);
+    console.log('[LOGIN] ✅ Connexion validée par backend - User ID:', userId, 'IP:', clientIp);
 
     // Générer les tokens avec durées différentes
     const accessToken = generateAccessToken({
       userId: userId,
-      username: userEmail || username,
+      username,
     });
     
     const refreshToken = generateRefreshToken({
       userId: userId,
-      username: userEmail || username,
+      username,
     });
 
     return new Response(
@@ -163,7 +130,7 @@ export const POST: APIRoute = async ({ request }) => {
         data: {
           user: {
             id: userId,
-            email: userEmail || null,
+            email: userEmail,
           },
           accessToken,
           refreshToken,

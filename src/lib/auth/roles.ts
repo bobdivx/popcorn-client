@@ -1,5 +1,3 @@
-import { getDb } from '../db/client.js';
-
 export type UserRole = 'admin' | 'dev' | 'guest';
 
 // Cache pour les vérifications dev (1 heure)
@@ -102,23 +100,27 @@ export async function canModifyRoles(user: UserWithRole): Promise<boolean> {
  */
 export async function getUserRoleFromDb(userId: string): Promise<UserWithRole | null> {
   try {
-    const db = getDb();
-    const result = await db.execute({
-      sql: 'SELECT id, username, email, is_admin, role FROM users WHERE id = ?',
-      args: [userId],
+    const { getBackendUrlAsync } = await import('../backend-url.js');
+    const backendUrl = await getBackendUrlAsync();
+    const backendApiUrl = `${backendUrl}/api/client/auth/users/${encodeURIComponent(userId)}`;
+
+    const response = await fetch(backendApiUrl, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
     });
 
-    if (result.rows.length === 0) {
-      return null;
-    }
+    if (!response.ok) return null;
 
-    const row = result.rows[0];
+    const data = await response.json().catch(() => ({}));
+    const u = data?.data;
+    if (!u?.id) return null;
+
     return {
-      id: row.id as string,
-      username: row.username as string,
-      email: row.email as string | null,
-      role: row.role as string | null,
-      is_admin: row.is_admin as number,
+      id: u.id,
+      username: u.username,
+      email: u.email ?? null,
+      role: u.role ?? null,
+      is_admin: u.is_admin ? 1 : 0,
     };
   } catch (error) {
     console.error('Erreur lors de la récupération du rôle utilisateur:', error);

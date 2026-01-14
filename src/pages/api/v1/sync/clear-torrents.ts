@@ -4,11 +4,11 @@ import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../../lib/auth/jwt.js';
 
 /**
- * GET /api/v1/sync/status
- * Récupère le statut de la synchronisation des torrents
- * Fait un proxy vers le backend Rust /api/sync/status
+ * POST /api/v1/sync/clear-torrents
+ * Vide tous les torrents synchronisés de la base de données
+ * Fait un proxy vers le backend Rust /api/sync/clear-torrents
  */
-export const GET: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request }) => {
   try {
     // Vérifier l'authentification
     const authHeader = request.headers.get('Authorization');
@@ -29,65 +29,53 @@ export const GET: APIRoute = async ({ request }) => {
       );
     }
 
-    const userId = payload.userId || payload.id;
-    if (!userId) {
+    const userIdFromToken = payload.userId || payload.id;
+    if (!userIdFromToken) {
       return new Response(
         JSON.stringify({ success: false, error: 'Token invalide - pas de user_id' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('[SYNC STATUS] 📊 Récupération du statut de synchronisation pour user_id:', userId);
+    console.log('[CLEAR TORRENTS] 🗑️ Suppression des torrents synchronisés pour user_id:', userIdFromToken);
     
     // Récupérer l'URL du backend Rust depuis la base de données
-    // Utiliser un import dynamique pour éviter les erreurs de chargement
     const { getBackendUrlAsync: getBackendUrl } = await import('../../../../lib/backend-url.js');
     const backendUrl = await getBackendUrl();
+    const backendApiUrl = `${backendUrl}/api/sync/clear-torrents`;
     
-    // Supprimer le health check qui ralentit inutilement - on va directement à la requête principale
-    // Le timeout de 20 secondes sur la requête principale suffit
+    console.log(`[CLEAR TORRENTS] 📡 Proxy vers: ${backendApiUrl}`);
     
-    const backendApiUrl = `${backendUrl}/api/sync/status?user_id=${encodeURIComponent(userId)}`;
-    
-    console.log(`[SYNC STATUS] 📡 Proxy vers: ${backendApiUrl}`);
-    
-    // Copier les headers pertinents
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
+    // Préparer le body pour le backend Rust
+    const backendRequest = {
+      user_id: userIdFromToken,
     };
     
-    // Ajouter les headers pour le backend Rust si nécessaire
-    const clientIp = request.headers.get('x-forwarded-for') ||
-                     request.headers.get('x-real-ip') ||
-                     'unknown';
-    if (clientIp !== 'unknown') {
-      headers['X-Forwarded-For'] = clientIp;
-    }
-    
     // Faire la requête vers le backend Rust avec un timeout
-    // Réduire le timeout à 5 secondes pour ne pas bloquer l'interface
-    // Si le backend est lent, on retournera un timeout mais l'interface restera accessible
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // Timeout de 5 secondes
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // Timeout de 10 secondes
     
     let response: Response;
     try {
       response = await fetch(backendApiUrl, {
-        method: 'GET',
-        headers,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(backendRequest),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);
-      console.log(`[SYNC STATUS] ✅ Réponse du backend: ${response.status}`);
+      console.log(`[CLEAR TORRENTS] ✅ Réponse du backend: ${response.status}`);
     } catch (fetchError) {
       clearTimeout(timeoutId);
-      console.error(`[SYNC STATUS] ❌ Erreur lors de la requête vers le backend:`, fetchError);
+      console.error(`[CLEAR TORRENTS] ❌ Erreur lors de la requête vers le backend:`, fetchError);
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
         return new Response(
           JSON.stringify({
             success: false,
             error: 'Timeout',
-            message: 'Le backend Rust ne répond pas rapidement. L\'interface reste accessible. Vérifiez que le backend est démarré.',
+            message: 'Le backend Rust ne répond pas dans les 10 secondes.',
           }),
           {
             status: 504,
@@ -112,17 +100,17 @@ export const GET: APIRoute = async ({ request }) => {
       },
     });
   } catch (error) {
-    console.error('[SYNC STATUS] ❌ Erreur:', error);
+    console.error('[CLEAR TORRENTS] ❌ Erreur:', error);
     
-    let errorMessage = 'Une erreur est survenue lors de la récupération du statut de synchronisation';
+    let errorMessage = 'Une erreur est survenue lors de la suppression des torrents';
     let errorStack = '';
     
     if (error instanceof Error) {
       errorMessage = error.message;
       errorStack = error.stack || '';
-      console.error('[SYNC STATUS] ❌ Stack trace:', errorStack);
+      console.error('[CLEAR TORRENTS] ❌ Stack trace:', errorStack);
     } else {
-      console.error('[SYNC STATUS] ❌ Erreur non-Error:', typeof error, error);
+      console.error('[CLEAR TORRENTS] ❌ Erreur non-Error:', typeof error, error);
     }
     
     return new Response(

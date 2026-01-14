@@ -32,7 +32,7 @@ Création de stubs pour éviter les erreurs d'import dans Tauri :
 - ✅ `@libsql/client` - Utilisé uniquement dans les routes API
 - ✅ `bcryptjs` - Utilisé uniquement dans les routes API
 - ✅ `jsonwebtoken` - Utilisé uniquement dans les routes API
-- ✅ `getDb()` - Utilisé uniquement dans les routes API et `roles.ts`
+- ✅ `getDb()` - **SUPPRIMÉ** : plus d'accès DB côté client, tout passe par l'API backend
 - ✅ `roles.ts` - Importé uniquement dans `jwt.ts` (routes API)
 
 ### Imports vérifiés

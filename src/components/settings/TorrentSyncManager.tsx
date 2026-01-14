@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import { RefreshCw } from 'lucide-preact';
+import type { Indexer } from '../../lib/client/types';
 
 interface SyncSettings {
   sync_frequency_minutes: number;
@@ -37,15 +38,10 @@ interface SyncStatus {
   tmdb_stats?: TmdbStats;
 }
 
-interface Indexer {
-  id: string;
-  name: string;
-  base_url: string;
-  is_enabled: number;
-}
-
 export default function TorrentSyncManager() {
-  const [loading, setLoading] = useState(true);
+  // Initialiser loading à false pour que l'interface s'affiche immédiatement
+  // Le statut par défaut sera créé dans loadStatus si nécessaire
+  const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -131,12 +127,90 @@ export default function TorrentSyncManager() {
     }
   }, [status?.sync_in_progress, status?.sync_start_time]);
 
+  const syncIndexersToBackend = async () => {
+    try {
+      // Récupérer tous les indexers activés depuis la DB locale
+      const response = await serverApi.getIndexers();
+      if (!response.success || !response.data) {
+        return;
+      }
+
+      const enabledIndexers = response.data.filter((idx: Indexer) => idx.isEnabled === true);
+      if (enabledIndexers.length === 0) {
+        return;
+      }
+
+      console.log(`[SYNC MANAGER] 🔄 Synchronisation de ${enabledIndexers.length} indexer(s) activé(s) vers le backend Rust...`);
+      
+      // Récupérer l'URL du backend
+      const { getBackendUrlAsync } = await import('../../lib/backend-url.js');
+      const backendUrl = await getBackendUrlAsync();
+      
+      // Synchroniser chaque indexer
+      const syncPromises = enabledIndexers.map(async (indexer: Indexer) => {
+        try {
+          const syncUrl = `${backendUrl}/api/client/admin/indexers/sync`;
+          const syncController = new AbortController();
+          const syncTimeout = setTimeout(() => syncController.abort(), 2000);
+          
+          const syncResponse = await fetch(syncUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              id: indexer.id,
+              name: indexer.name,
+              base_url: indexer.baseUrl,
+              api_key: indexer.apiKey || null,
+              jackett_indexer_name: indexer.jackettIndexerName || null,
+              is_enabled: indexer.isEnabled === true,
+              is_default: indexer.isDefault || false,
+              priority: indexer.priority || 0,
+              indexer_type_id: indexer.indexerTypeId || null,
+              config_json: indexer.configJson || null,
+            }),
+            signal: syncController.signal,
+          });
+          
+          clearTimeout(syncTimeout);
+          
+          if (syncResponse.ok) {
+            console.log(`[SYNC MANAGER] ✅ Indexer ${indexer.name} synchronisé avec succès`);
+            return true;
+          } else {
+            const errorText = await syncResponse.text().catch(() => '');
+            console.warn(`[SYNC MANAGER] ⚠️ Erreur lors de la synchronisation de ${indexer.name}:`, errorText);
+            return false;
+          }
+        } catch (syncError) {
+          if (syncError instanceof Error && syncError.name === 'AbortError') {
+            console.warn(`[SYNC MANAGER] ⚠️ Timeout lors de la synchronisation de ${indexer.name} (2s)`);
+          } else {
+            console.warn(`[SYNC MANAGER] ⚠️ Erreur lors de la synchronisation de ${indexer.name}:`, syncError);
+          }
+          return false;
+        }
+      });
+      
+      const results = await Promise.all(syncPromises);
+      const successful = results.filter(r => r).length;
+      console.log(`[SYNC MANAGER] 📊 Synchronisation des indexers terminée: ${successful}/${enabledIndexers.length} réussi(s)`);
+    } catch (err) {
+      console.warn('[SYNC MANAGER] ⚠️ Erreur lors de la synchronisation des indexers:', err);
+      // Ne pas bloquer si la synchronisation échoue
+    }
+  };
+
   const loadIndexers = async () => {
     try {
-      // Charger les indexers depuis l'API
+      // D'abord, synchroniser les indexers activés vers le backend Rust
+      await syncIndexersToBackend();
+      
+      // Ensuite, charger les indexers depuis l'API
       const response = await serverApi.getIndexers();
       if (response.success && response.data) {
-        setIndexers(response.data.filter((idx: Indexer) => idx.is_enabled === 1));
+        setIndexers(response.data.filter((idx: Indexer) => idx.isEnabled === true));
       }
     } catch (err) {
       console.error('Erreur lors du chargement des indexers:', err);
@@ -145,13 +219,77 @@ export default function TorrentSyncManager() {
   };
 
   const loadStatus = async () => {
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TorrentSyncManager.tsx:219',message:'loadStatus start',data:{hasStatus:!!status,loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
+    
     try {
-      setLoading(true);
+      // Ne pas mettre loading à true si on a déjà un statut (pour ne pas bloquer l'interface)
+      // Si on n'a pas de statut, créer un statut par défaut IMMÉDIATEMENT pour éviter le blocage
+      if (!status) {
+        // Créer un statut par défaut immédiatement pour que l'interface s'affiche
+        setStatus({
+          sync_in_progress: false,
+          last_sync_date: null,
+          settings: {
+            sync_frequency_minutes: 60,
+            is_enabled: 0,
+            last_sync_date: null,
+            sync_in_progress: 0,
+            max_torrents_per_category: 1000,
+          },
+          stats: {},
+          sync_start_time: null,
+        });
+        // Ne pas mettre loading à true pour ne pas bloquer l'interface
+        // setLoading(true); // DÉSACTIVÉ pour éviter le blocage
+      }
       setError('');
-      const response = await serverApi.getSyncStatus();
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TorrentSyncManager.tsx:240',message:'loadStatus - calling API',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
+      
+      // Ajouter un timeout côté client pour éviter de bloquer trop longtemps
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          // #region agent log
+          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TorrentSyncManager.tsx:245',message:'loadStatus - timeout triggered',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+          // #endregion
+          reject(new Error('Timeout'));
+        }, 3000); // Réduire à 3 secondes pour être plus réactif
+      });
+      
+      const response = await Promise.race([
+        serverApi.getSyncStatus(),
+        timeoutPromise,
+      ]) as any;
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TorrentSyncManager.tsx:252',message:'loadStatus - response received',data:{success:response?.success,hasData:!!response?.data,error:response?.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
       
       if (response.success && response.data) {
         const newStats = response.data.stats || {};
+        
+        // Log pour debug : vérifier si settings est présent
+        if (!response.data.settings) {
+          console.warn('[TORRENT SYNC MANAGER] ⚠️ Pas de settings dans la réponse:', response.data);
+          // Si pas de settings, créer des valeurs par défaut pour éviter les erreurs
+          response.data.settings = {
+            sync_frequency_minutes: 60,
+            is_enabled: 0,
+            last_sync_date: null,
+            sync_in_progress: 0,
+            max_torrents_per_category: 1000,
+          };
+        } else {
+          console.log('[TORRENT SYNC MANAGER] ✅ Settings récupérés:', {
+            sync_frequency_minutes: response.data.settings.sync_frequency_minutes,
+            is_enabled: response.data.settings.is_enabled,
+            max_torrents_per_category: response.data.settings.max_torrents_per_category,
+          });
+        }
         
         // Initialiser previousStats si c'est le début d'une sync
         if (Object.keys(previousStats).length === 0 && response.data.sync_in_progress) {
@@ -184,13 +322,107 @@ export default function TorrentSyncManager() {
         setStatus(response.data);
         setError('');
       } else {
-        setError(response.message || 'Erreur lors du chargement du statut');
+        // Si c'est un timeout, une erreur réseau ou backend indisponible, utiliser des valeurs par défaut
+        if (response.error === 'Timeout' || response.error === 'NetworkError' || response.error === 'BackendUnavailable') {
+          const errorMsg = response.error === 'BackendUnavailable' 
+            ? 'Le backend Rust n\'est pas accessible. Vérifiez qu\'il est démarré sur le port 3000.'
+            : 'Le backend ne répond pas. Utilisation des valeurs par défaut. Vérifiez que le backend est démarré.';
+          setError(errorMsg);
+          console.warn('[TORRENT SYNC MANAGER] ⚠️', errorMsg);
+          
+          // Créer un statut par défaut pour permettre l'affichage de l'interface
+          if (!status) {
+            setStatus({
+              sync_in_progress: false,
+              last_sync_date: null,
+              settings: {
+                sync_frequency_minutes: 60,
+                is_enabled: 0,
+                last_sync_date: null,
+                sync_in_progress: 0,
+                max_torrents_per_category: 1000,
+              },
+              stats: {},
+              sync_start_time: null,
+            });
+          }
+        } else {
+          setError(response.message || 'Erreur lors du chargement du statut');
+          // Même en cas d'erreur, essayer de garder les paramètres précédents si disponibles
+          if (status?.settings) {
+            console.log('[TORRENT SYNC MANAGER] ⚠️ Erreur mais conservation des paramètres précédents');
+          } else if (!status) {
+            // Créer un statut par défaut si on n'a pas de statut précédent
+            setStatus({
+              sync_in_progress: false,
+              last_sync_date: null,
+              settings: {
+                sync_frequency_minutes: 60,
+                is_enabled: 0,
+                last_sync_date: null,
+                sync_in_progress: 0,
+                max_torrents_per_category: 1000,
+              },
+              stats: {},
+              sync_start_time: null,
+            });
+          }
+        }
       }
     } catch (err) {
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TorrentSyncManager.tsx:337',message:'loadStatus - exception',data:{error:err instanceof Error ? err.message : String(err),errorName:err instanceof Error ? err.name : 'unknown'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
+      
       console.error('Erreur lors du chargement du statut:', err);
-      setError(err instanceof Error ? err.message : 'Erreur lors du chargement du statut');
+      const errorMsg = err instanceof Error ? err.message : 'Erreur lors du chargement du statut';
+      
+      // Si c'est un timeout, utiliser des valeurs par défaut pour ne pas bloquer l'interface
+      if (errorMsg === 'Timeout' || errorMsg.includes('timeout') || errorMsg.includes('Timeout')) {
+        console.warn('[TORRENT SYNC MANAGER] ⚠️ Timeout lors du chargement du statut, utilisation de valeurs par défaut');
+        setError('Le backend ne répond pas rapidement. L\'interface reste accessible.');
+        
+        // S'assurer qu'on a un statut (déjà créé au début, mais on le recrée au cas où)
+        if (!status) {
+          setStatus({
+            sync_in_progress: false,
+            last_sync_date: null,
+            settings: {
+              sync_frequency_minutes: 60,
+              is_enabled: 0,
+              last_sync_date: null,
+              sync_in_progress: 0,
+              max_torrents_per_category: 1000,
+            },
+            stats: {},
+            sync_start_time: null,
+          });
+        }
+      } else {
+        setError(errorMsg);
+        // Même en cas d'erreur, s'assurer qu'on a un statut
+        if (!status) {
+          setStatus({
+            sync_in_progress: false,
+            last_sync_date: null,
+            settings: {
+              sync_frequency_minutes: 60,
+              is_enabled: 0,
+              last_sync_date: null,
+              sync_in_progress: 0,
+              max_torrents_per_category: 1000,
+            },
+            stats: {},
+            sync_start_time: null,
+          });
+        }
+      }
     } finally {
+      // Toujours mettre loading à false pour débloquer l'interface
       setLoading(false);
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TorrentSyncManager.tsx:375',message:'loadStatus - finally, loading set to false',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
     }
   };
 
@@ -199,6 +431,10 @@ export default function TorrentSyncManager() {
       setSyncing(true);
       setError('');
       setSuccess('');
+      
+      // Synchroniser les indexers activés vers le backend Rust avant de démarrer la sync
+      console.log('[SYNC MANAGER] 🔄 Synchronisation des indexers avant démarrage de la sync...');
+      await syncIndexersToBackend();
       
       const response = await serverApi.startSync();
       
@@ -210,7 +446,16 @@ export default function TorrentSyncManager() {
           loadIndexers();
         }, 1000);
       } else {
-        setError(response.message || 'Erreur lors du démarrage de la synchronisation');
+        // Améliorer le message d'erreur pour les erreurs 400
+        let errorMessage = response.message || 'Erreur lors du démarrage de la synchronisation';
+        if (response.error === 'BadRequest' || errorMessage.includes('indexer') || errorMessage.includes('TMDB')) {
+          if (errorMessage.includes('indexer')) {
+            errorMessage = '⚠️ Aucun indexer activé dans le backend Rust. Les indexers configurés dans le wizard doivent être synchronisés avec le backend.';
+          } else if (errorMessage.includes('TMDB')) {
+            errorMessage = '⚠️ Aucun token TMDB configuré dans le backend Rust. La clé TMDB doit être synchronisée avec le backend.';
+          }
+        }
+        setError(errorMessage);
       }
     } catch (err) {
       console.error('Erreur lors du démarrage de la synchronisation:', err);
@@ -261,6 +506,36 @@ export default function TorrentSyncManager() {
     } catch (err) {
       console.error('Erreur lors de la mise à jour des paramètres:', err);
       setError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour des paramètres');
+    }
+  };
+
+  const clearTorrents = async () => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer tous les torrents synchronisés ? Cette action est irréversible.')) {
+      return;
+    }
+
+    try {
+      setSyncing(true);
+      setError('');
+      setSuccess('');
+      
+      const response = await serverApi.clearSyncTorrents();
+      
+      if (response.success) {
+        const count = typeof response.data === 'number' ? response.data : 0;
+        setSuccess(`✅ ${count} torrent(s) supprimé(s) avec succès`);
+        setTimeout(() => {
+          loadStatus();
+          loadIndexers();
+        }, 1000);
+      } else {
+        setError(response.message || 'Erreur lors de la suppression des torrents');
+      }
+    } catch (err) {
+      console.error('Erreur lors de la suppression des torrents:', err);
+      setError(err instanceof Error ? err.message : 'Erreur lors de la suppression des torrents');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -346,6 +621,11 @@ export default function TorrentSyncManager() {
 
   const totalTorrents = Object.values(status.stats || {}).reduce((sum, count) => sum + count, 0);
   const progress = calculateProgress(status.stats, previousStats);
+  
+  // Vérifier s'il y a des torrents même si stats est vide (pour afficher le bouton de suppression)
+  // On peut aussi vérifier via tmdb_stats qui compte les torrents
+  const hasTorrents = totalTorrents > 0 || 
+    (status.tmdb_stats && (status.tmdb_stats.with_tmdb > 0 || status.tmdb_stats.without_tmdb > 0));
 
   return (
     <div class="space-y-6">
@@ -552,7 +832,7 @@ export default function TorrentSyncManager() {
                             </div>
                             <div class="flex-1 min-w-0">
                               <p class="text-white font-semibold text-sm truncate">{indexer.name}</p>
-                              <p class="text-gray-400 text-xs truncate">{indexer.base_url}</p>
+                              <p class="text-gray-400 text-xs truncate">{indexer.baseUrl}</p>
                             </div>
                             {torrentCount > 0 && (
                               <div class="text-right">
@@ -861,7 +1141,7 @@ export default function TorrentSyncManager() {
                               <div class="w-2 h-2 bg-green-400 rounded-full"></div>
                               <div class="flex-1 min-w-0">
                                 <p class="text-white text-sm font-medium truncate">{indexer.name}</p>
-                                <p class="text-gray-500 text-xs truncate">{indexer.base_url}</p>
+                                <p class="text-gray-500 text-xs truncate">{indexer.baseUrl}</p>
                               </div>
                             </div>
                           </div>
@@ -903,41 +1183,65 @@ export default function TorrentSyncManager() {
                 )}
               </button>
             ) : (
-              <button
-                class="btn btn-primary flex-1 sm:flex-none"
-                onClick={startSync}
-                disabled={syncing}
-              >
-                {syncing ? (
-                  <>
-                    <span class="loading loading-spinner loading-sm"></span>
-                    Démarrage...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw class="w-4 h-4" />
-                    Lancer une synchronisation
-                  </>
+              <>
+                <button
+                  class="btn btn-primary flex-1 sm:flex-none"
+                  onClick={startSync}
+                  disabled={syncing}
+                >
+                  {syncing ? (
+                    <>
+                      <span class="loading loading-spinner loading-sm"></span>
+                      Démarrage...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw class="w-4 h-4" />
+                      Lancer une synchronisation
+                    </>
+                  )}
+                </button>
+                {hasTorrents && (
+                  <button
+                    class="btn btn-error flex-1 sm:flex-none"
+                    onClick={clearTorrents}
+                    disabled={syncing || status.sync_in_progress}
+                    title="Supprimer tous les torrents synchronisés de la base de données"
+                  >
+                    {syncing ? (
+                      <>
+                        <span class="loading loading-spinner loading-sm"></span>
+                        Suppression...
+                      </>
+                    ) : (
+                      <>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Vider les torrents
+                      </>
+                    )}
+                  </button>
                 )}
-              </button>
+              </>
             )}
           </div>
         </div>
       </div>
 
       {/* Paramètres */}
-      {status.settings && (
+      {status.settings ? (
         <div class="card bg-base-200">
           <div class="card-body p-6">
             <h2 class="card-title text-2xl mb-4">Paramètres</h2>
             <div class="space-y-4">
               <div>
                 <label class="label">
-                  <span class="label-text font-semibold">Fréquence de synchronisation</span>
+                  <span class="label-text font-semibold">Fréquence de synchronisation automatique</span>
                 </label>
                 <select
                   class="select select-bordered w-full"
-                  value={status.settings.sync_frequency_minutes}
+                  value={status.settings.sync_frequency_minutes || 60}
                   onChange={(e) => {
                     const value = parseInt((e.target as HTMLSelectElement).value);
                     updateSettings({ sync_frequency_minutes: value });
@@ -952,7 +1256,7 @@ export default function TorrentSyncManager() {
                   <option value={1440}>24 heures</option>
                 </select>
                 <p class="text-xs text-gray-400 mt-1">
-                  Actuellement : {formatFrequency(status.settings.sync_frequency_minutes)}
+                  Actuellement : {formatFrequency(status.settings.sync_frequency_minutes || 60)}
                 </p>
               </div>
 
@@ -979,7 +1283,7 @@ export default function TorrentSyncManager() {
                   class="input input-bordered w-full"
                   min="1"
                   max="100000"
-                  value={status.settings.max_torrents_per_category}
+                  value={status.settings.max_torrents_per_category || 1000}
                   onChange={(e) => {
                     const value = parseInt((e.target as HTMLInputElement).value);
                     if (value >= 1 && value <= 100000) {
@@ -988,6 +1292,14 @@ export default function TorrentSyncManager() {
                   }}
                 />
               </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div class="card bg-base-200">
+          <div class="card-body p-6">
+            <div class="alert alert-warning">
+              <span>⚠️ Les paramètres de synchronisation ne sont pas disponibles. Rechargez la page.</span>
             </div>
           </div>
         </div>

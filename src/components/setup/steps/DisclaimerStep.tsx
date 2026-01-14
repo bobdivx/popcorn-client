@@ -99,7 +99,7 @@ export function DisclaimerStep({ focusedButtonIndex, buttonRefs, onNext }: Discl
       <div className="flex items-start gap-4">
         <input
           type="checkbox"
-          className="w-4 h-4 mt-1 text-red-600 bg-gray-900 border-gray-700 rounded focus:ring-red-600"
+          className="w-4 h-4 mt-1 text-primary-600 bg-gray-900 border-gray-700 rounded focus:ring-primary-600"
           checked={accepted}
           onChange={(e) => setAccepted((e.target as HTMLInputElement).checked)}
         />
@@ -113,13 +113,13 @@ export function DisclaimerStep({ focusedButtonIndex, buttonRefs, onNext }: Discl
         <a
           href="/disclaimer"
           target="_blank"
-          className="text-red-600 hover:text-red-500 transition-colors text-sm"
+          className="text-primary-600 hover:text-primary-500 transition-colors text-sm"
         >
           Lire le disclaimer complet →
         </a>
         <button
           ref={(el) => { buttonRefs.current[0] = el; }}
-          className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={onNext}
           disabled={!accepted}
         >

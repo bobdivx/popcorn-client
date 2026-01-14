@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { Monitor, Search, Database, User, Palette, RefreshCw } from 'lucide-preact';
+import { Monitor, Search, Database, User, Palette, RefreshCw, Settings } from 'lucide-preact';
 
 interface SettingsCard {
   id: string;
@@ -12,6 +12,14 @@ interface SettingsCard {
 
 export default function SettingsMenu() {
   const [cards] = useState<SettingsCard[]>([
+    {
+      id: 'setup',
+      title: 'Configuration initiale',
+      description: 'Rouvrir l\'assistant de configuration pour configurer votre client',
+      href: '/setup',
+      icon: Settings,
+      color: 'purple-500',
+    },
     {
       id: 'ui-preferences',
       title: 'Préférences UI',

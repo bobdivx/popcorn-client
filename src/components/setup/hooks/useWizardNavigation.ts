@@ -8,7 +8,7 @@ export function useWizardNavigation(setupStatus: SetupStatus | null) {
 
   // Navigation entre étapes
   const goToNext = () => {
-    if (currentStep < 7) {
+    if (currentStep < 8) {
       setCurrentStep(currentStep + 1);
       setFocusedButtonIndex(0);
     }

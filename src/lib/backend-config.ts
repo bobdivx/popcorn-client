@@ -7,7 +7,7 @@
  * Priorité de récupération:
  * 1. localStorage (côté client uniquement)
  * 2. Variable d'environnement BACKEND_URL (dev/prod)
- * 3. Valeur par défaut http://127.0.0.1:4327
+ * 3. Valeur par défaut http://127.0.0.1:3000
  */
 
 const STORAGE_KEY = 'popcorn_backend_url';
@@ -24,7 +24,7 @@ export function getBackendUrl(): string {
     // Utiliser variable d'environnement ou valeur par défaut
     return import.meta.env.BACKEND_URL || 
            import.meta.env.PUBLIC_BACKEND_URL || 
-           'http://127.0.0.1:4327';
+           'http://127.0.0.1:3000';
   }
 
   // Côté client: priorité localStorage
@@ -43,7 +43,7 @@ export function getBackendUrl(): string {
   }
 
   // Valeur par défaut
-  return 'http://127.0.0.1:4327';
+  return 'http://127.0.0.1:3000';
 }
 
 /**

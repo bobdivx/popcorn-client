@@ -3,14 +3,30 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import { getBackendUrlAsync } from '../../../lib/backend-url.js';
 
+function getBackendUrlOverrideFromRequest(request: Request): string | null {
+  const raw = request.headers.get('x-popcorn-backend-url') || request.headers.get('X-Popcorn-Backend-Url');
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === 'undefined') return null;
+  try {
+    const u = new URL(trimmed);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    return trimmed.replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
+
 /**
  * API de health check pour le client
  * Fait un proxy vers le backend Rust /api/client/health
  */
-export const GET: APIRoute = async () => {
+export const GET: APIRoute = async ({ request }) => {
   try {
     // Récupérer l'URL du backend depuis la base de données
-    const backendUrl = await getBackendUrlAsync();
+    const backendUrl =
+      getBackendUrlOverrideFromRequest(request) ||
+      (await getBackendUrlAsync());
     const response = await fetch(`${backendUrl}/api/client/health`, {
       method: 'GET',
       headers: {

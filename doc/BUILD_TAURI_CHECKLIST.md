@@ -30,10 +30,10 @@
 ### Modules Node.js dans les librairies
 Les librairies suivantes utilisent des modules Node.js mais sont **uniquement importées dans les routes API** qui sont **exclues du build Tauri** :
 
-- `src/lib/db/client.ts` - Utilise `fs`, `path`
-- `src/lib/auth/jwt.ts` - Utilise `jsonwebtoken` (Node.js)
-- `src/lib/auth/password.ts` - Utilise `bcryptjs` (bindings natifs)
-- `src/lib/db/turso-client.ts` - Utilise `@libsql/client` (bindings natifs)
+- `src/lib/db/client.ts` - **SUPPRIMÉ** (plus d'accès DB côté client)
+- `src/lib/db/turso-client.ts` - **SUPPRIMÉ** (plus d'accès DB côté client)
+- `src/lib/auth/jwt.ts` - Utilise `jsonwebtoken` (Node.js) - **Uniquement dans routes API**
+- `src/lib/auth/password.ts` - Utilise `bcryptjs` (bindings natifs) - **Uniquement dans routes API**
 
 **✅ Solution** : Ces librairies ne sont jamais importées dans le code client (hors routes API), donc elles ne seront pas incluses dans le build Tauri.
 

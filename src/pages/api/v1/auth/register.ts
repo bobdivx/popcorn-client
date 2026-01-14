@@ -1,11 +1,7 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import { getTursoClient } from '../../../../lib/db/turso-client.js';
-import { getDb } from '../../../../lib/db/client.js';
-import { hashPassword } from '../../../../lib/auth/password.js';
 import { generateAccessToken, generateRefreshToken } from '../../../../lib/auth/jwt.js';
-import { generateId } from '../../../../lib/utils/uuid.js';
 import { z } from 'zod';
 
 const registerSchema = z.object({
@@ -41,86 +37,59 @@ export const POST: APIRoute = async ({ request }) => {
 
     const { email, password, inviteCode } = validation.data;
 
-    // Essayer d'abord Turso, puis fallback sur la base locale
-    const tursoClient = getTursoClient();
-    let db;
-    let useTurso = false;
-    
-    if (tursoClient) {
-      db = tursoClient;
-      useTurso = true;
-    } else {
-      db = getDb();
-    }
+    // Register via backend (plus aucun accès DB depuis le client)
+    const { getBackendUrlAsync } = await import('../../../../lib/backend-url.js');
+    const backendUrl = await getBackendUrlAsync();
+    const backendApiUrl = `${backendUrl}/api/client/auth/register`;
 
-    // Vérifier le code d'invitation
-    // Pour l'instant, utiliser la table invitations de la base locale
-    // (les invitations cloud seront gérées plus tard si nécessaire)
-    const inviteResult = await db.execute({
-      sql: 'SELECT * FROM invitations WHERE code = ? AND used_by IS NULL',
-      args: [inviteCode],
+    // Username: on garde le comportement actuel (email comme username)
+    const username = email;
+
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth/register.ts:44',message:'REGISTER proxy -> backend',data:{backendApiUrl,emailLen:email.length,inviteLen:inviteCode.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'AUTH'})}).catch(()=>{});
+    // #endregion
+
+    const backendResponse = await fetch(backendApiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        email,
+        username,
+        password,
+        invite_code: inviteCode,
+      }),
     });
 
-    if (inviteResult.rows.length === 0) {
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth/register.ts:60',message:'REGISTER backend response',data:{status:backendResponse.status,ok:backendResponse.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'AUTH'})}).catch(()=>{});
+    // #endregion
+
+    if (!backendResponse.ok) {
+      const errorText = await backendResponse.text().catch(() => '');
+      let errorData: any = {};
+      try { errorData = errorText ? JSON.parse(errorText) : {}; } catch { errorData = {}; }
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'InvalidInviteCode',
-          message: 'Code d\'invitation invalide ou déjà utilisé',
+          error: errorData.error || 'RegisterError',
+          message: errorData.message || 'Erreur lors de la création du compte',
         }),
-        {
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
+        { status: backendResponse.status, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    const invitation = inviteResult.rows[0];
+    const backendData = await backendResponse.json().catch(() => ({}));
+    const backendUser = backendData?.data;
+    const userId = backendUser?.id as string | undefined;
 
-    // Vérifier si l'email existe déjà
-    const accountTable = useTurso ? 'cloud_accounts' : 'users';
-    const userCheck = await db.execute({
-      sql: `SELECT id FROM ${accountTable} WHERE email = ?`,
-      args: [email],
-    });
-
-    if (userCheck.rows.length > 0) {
+    if (!userId) {
       return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'EmailExists',
-          message: 'Cet email est déjà utilisé',
-        }),
-        {
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
+        JSON.stringify({ success: false, error: 'InvalidResponse', message: 'Réponse backend invalide' }),
+        { status: 502, headers: { 'Content-Type': 'application/json' } }
       );
     }
-
-    // Créer le compte
-    const userId = generateId();
-    const passwordHash = await hashPassword(password);
-    const now = Date.now();
-
-    await db.execute({
-      sql: useTurso
-        ? `INSERT INTO cloud_accounts (id, email, password_hash, created_at) VALUES (?, ?, ?, ?)`
-        : `INSERT INTO users (id, email, password_hash, created_at, is_admin, role) VALUES (?, ?, ?, ?, ?, ?)`,
-      args: useTurso
-        ? [userId, email, passwordHash, now]
-        : [userId, email, passwordHash, now, 0, 'guest'],
-    });
-
-    // Marquer l'invitation comme utilisée
-    await db.execute({
-      sql: 'UPDATE invitations SET used_by = ?, used_at = ? WHERE id = ?',
-      args: [userId, now, invitation.id as string],
-    });
 
     // Générer les tokens
     const accessToken = generateAccessToken({

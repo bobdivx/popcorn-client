@@ -1,9 +1,22 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import { getDb } from '../../../../../lib/db/client.js';
 import type { Indexer } from '../../../../../lib/client/types.js';
 import { z } from 'zod';
+
+function getBackendUrlOverrideFromRequest(request: Request): string | null {
+  const raw = request.headers.get('x-popcorn-backend-url') || request.headers.get('X-Popcorn-Backend-Url');
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === 'undefined') return null;
+  try {
+    const u = new URL(trimmed);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    return trimmed.replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
 
 const updateIndexerSchema = z.object({
   name: z.string().min(1).optional(),
@@ -21,7 +34,7 @@ const updateIndexerSchema = z.object({
  * GET /api/v1/setup/indexers/:id
  * Récupère un indexer par son ID
  */
-export const GET: APIRoute = async ({ params }) => {
+export const GET: APIRoute = async ({ params, request }) => {
   try {
     const { id } = params;
     if (!id) {
@@ -31,35 +44,71 @@ export const GET: APIRoute = async ({ params }) => {
       );
     }
 
-    const db = getDb();
-    const result = await db.execute({
-      sql: `SELECT id, name, base_url, api_key, jackett_indexer_name, is_enabled, is_default, priority, fallback_indexer_id, indexer_type_id, config_json
-            FROM indexers
-            WHERE id = ?`,
-      args: [id],
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:24',message:'GET indexer by id - calling backend',data:{indexerId:id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
+    const { getBackendUrlAsync } = await import('../../../../../lib/backend-url.js');
+    const backendUrl =
+      getBackendUrlOverrideFromRequest(request) ||
+      (await getBackendUrlAsync());
+    const backendApiUrl = `${backendUrl}/api/client/admin/indexers/${encodeURIComponent(id)}`;
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:32',message:'GET indexer by id - backend URL',data:{backendUrl,backendApiUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
+    const response = await fetch(backendApiUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
 
-    if (result.rows.length === 0) {
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:43',message:'GET indexer by id - response received',data:{status:response.status,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      const errorData = errorText ? JSON.parse(errorText).catch(() => ({})) : {};
+      console.error('[INDEXER GET] ❌ Erreur backend:', errorData);
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:49',message:'GET indexer by id - backend error',data:{status:response.status,error:errorData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       return new Response(
-        JSON.stringify({ success: false, error: 'Indexer non trouvé' }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          success: false,
+          error: errorData.message || 'Indexer non trouvé',
+        }),
+        {
+          status: response.status,
+          headers: { 'Content-Type': 'application/json' },
+        }
       );
     }
 
-    const row = result.rows[0];
+    const backendData = await response.json();
+    const backendIndexer = backendData.data;
+    
+    // Convertir l'indexer du backend vers le format attendu par le client
     const indexer: Indexer = {
-      id: row.id as string,
-      name: row.name as string,
-      baseUrl: row.base_url as string,
-      apiKey: (row.api_key as string) || null,
-      jackettIndexerName: (row.jackett_indexer_name as string) || null,
-      isEnabled: Boolean(row.is_enabled),
-      isDefault: Boolean(row.is_default),
-      priority: row.priority as number,
-      fallbackIndexerId: (row.fallback_indexer_id as string) || null,
-      indexerTypeId: (row.indexer_type_id as string) || null,
-      configJson: (row.config_json as string) || null,
+      id: backendIndexer.id,
+      name: backendIndexer.name,
+      baseUrl: backendIndexer.base_url,
+      apiKey: backendIndexer.api_key || null,
+      jackettIndexerName: backendIndexer.jackett_indexer_name || null,
+      isEnabled: backendIndexer.is_enabled === 1,
+      isDefault: backendIndexer.is_default === 1,
+      priority: backendIndexer.priority || 0,
+      fallbackIndexerId: backendIndexer.fallback_indexer_id || null,
+      indexerTypeId: backendIndexer.indexer_type_id || null,
+      configJson: backendIndexer.config_json || null,
     };
+
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:70',message:'GET indexer by id - success',data:{indexerId:indexer.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
 
     return new Response(
       JSON.stringify({
@@ -73,6 +122,9 @@ export const GET: APIRoute = async ({ params }) => {
     );
   } catch (error) {
     console.error('[INDEXER GET] ❌ Erreur:', error);
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:85',message:'GET indexer by id - exception',data:{error:error instanceof Error ? error.message : String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     return new Response(
       JSON.stringify({
         success: false,
@@ -118,103 +170,141 @@ export const PUT: APIRoute = async ({ params, request }) => {
     }
 
     const data = validation.data;
-    const db = getDb();
-    const now = Math.floor(Date.now() / 1000);
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:120',message:'PUT indexer - calling backend',data:{indexerId:id,updates:Object.keys(data)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
 
-    // Construire la requête UPDATE dynamiquement
-    const updates: string[] = [];
-    const args: any[] = [];
-
-    if (data.name !== undefined) {
-      updates.push('name = ?');
-      args.push(data.name);
-    }
-    if (data.baseUrl !== undefined) {
-      updates.push('base_url = ?');
-      args.push(data.baseUrl);
-    }
-    if (data.apiKey !== undefined) {
-      updates.push('api_key = ?');
-      args.push(data.apiKey);
-    }
-    if (data.jackettIndexerName !== undefined) {
-      updates.push('jackett_indexer_name = ?');
-      args.push(data.jackettIndexerName);
-    }
-    if (data.isEnabled !== undefined) {
-      updates.push('is_enabled = ?');
-      args.push(data.isEnabled ? 1 : 0);
-    }
-    if (data.isDefault !== undefined) {
-      updates.push('is_default = ?');
-      args.push(data.isDefault ? 1 : 0);
-    }
-    if (data.priority !== undefined) {
-      updates.push('priority = ?');
-      args.push(data.priority);
-    }
-    if (data.indexerTypeId !== undefined) {
-      updates.push('indexer_type_id = ?');
-      args.push(data.indexerTypeId);
-    }
-    if (data.configJson !== undefined) {
-      updates.push('config_json = ?');
-      args.push(data.configJson);
-    }
-
-    if (updates.length === 0) {
+    if (Object.keys(data).length === 0) {
       return new Response(
         JSON.stringify({ success: false, error: 'Aucune donnée à mettre à jour' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    updates.push('updated_at = ?');
-    args.push(now);
-    args.push(id);
-
-    await db.execute({
-      sql: `UPDATE indexers SET ${updates.join(', ')} WHERE id = ?`,
-      args,
+    // Récupérer l'indexer actuel depuis le backend
+    const { getBackendUrlAsync } = await import('../../../../../lib/backend-url.js');
+    const backendUrl =
+      getBackendUrlOverrideFromRequest(request) ||
+      (await getBackendUrlAsync());
+    const getUrl = `${backendUrl}/api/client/admin/indexers/${encodeURIComponent(id)}`;
+    
+    const getResponse = await fetch(getUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
 
-    // Si c'est le défaut, désactiver les autres
-    if (data.isDefault) {
-      await db.execute({
-        sql: 'UPDATE indexers SET is_default = 0 WHERE id != ?',
-        args: [id],
-      });
-    }
-
-    // Récupérer l'indexer mis à jour
-    const result = await db.execute({
-      sql: `SELECT id, name, base_url, api_key, jackett_indexer_name, is_enabled, is_default, priority, fallback_indexer_id, indexer_type_id, config_json
-            FROM indexers
-            WHERE id = ?`,
-      args: [id],
-    });
-
-    if (result.rows.length === 0) {
+    if (!getResponse.ok) {
+      const errorText = await getResponse.text().catch(() => '');
+      const errorData = errorText ? JSON.parse(errorText).catch(() => ({})) : {};
+      console.error('[INDEXER PUT] ❌ Erreur lors de la récupération:', errorData);
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:138',message:'PUT indexer - get error',data:{status:getResponse.status,error:errorData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       return new Response(
-        JSON.stringify({ success: false, error: 'Indexer non trouvé' }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          success: false,
+          error: errorData.message || 'Indexer non trouvé',
+        }),
+        {
+          status: getResponse.status,
+          headers: { 'Content-Type': 'application/json' },
+        }
       );
     }
 
-    const row = result.rows[0];
-    const indexer: Indexer = {
-      id: row.id as string,
-      name: row.name as string,
-      baseUrl: row.base_url as string,
-      apiKey: (row.api_key as string) || null,
-      jackettIndexerName: (row.jackett_indexer_name as string) || null,
-      isEnabled: Boolean(row.is_enabled),
-      isDefault: Boolean(row.is_default),
-      priority: row.priority as number,
-      fallbackIndexerId: (row.fallback_indexer_id as string) || null,
-      indexerTypeId: (row.indexer_type_id as string) || null,
-      configJson: (row.config_json as string) || null,
+    const getData = await getResponse.json();
+    const currentIndexer = getData.data;
+    
+    // Le backend fait maintenant automatiquement le matching avec les définitions JSON
+    // Si indexerTypeId n'est pas fourni et que l'indexer actuel n'en a pas,
+    // le backend cherchera dans les définitions JSON en utilisant le nom de l'indexer
+    let detectedIndexerTypeId = data.indexerTypeId !== undefined ? data.indexerTypeId : currentIndexer.indexer_type_id;
+    
+    if (!detectedIndexerTypeId) {
+      console.log(`[INDEXER PUT] Le backend fera le matching automatique pour l'indexer '${currentIndexer.name}'`);
+    }
+    
+    // Fusionner les données actuelles avec les nouvelles données
+    const updatePayload = {
+      id: currentIndexer.id,
+      name: data.name !== undefined ? data.name : currentIndexer.name,
+      base_url: data.baseUrl !== undefined ? data.baseUrl : currentIndexer.base_url,
+      api_key: data.apiKey !== undefined ? data.apiKey : currentIndexer.api_key,
+      jackett_indexer_name: data.jackettIndexerName !== undefined ? data.jackettIndexerName : currentIndexer.jackett_indexer_name,
+      is_enabled: data.isEnabled !== undefined ? data.isEnabled : (currentIndexer.is_enabled === 1),
+      is_default: data.isDefault !== undefined ? data.isDefault : (currentIndexer.is_default === 1),
+      priority: data.priority !== undefined ? data.priority : currentIndexer.priority,
+      indexer_type_id: detectedIndexerTypeId,
+      config_json: data.configJson !== undefined ? data.configJson : currentIndexer.config_json,
     };
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:180',message:'PUT indexer - final payload with detected type',data:{indexerTypeId:detectedIndexerTypeId,name:updatePayload.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:160',message:'PUT indexer - update payload prepared',data:{backendUrl,updatePayload},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
+    // Mettre à jour dans le backend
+    const updateUrl = `${backendUrl}/api/client/admin/indexers/${encodeURIComponent(id)}`;
+    const updateResponse = await fetch(updateUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(updatePayload),
+    });
+
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:173',message:'PUT indexer - update response received',data:{status:updateResponse.status,ok:updateResponse.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
+    if (!updateResponse.ok) {
+      const errorText = await updateResponse.text().catch(() => '');
+      const errorData = errorText ? JSON.parse(errorText).catch(() => ({})) : {};
+      console.error('[INDEXER PUT] ❌ Erreur backend:', errorData);
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:180',message:'PUT indexer - update error',data:{status:updateResponse.status,error:errorData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: errorData.message || 'Erreur lors de la mise à jour de l\'indexer dans le backend',
+        }),
+        {
+          status: updateResponse.status,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    const updateData = await updateResponse.json();
+    const backendIndexer = updateData.data;
+    
+    // Convertir l'indexer du backend vers le format attendu par le client
+    const indexer: Indexer = {
+      id: backendIndexer.id,
+      name: backendIndexer.name,
+      baseUrl: backendIndexer.base_url,
+      apiKey: backendIndexer.api_key || null,
+      jackettIndexerName: backendIndexer.jackett_indexer_name || null,
+      isEnabled: backendIndexer.is_enabled === 1,
+      isDefault: backendIndexer.is_default === 1,
+      priority: backendIndexer.priority || 0,
+      fallbackIndexerId: backendIndexer.fallback_indexer_id || null,
+      indexerTypeId: backendIndexer.indexer_type_id || null,
+      configJson: backendIndexer.config_json || null,
+    };
+
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:202',message:'PUT indexer - success',data:{indexerId:indexer.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
+    // Plus besoin de synchronisation asynchrone, tout est déjà dans le backend
 
     return new Response(
       JSON.stringify({
@@ -245,7 +335,7 @@ export const PUT: APIRoute = async ({ params, request }) => {
  * DELETE /api/v1/setup/indexers/:id
  * Supprime un indexer
  */
-export const DELETE: APIRoute = async ({ params }) => {
+export const DELETE: APIRoute = async ({ params, request }) => {
   try {
     const { id } = params;
     if (!id) {
@@ -255,11 +345,57 @@ export const DELETE: APIRoute = async ({ params }) => {
       );
     }
 
-    const db = getDb();
-    await db.execute({
-      sql: 'DELETE FROM indexers WHERE id = ?',
-      args: [id],
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:318',message:'DELETE indexer - calling backend',data:{indexerId:id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
+    // Déterminer l'URL du backend (priorité: header transmis par le client -> fallback env/default)
+    const { getBackendUrlAsync } = await import('../../../../../lib/backend-url.js');
+    const backendUrl =
+      getBackendUrlOverrideFromRequest(request) ||
+      (await getBackendUrlAsync());
+    const deleteUrl = `${backendUrl}/api/client/admin/indexers/${encodeURIComponent(id)}`;
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:323',message:'DELETE indexer - backend URL',data:{backendUrl,deleteUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
+    console.log('[INDEXER DELETE] 🔄 Suppression de l\'indexer dans le backend Rust:', deleteUrl);
+    
+    const deleteResponse = await fetch(deleteUrl, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
+
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:335',message:'DELETE indexer - response received',data:{status:deleteResponse.status,ok:deleteResponse.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
+    if (!deleteResponse.ok) {
+      const errorText = await deleteResponse.text().catch(() => '');
+      const errorData = errorText ? JSON.parse(errorText).catch(() => ({})) : {};
+      console.error('[INDEXER DELETE] ❌ Erreur backend:', errorData);
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:342',message:'DELETE indexer - backend error',data:{status:deleteResponse.status,error:errorData},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: errorData.message || 'Erreur lors de la suppression de l\'indexer dans le backend',
+        }),
+        {
+          status: deleteResponse.status,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
+    console.log('[INDEXER DELETE] ✅ Indexer supprimé du backend Rust avec succès');
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'indexers/[id].ts:355',message:'DELETE indexer - success',data:{indexerId:id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
 
     return new Response(
       JSON.stringify({

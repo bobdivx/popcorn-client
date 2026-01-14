@@ -36,22 +36,46 @@ export const GET: APIRoute = async ({ request }) => {
     const { getBackendUrlAsync: getBackendUrl } = await import('../../../lib/backend-url.js');
     const backendUrl = await getBackendUrl();
 
-    // Récupérer les films populaires (premiers 10, triés par popularité)
+    // Récupérer toutes les données en parallèle pour éviter les blocages séquentiels
     const filmsUrl = `${backendUrl}/api/torrents/list?category=films&page=1&limit=10&sort=popular`;
-    console.log('[DASHBOARD] 📡 Récupération des films depuis:', filmsUrl);
+    const seriesUrl = `${backendUrl}/api/torrents/list?category=series&page=1&limit=10&sort=popular`;
+    const recentUrl = `${backendUrl}/api/torrents/list?page=1&limit=20`;
     
+    console.log('[DASHBOARD] 📡 Récupération des données en parallèle depuis le backend...');
+    
+    // Fonction helper pour faire une requête avec timeout
+    const fetchWithTimeout = async (url: string, timeout: number = 5000): Promise<Response | null> => {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        return response;
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.warn(`[DASHBOARD] ⚠️ Timeout lors de la récupération de ${url} (${timeout}s)`);
+        } else {
+          console.error(`[DASHBOARD] ❌ Erreur lors de la récupération de ${url}:`, error);
+        }
+        return null;
+      }
+    };
+    
+    // Faire toutes les requêtes en parallèle
+    const [filmsResponse, seriesResponse, recentResponse] = await Promise.all([
+      fetchWithTimeout(filmsUrl, 5000),
+      fetchWithTimeout(seriesUrl, 5000),
+      fetchWithTimeout(recentUrl, 5000),
+    ]);
+    
+    // Traiter les films
     let popularMovies: ContentItem[] = [];
-    try {
-      const filmsController = new AbortController();
-      const filmsTimeout = setTimeout(() => filmsController.abort(), 10000);
-      const filmsResponse = await fetch(filmsUrl, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: filmsController.signal,
-      });
-      clearTimeout(filmsTimeout);
-      
-      if (filmsResponse.ok) {
+    if (filmsResponse && filmsResponse.ok) {
+      try {
         const filmsData = await filmsResponse.json();
         if (filmsData.success && Array.isArray(filmsData.data)) {
           popularMovies = filmsData.data
@@ -72,24 +96,15 @@ export const GET: APIRoute = async ({ request }) => {
             });
           console.log(`[DASHBOARD] ✅ ${popularMovies.length} film(s) récupéré(s)`);
         }
+      } catch (error) {
+        console.warn('[DASHBOARD] ⚠️ Erreur lors du parsing des films:', error);
       }
-    } catch (filmsError) {
-      console.error('[DASHBOARD] ❌ Erreur lors de la récupération des films:', filmsError);
     }
-
-    // Récupérer les séries populaires (premiers 10, triés par popularité)
-    const seriesUrl = `${backendUrl}/api/torrents/list?category=series&page=1&limit=10&sort=popular`;
-    console.log('[DASHBOARD] 📡 Récupération des séries depuis:', seriesUrl);
     
+    // Traiter les séries
     let popularSeries: ContentItem[] = [];
-    try {
-      const seriesResponse = await fetch(seriesUrl, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(10000),
-      });
-      
-      if (seriesResponse.ok) {
+    if (seriesResponse && seriesResponse.ok) {
+      try {
         const seriesData = await seriesResponse.json();
         if (seriesData.success && Array.isArray(seriesData.data)) {
           popularSeries = seriesData.data
@@ -110,28 +125,15 @@ export const GET: APIRoute = async ({ request }) => {
             });
           console.log(`[DASHBOARD] ✅ ${popularSeries.length} série(s) récupérée(s)`);
         }
+      } catch (error) {
+        console.warn('[DASHBOARD] ⚠️ Erreur lors du parsing des séries:', error);
       }
-    } catch (seriesError) {
-      console.error('[DASHBOARD] ❌ Erreur lors de la récupération des séries:', seriesError);
     }
-
-    // Récupérer les ajouts récents (tous torrents, triés par date de création décroissante)
-    // Le backend trie par created_at DESC par défaut si sort n'est pas "popular"
-    const recentUrl = `${backendUrl}/api/torrents/list?page=1&limit=20`;
-    console.log('[DASHBOARD] 📡 Récupération des ajouts récents depuis:', recentUrl);
     
+    // Traiter les ajouts récents
     let recentAdditions: ContentItem[] = [];
-    try {
-      const recentController = new AbortController();
-      const recentTimeout = setTimeout(() => recentController.abort(), 10000);
-      const recentResponse = await fetch(recentUrl, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-        signal: recentController.signal,
-      });
-      clearTimeout(recentTimeout);
-      
-      if (recentResponse.ok) {
+    if (recentResponse && recentResponse.ok) {
+      try {
         const recentData = await recentResponse.json();
         if (recentData.success && Array.isArray(recentData.data)) {
           recentAdditions = recentData.data
@@ -153,9 +155,9 @@ export const GET: APIRoute = async ({ request }) => {
             });
           console.log(`[DASHBOARD] ✅ ${recentAdditions.length} ajout(s) récent(s) récupéré(s)`);
         }
+      } catch (error) {
+        console.warn('[DASHBOARD] ⚠️ Erreur lors du parsing des ajouts récents:', error);
       }
-    } catch (recentError) {
-      console.error('[DASHBOARD] ❌ Erreur lors de la récupération des ajouts récents:', recentError);
     }
 
     // Sélectionner le hero (premier film ou série avec backdrop)
