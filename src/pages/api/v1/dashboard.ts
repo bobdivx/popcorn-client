@@ -4,6 +4,20 @@ import type { APIRoute } from 'astro';
 import { verifyToken } from '../../../lib/auth/jwt.js';
 import type { DashboardData, ContentItem } from '../../../lib/client/types.js';
 
+function getBackendUrlOverrideFromRequest(request: Request): string | null {
+  const raw = request.headers.get('x-popcorn-backend-url') || request.headers.get('X-Popcorn-Backend-Url');
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === 'undefined') return null;
+  try {
+    const u = new URL(trimmed);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    return trimmed.replace(/\/$/, '');
+  } catch {
+    return null;
+  }
+}
+
 /**
  * API pour récupérer les données du dashboard
  * Retourne les données pour afficher le dashboard (hero, continue watching, etc.)
@@ -34,7 +48,8 @@ export const GET: APIRoute = async ({ request }) => {
 
     // Récupérer l'URL du backend Rust depuis la base de données
     const { getBackendUrlAsync: getBackendUrl } = await import('../../../lib/backend-url.js');
-    const backendUrl = await getBackendUrl();
+    const backendUrl = getBackendUrlOverrideFromRequest(request) || (await getBackendUrl());
+    console.log('[DASHBOARD] 🔗 Backend URL utilisé:', backendUrl);
 
     // Récupérer toutes les données en parallèle pour éviter les blocages séquentiels
     const filmsUrl = `${backendUrl}/api/torrents/list?category=films&page=1&limit=10&sort=popular`;
@@ -44,7 +59,9 @@ export const GET: APIRoute = async ({ request }) => {
     console.log('[DASHBOARD] 📡 Récupération des données en parallèle depuis le backend...');
     
     // Fonction helper pour faire une requête avec timeout
-    const fetchWithTimeout = async (url: string, timeout: number = 5000): Promise<Response | null> => {
+    // Note: pendant/juste après une sync, la DB peut être occupée.
+    // On utilise un timeout plus généreux pour éviter de renvoyer un dashboard vide.
+    const fetchWithTimeout = async (url: string, timeout: number = 15000): Promise<Response | null> => {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -57,7 +74,7 @@ export const GET: APIRoute = async ({ request }) => {
         return response;
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
-          console.warn(`[DASHBOARD] ⚠️ Timeout lors de la récupération de ${url} (${timeout}s)`);
+          console.warn(`[DASHBOARD] ⚠️ Timeout lors de la récupération de ${url} (${timeout}ms)`);
         } else {
           console.error(`[DASHBOARD] ❌ Erreur lors de la récupération de ${url}:`, error);
         }
@@ -67,10 +84,22 @@ export const GET: APIRoute = async ({ request }) => {
     
     // Faire toutes les requêtes en parallèle
     const [filmsResponse, seriesResponse, recentResponse] = await Promise.all([
-      fetchWithTimeout(filmsUrl, 5000),
-      fetchWithTimeout(seriesUrl, 5000),
-      fetchWithTimeout(recentUrl, 5000),
+      fetchWithTimeout(filmsUrl, 15000),
+      fetchWithTimeout(seriesUrl, 15000),
+      fetchWithTimeout(recentUrl, 15000),
     ]);
+
+    // Si tout a échoué (timeout / réseau / mauvais backend), remonter une erreur plutôt qu'un dashboard vide.
+    if (!filmsResponse && !seriesResponse && !recentResponse) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Timeout',
+          message: 'Impossible de récupérer les données du dashboard (backend injoignable ou trop lent).',
+        }),
+        { status: 504, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
     
     // Traiter les films
     let popularMovies: ContentItem[] = [];

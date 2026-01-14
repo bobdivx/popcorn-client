@@ -6,7 +6,7 @@ import { PreferencesManager } from '../../../../lib/client/storage.js';
 
 /**
  * GET /api/v1/setup/export-config
- * Exporte la configuration complète (indexers, TMDB key, download location)
+ * Exporte la configuration complète (indexers, TMDB key, download location, sync settings)
  * Nécessite une authentification
  */
 export const GET: APIRoute = async ({ request }) => {
@@ -115,6 +115,40 @@ export const GET: APIRoute = async ({ request }) => {
     // Récupérer le download location
     const downloadLocation = PreferencesManager.getDownloadLocation();
 
+    // Récupérer les paramètres de synchronisation torrents depuis le backend
+    let syncSettings: any = null;
+    try {
+      const { getBackendUrlAsync } = await import('../../../../lib/backend-url.js');
+      const backendUrl = await getBackendUrlAsync();
+      const syncSettingsUrl = `${backendUrl}/api/sync/settings`;
+
+      const syncRes = await fetch(syncSettingsUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (syncRes.ok) {
+        const syncData = await syncRes.json();
+        const s = syncData?.data;
+        if (s) {
+          syncSettings = {
+            syncEnabled: (s.is_enabled ?? 0) === 1,
+            syncFrequencyMinutes: s.sync_frequency_minutes ?? undefined,
+            maxTorrentsPerCategory: s.max_torrents_per_category ?? undefined,
+            rssIncrementalEnabled: (s.rss_incremental_enabled ?? 0) === 1,
+            syncQueriesFilms: Array.isArray(s.sync_queries_films) ? s.sync_queries_films : undefined,
+            syncQueriesSeries: Array.isArray(s.sync_queries_series) ? s.sync_queries_series : undefined,
+          };
+        }
+      } else {
+        console.warn('[EXPORT CONFIG] ⚠️ Erreur lors de la récupération des paramètres sync:', syncRes.status);
+      }
+    } catch (syncErr) {
+      console.warn('[EXPORT CONFIG] ⚠️ Erreur lors de la récupération des paramètres sync:', syncErr);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -122,6 +156,7 @@ export const GET: APIRoute = async ({ request }) => {
           indexers,
           tmdbApiKey,
           downloadLocation,
+          syncSettings,
         },
       }),
       {

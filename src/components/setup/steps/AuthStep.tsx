@@ -62,7 +62,12 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
           
           // getUserConfig utilise maintenant automatiquement le token cloud si aucun token n'est fourni
           const savedConfig = await getUserConfig();
-          if (savedConfig && (savedConfig.indexers?.length || savedConfig.tmdbApiKey || savedConfig.downloadLocation)) {
+          const hasSomething =
+            !!(savedConfig?.indexers?.length) ||
+            !!savedConfig?.tmdbApiKey ||
+            !!savedConfig?.downloadLocation ||
+            !!savedConfig?.syncSettings;
+          if (savedConfig && hasSomething) {
             console.log('[AUTH] Configuration sauvegardée trouvée:', savedConfig);
             // Démarrer l'import cloud et avancer vers l'étape suivante
             CloudImportManager.startImport(savedConfig).finally(() => {
@@ -173,6 +178,25 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
       // Restaurer le download location
       if (savedConfig.downloadLocation) {
         PreferencesManager.setDownloadLocation(savedConfig.downloadLocation);
+      }
+
+      // Restaurer les paramètres de synchronisation (backend Rust)
+      if (savedConfig.syncSettings) {
+        try {
+          const s = savedConfig.syncSettings;
+          const payload: any = {};
+          if (typeof s.syncEnabled === 'boolean') payload.is_enabled = s.syncEnabled ? 1 : 0;
+          if (typeof s.syncFrequencyMinutes === 'number') payload.sync_frequency_minutes = s.syncFrequencyMinutes;
+          if (typeof s.maxTorrentsPerCategory === 'number') payload.max_torrents_per_category = s.maxTorrentsPerCategory;
+          if (typeof s.rssIncrementalEnabled === 'boolean') payload.rss_incremental_enabled = s.rssIncrementalEnabled ? 1 : 0;
+          if (Array.isArray(s.syncQueriesFilms)) payload.sync_queries_films = s.syncQueriesFilms;
+          if (Array.isArray(s.syncQueriesSeries)) payload.sync_queries_series = s.syncQueriesSeries;
+          if (Object.keys(payload).length > 0) {
+            await serverApi.updateSyncSettings(payload);
+          }
+        } catch (syncSettingsErr) {
+          console.warn('[AUTH] Erreur lors de la restauration des paramètres de sync:', syncSettingsErr);
+        }
       }
 
       // Configuration restaurée, continuer

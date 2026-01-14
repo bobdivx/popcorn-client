@@ -101,6 +101,7 @@ export function useWizardActions() {
                   indexers: configData.data.indexers || [],
                   tmdbApiKey: configData.data.tmdbApiKey || null,
                   downloadLocation: configData.data.downloadLocation || null,
+                  syncSettings: configData.data.syncSettings || null,
                 });
 
                 if (saveResult?.success) {

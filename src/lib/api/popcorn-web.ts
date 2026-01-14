@@ -296,6 +296,14 @@ export interface UserConfig {
   }>;
   tmdbApiKey?: string | null;
   downloadLocation?: string | null;
+  syncSettings?: {
+    syncEnabled?: boolean;
+    syncFrequencyMinutes?: number;
+    maxTorrentsPerCategory?: number;
+    rssIncrementalEnabled?: boolean;
+    syncQueriesFilms?: string[];
+    syncQueriesSeries?: string[];
+  } | null;
 }
 
 async function fetchJsonWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
@@ -447,6 +455,7 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
         indexers: data.data.config.indexers,
         tmdbApiKey: data.data.config.tmdbApiKey,
         downloadLocation: data.data.config.downloadLocation,
+        syncSettings: data.data.config.syncSettings ?? null,
       };
     }
 

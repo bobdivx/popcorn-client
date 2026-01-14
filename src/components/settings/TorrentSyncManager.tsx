@@ -9,6 +9,10 @@ interface SyncSettings {
   last_sync_date: number | null;
   sync_in_progress: number;
   max_torrents_per_category: number;
+  // Nouveaux paramètres (backend Rust)
+  rss_incremental_enabled?: number;
+  sync_queries_films?: string[];
+  sync_queries_series?: string[];
 }
 
 interface SyncProgress {
@@ -51,11 +55,23 @@ export default function TorrentSyncManager() {
   const [animatedCounts, setAnimatedCounts] = useState<Record<string, number>>({});
   const [previousStats, setPreviousStats] = useState<Record<string, number>>({});
   const [syncStartTime, setSyncStartTime] = useState<number | null>(null);
+  const [filmsQueriesText, setFilmsQueriesText] = useState('');
+  const [seriesQueriesText, setSeriesQueriesText] = useState('');
 
   useEffect(() => {
     loadStatus();
     loadIndexers();
   }, []);
+
+  // Sync local textarea state from backend settings (quand la réponse arrive)
+  useEffect(() => {
+    const s = status?.settings;
+    if (!s) return;
+    const films = Array.isArray(s.sync_queries_films) ? s.sync_queries_films : [];
+    const series = Array.isArray(s.sync_queries_series) ? s.sync_queries_series : [];
+    setFilmsQueriesText(films.join('\n'));
+    setSeriesQueriesText(series.join('\n'));
+  }, [status?.settings]);
 
   // Timer pour le temps écoulé
   useEffect(() => {
@@ -149,7 +165,11 @@ export default function TorrentSyncManager() {
       // Synchroniser chaque indexer
       const syncPromises = enabledIndexers.map(async (indexer: Indexer) => {
         try {
-          const syncUrl = `${backendUrl}/api/client/admin/indexers/sync`;
+          // Côté backend Rust, l'endpoint de création/màj est:
+          //   POST /api/client/admin/indexers
+          // (et /api/client/admin/indexers/:id pour GET/PUT/DELETE).
+          // Ici, "/sync" était interprété comme un :id="sync" => POST non autorisé => 405.
+          const syncUrl = `${backendUrl}/api/client/admin/indexers`;
           const syncController = new AbortController();
           const syncTimeout = setTimeout(() => syncController.abort(), 2000);
           
@@ -507,6 +527,14 @@ export default function TorrentSyncManager() {
       console.error('Erreur lors de la mise à jour des paramètres:', err);
       setError(err instanceof Error ? err.message : 'Erreur lors de la mise à jour des paramètres');
     }
+  };
+
+  const parseQueries = (text: string): string[] => {
+    return text
+      .split('\n')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .slice(0, 50);
   };
 
   const clearTorrents = async () => {
@@ -1291,6 +1319,59 @@ export default function TorrentSyncManager() {
                     }
                   }}
                 />
+              </div>
+
+              <div class="divider">Avancé</div>
+
+              <div>
+                <label class="label cursor-pointer">
+                  <span class="label-text">
+                    RSS Torznab (incremental) — rattraper les nouveaux torrents entre deux sync
+                  </span>
+                  <input
+                    type="checkbox"
+                    class="toggle toggle-primary"
+                    checked={(status.settings.rss_incremental_enabled || 0) === 1}
+                    onChange={(e) => {
+                      updateSettings({ rss_incremental_enabled: (e.target as HTMLInputElement).checked ? 1 : 0 });
+                    }}
+                  />
+                </label>
+                <p class="text-xs text-gray-400 mt-1">
+                  Recommandé si tu utilises Torznab/Jackett. (N’affecte pas les indexers non‑Torznab)
+                </p>
+              </div>
+
+              <div>
+                <label class="label">
+                  <span class="label-text font-semibold">Mots‑clés de synchronisation — Films (1 par ligne)</span>
+                </label>
+                <textarea
+                  class="textarea textarea-bordered w-full h-28"
+                  value={filmsQueriesText}
+                  placeholder="Ex: *\n2024\n2023\nnouveau\nrecent"
+                  onInput={(e) => setFilmsQueriesText((e.target as HTMLTextAreaElement).value)}
+                  onBlur={() => updateSettings({ sync_queries_films: parseQueries(filmsQueriesText) })}
+                />
+                <p class="text-xs text-gray-400 mt-1">
+                  Laisse vide pour utiliser les valeurs par défaut côté serveur.
+                </p>
+              </div>
+
+              <div>
+                <label class="label">
+                  <span class="label-text font-semibold">Mots‑clés de synchronisation — Séries (1 par ligne)</span>
+                </label>
+                <textarea
+                  class="textarea textarea-bordered w-full h-28"
+                  value={seriesQueriesText}
+                  placeholder="Ex: *\n2024\n2023\nnouvelle\nrecente"
+                  onInput={(e) => setSeriesQueriesText((e.target as HTMLTextAreaElement).value)}
+                  onBlur={() => updateSettings({ sync_queries_series: parseQueries(seriesQueriesText) })}
+                />
+                <p class="text-xs text-gray-400 mt-1">
+                  Laisse vide pour utiliser les valeurs par défaut côté serveur.
+                </p>
               </div>
             </div>
           </div>

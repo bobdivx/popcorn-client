@@ -49,7 +49,8 @@ class CloudImportManagerImpl {
     const total =
       (savedConfig.indexers?.length ?? 0) +
       (savedConfig.tmdbApiKey ? 1 : 0) +
-      (savedConfig.downloadLocation ? 1 : 0);
+      (savedConfig.downloadLocation ? 1 : 0) +
+      (savedConfig.syncSettings ? 1 : 0);
 
     this.setStatus({
       phase: 'running',
@@ -121,6 +122,30 @@ class CloudImportManagerImpl {
         if (savedConfig.downloadLocation) {
           this.setStatus({ message: 'Import emplacement de téléchargement…' });
           PreferencesManager.setDownloadLocation(savedConfig.downloadLocation);
+          this.setStatus({ done: this.status.done + 1 });
+        }
+
+        // Sync settings (backend Rust)
+        if (savedConfig.syncSettings) {
+          this.setStatus({ message: 'Import paramètres de synchronisation…' });
+          const s = savedConfig.syncSettings;
+
+          const payload: any = {};
+          if (typeof s.syncEnabled === 'boolean') payload.is_enabled = s.syncEnabled ? 1 : 0;
+          if (typeof s.syncFrequencyMinutes === 'number') payload.sync_frequency_minutes = s.syncFrequencyMinutes;
+          if (typeof s.maxTorrentsPerCategory === 'number') payload.max_torrents_per_category = s.maxTorrentsPerCategory;
+          if (typeof s.rssIncrementalEnabled === 'boolean') payload.rss_incremental_enabled = s.rssIncrementalEnabled ? 1 : 0;
+          if (Array.isArray(s.syncQueriesFilms)) payload.sync_queries_films = s.syncQueriesFilms;
+          if (Array.isArray(s.syncQueriesSeries)) payload.sync_queries_series = s.syncQueriesSeries;
+
+          // Ne pas échouer si rien à appliquer
+          if (Object.keys(payload).length > 0) {
+            const res = await serverApi.updateSyncSettings(payload);
+            if (!res.success) {
+              throw new Error(res.message || res.error || 'Erreur import paramètres de synchronisation');
+            }
+          }
+
           this.setStatus({ done: this.status.done + 1 });
         }
 
