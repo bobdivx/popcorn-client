@@ -1,28 +1,29 @@
 ---
 import Layout from '../../layouts/Layout.astro';
 import TorrentSyncManager from '../../components/settings/TorrentSyncManager';
+import PageHeader from '../../components/ui/PageHeader';
 ---
 
 <Layout title="Synchronisation des Torrents - Popcorn Client">
   <div class="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
     <div class="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-8 sm:py-10 md:py-12">
-      <div class="mb-6 sm:mb-8 md:mb-10">
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-6 mb-4 sm:mb-6">
-          <h1 class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white">Synchronisation des Torrents</h1>
-          <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4 w-full sm:w-auto">
-            <a href="/settings/account" class="btn btn-ghost text-xs sm:text-sm md:text-base lg:text-lg px-3 sm:px-4 md:px-6 py-2 sm:py-3 min-h-[44px] sm:min-h-[48px] focus:outline-none focus:ring-4 focus:ring-red-500 focus:ring-opacity-50 hover:bg-base-200 transition-colors">👤 Mon compte</a>
-            <a href="/settings" class="btn btn-ghost text-xs sm:text-sm md:text-base lg:text-lg px-3 sm:px-4 md:px-6 py-2 sm:py-3 min-h-[44px] sm:min-h-[48px] focus:outline-none focus:ring-4 focus:ring-red-500 focus:ring-opacity-50 hover:bg-base-200 transition-colors">← Retour</a>
-          </div>
-        </div>
-        <p class="text-gray-400 text-xs sm:text-sm md:text-base lg:text-lg">Gérez la synchronisation automatique des torrents depuis les indexers</p>
-        <p class="text-gray-500 text-xs sm:text-sm md:text-base mt-2">
-          💡 Pour configurer vos indexers, rendez-vous sur la <a href="/settings/indexers" class="text-red-400 hover:text-red-300 underline">page dédiée aux indexers</a>.
-        </p>
-      </div>
+      <PageHeader
+        client:only="preact"
+        title="Synchronisation"
+        subtitle="Gérez la synchronisation automatique des torrents"
+        backHref="/settings"
+      >
+        <a
+          href="/settings/indexers"
+          class="btn btn-ghost glass-panel hover:bg-white/10 border border-white/10 text-xs sm:text-sm md:text-base px-3 sm:px-4 md:px-6 py-2 sm:py-3 min-h-[44px] sm:min-h-[48px] focus:outline-none focus:ring-4 focus:ring-primary-600/50 transition-colors"
+        >
+          Configurer les indexers
+        </a>
+      </PageHeader>
 
       {/* Section Synchronisation */}
       <div class="mb-8 sm:mb-10 md:mb-12">
-        <h2 class="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-4 sm:mb-6">🔄 Synchronisation</h2>
+        <h2 class="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-4 sm:mb-6">Synchronisation</h2>
         <TorrentSyncManager client:only="preact" />
       </div>
     </div>

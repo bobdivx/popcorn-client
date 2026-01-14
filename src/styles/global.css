@@ -48,9 +48,8 @@
 .form-tv-input:focus {
   background-color: rgba(255, 255, 255, 0.15);
   outline: none;
-  ring: 2px;
-  ring-color: rgba(168, 85, 247, 0.5);
   border-color: rgb(168, 85, 247);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.35);
 }
 
 .form-tv-button {
@@ -64,8 +63,6 @@
 
 .form-tv-button:focus:not(:disabled) {
   outline: none;
-  ring: 4px;
-  ring-color: rgba(168, 85, 247, 0.5);
   box-shadow: 0 4px 12px rgba(168, 85, 247, 0.6);
 }
 
@@ -408,6 +405,28 @@
 
 button, a, input, select, textarea {
   @apply transition-all duration-200;
+}
+
+/* Focus visible global: indispensable TV (D-pad) + clavier */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.35);
+  border-radius: 0.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Décalage du contenu quand la sidebar est présente (desktop/TV) */
+@media (min-width: 1024px) {
+  body.has-sidebar .app-main {
+    padding-left: 6rem; /* rail d’icônes (w-24) */
+  }
 }
 
 /* Optimisations Performance - Animations */

@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 import { Monitor, Search, Database, User, Palette, RefreshCw, Settings } from 'lucide-preact';
+import PageHeader from '../ui/PageHeader';
 
 interface SettingsCard {
   id: string;
@@ -103,10 +104,10 @@ export default function SettingsMenu() {
 
   return (
     <div class="space-y-6">
-      <div class="mb-8">
-        <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-2 sm:mb-4">Paramètres</h1>
-        <p class="text-gray-400 text-sm sm:text-base md:text-lg lg:text-xl">Configurez votre application selon vos préférences</p>
-      </div>
+      <PageHeader
+        title="Paramètres"
+        subtitle="Configurez votre application selon vos préférences"
+      />
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
         {cards.map((card) => {

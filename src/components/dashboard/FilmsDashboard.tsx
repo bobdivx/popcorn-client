@@ -134,7 +134,7 @@ export default function FilmsDashboard() {
         <HeroSection items={heroFilms} onPlay={handlePlay} />
       )}
 
-      <div className="pb-8">
+      <div className="pb-8 tv:pb-12">
         {/* Afficher une ligne par genre */}
         {sortedGenres.map(genre => {
           const genreFilms = filmsByGenre[genre];
@@ -143,7 +143,7 @@ export default function FilmsDashboard() {
           return (
             <CarouselRow key={genre} title={genre}>
               {genreFilms.map((film) => (
-                <div key={film.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px]">
+                <div key={film.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                   <TorrentPoster item={{ ...film, type: 'movie' }} />
                 </div>
               ))}

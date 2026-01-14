@@ -1,12 +1,16 @@
 import { useState, useEffect } from 'preact/hooks';
-import { X, Home, Library, Search, Download, Settings, Menu } from 'lucide-preact';
+import { X, Home, Library, Download, Settings, Menu, Film, Tv } from 'lucide-preact';
 import { serverApi } from '../../lib/client/server-api';
+import { getLocalProfile, onProfileChanged } from '../../lib/client/profile';
+import Avatar from '../ui/Avatar';
 
 export default function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isCompact, setIsCompact] = useState(false);
   const [currentPath, setCurrentPath] = useState('');
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(() => getLocalProfile());
 
   useEffect(() => {
     const updatePath = () => {
@@ -24,6 +28,11 @@ export default function Sidebar() {
     };
   }, []);
 
+  // Sync profil local (avatar / displayName)
+  useEffect(() => {
+    return onProfileChanged(() => setProfile(getLocalProfile()));
+  }, []);
+
   // Détecter si on est sur TV/Desktop pour afficher la sidebar par défaut
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -34,6 +43,28 @@ export default function Sidebar() {
         setIsOpen(true);
       }
     }
+  }, []);
+
+  // Mode rail (icônes) sur desktop/TV, menu complet sur mobile
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const apply = () => setIsCompact(mq.matches);
+    apply();
+
+    // compat vieux navigateurs
+    // @ts-expect-error addEventListener pas toujours typé sur MediaQueryList
+    mq.addEventListener?.('change', apply);
+    // @ts-expect-error removeEventListener pas toujours typé sur MediaQueryList
+    return () => mq.removeEventListener?.('change', apply);
+  }, []);
+
+  // Permet au header de déclencher l’ouverture/fermeture (mobile)
+  useEffect(() => {
+    const handler = () => setIsOpen((v) => !v);
+    window.addEventListener('sidebar-toggle', handler as EventListener);
+    return () => window.removeEventListener('sidebar-toggle', handler as EventListener);
   }, []);
 
   const loadUser = async () => {
@@ -57,11 +88,12 @@ export default function Sidebar() {
   const isActive = (path: string) => currentPath === path;
 
   const navigationItems = [
-    { href: '/dashboard', label: 'Torrents', icon: Home, paths: ['/dashboard', '/torrents', '/films', '/series'] },
-    { href: '/library', label: 'Library', icon: Library, paths: ['/library'] },
-    { href: '/search', label: 'Search', icon: Search, paths: ['/search'] },
-    { href: '/downloads', label: 'Transfers', icon: Download, paths: ['/downloads'] },
-    { href: '/settings', label: 'Settings', icon: Settings, paths: ['/settings'] },
+    { href: '/dashboard', label: 'Accueil', icon: Home, paths: ['/dashboard', '/torrents', '/films', '/series'] },
+    { href: '/films', label: 'Films', icon: Film, paths: ['/films'] },
+    { href: '/series', label: 'Séries', icon: Tv, paths: ['/series'] },
+    { href: '/library', label: 'Bibliothèque', icon: Library, paths: ['/library'] },
+    { href: '/downloads', label: 'Téléchargements', icon: Download, paths: ['/downloads'] },
+    { href: '/settings', label: 'Paramètres', icon: Settings, paths: ['/settings'] },
   ];
 
   if (loading || !user) {
@@ -70,7 +102,7 @@ export default function Sidebar() {
 
   return (
     <>
-      {/* Bouton toggle pour mobile */}
+      {/* Bouton toggle pour mobile (fallback si besoin) */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`fixed top-20 left-4 z-40 lg:hidden p-3 glass-panel rounded-lg text-white hover:bg-glass-hover transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] min-w-[48px] ${
@@ -94,49 +126,35 @@ export default function Sidebar() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed top-0 left-0 h-screen w-80 max-w-[85vw] z-50 transform transition-transform duration-300 ease-out glass-panel-lg border-r border-white/10 ${
+        className={`fixed top-0 left-0 h-screen z-50 transform transition-transform duration-300 ease-out glass-panel-lg border-r border-white/10 ${
+          isCompact ? 'lg:w-24 lg:max-w-none' : 'w-80 max-w-[85vw]'
+        } ${
           isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
         role="navigation"
         aria-label="Navigation latérale"
       >
-        <div className="flex flex-col h-full">
-          {/* Header avec artwork en arrière-plan */}
-          <div className="relative p-6 border-b border-white/10 flex-shrink-0 overflow-hidden">
-            {/* Artwork en arrière-plan avec blur */}
-            <div 
-              className="absolute inset-0 opacity-20"
-              style={{
-                backgroundImage: 'url(/popcorn_logo.png)',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                filter: 'blur(40px)',
-              }}
-            />
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <img 
-                  src="/popcorn_logo.png" 
-                  alt="Popcorn" 
-                  className="w-10 h-10 object-contain"
-                />
-                <span className="text-white font-bold text-xl">Popcorn</span>
-              </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="lg:hidden p-2 text-white hover:bg-glass-hover rounded-lg transition-colors focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] min-w-[48px]"
-                aria-label="Fermer la sidebar"
-                tabIndex={0}
-                data-focusable
-              >
-                <X className="w-5 h-5" size={20} />
-              </button>
-            </div>
-          </div>
+        <div className="flex flex-col h-full relative">
+          {/* Spacer pour éviter le chevauchement avec la navbar */}
+          <div className="flex-shrink-0 pt-16 md:pt-20 lg:pt-24 tv:pt-28" />
+
+          {/* Bouton fermer (mobile drawer) */}
+          <button
+            onClick={() => setIsOpen(false)}
+            className="lg:hidden absolute top-4 right-4 p-2 text-white hover:bg-glass-hover rounded-lg transition-colors focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] min-w-[48px]"
+            aria-label="Fermer la sidebar"
+            tabIndex={0}
+            data-focusable
+          >
+            <X className="w-5 h-5" size={20} />
+          </button>
 
           {/* Navigation */}
-          <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-4 min-h-0" data-focusable-container>
-            <ul className="space-y-2">
+          <nav
+            className={`flex-1 overflow-y-auto overflow-x-hidden min-h-0 ${isCompact ? 'py-4 px-2' : 'py-4 px-4'}`}
+            data-focusable-container
+          >
+            <ul className={isCompact ? 'space-y-3 flex flex-col items-center' : 'space-y-2'}>
               {navigationItems.map((item) => {
                 const Icon = item.icon;
                 const active = item.paths.some(path => isActive(path));
@@ -145,7 +163,13 @@ export default function Sidebar() {
                   <li key={item.href}>
                     <a
                       href={item.href}
-                      className={`flex items-center gap-4 px-4 py-3 text-white transition-all duration-300 rounded-lg min-h-[48px] tv:min-h-[56px] focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 ${
+                      aria-label={item.label}
+                      data-tip={item.label}
+                      className={`${
+                        isCompact ? 'tooltip tooltip-right' : ''
+                      } flex items-center ${
+                        isCompact ? 'justify-center w-14 h-14 tv:w-16 tv:h-16 px-0 py-0' : 'gap-4 px-4 py-3 min-h-[48px] tv:min-h-[56px]'
+                      } text-white transition-all duration-300 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 ${
                         active
                           ? 'bg-primary shadow-primary-lg text-white font-semibold'
                           : 'hover:bg-glass-hover text-gray-300 hover:text-white'
@@ -153,8 +177,8 @@ export default function Sidebar() {
                       tabIndex={0}
                       data-focusable
                     >
-                      <Icon className="w-5 h-5 tv:w-6 tv:h-6 flex-shrink-0" size={24} />
-                      <span className="text-base tv:text-lg font-medium">{item.label}</span>
+                      <Icon className="w-6 h-6 tv:w-7 tv:h-7 flex-shrink-0" size={24} />
+                      {!isCompact && <span className="text-base tv:text-lg font-medium">{item.label}</span>}
                     </a>
                   </li>
                 );
@@ -164,15 +188,21 @@ export default function Sidebar() {
 
           {/* Footer avec profil utilisateur */}
           <div className="border-t border-white/10 p-4 flex-shrink-0 glass-panel">
-            <div className="flex items-center gap-3 px-4 py-3">
-              <div className="w-10 h-10 tv:w-12 tv:h-12 rounded-lg bg-primary text-white flex items-center justify-center font-bold text-sm tv:text-base shadow-primary flex-shrink-0">
-                {user.email ? user.email.charAt(0).toUpperCase() : 'U'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white font-semibold text-sm tv:text-base truncate">
-                  {user.email || 'Utilisateur'}
-                </p>
-              </div>
+            <div className={`flex items-center ${isCompact ? 'justify-center px-0' : 'gap-3 px-4'} py-3`}>
+              <Avatar
+                email={user.email}
+                displayName={profile.displayName}
+                profile={profile}
+                sizeClassName="w-10 h-10 tv:w-12 tv:h-12"
+                className="flex-shrink-0"
+              />
+              {!isCompact && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-white font-semibold text-sm tv:text-base truncate">
+                    {profile.displayName || user.email || 'Utilisateur'}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
