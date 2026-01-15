@@ -3,14 +3,18 @@
  * popcorn-client et popcorn-server ne doivent JAMAIS accéder directement à Turso
  * Ils doivent passer par les routes API de popcorn-web
  */
+import { isTauri } from '../utils/tauri.js';
 
 /**
  * Obtient l'URL de base de l'API popcorn-web
  * URL fixe pointant vers le déploiement Vercel
  */
 export function getPopcornWebApiUrl(): string {
-  // URL fixe pour popcorn-web déployé sur Vercel
-  const apiUrl = 'https://popcorn-web-five.vercel.app';
+  // Permet d'overrider sans changer le code (ex: staging / domaine custom)
+  const apiUrl =
+    import.meta.env.PUBLIC_POPCORN_WEB_URL ||
+    import.meta.env.POPCORN_WEB_URL ||
+    'https://popcorn-web-five.vercel.app';
   
   // S'assurer que l'URL se termine par /api/v1
   const finalUrl = apiUrl.replace(/\/$/, '') + '/api/v1';
@@ -21,6 +25,74 @@ export function getPopcornWebApiUrl(): string {
   }
   
   return finalUrl;
+}
+
+async function fetchJsonWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+type JsonResult =
+  | { ok: true; status: number; data: any }
+  | { ok: false; status: number; data: any; rawText?: string };
+
+async function requestJson(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number
+): Promise<JsonResult> {
+  // En Tauri (Android/Desktop), utiliser la requête native pour contourner CORS
+  if (isTauri()) {
+    const { fetch: tauriFetch, Body, ResponseType } = await import('@tauri-apps/plugin-http');
+    const headers: Record<string, string> = {};
+    if (init.headers) {
+      // HeadersInit peut être object/Headers/array; on normalise au plus simple
+      if (Array.isArray(init.headers)) {
+        for (const [k, v] of init.headers) headers[k] = v;
+      } else if (init.headers instanceof Headers) {
+        init.headers.forEach((v, k) => (headers[k] = v));
+      } else {
+        Object.assign(headers, init.headers as Record<string, string>);
+      }
+    }
+
+    const method = (init.method || 'GET').toUpperCase();
+    const hasBody = typeof init.body !== 'undefined' && init.body !== null;
+    const body = hasBody
+      ? typeof init.body === 'string'
+        ? Body.text(init.body)
+        : Body.text(String(init.body))
+      : undefined;
+
+    const resp: any = await (tauriFetch as any)(url, {
+      method,
+      headers,
+      body,
+      responseType: (ResponseType as any).Json,
+      timeout: timeoutMs,
+    });
+
+    // resp.data est déjà parsé en JSON quand ResponseType.Json
+    if (resp?.ok) return { ok: true, status: resp.status, data: resp.data };
+    return { ok: false, status: resp?.status ?? 0, data: resp?.data };
+  }
+
+  const response = await fetchJsonWithTimeout(url, init, timeoutMs);
+  const rawText = await response.text().catch(() => '');
+  let data: any = {};
+  try {
+    data = rawText ? JSON.parse(rawText) : {};
+  } catch {
+    data = {};
+  }
+
+  if (response.ok) return { ok: true, status: response.status, data };
+  return { ok: false, status: response.status, data, rawText };
 }
 
 /**
@@ -45,62 +117,51 @@ export async function loginCloud(email: string, password: string): Promise<{
   console.log('[POPCORN-WEB] Tentative de connexion à:', fullUrl);
   
   try {
-    // Ajouter un timeout de 10 secondes
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-    
-    const response = await fetch(fullUrl, {
+    const res = await requestJson(
+      fullUrl,
+      {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ email, password }),
-      signal: controller.signal,
-    });
-    
-    clearTimeout(timeoutId);
+      },
+      10000
+    );
 
     console.log('[POPCORN-WEB] Réponse reçue:', {
-      status: response.status,
-      statusText: response.statusText,
-      ok: response.ok,
-      url: response.url,
+      status: res.status,
+      ok: res.ok,
+      url: fullUrl,
     });
 
-    if (!response.ok) {
+    if (!res.ok) {
       // Si l'API n'est pas disponible (erreur serveur)
-      if (response.status === 500 || response.status === 503) {
-        const errorText = await response.text().catch(() => '');
+      if (res.status === 500 || res.status === 503 || res.status === 0) {
         console.error('[POPCORN-WEB] API non disponible:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText,
+          status: res.status,
+          body: res.rawText || res.data,
         });
         return null;
       }
       
       // Pour les erreurs 401 (identifiants incorrects), propager l'erreur
-      const errorData = await response.json().catch(() => {
-        return response.text().then(text => {
-          console.error('[POPCORN-WEB] Erreur de parsing JSON:', text);
-          return { message: `Erreur ${response.status}: ${response.statusText}` };
-        });
-      });
+      const errorData = res.data || {};
       
-      const errorMessage = errorData.message || `Erreur ${response.status} lors de la connexion`;
+      const errorMessage = errorData.message || `Erreur ${res.status} lors de la connexion`;
       console.error('[POPCORN-WEB] Erreur API:', {
-        status: response.status,
+        status: res.status,
         message: errorMessage,
         data: errorData,
       });
       
       // Créer une erreur avec le statut pour que la route puisse la gérer
       const error = new Error(errorMessage) as Error & { status?: number };
-      error.status = response.status;
+      error.status = res.status;
       throw error;
     }
 
-    const data = await response.json();
+    const data = res.data;
     console.log('[POPCORN-WEB] Données reçues:', { success: data.success, hasData: !!data.data });
     
     if (data.success && data.data) {
@@ -180,25 +241,28 @@ export async function registerCloud(email: string, password: string, inviteCode:
 } | null> {
   try {
     const apiUrl = getPopcornWebApiUrl();
-    const response = await fetch(`${apiUrl}/auth/register`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const fullUrl = `${apiUrl}/auth/register`;
+    const res = await requestJson(
+      fullUrl,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, inviteCode }),
       },
-      body: JSON.stringify({ email, password, inviteCode }),
-    });
+      10000
+    );
 
-    if (!response.ok) {
-      if (response.status === 500 || response.status === 503) {
+    if (!res.ok) {
+      if (res.status === 500 || res.status === 503 || res.status === 0) {
         console.warn('[POPCORN-WEB] API non disponible pour l\'inscription cloud');
         return null;
       }
       
-      const errorData = await response.json().catch(() => ({}));
+      const errorData = res.data || {};
       throw new Error(errorData.message || 'Erreur lors de l\'inscription');
     }
 
-    const data = await response.json();
+    const data = res.data;
     
     if (data.success && data.data) {
       return {
@@ -232,22 +296,25 @@ export async function validateInvitationCloud(code: string): Promise<{
 } | null> {
   try {
     const apiUrl = getPopcornWebApiUrl();
-    const response = await fetch(`${apiUrl}/invitations/validate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
+    const fullUrl = `${apiUrl}/invitations/validate`;
+    const res = await requestJson(
+      fullUrl,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
       },
-      body: JSON.stringify({ code }),
-    });
+      10000
+    );
 
-    if (!response.ok) {
+    if (!res.ok) {
       // Si l'API n'est pas disponible, retourner null (pas d'erreur)
-      if (response.status === 500 || response.status === 503) {
+      if (res.status === 500 || res.status === 503 || res.status === 0) {
         console.warn('[POPCORN-WEB] API non disponible pour valider l\'invitation cloud');
         return null;
       }
       
-      const errorData = await response.json().catch(() => ({}));
+      const errorData = res.data || {};
       return {
         isValid: false,
         reason: 'api_error',
@@ -255,7 +322,7 @@ export async function validateInvitationCloud(code: string): Promise<{
       };
     }
 
-    const data = await response.json();
+    const data = res.data;
     
     if (data.success && data.data) {
       return {
@@ -306,16 +373,6 @@ export interface UserConfig {
   } | null;
 }
 
-async function fetchJsonWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
 /**
  * Sauvegarde la configuration utilisateur dans popcorn-web
  * @param config Configuration à sauvegarder
@@ -338,38 +395,43 @@ export async function saveUserConfig(config: UserConfig, accessToken?: string): 
       }
     }
     
-    // Utiliser la route proxy dans popcorn-client pour éviter les problèmes CORS
-    // S'assurer d'utiliser window.location.origin pour éviter les redirections vers le backend Rust
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    const apiUrl = `${baseUrl}/api/v1/config/save`;
+    // En Tauri (build static), pas de routes Astro /api/* -> appeler popcorn-web directement.
+    // En web, on garde le proxy local pour éviter CORS.
+    const apiUrl = isTauri()
+      ? `${getPopcornWebApiUrl()}/config/save`
+      : `${typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/config/save`;
     
     if (import.meta.env.DEV) {
       console.log('[POPCORN-WEB] Sauvegarde de la configuration à:', apiUrl);
     }
     
-    const response = await fetchJsonWithTimeout(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${tokenToUse}`,
+    const res = await requestJson(
+      apiUrl,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${tokenToUse}`,
+        },
+        body: JSON.stringify(config),
       },
-      body: JSON.stringify(config),
-    }, 10000);
+      10000
+    );
 
-    if (!response.ok) {
-      if (response.status === 500 || response.status === 503) {
+    if (!res.ok) {
+      if (res.status === 500 || res.status === 503 || res.status === 0) {
         console.warn('[POPCORN-WEB] API non disponible pour sauvegarder la configuration');
         return null;
       }
       
-      const errorData = await response.json().catch(() => ({}));
+      const errorData = res.data || {};
       return {
         success: false,
         message: errorData.message || 'Erreur lors de la sauvegarde de la configuration',
       };
     }
 
-    const data = await response.json();
+    const data = res.data;
     
     if (data.success) {
       return {
@@ -410,32 +472,37 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
       }
     }
     
-    // Utiliser la route proxy dans popcorn-client pour éviter les problèmes CORS
-    // S'assurer d'utiliser window.location.origin pour éviter les redirections vers le backend Rust
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
-    const apiUrl = `${baseUrl}/api/v1/config/save`;
+    // En Tauri (build static), pas de routes Astro /api/* -> appeler popcorn-web directement.
+    // En web, on garde le proxy local pour éviter CORS.
+    const apiUrl = isTauri()
+      ? `${getPopcornWebApiUrl()}/config/save`
+      : `${typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/config/save`;
     
     if (import.meta.env.DEV) {
       console.log('[POPCORN-WEB] Appel à:', apiUrl);
     }
     
-    const response = await fetchJsonWithTimeout(apiUrl, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${tokenToUse}`,
+    const res = await requestJson(
+      apiUrl,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${tokenToUse}`,
+        },
       },
-    }, 10000);
+      10000
+    );
 
-    if (!response.ok) {
-      if (response.status === 500 || response.status === 503) {
+    if (!res.ok) {
+      if (res.status === 500 || res.status === 503 || res.status === 0) {
         console.warn('[POPCORN-WEB] API non disponible pour récupérer la configuration');
         return null;
       }
       
       // Si 401 ou 404, c'est probablement que l'utilisateur n'a pas de configuration sauvegardée - ne pas bloquer
       // Le proxy retourne maintenant 404 au lieu de 401 pour les cas "pas de config"
-      if (response.status === 401 || response.status === 404) {
+      if (res.status === 401 || res.status === 404) {
         // Ne pas logger comme warning, c'est normal pour une première connexion
         if (import.meta.env.DEV) {
           console.log('[POPCORN-WEB] ℹ️ Aucune configuration sauvegardée (normal pour première connexion)');
@@ -443,12 +510,12 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
         return null;
       }
       
-      const errorData = await response.json().catch(() => ({}));
+      const errorData = res.data || {};
       console.error('[POPCORN-WEB] Erreur lors de la récupération de la configuration:', errorData);
       return null;
     }
 
-    const data = await response.json();
+    const data = res.data;
     
     if (data.success && data.data && data.data.config) {
       return {

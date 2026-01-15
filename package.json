@@ -28,6 +28,7 @@
     "@astrojs/tailwind": "^6.0.2",
     "@libsql/client": "^0.14.0",
     "@tauri-apps/plugin-dialog": "^2.0.0",
+    "@tauri-apps/plugin-http": "^2.5.6",
     "astro": "^5.16.6",
     "bcryptjs": "^2.4.3",
     "daisyui": "^4.12.10",
