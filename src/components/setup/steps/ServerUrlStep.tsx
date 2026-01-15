@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
-import { getBackendUrl, setBackendUrl as saveBackendUrl } from '../../../lib/backend-config.js';
+import { getBackendUrl, hasBackendUrl, setBackendUrl as saveBackendUrl } from '../../../lib/backend-config.js';
 
 interface ServerUrlStepProps {
   focusedButtonIndex: number;
@@ -24,9 +24,14 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext }: Server
       setLoading(true);
       setError(null);
       
-      // Récupérer l'URL du backend depuis localStorage
-      const url = getBackendUrl();
-      setBackendUrl(url);
+      // Si aucune URL n'a été configurée, ne pas pré-remplir: on force la saisie.
+      if (!hasBackendUrl()) {
+        setBackendUrl('');
+        return;
+      }
+
+      // Sinon, récupérer l'URL existante (localStorage > env > défaut)
+      setBackendUrl(getBackendUrl());
     } catch (err) {
       console.error('Erreur lors du chargement de l\'URL du backend:', err);
       // Valeur par défaut en cas d'erreur

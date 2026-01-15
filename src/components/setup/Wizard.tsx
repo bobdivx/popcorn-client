@@ -12,6 +12,7 @@ import { TmdbStep } from './steps/TmdbStep';
 import { DownloadLocationStep } from './steps/DownloadLocationStep';
 import { SyncStep } from './steps/SyncStep';
 import { CompleteStep } from './steps/CompleteStep';
+import { hasBackendUrl } from '../../lib/backend-config.js';
 
 export default function Wizard() {
   const { loading, setupStatus, checkSetupStatus } = useSetupStatus();
@@ -45,6 +46,31 @@ export default function Wizard() {
         <div className="text-center">
           <span className="loading loading-spinner loading-lg text-primary-600"></span>
           <p className="mt-4 text-white text-xl">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Premier lancement: aucune URL backend -> on affiche directement l'étape URL
+  // (sans exiger setupStatus, car il ne peut pas être chargé sans backend).
+  if (!hasBackendUrl()) {
+    return (
+      <div className="min-h-screen bg-[#121212] flex items-center justify-center p-4 sm:p-6 md:p-8 lg:p-12">
+        <div className="w-full max-w-5xl glass-panel-lg rounded-2xl shadow-2xl border border-white/10 p-6 sm:p-8 md:p-10 lg:p-12">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-white mb-8 sm:mb-10 md:mb-12 text-center">
+            Configuration initiale
+          </h2>
+
+          <StepIndicator currentStep={1} totalSteps={9} />
+
+          <ServerUrlStep
+            focusedButtonIndex={focusedButtonIndex}
+            buttonRefs={buttonRefs}
+            onNext={async () => {
+              await checkSetupStatus();
+              setCurrentStep(2);
+            }}
+          />
         </div>
       </div>
     );
@@ -100,15 +126,18 @@ export default function Wizard() {
         <StepIndicator currentStep={currentStep} totalSteps={9} />
 
         {currentStep === 1 && (
-          <DisclaimerStep
+          <ServerUrlStep
             focusedButtonIndex={focusedButtonIndex}
             buttonRefs={buttonRefs}
-            onNext={() => setCurrentStep(2)}
+            onNext={async () => {
+              await checkSetupStatus();
+              setCurrentStep(2);
+            }}
           />
         )}
 
         {currentStep === 2 && (
-          <ServerUrlStep
+          <DisclaimerStep
             focusedButtonIndex={focusedButtonIndex}
             buttonRefs={buttonRefs}
             onNext={() => setCurrentStep(3)}

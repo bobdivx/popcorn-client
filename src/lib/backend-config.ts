@@ -108,8 +108,12 @@ export function hasBackendUrl(): boolean {
   }
 
   try {
-    return localStorage.getItem(STORAGE_KEY) !== null;
+    // Côté client: considérer configuré si:
+    // - localStorage contient une valeur, OU
+    // - une env var est fournie au build (use-case web / déploiement)
+    if (localStorage.getItem(STORAGE_KEY) !== null) return true;
+    return !!(import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL);
   } catch (error) {
-    return false;
+    return !!(import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL);
   }
 }

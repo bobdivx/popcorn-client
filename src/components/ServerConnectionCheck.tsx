@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
+import { hasBackendUrl } from '../lib/backend-config.js';
 
 type ConnectionStatus = 'checking' | 'connecting' | 'connected' | 'error';
 
@@ -29,6 +30,14 @@ export default function ServerConnectionCheck() {
     // Si on est sur une page de configuration, ne pas afficher l'animation
     if (allowedPaths.some(path => currentPath.startsWith(path))) {
       setIsVisible(false);
+      return;
+    }
+
+    // Premier lancement / aucune URL configurée: forcer l'assistant de configuration
+    // (sinon l'app reste bloquée sur "En attente du serveur..." avec l'URL par défaut)
+    if (!hasBackendUrl()) {
+      setIsVisible(false);
+      window.location.href = '/setup';
       return;
     }
 

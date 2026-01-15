@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../../../lib/client/server-api';
 import type { SetupStatus } from '../../../lib/client/types';
+import { hasBackendUrl } from '../../../lib/backend-config.js';
 
 export function useSetupStatus() {
-  const [loading, setLoading] = useState(true);
+  // Au premier lancement, tant qu'aucune URL backend n'est configurée,
+  // on ne tente pas de charger le statut (sinon l'assistant ne s'affiche pas).
+  const [loading, setLoading] = useState(false);
   const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
 
   const checkSetupStatus = async () => {
@@ -24,6 +27,12 @@ export function useSetupStatus() {
   };
 
   useEffect(() => {
+    if (!hasBackendUrl()) {
+      setLoading(false);
+      setSetupStatus(null);
+      return;
+    }
+
     checkSetupStatus();
   }, []);
 

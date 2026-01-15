@@ -38,6 +38,74 @@ function Get-TauriConfigPath {
     }
 }
 
+function Sanitize-FileName {
+    param([string]$Name)
+    if (-not $Name) { return "popcorn" }
+    # Remplacer tout caractère non sûr pour un nom de fichier Windows
+    return ($Name -replace '[^a-zA-Z0-9._-]', '_')
+}
+
+function Get-ProductInfoForVariant {
+    param([string]$Variant)
+    $configPath = Get-TauriConfigPath -Variant $Variant
+    $productName = $null
+    $version = $null
+    try {
+        if (Test-Path $configPath) {
+            $cfg = Get-Content $configPath -Raw | ConvertFrom-Json
+            $productName = $cfg.productName
+            $version = $cfg.version
+        }
+    } catch {
+        # non bloquant
+    }
+    if ([string]::IsNullOrWhiteSpace($productName)) { $productName = "popcorn" }
+    if ([string]::IsNullOrWhiteSpace($version)) { $version = "0.0.0" }
+    return @{
+        ProductName = $productName
+        Version = $version
+    }
+}
+
+function Clean-PopcornWebApkArtifactsForVariant {
+    param(
+        [Parameter(Mandatory=$true)][string]$BuildType
+    )
+
+    $info = Get-ProductInfoForVariant -Variant $BuildType
+    $safeName = Sanitize-FileName -Name $info.ProductName
+    $variantTag = Sanitize-FileName -Name $BuildType
+
+    $destDir = Resolve-Path (Join-Path $PSScriptRoot "..\..\popcorn-web") -ErrorAction SilentlyContinue
+    if (-not $destDir) {
+        Write-Host "  [WARN] Impossible de resoudre le chemin vers popcorn-web. Clean des APK ignore." -ForegroundColor Yellow
+        return
+    }
+
+    $appDir = Join-Path $destDir "app"
+    if (-not (Test-Path $appDir)) {
+        return
+    }
+
+    # Supprimer toutes les anciennes versions pour cette variante (apk + artefacts)
+    $pattern = "$safeName-v*-android-$variantTag*.apk*"
+    $toDelete = Get-ChildItem -Path $appDir -File -ErrorAction SilentlyContinue | Where-Object {
+        $_.Name -like $pattern
+    }
+
+    if ($toDelete -and $toDelete.Count -gt 0) {
+        Write-Host "-> Clean anciens APK dans popcorn-web/app pour $safeName ($BuildType): $($toDelete.Count) fichier(s)" -ForegroundColor Yellow
+        $toDelete | ForEach-Object {
+            try {
+                Remove-Item -Force -Path $_.FullName -ErrorAction Stop
+            } catch {
+                Write-Host "  [WARN] Suppression echouee: $($_.FullName) : $($_.Exception.Message)" -ForegroundColor Yellow
+            }
+        }
+        Write-Host ""
+    }
+}
+
 function Get-ExpectedAndroidJavaDir {
     param([string]$Variant)
     $configPath = Get-TauriConfigPath -Variant $Variant
@@ -80,6 +148,9 @@ function Ensure-AndroidCleartextTrafficEnabled {
         Write-Host "  [WARN] Impossible de patcher usesCleartextTraffic: $($_.Exception.Message)" -ForegroundColor Yellow
     }
 }
+
+# Avant le build: supprimer les anciennes versions (destination)
+Clean-PopcornWebApkArtifactsForVariant -BuildType $buildType
 
 # Détection automatique des chemins sur D:\ si les variables ne sont pas configurées
 if (-not $env:JAVA_HOME -or -not (Test-Path $env:JAVA_HOME)) {
@@ -421,13 +492,6 @@ try {
         Write-Host "[OK] Build Android termine avec succes !" -ForegroundColor Green
         Write-Host "========================================" -ForegroundColor Cyan
         Write-Host ""
-
-        function Sanitize-FileName {
-            param([string]$Name)
-            if (-not $Name) { return "popcorn" }
-            # Remplacer tout caractère non sûr pour un nom de fichier Windows
-            return ($Name -replace '[^a-zA-Z0-9._-]', '_')
-        }
 
         function Find-LatestApk {
             param([string[]]$SearchDirs)
