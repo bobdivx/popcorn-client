@@ -20,10 +20,37 @@ $buildType = if ($Variant -eq "mobile") { "mobile" } elseif ($Variant -eq "tv") 
 Write-Host "Variante sélectionnée: $buildType" -ForegroundColor Yellow
 Write-Host ""
 
+# Racine du projet (popcorn-client)
+$projectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+
 # Fonction pour vérifier si une commande existe
 function Test-Command {
     param([string]$Command)
     $null -ne (Get-Command $Command -ErrorAction SilentlyContinue)
+}
+
+function Get-TauriConfigPath {
+    param([string]$Variant)
+    switch ($Variant) {
+        "mobile" { return (Join-Path $projectRoot "src-tauri\tauri.android.mobile.conf.json") }
+        "tv" { return (Join-Path $projectRoot "src-tauri\tauri.android.conf.json") }
+        default { return (Join-Path $projectRoot "src-tauri\tauri.conf.json") }
+    }
+}
+
+function Get-ExpectedAndroidJavaDir {
+    param([string]$Variant)
+    $configPath = Get-TauriConfigPath -Variant $Variant
+    if (-not (Test-Path $configPath)) { return $null }
+    try {
+        $cfg = Get-Content $configPath -Raw | ConvertFrom-Json
+        $identifier = $cfg.identifier
+        if ([string]::IsNullOrWhiteSpace($identifier)) { return $null }
+        $pkgPath = $identifier -replace '\.', '\'
+        return (Join-Path (Join-Path $projectRoot "src-tauri\gen\android\app\src\main\java") $pkgPath)
+    } catch {
+        return $null
+    }
 }
 
 # Détection automatique des chemins sur D:\ si les variables ne sont pas configurées
@@ -57,9 +84,14 @@ if ($env:ANDROID_HOME) {
                 $ar = Get-ChildItem "$toolchainPath\llvm-ar.exe" | Select-Object -First 1
                 if ($clang) {
                     $env:CC_aarch64_linux_android = $clang.FullName
+                    # Rust utilise ce linker pour la target Android (évite l'erreur "linker cc not found")
+                    $env:CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER = $clang.FullName
+                    # Certains toolchains regardent aussi CC/AR génériques
+                    if (-not $env:CC) { $env:CC = $clang.FullName }
                 }
                 if ($ar) {
                     $env:AR_aarch64_linux_android = $ar.FullName
+                    if (-not $env:AR) { $env:AR = $ar.FullName }
                 }
                 $ranlib = Get-ChildItem "$toolchainPath\llvm-ranlib.exe" | Select-Object -First 1
                 if ($ranlib) {
@@ -176,11 +208,56 @@ if (-not $allOk) {
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 
-# Vérifier si l'environnement Android Tauri est initialisé
-$androidDir = Join-Path $PSScriptRoot "..\src-tauri\android"
-$androidDir = Resolve-Path $androidDir -ErrorAction SilentlyContinue
+# Vérifier si l'environnement Android Tauri est initialisé (Tauri v2 génère dans src-tauri/gen/android)
+$androidDirPath = Join-Path $projectRoot "src-tauri\gen\android"
+$expectedJavaDir = Get-ExpectedAndroidJavaDir -Variant $buildType
 
-if (-not $androidDir -or -not (Test-Path $androidDir)) {
+$needsInit = $false
+if (-not (Test-Path $androidDirPath)) {
+    $needsInit = $true
+} elseif ($expectedJavaDir -and -not (Test-Path $expectedJavaDir)) {
+    Write-Host ""
+    Write-Host "[!] Projet Android existant ne correspond pas à la variante '$buildType'." -ForegroundColor Yellow
+    Write-Host "    (Package Java attendu introuvable: $expectedJavaDir)" -ForegroundColor Gray
+    Write-Host "    Suppression de src-tauri/gen/android pour régénérer..." -ForegroundColor Cyan
+
+    # Tuer les daemons Gradle éventuels (verrouillage Windows)
+    $gradlew = Join-Path $androidDirPath "gradlew.bat"
+    if (Test-Path $gradlew) {
+        try {
+            $prev = Get-Location
+            Set-Location $androidDirPath
+            .\gradlew.bat --stop | Out-Null
+        } catch {
+            # non bloquant
+        } finally {
+            if ($prev) { Set-Location $prev }
+        }
+    }
+
+    $deleted = $false
+    for ($i = 1; $i -le 6; $i++) {
+        try {
+            if (Test-Path $androidDirPath) {
+                Remove-Item -Recurse -Force -Path $androidDirPath -ErrorAction Stop
+            }
+            $deleted = $true
+            break
+        } catch {
+            Write-Host "    [WARN] Suppression échouée (tentative $i/6): $($_.Exception.Message)" -ForegroundColor Yellow
+            Start-Sleep -Seconds 2
+        }
+    }
+
+    if (-not $deleted) {
+        Write-Host "[ERREUR] Impossible de supprimer $androidDirPath (fichiers verrouillés)." -ForegroundColor Red
+        Write-Host "Fermez Android Studio/Gradle et relancez." -ForegroundColor Yellow
+        exit 1
+    }
+    $needsInit = $true
+}
+
+if ($needsInit) {
     Write-Host ""
     Write-Host "[!] Environnement Android Tauri non initialise" -ForegroundColor Yellow
     Write-Host "Initialisation automatique..." -ForegroundColor Cyan
@@ -195,17 +272,37 @@ if (-not $androidDir -or -not (Test-Path $androidDir)) {
         Write-Host "(Cela peut prendre plusieurs minutes)" -ForegroundColor Gray
         Write-Host ""
         
-        Set-Location (Join-Path $PSScriptRoot "..")
+        Set-Location $projectRoot
         
         try {
-            $output = npx tauri android init 2>&1
+            Write-Host "  ANDROID_HOME: $env:ANDROID_HOME" -ForegroundColor Gray
+            Write-Host "  ANDROID_SDK_ROOT: $env:ANDROID_SDK_ROOT" -ForegroundColor Gray
+            Write-Host "  JAVA_HOME: $env:JAVA_HOME" -ForegroundColor Gray
+
+            # Forcer la présence des variables d'environnement pour le process enfant (robuste sur Windows)
+            $androidHomeForCmd = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { "" }
+            $androidSdkRootForCmd = if ($env:ANDROID_SDK_ROOT) { $env:ANDROID_SDK_ROOT } else { $androidHomeForCmd }
+            $androidNdkHomeForCmd = if ($env:ANDROID_NDK_HOME) { $env:ANDROID_NDK_HOME } else { "" }
+            $javaHomeForCmd = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { "" }
+
+            $initConfigArg = ""
+            if ($buildType -eq "mobile") { $initConfigArg = " --config src-tauri\tauri.android.mobile.conf.json" }
+            elseif ($buildType -eq "tv") { $initConfigArg = " --config src-tauri\tauri.android.conf.json" }
+
+            $cmdArgs = 'set "ANDROID_HOME=' + $androidHomeForCmd + '"&& ' +
+                       'set "ANDROID_SDK_ROOT=' + $androidSdkRootForCmd + '"&& ' +
+                       'set "ANDROID_NDK_HOME=' + $androidNdkHomeForCmd + '"&& ' +
+                       'set "NDK_HOME=' + $androidNdkHomeForCmd + '"&& ' +
+                       'set "JAVA_HOME=' + $javaHomeForCmd + '"&& ' +
+                       ('npx tauri android init --ci -v' + $initConfigArg)
+
+            & cmd /c $cmdArgs
             if ($LASTEXITCODE -eq 0) {
                 Write-Host ""
                 Write-Host "[OK] Environnement Android Tauri initialise !" -ForegroundColor Green
             } else {
                 Write-Host ""
                 Write-Host "[ERREUR] Erreur lors de l'initialisation:" -ForegroundColor Red
-                Write-Host $output -ForegroundColor Red
                 exit 1
             }
         } catch {
@@ -239,41 +336,48 @@ try {
     # Exécuter le build
     Invoke-Expression $buildCommand
     
-    # Le build Tauri peut echouer sur le bundling mais reussir la compilation
-    # Dans ce cas, on construit l'APK manuellement avec Gradle
     $buildSucceeded = $LASTEXITCODE -eq 0
-    
+
+    # Workaround Windows: si le build échoue uniquement à cause des symlinks (mode développeur non activé),
+    # on copie la lib .so dans jniLibs puis on construit l'APK via Gradle en sautant la tâche Rust.
     if (-not $buildSucceeded) {
         Write-Host ""
-        Write-Host "[INFO] Build Tauri termine (bundling non supporte)" -ForegroundColor Yellow
-        Write-Host "Construction de l'APK avec Gradle..." -ForegroundColor Cyan
-        Write-Host ""
-        
-        # Construire l'APK avec Gradle
-        $androidProjectDir = Join-Path (Get-Location) "src-tauri\gen\android"
-        if (Test-Path $androidProjectDir) {
-            $originalDir = Get-Location
-            Set-Location $androidProjectDir
-            
-            # Configurer les outils NDK pour Gradle
-            $ndk = Get-ChildItem "$env:ANDROID_HOME\ndk" -Directory | Sort-Object Name -Descending | Select-Object -First 1
-            if ($ndk) {
-                $toolchainPath = Join-Path $ndk.FullName "toolchains\llvm\prebuilt\windows-x86_64\bin"
-                $clang = Get-ChildItem "$toolchainPath\aarch64-linux-android*-clang.cmd" | Select-Object -First 1
-                $ar = Get-ChildItem "$toolchainPath\llvm-ar.exe" | Select-Object -First 1
-                if ($clang) { $env:CC_aarch64_linux_android = $clang.FullName }
-                if ($ar) { $env:AR_aarch64_linux_android = $ar.FullName }
-                $env:CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER = $clang.FullName
-            }
-            
-            .\gradlew.bat assembleRelease
-            $gradleSuccess = $LASTEXITCODE -eq 0
-            
+        Write-Host "[WARN] Build Tauri Android a échoué. Tentative de contournement (copie .so + Gradle)..." -ForegroundColor Yellow
+
+        $soPath = Join-Path $projectRoot "src-tauri\target\aarch64-linux-android\release\libpopcorn_vercel_client.so"
+        $jniDir = Join-Path $projectRoot "src-tauri\gen\android\app\src\main\jniLibs\arm64-v8a"
+        $jniSoPath = Join-Path $jniDir "libpopcorn_vercel_client.so"
+
+        if (-not (Test-Path $soPath)) {
+            Write-Host "[ERREUR] La bibliothèque Android n'a pas été générée: $soPath" -ForegroundColor Red
+            Write-Host "Activez Windows Developer Mode (ou lancez en admin) ou corrigez l'erreur de build ci-dessus." -ForegroundColor Yellow
+            exit 1
+        }
+
+        New-Item -ItemType Directory -Force -Path $jniDir | Out-Null
+        Copy-Item -Path $soPath -Destination $jniSoPath -Force
+        Write-Host "  [OK] Copie lib -> jniLibs: $jniSoPath" -ForegroundColor Green
+
+        $androidProjectDir = Join-Path $projectRoot "src-tauri\gen\android"
+        if (-not (Test-Path $androidProjectDir)) {
+            Write-Host "[ERREUR] Projet Android introuvable: $androidProjectDir" -ForegroundColor Red
+            exit 1
+        }
+
+        $originalDir = Get-Location
+        Set-Location $androidProjectDir
+        try {
+            # On build uniquement la variante arm64, en sautant le task rustBuildArm64Release (sinon relance tauri et retombe sur les symlinks)
+            .\gradlew.bat :app:assembleArm64Release -x :app:rustBuildArm64Release
+            $buildSucceeded = $LASTEXITCODE -eq 0
+        } finally {
             Set-Location $originalDir
-            
-            if ($gradleSuccess) {
-                $buildSucceeded = $true
-            }
+        }
+
+        if (-not $buildSucceeded) {
+            Write-Host ""
+            Write-Host "[ERREUR] Le workaround Gradle a échoué. Voir les logs ci-dessus." -ForegroundColor Red
+            exit 1
         }
     }
     
@@ -283,37 +387,89 @@ try {
         Write-Host "[OK] Build Android termine avec succes !" -ForegroundColor Green
         Write-Host "========================================" -ForegroundColor Cyan
         Write-Host ""
-        
-        # Trouver le fichier APK généré
-        $apkPaths = @(
-            "src-tauri\gen\android\app\build\outputs\apk\release\app-release.apk",
-            "src-tauri\target\aarch64-linux-android\release\app\build\outputs\apk\release\app-release.apk",
-            "src-tauri\target\aarch64-linux-android\debug\app\build\outputs\apk\debug\app-debug.apk"
+
+        function Sanitize-FileName {
+            param([string]$Name)
+            if (-not $Name) { return "popcorn" }
+            # Remplacer tout caractère non sûr pour un nom de fichier Windows
+            return ($Name -replace '[^a-zA-Z0-9._-]', '_')
+        }
+
+        function Find-LatestApk {
+            param([string[]]$SearchDirs)
+            $candidates = @()
+            foreach ($dir in $SearchDirs) {
+                if (Test-Path $dir) {
+                    $candidates += Get-ChildItem $dir -Filter "*.apk" -Recurse -File -ErrorAction SilentlyContinue
+                }
+            }
+            if (-not $candidates -or $candidates.Count -eq 0) { return $null }
+            return ($candidates | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
+        }
+
+        # Trouver l'APK généré (on privilégie les outputs Gradle)
+        $searchDirs = @(
+            (Join-Path (Get-Location) "src-tauri\gen\android\app\build\outputs\apk"),
+            (Join-Path (Get-Location) "src-tauri\target\aarch64-linux-android\release"),
+            (Join-Path (Get-Location) "src-tauri\target\aarch64-linux-android\debug")
         )
-        
-        $apkFound = $false
-        foreach ($apkPath in $apkPaths) {
-            $fullPath = Join-Path (Get-Location) $apkPath
-            if (Test-Path $fullPath) {
-                $apk = Get-Item $fullPath
-                Write-Host "[APK] APK genere:" -ForegroundColor Cyan
-                Write-Host "   $fullPath" -ForegroundColor White
-                Write-Host "   Taille: $([math]::Round($apk.Length / 1MB, 2)) MB" -ForegroundColor Gray
-                Write-Host ""
-                $apkFound = $true
-                break
-            }
-        }
-        
-        if (-not $apkFound) {
+
+        $apk = Find-LatestApk -SearchDirs $searchDirs
+
+        if (-not $apk) {
             Write-Host "[!] APK non trouve dans les emplacements standards" -ForegroundColor Yellow
-            Write-Host "Recherche dans tout le projet..." -ForegroundColor Cyan
-            Get-ChildItem "src-tauri" -Filter "*.apk" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-                Write-Host "  APK trouve: $($_.FullName)" -ForegroundColor Green
-            }
-        } else {
-            Write-Host "Vous pouvez maintenant installer l'APK sur votre appareil Android." -ForegroundColor Green
+            Write-Host "Recherche dans src-tauri..." -ForegroundColor Cyan
+            $apk = Find-LatestApk -SearchDirs @((Join-Path (Get-Location) "src-tauri"))
         }
+
+        if (-not $apk) {
+            Write-Host "[ERREUR] Aucun APK n'a ete trouve apres le build." -ForegroundColor Red
+            exit 1
+        }
+
+        Write-Host "[APK] APK genere:" -ForegroundColor Cyan
+        Write-Host "   $($apk.FullName)" -ForegroundColor White
+        Write-Host "   Taille: $([math]::Round($apk.Length / 1MB, 2)) MB" -ForegroundColor Gray
+        Write-Host ""
+
+        # Lire la config Tauri correspondante pour nommer l'APK exporté
+        $configPath = Get-TauriConfigPath -Variant $buildType
+        $productName = $null
+        $version = $null
+        try {
+            if (Test-Path $configPath) {
+                $cfg = Get-Content $configPath -Raw | ConvertFrom-Json
+                $productName = $cfg.productName
+                $version = $cfg.version
+            }
+        } catch {
+            # Pas bloquant: on tombera sur des valeurs par défaut
+        }
+
+        if ([string]::IsNullOrWhiteSpace($productName)) { $productName = "popcorn" }
+        if ([string]::IsNullOrWhiteSpace($version)) { $version = "0.0.0" }
+
+        $safeName = Sanitize-FileName -Name $productName
+        $safeVersion = Sanitize-FileName -Name $version
+        $variantTag = Sanitize-FileName -Name $buildType
+
+        # Dossier de destination demandé: popcorn-web/app
+        $destDir = Resolve-Path (Join-Path $PSScriptRoot "..\..\popcorn-web") -ErrorAction SilentlyContinue
+        if (-not $destDir) {
+            Write-Host "[!] Impossible de resoudre le chemin vers popcorn-web (attendu a cote de popcorn-client)" -ForegroundColor Yellow
+        } else {
+            $appDir = Join-Path $destDir "app"
+            New-Item -ItemType Directory -Force -Path $appDir | Out-Null
+
+            $destFile = Join-Path $appDir "$safeName-v$safeVersion-android-$variantTag.apk"
+            Copy-Item -Path $apk.FullName -Destination $destFile -Force
+
+            Write-Host "[OK] APK copie dans:" -ForegroundColor Green
+            Write-Host "   $destFile" -ForegroundColor White
+            Write-Host ""
+        }
+
+        Write-Host "Vous pouvez maintenant installer l'APK sur votre appareil Android." -ForegroundColor Green
     } else {
         Write-Host ""
         Write-Host "[ERREUR] Erreur lors du build" -ForegroundColor Red

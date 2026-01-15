@@ -13,14 +13,15 @@
     "tauri:dev": "cross-env TAURI_PLATFORM=desktop tauri dev",
     "tauri:build": "cross-env TAURI_PLATFORM=desktop tauri build",
     "tauri:build:windows": "cross-env TAURI_PLATFORM=desktop tauri build --target x86_64-pc-windows-msvc",
-    "tauri:build:android": "cross-env TAURI_PLATFORM=android tauri build --target aarch64-linux-android",
-    "tauri:build:android-tv": "cross-env TAURI_PLATFORM=android tauri build --target aarch64-linux-android --config src-tauri/tauri.android.conf.json",
-    "tauri:build:android-mobile": "cross-env TAURI_PLATFORM=android tauri build --target aarch64-linux-android --config src-tauri/tauri.android.mobile.conf.json",
+    "tauri:build:android": "cross-env TAURI_PLATFORM=android tauri android build --ci -t aarch64 --apk true --aab false",
+    "tauri:build:android-tv": "cross-env TAURI_PLATFORM=android tauri android build --ci -t aarch64 --apk true --aab false --config src-tauri/tauri.android.conf.json",
+    "tauri:build:android-mobile": "cross-env TAURI_PLATFORM=android tauri android build --ci -t aarch64 --apk true --aab false --config src-tauri/tauri.android.mobile.conf.json",
     "android:setup": "powershell -ExecutionPolicy Bypass -File scripts/setup-android.ps1",
     "android:check": "powershell -ExecutionPolicy Bypass -File scripts/check-android.ps1",
     "android:build": "powershell -ExecutionPolicy Bypass -File scripts/build-android.ps1",
     "android:build:mobile": "powershell -ExecutionPolicy Bypass -File scripts/build-android.ps1 mobile",
-    "android:build:tv": "powershell -ExecutionPolicy Bypass -File scripts/build-android.ps1 tv"
+    "android:build:tv": "powershell -ExecutionPolicy Bypass -File scripts/build-android.ps1 tv",
+    "android:build:all": "powershell -ExecutionPolicy Bypass -File scripts/build-android-all.ps1"
   },
   "dependencies": {
     "@astrojs/preact": "^4.1.3",

@@ -49,14 +49,14 @@ services:
       - BACKEND_URL=http://server:3000
       - PUBLIC_BACKEND_URL=http://server:3000
       - PUBLIC_CLIENT_URL=http://client:4321
-      - TZ=${TZ:-Europe/Paris}
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
+      - TZ=$&#123;TZ:-Europe/Paris&#125;
+      - PUID=$&#123;PUID:-1000&#125;
+      - PGID=$&#123;PGID:-1000&#125;
       # Variables Turso en lecture seule pour valider les codes d'invitation
       # Ces variables permettent uniquement de LIRE les codes d'invitation depuis Turso
       # Les données utilisateur restent dans SQLite local
-      - TURSO_READONLY_DATABASE_URL=${TURSO_READONLY_DATABASE_URL:-libsql://popcorn-bobdivx.aws-eu-west-1.turso.io}
-      - TURSO_READONLY_AUTH_TOKEN=${TURSO_READONLY_AUTH_TOKEN:-eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicm8iLCJpYXQiOjE3Njc0NTE3MzMsImlkIjoiZTVmMGZiZjAtZTEzMS00MTY2LTgyYmEtMmEwYjZiNWQ3ZTA3IiwicmlkIjoiOGM2NmRlMjctYjkxMy00ZWNjLTlmZDQtYjhmNzRkZDhhODMyIn0.H27fjXjDdIoWLbJ7q-ejckjuD8iVz6CzyN4vBxq7lZJZ7d6RoxZAeBSLk0W2Ax6jnjV8d8EIV0CgO7BSxuRuBg}
+      - TURSO_READONLY_DATABASE_URL=$&#123;TURSO_READONLY_DATABASE_URL:-libsql://popcorn-bobdivx.aws-eu-west-1.turso.io&#125;
+      - TURSO_READONLY_AUTH_TOKEN=$&#123;TURSO_READONLY_AUTH_TOKEN:-eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicm8iLCJpYXQiOjE3Njc0NTE3MzMsImlkIjoiZTVmMGZiZjAtZTEzMS00MTY2LTgyYmEtMmEwYjZiNWQ3ZTA3IiwicmlkIjoiOGM2NmRlMjctYjkxMy00ZWNjLTlmZDQtYjhmNzRkZDhhODMyIn0.H27fjXjDdIoWLbJ7q-ejckjuD8iVz6CzyN4vBxq7lZJZ7d6RoxZAeBSLk0W2Ax6jnjV8d8EIV0CgO7BSxuRuBg&#125;
     labels:
       icon: https://raw.githubusercontent.com/bobdivx/popcorn/main/public/favicon.svg
     ports:
@@ -95,18 +95,18 @@ services:
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=3000
       - DOWNLOAD_DIR=/app/downloads
-      - API_BASE_URL=${API_BASE_URL:-http://client:4321}
-      - API_USERNAME=${API_USERNAME:-admin}
-      - API_PASSWORD=${API_PASSWORD:-admin123}
-      - MAX_DOWNLOADS=${MAX_DOWNLOADS:-5}
-      - MAX_UPLOAD_SLOTS=${MAX_UPLOAD_SLOTS:-4}
-      - LIBRQBIT_API_URL=${LIBRQBIT_API_URL:-http://127.0.0.1:3030}
-      - LOG_LEVEL=${LOG_LEVEL:-info}
-      - RUST_LOG=${RUST_LOG:-info}
-      - ANNOUNCE_INTERVAL=${ANNOUNCE_INTERVAL:-1800}
-      - TZ=${TZ:-Europe/Paris}
-      - PUID=${PUID:-1000}
-      - PGID=${PGID:-1000}
+      - API_BASE_URL=$&#123;API_BASE_URL:-http://client:4321&#125;
+      - API_USERNAME=$&#123;API_USERNAME:-admin&#125;
+      - API_PASSWORD=$&#123;API_PASSWORD:-admin123&#125;
+      - MAX_DOWNLOADS=$&#123;MAX_DOWNLOADS:-5&#125;
+      - MAX_UPLOAD_SLOTS=$&#123;MAX_UPLOAD_SLOTS:-4&#125;
+      - LIBRQBIT_API_URL=$&#123;LIBRQBIT_API_URL:-http://127.0.0.1:3030&#125;
+      - LOG_LEVEL=$&#123;LOG_LEVEL:-info&#125;
+      - RUST_LOG=$&#123;RUST_LOG:-info&#125;
+      - ANNOUNCE_INTERVAL=$&#123;ANNOUNCE_INTERVAL:-1800&#125;
+      - TZ=$&#123;TZ:-Europe/Paris&#125;
+      - PUID=$&#123;PUID:-1000&#125;
+      - PGID=$&#123;PGID:-1000&#125;
     labels:
       icon: https://raw.githubusercontent.com/bobdivx/popcorn/main/public/favicon.svg
     ports:
@@ -277,14 +277,14 @@ services:
       - BACKEND_URL=http://server:3000
       - PUBLIC_BACKEND_URL=http://server:3000
       - PUBLIC_CLIENT_URL=http://client:4321
-      - TZ=\${TZ:-Europe/Paris}
-      - PUID=\${PUID:-1000}
-      - PGID=\${PGID:-1000}
+      - TZ=$&#123;TZ:-Europe/Paris&#125;
+      - PUID=$&#123;PUID:-1000&#125;
+      - PGID=$&#123;PGID:-1000&#125;
       # Variables Turso en lecture seule pour valider les codes d'invitation
       # Ces variables permettent uniquement de LIRE les codes d'invitation depuis Turso
       # Les données utilisateur restent dans SQLite local
-      - TURSO_READONLY_DATABASE_URL=\${TURSO_READONLY_DATABASE_URL:-libsql://popcorn-bobdivx.aws-eu-west-1.turso.io}
-      - TURSO_READONLY_AUTH_TOKEN=\${TURSO_READONLY_AUTH_TOKEN:-eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicm8iLCJpYXQiOjE3Njc0NTE3MzMsImlkIjoiZTVmMGZiZjAtZTEzMS00MTY2LTgyYmEtMmEwYjZiNWQ3ZTA3IiwicmlkIjoiOGM2NmRlMjctYjkxMy00ZWNjLTlmZDQtYjhmNzRkZDhhODMyIn0.H27fjXjDdIoWLbJ7q-ejckjuD8iVz6CzyN4vBxq7lZJZ7d6RoxZAeBSLk0W2Ax6jnjV8d8EIV0CgO7BSxuRuBg}
+      - TURSO_READONLY_DATABASE_URL=$&#123;TURSO_READONLY_DATABASE_URL:-libsql://popcorn-bobdivx.aws-eu-west-1.turso.io&#125;
+      - TURSO_READONLY_AUTH_TOKEN=$&#123;TURSO_READONLY_AUTH_TOKEN:-eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicm8iLCJpYXQiOjE3Njc0NTE3MzMsImlkIjoiZTVmMGZiZjAtZTEzMS00MTY2LTgyYmEtMmEwYjZiNWQ3ZTA3IiwicmlkIjoiOGM2NmRlMjctYjkxMy00ZWNjLTlmZDQtYjhmNzRkZDhhODMyIn0.H27fjXjDdIoWLbJ7q-ejckjuD8iVz6CzyN4vBxq7lZJZ7d6RoxZAeBSLk0W2Ax6jnjV8d8EIV0CgO7BSxuRuBg&#125;
     labels:
       icon: https://raw.githubusercontent.com/bobdivx/popcorn/main/public/favicon.svg
     ports:
@@ -323,18 +323,18 @@ services:
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=3000
       - DOWNLOAD_DIR=/app/downloads
-      - API_BASE_URL=\${API_BASE_URL:-http://client:4321}
-      - API_USERNAME=\${API_USERNAME:-admin}
-      - API_PASSWORD=\${API_PASSWORD:-admin123}
-      - MAX_DOWNLOADS=\${MAX_DOWNLOADS:-5}
-      - MAX_UPLOAD_SLOTS=\${MAX_UPLOAD_SLOTS:-4}
-      - LIBRQBIT_API_URL=\${LIBRQBIT_API_URL:-http://127.0.0.1:3030}
-      - LOG_LEVEL=\${LOG_LEVEL:-info}
-      - RUST_LOG=\${RUST_LOG:-info}
-      - ANNOUNCE_INTERVAL=\${ANNOUNCE_INTERVAL:-1800}
-      - TZ=\${TZ:-Europe/Paris}
-      - PUID=\${PUID:-1000}
-      - PGID=\${PGID:-1000}
+      - API_BASE_URL=$&#123;API_BASE_URL:-http://client:4321&#125;
+      - API_USERNAME=$&#123;API_USERNAME:-admin&#125;
+      - API_PASSWORD=$&#123;API_PASSWORD:-admin123&#125;
+      - MAX_DOWNLOADS=$&#123;MAX_DOWNLOADS:-5&#125;
+      - MAX_UPLOAD_SLOTS=$&#123;MAX_UPLOAD_SLOTS:-4&#125;
+      - LIBRQBIT_API_URL=$&#123;LIBRQBIT_API_URL:-http://127.0.0.1:3030&#125;
+      - LOG_LEVEL=$&#123;LOG_LEVEL:-info&#125;
+      - RUST_LOG=$&#123;RUST_LOG:-info&#125;
+      - ANNOUNCE_INTERVAL=$&#123;ANNOUNCE_INTERVAL:-1800&#125;
+      - TZ=$&#123;TZ:-Europe/Paris&#125;
+      - PUID=$&#123;PUID:-1000&#125;
+      - PGID=$&#123;PGID:-1000&#125;
     labels:
       icon: https://raw.githubusercontent.com/bobdivx/popcorn/main/public/favicon.svg
     ports:

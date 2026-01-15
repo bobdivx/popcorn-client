@@ -8,6 +8,12 @@ repository = ""
 edition = "2021"
 rust-version = "1.70"
 
+[lib]
+# Requis pour les builds mobile (Android/iOS) : Tauri compile en bibliothèque (cdylib)
+name = "popcorn_vercel_client"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
