@@ -59,8 +59,29 @@ export const GET: APIRoute = async ({ request }) => {
           getBackendUrlOverrideFromRequest(request) ||
           (await getBackendUrlAsync());
 
+        // Vérifier rapidement si le backend est joignable.
+        // Si non joignable, NE PAS forcer needsSetup=true (évite le wizard après reboot).
+        let backendReachable = false;
+        try {
+          const healthUrl = `${backendUrl}/api/client/health`;
+          const healthResponse = await fetchWithTimeout(healthUrl, { method: 'GET' }, 700);
+          backendReachable = !!healthResponse?.ok;
+        } catch {
+          backendReachable = false;
+        }
+
         // Vérifier si des indexers existent (depuis le backend)
         let hasIndexers = false;
+        if (!backendReachable) {
+          // Backend down -> statut "inconnu", on renvoie vite pour éviter les timeouts globaux.
+          return {
+            backendReachable,
+            hasIndexers: false,
+            hasTmdbKey: false,
+            hasUsers: false,
+            hasDownloadLocation: false,
+          };
+        }
         try {
           const backendApiUrl = `${backendUrl}/api/client/admin/indexers`;
           
@@ -149,6 +170,7 @@ export const GET: APIRoute = async ({ request }) => {
         const hasDownloadLocation = downloadLocation !== null && downloadLocation.trim() !== '';
 
         return {
+          backendReachable,
           hasIndexers,
           hasTmdbKey,
           hasUsers,
@@ -157,13 +179,14 @@ export const GET: APIRoute = async ({ request }) => {
       })();
 
     // Timeout global de 4 secondes
-    const timeoutPromise = new Promise<{ hasIndexers: boolean; hasTmdbKey: boolean; hasUsers: boolean; hasDownloadLocation: boolean }>((resolve) => {
+    const timeoutPromise = new Promise<{ backendReachable: boolean; hasIndexers: boolean; hasTmdbKey: boolean; hasUsers: boolean; hasDownloadLocation: boolean }>((resolve) => {
       setTimeout(() => {
         // Ne logger que en mode développement
         if (import.meta.env.DEV) {
           console.log('[SETUP STATUS] Timeout global, retour des valeurs par défaut (backend non accessible)');
         }
         resolve({
+          backendReachable: false,
           hasIndexers: false,
           hasTmdbKey: false,
           hasUsers: false,
@@ -172,7 +195,7 @@ export const GET: APIRoute = async ({ request }) => {
       }, 4000);
     });
 
-    const { hasIndexers, hasTmdbKey, hasUsers, hasDownloadLocation } = await Promise.race([
+    const { backendReachable, hasIndexers, hasTmdbKey, hasUsers, hasDownloadLocation } = await Promise.race([
       statusCheckPromise,
       timeoutPromise,
     ]);
@@ -183,14 +206,23 @@ export const GET: APIRoute = async ({ request }) => {
     // Vérifier si des torrents existent (optionnel)
     const hasTorrents = false;
 
+    // Important:
+    // - ne pas forcer le wizard si le backend n'est pas joignable (reboot / démarrage)
+    // - ne pas forcer le wizard uniquement parce qu'on ne peut pas vérifier TMDB sans userId
+    //   (ex: pas encore connecté / token manquant). TMDB est une config "par utilisateur".
+    const needsSetup = backendReachable
+      ? (!hasUsers || !hasIndexers || !hasBackendConfig)
+      : false;
+
     const setupStatus: SetupStatus = {
-      needsSetup: !hasIndexers || !hasTmdbKey || !hasBackendConfig,
+      needsSetup,
       hasUsers,
       hasIndexers,
       hasBackendConfig,
       hasTmdbKey,
       hasTorrents,
       hasDownloadLocation,
+      backendReachable,
     };
 
     return new Response(
@@ -208,13 +240,15 @@ export const GET: APIRoute = async ({ request }) => {
     
     // Même en cas d'erreur, retourner un statut par défaut pour éviter que le client reste bloqué
     const defaultStatus: SetupStatus = {
-      needsSetup: true,
+      // "Inconnu" -> ne pas forcer /setup, sinon wizard fantôme après reboot
+      needsSetup: false,
       hasUsers: false,
       hasIndexers: false,
       hasBackendConfig: true,
       hasTmdbKey: false,
       hasTorrents: false,
       hasDownloadLocation: false,
+      backendReachable: false,
     };
 
     return new Response(

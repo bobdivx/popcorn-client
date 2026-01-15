@@ -40,7 +40,8 @@ const { title = 'Popcorn Client' } = Astro.props;
         } catch (e) {}
       })();
     </script>
-    <main class="app-main flex-1 w-full overflow-x-hidden pt-16 sm:pt-18 md:pt-20 lg:pt-24">
+    <!-- Header plus haut (barre + onglets) -->
+    <main class="app-main flex-1 w-full overflow-x-hidden pt-28 sm:pt-32 md:pt-36 lg:pt-40 tv:pt-44">
       <slot />
     </main>
     <script is:inline>

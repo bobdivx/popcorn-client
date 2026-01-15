@@ -20,6 +20,12 @@ export interface SetupStatus {
   hasTmdbKey: boolean;
   hasTorrents: boolean;
   hasDownloadLocation?: boolean;
+  /**
+   * Indique si le backend Rust est joignable au moment du check.
+   * Important: permet de ne PAS déclencher le wizard sur un simple reboot
+   * (frontend up, backend pas encore prêt) ou sur un timeout transitoire.
+   */
+  backendReachable?: boolean;
 }
 
 export interface IndexerFormData {

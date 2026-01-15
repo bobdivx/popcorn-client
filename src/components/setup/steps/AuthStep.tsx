@@ -93,7 +93,19 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         console.warn('[AUTH] Aucun token d\'accès trouvé après la connexion');
       }
 
-      // Pas de configuration sauvegardée, continuer normalement
+      // Si le backend est déjà configuré (sur le serveur), ne pas forcer la poursuite du wizard.
+      // Exemple: tu installes l'app Android mais le serveur est déjà configuré sur une machine.
+      try {
+        const setup = await serverApi.getSetupStatus();
+        if (setup.success && setup.data && setup.data.needsSetup === false) {
+          window.location.href = '/dashboard';
+          return;
+        }
+      } catch {
+        // ignore
+      }
+
+      // Pas de configuration sauvegardée / setup incomplet, continuer normalement
       onNext();
     } catch (err) {
       setError('Erreur de connexion. Vérifiez votre connexion réseau et que l\'API popcorn-web est accessible.');

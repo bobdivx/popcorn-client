@@ -89,7 +89,8 @@ export default function ServerConnectionCheck() {
       if (currentPath !== '/setup' && !currentPath.startsWith('/setup')) {
         const setupResponse = await serverApi.getSetupStatus();
         if (setupResponse.success && setupResponse.data) {
-          if (setupResponse.data.needsSetup) {
+          // Ne pas forcer /setup si le backend est momentanément indisponible (reboot)
+          if (setupResponse.data.backendReachable !== false && setupResponse.data.needsSetup) {
             window.location.href = '/setup';
             return;
           }

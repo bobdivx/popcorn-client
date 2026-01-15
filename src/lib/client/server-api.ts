@@ -15,6 +15,10 @@ import type {
 } from './types';
 import { getClientUrl } from '../client-url.js';
 import { getBackendUrl } from '../backend-config.js';
+import { isTauri } from '../utils/tauri.js';
+import { PreferencesManager } from './storage.js';
+import { TokenManager } from './storage.js';
+import { loginCloud as popcornWebLogin, registerCloud as popcornWebRegister } from '../api/popcorn-web.js';
 
 // Ré-exporter les types pour compatibilité
 export type { ApiResponse } from './types';
@@ -69,6 +73,64 @@ class ServerApiClient {
   private baseUrl: string;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
+
+  private getBackendBaseUrl(): string {
+    const raw = getBackendUrl();
+    return (raw || 'http://127.0.0.1:3000').trim().replace(/\/$/, '');
+  }
+
+  private async backendRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+    const base = this.getBackendBaseUrl();
+    const url = `${base}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    };
+
+    try {
+      const controller = new AbortController();
+      const timeoutMs = this.getTimeoutMs(endpoint);
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      const response = await fetch(url, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return {
+          success: false,
+          error: (data && typeof data === 'object' ? (data as any).error : undefined) || 'BackendError',
+          message:
+            (data && typeof data === 'object' ? (data as any).message : undefined) ||
+            `Erreur ${response.status}`,
+        };
+      }
+
+      // Backend renvoie souvent { success, data }, on normalise.
+      return {
+        success: true,
+        data: (data && typeof data === 'object' && 'data' in data ? (data as any).data : data) as T,
+      };
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return {
+          success: false,
+          error: 'Timeout',
+          message: 'Timeout: le backend ne répond pas.',
+        };
+      }
+      return {
+        success: false,
+        error: 'NetworkError',
+        message: error instanceof Error ? error.message : 'Erreur réseau',
+      };
+    }
+  }
 
   private getTimeoutMs(endpoint: string): number {
     // Valeurs conservatrices pour éviter les "spinners infinis"
@@ -438,6 +500,42 @@ class ServerApiClient {
    * Connexion avec compte cloud (popcorn-web)
    */
   async loginCloud(email: string, password: string): Promise<ApiResponse<AuthResponse>> {
+    // En Tauri/mobile (build static), on n'a pas les routes Astro /api/v1/*.
+    // On appelle donc directement l'API popcorn-web et on stocke les tokens cloud.
+    if (isTauri()) {
+      try {
+        const result = await popcornWebLogin(email, password);
+        if (!result) {
+          return {
+            success: false,
+            error: 'CloudUnavailable',
+            message: 'API cloud indisponible',
+          };
+        }
+
+        // On stocke uniquement les tokens cloud ici.
+        // (Le token "local" du client était généré via la route Astro login-cloud, indisponible en build static.)
+        TokenManager.setCloudTokens(result.accessToken, result.refreshToken);
+
+        return {
+          success: true,
+          data: {
+            user: result.user,
+            accessToken: '', // non utilisé en Tauri
+            refreshToken: '', // non utilisé en Tauri
+            cloudAccessToken: result.accessToken,
+            cloudRefreshToken: result.refreshToken,
+          },
+        };
+      } catch (e) {
+        return {
+          success: false,
+          error: 'CloudLoginError',
+          message: e instanceof Error ? e.message : 'Erreur de connexion cloud',
+        };
+      }
+    }
+
     const response = await this.request<AuthResponse>('/api/v1/auth/login-cloud', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
@@ -459,6 +557,37 @@ class ServerApiClient {
    * Inscription avec compte cloud (popcorn-web)
    */
   async registerCloud(email: string, password: string, inviteCode: string): Promise<ApiResponse<AuthResponse>> {
+    if (isTauri()) {
+      try {
+        const result = await popcornWebRegister(email, password, inviteCode);
+        if (!result) {
+          return {
+            success: false,
+            error: 'CloudUnavailable',
+            message: 'API cloud indisponible',
+          };
+        }
+
+        TokenManager.setCloudTokens(result.accessToken, result.refreshToken);
+        return {
+          success: true,
+          data: {
+            user: result.user,
+            accessToken: '',
+            refreshToken: '',
+            cloudAccessToken: result.accessToken,
+            cloudRefreshToken: result.refreshToken,
+          },
+        };
+      } catch (e) {
+        return {
+          success: false,
+          error: 'CloudRegisterError',
+          message: e instanceof Error ? e.message : 'Erreur d’inscription cloud',
+        };
+      }
+    }
+
     const response = await this.request<AuthResponse>('/api/v1/auth/register-cloud', {
       method: 'POST',
       body: JSON.stringify({ email, password, inviteCode }),
@@ -681,6 +810,12 @@ class ServerApiClient {
    * Vérifie la santé du serveur
    */
   async checkServerHealth(): Promise<ApiResponse<{ status: string }>> {
+    if (isTauri()) {
+      // En Tauri, on parle directement au backend Rust (URL configurée dans localStorage)
+      const res = await this.backendRequest<any>('/api/client/health', { method: 'GET' });
+      if (!res.success) return res as ApiResponse<{ status: string }>;
+      return { success: true, data: { status: 'ok' } };
+    }
     // Passer par request() pour bénéficier:
     // - du header X-Popcorn-Backend-Url (backend configuré dans localStorage)
     // - des timeouts (évite les spinners infinis)
@@ -693,6 +828,59 @@ class ServerApiClient {
    * Récupère le statut du setup
    */
   async getSetupStatus(): Promise<ApiResponse<SetupStatus>> {
+    if (isTauri()) {
+      // En Tauri, pas de proxy Astro: on calcule le statut directement depuis le backend Rust + prefs locales.
+      const backendReachable = (await this.checkServerHealth()).success;
+      if (!backendReachable) {
+        return {
+          success: true,
+          data: {
+            needsSetup: false,
+            hasUsers: false,
+            hasIndexers: false,
+            hasBackendConfig: true,
+            hasTmdbKey: false,
+            hasTorrents: false,
+            hasDownloadLocation: false,
+            backendReachable: false,
+          },
+        };
+      }
+
+      const usersCount = await this.backendRequest<number>('/api/client/auth/users/count', { method: 'GET' });
+      const hasUsers = usersCount.success ? (typeof usersCount.data === 'number' ? usersCount.data > 0 : false) : false;
+
+      const indexersRes = await this.backendRequest<any[]>('/api/client/admin/indexers', { method: 'GET' });
+      const hasIndexers = indexersRes.success
+        ? (Array.isArray(indexersRes.data) ? indexersRes.data.some((i: any) => i?.is_enabled === 1 || i?.is_enabled === true) : false)
+        : false;
+
+      const downloadLocation = PreferencesManager.getDownloadLocation();
+      const hasDownloadLocation = !!(downloadLocation && downloadLocation.trim());
+
+      // Important: le token TMDB est lié à un user_id (header X-User-ID).
+      // Sur mobile, l'utilisateur peut être cloud/local, et on ne veut pas forcer le wizard juste parce qu'on ne peut pas le vérifier ici.
+      const hasTmdbKey = true;
+
+      // Critère simple et robuste:
+      // - si aucun user sur le backend => setup requis (première installation)
+      // - sinon, ne pas bloquer le démarrage (le reste se configure dans les settings si besoin)
+      const needsSetup = !hasUsers;
+
+      return {
+        success: true,
+        data: {
+          needsSetup,
+          hasUsers,
+          hasIndexers,
+          hasBackendConfig: true,
+          hasTmdbKey,
+          hasTorrents: false,
+          hasDownloadLocation,
+          backendReachable: true,
+        },
+      };
+    }
     return this.request<SetupStatus>('/api/v1/setup/status');
   }
 
@@ -700,6 +888,24 @@ class ServerApiClient {
    * Récupère tous les indexers
    */
   async getIndexers(): Promise<ApiResponse<Indexer[]>> {
+    if (isTauri()) {
+      const res = await this.backendRequest<any[]>('/api/client/admin/indexers', { method: 'GET' });
+      if (!res.success) return res as ApiResponse<Indexer[]>;
+      const indexers: Indexer[] = (Array.isArray(res.data) ? res.data : []).map((idx: any) => ({
+        id: idx.id,
+        name: idx.name,
+        baseUrl: idx.base_url,
+        apiKey: idx.api_key || null,
+        jackettIndexerName: idx.jackett_indexer_name || null,
+        isEnabled: idx.is_enabled === 1 || idx.is_enabled === true,
+        isDefault: idx.is_default === 1 || idx.is_default === true,
+        priority: idx.priority || 0,
+        fallbackIndexerId: idx.fallback_indexer_id || null,
+        indexerTypeId: idx.indexer_type_id || null,
+        configJson: idx.config_json || null,
+      }));
+      return { success: true, data: indexers };
+    }
     return this.request<Indexer[]>('/api/v1/setup/indexers');
   }
 
@@ -714,6 +920,51 @@ class ServerApiClient {
    * Crée un nouvel indexer
    */
   async createIndexer(data: IndexerFormData): Promise<ApiResponse<Indexer>> {
+    if (isTauri()) {
+      // Adapter le payload au backend Rust (snake_case)
+      const id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
+
+      const payload: any = {
+        id,
+        name: data.name,
+        base_url: data.baseUrl,
+        api_key: data.apiKey || null,
+        jackett_indexer_name: data.jackettIndexerName || null,
+        is_enabled: data.isEnabled,
+        is_default: data.isDefault,
+        priority: data.priority,
+        indexer_type_id: data.indexerTypeId || null,
+        config_json: data.configJson || null,
+      };
+
+      const res = await this.backendRequest<any>('/api/client/admin/indexers', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      if (!res.success) return res as ApiResponse<Indexer>;
+
+      const idx: any = res.data;
+      return {
+        success: true,
+        data: {
+          id: idx.id || id,
+          name: idx.name || data.name,
+          baseUrl: idx.base_url || data.baseUrl,
+          apiKey: idx.api_key || data.apiKey || null,
+          jackettIndexerName: idx.jackett_indexer_name || data.jackettIndexerName || null,
+          isEnabled: idx.is_enabled === 1 || idx.is_enabled === true || data.isEnabled,
+          isDefault: idx.is_default === 1 || idx.is_default === true || data.isDefault,
+          priority: idx.priority ?? data.priority ?? 0,
+          fallbackIndexerId: idx.fallback_indexer_id || null,
+          indexerTypeId: idx.indexer_type_id || data.indexerTypeId || null,
+          configJson: idx.config_json || data.configJson || null,
+        },
+      };
+    }
     return this.request<Indexer>('/api/v1/setup/indexers', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -807,6 +1058,32 @@ class ServerApiClient {
    * Sauvegarde la clé API TMDB
    */
   async saveTmdbKey(key: string): Promise<ApiResponse<void>> {
+    if (isTauri()) {
+      // Sur mobile, on utilise l'ID du compte cloud comme user_id (même convention que /api/v1/auth/login-cloud).
+      // Si pas de token cloud, on ne peut pas associer la clé à un user -> on renvoie une erreur explicite.
+      const cloudToken = TokenManager.getCloudAccessToken();
+      if (!cloudToken) {
+        return {
+          success: false,
+          error: 'Unauthorized',
+          message: 'Veuillez vous connecter avec un compte cloud pour sauvegarder la clé TMDB.',
+        };
+      }
+
+      // Le backend exige X-User-ID, et côté client on utilise l'access_token local (JWT) pour porter userId en web.
+      // En Tauri, on n'a pas ce JWT local; on réutilise l'identité du compte cloud stockée en localStorage si dispo.
+      // Le TokenManager ne stocke pas l'id, donc on le récupère depuis le token cloud via le backend: ici, on ne peut pas.
+      // On s'appuie donc sur le champ access_token local si présent (cas desktop), sinon on laisse l'utilisateur configurer TMDB via l'UI web.
+      const localAccess = TokenManager.getAccessToken();
+      const userId = localAccess ? undefined : undefined;
+
+      // Fallback pragmatique: essayer sans X-User-ID n'aura pas d'effet -> guider l'utilisateur.
+      return {
+        success: false,
+        error: 'Unsupported',
+        message: 'TMDB est lié à un utilisateur. Sur Android, configure la clé TMDB depuis un client web/desktop (ou on ajoute un mapping userId cloud -> backend).',
+      };
+    }
     return this.request<void>('/api/v1/setup/tmdb', {
       method: 'POST',
       body: JSON.stringify({ apiKey: key }),
@@ -866,6 +1143,9 @@ class ServerApiClient {
    * Récupère le statut de la synchronisation des torrents
    */
   async getSyncStatus(): Promise<ApiResponse<any>> {
+    if (isTauri()) {
+      return this.backendRequest('/api/sync/status', { method: 'GET' });
+    }
     return this.request('/api/v1/sync/status');
   }
 
@@ -873,6 +1153,9 @@ class ServerApiClient {
    * Démarre la synchronisation des torrents
    */
   async startSync(): Promise<ApiResponse<void>> {
+    if (isTauri()) {
+      return this.backendRequest<void>('/api/sync/start', { method: 'POST' });
+    }
     return this.request<void>('/api/v1/sync/start', {
       method: 'POST',
     });
@@ -898,6 +1181,12 @@ class ServerApiClient {
    * Met à jour les paramètres de synchronisation
    */
   async updateSyncSettings(settings: any): Promise<ApiResponse<void>> {
+    if (isTauri()) {
+      return this.backendRequest<void>('/api/sync/settings', {
+        method: 'PUT',
+        body: JSON.stringify(settings),
+      });
+    }
     return this.request<void>('/api/v1/sync/settings', {
       method: 'PUT',
       body: JSON.stringify(settings),

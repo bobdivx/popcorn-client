@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import { RefreshCw } from 'lucide-preact';
 import type { Indexer } from '../../lib/client/types';
@@ -58,6 +58,11 @@ export default function TorrentSyncManager() {
   const [filmsQueriesText, setFilmsQueriesText] = useState('');
   const [seriesQueriesText, setSeriesQueriesText] = useState('');
 
+  // Évite les appels concurrents (polling + clics) et réduit les boucles de logs
+  const loadStatusInFlight = useRef(false);
+  const loadIndexersInFlight = useRef(false);
+  const lastLoggedSettingsKey = useRef<string>('');
+
   useEffect(() => {
     loadStatus();
     loadIndexers();
@@ -69,8 +74,10 @@ export default function TorrentSyncManager() {
     if (!s) return;
     const films = Array.isArray(s.sync_queries_films) ? s.sync_queries_films : [];
     const series = Array.isArray(s.sync_queries_series) ? s.sync_queries_series : [];
-    setFilmsQueriesText(films.join('\n'));
-    setSeriesQueriesText(series.join('\n'));
+    const filmsText = films.join('\n');
+    const seriesText = series.join('\n');
+    setFilmsQueriesText((prev) => (prev === filmsText ? prev : filmsText));
+    setSeriesQueriesText((prev) => (prev === seriesText ? prev : seriesText));
   }, [status?.settings]);
 
   // Timer pour le temps écoulé
@@ -126,7 +133,6 @@ export default function TorrentSyncManager() {
       // Rafraîchir toutes les 2 secondes pendant la sync
       const interval = setInterval(() => {
         loadStatus();
-        loadIndexers();
       }, 2000);
       return () => clearInterval(interval);
     } else {
@@ -223,11 +229,9 @@ export default function TorrentSyncManager() {
   };
 
   const loadIndexers = async () => {
+    if (loadIndexersInFlight.current) return;
+    loadIndexersInFlight.current = true;
     try {
-      // D'abord, synchroniser les indexers activés vers le backend Rust
-      await syncIndexersToBackend();
-      
-      // Ensuite, charger les indexers depuis l'API
       const response = await serverApi.getIndexers();
       if (response.success && response.data) {
         setIndexers(response.data.filter((idx: Indexer) => idx.isEnabled === true));
@@ -235,13 +239,14 @@ export default function TorrentSyncManager() {
     } catch (err) {
       console.error('Erreur lors du chargement des indexers:', err);
       // Ne pas bloquer si on ne peut pas charger les indexers
+    } finally {
+      loadIndexersInFlight.current = false;
     }
   };
 
   const loadStatus = async () => {
-    // #region agent log
-    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TorrentSyncManager.tsx:219',message:'loadStatus start',data:{hasStatus:!!status,loading},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
+    if (loadStatusInFlight.current) return;
+    loadStatusInFlight.current = true;
     
     try {
       // Ne pas mettre loading à true si on a déjà un statut (pour ne pas bloquer l'interface)
@@ -266,16 +271,9 @@ export default function TorrentSyncManager() {
       }
       setError('');
       
-      // #region agent log
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TorrentSyncManager.tsx:240',message:'loadStatus - calling API',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
-      
       // Ajouter un timeout côté client pour éviter de bloquer trop longtemps
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
-          // #region agent log
-          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TorrentSyncManager.tsx:245',message:'loadStatus - timeout triggered',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-          // #endregion
           reject(new Error('Timeout'));
         }, 3000); // Réduire à 3 secondes pour être plus réactif
       });
@@ -284,10 +282,6 @@ export default function TorrentSyncManager() {
         serverApi.getSyncStatus(),
         timeoutPromise,
       ]) as any;
-      
-      // #region agent log
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TorrentSyncManager.tsx:252',message:'loadStatus - response received',data:{success:response?.success,hasData:!!response?.data,error:response?.error},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
       
       if (response.success && response.data) {
         const newStats = response.data.stats || {};
@@ -304,11 +298,19 @@ export default function TorrentSyncManager() {
             max_torrents_per_category: 1000,
           };
         } else {
-          console.log('[TORRENT SYNC MANAGER] ✅ Settings récupérés:', {
+          const settingsKey = JSON.stringify({
             sync_frequency_minutes: response.data.settings.sync_frequency_minutes,
             is_enabled: response.data.settings.is_enabled,
             max_torrents_per_category: response.data.settings.max_torrents_per_category,
           });
+          if (lastLoggedSettingsKey.current !== settingsKey) {
+            console.log('[TORRENT SYNC MANAGER] ✅ Settings récupérés:', {
+              sync_frequency_minutes: response.data.settings.sync_frequency_minutes,
+              is_enabled: response.data.settings.is_enabled,
+              max_torrents_per_category: response.data.settings.max_torrents_per_category,
+            });
+            lastLoggedSettingsKey.current = settingsKey;
+          }
         }
         
         // Initialiser previousStats si c'est le début d'une sync
@@ -390,10 +392,6 @@ export default function TorrentSyncManager() {
         }
       }
     } catch (err) {
-      // #region agent log
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TorrentSyncManager.tsx:337',message:'loadStatus - exception',data:{error:err instanceof Error ? err.message : String(err),errorName:err instanceof Error ? err.name : 'unknown'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
-      
       console.error('Erreur lors du chargement du statut:', err);
       const errorMsg = err instanceof Error ? err.message : 'Erreur lors du chargement du statut';
       
@@ -440,9 +438,7 @@ export default function TorrentSyncManager() {
     } finally {
       // Toujours mettre loading à false pour débloquer l'interface
       setLoading(false);
-      // #region agent log
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'TorrentSyncManager.tsx:375',message:'loadStatus - finally, loading set to false',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
+      loadStatusInFlight.current = false;
     }
   };
 

@@ -53,6 +53,34 @@ function Get-ExpectedAndroidJavaDir {
     }
 }
 
+function Ensure-AndroidCleartextTrafficEnabled {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$AndroidAppGradlePath
+    )
+
+    if (-not (Test-Path $AndroidAppGradlePath)) {
+        Write-Host "  [WARN] build.gradle.kts introuvable: $AndroidAppGradlePath" -ForegroundColor Yellow
+        return
+    }
+
+    try {
+        $content = Get-Content $AndroidAppGradlePath -Raw
+        # Tauri Android utilise un placeholder manifestPlaceholders["usesCleartextTraffic"].
+        # En release, par défaut c'est souvent "false" => HTTP bloqué (Android 9+).
+        $updated = $content -replace 'manifestPlaceholders\["usesCleartextTraffic"\]\s*=\s*"false"', 'manifestPlaceholders["usesCleartextTraffic"] = "true"'
+
+        if ($updated -ne $content) {
+            Set-Content -Path $AndroidAppGradlePath -Value $updated -Encoding UTF8
+            Write-Host "  [OK] Cleartext HTTP activé (release) dans build.gradle.kts" -ForegroundColor Green
+        } else {
+            Write-Host "  [OK] Cleartext HTTP déjà activé (ou pattern non trouvé)" -ForegroundColor Green
+        }
+    } catch {
+        Write-Host "  [WARN] Impossible de patcher usesCleartextTraffic: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
 # Détection automatique des chemins sur D:\ si les variables ne sont pas configurées
 if (-not $env:JAVA_HOME -or -not (Test-Path $env:JAVA_HOME)) {
     $dJava = "D:\Android Studio\jbr"
@@ -314,6 +342,12 @@ if ($needsInit) {
     }
 }
 
+# Important: en release Android, HTTP est bloqué si usesCleartextTraffic=false.
+# Comme le setup utilise souvent un backend en LAN (http://ip:3000), on l'active ici
+# après init/régénération du projet Android et avant le build.
+$androidAppGradle = Join-Path $projectRoot "src-tauri\gen\android\app\build.gradle.kts"
+Ensure-AndroidCleartextTrafficEnabled -AndroidAppGradlePath $androidAppGradle
+
 # Déterminer la commande de build
 Set-Location (Join-Path $PSScriptRoot "..")
 
@@ -426,6 +460,87 @@ try {
             Write-Host "[ERREUR] Aucun APK n'a ete trouve apres le build." -ForegroundColor Red
             exit 1
         }
+
+        function Get-LatestBuildToolsDir {
+            param([string]$AndroidHome)
+            if (-not $AndroidHome) { return $null }
+            $btRoot = Join-Path $AndroidHome "build-tools"
+            if (-not (Test-Path $btRoot)) { return $null }
+            return (Get-ChildItem $btRoot -Directory | Sort-Object Name -Descending | Select-Object -First 1)
+        }
+
+        function Ensure-DebugKeystore {
+            param([string]$JavaHome)
+            $androidUserDir = Join-Path $env:USERPROFILE ".android"
+            $ksPath = Join-Path $androidUserDir "debug.keystore"
+
+            if (Test-Path $ksPath) { return $ksPath }
+
+            New-Item -ItemType Directory -Force -Path $androidUserDir | Out-Null
+
+            $keytool = "keytool"
+            if ($JavaHome) {
+                $candidate = Join-Path $JavaHome "bin\keytool.exe"
+                if (Test-Path $candidate) { $keytool = $candidate }
+            }
+
+            & $keytool -genkeypair -noprompt `
+                -keystore $ksPath `
+                -storepass "android" `
+                -keypass "android" `
+                -alias "androiddebugkey" `
+                -dname "CN=Android Debug,O=Android,C=US" `
+                -keyalg RSA -keysize 2048 -validity 10000 | Out-Null
+
+            return $ksPath
+        }
+
+        function Sign-ApkIfNeeded {
+            param(
+                [Parameter(Mandatory=$true)][string]$ApkPath,
+                [Parameter(Mandatory=$true)][string]$AndroidHome,
+                [Parameter(Mandatory=$true)][string]$JavaHome
+            )
+
+            $bt = Get-LatestBuildToolsDir -AndroidHome $AndroidHome
+            if (-not $bt) { return $ApkPath }
+
+            $apksigner = Join-Path $bt.FullName "apksigner.bat"
+            $zipalign = Join-Path $bt.FullName "zipalign.exe"
+            if (-not (Test-Path $apksigner) -or -not (Test-Path $zipalign)) { return $ApkPath }
+
+            # Vérifier signature existante
+            # Important: PowerShell peut transformer la sortie d'erreur des exécutables natifs
+            # en "erreur PowerShell" (terminating) quand $ErrorActionPreference = Stop.
+            # On passe donc par cmd.exe pour neutraliser stdout/stderr.
+            $verifyCmd = "`"$apksigner`" verify `"$ApkPath`" >nul 2>nul"
+            & cmd /c $verifyCmd | Out-Null
+            if ($LASTEXITCODE -eq 0) { return $ApkPath }
+
+            $ks = Ensure-DebugKeystore -JavaHome $JavaHome
+            $aligned = [System.IO.Path]::ChangeExtension($ApkPath, ".aligned.apk")
+            $signed = [System.IO.Path]::ChangeExtension($ApkPath, ".signed.apk")
+
+            & $zipalign -f 4 $ApkPath $aligned | Out-Null
+            if ($LASTEXITCODE -ne 0) { return $ApkPath }
+
+            & $apksigner sign `
+                --ks $ks `
+                --ks-key-alias "androiddebugkey" `
+                --ks-pass "pass:android" `
+                --key-pass "pass:android" `
+                --out $signed `
+                $aligned | Out-Null
+            if ($LASTEXITCODE -ne 0) { return $ApkPath }
+
+            $verifySignedCmd = "`"$apksigner`" verify `"$signed`" >nul 2>nul"
+            & cmd /c $verifySignedCmd | Out-Null
+            if ($LASTEXITCODE -eq 0) { return $signed }
+
+            return $ApkPath
+        }
+
+        $apk = Get-Item (Sign-ApkIfNeeded -ApkPath $apk.FullName -AndroidHome $env:ANDROID_HOME -JavaHome $env:JAVA_HOME)
 
         Write-Host "[APK] APK genere:" -ForegroundColor Cyan
         Write-Host "   $($apk.FullName)" -ForegroundColor White

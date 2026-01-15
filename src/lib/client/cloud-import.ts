@@ -111,9 +111,15 @@ class CloudImportManagerImpl {
         // TMDB
         if (savedConfig.tmdbApiKey) {
           this.setStatus({ message: 'Import clé TMDB…' });
-          const res = await serverApi.saveTmdbKey(savedConfig.tmdbApiKey);
-          if (!res.success) {
-            throw new Error(res.message || res.error || 'Erreur import clé TMDB');
+          try {
+            const res = await serverApi.saveTmdbKey(savedConfig.tmdbApiKey);
+            // Sur certaines plateformes (ex: Android) la clé TMDB peut être liée à un user_id backend
+            // et donc impossible à restaurer automatiquement. Dans ce cas, on n'échoue pas l'import complet.
+            if (!res.success) {
+              console.warn('[CLOUD IMPORT] ⚠️ Import TMDB ignoré:', res.message || res.error);
+            }
+          } catch (e) {
+            console.warn('[CLOUD IMPORT] ⚠️ Import TMDB ignoré (exception):', e);
           }
           this.setStatus({ done: this.status.done + 1 });
         }
