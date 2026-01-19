@@ -156,6 +156,14 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "Generated tag: $TAG"
 
+      - name: Create Git tag
+        if: startsWith(github.ref, 'refs/heads/')
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -f ${{ steps.release-tag.outputs.tag }} || git tag ${{ steps.release-tag.outputs.tag }}
+          git push origin ${{ steps.release-tag.outputs.tag }} || echo "Tag already exists or push failed"
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
