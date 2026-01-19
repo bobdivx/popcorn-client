@@ -60,12 +60,46 @@ function Update-VersionBuild {
         $content = Get-Content $VERSION_FILE -Raw | ConvertFrom-Json
         
         if ($Component -eq "client") {
+            # Incrémenter la version patch (1.0.1 -> 1.0.2) à chaque build
+            $parts = $content.client.version -split '\.'
+            $major = [int]$parts[0]
+            $minor = [int]$parts[1]
+            $patch = [int]$parts[2]
+            $patch = $patch + 1
+            if ($patch -ge 100) {
+                $patch = 0
+                $minor = $minor + 1
+            }
+            if ($minor -ge 100) {
+                $minor = 0
+                $major = $major + 1
+            }
+            $content.client.version = "$major.$minor.$patch"
+            
+            # Incrémenter le build aussi
             if ($IncrementBuild) {
                 $content.client.build = [int]$content.client.build + 1
             }
             $version = $content.client.version
             $build = $content.client.build
         } elseif ($Component -eq "server") {
+            # Incrémenter la version patch (1.0.1 -> 1.0.2) à chaque build
+            $parts = $content.server.version -split '\.'
+            $major = [int]$parts[0]
+            $minor = [int]$parts[1]
+            $patch = [int]$parts[2]
+            $patch = $patch + 1
+            if ($patch -ge 100) {
+                $patch = 0
+                $minor = $minor + 1
+            }
+            if ($minor -ge 100) {
+                $minor = 0
+                $major = $major + 1
+            }
+            $content.server.version = "$major.$minor.$patch"
+            
+            # Incrémenter le build aussi
             if ($IncrementBuild) {
                 $content.server.build = [int]$content.server.build + 1
             }

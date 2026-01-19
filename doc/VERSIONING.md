@@ -31,9 +31,9 @@ Même structure que le client.
 ## Incrémentation automatique
 
 ### À chaque build Android
-- Le numéro de **build** est automatiquement incrémenté
-- La version principale (X.Y.Z) reste la même
-- Format dans l'APK : `1.0.1` (version) avec `versionCode: 1` (build)
+- La version **patch** (X.Y.Z) est automatiquement incrémentée : `1.0.1` → `1.0.2` → `1.0.3`...
+- Le numéro de **build** est aussi automatiquement incrémenté : `1` → `2` → `3`...
+- Format dans l'APK : `1.0.2` (version) avec `versionCode: 2` (build)
 
 ### Incrémentation manuelle de la version
 Pour incrémenter la version principale (X.Y.Z), utilisez :

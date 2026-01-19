@@ -608,8 +608,154 @@ try {
             exit 1
         }
         
-        # Signer si nécessaire (fonction simplifiée)
-        # ... (logique de signature à conserver du script original si nécessaire)
+        Write-Info "APK trouvé: $($apk.FullName)"
+        Write-Info "Taille: $([math]::Round($apk.Length / 1MB, 2)) MB"
+        if ($apk.Name -like "*unsigned*") {
+            Write-Warn "APK non signé détecté, signature en cours..."
+        }
+        
+        # Fonctions de signature
+        function Get-LatestBuildToolsDir {
+            param([string]$AndroidHome)
+            if (-not $AndroidHome) { return $null }
+            $btRoot = Join-Path $AndroidHome "build-tools"
+            if (-not (Test-Path $btRoot)) { return $null }
+            return (Get-ChildItem $btRoot -Directory | Sort-Object Name -Descending | Select-Object -First 1)
+        }
+
+        function Ensure-DebugKeystore {
+            param([string]$JavaHome)
+            $androidUserDir = Join-Path $env:USERPROFILE ".android"
+            $ksPath = Join-Path $androidUserDir "debug.keystore"
+
+            if (Test-Path $ksPath) { return $ksPath }
+
+            New-Item -ItemType Directory -Force -Path $androidUserDir | Out-Null
+
+            $keytool = "keytool"
+            if ($JavaHome) {
+                $candidate = Join-Path $JavaHome "bin\keytool.exe"
+                if (Test-Path $candidate) { $keytool = $candidate }
+            }
+
+            & $keytool -genkeypair -noprompt `
+                -keystore $ksPath `
+                -storepass "android" `
+                -keypass "android" `
+                -alias "androiddebugkey" `
+                -dname "CN=Android Debug,O=Android,C=US" `
+                -keyalg RSA -keysize 2048 -validity 10000 | Out-Null
+
+            return $ksPath
+        }
+
+        function Sign-ApkIfNeeded {
+            param(
+                [Parameter(Mandatory=$true)][string]$ApkPath,
+                [Parameter(Mandatory=$true)][string]$AndroidHome,
+                [Parameter(Mandatory=$true)][string]$JavaHome
+            )
+
+            $bt = Get-LatestBuildToolsDir -AndroidHome $AndroidHome
+            if (-not $bt) { 
+                Write-Warn "build-tools introuvable, signature ignorée"
+                return $ApkPath 
+            }
+
+            $apksigner = Join-Path $bt.FullName "apksigner.bat"
+            $zipalign = Join-Path $bt.FullName "zipalign.exe"
+            if (-not (Test-Path $apksigner) -or -not (Test-Path $zipalign)) { 
+                Write-Warn "apksigner/zipalign introuvables, signature ignorée"
+                return $ApkPath 
+            }
+
+            # Vérifier signature existante
+            $verifyCmd = "`"$apksigner`" verify `"$ApkPath`" >nul 2>nul"
+            & cmd /c $verifyCmd | Out-Null
+            $isSigned = $LASTEXITCODE -eq 0
+
+            # Vérifier aussi par le nom du fichier
+            $isUnsignedByName = $ApkPath -like "*unsigned*"
+            
+            # TOUJOURS re-signer l'APK pour garantir qu'il est valide et correctement signé
+            if ($isUnsignedByName -or -not $isSigned) {
+                Write-Info "APK non signé détecté, signature en cours..."
+            } else {
+                Write-Info "Re-signature de l'APK pour garantir la validité..."
+            }
+
+            $ks = Ensure-DebugKeystore -JavaHome $JavaHome
+            $aligned = [System.IO.Path]::ChangeExtension($ApkPath, ".aligned.apk")
+            $signed = [System.IO.Path]::ChangeExtension($ApkPath, ".signed.apk")
+
+            # Aligner l'APK
+            & $zipalign -f 4 $ApkPath $aligned 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { 
+                Write-Err "Échec de l'alignement"
+                return $ApkPath 
+            }
+
+            # Vérifier l'alignement
+            $checkAlignedCmd = "`"$zipalign`" -c 4 `"$aligned`" >nul 2>nul"
+            & cmd /c $checkAlignedCmd | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Err "L'APK aligné n'est pas correctement aligné"
+                Remove-Item $aligned -Force -ErrorAction SilentlyContinue
+                return $ApkPath
+            }
+
+            # Signer l'APK aligné
+            & $apksigner sign `
+                --ks $ks `
+                --ks-key-alias "androiddebugkey" `
+                --ks-pass "pass:android" `
+                --key-pass "pass:android" `
+                --out $signed `
+                $aligned 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { 
+                Write-Err "Échec de la signature"
+                Remove-Item $aligned -Force -ErrorAction SilentlyContinue
+                return $ApkPath 
+            }
+
+            # Vérifier la signature finale
+            $verifySignedCmd = "`"$apksigner`" verify `"$signed`" >nul 2>nul"
+            & cmd /c $verifySignedCmd | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                # Nettoyer le fichier temporaire aligné
+                Remove-Item $aligned -Force -ErrorAction SilentlyContinue
+                Write-Ok "APK signé et aligné avec succès"
+                return $signed
+            } else {
+                Write-Err "La signature n'a pas pu être vérifiée"
+                Remove-Item $aligned -Force -ErrorAction SilentlyContinue
+                Remove-Item $signed -Force -ErrorAction SilentlyContinue
+                return $ApkPath
+            }
+        }
+        
+        # Signer l'APK (TOUJOURS, pour garantir qu'il est valide et correctement signé)
+        Write-Section "Signature de l'APK"
+        $androidHome = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($script:AndroidHome) { $script:AndroidHome } else { $null }
+        $javaHome = if ($env:JAVA_HOME) { $env:JAVA_HOME } elseif ($script:JavaHome) { $script:JavaHome } else { $null }
+        $signedApkPath = Sign-ApkIfNeeded -ApkPath $apk.FullName -AndroidHome $androidHome -JavaHome $javaHome
+        $apk = Get-Item $signedApkPath
+        
+        # Vérification finale obligatoire : l'APK DOIT être signé
+        $bt = Get-LatestBuildToolsDir -AndroidHome $androidHome
+        if ($bt) {
+            $apksigner = Join-Path $bt.FullName "apksigner.bat"
+            if (Test-Path $apksigner) {
+                $finalVerifyCmd = "`"$apksigner`" verify `"$($apk.FullName)`" >nul 2>nul"
+                & cmd /c $finalVerifyCmd | Out-Null
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Err "L'APK final n'est pas signé!"
+                    Write-Err "Le build ne peut pas continuer sans un APK signé."
+                    exit 1
+                }
+                Write-Ok "APK final vérifié: signature valide"
+            }
+        }
         
         # Copier dans popcorn-web/app
         $info = Get-ProductInfoForVariant -Variant $buildType

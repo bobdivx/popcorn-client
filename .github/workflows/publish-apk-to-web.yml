@@ -204,29 +204,30 @@ jobs:
           echo "📝 Préparation du commit..."
           git add apk/
           
-          # Créer un message de commit descriptif
-          COMMIT_MSG="📦 Mise à jour des APK Android"
+          # Créer un message de commit descriptif avec heredoc
+          cat > /tmp/commit_msg.txt << 'EOF'
+          📦 Mise à jour des APK Android
+          EOF
           
           # Ajouter les noms des APK
           for apk in apk/*.apk; do
             if [ -f "$apk" ]; then
               APK_NAME=$(basename "$apk")
-              COMMIT_MSG="$COMMIT_MSG
-
-- $APK_NAME"
+              echo "" >> /tmp/commit_msg.txt
+              echo "- $APK_NAME" >> /tmp/commit_msg.txt
             fi
           done
           
-          COMMIT_MSG="$COMMIT_MSG
-
-Build: ${{ github.event.workflow_run.id }}
-Workflow: ${{ github.event.workflow_run.name }}
-Commit: ${{ github.event.workflow_run.head_sha }}"
+          # Ajouter les métadonnées
+          echo "" >> /tmp/commit_msg.txt
+          echo "Build: ${{ github.event.workflow_run.id }}" >> /tmp/commit_msg.txt
+          echo "Workflow: ${{ github.event.workflow_run.name }}" >> /tmp/commit_msg.txt
+          echo "Commit: ${{ github.event.workflow_run.head_sha }}" >> /tmp/commit_msg.txt
           
           echo "💾 Commit:"
-          echo "$COMMIT_MSG"
+          cat /tmp/commit_msg.txt
           
-          git commit -m "$COMMIT_MSG" || echo "Aucun changement à commiter"
+          git commit -F /tmp/commit_msg.txt || echo "Aucun changement à commiter"
           git push origin main || git push origin master || echo "Push échoué ou déjà à jour"
 
       - name: Display summary
