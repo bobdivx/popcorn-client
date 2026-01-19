@@ -265,17 +265,109 @@ jobs:
             echo "⚠️  APK non aligné (non bloquant mais recommandé)"
           fi
 
+      - name: Rename APK with correct format
+        id: rename-apk
+        run: |
+          APK_PATH="${{ steps.find-apk.outputs.path }}"
+          
+          # Vérifier que l'APK est bien signé avant de le renommer
+          BUILD_TOOLS=$(find $ANDROID_HOME/build-tools -maxdepth 1 -type d | sort -V | tail -n 1)
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          
+          if [ -f "$APKSIGNER" ]; then
+            if ! $APKSIGNER verify "$APK_PATH" > /dev/null 2>&1; then
+              echo "❌ ERREUR: L'APK n'est pas signé avant le renommage!"
+              echo "   Chemin: $APK_PATH"
+              exit 1
+            fi
+            echo "✅ APK vérifié: signature valide"
+          fi
+          
+          # Lire la version depuis tauri.android.conf.json
+          PRODUCT_NAME=$(jq -r '.productName' src-tauri/tauri.android.conf.json)
+          VERSION=$(jq -r '.version' src-tauri/tauri.android.conf.json)
+          
+          # Nettoyer le nom (remplacer les espaces par des underscores)
+          SAFE_NAME=$(echo "$PRODUCT_NAME" | sed 's/ /_/g')
+          
+          # Nouveau nom: Popcorn_TV-v1.0.1.apk (sans -android-tv)
+          NEW_APK_NAME="${SAFE_NAME}-v${VERSION}.apk"
+          
+          # Créer un dossier temporaire pour le fichier final avec le bon nom
+          FINAL_APK_DIR="./release-apk"
+          mkdir -p "$FINAL_APK_DIR"
+          NEW_APK_PATH="$FINAL_APK_DIR/$NEW_APK_NAME"
+          
+          echo "📝 Copie de l'APK signé avec le nouveau nom..."
+          echo "   Ancien: $(basename "$APK_PATH")"
+          echo "   Nouveau: $NEW_APK_NAME"
+          
+          # Copier (pas renommer) pour garder l'original si nécessaire
+          cp "$APK_PATH" "$NEW_APK_PATH"
+          
+          # Vérifier que la copie est bien signée
+          if [ -f "$APKSIGNER" ]; then
+            if $APKSIGNER verify "$NEW_APK_PATH" > /dev/null 2>&1; then
+              echo "✅ APK copié et vérifié: signature valide"
+            else
+              echo "❌ ERREUR: L'APK copié n'est pas signé!"
+              exit 1
+            fi
+          fi
+          
+          echo "path=$NEW_APK_PATH" >> $GITHUB_OUTPUT
+          echo "name=$NEW_APK_NAME" >> $GITHUB_OUTPUT
+          echo "✅ APK prêt pour upload: $NEW_APK_NAME"
+
+      - name: Verify final APK before upload
+        run: |
+          APK_PATH="${{ steps.rename-apk.outputs.path }}"
+          APK_NAME="${{ steps.rename-apk.outputs.name }}"
+          
+          echo "🔍 Vérification finale de l'APK avant upload..."
+          echo "   Chemin: $APK_PATH"
+          echo "   Nom: $APK_NAME"
+          
+          if [ ! -f "$APK_PATH" ]; then
+            echo "❌ ERREUR: L'APK n'existe pas: $APK_PATH"
+            exit 1
+          fi
+          
+          # Vérifier que le nom ne contient pas "unsigned"
+          if echo "$APK_NAME" | grep -qi "unsigned"; then
+            echo "❌ ERREUR: Le nom de l'APK contient 'unsigned': $APK_NAME"
+            exit 1
+          fi
+          
+          # Vérifier la signature
+          BUILD_TOOLS=$(find $ANDROID_HOME/build-tools -maxdepth 1 -type d | sort -V | tail -n 1)
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          
+          if [ -f "$APKSIGNER" ]; then
+            if $APKSIGNER verify "$APK_PATH" > /dev/null 2>&1; then
+              echo "✅ APK signé et prêt pour l'upload"
+              $APKSIGNER verify --print-certs "$APK_PATH" | head -n 3
+            else
+              echo "❌ ERREUR: L'APK final n'est pas signé!"
+              exit 1
+            fi
+          else
+            echo "⚠️  apksigner introuvable, vérification de signature ignorée"
+          fi
+          
+          echo "✅ APK validé: $APK_NAME"
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: popcorn-android-tv
-          path: ${{ steps.find-apk.outputs.path }}
+          path: ${{ steps.rename-apk.outputs.path }}
           retention-days: 30
           if-no-files-found: error
 
       - name: Display APK info
         run: |
-          APK_PATH="${{ steps.find-apk.outputs.path }}"
+          APK_PATH="${{ steps.rename-apk.outputs.path }}"
           echo "📦 Informations sur l'APK:"
           echo "   Chemin: $APK_PATH"
           echo "   Taille: $(du -h "$APK_PATH" | cut -f1)"
@@ -304,6 +396,51 @@ jobs:
           git tag -f ${{ steps.release-tag.outputs.tag }} || git tag ${{ steps.release-tag.outputs.tag }}
           git push origin ${{ steps.release-tag.outputs.tag }} || echo "Tag already exists or push failed"
 
+      - name: Verify APK before release upload
+        run: |
+          APK_PATH="${{ steps.rename-apk.outputs.path }}"
+          APK_NAME="${{ steps.rename-apk.outputs.name }}"
+          
+          echo "🔍 Vérification finale avant upload dans la release..."
+          echo "   Chemin: $APK_PATH"
+          echo "   Nom attendu: $APK_NAME"
+          
+          if [ ! -f "$APK_PATH" ]; then
+            echo "❌ ERREUR CRITIQUE: L'APK n'existe pas: $APK_PATH"
+            exit 1
+          fi
+          
+          # Vérifier que le nom du fichier correspond
+          ACTUAL_NAME=$(basename "$APK_PATH")
+          if [ "$ACTUAL_NAME" != "$APK_NAME" ]; then
+            echo "❌ ERREUR: Le nom du fichier ne correspond pas!"
+            echo "   Attendu: $APK_NAME"
+            echo "   Trouvé: $ACTUAL_NAME"
+            exit 1
+          fi
+          
+          # Vérifier que le nom ne contient pas "unsigned"
+          if echo "$ACTUAL_NAME" | grep -qi "unsigned"; then
+            echo "❌ ERREUR CRITIQUE: Le nom de l'APK contient 'unsigned': $ACTUAL_NAME"
+            exit 1
+          fi
+          
+          # Vérifier la signature une dernière fois
+          BUILD_TOOLS=$(find $ANDROID_HOME/build-tools -maxdepth 1 -type d | sort -V | tail -n 1)
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          
+          if [ -f "$APKSIGNER" ]; then
+            if $APKSIGNER verify "$APK_PATH" > /dev/null 2>&1; then
+              echo "✅ APK signé et validé: $ACTUAL_NAME"
+              echo "   Taille: $(du -h "$APK_PATH" | cut -f1)"
+            else
+              echo "❌ ERREUR CRITIQUE: L'APK n'est pas signé!"
+              exit 1
+            fi
+          fi
+          
+          echo "✅ APK prêt pour la release: $ACTUAL_NAME"
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -319,6 +456,8 @@ jobs:
             ### 📥 Téléchargement
             
             **Téléchargez l'APK ci-dessous** ⬇️
+            
+            **Nom du fichier:** ${{ steps.rename-apk.outputs.name }}
             
             ### 📺 Installation
             
@@ -337,7 +476,7 @@ jobs:
             ### 🔍 Autres emplacements
             
             L'APK est également disponible dans les **Artifacts** de ce workflow (onglet Actions).
-          files: ${{ steps.find-apk.outputs.path }}
+          files: ${{ steps.rename-apk.outputs.path }}
           draft: false
           prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         env:

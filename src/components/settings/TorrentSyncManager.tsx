@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import { RefreshCw } from 'lucide-preact';
 import type { Indexer } from '../../lib/client/types';
+import { useNativeNotifications } from '../../hooks/useNativeNotifications';
 
 interface SyncSettings {
   sync_frequency_minutes: number;
@@ -57,6 +58,14 @@ export default function TorrentSyncManager() {
   const [syncStartTime, setSyncStartTime] = useState<number | null>(null);
   const [filmsQueriesText, setFilmsQueriesText] = useState('');
   const [seriesQueriesText, setSeriesQueriesText] = useState('');
+
+  // Hook pour les notifications natives
+  const {
+    notifySyncStart,
+    notifySyncProgress,
+    notifySyncError,
+    notifySyncComplete,
+  } = useNativeNotifications();
 
   // Évite les appels concurrents (polling + clics) et réduit les boucles de logs
   const loadStatusInFlight = useRef(false);
@@ -337,8 +346,23 @@ export default function TorrentSyncManager() {
         const isNowInProgress = response.data.sync_in_progress;
         
         if (wasInProgress && !isNowInProgress) {
+          // Notification native de complétion
+          const totalAdded = Object.values(newStats).reduce((sum, count) => sum + (count || 0), 0);
+          const previousTotal = Object.values(previousStats).reduce((sum, count) => sum + (count || 0), 0);
+          const newTorrents = totalAdded - previousTotal;
+          if (newTorrents > 0) {
+            notifySyncComplete(newTorrents).catch(console.error);
+          }
           loadIndexers();
           setAnimatedCounts({});
+        }
+
+        // Notification de progression (toutes les 10-20 torrents)
+        if (isNowInProgress && response.data.progress) {
+          const totalProcessed = response.data.progress.total_processed || 0;
+          if (totalProcessed > 0 && totalProcessed % 15 === 0) {
+            notifySyncProgress(totalProcessed).catch(console.error);
+          }
         }
         
         setStatus(response.data);
@@ -456,6 +480,8 @@ export default function TorrentSyncManager() {
       
       if (response.success) {
         setSuccess('Synchronisation démarrée avec succès');
+        // Notification native de démarrage
+        await notifySyncStart();
         setPreviousStats({});
         setTimeout(() => {
           loadStatus();
@@ -472,10 +498,15 @@ export default function TorrentSyncManager() {
           }
         }
         setError(errorMessage);
+        // Notification native d'erreur
+        await notifySyncError(errorMessage);
       }
     } catch (err) {
       console.error('Erreur lors du démarrage de la synchronisation:', err);
-      setError(err instanceof Error ? err.message : 'Erreur lors du démarrage de la synchronisation');
+      const errorMsg = err instanceof Error ? err.message : 'Erreur lors du démarrage de la synchronisation';
+      setError(errorMsg);
+      // Notification native d'erreur
+      await notifySyncError(errorMsg);
     } finally {
       setSyncing(false);
     }

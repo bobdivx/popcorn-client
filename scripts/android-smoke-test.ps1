@@ -44,7 +44,7 @@ if (-not (Get-Command adb -ErrorAction SilentlyContinue)) {
   Fail "adb introuvable dans PATH. Installe Android platform-tools ou ajoute-les au PATH."
 }
 
-$apkNamePattern = if ($Variant -eq "tv") { "Popcorn_TV-v*-android-tv*.apk" } else { "Popcorn_Mobile-v*-android-mobile*.apk" }
+$apkNamePattern = if ($Variant -eq "tv") { "Popcorn_TV-v*.apk" } else { "Popcorn_Mobile-v*.apk" }
 $apkDir = Resolve-Path (Join-Path $projectRoot "..\popcorn-web\app") -ErrorAction SilentlyContinue
 if (-not $apkDir) { Fail "Impossible de trouver popcorn-web/app à côté de popcorn-client" }
 

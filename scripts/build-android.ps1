@@ -380,7 +380,7 @@ function Clean-PopcornWebApkArtifactsForVariant {
     }
 
     # Supprimer toutes les anciennes versions pour cette variante (apk + artefacts)
-    $pattern = "$safeName-v*-android-$variantTag*.apk*"
+    $pattern = "$safeName-v*.apk*"
     $toDelete = Get-ChildItem -Path $appDir -File -ErrorAction SilentlyContinue | Where-Object {
         $_.Name -like $pattern
     }
@@ -1050,7 +1050,7 @@ try {
             $appDir = Join-Path $destDir "app"
             New-Item -ItemType Directory -Force -Path $appDir | Out-Null
 
-            $destFile = Join-Path $appDir "$safeName-v$safeVersion-android-$variantTag.apk"
+            $destFile = Join-Path $appDir "$safeName-v$safeVersion.apk"
             
             # Vérifier que l'APK est bien signé avant de le copier
             $bt = Get-LatestBuildToolsDir -AndroidHome $env:ANDROID_HOME

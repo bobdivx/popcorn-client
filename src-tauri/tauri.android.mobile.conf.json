@@ -1,6 +1,6 @@
 ﻿{
     "productName":  "Popcorn Mobile",
-    "version": "1.0.1",
+    "version": "1.0.5",
     "identifier":  "com.popcorn.client.mobile",
     "build":  {
                   "beforeDevCommand":  "npm run dev",
@@ -21,7 +21,7 @@
                 "withGlobalTauri":  true,
                 "security":  {
                                  "csp":  null,
-                                 "capabilities":  ["main"]
+                                 "capabilities":  ["main", "mobile"]
                              }
             },
     "bundle":  {
@@ -41,7 +41,7 @@
                    "shortDescription":  "Client l\u00e9ger Popcorn pour Android Mobile",
                    "longDescription":  "Client l\u00e9ger pour Android Mobile - se connecte au serveur Popcorn distant",
                    "android":  {
-                                   "versionCode": 2,
+                                   "versionCode": 5,
                                    "autoIncrementVersionCode":  false
                                }
                },

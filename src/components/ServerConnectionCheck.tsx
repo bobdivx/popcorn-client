@@ -7,6 +7,7 @@
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
 import { hasBackendUrl } from '../lib/backend-config.js';
+import { updateChecker } from '../lib/services/update-checker.js';
 
 type ConnectionStatus = 'checking' | 'connecting' | 'connected' | 'error';
 
@@ -38,6 +39,11 @@ export default function ServerConnectionCheck() {
   }, []);
 
   useEffect(() => {
+    // Vérifier les mises à jour au démarrage (non-bloquant)
+    updateChecker.checkAndNotify().catch((error) => {
+      console.error('[ServerConnectionCheck] Erreur lors de la vérification des mises à jour:', error);
+    });
+
     // Ne pas bloquer l'accès aux pages de configuration
     const currentPath = window.location.pathname;
     const allowedPaths = [SERVER_SETTINGS_PATH, AUDIT_PATH, '/setup', '/disclaimer', DIAG_PATH];

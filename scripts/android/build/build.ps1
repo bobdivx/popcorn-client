@@ -70,7 +70,7 @@ function Clean-PopcornWebApkArtifacts {
     if (-not $destDir) { return }
     $appDir = Join-Path $destDir "app"
     if (-not (Test-Path $appDir)) { return }
-    $pattern = "$safeName-v*-android-$variantTag*.apk*"
+    $pattern = "$safeName-v*.apk*"
     $toDelete = Get-ChildItem -Path $appDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like $pattern }
     if ($toDelete -and $toDelete.Count -gt 0) {
         Write-Info "Nettoyage de $($toDelete.Count) ancien(s) APK(s) dans popcorn-web/app"
@@ -761,13 +761,12 @@ try {
         $info = Get-ProductInfoForVariant -Variant $buildType
         $safeName = Sanitize-FileName -Name $info.ProductName
         $safeVersion = Sanitize-FileName -Name $info.Version
-        $variantTag = Sanitize-FileName -Name $buildType
         
         $destDir = Resolve-Path (Join-Path $script:ProjectRoot "..\popcorn-web") -ErrorAction SilentlyContinue
         if ($destDir) {
             $appDir = Join-Path $destDir "app"
             New-Item -ItemType Directory -Force -Path $appDir | Out-Null
-            $destFile = Join-Path $appDir "$safeName-v$safeVersion-android-$variantTag.apk"
+            $destFile = Join-Path $appDir "$safeName-v$safeVersion.apk"
             Copy-Item -Path $apk.FullName -Destination $destFile -Force
             Write-Ok "APK copié dans: $destFile"
             Write-Info "Taille: $([math]::Round((Get-Item $destFile).Length / 1MB, 2)) MB"

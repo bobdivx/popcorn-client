@@ -26,7 +26,7 @@ function Clean-PopcornWebApkArtifacts {
 
     # On ne supprime que les APK Popcorn (mobile/tv) et artefacts associés (.aligned/.signed/.idsig)
     $toDelete = Get-ChildItem -Path $appDir -File -ErrorAction SilentlyContinue | Where-Object {
-        ($_.Name -like "Popcorn_*-android-*.apk*") -or ($_.Name -like "Popcorn_*-android-*.aab*")
+        ($_.Name -like "Popcorn_*-v*.apk*") -or ($_.Name -like "Popcorn_*-v*.aab*")
     }
 
     if ($toDelete -and $toDelete.Count -gt 0) {
