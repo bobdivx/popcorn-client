@@ -888,11 +888,22 @@ try {
             )
 
             $bt = Get-LatestBuildToolsDir -AndroidHome $AndroidHome
-            if (-not $bt) { return $ApkPath }
+            if (-not $bt) { 
+                Write-Host "  [WARN] build-tools introuvable, signature ignorée" -ForegroundColor Yellow
+                return $ApkPath 
+            }
 
             $apksigner = Join-Path $bt.FullName "apksigner.bat"
             $zipalign = Join-Path $bt.FullName "zipalign.exe"
-            if (-not (Test-Path $apksigner) -or -not (Test-Path $zipalign)) { return $ApkPath }
+            if (-not (Test-Path $apksigner) -or -not (Test-Path $zipalign)) { 
+                Write-Host "  [WARN] apksigner/zipalign introuvables, signature ignorée" -ForegroundColor Yellow
+                return $ApkPath 
+            }
+
+            # Vérifier alignement d'abord (important pour Android)
+            $checkAlignCmd = "`"$zipalign`" -c 4 `"$ApkPath`" >nul 2>nul"
+            & cmd /c $checkAlignCmd | Out-Null
+            $needsAlign = $LASTEXITCODE -ne 0
 
             # Vérifier signature existante
             # Important: PowerShell peut transformer la sortie d'erreur des exécutables natifs
@@ -900,29 +911,65 @@ try {
             # On passe donc par cmd.exe pour neutraliser stdout/stderr.
             $verifyCmd = "`"$apksigner`" verify `"$ApkPath`" >nul 2>nul"
             & cmd /c $verifyCmd | Out-Null
-            if ($LASTEXITCODE -eq 0) { return $ApkPath }
+            $isSigned = $LASTEXITCODE -eq 0
+
+            # Si l'APK est déjà signé ET aligné, on le retourne tel quel
+            if ($isSigned -and -not $needsAlign) {
+                Write-Host "  [OK] APK déjà signé et aligné" -ForegroundColor Green
+                return $ApkPath
+            }
+
+            # On doit re-signer (et potentiellement ré-aligner)
+            Write-Host "  [INFO] Signature/alignement de l'APK..." -ForegroundColor Cyan
 
             $ks = Ensure-DebugKeystore -JavaHome $JavaHome
             $aligned = [System.IO.Path]::ChangeExtension($ApkPath, ".aligned.apk")
             $signed = [System.IO.Path]::ChangeExtension($ApkPath, ".signed.apk")
 
-            & $zipalign -f 4 $ApkPath $aligned | Out-Null
-            if ($LASTEXITCODE -ne 0) { return $ApkPath }
+            # Aligner l'APK (toujours, même s'il est déjà signé, car on va le re-signer)
+            & $zipalign -f 4 $ApkPath $aligned 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { 
+                Write-Host "  [ERREUR] Échec de l'alignement" -ForegroundColor Red
+                return $ApkPath 
+            }
 
+            # Vérifier l'alignement
+            $checkAlignedCmd = "`"$zipalign`" -c 4 `"$aligned`" >nul 2>nul"
+            & cmd /c $checkAlignedCmd | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "  [ERREUR] L'APK aligné n'est pas correctement aligné" -ForegroundColor Red
+                Remove-Item $aligned -Force -ErrorAction SilentlyContinue
+                return $ApkPath
+            }
+
+            # Signer l'APK aligné
             & $apksigner sign `
                 --ks $ks `
                 --ks-key-alias "androiddebugkey" `
                 --ks-pass "pass:android" `
                 --key-pass "pass:android" `
                 --out $signed `
-                $aligned | Out-Null
-            if ($LASTEXITCODE -ne 0) { return $ApkPath }
+                $aligned 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) { 
+                Write-Host "  [ERREUR] Échec de la signature" -ForegroundColor Red
+                Remove-Item $aligned -Force -ErrorAction SilentlyContinue
+                return $ApkPath 
+            }
 
+            # Vérifier la signature finale
             $verifySignedCmd = "`"$apksigner`" verify `"$signed`" >nul 2>nul"
             & cmd /c $verifySignedCmd | Out-Null
-            if ($LASTEXITCODE -eq 0) { return $signed }
-
-            return $ApkPath
+            if ($LASTEXITCODE -eq 0) {
+                # Nettoyer le fichier temporaire aligné
+                Remove-Item $aligned -Force -ErrorAction SilentlyContinue
+                Write-Host "  [OK] APK signé et aligné avec succès" -ForegroundColor Green
+                return $signed
+            } else {
+                Write-Host "  [ERREUR] La signature n'a pas pu être vérifiée" -ForegroundColor Red
+                Remove-Item $aligned -Force -ErrorAction SilentlyContinue
+                Remove-Item $signed -Force -ErrorAction SilentlyContinue
+                return $ApkPath
+            }
         }
 
         $apk = Get-Item (Sign-ApkIfNeeded -ApkPath $apk.FullName -AndroidHome $env:ANDROID_HOME -JavaHome $env:JAVA_HOME)
