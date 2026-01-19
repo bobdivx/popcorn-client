@@ -19,10 +19,28 @@ class NotificationService {
   private channelsInitialized = false;
 
   /**
+   * Vérifie si on est en environnement Tauri
+   */
+  private async isTauriEnvironment(): Promise<boolean> {
+    try {
+      // Vérifier si l'API Tauri est disponible
+      if (typeof window === 'undefined') return false;
+      const { isTauri } = await import('../utils/tauri.js');
+      return isTauri();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Vérifie si les permissions de notification sont accordées
    */
   async checkPermission(): Promise<boolean> {
     try {
+      // Vérifier si on est en Tauri avant d'importer le plugin
+      if (!(await this.isTauriEnvironment())) {
+        return false;
+      }
       const { isPermissionGranted } = await import('@tauri-apps/plugin-notification');
       this.permissionGranted = await isPermissionGranted();
       return this.permissionGranted;
@@ -37,6 +55,10 @@ class NotificationService {
    */
   async requestPermission(): Promise<boolean> {
     try {
+      // Vérifier si on est en Tauri avant d'importer le plugin
+      if (!(await this.isTauriEnvironment())) {
+        return false;
+      }
       const { requestPermission } = await import('@tauri-apps/plugin-notification');
       const permission = await requestPermission();
       this.permissionGranted = permission === 'granted';
@@ -54,6 +76,11 @@ class NotificationService {
     if (this.channelsInitialized) return;
 
     try {
+      // Vérifier si on est en Tauri avant d'importer le plugin
+      if (!(await this.isTauriEnvironment())) {
+        this.channelsInitialized = true;
+        return;
+      }
       const { Channel, ChannelImportance } = await import('@tauri-apps/plugin-notification');
       
       // Canal pour la synchronisation (importance élevée)
@@ -122,6 +149,12 @@ class NotificationService {
     }
 
     try {
+      // Vérifier si on est en Tauri avant d'envoyer la notification
+      if (!(await this.isTauriEnvironment())) {
+        console.log('[NotificationService] Pas en environnement Tauri, notification ignorée');
+        return;
+      }
+
       // S'assurer que les canaux sont initialisés
       await this.initializeChannels();
 
