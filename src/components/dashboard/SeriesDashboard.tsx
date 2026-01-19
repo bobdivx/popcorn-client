@@ -19,24 +19,38 @@ export default function SeriesDashboard() {
     try {
       setLoading(true);
       setError(null);
+      console.log('[SERIES DASHBOARD] Chargement des séries...');
       const response = await serverApi.getSeriesData();
+      
+      console.log('[SERIES DASHBOARD] Réponse reçue:', {
+        success: response.success,
+        hasData: !!response.data,
+        dataLength: Array.isArray(response.data) ? response.data.length : 'N/A',
+        error: response.error,
+        message: response.message,
+      });
       
       if (response.success && response.data) {
         if (!Array.isArray(response.data)) {
+          console.error('[SERIES DASHBOARD] Réponse invalide: data n\'est pas un tableau', response.data);
           setError('Réponse invalide: liste de séries attendue');
           return;
         }
+        console.log(`[SERIES DASHBOARD] ${response.data.length} série(s) reçu(s) avant tri`);
         // Trier par date de première diffusion (les plus récents en premier)
         const sortedSeries = [...response.data].sort((a, b) => {
           const dateA = a.firstAirDate ? new Date(a.firstAirDate).getTime() : 0;
           const dateB = b.firstAirDate ? new Date(b.firstAirDate).getTime() : 0;
           return dateB - dateA; // Plus récent en premier
         });
+        console.log(`[SERIES DASHBOARD] ${sortedSeries.length} série(s) après tri, mise à jour de l'état`);
         setSeries(sortedSeries);
       } else {
+        console.error('[SERIES DASHBOARD] Erreur:', response.message || response.error);
         setError(response.message || 'Erreur lors du chargement des séries');
       }
     } catch (err) {
+      console.error('[SERIES DASHBOARD] Exception:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
       setLoading(false);
@@ -124,6 +138,9 @@ export default function SeriesDashboard() {
           <p className="text-gray-400 text-lg">
             Aucune série n'est disponible pour le moment.
           </p>
+          <p className="text-gray-500 text-sm mt-2">
+            Vérifiez la console pour plus de détails.
+          </p>
         </div>
       </div>
     );
@@ -131,6 +148,13 @@ export default function SeriesDashboard() {
 
   // Trier les genres par ordre alphabétique
   const sortedGenres = Object.keys(seriesByGenre).sort();
+  
+  console.log(`[SERIES DASHBOARD] Affichage: ${series.length} série(s), ${sortedGenres.length} genre(s)`, {
+    genres: sortedGenres,
+    seriesByGenreCounts: Object.fromEntries(
+      Object.entries(seriesByGenre).map(([genre, series]) => [genre, series.length])
+    ),
+  });
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -141,20 +165,31 @@ export default function SeriesDashboard() {
 
       <div className="pb-8 tv:pb-12">
         {/* Afficher une ligne par genre */}
-        {sortedGenres.map(genre => {
-          const genreSeries = seriesByGenre[genre];
-          if (genreSeries.length === 0) return null;
+        {sortedGenres.length > 0 ? (
+          sortedGenres.map(genre => {
+            const genreSeries = seriesByGenre[genre];
+            if (genreSeries.length === 0) return null;
 
-          return (
-            <CarouselRow key={genre} title={genre}>
-              {genreSeries.map((serie) => (
-                <div key={serie.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                  <TorrentPoster item={{ ...serie, type: 'tv' }} />
-                </div>
-              ))}
-            </CarouselRow>
-          );
-        })}
+            return (
+              <CarouselRow key={genre} title={genre}>
+                {genreSeries.map((serie) => (
+                  <div key={serie.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+                    <TorrentPoster item={{ ...serie, type: 'tv' }} />
+                  </div>
+                ))}
+              </CarouselRow>
+            );
+          })
+        ) : (
+          // Si aucun genre, afficher toutes les séries dans une seule ligne
+          <CarouselRow title="Toutes les séries">
+            {series.map((serie) => (
+              <div key={serie.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+                <TorrentPoster item={{ ...serie, type: 'tv' }} />
+              </div>
+            ))}
+          </CarouselRow>
+        )}
       </div>
     </div>
   );

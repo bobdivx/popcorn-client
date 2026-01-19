@@ -19,24 +19,38 @@ export default function FilmsDashboard() {
     try {
       setLoading(true);
       setError(null);
+      console.log('[FILMS DASHBOARD] Chargement des films...');
       const response = await serverApi.getFilmsData();
+      
+      console.log('[FILMS DASHBOARD] Réponse reçue:', {
+        success: response.success,
+        hasData: !!response.data,
+        dataLength: Array.isArray(response.data) ? response.data.length : 'N/A',
+        error: response.error,
+        message: response.message,
+      });
       
       if (response.success && response.data) {
         if (!Array.isArray(response.data)) {
+          console.error('[FILMS DASHBOARD] Réponse invalide: data n\'est pas un tableau', response.data);
           setError('Réponse invalide: liste de films attendue');
           return;
         }
+        console.log(`[FILMS DASHBOARD] ${response.data.length} film(s) reçu(s) avant tri`);
         // Trier par date de sortie (les plus récents en premier)
         const sortedFilms = [...response.data].sort((a, b) => {
           const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
           const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
           return dateB - dateA; // Plus récent en premier
         });
+        console.log(`[FILMS DASHBOARD] ${sortedFilms.length} film(s) après tri, mise à jour de l'état`);
         setFilms(sortedFilms);
       } else {
+        console.error('[FILMS DASHBOARD] Erreur:', response.message || response.error);
         setError(response.message || 'Erreur lors du chargement des films');
       }
     } catch (err) {
+      console.error('[FILMS DASHBOARD] Exception:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
       setLoading(false);
@@ -124,6 +138,9 @@ export default function FilmsDashboard() {
           <p className="text-gray-400 text-lg">
             Aucun film n'est disponible pour le moment.
           </p>
+          <p className="text-gray-500 text-sm mt-2">
+            Vérifiez la console pour plus de détails.
+          </p>
         </div>
       </div>
     );
@@ -131,6 +148,13 @@ export default function FilmsDashboard() {
 
   // Trier les genres par ordre alphabétique
   const sortedGenres = Object.keys(filmsByGenre).sort();
+  
+  console.log(`[FILMS DASHBOARD] Affichage: ${films.length} film(s), ${sortedGenres.length} genre(s)`, {
+    genres: sortedGenres,
+    filmsByGenreCounts: Object.fromEntries(
+      Object.entries(filmsByGenre).map(([genre, films]) => [genre, films.length])
+    ),
+  });
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -141,20 +165,31 @@ export default function FilmsDashboard() {
 
       <div className="pb-8 tv:pb-12">
         {/* Afficher une ligne par genre */}
-        {sortedGenres.map(genre => {
-          const genreFilms = filmsByGenre[genre];
-          if (genreFilms.length === 0) return null;
+        {sortedGenres.length > 0 ? (
+          sortedGenres.map(genre => {
+            const genreFilms = filmsByGenre[genre];
+            if (genreFilms.length === 0) return null;
 
-          return (
-            <CarouselRow key={genre} title={genre}>
-              {genreFilms.map((film) => (
-                <div key={film.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                  <TorrentPoster item={{ ...film, type: 'movie' }} />
-                </div>
-              ))}
-            </CarouselRow>
-          );
-        })}
+            return (
+              <CarouselRow key={genre} title={genre}>
+                {genreFilms.map((film) => (
+                  <div key={film.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+                    <TorrentPoster item={{ ...film, type: 'movie' }} />
+                  </div>
+                ))}
+              </CarouselRow>
+            );
+          })
+        ) : (
+          // Si aucun genre, afficher tous les films dans une seule ligne
+          <CarouselRow title="Tous les films">
+            {films.map((film) => (
+              <div key={film.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+                <TorrentPoster item={{ ...film, type: 'movie' }} />
+              </div>
+            ))}
+          </CarouselRow>
+        )}
       </div>
     </div>
   );

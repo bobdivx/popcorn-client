@@ -14,6 +14,7 @@ export function SyncStep({ focusedButtonIndex, buttonRefs, onPrevious, onNext }:
   const [syncComplete, setSyncComplete] = useState(false);
   const [syncStarted, setSyncStarted] = useState(false);
   const [error, setError] = useState('');
+  const [consecutiveChecks, setConsecutiveChecks] = useState(0); // Compteur de vérifications consécutives
 
   // Vérifier si une synchronisation est en cours
   useEffect(() => {
@@ -21,18 +22,58 @@ export function SyncStep({ focusedButtonIndex, buttonRefs, onPrevious, onNext }:
       try {
         const response = await serverApi.getSyncStatus();
         if (response.success && response.data) {
-          setSyncing(response.data.sync_in_progress || false);
-          if (!response.data.sync_in_progress && syncStarted) {
-            // La sync était en cours et vient de se terminer
-            setSyncComplete(true);
-            setSyncing(false);
+          const syncInProgress = response.data.sync_in_progress || false;
+          const hasStats = response.data.stats && Object.keys(response.data.stats).length > 0;
+          const progress = response.data.progress;
+          
+          // Vérifier si la sync est vraiment en cours en regardant plusieurs indicateurs
+          const hasActiveProgress = progress && (
+            progress.current_indexer || 
+            progress.current_category || 
+            (progress.total_to_process > 0 && progress.total_processed < progress.total_to_process)
+          );
+          
+          // Si la sync est marquée comme en cours OU si on a des stats OU si on a une progression active
+          const isActuallySyncing = syncInProgress || hasActiveProgress || (hasStats && syncStarted && !syncComplete);
+          
+          setSyncing(isActuallySyncing);
+          
+          // Si la sync est vraiment en cours, réinitialiser le compteur
+          if (isActuallySyncing) {
+            setConsecutiveChecks(0);
+            return;
+          }
+          
+          // Si la sync n'est pas en cours, incrémenter le compteur
+          if (!syncInProgress && !hasActiveProgress && syncStarted && !syncComplete) {
+            const newCount = consecutiveChecks + 1;
+            setConsecutiveChecks(newCount);
+            
+            // Marquer comme complète seulement après 3 vérifications consécutives (6 secondes)
+            // Cela évite de marquer comme complète si le backend est juste lent à répondre
+            if (newCount >= 3) {
+              console.log('[SYNC STEP] ✅ Synchronisation terminée après 3 vérifications consécutives');
+              setSyncComplete(true);
+              setSyncing(false);
+              setConsecutiveChecks(0);
+            } else {
+              console.log(`[SYNC STEP] Vérification ${newCount}/3 : sync semble terminée, vérification dans 2s...`);
+            }
           }
         } else {
-          // Si la réponse n'est pas un succès, continuer à vérifier
+          // Si la réponse n'est pas un succès, continuer à vérifier et garder syncing à true si syncStarted
+          if (syncStarted && !syncComplete) {
+            setSyncing(true); // Garder l'affichage de la sync même si le backend ne répond pas
+            setConsecutiveChecks(0); // Réinitialiser le compteur car on ne peut pas vérifier
+          }
           console.log('[SYNC STEP] Réponse non réussie, continuation de la vérification');
         }
       } catch (err) {
-        // En cas d'erreur (timeout, etc.), continuer à vérifier
+        // En cas d'erreur (timeout, etc.), continuer à vérifier et garder syncing à true si syncStarted
+        if (syncStarted && !syncComplete) {
+          setSyncing(true); // Garder l'affichage de la sync même en cas d'erreur
+          setConsecutiveChecks(0); // Réinitialiser le compteur car on ne peut pas vérifier
+        }
         if (err instanceof Error && (err.message.includes('Timeout') || err.message.includes('504'))) {
           console.log('[SYNC STEP] ⚠️ Backend lent, continuation de la vérification');
         } else {
@@ -54,13 +95,15 @@ export function SyncStep({ focusedButtonIndex, buttonRefs, onPrevious, onNext }:
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [syncStarted, syncComplete]);
+  }, [syncStarted, syncComplete, consecutiveChecks]);
 
   const handleStartSync = async () => {
     try {
       setError('');
       setSyncStarted(true);
       setSyncing(true);
+      setSyncComplete(false);
+      setConsecutiveChecks(0); // Réinitialiser le compteur
       
       // Démarrer la synchronisation
       const response = await serverApi.startSync();

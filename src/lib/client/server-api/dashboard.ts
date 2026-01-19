@@ -21,8 +21,8 @@ export const dashboardMethods = {
     // - continueWatching n'est pas implémenté ici (nécessite stats player)
     try {
       const [moviesRes, seriesRes] = await Promise.all([
-        this.backendRequest<any[]>('/api/torrents/list?category=FILM&sort=popular&limit=60&page=1', { method: 'GET' }),
-        this.backendRequest<any[]>('/api/torrents/list?category=SERIES&sort=popular&limit=60&page=1', { method: 'GET' }),
+        this.backendRequest<any[]>('/api/torrents/list?category=films&sort=popular&limit=60&page=1', { method: 'GET' }),
+        this.backendRequest<any[]>('/api/torrents/list?category=series&sort=popular&limit=60&page=1', { method: 'GET' }),
       ]);
 
       if (!moviesRes.success && !seriesRes.success) {
@@ -132,33 +132,56 @@ export const dashboardMethods = {
    */
   async getFilmsData(this: ServerApiClientDashboardAccess): Promise<ApiResponse<FilmData[]>> {
     // Unifié : appel direct au backend Rust
-    const res = await this.backendRequest<any[]>('/api/torrents/list?category=FILM&sort=popular&limit=200&page=1', {
+    // Note: le backend utilise "films" (minuscules) comme catégorie, pas "FILM"
+    const res = await this.backendRequest<any[]>('/api/torrents/list?category=films&sort=popular&limit=200&page=1', {
       method: 'GET',
     });
-    if (!res.success) return res as unknown as ApiResponse<FilmData[]>;
+    if (!res.success) {
+      console.warn('[DASHBOARD] Erreur lors de la récupération des films:', res.message || res.error);
+      return res as unknown as ApiResponse<FilmData[]>;
+    }
     const rows = Array.isArray(res.data) ? res.data : [];
+    console.log(`[DASHBOARD] ${rows.length} torrent(s) FILM reçu(s) du backend`);
 
     const films: FilmData[] = rows
-      .map((raw: any) => {
-        const id = raw?.slug || raw?.id || raw?.infoHash || raw?.info_hash || '';
-        if (!id) return null;
+      .map((raw: any, index: number) => {
+        // Essayer plusieurs champs pour l'ID (slug en priorité car c'est l'identifiant unique pour le frontend)
+        // Si l'id est un nombre, le convertir en string
+        const rawId = raw?.id;
+        const idAsString = rawId !== undefined && rawId !== null ? String(rawId) : '';
+        const id = raw?.slug || idAsString || raw?.infoHash || raw?.info_hash || raw?.info_hash_hex || '';
+        if (!id) {
+          console.warn(`[DASHBOARD] Torrent FILM ${index} sans ID valide:`, {
+            slug: raw?.slug,
+            id: raw?.id,
+            idAsString,
+            infoHash: raw?.infoHash,
+            info_hash: raw?.info_hash,
+            info_hash_hex: raw?.info_hash_hex,
+            name: raw?.name,
+            cleanTitle: raw?.cleanTitle,
+            raw: JSON.stringify(raw).substring(0, 200), // Aperçu des données brutes
+          });
+          return null;
+        }
         return {
           id,
-          title: raw?.cleanTitle || raw?.clean_title || raw?.name || '',
+          title: raw?.cleanTitle || raw?.clean_title || raw?.name || raw?.title || 'Sans titre',
           type: 'movie',
-          poster: raw?.imageUrl || raw?.poster_url || undefined,
-          backdrop: raw?.heroImageUrl || raw?.hero_image_url || undefined,
-          overview: raw?.synopsis || undefined,
-          rating: typeof raw?.voteAverage === 'number' ? raw.voteAverage : undefined,
+          poster: raw?.imageUrl || raw?.poster_url || raw?.poster || undefined,
+          backdrop: raw?.heroImageUrl || raw?.hero_image_url || raw?.backdrop || undefined,
+          overview: raw?.synopsis || raw?.overview || undefined,
+          rating: typeof raw?.voteAverage === 'number' ? raw.voteAverage : raw?.vote_average,
           releaseDate: raw?.releaseDate || raw?.release_date || undefined,
           genres: Array.isArray(raw?.genres) ? raw.genres : undefined,
-          seeds: typeof raw?.seedCount === 'number' ? raw.seedCount : undefined,
-          peers: typeof raw?.leechCount === 'number' ? raw.leechCount : undefined,
-          fileSize: typeof raw?.fileSize === 'number' ? raw.fileSize : undefined,
+          seeds: typeof raw?.seedCount === 'number' ? raw.seedCount : raw?.seed_count,
+          peers: typeof raw?.leechCount === 'number' ? raw.leechCount : raw?.leech_count,
+          fileSize: typeof raw?.fileSize === 'number' ? raw.fileSize : raw?.file_size,
         } satisfies FilmData;
       })
       .filter(Boolean) as FilmData[];
 
+    console.log(`[DASHBOARD] ${films.length} film(s) valide(s) après filtrage`);
     return { success: true, data: films };
   },
 
@@ -167,33 +190,56 @@ export const dashboardMethods = {
    */
   async getSeriesData(this: ServerApiClientDashboardAccess): Promise<ApiResponse<SeriesData[]>> {
     // Unifié : appel direct au backend Rust
-    const res = await this.backendRequest<any[]>('/api/torrents/list?category=SERIES&sort=popular&limit=200&page=1', {
+    // Note: le backend utilise "series" (minuscules) comme catégorie, pas "SERIES"
+    const res = await this.backendRequest<any[]>('/api/torrents/list?category=series&sort=popular&limit=200&page=1', {
       method: 'GET',
     });
-    if (!res.success) return res as unknown as ApiResponse<SeriesData[]>;
+    if (!res.success) {
+      console.warn('[DASHBOARD] Erreur lors de la récupération des séries:', res.message || res.error);
+      return res as unknown as ApiResponse<SeriesData[]>;
+    }
     const rows = Array.isArray(res.data) ? res.data : [];
+    console.log(`[DASHBOARD] ${rows.length} torrent(s) SERIES reçu(s) du backend`);
 
     const series: SeriesData[] = rows
-      .map((raw: any) => {
-        const id = raw?.slug || raw?.id || raw?.infoHash || raw?.info_hash || '';
-        if (!id) return null;
+      .map((raw: any, index: number) => {
+        // Essayer plusieurs champs pour l'ID (slug en priorité car c'est l'identifiant unique pour le frontend)
+        // Si l'id est un nombre, le convertir en string
+        const rawId = raw?.id;
+        const idAsString = rawId !== undefined && rawId !== null ? String(rawId) : '';
+        const id = raw?.slug || idAsString || raw?.infoHash || raw?.info_hash || raw?.info_hash_hex || '';
+        if (!id) {
+          console.warn(`[DASHBOARD] Torrent SERIES ${index} sans ID valide:`, {
+            slug: raw?.slug,
+            id: raw?.id,
+            idAsString,
+            infoHash: raw?.infoHash,
+            info_hash: raw?.info_hash,
+            info_hash_hex: raw?.info_hash_hex,
+            name: raw?.name,
+            cleanTitle: raw?.cleanTitle,
+            raw: JSON.stringify(raw).substring(0, 200), // Aperçu des données brutes
+          });
+          return null;
+        }
         return {
           id,
-          title: raw?.cleanTitle || raw?.clean_title || raw?.name || '',
+          title: raw?.cleanTitle || raw?.clean_title || raw?.name || raw?.title || 'Sans titre',
           type: 'tv',
-          poster: raw?.imageUrl || raw?.poster_url || undefined,
-          backdrop: raw?.heroImageUrl || raw?.hero_image_url || undefined,
-          overview: raw?.synopsis || undefined,
-          rating: typeof raw?.voteAverage === 'number' ? raw.voteAverage : undefined,
+          poster: raw?.imageUrl || raw?.poster_url || raw?.poster || undefined,
+          backdrop: raw?.heroImageUrl || raw?.hero_image_url || raw?.backdrop || undefined,
+          overview: raw?.synopsis || raw?.overview || undefined,
+          rating: typeof raw?.voteAverage === 'number' ? raw.voteAverage : raw?.vote_average,
           firstAirDate: raw?.releaseDate || raw?.release_date || undefined,
           genres: Array.isArray(raw?.genres) ? raw.genres : undefined,
-          seeds: typeof raw?.seedCount === 'number' ? raw.seedCount : undefined,
-          peers: typeof raw?.leechCount === 'number' ? raw.leechCount : undefined,
-          fileSize: typeof raw?.fileSize === 'number' ? raw.fileSize : undefined,
+          seeds: typeof raw?.seedCount === 'number' ? raw.seedCount : raw?.seed_count,
+          peers: typeof raw?.leechCount === 'number' ? raw.leechCount : raw?.leech_count,
+          fileSize: typeof raw?.fileSize === 'number' ? raw.fileSize : raw?.file_size,
         } satisfies SeriesData;
       })
       .filter(Boolean) as SeriesData[];
 
+    console.log(`[DASHBOARD] ${series.length} série(s) valide(s) après filtrage`);
     return { success: true, data: series };
   },
 };

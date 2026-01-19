@@ -312,8 +312,8 @@ export default function BackendDiagnostics() {
       const testWithUrl = async (baseUrl: string, label: string) => {
         await timed(`${label} - health (/api/client/health)`, () => testEndpoint(baseUrl, '/api/client/health'), `${baseUrl}/api/client/health`);
         // Corriger: /api/torrents/list est GET avec query parameters, pas POST avec body
-        await timed(`${label} - torrents FILM (/api/torrents/list)`, () => testEndpoint(baseUrl, '/api/torrents/list', 'GET', undefined, { category: 'FILM' }), `${baseUrl}/api/torrents/list?category=FILM`);
-        await timed(`${label} - torrents SERIES (/api/torrents/list)`, () => testEndpoint(baseUrl, '/api/torrents/list', 'GET', undefined, { category: 'SERIES' }), `${baseUrl}/api/torrents/list?category=SERIES`);
+        await timed(`${label} - torrents FILM (/api/torrents/list)`, () => testEndpoint(baseUrl, '/api/torrents/list', 'GET', undefined, { category: 'films' }), `${baseUrl}/api/torrents/list?category=films`);
+        await timed(`${label} - torrents SERIES (/api/torrents/list)`, () => testEndpoint(baseUrl, '/api/torrents/list', 'GET', undefined, { category: 'series' }), `${baseUrl}/api/torrents/list?category=series`);
         await timed(`${label} - library (/library)`, () => testEndpoint(baseUrl, '/library'), `${baseUrl}/library`);
         await timed(`${label} - indexers (/api/client/admin/indexers)`, () => testEndpoint(baseUrl, '/api/client/admin/indexers'), `${baseUrl}/api/client/admin/indexers`);
       };

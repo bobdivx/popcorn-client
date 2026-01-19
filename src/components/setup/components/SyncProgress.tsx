@@ -29,8 +29,10 @@ export function SyncProgress() {
   // Rafraîchir le statut toutes les 2 secondes si une sync est en cours ou si on n'a pas encore de statut
   useEffect(() => {
     // Continuer à essayer de charger le statut même si le backend n'est pas encore démarré
+    // Aussi continuer si on a des stats (la sync peut être en cours même si sync_in_progress est false temporairement)
+    const hasStats = status && Object.keys(status.stats || {}).length > 0;
     const interval = setInterval(() => {
-      if (status?.sync_in_progress || !status) {
+      if (status?.sync_in_progress || !status || hasStats) {
         loadStatus();
       }
     }, 2000);
@@ -39,15 +41,24 @@ export function SyncProgress() {
 
   // Timer pour le temps écoulé
   useEffect(() => {
-    if (status?.sync_in_progress && status.sync_start_time) {
+    // Si la sync est en cours ou si on a des stats (sync peut être en cours même si sync_in_progress est false temporairement)
+    const hasStats = status && Object.keys(status.stats || {}).length > 0;
+    if ((status?.sync_in_progress || hasStats) && status.sync_start_time) {
       const interval = setInterval(() => {
         setElapsedTime(Math.floor((Date.now() / 1000) - status.sync_start_time!));
+      }, 1000);
+      return () => clearInterval(interval);
+    } else if (status?.sync_in_progress && !status.sync_start_time) {
+      // Si la sync est en cours mais pas de start_time, utiliser le temps actuel comme référence
+      const startRef = Date.now() / 1000;
+      const interval = setInterval(() => {
+        setElapsedTime(Math.floor((Date.now() / 1000) - startRef));
       }, 1000);
       return () => clearInterval(interval);
     } else {
       setElapsedTime(0);
     }
-  }, [status?.sync_in_progress, status?.sync_start_time]);
+  }, [status?.sync_in_progress, status?.sync_start_time, status?.stats]);
 
   // Animation des compteurs
   useEffect(() => {
@@ -127,7 +138,12 @@ export function SyncProgress() {
     );
   }
 
-  if (!status.sync_in_progress) {
+  // Si la sync n'est pas en cours selon le statut, mais qu'on a des stats, afficher quand même
+  // (la sync peut être en cours mais le statut peut ne pas être encore mis à jour)
+  const hasStats = Object.keys(status.stats || {}).length > 0;
+  const isActuallySyncing = status.sync_in_progress || hasStats;
+  
+  if (!isActuallySyncing) {
     return null;
   }
 
@@ -145,7 +161,7 @@ export function SyncProgress() {
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-            Synchronisation en cours
+            {isActuallySyncing ? 'Synchronisation en cours' : 'Synchronisation en attente...'}
           </h3>
           {elapsedTime > 0 && (
             <span className="text-blue-400 text-sm font-semibold">
