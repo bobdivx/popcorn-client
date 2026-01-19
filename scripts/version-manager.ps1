@@ -1,7 +1,11 @@
 # Gestion centralisée des versions pour client et serveur
 # Format: X.Y.Z (ex: 1.0.1)
 
-$VERSION_FILE = Join-Path $PSScriptRoot "..\VERSION.json"
+# Trouver la racine du projet (où se trouve VERSION.json)
+# Le script est dans scripts/, donc VERSION.json est à la racine (un niveau au-dessus)
+$scriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { Split-Path -Parent $MyInvocation.MyCommand.Path }
+$projectRoot = Split-Path $scriptDir -Parent
+$VERSION_FILE = Join-Path $projectRoot "VERSION.json"
 
 function Get-VersionInfo {
     param(
@@ -155,5 +159,5 @@ function Update-VersionMinor {
     }
 }
 
-# Export des fonctions
-Export-ModuleMember -Function Get-VersionInfo, Update-VersionBuild, Update-VersionMinor
+# Les fonctions sont disponibles après le chargement du script avec: . $versionScript
+# Pas besoin d'Export-ModuleMember car ce n'est pas un module PowerShell

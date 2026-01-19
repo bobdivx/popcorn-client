@@ -109,11 +109,49 @@ function Update-VersionForAndroidBuild {
     }
     
     # Charger le module de gestion de version
-    $versionScript = Join-Path $PSScriptRoot "..\..\scripts\version-manager.ps1"
+    # Utiliser $script:ProjectRoot défini dans variables.ps1 (déjà importé)
+    $versionScript = Join-Path $script:ProjectRoot "scripts\version-manager.ps1"
+    
     if (Test-Path $versionScript) {
+        Write-Host "  [INFO] Chargement du script de version: $versionScript" -ForegroundColor Gray
         . $versionScript
     } else {
-        Write-Warn "Script version-manager.ps1 introuvable, utilisation de l'ancien système"
+        Write-Warn "Script version-manager.ps1 introuvable à: $versionScript"
+        Write-Warn "Racine projet: $script:ProjectRoot"
+        Write-Warn "Utilisation de l'ancien système de version"
+        # Fallback vers l'ancien système
+        $mCode = [regex]::Match($raw, '"versionCode"\s*:\s*(\d+)')
+        $oldCode = if ($mCode.Success) { [int]$mCode.Groups[1].Value } else { 0 }
+        if ($oldCode -lt 1) { $oldCode = 1 }
+        $newCode = $oldCode + 1
+        
+        $mVer = [regex]::Match($raw, '"version"\s*:\s*"([^"]*)"')
+        $base = if ($mVer.Success -and ($mVer.Groups[1].Value -match '^\d+\.\d+\.\d+')) { ($mVer.Groups[1].Value -split '\+')[0] } else { "1.0.1" }
+        $newVersion = "$base"
+        
+        $reCode = New-Object System.Text.RegularExpressions.Regex('"versionCode"\s*:\s*\d+')
+        $updated = $reCode.Replace($raw, "`"versionCode`": $newCode", 1)
+        $reVer = New-Object System.Text.RegularExpressions.Regex('"version"\s*:\s*"[^"]*"')
+        $updated = $reVer.Replace($updated, "`"version`": `"$newVersion`"", 1)
+        
+        try {
+            Set-Content -Path $configPath -Value $updated -Encoding UTF8 -NoNewline -ErrorAction Stop
+            $verify = Get-Content $configPath -Raw -ErrorAction SilentlyContinue
+            if ([string]::IsNullOrWhiteSpace($verify)) {
+                Write-Err "Écriture de la config Tauri a échoué (fichier vide après écriture): $configPath"
+                return $null
+            }
+        } catch {
+            Write-Err "Erreur lors de l'écriture de la config Tauri: $_"
+            return $null
+        }
+        
+        $env:PUBLIC_APP_VERSION = $newVersion
+        $env:PUBLIC_APP_VERSION_CODE = "$newCode"
+        $env:PUBLIC_APP_VARIANT = $Variant
+        
+        Write-Ok "Version Android (ancien système): version=$newVersion versionCode=$newCode"
+        return @{ Version = $newVersion; VersionCode = $newCode; FullVersion = "$newVersion.$newCode" }
     }
 
     # Obtenir et incrémenter la version depuis VERSION.json
