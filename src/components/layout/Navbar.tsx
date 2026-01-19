@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { Plus, Search as SearchIcon, Settings as SettingsIcon } from 'lucide-preact';
+import { Download, Search as SearchIcon, Settings as SettingsIcon } from 'lucide-preact';
 import { serverApi } from '../../lib/client/server-api';
 import { getLocalProfile, onProfileChanged } from '../../lib/client/profile';
 import Avatar from '../ui/Avatar';
@@ -174,7 +174,7 @@ export default function Navbar() {
                   tabIndex={0}
                   data-focusable
                 >
-                  <Plus className="w-5 h-5 tv:w-6 tv:h-6" />
+                  <Download className="w-5 h-5 tv:w-6 tv:h-6" />
                 </a>
                 <a
                   href="/settings"

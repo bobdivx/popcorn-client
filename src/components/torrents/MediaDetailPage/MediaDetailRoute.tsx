@@ -49,12 +49,25 @@ function convertVariantToTorrent(variant: any): Torrent {
   if (variant.quality) {
     try {
       if (typeof variant.quality === 'string') {
-        qualityObj = JSON.parse(variant.quality);
+        // Vérifier si c'est du JSON valide avant de parser
+        // Si ça commence par { ou [, c'est probablement du JSON
+        const trimmed = variant.quality.trim();
+        if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+            (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+          qualityObj = JSON.parse(variant.quality);
+        } else {
+          // Ce n'est pas du JSON, c'est probablement juste une chaîne simple comme "1080P"
+          // On l'utilisera directement dans le champ "full"
+          qualityObj = null;
+        }
       } else if (typeof variant.quality === 'object') {
         qualityObj = variant.quality;
       }
     } catch (e) {
-      console.warn('[MediaDetailRoute] Erreur lors du parsing de quality:', e);
+      // Erreur de parsing JSON, ce n'est probablement pas du JSON
+      // On ignore l'erreur et on utilisera la valeur directement
+      console.debug('[MediaDetailRoute] quality n\'est pas du JSON valide, utilisation directe:', variant.quality);
+      qualityObj = null;
     }
   }
 

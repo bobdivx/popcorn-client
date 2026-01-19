@@ -114,7 +114,9 @@ export function createPollTorrentProgress(context: PollingContext) {
         }
 
         // Traiter selon l'état du torrent
-        if (state === 'queued' && !isPlaying) {
+        // Ne traiter l'état "queued" que si on est en mode streaming (isPlaying = true)
+        // Sinon, on ne veut pas démarrer automatiquement le téléchargement
+        if (state === 'queued' && isPlaying) {
           await handleQueuedState(infoHash, stats, now, context);
         } else if (state === 'downloading') {
           await handleDownloadingState(infoHash, stats, progress, context);
@@ -170,8 +172,9 @@ async function handleQueuedState(
     const lastResumeAttempt = lastResumeAttemptRef.current;
 
     // Essayer de reprendre le torrent périodiquement
-    // Mais seulement si on a des peers ou si on attend depuis un moment
-    if (!lastResumeAttempt || nowTime - lastResumeAttempt >= QUEUED_RETRY_RESUME_MS) {
+    // Mais seulement si on est en mode streaming (isPlaying = true)
+    // Si on n'est pas en mode streaming, on ne veut pas démarrer automatiquement le téléchargement
+    if (isPlaying && (!lastResumeAttempt || nowTime - lastResumeAttempt >= QUEUED_RETRY_RESUME_MS)) {
       lastResumeAttemptRef.current = nowTime;
       
       // Ne pas essayer de reprendre si on n'a pas de peers - cela peut causer des erreurs
@@ -204,7 +207,9 @@ async function handleQueuedState(
     // Cela évite de déclencher le lecteur HLS pendant le téléchargement
 
     // Essayer de reprendre le torrent périodiquement
-    const shouldRetryResume = lastResumeAttemptRef.current === null || now - lastResumeAttemptRef.current >= QUEUED_RETRY_RESUME_MS;
+    // Mais seulement si on est en mode streaming (isPlaying = true)
+    // Si on n'est pas en mode streaming, on ne veut pas démarrer automatiquement le téléchargement
+    const shouldRetryResume = isPlaying && (lastResumeAttemptRef.current === null || now - lastResumeAttemptRef.current >= QUEUED_RETRY_RESUME_MS);
     if (shouldRetryResume) {
       lastResumeAttemptRef.current = now;
       clientApi.resumeTorrent(infoHash).then(() => {

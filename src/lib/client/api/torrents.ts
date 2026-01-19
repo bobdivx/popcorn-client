@@ -31,18 +31,51 @@ export class TorrentsService {
 
   /**
    * Récupérer les statistiques d'un torrent spécifique
+   * 
+   * Note: Cette méthode peut générer des erreurs 404 dans la console du navigateur
+   * si le torrent n'est pas encore téléchargé. C'est normal et attendu - ces erreurs
+   * sont gérées silencieusement dans le code et ne doivent pas être considérées comme
+   * des problèmes. Le navigateur affiche ces erreurs par défaut pour toutes les requêtes
+   * HTTP qui retournent un 404, et cela ne peut pas être complètement supprimé.
    */
   async getTorrent(infoHash: string): Promise<ClientTorrentStats | null> {
     try {
       const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}`);
+      
+      // Utiliser un AbortController pour pouvoir annuler la requête si nécessaire
+      const controller = new AbortController();
+      
+      // Faire la requête avec un signal pour pouvoir l'annuler
       const response = await fetch(url, {
-        // Ne pas afficher d'erreur dans la console pour les 404
-        // Le navigateur affichera quand même l'erreur, mais on peut la réduire
+        signal: controller.signal,
+      }).catch((err) => {
+        // Intercepter les erreurs réseau
+        if (err instanceof TypeError && err.message.includes('Failed to fetch')) {
+          // Erreur réseau (serveur non accessible), retourner null silencieusement
+          return null;
+        }
+        // Si c'est une erreur d'abort, retourner null silencieusement
+        if (err.name === 'AbortError') {
+          return null;
+        }
+        throw err;
       });
       
+      if (!response) {
+        // Erreur réseau interceptée
+        return null;
+      }
+      
       // Si le torrent n'existe pas (404), retourner null sans logger d'erreur
+      // Note: Le navigateur affichera quand même l'erreur 404 dans la console,
+      // mais c'est le comportement par défaut et ne peut pas être complètement supprimé
       if (response.status === 404) {
         // Retourner null silencieusement - c'est normal pour un torrent qui n'existe pas encore
+        return null;
+      }
+      
+      if (!response.ok) {
+        // Autre erreur HTTP, retourner null silencieusement
         return null;
       }
       
@@ -53,9 +86,10 @@ export class TorrentsService {
       if (error instanceof Error) {
         const is404 = error.message.includes('404') || error.message.includes('Not found');
         const isNetworkError = error.message.includes('Failed to fetch') || error.message.includes('NetworkError');
+        const isAbort = error.name === 'AbortError';
         
-        // Ne logger que les erreurs critiques (pas les 404 ni les erreurs réseau temporaires)
-        if (!is404 && !isNetworkError) {
+        // Ne logger que les erreurs critiques (pas les 404, ni les erreurs réseau temporaires, ni les aborts)
+        if (!is404 && !isNetworkError && !isAbort) {
           console.debug('Failed to get torrent:', error);
         }
       }

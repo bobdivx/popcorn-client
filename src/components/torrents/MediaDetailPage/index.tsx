@@ -148,6 +148,7 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
   }, [torrent.id]);
 
   // Vérifier si le torrent est disponible localement
+  // Note: Les erreurs 404 dans la console sont normales si le torrent n'est pas encore téléchargé
   useEffect(() => {
     if (torrent.clientState && torrent.clientProgress !== undefined) {
       const isCompleted = torrent.clientState === 'completed' || 
@@ -170,7 +171,13 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
           fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MediaDetailPage.tsx:166',message:'Vérification disponibilité torrent au chargement',data:{infoHash:torrent.infoHash?.substring(0,12),hasInfoHash,isExternal},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
           // #endregion
           const { clientApi } = await import('../../../lib/client/api');
-          const stats = await clientApi.getTorrent(torrent.infoHash!);
+          const stats = await clientApi.getTorrent(torrent.infoHash!).catch((err) => {
+            // Ignorer silencieusement les erreurs 404 (torrent non téléchargé)
+            if (err?.response?.status === 404 || err?.message?.includes('404')) {
+              return null;
+            }
+            throw err;
+          });
           // #region agent log
           fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MediaDetailPage.tsx:170',message:'Stats torrent récupérées',data:{hasStats:!!stats,state:stats?.state,progress:stats?.progress,isCompleted:stats?(stats.state==='completed'||stats.state==='seeding'||stats.progress>=0.95):false},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
           // #endregion
@@ -193,14 +200,16 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
                 progress: `${(stats.progress * 100).toFixed(1)}%`,
               });
             }
-          } else {
-            console.log('[MediaDetailPage] checkAvailability: Aucune stats récupérée pour', torrent.infoHash);
           }
+          // Ne pas logger si stats est null (torrent non téléchargé, c'est normal)
         } catch (err) {
+          // Ignorer silencieusement les erreurs 404 (torrent non téléchargé)
+          if (err instanceof Error && (err.message.includes('404') || err.message.includes('Not Found'))) {
+            return;
+          }
           // #region agent log
           fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MediaDetailPage.tsx:178',message:'Erreur vérification disponibilité',data:{error:err instanceof Error?err.message:String(err)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
           // #endregion
-          // Ignorer les erreurs
         }
       };
       
@@ -246,7 +255,13 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
       if (hasInfoHash && torrent.infoHash && !isPlaying && playStatus === 'idle') {
         try {
           const { clientApi } = await import('../../../lib/client/api');
-          const stats = await clientApi.getTorrent(torrent.infoHash);
+          const stats = await clientApi.getTorrent(torrent.infoHash).catch((err) => {
+            // Ignorer silencieusement les erreurs 404 (torrent non téléchargé)
+            if (err?.response?.status === 404 || err?.message?.includes('404')) {
+              return null;
+            }
+            throw err;
+          });
           if (stats) {
             // Toujours mettre à jour torrentStats pour que le bouton "Lire" puisse s'afficher
             console.log('[MediaDetailPage] checkDownloadingTorrent: Mise à jour torrentStats', {
@@ -269,20 +284,20 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
               return;
             }
             
-            if (stats.state === 'downloading' || stats.state === 'queued') {
-              // Pour le téléchargement (pas streaming), ne pas changer playStatus (réservé au streaming)
-              // Ne pas charger les fichiers vidéo pendant le téléchargement (réservé au streaming)
-              // Démarrer le polling pour suivre la progression et mettre à jour torrentStats
-              if (!progressPollIntervalRef.current) {
-                progressPollIntervalRef.current = window.setInterval(() => {
-                  pollTorrentProgress(torrent.infoHash!);
-                }, PROGRESS_POLL_INTERVAL_MS);
-                pollTorrentProgress(torrent.infoHash);
-              }
-            }
+            // Ne pas démarrer automatiquement le polling si le torrent est en téléchargement
+            // Le polling ne sera démarré que lorsque l'utilisateur clique explicitement sur "Télécharger" ou "Lire"
+            // On met juste à jour les stats pour l'affichage, mais on ne démarre pas le téléchargement automatiquement
+            // if (stats.state === 'downloading' || stats.state === 'queued') {
+            //   // Le polling sera démarré uniquement via handleDownload ou handlePlay
+            // }
           }
+          // Ne pas logger si stats est null (torrent non téléchargé, c'est normal)
         } catch (err) {
-          // Ignorer les erreurs
+          // Ignorer silencieusement les erreurs 404 (torrent non téléchargé)
+          if (err instanceof Error && (err.message.includes('404') || err.message.includes('Not Found'))) {
+            return;
+          }
+          // Ignorer les autres erreurs
         }
       }
     };
@@ -291,59 +306,21 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
   }, [hasInfoHash, torrent.infoHash, torrent.clientState, torrent.clientProgress, isPlaying, playStatus]);
 
   // Utiliser directement le trailerKey du torrent s'il est disponible
-  // Sinon, essayer de le charger via l'API (fallback)
-  const trailerFetchedRef = useRef<string | null>(null);
+  // Le trailer_key est déjà inclus dans les données du groupe de torrents
+  // Si le trailer n'est pas disponible, utiliser l'image à la place
   useEffect(() => {
-    if (!torrent.id && !torrent.slug) return;
-
-    // Si le torrent a déjà un trailerKey, l'utiliser directement
+    // Le trailer_key est déjà dans les données du torrent depuis getTorrentGroup
+    // Pas besoin d'appeler un endpoint séparé
     if (torrent.trailerKey) {
       setTrailerKey(torrent.trailerKey);
-      trailerFetchedRef.current = (torrent.slug || torrent.id || '').toString().trim();
-      return;
+      // Lancer automatiquement le trailer si disponible
+      setIsPlayingTrailer(true);
+    } else {
+      // Pas de trailer disponible, utiliser l'image à la place
+      setTrailerKey(null);
+      setIsPlayingTrailer(false);
     }
-
-    // Sinon, essayer de charger via l'API (fallback)
-    const identifier = (torrent.slug || torrent.id || '').toString().trim();
-    if (!identifier || trailerFetchedRef.current === identifier) return;
-    
-    trailerFetchedRef.current = identifier;
-    setIsLoadingTrailer(true);
-
-    const baseUrl = serverApi.getServerUrl();
-    const token = serverApi.getAccessToken();
-    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-
-    fetch(`${baseUrl}/api/torrents/${encodeURIComponent(identifier)}/trailer`, { headers })
-      .then((res) => {
-        if (res.status === 404) {
-          setTrailerKey(null);
-          setIsLoadingTrailer(false);
-          return null;
-        }
-        if (!res.ok) {
-          setTrailerKey(null);
-          setIsLoadingTrailer(false);
-          return null;
-        }
-        return res.json();
-      })
-      .catch(() => {
-        setTrailerKey(null);
-        setIsLoadingTrailer(false);
-      })
-      .then((data) => {
-        if (data && data.success && data.trailerKey) {
-          setTrailerKey(data.trailerKey);
-          setIsPlayingTrailer(true);
-        } else {
-          setTrailerKey(null);
-        }
-      })
-      .finally(() => {
-        setIsLoadingTrailer(false);
-      });
-  }, [torrent.id, torrent.slug, torrent.trailerKey]);
+  }, [torrent.trailerKey]);
 
   // Déterminer le torrent actif
   const activeTorrent = selectedTorrent || torrent;
@@ -504,6 +481,7 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
       )}
     <div className="relative bg-black text-white">
       {/* Hero section */}
+      {/* Afficher le trailer seulement s'il est disponible ET qu'on veut le jouer */}
       {isPlayingTrailer && trailerKey ? (
         <div className="fixed top-0 left-0 right-0 bottom-0 z-0 overflow-hidden pointer-events-none">
           <VideoPlayer
@@ -519,12 +497,12 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/40 to-black" />
         </div>
-      ) : imageUrl ? (
+      ) : (heroImageUrl || imageUrl) ? (
         <div className="fixed top-0 left-0 right-0 bottom-0 z-0 overflow-hidden pointer-events-none">
           <div
             className="absolute inset-0 bg-cover bg-center bg-no-repeat"
             style={{
-              backgroundImage: `url(${imageUrl})`,
+              backgroundImage: `url(${heroImageUrl || imageUrl})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center',
             }}
@@ -666,32 +644,12 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
                   return;
                 }
                 
+                // Le trailer_key est déjà dans les données du torrent depuis getTorrentGroup
+                // Pas besoin d'appeler un endpoint séparé
                 if (trailerKey) {
                   setIsPlayingTrailer(true);
-                } else if (!isLoadingTrailer) {
-                  const identifier = (torrent.slug || torrent.id || '').toString().trim();
-                  if (identifier) {
-                    setIsLoadingTrailer(true);
-                    const baseUrl = serverApi.getServerUrl();
-                    const token = serverApi.getAccessToken();
-                    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-                    fetch(`${baseUrl}/api/torrents/${encodeURIComponent(identifier)}/trailer`, { headers })
-                      .then((res) => res.json())
-                      .then((data) => {
-                        if (data && data.success && data.trailerKey) {
-                          setTrailerKey(data.trailerKey);
-                          setIsPlayingTrailer(true);
-                        } else {
-                          addNotification('info', 'Bande-annonce non disponible pour ce média');
-                        }
-                      })
-                      .catch(() => {
-                        addNotification('error', 'Erreur lors du chargement de la bande-annonce');
-                      })
-                      .finally(() => {
-                        setIsLoadingTrailer(false);
-                      });
-                  }
+                } else {
+                  addNotification('info', 'Bande-annonce non disponible pour ce média. Le torrent n\'a peut-être pas été enrichi avec les données TMDB.');
                 }
               }}
             />
