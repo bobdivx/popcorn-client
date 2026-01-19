@@ -103,6 +103,177 @@ jobs:
           JAVA_HOME: ${{ env.JAVA_HOME }}
           CARGO_TERM_COLOR: always
 
+      - name: Setup signing keystore
+        run: |
+          echo "🔐 Configuration de la signature native..."
+          ANDROID_DIR="src-tauri/gen/android"
+          
+          # Créer le répertoire si nécessaire
+          mkdir -p "$ANDROID_DIR"
+          
+          # Option 1: Utiliser un keystore existant depuis les secrets (base64 encodé)
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "📥 Décodage du keystore depuis les secrets..."
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$ANDROID_DIR/keystore.jks"
+            echo "✅ Keystore décodé"
+          else
+            echo "⚠️  Aucun keystore dans les secrets, création d'un nouveau keystore..."
+            KEYTOOL="$JAVA_HOME/bin/keytool"
+            if [ ! -f "$KEYTOOL" ]; then
+              KEYTOOL="keytool"
+            fi
+            
+            # Créer un keystore avec les secrets ou valeurs par défaut
+            KEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+            KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
+            
+            if [ -z "$KEYSTORE_PASSWORD" ]; then
+              KEYSTORE_PASSWORD="changeit"
+              KEY_PASSWORD="changeit"
+              echo "⚠️  Utilisation d'un mot de passe par défaut (changez-le dans les secrets GitHub!)"
+            fi
+            
+            $KEYTOOL -genkeypair -noprompt \
+              -keystore "$ANDROID_DIR/keystore.jks" \
+              -storepass "$KEYSTORE_PASSWORD" \
+              -keypass "$KEY_PASSWORD" \
+              -alias "popcorn-key" \
+              -dname "CN=Popcorn Client, OU=Development, O=Popcorn, L=Unknown, ST=Unknown, C=FR" \
+              -keyalg RSA -keysize 2048 -validity 9125
+            echo "✅ Keystore créé"
+          fi
+          
+          # Créer le fichier keystore.properties
+          KEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+          KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
+          
+          if [ -z "$KEYSTORE_PASSWORD" ]; then
+            KEYSTORE_PASSWORD="changeit"
+            KEY_PASSWORD="changeit"
+          fi
+          
+          cat > "$ANDROID_DIR/keystore.properties" << EOF
+          # Configuration du keystore pour la signature de l'APK
+          # Généré automatiquement par GitHub Actions
+          
+          storeFile=keystore.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=popcorn-key
+          keyPassword=$KEY_PASSWORD
+          EOF
+          
+          echo "✅ Fichier keystore.properties créé"
+          echo "📋 Configuration:"
+          echo "   - Keystore: $ANDROID_DIR/keystore.jks"
+          echo "   - Alias: popcorn-key"
+          echo "   - Fichier properties: $ANDROID_DIR/keystore.properties"
+
+      - name: Apply signing configuration to build.gradle.kts
+        run: |
+          echo "🔧 Application de la configuration de signature..."
+          BUILD_GRADLE="src-tauri/gen/android/app/build.gradle.kts"
+          
+          if [ ! -f "$BUILD_GRADLE" ]; then
+            echo "⚠️  build.gradle.kts non trouvé, attente..."
+            # Attendre que Tauri génère le fichier
+            for i in {1..30}; do
+              if [ -f "$BUILD_GRADLE" ]; then
+                break
+              fi
+              sleep 1
+            done
+          fi
+          
+          if [ ! -f "$BUILD_GRADLE" ]; then
+            echo "❌ build.gradle.kts introuvable après attente"
+            exit 1
+          fi
+          
+          # Vérifier si la configuration existe déjà
+          if grep -q "signingConfigs" "$BUILD_GRADLE"; then
+            echo "✅ Configuration de signature déjà présente"
+          else
+            echo "📝 Ajout de la configuration de signature..."
+            
+            # Créer un script Python temporaire pour modifier le fichier
+            cat > /tmp/apply_signing.py << 'PYTHON_SCRIPT'
+          import re
+          import sys
+          
+          file_path = sys.argv[1]
+          
+          with open(file_path, 'r', encoding='utf-8') as f:
+              content = f.read()
+          
+          # Vérifier si signingConfigs existe déjà
+          if 'signingConfigs' in content:
+              print("Configuration déjà présente")
+              sys.exit(0)
+          
+          # Configuration de signature à insérer
+          signing_config = '''
+    // Configuration de la signature
+    signingConfigs {
+        create("release") {
+            val keystorePropertiesFile = rootProject.file("keystore.properties")
+            if (keystorePropertiesFile.exists()) {
+                val keystoreProperties = Properties()
+                keystoreProperties.load(keystorePropertiesFile.inputStream())
+                // Résoudre le chemin du keystore depuis la racine du projet (rootProject)
+                val keystoreFileName = keystoreProperties["storeFile"] as String
+                storeFile = rootProject.file(keystoreFileName)
+                storePassword = keystoreProperties["storePassword"] as String
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+            } else {
+                // Utiliser les variables d'environnement si le fichier n'existe pas
+                val keystorePath = System.getenv("ANDROID_KEYSTORE_PATH") ?: ""
+                val keystorePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD") ?: ""
+                val keyAlias = System.getenv("ANDROID_KEY_ALIAS") ?: "popcorn-key"
+                val keyPassword = System.getenv("ANDROID_KEY_PASSWORD") ?: keystorePassword
+                
+                if (keystorePath.isNotEmpty() && keystorePassword.isNotEmpty()) {
+                    // Vérifier si le chemin est absolu (Windows: contient ':', Unix: commence par '/')
+                    val isAbsolute = keystorePath.contains(":") || keystorePath.startsWith("/")
+                    val keystoreFile = if (isAbsolute) {
+                        file(keystorePath)
+                    } else {
+                        rootProject.file(keystorePath)
+                    }
+                    if (keystoreFile.exists()) {
+                        storeFile = keystoreFile
+                        storePassword = keystorePassword
+                        this.keyAlias = keyAlias
+                        this.keyPassword = keyPassword
+                    }
+                }
+            }
+        }
+    }
+    '''
+          
+          # Insérer après compileOptions et avant buildTypes
+          pattern = r'(compileOptions \{[^}]*\})\s*(buildTypes)'
+          replacement = r'\1' + signing_config + r'\n    \2'
+          
+          new_content = re.sub(pattern, replacement, content)
+          
+          # Ajouter signingConfig au buildType release
+          release_pattern = r'(getByName\("release"\) \{[^}]*)(isMinifyEnabled = true)'
+          release_replacement = r'\1\n            signingConfig = signingConfigs.getByName("release")\n            \2'
+          
+          new_content = re.sub(release_pattern, release_replacement, new_content)
+          
+          with open(file_path, 'w', encoding='utf-8') as f:
+              f.write(new_content)
+          
+          print("✅ Configuration de signature appliquée")
+          PYTHON_SCRIPT
+            python3 /tmp/apply_signing.py "$BUILD_GRADLE"
+            
+            echo "✅ Configuration appliquée avec succès"
+          fi
+
       - name: Build Android APK
         run: npm run tauri:build:android-mobile
         env:
@@ -197,10 +368,10 @@ jobs:
           ls -lh "$APK_PATH"
           echo "Taille: $(du -h "$APK_PATH" | cut -f1)"
 
-      - name: Verify and sign APK
+      - name: Verify native signed APK
         run: |
           APK_PATH="${{ steps.find-apk.outputs.path }}"
-          echo "🔍 Vérification de l'APK: $APK_PATH"
+          echo "🔍 Vérification de l'APK signé nativement: $APK_PATH"
           
           # Trouver les outils Android
           BUILD_TOOLS=$(find $ANDROID_HOME/build-tools -maxdepth 1 -type d | sort -V | tail -n 1)
@@ -208,84 +379,45 @@ jobs:
           ZIPALIGN="$BUILD_TOOLS/zipalign"
           
           if [ ! -f "$APKSIGNER" ] || [ ! -f "$ZIPALIGN" ]; then
-            echo "⚠️  Outils de signature introuvables, vérification ignorée"
+            echo "⚠️  Outils de vérification introuvables, vérification ignorée"
             exit 0
+          fi
+          
+          # Vérifier la signature native (l'APK devrait déjà être signé par Gradle)
+          echo "🔐 Vérification de la signature native..."
+          if $APKSIGNER verify "$APK_PATH" > /dev/null 2>&1; then
+            echo "✅ APK signé nativement avec succès"
+            $APKSIGNER verify --print-certs "$APK_PATH" | head -n 5
+          else
+            echo "❌ ERREUR CRITIQUE: L'APK n'est pas signé ou la signature est invalide!"
+            echo "   Chemin: $APK_PATH"
+            echo "   L'APK doit être signé nativement par Gradle avec le keystore de production"
+            exit 1
           fi
           
           # Vérifier l'alignement
           echo "📐 Vérification de l'alignement..."
-          if ! $ZIPALIGN -c 4 "$APK_PATH" > /dev/null 2>&1; then
-            echo "⚠️  APK non aligné, alignement en cours..."
-            ALIGNED_APK="${APK_PATH}.aligned"
-            $ZIPALIGN -f 4 "$APK_PATH" "$ALIGNED_APK"
-            mv "$ALIGNED_APK" "$APK_PATH"
-            echo "✅ APK aligné"
-          else
+          if $ZIPALIGN -c 4 "$APK_PATH" > /dev/null 2>&1; then
             echo "✅ APK correctement aligné"
-          fi
-          
-          # TOUJOURS signer l'APK pour garantir qu'il est valide
-          # Même si l'APK semble signé, on le re-signe pour éviter les problèmes
-          echo "🔐 Signature de l'APK (toujours re-signer pour garantir la validité)..."
-          
-          # Créer le keystore debug s'il n'existe pas
-          KEYSTORE="$HOME/.android/debug.keystore"
-          if [ ! -f "$KEYSTORE" ]; then
-            echo "📝 Création du keystore debug..."
-            mkdir -p "$HOME/.android"
-            KEYTOOL="$JAVA_HOME/bin/keytool"
-            if [ ! -f "$KEYTOOL" ]; then
-              KEYTOOL="keytool"
+          else
+            echo "⚠️  APK non aligné (non bloquant mais recommandé)"
+            # Aligner si nécessaire (sans re-signer)
+            ALIGNED_APK="${APK_PATH}.aligned"
+            if $ZIPALIGN -f 4 "$APK_PATH" "$ALIGNED_APK" > /dev/null 2>&1; then
+              mv "$ALIGNED_APK" "$APK_PATH"
+              echo "✅ APK aligné (signature préservée)"
             fi
-            $KEYTOOL -genkeypair -noprompt \
-              -keystore "$KEYSTORE" \
-              -storepass "android" \
-              -keypass "android" \
-              -alias "androiddebugkey" \
-              -dname "CN=Android Debug,O=Android,C=US" \
-              -keyalg RSA -keysize 2048 -validity 10000
-          fi
-          
-          # Vérifier si l'APK est déjà signé (pour info seulement)
-          if $APKSIGNER verify "$APK_PATH" > /dev/null 2>&1; then
-            echo "ℹ️  APK semble signé, re-signature pour garantir la validité..."
-          else
-            echo "⚠️  APK non signé ou signature invalide, signature en cours..."
-          fi
-          
-          # Signer l'APK (toujours)
-          SIGNED_APK="${APK_PATH}.signed"
-          $APKSIGNER sign \
-            --ks "$KEYSTORE" \
-            --ks-key-alias "androiddebugkey" \
-            --ks-pass "pass:android" \
-            --key-pass "pass:android" \
-            --out "$SIGNED_APK" \
-            "$APK_PATH"
-          
-          # Vérifier la signature
-          if $APKSIGNER verify "$SIGNED_APK" > /dev/null 2>&1; then
-            mv "$SIGNED_APK" "$APK_PATH"
-            echo "✅ APK signé avec succès"
-          else
-            echo "❌ Échec de la signature"
-            exit 1
           fi
           
           # Vérification finale obligatoire
           echo "🔍 Vérification finale..."
           if $APKSIGNER verify "$APK_PATH" > /dev/null 2>&1; then
             echo "✅ APK valide et prêt pour l'installation"
+            echo "   Signature: Native (keystore de production)"
           else
             echo "❌ ERREUR CRITIQUE: L'APK final n'est pas signé!"
             echo "   Chemin: $APK_PATH"
             exit 1
-          fi
-          
-          if $ZIPALIGN -c 4 "$APK_PATH" > /dev/null 2>&1; then
-            echo "✅ APK correctement aligné"
-          else
-            echo "⚠️  APK non aligné (non bloquant mais recommandé)"
           fi
 
       - name: Rename APK with correct format

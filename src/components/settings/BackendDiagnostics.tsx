@@ -561,19 +561,19 @@ export default function BackendDiagnostics() {
   return (
     <div className="space-y-4">
       <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="flex-1 min-w-0">
             <h2 className="text-lg font-bold text-white">Diagnostics réseau (Android/Desktop)</h2>
             <p className="text-gray-400 text-sm">
               Vérifie les endpoints utilisés par l’app en build statique.
             </p>
             <p className="text-gray-500 text-xs mt-2">
-              Backend configuré: <span className="text-gray-300">{backendUrl || '(non défini)'}</span>
+              Backend configuré: <span className="text-gray-300 break-all">{backendUrl || '(non défini)'}</span>
             </p>
             <div className="mt-3 mb-3">
               <a 
                 href="/settings/audit" 
-                className="text-sm text-blue-400 hover:text-blue-300 underline inline-flex items-center gap-1"
+                className="text-sm text-blue-400 hover:text-blue-300 underline inline-flex items-center gap-1 break-words"
               >
                 🔍 Ouvrir la page Audit (teste toutes les méthodes de communication)
               </a>
@@ -586,7 +586,7 @@ export default function BackendDiagnostics() {
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    className="input input-sm input-bordered flex-1"
+                    className="input input-sm input-bordered flex-1 min-w-0"
                     value={altBackendUrl}
                     onChange={(e) => setAltBackendUrlAndSave((e.currentTarget as HTMLInputElement).value)}
                     placeholder="http://10.0.2.2:3000"
@@ -596,9 +596,9 @@ export default function BackendDiagnostics() {
                   <p className="text-gray-500 text-xs">
                     Le diagnostic testera les deux URLs: celle configurée et celle-ci.
                   </p>
-                  <p className="text-blue-400/80 text-xs flex items-center gap-1">
-                    <span>📱</span>
-                    <span>
+                  <p className="text-blue-400/80 text-xs flex items-start gap-1">
+                    <span className="flex-shrink-0">📱</span>
+                    <span className="break-words">
                       <strong>10.0.2.2</strong> est l'IP spéciale de l'émulateur Android pour accéder au localhost de la machine hôte.
                       Les tests avec cette IP échoueront si vous n'êtes pas sur un émulateur Android.
                     </span>
@@ -608,11 +608,11 @@ export default function BackendDiagnostics() {
               <label className="flex items-center gap-3 text-sm text-gray-300">
                 <input
                   type="checkbox"
-                  className="checkbox checkbox-sm"
+                  className="checkbox checkbox-sm flex-shrink-0"
                   checked={runOnBoot}
                   onChange={(e) => setDiagOnBoot((e.currentTarget as HTMLInputElement).checked)}
                 />
-                Lancer cette page automatiquement au démarrage
+                <span className="break-words">Lancer cette page automatiquement au démarrage</span>
               </label>
               <p className="text-gray-500 text-xs">
                 En pratique: si activé, l’app redirige vers <span className="text-gray-300">/settings/diagnostics</span> au lancement.
@@ -620,7 +620,7 @@ export default function BackendDiagnostics() {
             </div>
           </div>
           <button
-            className="btn btn-primary"
+            className="btn btn-primary flex-shrink-0 w-full sm:w-auto"
             disabled={running}
             onClick={() => run()}
           >
@@ -660,7 +660,7 @@ export default function BackendDiagnostics() {
                             : ''
                     }
                   >
-                    <td className="font-medium text-white">
+                    <td className="font-medium text-white break-words min-w-[150px]">
                       {isEmulatorTest && (
                         <span className="inline-flex items-center gap-1 mr-2">
                           <span className="text-blue-400 text-xs">📱</span>
@@ -673,16 +673,16 @@ export default function BackendDiagnostics() {
                       )}
                       {r.name}
                       {isEmulatorTest && (
-                        <span className="ml-2 text-xs text-blue-400/70 italic">
+                        <span className="ml-2 text-xs text-blue-400/70 italic break-words">
                           (uniquement émulateur Android)
                         </span>
                       )}
                     </td>
-                    <td className={r.ok ? 'text-green-400' : 'text-red-400'}>
+                    <td className={`${r.ok ? 'text-green-400' : 'text-red-400'} whitespace-nowrap`}>
                       {r.ok ? 'OK' : 'KO'}
                     </td>
-                    <td className="text-gray-300">{typeof r.ms === 'number' ? `${r.ms} ms` : '-'}</td>
-                    <td className="text-gray-400">{r.message || '-'}</td>
+                    <td className="text-gray-300 whitespace-nowrap">{typeof r.ms === 'number' ? `${r.ms} ms` : '-'}</td>
+                    <td className="text-gray-400 break-words min-w-[200px]">{r.message || '-'}</td>
                   </tr>
                 );
               })}
@@ -697,10 +697,10 @@ export default function BackendDiagnostics() {
       </div>
 
       <div className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h3 className="text-base font-bold text-white">Rapport</h3>
           <div className="flex items-center gap-2">
-            <button className="btn btn-sm" onClick={() => copyReport()} disabled={!report}>
+            <button className="btn btn-sm w-full sm:w-auto" onClick={() => copyReport()} disabled={!report}>
               Copier
             </button>
           </div>
@@ -712,7 +712,7 @@ export default function BackendDiagnostics() {
           readOnly
           value={report || 'Génération du rapport…'}
         />
-        <p className="text-gray-500 text-xs">
+        <p className="text-gray-500 text-xs break-words">
           Astuce: colle ce JSON dans un message, ça me permet de diagnostiquer très vite (DNS/LAN, cleartext, auth, endpoints).
         </p>
       </div>

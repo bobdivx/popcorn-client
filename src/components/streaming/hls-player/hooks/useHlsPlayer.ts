@@ -16,6 +16,7 @@ interface UseHlsPlayerProps {
   onError?: (error: Error) => void;
   onLoadingChange?: (loading: boolean) => void;
   canAutoPlay?: () => boolean;
+  onDurationChange?: (duration: number) => void;
 }
 
 export function useHlsPlayer({
@@ -28,6 +29,7 @@ export function useHlsPlayer({
   onError,
   onLoadingChange,
   canAutoPlay,
+  onDurationChange,
 }: UseHlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<any>(null);
@@ -47,6 +49,7 @@ export function useHlsPlayer({
   const canAutoPlayRef = useRef(canAutoPlay);
   const startFromBeginningRef = useRef(startFromBeginning);
   const torrentIdRef = useRef(torrentId);
+  const onDurationChangeRef = useRef(onDurationChange);
   
   // Mettre à jour les refs quand les props changent (sans déclencher de réinitialisation)
   useEffect(() => {
@@ -55,7 +58,8 @@ export function useHlsPlayer({
     canAutoPlayRef.current = canAutoPlay;
     startFromBeginningRef.current = startFromBeginning;
     torrentIdRef.current = torrentId;
-  }, [onError, onLoadingChange, canAutoPlay, startFromBeginning, torrentId]);
+    onDurationChangeRef.current = onDurationChange;
+  }, [onError, onLoadingChange, canAutoPlay, startFromBeginning, torrentId, onDurationChange]);
 
   const { hlsLoaded, error: loaderError } = useHlsLoader();
   const playerConfig = usePlayerConfig();
@@ -157,11 +161,54 @@ export function useHlsPlayer({
         hls.loadSource(hlsUrl);
         hls.attachMedia(video);
 
-        hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        hls.on(window.Hls.Events.MANIFEST_PARSED, (event: any, data: any) => {
           // Réinitialiser le compteur de retry en cas de succès
           retryCountRef.current = 0;
           setIsLoading(false);
           onLoadingChangeRef.current?.(false);
+          
+          // Extraire la durée totale depuis la playlist HLS
+          // La durée totale peut être obtenue depuis les niveaux de qualité
+          let totalDuration = 0;
+          if (hls.levels && hls.levels.length > 0) {
+            // Chercher la durée totale depuis le niveau de qualité principal
+            const mainLevel = hls.levels[hls.currentLevel !== -1 ? hls.currentLevel : 0];
+            if (mainLevel && mainLevel.details) {
+              // Si totalduration est disponible
+              if (mainLevel.details.totalduration) {
+                totalDuration = mainLevel.details.totalduration;
+              } else if (mainLevel.details.fragments && mainLevel.details.fragments.length > 0) {
+                // Calculer depuis les fragments
+                const lastFragment = mainLevel.details.fragments[mainLevel.details.fragments.length - 1];
+                totalDuration = lastFragment.start + lastFragment.duration;
+              }
+            }
+          }
+          
+          // Si pas de durée depuis les niveaux, utiliser data.totalduration ou video.duration
+          if (totalDuration === 0) {
+            if (data && data.totalduration) {
+              totalDuration = data.totalduration;
+            } else {
+              // Fallback: attendre que video.duration soit disponible
+              const checkDuration = () => {
+                if (video.duration && isFinite(video.duration) && video.duration > 0) {
+                  totalDuration = video.duration;
+                  onDurationChangeRef.current?.(totalDuration);
+                }
+              };
+              video.addEventListener('loadedmetadata', checkDuration, { once: true });
+              // Vérifier immédiatement si déjà disponible
+              if (video.duration && isFinite(video.duration) && video.duration > 0) {
+                totalDuration = video.duration;
+              }
+            }
+          }
+          
+          // Notifier la durée totale si disponible
+          if (totalDuration > 0 && isFinite(totalDuration)) {
+            onDurationChangeRef.current?.(totalDuration);
+          }
           
           if (startFromBeginningRef.current) {
             video.currentTime = 0;
@@ -173,9 +220,11 @@ export function useHlsPlayer({
                 // Convertir bytes en secondes approximativement
                 const files = await clientApi.getTorrentFiles(infoHash);
                 const file = files.find(f => f.path === filePath);
-                if (file && file.size > 0 && video.duration > 0) {
-                  const estimatedSeconds = (position / file.size) * video.duration;
-                  const maxPosition = video.duration * 0.95;
+                // Utiliser la durée totale si disponible, sinon video.duration
+                const videoDuration = totalDuration > 0 ? totalDuration : (video.duration || 0);
+                if (file && file.size > 0 && videoDuration > 0) {
+                  const estimatedSeconds = (position / file.size) * videoDuration;
+                  const maxPosition = videoDuration * 0.95;
                   const finalPosition = Math.min(estimatedSeconds, maxPosition);
                   if (finalPosition > 1) {
                     video.currentTime = finalPosition;
@@ -190,6 +239,23 @@ export function useHlsPlayer({
               video.play().catch(() => {});
             }
           }, 100);
+        });
+        
+        // Écouter LEVEL_UPDATED pour mettre à jour la durée si elle change
+        hls.on(window.Hls.Events.LEVEL_UPDATED, (event: any, data: any) => {
+          if (data && data.details && data.details.totalduration) {
+            const totalDuration = data.details.totalduration;
+            if (totalDuration > 0 && isFinite(totalDuration)) {
+              onDurationChangeRef.current?.(totalDuration);
+            }
+          } else if (data && data.details && data.details.fragments && data.details.fragments.length > 0) {
+            // Calculer depuis les fragments
+            const lastFragment = data.details.fragments[data.details.fragments.length - 1];
+            const totalDuration = lastFragment.start + lastFragment.duration;
+            if (totalDuration > 0 && isFinite(totalDuration)) {
+              onDurationChangeRef.current?.(totalDuration);
+            }
+          }
         });
 
         hls.on(window.Hls.Events.ERROR, (event: any, data: any) => {

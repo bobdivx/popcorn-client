@@ -27,7 +27,7 @@ export function StepIndicator({ currentStep, totalSteps }: StepIndicatorProps) {
           <span className="text-sm font-semibold text-white">
             Étape {currentStep}/{totalSteps}
           </span>
-          <span className="text-xs text-gray-400 truncate">{currentLabel}</span>
+          <span className="text-xs text-gray-400 truncate" title={currentLabel}>{currentLabel}</span>
         </div>
         <div className="mt-3 w-full bg-gray-800 rounded-full h-2">
           <div className="bg-primary-600 h-2 rounded-full transition-all" style={{ width: `${progressPct}%` }} />

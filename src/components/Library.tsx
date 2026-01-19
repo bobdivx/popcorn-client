@@ -69,10 +69,13 @@ export default function Library({ onItemClick }: LibraryProps) {
   };
 
   const handlePlay = (item: LibraryMedia) => {
+    // Utiliser le slug ou l'info_hash comme paramètre de requête
+    // MediaDetailRoute attend un paramètre 'slug' dans la query string
     if (item.slug) {
-      window.location.href = `/torrents/${item.slug}`;
+      window.location.href = `/torrents?slug=${encodeURIComponent(item.slug)}`;
     } else if (item.info_hash) {
-      window.location.href = `/player/${item.info_hash}`;
+      // Si pas de slug, utiliser l'info_hash comme slug (MediaDetailRoute le gère)
+      window.location.href = `/torrents?slug=${encodeURIComponent(item.info_hash)}`;
     }
   };
 

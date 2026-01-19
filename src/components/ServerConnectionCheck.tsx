@@ -348,7 +348,15 @@ export default function ServerConnectionCheck() {
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center">
+    <div 
+      className="fixed inset-0 z-[9999] bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center"
+      style={{ 
+        paddingTop: 'var(--safe-area-inset-top)',
+        paddingBottom: 'var(--safe-area-inset-bottom)',
+        paddingLeft: 'var(--safe-area-inset-left)',
+        paddingRight: 'var(--safe-area-inset-right)'
+      }}
+    >
       {/* Animation de fond */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,119,198,0.1),transparent_50%)] animate-pulse"></div>
@@ -357,7 +365,7 @@ export default function ServerConnectionCheck() {
       </div>
 
       {/* Contenu principal */}
-      <div className="relative z-10 flex flex-col items-center justify-center space-y-8 px-4">
+      <div className="relative z-10 flex flex-col items-center justify-center space-y-6 sm:space-y-8 px-4 py-4 sm:py-8 min-h-0 max-h-full overflow-y-auto">
         {/* Logo/Icone animé */}
         <div className="relative">
           <div className="w-24 h-24 md:w-32 md:h-32 relative">
@@ -375,13 +383,13 @@ export default function ServerConnectionCheck() {
         </div>
 
           {/* Titre */}
-          <div className="text-center space-y-4 tv:space-y-6">
-            <h1 className="text-3xl md:text-5xl tv:text-6xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-pulse">
+          <div className="text-center space-y-3 sm:space-y-4 tv:space-y-6">
+            <h1 className="text-2xl sm:text-3xl md:text-5xl tv:text-6xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-pulse">
               Popcorn Torrent
             </h1>
             
             {/* Message de statut */}
-            <p className={`text-lg md:text-xl tv:text-2xl font-medium ${
+            <p className={`text-base sm:text-lg md:text-xl tv:text-2xl font-medium px-2 ${
               status === 'connecting' && retryCount > 0
                 ? 'text-yellow-300' 
                 : status === 'connecting'
@@ -432,7 +440,7 @@ export default function ServerConnectionCheck() {
         </div>
 
         {backendUrl && (
-          <div className="text-center text-xs text-gray-500 max-w-lg break-all">
+          <div className="text-center text-xs sm:text-sm text-gray-500 max-w-lg break-all px-2" title={backendUrl}>
             Backend: <span className="text-gray-300">{backendUrl}</span>
           </div>
         )}

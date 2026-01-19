@@ -326,8 +326,13 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
   const activeTorrent = selectedTorrent || torrent;
   const activeInfoHash = activeTorrent.infoHash;
   
+  // Vérifier que l'infoHash est valide
+  const hasValidInfoHash = activeInfoHash && 
+                          typeof activeInfoHash === 'string' && 
+                          activeInfoHash.trim().length > 0;
+  
   // Vérifier si on peut afficher le lecteur vidéo
-  const canShowVideoPlayer = isPlaying && activeInfoHash && selectedFile && videoFiles.length > 0;
+  const canShowVideoPlayer = isPlaying && hasValidInfoHash && selectedFile && videoFiles.length > 0;
   
   // Ref pour le wrapper vidéo
   const videoWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -445,10 +450,10 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
   }
 
   // Si on peut afficher le lecteur vidéo, l'afficher
-  if (canShowVideoPlayer && !shouldShowOverlay) {
+  if (canShowVideoPlayer && !shouldShowOverlay && hasValidInfoHash) {
     return (
       <VideoPlayerWrapper
-        infoHash={activeInfoHash}
+        infoHash={activeInfoHash!}
         selectedFile={selectedFile}
         torrentName={activeTorrent.cleanTitle || activeTorrent.name}
         torrentId={activeTorrent.id}
@@ -466,9 +471,9 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
     <>
       {/* Ne rendre VideoPlayerWrapper QUE si on est en mode streaming (isPlaying = true) */}
       {/* Pendant le téléchargement (isPlaying = false), ne pas rendre le composant pour éviter de déclencher le lecteur HLS */}
-      {activeInfoHash && !shouldShowOverlay && isPlaying && canShowVideoPlayer && (
+      {hasValidInfoHash && !shouldShowOverlay && isPlaying && canShowVideoPlayer && (
         <VideoPlayerWrapper
-          infoHash={activeInfoHash}
+          infoHash={activeInfoHash!}
           selectedFile={selectedFile}
           torrentName={activeTorrent.cleanTitle || activeTorrent.name}
           torrentId={activeTorrent.id}

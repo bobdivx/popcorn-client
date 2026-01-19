@@ -85,7 +85,7 @@ export function SyncBanner() {
             {progress && (
               <div className="flex items-center gap-4 text-xs text-gray-300">
                 {progress.current_indexer && (
-                  <span className="truncate">
+                  <span className="truncate" title={`Indexer: ${progress.current_indexer}`}>
                     Indexer: <span className="text-blue-300 font-medium">{progress.current_indexer}</span>
                   </span>
                 )}

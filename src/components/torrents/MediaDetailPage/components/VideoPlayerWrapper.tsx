@@ -5,6 +5,7 @@ import { serverApi } from '../../../../lib/client/server-api';
 import type { TorrentFile } from '../hooks/useVideoFiles';
 import { useFullscreen } from '../../../streaming/hls-player/hooks/useFullscreen';
 import { QualityBadges } from './QualityBadges';
+import { isMobileDevice } from '../../../../lib/utils/device-detection';
 
 interface VideoPlayerWrapperProps {
   infoHash: string;
@@ -40,6 +41,7 @@ export function VideoPlayerWrapper({
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const isFullscreen = useFullscreen();
   const wrapperElementRef = useRef<HTMLDivElement>(null);
+  const isMobile = isMobileDevice();
 
   useEffect(() => {
     if (wrapperRef) {
@@ -48,42 +50,72 @@ export function VideoPlayerWrapper({
   }, [wrapperRef]);
 
   useEffect(() => {
-    if (!selectedFile || !infoHash) return;
+    if (!selectedFile) {
+      console.warn('[VideoPlayerWrapper] Fichier manquant:', {
+        hasSelectedFile: !!selectedFile,
+        hasInfoHash: !!infoHash,
+      });
+      return;
+    }
+    
+    if (!infoHash || infoHash.trim().length === 0) {
+      console.error('[VideoPlayerWrapper] ❌ InfoHash manquant ou invalide. Impossible de construire l\'URL HLS.', {
+        infoHash,
+        fileName: selectedFile.name,
+        filePath: selectedFile.path,
+      });
+      setIsLoading(false);
+      return;
+    }
 
     const loadHlsUrl = async () => {
       try {
         setIsLoading(true);
         // Utiliser l'URL HLS du backend au lieu d'une Blob URL
         const baseUrl = serverApi.getServerUrl();
-        // Encoder le chemin du fichier pour l'URL
-        // Le backend attend /api/local/stream/{filePath}/playlist.m3u8
-        // Utiliser le chemin complet du fichier (qui inclut le chemin relatif dans le torrent)
-        // Normaliser le chemin : remplacer les backslashes par des slashes pour l'URL
+        
+        // Utiliser le chemin du fichier (path) si disponible, sinon le nom
+        // Le path contient le chemin relatif dans le torrent tel que retourné par le backend
         const filePath = selectedFile.path || selectedFile.name;
-        const normalizedPath = filePath.replace(/\\/g, '/');
-        // #region agent log
-        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VideoPlayerWrapper.tsx:62',message:'Construction URL HLS - avant encodage',data:{filePath,normalizedPath,name:selectedFile.name,path:selectedFile.path,infoHash:infoHash?.substring(0,12)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
+        
+        // Normaliser le chemin : remplacer les backslashes par des slashes pour l'URL
+        // Le backend s'attend à recevoir le chemin tel qu'il est dans le torrent
+        let normalizedPath = filePath.replace(/\\/g, '/');
+        
+        // S'assurer que le chemin ne commence pas par un slash (sauf si c'est un chemin absolu)
+        if (normalizedPath.startsWith('/') && !normalizedPath.startsWith('//')) {
+          normalizedPath = normalizedPath.substring(1);
+        }
+        
         console.log('[VideoPlayerWrapper] Construction URL HLS:', {
           filePath,
           normalizedPath,
           name: selectedFile.name,
           path: selectedFile.path,
-          infoHash,
+          infoHash: infoHash.substring(0, 12) + '...',
+          baseUrl,
         });
+        
+        // Encoder le chemin pour l'URL (chaque segment doit être encodé séparément pour éviter les problèmes)
+        // Utiliser encodeURIComponent sur le chemin normalisé
         const encodedPath = encodeURIComponent(normalizedPath);
+        
         // Passer l'info_hash en query parameter pour que le backend puisse utiliser get_file_path
         // qui utilise le download_path depuis la DB ou le handle (plus fiable que la recherche dans les dossiers)
         const infoHashParam = infoHash ? `?info_hash=${encodeURIComponent(infoHash)}` : '';
         const hlsUrl = `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8${infoHashParam}`;
-        // #region agent log
-        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'VideoPlayerWrapper.tsx:72',message:'URL HLS construite',data:{encodedPath,hlsUrl,normalizedPath},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-        // #endregion
-        console.log('[VideoPlayerWrapper] URL HLS construite:', hlsUrl);
+        
+        console.log('[VideoPlayerWrapper] URL HLS construite:', {
+          encodedPath,
+          hlsUrl,
+          normalizedPath,
+          infoHash: infoHash.substring(0, 12) + '...',
+        });
+        
         setBlobUrl(hlsUrl);
         setIsLoading(false);
       } catch (error) {
-        console.error('Erreur lors de la création de l\'URL HLS:', error);
+        console.error('[VideoPlayerWrapper] Erreur lors de la création de l\'URL HLS:', error);
         setIsLoading(false);
       }
     };
@@ -155,10 +187,10 @@ export function VideoPlayerWrapper({
       )}
 
       <div 
-        className={`absolute inset-0 ${isFullscreen ? 'p-0' : 'pt-16 pb-8 px-4 sm:px-6 lg:px-8'}`}
+        className={`absolute inset-0 ${isFullscreen ? 'p-0' : isMobile ? 'pt-12 pb-4 px-2' : 'pt-16 pb-8 px-4 sm:px-6 lg:px-8'}`}
       >
         <div 
-          className={`h-full w-full ${isFullscreen ? '' : 'max-w-7xl mx-auto'} flex flex-col relative`}
+          className={`h-full w-full ${isFullscreen || isMobile ? '' : 'max-w-7xl mx-auto'} flex flex-col relative`}
         >
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30">

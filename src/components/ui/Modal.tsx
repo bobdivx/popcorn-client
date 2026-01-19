@@ -156,7 +156,7 @@ export function Modal({
           <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
             <h2
               id="modal-title"
-              className="text-xl tv:text-2xl font-bold text-white"
+              className="text-lg sm:text-xl tv:text-2xl font-bold text-white"
             >
               {title}
             </h2>

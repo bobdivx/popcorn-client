@@ -4,9 +4,10 @@ import { usePlayerConfig } from './usePlayerConfig';
 interface UseVideoControlsProps {
   videoRef: { current: HTMLVideoElement | null };
   hlsLoaded: boolean;
+  hlsDuration?: number;
 }
 
-export function useVideoControls({ videoRef, hlsLoaded }: UseVideoControlsProps) {
+export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoControlsProps) {
   const playerConfig = usePlayerConfig();
   const [showControls, setShowControls] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -16,6 +17,13 @@ export function useVideoControls({ videoRef, hlsLoaded }: UseVideoControlsProps)
   const [volume, setVolume] = useState(playerConfig.volume);
   const controlsTimeoutRef = useRef<number | null>(null);
   const userPausedRef = useRef<boolean>(false);
+
+  // Utiliser la durée HLS si disponible, sinon video.duration
+  useEffect(() => {
+    if (hlsDuration && hlsDuration > 0 && isFinite(hlsDuration)) {
+      setDuration(hlsDuration);
+    }
+  }, [hlsDuration]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -35,7 +43,14 @@ export function useVideoControls({ videoRef, hlsLoaded }: UseVideoControlsProps)
 
     const handleTimeUpdate = () => {
       setCurrentTime(video.currentTime);
-      setDuration(video.duration || 0);
+      // Utiliser hlsDuration si disponible, sinon video.duration
+      // Mais ne pas écraser hlsDuration si elle est déjà définie
+      if (!hlsDuration || hlsDuration === 0 || !isFinite(hlsDuration)) {
+        const videoDuration = video.duration || 0;
+        if (videoDuration > 0 && isFinite(videoDuration)) {
+          setDuration(videoDuration);
+        }
+      }
     };
 
     const handlePlay = () => {
@@ -68,7 +83,13 @@ export function useVideoControls({ videoRef, hlsLoaded }: UseVideoControlsProps)
     };
 
     const handleLoadedMetadata = () => {
-      setDuration(video.duration || 0);
+      // Utiliser hlsDuration si disponible, sinon video.duration
+      if (!hlsDuration || hlsDuration === 0 || !isFinite(hlsDuration)) {
+        const videoDuration = video.duration || 0;
+        if (videoDuration > 0 && isFinite(videoDuration)) {
+          setDuration(videoDuration);
+        }
+      }
     };
 
     const container = video.parentElement?.parentElement;
@@ -110,7 +131,7 @@ export function useVideoControls({ videoRef, hlsLoaded }: UseVideoControlsProps)
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     };
-  }, [videoRef, hlsLoaded, playerConfig]);
+  }, [videoRef, hlsLoaded, playerConfig, hlsDuration]);
 
   const handlePlayPause = () => {
     const video = videoRef.current;

@@ -30,9 +30,31 @@ const { title = 'Popcorn Client' } = Astro.props;
     <ServerConnectionCheck client:only="preact" />
     <Navbar client:only="preact" />
     <!-- Header (barre en haut) -->
-    <main class="app-main flex-1 w-full overflow-x-hidden pt-20 sm:pt-22 md:pt-24 lg:pt-24 tv:pt-28">
+    <main class="app-main flex-1 w-full overflow-x-hidden safe-area-top" style="padding-top: calc(5rem + var(--safe-area-inset-top));">
       <slot />
     </main>
+    <style>
+      @media (min-width: 640px) {
+        .app-main {
+          padding-top: calc(5.5rem + var(--safe-area-inset-top)) !important;
+        }
+      }
+      @media (min-width: 768px) {
+        .app-main {
+          padding-top: calc(6rem + var(--safe-area-inset-top)) !important;
+        }
+      }
+      @media (min-width: 1024px) {
+        .app-main {
+          padding-top: calc(6rem + var(--safe-area-inset-top)) !important;
+        }
+      }
+      @media (min-width: 1920px) {
+        .app-main {
+          padding-top: calc(7rem + var(--safe-area-inset-top)) !important;
+        }
+      }
+    </style>
     <script is:inline>
       // Intercepter les routes /player/* et rediriger vers /player avec l'ID en query param
       // Cela permet de gérer les routes dynamiques en mode static

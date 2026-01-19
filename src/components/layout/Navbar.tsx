@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'preact/hooks';
-import { Download, Search as SearchIcon, Settings as SettingsIcon } from 'lucide-preact';
+import { useEffect, useState, useRef } from 'preact/hooks';
+import { Download, Search as SearchIcon, Settings as SettingsIcon, Menu, X } from 'lucide-preact';
 import { serverApi } from '../../lib/client/server-api';
 import { getLocalProfile, onProfileChanged } from '../../lib/client/profile';
 import Avatar from '../ui/Avatar';
+import { isMobileDevice } from '../../lib/utils/device-detection';
 
 type NavTab = { label: string; href: string; match?: 'exact' | 'prefix' };
 
@@ -12,6 +13,12 @@ export default function Navbar() {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(() => getLocalProfile());
+  const isMobile = isMobileDevice();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [useHamburger, setUseHamburger] = useState(false);
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
+  const tabsWrapperRef = useRef<HTMLDivElement>(null);
+  const checkTimeoutRef = useRef<number | null>(null);
   const [clock, setClock] = useState(() => {
     try {
       return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(new Date());
@@ -42,6 +49,54 @@ export default function Navbar() {
   useEffect(() => {
     return onProfileChanged(() => setProfile(getLocalProfile()));
   }, []);
+
+  // Vérifier si tous les onglets peuvent tenir dans l'espace disponible
+  useEffect(() => {
+    if (!user) {
+      setUseHamburger(false);
+      return;
+    }
+
+    const checkSpace = () => {
+      if (checkTimeoutRef.current) {
+        clearTimeout(checkTimeoutRef.current);
+      }
+
+      checkTimeoutRef.current = window.setTimeout(() => {
+        const wrapper = tabsWrapperRef.current;
+        if (!wrapper) return;
+
+        // Vérifier si le wrapper a un scroll (donc les éléments débordent)
+        const hasScroll = wrapper.scrollWidth > wrapper.clientWidth;
+        
+        // Si scroll activé, on ne peut pas tout afficher → utiliser hamburger
+        setUseHamburger(hasScroll);
+      }, 100);
+    };
+
+    // Vérifier après le rendu
+    const initialCheck = window.setTimeout(checkSpace, 200);
+
+    // Observer les changements de taille du wrapper
+    let resizeObserver: ResizeObserver | null = null;
+    if (tabsWrapperRef.current) {
+      resizeObserver = new ResizeObserver(checkSpace);
+      resizeObserver.observe(tabsWrapperRef.current);
+    }
+
+    window.addEventListener('resize', checkSpace);
+
+    return () => {
+      clearTimeout(initialCheck);
+      if (checkTimeoutRef.current) {
+        clearTimeout(checkTimeoutRef.current);
+      }
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      window.removeEventListener('resize', checkSpace);
+    };
+  }, [user]);
 
   useEffect(() => {
     // Horloge (mise à jour au changement de minute)
@@ -94,6 +149,7 @@ export default function Navbar() {
     // Sur certains environnements (Tauri / WebView), les routes "directory" nécessitent un slash final.
     { label: 'Films', href: '/films/', match: 'prefix' },
     { label: 'Séries', href: '/series/', match: 'prefix' },
+    { label: 'Bibliothèque', href: '/library', match: 'prefix' },
   ];
 
   if (loading) return null;
@@ -103,6 +159,11 @@ export default function Navbar() {
       className={`fixed top-0 left-0 right-0 w-full z-50 transition-all duration-300 glass-panel border-b border-white/10 ${
         isScrolled ? 'bg-glass-active' : 'bg-glass'
       }`}
+      style={{
+        paddingTop: 'var(--safe-area-inset-top)',
+        paddingLeft: 'var(--safe-area-inset-left)',
+        paddingRight: 'var(--safe-area-inset-right)'
+      }}
     >
       <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 tv:px-24">
         <div className="flex items-center justify-between h-16 sm:h-18 md:h-20 lg:h-20 tv:h-24">
@@ -136,29 +197,86 @@ export default function Navbar() {
             ) : null}
           </div>
 
-          {/* Centre: onglets en pilule (Google TV-like) */}
+          {/* Centre: onglets en pilule (Google TV-like) ou menu hamburger si pas assez de place */}
           {user ? (
-            <div className="flex-1 min-w-0 px-2 sm:px-4">
-              <div className="flex items-center justify-center">
-                <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-hide max-w-full">
-                  {tabs.map((t) => {
-                    const active = t.match === 'exact' ? isActive(t.href) : isActivePrefix(t.href);
-                    return (
-                      <a
-                        key={t.href}
-                        href={t.href}
-                        className={`nav-tab whitespace-nowrap ${active ? 'nav-tab-active' : ''}`}
-                        tabIndex={0}
-                        data-focusable
-                        aria-current={active ? 'page' : undefined}
-                      >
-                        {t.label}
-                      </a>
-                    );
-                  })}
+            <>
+              {!useHamburger ? (
+                <div 
+                  ref={tabsContainerRef}
+                  className={`flex-1 min-w-0 ${isMobile ? 'px-1' : 'px-2 sm:px-4'}`}
+                >
+                  <div className="flex items-center justify-center">
+                    <div 
+                      ref={tabsWrapperRef}
+                      className={`flex items-center gap-1 sm:gap-2 overflow-x-hidden scrollbar-hide max-w-full ${isMobile ? 'px-1' : ''}`}
+                    >
+                      {tabs.map((t) => {
+                        const active = t.match === 'exact' ? isActive(t.href) : isActivePrefix(t.href);
+                        return (
+                          <a
+                            key={t.href}
+                            href={t.href}
+                            className={`nav-tab whitespace-nowrap flex-shrink-0 ${isMobile ? 'nav-tab-mobile' : ''} ${active ? 'nav-tab-active' : ''}`}
+                            tabIndex={0}
+                            data-focusable
+                            aria-current={active ? 'page' : undefined}
+                          >
+                            {t.label}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+              ) : (
+                <>
+                  {/* Menu hamburger si pas assez de place */}
+                  <div className="flex-1 min-w-0 flex items-center justify-center">
+                    <button
+                      onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                      className="gtv-icon-btn"
+                      aria-label="Menu"
+                      tabIndex={0}
+                      data-focusable
+                    >
+                      {mobileMenuOpen ? (
+                        <X className="w-5 h-5" />
+                      ) : (
+                        <Menu className="w-5 h-5" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Menu dropdown */}
+                  {mobileMenuOpen && (
+                    <div className="absolute top-full left-0 right-0 z-50 bg-glass-panel-lg border-b border-white/10 backdrop-blur-md">
+                      <div className="px-4 py-3 space-y-2">
+                        {tabs.map((t) => {
+                          const active = t.match === 'exact' ? isActive(t.href) : isActivePrefix(t.href);
+                          return (
+                            <a
+                              key={t.href}
+                              href={t.href}
+                              onClick={() => setMobileMenuOpen(false)}
+                              className={`block px-4 py-3 rounded-lg text-white/90 transition-all ${
+                                active 
+                                  ? 'bg-glass-active text-white font-bold' 
+                                  : 'hover:bg-glass-hover text-white/80'
+                              }`}
+                              tabIndex={0}
+                              data-focusable
+                              aria-current={active ? 'page' : undefined}
+                            >
+                              {t.label}
+                            </a>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </>
           ) : (
             <div className="flex-1" />
           )}
@@ -223,11 +341,6 @@ export default function Navbar() {
                     <li>
                       <a href="/series/" className="text-white hover:bg-glass-hover text-base py-3 px-4 rounded-lg">
                         Séries
-                      </a>
-                    </li>
-                    <li>
-                      <a href="/library" className="text-white hover:bg-glass-hover text-base py-3 px-4 rounded-lg">
-                        Bibliothèque
                       </a>
                     </li>
                     <li>

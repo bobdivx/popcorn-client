@@ -402,7 +402,7 @@ export function IndexerCard({
                       {(testResult as any).sampleResult && (
                         <div class="mt-2 text-xs sm:text-sm opacity-75">
                           <p class="font-semibold">Exemple de résultat :</p>
-                          <p class="truncate">{(testResult as any).sampleResult.title || 'N/A'}</p>
+                          <p class="truncate" title={(testResult as any).sampleResult.title || 'N/A'}>{(testResult as any).sampleResult.title || 'N/A'}</p>
                           {(testResult as any).sampleResult.size && (
                             <p class="text-gray-400">
                               Taille: {((testResult as any).sampleResult.size / 1024 / 1024 / 1024).toFixed(2)} GB

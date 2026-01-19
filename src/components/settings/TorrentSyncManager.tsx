@@ -886,8 +886,8 @@ export default function TorrentSyncManager() {
                               )}
                             </div>
                             <div class="flex-1 min-w-0">
-                              <p class="text-white font-semibold text-sm truncate">{indexer.name}</p>
-                              <p class="text-gray-400 text-xs truncate">{indexer.baseUrl}</p>
+                              <p class="text-white font-semibold text-sm truncate" title={indexer.name}>{indexer.name}</p>
+                              <p class="text-gray-400 text-xs truncate" title={indexer.baseUrl}>{indexer.baseUrl}</p>
                             </div>
                             {torrentCount > 0 && (
                               <div class="text-right">
@@ -1195,8 +1195,8 @@ export default function TorrentSyncManager() {
                             <div class="flex items-center gap-2">
                               <div class="w-2 h-2 bg-green-400 rounded-full"></div>
                               <div class="flex-1 min-w-0">
-                                <p class="text-white text-sm font-medium truncate">{indexer.name}</p>
-                                <p class="text-gray-500 text-xs truncate">{indexer.baseUrl}</p>
+                                <p class="text-white text-sm font-medium truncate" title={indexer.name}>{indexer.name}</p>
+                                <p class="text-gray-500 text-xs truncate" title={indexer.baseUrl}>{indexer.baseUrl}</p>
                               </div>
                             </div>
                           </div>

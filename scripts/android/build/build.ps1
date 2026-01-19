@@ -521,6 +521,25 @@ Write-Info "Commande: $buildCommand"
 Write-Info "Le build peut prendre plusieurs minutes..."
 Write-Host ""
 
+# Appliquer la configuration de signature avant le build (si les fichiers Android existent déjà)
+# Note: Le fichier build.gradle.kts est généré par Tauri, donc on l'applique aussi dans le workaround
+$androidProjectDir = Join-Path $script:ProjectRoot "src-tauri\gen\android"
+$buildGradlePath = Join-Path $androidProjectDir "app\build.gradle.kts"
+$applySigningScript = Join-Path $script:ProjectRoot "scripts\android\apply-signing-config.ps1"
+if (Test-Path $applySigningScript) {
+    # Attendre un peu que Tauri génère les fichiers (si nécessaire)
+    $maxWait = 30
+    $waited = 0
+    while (-not (Test-Path $buildGradlePath) -and $waited -lt $maxWait) {
+        Start-Sleep -Milliseconds 500
+        $waited += 0.5
+    }
+    if (Test-Path $buildGradlePath) {
+        Write-Info "Application de la configuration de signature..."
+        & $applySigningScript -BuildGradlePath $buildGradlePath
+    }
+}
+
 try {
     # Exécuter le build avec progression visible en temps réel
     # Utiliser & directement pour que la sortie passe en temps réel (comme stdio:inherit)
@@ -552,6 +571,14 @@ try {
         Write-Ok "Copie lib -> jniLibs: $jniSoPath"
         
         $androidProjectDir = Join-Path $script:ProjectRoot "src-tauri\gen\android"
+        
+        # Appliquer la configuration de signature
+        $applySigningScript = Join-Path $script:ProjectRoot "scripts\android\apply-signing-config.ps1"
+        if (Test-Path $applySigningScript) {
+            Write-Info "Application de la configuration de signature..."
+            & $applySigningScript -BuildGradlePath (Join-Path $androidProjectDir "app\build.gradle.kts")
+        }
+        
         Push-Location $androidProjectDir
         try {
             # Arrêter le daemon Gradle/Kotlin pour éviter les erreurs de cache
@@ -677,14 +704,67 @@ try {
             # Vérifier aussi par le nom du fichier
             $isUnsignedByName = $ApkPath -like "*unsigned*"
             
-            # TOUJOURS re-signer l'APK pour garantir qu'il est valide et correctement signé
-            if ($isUnsignedByName -or -not $isSigned) {
-                Write-Info "APK non signé détecté, signature en cours..."
-            } else {
-                Write-Info "Re-signature de l'APK pour garantir la validité..."
+            # Si l'APK est déjà signé et valide, ne pas le re-signer (préserver la signature native)
+            if ($isSigned -and -not $isUnsignedByName) {
+                Write-Ok "APK déjà signé avec signature native, préservation de la signature"
+                return $ApkPath
             }
 
-            $ks = Ensure-DebugKeystore -JavaHome $JavaHome
+            # L'APK n'est pas signé ou invalide, on doit le signer
+            if ($isUnsignedByName -or -not $isSigned) {
+                Write-Info "APK non signé détecté, signature en cours..."
+            }
+
+            # Essayer d'utiliser le keystore de production en priorité
+            $androidProjectDir = Join-Path $script:ProjectRoot "src-tauri\gen\android"
+            $keystorePropertiesPath = Join-Path $androidProjectDir "keystore.properties"
+            $keystorePath = Join-Path $androidProjectDir "keystore.jks"
+            
+            $useProductionKeystore = $false
+            $ks = $null
+            $ksAlias = $null
+            $ksPass = $null
+            $keyPass = $null
+
+            # Vérifier si le keystore de production existe
+            if ((Test-Path $keystorePropertiesPath) -and (Test-Path $keystorePath)) {
+                try {
+                    $props = @{}
+                    Get-Content $keystorePropertiesPath | ForEach-Object {
+                        if ($_ -match '^\s*([^#=]+)\s*=\s*(.+)$') {
+                            $props[$matches[1].Trim()] = $matches[2].Trim()
+                        }
+                    }
+                    
+                    if ($props.ContainsKey("storeFile") -and $props.ContainsKey("storePassword") -and 
+                        $props.ContainsKey("keyAlias") -and $props.ContainsKey("keyPassword")) {
+                        $ksFile = $props["storeFile"]
+                        if (-not [System.IO.Path]::IsPathRooted($ksFile)) {
+                            $ksFile = Join-Path $androidProjectDir $ksFile
+                        }
+                        if (Test-Path $ksFile) {
+                            $ks = $ksFile
+                            $ksAlias = $props["keyAlias"]
+                            $ksPass = $props["storePassword"]
+                            $keyPass = $props["keyPassword"]
+                            $useProductionKeystore = $true
+                            Write-Info "Utilisation du keystore de production: $ks"
+                        }
+                    }
+                } catch {
+                    Write-Warn "Impossible de lire keystore.properties: $_"
+                }
+            }
+
+            # Fallback vers le debug keystore si le keystore de production n'est pas disponible
+            if (-not $useProductionKeystore) {
+                $ks = Ensure-DebugKeystore -JavaHome $JavaHome
+                $ksAlias = "androiddebugkey"
+                $ksPass = "android"
+                $keyPass = "android"
+                Write-Info "Utilisation du debug keystore (fallback)"
+            }
+
             $aligned = [System.IO.Path]::ChangeExtension($ApkPath, ".aligned.apk")
             $signed = [System.IO.Path]::ChangeExtension($ApkPath, ".signed.apk")
 
@@ -707,9 +787,9 @@ try {
             # Signer l'APK aligné
             & $apksigner sign `
                 --ks $ks `
-                --ks-key-alias "androiddebugkey" `
-                --ks-pass "pass:android" `
-                --key-pass "pass:android" `
+                --ks-key-alias $ksAlias `
+                --ks-pass "pass:$ksPass" `
+                --key-pass "pass:$keyPass" `
                 --out $signed `
                 $aligned 2>&1 | Out-Null
             if ($LASTEXITCODE -ne 0) { 
@@ -734,8 +814,8 @@ try {
             }
         }
         
-        # Signer l'APK (TOUJOURS, pour garantir qu'il est valide et correctement signé)
-        Write-Section "Signature de l'APK"
+        # Vérifier et signer l'APK si nécessaire (préserve la signature native si déjà présente)
+        Write-Section "Vérification de la signature de l'APK"
         $androidHome = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($script:AndroidHome) { $script:AndroidHome } else { $null }
         $javaHome = if ($env:JAVA_HOME) { $env:JAVA_HOME } elseif ($script:JavaHome) { $script:JavaHome } else { $null }
         $signedApkPath = Sign-ApkIfNeeded -ApkPath $apk.FullName -AndroidHome $androidHome -JavaHome $javaHome

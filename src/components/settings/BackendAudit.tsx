@@ -714,22 +714,22 @@ export default function BackendAudit() {
     <div className="space-y-6">
       <div className="bg-white/5 border border-white/10 rounded-lg p-4">
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div className="flex-1 min-w-0">
               <h2 className="text-lg font-bold text-white">Audit de communication (Android)</h2>
-              <p className="text-gray-400 text-sm">
+              <p className="text-gray-400 text-sm break-words">
                 Teste automatiquement toutes les façons de communiquer avec le backend pour trouver la solution qui fonctionne.
               </p>
               {bestMethod !== 'Aucune méthode ne fonctionne' && (
                 <div className="mt-3 p-3 bg-green-500/20 border border-green-500/50 rounded">
-                  <p className="text-sm text-green-400 font-semibold">
+                  <p className="text-sm text-green-400 font-semibold break-words">
                     ✓ Solution trouvée: <span className="text-white">{bestMethod}</span>
                   </p>
                 </div>
               )}
             </div>
             <button
-              className="btn btn-primary"
+              className="btn btn-primary flex-shrink-0 w-full sm:w-auto"
               disabled={running}
               onClick={() => runAudit()}
             >
@@ -745,7 +745,7 @@ export default function BackendAudit() {
             <div className="flex gap-2">
               <input
                 type="text"
-                className="input input-bordered flex-1"
+                className="input input-bordered flex-1 min-w-0"
                 placeholder={backendUrl || 'http://10.0.2.2:3000'}
                 value={customBackendUrl}
                 onChange={(e) => setCustomBackendUrl((e.target as HTMLInputElement).value)}
@@ -763,8 +763,8 @@ export default function BackendAudit() {
               )}
             </div>
             <div className="space-y-1">
-              <p className="text-gray-500 text-xs">
-                Backend testé: <span className="text-gray-300">{testUrl}</span>
+              <p className="text-gray-500 text-xs break-words">
+                Backend testé: <span className="text-gray-300 break-all">{testUrl}</span>
                 {customBackendUrl && (
                   <span className="text-blue-400 ml-2">(URL personnalisée)</span>
                 )}
@@ -773,9 +773,9 @@ export default function BackendAudit() {
                 )}
               </p>
               {testUrl.includes('10.0.2.2') && (
-                <p className="text-blue-400/80 text-xs flex items-center gap-1">
-                  <span>📱</span>
-                  <span>
+                <p className="text-blue-400/80 text-xs flex items-start gap-1">
+                  <span className="flex-shrink-0">📱</span>
+                  <span className="break-words">
                     <strong>10.0.2.2</strong> est l'IP spéciale de l'émulateur Android pour accéder au localhost de la machine hôte.
                     Les tests avec cette IP échoueront si vous n'êtes pas sur un émulateur Android.
                   </span>
@@ -803,7 +803,7 @@ export default function BackendAudit() {
             </div>
             <div className="bg-gray-900/50 p-3 rounded">
               <p className="text-xs text-gray-400">Meilleure méthode</p>
-              <p className="text-sm font-bold text-white truncate">{bestMethod}</p>
+              <p className="text-sm font-bold text-white break-words">{bestMethod}</p>
             </div>
           </div>
         </div>
@@ -813,12 +813,12 @@ export default function BackendAudit() {
       {results.map((result, idx) => (
         <div key={idx} className="bg-white/5 border border-white/10 rounded-lg overflow-hidden">
           <div className="p-4 bg-gray-900/30 border-b border-white/10">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-white">{result.methodName}</h3>
-                <p className="text-xs text-gray-400 mt-1">{result.description}</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-white break-words">{result.methodName}</h3>
+                <p className="text-xs text-gray-400 mt-1 break-words">{result.description}</p>
               </div>
-              <div className={`px-3 py-1 rounded text-sm font-semibold ${
+              <div className={`px-3 py-1 rounded text-sm font-semibold flex-shrink-0 ${
                 result.overallOk ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
               }`}>
                 {result.overallOk ? 'FONCTIONNE' : 'ÉCHOUÉ'}
@@ -856,7 +856,7 @@ export default function BackendAudit() {
                               : ''
                       }
                     >
-                      <td className="font-medium text-white text-sm">
+                      <td className="font-medium text-white text-sm break-words min-w-[150px]">
                         {isNotApplicable && (
                           <span className="inline-flex items-center gap-1 mr-2">
                             <span className="text-gray-400 text-xs">⏭️</span>
@@ -874,26 +874,26 @@ export default function BackendAudit() {
                         )}
                         {test.method}
                       </td>
-                      <td className="text-gray-300 text-xs max-w-xs truncate">
+                      <td className="text-gray-300 text-xs break-words min-w-[150px]">
                         {test.url}
                         {isEmulatorUrl && !isNotApplicable && (
-                          <span className="ml-2 text-xs text-blue-400/70 italic">
+                          <span className="ml-2 text-xs text-blue-400/70 italic break-words">
                             (émulateur)
                           </span>
                         )}
                       </td>
-                      <td className={
+                      <td className={`whitespace-nowrap ${
                         isNotApplicable 
                           ? 'text-gray-400' 
                           : test.ok 
                             ? 'text-green-400' 
                             : 'text-red-400'
-                      }>
+                      }`}>
                         {isNotApplicable ? 'N/A' : (test.ok ? 'OK' : 'KO')}
                         {test.status && ` (${test.status})`}
                       </td>
-                      <td className="text-gray-300">{test.ms} ms</td>
-                      <td className="text-gray-400 text-xs">
+                      <td className="text-gray-300 whitespace-nowrap">{test.ms} ms</td>
+                      <td className="text-gray-400 text-xs break-words min-w-[200px]">
                         {test.message || test.details || '-'}
                       </td>
                     </tr>
@@ -907,9 +907,9 @@ export default function BackendAudit() {
 
       {/* Rapport */}
       <div className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <h3 className="text-base font-bold text-white">Rapport complet</h3>
-          <button className="btn btn-sm" onClick={() => copyReport()} disabled={!report}>
+          <button className="btn btn-sm w-full sm:w-auto" onClick={() => copyReport()} disabled={!report}>
             Copier
           </button>
         </div>
@@ -919,7 +919,7 @@ export default function BackendAudit() {
           readOnly
           value={report || 'Génération du rapport…'}
         />
-        <p className="text-gray-500 text-xs">
+        <p className="text-gray-500 text-xs break-words">
           Ce rapport contient tous les détails des tests pour identifier la bonne méthode de communication.
         </p>
       </div>

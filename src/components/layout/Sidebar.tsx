@@ -196,7 +196,7 @@ export default function Sidebar() {
               />
               {!isCompact && (
                 <div className="flex-1 min-w-0">
-                  <p className="text-white font-semibold text-sm tv:text-base truncate">
+                  <p className="text-white font-semibold text-sm tv:text-base truncate" title={profile.displayName || user.email || 'Utilisateur'}>
                     {profile.displayName || user.email || 'Utilisateur'}
                   </p>
                 </div>

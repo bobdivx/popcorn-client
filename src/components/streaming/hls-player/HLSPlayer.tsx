@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'preact/hooks';
 import { useVideoControls } from './hooks/useVideoControls';
-import { useFullscreen } from './hooks/useFullscreen';
+import { useFullscreen, toggleFullscreen } from './hooks/useFullscreen';
 import { ErrorDisplay } from './components/ErrorDisplay';
 import { VideoControls } from './components/VideoControls';
 import type { HLSPlayerProps } from './types';
@@ -8,6 +8,7 @@ import { useHlsPlayer } from './hooks/useHlsPlayer';
 import { useTVPlayerNavigation } from './hooks/useTVPlayerNavigation';
 import { useHlsTracks } from './hooks/useHlsTracks';
 import { usePlayerConfig } from './hooks/usePlayerConfig';
+import { shouldAutoFullscreen } from '../../../lib/utils/device-detection';
 
 export default function HLSPlayer({ 
   src, 
@@ -22,6 +23,9 @@ export default function HLSPlayer({
 }: HLSPlayerProps) {
   const playerConfig = usePlayerConfig();
   const canAutoPlayRef = useRef<(() => boolean) | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const hasAutoFullscreenedRef = useRef(false);
+  const [hlsDuration, setHlsDuration] = useState<number | undefined>(undefined);
   
   const { videoRef, hlsRef, isLoading, error, hlsLoaded } = useHlsPlayer({
     src,
@@ -33,6 +37,9 @@ export default function HLSPlayer({
     onError,
     onLoadingChange,
     canAutoPlay: () => canAutoPlayRef.current ? canAutoPlayRef.current() : true,
+    onDurationChange: (duration) => {
+      setHlsDuration(duration);
+    },
   });
 
   const isFullscreen = useFullscreen();
@@ -49,7 +56,7 @@ export default function HLSPlayer({
     handleVolumeChange: baseHandleVolumeChange,
     toggleMute,
     canAutoPlay,
-  } = useVideoControls({ videoRef, hlsLoaded });
+  } = useVideoControls({ videoRef, hlsLoaded, hlsDuration });
   
   useEffect(() => {
     canAutoPlayRef.current = canAutoPlay;
@@ -95,15 +102,46 @@ export default function HLSPlayer({
   };
 
   const handleToggleFullscreen = () => {
+    // Utiliser video-player-wrapper en priorité car c'est le conteneur principal
     const container = document.getElementById('video-player-wrapper') || 
+                      containerRef.current ||
                       document.getElementById('hls-player-container');
-    if (!container) return;
-    if (document.fullscreenElement) {
-      document.exitFullscreen().catch(() => {});
-    } else {
-      container.requestFullscreen().catch(() => {});
+    if (!container) {
+      console.warn('Aucun conteneur trouvé pour le plein écran');
+      return;
     }
+    toggleFullscreen(container).catch((err) => {
+      console.error('Erreur lors du toggle plein écran:', err);
+    });
   };
+
+  // Activer le plein écran automatiquement au démarrage sur mobile/Android
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !hlsLoaded || hasAutoFullscreenedRef.current) return;
+
+    const handleFirstPlay = () => {
+      if (shouldAutoFullscreen() && !isFullscreen) {
+        // Utiliser video-player-wrapper en priorité pour le plein écran automatique
+        const container = document.getElementById('video-player-wrapper') || containerRef.current;
+        if (container) {
+          hasAutoFullscreenedRef.current = true;
+          // Petit délai pour s'assurer que la vidéo est bien prête
+          setTimeout(() => {
+            toggleFullscreen(container).catch((err) => {
+              console.warn('Impossible d\'activer le plein écran automatique:', err);
+            });
+          }, 300); // Délai un peu plus long pour laisser le temps au navigateur
+        }
+      }
+    };
+
+    video.addEventListener('play', handleFirstPlay, { once: true });
+
+    return () => {
+      video.removeEventListener('play', handleFirstPlay);
+    };
+  }, [videoRef, hlsLoaded, isFullscreen]);
 
   const { isTV, focusedControlIndex } = useTVPlayerNavigation({
     showControls,
@@ -125,6 +163,7 @@ export default function HLSPlayer({
 
   return (
     <div 
+      ref={containerRef}
       class="w-full h-full flex flex-col relative bg-black group" 
       id="hls-player-container" 
       style={{ 

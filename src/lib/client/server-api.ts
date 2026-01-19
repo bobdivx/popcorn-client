@@ -70,10 +70,43 @@ class ServerApiClient {
 
   private async nativeFetch(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
     // IMPORTANT:
+    // - En production Android, fetch standard fonctionne et est prioritaire
+    // - Les méthodes Tauri (native-fetch, plugin-http) sont utilisées en fallback seulement si fetch standard échoue
     // - Dans Tauri (plugin-http), les options sont sérialisées vers Rust.
     //   Un AbortSignal n'est pas sérialisable -> peut provoquer un échec immédiat ("Erreur réseau").
-    // - Dans le navigateur, on garde AbortController pour un vrai abort.
-    if (isTauri()) {
+    
+    // Tenter fetch standard d'abord (même en Tauri - c'est ce qui fonctionne en production Android)
+    let fetchStandardError: unknown = null;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, { ...(init as any), signal: controller.signal });
+      // Si fetch standard réussit, retourner directement
+      return response;
+    } catch (fetchError) {
+      // Nettoyer le timeout avant de continuer
+      clearTimeout(timeoutId);
+      fetchStandardError = fetchError;
+      
+      // Si on n'est pas en Tauri, relancer l'erreur
+      if (!isTauri()) {
+        throw fetchError;
+      }
+      
+      // En Tauri, si fetch standard échoue, essayer les méthodes Tauri en fallback
+      // Exception : si c'est un AbortError (timeout), ne pas essayer les fallbacks (ce serait trop lent)
+      const isAbortError = fetchError instanceof Error && fetchError.name === 'AbortError';
+      if (isAbortError) {
+        // Timeout = relancer directement sans essayer les méthodes Tauri (ce serait trop lent)
+        throw fetchError;
+      }
+      
+      // Pour toutes les autres erreurs (CORS, réseau, etc.), essayer les méthodes Tauri en fallback
+      // (continuer vers le bloc ci-dessous)
+    }
+
+    // Fallback vers les méthodes Tauri uniquement si fetch standard a échoué et qu'on est en Tauri
+    if (isTauri() && fetchStandardError) {
       const logNative = async (message: string) => {
         try {
           const { invoke } = await import('@tauri-apps/api/core');
@@ -83,7 +116,10 @@ class ServerApiClient {
         }
       };
 
-      // Sur Android/Tauri v2, essayer d'abord native-fetch, puis plugin-http en fallback
+      await logNative(`[popcorn-debug] fetch standard failed, trying Tauri methods as fallback for ${url}`);
+      console.warn('[popcorn-debug] fetch standard failed, falling back to Tauri methods:', { url });
+      
+      // Essayer native-fetch, puis plugin-http en fallback
       // native-fetch est une commande personnalisée qui contourne les limitations ACL
       
       // Préparer les variables AVANT le try pour qu'elles soient accessibles dans le catch
@@ -108,7 +144,8 @@ class ServerApiClient {
           : undefined;
 
       // Fonction helper pour le fallback plugin-http
-      const usePluginHttpFallback = async (): Promise<Response> => {
+      // Retourne null si échoue pour permettre un fallback supplémentaire vers fetch standard
+      const usePluginHttpFallback = async (): Promise<Response | null> => {
         await logNative(`[popcorn-debug] Using plugin-http fallback for ${url}`);
         try {
           const { fetch: httpFetch } = await import('@tauri-apps/plugin-http');
@@ -138,7 +175,8 @@ class ServerApiClient {
             ? { name: httpError.name, message: httpError.message, stack: httpError.stack }
             : { value: httpError, type: typeof httpError };
           await logNative(`[popcorn-debug] plugin-http fallback failed: ${JSON.stringify(httpErrDetails)}`);
-          throw httpError;
+          // Retourner null au lieu de lancer une erreur pour permettre le fallback vers fetch standard
+          return null;
         }
       };
 
@@ -208,37 +246,47 @@ class ServerApiClient {
           errorName === 'CommandNotFound' ||
           errorName === 'TauriError' && errorStr.includes('not found');
         
+        // Essayer plugin-http en fallback
+        let pluginHttpResult: Response | null = null;
         if (isCommandNotFound) {
           await logNative(`[popcorn-debug] Command not found detected, using plugin-http fallback`);
-          return await usePluginHttpFallback();
-        }
-        
-        // Si ce n'est pas une erreur "not found", mais qu'on est sur Android, 
-        // essayer quand même plugin-http comme dernier recours
-        // (certaines erreurs peuvent masquer le vrai problème)
-        try {
-          const { invoke: invokeCheck } = await import('@tauri-apps/api/core');
-          const platform = await invokeCheck('get-platform').catch(() => 'unknown');
-          if (platform === 'android') {
-            await logNative(`[popcorn-debug] Android detected, trying plugin-http as last resort`);
-            return await usePluginHttpFallback();
+          pluginHttpResult = await usePluginHttpFallback();
+        } else {
+          // Si ce n'est pas une erreur "not found", mais qu'on est sur Android, 
+          // essayer quand même plugin-http comme dernier recours
+          // (certaines erreurs peuvent masquer le vrai problème)
+          try {
+            const { invoke: invokeCheck } = await import('@tauri-apps/api/core');
+            const platform = await invokeCheck('get-platform').catch(() => 'unknown');
+            if (platform === 'android') {
+              await logNative(`[popcorn-debug] Android detected, trying plugin-http as last resort`);
+              pluginHttpResult = await usePluginHttpFallback();
+            }
+          } catch {
+            // Ignore si on ne peut pas vérifier la plateforme
           }
-        } catch {
-          // Ignore si on ne peut pas vérifier la plateforme
         }
         
-        await logNative(`[popcorn-debug] native-fetch failed (not recoverable) url=${url} err=${JSON.stringify(err)}`);
-        throw e;
+        // Si plugin-http a réussi, retourner le résultat
+        if (pluginHttpResult !== null) {
+          return pluginHttpResult;
+        }
+        
+        // Si plugin-http a échoué aussi, relancer l'erreur originale de fetch standard
+        // (on est déjà ici parce que fetch standard a échoué en premier)
+        await logNative(`[popcorn-debug] native-fetch and plugin-http both failed for ${url}`);
+        console.error('[popcorn-debug] All fetch methods failed:', { url, method });
+        
+        // Relancer l'erreur originale de fetch standard
+        // Cela permettra au gestionnaire d'erreurs de la méthode appelante de gérer proprement
+        throw fetchStandardError;
       }
     }
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      return await fetch(url, { ...(init as any), signal: controller.signal });
-    } finally {
-      clearTimeout(timeoutId);
-    }
+    
+    // Si on arrive ici, cela signifie qu'on n'est pas en Tauri et que fetch standard a réussi
+    // (ce qui ne devrait jamais arriver car on retourne directement dans le try au-dessus)
+    // Cette ligne ne devrait jamais être atteinte
+    throw new Error('Unreachable code in nativeFetch');
   }
 
   private saveUser(user: any): void {
