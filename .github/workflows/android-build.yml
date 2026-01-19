@@ -68,10 +68,15 @@ jobs:
 
       - name: Initialize Android project
         run: |
+          echo "Checking if Android project exists..."
           if [ ! -d "src-tauri/gen/android" ]; then
-            cd src-tauri
-            tauri android init --force || true
+            echo "Android project not found, initializing..."
+            npx tauri android init --ci --config src-tauri/tauri.android.mobile.conf.json
+            echo "Android project initialized"
+          else
+            echo "Android project already exists"
           fi
+          ls -la src-tauri/gen/ || echo "gen directory does not exist"
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
