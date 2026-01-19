@@ -49,7 +49,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          packages: 'platform-tools platforms;android-33 build-tools;33.0.0 ndk;25.1.8937393'
+          packages: 'platform-tools platforms;android-33 build-tools;33.0.0 ndk;25.2.9519653'
 
       - name: Accept Android licenses
         run: |
@@ -57,8 +57,8 @@ jobs:
 
       - name: Setup NDK environment variables
         run: |
-          # Find NDK directory
-          NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -type d -name "25.1.8937393" 2>/dev/null | head -n 1)
+          # Find NDK directory (try specific version first, then any version)
+          NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -type d -name "25.2.9519653" 2>/dev/null | head -n 1)
           if [ -z "$NDK_PATH" ]; then
             # Fallback: find any NDK version
             NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -type d 2>/dev/null | head -n 1)
