@@ -19,7 +19,12 @@ export default function LoginForm() {
           return;
         }
       } catch (error) {
-        console.error('Erreur lors de la vérification des utilisateurs:', error);
+        // Si getSetupStatus() plante, rediriger vers /setup (mode "premier démarrage")
+        // plutôt que de rester bloqué sur spinner "Vérification..."
+        console.error('[LoginForm] Erreur lors de la vérification des utilisateurs:', error);
+        // Rediriger vers setup si on ne peut pas déterminer l'état
+        window.location.href = '/setup';
+        return;
       } finally {
         setCheckingUsers(false);
       }

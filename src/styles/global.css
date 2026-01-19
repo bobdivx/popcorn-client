@@ -332,42 +332,49 @@
 
 /* Styles pour navigation TV */
 .nav-tab {
-  @apply transition-all duration-300 focus:outline-none rounded-lg px-4 lg:px-6 py-2 lg:py-3 relative;
-  min-height: 48px; /* Taille minimale pour TV */
+  @apply inline-flex items-center justify-center transition-all duration-300 focus:outline-none rounded-full px-5 lg:px-7 py-2 lg:py-3 text-white/80 bg-transparent;
+  min-height: 44px;
 }
 
 /* Padding TV pour nav-tab - doit être dans media query */
 @media (min-width: 1920px) {
   .nav-tab {
-    padding-left: 2rem !important; /* 32px */
-    padding-right: 2rem !important; /* 32px */
+    padding-left: 2.25rem !important; /* 36px */
+    padding-right: 2.25rem !important; /* 36px */
     padding-top: 1rem !important; /* 16px */
     padding-bottom: 1rem !important; /* 16px */
+    min-height: 52px;
   }
 }
 
 .nav-tab-active {
-  @apply text-white font-bold;
-  position: relative;
-}
-
-.nav-tab-active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background-color: rgb(168, 85, 247); /* primary-600 Neon Violet */
-  border-radius: 9999px;
+  @apply text-white font-bold bg-glass-active;
 }
 
 .nav-tab:focus {
-  @apply ring-4 ring-primary-600 ring-opacity-50 bg-glass-hover;
+  @apply ring-4 ring-primary-600 ring-opacity-50 bg-glass-hover text-white;
 }
 
 .nav-tab:hover {
-  @apply bg-glass-hover;
+  @apply bg-glass-hover text-white;
+}
+
+/* Boutons compacts type Google TV */
+.gtv-icon-btn {
+  @apply inline-flex items-center justify-center rounded-full glass-panel text-white/90 hover:bg-glass-hover focus:outline-none focus:ring-4 focus:ring-primary-600/50;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.5rem;
+}
+
+.gtv-pill-btn {
+  @apply inline-flex items-center justify-center rounded-full glass-panel text-white/90 hover:bg-glass-hover focus:outline-none focus:ring-4 focus:ring-primary-600/50 font-semibold;
+  min-height: 44px;
+  padding: 0.6rem 1rem;
+}
+
+.gtv-pill-btn-primary {
+  @apply bg-primary text-white hover:bg-primary-700 shadow-primary;
 }
 
 /* Styles pour cartes interactives TV */
@@ -419,13 +426,6 @@ button, a, input, select, textarea {
     animation: none !important;
     transition-duration: 0ms !important;
     scroll-behavior: auto !important;
-  }
-}
-
-/* Décalage du contenu quand la sidebar est présente (desktop/TV) */
-@media (min-width: 1024px) {
-  body.has-sidebar .app-main {
-    padding-left: 6rem; /* rail d’icônes (w-24) */
   }
 }
 

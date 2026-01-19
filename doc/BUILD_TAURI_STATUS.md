@@ -31,9 +31,14 @@ Création de stubs pour éviter les erreurs d'import dans Tauri :
 ### Librairies Node.js
 - ✅ `@libsql/client` - Utilisé uniquement dans les routes API
 - ✅ `bcryptjs` - Utilisé uniquement dans les routes API
-- ✅ `jsonwebtoken` - Utilisé uniquement dans les routes API
+- ✅ `jsonwebtoken` - Utilisé uniquement dans `src/lib/auth/jwt.ts` (routes API serveur)
 - ✅ `getDb()` - **SUPPRIMÉ** : plus d'accès DB côté client, tout passe par l'API backend
 - ✅ `roles.ts` - Importé uniquement dans `jwt.ts` (routes API)
+
+### Implémentation JWT côté client
+- ✅ `src/lib/auth/jwt-client.ts` - Utilise **Web Crypto API** (compatible navigateur et Tauri)
+- ✅ `src/lib/auth/jwt.ts` - Utilise `jsonwebtoken` (Node.js uniquement, routes API serveur)
+- ✅ Séparation claire : `jwt-client.ts` pour client, `jwt.ts` pour serveur
 
 ### Imports vérifiés
 - ✅ Aucun composant client n'importe les librairies Node.js
@@ -62,9 +67,11 @@ npm run tauri:build:android-mobile
 
 2. **Modules Node.js** : Les modules Node.js (`@libsql/client`, `bcryptjs`, `jsonwebtoken`) sont **uniquement utilisés dans les routes API** qui sont exclues du build Tauri.
 
-3. **Stubs** : Les stubs sont en place pour éviter les erreurs d'import si ces modules étaient référencés indirectement (ce qui ne devrait pas arriver).
+3. **JWT côté client** : Les tokens JWT sont générés côté client avec `jwt-client.ts` qui utilise **Web Crypto API** (compatible navigateur et Tauri Android/Desktop). Le module `jsonwebtoken` n'est plus importé côté client, résolvant les erreurs de compatibilité navigateur.
 
-4. **Web Crypto API** : La génération d'IDs utilise maintenant Web Crypto API qui est compatible avec Tauri.
+4. **Stubs** : Les stubs sont en place pour éviter les erreurs d'import si ces modules étaient référencés indirectement (ce qui ne devrait pas arriver).
+
+5. **Web Crypto API** : La génération d'IDs et les tokens JWT utilisent maintenant Web Crypto API qui est compatible avec Tauri (Android et Desktop).
 
 ## ✅ Conclusion
 

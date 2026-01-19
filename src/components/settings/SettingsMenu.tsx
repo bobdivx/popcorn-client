@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { Monitor, Search, Database, User, Palette, RefreshCw, Settings } from 'lucide-preact';
+import { Monitor, Search, User, Palette, RefreshCw, Settings, Activity } from 'lucide-preact';
 import PageHeader from '../ui/PageHeader';
 
 interface SettingsCard {
@@ -52,6 +52,14 @@ export default function SettingsMenu() {
       href: '/settings/sync',
       icon: RefreshCw,
       color: 'orange-500',
+    },
+    {
+      id: 'diagnostics',
+      title: 'Diagnostics réseau',
+      description: 'Vérifiez rapidement l’accès aux routes backend (Android/Desktop)',
+      href: '/settings/diagnostics',
+      icon: Activity,
+      color: 'blue-500',
     },
     {
       id: 'account',

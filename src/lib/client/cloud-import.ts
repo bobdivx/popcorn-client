@@ -91,8 +91,8 @@ class CloudImportManagerImpl {
               const res = await serverApi.createIndexer({
                 name: indexer.name,
                 baseUrl: indexer.baseUrl,
-                apiKey: indexer.apiKey || undefined,
-                jackettIndexerName: indexer.jackettIndexerName || undefined,
+                apiKey: indexer.apiKey ?? '',
+                jackettIndexerName: indexer.jackettIndexerName ?? '',
                 isEnabled: indexer.isEnabled !== false,
                 isDefault: indexer.isDefault || false,
                 priority: indexer.priority || 0,

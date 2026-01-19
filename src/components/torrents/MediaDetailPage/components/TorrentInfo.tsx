@@ -151,10 +151,10 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, sources 
               .map((source, index) => (
                 <div
                   key={index}
-                  className="flex items-center justify-between p-3 tv:p-4 bg-glass hover:bg-glass-hover rounded-lg border border-white/10 transition-all duration-200 glass-panel"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 tv:p-4 bg-glass hover:bg-glass-hover rounded-lg border border-white/10 transition-all duration-200 glass-panel"
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex flex-wrap items-center gap-3 mb-2">
                       <span className="px-3 py-1 tv:px-4 tv:py-2 bg-primary/20 border border-primary-600/30 text-primary-300 rounded-lg text-xs tv:text-sm font-semibold glass-panel">
                         {source.tracker || torrent.indexerName || 'Tracker'}
                       </span>
@@ -169,7 +169,7 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, sources 
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-4 text-xs tv:text-sm text-gray-300">
+                    <div className="flex flex-wrap items-center gap-4 text-xs tv:text-sm text-gray-300">
                       <span className="flex items-center gap-1">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />

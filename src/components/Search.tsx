@@ -214,7 +214,7 @@ export default function Search({ onResultClick }: SearchProps) {
             </h1>
 
             {/* Barre de recherche moderne */}
-            <div className="flex gap-3 tv:gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row gap-3 tv:gap-4 mb-6">
               <div className="relative flex-1">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-4 tv:pl-6 pointer-events-none z-10">
                   <SearchIcon className="w-5 h-5 tv:w-7 tv:h-7 text-gray-400" size={24} />
@@ -243,7 +243,7 @@ export default function Search({ onResultClick }: SearchProps) {
               <button
                 onClick={handleSearch}
                 disabled={loading || !query.trim()}
-                className="bg-primary hover:bg-primary-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-8 tv:px-12 py-3 tv:py-4 rounded-lg font-semibold text-base tv:text-lg flex items-center gap-2 transition-all duration-300 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[56px] tv:min-h-[64px]"
+                className="w-full sm:w-auto bg-primary hover:bg-primary-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-8 tv:px-12 py-3 tv:py-4 rounded-lg font-semibold text-base tv:text-lg flex items-center justify-center gap-2 transition-all duration-300 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[56px] tv:min-h-[64px]"
                 tabIndex={0}
               >
                 {loading ? (

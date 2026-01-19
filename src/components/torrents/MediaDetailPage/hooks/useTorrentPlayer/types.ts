@@ -8,6 +8,10 @@ export interface UseTorrentPlayerOptions {
     name: string;
     _externalLink?: string;
     _externalMagnetUri?: string | null;
+    _guid?: string | null;
+    tmdbType?: string | null;
+    indexerId?: string | number | null;
+    indexerName?: string | null;
   };
   isExternal: boolean;
   hasInfoHash: boolean;
@@ -15,7 +19,7 @@ export interface UseTorrentPlayerOptions {
   canStream: boolean;
   isAvailableLocally: boolean;
   setIsAvailableLocally: (value: boolean) => void;
-  loadVideoFiles: (infoHash: string) => Promise<any[]>;
+  loadVideoFiles: (infoHash: string, retryCount?: number) => Promise<any[]>;
   videoFiles: any[];
   selectedFile: any;
   setVideoFiles: (files: any[]) => void;
@@ -43,7 +47,7 @@ export interface PollingContext {
   videoFiles: any[];
   selectedFile: any;
   torrent: { name: string };
-  loadVideoFiles: (infoHash: string) => Promise<any[]>;
+  loadVideoFiles: (infoHash: string, retryCount?: number) => Promise<any[]>;
   progressPollIntervalRef: { current: number | null };
   queuedStartTimeRef: { current: number | null };
   lastQueuedLogTimeRef: { current: number | null };
@@ -57,12 +61,16 @@ export interface PlayHandlerContext {
     name: string;
     _externalLink?: string;
     _externalMagnetUri?: string | null;
+    _guid?: string | null;
+    tmdbType?: string | null;
+    indexerId?: string | number | null;
+    indexerName?: string | null;
   };
   isExternal: boolean;
   hasInfoHash: boolean;
   hasMagnetLink: boolean;
   isAvailableLocally: boolean;
-  loadVideoFiles: (infoHash: string) => Promise<any[]>;
+  loadVideoFiles: (infoHash: string, retryCount?: number) => Promise<any[]>;
   videoFiles: any[];
   selectedFile: any;
   setVideoFiles: (files: any[]) => void;

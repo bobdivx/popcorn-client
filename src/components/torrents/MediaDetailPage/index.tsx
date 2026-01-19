@@ -27,9 +27,6 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
   const isCompletedFromProps = torrent.clientState === 'completed' || 
                                 torrent.clientState === 'seeding' || 
                                 (torrent.clientProgress !== undefined && torrent.clientProgress >= 0.95);
-  // #region agent log
-  fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MediaDetailPage.tsx:30',message:'Initialisation isAvailableLocally',data:{isCompletedFromProps,torrentClientState:torrent.clientState,torrentClientProgress:torrent.clientProgress,hasInfoHash:torrent.infoHash?.length>0,infoHash:torrent.infoHash?.substring(0,12)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   const [isAvailableLocally, setIsAvailableLocally] = useState(isCompletedFromProps);
   const [downloadingToClient, setDownloadingToClient] = useState(false);
   const [magnetCopied, setMagnetCopied] = useState(false);
@@ -53,9 +50,9 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
 
   // Constantes dérivées
   const isExternal = torrent.id.startsWith('external_');
-  const hasInfoHash = torrent.infoHash && torrent.infoHash.trim().length > 0;
-  const hasMagnetLink = torrent._externalMagnetUri && torrent._externalMagnetUri.trim().length > 0;
-  const canStream = hasInfoHash || (isExternal && (torrent._externalLink || hasMagnetLink));
+  const hasInfoHash = typeof torrent.infoHash === 'string' && torrent.infoHash.trim().length > 0;
+  const hasMagnetLink = typeof torrent._externalMagnetUri === 'string' && torrent._externalMagnetUri.trim().length > 0;
+  const canStream = hasInfoHash || (isExternal && (!!torrent._externalLink || hasMagnetLink));
 
   // Hooks personnalisés
   const { videoFiles, selectedFile, setVideoFiles, setSelectedFile, loadVideoFiles } = useVideoFiles({

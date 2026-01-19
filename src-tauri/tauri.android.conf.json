@@ -18,7 +18,8 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "capabilities": ["main"]
     }
   },
   "bundle": {
@@ -33,8 +34,8 @@
     "externalBin": [],
     "copyright": "",
     "category": "Utility",
-    "shortDescription": "Client léger Popcorn pour Android TV",
-    "longDescription": "Client léger pour Android TV - se connecte au serveur Popcorn distant",
+    "shortDescription": "Client lÃ©ger Popcorn pour Android TV",
+    "longDescription": "Client lÃ©ger pour Android TV - se connecte au serveur Popcorn distant",
     "android": {
       "versionCode": 1,
       "autoIncrementVersionCode": false

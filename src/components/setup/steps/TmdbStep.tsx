@@ -63,16 +63,12 @@ export function TmdbStep({
     setSuccess(null);
 
     try {
-      const result = await onSave(tmdbKey);
-      if (result) {
-        setSuccess('Clé TMDB sauvegardée avec succès');
-        // Recharger la clé masquée après sauvegarde
-        await loadTmdbKey();
-        // Mettre à jour le statut du setup (comme dans IndexersStep)
-        if (onStatusChange) {
-          onStatusChange();
-        }
-      }
+      await onSave(tmdbKey);
+      setSuccess('Clé TMDB sauvegardée avec succès');
+      // Recharger la clé masquée après sauvegarde
+      await loadTmdbKey();
+      // Mettre à jour le statut du setup (comme dans IndexersStep)
+      await Promise.resolve(onStatusChange?.());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
@@ -136,10 +132,10 @@ export function TmdbStep({
         <label className="block text-sm font-semibold text-white">
           Clé API TMDB
         </label>
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-4">
           <input
             type="text"
-            className="flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+            className="w-full sm:flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
             placeholder={hasExistingKey ? "Entrez une nouvelle clé pour remplacer" : "Entrez votre clé API TMDB"}
             value={tmdbKey}
             onInput={(e) => setTmdbKey((e.target as HTMLInputElement).value)}
@@ -147,7 +143,7 @@ export function TmdbStep({
           />
           <button
             ref={(el) => { buttonRefs.current[0] = el; }}
-            className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto whitespace-nowrap px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleSave}
             disabled={saving || !tmdbKey.trim() || tmdbKey.includes('*')}
           >
@@ -168,17 +164,17 @@ export function TmdbStep({
         )}
       </div>
 
-      <div className="flex justify-between mt-8">
+      <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-4 mt-8">
         <button
           ref={(el) => { buttonRefs.current[1] = el; }}
-          className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
+          className="w-full sm:w-auto px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
           onClick={onPrevious}
         >
           ← Précédent
         </button>
         <button
           ref={(el) => { buttonRefs.current[2] = el; }}
-          className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors"
+          className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors"
           onClick={onNext}
         >
           Suivant →

@@ -84,7 +84,8 @@ export function useTVNavigation({
       currentFocusIndex = index;
     };
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = (evt: Event) => {
+      const e = evt as KeyboardEvent;
       // Ignorer si une modal est ouverte (géré par le système de modals)
       if (document.querySelector('[role="dialog"]:not([aria-hidden="true"])')) {
         return;
@@ -208,7 +209,7 @@ export function useTVNavigation({
       }
     };
 
-    container.addEventListener('keydown', handleKeyDown, true);
+    container.addEventListener('keydown', handleKeyDown as any, true);
 
     // Initialiser les éléments focusables
     updateFocusableElements();
@@ -228,7 +229,7 @@ export function useTVNavigation({
     }
 
     return () => {
-      container.removeEventListener('keydown', handleKeyDown, true);
+      container.removeEventListener('keydown', handleKeyDown as any, true);
       observer.disconnect();
     };
   }, [selector, disabled, onFocusChange, verticalOnly, horizontalOnly]);

@@ -23,7 +23,8 @@
 ### ✅ Dépendances
 - [x] `@libsql/client` - Utilisé uniquement dans les routes API (exclues)
 - [x] `bcryptjs` - Utilisé uniquement dans les routes API (exclues)
-- [x] `jsonwebtoken` - Utilisé uniquement dans les routes API (exclues)
+- [x] `jsonwebtoken` - Utilisé uniquement dans `src/lib/auth/jwt.ts` (routes API serveur)
+- [x] `jwt-client.ts` - Utilise Web Crypto API (compatible navigateur et Tauri)
 
 ## ⚠️ Points d'attention
 
@@ -36,6 +37,8 @@ Les librairies suivantes utilisent des modules Node.js mais sont **uniquement im
 - `src/lib/auth/password.ts` - Utilise `bcryptjs` (bindings natifs) - **Uniquement dans routes API**
 
 **✅ Solution** : Ces librairies ne sont jamais importées dans le code client (hors routes API), donc elles ne seront pas incluses dans le build Tauri.
+
+**✅ JWT Client** : `server-api.ts` importe `jwt-client.ts` (Web Crypto API) au lieu de `jwt.ts` (jsonwebtoken), garantissant la compatibilité navigateur et Tauri.
 
 ### Stubs créés
 Des stubs ont été créés pour éviter les erreurs d'import si ces modules étaient référencés indirectement :
@@ -78,5 +81,6 @@ npm run tauri:build:android-mobile
 **Le build Tauri devrait fonctionner correctement** car :
 1. Les routes API sont exclues du build
 2. Les librairies Node.js ne sont utilisées que dans les routes API
-3. Des stubs sont en place pour éviter les erreurs d'import
-4. Web Crypto API est utilisé pour la génération d'IDs (compatible Tauri)
+3. Les tokens JWT côté client utilisent Web Crypto API (compatible Tauri)
+4. Des stubs sont en place pour éviter les erreurs d'import
+5. Web Crypto API est utilisé pour la génération d'IDs et les tokens JWT (compatible Tauri)

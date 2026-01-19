@@ -117,17 +117,17 @@ export function SyncStep({ focusedButtonIndex, buttonRefs, onPrevious, onNext }:
             </div>
           )}
 
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <button
               ref={(el) => { buttonRefs.current[0] = el; }}
-              className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors"
+              className="w-full sm:w-auto px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors"
               onClick={onPrevious}
             >
               Précédent
             </button>
             <button
               ref={(el) => { buttonRefs.current[1] = el; }}
-              className="flex-1 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors"
+              className="w-full sm:flex-1 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors"
               onClick={handleStartSync}
               disabled={syncing}
             >
@@ -189,7 +189,7 @@ export function SyncStep({ focusedButtonIndex, buttonRefs, onPrevious, onNext }:
 
             <button
               ref={(el) => { buttonRefs.current[0] = el; }}
-              className="px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors text-lg"
+              className="w-full sm:w-auto px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors text-lg"
               onClick={handleNext}
             >
               Continuer

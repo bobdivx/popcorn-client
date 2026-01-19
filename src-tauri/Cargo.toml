@@ -1,5 +1,5 @@
 [package]
-name = "popcorn-vercel-client"
+name = "popcorn-client"
 version = "0.1.0"
 description = "Popcorn Client Léger - Application Tauri"
 authors = ["you"]
@@ -10,7 +10,7 @@ rust-version = "1.70"
 
 [lib]
 # Requis pour les builds mobile (Android/iOS) : Tauri compile en bibliothèque (cdylib)
-name = "popcorn_vercel_client"
+name = "popcorn_client"
 path = "src/lib.rs"
 crate-type = ["cdylib", "rlib"]
 

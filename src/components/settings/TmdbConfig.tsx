@@ -19,7 +19,7 @@ export default function TmdbConfig() {
       const response = await serverApi.getTmdbKey();
       
       if (response.success && response.data) {
-        const hasKey = response.data.hasKey === true || response.data.hasKey === 1;
+        const hasKey = response.data.hasKey === true || (response.data as any).hasKey === 1;
         setTmdbHasKey(hasKey);
         
         if (hasKey) {

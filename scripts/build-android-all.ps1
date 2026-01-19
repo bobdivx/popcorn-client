@@ -4,7 +4,7 @@
 $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$buildScript = Join-Path $scriptDir "build-android.ps1"
+$buildScript = Join-Path $scriptDir "android\build\build.ps1"
 
 if (-not (Test-Path $buildScript)) {
     Write-Host "[ERREUR] build-android.ps1 introuvable: $buildScript" -ForegroundColor Red

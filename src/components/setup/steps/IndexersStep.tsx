@@ -254,8 +254,8 @@ export function IndexersStep({
               <div className="space-y-2">
                 {indexers.map((indexer) => (
                   <div key={indexer.id} className="bg-gray-900 border border-gray-800 rounded-lg p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-3 mb-2">
                           <h4 className="text-lg font-semibold text-white">{indexer.name}</h4>
                           {indexer.isDefault && (
@@ -271,15 +271,15 @@ export function IndexersStep({
                         )}
                         <p className="text-xs text-gray-500">Priorité: {indexer.priority}</p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                         <button
-                          className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                          className="w-full sm:w-auto px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded-lg transition-colors"
                           onClick={() => handleEdit(indexer)}
                         >
                           Éditer
                         </button>
                         <button
-                          className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
+                          className="w-full sm:w-auto px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
                           onClick={() => handleDelete(indexer.id)}
                           disabled={deleting === indexer.id}
                         >
@@ -380,7 +380,7 @@ export function IndexersStep({
             />
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -401,17 +401,17 @@ export function IndexersStep({
             </label>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <button
               type="button"
-              className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
+              className="w-full sm:w-auto px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
               onClick={handleCancel}
             >
               Annuler
             </button>
             <button
               type="submit"
-              className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={saving}
             >
               {saving ? (
@@ -427,17 +427,17 @@ export function IndexersStep({
         </form>
       )}
 
-      <div className="flex justify-between mt-8">
+      <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-4 mt-8">
         <button
           ref={(el) => { buttonRefs.current[0] = el; }}
-          className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
+          className="w-full sm:w-auto px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
           onClick={onPrevious}
         >
           ← Précédent
         </button>
         <button
           ref={(el) => { buttonRefs.current[1] = el; }}
-          className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={onNext}
           disabled={!hasIndexers}
         >

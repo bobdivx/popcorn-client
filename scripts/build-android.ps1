@@ -45,6 +45,222 @@ function Sanitize-FileName {
     return ($Name -replace '[^a-zA-Z0-9._-]', '_')
 }
 
+function Invoke-BuildWithProgress {
+    param(
+        [string]$Command,
+        [string]$BuildType
+    )
+    
+    # Définir les étapes du build avec leurs patterns de détection
+    $buildSteps = @(
+        @{ Name = "Nettoyage"; Pattern = "Caches nettoy|Cleaning|Nettoyage"; Percent = 5 },
+        @{ Name = "Routes API"; Pattern = "Routes API|api-routes|Déplacement"; Percent = 10 },
+        @{ Name = "Config Tauri"; Pattern = "Configuration Tauri|Tauri config"; Percent = 15 },
+        @{ Name = "Build Astro"; Pattern = "Build Astro|Building static|astro build|built in|vite.*built"; Percent = 40 },
+        @{ Name = "Build Rust"; Pattern = "Compiling|Building.*rust|cargo build|Finished.*release"; Percent = 60 },
+        @{ Name = "Build Gradle"; Pattern = "Task :|Gradle|BUILD SUCCESSFUL|assemble.*Release"; Percent = 90 },
+        @{ Name = "Signature APK"; Pattern = "Signing|apksigner|signed\.apk"; Percent = 95 }
+    )
+    
+    $currentStep = 0
+    $currentPercent = 0
+    $startTime = Get-Date
+    $errorLines = New-Object System.Collections.ArrayList
+    
+    Write-Progress -Activity "Build Android ($BuildType)" -Status "Démarrage..." -PercentComplete 0
+    
+    # Exécuter la commande et capturer la sortie ligne par ligne
+    try {
+        # Utiliser Invoke-Expression mais avec redirection pour capturer la sortie
+        $output = Invoke-Expression $Command 2>&1 | Tee-Object -Variable allOutput
+        
+        # Traiter chaque ligne de sortie
+        foreach ($line in $allOutput) {
+            $lineStr = if ($line -is [string]) { $line } else { $line.ToString() }
+            Write-Host $lineStr
+            
+            # Détecter les erreurs
+            if ($lineStr -match "ERROR|Error|error|FAILED|Failed|failed|\[ERROR\]|\[ERREUR\]") {
+                [void]$errorLines.Add($lineStr)
+            }
+            
+            # Détecter les étapes du build
+            for ($i = $currentStep; $i -lt $buildSteps.Count; $i++) {
+                if ($lineStr -match $buildSteps[$i].Pattern) {
+                    if ($i -ge $currentStep) {
+                        $currentStep = $i
+                        $currentPercent = $buildSteps[$i].Percent
+                        Write-Progress -Activity "Build Android ($BuildType)" `
+                            -Status $buildSteps[$i].Name `
+                            -PercentComplete $currentPercent `
+                            -CurrentOperation $lineStr.Trim()
+                    }
+                    break
+                }
+            }
+        }
+        
+        $exitCode = $LASTEXITCODE
+        
+    } catch {
+        Write-Host $_.Exception.Message -ForegroundColor Red
+        $exitCode = 1
+    }
+    
+    # Afficher la progression finale
+    if ($exitCode -eq 0) {
+        Write-Progress -Activity "Build Android ($BuildType)" -Status "Terminé avec succès!" -PercentComplete 100 -Completed
+    } else {
+        Write-Progress -Activity "Build Android ($BuildType)" -Status "Échec du build" -PercentComplete 100 -Completed
+    }
+    
+    # Afficher les erreurs s'il y en a
+    if ($errorLines.Count -gt 0 -or $exitCode -ne 0) {
+        Write-Host ""
+        Write-Host "========================================" -ForegroundColor Red
+        Write-Host "Erreurs détectées:" -ForegroundColor Red
+        Write-Host "========================================" -ForegroundColor Red
+        foreach ($errorLine in $errorLines) {
+            Write-Host $errorLine -ForegroundColor Red
+        }
+        Write-Host ""
+    }
+    
+    $elapsed = ((Get-Date) - $startTime).TotalSeconds
+    Write-Host ""
+    if ($exitCode -eq 0) {
+        Write-Host "[100%] Build termine avec succes en $([math]::Round($elapsed))s" -ForegroundColor Green
+    } else {
+        Write-Host "[ERREUR] Build echoue apres $([math]::Round($elapsed))s (code: $exitCode)" -ForegroundColor Red
+    }
+    Write-Host ""
+    
+    return $exitCode
+}
+
+function Install-ApkOnEmulator {
+    param(
+        [string]$ApkPath,
+        [string]$ConfigPath,
+        [string]$BuildType
+    )
+
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host "Installation automatique sur emulateur" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host ""
+
+    # Vérifier si adb est disponible
+    $androidHome = $env:ANDROID_HOME
+    if (-not $androidHome) {
+        $androidHome = $env:ANDROID_SDK_ROOT
+    }
+    if (-not $androidHome) {
+        Write-Host "[!] ANDROID_HOME non defini, installation automatique ignoree" -ForegroundColor Yellow
+        return
+    }
+
+    $adbPath = Join-Path $androidHome "platform-tools\adb.exe"
+    if (-not (Test-Path $adbPath)) {
+        Write-Host "[!] adb.exe non trouve dans $androidHome\platform-tools, installation automatique ignoree" -ForegroundColor Yellow
+        return
+    }
+
+    # Vérifier si un émulateur est connecté
+    try {
+        $devicesOutput = & $adbPath devices 2>&1
+        $devices = $devicesOutput | Select-String -Pattern "device$" | ForEach-Object { $_.Line -split '\s+' | Select-Object -First 1 }
+        
+        if ($devices.Count -eq 0) {
+            Write-Host "[!] Aucun emulateur Android connecte, installation automatique ignoree" -ForegroundColor Yellow
+            Write-Host "    Lancez un emulateur et reessayez, ou installez manuellement l'APK" -ForegroundColor Gray
+            return
+        }
+
+        Write-Host "[OK] Emulateur(s) detecte(s): $($devices -join ', ')" -ForegroundColor Green
+    } catch {
+        Write-Host "[!] Erreur lors de la verification des emulateurs: $_" -ForegroundColor Yellow
+        return
+    }
+
+    # Récupérer le package name depuis la config
+    $packageName = $null
+    try {
+        if (Test-Path $ConfigPath) {
+            $cfg = Get-Content $ConfigPath -Raw | ConvertFrom-Json
+            $packageName = $cfg.identifier
+        }
+    } catch {
+        Write-Host "[!] Impossible de lire la config pour obtenir le package name" -ForegroundColor Yellow
+    }
+
+    if ([string]::IsNullOrWhiteSpace($packageName)) {
+        # Package names par défaut selon la variante
+        switch ($BuildType) {
+            "mobile" { $packageName = "com.popcorn.client.mobile" }
+            "tv" { $packageName = "com.popcorn.client.tv" }
+            default { $packageName = "com.popcorn.client" }
+        }
+    }
+
+    Write-Host "[INFO] Package name: $packageName" -ForegroundColor Gray
+    Write-Host ""
+
+    # Désinstaller l'ancienne version si elle existe
+    Write-Host "Desinstallation de l'ancienne version..." -ForegroundColor Cyan
+    try {
+        $uninstallOutput = & $adbPath uninstall $packageName 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  [OK] Ancienne version desinstallee" -ForegroundColor Green
+        } else {
+            Write-Host "  [INFO] Aucune version precedente trouvee (normal pour premiere installation)" -ForegroundColor Gray
+        }
+    } catch {
+        Write-Host "  [!] Erreur lors de la desinstallation: $_" -ForegroundColor Yellow
+    }
+
+    Write-Host ""
+
+    # Installer la nouvelle version
+    Write-Host "Installation de la nouvelle version..." -ForegroundColor Cyan
+    Write-Host "  APK: $ApkPath" -ForegroundColor Gray
+    try {
+        $installOutput = & $adbPath install $ApkPath 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  [OK] Installation reussie!" -ForegroundColor Green
+        } else {
+            Write-Host "  [ERREUR] Echec de l'installation" -ForegroundColor Red
+            Write-Host "  $installOutput" -ForegroundColor Red
+            return
+        }
+    } catch {
+        Write-Host "  [ERREUR] Erreur lors de l'installation: $_" -ForegroundColor Red
+        return
+    }
+
+    Write-Host ""
+
+    # Lancer l'application
+    Write-Host "Lancement de l'application..." -ForegroundColor Cyan
+    try {
+        Start-Sleep -Seconds 2
+        $launchOutput = & $adbPath shell am start -n "$packageName/.MainActivity" 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "  [OK] Application lancee!" -ForegroundColor Green
+        } else {
+            Write-Host "  [!] Impossible de lancer l'application automatiquement" -ForegroundColor Yellow
+            Write-Host "      Lancez-la manuellement depuis l'emulateur" -ForegroundColor Gray
+        }
+    } catch {
+        Write-Host "  [!] Erreur lors du lancement: $_" -ForegroundColor Yellow
+    }
+
+    Write-Host ""
+    Write-Host "[OK] Installation automatique terminee!" -ForegroundColor Green
+    Write-Host ""
+}
+
 function Get-ProductInfoForVariant {
     param([string]$Variant)
     $configPath = Get-TauriConfigPath -Variant $Variant
@@ -64,6 +280,78 @@ function Get-ProductInfoForVariant {
     return @{
         ProductName = $productName
         Version = $version
+    }
+}
+
+function Update-VersionForAndroidBuild {
+    param(
+        [Parameter(Mandatory=$true)][string]$Variant
+    )
+
+    $configPath = Get-TauriConfigPath -Variant $Variant
+    if (-not (Test-Path $configPath)) { return $null }
+
+    # IMPORTANT: on ne réécrit pas tout le JSON (ConvertTo-Json) car ça peut casser l'encodage
+    # et modifier le formatage. On ne touche qu'aux champs nécessaires via regex.
+    $raw = $null
+    try {
+        $raw = Get-Content $configPath -Raw
+    } catch {
+        Write-Host "  [WARN] Impossible de lire la config Tauri ($configPath) pour bump version: $($_.Exception.Message)" -ForegroundColor Yellow
+        return $null
+    }
+    if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
+
+    # Lire versionCode actuel
+    $mCode = [regex]::Match($raw, '"versionCode"\s*:\s*(\d+)', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    $oldCode = 0
+    if ($mCode.Success) {
+        try { $oldCode = [int]$mCode.Groups[1].Value } catch { $oldCode = 0 }
+    }
+    if ($oldCode -lt 1) { $oldCode = 1 }
+    $newCode = $oldCode + 1
+
+    # Lire version actuelle et en extraire la base (X.Y.Z)
+    $mVer = [regex]::Match($raw, '"version"\s*:\s*"([^"]*)"', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    $base = "0.1.0"
+    if ($mVer.Success) {
+        $current = $mVer.Groups[1].Value
+        if ($current -match '^\d+\.\d+\.\d+') {
+            $base = ($current -split '\+')[0]
+        }
+    }
+    $newVersion = "$base+$newCode"
+
+    # Remplacements (1 occurrence) - éviter ConvertTo-Json et préserver le reste du fichier
+    $reCode = New-Object System.Text.RegularExpressions.Regex('"versionCode"\s*:\s*\d+', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    $updated = $reCode.Replace($raw, "`"versionCode`": $newCode", 1)
+
+    $reVer = New-Object System.Text.RegularExpressions.Regex('"version"\s*:\s*"[^"]*"', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    $updated = $reVer.Replace($updated, "`"version`": `"$newVersion`"", 1)
+
+    try {
+        Set-Content -Path $configPath -Value $updated -Encoding UTF8
+    } catch {
+        Write-Host "  [WARN] Impossible d'écrire la config Tauri ($configPath) pour bump version: $($_.Exception.Message)" -ForegroundColor Yellow
+        return $null
+    }
+
+    # Exposer la version au frontend (Astro) via import.meta.env.PUBLIC_*
+    $env:PUBLIC_APP_VERSION = $newVersion
+    $env:PUBLIC_APP_VERSION_CODE = "$newCode"
+    $env:PUBLIC_APP_VARIANT = $Variant
+    
+    # S'assurer que les variables sont bien définies (pour débogage)
+    Write-Host "  [DEBUG] Variables d'environnement:" -ForegroundColor Gray
+    Write-Host "    PUBLIC_APP_VERSION=$($env:PUBLIC_APP_VERSION)" -ForegroundColor Gray
+    Write-Host "    PUBLIC_APP_VERSION_CODE=$($env:PUBLIC_APP_VERSION_CODE)" -ForegroundColor Gray
+    Write-Host "    PUBLIC_APP_VARIANT=$($env:PUBLIC_APP_VARIANT)" -ForegroundColor Gray
+
+    Write-Host "  [OK] Version Android bump: version=$newVersion versionCode=$newCode" -ForegroundColor Green
+    return @{
+        Version = $newVersion
+        VersionCode = $newCode
+        ConfigPath = $configPath
     }
 }
 
@@ -387,6 +675,7 @@ if ($needsInit) {
             $initConfigArg = ""
             if ($buildType -eq "mobile") { $initConfigArg = " --config src-tauri\tauri.android.mobile.conf.json" }
             elseif ($buildType -eq "tv") { $initConfigArg = " --config src-tauri\tauri.android.conf.json" }
+            # Note: "standard" utilise tauri.conf.json (pas de --config)
 
             $cmdArgs = 'set "ANDROID_HOME=' + $androidHomeForCmd + '"&& ' +
                        'set "ANDROID_SDK_ROOT=' + $androidSdkRootForCmd + '"&& ' +
@@ -419,13 +708,32 @@ if ($needsInit) {
 $androidAppGradle = Join-Path $projectRoot "src-tauri\gen\android\app\build.gradle.kts"
 Ensure-AndroidCleartextTrafficEnabled -AndroidAppGradlePath $androidAppGradle
 
+# Bump automatique version/versionCode pour garantir un APK toujours "nouveau"
+# et afficher le numéro de version dans le wizard.
+Update-VersionForAndroidBuild -Variant $buildType | Out-Null
+
 # Déterminer la commande de build
 Set-Location (Join-Path $PSScriptRoot "..")
 
+# Préparer les variables d'environnement pour cross-env
+# Utiliser npx pour exécuter cross-env depuis node_modules
+$versionEnv = ""
+$codeEnv = ""
+$variantEnv = ""
+if ($env:PUBLIC_APP_VERSION) {
+    $versionEnv = "PUBLIC_APP_VERSION=$($env:PUBLIC_APP_VERSION) "
+}
+if ($env:PUBLIC_APP_VERSION_CODE) {
+    $codeEnv = "PUBLIC_APP_VERSION_CODE=$($env:PUBLIC_APP_VERSION_CODE) "
+}
+if ($env:PUBLIC_APP_VARIANT) {
+    $variantEnv = "PUBLIC_APP_VARIANT=$($env:PUBLIC_APP_VARIANT) "
+}
+
 $buildCommand = switch ($buildType) {
-    "mobile" { "npm run tauri:build:android-mobile" }
-    "tv" { "npm run tauri:build:android-tv" }
-    default { "npm run tauri:build:android" }
+    "mobile" { "npx cross-env $versionEnv$codeEnv$variantEnv npm run tauri:build:android-mobile" }
+    "tv" { "npx cross-env $versionEnv$codeEnv$variantEnv npm run tauri:build:android-tv" }
+    default { "npx cross-env $versionEnv$codeEnv$variantEnv npm run tauri:build:android" }
 }
 
 Write-Host ""
@@ -438,10 +746,23 @@ Write-Host "[!] Le build peut prendre plusieurs minutes..." -ForegroundColor Yel
 Write-Host ""
 
 try {
-    # Exécuter le build
-    Invoke-Expression $buildCommand
+    # Exécuter le build avec affichage de progression
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host "Progression du build Android" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host ""
     
-    $buildSucceeded = $LASTEXITCODE -eq 0
+    # Exécuter le build avec affichage de progression basée sur les étapes réelles
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host "Progression du build Android" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host ""
+    
+    $exitCode = Invoke-BuildWithProgress -Command $buildCommand -BuildType $buildType
+    
+    $buildSucceeded = $exitCode -eq 0
 
     # Workaround Windows: si le build échoue uniquement à cause des symlinks (mode développeur non activé),
     # on copie la lib .so dans jniLibs puis on construit l'APK via Gradle en sautant la tâche Rust.
@@ -449,9 +770,9 @@ try {
         Write-Host ""
         Write-Host "[WARN] Build Tauri Android a échoué. Tentative de contournement (copie .so + Gradle)..." -ForegroundColor Yellow
 
-        $soPath = Join-Path $projectRoot "src-tauri\target\aarch64-linux-android\release\libpopcorn_vercel_client.so"
+        $soPath = Join-Path $projectRoot "src-tauri\target\aarch64-linux-android\release\libpopcorn_client.so"
         $jniDir = Join-Path $projectRoot "src-tauri\gen\android\app\src\main\jniLibs\arm64-v8a"
-        $jniSoPath = Join-Path $jniDir "libpopcorn_vercel_client.so"
+        $jniSoPath = Join-Path $jniDir "libpopcorn_client.so"
 
         if (-not (Test-Path $soPath)) {
             Write-Host "[ERREUR] La bibliothèque Android n'a pas été générée: $soPath" -ForegroundColor Red
@@ -646,9 +967,16 @@ try {
             Write-Host "[OK] APK copie dans:" -ForegroundColor Green
             Write-Host "   $destFile" -ForegroundColor White
             Write-Host ""
+
+            # Installation automatique sur l'émulateur Android si disponible
+            Install-ApkOnEmulator -ApkPath $destFile -ConfigPath $configPath -BuildType $buildType
+        } else {
+            # Si l'APK n'a pas été copié dans popcorn-web/app, essayer quand même l'installation avec l'APK local
+            Write-Host "[INFO] APK local disponible, tentative d'installation automatique..." -ForegroundColor Yellow
+            Install-ApkOnEmulator -ApkPath $apk.FullName -ConfigPath $configPath -BuildType $buildType
         }
 
-        Write-Host "Vous pouvez maintenant installer l'APK sur votre appareil Android." -ForegroundColor Green
+        Write-Host "Build termine avec succes!" -ForegroundColor Green
     } else {
         Write-Host ""
         Write-Host "[ERREUR] Erreur lors du build" -ForegroundColor Red

@@ -25,7 +25,8 @@ export function FocusableCard({
     if (!element) return;
 
     // Gestion du clavier pour TV
-    const handleKeyPress = (e: KeyboardEvent) => {
+    const handleKeyPress = (evt: Event) => {
+      const e = evt as KeyboardEvent;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         if (onClick) {
@@ -68,7 +69,7 @@ export function FocusableCard({
   }, [onClick, href]);
 
   const baseClasses = `card-tv focus-tv-glow transition-all duration-300 ${className}`;
-  const commonProps = {
+  const commonProps: any = {
     ref: cardRef as any,
     className: baseClasses,
     tabIndex,

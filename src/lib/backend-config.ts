@@ -7,10 +7,27 @@
  * Priorité de récupération:
  * 1. localStorage (côté client uniquement)
  * 2. Variable d'environnement BACKEND_URL (dev/prod)
- * 3. Valeur par défaut http://127.0.0.1:3000
+ * 3. Valeur par défaut:
+ *    - Android: http://10.0.2.2:3000 (adresse spéciale émulateur pour accéder à localhost de l'hôte)
+ *    - Autres: http://127.0.0.1:3000
  */
 
 const STORAGE_KEY = 'popcorn_backend_url';
+
+/**
+ * Retourne l'URL backend par défaut selon la plateforme
+ */
+function getDefaultBackendUrl(): string {
+  // Sur Android (émulateur), utiliser 10.0.2.2 pour accéder à localhost de la machine hôte
+  if (typeof window !== 'undefined') {
+    const ua = navigator.userAgent || '';
+    const isAndroid = /Android/i.test(ua);
+    if (isAndroid) {
+      return 'http://10.0.2.2:3000';
+    }
+  }
+  return 'http://127.0.0.1:3000';
+}
 
 /**
  * Récupère l'URL du backend
@@ -24,7 +41,7 @@ export function getBackendUrl(): string {
     // Utiliser variable d'environnement ou valeur par défaut
     return import.meta.env.BACKEND_URL || 
            import.meta.env.PUBLIC_BACKEND_URL || 
-           'http://127.0.0.1:3000';
+           getDefaultBackendUrl();
   }
 
   // Côté client: priorité localStorage
@@ -42,8 +59,8 @@ export function getBackendUrl(): string {
     return import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL || '';
   }
 
-  // Valeur par défaut
-  return 'http://127.0.0.1:3000';
+  // Valeur par défaut (détecte Android automatiquement)
+  return getDefaultBackendUrl();
 }
 
 /**
@@ -99,21 +116,27 @@ export function clearBackendUrl(): void {
 }
 
 /**
- * Vérifie si une URL du backend est configurée
+ * Vérifie si une URL du backend est configurée PAR L'UTILISATEUR
+ * 
+ * IMPORTANT: Cette fonction doit retourner true SEULEMENT si l'utilisateur a configuré l'URL
+ * (via localStorage). Les env vars sont des fallbacks pour getBackendUrl(), pas des "configurations".
+ * 
+ * Si hasBackendUrl() retourne false, l'app doit rediriger vers /setup (premier démarrage).
  */
 export function hasBackendUrl(): boolean {
   if (typeof window === 'undefined') {
-    // Côté serveur: vérifier env vars
-    return !!(import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL);
+    // Côté serveur: considérer comme non configuré (le setup n'existe qu'en client)
+    return false;
   }
 
   try {
-    // Côté client: considérer configuré si:
-    // - localStorage contient une valeur, OU
-    // - une env var est fournie au build (use-case web / déploiement)
-    if (localStorage.getItem(STORAGE_KEY) !== null) return true;
-    return !!(import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL);
+    // Côté client: retourner true SEULEMENT si localStorage contient une valeur
+    // (env vars = fallback, pas une "configuration utilisateur")
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored !== null && stored.trim() !== '';
   } catch (error) {
-    return !!(import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL);
+    // Si localStorage n'est pas accessible, considérer comme non configuré
+    console.warn('[backend-config] hasBackendUrl: localStorage access failed:', error);
+    return false;
   }
 }

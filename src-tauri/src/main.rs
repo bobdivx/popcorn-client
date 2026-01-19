@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    popcorn_vercel_client::run();
+    popcorn_client::run();
 }

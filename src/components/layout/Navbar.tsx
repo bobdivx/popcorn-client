@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { Menu, Search as SearchIcon } from 'lucide-preact';
+import { Plus, Search as SearchIcon, Settings as SettingsIcon } from 'lucide-preact';
 import { serverApi } from '../../lib/client/server-api';
 import { getLocalProfile, onProfileChanged } from '../../lib/client/profile';
 import Avatar from '../ui/Avatar';
@@ -12,6 +12,14 @@ export default function Navbar() {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(() => getLocalProfile());
+  const [clock, setClock] = useState(() => {
+    try {
+      return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(new Date());
+    } catch {
+      const d = new Date();
+      return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    }
+  });
 
   useEffect(() => {
     const updatePath = () => setCurrentPath(window.location.pathname + window.location.search);
@@ -33,6 +41,21 @@ export default function Navbar() {
 
   useEffect(() => {
     return onProfileChanged(() => setProfile(getLocalProfile()));
+  }, []);
+
+  useEffect(() => {
+    // Horloge (mise à jour au changement de minute)
+    const tick = () => {
+      try {
+        setClock(new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(new Date()));
+      } catch {
+        const d = new Date();
+        setClock(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
+      }
+    };
+    tick();
+    const i = window.setInterval(tick, 30_000);
+    return () => window.clearInterval(i);
   }, []);
 
   const loadUser = async () => {
@@ -67,12 +90,10 @@ export default function Navbar() {
   const isActivePrefix = (prefix: string) => currentPath === prefix || currentPath.startsWith(prefix + '/') || currentPath.startsWith(prefix + '?');
 
   const tabs: NavTab[] = [
-    { label: 'Accueil', href: '/dashboard', match: 'exact' },
-    { label: 'Films', href: '/films', match: 'prefix' },
-    { label: 'Séries', href: '/series', match: 'prefix' },
-    { label: 'Bibliothèque', href: '/library', match: 'prefix' },
-    { label: 'Torrents', href: '/torrents', match: 'prefix' },
-    { label: 'Téléchargements', href: '/downloads', match: 'prefix' },
+    { label: 'Home', href: '/dashboard', match: 'exact' },
+    // Sur certains environnements (Tauri / WebView), les routes "directory" nécessitent un slash final.
+    { label: 'Films', href: '/films/', match: 'prefix' },
+    { label: 'Séries', href: '/series/', match: 'prefix' },
   ];
 
   if (loading) return null;
@@ -84,159 +105,181 @@ export default function Navbar() {
       }`}
     >
       <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 tv:px-24">
-        <div className="flex flex-col">
-          {/* Barre haute (style Google TV) */}
-          <div className="flex items-center justify-between h-16 sm:h-18 md:h-20 lg:h-24 tv:h-28">
-            {/* Logo + menu */}
-            <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-              {user ? (
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new CustomEvent('sidebar-toggle'))}
-                  className="lg:hidden p-2 text-white hover:bg-glass-hover transition-colors focus:outline-none focus:ring-4 focus:ring-primary-600/50 rounded min-h-[48px] min-w-[48px]"
-                  aria-label="Ouvrir le menu"
-                  tabIndex={0}
-                  data-focusable
-                >
-                  <Menu className="w-6 h-6" />
-                </button>
-              ) : null}
+        <div className="flex items-center justify-between h-16 sm:h-18 md:h-20 lg:h-20 tv:h-24">
+          {/* Gauche: avatar (ou logo) + recherche */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0 min-w-0">
+            <a
+              href={user ? '/dashboard' : '/'}
+              className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity focus:outline-none focus:ring-4 focus:ring-primary-600/50 focus:ring-offset-2 focus:ring-offset-black rounded-full py-1 pr-2"
+              tabIndex={0}
+              data-focusable
+              aria-label="Aller à l'accueil"
+            >
+              <img
+                src="/popcorn_logo.png"
+                alt="Popcorn Client"
+                className="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 tv:w-14 tv:h-14 object-contain"
+                loading="eager"
+              />
+            </a>
 
+            {user ? (
               <a
-                href={user ? '/dashboard' : '/'}
-                className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity focus:outline-none focus:ring-4 focus:ring-primary-600/50 focus:ring-offset-2 focus:ring-offset-black rounded-lg py-1 tv:py-2"
+                href="/search"
+                className={`gtv-icon-btn ${isActive('/search') ? 'bg-glass-active' : ''}`}
+                aria-label="Recherche"
                 tabIndex={0}
                 data-focusable
               >
-                <img
-                  src="/popcorn_logo.png"
-                  alt="Popcorn Client"
-                  className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 tv:w-16 tv:h-16 object-contain"
-                  loading="eager"
-                />
-                <span className="hidden sm:inline text-xl sm:text-2xl md:text-3xl tv:text-4xl font-bold text-white">
-                  Popcorn
-                </span>
+                <SearchIcon className="w-5 h-5 tv:w-6 tv:h-6" />
               </a>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-3 sm:gap-4 md:gap-6 flex-shrink-0">
-              {user ? (
-                <>
-                  {/* Recherche: bouton pill sur desktop/TV, icône sur mobile */}
-                  <a
-                    href="/search"
-                    className={`btn btn-ghost glass-panel min-h-[48px] min-w-[48px] px-3 text-white hover:bg-glass-hover focus:outline-none focus:ring-4 focus:ring-primary-600/50 ${
-                      isActive('/search') ? 'bg-glass-active' : ''
-                    }`}
-                    aria-label="Recherche"
-                    tabIndex={0}
-                    data-focusable
-                  >
-                    <SearchIcon className="w-5 h-5 tv:w-6 tv:h-6" />
-                    <span className="hidden md:inline ml-2 text-base tv:text-xl opacity-90">Rechercher</span>
-                  </a>
-
-                  <div className="dropdown dropdown-end">
-                    <div
-                      tabIndex={0}
-                      role="button"
-                      className="cursor-pointer focus:outline-none focus:ring-4 focus:ring-primary-600/50 rounded-lg"
-                      data-focusable
-                    >
-                      <Avatar
-                        email={user.email}
-                        displayName={profile.displayName}
-                        profile={profile}
-                        sizeClassName="w-9 h-9 sm:w-10 sm:h-10 md:w-12 md:h-12 tv:w-16 tv:h-16"
-                      />
-                    </div>
-                    <ul
-                      tabIndex={0}
-                      className="menu menu-sm dropdown-content mt-3 z-[1] p-3 shadow-2xl glass-panel-lg rounded-xl w-72 border border-white/10"
-                    >
-                      <li className="menu-title">
-                        <span className="text-white font-bold text-lg">
-                          {profile.displayName || user.email || 'Utilisateur'}
-                        </span>
-                      </li>
-                      <li>
-                        <a href="/dashboard" className="text-white hover:bg-glass-hover text-base py-3 px-4 rounded-lg">
-                          Accueil
-                        </a>
-                      </li>
-                      <li>
-                        <a href="/settings" className="text-white hover:bg-glass-hover text-base py-3 px-4 rounded-lg">
-                          Paramètres
-                        </a>
-                      </li>
-                      <li>
-                        <a href="/settings/account" className="text-white hover:bg-glass-hover text-base py-3 px-4 rounded-lg">
-                          Mon compte
-                        </a>
-                      </li>
-                      <li>
-                        <hr className="my-2 border-white/10" />
-                      </li>
-                      <li>
-                        <a
-                          onClick={handleLogout}
-                          className="text-primary-400 hover:bg-glass-hover text-base py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600/50"
-                        >
-                          Déconnexion
-                        </a>
-                      </li>
-                    </ul>
-                  </div>
-                </>
-              ) : (
-                <div className="flex gap-3 sm:gap-4">
-                  <a
-                    href="/login"
-                    className="text-white hover:text-gray-300 transition-all duration-300 text-base sm:text-lg md:text-xl tv:text-2xl px-4 sm:px-6 tv:px-8 py-2 sm:py-3 tv:py-4 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary-600/50 focus:bg-glass-hover glass-panel min-h-[48px] tv:min-h-[56px]"
-                    tabIndex={0}
-                    data-focusable
-                  >
-                    Connexion
-                  </a>
-                  <a
-                    href="/register"
-                    className="bg-primary hover:bg-primary-700 text-white px-4 sm:px-6 md:px-8 tv:px-12 py-2 sm:py-3 md:py-4 tv:py-5 rounded-lg text-base sm:text-lg md:text-xl tv:text-2xl font-semibold transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-primary-600/50 shadow-primary min-h-[48px] tv:min-h-[56px]"
-                    tabIndex={0}
-                    data-focusable
-                  >
-                    Inscription
-                  </a>
-                </div>
-              )}
-            </div>
+            ) : null}
           </div>
 
-          {/* Onglets (Google TV-like) */}
+          {/* Centre: onglets en pilule (Google TV-like) */}
           {user ? (
-            <div className="flex items-center h-12 md:h-14 lg:h-16 tv:h-18 -mx-2 sm:-mx-3 md:-mx-4">
-              <div className="flex items-center gap-1 sm:gap-2 md:gap-3 overflow-x-auto scrollbar-hide w-full px-2 sm:px-3 md:px-4">
-                {tabs.map((t) => {
-                  const active = t.match === 'exact' ? isActive(t.href) : isActivePrefix(t.href);
-                  return (
-                    <a
-                      key={t.href}
-                      href={t.href}
-                      className={`nav-tab whitespace-nowrap text-white/85 hover:text-white ${
-                        active ? 'nav-tab-active text-white' : ''
-                      }`}
-                      tabIndex={0}
-                      data-focusable
-                      aria-current={active ? 'page' : undefined}
-                    >
-                      {t.label}
-                    </a>
-                  );
-                })}
+            <div className="flex-1 min-w-0 px-2 sm:px-4">
+              <div className="flex items-center justify-center">
+                <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-hide max-w-full">
+                  {tabs.map((t) => {
+                    const active = t.match === 'exact' ? isActive(t.href) : isActivePrefix(t.href);
+                    return (
+                      <a
+                        key={t.href}
+                        href={t.href}
+                        className={`nav-tab whitespace-nowrap ${active ? 'nav-tab-active' : ''}`}
+                        tabIndex={0}
+                        data-focusable
+                        aria-current={active ? 'page' : undefined}
+                      >
+                        {t.label}
+                      </a>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          ) : null}
+          ) : (
+            <div className="flex-1" />
+          )}
+
+          {/* Droite: actions + profil + horloge */}
+          <div className="flex items-center gap-2 sm:gap-3 md:gap-4 flex-shrink-0">
+            {user ? (
+              <>
+                <a
+                  href="/downloads"
+                  className="gtv-icon-btn hidden sm:inline-flex"
+                  aria-label="Téléchargements"
+                  tabIndex={0}
+                  data-focusable
+                >
+                  <Plus className="w-5 h-5 tv:w-6 tv:h-6" />
+                </a>
+                <a
+                  href="/settings"
+                  className={`gtv-icon-btn hidden sm:inline-flex ${isActivePrefix('/settings') ? 'bg-glass-active' : ''}`}
+                  aria-label="Paramètres"
+                  tabIndex={0}
+                  data-focusable
+                >
+                  <SettingsIcon className="w-5 h-5 tv:w-6 tv:h-6" />
+                </a>
+
+                <div className="dropdown dropdown-end">
+                  <div
+                    tabIndex={0}
+                    role="button"
+                    className="cursor-pointer focus:outline-none focus:ring-4 focus:ring-primary-600/50 rounded-full"
+                    data-focusable
+                    aria-label="Menu profil"
+                  >
+                    <Avatar
+                      email={user.email}
+                      displayName={profile.displayName}
+                      profile={profile}
+                      sizeClassName="w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 tv:w-14 tv:h-14"
+                    />
+                  </div>
+                  <ul
+                    tabIndex={0}
+                    className="menu menu-sm dropdown-content mt-3 z-[1] p-3 shadow-2xl glass-panel-lg rounded-xl w-72 border border-white/10"
+                  >
+                    <li className="menu-title">
+                      <span className="text-white font-bold text-lg">
+                        {profile.displayName || user.email || 'Utilisateur'}
+                      </span>
+                    </li>
+                    <li>
+                      <a href="/dashboard" className="text-white hover:bg-glass-hover text-base py-3 px-4 rounded-lg">
+                        Accueil
+                      </a>
+                    </li>
+                    <li>
+                      <a href="/films/" className="text-white hover:bg-glass-hover text-base py-3 px-4 rounded-lg">
+                        Films
+                      </a>
+                    </li>
+                    <li>
+                      <a href="/series/" className="text-white hover:bg-glass-hover text-base py-3 px-4 rounded-lg">
+                        Séries
+                      </a>
+                    </li>
+                    <li>
+                      <a href="/library" className="text-white hover:bg-glass-hover text-base py-3 px-4 rounded-lg">
+                        Bibliothèque
+                      </a>
+                    </li>
+                    <li>
+                      <a href="/downloads" className="text-white hover:bg-glass-hover text-base py-3 px-4 rounded-lg">
+                        Téléchargements
+                      </a>
+                    </li>
+                    <li>
+                      <a href="/settings" className="text-white hover:bg-glass-hover text-base py-3 px-4 rounded-lg">
+                        Paramètres
+                      </a>
+                    </li>
+                    <li>
+                      <hr className="my-2 border-white/10" />
+                    </li>
+                    <li>
+                      <a
+                        onClick={handleLogout}
+                        className="text-primary-400 hover:bg-glass-hover text-base py-3 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-600/50"
+                      >
+                        Déconnexion
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="hidden lg:flex flex-col items-end leading-none pl-2">
+                  <div className="text-white/90 font-semibold text-sm tv:text-base tabular-nums">{clock}</div>
+                  <div className="text-white/50 text-xs tv:text-sm">Popcorn TV</div>
+                </div>
+              </>
+            ) : (
+              <div className="flex gap-2 sm:gap-3">
+                <a
+                  href="/login"
+                  className="gtv-pill-btn"
+                  tabIndex={0}
+                  data-focusable
+                >
+                  Connexion
+                </a>
+                <a
+                  href="/register"
+                  className="gtv-pill-btn gtv-pill-btn-primary"
+                  tabIndex={0}
+                  data-focusable
+                >
+                  Inscription
+                </a>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </nav>

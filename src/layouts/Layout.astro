@@ -2,7 +2,6 @@
 import '../styles/global.css';
 import ServerConnectionCheck from '../components/ServerConnectionCheck';
 import Navbar from '../components/layout/Navbar';
-import Sidebar from '../components/layout/Sidebar';
 
 interface Props {
   title?: string;
@@ -30,18 +29,8 @@ const { title = 'Popcorn Client' } = Astro.props;
   <body class="min-h-screen bg-[#121212] text-white flex flex-col overflow-x-hidden">
     <ServerConnectionCheck client:only="preact" />
     <Navbar client:only="preact" />
-    <Sidebar client:only="preact" />
-    <script is:inline>
-      // Ajoute un padding desktop uniquement si authentifié (évite un décalage sur /login).
-      (function () {
-        try {
-          const hasToken = !!localStorage.getItem('access_token');
-          if (hasToken) document.body.classList.add('has-sidebar');
-        } catch (e) {}
-      })();
-    </script>
-    <!-- Header plus haut (barre + onglets) -->
-    <main class="app-main flex-1 w-full overflow-x-hidden pt-28 sm:pt-32 md:pt-36 lg:pt-40 tv:pt-44">
+    <!-- Header (barre en haut) -->
+    <main class="app-main flex-1 w-full overflow-x-hidden pt-20 sm:pt-22 md:pt-24 lg:pt-24 tv:pt-28">
       <slot />
     </main>
     <script is:inline>

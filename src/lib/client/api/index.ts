@@ -24,10 +24,19 @@ export class ClientApi {
    * Utilise des requêtes relatives côté client (navigateur) pour passer par le proxy Astro
    */
   async getRequestUrl(path: string): Promise<string> {
-    // Si on est côté client (navigateur), utiliser des requêtes relatives pour passer par le proxy Astro
+    // Dans le navigateur (y compris site statique), on parle directement au backend Rust configuré.
+    // Ça évite les 404 "bruyants" sur /api/client/* quand l'UI est servie sans proxy (Astro SSR absent).
     if (typeof window !== 'undefined') {
-      return `/api/client/${path}`;
+      const { getBackendUrl } = await import('../../backend-config.js');
+      const backend = (getBackendUrl?.() || '').trim().replace(/\/$/, '');
+      const envFallback = (import.meta.env.PUBLIC_BACKEND_URL || import.meta.env.BACKEND_URL || '')
+        .trim()
+        .replace(/\/$/, '');
+      // 3000 = port backend par défaut. (4326 est le port Astro dev, pas le backend Rust.)
+      const base = backend || envFallback || 'http://127.0.0.1:3000';
+      return `${base}/api/client/${path}`;
     }
+
     // Sinon (SSR), utiliser l'URL absolue du backend Rust
     const baseUrl = this.baseUrl || await getBaseUrl();
     return `${baseUrl}/api/client/${path}`;

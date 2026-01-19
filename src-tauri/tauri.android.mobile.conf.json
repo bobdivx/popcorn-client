@@ -1,44 +1,50 @@
-{
-  "productName": "Popcorn Mobile",
-  "version": "0.1.0",
-  "identifier": "com.popcorn.client.mobile",
-  "build": {
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build:tauri",
-    "devUrl": "http://localhost:4326",
-    "frontendDist": "../dist"
-  },
-  "app": {
-    "windows": [
-      {
-        "title": "Popcorn Mobile",
-        "width": 400,
-        "height": 800,
-        "fullscreen": false
-      }
-    ],
-    "security": {
-      "csp": null
-    }
-  },
-  "bundle": {
-    "active": true,
-    "targets": "all",
-    "icon": [
-      "icons/32x32.png",
-      "icons/128x128.png",
-      "icons/128x128@2x.png"
-    ],
-    "resources": [],
-    "externalBin": [],
-    "copyright": "",
-    "category": "Utility",
-    "shortDescription": "Client léger Popcorn pour Android Mobile",
-    "longDescription": "Client léger pour Android Mobile - se connecte au serveur Popcorn distant",
-    "android": {
-      "versionCode": 1,
-      "autoIncrementVersionCode": false
-    }
-  },
-  "plugins": {}
+﻿{
+    "productName":  "Popcorn Mobile",
+    "version": "0.1.0+59",
+    "identifier":  "com.popcorn.client.mobile",
+    "build":  {
+                  "beforeDevCommand":  "npm run dev",
+                  "beforeBuildCommand":  "npm run build:tauri",
+                  "devUrl":  "http://localhost:4326",
+                  "frontendDist":  "../dist"
+              },
+    "app":  {
+                "windows":  [
+                                {
+                                    "label":  "main",
+                                    "title":  "Popcorn Mobile",
+                                    "width":  400,
+                                    "height":  800,
+                                    "fullscreen":  false
+                                }
+                            ],
+                "withGlobalTauri":  true,
+                "security":  {
+                                 "csp":  null,
+                                 "capabilities":  ["main"]
+                             }
+            },
+    "bundle":  {
+                   "active":  true,
+                   "targets":  "all",
+                   "icon":  [
+                                "icons/32x32.png",
+                                "icons/128x128.png",
+                                "icons/128x128@2x.png"
+                            ],
+                   "resources":  [
+                                 ],
+                   "externalBin":  [
+                                   ],
+                   "copyright":  "",
+                   "category":  "Utility",
+                   "shortDescription":  "Client l\u00e9ger Popcorn pour Android Mobile",
+                   "longDescription":  "Client l\u00e9ger pour Android Mobile - se connecte au serveur Popcorn distant",
+                   "android":  {
+                                   "versionCode": 59,
+                                   "autoIncrementVersionCode":  false
+                               }
+               },
+    "plugins":  {
+                }
 }

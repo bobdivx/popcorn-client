@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
+import { getBackendUrl } from '../lib/backend-config';
+import { isTauri } from '../lib/utils/tauri';
+
+const STORAGE_DIAG_ON_BOOT = 'popcorn_diagnostics_on_boot';
 
 export default function IndexRedirect() {
   const [loading, setLoading] = useState(true);
@@ -7,13 +11,93 @@ export default function IndexRedirect() {
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    // Wrapper externe pour catch toutes les erreurs (imports, module init, etc.)
+    let mounted = true;
     const checkAndRedirect = async () => {
       try {
+        // Sur Android, attendre un peu avant de faire des requêtes réseau
+        // pour laisser le système initialiser les permissions réseau
+        if (isTauri()) {
+          try {
+            const { invoke } = await import('@tauri-apps/api/core');
+            const platform = await invoke('get-platform').catch(() => 'unknown');
+            if (platform === 'android') {
+              // Délai de 1 seconde pour laisser Android initialiser complètement les permissions réseau
+              // et éviter les ANR (Application Not Responding)
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          } catch {
+            // Si on ne peut pas détecter la plateforme, continuer quand même
+          }
+        }
+        
+        // Logger immédiatement pour diagnostiquer les crashes silencieux
+        console.log('[IndexRedirect] Starting checkAndRedirect');
+        try {
+          if (isTauri()) {
+            const { invoke } = await import('@tauri-apps/api/core');
+            await invoke('log-message', {
+              message: `[popcorn-debug] IndexRedirect mounted: href=${typeof window !== 'undefined' ? window.location.href : ''}`,
+            }).catch(() => {
+              // Si invoke échoue, continuer quand même
+              console.warn('[IndexRedirect] log-message invoke failed');
+            });
+          }
+        } catch (invokeErr) {
+          console.warn('[IndexRedirect] Tauri invoke error (non-fatal):', invokeErr);
+        }
+
+        // Mode "page de test au démarrage" : si activé, rediriger vers les diagnostics.
+        // Important: ne pas l'activer par défaut ici (sinon ça surprend), et ne pas le limiter à Android:
+        // ça peut servir sur desktop/web aussi.
+        try {
+          const shouldDiag = localStorage.getItem(STORAGE_DIAG_ON_BOOT) === '1';
+          if (shouldDiag) {
+            window.location.href = '/settings/diagnostics';
+            setLoading(false);
+            return;
+          }
+        } catch {
+          // ignore
+        }
+
         setMessage('Vérification du serveur...');
+        // Debug: log la config backend (sans faire de requête réseau pour éviter les blocages)
+        // On évite checkServerHealth() ici car il peut bloquer et causer un ANR
+        try {
+          if (isTauri()) {
+            const backendUrl = (() => {
+              try {
+                return getBackendUrl();
+              } catch {
+                return '(backend-url-error)';
+              }
+            })();
+            const { invoke } = await import('@tauri-apps/api/core');
+            await invoke('log-message', {
+              message: `[popcorn-debug] BackendUrl=${backendUrl}`,
+            }).catch(() => {
+              // Ignore les erreurs de log
+            });
+          }
+        } catch {
+          // ignore
+        }
+
         // D'abord vérifier le statut du setup pour savoir si la DB est vide
         const setupResponse = await serverApi.getSetupStatus();
         
         console.log('[IndexRedirect] Setup response:', setupResponse);
+        try {
+          if (isTauri()) {
+            const { invoke } = await import('@tauri-apps/api/core');
+            await invoke('log-message', {
+              message: `[popcorn-debug] Setup response: ${JSON.stringify(setupResponse)}`,
+            });
+          }
+        } catch {
+          // ignore
+        }
         
         if (setupResponse.success && setupResponse.data) {
           // Si le backend n'est pas joignable (ex: reboot), ne pas basculer vers /setup.
@@ -35,7 +119,8 @@ export default function IndexRedirect() {
 
           console.log('[IndexRedirect] hasUsers:', setupResponse.data.hasUsers);
           // Si pas d'utilisateurs dans la DB (première installation), rediriger vers setup
-          if (setupResponse.data.backendReachable !== false && setupResponse.data.hasUsers === false) {
+          // hasUsers est optionnel selon les plateformes; on ne redirige que si le backend indique explicitement "false".
+          if ((setupResponse.data as any).hasUsers === false) {
             console.log('[IndexRedirect] DB vide, redirection vers /setup');
             window.location.href = '/setup';
             setLoading(false);
@@ -77,36 +162,59 @@ export default function IndexRedirect() {
           window.location.href = '/login';
         }
       } catch (error) {
-        // En cas d'erreur, vérifier si on peut accéder au setup
-        // Si setup accessible, rediriger vers setup (DB peut être vide)
-        // Sinon, rediriger vers login
+        // Logger l'erreur de manière visible (console.error apparaît dans logcat WebView)
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        console.error('[IndexRedirect] Fatal error in checkAndRedirect:', errorMsg, errorStack || '');
+        
+        // Essayer de logger via Tauri si disponible (mais ne pas bloquer si ça échoue)
         try {
-          setMessage('Récupération du statut... (réessai)');
-          const setupResponse = await serverApi.getSetupStatus();
-          if (setupResponse.success && setupResponse.data?.backendReachable === false) {
-            const next = attempt + 1;
-            setAttempt(next);
-            if (next < 10) {
-              setTimeout(checkAndRedirect, 1000);
-              return;
-            }
-            window.location.href = '/setup';
-            return;
-          }
-          if (setupResponse.success && setupResponse.data?.backendReachable !== false && setupResponse.data?.hasUsers === false) {
-            window.location.href = '/setup';
-          } else {
-            window.location.href = '/login';
+          if (isTauri()) {
+            const { invoke } = await import('@tauri-apps/api/core');
+            await invoke('log-message', {
+              message: `[popcorn-debug] IndexRedirect error: ${errorMsg}`,
+            }).catch(() => {
+              // ignore invoke errors
+            });
           }
         } catch {
-          window.location.href = '/login';
+          // ignore Tauri import/invoke errors
         }
-      } finally {
+
+        // En cas d'erreur fatale : rediriger vers /setup (mode "premier démarrage")
+        // C'est plus sûr que de rester sur /login si on ne peut pas déterminer l'état
         setLoading(false);
+        if (mounted) {
+          console.log('[IndexRedirect] Redirecting to /setup due to error');
+          window.location.href = '/setup';
+        }
+        return;
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
-    checkAndRedirect();
+    // Exécuter checkAndRedirect avec protection externe
+    try {
+      checkAndRedirect();
+    } catch (outerError) {
+      // Erreur lors de l'initialisation du useEffect (très rare, mais possible)
+      console.error('[IndexRedirect] Fatal error in useEffect (outer):', outerError);
+      setLoading(false);
+      // Rediriger vers /setup en cas d'erreur fatale au niveau du useEffect
+      try {
+        window.location.href = '/setup';
+      } catch {
+        // Si même window.location échoue, il y a un problème système
+        console.error('[IndexRedirect] Cannot redirect to /setup - window.location failed');
+      }
+    }
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   if (loading) {

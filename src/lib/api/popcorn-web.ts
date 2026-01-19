@@ -4,6 +4,7 @@
  * Ils doivent passer par les routes API de popcorn-web
  */
 import { isTauri } from '../utils/tauri.js';
+import { TokenManager } from '../client/storage.js';
 
 /**
  * Obtient l'URL de base de l'API popcorn-web
@@ -48,38 +49,109 @@ async function requestJson(
 ): Promise<JsonResult> {
   // En Tauri (Android/Desktop), utiliser la requête native pour contourner CORS
   if (isTauri()) {
-    const { fetch: tauriFetch, Body, ResponseType } = await import('@tauri-apps/plugin-http');
-    const headers: Record<string, string> = {};
-    if (init.headers) {
-      // HeadersInit peut être object/Headers/array; on normalise au plus simple
-      if (Array.isArray(init.headers)) {
-        for (const [k, v] of init.headers) headers[k] = v;
-      } else if (init.headers instanceof Headers) {
-        init.headers.forEach((v, k) => (headers[k] = v));
-      } else {
-        Object.assign(headers, init.headers as Record<string, string>);
+    const logNative = async (message: string) => {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core');
+        await invoke('log-message', { message });
+      } catch {
+        // ignore
       }
+    };
+
+    try {
+      // Essayer d'abord native-fetch (commande personnalisée), puis plugin-http en fallback
+      const { invoke } = await import('@tauri-apps/api/core');
+
+      const method =
+        (init as any)?.method && typeof (init as any).method === 'string' ? (init as any).method : 'GET';
+
+      const headerPairs: Array<[string, string]> = [];
+      try {
+        const headersObj = new Headers((init as any)?.headers as any);
+        headersObj.forEach((value, key) => headerPairs.push([key, value]));
+      } catch {
+        // ignore
+      }
+
+      const body =
+        typeof (init as any)?.body === 'string' || (init as any)?.body instanceof String
+          ? String((init as any).body)
+          : undefined;
+
+      let nativeRes: any;
+      try {
+        nativeRes = await invoke('native-fetch', {
+          url,
+          method,
+          headers: headerPairs,
+          body,
+          timeoutMs,
+        } as any);
+      } catch (invokeError) {
+        const errorMsg = invokeError instanceof Error ? invokeError.message : String(invokeError);
+        // Si native-fetch n'est pas disponible, utiliser plugin-http
+        if (errorMsg.includes('not found') || errorMsg.includes('Command native-fetch')) {
+          const { fetch: httpFetch } = await import('@tauri-apps/plugin-http');
+          const httpResponse = await httpFetch(url, {
+            method: method as any,
+            headers: Object.fromEntries(headerPairs),
+            body: body,
+          } as any);
+          
+          const responseBody = await httpResponse.text();
+          return {
+            ok: httpResponse.ok,
+            status: httpResponse.status,
+            data: responseBody ? JSON.parse(responseBody) : {},
+            rawText: responseBody,
+          };
+        }
+        throw invokeError;
+      }
+
+      const response = new Response(nativeRes?.body ?? '', {
+        status: nativeRes?.status ?? 0,
+        headers: (() => {
+          const h = new Headers();
+          try {
+            for (const [k, v] of (nativeRes?.headers || []) as Array<[string, string]>) {
+              if (k) h.set(k, v);
+            }
+          } catch {
+            // ignore
+          }
+          return h;
+        })(),
+      });
+
+      const rawText = await response.text().catch(() => '');
+      let data: any = {};
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        data = {};
+      }
+
+      if (response.ok) return { ok: true, status: response.status, data };
+      return { ok: false, status: response.status, data, rawText };
+    } catch (e) {
+      const eStr = typeof e === 'string' ? e : e instanceof Error ? e.message || '' : String(e);
+      // Cas fréquent: plugin-http bloqué par ACL (capabilities). On loggue pour diagnostic.
+      await logNative(
+        `[popcorn-debug] popcorn-web requestJson failed url=${url} err=${JSON.stringify({
+          type: typeof e,
+          value: eStr,
+        })}`
+      );
+
+      // Sur AbortError: simuler "API indisponible"
+      if (e instanceof Error && e.name === 'AbortError') {
+        return { ok: false, status: 0, data: {}, rawText: 'timeout' };
+      }
+
+      // Sinon: laisser la logique caller gérer (loginCloud transforme certains cas en null)
+      throw e;
     }
-
-    const method = (init.method || 'GET').toUpperCase();
-    const hasBody = typeof init.body !== 'undefined' && init.body !== null;
-    const body = hasBody
-      ? typeof init.body === 'string'
-        ? Body.text(init.body)
-        : Body.text(String(init.body))
-      : undefined;
-
-    const resp: any = await (tauriFetch as any)(url, {
-      method,
-      headers,
-      body,
-      responseType: (ResponseType as any).Json,
-      timeout: timeoutMs,
-    });
-
-    // resp.data est déjà parsé en JSON quand ResponseType.Json
-    if (resp?.ok) return { ok: true, status: resp.status, data: resp.data };
-    return { ok: false, status: resp?.status ?? 0, data: resp?.data };
   }
 
   const response = await fetchJsonWithTimeout(url, init, timeoutMs);
@@ -387,19 +459,15 @@ export async function saveUserConfig(config: UserConfig, accessToken?: string): 
     // Utiliser le token cloud si aucun token n'est fourni
     let tokenToUse = accessToken;
     if (!tokenToUse) {
-      const { TokenManager } = await import('../client/storage.js');
-      tokenToUse = TokenManager.getCloudAccessToken();
+      tokenToUse = TokenManager.getCloudAccessToken() || undefined;
       if (!tokenToUse) {
         console.warn('[POPCORN-WEB] Aucun token cloud disponible pour sauvegarder la configuration');
         return { success: false, message: 'Token d\'authentification cloud manquant' };
       }
     }
     
-    // En Tauri (build static), pas de routes Astro /api/* -> appeler popcorn-web directement.
-    // En web, on garde le proxy local pour éviter CORS.
-    const apiUrl = isTauri()
-      ? `${getPopcornWebApiUrl()}/config/save`
-      : `${typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/config/save`;
+    // Unifié : appel direct à popcorn-web pour tous les modes (CORS géré par popcorn-web ou native-fetch)
+    const apiUrl = `${getPopcornWebApiUrl()}/config/save`;
     
     if (import.meta.env.DEV) {
       console.log('[POPCORN-WEB] Sauvegarde de la configuration à:', apiUrl);
@@ -464,19 +532,15 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
     // Utiliser le token cloud si aucun token n'est fourni
     let tokenToUse = accessToken;
     if (!tokenToUse) {
-      const { TokenManager } = await import('../client/storage.js');
-      tokenToUse = TokenManager.getCloudAccessToken();
+      tokenToUse = TokenManager.getCloudAccessToken() || undefined;
       if (!tokenToUse) {
         console.warn('[POPCORN-WEB] Aucun token cloud disponible pour récupérer la configuration');
         return null;
       }
     }
     
-    // En Tauri (build static), pas de routes Astro /api/* -> appeler popcorn-web directement.
-    // En web, on garde le proxy local pour éviter CORS.
-    const apiUrl = isTauri()
-      ? `${getPopcornWebApiUrl()}/config/save`
-      : `${typeof window !== 'undefined' ? window.location.origin : ''}/api/v1/config/save`;
+    // Unifié : appel direct à popcorn-web pour tous les modes (CORS géré par popcorn-web ou native-fetch)
+    const apiUrl = `${getPopcornWebApiUrl()}/config/save`;
     
     if (import.meta.env.DEV) {
       console.log('[POPCORN-WEB] Appel à:', apiUrl);

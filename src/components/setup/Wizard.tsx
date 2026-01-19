@@ -40,6 +40,48 @@ export default function Wizard() {
   // (suppression du polling pour éviter les rafraîchissements inutiles)
   // Le statut est déjà vérifié au chargement initial via useSetupStatus
 
+  // Déclarer Footer et ses dépendances avant les premiers return
+  const appVersion = (() => {
+    try {
+      return ((import.meta as any).env?.PUBLIC_APP_VERSION as string) || 'dev';
+    } catch {
+      return 'dev';
+    }
+  })();
+
+  const appVersionCode = (() => {
+    try {
+      const raw = (import.meta as any).env?.PUBLIC_APP_VERSION_CODE as string | undefined;
+      return raw ? String(raw) : '';
+    } catch {
+      return '';
+    }
+  })();
+
+  const openDiagnostics = () => {
+    try {
+      window.location.href = '/settings/diagnostics';
+    } catch {
+      // ignore
+    }
+  };
+
+  const Footer = () => (
+    <div className="mt-8 flex flex-col items-center gap-3">
+      <button className="btn btn-outline btn-sm" type="button" onClick={openDiagnostics}>
+        Ouvrir diagnostics
+      </button>
+      <div className="text-xs text-gray-400">
+        Version&nbsp;<span className="text-gray-200 font-mono">{appVersion}</span>
+        {appVersionCode ? (
+          <>
+            &nbsp;•&nbsp;build&nbsp;<span className="text-gray-200 font-mono">{appVersionCode}</span>
+          </>
+        ) : null}
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-black">
@@ -71,6 +113,8 @@ export default function Wizard() {
               setCurrentStep(2);
             }}
           />
+
+          <Footer />
         </div>
       </div>
     );
@@ -83,6 +127,7 @@ export default function Wizard() {
           <div className="p-4 bg-primary-900/30 border border-primary-700 rounded-lg">
             <span className="text-primary-300 text-lg">Impossible de charger le statut du setup</span>
           </div>
+          <Footer />
         </div>
       </div>
     );
@@ -90,18 +135,12 @@ export default function Wizard() {
 
   const handleSaveTmdb = async (key: string) => {
     const result = await saveTmdbKey(key);
-    if (result) {
-      await checkSetupStatus();
-    }
-    return result;
+    if (result) await checkSetupStatus();
   };
 
   const handleSaveDownloadLocation = async (path: string) => {
     const result = await saveDownloadLocation(path);
-    if (result) {
-      await checkSetupStatus();
-    }
-    return result;
+    if (result) await checkSetupStatus();
   };
 
   return (
@@ -223,6 +262,8 @@ export default function Wizard() {
             }}
           />
         )}
+
+        <Footer />
       </div>
     </div>
   );

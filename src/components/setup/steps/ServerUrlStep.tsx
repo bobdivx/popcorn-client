@@ -173,10 +173,10 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext }: Server
         </p>
       </div>
 
-      <div className="flex gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
         <button
           ref={(el) => { buttonRefs.current[0] = el; }}
-          className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full sm:w-auto px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={handleTest}
           disabled={testing || loading || !backendUrl.trim()}
         >
@@ -191,7 +191,7 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext }: Server
         </button>
         <button
           ref={(el) => { buttonRefs.current[1] = el; }}
-          className="flex-1 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full sm:flex-1 px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={handleNext}
           disabled={testing || loading || !backendUrl.trim()}
         >

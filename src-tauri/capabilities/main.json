@@ -1,0 +1,30 @@
+{
+  "identifier": "main",
+  "description": "Permissions principales (core + HTTP) pour l'app.",
+  "remote": { "urls": ["http://tauri.localhost/*"] },
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "custom-commands",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "http://localhost/*" },
+        { "url": "https://localhost/*" },
+        { "url": "http://127.0.0.1/*" },
+        { "url": "https://127.0.0.1/*" },
+        { "url": "http://10.0.2.2/*" },
+        { "url": "https://10.0.2.2/*" },
+        { "url": "http://192.168.*/*" },
+        { "url": "https://192.168.*/*" },
+        { "url": "http://10.0.2.2:3000/*" },
+        { "url": "http://10.0.2.2:4326/*" },
+        { "url": "http://127.0.0.1:3000/*" },
+        { "url": "http://127.0.0.1:4326/*" },
+        { "url": "http://localhost:3000/*" },
+        { "url": "http://localhost:4326/*" }
+      ]
+    }
+  ]
+}
+

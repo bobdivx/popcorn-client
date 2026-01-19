@@ -57,7 +57,8 @@ export default function Library({ onItemClick }: LibraryProps) {
 
       if (response.data) {
         // Filtrer uniquement les médias qui existent réellement
-        const existingItems = (response.data as LibraryMedia[]).filter(item => item.exists);
+        const list = Array.isArray(response.data) ? (response.data as unknown as LibraryMedia[]) : [];
+        const existingItems = list.filter(item => item.exists);
         setItems(existingItems);
       }
     } catch (err) {

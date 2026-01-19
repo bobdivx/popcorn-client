@@ -177,17 +177,17 @@ export function DownloadLocationStep({
         </div>
       </div>
 
-      <div className="flex justify-between mt-8">
+      <div className="flex flex-col-reverse sm:flex-row sm:justify-between gap-4 mt-8">
         <button
           ref={(el) => { buttonRefs.current[0] = el; }}
-          className="px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
+          className="w-full sm:w-auto px-6 py-3 bg-gray-800 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
           onClick={onPrevious}
         >
           ← Précédent
         </button>
         <button
           ref={(el) => { buttonRefs.current[1] = el; }}
-          className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors"
+          className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors"
           onClick={async () => {
             // Si le chemin a été modifié en mode Docker, sauvegarder avant de continuer
             if (isDockerPath && downloadPath && !downloadPath.startsWith('/app/')) {

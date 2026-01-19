@@ -105,9 +105,7 @@ export default function IndexerCategoriesSelector({
       setLoading(true);
       setError('');
       
-      const response = await serverApi.request(`/api/v1/indexers/${indexerId}/categories`, {
-        method: 'GET',
-      });
+      const response = await serverApi.getIndexerCategories(indexerId);
       
       if (response.success && response.data) {
         setSelectedCategories(response.data || []);

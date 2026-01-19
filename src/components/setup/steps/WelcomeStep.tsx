@@ -60,7 +60,7 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext }: WelcomeS
 
       {(importStatus.phase === 'running' || importStatus.phase === 'success' || importStatus.phase === 'error') && (
         <div className="rounded-xl p-6 sm:p-8 border border-gray-800 bg-gray-900">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex-1">
               <p className="text-white font-semibold mb-1">
                 Import de votre configuration cloud
@@ -129,7 +129,7 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext }: WelcomeS
       <div className="flex justify-end mt-8 sm:mt-12">
         <button
           ref={(el) => { buttonRefs.current[0] = el; }}
-          className="px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors text-lg"
+          className="w-full sm:w-auto px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors text-lg"
           onClick={() => onNext(saveToCloud)}
           disabled={isImportRunning}
         >

@@ -128,7 +128,7 @@ export function FiltersPanel({
                     value={localMinFileSize ? (localMinFileSize / (1024 * 1024 * 1024)).toFixed(1) : ''}
                     onChange={(e) => {
                       const value = parseFloat(e.currentTarget.value);
-                      handleFileSizeMinChange(value ? value * 1024 * 1024 * 1024 : undefined);
+                      handleFileSizeMinChange(value ? value * 1024 * 1024 * 1024 : 0);
                     }}
                     className="w-full px-4 py-3 tv:px-6 tv:py-4 bg-glass glass-panel border border-white/20 rounded-lg text-white placeholder-gray-400 focus:border-primary-600 focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 text-base tv:text-lg min-h-[48px] tv:min-h-[56px] transition-all duration-200"
                     placeholder="0.0"
@@ -146,7 +146,7 @@ export function FiltersPanel({
                     value={localMaxFileSize ? (localMaxFileSize / (1024 * 1024 * 1024)).toFixed(1) : ''}
                     onChange={(e) => {
                       const value = parseFloat(e.currentTarget.value);
-                      handleFileSizeMaxChange(value ? value * 1024 * 1024 * 1024 : undefined);
+                      handleFileSizeMaxChange(value ? value * 1024 * 1024 * 1024 : 0);
                     }}
                     className="w-full px-4 py-3 tv:px-6 tv:py-4 bg-glass glass-panel border border-white/20 rounded-lg text-white placeholder-gray-400 focus:border-primary-600 focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 text-base tv:text-lg min-h-[48px] tv:min-h-[56px] transition-all duration-200"
                     placeholder="50.0"
@@ -162,9 +162,9 @@ export function FiltersPanel({
                       min="0"
                       max="200"
                       step="1"
-                      value={localMaxFileSize ? (localMaxFileSize / (1024 * 1024 * 1024)).toFixed(0) : 50}
+                      value={localMaxFileSize ? Math.round(localMaxFileSize / (1024 * 1024 * 1024)) : 50}
                       onChange={(e) => {
-                        const value = parseFloat(e.target.value);
+                        const value = parseFloat(e.currentTarget.value);
                         handleFileSizeMaxChange(value * 1024 * 1024 * 1024);
                       }}
                       className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-primary-600 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-opacity-50"
@@ -182,7 +182,7 @@ export function FiltersPanel({
             </div>
 
             {/* Boutons Actions */}
-            <div className="flex gap-3 pt-4 border-t border-white/10">
+            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-white/10">
               <button
                 onClick={() => {
                   setLocalSelectedCodecs([]);
@@ -191,14 +191,14 @@ export function FiltersPanel({
                   onCodecChange?.([]);
                   onFileSizeChange?.(undefined, undefined);
                 }}
-                className="flex-1 px-6 py-3 tv:px-8 tv:py-4 bg-glass hover:bg-glass-hover text-white rounded-lg font-semibold text-base tv:text-lg transition-all duration-200 border border-white/20 glass-panel focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv:min-h-[56px]"
+                className="w-full sm:flex-1 px-6 py-3 tv:px-8 tv:py-4 bg-glass hover:bg-glass-hover text-white rounded-lg font-semibold text-base tv:text-lg transition-all duration-200 border border-white/20 glass-panel focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv:min-h-[56px]"
                 tabIndex={0}
               >
                 Réinitialiser
               </button>
               <button
                 onClick={onClose}
-                className="flex-1 px-6 py-3 tv:px-8 tv:py-4 bg-primary hover:bg-primary-700 text-white rounded-lg font-semibold text-base tv:text-lg transition-all duration-200 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv:min-h-[56px]"
+                className="w-full sm:flex-1 px-6 py-3 tv:px-8 tv:py-4 bg-primary hover:bg-primary-700 text-white rounded-lg font-semibold text-base tv:text-lg transition-all duration-200 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv:min-h-[56px]"
                 tabIndex={0}
               >
                 Appliquer

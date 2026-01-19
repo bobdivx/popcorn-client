@@ -4,13 +4,16 @@
  * Réessaie automatiquement en cas d'erreur
  */
 
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
 import { hasBackendUrl } from '../lib/backend-config.js';
 
 type ConnectionStatus = 'checking' | 'connecting' | 'connected' | 'error';
 
 const RETRY_INTERVAL = 3000; // Réessayer toutes les 3 secondes
+const DIAG_PATH = '/settings/diagnostics';
+const AUDIT_PATH = '/settings/audit';
+const SERVER_SETTINGS_PATH = '/settings/server';
 
 export default function ServerConnectionCheck() {
   const [status, setStatus] = useState<ConnectionStatus>('checking');
@@ -22,12 +25,21 @@ export default function ServerConnectionCheck() {
   const retryIntervalRef = useRef<number | null>(null);
   const checkStartTimeRef = useRef<number | null>(null);
 
+  const backendUrl = useMemo(() => {
+    try {
+      return serverApi.getServerUrl?.() || '';
+    } catch {
+      return '';
+    }
+  }, []);
+
   useEffect(() => {
     // Ne pas bloquer l'accès aux pages de configuration
     const currentPath = window.location.pathname;
-    const allowedPaths = ['/settings/server', '/setup', '/disclaimer'];
+    const allowedPaths = [SERVER_SETTINGS_PATH, AUDIT_PATH, '/setup', '/disclaimer', DIAG_PATH];
     
     // Si on est sur une page de configuration, ne pas afficher l'animation
+    // ET ne pas vérifier hasBackendUrl() - ces pages doivent être accessibles même sans URL configurée
     if (allowedPaths.some(path => currentPath.startsWith(path))) {
       setIsVisible(false);
       return;
@@ -35,14 +47,37 @@ export default function ServerConnectionCheck() {
 
     // Premier lancement / aucune URL configurée: forcer l'assistant de configuration
     // (sinon l'app reste bloquée sur "En attente du serveur..." avec l'URL par défaut)
-    if (!hasBackendUrl()) {
+    // IMPORTANT: Vérifier hasBackendUrl() APRÈS avoir vérifié les chemins autorisés
+    try {
+      if (!hasBackendUrl()) {
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ServerConnectionCheck.tsx:52',message:'No backend URL - redirecting to setup',data:{currentPath},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
+        setIsVisible(false);
+        window.location.href = '/setup';
+        return;
+      }
+    } catch (error) {
+      // Si hasBackendUrl() plante (localStorage inaccessible), rediriger vers setup
+      console.error('[ServerConnectionCheck] hasBackendUrl() failed:', error);
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ServerConnectionCheck.tsx:59',message:'hasBackendUrl() error - redirecting to setup',data:{currentPath,error:String(error)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       setIsVisible(false);
       window.location.href = '/setup';
       return;
     }
 
     // Vérifier rapidement si le serveur est accessible avant d'afficher l'animation
-    checkConnectionQuick();
+    // Protéger contre les erreurs qui pourraient bloquer le rendu
+    try {
+      checkConnectionQuick();
+    } catch (error) {
+      // Si checkConnectionQuick() plante immédiatement (pas async), logger et ne pas bloquer
+      console.error('[ServerConnectionCheck] checkConnectionQuick() failed (non-async error):', error);
+      setIsVisible(false);
+      // Ne pas rediriger automatiquement ici - laisser l'utilisateur voir la page
+    }
 
     // Nettoyer le timeout lors du démontage
     return () => {
@@ -82,6 +117,10 @@ export default function ServerConnectionCheck() {
   const handleConnectionSuccess = async (response: any) => {
     setRetryCount(0);
     setStatus('connected');
+
+    // Sur les pages diagnostics et audit, ne jamais forcer de redirection (le but est de diagnostiquer)
+    const p = window.location.pathname;
+    if (p === DIAG_PATH || p.startsWith(`${DIAG_PATH}/`) || p === AUDIT_PATH || p.startsWith(`${AUDIT_PATH}/`)) return;
     
     // Vérifier si l'utilisateur est authentifié
     if (!serverApi.isAuthenticated()) {
@@ -161,7 +200,7 @@ export default function ServerConnectionCheck() {
         
         // Ne pas bloquer l'accès aux pages de configuration en cas d'erreur
         const currentPath = window.location.pathname;
-        const allowedPaths = ['/settings/server', '/setup', '/disclaimer', '/login', '/register'];
+        const allowedPaths = [SERVER_SETTINGS_PATH, AUDIT_PATH, '/setup', '/disclaimer', '/login', '/register', DIAG_PATH];
         if (allowedPaths.some(path => currentPath.startsWith(path))) {
           setIsVisible(false);
           return;
@@ -185,7 +224,7 @@ export default function ServerConnectionCheck() {
       
       // Ne pas bloquer l'accès aux pages de configuration en cas d'erreur
       const currentPath = window.location.pathname;
-      const allowedPaths = ['/settings/server', '/setup', '/disclaimer', '/login', '/register'];
+      const allowedPaths = ['/settings/server', '/settings/audit', '/setup', '/disclaimer', '/login', '/register', DIAG_PATH];
       if (allowedPaths.some(path => currentPath.startsWith(path))) {
         setIsVisible(false);
         return;
@@ -204,7 +243,7 @@ export default function ServerConnectionCheck() {
 
   // Ne jamais afficher sur les pages de configuration
   const currentPath = window.location.pathname;
-  const allowedPaths = ['/settings/server', '/setup', '/disclaimer'];
+  const allowedPaths = [SERVER_SETTINGS_PATH, AUDIT_PATH, '/setup', '/disclaimer', DIAG_PATH];
   if (allowedPaths.some(path => currentPath.startsWith(path))) {
     return null;
   }
@@ -212,6 +251,22 @@ export default function ServerConnectionCheck() {
   if (!isVisible || status === 'connected') {
     return null;
   }
+
+  const openDiagnostics = () => {
+    try {
+      window.location.href = DIAG_PATH;
+    } catch {
+      // ignore
+    }
+  };
+
+  const openServerSettings = () => {
+    try {
+      window.location.href = SERVER_SETTINGS_PATH;
+    } catch {
+      // ignore
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[9999] bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center">
@@ -250,7 +305,7 @@ export default function ServerConnectionCheck() {
             <p className={`text-lg md:text-xl tv:text-2xl font-medium ${
               status === 'connecting' && retryCount > 0
                 ? 'text-yellow-300' 
-                : status === 'starting' || status === 'connecting'
+                : status === 'connecting'
                   ? 'text-yellow-300' 
                   : 'text-gray-300'
             }`}>
@@ -284,6 +339,22 @@ export default function ServerConnectionCheck() {
         {retryCount > 0 && (
           <div className="text-center text-sm text-gray-500">
             Tentative {retryCount}... Réessai automatique dans quelques secondes
+          </div>
+        )}
+
+        {/* Actions utiles (pour tous les utilisateurs) */}
+        <div className="flex flex-wrap items-center justify-center gap-3 max-w-lg">
+          <button className="btn btn-sm btn-outline" onClick={openDiagnostics}>
+            Ouvrir diagnostics
+          </button>
+          <button className="btn btn-sm btn-outline" onClick={openServerSettings}>
+            Configurer le serveur
+          </button>
+        </div>
+
+        {backendUrl && (
+          <div className="text-center text-xs text-gray-500 max-w-lg break-all">
+            Backend: <span className="text-gray-300">{backendUrl}</span>
           </div>
         )}
 

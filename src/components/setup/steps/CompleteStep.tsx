@@ -41,7 +41,7 @@ export function CompleteStep({ focusedButtonIndex, buttonRefs, onComplete }: Com
 
         <button
           ref={(el) => { buttonRefs.current[0] = el; }}
-          className="px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors text-lg"
+          className="w-full sm:w-auto px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors text-lg"
           onClick={onComplete}
         >
           Accéder au dashboard

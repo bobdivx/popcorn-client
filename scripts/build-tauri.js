@@ -118,6 +118,49 @@ const removeWithRetry = async (path, maxRetries = 3, delay = 1000) => {
       console.log('ℹ️  Aucune route API à déplacer\n');
     }
 
+    // Protection: Vérifier que tauri.android.conf.json est valide (Rust le lit toujours)
+    const tauriAndroidConfigPath = join(process.cwd(), 'src-tauri', 'tauri.android.conf.json');
+    if (existsSync(tauriAndroidConfigPath)) {
+      try {
+        let androidConfigContent = readFileSync(tauriAndroidConfigPath, 'utf-8');
+        // Supprimer le BOM UTF-8 si présent (U+FEFF)
+        if (androidConfigContent.length > 0 && androidConfigContent.charCodeAt(0) === 0xFEFF) {
+          androidConfigContent = androidConfigContent.slice(1);
+          writeFileSync(tauriAndroidConfigPath, androidConfigContent, 'utf-8');
+        }
+        if (!androidConfigContent || androidConfigContent.trim().length < 10) {
+          console.log('⚠️  tauri.android.conf.json est vide, restauration depuis git...');
+          execSync('git restore src-tauri/tauri.android.conf.json', { 
+            cwd: process.cwd(), 
+            stdio: 'ignore' 
+          });
+          console.log('✅ Configuration restaurée\n');
+        } else {
+          // Vérifier que c'est un JSON valide
+          JSON.parse(androidConfigContent);
+        }
+      } catch (error) {
+        console.log('⚠️  tauri.android.conf.json invalide, tentative de restauration...');
+        try {
+          execSync('git restore src-tauri/tauri.android.conf.json', { 
+            cwd: process.cwd(), 
+            stdio: 'ignore' 
+          });
+          // Vérifier à nouveau après restauration (et supprimer BOM si présent)
+          let restored = readFileSync(tauriAndroidConfigPath, 'utf-8');
+          if (restored.length > 0 && restored.charCodeAt(0) === 0xFEFF) {
+            restored = restored.slice(1);
+            writeFileSync(tauriAndroidConfigPath, restored, 'utf-8');
+          }
+          JSON.parse(restored);
+          console.log('✅ Configuration restaurée et validée\n');
+        } catch (restoreError) {
+          console.error('❌ Impossible de restaurer tauri.android.conf.json:', restoreError.message);
+          // Ne pas bloquer le build, mais logguer l'erreur
+        }
+      }
+    }
+
     // Utiliser la configuration Tauri spécifique (mode static uniquement)
     if (existsSync(originalConfig) && existsSync(tauriConfig)) {
       console.log('📝 Application de la configuration Tauri (static)...');
@@ -146,13 +189,24 @@ const removeWithRetry = async (path, maxRetries = 3, delay = 1000) => {
     console.log(`🏗️  Build Astro en mode static (Tauri ${platformName})...\n`);
     
     try {
+      // Préparer les variables d'environnement pour le build
+      const buildEnv = {
+        ...process.env,
+        TAURI_PLATFORM: platform,
+        NODE_ENV: 'production',
+      };
+      
+      // Log les variables PUBLIC_* pour débogage
+      if (buildEnv.PUBLIC_APP_VERSION) {
+        console.log(`ℹ️  PUBLIC_APP_VERSION: ${buildEnv.PUBLIC_APP_VERSION}`);
+      }
+      if (buildEnv.PUBLIC_APP_VERSION_CODE) {
+        console.log(`ℹ️  PUBLIC_APP_VERSION_CODE: ${buildEnv.PUBLIC_APP_VERSION_CODE}`);
+      }
+      
       execSync('npx astro build', {
         stdio: 'inherit',
-        env: { 
-          ...process.env, 
-          TAURI_PLATFORM: platform,
-          NODE_ENV: 'production'
-        },
+        env: buildEnv,
         cwd: process.cwd(),
       });
       console.log(`\n✅ Build Astro terminé avec succès pour ${platformName}!\n`);

@@ -109,17 +109,17 @@ export function DisclaimerStep({ focusedButtonIndex, buttonRefs, onNext }: Discl
         </span>
       </div>
 
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <a
           href="/disclaimer"
           target="_blank"
-          className="text-primary-600 hover:text-primary-500 transition-colors text-sm"
+          className="text-primary-600 hover:text-primary-500 transition-colors text-sm text-center sm:text-left"
         >
           Lire le disclaimer complet →
         </a>
         <button
           ref={(el) => { buttonRefs.current[0] = el; }}
-          className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           onClick={onNext}
           disabled={!accepted}
         >

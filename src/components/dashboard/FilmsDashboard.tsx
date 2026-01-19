@@ -4,6 +4,7 @@ import type { FilmData } from '../../lib/client/types';
 import { HeroSection } from './components/HeroSection';
 import CarouselRow from '../torrents/CarouselRow';
 import { TorrentPoster } from './components/TorrentPoster';
+import type { ContentItem } from '../../lib/client/types';
 
 export default function FilmsDashboard() {
   const [films, setFilms] = useState<FilmData[]>([]);
@@ -21,6 +22,10 @@ export default function FilmsDashboard() {
       const response = await serverApi.getFilmsData();
       
       if (response.success && response.data) {
+        if (!Array.isArray(response.data)) {
+          setError('Réponse invalide: liste de films attendue');
+          return;
+        }
         // Trier par date de sortie (les plus récents en premier)
         const sortedFilms = [...response.data].sort((a, b) => {
           const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
@@ -38,8 +43,8 @@ export default function FilmsDashboard() {
     }
   };
 
-  const handlePlay = (film: FilmData) => {
-    window.location.href = `/player/${film.id}`;
+  const handlePlay = (item: ContentItem) => {
+    window.location.href = `/player/${item.id}`;
   };
 
   // Grouper les films par genre

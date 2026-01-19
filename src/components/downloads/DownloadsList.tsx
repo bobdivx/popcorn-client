@@ -3,6 +3,7 @@ import { Download, Pause, Play, Trash2, Plus, FileText, Link2, X, FileText as Lo
 import { clientApi } from '../../lib/client/api';
 import type { ClientTorrentStats, TorrentLogEntry } from '../../lib/client/types';
 import { FocusableCard } from '../ui/FocusableCard';
+import { getBackendUrl } from '../../lib/backend-config';
 
 const REFRESH_INTERVAL = 2000; // Rafraîchir toutes les 2 secondes
 
@@ -57,7 +58,9 @@ function TorrentCard({ torrent, onPause, onResume, onRemove, onShowLogs }: Torre
         // Rechercher dans les torrents enrichis via /api/torrents/list
         // Cet endpoint retourne les torrents depuis cached_torrents avec données TMDB enrichies
         const { serverApi } = await import('../../lib/client/server-api');
-        const baseUrl = serverApi.getServerUrl();
+        // /api/torrents/list est exposé par le backend Rust (pas par Astro en dev).
+        // Donc on utilise l'URL backend configurée pour éviter les 404 sur localhost:4326.
+        const baseUrl = (getBackendUrl() || serverApi.getServerUrl()).trim().replace(/\/$/, '');
         const token = serverApi.getAccessToken();
         const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
         
@@ -128,6 +131,7 @@ function TorrentCard({ torrent, onPause, onResume, onRemove, onShowLogs }: Torre
       seeding: 'Partage',
       paused: 'En pause',
       completed: 'Terminé',
+      error: 'Erreur',
     };
     return labels[state] || state;
   };
@@ -139,6 +143,7 @@ function TorrentCard({ torrent, onPause, onResume, onRemove, onShowLogs }: Torre
       seeding: 'text-green-400 bg-green-900/20',
       paused: 'text-yellow-400 bg-yellow-900/20',
       completed: 'text-green-500 bg-green-900/20',
+      error: 'text-red-400 bg-red-900/20',
     };
     return colors[state] || 'text-gray-400 bg-gray-800';
   };
@@ -842,14 +847,14 @@ export default function DownloadsList() {
                   <p className="text-primary-300 text-sm tv:text-base">{error}</p>
                 </div>
               )}
-              <div className="flex gap-3 tv:gap-4 justify-end">
+              <div className="flex flex-col sm:flex-row gap-3 tv:gap-4 justify-end">
                 <button
                   onClick={() => {
                     setShowAddMagnetModal(false);
                     setMagnetLink('');
                     setError(null);
                   }}
-                  className="px-6 py-3 tv:px-8 tv:py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold text-base tv:text-lg transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv:min-h-[56px]"
+                  className="w-full sm:w-auto px-6 py-3 tv:px-8 tv:py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold text-base tv:text-lg transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv:min-h-[56px]"
                   disabled={addingTorrent}
                   tabIndex={0}
                 >
@@ -857,7 +862,7 @@ export default function DownloadsList() {
                 </button>
                 <button
                   onClick={handleAddMagnet}
-                  className="px-6 py-3 tv:px-8 tv:py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg font-semibold text-base tv:text-lg transition-all duration-300 shadow-lg hover:shadow-primary focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv:min-h-[56px] flex items-center gap-2"
+                  className="w-full sm:w-auto px-6 py-3 tv:px-8 tv:py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-lg font-semibold text-base tv:text-lg transition-all duration-300 shadow-lg hover:shadow-primary focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv:min-h-[56px] flex items-center justify-center gap-2"
                   disabled={addingTorrent || !magnetLink.trim()}
                   tabIndex={0}
                 >

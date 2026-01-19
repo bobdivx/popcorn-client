@@ -112,8 +112,8 @@ export function ActionButtons({
   const hasSavedPosition = savedPlaybackPosition !== null && savedPlaybackPosition !== undefined && savedPlaybackPosition > 0;
 
   // Déterminer l'état du bouton de téléchargement
-  const isDownloading = torrentStats && (torrentStats.state === 'downloading' || torrentStats.state === 'queued');
-  const isCompleted = torrentStats && (torrentStats.state === 'completed' || torrentStats.state === 'seeding');
+  const isDownloading = !!torrentStats && (torrentStats.state === 'downloading' || torrentStats.state === 'queued');
+  const isCompleted = !!torrentStats && (torrentStats.state === 'completed' || torrentStats.state === 'seeding');
   const progressPercent = torrentStats ? Math.round(torrentStats.progress * 100) : 0;
 
   // Afficher le bouton si :
@@ -147,7 +147,7 @@ export function ActionButtons({
         {shouldShowButton && (
           <button
             onClick={shouldShowPlayButton ? onPlay : onDownload}
-            disabled={downloadingToClient || (isDownloading && !shouldShowPlayButton)}
+            disabled={!!downloadingToClient || (isDownloading && !shouldShowPlayButton)}
             className="inline-flex items-center gap-2 bg-primary hover:bg-primary-700 text-white px-6 py-3 rounded-lg font-semibold text-lg transition-all duration-200 border border-primary-500/50 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px]"
           >
             {downloadingToClient ? (

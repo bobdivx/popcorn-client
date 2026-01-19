@@ -54,10 +54,8 @@ export default function Sidebar() {
     apply();
 
     // compat vieux navigateurs
-    // @ts-expect-error addEventListener pas toujours typé sur MediaQueryList
-    mq.addEventListener?.('change', apply);
-    // @ts-expect-error removeEventListener pas toujours typé sur MediaQueryList
-    return () => mq.removeEventListener?.('change', apply);
+    mq.addEventListener?.('change', apply as any);
+    return () => mq.removeEventListener?.('change', apply as any);
   }, []);
 
   // Permet au header de déclencher l’ouverture/fermeture (mobile)

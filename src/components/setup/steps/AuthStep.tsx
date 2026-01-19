@@ -154,8 +154,8 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
             const res = await serverApi.createIndexer({
               name: indexer.name,
               baseUrl: indexer.baseUrl,
-              apiKey: indexer.apiKey || undefined,
-              jackettIndexerName: indexer.jackettIndexerName || undefined,
+              apiKey: indexer.apiKey ?? '',
+              jackettIndexerName: indexer.jackettIndexerName ?? '',
               isEnabled: indexer.isEnabled !== false,
               isDefault: indexer.isDefault || false,
               priority: indexer.priority || 0,
@@ -283,12 +283,12 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
           <p className="text-gray-300 text-sm mb-4">
             Une configuration précédente a été trouvée dans votre compte. Souhaitez-vous la restaurer ?
           </p>
-          <div className="flex gap-3">
+          <div className="flex flex-col sm:flex-row gap-3">
             <button
               type="button"
               onClick={handleRestoreConfig}
               disabled={restoringConfig}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {restoringConfig ? (
                 <>
@@ -303,7 +303,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
               type="button"
               onClick={handleSkipRestore}
               disabled={restoringConfig}
-              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Passer
             </button>
@@ -376,11 +376,11 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
               autocomplete="current-password"
             />
           </div>
-          <div className="flex justify-end pt-4">
+          <div className="flex flex-col sm:flex-row sm:justify-end pt-4">
             <button
               ref={(el) => { buttonRefs.current[0] = el; }}
               type="submit"
-              className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={loading || !loginEmail || !loginPassword}
             >
               {loading ? (
@@ -459,11 +459,11 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
               autocomplete="new-password"
             />
           </div>
-          <div className="flex justify-end pt-4">
+          <div className="flex flex-col sm:flex-row sm:justify-end pt-4">
             <button
               ref={(el) => { buttonRefs.current[0] = el; }}
               type="submit"
-              className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={loading || !registerEmail || !registerPassword || !registerInviteCode}
             >
               {loading ? (

@@ -203,9 +203,9 @@ export const GET: APIRoute = async ({ request }) => {
 
     console.log('[DASHBOARD] ✅ Données du dashboard préparées:', {
       hasHero: !!dashboardData.hero,
-      popularMoviesCount: dashboardData.popularMovies.length,
-      popularSeriesCount: dashboardData.popularSeries.length,
-      recentAdditionsCount: dashboardData.recentAdditions.length,
+      popularMoviesCount: dashboardData.popularMovies?.length ?? 0,
+      popularSeriesCount: dashboardData.popularSeries?.length ?? 0,
+      recentAdditionsCount: dashboardData.recentAdditions?.length ?? 0,
     });
 
     return new Response(

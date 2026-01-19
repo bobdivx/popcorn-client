@@ -48,7 +48,7 @@ export function HeroSection({ items, onPlay }: HeroSectionProps) {
     if (trailerKey && typeof trailerKey === 'string' && trailerKey.trim().length > 0) {
       setTrailerKeys((prev) => ({ ...prev, [itemId]: trailerKey }));
       setIsPlayingTrailer(true);
-      setIsLoadingTrailer(true);
+      setIsLoadingTrailer((prev) => ({ ...prev, [itemId]: true }));
     } else {
       setTrailerKeys((prev) => ({ ...prev, [itemId]: null }));
       setIsPlayingTrailer(false);
@@ -103,7 +103,7 @@ export function HeroSection({ items, onPlay }: HeroSectionProps) {
   const currentTrailerKey = trailerKeys[currentItem.id];
 
   return (
-    <div className="relative w-full h-[70vh] min-h-[500px] tv:min-h-[600px] max-h-[800px] mb-8 overflow-hidden -mt-14 sm:-mt-20 md:-mt-32">
+    <div className="relative w-full h-[70vh] min-h-[380px] sm:min-h-[500px] tv:min-h-[600px] max-h-[800px] mb-8 overflow-hidden -mt-8 sm:-mt-20 md:-mt-32">
       {/* Vidéo de la bande annonce ou image de fond */}
       {isPlayingTrailer && currentTrailerKey ? (
         <div className="absolute inset-0">
@@ -186,7 +186,7 @@ export function HeroSection({ items, onPlay }: HeroSectionProps) {
           )}
 
           {/* Métadonnées */}
-          <div className="flex items-center gap-4 tv:gap-6 mb-6 tv:mb-8 text-sm tv:text-base text-white/80">
+          <div className="flex flex-wrap items-center gap-4 tv:gap-6 mb-6 tv:mb-8 text-sm tv:text-base text-white/80">
             {currentItem.year && <span>{currentItem.year}</span>}
             {currentItem.rating && (
               <>
@@ -197,10 +197,10 @@ export function HeroSection({ items, onPlay }: HeroSectionProps) {
           </div>
 
           {/* Boutons d'action */}
-          <div className="flex gap-4 tv:gap-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 tv:gap-6">
             <button
               onClick={handlePlay}
-              className="bg-primary hover:bg-primary-700 text-white px-8 py-3 tv:px-12 tv:py-4 rounded-lg font-semibold text-lg tv:text-xl flex items-center gap-2 transition-all duration-300 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv:min-h-[56px]"
+              className="w-full sm:w-auto bg-primary hover:bg-primary-700 text-white px-8 py-3 tv:px-12 tv:py-4 rounded-lg font-semibold text-lg tv:text-xl flex items-center justify-center gap-2 transition-all duration-300 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv:min-h-[56px]"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 tv:h-8 tv:w-8" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M8 5v14l11-7z"/>
@@ -209,7 +209,7 @@ export function HeroSection({ items, onPlay }: HeroSectionProps) {
             </button>
             <button
               onClick={() => handleMoreInfo(currentItem)}
-              className="bg-glass hover:bg-glass-hover text-white px-8 py-3 tv:px-12 tv:py-4 rounded-lg font-semibold text-lg tv:text-xl flex items-center gap-2 transition-all duration-300 border border-white/30 glass-panel focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv:min-h-[56px]"
+              className="w-full sm:w-auto bg-glass hover:bg-glass-hover text-white px-8 py-3 tv:px-12 tv:py-4 rounded-lg font-semibold text-lg tv:text-xl flex items-center justify-center gap-2 transition-all duration-300 border border-white/30 glass-panel focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv:min-h-[56px]"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 tv:h-8 tv:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />

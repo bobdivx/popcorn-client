@@ -99,16 +99,17 @@ export function useTrailerImmersive({
             container.insertBefore(video, container.firstChild);
           }
 
-          // Lazy loading : charger la vidéo uniquement après le délai
-          video.loading = 'lazy';
+          // Charger la vidéo uniquement après le délai (pas de "loading" sur <video>)
           video.preload = 'none'; // Ne pas précharger avant le délai
 
           // Gérer le chargement de la vidéo
           video.addEventListener('loadeddata', () => {
             setIsLoading(false);
             setIsPlaying(true);
-            video?.classList.add('animate-trailer-immersive');
-            video.style.opacity = '1';
+            const v = videoRef.current;
+            if (!v) return;
+            v.classList.add('animate-trailer-immersive');
+            v.style.opacity = '1';
           });
 
           video.addEventListener('error', () => {
@@ -120,6 +121,8 @@ export function useTrailerImmersive({
             }
           });
         }
+
+        if (!video) return;
 
         // Charger la vidéo uniquement après le délai (lazy loading)
         if (video.src !== trailerUrl) {

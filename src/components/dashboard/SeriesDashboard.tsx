@@ -4,6 +4,7 @@ import type { SeriesData } from '../../lib/client/types';
 import { HeroSection } from './components/HeroSection';
 import CarouselRow from '../torrents/CarouselRow';
 import { TorrentPoster } from './components/TorrentPoster';
+import type { ContentItem } from '../../lib/client/types';
 
 export default function SeriesDashboard() {
   const [series, setSeries] = useState<SeriesData[]>([]);
@@ -21,6 +22,10 @@ export default function SeriesDashboard() {
       const response = await serverApi.getSeriesData();
       
       if (response.success && response.data) {
+        if (!Array.isArray(response.data)) {
+          setError('Réponse invalide: liste de séries attendue');
+          return;
+        }
         // Trier par date de première diffusion (les plus récents en premier)
         const sortedSeries = [...response.data].sort((a, b) => {
           const dateA = a.firstAirDate ? new Date(a.firstAirDate).getTime() : 0;
@@ -38,8 +43,8 @@ export default function SeriesDashboard() {
     }
   };
 
-  const handlePlay = (serie: SeriesData) => {
-    window.location.href = `/player/${serie.id}`;
+  const handlePlay = (item: ContentItem) => {
+    window.location.href = `/player/${item.id}`;
   };
 
   // Grouper les séries par genre
