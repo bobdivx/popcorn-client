@@ -1,4 +1,4 @@
-﻿/**
+/**
  * MÃ©thodes de configuration (TMDB, torrent config)
  */
 
@@ -21,19 +21,42 @@ export const settingsMethods = {
     });
     if (!res.success) return res as ApiResponse<{ apiKey: string | null; hasKey: boolean }>;
     const hasKey = (res.data as any)?.has_key === true || (res.data as any)?.has_key === 1;
-    return { success: true, data: { apiKey: null, hasKey } };
+    const maskedKey = (res.data as any)?.masked_key as string | undefined;
+    return { success: true, data: { apiKey: maskedKey || null, hasKey } };
   },
   async saveTmdbKey(this: ServerApiClientSettingsAccess, key: string): Promise<ApiResponse<void>> {
     const userId = this.getCurrentUserId();
     if (!userId) {
       return { success: false, error: 'Unauthorized', message: 'Connecte-toi avant de configurer TMDB.' };
     }
+    // Nettoyer la clé avant de l'envoyer (trim, supprimer les espaces)
+    const cleanedKey = key.trim().replace(/\s+/g, '');
+    if (!cleanedKey) {
+      return { success: false, error: 'ValidationError', message: 'La clé API TMDB ne peut pas être vide' };
+    }
+    
+    // Logger pour diagnostic (masqué)
+    const keyPreview = cleanedKey.length > 8 
+      ? `${cleanedKey.substring(0, 4)}...${cleanedKey.substring(cleanedKey.length - 4)}`
+      : '****';
+    console.log(`[TMDB] Sauvegarde clé TMDB (longueur: ${cleanedKey.length}, preview: ${keyPreview})`);
+    
     const res = await this.backendRequest('/api/tmdb/key', {
       method: 'POST',
       headers: { 'X-User-ID': userId },
-      body: JSON.stringify({ api_key: key }),
+      body: JSON.stringify({ api_key: cleanedKey }),
     });
-    if (!res.success) return res as ApiResponse<void>;
+    if (!res.success) {
+      // Améliorer le message d'erreur pour les erreurs de validation
+      if (res.message?.includes('invalide') || res.message?.includes('401') || res.message?.includes('403')) {
+        return {
+          success: false,
+          error: res.error || 'ValidationError',
+          message: res.message || 'La clé API TMDB est invalide. Vérifiez qu\'il s\'agit bien d\'une clé v3 "API Key" (32 caractères) depuis https://www.themoviedb.org/settings/api',
+        };
+      }
+      return res as ApiResponse<void>;
+    }
     return { success: true };
   },
   async deleteTmdbKey(this: ServerApiClientSettingsAccess): Promise<ApiResponse<void>> {

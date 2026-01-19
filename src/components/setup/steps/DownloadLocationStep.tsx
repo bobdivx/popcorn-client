@@ -95,8 +95,11 @@ export function DownloadLocationStep({
           </>
         ) : (
           <>
-            Le backend utilise le dossier <code className="bg-gray-800 px-2 py-1 rounded">downloads</code> à la racine du projet.
-            {downloadPath && ' Ce chemin a été récupéré depuis le backend.'}
+            {downloadPath ? (
+              <>Le backend utilise le dossier <code className="bg-gray-800 px-2 py-1 rounded">{downloadPath}</code>. Ce chemin a été récupéré depuis le backend.</>
+            ) : (
+              <>Le backend utilise le dossier <code className="bg-gray-800 px-2 py-1 rounded">downloads</code> à la racine du projet.</>
+            )}
           </>
         )}
       </p>

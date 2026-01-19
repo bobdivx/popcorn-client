@@ -29,30 +29,8 @@ export default defineConfig({
       fs: {
         strict: false,
       },
-      watch: {
-        // Limiter le nombre de fichiers surveillés pour éviter "too many open files" sur Windows
-        ignored: [
-          '**/node_modules/**',
-          '**/dist/**',
-          '**/.astro/**',
-          '**/.git/**',
-          '**/src-tauri/gen/**',
-          '**/src-tauri/target/**',
-          '**/docs-backup-temp/**',
-        ],
-        // Réduire la fréquence de scan
-        interval: 1000,
-        // Désactiver la surveillance récursive profonde pour certains dossiers
-        usePolling: false,
-      },
-      // Limiter les connexions concurrentes
-      hmr: {
-        clientPort: 4326,
-      },
     },
     build: {
-      // Augmenter la limite des warnings de taille de chunks (HLS.js fait ~522 kB)
-      chunkSizeWarningLimit: 600,
       rollupOptions: {
         external: [
           // Les plugins Tauri ne sont disponibles que dans l'environnement Tauri
@@ -60,26 +38,6 @@ export default defineConfig({
           '@tauri-apps/plugin-dialog',
           '@tauri-apps/api',
         ],
-        output: {
-          // Séparer HLS.js dans son propre chunk (il est déjà en lazy-load via import dynamique)
-          manualChunks(id) {
-            // Mettre HLS.js dans un chunk séparé si détecté
-            if (id.includes('hls.js') || id.includes('hls')) {
-              return 'hls';
-            }
-            // Séparer node_modules en chunks plus petits
-            if (id.includes('node_modules')) {
-              // Vendor chunks séparés pour les grandes libs
-              if (id.includes('preact') || id.includes('preact-compat')) {
-                return 'vendor-preact';
-              }
-              if (id.includes('lucide')) {
-                return 'vendor-icons';
-              }
-              return 'vendor';
-            }
-          },
-        },
       },
     },
   },

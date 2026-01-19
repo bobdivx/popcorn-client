@@ -113,10 +113,27 @@ export default function BackendDiagnostics() {
                 errorMessage = `Erreur réseau (TypeError): ${e.message}`;
               }
             } else if (e.name === 'AbortError') {
-              errorMessage = `Timeout: ${e.message}`;
+              errorMessage = `Timeout: Le backend ne répond pas dans le délai imparti`;
             }
           } else {
             errorMessage = String(e);
+          }
+          
+          // Extraire le statut HTTP si disponible dans le message
+          const statusMatch = errorMessage.match(/HTTP (\d+)/);
+          if (statusMatch) {
+            const status = parseInt(statusMatch[1], 10);
+            if (status === 405) {
+              errorMessage = `Méthode HTTP incorrecte (405). Vérifiez que la méthode (GET/POST) correspond à l'endpoint.`;
+            } else if (status === 404) {
+              errorMessage = `Endpoint non trouvé (404). Vérifiez que l'URL est correcte.`;
+            } else if (status === 401) {
+              errorMessage = `Authentification requise (401). L'endpoint fonctionne mais nécessite une authentification.`;
+            } else if (status === 403) {
+              errorMessage = `Accès refusé (403). Vous n'avez pas les permissions nécessaires.`;
+            } else if (status >= 500) {
+              errorMessage = `Erreur serveur (${status}). Le backend a rencontré une erreur interne.`;
+            }
           }
           
           const row: Row = {
@@ -132,13 +149,20 @@ export default function BackendDiagnostics() {
       };
 
       // Fonction helper pour tester un endpoint avec une URL backend spécifique
-      const testEndpoint = async (baseUrl: string, endpoint: string, method: string = 'GET', body?: any) => {
-        const url = `${baseUrl.replace(/\/$/, '')}${endpoint}`;
+      const testEndpoint = async (baseUrl: string, endpoint: string, method: string = 'GET', body?: any, queryParams?: Record<string, string>) => {
+        // Construire l'URL avec les query parameters si fournis
+        let url = `${baseUrl.replace(/\/$/, '')}${endpoint}`;
+        if (queryParams && Object.keys(queryParams).length > 0) {
+          const params = new URLSearchParams(queryParams);
+          url += (endpoint.includes('?') ? '&' : '?') + params.toString();
+        }
+        
         const options: RequestInit = {
           method,
           headers: { 'Content-Type': 'application/json' },
         };
-        if (body) {
+        // Ne pas ajouter de body pour GET, HEAD, OPTIONS
+        if (body && method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
           options.body = JSON.stringify(body);
         }
         
@@ -257,10 +281,29 @@ export default function BackendDiagnostics() {
         // En mode navigateur, utiliser fetch standard
         const response = await fetch(url, options);
         const data = await response.json().catch(() => ({}));
+        
+        // Messages d'erreur plus clairs selon le statut HTTP
+        let errorMessage: string | null = null;
+        if (!response.ok) {
+          if (response.status === 405) {
+            errorMessage = `Méthode HTTP incorrecte (405). L'endpoint n'accepte pas ${method}.`;
+          } else if (response.status === 404) {
+            errorMessage = `Endpoint non trouvé (404).`;
+          } else if (response.status === 401) {
+            errorMessage = null; // 401 = auth manquante mais serveur répond (considéré comme OK pour le diagnostic)
+          } else if (response.status === 403) {
+            errorMessage = `Accès refusé (403).`;
+          } else if (response.status >= 500) {
+            errorMessage = `Erreur serveur (${response.status}).`;
+          } else {
+            errorMessage = `HTTP ${response.status}: ${JSON.stringify(data)}`;
+          }
+        }
+        
         return {
           success: response.ok || response.status === 401, // 401 = auth manquante mais serveur répond
           status: response.status,
-          message: response.ok ? null : `HTTP ${response.status}: ${JSON.stringify(data)}`,
+          message: errorMessage,
         };
       };
 
@@ -268,8 +311,9 @@ export default function BackendDiagnostics() {
       const backendBase = backendUrl || 'http://127.0.0.1:3000';
       const testWithUrl = async (baseUrl: string, label: string) => {
         await timed(`${label} - health (/api/client/health)`, () => testEndpoint(baseUrl, '/api/client/health'), `${baseUrl}/api/client/health`);
-        await timed(`${label} - torrents FILM (/api/torrents/list)`, () => testEndpoint(baseUrl, '/api/torrents/list', 'POST', { category: 'FILM' }), `${baseUrl}/api/torrents/list`);
-        await timed(`${label} - torrents SERIES (/api/torrents/list)`, () => testEndpoint(baseUrl, '/api/torrents/list', 'POST', { category: 'SERIES' }), `${baseUrl}/api/torrents/list`);
+        // Corriger: /api/torrents/list est GET avec query parameters, pas POST avec body
+        await timed(`${label} - torrents FILM (/api/torrents/list)`, () => testEndpoint(baseUrl, '/api/torrents/list', 'GET', undefined, { category: 'FILM' }), `${baseUrl}/api/torrents/list?category=FILM`);
+        await timed(`${label} - torrents SERIES (/api/torrents/list)`, () => testEndpoint(baseUrl, '/api/torrents/list', 'GET', undefined, { category: 'SERIES' }), `${baseUrl}/api/torrents/list?category=SERIES`);
         await timed(`${label} - library (/library)`, () => testEndpoint(baseUrl, '/library'), `${baseUrl}/library`);
         await timed(`${label} - indexers (/api/client/admin/indexers)`, () => testEndpoint(baseUrl, '/api/client/admin/indexers'), `${baseUrl}/api/client/admin/indexers`);
       };
@@ -280,7 +324,12 @@ export default function BackendDiagnostics() {
       // Tester avec l'URL alternative si différente
       const altBase = altBackendUrl.trim() || 'http://10.0.2.2:3000';
       if (altBase !== backendBase) {
-        await testWithUrl(altBase, `Backend Alt (${altBase})`);
+        // Identifier si c'est l'IP de l'émulateur Android
+        const isEmulatorIp = altBase.includes('10.0.2.2');
+        const altLabel = isEmulatorIp 
+          ? `Backend Émulateur Android (${altBase})`
+          : `Backend Alt (${altBase})`;
+        await testWithUrl(altBase, altLabel);
       }
       const popcornWebUrl = (() => {
         try {
@@ -289,6 +338,59 @@ export default function BackendDiagnostics() {
           return 'unknown';
         }
       })();
+      
+      // Test de connectivité pour l'endpoint de connexion cloud
+      await timed('popcorn-web (auth/login - test connectivité)', async () => {
+        try {
+          const apiUrl = getPopcornWebApiUrl();
+          const fullUrl = `${apiUrl}/auth/login`;
+          
+          // Tester juste la connectivité (sans credentials valides)
+          // On s'attend à une erreur 400/401, mais ça confirme que l'API est accessible
+          try {
+            const testRes = await fetch(fullUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: 'test@test.com', password: 'test' }),
+            });
+            
+            // Si on arrive ici, pas d'erreur CORS → l'API est accessible
+            const data = await testRes.json().catch(() => ({}));
+            // 400/401 sont attendus (credentials invalides), mais ça confirme que l'API répond
+            if (testRes.status === 400 || testRes.status === 401) {
+              return { success: true, message: `API accessible (erreur ${testRes.status} attendue pour credentials de test)` };
+            }
+            return { 
+              success: testRes.ok,
+              message: testRes.ok ? null : `API répond avec statut ${testRes.status}`
+            };
+          } catch (fetchError) {
+            const errorMsg = fetchError instanceof Error ? fetchError.message : String(fetchError);
+            const isCorsError = errorMsg.includes('Failed to fetch') ||
+                               errorMsg.includes('CORS') ||
+                               errorMsg.includes('NetworkError') ||
+                               (fetchError instanceof TypeError && fetchError.message.includes('fetch'));
+            
+            if (isCorsError) {
+              return {
+                success: false,
+                message: `CORS bloque l'accès (ne devrait plus arriver maintenant que CORS est configuré dans popcorn-web). En Android, native-fetch contourne CORS.`
+              };
+            }
+            
+            return {
+              success: false,
+              message: `Erreur réseau: ${errorMsg}`
+            };
+          }
+        } catch (e) {
+          const errorMsg = e instanceof Error ? e.message : String(e);
+          return { 
+            success: false,
+            message: `Erreur: ${errorMsg}`
+          };
+        }
+      }, `${getPopcornWebApiUrl()}/auth/login`);
       
       await timed('popcorn-web (invitations/validate)', async () => {
         // Utiliser validateInvitationCloud qui utilise requestJson
@@ -332,7 +434,7 @@ export default function BackendDiagnostics() {
             if (isCorsError) {
               return {
                 success: false,
-                message: `CORS bloque l'accès à popcorn-web en mode navigateur. popcorn-web doit configurer CORS pour autoriser les requêtes depuis ${window.location.origin}. En Android, native-fetch contourne CORS donc ça fonctionnera.`
+                message: `CORS bloque l'accès à popcorn-web en mode navigateur (ne devrait plus arriver - CORS est configuré partout). Vérifiez que popcorn-web est déployé avec les dernières modifications CORS. En Android, native-fetch contourne CORS donc ça fonctionnera.`
               };
             }
             
@@ -350,8 +452,8 @@ export default function BackendDiagnostics() {
         }
       }, popcornWebUrl);
 
-      // Calculer le résumé : popcorn-web peut échouer en mode navigateur (CORS) mais ce n'est pas bloquant
-      // En Tauri Android, native-fetch contourne CORS et ça fonctionnera
+      // Calculer le résumé : popcorn-web devrait maintenant fonctionner en mode navigateur (CORS configuré)
+      // En Tauri Android, native-fetch reste disponible en fallback si nécessaire
       const criticalTests = out.filter((r) => !r.name.includes('popcorn-web'));
       const allCriticalOk = criticalTests.every((r) => r.ok);
       const popcornWebTest = out.find((r) => r.name.includes('popcorn-web'));
@@ -362,7 +464,7 @@ export default function BackendDiagnostics() {
         ms: Date.now() - started,
         message: allCriticalOk 
           ? (popcornWebTest && !popcornWebTest.ok 
-              ? 'OK (popcorn-web non testable en mode navigateur, fonctionnera en Android)'
+              ? 'OK (popcorn-web échoue - vérifiez que popcorn-web est déployé avec CORS configuré)'
               : 'OK')
           : 'Au moins un test critique a échoué',
       });
@@ -479,7 +581,7 @@ export default function BackendDiagnostics() {
             <div className="mt-3 flex flex-col gap-3">
               <div className="flex flex-col gap-1">
                 <label className="text-sm text-gray-300">
-                  IP alternative à tester (ex: 10.0.2.2:3000 pour émulateur Android)
+                  IP alternative à tester
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -490,9 +592,18 @@ export default function BackendDiagnostics() {
                     placeholder="http://10.0.2.2:3000"
                   />
                 </div>
-                <p className="text-gray-500 text-xs">
-                  Le diagnostic testera les deux URLs: celle configurée et celle-ci.
-                </p>
+                <div className="space-y-1">
+                  <p className="text-gray-500 text-xs">
+                    Le diagnostic testera les deux URLs: celle configurée et celle-ci.
+                  </p>
+                  <p className="text-blue-400/80 text-xs flex items-center gap-1">
+                    <span>📱</span>
+                    <span>
+                      <strong>10.0.2.2</strong> est l'IP spéciale de l'émulateur Android pour accéder au localhost de la machine hôte.
+                      Les tests avec cette IP échoueront si vous n'êtes pas sur un émulateur Android.
+                    </span>
+                  </p>
+                </div>
               </div>
               <label className="flex items-center gap-3 text-sm text-gray-300">
                 <input
@@ -530,16 +641,51 @@ export default function BackendDiagnostics() {
               </tr>
             </thead>
             <tbody>
-              {(rows || []).map((r) => (
-                <tr key={r.name}>
-                  <td className="font-medium text-white">{r.name}</td>
-                  <td className={r.ok ? 'text-green-400' : 'text-red-400'}>
-                    {r.ok ? 'OK' : 'KO'}
-                  </td>
-                  <td className="text-gray-300">{typeof r.ms === 'number' ? `${r.ms} ms` : '-'}</td>
-                  <td className="text-gray-400">{r.message || '-'}</td>
-                </tr>
-              ))}
+              {(rows || []).map((r) => {
+                // Identifier si c'est un test pour l'émulateur Android
+                const isEmulatorTest = r.name.includes('Émulateur Android') || r.name.includes('10.0.2.2');
+                const isMainBackend = r.name.includes('Backend (') && !r.name.includes('Alt') && !r.name.includes('Émulateur');
+                const isSummary = r.name === 'Résumé';
+                
+                return (
+                  <tr 
+                    key={r.name}
+                    className={
+                      isSummary 
+                        ? 'bg-white/10 font-bold' 
+                        : isEmulatorTest 
+                          ? 'bg-blue-500/10 border-l-4 border-blue-500/50' 
+                          : isMainBackend 
+                            ? 'bg-green-500/5 border-l-4 border-green-500/30' 
+                            : ''
+                    }
+                  >
+                    <td className="font-medium text-white">
+                      {isEmulatorTest && (
+                        <span className="inline-flex items-center gap-1 mr-2">
+                          <span className="text-blue-400 text-xs">📱</span>
+                        </span>
+                      )}
+                      {isMainBackend && !isSummary && (
+                        <span className="inline-flex items-center gap-1 mr-2">
+                          <span className="text-green-400 text-xs">🖥️</span>
+                        </span>
+                      )}
+                      {r.name}
+                      {isEmulatorTest && (
+                        <span className="ml-2 text-xs text-blue-400/70 italic">
+                          (uniquement émulateur Android)
+                        </span>
+                      )}
+                    </td>
+                    <td className={r.ok ? 'text-green-400' : 'text-red-400'}>
+                      {r.ok ? 'OK' : 'KO'}
+                    </td>
+                    <td className="text-gray-300">{typeof r.ms === 'number' ? `${r.ms} ms` : '-'}</td>
+                    <td className="text-gray-400">{r.message || '-'}</td>
+                  </tr>
+                );
+              })}
               {rows === null && (
                 <tr>
                   <td className="text-gray-400" colSpan={4}>Chargement…</td>

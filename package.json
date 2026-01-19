@@ -33,7 +33,8 @@
     "android:test:communication:tv": "powershell -ExecutionPolicy Bypass -File scripts/android/test/communication.ps1 tv",
     "smoke:backend": "node scripts/smoke-backend.mjs --backend http://127.0.0.1:3000",
     "smoke:android:mobile": "powershell -ExecutionPolicy Bypass -File scripts/android-smoke-test.ps1 -Variant mobile -BackendUrl http://127.0.0.1:3000",
-    "smoke:android:tv": "powershell -ExecutionPolicy Bypass -File scripts/android-smoke-test.ps1 -Variant tv -BackendUrl http://127.0.0.1:3000"
+    "smoke:android:tv": "powershell -ExecutionPolicy Bypass -File scripts/android-smoke-test.ps1 -Variant tv -BackendUrl http://127.0.0.1:3000",
+    "patch:android": "node scripts/patch-android-manifest.js"
   },
   "dependencies": {
     "@astrojs/preact": "^4.1.3",

@@ -14,13 +14,56 @@ interface ServerApiClientAccess {
 
 export const healthMethods = {
   /**
-   * Vérifie la santé du serveur
+   * Vérifie la santé du serveur avec détails
+   * Retourne des informations détaillées sur l'état de la connexion
    */
-  async checkServerHealth(this: ServerApiClientAccess): Promise<ApiResponse<{ status: string }>> {
+  async checkServerHealth(this: ServerApiClientAccess): Promise<ApiResponse<{ status: string; reachable: boolean; latency?: number }>> {
+    const startTime = Date.now();
+    
     // Unifié : appel direct au backend Rust
     const res = await this.backendRequest<any>('/api/client/health', { method: 'GET' });
-    if (!res.success) return res as ApiResponse<{ status: string }>;
-    return { success: true, data: { status: 'ok' } };
+    
+    const latency = Date.now() - startTime;
+    
+    if (!res.success) {
+      // Détecter le type d'erreur pour fournir un message plus clair
+      const isConnectionError = res.error === 'ConnectionError' || res.error === 'Timeout' || res.error === 'NetworkError';
+      
+      return {
+        success: false,
+        error: res.error,
+        message: isConnectionError 
+          ? 'Le backend n\'est pas accessible. Vérifiez que le serveur est démarré et que l\'URL est correcte.'
+          : res.message,
+        data: {
+          status: 'error',
+          reachable: false,
+          latency,
+        },
+      };
+    }
+    
+    return {
+      success: true,
+      data: {
+        status: 'ok',
+        reachable: true,
+        latency,
+      },
+    };
+  },
+
+  /**
+   * Vérifie rapidement si le backend est accessible (pour le démarrage de l'app)
+   * Version optimisée avec timeout court pour éviter les ANR sur Android
+   */
+  async quickHealthCheck(this: ServerApiClientAccess): Promise<boolean> {
+    try {
+      const res = await this.backendRequest<any>('/api/client/health', { method: 'GET' });
+      return res.success;
+    } catch {
+      return false;
+    }
   },
 
   /**

@@ -112,11 +112,31 @@ class CloudImportManagerImpl {
         if (savedConfig.tmdbApiKey) {
           this.setStatus({ message: 'Import clé TMDB…' });
           try {
-            const res = await serverApi.saveTmdbKey(savedConfig.tmdbApiKey);
-            // Sur certaines plateformes (ex: Android) la clé TMDB peut être liée à un user_id backend
-            // et donc impossible à restaurer automatiquement. Dans ce cas, on n'échoue pas l'import complet.
-            if (!res.success) {
-              console.warn('[CLOUD IMPORT] ⚠️ Import TMDB ignoré:', res.message || res.error);
+            // Nettoyer la clé (trim, supprimer les espaces, etc.)
+            const cleanedKey = savedConfig.tmdbApiKey.trim().replace(/\s+/g, '');
+            if (!cleanedKey) {
+              console.warn('[CLOUD IMPORT] ⚠️ Clé TMDB vide après nettoyage');
+            } else {
+              // Logger la longueur de la clé pour diagnostic (sans exposer la clé)
+              const keyLength = cleanedKey.length;
+              const keyPreview = keyLength > 8 
+                ? `${cleanedKey.substring(0, 4)}...${cleanedKey.substring(cleanedKey.length - 4)}`
+                : '****';
+              console.log(`[CLOUD IMPORT] Tentative d'import clé TMDB (longueur: ${keyLength}, preview: ${keyPreview})`);
+              
+              const res = await serverApi.saveTmdbKey(cleanedKey);
+              // Sur certaines plateformes (ex: Android) la clé TMDB peut être liée à un user_id backend
+              // et donc impossible à restaurer automatiquement. Dans ce cas, on n'échoue pas l'import complet.
+              if (!res.success) {
+                console.warn('[CLOUD IMPORT] ⚠️ Import TMDB ignoré:', res.message || res.error);
+                // Si l'erreur indique que la clé est invalide, donner plus de détails
+                if (res.message?.includes('invalide') || res.message?.includes('401') || res.message?.includes('403')) {
+                  console.warn(`[CLOUD IMPORT] 💡 La clé TMDB du cloud (${keyPreview}, longueur: ${keyLength}) est invalide selon l'API TMDB. Vérifiez qu'il s'agit bien d'une clé v3 "API Key" (32 caractères) depuis https://www.themoviedb.org/settings/api`);
+                  console.warn('[CLOUD IMPORT] 💡 Note: La clé dans votre compte cloud peut être différente de celle dans votre .env local. Mettez à jour la clé dans popcorn-web si nécessaire.');
+                }
+              } else {
+                console.log('[CLOUD IMPORT] ✅ Clé TMDB importée avec succès');
+              }
             }
           } catch (e) {
             console.warn('[CLOUD IMPORT] ⚠️ Import TMDB ignoré (exception):', e);

@@ -261,9 +261,95 @@ class ServerApiClient {
     return typeof id === 'string' && id.trim() ? id : null;
   }
 
-  private async backendRequest<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  /**
+   * Détecte si une erreur est récupérable (peut être retentée)
+   */
+  private isRetryableError(error: unknown, response?: Response): boolean {
+    // Erreurs réseau temporaires (timeout, connexion refusée, etc.)
+    if (error instanceof Error) {
+      const msg = error.message.toLowerCase();
+      if (
+        error.name === 'AbortError' ||
+        msg.includes('timeout') ||
+        msg.includes('network') ||
+        msg.includes('connection') ||
+        msg.includes('failed to fetch') ||
+        msg.includes('networkerror')
+      ) {
+        return true;
+      }
+    }
+    
+    // Erreurs HTTP 5xx (erreurs serveur temporaires)
+    if (response && response.status >= 500 && response.status < 600) {
+      return true;
+    }
+    
+    return false;
+  }
+
+  /**
+   * Retourne un message d'erreur clair pour l'utilisateur
+   */
+  private getErrorMessage(error: unknown, response?: Response, endpoint?: string): { code: string; message: string } {
+    // Erreur de timeout
+    if (error instanceof Error && error.name === 'AbortError') {
+      return {
+        code: 'Timeout',
+        message: 'Le backend ne répond pas. Vérifiez que le serveur est démarré et accessible.',
+      };
+    }
+    
+    // Erreur de connexion réseau
+    if (error instanceof Error) {
+      const msg = error.message.toLowerCase();
+      if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('connection')) {
+        return {
+          code: 'ConnectionError',
+          message: 'Impossible de se connecter au backend. Vérifiez votre connexion réseau et que le serveur est démarré.',
+        };
+      }
+    }
+    
+    // Erreur HTTP avec réponse
+    if (response) {
+      if (response.status === 401) {
+        return {
+          code: 'Unauthorized',
+          message: 'Authentification requise. Veuillez vous connecter.',
+        };
+      }
+      if (response.status === 403) {
+        return {
+          code: 'Forbidden',
+          message: 'Accès refusé. Vous n\'avez pas les permissions nécessaires.',
+        };
+      }
+      if (response.status === 404) {
+        return {
+          code: 'NotFound',
+          message: 'Ressource non trouvée sur le serveur.',
+        };
+      }
+      if (response.status >= 500) {
+        return {
+          code: 'ServerError',
+          message: 'Erreur serveur. Veuillez réessayer dans quelques instants.',
+        };
+      }
+    }
+    
+    // Erreur générique
+    return {
+      code: 'NetworkError',
+      message: error instanceof Error ? error.message : 'Erreur réseau inconnue.',
+    };
+  }
+
+  private async backendRequest<T>(endpoint: string, options: RequestInit = {}, retryCount = 0): Promise<ApiResponse<T>> {
     const base = this.getBackendBaseUrl();
     const url = `${base}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+    const maxRetries = 2; // Maximum 2 retries (3 tentatives au total)
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -286,6 +372,14 @@ class ServerApiClient {
           });
           console.error('[server-api] Données complètes du backend:', dataStr);
           console.error('[server-api] Structure data:', data && typeof data === 'object' ? Object.keys(data) : []);
+        }
+        
+        // Vérifier si l'erreur est récupérable et retenter si nécessaire
+        if (retryCount < maxRetries && this.isRetryableError(null, response)) {
+          const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Exponential backoff, max 3s
+          console.warn(`[server-api] Erreur récupérable ${response.status}, retry dans ${delay}ms (tentative ${retryCount + 1}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          return this.backendRequest<T>(endpoint, options, retryCount + 1);
         }
         
         // Extraire le message d'erreur du backend
@@ -322,18 +416,20 @@ class ServerApiClient {
         data: (data && typeof data === 'object' && 'data' in data ? (data as any).data : data) as T,
       };
     } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return {
-          success: false,
-          error: 'Timeout',
-          message: 'Timeout: le backend ne répond pas.',
-        };
+      // Vérifier si l'erreur est récupérable et retenter si nécessaire
+      if (retryCount < maxRetries && this.isRetryableError(error)) {
+        const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Exponential backoff, max 3s
+        console.warn(`[server-api] Erreur réseau récupérable, retry dans ${delay}ms (tentative ${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return this.backendRequest<T>(endpoint, options, retryCount + 1);
       }
+      
+      // Obtenir un message d'erreur clair pour l'utilisateur
+      const errorInfo = this.getErrorMessage(error, undefined, endpoint);
       return {
         success: false,
-        error: 'NetworkError',
-        // Garder le message le plus informatif possible (utile pour diagnostiquer Android/Tauri).
-        message: error instanceof Error ? (error.message || error.toString()) : String(error),
+        error: errorInfo.code,
+        message: errorInfo.message,
       };
     }
   }

@@ -15,7 +15,61 @@
 const STORAGE_KEY = 'popcorn_backend_url';
 
 /**
+ * Détecte si on est sur Android (via Tauri ou UserAgent)
+ */
+async function isAndroidPlatform(): Promise<boolean> {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  
+  // Essayer d'abord via Tauri (plus fiable)
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const platform = await invoke<string>('get-platform').catch(() => null);
+    if (platform === 'android') {
+      return true;
+    }
+  } catch {
+    // Tauri non disponible, continuer avec UserAgent
+  }
+  
+  // Fallback: détection via UserAgent
+  const ua = navigator.userAgent || '';
+  return /Android/i.test(ua);
+}
+
+/**
+ * Détecte si on est sur un émulateur Android
+ * L'émulateur utilise toujours 10.0.2.2 pour accéder à localhost de l'hôte
+ */
+function isAndroidEmulator(): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  
+  // L'émulateur Android a généralement certaines caractéristiques
+  // On peut aussi vérifier via l'IP actuelle, mais c'est plus complexe
+  // Pour l'instant, on assume que si on est sur Android sans config explicite,
+  // c'est probablement un émulateur (10.0.2.2 fonctionne toujours)
+  return true; // Par défaut, utiliser 10.0.2.2 (fonctionne aussi sur appareil physique si configuré)
+}
+
+/**
  * Retourne l'URL backend par défaut selon la plateforme
+ */
+async function getDefaultBackendUrlAsync(): Promise<string> {
+  // Sur Android, utiliser 10.0.2.2 pour accéder à localhost de la machine hôte
+  // (fonctionne pour émulateur ET appareil physique si le backend est sur la même machine)
+  const isAndroid = await isAndroidPlatform();
+  if (isAndroid) {
+    return 'http://10.0.2.2:3000';
+  }
+  return 'http://127.0.0.1:3000';
+}
+
+/**
+ * Version synchrone (pour compatibilité)
+ * Utilise la détection UserAgent comme fallback
  */
 function getDefaultBackendUrl(): string {
   // Sur Android (émulateur), utiliser 10.0.2.2 pour accéder à localhost de la machine hôte
@@ -64,10 +118,34 @@ export function getBackendUrl(): string {
 }
 
 /**
- * Version asynchrone pour compatibilité
+ * Version asynchrone avec détection améliorée Android
  */
 export async function getBackendUrlAsync(): Promise<string> {
-  return getBackendUrl();
+  // Côté serveur (Astro SSR), localStorage n'est pas disponible
+  if (typeof window === 'undefined') {
+    // Utiliser variable d'environnement ou valeur par défaut
+    return import.meta.env.BACKEND_URL || 
+           import.meta.env.PUBLIC_BACKEND_URL || 
+           await getDefaultBackendUrlAsync();
+  }
+
+  // Côté client: priorité localStorage
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return stored;
+    }
+  } catch (error) {
+    console.warn('[backend-config] Erreur lors de la lecture de localStorage:', error);
+  }
+
+  // Fallback: variable d'environnement
+  if (import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL) {
+    return import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL || '';
+  }
+
+  // Valeur par défaut avec détection améliorée Android
+  return await getDefaultBackendUrlAsync();
 }
 
 /**

@@ -57,126 +57,162 @@ export default function BackendAudit() {
         details: `window.__TAURI_INTERNALS__: ${typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window}, window.__TAURI__: ${typeof window !== 'undefined' && '__TAURI__' in window}`,
       });
 
-      // Test 2: Vérifier si invoke est disponible
-      try {
-        const { invoke } = await import('@tauri-apps/api/core');
+      // Test 2: Vérifier si invoke est disponible (seulement si Tauri est détecté)
+      if (tauriDetected) {
+        try {
+          const { invoke } = await import('@tauri-apps/api/core');
+          tests.push({
+            method: 'Import @tauri-apps/api/core',
+            url: 'N/A',
+            ok: true,
+            ms: 0,
+            message: 'Import réussi',
+            details: `invoke type: ${typeof invoke}`,
+          });
+
+          // Test 3: Tester get-platform (commande simple)
+          try {
+            const start = Date.now();
+            const platform = await invoke('get-platform');
+            const ms = Date.now() - start;
+            tests.push({
+              method: 'Commande get-platform (test basic invoke)',
+              url: 'N/A',
+              ok: true,
+              ms,
+              message: `Plateforme: ${platform}`,
+              details: 'Invoke fonctionne pour les commandes de base',
+            });
+          } catch (e: any) {
+            const errorMsg = e instanceof Error ? e.message : String(e);
+            tests.push({
+              method: 'Commande get-platform (test basic invoke)',
+              url: 'N/A',
+              ok: false,
+              ms: 0,
+              message: errorMsg,
+              details: `Erreur complète: ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`,
+            });
+          }
+
+          // Test 4: Tester log-message
+          try {
+            const start = Date.now();
+            await invoke('log-message', { message: '[audit-test] Test log-message' });
+            const ms = Date.now() - start;
+            tests.push({
+              method: 'Commande log-message',
+              url: 'N/A',
+              ok: true,
+              ms,
+              message: 'Commande exécutée',
+              details: 'log-message fonctionne',
+            });
+          } catch (e: any) {
+            const errorMsg = e instanceof Error ? e.message : String(e);
+            tests.push({
+              method: 'Commande log-message',
+              url: 'N/A',
+              ok: false,
+              ms: 0,
+              message: errorMsg,
+              details: `Erreur: ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`,
+            });
+          }
+
+          // Test 5: Tester native-fetch (pour voir l'erreur détaillée)
+          try {
+            const start = Date.now();
+            const testUrl = 'http://10.0.2.2:3000/api/client/health';
+            const res = await invoke('native-fetch', {
+              url: testUrl,
+              method: 'GET',
+              headers: [['Content-Type', 'application/json']],
+              body: null,
+              timeoutMs: 1000,
+            } as any);
+            const ms = Date.now() - start;
+            tests.push({
+              method: 'Commande native-fetch (test diagnostic)',
+              url: testUrl,
+              ok: true,
+              ms,
+              message: `Status: ${res?.status}`,
+              details: `native-fetch est disponible et fonctionne`,
+            });
+          } catch (e: any) {
+            const errorMsg = e instanceof Error ? e.message : String(e);
+            const errorDetails: any = {
+              name: e instanceof Error ? e.name : typeof e,
+              message: errorMsg,
+              string: String(e),
+            };
+            
+            // Capturer plus de détails si disponibles
+            if (e instanceof Error) {
+              errorDetails.stack = e.stack;
+              Object.keys(e).forEach(key => {
+                if (key !== 'name' && key !== 'message' && key !== 'stack') {
+                  try {
+                    errorDetails[key] = (e as any)[key];
+                  } catch {}
+                }
+              });
+            }
+            
+            tests.push({
+              method: 'Commande native-fetch (test diagnostic)',
+              url: 'http://10.0.2.2:3000/api/client/health',
+              ok: false,
+              ms: 0,
+              message: errorMsg,
+              details: `Diagnostic complet: ${JSON.stringify(errorDetails, null, 2)}`,
+            });
+          }
+
+        } catch (e: any) {
+          tests.push({
+            method: 'Import @tauri-apps/api/core',
+            url: 'N/A',
+            ok: false,
+            ms: 0,
+            message: `Import échoué: ${e instanceof Error ? e.message : String(e)}`,
+            details: `Type erreur: ${e instanceof Error ? e.name : typeof e}`,
+          });
+        }
+      } else {
+        // Tauri non détecté - marquer les tests Tauri comme non applicables
         tests.push({
           method: 'Import @tauri-apps/api/core',
           url: 'N/A',
           ok: true,
           ms: 0,
-          message: 'Import réussi',
-          details: `invoke type: ${typeof invoke}`,
+          message: 'Non applicable (mode navigateur)',
+          details: 'Les tests Tauri ne sont pertinents que dans un environnement Tauri (Android/Desktop)',
         });
-
-        // Test 3: Tester get-platform (commande simple)
-        try {
-          const start = Date.now();
-          const platform = await invoke('get-platform');
-          const ms = Date.now() - start;
-          tests.push({
-            method: 'Commande get-platform (test basic invoke)',
-            url: 'N/A',
-            ok: true,
-            ms,
-            message: `Plateforme: ${platform}`,
-            details: 'Invoke fonctionne pour les commandes de base',
-          });
-        } catch (e: any) {
-          const errorMsg = e instanceof Error ? e.message : String(e);
-          tests.push({
-            method: 'Commande get-platform (test basic invoke)',
-            url: 'N/A',
-            ok: false,
-            ms: 0,
-            message: errorMsg,
-            details: `Erreur complète: ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`,
-          });
-        }
-
-        // Test 4: Tester log-message
-        try {
-          const start = Date.now();
-          await invoke('log-message', { message: '[audit-test] Test log-message' });
-          const ms = Date.now() - start;
-          tests.push({
-            method: 'Commande log-message',
-            url: 'N/A',
-            ok: true,
-            ms,
-            message: 'Commande exécutée',
-            details: 'log-message fonctionne',
-          });
-        } catch (e: any) {
-          const errorMsg = e instanceof Error ? e.message : String(e);
-          tests.push({
-            method: 'Commande log-message',
-            url: 'N/A',
-            ok: false,
-            ms: 0,
-            message: errorMsg,
-            details: `Erreur: ${JSON.stringify(e, Object.getOwnPropertyNames(e))}`,
-          });
-        }
-
-        // Test 5: Tester native-fetch (pour voir l'erreur détaillée)
-        try {
-          const start = Date.now();
-          const testUrl = 'http://10.0.2.2:3000/api/client/health';
-          const res = await invoke('native-fetch', {
-            url: testUrl,
-            method: 'GET',
-            headers: [['Content-Type', 'application/json']],
-            body: null,
-            timeoutMs: 1000,
-          } as any);
-          const ms = Date.now() - start;
-          tests.push({
-            method: 'Commande native-fetch (test diagnostic)',
-            url: testUrl,
-            ok: true,
-            ms,
-            message: `Status: ${res?.status}`,
-            details: `native-fetch est disponible et fonctionne`,
-          });
-        } catch (e: any) {
-          const errorMsg = e instanceof Error ? e.message : String(e);
-          const errorDetails: any = {
-            name: e instanceof Error ? e.name : typeof e,
-            message: errorMsg,
-            string: String(e),
-          };
-          
-          // Capturer plus de détails si disponibles
-          if (e instanceof Error) {
-            errorDetails.stack = e.stack;
-            Object.keys(e).forEach(key => {
-              if (key !== 'name' && key !== 'message' && key !== 'stack') {
-                try {
-                  errorDetails[key] = (e as any)[key];
-                } catch {}
-              }
-            });
-          }
-          
-          tests.push({
-            method: 'Commande native-fetch (test diagnostic)',
-            url: 'http://10.0.2.2:3000/api/client/health',
-            ok: false,
-            ms: 0,
-            message: errorMsg,
-            details: `Diagnostic complet: ${JSON.stringify(errorDetails, null, 2)}`,
-          });
-        }
-
-      } catch (e: any) {
         tests.push({
-          method: 'Import @tauri-apps/api/core',
+          method: 'Commande get-platform (test basic invoke)',
           url: 'N/A',
-          ok: false,
+          ok: true,
           ms: 0,
-          message: `Import échoué: ${e instanceof Error ? e.message : String(e)}`,
-          details: `Type erreur: ${e instanceof Error ? e.name : typeof e}`,
+          message: 'Non applicable (mode navigateur)',
+          details: 'Tauri non détecté - cette commande nécessite un environnement Tauri',
+        });
+        tests.push({
+          method: 'Commande log-message',
+          url: 'N/A',
+          ok: true,
+          ms: 0,
+          message: 'Non applicable (mode navigateur)',
+          details: 'Tauri non détecté - cette commande nécessite un environnement Tauri',
+        });
+        tests.push({
+          method: 'Commande native-fetch (test diagnostic)',
+          url: 'N/A',
+          ok: true,
+          ms: 0,
+          message: 'Non applicable (mode navigateur)',
+          details: 'Tauri non détecté - cette commande nécessite un environnement Tauri',
         });
       }
 
@@ -210,7 +246,25 @@ export default function BackendAudit() {
       
       const url = `${testUrl}${healthEndpoint}`;
       
-      // Toujours essayer, même si isTauri() retourne false (au cas où l'API serait disponible sur Android)
+      // Vérifier si Tauri est disponible avant d'essayer
+      if (!isTauri()) {
+        tests.push({
+          method: methodName,
+          url,
+          ok: true,
+          ms: 0,
+          status: null,
+          message: 'Non applicable (mode navigateur)',
+          details: 'Tauri non détecté - cette méthode nécessite un environnement Tauri (Android/Desktop)',
+        });
+        return {
+          methodName,
+          description: 'Commande Rust personnalisée via invoke("native-fetch")',
+          tests,
+          overallOk: true, // Marquer comme OK car non applicable
+        };
+      }
+      
       try {
         // #region agent log
         fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'BackendAudit.tsx:52',message:'Before invoke native-fetch',data:{url,methodName},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
@@ -279,7 +333,25 @@ export default function BackendAudit() {
       
       const url = `${testUrl}${healthEndpoint}`;
       
-      // Toujours essayer, même si isTauri() retourne false (au cas où l'API serait disponible sur Android)
+      // Vérifier si Tauri est disponible avant d'essayer
+      if (!isTauri()) {
+        tests.push({
+          method: methodName,
+          url,
+          ok: true,
+          ms: 0,
+          status: null,
+          message: 'Non applicable (mode navigateur)',
+          details: 'Tauri non détecté - cette méthode nécessite un environnement Tauri (Android/Desktop)',
+        });
+        return {
+          methodName,
+          description: 'Plugin HTTP Tauri standard',
+          tests,
+          overallOk: true, // Marquer comme OK car non applicable
+        };
+      }
+      
       try {
         const start = Date.now();
         
@@ -387,7 +459,33 @@ export default function BackendAudit() {
       const tests: TestResult[] = [];
       const methodName = 'native-fetch avec URLs alternatives';
       
-      // Toujours essayer, même si isTauri() retourne false (au cas où l'API serait disponible sur Android)
+      // Vérifier si Tauri est disponible avant d'essayer
+      if (!isTauri()) {
+        const urlsToTest = [
+          'http://10.0.2.2:3000',
+          'http://localhost:3000',
+          'http://127.0.0.1:3000',
+          'http://192.168.1.1:3000',
+        ];
+        urlsToTest.forEach(baseUrl => {
+          tests.push({
+            method: methodName,
+            url: `${baseUrl}${healthEndpoint}`,
+            ok: true,
+            ms: 0,
+            status: null,
+            message: 'Non applicable (mode navigateur)',
+            details: 'Tauri non détecté - cette méthode nécessite un environnement Tauri (Android/Desktop)',
+          });
+        });
+        return {
+          methodName,
+          description: 'Test avec différentes URLs (10.0.2.2=émulateur Android, localhost, 127.0.0.1, réseau local)',
+          tests,
+          overallOk: true, // Marquer comme OK car non applicable
+        };
+      }
+      
       const urlsToTest = [
         'http://10.0.2.2:3000',
         'http://localhost:3000',
@@ -445,7 +543,7 @@ export default function BackendAudit() {
 
       return {
         methodName,
-        description: 'Test avec différentes URLs (10.0.2.2, localhost, 127.0.0.1)',
+        description: 'Test avec différentes URLs (10.0.2.2=émulateur Android, localhost, 127.0.0.1, réseau local)',
         tests,
         overallOk: tests.some(t => t.ok),
       };
@@ -459,7 +557,27 @@ export default function BackendAudit() {
       const url = `${testUrl}${healthEndpoint}`;
       const methods = ['GET', 'POST', 'OPTIONS'];
       
-      // Toujours essayer, même si isTauri() retourne false (au cas où l'API serait disponible sur Android)
+      // Vérifier si Tauri est disponible avant d'essayer
+      if (!isTauri()) {
+        methods.forEach(httpMethod => {
+          tests.push({
+            method: `${methodName} - ${httpMethod}`,
+            url,
+            ok: true,
+            ms: 0,
+            status: null,
+            message: 'Non applicable (mode navigateur)',
+            details: 'Tauri non détecté - cette méthode nécessite un environnement Tauri (Android/Desktop)',
+          });
+        });
+        return {
+          methodName,
+          description: 'Test avec différentes méthodes HTTP',
+          tests,
+          overallOk: true, // Marquer comme OK car non applicable
+        };
+      }
+      
       try {
         const { invoke } = await import('@tauri-apps/api/core');
 
@@ -644,15 +762,26 @@ export default function BackendAudit() {
                 </button>
               )}
             </div>
-            <p className="text-gray-500 text-xs">
-              Backend testé: <span className="text-gray-300">{testUrl}</span>
-              {customBackendUrl && (
-                <span className="text-blue-400 ml-2">(URL personnalisée)</span>
+            <div className="space-y-1">
+              <p className="text-gray-500 text-xs">
+                Backend testé: <span className="text-gray-300">{testUrl}</span>
+                {customBackendUrl && (
+                  <span className="text-blue-400 ml-2">(URL personnalisée)</span>
+                )}
+                {!customBackendUrl && backendUrl && (
+                  <span className="text-gray-500 ml-2">(URL configurée)</span>
+                )}
+              </p>
+              {testUrl.includes('10.0.2.2') && (
+                <p className="text-blue-400/80 text-xs flex items-center gap-1">
+                  <span>📱</span>
+                  <span>
+                    <strong>10.0.2.2</strong> est l'IP spéciale de l'émulateur Android pour accéder au localhost de la machine hôte.
+                    Les tests avec cette IP échoueront si vous n'êtes pas sur un émulateur Android.
+                  </span>
+                </p>
               )}
-              {!customBackendUrl && backendUrl && (
-                <span className="text-gray-500 ml-2">(URL configurée)</span>
-              )}
-            </p>
+            </div>
           </div>
         </div>
       </div>
@@ -708,20 +837,68 @@ export default function BackendAudit() {
                 </tr>
               </thead>
               <tbody>
-                {result.tests.map((test, testIdx) => (
-                  <tr key={testIdx}>
-                    <td className="font-medium text-white text-sm">{test.method}</td>
-                    <td className="text-gray-300 text-xs max-w-xs truncate">{test.url}</td>
-                    <td className={test.ok ? 'text-green-400' : 'text-red-400'}>
-                      {test.ok ? 'OK' : 'KO'}
-                      {test.status && ` (${test.status})`}
-                    </td>
-                    <td className="text-gray-300">{test.ms} ms</td>
-                    <td className="text-gray-400 text-xs">
-                      {test.message || test.details || '-'}
-                    </td>
-                  </tr>
-                ))}
+                {result.tests.map((test, testIdx) => {
+                  // Identifier si c'est un test avec l'IP de l'émulateur Android
+                  const isEmulatorUrl = test.url.includes('10.0.2.2');
+                  const isLocalhost = test.url.includes('localhost') || test.url.includes('127.0.0.1');
+                  const isNotApplicable = test.message?.includes('Non applicable') || test.details?.includes('non applicable');
+                  
+                  return (
+                    <tr 
+                      key={testIdx}
+                      className={
+                        isNotApplicable
+                          ? 'bg-gray-700/20 border-l-4 border-gray-500/50'
+                          : isEmulatorUrl 
+                            ? 'bg-blue-500/10 border-l-4 border-blue-500/50' 
+                            : isLocalhost 
+                              ? 'bg-green-500/5 border-l-4 border-green-500/30' 
+                              : ''
+                      }
+                    >
+                      <td className="font-medium text-white text-sm">
+                        {isNotApplicable && (
+                          <span className="inline-flex items-center gap-1 mr-2">
+                            <span className="text-gray-400 text-xs">⏭️</span>
+                          </span>
+                        )}
+                        {isEmulatorUrl && !isNotApplicable && (
+                          <span className="inline-flex items-center gap-1 mr-2">
+                            <span className="text-blue-400 text-xs">📱</span>
+                          </span>
+                        )}
+                        {isLocalhost && !isEmulatorUrl && !isNotApplicable && (
+                          <span className="inline-flex items-center gap-1 mr-2">
+                            <span className="text-green-400 text-xs">🖥️</span>
+                          </span>
+                        )}
+                        {test.method}
+                      </td>
+                      <td className="text-gray-300 text-xs max-w-xs truncate">
+                        {test.url}
+                        {isEmulatorUrl && !isNotApplicable && (
+                          <span className="ml-2 text-xs text-blue-400/70 italic">
+                            (émulateur)
+                          </span>
+                        )}
+                      </td>
+                      <td className={
+                        isNotApplicable 
+                          ? 'text-gray-400' 
+                          : test.ok 
+                            ? 'text-green-400' 
+                            : 'text-red-400'
+                      }>
+                        {isNotApplicable ? 'N/A' : (test.ok ? 'OK' : 'KO')}
+                        {test.status && ` (${test.status})`}
+                      </td>
+                      <td className="text-gray-300">{test.ms} ms</td>
+                      <td className="text-gray-400 text-xs">
+                        {test.message || test.details || '-'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

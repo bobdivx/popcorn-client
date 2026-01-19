@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../../../lib/client/server-api';
+import { getUserConfig } from '../../../lib/api/popcorn-web';
 import type { SetupStatus } from '../../../lib/client/types';
 
 interface TmdbStepProps {
@@ -26,18 +27,90 @@ export function TmdbStep({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cloudKeyWarning, setCloudKeyWarning] = useState<string | null>(null);
 
   useEffect(() => {
     loadTmdbKey();
   }, []);
 
+  // La clé peut être importée en arrière-plan depuis AuthStep via CloudImportManager.
+  // On re-tente quelques fois si aucune clé n'est trouvée (évite l'impression "rien ne se passe").
+  useEffect(() => {
+    if (loading) return;
+    if (tmdbKey && tmdbKey.includes('...')) return; // Déjà une clé masquée affichée
+
+    let cancelled = false;
+    let attempts = 0;
+    const maxAttempts = 15; // ~30s (15 * 2s)
+
+    const interval = setInterval(async () => {
+      if (cancelled) return;
+      attempts += 1;
+      if (attempts > maxAttempts) {
+        clearInterval(interval);
+        return;
+      }
+
+      try {
+        const res = await serverApi.getTmdbKey();
+        if (res.success && res.data?.hasKey && res.data.apiKey) {
+          setTmdbKey(res.data.apiKey);
+          setCloudKeyWarning(null); // Effacer l'avertissement si la clé est maintenant dans le backend
+          onStatusChange?.();
+          clearInterval(interval);
+        } else {
+          // Si pas de clé dans le backend, vérifier dans le cloud
+          try {
+            const cloudConfig = await getUserConfig();
+            if (cloudConfig?.tmdbApiKey && !tmdbKey.includes('...')) {
+              const cloudKey = cloudConfig.tmdbApiKey;
+              const masked = cloudKey.length > 8 
+                ? `${cloudKey.substring(0, 4)}...${cloudKey.substring(cloudKey.length - 4)}`
+                : '****';
+              setTmdbKey(masked);
+              setCloudKeyWarning('Une clé TMDB existe dans votre compte cloud mais n\'a pas pu être importée (clé invalide). Entrez une nouvelle clé v3 valide pour la remplacer.');
+            }
+          } catch {
+            // ignore
+          }
+        }
+      } catch {
+        // ignore (on retentera)
+      }
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [loading, tmdbKey]);
+
   const loadTmdbKey = async () => {
     try {
       setLoading(true);
+      // D'abord, essayer de charger depuis le backend local
       const response = await serverApi.getTmdbKey();
       if (response.success && response.data?.hasKey && response.data.apiKey) {
         // Afficher la clé masquée pour indiquer qu'une clé existe
         setTmdbKey(response.data.apiKey);
+        setCloudKeyWarning(null);
+      } else {
+        // Si pas de clé dans le backend local, vérifier dans le cloud
+        try {
+          const cloudConfig = await getUserConfig();
+          if (cloudConfig?.tmdbApiKey) {
+            // Créer une version masquée de la clé cloud
+            const cloudKey = cloudConfig.tmdbApiKey;
+            const masked = cloudKey.length > 8 
+              ? `${cloudKey.substring(0, 4)}...${cloudKey.substring(cloudKey.length - 4)}`
+              : '****';
+            setTmdbKey(masked);
+            setCloudKeyWarning('Une clé TMDB existe dans votre compte cloud mais n\'a pas pu être importée (clé invalide). Entrez une nouvelle clé v3 valide pour la remplacer.');
+          }
+        } catch (cloudErr) {
+          // Ignorer les erreurs de récupération cloud (CORS, etc.)
+          console.log('[TMDB] Impossible de récupérer la clé depuis le cloud:', cloudErr);
+        }
       }
     } catch (err) {
       console.error('Erreur lors du chargement de la clé TMDB:', err);
@@ -52,8 +125,8 @@ export function TmdbStep({
       return;
     }
 
-    // Si c'est une clé masquée (contient des *), ne pas sauvegarder
-    if (tmdbKey.includes('*')) {
+    // Si c'est une clé masquée (contient des * ou ...), ne pas sauvegarder
+    if (tmdbKey.includes('*') || tmdbKey.includes('...')) {
       setError('Veuillez entrer une nouvelle clé API TMDB complète');
       return;
     }
@@ -84,7 +157,7 @@ export function TmdbStep({
     );
   }
 
-  const hasExistingKey = setupStatus?.hasTmdbKey || (tmdbKey && tmdbKey.includes('*'));
+  const hasExistingKey = setupStatus?.hasTmdbKey || (tmdbKey && (tmdbKey.includes('*') || tmdbKey.includes('...')));
 
   return (
     <div className="space-y-6">
@@ -128,6 +201,12 @@ export function TmdbStep({
         </div>
       )}
 
+      {cloudKeyWarning && (
+        <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 text-yellow-300">
+          <span>⚠️ {cloudKeyWarning}</span>
+        </div>
+      )}
+
       <div className="space-y-2">
         <label className="block text-sm font-semibold text-white">
           Clé API TMDB
@@ -145,7 +224,7 @@ export function TmdbStep({
             ref={(el) => { buttonRefs.current[0] = el; }}
             className="w-full sm:w-auto whitespace-nowrap px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={handleSave}
-            disabled={saving || !tmdbKey.trim() || tmdbKey.includes('*')}
+            disabled={saving || !tmdbKey.trim() || tmdbKey.includes('*') || tmdbKey.includes('...')}
           >
             {saving ? (
               <>

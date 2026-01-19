@@ -137,10 +137,33 @@ export const authMethods = {
         },
       };
     } catch (e) {
+      // Log détaillé pour le diagnostic
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      const errorName = e instanceof Error ? e.name : 'UnknownError';
+      
+      console.error('[AUTH] Erreur lors de la connexion cloud:', {
+        error: e,
+        message: errorMessage,
+        name: errorName,
+        stack: e instanceof Error ? e.stack : undefined,
+      });
+      
+      // Messages d'erreur plus clairs
+      let userMessage = 'Erreur de connexion cloud';
+      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        userMessage = 'Email ou mot de passe incorrect';
+      } else if (errorMessage.includes('timeout') || errorMessage.includes('Timeout')) {
+        userMessage = 'Le service cloud ne répond pas. Vérifiez votre connexion internet.';
+      } else if (errorMessage.includes('network') || errorMessage.includes('fetch') || errorMessage.includes('Failed to fetch')) {
+        userMessage = 'Impossible de contacter le service cloud. Vérifiez votre connexion internet.';
+      } else if (errorMessage) {
+        userMessage = errorMessage;
+      }
+      
       return {
         success: false,
         error: 'CloudLoginError',
-        message: e instanceof Error ? e.message : 'Erreur de connexion cloud',
+        message: userMessage,
       };
     }
   },

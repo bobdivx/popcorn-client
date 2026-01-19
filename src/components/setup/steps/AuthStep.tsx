@@ -39,10 +39,36 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
     setLoading(true);
 
     try {
+      console.log('[AUTH] Tentative de connexion cloud pour:', loginEmail);
       const response = await serverApi.loginCloud(loginEmail, loginPassword);
 
       if (!response.success) {
-        setError(response.message || 'Erreur de connexion');
+        // Messages d'erreur plus détaillés selon le type d'erreur
+        let errorMessage = response.message || 'Erreur de connexion cloud';
+        
+        if (response.error === 'CloudUnavailable') {
+          errorMessage = 'Le service cloud est actuellement indisponible. Vérifiez votre connexion internet et réessayez.';
+        } else if (response.error === 'CloudLoginError') {
+          // Analyser le message pour donner plus de détails
+          const msg = response.message || '';
+          if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('incorrect')) {
+            errorMessage = 'Email ou mot de passe incorrect';
+          } else if (msg.includes('timeout') || msg.includes('Timeout')) {
+            errorMessage = 'Le service cloud ne répond pas. Vérifiez votre connexion internet.';
+          } else if (msg.includes('network') || msg.includes('fetch') || msg.includes('Failed to fetch')) {
+            errorMessage = 'Impossible de contacter le service cloud. Vérifiez votre connexion internet.';
+          } else {
+            errorMessage = `Erreur de connexion: ${msg}`;
+          }
+        }
+        
+        console.error('[AUTH] Erreur de connexion cloud:', {
+          error: response.error,
+          message: response.message,
+          fullResponse: response,
+        });
+        
+        setError(errorMessage);
         setLoading(false);
         return;
       }
@@ -52,6 +78,8 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
       const cloudToken = response.data?.cloudAccessToken || TokenManager.getCloudAccessToken();
       
       if (cloudToken) {
+        // Maintenant que CORS est configuré partout dans popcorn-web, on peut récupérer la config
+        // en mode navigateur web aussi (plus besoin de workaround)
         try {
           console.log('[AUTH] Token cloud récupéré, vérification de la configuration sauvegardée...');
           console.log('[AUTH] Token cloud (premiers caractères):', cloudToken.substring(0, 20) + '...');
@@ -87,7 +115,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
           } else {
             console.warn('[AUTH] Impossible de vérifier la configuration sauvegardée:', configError);
           }
-          // Continuer même si on ne peut pas vérifier la config
+          // Continuer même si on ne peut pas vérifier la config (pas bloquant)
         }
       } else {
         console.warn('[AUTH] Aucun token d\'accès trouvé après la connexion');
@@ -108,8 +136,28 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
       // Pas de configuration sauvegardée / setup incomplet, continuer normalement
       onNext();
     } catch (err) {
-      setError('Erreur de connexion. Vérifiez votre connexion réseau et que l\'API popcorn-web est accessible.');
-      console.error('Erreur:', err);
+      // Gestion d'erreur plus détaillée
+      let errorMessage = 'Erreur de connexion cloud';
+      
+      if (err instanceof Error) {
+        if (err.message.includes('timeout') || err.message.includes('Timeout')) {
+          errorMessage = 'Le service cloud ne répond pas dans le délai imparti. Vérifiez votre connexion internet.';
+        } else if (err.message.includes('network') || err.message.includes('fetch') || err.message.includes('Failed to fetch')) {
+          errorMessage = 'Impossible de contacter le service cloud. Vérifiez votre connexion internet et que le service est accessible.';
+        } else if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+          errorMessage = 'Email ou mot de passe incorrect';
+        } else {
+          errorMessage = `Erreur: ${err.message}`;
+        }
+      }
+      
+      console.error('[AUTH] Erreur lors de la connexion cloud:', {
+        error: err,
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
+      });
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }

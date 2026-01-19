@@ -33,6 +33,15 @@ async function fetchJsonWithTimeout(url: string, init: RequestInit, timeoutMs: n
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
+  } catch (error) {
+    // Améliorer les messages d'erreur pour les erreurs CORS
+    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+      // Créer une erreur plus descriptive pour CORS
+      const corsError = new Error(`CORS bloque l'accès à ${url}. En mode navigateur web, l'accès direct à popcorn-web est bloqué par CORS. En Tauri Android/Desktop, native-fetch contourne CORS.`);
+      (corsError as any).isCorsError = true;
+      throw corsError;
+    }
+    throw error;
   } finally {
     clearTimeout(timeoutId);
   }
@@ -47,124 +56,150 @@ async function requestJson(
   init: RequestInit,
   timeoutMs: number
 ): Promise<JsonResult> {
-  // En Tauri (Android/Desktop), utiliser la requête native pour contourner CORS
-  if (isTauri()) {
-    const logNative = async (message: string) => {
+  // Essayer d'abord fetch standard (fonctionne maintenant que CORS est configuré partout)
+  try {
+    const response = await fetchJsonWithTimeout(url, init, timeoutMs);
+    const rawText = await response.text().catch(() => '');
+    let data: any = {};
+    try {
+      data = rawText ? JSON.parse(rawText) : {};
+    } catch {
+      data = {};
+    }
+
+    if (response.ok) return { ok: true, status: response.status, data };
+    return { ok: false, status: response.status, data, rawText };
+  } catch (error) {
+    // Si fetch standard échoue (CORS ou autre), et qu'on est en Tauri, essayer native-fetch
+    const isCorsError = error instanceof Error && (
+      (error as any).isCorsError ||
+      error.message.includes('CORS') ||
+      error.message.includes('Failed to fetch') ||
+      error.message.includes('Access-Control-Allow-Origin') ||
+      error.message.includes('blocked by CORS policy')
+    );
+    
+    // En Tauri, utiliser native-fetch comme fallback si fetch standard échoue
+    if (isTauri() && (isCorsError || error instanceof TypeError)) {
+      const logNative = async (message: string) => {
+        try {
+          const { invoke } = await import('@tauri-apps/api/core');
+          await invoke('log-message', { message });
+        } catch {
+          // ignore
+        }
+      };
+
       try {
         const { invoke } = await import('@tauri-apps/api/core');
-        await invoke('log-message', { message });
-      } catch {
-        // ignore
-      }
-    };
 
-    try {
-      // Essayer d'abord native-fetch (commande personnalisée), puis plugin-http en fallback
-      const { invoke } = await import('@tauri-apps/api/core');
+        const method =
+          (init as any)?.method && typeof (init as any).method === 'string' ? (init as any).method : 'GET';
 
-      const method =
-        (init as any)?.method && typeof (init as any).method === 'string' ? (init as any).method : 'GET';
-
-      const headerPairs: Array<[string, string]> = [];
-      try {
-        const headersObj = new Headers((init as any)?.headers as any);
-        headersObj.forEach((value, key) => headerPairs.push([key, value]));
-      } catch {
-        // ignore
-      }
-
-      const body =
-        typeof (init as any)?.body === 'string' || (init as any)?.body instanceof String
-          ? String((init as any).body)
-          : undefined;
-
-      let nativeRes: any;
-      try {
-        nativeRes = await invoke('native-fetch', {
-          url,
-          method,
-          headers: headerPairs,
-          body,
-          timeoutMs,
-        } as any);
-      } catch (invokeError) {
-        const errorMsg = invokeError instanceof Error ? invokeError.message : String(invokeError);
-        // Si native-fetch n'est pas disponible, utiliser plugin-http
-        if (errorMsg.includes('not found') || errorMsg.includes('Command native-fetch')) {
-          const { fetch: httpFetch } = await import('@tauri-apps/plugin-http');
-          const httpResponse = await httpFetch(url, {
-            method: method as any,
-            headers: Object.fromEntries(headerPairs),
-            body: body,
-          } as any);
-          
-          const responseBody = await httpResponse.text();
-          return {
-            ok: httpResponse.ok,
-            status: httpResponse.status,
-            data: responseBody ? JSON.parse(responseBody) : {},
-            rawText: responseBody,
-          };
+        const headerPairs: Array<[string, string]> = [];
+        try {
+          const headersObj = new Headers((init as any)?.headers as any);
+          headersObj.forEach((value, key) => headerPairs.push([key, value]));
+        } catch {
+          // ignore
         }
-        throw invokeError;
-      }
 
-      const response = new Response(nativeRes?.body ?? '', {
-        status: nativeRes?.status ?? 0,
-        headers: (() => {
-          const h = new Headers();
-          try {
-            for (const [k, v] of (nativeRes?.headers || []) as Array<[string, string]>) {
-              if (k) h.set(k, v);
-            }
-          } catch {
-            // ignore
+        const body =
+          typeof (init as any)?.body === 'string' || (init as any)?.body instanceof String
+            ? String((init as any).body)
+            : undefined;
+
+        let nativeRes: any;
+        try {
+          nativeRes = await invoke('native-fetch', {
+            url,
+            method,
+            headers: headerPairs,
+            body,
+            timeoutMs,
+          } as any);
+        } catch (invokeError) {
+          const errorMsg = invokeError instanceof Error ? invokeError.message : String(invokeError);
+          // Si native-fetch n'est pas disponible, utiliser plugin-http
+          if (errorMsg.includes('not found') || errorMsg.includes('Command native-fetch')) {
+            const { fetch: httpFetch } = await import('@tauri-apps/plugin-http');
+            const httpResponse = await httpFetch(url, {
+              method: method as any,
+              headers: Object.fromEntries(headerPairs),
+              body: body,
+            } as any);
+            
+            const responseBody = await httpResponse.text();
+            return {
+              ok: httpResponse.ok,
+              status: httpResponse.status,
+              data: responseBody ? JSON.parse(responseBody) : {},
+              rawText: responseBody,
+            };
           }
-          return h;
-        })(),
-      });
+          throw invokeError;
+        }
 
-      const rawText = await response.text().catch(() => '');
-      let data: any = {};
-      try {
-        data = rawText ? JSON.parse(rawText) : {};
-      } catch {
-        data = {};
+        const response = new Response(nativeRes?.body ?? '', {
+          status: nativeRes?.status ?? 0,
+          headers: (() => {
+            const h = new Headers();
+            try {
+              for (const [k, v] of (nativeRes?.headers || []) as Array<[string, string]>) {
+                if (k) h.set(k, v);
+              }
+            } catch {
+              // ignore
+            }
+            return h;
+          })(),
+        });
+
+        const rawText = await response.text().catch(() => '');
+        let data: any = {};
+        try {
+          data = rawText ? JSON.parse(rawText) : {};
+        } catch {
+          data = {};
+        }
+
+        if (response.ok) return { ok: true, status: response.status, data };
+        return { ok: false, status: response.status, data, rawText };
+      } catch (e) {
+        const eStr = typeof e === 'string' ? e : e instanceof Error ? e.message || '' : String(e);
+        await logNative(
+          `[popcorn-debug] popcorn-web requestJson fallback failed url=${url} err=${JSON.stringify({
+            type: typeof e,
+            value: eStr,
+          })}`
+        );
+
+        // Sur AbortError: simuler "API indisponible"
+        if (e instanceof Error && e.name === 'AbortError') {
+          return { ok: false, status: 0, data: {}, rawText: 'timeout' };
+        }
+
+        // Propager l'erreur
+        throw e;
       }
-
-      if (response.ok) return { ok: true, status: response.status, data };
-      return { ok: false, status: response.status, data, rawText };
-    } catch (e) {
-      const eStr = typeof e === 'string' ? e : e instanceof Error ? e.message || '' : String(e);
-      // Cas fréquent: plugin-http bloqué par ACL (capabilities). On loggue pour diagnostic.
-      await logNative(
-        `[popcorn-debug] popcorn-web requestJson failed url=${url} err=${JSON.stringify({
-          type: typeof e,
-          value: eStr,
-        })}`
-      );
-
-      // Sur AbortError: simuler "API indisponible"
-      if (e instanceof Error && e.name === 'AbortError') {
-        return { ok: false, status: 0, data: {}, rawText: 'timeout' };
-      }
-
-      // Sinon: laisser la logique caller gérer (loginCloud transforme certains cas en null)
-      throw e;
     }
+    
+    // En mode navigateur web, si CORS bloque encore (ne devrait plus arriver avec CORS configuré)
+    if (isCorsError) {
+      return { 
+        ok: false, 
+        status: 0, 
+        data: { 
+          corsError: true,
+          message: 'CORS bloque l\'accès. Vérifiez que popcorn-web a CORS configuré pour cet endpoint.'
+        }, 
+        rawText: 'CORS_ERROR' 
+      };
+    }
+    
+    // Pour les autres erreurs, les propager
+    throw error;
   }
-
-  const response = await fetchJsonWithTimeout(url, init, timeoutMs);
-  const rawText = await response.text().catch(() => '');
-  let data: any = {};
-  try {
-    data = rawText ? JSON.parse(rawText) : {};
-  } catch {
-    data = {};
-  }
-
-  if (response.ok) return { ok: true, status: response.status, data };
-  return { ok: false, status: response.status, data, rawText };
 }
 
 /**
@@ -186,7 +221,11 @@ export async function loginCloud(email: string, password: string): Promise<{
   const fullUrl = `${apiUrl}/auth/login`;
   
   // Log pour debug
-  console.log('[POPCORN-WEB] Tentative de connexion à:', fullUrl);
+  const isTauriEnv = isTauri();
+  console.log('[POPCORN-WEB] Tentative de connexion à:', fullUrl, {
+    environment: isTauriEnv ? 'Tauri (Android/Desktop)' : 'Navigateur',
+    email: email.substring(0, 3) + '***', // Masquer l'email complet
+  });
   
   try {
     const res = await requestJson(
@@ -205,6 +244,8 @@ export async function loginCloud(email: string, password: string): Promise<{
       status: res.status,
       ok: res.ok,
       url: fullUrl,
+      environment: isTauriEnv ? 'Tauri' : 'Navigateur',
+      hasData: !!res.data,
     });
 
     if (!res.ok) {
@@ -559,6 +600,15 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
     );
 
     if (!res.ok) {
+      // Détecter les erreurs CORS (status 0 avec corsError dans data)
+      if (res.status === 0 && res.data?.corsError) {
+        // En mode navigateur web, CORS bloque l'accès - c'est normal et non bloquant
+        if (import.meta.env.DEV) {
+          console.log('[POPCORN-WEB] ℹ️ CORS bloque l\'accès en mode navigateur web (normal). La configuration sera récupérable en Tauri Android/Desktop.');
+        }
+        return null;
+      }
+      
       if (res.status === 500 || res.status === 503 || res.status === 0) {
         console.warn('[POPCORN-WEB] API non disponible pour récupérer la configuration');
         return null;
@@ -596,6 +646,24 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
       console.warn('[POPCORN-WEB] Timeout lors de la récupération de la configuration');
       return null;
     }
+    
+    // Détecter les erreurs CORS (normales en mode navigateur web)
+    const isCorsError = error instanceof Error && (
+      error.message.includes('CORS') ||
+      error.message.includes('Failed to fetch') ||
+      error.message.includes('Access-Control-Allow-Origin') ||
+      error.message.includes('blocked by CORS policy')
+    );
+    
+    if (isCorsError) {
+      // En mode navigateur web, CORS bloque l'accès direct - c'est normal
+      // La config sera récupérable en Tauri Android/Desktop via native-fetch
+      if (import.meta.env.DEV) {
+        console.log('[POPCORN-WEB] ℹ️ CORS bloque l\'accès en mode navigateur web (normal). La configuration sera récupérable en Tauri Android/Desktop.');
+      }
+      return null;
+    }
+    
     console.warn('[POPCORN-WEB] Impossible de récupérer la configuration:', error);
     return null;
   }
