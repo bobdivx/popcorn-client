@@ -49,13 +49,32 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
-          api-level: 33
-          build-tools: 33.0.0
-          ndk-version: 25.1.8937393
+          packages: |
+            platform-tools
+            platforms;android-33
+            build-tools;33.0.0
+            ndk;25.1.8937393
 
       - name: Accept Android licenses
         run: |
           yes | sdkmanager --licenses || true
+
+      - name: Setup NDK environment variables
+        run: |
+          # Find NDK directory
+          NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -type d -name "25.1.8937393" 2>/dev/null | head -n 1)
+          if [ -z "$NDK_PATH" ]; then
+            # Fallback: find any NDK version
+            NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -type d 2>/dev/null | head -n 1)
+          fi
+          if [ -n "$NDK_PATH" ]; then
+            echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+            echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+            echo "Found NDK at: $NDK_PATH"
+          else
+            echo "Warning: NDK not found in $ANDROID_HOME/ndk"
+            ls -la $ANDROID_HOME/ndk/ || echo "NDK directory does not exist"
+          fi
 
       - name: Install Tauri CLI
         run: npm install -g @tauri-apps/cli@latest
@@ -65,8 +84,6 @@ jobs:
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
           echo "$ANDROID_HOME/tools" >> $GITHUB_PATH
-          # Set NDK_HOME to match ANDROID_NDK_HOME for Tauri compatibility
-          echo "NDK_HOME=$ANDROID_NDK_HOME" >> $GITHUB_ENV
 
       - name: Initialize Android project
         run: |
