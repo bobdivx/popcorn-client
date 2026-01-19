@@ -41,6 +41,21 @@ export function useHlsPlayer({
   const retryTimeoutRef = useRef<number | null>(null);
   const previousFilePathRef = useRef<string | null>(null);
   const previousInfoHashRef = useRef<string | null>(null);
+  // Refs pour les callbacks et configs qui changent mais ne doivent pas déclencher de réinitialisation
+  const onErrorRef = useRef(onError);
+  const onLoadingChangeRef = useRef(onLoadingChange);
+  const canAutoPlayRef = useRef(canAutoPlay);
+  const startFromBeginningRef = useRef(startFromBeginning);
+  const torrentIdRef = useRef(torrentId);
+  
+  // Mettre à jour les refs quand les props changent (sans déclencher de réinitialisation)
+  useEffect(() => {
+    onErrorRef.current = onError;
+    onLoadingChangeRef.current = onLoadingChange;
+    canAutoPlayRef.current = canAutoPlay;
+    startFromBeginningRef.current = startFromBeginning;
+    torrentIdRef.current = torrentId;
+  }, [onError, onLoadingChange, canAutoPlay, startFromBeginning, torrentId]);
 
   const { hlsLoaded, error: loaderError } = useHlsLoader();
   const playerConfig = usePlayerConfig();
@@ -49,9 +64,9 @@ export function useHlsPlayer({
     if (loaderError) {
       setError(loaderError);
       setIsLoading(false);
-      onError?.(new Error(loaderError));
+      onErrorRef.current?.(new Error(loaderError));
     }
-  }, [loaderError, onError]);
+  }, [loaderError]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -60,6 +75,18 @@ export function useHlsPlayer({
     // Réinitialiser le compteur de retry seulement si le fichier ou l'infoHash change vraiment
     const filePathChanged = previousFilePathRef.current !== filePath;
     const infoHashChanged = previousInfoHashRef.current !== infoHash;
+    
+    // Construire l'URL HLS pour vérifier si elle a changé
+    const baseUrl = serverApi.getServerUrl();
+    const normalizedPath = filePath.replace(/\\/g, '/');
+    const encodedPath = encodeURIComponent(normalizedPath);
+    const hlsUrl = `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8?info_hash=${encodeURIComponent(infoHash)}`;
+    
+    // Si l'URL est la même que la précédente, ne pas réinitialiser le player
+    if (currentSrcRef.current === hlsUrl && hlsRef.current && !filePathChanged && !infoHashChanged) {
+      // L'URL est identique et le player existe déjà, ne rien faire
+      return;
+    }
     
     if (filePathChanged || infoHashChanged) {
       retryCountRef.current = 0;
@@ -78,7 +105,15 @@ export function useHlsPlayer({
         // Normaliser le chemin (remplacer les backslashes par des slashes pour l'URL)
         const normalizedPath = filePath.replace(/\\/g, '/');
         const encodedPath = encodeURIComponent(normalizedPath);
-        const hlsUrl = `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8`;
+        // Passer l'info_hash en query parameter pour que le backend puisse utiliser get_file_path
+        const hlsUrl = `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8?info_hash=${encodeURIComponent(infoHash)}`;
+
+        // Si l'URL est la même que celle déjà chargée, ne pas réinitialiser
+        if (currentSrcRef.current === hlsUrl && hlsRef.current) {
+          console.log('[useHlsPlayer] URL HLS identique, réutilisation du player existant:', hlsUrl);
+          setIsLoading(false);
+          return;
+        }
 
         console.log('[useHlsPlayer] Construction URL HLS:', {
           filePath,
@@ -87,7 +122,18 @@ export function useHlsPlayer({
           hlsUrl,
           infoHash,
           retryCount: retryCountRef.current,
+          previousUrl: currentSrcRef.current,
         });
+
+        // Détruire l'ancien player HLS si il existe
+        if (hlsRef.current) {
+          try {
+            hlsRef.current.destroy();
+          } catch (e) {
+            console.warn('[useHlsPlayer] Erreur lors de la destruction de l\'ancien player:', e);
+          }
+          hlsRef.current = null;
+        }
 
         blobUrlRef.current = hlsUrl;
         currentSrcRef.current = hlsUrl;
@@ -115,14 +161,14 @@ export function useHlsPlayer({
           // Réinitialiser le compteur de retry en cas de succès
           retryCountRef.current = 0;
           setIsLoading(false);
-          onLoadingChange?.(false);
+          onLoadingChangeRef.current?.(false);
           
-          if (startFromBeginning) {
+          if (startFromBeginningRef.current) {
             video.currentTime = 0;
-          } else if (torrentId) {
+          } else if (torrentIdRef.current) {
             // Charger la position sauvegardée
             const deviceId = getOrCreateDeviceId();
-            getPlaybackPosition(torrentId, deviceId).then(async (position) => {
+            getPlaybackPosition(torrentIdRef.current, deviceId).then(async (position) => {
               if (position && position > 0 && filePath) {
                 // Convertir bytes en secondes approximativement
                 const files = await clientApi.getTorrentFiles(infoHash);
@@ -140,7 +186,7 @@ export function useHlsPlayer({
           }
 
           setTimeout(() => {
-            if (video.paused && (canAutoPlay === undefined || canAutoPlay())) {
+            if (video.paused && (canAutoPlayRef.current === undefined || canAutoPlayRef.current())) {
               video.play().catch(() => {});
             }
           }, 100);
@@ -148,6 +194,15 @@ export function useHlsPlayer({
 
         hls.on(window.Hls.Events.ERROR, (event: any, data: any) => {
           if (data.fatal) {
+            console.error('[useHlsPlayer] Erreur HLS fatale:', {
+              type: data.type,
+              details: data.details,
+              fatal: data.fatal,
+              frag: data.frag,
+              response: data.response,
+              hlsUrl,
+            });
+            
             // Pour les erreurs réseau (404, networkError), réessayer automatiquement
             // car le fichier HLS peut ne pas être encore prêt même si le torrent est "completed"
             const isNetworkError = data.type === 'networkError' || 
@@ -157,6 +212,57 @@ export function useHlsPlayer({
                                     data.details.includes('Failed to fetch') ||
                                     data.details.includes('NetworkError')
                                   ));
+            
+            // Gestion spécifique des erreurs mediaError
+            const isMediaError = data.type === 'mediaError';
+            
+            if (isMediaError) {
+              // Erreur mediaError: problème avec le média lui-même
+              // Causes possibles: fichier corrompu, format non supporté, fichier inexistant, conversion HLS échouée
+              let errorMsg = 'Erreur de lecture du média';
+              let suggestions: string[] = [];
+              
+              if (data.details) {
+                console.error('[useHlsPlayer] Détails de l\'erreur mediaError:', data.details);
+                
+                if (data.details.includes('buffer') || data.details.includes('Buffer')) {
+                  errorMsg = 'Erreur de lecture: problème de tampon vidéo';
+                  suggestions.push('Le fichier vidéo peut être corrompu ou incomplet');
+                  suggestions.push('La conversion HLS peut avoir échoué');
+                } else if (data.details.includes('codec') || data.details.includes('decoder')) {
+                  errorMsg = 'Erreur de décodage: codec non supporté ou problème de décodage';
+                  suggestions.push('Le format vidéo peut ne pas être compatible');
+                  suggestions.push('Le fichier peut nécessiter une conversion');
+                } else if (data.details.includes('fragment') || data.details.includes('segment')) {
+                  errorMsg = 'Erreur de segment HLS: segment manquant ou corrompu';
+                  suggestions.push('La conversion HLS peut être incomplète');
+                  suggestions.push('Les segments vidéo peuvent être corrompus');
+                }
+              }
+              
+              // Suggestions générales pour mediaError
+              if (suggestions.length === 0) {
+                suggestions.push('Le fichier vidéo peut être corrompu ou dans un format non supporté');
+                suggestions.push('La conversion HLS peut avoir échoué - vérifiez les logs du serveur');
+                suggestions.push('Le torrent peut être marqué comme complété mais le fichier peut ne pas être encore disponible sur le disque');
+                suggestions.push('Essayez de redémarrer la lecture ou de retélécharger le torrent');
+              }
+              
+              const fullErrorMessage = `${errorMsg}.\n\nCauses possibles:\n${suggestions.map(s => `• ${s}`).join('\n')}`;
+              
+              console.error('[useHlsPlayer] Erreur mediaError détectée:', {
+                errorMsg,
+                suggestions,
+                data: data,
+                filePath,
+                infoHash,
+              });
+              
+              setError(fullErrorMessage);
+              setIsLoading(false);
+              onErrorRef.current?.(new Error(fullErrorMessage));
+              return;
+            }
             
             if (isNetworkError && retryCountRef.current < maxRetries) {
               retryCountRef.current++;
@@ -189,25 +295,55 @@ export function useHlsPlayer({
               }, retryDelay);
             } else {
               // Erreur fatale non-réseau ou trop de tentatives
-              const errorMsg = retryCountRef.current >= maxRetries 
-                ? `Erreur HLS: ${data.type} (trop de tentatives: ${retryCountRef.current})`
-                : `Erreur HLS: ${data.type}`;
+              let errorMsg: string;
+              
+              if (retryCountRef.current >= maxRetries) {
+                errorMsg = `Erreur HLS: ${data.type} (trop de tentatives: ${retryCountRef.current})`;
+                
+                // Ajouter des suggestions selon le type d'erreur
+                if (isNetworkError) {
+                  errorMsg += '\n\nLa playlist HLS n\'est toujours pas disponible après plusieurs tentatives.';
+                  errorMsg += '\n• Le fichier peut ne pas être complètement téléchargé';
+                  errorMsg += '\n• La conversion HLS peut prendre plus de temps';
+                  errorMsg += '\n• Vérifiez les logs du serveur pour plus de détails';
+                }
+              } else {
+                errorMsg = `Erreur HLS: ${data.type}`;
+                if (data.details) {
+                  errorMsg += `\nDétails: ${data.details}`;
+                }
+              }
+              
+              console.error('[useHlsPlayer] Erreur HLS fatale (non-récupérable):', {
+                type: data.type,
+                details: data.details,
+                errorMsg,
+                retryCount: retryCountRef.current,
+              });
+              
               setError(errorMsg);
               setIsLoading(false);
-              onError?.(new Error(errorMsg));
+              onErrorRef.current?.(new Error(errorMsg));
             }
+          } else {
+            // Erreur non-fatale, juste logger
+            console.warn('[useHlsPlayer] Erreur HLS non-fatale:', {
+              type: data.type,
+              details: data.details,
+            });
           }
         });
 
         // Sauvegarder la position périodiquement
         const savePositionInterval = setInterval(async () => {
-          if (torrentId && filePath && video.duration > 0 && video.currentTime > 0) {
+          const currentTorrentId = torrentIdRef.current;
+          if (currentTorrentId && filePath && video.duration > 0 && video.currentTime > 0) {
             const files = await clientApi.getTorrentFiles(infoHash);
             const file = files.find(f => f.path === filePath);
             if (file && file.size > 0) {
               const positionBytes = Math.floor((video.currentTime / video.duration) * file.size);
               const deviceId = getOrCreateDeviceId();
-              savePlaybackPosition(torrentId, deviceId, positionBytes).catch(() => {});
+              savePlaybackPosition(currentTorrentId, deviceId, positionBytes).catch(() => {});
             }
           }
         }, 10000); // Sauvegarder toutes les 10 secondes
@@ -236,7 +372,7 @@ export function useHlsPlayer({
         const errorMsg = e instanceof Error ? e.message : 'Erreur inconnue';
         setError(errorMsg);
         setIsLoading(false);
-        onError?.(e instanceof Error ? e : new Error(errorMsg));
+        onErrorRef.current?.(e instanceof Error ? e : new Error(errorMsg));
         return () => {};
       }
     };
@@ -252,7 +388,9 @@ export function useHlsPlayer({
       // Réinitialiser le compteur de retry
       retryCountRef.current = 0;
     };
-  }, [videoRef, hlsLoaded, infoHash, filePath, fileName, torrentId, startFromBeginning, canAutoPlay, playerConfig, onError, onLoadingChange]);
+    // IMPORTANT: Utiliser des dépendances stabilisées pour éviter les réinitialisations multiples
+    // Seulement infoHash et filePath sont critiques, les autres dépendances sont stables ou gérées via refs
+  }, [hlsLoaded, infoHash, filePath]); // Retirer videoRef, fileName, torrentId, startFromBeginning, canAutoPlay, playerConfig, onError, onLoadingChange car ils ne devraient pas déclencher une réinitialisation
 
   return {
     videoRef,

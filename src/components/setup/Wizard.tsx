@@ -13,6 +13,7 @@ import { DownloadLocationStep } from './steps/DownloadLocationStep';
 import { SyncStep } from './steps/SyncStep';
 import { CompleteStep } from './steps/CompleteStep';
 import { hasBackendUrl } from '../../lib/backend-config.js';
+import { serverApi } from '../../lib/client/server-api';
 
 export default function Wizard() {
   const { loading, setupStatus, checkSetupStatus } = useSetupStatus();
@@ -35,6 +36,34 @@ export default function Wizard() {
     saveDownloadLocation,
     completeSetup,
   } = useWizardActions();
+
+  // Vérifier si l'utilisateur doit être redirigé vers /login
+  // Si l'URL backend est configurée ET qu'il y a des utilisateurs, on redirige vers /login
+  useEffect(() => {
+    const checkAndRedirect = async () => {
+      // Si l'URL backend n'est pas configurée, on reste sur le wizard
+      if (!hasBackendUrl()) {
+        return;
+      }
+
+      // Si le setupStatus n'est pas encore chargé, attendre
+      if (loading || !setupStatus) {
+        return;
+      }
+
+      // Si le backend est accessible ET qu'il y a des utilisateurs, rediriger vers /login
+      if (setupStatus.backendReachable && setupStatus.hasUsers) {
+        // Vérifier aussi si l'utilisateur est déjà authentifié
+        if (serverApi.isAuthenticated()) {
+          window.location.href = '/dashboard';
+        } else {
+          window.location.href = '/login';
+        }
+      }
+    };
+
+    checkAndRedirect();
+  }, [loading, setupStatus]);
 
   // Désactiver le polling automatique - le statut sera rafraîchi manuellement après les actions
   // (suppression du polling pour éviter les rafraîchissements inutiles)
@@ -110,6 +139,19 @@ export default function Wizard() {
             buttonRefs={buttonRefs}
             onNext={async () => {
               await checkSetupStatus();
+              // Vérifier si le backend a déjà des utilisateurs après avoir configuré l'URL
+              const updatedStatus = await serverApi.getSetupStatus();
+              if (updatedStatus.success && updatedStatus.data) {
+                if (updatedStatus.data.backendReachable && updatedStatus.data.hasUsers) {
+                  // Le backend est déjà configuré avec des utilisateurs, rediriger vers /login
+                  if (serverApi.isAuthenticated()) {
+                    window.location.href = '/dashboard';
+                  } else {
+                    window.location.href = '/login';
+                  }
+                  return;
+                }
+              }
               setCurrentStep(2);
             }}
           />
@@ -170,6 +212,19 @@ export default function Wizard() {
             buttonRefs={buttonRefs}
             onNext={async () => {
               await checkSetupStatus();
+              // Vérifier si le backend a déjà des utilisateurs après avoir configuré l'URL
+              const updatedStatus = await serverApi.getSetupStatus();
+              if (updatedStatus.success && updatedStatus.data) {
+                if (updatedStatus.data.backendReachable && updatedStatus.data.hasUsers) {
+                  // Le backend est déjà configuré avec des utilisateurs, rediriger vers /login
+                  if (serverApi.isAuthenticated()) {
+                    window.location.href = '/dashboard';
+                  } else {
+                    window.location.href = '/login';
+                  }
+                  return;
+                }
+              }
               setCurrentStep(2);
             }}
           />

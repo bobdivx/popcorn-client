@@ -107,12 +107,39 @@ jobs:
           path: ${{ steps.find-apk.outputs.path }}
           retention-days: 30
 
-      - name: Create Release (on tag)
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Generate release tag
+        id: release-tag
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG=${GITHUB_REF#refs/tags/}
+          else
+            TAG="nightly-$(date +%Y%m%d)-${GITHUB_SHA::7}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Generated tag: $TAG"
+
+      - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ steps.release-tag.outputs.tag }}
+          name: "Popcorn Android Mobile - ${{ steps.release-tag.outputs.tag }}"
+          body: |
+            ## Popcorn Android Mobile APK
+            
+            **Version:** ${{ steps.release-tag.outputs.tag }}
+            **Commit:** ${{ github.sha }}
+            **Build Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+            
+            ### Installation
+            1. Téléchargez le fichier APK ci-dessous
+            2. Activez l'installation depuis des sources inconnues dans les paramètres Android
+            3. Installez l'APK
+            
+            ### Notes
+            - Cette version est pour Android Mobile (téléphones et tablettes)
+            - Architecture: aarch64
           files: ${{ steps.find-apk.outputs.path }}
-          draft: false
-          prerelease: false
+          draft: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
