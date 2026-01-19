@@ -36,6 +36,7 @@ export default defineConfig({
           // Les plugins Tauri ne sont disponibles que dans l'environnement Tauri
           // Ils doivent être externalisés lors du build statique
           '@tauri-apps/plugin-dialog',
+          '@tauri-apps/plugin-notification',
           '@tauri-apps/api',
         ],
       },
