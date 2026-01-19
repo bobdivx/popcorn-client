@@ -66,6 +66,19 @@ jobs:
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
           echo "$ANDROID_HOME/tools" >> $GITHUB_PATH
 
+      - name: Initialize Android project
+        run: |
+          if [ ! -d "src-tauri/gen/android" ]; then
+            cd src-tauri
+            tauri android init --force || true
+          fi
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+          JAVA_HOME: ${{ env.JAVA_HOME }}
+          CARGO_TERM_COLOR: always
+
       - name: Build Android APK
         run: npm run tauri:build:android-mobile
         env:
