@@ -29,12 +29,22 @@ export const healthMethods = {
       // Détecter le type d'erreur pour fournir un message plus clair
       const isConnectionError = res.error === 'ConnectionError' || res.error === 'Timeout' || res.error === 'NetworkError';
       
+      // Message d'erreur amélioré pour Android
+      let errorMessage = res.message;
+      if (isConnectionError) {
+        // Détecter si on est sur Android
+        const isAndroid = typeof window !== 'undefined' && /Android/i.test(navigator.userAgent || '');
+        if (isAndroid) {
+          errorMessage = 'Le backend n\'est pas accessible.\n\nSur Android:\n• Vérifiez que l\'IP est correcte (pas 10.0.2.2 sur appareil physique)\n• Utilisez l\'IP locale de votre machine (ex: http://192.168.1.100:3000)\n• Assurez-vous que votre mobile et votre PC sont sur le même réseau Wi-Fi\n• Vérifiez que le backend Rust est démarré';
+        } else {
+          errorMessage = 'Le backend n\'est pas accessible. Vérifiez que le serveur est démarré et que l\'URL est correcte.';
+        }
+      }
+      
       return {
         success: false,
         error: res.error,
-        message: isConnectionError 
-          ? 'Le backend n\'est pas accessible. Vérifiez que le serveur est démarré et que l\'URL est correcte.'
-          : res.message,
+        message: errorMessage,
         data: {
           status: 'error',
           reachable: false,

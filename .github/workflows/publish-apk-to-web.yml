@@ -1,0 +1,251 @@
+name: Publish APK to popcorn-web
+
+on:
+  workflow_run:
+    workflows: ["Build Android APK", "Build Android TV APK"]
+    types:
+      - completed
+  workflow_dispatch:  # Permet de déclencher manuellement
+
+jobs:
+  publish-apk:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      contents: write
+      actions: read
+
+    steps:
+      - name: Checkout current repository
+        uses: actions/checkout@v4
+
+      - name: Determine artifact name
+        id: artifact-name
+        run: |
+          WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
+          if [ "$WORKFLOW_NAME" = "Build Android APK" ]; then
+            ARTIFACT_NAME="popcorn-android-mobile"
+          elif [ "$WORKFLOW_NAME" = "Build Android TV APK" ]; then
+            ARTIFACT_NAME="popcorn-android-tv"
+          else
+            ARTIFACT_NAME=""
+          fi
+          echo "name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          echo "Artifact name: $ARTIFACT_NAME"
+
+      - name: Download APK artifact from workflow run
+        uses: dawidd6/action-download-artifact@v3
+        with:
+          name: ${{ steps.artifact-name.outputs.name }}
+          path: ./apk-temp
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          workflow: ${{ github.event.workflow_run.name }}.yml
+          run_id: ${{ github.event.workflow_run.id }}
+          if_no_artifact_found: fail
+
+      - name: List downloaded artifacts
+        run: |
+          echo "📦 Artifacts téléchargés:"
+          if [ -d "./apk-temp" ]; then
+            ls -lh ./apk-temp/ || echo "   (vide)"
+          else
+            echo "   (dossier n'existe pas)"
+          fi
+
+      - name: Verify APKs are signed
+        run: |
+          echo "🔍 Vérification des APK signés..."
+          
+          # Vérifier qu'il y a des APK à vérifier
+          if [ ! -d "./apk-temp" ] || [ -z "$(ls -A ./apk-temp/*.apk 2>/dev/null)" ]; then
+            echo "⚠️  Aucun APK trouvé dans apk-temp"
+            exit 1
+          fi
+          
+          # Installer les outils Android pour vérifier les signatures
+          sudo apt-get update
+          sudo apt-get install -y wget unzip openjdk-17-jdk
+          
+          # Télécharger Android SDK command-line tools (minimal)
+          ANDROID_SDK_ROOT="$HOME/android-sdk"
+          mkdir -p "$ANDROID_SDK_ROOT"
+          
+          # Télécharger build-tools pour apksigner
+          BUILD_TOOLS_VERSION="33.0.0"
+          BUILD_TOOLS_DIR="$ANDROID_SDK_ROOT/build-tools/$BUILD_TOOLS_VERSION"
+          
+          if [ ! -f "$BUILD_TOOLS_DIR/apksigner" ]; then
+            echo "📥 Téléchargement des build-tools..."
+            cd "$ANDROID_SDK_ROOT"
+            wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+            unzip -q commandlinetools-linux-9477386_latest.zip
+            rm commandlinetools-linux-9477386_latest.zip
+            
+            mkdir -p cmdline-tools
+            mv cmdline-tools cmdline-tools/latest || true
+            
+            export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+            export PATH="$JAVA_HOME/bin:$PATH"
+            
+            yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_SDK_ROOT" "build-tools;$BUILD_TOOLS_VERSION" 2>&1 | grep -v "Warning" || true
+          fi
+          
+          APKSIGNER="$BUILD_TOOLS_DIR/apksigner"
+          export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+          export PATH="$JAVA_HOME/bin:$PATH"
+          
+          if [ ! -f "$APKSIGNER" ]; then
+            echo "❌ apksigner introuvable après installation"
+            echo "   Chemin attendu: $APKSIGNER"
+            exit 1
+          fi
+          
+          echo "✅ apksigner trouvé: $APKSIGNER"
+          
+          SIGNED_APKS=()
+          UNSIGNED_APKS=()
+          
+          # Vérifier les APK dans apk-temp
+          for apk in ./apk-temp/*.apk; do
+            if [ -f "$apk" ]; then
+              APK_NAME=$(basename "$apk")
+              echo "🔍 Vérification de: $APK_NAME"
+              
+              # Vérifier la signature
+              if "$APKSIGNER" verify "$apk" > /dev/null 2>&1; then
+                echo "✅ APK signé: $APK_NAME"
+                SIGNED_APKS+=("$apk")
+              else
+                echo "❌ APK non signé ou signature invalide: $APK_NAME"
+                echo "   Cet APK ne sera PAS envoyé"
+                UNSIGNED_APKS+=("$apk")
+                rm "$apk"
+              fi
+            fi
+          done
+          
+          if [ ${#UNSIGNED_APKS[@]} -gt 0 ]; then
+            echo "⚠️  ${#UNSIGNED_APKS[@]} APK non signé(s) ignoré(s)"
+          fi
+          
+          if [ ${#SIGNED_APKS[@]} -eq 0 ]; then
+            echo "❌ ERREUR: Aucun APK signé trouvé!"
+            echo "   Les APK doivent être signés avant d'être envoyés"
+            exit 1
+          else
+            echo "✅ ${#SIGNED_APKS[@]} APK signé(s) trouvé(s) et prêt(s) à être envoyé(s)"
+          fi
+
+      - name: Checkout popcorn-web repository
+        uses: actions/checkout@v4
+        with:
+          repository: bobdivx/popcorn-web
+          token: ${{ secrets.POPCORN_WEB_TOKEN }}
+          path: popcorn-web
+          fetch-depth: 1
+
+      - name: Setup Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create apk directory if needed
+        run: |
+          cd popcorn-web
+          mkdir -p apk
+          echo "📁 Dossier apk créé/vérifié"
+
+      - name: Copy signed APKs to popcorn-web
+        run: |
+          echo "📦 Copie des APK signés vers popcorn-web/apk..."
+          
+          # Compter les APK signés
+          APK_COUNT=0
+          
+          if [ -d "./apk-temp" ]; then
+            for apk in ./apk-temp/*.apk; do
+              if [ -f "$apk" ]; then
+                APK_NAME=$(basename "$apk")
+                echo "📋 Copie de $APK_NAME..."
+                cp "$apk" "./popcorn-web/apk/$APK_NAME"
+                APK_COUNT=$((APK_COUNT + 1))
+                
+                # Afficher les infos
+                echo "   Taille: $(du -h "$apk" | cut -f1)"
+                echo "   Destination: popcorn-web/apk/$APK_NAME"
+              fi
+            done
+          fi
+          
+          if [ $APK_COUNT -eq 0 ]; then
+            echo "⚠️  Aucun APK à copier"
+            echo "   Vérification du contenu de apk-temp..."
+            ls -la ./apk-temp/ || echo "   (dossier vide ou inexistant)"
+            exit 1
+          else
+            echo "✅ $APK_COUNT APK(s) copié(s) avec succès"
+          fi
+          
+          # Lister les fichiers dans popcorn-web/apk
+          echo ""
+          echo "📂 Contenu de popcorn-web/apk:"
+          ls -lh ./popcorn-web/apk/ || echo "   (vide)"
+
+      - name: Commit and push APKs
+        run: |
+          cd popcorn-web
+          
+          # Vérifier s'il y a des changements
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "ℹ️  Aucun changement à commiter"
+            exit 0
+          fi
+          
+          echo "📝 Préparation du commit..."
+          git add apk/
+          
+          # Créer un message de commit descriptif
+          COMMIT_MSG="📦 Mise à jour des APK Android"
+          
+          # Ajouter les noms des APK
+          for apk in apk/*.apk; do
+            if [ -f "$apk" ]; then
+              APK_NAME=$(basename "$apk")
+              COMMIT_MSG="$COMMIT_MSG
+
+- $APK_NAME"
+            fi
+          done
+          
+          COMMIT_MSG="$COMMIT_MSG
+
+Build: ${{ github.event.workflow_run.id }}
+Workflow: ${{ github.event.workflow_run.name }}
+Commit: ${{ github.event.workflow_run.head_sha }}"
+          
+          echo "💾 Commit:"
+          echo "$COMMIT_MSG"
+          
+          git commit -m "$COMMIT_MSG" || echo "Aucun changement à commiter"
+          git push origin main || git push origin master || echo "Push échoué ou déjà à jour"
+
+      - name: Display summary
+        run: |
+          echo "## 📦 Résumé de la publication" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ APK publiés vers: [bobdivx/popcorn-web](https://github.com/bobdivx/popcorn-web/tree/main/apk)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### APK envoyés:" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -d "./apk-temp" ]; then
+            for apk in ./apk-temp/*.apk; do
+              if [ -f "$apk" ]; then
+                APK_NAME=$(basename "$apk")
+                APK_SIZE=$(du -h "$apk" | cut -f1)
+                echo "- **$APK_NAME** ($APK_SIZE)" >> $GITHUB_STEP_SUMMARY
+              fi
+            done
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 [Voir les APK sur popcorn-web](https://github.com/bobdivx/popcorn-web/tree/main/apk)" >> $GITHUB_STEP_SUMMARY

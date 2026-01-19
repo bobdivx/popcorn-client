@@ -201,55 +201,69 @@ jobs:
             echo "✅ APK correctement aligné"
           fi
           
-          # Vérifier la signature
-          echo "🔐 Vérification de la signature..."
-          if ! $APKSIGNER verify "$APK_PATH" > /dev/null 2>&1; then
-            echo "⚠️  APK non signé ou signature invalide, signature en cours..."
-            
-            # Créer le keystore debug s'il n'existe pas
-            KEYSTORE="$HOME/.android/debug.keystore"
-            if [ ! -f "$KEYSTORE" ]; then
-              echo "📝 Création du keystore debug..."
-              mkdir -p "$HOME/.android"
-              KEYTOOL="$JAVA_HOME/bin/keytool"
-              if [ ! -f "$KEYTOOL" ]; then
-                KEYTOOL="keytool"
-              fi
-              $KEYTOOL -genkeypair -noprompt \
-                -keystore "$KEYSTORE" \
-                -storepass "android" \
-                -keypass "android" \
-                -alias "androiddebugkey" \
-                -dname "CN=Android Debug,O=Android,C=US" \
-                -keyalg RSA -keysize 2048 -validity 10000
+          # TOUJOURS signer l'APK pour garantir qu'il est valide
+          # Même si l'APK semble signé, on le re-signe pour éviter les problèmes
+          echo "🔐 Signature de l'APK (toujours re-signer pour garantir la validité)..."
+          
+          # Créer le keystore debug s'il n'existe pas
+          KEYSTORE="$HOME/.android/debug.keystore"
+          if [ ! -f "$KEYSTORE" ]; then
+            echo "📝 Création du keystore debug..."
+            mkdir -p "$HOME/.android"
+            KEYTOOL="$JAVA_HOME/bin/keytool"
+            if [ ! -f "$KEYTOOL" ]; then
+              KEYTOOL="keytool"
             fi
-            
-            # Signer l'APK
-            SIGNED_APK="${APK_PATH}.signed"
-            $APKSIGNER sign \
-              --ks "$KEYSTORE" \
-              --ks-key-alias "androiddebugkey" \
-              --ks-pass "pass:android" \
-              --key-pass "pass:android" \
-              --out "$SIGNED_APK" \
-              "$APK_PATH"
-            
-            # Vérifier la signature
-            if $APKSIGNER verify "$SIGNED_APK" > /dev/null 2>&1; then
-              mv "$SIGNED_APK" "$APK_PATH"
-              echo "✅ APK signé avec succès"
-            else
-              echo "❌ Échec de la signature"
-              exit 1
-            fi
-          else
-            echo "✅ APK correctement signé"
+            $KEYTOOL -genkeypair -noprompt \
+              -keystore "$KEYSTORE" \
+              -storepass "android" \
+              -keypass "android" \
+              -alias "androiddebugkey" \
+              -dname "CN=Android Debug,O=Android,C=US" \
+              -keyalg RSA -keysize 2048 -validity 10000
           fi
           
-          # Vérification finale
+          # Vérifier si l'APK est déjà signé (pour info seulement)
+          if $APKSIGNER verify "$APK_PATH" > /dev/null 2>&1; then
+            echo "ℹ️  APK semble signé, re-signature pour garantir la validité..."
+          else
+            echo "⚠️  APK non signé ou signature invalide, signature en cours..."
+          fi
+          
+          # Signer l'APK (toujours)
+          SIGNED_APK="${APK_PATH}.signed"
+          $APKSIGNER sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias "androiddebugkey" \
+            --ks-pass "pass:android" \
+            --key-pass "pass:android" \
+            --out "$SIGNED_APK" \
+            "$APK_PATH"
+          
+          # Vérifier la signature
+          if $APKSIGNER verify "$SIGNED_APK" > /dev/null 2>&1; then
+            mv "$SIGNED_APK" "$APK_PATH"
+            echo "✅ APK signé avec succès"
+          else
+            echo "❌ Échec de la signature"
+            exit 1
+          fi
+          
+          # Vérification finale obligatoire
           echo "🔍 Vérification finale..."
-          $APKSIGNER verify "$APK_PATH" && echo "✅ APK valide et prêt pour l'installation"
-          $ZIPALIGN -c 4 "$APK_PATH" > /dev/null 2>&1 && echo "✅ APK correctement aligné"
+          if $APKSIGNER verify "$APK_PATH" > /dev/null 2>&1; then
+            echo "✅ APK valide et prêt pour l'installation"
+          else
+            echo "❌ ERREUR CRITIQUE: L'APK final n'est pas signé!"
+            echo "   Chemin: $APK_PATH"
+            exit 1
+          fi
+          
+          if $ZIPALIGN -c 4 "$APK_PATH" > /dev/null 2>&1; then
+            echo "✅ APK correctement aligné"
+          else
+            echo "⚠️  APK non aligné (non bloquant mais recommandé)"
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4

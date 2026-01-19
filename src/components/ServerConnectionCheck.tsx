@@ -14,6 +14,10 @@ const RETRY_INTERVAL = 3000; // Réessayer toutes les 3 secondes
 const DIAG_PATH = '/settings/diagnostics';
 const AUDIT_PATH = '/settings/audit';
 const SERVER_SETTINGS_PATH = '/settings/server';
+const HEALTH_CHECK_CACHE_DURATION = 10000; // Cache de 10 secondes pour éviter les checks répétés
+
+// Cache global pour éviter les checks répétés lors de la navigation
+let lastHealthCheck: { timestamp: number; success: boolean } | null = null;
 
 export default function ServerConnectionCheck() {
   const [status, setStatus] = useState<ConnectionStatus>('checking');
@@ -89,10 +93,55 @@ export default function ServerConnectionCheck() {
 
   // Vérification rapide sans afficher l'animation si le serveur répond rapidement
   const checkConnectionQuick = async () => {
+    // Si l'utilisateur est déjà authentifié, c'est une preuve que le backend est accessible
+    // Ne pas afficher l'animation dans ce cas
+    if (serverApi.isAuthenticated()) {
+      // Vérifier rapidement mais sans bloquer l'interface
+      try {
+        const response = await serverApi.checkServerHealth();
+        if (response.success) {
+          lastHealthCheck = {
+            timestamp: Date.now(),
+            success: true,
+          };
+          setIsVisible(false);
+          setStatus('connected');
+          return;
+        }
+      } catch {
+        // Si le health check échoue mais que l'utilisateur est authentifié,
+        // ne pas bloquer l'interface - le backend est probablement accessible
+        setIsVisible(false);
+        return;
+      }
+    }
+    
+    // Vérifier le cache d'abord
+    const now = Date.now();
+    if (lastHealthCheck && (now - lastHealthCheck.timestamp) < HEALTH_CHECK_CACHE_DURATION) {
+      if (lastHealthCheck.success) {
+        // Si le dernier check était réussi et récent, ne pas refaire le check
+        setIsVisible(false);
+        setStatus('connected');
+        return;
+      }
+      // Si le dernier check a échoué mais est récent, attendre un peu avant de réessayer
+      if ((now - lastHealthCheck.timestamp) < 2000) {
+        setIsVisible(false);
+        return;
+      }
+    }
+    
     checkStartTimeRef.current = Date.now();
     
     try {
       const response = await serverApi.checkServerHealth();
+      
+      // Mettre à jour le cache
+      lastHealthCheck = {
+        timestamp: Date.now(),
+        success: response.success,
+      };
       
       if (response.success) {
         // Si le serveur répond rapidement (moins de 500ms), ne pas afficher l'animation
@@ -108,6 +157,18 @@ export default function ServerConnectionCheck() {
       setIsVisible(true);
       checkConnection();
     } catch (err) {
+      // Mettre à jour le cache avec l'échec
+      lastHealthCheck = {
+        timestamp: Date.now(),
+        success: false,
+      };
+      
+      // Si l'utilisateur est authentifié, ne pas bloquer même en cas d'erreur
+      if (serverApi.isAuthenticated()) {
+        setIsVisible(false);
+        return;
+      }
+      
       // En cas d'erreur, afficher l'animation et réessayer
       setIsVisible(true);
       checkConnection();
@@ -174,6 +235,12 @@ export default function ServerConnectionCheck() {
 
       const response = await serverApi.checkServerHealth();
 
+      // Mettre à jour le cache
+      lastHealthCheck = {
+        timestamp: Date.now(),
+        success: response.success,
+      };
+
       if (response.success) {
         // Nettoyer le timeout si la connexion réussit
         if (retryIntervalRef.current !== null) {
@@ -215,6 +282,12 @@ export default function ServerConnectionCheck() {
         }, RETRY_INTERVAL);
       }
     } catch (err) {
+      // Mettre à jour le cache avec l'échec
+      lastHealthCheck = {
+        timestamp: Date.now(),
+        success: false,
+      };
+      
       // En cas d'erreur réseau, continuer à réessayer automatiquement
       setStatus('connecting');
       setError(err instanceof Error ? err.message : 'Erreur de connexion');

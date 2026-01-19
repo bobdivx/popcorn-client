@@ -136,7 +136,7 @@ export default function Settings() {
           <h2 className="card-title">Informations</h2>
           <div className="space-y-2 text-sm">
             <p>
-              <strong>Version:</strong> 0.1.0
+              <strong>Version:</strong> {((import.meta as any).env?.PUBLIC_APP_VERSION as string) || '1.0.1'}
             </p>
             <p>
               <strong>Type:</strong> Client léger

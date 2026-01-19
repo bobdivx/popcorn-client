@@ -108,14 +108,28 @@ function Update-VersionForAndroidBuild {
         return $null 
     }
     
-    $mCode = [regex]::Match($raw, '"versionCode"\s*:\s*(\d+)')
-    $oldCode = if ($mCode.Success) { [int]$mCode.Groups[1].Value } else { 0 }
-    if ($oldCode -lt 1) { $oldCode = 1 }
-    $newCode = $oldCode + 1
-    
-    $mVer = [regex]::Match($raw, '"version"\s*:\s*"([^"]*)"')
-    $base = if ($mVer.Success -and ($mVer.Groups[1].Value -match '^\d+\.\d+\.\d+')) { ($mVer.Groups[1].Value -split '\+')[0] } else { "0.1.0" }
-    $newVersion = "$base+$newCode"
+    # Charger le module de gestion de version
+    $versionScript = Join-Path $PSScriptRoot "..\..\scripts\version-manager.ps1"
+    if (Test-Path $versionScript) {
+        . $versionScript
+    } else {
+        Write-Warn "Script version-manager.ps1 introuvable, utilisation de l'ancien système"
+    }
+
+    # Obtenir et incrémenter la version depuis VERSION.json
+    $versionInfo = Update-VersionBuild -Component "client" -IncrementBuild
+    if (-not $versionInfo) {
+        Write-Warn "Impossible de lire la version, utilisation de valeurs par défaut"
+        $versionInfo = @{
+            Version = "1.0.1"
+            Build = 1
+            FullVersion = "1.0.1.1"
+        }
+    }
+
+    $newVersion = $versionInfo.Version
+    $newCode = $versionInfo.Build
+    $fullVersion = $versionInfo.FullVersion
     
     $reCode = New-Object System.Text.RegularExpressions.Regex('"versionCode"\s*:\s*\d+')
     $updated = $reCode.Replace($raw, "`"versionCode`": $newCode", 1)
@@ -139,8 +153,8 @@ function Update-VersionForAndroidBuild {
     $env:PUBLIC_APP_VERSION_CODE = "$newCode"
     $env:PUBLIC_APP_VARIANT = $Variant
     
-    Write-Ok "Version Android bump: version=$newVersion versionCode=$newCode"
-    return @{ Version = $newVersion; VersionCode = $newCode }
+    Write-Ok "Version Android: version=$newVersion versionCode=$newCode (build=$fullVersion)"
+    return @{ Version = $newVersion; VersionCode = $newCode; FullVersion = $fullVersion }
 }
 
 function Ensure-AndroidCleartextTrafficEnabled {

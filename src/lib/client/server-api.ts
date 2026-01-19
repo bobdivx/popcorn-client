@@ -149,6 +149,7 @@ class ServerApiClient {
         await logNative(`[popcorn-debug] Attempting native-fetch: url=${url}, method=${method}`);
         // Log aussi dans la console JavaScript pour capture
         console.error('[popcorn-debug] Attempting native-fetch:', { url, method });
+        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:nativeFetch:NATIVE_FETCH_START',message:'Début native-fetch',data:{url,method,timeoutMs,headerCount:headerPairs.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
         // #endregion
 
         const res: any = await invoke('native-fetch', {
@@ -158,6 +159,9 @@ class ServerApiClient {
           body,
           timeoutMs,
         } as any);
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:nativeFetch:NATIVE_FETCH_SUCCESS',message:'native-fetch réussi',data:{url,method,status:res?.status,ok:res?.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+        // #endregion
 
         // #region agent log
         await logNative(`[popcorn-debug] native-fetch success: status=${res?.status}, ok=${res?.ok}`);
@@ -191,6 +195,7 @@ class ServerApiClient {
           full: err,
           url 
         });
+        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:nativeFetch:NATIVE_FETCH_ERROR',message:'Erreur native-fetch',data:{url,method,errorName,errorMsg,errorStr,errorDetails:err},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
         // #endregion
         
         // Détection robuste : vérifier plusieurs patterns d'erreur possibles
@@ -291,12 +296,13 @@ class ServerApiClient {
   /**
    * Retourne un message d'erreur clair pour l'utilisateur
    */
-  private getErrorMessage(error: unknown, response?: Response, endpoint?: string): { code: string; message: string } {
+  private getErrorMessage(error: unknown, response?: Response, endpoint?: string, url?: string): { code: string; message: string } {
     // Erreur de timeout
     if (error instanceof Error && error.name === 'AbortError') {
+      const urlInfo = url ? `\n\nURL utilisée: ${url}` : '';
       return {
         code: 'Timeout',
-        message: 'Le backend ne répond pas. Vérifiez que le serveur est démarré et accessible.',
+        message: `Le backend ne répond pas. Vérifiez que le serveur est démarré et accessible.${urlInfo}`,
       };
     }
     
@@ -304,9 +310,19 @@ class ServerApiClient {
     if (error instanceof Error) {
       const msg = error.message.toLowerCase();
       if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('connection')) {
+        const urlInfo = url ? `\n\nURL utilisée: ${url}` : '';
+        const isAndroid = typeof window !== 'undefined' && /Android/i.test(navigator.userAgent || '');
+        let message = `Impossible de se connecter au backend.${urlInfo}`;
+        
+        if (isAndroid) {
+          message += `\n\nSur Android:\n• Vérifiez que l'IP est correcte (pas 10.0.2.2 sur appareil physique)\n• Utilisez l'IP locale de votre machine (ex: http://192.168.1.100:3000)\n• Assurez-vous que votre mobile et votre PC sont sur le même réseau Wi-Fi\n• Vérifiez que le backend Rust est démarré\n• Testez depuis le navigateur mobile: ${url || 'http://VOTRE_IP:3000'}/api/client/health`;
+        } else {
+          message += `\n\nVérifiez votre connexion réseau et que le serveur est démarré.`;
+        }
+        
         return {
           code: 'ConnectionError',
-          message: 'Impossible de se connecter au backend. Vérifiez votre connexion réseau et que le serveur est démarré.',
+          message,
         };
       }
     }
@@ -350,6 +366,16 @@ class ServerApiClient {
     const base = this.getBackendBaseUrl();
     const url = `${base}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
     const maxRetries = 2; // Maximum 2 retries (3 tentatives au total)
+    
+    // #region agent log
+    if (retryCount === 0) {
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest:ENTRY',message:'Début requête backend',data:{base,endpoint,url,retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+    }
+    // #endregion
+    // Logger l'URL utilisée pour le diagnostic
+    if (retryCount === 0) {
+      console.log('[server-api] Requête vers:', url);
+    }
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -358,7 +384,13 @@ class ServerApiClient {
 
     try {
       const timeoutMs = this.getTimeoutMs(endpoint);
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest:BEFORE_FETCH',message:'Avant nativeFetch',data:{url,timeoutMs,endpoint},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
       const response = await this.nativeFetch(url, { ...options, headers }, timeoutMs);
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest:AFTER_FETCH',message:'Après nativeFetch',data:{url,status:response.status,ok:response.ok,statusText:response.statusText},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -416,16 +448,32 @@ class ServerApiClient {
         data: (data && typeof data === 'object' && 'data' in data ? (data as any).data : data) as T,
       };
     } catch (error) {
+      // #region agent log
+      const errorDetails = error instanceof Error ? {name:error.name,message:error.message,stack:error.stack} : {value:String(error),type:typeof error};
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest:CATCH',message:'Erreur lors requête backend',data:{url,endpoint,error:errorDetails,retryCount,isRetryable:this.isRetryableError(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
       // Vérifier si l'erreur est récupérable et retenter si nécessaire
       if (retryCount < maxRetries && this.isRetryableError(error)) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Exponential backoff, max 3s
         console.warn(`[server-api] Erreur réseau récupérable, retry dans ${delay}ms (tentative ${retryCount + 1}/${maxRetries})`);
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest:RETRY',message:'Retry de la requête',data:{url,endpoint,retryCount,delay,nextRetryCount:retryCount+1},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+        // #endregion
         await new Promise(resolve => setTimeout(resolve, delay));
         return this.backendRequest<T>(endpoint, options, retryCount + 1);
       }
       
       // Obtenir un message d'erreur clair pour l'utilisateur
-      const errorInfo = this.getErrorMessage(error, undefined, endpoint);
+      const errorInfo = this.getErrorMessage(error, undefined, endpoint, url);
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest:ERROR_INFO',message:'Détails erreur finale',data:{url,endpoint,errorCode:errorInfo.code,errorMessage:errorInfo.message,errorDetails},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+      console.error('[server-api] Erreur de connexion:', {
+        url,
+        endpoint,
+        error: error instanceof Error ? error.message : String(error),
+        errorCode: errorInfo.code,
+      });
       return {
         success: false,
         error: errorInfo.code,
@@ -441,8 +489,11 @@ class ServerApiClient {
     // Le setup peut impliquer des écritures DB + détection/validation indexer -> parfois lent
     if (endpoint.startsWith('/api/v1/setup/')) return 60000;
     if (endpoint.startsWith('/api/v1/sync/')) return 60000;
-    // Health checks au démarrage : timeout plus court pour éviter les ANR sur Android
-    if (endpoint.includes('/health') || endpoint.includes('/api/client/health')) return 5000;
+    // Health checks : timeout plus long sur Android pour gérer les réseaux lents
+    if (endpoint.includes('/health') || endpoint.includes('/api/client/health')) {
+      const isAndroid = typeof window !== 'undefined' && /Android/i.test(navigator.userAgent || '');
+      return isAndroid ? 10000 : 5000; // 10 secondes sur Android, 5 secondes ailleurs
+    }
     return 15000;
   }
 

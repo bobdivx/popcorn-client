@@ -41,28 +41,47 @@ async function isAndroidPlatform(): Promise<boolean> {
 /**
  * Détecte si on est sur un émulateur Android
  * L'émulateur utilise toujours 10.0.2.2 pour accéder à localhost de l'hôte
+ * 
+ * Note: 10.0.2.2 ne fonctionne QUE sur l'émulateur, pas sur appareil physique.
+ * Sur appareil physique, l'utilisateur doit utiliser l'IP locale de sa machine.
  */
 function isAndroidEmulator(): boolean {
   if (typeof window === 'undefined') {
     return false;
   }
   
-  // L'émulateur Android a généralement certaines caractéristiques
-  // On peut aussi vérifier via l'IP actuelle, mais c'est plus complexe
-  // Pour l'instant, on assume que si on est sur Android sans config explicite,
-  // c'est probablement un émulateur (10.0.2.2 fonctionne toujours)
-  return true; // Par défaut, utiliser 10.0.2.2 (fonctionne aussi sur appareil physique si configuré)
+  // Détection basique: vérifier si on est sur un émulateur
+  // Les émulateurs ont souvent certains patterns dans le UserAgent
+  const ua = navigator.userAgent || '';
+  
+  // Patterns d'émulateur Android
+  if (/sdk/i.test(ua) || /Emulator/i.test(ua) || /Android SDK/i.test(ua)) {
+    return true;
+  }
+  
+  // Par défaut, on assume que c'est un appareil physique
+  // L'utilisateur devra configurer l'IP manuellement
+  return false;
 }
 
 /**
  * Retourne l'URL backend par défaut selon la plateforme
  */
 async function getDefaultBackendUrlAsync(): Promise<string> {
-  // Sur Android, utiliser 10.0.2.2 pour accéder à localhost de la machine hôte
-  // (fonctionne pour émulateur ET appareil physique si le backend est sur la même machine)
   const isAndroid = await isAndroidPlatform();
   if (isAndroid) {
-    return 'http://10.0.2.2:3000';
+    // Vérifier si c'est un émulateur
+    const isEmulator = isAndroidEmulator();
+    if (isEmulator) {
+      // Sur émulateur, 10.0.2.2 fonctionne pour accéder au localhost de l'hôte
+      return 'http://10.0.2.2:3000';
+    } else {
+      // Sur appareil physique, pas de valeur par défaut valide
+      // L'utilisateur devra configurer l'IP locale de sa machine
+      // On retourne quand même une valeur pour éviter les erreurs, mais elle ne fonctionnera pas
+      // L'utilisateur sera redirigé vers /setup pour configurer
+      return 'http://10.0.2.2:3000'; // Ne fonctionnera pas, mais forcera la configuration
+    }
   }
   return 'http://127.0.0.1:3000';
 }
@@ -72,12 +91,19 @@ async function getDefaultBackendUrlAsync(): Promise<string> {
  * Utilise la détection UserAgent comme fallback
  */
 function getDefaultBackendUrl(): string {
-  // Sur Android (émulateur), utiliser 10.0.2.2 pour accéder à localhost de la machine hôte
   if (typeof window !== 'undefined') {
     const ua = navigator.userAgent || '';
     const isAndroid = /Android/i.test(ua);
     if (isAndroid) {
-      return 'http://10.0.2.2:3000';
+      // Vérifier si c'est un émulateur (détection basique)
+      const isEmulator = /sdk/i.test(ua) || /Emulator/i.test(ua) || /Android SDK/i.test(ua);
+      if (isEmulator) {
+        return 'http://10.0.2.2:3000';
+      } else {
+        // Appareil physique: retourner quand même 10.0.2.2 (ne fonctionnera pas)
+        // mais cela forcera l'utilisateur à configurer via /setup
+        return 'http://10.0.2.2:3000';
+      }
     }
   }
   return 'http://127.0.0.1:3000';
@@ -90,31 +116,57 @@ function getDefaultBackendUrl(): string {
  * Côté serveur (SSR): lit depuis env, puis défaut (localStorage non disponible)
  */
 export function getBackendUrl(): string {
+  // #region agent log
+  if (typeof window !== 'undefined') {
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:getBackendUrl:ENTRY',message:'Récupération URL backend',data:{isServer:typeof window === 'undefined'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+  }
+  // #endregion
   // Côté serveur (Astro SSR), localStorage n'est pas disponible
   if (typeof window === 'undefined') {
     // Utiliser variable d'environnement ou valeur par défaut
-    return import.meta.env.BACKEND_URL || 
+    const result = import.meta.env.BACKEND_URL || 
            import.meta.env.PUBLIC_BACKEND_URL || 
            getDefaultBackendUrl();
+    return result;
   }
 
   // Côté client: priorité localStorage
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:getBackendUrl:LOCALSTORAGE',message:'Lecture localStorage',data:{stored,hasStored:!!stored},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
     if (stored) {
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:getBackendUrl:RETURN_STORED',message:'URL retournée depuis localStorage',data:{stored},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+      // #endregion
       return stored;
     }
   } catch (error) {
     console.warn('[backend-config] Erreur lors de la lecture de localStorage:', error);
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:getBackendUrl:LOCALSTORAGE_ERROR',message:'Erreur lecture localStorage',data:{error:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
   }
 
   // Fallback: variable d'environnement
-  if (import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL) {
-    return import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL || '';
+  const envUrl = import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL || '';
+  // #region agent log
+  fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:getBackendUrl:ENV_CHECK',message:'Vérification variables env',data:{envUrl,hasEnvUrl:!!envUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+  // #endregion
+  if (envUrl) {
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:getBackendUrl:RETURN_ENV',message:'URL retournée depuis env',data:{envUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+    // #endregion
+    return envUrl;
   }
 
   // Valeur par défaut (détecte Android automatiquement)
-  return getDefaultBackendUrl();
+  const defaultUrl = getDefaultBackendUrl();
+  // #region agent log
+  fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:getBackendUrl:RETURN_DEFAULT',message:'URL retournée par défaut',data:{defaultUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
+  // #endregion
+  return defaultUrl;
 }
 
 /**
@@ -149,6 +201,40 @@ export async function getBackendUrlAsync(): Promise<string> {
 }
 
 /**
+ * Normalise une URL en ajoutant le protocole si manquant
+ */
+function normalizeBackendUrl(url: string): string {
+  // #region agent log
+  fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:normalizeBackendUrl:ENTRY',message:'Normalisation URL backend',data:{urlOriginal:url},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  const trimmed = url.trim();
+  if (!trimmed) {
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:normalizeBackendUrl:EMPTY',message:'URL vide après trim',data:{urlOriginal:url,trimmed},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    return trimmed;
+  }
+  
+  // Si l'URL ne commence pas par http:// ou https://, ajouter http://
+  const hasProtocol = trimmed.match(/^https?:\/\//i);
+  // #region agent log
+  fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:normalizeBackendUrl:CHECK_PROTOCOL',message:'Vérification protocole',data:{urlOriginal:url,trimmed,hasProtocol:!!hasProtocol},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  if (!hasProtocol) {
+    const normalized = `http://${trimmed}`;
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:normalizeBackendUrl:ADD_PROTOCOL',message:'Protocole http:// ajouté',data:{urlOriginal:url,trimmed,normalized},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+    return normalized;
+  }
+  
+  // #region agent log
+  fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:normalizeBackendUrl:EXIT',message:'URL normalisée (protocole déjà présent)',data:{urlOriginal:url,trimmed,normalized:trimmed},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  // #endregion
+  return trimmed;
+}
+
+/**
  * Définit l'URL du backend dans localStorage (côté client uniquement)
  */
 export function setBackendUrl(url: string): void {
@@ -158,9 +244,12 @@ export function setBackendUrl(url: string): void {
   }
 
   try {
+    // Normaliser l'URL (ajouter http:// si manquant)
+    const normalizedUrl = normalizeBackendUrl(url);
+    
     // Valider l'URL avant de la stocker
     try {
-      const urlObj = new URL(url);
+      const urlObj = new URL(normalizedUrl);
       if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
         throw new Error('Le protocole doit être http:// ou https://');
       }
@@ -171,7 +260,8 @@ export function setBackendUrl(url: string): void {
       throw e;
     }
 
-    localStorage.setItem(STORAGE_KEY, url.trim());
+    localStorage.setItem(STORAGE_KEY, normalizedUrl);
+    console.log('[backend-config] URL backend sauvegardée:', normalizedUrl);
   } catch (error) {
     console.error('[backend-config] Erreur lors de la sauvegarde dans localStorage:', error);
     throw error;
@@ -216,5 +306,21 @@ export function hasBackendUrl(): boolean {
     // Si localStorage n'est pas accessible, considérer comme non configuré
     console.warn('[backend-config] hasBackendUrl: localStorage access failed:', error);
     return false;
+  }
+}
+
+/**
+ * Retourne l'URL configurée dans localStorage (pour diagnostic)
+ */
+export function getConfiguredBackendUrl(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    return localStorage.getItem(STORAGE_KEY);
+  } catch (error) {
+    console.warn('[backend-config] getConfiguredBackendUrl: localStorage access failed:', error);
+    return null;
   }
 }

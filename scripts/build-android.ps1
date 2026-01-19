@@ -288,6 +288,29 @@ function Update-VersionForAndroidBuild {
         [Parameter(Mandatory=$true)][string]$Variant
     )
 
+    # Charger le module de gestion de version
+    $versionScript = Join-Path $PSScriptRoot "version-manager.ps1"
+    if (Test-Path $versionScript) {
+        . $versionScript
+    } else {
+        Write-Host "  [WARN] Script version-manager.ps1 introuvable, utilisation de l'ancien système" -ForegroundColor Yellow
+    }
+
+    # Obtenir et incrémenter la version depuis VERSION.json
+    $versionInfo = Update-VersionBuild -Component "client" -IncrementBuild
+    if (-not $versionInfo) {
+        Write-Host "  [WARN] Impossible de lire la version, utilisation de valeurs par défaut" -ForegroundColor Yellow
+        $versionInfo = @{
+            Version = "1.0.1"
+            Build = 1
+            FullVersion = "1.0.1.1"
+        }
+    }
+
+    $newVersion = $versionInfo.Version
+    $newCode = $versionInfo.Build
+    $fullVersion = $versionInfo.FullVersion
+
     $configPath = Get-TauriConfigPath -Variant $Variant
     if (-not (Test-Path $configPath)) { return $null }
 
@@ -301,26 +324,6 @@ function Update-VersionForAndroidBuild {
         return $null
     }
     if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
-
-    # Lire versionCode actuel
-    $mCode = [regex]::Match($raw, '"versionCode"\s*:\s*(\d+)', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
-    $oldCode = 0
-    if ($mCode.Success) {
-        try { $oldCode = [int]$mCode.Groups[1].Value } catch { $oldCode = 0 }
-    }
-    if ($oldCode -lt 1) { $oldCode = 1 }
-    $newCode = $oldCode + 1
-
-    # Lire version actuelle et en extraire la base (X.Y.Z)
-    $mVer = [regex]::Match($raw, '"version"\s*:\s*"([^"]*)"', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
-    $base = "0.1.0"
-    if ($mVer.Success) {
-        $current = $mVer.Groups[1].Value
-        if ($current -match '^\d+\.\d+\.\d+') {
-            $base = ($current -split '\+')[0]
-        }
-    }
-    $newVersion = "$base+$newCode"
 
     # Remplacements (1 occurrence) - éviter ConvertTo-Json et préserver le reste du fichier
     $reCode = New-Object System.Text.RegularExpressions.Regex('"versionCode"\s*:\s*\d+', [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
@@ -347,10 +350,11 @@ function Update-VersionForAndroidBuild {
     Write-Host "    PUBLIC_APP_VERSION_CODE=$($env:PUBLIC_APP_VERSION_CODE)" -ForegroundColor Gray
     Write-Host "    PUBLIC_APP_VARIANT=$($env:PUBLIC_APP_VARIANT)" -ForegroundColor Gray
 
-    Write-Host "  [OK] Version Android bump: version=$newVersion versionCode=$newCode" -ForegroundColor Green
+    Write-Host "  [OK] Version Android: version=$newVersion versionCode=$newCode (build=$fullVersion)" -ForegroundColor Green
     return @{
         Version = $newVersion
         VersionCode = $newCode
+        FullVersion = $fullVersion
         ConfigPath = $configPath
     }
 }
@@ -823,6 +827,14 @@ try {
                 }
             }
             if (-not $candidates -or $candidates.Count -eq 0) { return $null }
+            
+            # Privilégier les APK signés (sans "unsigned" dans le nom), mais accepter les unsigned si nécessaire
+            $signedApks = $candidates | Where-Object { $_.Name -notlike "*unsigned*" }
+            if ($signedApks -and $signedApks.Count -gt 0) {
+                return ($signedApks | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
+            }
+            
+            # Si aucun APK signé, prendre le plus récent (même unsigned, on le signera après)
             return ($candidates | Sort-Object LastWriteTime -Descending | Select-Object -First 1)
         }
 
@@ -913,14 +925,16 @@ try {
             & cmd /c $verifyCmd | Out-Null
             $isSigned = $LASTEXITCODE -eq 0
 
-            # Si l'APK est déjà signé ET aligné, on le retourne tel quel
-            if ($isSigned -and -not $needsAlign) {
-                Write-Host "  [OK] APK déjà signé et aligné" -ForegroundColor Green
-                return $ApkPath
+            # Vérifier aussi par le nom du fichier (plus fiable pour les APK unsigned)
+            $isUnsignedByName = $ApkPath -like "*unsigned*"
+            
+            # TOUJOURS re-signer l'APK pour garantir qu'il est valide et correctement signé
+            # Même si l'APK semble signé, on le re-signe pour éviter les problèmes
+            if ($isUnsignedByName -or -not $isSigned) {
+                Write-Host "  [INFO] APK non signé détecté, signature en cours..." -ForegroundColor Cyan
+            } else {
+                Write-Host "  [INFO] Re-signature de l'APK pour garantir la validité..." -ForegroundColor Cyan
             }
-
-            # On doit re-signer (et potentiellement ré-aligner)
-            Write-Host "  [INFO] Signature/alignement de l'APK..." -ForegroundColor Cyan
 
             $ks = Ensure-DebugKeystore -JavaHome $JavaHome
             $aligned = [System.IO.Path]::ChangeExtension($ApkPath, ".aligned.apk")
@@ -972,9 +986,37 @@ try {
             }
         }
 
-        $apk = Get-Item (Sign-ApkIfNeeded -ApkPath $apk.FullName -AndroidHome $env:ANDROID_HOME -JavaHome $env:JAVA_HOME)
+        Write-Host "[APK] APK trouve (avant signature):" -ForegroundColor Cyan
+        Write-Host "   $($apk.FullName)" -ForegroundColor White
+        Write-Host "   Taille: $([math]::Round($apk.Length / 1MB, 2)) MB" -ForegroundColor Gray
+        if ($apk.Name -like "*unsigned*") {
+            Write-Host "   [!] APK non signe detecte, signature en cours..." -ForegroundColor Yellow
+        }
+        Write-Host ""
 
-        Write-Host "[APK] APK genere:" -ForegroundColor Cyan
+        # Signer l'APK (TOUJOURS, pour garantir qu'il est valide et correctement signé)
+        Write-Host "[APK] Signature de l'APK (toujours re-signer pour garantir la validité)..." -ForegroundColor Cyan
+        $signedApkPath = Sign-ApkIfNeeded -ApkPath $apk.FullName -AndroidHome $env:ANDROID_HOME -JavaHome $env:JAVA_HOME
+        $apk = Get-Item $signedApkPath
+
+        # Vérification finale obligatoire : l'APK DOIT être signé
+        $bt = Get-LatestBuildToolsDir -AndroidHome $env:ANDROID_HOME
+        if ($bt) {
+            $apksigner = Join-Path $bt.FullName "apksigner.bat"
+            if (Test-Path $apksigner) {
+                $finalVerifyCmd = "`"$apksigner`" verify `"$($apk.FullName)`" >nul 2>nul"
+                & cmd /c $finalVerifyCmd | Out-Null
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Host "[ERREUR CRITIQUE] L'APK final n'est pas signé!" -ForegroundColor Red
+                    Write-Host "   Chemin: $($apk.FullName)" -ForegroundColor Yellow
+                    Write-Host "   Le build ne peut pas continuer sans un APK signé." -ForegroundColor Red
+                    exit 1
+                }
+                Write-Host "[OK] APK final verifie: signature valide" -ForegroundColor Green
+            }
+        }
+
+        Write-Host "[APK] APK final (apres signature):" -ForegroundColor Cyan
         Write-Host "   $($apk.FullName)" -ForegroundColor White
         Write-Host "   Taille: $([math]::Round($apk.Length / 1MB, 2)) MB" -ForegroundColor Gray
         Write-Host ""
@@ -1009,10 +1051,47 @@ try {
             New-Item -ItemType Directory -Force -Path $appDir | Out-Null
 
             $destFile = Join-Path $appDir "$safeName-v$safeVersion-android-$variantTag.apk"
+            
+            # Vérifier que l'APK est bien signé avant de le copier
+            $bt = Get-LatestBuildToolsDir -AndroidHome $env:ANDROID_HOME
+            if ($bt) {
+                $apksigner = Join-Path $bt.FullName "apksigner.bat"
+                if (Test-Path $apksigner) {
+                    $verifyFinalCmd = "`"$apksigner`" verify `"$($apk.FullName)`" >nul 2>nul"
+                    & cmd /c $verifyFinalCmd | Out-Null
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Host "[ERREUR] L'APK n'est pas signé correctement avant la copie!" -ForegroundColor Red
+                        Write-Host "   Chemin: $($apk.FullName)" -ForegroundColor Yellow
+                        Write-Host "   Veuillez re-signer l'APK avec: .\scripts\fix-apk-signature.ps1 -ApkPath `"$($apk.FullName)`"" -ForegroundColor Yellow
+                        exit 1
+                    }
+                }
+            }
+            
             Copy-Item -Path $apk.FullName -Destination $destFile -Force
 
             Write-Host "[OK] APK copie dans:" -ForegroundColor Green
             Write-Host "   $destFile" -ForegroundColor White
+            Write-Host ""
+            
+            # Vérification finale après copie
+            if ($bt) {
+                $apksigner = Join-Path $bt.FullName "apksigner.bat"
+                if (Test-Path $apksigner) {
+                    $verifyCopiedCmd = "`"$apksigner`" verify `"$destFile`" >nul 2>nul"
+                    & cmd /c $verifyCopiedCmd | Out-Null
+                    if ($LASTEXITCODE -eq 0) {
+                        Write-Host "[OK] APK copie est correctement signe et pret pour l'installation" -ForegroundColor Green
+                    } else {
+                        Write-Host "[WARN] L'APK copie ne semble pas signe, re-signature..." -ForegroundColor Yellow
+                        $reSigned = Sign-ApkIfNeeded -ApkPath $destFile -AndroidHome $env:ANDROID_HOME -JavaHome $env:JAVA_HOME
+                        if ($reSigned -ne $destFile) {
+                            Copy-Item -Path $reSigned -Destination $destFile -Force
+                            Write-Host "[OK] APK re-signe avec succes" -ForegroundColor Green
+                        }
+                    }
+                }
+            }
             Write-Host ""
 
             # Installation automatique sur l'émulateur Android si disponible
