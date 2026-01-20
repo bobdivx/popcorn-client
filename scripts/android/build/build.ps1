@@ -951,9 +951,118 @@ try {
             }
         }
         
+        # Fonction pour générer les symboles de débogage natifs
+        function Generate-NativeDebugSymbols {
+            param(
+                [Parameter(Mandatory=$true)][string]$Variant,
+                [Parameter(Mandatory=$true)][string]$ProjectRoot
+            )
+            
+            Write-Section "Génération des symboles de débogage natifs"
+            
+            # Créer la structure de répertoires pour les symboles natifs
+            $symbolsDir = Join-Path $ProjectRoot "native-debug-symbols"
+            $libDir = Join-Path $symbolsDir "lib\arm64-v8a"
+            New-Item -ItemType Directory -Force -Path $libDir | Out-Null
+            
+            # Chercher les fichiers .so compilés (bibliothèques Rust natives)
+            $soFiles = @()
+            
+            # Chercher dans target/release (emplacement principal)
+            $targetSoPath = Join-Path $ProjectRoot "src-tauri\target\aarch64-linux-android\release"
+            if (Test-Path $targetSoPath) {
+                $soFiles += Get-ChildItem -Path $targetSoPath -Filter "*.so" -File -Recurse -ErrorAction SilentlyContinue
+            }
+            
+            # Si aucun fichier trouvé, chercher dans gen/android
+            if ($soFiles.Count -eq 0) {
+                Write-Info "Aucun fichier .so trouvé dans target, recherche dans gen/android..."
+                $genSoPath = Join-Path $ProjectRoot "src-tauri\gen\android"
+                if (Test-Path $genSoPath) {
+                    $soFiles += Get-ChildItem -Path $genSoPath -Filter "*.so" -File -Recurse -ErrorAction SilentlyContinue
+                }
+            }
+            
+            if ($soFiles.Count -eq 0) {
+                Write-Warn "Aucun fichier .so trouvé pour générer les symboles"
+                Write-Info "Recherche dans les répertoires..."
+                if (Test-Path $targetSoPath) {
+                    Get-ChildItem -Path $targetSoPath -Filter "*.so" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+                        Write-Info "  Trouvé: $($_.FullName)"
+                    }
+                }
+                return $null
+            }
+            
+            # Copier les fichiers .so dans la structure attendue par Google Play
+            $copiedCount = 0
+            foreach ($soFile in $soFiles) {
+                $destPath = Join-Path $libDir $soFile.Name
+                Copy-Item -Path $soFile.FullName -Destination $destPath -Force
+                Write-Info "✅ Copié: $($soFile.Name) depuis $($soFile.DirectoryName)"
+                $copiedCount++
+            }
+            
+            Write-Info "📦 $copiedCount fichier(s) .so copié(s)"
+            
+            # Vérifier que des fichiers ont bien été copiés
+            $copiedFiles = Get-ChildItem -Path $libDir -File -ErrorAction SilentlyContinue
+            if ($copiedFiles.Count -eq 0) {
+                Write-Err "Aucun fichier .so copié dans $libDir"
+                return $null
+            }
+            
+            # Créer le fichier ZIP avec les symboles
+            $configPath = Get-TauriConfigPath -Variant $Variant
+            $productName = "popcorn"
+            $version = "0.0.0"
+            
+            if (Test-Path $configPath) {
+                try {
+                    $cfg = Get-Content $configPath -Raw | ConvertFrom-Json
+                    $productName = $cfg.productName
+                    $version = $cfg.version
+                } catch {
+                    Write-Warn "Impossible de lire la version depuis $configPath"
+                }
+            }
+            
+            $safeName = Sanitize-FileName -Name $productName
+            $symbolsZip = Join-Path $symbolsDir "$safeName-v$version-native-debug-symbols.zip"
+            
+            # Créer le ZIP
+            Push-Location $symbolsDir
+            try {
+                if (Test-Path $symbolsZip) {
+                    Remove-Item $symbolsZip -Force
+                }
+                Compress-Archive -Path "lib" -DestinationPath $symbolsZip -Force
+                Write-Ok "Symboles natifs générés: $symbolsZip"
+                Write-Info "Taille: $([math]::Round((Get-Item $symbolsZip).Length / 1MB, 2)) MB"
+                
+                # Afficher le contenu du ZIP
+                Write-Info "Contenu du ZIP:"
+                Add-Type -AssemblyName System.IO.Compression.FileSystem
+                $zip = [System.IO.Compression.ZipFile]::OpenRead($symbolsZip)
+                $entries = $zip.Entries | Select-Object -First 10
+                foreach ($entry in $entries) {
+                    Write-Info "  - $($entry.FullName)"
+                }
+                $zip.Dispose()
+                
+                return $symbolsZip
+            } catch {
+                Write-Err "Erreur lors de la création du ZIP: $_"
+                return $null
+            } finally {
+                Pop-Location
+            }
+        }
+        
         # Vérifier et signer l'APK/AAB si nécessaire
         $androidHome = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($script:AndroidHome) { $script:AndroidHome } else { $null }
         $javaHome = if ($env:JAVA_HOME) { $env:JAVA_HOME } elseif ($script:JavaHome) { $script:JavaHome } else { $null }
+        $symbolsZip = $null
         
         if ($buildAab) {
             Write-Section "Vérification de la signature de l'AAB"
@@ -975,6 +1084,15 @@ try {
                     exit 1
                 }
                 Write-Ok "AAB final vérifié: signature valide"
+            }
+            
+            # Générer les symboles de débogage natifs pour les AAB
+            $symbolsZip = Generate-NativeDebugSymbols -Variant $buildType -ProjectRoot $script:ProjectRoot
+            if ($symbolsZip) {
+                Write-Info "📝 Instructions pour upload sur Play Store:"
+                Write-Info "   1. Téléversez l'AAB: $($artifact.FullName)"
+                Write-Info "   2. Allez dans l'onglet 'Symboles de débogage natifs'"
+                Write-Info "   3. Téléversez le ZIP de symboles: $symbolsZip"
             }
         } else {
             Write-Section "Vérification de la signature de l'APK"
@@ -1012,6 +1130,14 @@ try {
             Copy-Item -Path $artifact.FullName -Destination $destFile -Force
             Write-Ok "$outputType copié dans: $destFile"
             Write-Info "Taille: $([math]::Round((Get-Item $destFile).Length / 1MB, 2)) MB"
+            
+            # Copier aussi les symboles natifs si disponibles (pour les AAB)
+            if ($buildAab -and $symbolsZip -and (Test-Path $symbolsZip)) {
+                $symbolsDestFile = Join-Path $appDir "$safeName-v$safeVersion-native-debug-symbols.zip"
+                Copy-Item -Path $symbolsZip -Destination $symbolsDestFile -Force
+                Write-Ok "Symboles natifs copiés dans: $symbolsDestFile"
+                Write-Info "Taille: $([math]::Round((Get-Item $symbolsDestFile).Length / 1MB, 2)) MB"
+            }
         }
         
         Write-Ok "Build terminé avec succès"

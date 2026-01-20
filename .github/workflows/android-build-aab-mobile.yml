@@ -230,6 +230,72 @@ jobs:
           ls -lh "$AAB_PATH"
           echo "Taille: $(du -h "$AAB_PATH" | cut -f1)"
 
+      - name: Generate native debug symbols
+        id: generate-symbols
+        run: |
+          echo "🔍 Génération des symboles de débogage natifs..."
+          
+          # Créer la structure de répertoires pour les symboles natifs
+          SYMBOLS_DIR="./native-debug-symbols"
+          mkdir -p "$SYMBOLS_DIR/lib/arm64-v8a"
+          
+          # Chercher et copier les fichiers .so compilés (bibliothèques Rust natives)
+          SO_COUNT=0
+          
+          # Chercher dans target/release (emplacement principal)
+          while IFS= read -r -d '' so_file; do
+            if [ -f "$so_file" ]; then
+              cp "$so_file" "$SYMBOLS_DIR/lib/arm64-v8a/"
+              echo "✅ Copié: $(basename "$so_file") depuis $(dirname "$so_file")"
+              SO_COUNT=$((SO_COUNT + 1))
+            fi
+          done < <(find src-tauri/target/aarch64-linux-android/release -name "*.so" -type f -print0 2>/dev/null)
+          
+          # Si aucun fichier trouvé, chercher dans gen/android
+          if [ $SO_COUNT -eq 0 ]; then
+            echo "⚠️  Aucun fichier .so trouvé dans target, recherche dans gen/android..."
+            while IFS= read -r -d '' so_file; do
+              if [ -f "$so_file" ]; then
+                cp "$so_file" "$SYMBOLS_DIR/lib/arm64-v8a/"
+                echo "✅ Copié: $(basename "$so_file") depuis $(dirname "$so_file")"
+                SO_COUNT=$((SO_COUNT + 1))
+              fi
+            done < <(find src-tauri/gen/android -name "*.so" -type f -print0 2>/dev/null)
+          fi
+          
+          if [ $SO_COUNT -eq 0 ]; then
+            echo "❌ Aucun fichier .so trouvé pour générer les symboles"
+            echo "Recherche dans les répertoires..."
+            find src-tauri/target/aarch64-linux-android/release -name "*.so" 2>/dev/null || echo "  (aucun .so dans target)"
+            find src-tauri/gen/android -name "*.so" 2>/dev/null || echo "  (aucun .so dans gen)"
+            exit 1
+          fi
+          
+          echo "📦 $SO_COUNT fichier(s) .so copié(s)"
+          
+          # Vérifier que des fichiers ont bien été copiés
+          if [ ! "$(ls -A $SYMBOLS_DIR/lib/arm64-v8a/)" ]; then
+            echo "❌ ERREUR: Aucun fichier .so copié dans $SYMBOLS_DIR/lib/arm64-v8a/"
+            exit 1
+          fi
+          
+          # Créer le fichier ZIP avec les symboles
+          VERSION=$(jq -r '.version' src-tauri/tauri.android.mobile.conf.json)
+          PRODUCT_NAME=$(jq -r '.productName' src-tauri/tauri.android.mobile.conf.json)
+          SAFE_NAME=$(echo "$PRODUCT_NAME" | sed 's/ /_/g')
+          SYMBOLS_ZIP="${SYMBOLS_DIR}/${SAFE_NAME}-v${VERSION}-native-debug-symbols.zip"
+          
+          cd "$SYMBOLS_DIR"
+          zip -r "../$SYMBOLS_ZIP" lib/ > /dev/null
+          cd ..
+          
+          echo "path=$SYMBOLS_ZIP" >> $GITHUB_OUTPUT
+          echo "✅ Symboles natifs générés: $SYMBOLS_ZIP"
+          ls -lh "$SYMBOLS_ZIP"
+          echo "Taille: $(du -h "$SYMBOLS_ZIP" | cut -f1)"
+          echo "Contenu du ZIP:"
+          unzip -l "$SYMBOLS_ZIP" | head -n 10
+
       - name: Verify AAB signature
         run: |
           AAB_PATH="${{ steps.find-aab.outputs.path }}"
@@ -327,6 +393,14 @@ jobs:
           retention-days: 90
           if-no-files-found: error
 
+      - name: Upload native debug symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: popcorn-android-mobile-native-symbols
+          path: ${{ steps.generate-symbols.outputs.path }}
+          retention-days: 90
+          if-no-files-found: error
+
       - name: Display AAB info
         run: |
           AAB_PATH="${{ steps.rename-aab.outputs.path }}"
@@ -341,8 +415,10 @@ jobs:
           echo ""
           echo "📝 Instructions pour upload sur Play Store:"
           echo "   1. Téléchargez l'AAB depuis les Artifacts"
-          echo "   2. Connectez-vous à Google Play Console"
-          echo "   3. Allez dans Production > Créer une version"
-          echo "   4. Téléversez l'AAB"
-          echo "   5. Remplissez les notes de version"
-          echo "   6. Soumettez pour révision"
+          echo "   2. Téléchargez les symboles natifs depuis les Artifacts (popcorn-android-mobile-native-symbols)"
+          echo "   3. Connectez-vous à Google Play Console"
+          echo "   4. Allez dans Production > Créer une version"
+          echo "   5. Téléversez l'AAB"
+          echo "   6. Allez dans l'onglet 'Symboles de débogage natifs' et téléversez le ZIP de symboles"
+          echo "   7. Remplissez les notes de version"
+          echo "   8. Soumettez pour révision"
