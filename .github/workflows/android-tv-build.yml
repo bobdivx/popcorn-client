@@ -103,6 +103,107 @@ jobs:
           JAVA_HOME: ${{ env.JAVA_HOME }}
           CARGO_TERM_COLOR: always
 
+      - name: Setup signing keystore (native)
+        run: |
+          echo "🔐 Configuration de la signature native (release)..."
+          ANDROID_DIR="src-tauri/gen/android"
+          mkdir -p "$ANDROID_DIR"
+          
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ] || [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ]; then
+            echo "❌ Secrets de signature manquants."
+            echo "   Configure au minimum:"
+            echo "   - ANDROID_KEYSTORE_BASE64"
+            echo "   - ANDROID_KEYSTORE_PASSWORD"
+            echo "   - (optionnel) ANDROID_KEY_PASSWORD"
+            exit 1
+          fi
+          
+          echo "📥 Décodage du keystore depuis GitHub Secrets..."
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$ANDROID_DIR/keystore.jks"
+          
+          KEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+          KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
+          if [ -z "$KEY_PASSWORD" ]; then
+            KEY_PASSWORD="$KEYSTORE_PASSWORD"
+          fi
+          
+          cat > "$ANDROID_DIR/keystore.properties" << EOF
+          storeFile=keystore.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=popcorn-key
+          keyPassword=$KEY_PASSWORD
+          EOF
+          
+          echo "✅ Keystore + keystore.properties prêts"
+
+      - name: Apply signing configuration to build.gradle.kts
+        run: |
+          echo "🔧 Application de la configuration de signature dans Gradle..."
+          BUILD_GRADLE="src-tauri/gen/android/app/build.gradle.kts"
+          
+          if [ ! -f "$BUILD_GRADLE" ]; then
+            echo "⚠️  build.gradle.kts non trouvé, attente..."
+            for i in {1..30}; do
+              if [ -f "$BUILD_GRADLE" ]; then
+                break
+              fi
+              sleep 1
+            done
+          fi
+          
+          if [ ! -f "$BUILD_GRADLE" ]; then
+            echo "❌ build.gradle.kts introuvable"
+            exit 1
+          fi
+          
+          if grep -q "signingConfigs" "$BUILD_GRADLE"; then
+            echo "✅ signingConfigs déjà présent"
+            exit 0
+          fi
+          
+          cat > /tmp/apply_signing_tv.py << 'PYTHON_SCRIPT_END'
+          import re
+          import sys
+          
+          file_path = sys.argv[1]
+          
+          with open(file_path, 'r', encoding='utf-8') as f:
+              content = f.read()
+          
+          signing_config = '''
+              // Configuration de la signature
+              signingConfigs {
+                  create("release") {
+                      val keystorePropertiesFile = rootProject.file("keystore.properties")
+                      if (keystorePropertiesFile.exists()) {
+                          val keystoreProperties = Properties()
+                          keystoreProperties.load(keystorePropertiesFile.inputStream())
+                          val keystoreFileName = keystoreProperties["storeFile"] as String
+                          storeFile = rootProject.file(keystoreFileName)
+                          storePassword = keystoreProperties["storePassword"] as String
+                          keyAlias = keystoreProperties["keyAlias"] as String
+                          keyPassword = keystoreProperties["keyPassword"] as String
+                      }
+                  }
+              }
+              '''
+          
+          pattern = r'(compileOptions \{[^}]*\})\s*(buildTypes)'
+          replacement = r'\1' + signing_config + r'\n    \2'
+          new_content = re.sub(pattern, replacement, content)
+          
+          release_pattern = r'(getByName\("release"\) \{[^}]*)(isMinifyEnabled = true)'
+          release_replacement = r'\1\n            signingConfig = signingConfigs.getByName("release")\n            \2'
+          new_content = re.sub(release_pattern, release_replacement, new_content)
+          
+          with open(file_path, 'w', encoding='utf-8') as f:
+              f.write(new_content)
+          
+          print("✅ Configuration de signature appliquée")
+          PYTHON_SCRIPT_END
+          
+          python3 /tmp/apply_signing_tv.py "$BUILD_GRADLE"
+
       - name: Build Android TV APK
         run: npm run tauri:build:android-tv
         env:
@@ -121,7 +222,13 @@ jobs:
           
           # 1. Chercher dans gen/android/app/build/outputs/apk (emplacement Gradle standard)
           APK_PATH=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" -type f 2>/dev/null | grep -v "unsigned" | head -n 1)
-          if [ -n "$APK_PATH" ]; then
+          if [ -z "$APK_PATH" ]; then
+            # Accepter l'unsigned pour diagnostiquer (mais on refusera plus bas si non signé nativement)
+            APK_PATH=$(find src-tauri/gen/android/app/build/outputs/apk -name "*unsigned*.apk" -type f 2>/dev/null | head -n 1)
+            if [ -n "$APK_PATH" ]; then
+              echo "⚠️  APK unsigned trouvé dans gen/android/app/build/outputs/apk"
+            fi
+          else
             echo "✅ APK trouvé dans gen/android/app/build/outputs/apk"
           fi
           
@@ -136,7 +243,12 @@ jobs:
           # 3. Chercher dans release
           if [ -z "$APK_PATH" ]; then
             APK_PATH=$(find src-tauri/target/aarch64-linux-android/release -name "*.apk" -type f 2>/dev/null | grep -v "unsigned" | head -n 1)
-            if [ -n "$APK_PATH" ]; then
+            if [ -z "$APK_PATH" ]; then
+              APK_PATH=$(find src-tauri/target/aarch64-linux-android/release -name "*unsigned*.apk" -type f 2>/dev/null | head -n 1)
+              if [ -n "$APK_PATH" ]; then
+                echo "⚠️  APK unsigned trouvé dans release (sera signé)"
+              fi
+            else
               echo "✅ APK trouvé dans release"
             fi
           fi
@@ -144,7 +256,12 @@ jobs:
           # 4. Chercher dans debug
           if [ -z "$APK_PATH" ]; then
             APK_PATH=$(find src-tauri/target/aarch64-linux-android/debug -name "*.apk" -type f 2>/dev/null | grep -v "unsigned" | head -n 1)
-            if [ -n "$APK_PATH" ]; then
+            if [ -z "$APK_PATH" ]; then
+              APK_PATH=$(find src-tauri/target/aarch64-linux-android/debug -name "*unsigned*.apk" -type f 2>/dev/null | head -n 1)
+              if [ -n "$APK_PATH" ]; then
+                echo "⚠️  APK unsigned trouvé dans debug (sera signé)"
+              fi
+            else
               echo "✅ APK trouvé dans debug"
             fi
           fi
@@ -152,7 +269,12 @@ jobs:
           # 5. Dernier fallback: chercher partout (sauf node_modules et .git)
           if [ -z "$APK_PATH" ]; then
             APK_PATH=$(find . -name "*.apk" -type f -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | grep -v "unsigned" | head -n 1)
-            if [ -n "$APK_PATH" ]; then
+            if [ -z "$APK_PATH" ]; then
+              APK_PATH=$(find . -name "*unsigned*.apk" -type f -not -path "*/node_modules/*" -not -path "*/.git/*" 2>/dev/null | head -n 1)
+              if [ -n "$APK_PATH" ]; then
+                echo "⚠️  APK unsigned trouvé ailleurs (sera signé)"
+              fi
+            else
               echo "✅ APK trouvé ailleurs"
             fi
           fi
@@ -174,95 +296,40 @@ jobs:
           ls -lh "$APK_PATH"
           echo "Taille: $(du -h "$APK_PATH" | cut -f1)"
 
-      - name: Verify and sign APK
+      - name: Verify native signed APK
         run: |
           APK_PATH="${{ steps.find-apk.outputs.path }}"
-          echo "🔍 Vérification de l'APK: $APK_PATH"
+          echo "🔍 Vérification de l'APK signé nativement: $APK_PATH"
           
-          # Trouver les outils Android
+          if echo "$APK_PATH" | grep -qi "unsigned"; then
+            echo "❌ APK unsigned détecté."
+            echo "   La signature doit être NATIVE (Gradle release + keystore de production)."
+            exit 1
+          fi
+          
           BUILD_TOOLS=$(find $ANDROID_HOME/build-tools -maxdepth 1 -type d | sort -V | tail -n 1)
           APKSIGNER="$BUILD_TOOLS/apksigner"
           ZIPALIGN="$BUILD_TOOLS/zipalign"
           
-          if [ ! -f "$APKSIGNER" ] || [ ! -f "$ZIPALIGN" ]; then
-            echo "⚠️  Outils de signature introuvables, vérification ignorée"
-            exit 0
-          fi
-          
-          # Vérifier l'alignement
-          echo "📐 Vérification de l'alignement..."
-          if ! $ZIPALIGN -c 4 "$APK_PATH" > /dev/null 2>&1; then
-            echo "⚠️  APK non aligné, alignement en cours..."
-            ALIGNED_APK="${APK_PATH}.aligned"
-            $ZIPALIGN -f 4 "$APK_PATH" "$ALIGNED_APK"
-            mv "$ALIGNED_APK" "$APK_PATH"
-            echo "✅ APK aligné"
-          else
-            echo "✅ APK correctement aligné"
-          fi
-          
-          # TOUJOURS signer l'APK pour garantir qu'il est valide
-          # Même si l'APK semble signé, on le re-signe pour éviter les problèmes
-          echo "🔐 Signature de l'APK (toujours re-signer pour garantir la validité)..."
-          
-          # Créer le keystore debug s'il n'existe pas
-          KEYSTORE="$HOME/.android/debug.keystore"
-          if [ ! -f "$KEYSTORE" ]; then
-            echo "📝 Création du keystore debug..."
-            mkdir -p "$HOME/.android"
-            KEYTOOL="$JAVA_HOME/bin/keytool"
-            if [ ! -f "$KEYTOOL" ]; then
-              KEYTOOL="keytool"
+          if [ -f "$APKSIGNER" ]; then
+            if $APKSIGNER verify "$APK_PATH" > /dev/null 2>&1; then
+              echo "✅ Signature native OK"
+              $APKSIGNER verify --print-certs "$APK_PATH" | head -n 5
+            else
+              echo "❌ Signature invalide / absente"
+              exit 1
             fi
-            $KEYTOOL -genkeypair -noprompt \
-              -keystore "$KEYSTORE" \
-              -storepass "android" \
-              -keypass "android" \
-              -alias "androiddebugkey" \
-              -dname "CN=Android Debug,O=Android,C=US" \
-              -keyalg RSA -keysize 2048 -validity 10000
-          fi
-          
-          # Vérifier si l'APK est déjà signé (pour info seulement)
-          if $APKSIGNER verify "$APK_PATH" > /dev/null 2>&1; then
-            echo "ℹ️  APK semble signé, re-signature pour garantir la validité..."
           else
-            echo "⚠️  APK non signé ou signature invalide, signature en cours..."
-          fi
-          
-          # Signer l'APK (toujours)
-          SIGNED_APK="${APK_PATH}.signed"
-          $APKSIGNER sign \
-            --ks "$KEYSTORE" \
-            --ks-key-alias "androiddebugkey" \
-            --ks-pass "pass:android" \
-            --key-pass "pass:android" \
-            --out "$SIGNED_APK" \
-            "$APK_PATH"
-          
-          # Vérifier la signature
-          if $APKSIGNER verify "$SIGNED_APK" > /dev/null 2>&1; then
-            mv "$SIGNED_APK" "$APK_PATH"
-            echo "✅ APK signé avec succès"
-          else
-            echo "❌ Échec de la signature"
+            echo "⚠️ apksigner introuvable, impossible de vérifier (échec)"
             exit 1
           fi
           
-          # Vérification finale obligatoire
-          echo "🔍 Vérification finale..."
-          if $APKSIGNER verify "$APK_PATH" > /dev/null 2>&1; then
-            echo "✅ APK valide et prêt pour l'installation"
-          else
-            echo "❌ ERREUR CRITIQUE: L'APK final n'est pas signé!"
-            echo "   Chemin: $APK_PATH"
-            exit 1
-          fi
-          
-          if $ZIPALIGN -c 4 "$APK_PATH" > /dev/null 2>&1; then
-            echo "✅ APK correctement aligné"
-          else
-            echo "⚠️  APK non aligné (non bloquant mais recommandé)"
+          if [ -f "$ZIPALIGN" ]; then
+            if $ZIPALIGN -c 4 "$APK_PATH" > /dev/null 2>&1; then
+              echo "✅ APK aligné"
+            else
+              echo "⚠️ APK non aligné (non bloquant)"
+            fi
           fi
 
       - name: Rename APK with correct format
