@@ -1,11 +1,12 @@
 # Script de build Android avec Tauri
-# Usage: .\scripts\android\build\build.ps1 [mobile|tv|standard]
+# Usage: .\scripts\android\build\build.ps1 [mobile|tv|standard] [aab]
 # Affiche la progression en temps réel comme build-tauri.js
 
 param(
     [Parameter(Position=0)]
-    [ValidateSet("mobile", "tv", "standard", "")]
-    [string]$Variant = "standard"
+    [string]$Variant = "standard",
+    [Parameter(Position=1)]
+    [string]$BuildType = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -14,10 +15,25 @@ $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\..\..\_common\variables.ps1"
 . "$PSScriptRoot\..\..\_common\functions.ps1"
 
-# Déterminer la variante
-$buildType = if ($Variant -eq "mobile") { "mobile" } elseif ($Variant -eq "tv") { "tv" } else { "standard" }
+# Analyser les arguments pour déterminer la variante et le type de build
+# Les arguments peuvent être dans n'importe quel ordre
+$allArgs = @($Variant, $BuildType) + $args | Where-Object { $_ -ne "" -and $_ -ne $null }
 
-Write-Section "Build Android avec Tauri ($buildType)"
+# Déterminer si on veut un AAB
+$buildAab = ($allArgs -contains "aab")
+
+# Déterminer la variante (mobile, tv, ou standard par défaut)
+$buildType = "standard"
+if ($allArgs -contains "mobile") {
+    $buildType = "mobile"
+} elseif ($allArgs -contains "tv") {
+    $buildType = "tv"
+} elseif ($Variant -in @("mobile", "tv", "standard")) {
+    $buildType = $Variant
+}
+
+$outputType = if ($buildAab) { "AAB (App Bundle)" } else { "APK" }
+Write-Section "Build Android avec Tauri ($buildType) - $outputType"
 
 # Configuration des variables d'environnement depuis les variables communes
 if (-not $env:JAVA_HOME -or -not (Test-Path $env:JAVA_HOME)) {
@@ -62,7 +78,7 @@ if ($env:ANDROID_HOME) {
 
 # Fonctions internes pour le build (non partagées car spécifiques au build)
 function Clean-PopcornWebApkArtifacts {
-    param([string]$BuildType)
+    param([string]$BuildType, [bool]$IsAab = $false)
     $info = Get-ProductInfoForVariant -Variant $BuildType
     $safeName = Sanitize-FileName -Name $info.ProductName
     $variantTag = Sanitize-FileName -Name $BuildType
@@ -70,10 +86,12 @@ function Clean-PopcornWebApkArtifacts {
     if (-not $destDir) { return }
     $appDir = Join-Path $destDir "app"
     if (-not (Test-Path $appDir)) { return }
-    $pattern = "$safeName-v*.apk*"
+    $extension = if ($IsAab) { "aab" } else { "apk" }
+    $pattern = "$safeName-v*.$extension*"
     $toDelete = Get-ChildItem -Path $appDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -like $pattern }
     if ($toDelete -and $toDelete.Count -gt 0) {
-        Write-Info "Nettoyage de $($toDelete.Count) ancien(s) APK(s) dans popcorn-web/app"
+        $fileType = if ($IsAab) { "AAB(s)" } else { "APK(s)" }
+        Write-Info "Nettoyage de $($toDelete.Count) ancien(s) $fileType dans popcorn-web/app"
         $toDelete | Remove-Item -Force -ErrorAction SilentlyContinue
     }
 }
@@ -286,8 +304,8 @@ if (-not $allOk) {
     exit 1
 }
 
-# Nettoyer les anciens APK
-Clean-PopcornWebApkArtifacts -BuildType $buildType
+# Nettoyer les anciens APK/AAB
+Clean-PopcornWebApkArtifacts -BuildType $buildType -IsAab $buildAab
 
 # Vérifier/initialiser le projet Android Tauri
 $androidDirPath = Join-Path $script:ProjectRoot "src-tauri\gen\android"
@@ -510,10 +528,18 @@ $versionEnv = if ($env:PUBLIC_APP_VERSION) { "PUBLIC_APP_VERSION=$($env:PUBLIC_A
 $codeEnv = if ($env:PUBLIC_APP_VERSION_CODE) { "PUBLIC_APP_VERSION_CODE=$($env:PUBLIC_APP_VERSION_CODE) " } else { "" }
 $variantEnv = if ($env:PUBLIC_APP_VARIANT) { "PUBLIC_APP_VARIANT=$($env:PUBLIC_APP_VARIANT) " } else { "" }
 
-$buildCommand = switch ($buildType) {
-    "mobile" { "npx cross-env $versionEnv$codeEnv$variantEnv npm run tauri:build:android-mobile" }
-    "tv" { "npx cross-env $versionEnv$codeEnv$variantEnv npm run tauri:build:android-tv" }
-    default { "npx cross-env $versionEnv$codeEnv$variantEnv npm run tauri:build:android" }
+if ($buildAab) {
+    $buildCommand = switch ($buildType) {
+        "mobile" { "npx cross-env $versionEnv$codeEnv$variantEnv npm run tauri:build:android-mobile:aab" }
+        "tv" { "npx cross-env $versionEnv$codeEnv$variantEnv npm run tauri:build:android-tv:aab" }
+        default { Write-Err "AAB non supporté pour la variante 'standard'. Utilisez 'mobile' ou 'tv'."; exit 1 }
+    }
+} else {
+    $buildCommand = switch ($buildType) {
+        "mobile" { "npx cross-env $versionEnv$codeEnv$variantEnv npm run tauri:build:android-mobile" }
+        "tv" { "npx cross-env $versionEnv$codeEnv$variantEnv npm run tauri:build:android-tv" }
+        default { "npx cross-env $versionEnv$codeEnv$variantEnv npm run tauri:build:android" }
+    }
 }
 
 Write-Section "Lancement du build Android"
@@ -615,30 +641,34 @@ try {
     if ($exitCode -eq 0) {
         Write-Section "Build Android terminé avec succès"
         
-        # Trouver l'APK généré
+        # Trouver l'APK ou AAB généré
+        $extension = if ($buildAab) { "aab" } else { "apk" }
+        $outputType = if ($buildAab) { "AAB" } else { "APK" }
+        
         $searchDirs = @(
+            (Join-Path $script:ProjectRoot "src-tauri\gen\android\app\build\outputs\bundle"),
             (Join-Path $script:ProjectRoot "src-tauri\gen\android\app\build\outputs\apk"),
             (Join-Path $script:ProjectRoot "src-tauri\target\aarch64-linux-android\release")
         )
         
-        $apk = $null
+        $artifact = $null
         foreach ($dir in $searchDirs) {
             if (Test-Path $dir) {
-                $apk = Get-ChildItem $dir -Filter "*.apk" -Recurse -File -ErrorAction SilentlyContinue | 
+                $artifact = Get-ChildItem $dir -Filter "*.$extension" -Recurse -File -ErrorAction SilentlyContinue | 
                     Sort-Object LastWriteTime -Descending | Select-Object -First 1
-                if ($apk) { break }
+                if ($artifact) { break }
             }
         }
         
-        if (-not $apk) {
-            Write-Err "Aucun APK trouvé après le build"
+        if (-not $artifact) {
+            Write-Err "Aucun $outputType trouvé après le build"
             exit 1
         }
         
-        Write-Info "APK trouvé: $($apk.FullName)"
-        Write-Info "Taille: $([math]::Round($apk.Length / 1MB, 2)) MB"
-        if ($apk.Name -like "*unsigned*") {
-            Write-Warn "APK non signé détecté, signature en cours..."
+        Write-Info "$outputType trouvé: $($artifact.FullName)"
+        Write-Info "Taille: $([math]::Round($artifact.Length / 1MB, 2)) MB"
+        if ($artifact.Name -like "*unsigned*") {
+            Write-Warn "$outputType non signé détecté, signature en cours..."
         }
         
         # Fonctions de signature
@@ -674,6 +704,113 @@ try {
                 -keyalg RSA -keysize 2048 -validity 10000 | Out-Null
 
             return $ksPath
+        }
+
+        function Sign-AabIfNeeded {
+            param(
+                [Parameter(Mandatory=$true)][string]$AabPath,
+                [Parameter(Mandatory=$true)][string]$AndroidHome,
+                [Parameter(Mandatory=$true)][string]$JavaHome
+            )
+
+            # Les AAB sont signés avec jarsigner (inclus dans le JDK)
+            $jarsigner = "jarsigner"
+            if ($JavaHome) {
+                $candidate = Join-Path $JavaHome "bin\jarsigner.exe"
+                if (Test-Path $candidate) { $jarsigner = $candidate }
+            }
+
+            if (-not (Get-Command $jarsigner -ErrorAction SilentlyContinue)) {
+                Write-Warn "jarsigner introuvable, signature AAB ignorée"
+                return $AabPath
+            }
+
+            # Essayer d'utiliser le keystore de production en priorité
+            $androidProjectDir = Join-Path $script:ProjectRoot "src-tauri\gen\android"
+            $keystorePropertiesPath = Join-Path $androidProjectDir "keystore.properties"
+            $keystorePath = Join-Path $androidProjectDir "keystore.jks"
+            
+            $useProductionKeystore = $false
+            $ks = $null
+            $ksAlias = $null
+            $ksPass = $null
+            $keyPass = $null
+
+            # Vérifier si le keystore de production existe
+            if ((Test-Path $keystorePropertiesPath) -and (Test-Path $keystorePath)) {
+                try {
+                    $props = @{}
+                    Get-Content $keystorePropertiesPath | ForEach-Object {
+                        if ($_ -match '^\s*([^#=]+)\s*=\s*(.+)$') {
+                            $props[$matches[1].Trim()] = $matches[2].Trim()
+                        }
+                    }
+                    
+                    if ($props.ContainsKey("storeFile") -and $props.ContainsKey("storePassword") -and 
+                        $props.ContainsKey("keyAlias") -and $props.ContainsKey("keyPassword")) {
+                        $ksFile = $props["storeFile"]
+                        if (-not [System.IO.Path]::IsPathRooted($ksFile)) {
+                            $ksFile = Join-Path $androidProjectDir $ksFile
+                        }
+                        if (Test-Path $ksFile) {
+                            $ks = $ksFile
+                            $ksAlias = $props["keyAlias"]
+                            $ksPass = $props["storePassword"]
+                            $keyPass = $props["keyPassword"]
+                            $useProductionKeystore = $true
+                            Write-Info "Utilisation du keystore de production: $ks"
+                        }
+                    }
+                } catch {
+                    Write-Warn "Impossible de lire keystore.properties: $_"
+                }
+            }
+
+            # Fallback vers le debug keystore si le keystore de production n'est pas disponible
+            if (-not $useProductionKeystore) {
+                $ks = Ensure-DebugKeystore -JavaHome $JavaHome
+                $ksAlias = "androiddebugkey"
+                $ksPass = "android"
+                $keyPass = "android"
+                Write-Info "Utilisation du debug keystore (fallback)"
+            }
+
+            # Vérifier si l'AAB est déjà signé
+            $verifyCmd = "`"$jarsigner`" -verify -certs `"$AabPath`" >nul 2>nul"
+            & cmd /c $verifyCmd | Out-Null
+            $isSigned = $LASTEXITCODE -eq 0
+
+            if ($isSigned -and -not ($AabPath -like "*unsigned*")) {
+                Write-Ok "AAB déjà signé, préservation de la signature"
+                return $AabPath
+            }
+
+            # Signer l'AAB
+            Write-Info "Signature de l'AAB en cours..."
+            $signedAab = [System.IO.Path]::ChangeExtension($AabPath, ".signed.aab")
+            Copy-Item -Path $AabPath -Destination $signedAab -Force
+
+            # Signer avec jarsigner
+            $signCmd = "`"$jarsigner`" -verbose -sigalg SHA256withRSA -digestalg SHA-256 -keystore `"$ks`" -storepass `"$ksPass`" -keypass `"$keyPass`" `"$signedAab`" `"$ksAlias`""
+            & cmd /c $signCmd 2>&1 | Out-Null
+            
+            if ($LASTEXITCODE -ne 0) {
+                Write-Err "Échec de la signature AAB"
+                Remove-Item $signedAab -Force -ErrorAction SilentlyContinue
+                return $AabPath
+            }
+
+            # Vérifier la signature
+            $verifySignedCmd = "`"$jarsigner`" -verify -certs `"$signedAab`" >nul 2>nul"
+            & cmd /c $verifySignedCmd | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Ok "AAB signé avec succès"
+                return $signedAab
+            } else {
+                Write-Err "La signature AAB n'a pas pu être vérifiée"
+                Remove-Item $signedAab -Force -ErrorAction SilentlyContinue
+                return $AabPath
+            }
         }
 
         function Sign-ApkIfNeeded {
@@ -814,26 +951,50 @@ try {
             }
         }
         
-        # Vérifier et signer l'APK si nécessaire (préserve la signature native si déjà présente)
-        Write-Section "Vérification de la signature de l'APK"
+        # Vérifier et signer l'APK/AAB si nécessaire
         $androidHome = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } elseif ($script:AndroidHome) { $script:AndroidHome } else { $null }
         $javaHome = if ($env:JAVA_HOME) { $env:JAVA_HOME } elseif ($script:JavaHome) { $script:JavaHome } else { $null }
-        $signedApkPath = Sign-ApkIfNeeded -ApkPath $apk.FullName -AndroidHome $androidHome -JavaHome $javaHome
-        $apk = Get-Item $signedApkPath
         
-        # Vérification finale obligatoire : l'APK DOIT être signé
-        $bt = Get-LatestBuildToolsDir -AndroidHome $androidHome
-        if ($bt) {
-            $apksigner = Join-Path $bt.FullName "apksigner.bat"
-            if (Test-Path $apksigner) {
-                $finalVerifyCmd = "`"$apksigner`" verify `"$($apk.FullName)`" >nul 2>nul"
+        if ($buildAab) {
+            Write-Section "Vérification de la signature de l'AAB"
+            $signedArtifactPath = Sign-AabIfNeeded -AabPath $artifact.FullName -AndroidHome $androidHome -JavaHome $javaHome
+            $artifact = Get-Item $signedArtifactPath
+            
+            # Vérification finale obligatoire : l'AAB DOIT être signé
+            $jarsigner = "jarsigner"
+            if ($javaHome) {
+                $candidate = Join-Path $javaHome "bin\jarsigner.exe"
+                if (Test-Path $candidate) { $jarsigner = $candidate }
+            }
+            if (Get-Command $jarsigner -ErrorAction SilentlyContinue) {
+                $finalVerifyCmd = "`"$jarsigner`" -verify -certs `"$($artifact.FullName)`" >nul 2>nul"
                 & cmd /c $finalVerifyCmd | Out-Null
                 if ($LASTEXITCODE -ne 0) {
-                    Write-Err "L'APK final n'est pas signé!"
-                    Write-Err "Le build ne peut pas continuer sans un APK signé."
+                    Write-Err "L'AAB final n'est pas signé!"
+                    Write-Err "Le build ne peut pas continuer sans un AAB signé."
                     exit 1
                 }
-                Write-Ok "APK final vérifié: signature valide"
+                Write-Ok "AAB final vérifié: signature valide"
+            }
+        } else {
+            Write-Section "Vérification de la signature de l'APK"
+            $signedArtifactPath = Sign-ApkIfNeeded -ApkPath $artifact.FullName -AndroidHome $androidHome -JavaHome $javaHome
+            $artifact = Get-Item $signedArtifactPath
+            
+            # Vérification finale obligatoire : l'APK DOIT être signé
+            $bt = Get-LatestBuildToolsDir -AndroidHome $androidHome
+            if ($bt) {
+                $apksigner = Join-Path $bt.FullName "apksigner.bat"
+                if (Test-Path $apksigner) {
+                    $finalVerifyCmd = "`"$apksigner`" verify `"$($artifact.FullName)`" >nul 2>nul"
+                    & cmd /c $finalVerifyCmd | Out-Null
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Err "L'APK final n'est pas signé!"
+                        Write-Err "Le build ne peut pas continuer sans un APK signé."
+                        exit 1
+                    }
+                    Write-Ok "APK final vérifié: signature valide"
+                }
             }
         }
         
@@ -846,9 +1007,10 @@ try {
         if ($destDir) {
             $appDir = Join-Path $destDir "app"
             New-Item -ItemType Directory -Force -Path $appDir | Out-Null
-            $destFile = Join-Path $appDir "$safeName-v$safeVersion.apk"
-            Copy-Item -Path $apk.FullName -Destination $destFile -Force
-            Write-Ok "APK copié dans: $destFile"
+            $fileExtension = if ($buildAab) { "aab" } else { "apk" }
+            $destFile = Join-Path $appDir "$safeName-v$safeVersion.$fileExtension"
+            Copy-Item -Path $artifact.FullName -Destination $destFile -Force
+            Write-Ok "$outputType copié dans: $destFile"
             Write-Info "Taille: $([math]::Round((Get-Item $destFile).Length / 1MB, 2)) MB"
         }
         
