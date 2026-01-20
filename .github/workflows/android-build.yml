@@ -106,18 +106,33 @@ jobs:
       - name: Setup signing keystore
         run: |
           echo "🔐 Configuration de la signature native..."
+          echo ""
+          echo "📝 IMPORTANT - Configuration des secrets GitHub:"
+          echo "   Pour la production, configurez les secrets suivants dans GitHub:"
+          echo "   - ANDROID_KEYSTORE_BASE64: Votre keystore encodé en base64 (recommandé)"
+          echo "   - ANDROID_KEYSTORE_PASSWORD: Mot de passe du keystore"
+          echo "   - ANDROID_KEY_PASSWORD: Mot de passe de la clé (peut être identique au keystore)"
+          echo ""
+          echo "   Pour encoder votre keystore en base64:"
+          echo "   base64 -i votre-keystore.jks | pbcopy  # macOS"
+          echo "   base64 -i votre-keystore.jks           # Linux"
+          echo "   certutil -encode votre-keystore.jks temp.txt && type temp.txt  # Windows"
+          echo ""
           ANDROID_DIR="src-tauri/gen/android"
           
           # Créer le répertoire si nécessaire
           mkdir -p "$ANDROID_DIR"
           
           # Option 1: Utiliser un keystore existant depuis les secrets (base64 encodé)
+          # RECOMMANDÉ POUR LA PRODUCTION: Stockez votre keystore de production dans GitHub Secrets
+          # Le keystore est encodé en base64 pour éviter les problèmes de caractères spéciaux
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "📥 Décodage du keystore depuis les secrets..."
+            echo "📥 Décodage du keystore depuis les secrets GitHub..."
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$ANDROID_DIR/keystore.jks"
-            echo "✅ Keystore décodé"
+            echo "✅ Keystore de production décodé et prêt"
           else
-            echo "⚠️  Aucun keystore dans les secrets, création d'un nouveau keystore..."
+            echo "⚠️  Aucun keystore dans les secrets GitHub"
+            echo "   Création d'un keystore temporaire pour ce build (NON RECOMMANDÉ pour la production)"
             KEYTOOL="$JAVA_HOME/bin/keytool"
             if [ ! -f "$KEYTOOL" ]; then
               KEYTOOL="keytool"
@@ -130,7 +145,8 @@ jobs:
             if [ -z "$KEYSTORE_PASSWORD" ]; then
               KEYSTORE_PASSWORD="changeit"
               KEY_PASSWORD="changeit"
-              echo "⚠️  Utilisation d'un mot de passe par défaut (changez-le dans les secrets GitHub!)"
+              echo "⚠️  ATTENTION: Utilisation d'un mot de passe par défaut (NON SÉCURISÉ)"
+              echo "   Configurez ANDROID_KEYSTORE_PASSWORD et ANDROID_KEY_PASSWORD dans GitHub Secrets!"
             fi
             
             $KEYTOOL -genkeypair -noprompt \
@@ -196,22 +212,23 @@ jobs:
             echo "📝 Ajout de la configuration de signature..."
             
             # Créer un script Python temporaire pour modifier le fichier
-            cat > /tmp/apply_signing.py << 'PYTHON_SCRIPT'
-          import re
-          import sys
-          
-          file_path = sys.argv[1]
-          
-          with open(file_path, 'r', encoding='utf-8') as f:
-              content = f.read()
-          
-          # Vérifier si signingConfigs existe déjà
-          if 'signingConfigs' in content:
-              print("Configuration déjà présente")
-              sys.exit(0)
-          
-          # Configuration de signature à insérer
-          signing_config = '''
+            # Utiliser cat avec heredoc pour éviter les problèmes de parsing YAML
+            cat > /tmp/apply_signing.py << 'PYTHON_SCRIPT_END'
+import re
+import sys
+
+file_path = sys.argv[1]
+
+with open(file_path, 'r', encoding='utf-8') as f:
+    content = f.read()
+
+# Vérifier si signingConfigs existe déjà
+if 'signingConfigs' in content:
+    print("Configuration déjà présente")
+    sys.exit(0)
+
+# Configuration de signature à insérer (échapper les triples quotes)
+signing_config = '''\
     // Configuration de la signature
     signingConfigs {
         create("release") {
@@ -251,24 +268,24 @@ jobs:
         }
     }
     '''
-          
-          # Insérer après compileOptions et avant buildTypes
-          pattern = r'(compileOptions \{[^}]*\})\s*(buildTypes)'
-          replacement = r'\1' + signing_config + r'\n    \2'
-          
-          new_content = re.sub(pattern, replacement, content)
-          
-          # Ajouter signingConfig au buildType release
-          release_pattern = r'(getByName\("release"\) \{[^}]*)(isMinifyEnabled = true)'
-          release_replacement = r'\1\n            signingConfig = signingConfigs.getByName("release")\n            \2'
-          
-          new_content = re.sub(release_pattern, release_replacement, new_content)
-          
-          with open(file_path, 'w', encoding='utf-8') as f:
-              f.write(new_content)
-          
-          print("✅ Configuration de signature appliquée")
-          PYTHON_SCRIPT
+
+# Insérer après compileOptions et avant buildTypes
+pattern = r'(compileOptions \{[^}]*\})\s*(buildTypes)'
+replacement = r'\1' + signing_config + r'\n    \2'
+
+new_content = re.sub(pattern, replacement, content)
+
+# Ajouter signingConfig au buildType release
+release_pattern = r'(getByName\("release"\) \{[^}]*)(isMinifyEnabled = true)'
+release_replacement = r'\1\n            signingConfig = signingConfigs.getByName("release")\n            \2'
+
+new_content = re.sub(release_pattern, release_replacement, new_content)
+
+with open(file_path, 'w', encoding='utf-8') as f:
+    f.write(new_content)
+
+print("✅ Configuration de signature appliquée")
+PYTHON_SCRIPT_END
             python3 /tmp/apply_signing.py "$BUILD_GRADLE"
             
             echo "✅ Configuration appliquée avec succès"

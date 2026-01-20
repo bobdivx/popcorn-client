@@ -116,54 +116,9 @@ async function handleExternalDownload(options: {
     
     // Le fichier .torrent est disponible dans la DB locale, l'ajouter au client
     const blob = await response.blob();
-    
-    // #region agent log
-    const blobSize = blob.size;
-    const blobType = blob.type;
-    const blobStart = await blob.slice(0, Math.min(100, blob.size)).text().catch(() => '');
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'download.ts:118',
-        message: 'Blob téléchargé depuis DB',
-        data: {
-          infoHash: torrent.infoHash,
-          blobSize,
-          blobType,
-          blobStart: blobStart.substring(0, 50),
-          contentType: response.headers.get('content-type'),
-        },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId: 'G',
-      }),
-    }).catch(() => {});
-    // #endregion
-    
     const file = new File([blob], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
     const forStreaming = false;
     const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
-    
-    // #region agent log
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'download.ts:122',
-        message: 'Avant addTorrentFile',
-        data: {
-          infoHash: torrent.infoHash,
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: file.type,
-        },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId: 'G',
-      }),
-    }).catch(() => {});
-    // #endregion
     
     const result = await clientApi.addTorrentFile(file, forStreaming, downloadType);
     addNotification('success', 'Torrent ajouté au client avec succès depuis la DB locale !');
