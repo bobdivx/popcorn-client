@@ -16,6 +16,7 @@ on:
 jobs:
   build-android:
     runs-on: self-hosted
+    environment: production
     permissions:
       contents: write
 
