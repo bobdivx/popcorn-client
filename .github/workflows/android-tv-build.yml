@@ -109,6 +109,7 @@ jobs:
           ANDROID_DIR="src-tauri/gen/android"
           mkdir -p "$ANDROID_DIR"
           
+          # Vérifier que les secrets de signature sont configurés
           if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ] || [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ]; then
             echo "❌ Secrets de signature manquants."
             echo "   Configure au minimum:"
@@ -118,23 +119,34 @@ jobs:
             exit 1
           fi
           
-          echo "📥 Décodage du keystore depuis GitHub Secrets..."
+          # Décoder le keystore depuis les secrets GitHub
+          echo "📥 Décodage du keystore depuis les secrets GitHub..."
           echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$ANDROID_DIR/keystore.jks"
+          echo "✅ Keystore de production décodé et prêt"
           
+          # Créer le fichier keystore.properties
           KEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
           KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
+          
           if [ -z "$KEY_PASSWORD" ]; then
             KEY_PASSWORD="$KEYSTORE_PASSWORD"
           fi
           
           cat > "$ANDROID_DIR/keystore.properties" << EOF
+          # Configuration du keystore pour la signature de l'APK
+          # Généré automatiquement par GitHub Actions
+          
           storeFile=keystore.jks
           storePassword=$KEYSTORE_PASSWORD
           keyAlias=popcorn-key
           keyPassword=$KEY_PASSWORD
           EOF
           
-          echo "✅ Keystore + keystore.properties prêts"
+          echo "✅ Fichier keystore.properties créé"
+          echo "📋 Configuration:"
+          echo "   - Keystore: $ANDROID_DIR/keystore.jks"
+          echo "   - Alias: popcorn-key"
+          echo "   - Fichier properties: $ANDROID_DIR/keystore.properties"
 
       - name: Apply signing configuration to build.gradle.kts
         run: |

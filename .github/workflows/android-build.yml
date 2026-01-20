@@ -123,49 +123,27 @@ jobs:
           # Créer le répertoire si nécessaire
           mkdir -p "$ANDROID_DIR"
           
-          # Option 1: Utiliser un keystore existant depuis les secrets (base64 encodé)
-          # RECOMMANDÉ POUR LA PRODUCTION: Stockez votre keystore de production dans GitHub Secrets
-          # Le keystore est encodé en base64 pour éviter les problèmes de caractères spéciaux
-          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
-            echo "📥 Décodage du keystore depuis les secrets GitHub..."
-            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$ANDROID_DIR/keystore.jks"
-            echo "✅ Keystore de production décodé et prêt"
-          else
-            echo "⚠️  Aucun keystore dans les secrets GitHub"
-            echo "   Création d'un keystore temporaire pour ce build (NON RECOMMANDÉ pour la production)"
-            KEYTOOL="$JAVA_HOME/bin/keytool"
-            if [ ! -f "$KEYTOOL" ]; then
-              KEYTOOL="keytool"
-            fi
-            
-            # Créer un keystore avec les secrets ou valeurs par défaut
-            KEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
-            KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
-            
-            if [ -z "$KEYSTORE_PASSWORD" ]; then
-              KEYSTORE_PASSWORD="changeit"
-              KEY_PASSWORD="changeit"
-              echo "⚠️  ATTENTION: Utilisation d'un mot de passe par défaut (NON SÉCURISÉ)"
-              echo "   Configurez ANDROID_KEYSTORE_PASSWORD et ANDROID_KEY_PASSWORD dans GitHub Secrets!"
-            fi
-            
-            $KEYTOOL -genkeypair -noprompt \
-              -keystore "$ANDROID_DIR/keystore.jks" \
-              -storepass "$KEYSTORE_PASSWORD" \
-              -keypass "$KEY_PASSWORD" \
-              -alias "popcorn-key" \
-              -dname "CN=Popcorn Client, OU=Development, O=Popcorn, L=Unknown, ST=Unknown, C=FR" \
-              -keyalg RSA -keysize 2048 -validity 9125
-            echo "✅ Keystore créé"
+          # Vérifier que les secrets de signature sont configurés
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ] || [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ]; then
+            echo "❌ Secrets de signature manquants."
+            echo "   Configure au minimum:"
+            echo "   - ANDROID_KEYSTORE_BASE64"
+            echo "   - ANDROID_KEYSTORE_PASSWORD"
+            echo "   - (optionnel) ANDROID_KEY_PASSWORD"
+            exit 1
           fi
+          
+          # Décoder le keystore depuis les secrets GitHub
+          echo "📥 Décodage du keystore depuis les secrets GitHub..."
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$ANDROID_DIR/keystore.jks"
+          echo "✅ Keystore de production décodé et prêt"
           
           # Créer le fichier keystore.properties
           KEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
           KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
           
-          if [ -z "$KEYSTORE_PASSWORD" ]; then
-            KEYSTORE_PASSWORD="changeit"
-            KEY_PASSWORD="changeit"
+          if [ -z "$KEY_PASSWORD" ]; then
+            KEY_PASSWORD="$KEYSTORE_PASSWORD"
           fi
           
           cat > "$ANDROID_DIR/keystore.properties" << EOF
