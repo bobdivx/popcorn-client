@@ -68,10 +68,6 @@ export const POST: APIRoute = async ({ request }) => {
       (await getBackendUrlAsync());
     const backendApiUrl = `${backendUrl}/api/client/auth/login`;
 
-    // #region agent log
-    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth/login.ts:58',message:'LOGIN proxy -> backend',data:{backendApiUrl,hasPassword:!!password,emailLen:emailOrUsername.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'AUTH'})}).catch(()=>{});
-    // #endregion
-
     const backendResponse = await fetch(backendApiUrl, {
       method: 'POST',
       headers: {
@@ -79,10 +75,6 @@ export const POST: APIRoute = async ({ request }) => {
       },
       body: JSON.stringify({ email: emailOrUsername, password }),
     });
-
-    // #region agent log
-    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'auth/login.ts:71',message:'LOGIN backend response',data:{status:backendResponse.status,ok:backendResponse.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'AUTH'})}).catch(()=>{});
-    // #endregion
 
     if (!backendResponse.ok) {
       const errorText = await backendResponse.text().catch(() => '');

@@ -60,9 +60,6 @@ export default function ServerConnectionCheck() {
     // IMPORTANT: Vérifier hasBackendUrl() APRÈS avoir vérifié les chemins autorisés
     try {
       if (!hasBackendUrl()) {
-        // #region agent log
-        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ServerConnectionCheck.tsx:52',message:'No backend URL - redirecting to setup',data:{currentPath},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         setIsVisible(false);
         window.location.href = '/setup';
         return;
@@ -70,9 +67,6 @@ export default function ServerConnectionCheck() {
     } catch (error) {
       // Si hasBackendUrl() plante (localStorage inaccessible), rediriger vers setup
       console.error('[ServerConnectionCheck] hasBackendUrl() failed:', error);
-      // #region agent log
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ServerConnectionCheck.tsx:59',message:'hasBackendUrl() error - redirecting to setup',data:{currentPath,error:String(error)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       setIsVisible(false);
       window.location.href = '/setup';
       return;

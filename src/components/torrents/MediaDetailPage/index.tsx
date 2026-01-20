@@ -167,9 +167,6 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
     if (hasInfoHash && torrent.infoHash) {
       const checkAvailability = async () => {
         try {
-          // #region agent log
-          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MediaDetailPage.tsx:166',message:'Vérification disponibilité torrent au chargement',data:{infoHash:torrent.infoHash?.substring(0,12),hasInfoHash,isExternal},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-          // #endregion
           const { clientApi } = await import('../../../lib/client/api');
           const stats = await clientApi.getTorrent(torrent.infoHash!).catch((err) => {
             // Ignorer silencieusement les erreurs 404 (torrent non téléchargé)
@@ -178,9 +175,6 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
             }
             throw err;
           });
-          // #region agent log
-          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MediaDetailPage.tsx:170',message:'Stats torrent récupérées',data:{hasStats:!!stats,state:stats?.state,progress:stats?.progress,isCompleted:stats?(stats.state==='completed'||stats.state==='seeding'||stats.progress>=0.95):false},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-          // #endregion
           if (stats) {
             // Toujours mettre à jour torrentStats pour que le bouton "Lire" puisse s'afficher
             console.log('[MediaDetailPage] checkAvailability: Mise à jour torrentStats', {
@@ -192,9 +186,6 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
             
             if (stats.state === 'completed' || stats.state === 'seeding' || stats.progress >= 0.95) {
               setIsAvailableLocally(true);
-              // #region agent log
-              fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MediaDetailPage.tsx:171',message:'isAvailableLocally défini à true',data:{state:stats.state,progress:stats.progress},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-              // #endregion
               addDebugLog('success', '📚 Torrent disponible localement dans le backend', {
                 state: stats.state,
                 progress: `${(stats.progress * 100).toFixed(1)}%`,
@@ -207,10 +198,7 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
           if (err instanceof Error && (err.message.includes('404') || err.message.includes('Not Found'))) {
             return;
           }
-          // #region agent log
-          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MediaDetailPage.tsx:178',message:'Erreur vérification disponibilité',data:{error:err instanceof Error?err.message:String(err)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-          // #endregion
-        }
+          }
       };
       
       checkAvailability();
@@ -220,22 +208,13 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
   // Vérifier si un téléchargement est en cours au montage
   useEffect(() => {
     const checkDownloadingTorrent = async () => {
-      // #region agent log
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MediaDetailPage.tsx:188',message:'checkDownloadingTorrent appelé',data:{hasClientState:!!torrent.clientState,clientState:torrent.clientState,clientProgress:torrent.clientProgress,hasInfoHash,infoHash:torrent.infoHash?.substring(0,12)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       if (torrent.clientState && torrent.clientProgress !== undefined) {
         const isCompleted = torrent.clientState === 'completed' || 
                             torrent.clientState === 'seeding' || 
                             torrent.clientProgress >= 0.95;
-        // #region agent log
-        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MediaDetailPage.tsx:193',message:'Vérification complétion depuis props',data:{isCompleted,clientState:torrent.clientState,clientProgress:torrent.clientProgress},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         if (isCompleted && hasInfoHash && torrent.infoHash) {
           try {
             const videos = await loadVideoFiles(torrent.infoHash);
-            // #region agent log
-            fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MediaDetailPage.tsx:196',message:'Fichiers vidéo chargés depuis props',data:{videosCount:videos.length,hasSelectedFile:!!selectedFile},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
             if (videos.length > 0) {
               setVideoFiles(videos);
               if (!selectedFile) {
@@ -243,9 +222,6 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
               }
             }
           } catch (err) {
-            // #region agent log
-            fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MediaDetailPage.tsx:203',message:'Erreur chargement fichiers depuis props',data:{error:err instanceof Error?err.message:String(err)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-            // #endregion
             // Ignorer les erreurs
           }
           return;

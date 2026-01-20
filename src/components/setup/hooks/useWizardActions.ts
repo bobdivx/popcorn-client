@@ -96,12 +96,38 @@ export function useWizardActions() {
               const configData = await configResponse.json();
               
               if (configData.success && configData.data) {
+                // Récupérer les catégories d'indexers depuis le backend
+                let indexerCategories: Record<string, { enabled: boolean; genres?: number[] }> | null = null;
+                try {
+                  if (configData.data.indexers && Array.isArray(configData.data.indexers)) {
+                    const categoriesMap: Record<string, { enabled: boolean; genres?: number[] }> = {};
+                    for (const indexer of configData.data.indexers) {
+                      if (indexer.id) {
+                        try {
+                          const categoriesResponse = await serverApi.getIndexerCategories(indexer.id);
+                          if (categoriesResponse.success && categoriesResponse.data) {
+                            categoriesMap[indexer.id] = categoriesResponse.data;
+                          }
+                        } catch (catError) {
+                          console.warn(`[WIZARD] ⚠️ Impossible de récupérer les catégories pour ${indexer.name}:`, catError);
+                        }
+                      }
+                    }
+                    if (Object.keys(categoriesMap).length > 0) {
+                      indexerCategories = categoriesMap;
+                    }
+                  }
+                } catch (catError) {
+                  console.warn('[WIZARD] ⚠️ Erreur lors de la récupération des catégories:', catError);
+                }
+                
                 // Sauvegarder dans popcorn-web (saveUserConfig utilise maintenant automatiquement le token cloud)
                 const saveResult = await saveUserConfig({
                   indexers: configData.data.indexers || [],
                   tmdbApiKey: configData.data.tmdbApiKey || null,
                   downloadLocation: configData.data.downloadLocation || null,
                   syncSettings: configData.data.syncSettings || null,
+                  indexerCategories: indexerCategories,
                 });
 
                 if (saveResult?.success) {

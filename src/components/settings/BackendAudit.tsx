@@ -266,15 +266,7 @@ export default function BackendAudit() {
       }
       
       try {
-        // #region agent log
-        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'BackendAudit.tsx:52',message:'Before invoke native-fetch',data:{url,methodName},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
-        
         const { invoke } = await import('@tauri-apps/api/core');
-        
-        // #region agent log
-        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'BackendAudit.tsx:56',message:'Invoke imported, attempting native-fetch',data:{url},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'})}).catch(()=>{});
-        // #endregion
         
         const start = Date.now();
         try {

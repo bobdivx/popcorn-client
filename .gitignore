@@ -29,3 +29,17 @@ pnpm-debug.log*
 # Vercel
 .vercel/
 .vercel
+
+# Android keystore files (NEVER commit these!)
+*.keystore
+*.jks
+keystore.properties
+**/keystore.properties
+**/keystore.jks
+**/*.keystore
+**/*.jks
+
+# Android build artifacts
+src-tauri/gen/
+*.apk
+*.aab

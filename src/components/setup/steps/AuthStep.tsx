@@ -210,7 +210,26 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
               indexerTypeId: indexer.indexerTypeId || undefined,
               configJson: indexer.configJson || undefined,
             });
-            if (res?.success) restoredCount += 1;
+            if (res?.success) {
+              restoredCount += 1;
+              
+              // Restaurer les catégories pour cet indexer si disponibles
+              if (savedConfig.indexerCategories && res.data?.id) {
+                const indexerId = res.data.id;
+                // Chercher les catégories pour cet indexer (par nom ou ID)
+                const indexerCategories = savedConfig.indexerCategories[indexerId] || 
+                                         savedConfig.indexerCategories[indexer.name];
+                
+                if (indexerCategories) {
+                  try {
+                    await serverApi.updateIndexerCategories(indexerId, indexerCategories);
+                    console.log(`[AUTH] ✅ Catégories restaurées pour l'indexer ${indexer.name}`);
+                  } catch (catError) {
+                    console.warn(`[AUTH] ⚠️ Erreur lors de la restauration des catégories pour ${indexer.name}:`, catError);
+                  }
+                }
+              }
+            }
           } catch (idxError) {
             console.warn('[AUTH] Erreur lors de la restauration d\'un indexer:', idxError);
           }

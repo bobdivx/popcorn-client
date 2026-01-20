@@ -121,7 +121,6 @@ async function handleExternalDownload(options: {
     const blobSize = blob.size;
     const blobType = blob.type;
     const blobStart = await blob.slice(0, Math.min(100, blob.size)).text().catch(() => '');
-    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -147,7 +146,6 @@ async function handleExternalDownload(options: {
     const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
     
     // #region agent log
-    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -600,34 +600,11 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.release-tag.outputs.tag }}
-          name: "Popcorn Android Mobile - ${{ steps.release-tag.outputs.tag }}"
+          name: "${{ steps.release-tag.outputs.tag }}"
           body: |
-            ## Popcorn Android Mobile APK
-            
             **Version:** ${{ steps.release-tag.outputs.tag }}
             **Commit:** ${{ github.sha }}
             **Build Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-            
-            ### 📥 Téléchargement
-            
-            **Téléchargez l'APK ci-dessous** ⬇️
-            
-            **Nom du fichier:** ${{ steps.rename-apk.outputs.name }}
-            
-            ### 📱 Installation
-            
-            1. Téléchargez le fichier APK ci-dessus
-            2. Ouvrez le fichier APK téléchargé et installez-le
-            
-            ### ℹ️ Notes
-            
-            - Cette version est pour Android Mobile (téléphones et tablettes)
-            - Architecture: aarch64 (64-bit)
-            - APK signé et aligné, prêt pour l'installation
-            
-            ### 🔍 Autres emplacements
-            
-            L'APK est également disponible dans les **Artifacts** de ce workflow (onglet Actions).
           files: ${{ steps.rename-apk.outputs.path }}
           draft: false
           prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}

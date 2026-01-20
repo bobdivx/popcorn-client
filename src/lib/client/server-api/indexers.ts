@@ -1,4 +1,4 @@
-﻿/**
+/**
  * MÃ©thodes de gestion des indexers
  */
 
@@ -6,6 +6,7 @@ import type { ApiResponse, Indexer, IndexerFormData, IndexerTypeInfo } from './t
 
 interface ServerApiClientIndexersAccess {
   backendRequest<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>>;
+  getCurrentUserId(): string | null;
 }
 
 export const indexersMethods = {
@@ -108,14 +109,28 @@ export const indexersMethods = {
   async deleteIndexer(this: ServerApiClientIndexersAccess, id: string): Promise<ApiResponse<void>> {
     return this.backendRequest<void>(`/api/client/admin/indexers/${encodeURIComponent(id)}`, { method: 'DELETE' });
   },
-  async getIndexerCategories(this: ServerApiClientIndexersAccess, indexerId: string): Promise<ApiResponse<string[]>> {
-    return this.backendRequest<string[]>(`/api/admin/indexers/${encodeURIComponent(indexerId)}/categories`, { method: 'GET' });
+  async getIndexerCategories(this: ServerApiClientIndexersAccess, indexerId: string): Promise<ApiResponse<Record<string, { enabled: boolean; genres?: number[] }>>> {
+    return this.backendRequest<Record<string, { enabled: boolean; genres?: number[] }>>(`/api/admin/indexers/${encodeURIComponent(indexerId)}/categories`, { method: 'GET' });
   },
-  async updateIndexerCategories(this: ServerApiClientIndexersAccess, indexerId: string, categories: string[]): Promise<ApiResponse<void>> {
-    return this.backendRequest<void>(`/api/admin/indexers/${encodeURIComponent(indexerId)}/categories`, { method: 'PUT', body: JSON.stringify({ categories }) });
+  async updateIndexerCategories(
+    this: ServerApiClientIndexersAccess, 
+    indexerId: string, 
+    categories: string[] | Record<string, { enabled: boolean; genres?: number[] }>
+  ): Promise<ApiResponse<void>> {
+    // Support des deux formats : simple (string[]) pour compatibilité, ou hiérarchique (Record)
+    if (Array.isArray(categories)) {
+      return this.backendRequest<void>(`/api/admin/indexers/${encodeURIComponent(indexerId)}/categories`, { method: 'PUT', body: JSON.stringify({ categories }) });
+    } else {
+      return this.backendRequest<void>(`/api/admin/indexers/${encodeURIComponent(indexerId)}/categories`, { method: 'PUT', body: JSON.stringify({ categories_config: categories }) });
+    }
   },
   async getIndexerAvailableCategories(this: ServerApiClientIndexersAccess, indexerId: string): Promise<ApiResponse<Array<{ id: string; name: string; description?: string }>>> {
     return this.backendRequest<Array<{ id: string; name: string; description?: string }>>(`/api/admin/indexers/${encodeURIComponent(indexerId)}/categories/available`, { method: 'GET' });
+  },
+  async getTmdbGenres(this: ServerApiClientIndexersAccess): Promise<ApiResponse<{ movies: Array<{ id: number; name: string }>; tv: Array<{ id: number; name: string }> }>> {
+    const userId = this.getCurrentUserId();
+    const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
+    return this.backendRequest<{ movies: Array<{ id: number; name: string }>; tv: Array<{ id: number; name: string }> }>('/api/admin/indexers/tmdb-genres', { method: 'GET', headers });
   },
   async testIndexer(this: ServerApiClientIndexersAccess, id: string): Promise<ApiResponse<{ success: boolean; message?: string; totalResults?: number; resultsCount?: number; successfulQueries?: number; failedQueries?: Array<[string, string]>; testQueries?: string[]; categoriesFound?: string[]; sampleResults?: Array<{ title?: string; size?: number; seeders?: number; peers?: number; leechers?: number; category?: string; tmdbId?: number; slug?: string }>; sampleResult?: any }>> {
     return this.backendRequest(`/api/indexers/test`, { method: 'POST', body: JSON.stringify({ indexer_id: id }) });

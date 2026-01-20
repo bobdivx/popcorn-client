@@ -207,6 +207,7 @@ export class TokenManager {
   private static readonly REFRESH_TOKEN_KEY = 'refresh_token';
   private static readonly CLOUD_ACCESS_TOKEN_KEY = 'cloud_access_token';
   private static readonly CLOUD_REFRESH_TOKEN_KEY = 'cloud_refresh_token';
+  private static readonly JWT_SECRET_KEY = 'jwt_secret';
 
   /**
    * Stocke les tokens locaux
@@ -259,7 +260,23 @@ export class TokenManager {
   }
 
   /**
-   * Supprime tous les tokens (locaux et cloud)
+   * Stocke le secret JWT de l'utilisateur
+   */
+  static setJWTSecret(jwtSecret: string): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(this.JWT_SECRET_KEY, jwtSecret);
+  }
+
+  /**
+   * Récupère le secret JWT de l'utilisateur
+   */
+  static getJWTSecret(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(this.JWT_SECRET_KEY);
+  }
+
+  /**
+   * Supprime tous les tokens (locaux et cloud) et le secret JWT
    */
   static clearTokens(): void {
     if (typeof window === 'undefined') return;
@@ -267,5 +284,6 @@ export class TokenManager {
     localStorage.removeItem(this.REFRESH_TOKEN_KEY);
     localStorage.removeItem(this.CLOUD_ACCESS_TOKEN_KEY);
     localStorage.removeItem(this.CLOUD_REFRESH_TOKEN_KEY);
+    localStorage.removeItem(this.JWT_SECRET_KEY);
   }
 }

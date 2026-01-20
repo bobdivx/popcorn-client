@@ -10,7 +10,38 @@
  * Web Crypto API est disponible dans tous ces environnements via crypto.subtle
  */
 
-const JWT_SECRET = import.meta.env.JWT_SECRET || 'default-secret-change-in-production';
+// Récupérer le secret JWT de l'utilisateur depuis le stockage local
+// Si non trouvé, utiliser le secret d'environnement ou générer un secret temporaire
+function getJWTSecretSync(): string {
+  // D'abord, essayer de récupérer le secret stocké depuis localStorage (depuis login/register)
+  if (typeof window !== 'undefined') {
+    try {
+      const storedSecret = localStorage.getItem('jwt_secret');
+      if (storedSecret) {
+        return storedSecret;
+      }
+    } catch (error) {
+      // localStorage peut ne pas être disponible, continuer
+    }
+  }
+  
+  // Ensuite, essayer le secret d'environnement
+  const envSecret = import.meta.env.JWT_SECRET;
+  if (envSecret) {
+    return envSecret;
+  }
+  
+  // En mode production, exiger un secret
+  if (import.meta.env.PROD) {
+    throw new Error('JWT_SECRET must be defined. Please login or register to get your user-specific JWT secret.');
+  }
+  
+  // En développement, générer un secret aléatoire temporaire
+  console.warn('⚠️ JWT_SECRET not found. Generating a temporary secret for development. Please login to get your user-specific secret.');
+  const array = new Uint8Array(32);
+  crypto.getRandomValues(array);
+  return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+}
 const JWT_ACCESS_EXPIRES_IN = import.meta.env.JWT_ACCESS_EXPIRES_IN || '1h';
 const JWT_REFRESH_EXPIRES_IN = import.meta.env.JWT_REFRESH_EXPIRES_IN || '30d';
 
@@ -99,8 +130,11 @@ function getExpirationSeconds(expiresIn: string): number {
 
 /**
  * Génère un token JWT côté client (compatible navigateur)
+ * Utilise le secret JWT de l'utilisateur stocké localement
  */
 export async function generateAccessToken(payload: Omit<JWTPayload, 'type' | 'exp' | 'iat'>): Promise<string> {
+  const jwtSecret = getJWTSecretSync();
+  
   const normalizedPayload: JWTPayload = {
     ...payload,
     userId: payload.userId || payload.id || '',
@@ -113,15 +147,18 @@ export async function generateAccessToken(payload: Omit<JWTPayload, 'type' | 'ex
   const headerBase64 = base64UrlEncode(JSON.stringify(header));
   const payloadBase64 = base64UrlEncode(JSON.stringify(normalizedPayload));
   
-  const signature = await createSignature(headerBase64, payloadBase64, JWT_SECRET);
+  const signature = await createSignature(headerBase64, payloadBase64, jwtSecret);
   
   return `${headerBase64}.${payloadBase64}.${signature}`;
 }
 
 /**
  * Génère un token de rafraîchissement (longue durée)
+ * Utilise le secret JWT de l'utilisateur stocké localement
  */
 export async function generateRefreshToken(payload: Omit<JWTPayload, 'type' | 'exp' | 'iat'>): Promise<string> {
+  const jwtSecret = getJWTSecretSync();
+  
   const normalizedPayload: JWTPayload = {
     ...payload,
     userId: payload.userId || payload.id || '',
@@ -134,7 +171,7 @@ export async function generateRefreshToken(payload: Omit<JWTPayload, 'type' | 'e
   const headerBase64 = base64UrlEncode(JSON.stringify(header));
   const payloadBase64 = base64UrlEncode(JSON.stringify(normalizedPayload));
   
-  const signature = await createSignature(headerBase64, payloadBase64, JWT_SECRET);
+  const signature = await createSignature(headerBase64, payloadBase64, jwtSecret);
   
   return `${headerBase64}.${payloadBase64}.${signature}`;
 }

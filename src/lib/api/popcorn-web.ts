@@ -216,6 +216,7 @@ export async function loginCloud(email: string, password: string): Promise<{
   };
   accessToken: string;
   refreshToken: string;
+  jwtSecret?: string;
 } | null> {
   const apiUrl = getPopcornWebApiUrl();
   const fullUrl = `${apiUrl}/auth/login`;
@@ -282,6 +283,7 @@ export async function loginCloud(email: string, password: string): Promise<{
         user: data.data.user,
         accessToken: data.data.accessToken,
         refreshToken: data.data.refreshToken,
+        jwtSecret: data.data.jwtSecret,
       };
     }
 
@@ -350,6 +352,7 @@ export async function registerCloud(email: string, password: string, inviteCode:
   };
   accessToken: string;
   refreshToken: string;
+  jwtSecret?: string;
   grantsAdmin?: boolean;
 } | null> {
   try {
@@ -382,6 +385,7 @@ export async function registerCloud(email: string, password: string, inviteCode:
         user: data.data.user,
         accessToken: data.data.accessToken,
         refreshToken: data.data.refreshToken,
+        jwtSecret: data.data.jwtSecret,
         grantsAdmin: data.data.grantsAdmin || false,
       };
     }
@@ -484,6 +488,10 @@ export interface UserConfig {
     syncQueriesFilms?: string[];
     syncQueriesSeries?: string[];
   } | null;
+  indexerCategories?: Record<string, {
+    enabled: boolean;
+    genres?: number[];
+  }> | null;
 }
 
 /**
@@ -637,6 +645,7 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
         tmdbApiKey: data.data.config.tmdbApiKey,
         downloadLocation: data.data.config.downloadLocation,
         syncSettings: data.data.config.syncSettings ?? null,
+        indexerCategories: data.data.config.indexerCategories ?? null,
       };
     }
 

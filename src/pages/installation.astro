@@ -55,8 +55,8 @@ services:
       # Variables Turso en lecture seule pour valider les codes d'invitation
       # Ces variables permettent uniquement de LIRE les codes d'invitation depuis Turso
       # Les données utilisateur restent dans SQLite local
-      - TURSO_READONLY_DATABASE_URL=$&#123;TURSO_READONLY_DATABASE_URL:-libsql://popcorn-bobdivx.aws-eu-west-1.turso.io&#125;
-      - TURSO_READONLY_AUTH_TOKEN=$&#123;TURSO_READONLY_AUTH_TOKEN:-eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicm8iLCJpYXQiOjE3Njc0NTE3MzMsImlkIjoiZTVmMGZiZjAtZTEzMS00MTY2LTgyYmEtMmEwYjZiNWQ3ZTA3IiwicmlkIjoiOGM2NmRlMjctYjkxMy00ZWNjLTlmZDQtYjhmNzRkZDhhODMyIn0.H27fjXjDdIoWLbJ7q-ejckjuD8iVz6CzyN4vBxq7lZJZ7d6RoxZAeBSLk0W2Ax6jnjV8d8EIV0CgO7BSxuRuBg&#125;
+      - TURSO_READONLY_DATABASE_URL=$&#123;TURSO_READONLY_DATABASE_URL&#125;
+      - TURSO_READONLY_AUTH_TOKEN=$&#123;TURSO_READONLY_AUTH_TOKEN&#125;
     labels:
       icon: https://raw.githubusercontent.com/bobdivx/popcorn/main/public/favicon.svg
     ports:
@@ -96,8 +96,8 @@ services:
       - SERVER_PORT=3000
       - DOWNLOAD_DIR=/app/downloads
       - API_BASE_URL=$&#123;API_BASE_URL:-http://client:4321&#125;
-      - API_USERNAME=$&#123;API_USERNAME:-admin&#125;
-      - API_PASSWORD=$&#123;API_PASSWORD:-admin123&#125;
+      - API_USERNAME=$&#123;API_USERNAME&#125;
+      - API_PASSWORD=$&#123;API_PASSWORD&#125;
       - MAX_DOWNLOADS=$&#123;MAX_DOWNLOADS:-5&#125;
       - MAX_UPLOAD_SLOTS=$&#123;MAX_UPLOAD_SLOTS:-4&#125;
       - LIBRQBIT_API_URL=$&#123;LIBRQBIT_API_URL:-http://127.0.0.1:3030&#125;
@@ -205,8 +205,8 @@ PUID=1000
 PGID=1000
 
 # Configuration API
-API_USERNAME=admin
-API_PASSWORD=admin123
+API_USERNAME=CHANGE_ME
+API_PASSWORD=CHANGE_ME
 
 # Limites de téléchargement
 MAX_DOWNLOADS=5
@@ -283,8 +283,8 @@ services:
       # Variables Turso en lecture seule pour valider les codes d'invitation
       # Ces variables permettent uniquement de LIRE les codes d'invitation depuis Turso
       # Les données utilisateur restent dans SQLite local
-      - TURSO_READONLY_DATABASE_URL=$&#123;TURSO_READONLY_DATABASE_URL:-libsql://popcorn-bobdivx.aws-eu-west-1.turso.io&#125;
-      - TURSO_READONLY_AUTH_TOKEN=$&#123;TURSO_READONLY_AUTH_TOKEN:-eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicm8iLCJpYXQiOjE3Njc0NTE3MzMsImlkIjoiZTVmMGZiZjAtZTEzMS00MTY2LTgyYmEtMmEwYjZiNWQ3ZTA3IiwicmlkIjoiOGM2NmRlMjctYjkxMy00ZWNjLTlmZDQtYjhmNzRkZDhhODMyIn0.H27fjXjDdIoWLbJ7q-ejckjuD8iVz6CzyN4vBxq7lZJZ7d6RoxZAeBSLk0W2Ax6jnjV8d8EIV0CgO7BSxuRuBg&#125;
+      - TURSO_READONLY_DATABASE_URL=$&#123;TURSO_READONLY_DATABASE_URL&#125;
+      - TURSO_READONLY_AUTH_TOKEN=$&#123;TURSO_READONLY_AUTH_TOKEN&#125;
     labels:
       icon: https://raw.githubusercontent.com/bobdivx/popcorn/main/public/favicon.svg
     ports:
@@ -324,8 +324,8 @@ services:
       - SERVER_PORT=3000
       - DOWNLOAD_DIR=/app/downloads
       - API_BASE_URL=$&#123;API_BASE_URL:-http://client:4321&#125;
-      - API_USERNAME=$&#123;API_USERNAME:-admin&#125;
-      - API_PASSWORD=$&#123;API_PASSWORD:-admin123&#125;
+      - API_USERNAME=$&#123;API_USERNAME&#125;
+      - API_PASSWORD=$&#123;API_PASSWORD&#125;
       - MAX_DOWNLOADS=$&#123;MAX_DOWNLOADS:-5&#125;
       - MAX_UPLOAD_SLOTS=$&#123;MAX_UPLOAD_SLOTS:-4&#125;
       - LIBRQBIT_API_URL=$&#123;LIBRQBIT_API_URL:-http://127.0.0.1:3030&#125;

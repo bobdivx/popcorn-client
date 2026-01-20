@@ -144,36 +144,21 @@ export function IndexersStep({
         response = await serverApi.createIndexer(formData);
       }
 
-      // #region agent log
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'IndexersStep.tsx:108',message:'Wizard response received',data:{success:response.success,isEdit:!!editingIndexer,hasData:!!response.data},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       if (response.success) {
         // Si c'est une création (pas une édition), synchroniser les catégories avec le backend Rust
         if (!editingIndexer && response.data) {
           const indexerId = response.data.id;
-          // #region agent log
-          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'IndexersStep.tsx:112',message:'Wizard categories sync start (CREATE)',data:{indexerId,isEdit:false},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
           try {
             // Activer par défaut les catégories "films" et "séries" dans le backend Rust
             const defaultCategories = ['films', 'series'];
             await serverApi.updateIndexerCategories(indexerId, defaultCategories);
             console.log('[WIZARD] ✅ Catégories par défaut activées pour l\'indexer:', indexerId);
-            // #region agent log
-            fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'IndexersStep.tsx:116',message:'Wizard categories sync success (CREATE)',data:{indexerId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-            // #endregion
-          } catch (catError) {
+            } catch (catError) {
             console.warn('[WIZARD] ⚠️ Erreur lors de l\'activation des catégories par défaut:', catError);
-            // #region agent log
-            fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'IndexersStep.tsx:119',message:'Wizard categories sync error (CREATE)',data:{indexerId,error:catError instanceof Error ? catError.message : String(catError)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-            // #endregion
             // Ne pas bloquer si la synchronisation des catégories échoue
           }
         } else if (editingIndexer && response.data) {
-          // #region agent log
-          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'IndexersStep.tsx:123',message:'Wizard UPDATE - no categories sync',data:{indexerId:editingIndexer.id,isEdit:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
-        }
+          }
         
         setShowForm(false);
         setEditingIndexer(null);

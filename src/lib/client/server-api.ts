@@ -183,12 +183,7 @@ class ServerApiClient {
       try {
         const { invoke } = await import('@tauri-apps/api/core');
 
-        // #region agent log
-        await logNative(`[popcorn-debug] Attempting native-fetch: url=${url}, method=${method}`);
-        // Log aussi dans la console JavaScript pour capture
-        console.error('[popcorn-debug] Attempting native-fetch:', { url, method });
-        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:nativeFetch:NATIVE_FETCH_START',message:'Début native-fetch',data:{url,method,timeoutMs,headerCount:headerPairs.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
+        // Debug logging removed for production security
 
         const res: any = await invoke('native-fetch', {
           url,
@@ -197,9 +192,6 @@ class ServerApiClient {
           body,
           timeoutMs,
         } as any);
-        // #region agent log
-        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:nativeFetch:NATIVE_FETCH_SUCCESS',message:'native-fetch réussi',data:{url,method,status:res?.status,ok:res?.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
 
         // #region agent log
         await logNative(`[popcorn-debug] native-fetch success: status=${res?.status}, ok=${res?.ok}`);
@@ -223,18 +215,7 @@ class ServerApiClient {
         const errorStr = errorMsg.toLowerCase();
         const errorName = e instanceof Error ? e.name : '';
         
-        // #region agent log
-        await logNative(`[popcorn-debug] native-fetch error: name=${errorName}, message=${errorMsg}, full=${JSON.stringify(err)}`);
-        // Log aussi dans la console JavaScript pour capture dans logcat
-        console.error('[popcorn-debug] native-fetch ERROR:', { 
-          name: errorName, 
-          message: errorMsg, 
-          errorStr, 
-          full: err,
-          url 
-        });
-        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:nativeFetch:NATIVE_FETCH_ERROR',message:'Erreur native-fetch',data:{url,method,errorName,errorMsg,errorStr,errorDetails:err},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
+        // Debug logging removed for production security
         
         // Détection robuste : vérifier plusieurs patterns d'erreur possibles
         // Tauri peut retourner différentes variantes selon la version
@@ -415,11 +396,6 @@ class ServerApiClient {
     const url = `${base}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
     const maxRetries = 2; // Maximum 2 retries (3 tentatives au total)
     
-    // #region agent log
-    if (retryCount === 0) {
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest:ENTRY',message:'Début requête backend',data:{base,endpoint,url,retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    }
-    // #endregion
     // Logger l'URL utilisée pour le diagnostic
     if (retryCount === 0) {
       console.log('[server-api] Requête vers:', url);
@@ -432,13 +408,7 @@ class ServerApiClient {
 
     try {
       const timeoutMs = this.getTimeoutMs(endpoint);
-      // #region agent log
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest:BEFORE_FETCH',message:'Avant nativeFetch',data:{url,timeoutMs,endpoint},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       const response = await this.nativeFetch(url, { ...options, headers }, timeoutMs);
-      // #region agent log
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest:AFTER_FETCH',message:'Après nativeFetch',data:{url,status:response.status,ok:response.ok,statusText:response.statusText},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -496,26 +466,17 @@ class ServerApiClient {
         data: (data && typeof data === 'object' && 'data' in data ? (data as any).data : data) as T,
       };
     } catch (error) {
-      // #region agent log
       const errorDetails = error instanceof Error ? {name:error.name,message:error.message,stack:error.stack} : {value:String(error),type:typeof error};
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest:CATCH',message:'Erreur lors requête backend',data:{url,endpoint,error:errorDetails,retryCount,isRetryable:this.isRetryableError(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       // Vérifier si l'erreur est récupérable et retenter si nécessaire
       if (retryCount < maxRetries && this.isRetryableError(error)) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Exponential backoff, max 3s
         console.warn(`[server-api] Erreur réseau récupérable, retry dans ${delay}ms (tentative ${retryCount + 1}/${maxRetries})`);
-        // #region agent log
-        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest:RETRY',message:'Retry de la requête',data:{url,endpoint,retryCount,delay,nextRetryCount:retryCount+1},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-        // #endregion
         await new Promise(resolve => setTimeout(resolve, delay));
         return this.backendRequest<T>(endpoint, options, retryCount + 1);
       }
       
       // Obtenir un message d'erreur clair pour l'utilisateur
       const errorInfo = this.getErrorMessage(error, undefined, endpoint, url);
-      // #region agent log
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest:ERROR_INFO',message:'Détails erreur finale',data:{url,endpoint,errorCode:errorInfo.code,errorMessage:errorInfo.message,errorDetails},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       console.error('[server-api] Erreur de connexion:', {
         url,
         endpoint,
@@ -537,6 +498,8 @@ class ServerApiClient {
     // Le setup peut impliquer des écritures DB + détection/validation indexer -> parfois lent
     if (endpoint.startsWith('/api/v1/setup/')) return 60000;
     if (endpoint.startsWith('/api/v1/sync/')) return 60000;
+    // Test d'indexer : peut prendre du temps (plusieurs requêtes + tests téléchargement + RSS)
+    if (endpoint.includes('/api/indexers/test')) return 60000; // 60 secondes pour les tests d'indexers
     // Health checks : timeout plus long sur Android pour gérer les réseaux lents
     if (endpoint.includes('/health') || endpoint.includes('/api/client/health')) {
       const isAndroid = typeof window !== 'undefined' && /Android/i.test(navigator.userAgent || '');
@@ -904,9 +867,10 @@ interface IServerApiClientPublic {
   createIndexer(data: IndexerFormData): Promise<ApiResponse<Indexer>>;
   updateIndexer(id: string, data: Partial<IndexerFormData>): Promise<ApiResponse<Indexer>>;
   deleteIndexer(id: string): Promise<ApiResponse<void>>;
-  getIndexerCategories(indexerId: string): Promise<ApiResponse<string[]>>;
-  updateIndexerCategories(indexerId: string, categories: string[]): Promise<ApiResponse<void>>;
+  getIndexerCategories(indexerId: string): Promise<ApiResponse<Record<string, { enabled: boolean; genres?: number[] }>>>;
+  updateIndexerCategories(indexerId: string, categories: string[] | Record<string, { enabled: boolean; genres?: number[] }>): Promise<ApiResponse<void>>;
   getIndexerAvailableCategories(indexerId: string): Promise<ApiResponse<Array<{ id: string; name: string; description?: string }>>>;
+  getTmdbGenres(): Promise<ApiResponse<{ movies: Array<{ id: number; name: string }>; tv: Array<{ id: number; name: string }> }>>;
   testIndexer(id: string): Promise<ApiResponse<any>>;
 
   // Settings methods

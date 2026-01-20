@@ -118,7 +118,6 @@ function getDefaultBackendUrl(): string {
 export function getBackendUrl(): string {
   // #region agent log
   if (typeof window !== 'undefined') {
-    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:getBackendUrl:ENTRY',message:'Récupération URL backend',data:{isServer:typeof window === 'undefined'},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
   }
   // #endregion
   // Côté serveur (Astro SSR), localStorage n'est pas disponible
@@ -133,39 +132,21 @@ export function getBackendUrl(): string {
   // Côté client: priorité localStorage
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    // #region agent log
-    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:getBackendUrl:LOCALSTORAGE',message:'Lecture localStorage',data:{stored,hasStored:!!stored},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
     if (stored) {
-      // #region agent log
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:getBackendUrl:RETURN_STORED',message:'URL retournée depuis localStorage',data:{stored},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
       return stored;
     }
   } catch (error) {
     console.warn('[backend-config] Erreur lors de la lecture de localStorage:', error);
-    // #region agent log
-    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:getBackendUrl:LOCALSTORAGE_ERROR',message:'Erreur lecture localStorage',data:{error:String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
-  }
+    }
 
   // Fallback: variable d'environnement
   const envUrl = import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL || '';
-  // #region agent log
-  fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:getBackendUrl:ENV_CHECK',message:'Vérification variables env',data:{envUrl,hasEnvUrl:!!envUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-  // #endregion
   if (envUrl) {
-    // #region agent log
-    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:getBackendUrl:RETURN_ENV',message:'URL retournée depuis env',data:{envUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-    // #endregion
     return envUrl;
   }
 
   // Valeur par défaut (détecte Android automatiquement)
   const defaultUrl = getDefaultBackendUrl();
-  // #region agent log
-  fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:getBackendUrl:RETURN_DEFAULT',message:'URL retournée par défaut',data:{defaultUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-  // #endregion
   return defaultUrl;
 }
 
@@ -204,33 +185,18 @@ export async function getBackendUrlAsync(): Promise<string> {
  * Normalise une URL en ajoutant le protocole si manquant
  */
 function normalizeBackendUrl(url: string): string {
-  // #region agent log
-  fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:normalizeBackendUrl:ENTRY',message:'Normalisation URL backend',data:{urlOriginal:url},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   const trimmed = url.trim();
   if (!trimmed) {
-    // #region agent log
-    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:normalizeBackendUrl:EMPTY',message:'URL vide après trim',data:{urlOriginal:url,trimmed},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     return trimmed;
   }
   
   // Si l'URL ne commence pas par http:// ou https://, ajouter http://
   const hasProtocol = trimmed.match(/^https?:\/\//i);
-  // #region agent log
-  fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:normalizeBackendUrl:CHECK_PROTOCOL',message:'Vérification protocole',data:{urlOriginal:url,trimmed,hasProtocol:!!hasProtocol},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   if (!hasProtocol) {
     const normalized = `http://${trimmed}`;
-    // #region agent log
-    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:normalizeBackendUrl:ADD_PROTOCOL',message:'Protocole http:// ajouté',data:{urlOriginal:url,trimmed,normalized},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     return normalized;
   }
   
-  // #region agent log
-  fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'backend-config.ts:normalizeBackendUrl:EXIT',message:'URL normalisée (protocole déjà présent)',data:{urlOriginal:url,trimmed,normalized:trimmed},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-  // #endregion
   return trimmed;
 }
 

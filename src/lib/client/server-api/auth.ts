@@ -59,7 +59,9 @@ export const authMethods = {
 
   /**
    * Connexion utilisateur
-   * Unifié : génération de tokens JWT côté client pour tous les modes
+   * Détecte automatiquement si un secret JWT existe :
+   * - Si OUI : connexion au backend local
+   * - Si NON : connexion au cloud pour récupérer le secret, puis génération de tokens locaux
    */
   async login(this: ServerApiClientAuthAccess, email: string, password: string): Promise<ApiResponse<AuthResponse>> {
     // Log pour debug : voir ce qui est envoyé
@@ -67,6 +69,51 @@ export const authMethods = {
       console.log('[server-api] Tentative de login:', { email, passwordLength: password?.length || 0 });
     }
     
+    // Vérifier si un secret JWT existe déjà dans localStorage
+    const hasJWTSecret = typeof window !== 'undefined' && TokenManager.getJWTSecret() !== null;
+    
+    if (!hasJWTSecret) {
+      // Pas de secret JWT : se connecter au cloud pour le récupérer
+      console.log('[server-api] Aucun secret JWT trouvé, connexion au cloud pour le récupérer...');
+      const cloudResponse = await this.loginCloud(email, password);
+      
+      if (!cloudResponse.success) {
+        // Si la connexion cloud échoue, retourner l'erreur
+        return cloudResponse;
+      }
+      
+      // La connexion cloud a réussi et le secret JWT est stocké
+      // On génère des tokens locaux avec les informations de l'utilisateur cloud
+      // Pas besoin de se connecter au backend local car l'utilisateur n'y existe peut-être pas
+      console.log('[server-api] Connexion cloud réussie, génération de tokens locaux...');
+      
+      const user = cloudResponse.data?.user;
+      if (user) {
+        const userId = user.id || '';
+        const userEmail = user.email || email;
+        const username = userEmail.split('@')[0] || email || 'user';
+        
+        // Générer des tokens locaux JWT pour l'app
+        const { accessToken, refreshToken } = await this.generateClientTokens(userId, username);
+        this.saveTokens(accessToken, refreshToken);
+        this.saveUser(user);
+        
+        return {
+          success: true,
+          data: {
+            user: { id: userId, email: userEmail },
+            accessToken,
+            refreshToken,
+          },
+        };
+      }
+      
+      // Si pas d'utilisateur dans la réponse cloud, retourner la réponse cloud telle quelle
+      return cloudResponse;
+    }
+    
+    // Secret JWT présent : essayer de se connecter au backend local
+    console.log('[server-api] Secret JWT présent, tentative de connexion au backend local...');
     const res = await this.backendRequest<any>('/api/client/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
@@ -77,7 +124,38 @@ export const authMethods = {
       console.log('[server-api] Réponse login:', { success: res.success, error: res.error, message: res.message });
     }
     
-    if (!res.success) return res as ApiResponse<AuthResponse>;
+    if (!res.success) {
+      // Si la connexion locale échoue, essayer quand même avec le cloud
+      // (peut-être que l'utilisateur n'existe que dans le cloud)
+      console.log('[server-api] Connexion locale échouée, tentative avec le cloud...');
+      const cloudResponse = await this.loginCloud(email, password);
+      
+      if (cloudResponse.success) {
+        // Connexion cloud réussie, générer des tokens locaux
+        const user = cloudResponse.data?.user;
+        if (user) {
+          const userId = user.id || '';
+          const userEmail = user.email || email;
+          const username = userEmail.split('@')[0] || email || 'user';
+          
+          const { accessToken, refreshToken } = await this.generateClientTokens(userId, username);
+          this.saveTokens(accessToken, refreshToken);
+          this.saveUser(user);
+          
+          return {
+            success: true,
+            data: {
+              user: { id: userId, email: userEmail },
+              accessToken,
+              refreshToken,
+            },
+          };
+        }
+      }
+      
+      // Si le cloud échoue aussi, retourner l'erreur locale
+      return res as ApiResponse<AuthResponse>;
+    }
 
     const user = res.data?.user || res.data;
     const userId = user?.id || '';
@@ -116,6 +194,12 @@ export const authMethods = {
 
       // Stocker les tokens cloud
       TokenManager.setCloudTokens(result.accessToken, result.refreshToken);
+      
+      // Stocker le secret JWT si fourni (important pour les connexions suivantes)
+      if (result.jwtSecret) {
+        TokenManager.setJWTSecret(result.jwtSecret);
+        console.log('[server-api] Secret JWT stocké depuis la connexion cloud');
+      }
 
       // Stocker user localement pour pouvoir faire les appels backend qui demandent X-User-ID (TMDB/sync)
       this.saveUser(result.user);
@@ -189,6 +273,12 @@ export const authMethods = {
       }
 
       TokenManager.setCloudTokens(result.accessToken, result.refreshToken);
+      
+      // Stocker le secret JWT si fourni
+      if (result.jwtSecret) {
+        TokenManager.setJWTSecret(result.jwtSecret);
+      }
+      
       this.saveUser(result.user);
 
       // Générer des tokens locaux JWT pour l'app

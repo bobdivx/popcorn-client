@@ -76,10 +76,6 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext }: Server
       // Tester la connexion au backend Rust directement
       const testUrl = `${normalizedUrl}/api/client/health`;
       console.log('[ServerUrlStep] Test de connexion à:', testUrl);
-      // #region agent log
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ServerUrlStep.tsx:handleTest:BEFORE_FETCH',message:'Test connexion backend',data:{backendUrl,normalizedUrl,testUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
-      
       const response = await fetch(testUrl, {
         method: 'GET',
         headers: {
@@ -87,10 +83,6 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext }: Server
         },
         signal: AbortSignal.timeout(5000), // Timeout de 5 secondes
       });
-      // #region agent log
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ServerUrlStep.tsx:handleTest:AFTER_FETCH',message:'Réponse test connexion',data:{testUrl,status:response.status,ok:response.ok,statusText:response.statusText},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
-      
       if (response.ok) {
         setSuccess(`✅ Connexion réussie ! Le backend Rust est accessible à ${normalizedUrl}`);
       } else {
@@ -99,7 +91,6 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext }: Server
     } catch (err) {
       // #region agent log
       const errorDetails = err instanceof Error ? {name:err.name,message:err.message,stack:err.stack} : {value:String(err),type:typeof err};
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ServerUrlStep.tsx:handleTest:CATCH',message:'Erreur test connexion',data:{backendUrl,normalizedUrl,testUrl,error:errorDetails,isTypeError:err instanceof TypeError,isFailedToFetch:err instanceof TypeError && err.message.includes('Failed to fetch')},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
       // #endregion
       let errorMessage = 'Erreur de connexion';
       
