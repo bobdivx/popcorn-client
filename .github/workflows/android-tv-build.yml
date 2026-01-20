@@ -463,9 +463,7 @@ jobs:
             
             1. Téléchargez le fichier APK ci-dessus
             2. Transférez-le sur votre appareil Android TV (via USB, réseau, ou cloud)
-            3. Activez l'installation depuis des sources inconnues dans les paramètres
-               - Paramètres > Sécurité > Sources inconnues
-            4. Installez l'APK via un gestionnaire de fichiers sur votre TV
+            3. Installez l'APK via un gestionnaire de fichiers sur votre TV
             
             ### ℹ️ Notes
             

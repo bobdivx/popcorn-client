@@ -1,4 +1,4 @@
-import { Play, RotateCw, Download, FileDown, Link2, Check, Trash2, Pause, Loader2, Zap } from 'lucide-preact';
+import { Play, RotateCw, Download, FileDown, Link2, Check, Trash2, Pause, Loader2, Zap, Upload } from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
 
@@ -114,6 +114,7 @@ export function ActionButtons({
   // Déterminer l'état du bouton de téléchargement
   const isDownloading = !!torrentStats && (torrentStats.state === 'downloading' || torrentStats.state === 'queued');
   const isCompleted = !!torrentStats && (torrentStats.state === 'completed' || torrentStats.state === 'seeding');
+  const isSeeding = !!torrentStats && torrentStats.state === 'seeding';
   const progressPercent = torrentStats ? Math.round(torrentStats.progress * 100) : 0;
 
   // Afficher le bouton si :
@@ -317,6 +318,29 @@ export function ActionButtons({
               {torrentStats.eta_seconds && torrentStats.eta_seconds > 0 && (
                 <> • Temps restant: {formatTimeRemaining(torrentStats.eta_seconds)}</>
               )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Affichage du statut de partage (seeding) */}
+      {isSeeding && torrentStats && (
+        <div className="mt-4 p-4 bg-green-900/20 rounded-lg border border-green-500/50 backdrop-blur-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <Upload className="h-5 w-5 text-green-400" size={20} />
+            <span className="text-green-400 font-medium">Partage actif</span>
+          </div>
+          {torrentStats.upload_speed && torrentStats.upload_speed > 0 && (
+            <div className="text-green-300 text-sm">
+              Vitesse d'upload: {((torrentStats.upload_speed / (1024 * 1024)).toFixed(2))} MB/s
+              {torrentStats.peers_connected && (
+                <> • Partage avec {torrentStats.peers_connected} peer{torrentStats.peers_connected > 1 ? 's' : ''}</>
+              )}
+            </div>
+          )}
+          {(!torrentStats.upload_speed || torrentStats.upload_speed === 0) && (
+            <div className="text-green-300 text-sm">
+              En attente de connexions peers pour partager
             </div>
           )}
         </div>

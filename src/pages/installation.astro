@@ -31,7 +31,7 @@ import Layout from '../layouts/Layout.astro';
           <pre class="text-sm text-gray-300"><code>name: popcorn
 services:
   client:
-    # image: docker.io/bobdivx/popcorn-client:latest  # Commenté pour développement local
+    # image: docker.io/bobdivx/popcorn-frontend:latest  # Commenté pour développement local
     build:
       context: ../popcorn-client
       dockerfile: Dockerfile
@@ -81,7 +81,7 @@ services:
       start_period: 60s
     cap_add: []
   server:
-    # image: docker.io/bobdivx/popcorn-server:latest  # Commenté pour développement local
+    # image: docker.io/bobdivx/popcorn-backend:latest  # Commenté pour développement local
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -259,7 +259,7 @@ docker-compose up -d</code></pre>
     const fullCompose = `name: popcorn
 services:
   client:
-    # image: docker.io/bobdivx/popcorn-client:latest  # Commenté pour développement local
+    # image: docker.io/bobdivx/popcorn-frontend:latest  # Commenté pour développement local
     build:
       context: ../popcorn-client
       dockerfile: Dockerfile
@@ -309,7 +309,7 @@ services:
       start_period: 60s
     cap_add: []
   server:
-    # image: docker.io/bobdivx/popcorn-server:latest  # Commenté pour développement local
+    # image: docker.io/bobdivx/popcorn-backend:latest  # Commenté pour développement local
     build:
       context: ./backend
       dockerfile: Dockerfile

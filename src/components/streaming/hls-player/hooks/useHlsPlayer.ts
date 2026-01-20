@@ -50,6 +50,7 @@ export function useHlsPlayer({
   const startFromBeginningRef = useRef(startFromBeginning);
   const torrentIdRef = useRef(torrentId);
   const onDurationChangeRef = useRef(onDurationChange);
+  const totalDurationRef = useRef<number>(0);
   
   // Mettre à jour les refs quand les props changent (sans déclencher de réinitialisation)
   useEffect(() => {
@@ -99,6 +100,9 @@ export function useHlsPlayer({
     }
 
     const initializeVideo = async () => {
+      // Liste des fonctions de nettoyage à appeler
+      const cleanupFunctions: Array<() => void> = [];
+      
       try {
         setIsLoading(true);
         
@@ -170,45 +174,83 @@ export function useHlsPlayer({
           // Extraire la durée totale depuis la playlist HLS
           // La durée totale peut être obtenue depuis les niveaux de qualité
           let totalDuration = 0;
-          if (hls.levels && hls.levels.length > 0) {
-            // Chercher la durée totale depuis le niveau de qualité principal
-            const mainLevel = hls.levels[hls.currentLevel !== -1 ? hls.currentLevel : 0];
-            if (mainLevel && mainLevel.details) {
-              // Si totalduration est disponible
-              if (mainLevel.details.totalduration) {
-                totalDuration = mainLevel.details.totalduration;
-              } else if (mainLevel.details.fragments && mainLevel.details.fragments.length > 0) {
-                // Calculer depuis les fragments
-                const lastFragment = mainLevel.details.fragments[mainLevel.details.fragments.length - 1];
-                totalDuration = lastFragment.start + lastFragment.duration;
-              }
-            }
+          
+          // D'abord, essayer d'obtenir la durée depuis data.totalduration
+          if (data && data.totalduration && data.totalduration > 0) {
+            totalDuration = data.totalduration;
           }
           
-          // Si pas de durée depuis les niveaux, utiliser data.totalduration ou video.duration
-          if (totalDuration === 0) {
-            if (data && data.totalduration) {
-              totalDuration = data.totalduration;
-            } else {
-              // Fallback: attendre que video.duration soit disponible
-              const checkDuration = () => {
-                if (video.duration && isFinite(video.duration) && video.duration > 0) {
-                  totalDuration = video.duration;
-                  onDurationChangeRef.current?.(totalDuration);
+          // Si pas disponible, chercher dans tous les niveaux
+          if (totalDuration === 0 && hls.levels && hls.levels.length > 0) {
+            // Parcourir tous les niveaux pour trouver la durée la plus longue
+            for (const level of hls.levels) {
+              if (level.details) {
+                // D'abord essayer totalduration
+                if (level.details.totalduration && level.details.totalduration > totalDuration) {
+                  totalDuration = level.details.totalduration;
                 }
-              };
-              video.addEventListener('loadedmetadata', checkDuration, { once: true });
-              // Vérifier immédiatement si déjà disponible
-              if (video.duration && isFinite(video.duration) && video.duration > 0) {
-                totalDuration = video.duration;
+                // Sinon, calculer depuis les fragments
+                else if (level.details.fragments && level.details.fragments.length > 0) {
+                  const lastFragment = level.details.fragments[level.details.fragments.length - 1];
+                  const calculatedDuration = lastFragment.start + lastFragment.duration;
+                  if (calculatedDuration > totalDuration) {
+                    totalDuration = calculatedDuration;
+                  }
+                }
               }
             }
           }
           
-          // Notifier la durée totale si disponible
+          // Si toujours pas de durée, essayer de calculer depuis tous les fragments de tous les niveaux
+          if (totalDuration === 0 && hls.levels && hls.levels.length > 0) {
+            for (const level of hls.levels) {
+              if (level.details && level.details.fragments && level.details.fragments.length > 0) {
+                // Additionner tous les fragments
+                let sum = 0;
+                for (const frag of level.details.fragments) {
+                  if (frag.duration) {
+                    sum += frag.duration;
+                  }
+                }
+                if (sum > totalDuration) {
+                  totalDuration = sum;
+                }
+              }
+            }
+          }
+          
+          // Si on a une durée valide, la notifier immédiatement
           if (totalDuration > 0 && isFinite(totalDuration)) {
+            totalDurationRef.current = Math.max(totalDurationRef.current, totalDuration);
             onDurationChangeRef.current?.(totalDuration);
           }
+          
+          // Fallback: attendre que video.duration soit disponible et continuer à écouter
+          // pour les playlists HLS dynamiques où la durée peut changer
+          const checkDuration = () => {
+            const videoDuration = video.duration;
+            if (videoDuration && isFinite(videoDuration) && videoDuration > 0) {
+              // Utiliser video.duration si supérieur à la durée HLS calculée
+              // Cela permet de gérer les playlists qui se mettent à jour progressivement
+              const maxDuration = Math.max(totalDurationRef.current, videoDuration);
+              if (maxDuration > totalDurationRef.current) {
+                totalDurationRef.current = maxDuration;
+                onDurationChangeRef.current?.(maxDuration);
+              }
+            }
+          };
+          
+          // Écouter plusieurs fois durationchange car pour HLS, la durée peut changer
+          video.addEventListener('loadedmetadata', checkDuration);
+          video.addEventListener('durationchange', checkDuration);
+          // Vérifier immédiatement si déjà disponible
+          checkDuration();
+          
+          // Stocker la fonction de nettoyage pour le return
+          cleanupFunctions.push(() => {
+            video.removeEventListener('loadedmetadata', checkDuration);
+            video.removeEventListener('durationchange', checkDuration);
+          });
           
           if (startFromBeginningRef.current) {
             video.currentTime = 0;
@@ -223,6 +265,7 @@ export function useHlsPlayer({
                 // Utiliser la durée totale si disponible, sinon video.duration
                 const videoDuration = totalDuration > 0 ? totalDuration : (video.duration || 0);
                 if (file && file.size > 0 && videoDuration > 0) {
+                  totalDurationRef.current = videoDuration;
                   const estimatedSeconds = (position / file.size) * videoDuration;
                   const maxPosition = videoDuration * 0.95;
                   const finalPosition = Math.min(estimatedSeconds, maxPosition);
@@ -241,18 +284,65 @@ export function useHlsPlayer({
           }, 100);
         });
         
+        // Écouter LEVEL_LOADED pour obtenir la durée complète quand un niveau est complètement chargé
+        hls.on(window.Hls.Events.LEVEL_LOADED, (event: any, data: any) => {
+          if (data && data.details) {
+            let levelDuration = 0;
+            
+            // Essayer d'obtenir totalduration
+            if (data.details.totalduration) {
+              levelDuration = data.details.totalduration;
+            }
+            // Sinon, calculer depuis les fragments
+            else if (data.details.fragments && data.details.fragments.length > 0) {
+              const lastFragment = data.details.fragments[data.details.fragments.length - 1];
+              levelDuration = lastFragment.start + lastFragment.duration;
+              
+              // Si toujours 0, additionner tous les fragments
+              if (levelDuration === 0) {
+                for (const frag of data.details.fragments) {
+                  if (frag.duration) {
+                    levelDuration += frag.duration;
+                  }
+                }
+              }
+            }
+            
+            if (levelDuration > 0 && isFinite(levelDuration) && levelDuration > totalDurationRef.current) {
+              totalDurationRef.current = levelDuration;
+              onDurationChangeRef.current?.(levelDuration);
+            }
+          }
+        });
+        
         // Écouter LEVEL_UPDATED pour mettre à jour la durée si elle change
         hls.on(window.Hls.Events.LEVEL_UPDATED, (event: any, data: any) => {
+          if (data && data.details) {
+            let levelDuration = 0;
+            
+            // Essayer d'obtenir totalduration
+            if (data.details.totalduration) {
+              levelDuration = data.details.totalduration;
+            }
+            // Sinon, calculer depuis les fragments
+            else if (data.details.fragments && data.details.fragments.length > 0) {
+              const lastFragment = data.details.fragments[data.details.fragments.length - 1];
+              levelDuration = lastFragment.start + lastFragment.duration;
+            }
+            
+            if (levelDuration > 0 && isFinite(levelDuration) && levelDuration > totalDurationRef.current) {
+              totalDurationRef.current = levelDuration;
+              onDurationChangeRef.current?.(levelDuration);
+            }
+          }
+        });
+        
+        // Écouter FRAG_LOADED pour mettre à jour la durée si elle devient plus précise
+        hls.on(window.Hls.Events.FRAG_LOADED, (event: any, data: any) => {
           if (data && data.details && data.details.totalduration) {
             const totalDuration = data.details.totalduration;
-            if (totalDuration > 0 && isFinite(totalDuration)) {
-              onDurationChangeRef.current?.(totalDuration);
-            }
-          } else if (data && data.details && data.details.fragments && data.details.fragments.length > 0) {
-            // Calculer depuis les fragments
-            const lastFragment = data.details.fragments[data.details.fragments.length - 1];
-            const totalDuration = lastFragment.start + lastFragment.duration;
-            if (totalDuration > 0 && isFinite(totalDuration)) {
+            if (totalDuration > 0 && isFinite(totalDuration) && totalDuration > totalDurationRef.current) {
+              totalDurationRef.current = totalDuration;
               onDurationChangeRef.current?.(totalDuration);
             }
           }
@@ -403,11 +493,13 @@ export function useHlsPlayer({
         // Sauvegarder la position périodiquement
         const savePositionInterval = setInterval(async () => {
           const currentTorrentId = torrentIdRef.current;
-          if (currentTorrentId && filePath && video.duration > 0 && video.currentTime > 0) {
+          // Utiliser la durée totale HLS si disponible, sinon video.duration
+          const videoDuration = totalDurationRef.current > 0 ? totalDurationRef.current : (video.duration || 0);
+          if (currentTorrentId && filePath && videoDuration > 0 && video.currentTime > 0) {
             const files = await clientApi.getTorrentFiles(infoHash);
             const file = files.find(f => f.path === filePath);
             if (file && file.size > 0) {
-              const positionBytes = Math.floor((video.currentTime / video.duration) * file.size);
+              const positionBytes = Math.floor((video.currentTime / videoDuration) * file.size);
               const deviceId = getOrCreateDeviceId();
               savePlaybackPosition(currentTorrentId, deviceId, positionBytes).catch(() => {});
             }
@@ -416,6 +508,8 @@ export function useHlsPlayer({
 
         return () => {
           clearInterval(savePositionInterval);
+          // Nettoyer tous les event listeners
+          cleanupFunctions.forEach(cleanup => cleanup());
           // Annuler les retries en cours
           if (retryTimeoutRef.current !== null) {
             clearTimeout(retryTimeoutRef.current);

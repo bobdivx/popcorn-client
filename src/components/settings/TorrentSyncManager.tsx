@@ -80,14 +80,20 @@ export default function TorrentSyncManager() {
   // Sync local textarea state from backend settings (quand la réponse arrive)
   useEffect(() => {
     const s = status?.settings;
-    if (!s) return;
+    if (!s) {
+      // Si pas de settings, initialiser avec des valeurs vides
+      setFilmsQueriesText('');
+      setSeriesQueriesText('');
+      return;
+    }
     const films = Array.isArray(s.sync_queries_films) ? s.sync_queries_films : [];
     const series = Array.isArray(s.sync_queries_series) ? s.sync_queries_series : [];
     const filmsText = films.join('\n');
     const seriesText = series.join('\n');
-    setFilmsQueriesText((prev) => (prev === filmsText ? prev : filmsText));
-    setSeriesQueriesText((prev) => (prev === seriesText ? prev : seriesText));
-  }, [status?.settings]);
+    // Toujours mettre à jour pour s'assurer que les valeurs sont hydratées
+    setFilmsQueriesText(filmsText);
+    setSeriesQueriesText(seriesText);
+  }, [status?.settings?.sync_queries_films, status?.settings?.sync_queries_series]);
 
   // Timer pour le temps écoulé
   useEffect(() => {
@@ -271,6 +277,8 @@ export default function TorrentSyncManager() {
             last_sync_date: null,
             sync_in_progress: 0,
             max_torrents_per_category: 1000,
+            sync_queries_films: [],
+            sync_queries_series: [],
           },
           stats: {},
           sync_start_time: null,
@@ -305,18 +313,32 @@ export default function TorrentSyncManager() {
             last_sync_date: null,
             sync_in_progress: 0,
             max_torrents_per_category: 1000,
+            sync_queries_films: [],
+            sync_queries_series: [],
           };
         } else {
+          // S'assurer que sync_queries_films et sync_queries_series sont des tableaux
+          if (!Array.isArray(response.data.settings.sync_queries_films)) {
+            response.data.settings.sync_queries_films = [];
+          }
+          if (!Array.isArray(response.data.settings.sync_queries_series)) {
+            response.data.settings.sync_queries_series = [];
+          }
+          
           const settingsKey = JSON.stringify({
             sync_frequency_minutes: response.data.settings.sync_frequency_minutes,
             is_enabled: response.data.settings.is_enabled,
             max_torrents_per_category: response.data.settings.max_torrents_per_category,
+            sync_queries_films: response.data.settings.sync_queries_films,
+            sync_queries_series: response.data.settings.sync_queries_series,
           });
           if (lastLoggedSettingsKey.current !== settingsKey) {
             console.log('[TORRENT SYNC MANAGER] ✅ Settings récupérés:', {
               sync_frequency_minutes: response.data.settings.sync_frequency_minutes,
               is_enabled: response.data.settings.is_enabled,
               max_torrents_per_category: response.data.settings.max_torrents_per_category,
+              sync_queries_films: response.data.settings.sync_queries_films,
+              sync_queries_series: response.data.settings.sync_queries_series,
             });
             lastLoggedSettingsKey.current = settingsKey;
           }
@@ -722,7 +744,7 @@ export default function TorrentSyncManager() {
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span>Synchronisation</span>
+                    <span>Statut</span>
                   </>
                 )}
               </h2>
@@ -1296,22 +1318,29 @@ export default function TorrentSyncManager() {
                 </label>
                 <select
                   class="select select-bordered w-full"
-                  value={status.settings.sync_frequency_minutes || 60}
+                  value={String(status.settings?.sync_frequency_minutes ?? 60)}
                   onChange={(e) => {
                     const value = parseInt((e.target as HTMLSelectElement).value);
                     updateSettings({ sync_frequency_minutes: value });
                   }}
                 >
-                  <option value={15}>15 minutes</option>
-                  <option value={30}>30 minutes</option>
-                  <option value={60}>1 heure</option>
-                  <option value={120}>2 heures</option>
-                  <option value={240}>4 heures</option>
-                  <option value={480}>8 heures</option>
-                  <option value={1440}>24 heures</option>
+                  <option value="15">15 minutes</option>
+                  <option value="30">30 minutes</option>
+                  <option value="60">1 heure</option>
+                  <option value="120">2 heures</option>
+                  <option value="240">4 heures</option>
+                  <option value="480">8 heures</option>
+                  <option value="1440">24 heures</option>
+                  {/* Option dynamique si la valeur n'est pas dans la liste prédéfinie */}
+                  {status.settings?.sync_frequency_minutes && 
+                   ![15, 30, 60, 120, 240, 480, 1440].includes(status.settings.sync_frequency_minutes) && (
+                    <option value={String(status.settings.sync_frequency_minutes)}>
+                      {formatFrequency(status.settings.sync_frequency_minutes)} (personnalisé)
+                    </option>
+                  )}
                 </select>
                 <p class="text-xs text-gray-400 mt-1">
-                  Actuellement : {formatFrequency(status.settings.sync_frequency_minutes || 60)}
+                  Actuellement : {formatFrequency(status.settings?.sync_frequency_minutes ?? 60)}
                 </p>
               </div>
 
@@ -1381,7 +1410,7 @@ export default function TorrentSyncManager() {
                   onBlur={() => updateSettings({ sync_queries_films: parseQueries(filmsQueriesText) })}
                 />
                 <p class="text-xs text-gray-400 mt-1">
-                  Laisse vide pour utiliser les valeurs par défaut côté serveur.
+                  Utilisés comme complément si RSS n'est pas disponible ou insuffisant. Laisse vide pour utiliser les valeurs par défaut (*, 2024, 2023, nouveau, recent).
                 </p>
               </div>
 
@@ -1397,7 +1426,7 @@ export default function TorrentSyncManager() {
                   onBlur={() => updateSettings({ sync_queries_series: parseQueries(seriesQueriesText) })}
                 />
                 <p class="text-xs text-gray-400 mt-1">
-                  Laisse vide pour utiliser les valeurs par défaut côté serveur.
+                  Utilisés comme complément si RSS n'est pas disponible ou insuffisant. Laisse vide pour utiliser les valeurs par défaut (*, 2024, 2023, nouvelle, recente).
                 </p>
               </div>
             </div>

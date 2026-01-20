@@ -18,29 +18,65 @@ class UpdateChecker {
    * Initialise le vérificateur avec la version actuelle
    */
   async initialize(): Promise<void> {
+    // Essayer de charger depuis /VERSION.json (fichier copié dans public/ par le script copy-version.js)
     try {
-      // Récupérer la version depuis le fichier VERSION.json ou la config Tauri
       const response = await fetch('/VERSION.json');
       if (response.ok) {
         const data = await response.json();
-        this.currentVersion = data.version || data.VERSION || null;
+        // Structure: { client: { version: "...", build: ... }, server: { ... } }
+        this.currentVersion = data.client?.version || data.version || data.VERSION || null;
+        if (this.currentVersion) {
+          console.log(`[UpdateChecker] Version chargée depuis /VERSION.json: ${this.currentVersion}`);
+          return;
+        }
       }
     } catch (error) {
-      console.warn('[UpdateChecker] Impossible de charger VERSION.json, utilisation de la version Tauri');
-      // Fallback : essayer de récupérer depuis la config Tauri
-      try {
-        const { getVersion } = await import('@tauri-apps/api/app');
-        this.currentVersion = await getVersion();
-      } catch (e) {
-        console.error('[UpdateChecker] Impossible de récupérer la version:', e);
-      }
+      console.warn('[UpdateChecker] Impossible de charger /VERSION.json:', error);
     }
+
+    // Fallback : essayer de récupérer depuis la config Tauri
+    try {
+      const { getVersion } = await import('@tauri-apps/api/app');
+      this.currentVersion = await getVersion();
+      if (this.currentVersion) {
+        console.log(`[UpdateChecker] Version chargée depuis Tauri: ${this.currentVersion}`);
+        return;
+      }
+    } catch (e) {
+      // Ce n'est pas une erreur si on n'est pas dans un environnement Tauri
+      console.log('[UpdateChecker] Version Tauri non disponible (normal si pas dans Tauri)');
+    }
+
+    // Si aucune méthode n'a fonctionné
+    if (!this.currentVersion) {
+      console.warn('[UpdateChecker] Version actuelle inconnue - VERSION.json doit être dans public/');
+    }
+  }
+
+  /**
+   * Vérifie si on est en environnement de développement
+   */
+  private isDevelopment(): boolean {
+    if (typeof window === 'undefined') return false;
+    const hostname = window.location.hostname;
+    return hostname === 'localhost' || 
+           hostname === '127.0.0.1' ||
+           hostname.includes('localhost') ||
+           hostname.includes('192.168.') ||
+           hostname.includes('10.') ||
+           hostname.includes('172.');
   }
 
   /**
    * Parse la page de téléchargements pour extraire les versions disponibles
    */
   private async parseDownloadsPage(): Promise<VersionInfo | null> {
+    // Ne pas vérifier les mises à jour en développement (évite les erreurs CORS)
+    if (this.isDevelopment()) {
+      console.log('[UpdateChecker] Vérification des mises à jour désactivée en développement');
+      return null;
+    }
+
     try {
       const downloadsUrl = 'https://popcorn-web-five.vercel.app/downloads';
       const response = await fetch(downloadsUrl);
@@ -72,7 +108,17 @@ class UpdateChecker {
         downloadUrl: downloadUrl ? (downloadUrl.startsWith('http') ? downloadUrl : `${downloadsUrl}${downloadUrl}`) : undefined,
       };
     } catch (error) {
-      console.error('[UpdateChecker] Erreur lors du parsing de la page de téléchargements:', error);
+      // En production, logguer l'erreur seulement si ce n'est pas une erreur CORS
+      const isCorsError = error instanceof TypeError && 
+        (error.message?.includes('Failed to fetch') || 
+         error.message?.includes('CORS') ||
+         error.message?.includes('blocked by CORS'));
+      
+      if (isCorsError) {
+        console.warn('[UpdateChecker] Impossible de vérifier les mises à jour (CORS)');
+      } else {
+        console.error('[UpdateChecker] Erreur lors du parsing de la page de téléchargements:', error);
+      }
       return null;
     }
   }

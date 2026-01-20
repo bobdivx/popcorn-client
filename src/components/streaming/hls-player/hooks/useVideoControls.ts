@@ -18,9 +18,11 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
   const controlsTimeoutRef = useRef<number | null>(null);
   const userPausedRef = useRef<boolean>(false);
 
-  // Utiliser la durée HLS si disponible, sinon video.duration
+  // Utiliser la durée HLS en priorité si disponible
+  // La durée HLS est toujours prioritaire car elle est calculée depuis la playlist complète
   useEffect(() => {
     if (hlsDuration && hlsDuration > 0 && isFinite(hlsDuration)) {
+      // Toujours utiliser hlsDuration si disponible et valide, même si elle est différente
       setDuration(hlsDuration);
     }
   }, [hlsDuration]);
@@ -43,11 +45,13 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
 
     const handleTimeUpdate = () => {
       setCurrentTime(video.currentTime);
-      // Utiliser hlsDuration si disponible, sinon video.duration
-      // Mais ne pas écraser hlsDuration si elle est déjà définie
+      // Utiliser hlsDuration en priorité si disponible, sinon video.duration
+      // Mais ne pas écraser hlsDuration si elle est déjà définie et valide
       if (!hlsDuration || hlsDuration === 0 || !isFinite(hlsDuration)) {
         const videoDuration = video.duration || 0;
-        if (videoDuration > 0 && isFinite(videoDuration)) {
+        // Utiliser video.duration seulement s'il est supérieur à la durée actuelle
+        // Cela évite de réduire la durée si hlsDuration était plus grande
+        if (videoDuration > 0 && isFinite(videoDuration) && videoDuration > duration) {
           setDuration(videoDuration);
         }
       }
@@ -83,11 +87,31 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
     };
 
     const handleLoadedMetadata = () => {
-      // Utiliser hlsDuration si disponible, sinon video.duration
+      // Utiliser hlsDuration en priorité si disponible, sinon video.duration
       if (!hlsDuration || hlsDuration === 0 || !isFinite(hlsDuration)) {
         const videoDuration = video.duration || 0;
-        if (videoDuration > 0 && isFinite(videoDuration)) {
+        // Utiliser video.duration seulement s'il est supérieur à la durée actuelle
+        if (videoDuration > 0 && isFinite(videoDuration) && videoDuration > duration) {
           setDuration(videoDuration);
+        }
+      }
+    };
+    
+    const handleDurationChange = () => {
+      // Écouter les changements de durée de la vidéo
+      // Pour HLS, video.duration peut être mis à jour progressivement
+      // On doit toujours utiliser la valeur la plus grande
+      const videoDuration = video.duration || 0;
+      if (videoDuration > 0 && isFinite(videoDuration)) {
+        // Si hlsDuration n'est pas disponible, utiliser video.duration
+        // Sinon, utiliser la valeur la plus grande entre hlsDuration et video.duration
+        const finalDuration = hlsDuration && hlsDuration > 0 && isFinite(hlsDuration) 
+          ? Math.max(hlsDuration, videoDuration) 
+          : videoDuration;
+        
+        // Toujours mettre à jour si la nouvelle durée est supérieure
+        if (finalDuration > duration) {
+          setDuration(finalDuration);
         }
       }
     };
@@ -113,6 +137,7 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
     video.addEventListener('pause', handlePause);
     video.addEventListener('volumechange', handleVolumeChange);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
+    video.addEventListener('durationchange', handleDurationChange);
 
     // Initialiser le volume
     video.volume = playerConfig.volume;
@@ -129,6 +154,7 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('volumechange', handleVolumeChange);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+      video.removeEventListener('durationchange', handleDurationChange);
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     };
   }, [videoRef, hlsLoaded, playerConfig, hlsDuration]);

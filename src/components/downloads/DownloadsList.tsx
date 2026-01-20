@@ -190,8 +190,11 @@ function TorrentCard({ torrent, onPause, onResume, onRemove, onShowLogs }: Torre
               )}
             </div>
           </div>
-          <div className={`px-3 py-1.5 tv:px-4 tv:py-2 rounded-full text-xs lg:text-sm tv:text-base font-medium ${getStateColor(torrent.state)} border border-current/20 flex-shrink-0 drop-shadow-lg`}>
+          <div className={`px-3 py-1.5 tv:px-4 tv:py-2 rounded-full text-xs lg:text-sm tv:text-base font-medium ${getStateColor(torrent.state)} border border-current/20 flex-shrink-0 drop-shadow-lg ${(torrent.state === 'seeding' || torrent.upload_speed > 0) ? 'ring-2 ring-green-500/50 animate-pulse' : ''}`}>
             {getStateLabel(torrent.state)}
+            {(torrent.state === 'seeding' || torrent.upload_speed > 0) && torrent.upload_speed > 0 && (
+              <span className="ml-1.5 text-green-400">• Actif</span>
+            )}
           </div>
         </div>
 
@@ -226,9 +229,24 @@ function TorrentCard({ torrent, onPause, onResume, onRemove, onShowLogs }: Torre
             <span className="text-gray-400 block mb-1">Vitesse DL</span>
             <span className="font-semibold text-white">{formatSpeed(torrent.download_speed)}</span>
           </div>
-          <div className="bg-gray-800/50 rounded-lg p-2 tv:p-3">
-            <span className="text-gray-400 block mb-1">Vitesse UL</span>
-            <span className="font-semibold text-white">{formatSpeed(torrent.upload_speed)}</span>
+          <div className={`bg-gray-800/50 rounded-lg p-2 tv:p-3 ${torrent.state === 'seeding' || torrent.upload_speed > 0 ? 'ring-2 ring-green-500/50' : ''}`}>
+            <span className="text-gray-400 block mb-1 flex items-center gap-1">
+              Vitesse UL
+              {(torrent.state === 'seeding' || torrent.upload_speed > 0) && (
+                <span className="text-green-400 text-xs" title="En train de partager">
+                  🔄
+                </span>
+              )}
+            </span>
+            <span className={`font-semibold ${torrent.upload_speed > 0 ? 'text-green-400' : 'text-white'}`}>
+              {formatSpeed(torrent.upload_speed)}
+              {torrent.state === 'seeding' && torrent.upload_speed === 0 && (
+                <span className="text-xs text-green-400 ml-1">(En attente)</span>
+              )}
+              {torrent.state === 'seeding' && torrent.upload_speed > 0 && (
+                <span className="text-xs text-green-400 ml-1 animate-pulse">• Partage actif</span>
+              )}
+            </span>
           </div>
           <div className="bg-gray-800/50 rounded-lg p-2 tv:p-3">
             <span className="text-gray-400 block mb-1">Peers</span>

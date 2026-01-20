@@ -617,9 +617,7 @@ jobs:
             ### 📱 Installation
             
             1. Téléchargez le fichier APK ci-dessus
-            2. Activez l'installation depuis des sources inconnues dans les paramètres Android
-               - Paramètres > Sécurité > Sources inconnues (ou Installer des applications inconnues)
-            3. Ouvrez le fichier APK téléchargé et installez-le
+            2. Ouvrez le fichier APK téléchargé et installez-le
             
             ### ℹ️ Notes
             

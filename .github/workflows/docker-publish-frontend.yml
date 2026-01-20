@@ -73,7 +73,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}
+          images: ${{ secrets.DOCKER_USERNAME }}/popcorn-frontend
           tags: |
             type=raw,value=${{ steps.version.outputs.version }},enable=${{ github.event_name != 'pull_request' }}
             type=raw,value=latest,enable=${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
@@ -91,4 +91,4 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/popcorn-frontend:buildcache
           cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/popcorn-frontend:buildcache,mode=max
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64

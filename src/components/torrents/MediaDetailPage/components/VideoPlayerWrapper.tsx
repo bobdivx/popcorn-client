@@ -187,10 +187,14 @@ export function VideoPlayerWrapper({
       )}
 
       <div 
-        className={`absolute inset-0 ${isFullscreen ? 'p-0' : isMobile ? 'pt-12 pb-4 px-2' : 'pt-16 pb-8 px-4 sm:px-6 lg:px-8'}`}
+        className={`absolute inset-0 ${isFullscreen ? 'p-0' : isMobile ? 'pt-12 pb-1 px-0' : 'pt-16 pb-1 px-1'}`}
       >
         <div 
-          className={`h-full w-full ${isFullscreen || isMobile ? '' : 'max-w-7xl mx-auto'} flex flex-col relative`}
+          className={`h-full w-full flex flex-col relative ${isFullscreen ? '' : 'max-w-[99vw]'}`}
+          style={{
+            width: '100%',
+            height: '100%',
+          }}
         >
           {isLoading && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30">

@@ -179,6 +179,9 @@ export default function HLSPlayer({
         style={{ 
           width: '100%', 
           height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           transform: 'translateZ(0)',
           willChange: 'transform',
         }}
@@ -191,7 +194,7 @@ export default function HLSPlayer({
         )}
         <video
           ref={videoRef}
-          class="w-full h-full object-contain relative z-0"
+          class="relative z-0 w-full h-full"
           playsInline
           preload="auto"
           autoplay={playerConfig.autoplay}
@@ -200,6 +203,10 @@ export default function HLSPlayer({
             transform: playerConfig.hardwareAcceleration ? 'translateZ(0)' : 'none',
             willChange: 'auto',
             backfaceVisibility: playerConfig.hardwareAcceleration ? 'hidden' : 'visible',
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            display: 'block',
           }}
           onClick={(e: any) => {
             const target = e.target as HTMLElement;
