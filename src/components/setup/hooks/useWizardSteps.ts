@@ -22,7 +22,10 @@ export interface WizardStep {
 /**
  * Détermine dynamiquement les étapes du wizard à afficher selon le statut du setup
  */
-export function useWizardSteps(setupStatus: SetupStatus | null): {
+export function useWizardSteps(
+  setupStatus: SetupStatus | null,
+  forceShowStepIds: WizardStepId[] = []
+): {
   steps: WizardStep[];
   totalSteps: number;
   getStepNumber: (stepId: WizardStepId) => number | null;
@@ -68,9 +71,9 @@ export function useWizardSteps(setupStatus: SetupStatus | null): {
       { id: 'disclaimer', label: 'Disclaimer', shouldShow: true },
       { id: 'auth', label: 'Auth', shouldShow: true },
       { id: 'welcome', label: 'Bienvenue', shouldShow: true },
-      { id: 'indexers', label: 'Indexers', shouldShow: !setupStatus.hasIndexers },
-      { id: 'tmdb', label: 'TMDB', shouldShow: !setupStatus.hasTmdbKey },
-      { id: 'downloadLocation', label: 'Téléchargement', shouldShow: !setupStatus.hasDownloadLocation },
+      { id: 'indexers', label: 'Indexers', shouldShow: !setupStatus.hasIndexers || forceShowStepIds.includes('indexers') },
+      { id: 'tmdb', label: 'TMDB', shouldShow: !setupStatus.hasTmdbKey || forceShowStepIds.includes('tmdb') },
+      { id: 'downloadLocation', label: 'Téléchargement', shouldShow: !setupStatus.hasDownloadLocation || forceShowStepIds.includes('downloadLocation') },
       { id: 'sync', label: 'Sync', shouldShow: true },
       { id: 'complete', label: 'Terminé', shouldShow: true },
     ];
@@ -83,7 +86,7 @@ export function useWizardSteps(setupStatus: SetupStatus | null): {
         ...step,
         number: stepNumber++,
       }));
-  }, [setupStatus]);
+  }, [setupStatus, forceShowStepIds]);
 
   const totalSteps = steps.length;
 

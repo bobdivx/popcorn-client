@@ -13,6 +13,8 @@ export interface CloudImportStatus {
   error?: string;
   startedAt?: number;
   finishedAt?: number;
+  // Données importées (pour permettre l'édition)
+  importedData?: UserConfig;
 }
 
 type Listener = (s: CloudImportStatus) => void;
@@ -116,6 +118,10 @@ class CloudImportManagerImpl {
             const cleanedKey = savedConfig.tmdbApiKey.trim().replace(/\s+/g, '');
             if (!cleanedKey) {
               console.warn('[CLOUD IMPORT] ⚠️ Clé TMDB vide après nettoyage');
+            } else if (cleanedKey === '***' || cleanedKey.length < 10) {
+              // Ignorer les clés masquées ou trop courtes (probablement '***' ou une clé invalide)
+              console.warn('[CLOUD IMPORT] ⚠️ Clé TMDB ignorée: clé masquée ou invalide (longueur: ' + cleanedKey.length + ')');
+              console.warn('[CLOUD IMPORT] 💡 La clé TMDB dans votre compte cloud semble être invalide ou masquée. Entrez une nouvelle clé v3 valide (32 caractères) depuis https://www.themoviedb.org/settings/api');
             } else {
               // Logger la longueur de la clé pour diagnostic (sans exposer la clé)
               const keyLength = cleanedKey.length;
@@ -175,11 +181,12 @@ class CloudImportManagerImpl {
           this.setStatus({ done: this.status.done + 1 });
         }
 
-        this.setStatus({
-          phase: 'success',
-          message: 'Configuration cloud importée ✅',
-          finishedAt: Date.now(),
-        });
+    this.setStatus({
+      phase: 'success',
+      message: 'Configuration cloud importée ✅',
+      finishedAt: Date.now(),
+      importedData: savedConfig, // Stocker les données importées pour permettre l'édition
+    });
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         this.setStatus({

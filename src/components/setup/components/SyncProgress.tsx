@@ -10,6 +10,8 @@ interface SyncStatus {
     current_query?: string | null;
     indexer_torrents: Record<string, number>;
     category_torrents: Record<string, number>;
+    fetched_pages?: number;
+    fetched_torrents?: number;
     total_processed: number;
     total_to_process: number;
   };
@@ -148,9 +150,37 @@ export function SyncProgress() {
   }
 
   const totalTorrents = Object.values(status.stats || {}).reduce((sum, count) => sum + count, 0);
-  const progress = status.progress && status.progress.total_to_process > 0
-    ? Math.round((status.progress.total_processed / status.progress.total_to_process) * 100)
-    : 0;
+  const fetchedTotal =
+    status.progress?.indexer_torrents
+      ? Object.values(status.progress.indexer_torrents).reduce((sum, n) => sum + (n || 0), 0)
+      : 0;
+  
+  // Calculer la progression en 3 phases :
+  // 1. Fetch (récupération) = 0-33%
+  // 2. Enrichissement TMDB = 33-66%
+  // 3. Insertion DB = 66-100%
+  // 
+  // IMPORTANT : Utiliser les stats réels (torrents insérés) plutôt que total_processed
+  // car total_processed compte les torrents traités, pas ceux réellement insérés en DB
+  let progress = 0;
+  if (status.progress) {
+    if (status.progress.total_to_process > 0) {
+      // Phase 2-3 (enrichissement + insertion)
+      // Utiliser le max entre total_processed et totalTorrents pour refléter la réalité
+      // totalTorrents = stats réels (insérés en DB), total_processed = traités (pas tous insérés)
+      const maxProgress = Math.max(
+        status.progress.total_processed, // Progression du traitement
+        totalTorrents // Progression réelle (insérés en DB)
+      );
+      const phases23Progress = Math.min(1, maxProgress / status.progress.total_to_process);
+      progress = Math.round(33 + (phases23Progress * 67));
+    } else if (fetchedTotal > 0) {
+      // Phase 1 (fetch) : estimer à 33% max
+      // On estime qu'on est à 33% quand on a fetch ~1000 torrents
+      // (c'est arbitraire mais donne un feedback pendant le fetch)
+      progress = Math.min(33, Math.round((fetchedTotal / 1000) * 33));
+    }
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -173,6 +203,17 @@ export function SyncProgress() {
         {/* Informations de progression */}
         {status.progress && (
           <div className="space-y-3">
+            {/* Phase fetch (avant insertion/enrichissement) */}
+            {status.progress.total_to_process === 0 && fetchedTotal > 0 && (
+              <div className="bg-gray-800/50 rounded-lg p-3">
+                <p className="text-gray-400 text-xs">Récupération des torrents (avant insertion)</p>
+                <p className="text-white font-semibold text-sm">
+                  {fetchedTotal.toLocaleString()} torrent(s) récupéré(s)
+                  {typeof status.progress.fetched_pages === 'number' ? ` • ${status.progress.fetched_pages} page(s)` : ''}
+                </p>
+              </div>
+            )}
+
             {/* Indexer actuel */}
             {status.progress.current_indexer && (
               <div className="flex items-center gap-3 bg-gray-800/50 rounded-lg p-3">

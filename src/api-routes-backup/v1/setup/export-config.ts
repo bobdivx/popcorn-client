@@ -87,7 +87,8 @@ export const GET: APIRoute = async ({ request }) => {
           if (userId) {
             const { getBackendUrlAsync } = await import('../../../../lib/backend-url.js');
             const backendUrl = await getBackendUrlAsync();
-            const backendApiUrl = `${backendUrl}/api/tmdb/key`;
+            // Utiliser l'endpoint /export pour récupérer la clé complète
+            const backendApiUrl = `${backendUrl}/api/tmdb/key/export`;
             
             const tmdbResponse = await fetch(backendApiUrl, {
               method: 'GET',
@@ -97,13 +98,14 @@ export const GET: APIRoute = async ({ request }) => {
               },
             });
             
-            // Note: Le backend ne retourne pas la clé complète pour la sécurité
-            // On retourne juste un indicateur
             if (tmdbResponse.ok) {
               const tmdbData = await tmdbResponse.json();
-              // On ne peut pas récupérer la clé complète depuis le backend pour la sécurité
-              // On retourne null et l'utilisateur devra la reconfigurer
-              tmdbApiKey = tmdbData.data?.has_key ? '***' : null;
+              // Récupérer la clé complète depuis l'endpoint export
+              if (tmdbData.data?.has_key && tmdbData.data?.api_key) {
+                tmdbApiKey = tmdbData.data.api_key;
+              } else {
+                tmdbApiKey = null;
+              }
             }
           }
         }

@@ -1,5 +1,6 @@
 /**
- * Service de notifications natives Android
+ * Service de notifications natives
+ * Supporte à la fois Tauri (Android/Desktop) et les navigateurs web (Chrome, Firefox, etc.)
  * Wrapper autour de l'API Tauri notification avec gestion des permissions et canaux Android
  */
 
@@ -37,13 +38,23 @@ class NotificationService {
    */
   async checkPermission(): Promise<boolean> {
     try {
-      // Vérifier si on est en Tauri avant d'importer le plugin
-      if (!(await this.isTauriEnvironment())) {
-        return false;
+      const isTauri = await this.isTauriEnvironment();
+      
+      if (isTauri) {
+        // Environnement Tauri
+        const { isPermissionGranted } = await import('@tauri-apps/plugin-notification');
+        this.permissionGranted = await isPermissionGranted();
+        return this.permissionGranted;
+      } else {
+        // Environnement navigateur web
+        if (typeof Notification === 'undefined') {
+          console.warn('[NotificationService] API Notification non disponible dans ce navigateur');
+          return false;
+        }
+        const permission = Notification.permission;
+        this.permissionGranted = permission === 'granted';
+        return this.permissionGranted;
       }
-      const { isPermissionGranted } = await import('@tauri-apps/plugin-notification');
-      this.permissionGranted = await isPermissionGranted();
-      return this.permissionGranted;
     } catch (error) {
       console.error('[NotificationService] Erreur lors de la vérification des permissions:', error);
       return false;
@@ -55,14 +66,46 @@ class NotificationService {
    */
   async requestPermission(): Promise<boolean> {
     try {
-      // Vérifier si on est en Tauri avant d'importer le plugin
-      if (!(await this.isTauriEnvironment())) {
-        return false;
+      const isTauri = await this.isTauriEnvironment();
+      
+      if (isTauri) {
+        // Environnement Tauri
+        const { requestPermission } = await import('@tauri-apps/plugin-notification');
+        const permission = await requestPermission();
+        this.permissionGranted = permission === 'granted';
+        return this.permissionGranted;
+      } else {
+        // Environnement navigateur web
+        if (typeof Notification === 'undefined') {
+          console.warn('[NotificationService] API Notification non disponible dans ce navigateur');
+          return false;
+        }
+        
+        // Vérifier si la permission est déjà accordée ou refusée
+        if (Notification.permission === 'granted') {
+          this.permissionGranted = true;
+          return true;
+        }
+        if (Notification.permission === 'denied') {
+          this.permissionGranted = false;
+          console.warn('[NotificationService] Permissions de notification déjà refusées par l\'utilisateur');
+          return false;
+        }
+        
+        // Demander la permission (affichera la popup dans Chrome)
+        // IMPORTANT: Cette méthode doit être appelée depuis une interaction utilisateur
+        // (clic, touche, etc.) pour que Chrome affiche la popup de permission
+        const permission = await Notification.requestPermission();
+        this.permissionGranted = permission === 'granted';
+        
+        if (permission === 'granted') {
+          console.log('[NotificationService] Permissions de notification accordées');
+        } else if (permission === 'denied') {
+          console.warn('[NotificationService] Permissions de notification refusées par l\'utilisateur');
+        }
+        
+        return this.permissionGranted;
       }
-      const { requestPermission } = await import('@tauri-apps/plugin-notification');
-      const permission = await requestPermission();
-      this.permissionGranted = permission === 'granted';
-      return this.permissionGranted;
     } catch (error) {
       console.error('[NotificationService] Erreur lors de la demande de permissions:', error);
       return false;
@@ -149,26 +192,62 @@ class NotificationService {
     }
 
     try {
-      // Vérifier si on est en Tauri avant d'envoyer la notification
-      if (!(await this.isTauriEnvironment())) {
-        console.log('[NotificationService] Pas en environnement Tauri, notification ignorée');
-        return;
-      }
-
-      // S'assurer que les canaux sont initialisés
-      await this.initializeChannels();
-
-      const channelId = options.channel || 'general';
-      const { Notification } = await import('@tauri-apps/plugin-notification');
+      const isTauri = await this.isTauriEnvironment();
       
-      await Notification.sendNotification({
-        title: options.title,
-        body: options.body,
-        tag: options.tag,
-        channel: channelId,
-        // Sur Android, les notifications "ongoing" sont persistantes
-        ...(options.ongoing && { ongoing: true }),
-      });
+      if (isTauri) {
+        // Environnement Tauri
+        // S'assurer que les canaux sont initialisés
+        await this.initializeChannels();
+
+        const channelId = options.channel || 'general';
+        const { Notification } = await import('@tauri-apps/plugin-notification');
+        
+        await Notification.sendNotification({
+          title: options.title,
+          body: options.body,
+          tag: options.tag,
+          channel: channelId,
+          // Sur Android, les notifications "ongoing" sont persistantes
+          ...(options.ongoing && { ongoing: true }),
+        });
+      } else {
+        // Environnement navigateur web
+        if (typeof Notification === 'undefined') {
+          console.warn('[NotificationService] API Notification non disponible dans ce navigateur');
+          return;
+        }
+        
+        // Utiliser l'API Web Notifications standard (Chrome, Firefox, etc.)
+        const notification = new Notification(options.title, {
+          body: options.body,
+          tag: options.tag,
+          icon: '/popcorn_logo.png', // Icône de notification
+          requireInteraction: options.ongoing, // Pour les notifications persistantes (ne se ferment pas automatiquement)
+          badge: '/popcorn_logo.png', // Badge pour les notifications (mobile)
+        });
+        
+        // Gérer les événements de notification
+        notification.onclick = () => {
+          // Focus sur la fenêtre si elle existe
+          if (window.focus) {
+            window.focus();
+          }
+          // Fermer la notification au clic (surtout pour les notifications avec interaction requise)
+          notification.close();
+        };
+        
+        // Fermer automatiquement après 3 secondes UNIQUEMENT si ce n'est pas une notification avec interaction requise
+        // Les notifications avec ongoing: true restent affichées jusqu'à interaction utilisateur
+        if (!options.ongoing) {
+          setTimeout(() => {
+            try {
+              notification.close();
+            } catch (error) {
+              // La notification peut déjà être fermée, ignorer l'erreur
+            }
+          }, 3000);
+        }
+      }
     } catch (error) {
       console.error('[NotificationService] Erreur lors de l\'envoi de la notification:', error);
       // Fallback silencieux - ne pas bloquer l'application

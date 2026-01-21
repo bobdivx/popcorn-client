@@ -1,8 +1,9 @@
-import { useEffect } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { useSetupStatus } from './hooks/useSetupStatus';
 import { useWizardNavigation } from './hooks/useWizardNavigation';
 import { useWizardActions } from './hooks/useWizardActions';
 import { useWizardSteps } from './hooks/useWizardSteps';
+import type { WizardStepId } from './hooks/useWizardSteps';
 import { StepIndicator } from './components/StepIndicator';
 import { DisclaimerStep } from './steps/DisclaimerStep';
 import { ServerUrlStep } from './steps/ServerUrlStep';
@@ -18,7 +19,10 @@ import { serverApi } from '../../lib/client/server-api';
 
 export default function Wizard() {
   const { loading, setupStatus, checkSetupStatus } = useSetupStatus();
-  const { steps, totalSteps, getStepNumber, getStepId, getNextStepNumber, getPreviousStepNumber } = useWizardSteps(setupStatus);
+  const [forceShowStepIds, setForceShowStepIds] = useState<WizardStepId[]>([]);
+  const [pendingNavStepId, setPendingNavStepId] = useState<WizardStepId | null>(null);
+
+  const { steps, totalSteps, getStepNumber, getStepId, getNextStepNumber, getPreviousStepNumber } = useWizardSteps(setupStatus, forceShowStepIds);
   const {
     currentStep,
     setCurrentStep,
@@ -38,6 +42,16 @@ export default function Wizard() {
     saveDownloadLocation,
     completeSetup,
   } = useWizardActions();
+
+  // Navigation "forcée" vers une étape potentiellement masquée (édition post-import cloud)
+  useEffect(() => {
+    if (!pendingNavStepId) return;
+    const stepNumber = getStepNumber(pendingNavStepId);
+    if (stepNumber !== null) {
+      setCurrentStep(stepNumber);
+      setPendingNavStepId(null);
+    }
+  }, [pendingNavStepId, getStepNumber, setCurrentStep]);
 
   // Vérifier si l'utilisateur doit être redirigé vers /login
   // Si le setup est complet (needsSetup === false et hasUsers === true), rediriger
@@ -316,6 +330,11 @@ export default function Wizard() {
                     if (nextStepNumber) {
                       setCurrentStep(nextStepNumber);
                     }
+                  }}
+                  onNavigateToStep={(stepId) => {
+                    const id = stepId as WizardStepId;
+                    setForceShowStepIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+                    setPendingNavStepId(id);
                   }}
                 />
               );

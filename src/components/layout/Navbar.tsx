@@ -27,6 +27,7 @@ export default function Navbar() {
       return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     }
   });
+  const [syncProgress, setSyncProgress] = useState<{ inProgress: boolean; progress: number }>({ inProgress: false, progress: 0 });
 
   useEffect(() => {
     const updatePath = () => setCurrentPath(window.location.pathname + window.location.search);
@@ -112,6 +113,71 @@ export default function Navbar() {
     const i = window.setInterval(tick, 30_000);
     return () => window.clearInterval(i);
   }, []);
+
+  // Vérifier le statut de synchronisation pour afficher le cercle de progression
+  useEffect(() => {
+    if (!user) {
+      setSyncProgress({ inProgress: false, progress: 0 });
+      return;
+    }
+
+    const checkSyncStatus = async () => {
+      try {
+        const response = await serverApi.getSyncStatus();
+        if (response.success && response.data) {
+          // Vérifier si la sync est en cours (soit via flag, soit via stats)
+          const hasStats = response.data.stats && Object.keys(response.data.stats).length > 0;
+          const inProgress = response.data.sync_in_progress || hasStats;
+          let progress = 0;
+          
+          // Calculer la progression même si progress n'est pas encore défini
+          if (response.data.progress) {
+            const p = response.data.progress;
+            // Utiliser les stats réels (torrents insérés en DB) pour la progression
+            const totalTorrents = response.data.stats
+              ? Object.values(response.data.stats).reduce((sum: number, n: number) => sum + (n || 0), 0)
+              : 0;
+            
+            if (p.total_to_process > 0) {
+              // Phase 2-3 (enrichissement + insertion) : utiliser le max entre total_processed et stats réels
+              // car total_processed compte les traités, stats compte les réellement insérés
+              const maxProgress = Math.max(
+                p.total_processed, // Progression du traitement
+                totalTorrents // Progression réelle (insérés en DB)
+              );
+              const phases23Progress = Math.min(1, maxProgress / p.total_to_process);
+              progress = Math.round(33 + (phases23Progress * 67));
+            } else {
+              // Phase 1 (fetch) : utiliser indexer_torrents ou fetched_torrents
+              const fetchedTotal = p.indexer_torrents
+                ? Object.values(p.indexer_torrents).reduce((sum: number, n: number) => sum + (n || 0), 0)
+                : (p.fetched_torrents || 0);
+              
+              if (fetchedTotal > 0) {
+                // Phase fetch : estimer à 33% max
+                progress = Math.min(33, Math.round((fetchedTotal / 1000) * 33));
+              }
+            }
+          } else if (hasStats) {
+            // Si pas de progress mais qu'on a des stats, estimer une progression basique
+            const totalTorrents = Object.values(response.data.stats).reduce((sum: number, n: number) => sum + (n || 0), 0);
+            if (totalTorrents > 0) {
+              // Estimer qu'on est au moins à 33% (fetch terminé) + un peu d'insertion
+              progress = Math.min(100, 33 + Math.min(67, Math.round((totalTorrents / 100) * 10)));
+            }
+          }
+          
+          setSyncProgress({ inProgress, progress });
+        }
+      } catch (err) {
+        // Ignorer les erreurs silencieusement
+      }
+    };
+
+    checkSyncStatus();
+    const interval = setInterval(checkSyncStatus, 2000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   const loadUser = async () => {
     if (!serverApi.isAuthenticated()) {
@@ -296,12 +362,41 @@ export default function Navbar() {
                 </a>
                 <a
                   href="/settings"
-                  className={`gtv-icon-btn hidden sm:inline-flex ${isActivePrefix('/settings') ? 'bg-glass-active' : ''}`}
+                  className={`gtv-icon-btn hidden sm:inline-flex relative ${isActivePrefix('/settings') ? 'bg-glass-active' : ''}`}
                   aria-label="Paramètres"
                   tabIndex={0}
                   data-focusable
                 >
-                  <SettingsIcon className="w-5 h-5 tv:w-6 tv:h-6" />
+                  {syncProgress.inProgress && syncProgress.progress > 0 && (
+                    <svg
+                      className="absolute inset-0 w-full h-full transform -rotate-90 pointer-events-none"
+                      viewBox="0 0 36 36"
+                      style={{ width: '100%', height: '100%' }}
+                    >
+                      {/* Cercle de fond */}
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="16"
+                        fill="none"
+                        stroke="rgba(255, 255, 255, 0.1)"
+                        strokeWidth="2"
+                      />
+                      {/* Cercle de progression */}
+                      <circle
+                        cx="18"
+                        cy="18"
+                        r="16"
+                        fill="none"
+                        stroke="rgb(59, 130, 246)"
+                        strokeWidth="2"
+                        strokeDasharray={`${(syncProgress.progress / 100) * 100.53}, 100.53`}
+                        strokeLinecap="round"
+                        className="transition-all duration-500"
+                      />
+                    </svg>
+                  )}
+                  <SettingsIcon className="w-5 h-5 tv:w-6 tv:h-6 relative z-10" />
                 </a>
 
                 <div className="dropdown dropdown-end">

@@ -7,9 +7,10 @@ interface WelcomeStepProps {
   focusedButtonIndex: number;
   buttonRefs: { current: (HTMLButtonElement | null)[] };
   onNext: (saveToCloud: boolean) => void;
+  onNavigateToStep?: (stepId: string) => void;
 }
 
-export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext }: WelcomeStepProps) {
+export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext, onNavigateToStep }: WelcomeStepProps) {
   const [saveToCloud, setSaveToCloud] = useState(true);
   const [hasToken, setHasToken] = useState(false);
   const [importStatus, setImportStatus] = useState<CloudImportStatus>(CloudImportManager.getStatus());
@@ -90,6 +91,87 @@ export function WelcomeStep({ focusedButtonIndex, buttonRefs, onNext }: WelcomeS
               <p className="text-xs text-gray-500 mt-2">
                 {importStatus.done} / {importStatus.total}
               </p>
+            </div>
+          )}
+
+          {/* Afficher les données importées et permettre l'édition */}
+          {importStatus.phase === 'success' && importStatus.importedData && onNavigateToStep && (
+            <div className="mt-6 pt-6 border-t border-gray-700">
+              <p className="text-white font-semibold mb-4">
+                Configuration importée - Vous pouvez modifier les éléments ci-dessous :
+              </p>
+              <div className="space-y-3">
+                {importStatus.importedData.indexers && importStatus.importedData.indexers.length > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                    <div className="flex-1">
+                      <p className="text-white font-medium">
+                        {importStatus.importedData.indexers.length} indexer{importStatus.importedData.indexers.length > 1 ? 's' : ''} importé{importStatus.importedData.indexers.length > 1 ? 's' : ''}
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        {importStatus.importedData.indexers.map(idx => idx.name).join(', ')}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => onNavigateToStep('indexers')}
+                      className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                    >
+                      Modifier
+                    </button>
+                  </div>
+                )}
+                {importStatus.importedData.tmdbApiKey && (
+                  <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                    <div className="flex-1">
+                      <p className="text-white font-medium">Clé TMDB importée</p>
+                      <p className="text-sm text-gray-400">
+                        {importStatus.importedData.tmdbApiKey.length > 8 
+                          ? `${importStatus.importedData.tmdbApiKey.substring(0, 4)}...${importStatus.importedData.tmdbApiKey.substring(importStatus.importedData.tmdbApiKey.length - 4)}`
+                          : '****'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => onNavigateToStep('tmdb')}
+                      className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                    >
+                      Modifier
+                    </button>
+                  </div>
+                )}
+                {importStatus.importedData.downloadLocation && (
+                  <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                    <div className="flex-1">
+                      <p className="text-white font-medium">Emplacement de téléchargement</p>
+                      <p className="text-sm text-gray-400 truncate">
+                        {importStatus.importedData.downloadLocation}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => onNavigateToStep('downloadLocation')}
+                      className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                    >
+                      Modifier
+                    </button>
+                  </div>
+                )}
+                {importStatus.importedData.syncSettings && (
+                  <div className="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+                    <div className="flex-1">
+                      <p className="text-white font-medium">Paramètres de synchronisation</p>
+                      <p className="text-sm text-gray-400">
+                        {importStatus.importedData.syncSettings.syncEnabled ? 'Activée' : 'Désactivée'}
+                        {importStatus.importedData.syncSettings.syncFrequencyMinutes && 
+                          ` • ${importStatus.importedData.syncSettings.syncFrequencyMinutes} min`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => onNavigateToStep('sync')}
+                      className="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold rounded-lg transition-colors"
+                    >
+                      Modifier
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
