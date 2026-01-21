@@ -62,42 +62,35 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Detect Docker credentials
-        id: docker-auth
+      - name: Check Docker Hub credentials
+        id: check_creds
         run: |
-          # Par défaut: pas de push
-          echo "can_push=false" >> $GITHUB_OUTPUT
-          echo "image_name=popcorn-frontend" >> $GITHUB_OUTPUT
-          
-          # On ne push jamais sur les pull requests
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "ℹ️ Pull request: build sans push"
-            exit 0
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          if [ -z "$DOCKER_USER" ]; then
+            DOCKER_USER="${{ vars.DOCKERHUB_USERNAME }}"
           fi
           
-          # Si les secrets ne sont pas là, on build mais on ne push pas (ne pas échouer)
-          if [ -z "${{ secrets.DOCKER_USERNAME }}" ] || [ -z "${{ secrets.DOCKER_PASSWORD }}" ]; then
-            echo "⚠️ Secrets Docker manquants: build sans push"
-            echo "   Configurez DOCKER_USERNAME et DOCKER_PASSWORD dans GitHub > Settings > Secrets and variables > Actions"
-            exit 0
+          if [ -z "$DOCKER_USER" ]; then
+            echo "ERROR: No Docker Hub username configured!"
+            echo "Please set either secrets.DOCKER_USERNAME or vars.DOCKERHUB_USERNAME"
+            exit 1
           fi
           
-          echo "can_push=true" >> $GITHUB_OUTPUT
-          echo "image_name=${{ secrets.DOCKER_USERNAME }}/popcorn-frontend" >> $GITHUB_OUTPUT
-          echo "✅ Secrets Docker détectés: push activé"
+          echo "username=${DOCKER_USER}" >> $GITHUB_OUTPUT
+          echo "Using Docker Hub username: ${DOCKER_USER}"
 
       - name: Log in to Docker Hub
-        if: steps.docker-auth.outputs.can_push == 'true'
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          username: ${{ steps.check_creds.outputs.username }}
+          password: ${{ vars.DOCKER_PASSWORD != '' && vars.DOCKER_PASSWORD || (secrets.DOCKER_PASSWORD != '' && secrets.DOCKER_PASSWORD || secrets.DOCKERHUB_TOKEN) }}
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ steps.docker-auth.outputs.image_name }}
+          images: ${{ steps.check_creds.outputs.username }}/popcorn-frontend
           tags: |
             type=raw,value=${{ steps.version.outputs.version }},enable=${{ github.event_name != 'pull_request' }}
             type=raw,value=latest,enable=${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
@@ -105,8 +98,28 @@ jobs:
             type=ref,event=branch,enable=${{ github.event_name == 'pull_request' }}
             type=ref,event=pr,enable=${{ github.event_name == 'pull_request' }}
 
+      - name: Log image info
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "✅ Frontend Docker Image will be published!"
+          echo "Repository: ${{ steps.check_creds.outputs.username }}/popcorn-frontend"
+          echo "Tags: ${{ join(steps.meta.outputs.tags, ', ') }}"
+
+      - name: Build and push Docker image
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ steps.check_creds.outputs.username }}/popcorn-frontend:buildcache
+          cache-to: type=registry,ref=${{ steps.check_creds.outputs.username }}/popcorn-frontend:buildcache,mode=max
+          platforms: linux/amd64,linux/arm64
+
       - name: Build Docker image (no push)
-        if: steps.docker-auth.outputs.can_push != 'true'
+        if: github.event_name == 'pull_request'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -116,15 +129,8 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
 
-      - name: Build and push Docker image
-        if: steps.docker-auth.outputs.can_push == 'true'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/popcorn-frontend:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/popcorn-frontend:buildcache,mode=max
-          platforms: linux/amd64,linux/arm64
+      - name: Log success
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "✅ Frontend Docker Image published successfully!"
+          echo "You can find it at: https://hub.docker.com/r/${{ steps.check_creds.outputs.username }}/popcorn-frontend/tags"
