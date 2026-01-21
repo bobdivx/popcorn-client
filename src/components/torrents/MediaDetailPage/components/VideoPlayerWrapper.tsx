@@ -49,6 +49,35 @@ export function VideoPlayerWrapper({
     }
   }, [wrapperRef]);
 
+  // Arrêter le buffer HLS lors de la fermeture du lecteur
+  useEffect(() => {
+    if (!visible) {
+      // Arrêter le buffer quand le lecteur est fermé
+      const stopBuffer = (window as any).__hlsPlayerStopBuffer;
+      if (stopBuffer && typeof stopBuffer === 'function') {
+        try {
+          stopBuffer();
+        } catch (e) {
+          console.warn('[VideoPlayerWrapper] Erreur lors de l\'arrêt du buffer:', e);
+        }
+      }
+    }
+  }, [visible]);
+
+  // Arrêter le buffer lors du démontage du composant
+  useEffect(() => {
+    return () => {
+      const stopBuffer = (window as any).__hlsPlayerStopBuffer;
+      if (stopBuffer && typeof stopBuffer === 'function') {
+        try {
+          stopBuffer();
+        } catch (e) {
+          console.warn('[VideoPlayerWrapper] Erreur lors de l\'arrêt du buffer au démontage:', e);
+        }
+      }
+    };
+  }, []);
+
   useEffect(() => {
     if (!selectedFile) {
       console.warn('[VideoPlayerWrapper] Fichier manquant:', {

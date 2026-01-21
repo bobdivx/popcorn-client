@@ -72,4 +72,11 @@ export const libraryMethods = {
     // Unifié : pas encore implémenté
     return { success: true };
   },
+
+  /**
+   * Lance le scan et l'enrichissement des fichiers locaux
+   */
+  async scanLocalMedia(this: ServerApiClientLibraryAccess): Promise<ApiResponse<string>> {
+    return this.backendRequest<string>('/api/library/scan', { method: 'POST' });
+  },
 };

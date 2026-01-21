@@ -96,17 +96,29 @@ async function handleExternalDownload(options: {
   // Pour les torrents externes, utiliser l'infoHash depuis la DB locale (pas d'API Torznab)
   // Télécharger le fichier .torrent directement depuis la DB locale
   if (torrent.infoHash) {
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'download.ts:98',message:'handleExternalDownload début',data:{infoHash:torrent.infoHash,name:torrent.name,id:torrent.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     // Télécharger le fichier .torrent depuis la DB locale avec l'infoHash
     const downloadUrl = `${baseUrl}/api/torrents/${torrent.infoHash}/download`;
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'download.ts:100',message:'URL download construite',data:{downloadUrl,infoHash:torrent.infoHash},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     
     if (setPlayStatus) {
       setPlayStatus('adding');
     }
     
     const response = await fetch(downloadUrl, { headers });
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'download.ts:106',message:'Réponse download reçue',data:{status:response.status,ok:response.ok,infoHash:torrent.infoHash},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
     
     if (!response.ok) {
       if (response.status === 404) {
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'download.ts:109',message:'404 sur download',data:{infoHash:torrent.infoHash,downloadUrl},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         // Le fichier .torrent n'est pas dans la DB locale
         // Tout devrait être dans la DB locale, donc c'est une erreur
         throw new Error('Le fichier .torrent n\'est pas disponible dans la DB locale. Le torrent externe n\'a peut-être pas encore été synchronisé.');

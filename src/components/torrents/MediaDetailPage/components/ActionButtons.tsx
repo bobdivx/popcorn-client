@@ -1,4 +1,4 @@
-import { Play, RotateCw, Download, FileDown, Link2, Check, Trash2, Pause, Loader2, Zap, Upload } from 'lucide-preact';
+import { Play, RotateCw, Download, FileDown, Link2, Check, Trash2, Loader2, Zap, Upload } from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
 
@@ -209,42 +209,8 @@ export function ActionButtons({
         )
       )}
 
-      {/* Bouton Bande-annonce */}
-      <button
-        onClick={onPlayTrailer}
-        disabled={isLoadingTrailer || !trailerKey}
-        className={`inline-flex items-center gap-2 px-6 py-3 rounded-lg font-semibold text-lg transition-colors border focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] ${
-          isPlayingTrailer
-            ? 'bg-primary hover:bg-primary-700 text-white border-primary-500/50 glass-panel shadow-primary'
-            : 'bg-glass hover:bg-glass-hover text-white border-white/30 glass-panel'
-        } disabled:opacity-50 disabled:cursor-not-allowed`}
-        title={
-          isPlayingTrailer
-            ? "Arrêter la bande-annonce"
-            : trailerKey
-            ? "Lire la bande-annonce"
-            : isLoadingTrailer
-            ? "Chargement..."
-            : "Bande-annonce non disponible"
-        }
-      >
-        {isLoadingTrailer ? (
-          <>
-            <Loader2 className="animate-spin h-5 w-5" size={20} />
-            Chargement...
-          </>
-        ) : isPlayingTrailer ? (
-          <>
-            <Pause className="h-5 w-5" size={20} />
-            Arrêter
-          </>
-        ) : (
-          <>
-            <Play className="h-5 w-5" size={20} />
-            Bande-annonce
-          </>
-        )}
-      </button>
+      {/* Bouton Bande-annonce - Masqué car lecture automatique après délai */}
+      {/* Le bouton pause a été supprimé car le trailer se lance automatiquement après 3.5 secondes */}
 
       {/* Bouton Télécharger .torrent */}
       <button

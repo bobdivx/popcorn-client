@@ -872,6 +872,7 @@ interface IServerApiClientPublic {
   getFavorites(): Promise<ApiResponse<LibraryItem[]>>;
   addFavorite(contentId: string, encryptedData?: string): Promise<ApiResponse<LibraryItem>>;
   removeFavorite(favoriteId: string): Promise<ApiResponse<void>>;
+  scanLocalMedia(): Promise<ApiResponse<string>>;
 
   // Health methods
   checkServerHealth(): Promise<ApiResponse<{ status: string }>>;

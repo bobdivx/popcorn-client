@@ -227,20 +227,36 @@ export function useHlsPlayer({
           
           // Fallback: attendre que video.duration soit disponible et continuer à écouter
           // pour les playlists HLS dynamiques où la durée peut changer
+          // IMPORTANT: video.duration contient la durée réelle du fichier vidéo depuis les métadonnées
+          // et doit être privilégié par rapport à la durée calculée depuis les fragments HLS
+          let lastVideoDuration = 0;
+          let durationStableCount = 0;
           const checkDuration = () => {
             const videoDuration = video.duration;
             if (videoDuration && isFinite(videoDuration) && videoDuration > 0) {
-              // Utiliser video.duration si supérieur à la durée HLS calculée
-              // Cela permet de gérer les playlists qui se mettent à jour progressivement
-              const maxDuration = Math.max(totalDurationRef.current, videoDuration);
-              if (maxDuration > totalDurationRef.current) {
-                totalDurationRef.current = maxDuration;
-                onDurationChangeRef.current?.(maxDuration);
+              // Si la durée vidéo a changé, réinitialiser le compteur de stabilité
+              if (videoDuration !== lastVideoDuration) {
+                lastVideoDuration = videoDuration;
+                durationStableCount = 0;
+              } else {
+                durationStableCount++;
+              }
+              
+              // Utiliser video.duration comme source de vérité principale
+              // car il contient la durée réelle depuis les métadonnées du fichier
+              // Ne pas utiliser la durée calculée depuis les fragments si elle est inférieure
+              // (cela évite d'utiliser la durée du buffer au lieu de la durée réelle)
+              if (videoDuration > totalDurationRef.current || durationStableCount >= 2) {
+                // Si video.duration est supérieur OU si la durée est stable depuis 2 changements,
+                // l'utiliser comme durée définitive
+                totalDurationRef.current = videoDuration;
+                onDurationChangeRef.current?.(videoDuration);
               }
             }
           };
           
           // Écouter plusieurs fois durationchange car pour HLS, la durée peut changer
+          // mais on veut la durée réelle du fichier, pas celle du buffer
           video.addEventListener('loadedmetadata', checkDuration);
           video.addEventListener('durationchange', checkDuration);
           // Vérifier immédiatement si déjà disponible
@@ -255,27 +271,66 @@ export function useHlsPlayer({
           if (startFromBeginningRef.current) {
             video.currentTime = 0;
           } else if (torrentIdRef.current) {
-            // Charger la position sauvegardée
+            // Charger la position sauvegardée (maintenant en secondes directement)
             const deviceId = getOrCreateDeviceId();
-            getPlaybackPosition(torrentIdRef.current, deviceId).then(async (position) => {
-              if (position && position > 0 && filePath) {
-                // Convertir bytes en secondes approximativement
-                const files = await clientApi.getTorrentFiles(infoHash);
-                const file = files.find(f => f.path === filePath);
+            getPlaybackPosition(torrentIdRef.current, deviceId).then(async (positionSeconds) => {
+              if (positionSeconds && positionSeconds > 0) {
+                // La position est maintenant directement en secondes
                 // Utiliser la durée totale si disponible, sinon video.duration
                 const videoDuration = totalDuration > 0 ? totalDuration : (video.duration || 0);
-                if (file && file.size > 0 && videoDuration > 0) {
+                if (videoDuration > 0) {
                   totalDurationRef.current = videoDuration;
-                  const estimatedSeconds = (position / file.size) * videoDuration;
+                  // Limiter la position à 95% de la durée pour éviter les problèmes de fin de vidéo
                   const maxPosition = videoDuration * 0.95;
-                  const finalPosition = Math.min(estimatedSeconds, maxPosition);
+                  const finalPosition = Math.min(positionSeconds, maxPosition);
                   if (finalPosition > 1) {
                     video.currentTime = finalPosition;
                   }
+                } else {
+                  // Si la durée n'est pas encore disponible, attendre un peu et réessayer
+                  setTimeout(() => {
+                    const retryDuration = totalDurationRef.current > 0 ? totalDurationRef.current : (video.duration || 0);
+                    if (retryDuration > 0) {
+                      const maxPosition = retryDuration * 0.95;
+                      const finalPosition = Math.min(positionSeconds, maxPosition);
+                      if (finalPosition > 1) {
+                        video.currentTime = finalPosition;
+                      }
+                    }
+                  }, 1000);
                 }
               }
             });
           }
+
+          // Arrêter le buffer HLS lors de la pause pour économiser la bande passante
+          const handlePause = () => {
+            if (hlsRef.current && hlsRef.current.media) {
+              try {
+                hlsRef.current.stopLoad();
+              } catch (e) {
+                console.warn('[useHlsPlayer] Erreur lors de l\'arrêt du buffer:', e);
+              }
+            }
+          };
+          
+          const handlePlay = () => {
+            if (hlsRef.current && hlsRef.current.media) {
+              try {
+                hlsRef.current.startLoad();
+              } catch (e) {
+                console.warn('[useHlsPlayer] Erreur lors de la reprise du buffer:', e);
+              }
+            }
+          };
+          
+          video.addEventListener('pause', handlePause);
+          video.addEventListener('play', handlePlay);
+          
+          cleanupFunctions.push(() => {
+            video.removeEventListener('pause', handlePause);
+            video.removeEventListener('play', handlePlay);
+          });
 
           setTimeout(() => {
             if (video.paused && (canAutoPlayRef.current === undefined || canAutoPlayRef.current())) {
@@ -285,6 +340,7 @@ export function useHlsPlayer({
         });
         
         // Écouter LEVEL_LOADED pour obtenir la durée complète quand un niveau est complètement chargé
+        // NOTE: La durée depuis les fragments peut être celle du buffer, donc on privilégie video.duration
         hls.on(window.Hls.Events.LEVEL_LOADED, (event: any, data: any) => {
           if (data && data.details) {
             let levelDuration = 0;
@@ -308,14 +364,24 @@ export function useHlsPlayer({
               }
             }
             
-            if (levelDuration > 0 && isFinite(levelDuration) && levelDuration > totalDurationRef.current) {
-              totalDurationRef.current = levelDuration;
-              onDurationChangeRef.current?.(levelDuration);
+            // Ne mettre à jour que si la durée calculée est supérieure ET que video.duration n'est pas encore disponible
+            // ou si video.duration est inférieur (ce qui ne devrait pas arriver pour un fichier complet)
+            const videoDuration = video.duration || 0;
+            if (levelDuration > 0 && isFinite(levelDuration)) {
+              // Utiliser la durée la plus grande entre celle calculée et video.duration
+              // Mais privilégier video.duration si disponible car c'est la durée réelle
+              const finalDuration = videoDuration > 0 ? Math.max(levelDuration, videoDuration) : levelDuration;
+              if (finalDuration > totalDurationRef.current) {
+                totalDurationRef.current = finalDuration;
+                onDurationChangeRef.current?.(finalDuration);
+              }
             }
           }
         });
         
         // Écouter LEVEL_UPDATED pour mettre à jour la durée si elle change
+        // NOTE: Pour les playlists dynamiques, cela peut être la durée du buffer
+        // On privilégie toujours video.duration si disponible
         hls.on(window.Hls.Events.LEVEL_UPDATED, (event: any, data: any) => {
           if (data && data.details) {
             let levelDuration = 0;
@@ -330,20 +396,30 @@ export function useHlsPlayer({
               levelDuration = lastFragment.start + lastFragment.duration;
             }
             
-            if (levelDuration > 0 && isFinite(levelDuration) && levelDuration > totalDurationRef.current) {
-              totalDurationRef.current = levelDuration;
-              onDurationChangeRef.current?.(levelDuration);
+            // Privilégier video.duration si disponible car c'est la durée réelle du fichier
+            const videoDuration = video.duration || 0;
+            if (levelDuration > 0 && isFinite(levelDuration)) {
+              const finalDuration = videoDuration > 0 ? Math.max(levelDuration, videoDuration) : levelDuration;
+              if (finalDuration > totalDurationRef.current) {
+                totalDurationRef.current = finalDuration;
+                onDurationChangeRef.current?.(finalDuration);
+              }
             }
           }
         });
         
         // Écouter FRAG_LOADED pour mettre à jour la durée si elle devient plus précise
+        // NOTE: Pour les playlists dynamiques, cela peut être la durée du buffer
+        // On privilégie toujours video.duration si disponible
         hls.on(window.Hls.Events.FRAG_LOADED, (event: any, data: any) => {
           if (data && data.details && data.details.totalduration) {
-            const totalDuration = data.details.totalduration;
-            if (totalDuration > 0 && isFinite(totalDuration) && totalDuration > totalDurationRef.current) {
-              totalDurationRef.current = totalDuration;
-              onDurationChangeRef.current?.(totalDuration);
+            const fragDuration = data.details.totalduration;
+            const videoDuration = video.duration || 0;
+            // Utiliser la durée la plus grande, mais privilégier video.duration
+            const finalDuration = videoDuration > 0 ? Math.max(fragDuration, videoDuration) : fragDuration;
+            if (finalDuration > 0 && isFinite(finalDuration) && finalDuration > totalDurationRef.current) {
+              totalDurationRef.current = finalDuration;
+              onDurationChangeRef.current?.(finalDuration);
             }
           }
         });
@@ -490,24 +566,64 @@ export function useHlsPlayer({
           }
         });
 
-        // Sauvegarder la position périodiquement
+        // Sauvegarder la position périodiquement (maintenant directement en secondes)
         const savePositionInterval = setInterval(async () => {
           const currentTorrentId = torrentIdRef.current;
-          // Utiliser la durée totale HLS si disponible, sinon video.duration
-          const videoDuration = totalDurationRef.current > 0 ? totalDurationRef.current : (video.duration || 0);
-          if (currentTorrentId && filePath && videoDuration > 0 && video.currentTime > 0) {
-            const files = await clientApi.getTorrentFiles(infoHash);
-            const file = files.find(f => f.path === filePath);
-            if (file && file.size > 0) {
-              const positionBytes = Math.floor((video.currentTime / videoDuration) * file.size);
-              const deviceId = getOrCreateDeviceId();
-              savePlaybackPosition(currentTorrentId, deviceId, positionBytes).catch(() => {});
-            }
+          if (currentTorrentId && video.currentTime > 0) {
+            // Sauvegarder directement en secondes pour plus de précision
+            const deviceId = getOrCreateDeviceId();
+            savePlaybackPosition(currentTorrentId, deviceId, video.currentTime).catch(() => {});
           }
         }, 10000); // Sauvegarder toutes les 10 secondes
 
+        // Fonction pour sauvegarder la position et arrêter le buffer
+        const savePositionAndStopBuffer = async () => {
+          // Sauvegarder la position avant de quitter
+          const currentTorrentId = torrentIdRef.current;
+          if (currentTorrentId && video.currentTime > 0) {
+            const deviceId = getOrCreateDeviceId();
+            try {
+              await savePlaybackPosition(currentTorrentId, deviceId, video.currentTime);
+            } catch (e) {
+              console.warn('[useHlsPlayer] Erreur lors de la sauvegarde de position:', e);
+            }
+          }
+          
+          // Arrêter le buffer
+          if (hlsRef.current && hlsRef.current.media) {
+            try {
+              hlsRef.current.stopLoad();
+            } catch (e) {
+              console.warn('[useHlsPlayer] Erreur lors de l\'arrêt du buffer:', e);
+            }
+          }
+        };
+
+        // Arrêter le buffer lors de la sortie de page
+        const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+          savePositionAndStopBuffer();
+          // Note: on ne peut pas empêcher la navigation, mais on peut sauvegarder
+        };
+
+        const handleVisibilityChange = () => {
+          if (document.hidden) {
+            // Page cachée, arrêter le buffer et sauvegarder
+            savePositionAndStopBuffer();
+          }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        cleanupFunctions.push(() => {
+          window.removeEventListener('beforeunload', handleBeforeUnload);
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+        });
+
         return () => {
           clearInterval(savePositionInterval);
+          // Sauvegarder la position et arrêter le buffer lors du cleanup
+          savePositionAndStopBuffer();
           // Nettoyer tous les event listeners
           cleanupFunctions.forEach(cleanup => cleanup());
           // Annuler les retries en cours
@@ -552,11 +668,23 @@ export function useHlsPlayer({
     // Seulement infoHash et filePath sont critiques, les autres dépendances sont stables ou gérées via refs
   }, [hlsLoaded, infoHash, filePath]); // Retirer videoRef, fileName, torrentId, startFromBeginning, canAutoPlay, playerConfig, onError, onLoadingChange car ils ne devraient pas déclencher une réinitialisation
 
+  // Fonction pour arrêter le buffer manuellement (utile lors de la fermeture)
+  const stopBuffer = () => {
+    if (hlsRef.current && hlsRef.current.media) {
+      try {
+        hlsRef.current.stopLoad();
+      } catch (e) {
+        console.warn('[useHlsPlayer] Erreur lors de l\'arrêt manuel du buffer:', e);
+      }
+    }
+  };
+
   return {
     videoRef,
     hlsRef,
     isLoading,
     error,
     hlsLoaded,
+    stopBuffer,
   };
 }

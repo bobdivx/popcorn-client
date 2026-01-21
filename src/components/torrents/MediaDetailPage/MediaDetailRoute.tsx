@@ -81,10 +81,14 @@ function convertVariantToTorrent(variant: any): Torrent {
     full: qualityObj?.full || variant.quality || null,
   };
 
+  const infoHash = variant.info_hash || variant.infoHash || null;
+  // #region agent log
+  fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'MediaDetailRoute.tsx:87',message:'infoHash extrait du variant',data:{infoHash,variantId:variant.id,variantInfoHash:variant.info_hash,variantInfoHashAlt:variant.infoHash},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+  // #endregion
   return {
     id: variant.id || '',
     slug: variant.slug || variant.id || null,
-    infoHash: variant.info_hash || variant.infoHash || null,
+    infoHash: infoHash,
     name: variant.name || '',
     cleanTitle: variant.clean_title || variant.cleanTitle || null,
     description: variant.description || null,
@@ -243,12 +247,25 @@ export default function MediaDetailRoute() {
                 mainTitle: data.main_title,
                 variantCount: data.variant_count,
               });
+              // Ne pas essayer getTorrentById avec un slug, car cet endpoint n'existe pas
+              // Le slug n'est pas un info_hash valide
+              if (!cancelled) {
+                setError('Aucun torrent trouvé pour ce slug. Le torrent peut ne pas encore être synchronisé dans la base de données.');
+                setLoading(false);
+                return;
+              }
             }
           }
         }
 
-        // 2) Fallback /api/torrents/<id> via serverApi (seulement si pas un slug external_)
-        if (!contentId.startsWith('external_')) {
+        // 2) Fallback /api/torrents/<id> via serverApi (seulement si pas un slug external_ ET si contentId ressemble à un info_hash)
+        // Un info_hash fait généralement 40 caractères (hex) ou 32 caractères (base32)
+        // Ne pas appeler getTorrentById avec un slug (comme "le-million-2025")
+        const looksLikeInfoHash = !contentId.startsWith('external_') && 
+          (contentId.length === 40 || contentId.length === 32) && 
+          /^[a-fA-F0-9]+$/.test(contentId);
+        
+        if (looksLikeInfoHash) {
           const byIdResponse = await serverApi.getTorrentById(contentId);
           if (byIdResponse.success && byIdResponse.data) {
             const t: Torrent | null =

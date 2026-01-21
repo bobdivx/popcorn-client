@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
 import CarouselRow from './torrents/CarouselRow';
 import { LibraryPoster } from './library/LibraryPoster';
+import { RefreshCw } from 'lucide-preact';
 
 export interface LibraryMedia {
   info_hash: string;
@@ -39,6 +40,8 @@ export default function Library({ onItemClick }: LibraryProps) {
   const [items, setItems] = useState<LibraryMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadLibrary();
@@ -145,6 +148,28 @@ export default function Library({ onItemClick }: LibraryProps) {
 
   return (
     <div className="pb-8 tv:pb-12">
+      {/* Bouton de synchronisation */}
+      <div className="mb-6 tv:mb-8 px-4 tv:px-6">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            {scanMessage && (
+              <div className={`alert ${scanMessage.includes('succès') ? 'alert-success' : 'alert-error'} mb-4`}>
+                <span>{scanMessage}</span>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={handleScanLocalMedia}
+            disabled={scanning}
+            className="btn btn-primary gap-2 min-h-[48px] tv:min-h-[56px]"
+            title="Scanner les fichiers locaux et enrichir avec TMDB"
+          >
+            <RefreshCw className={`w-5 h-5 ${scanning ? 'animate-spin' : ''}`} />
+            {scanning ? 'Scan en cours...' : 'Synchroniser la bibliothèque'}
+          </button>
+        </div>
+      </div>
+
       {/* Section Films */}
       {groupedItems.movies.length > 0 && (
         <CarouselRow title="Films">

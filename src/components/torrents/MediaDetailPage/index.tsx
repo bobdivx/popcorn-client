@@ -166,6 +166,9 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
 
     if (hasInfoHash && torrent.infoHash) {
       const checkAvailability = async () => {
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.tsx:168',message:'checkAvailability début',data:{infoHash:torrent.infoHash,id:torrent.id},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         try {
           const { clientApi } = await import('../../../lib/client/api');
           const stats = await clientApi.getTorrent(torrent.infoHash!).catch((err) => {
@@ -190,6 +193,28 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
                 state: stats.state,
                 progress: `${(stats.progress * 100).toFixed(1)}%`,
               });
+            }
+          } else if (torrent.tmdbId) {
+            // Si le torrent n'est pas trouvé par info_hash mais qu'on a un TMDB ID, chercher par TMDB ID
+            const localMedia = await clientApi.findLocalMediaByTmdb(torrent.tmdbId, torrent.tmdbType || undefined);
+            if (localMedia.length > 0) {
+              // Médias locaux trouvés par TMDB ID
+              setIsAvailableLocally(true);
+              if (localMedia.length === 1) {
+                addDebugLog('success', `📚 Média local trouvé (TMDB ID: ${torrent.tmdbId})`, {
+                  file: localMedia[0].file_name,
+                  quality: localMedia[0].quality || 'N/A',
+                  resolution: localMedia[0].resolution || 'N/A',
+                });
+              } else {
+                addDebugLog('success', `📚 ${localMedia.length} version(s) locale(s) trouvée(s) (TMDB ID: ${torrent.tmdbId})`, {
+                  versions: localMedia.map(m => ({
+                    file: m.file_name,
+                    quality: m.quality || 'N/A',
+                    resolution: m.resolution || 'N/A',
+                  })),
+                });
+              }
             }
           }
           // Ne pas logger si stats est null (torrent non téléchargé, c'est normal)
@@ -289,8 +314,13 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
     // Pas besoin d'appeler un endpoint séparé
     if (torrent.trailerKey) {
       setTrailerKey(torrent.trailerKey);
-      // Lancer automatiquement le trailer si disponible
-      setIsPlayingTrailer(true);
+      // Afficher d'abord l'image, puis lancer le trailer après 3.5 secondes
+      setIsPlayingTrailer(false);
+      const timer = setTimeout(() => {
+        setIsPlayingTrailer(true);
+      }, 3500); // 3.5 secondes de délai
+      
+      return () => clearTimeout(timer);
     } else {
       // Pas de trailer disponible, utiliser l'image à la place
       setTrailerKey(null);
@@ -620,18 +650,8 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
               onCopyMagnet={handleCopyMagnet}
               onDeleteMedia={handleDeleteMedia}
               onPlayTrailer={() => {
-                if (isPlayingTrailer) {
-                  setIsPlayingTrailer(false);
-                  return;
-                }
-                
-                // Le trailer_key est déjà dans les données du torrent depuis getTorrentGroup
-                // Pas besoin d'appeler un endpoint séparé
-                if (trailerKey) {
-                  setIsPlayingTrailer(true);
-                } else {
-                  addNotification('info', 'Bande-annonce non disponible pour ce média. Le torrent n\'a peut-être pas été enrichi avec les données TMDB.');
-                }
+                // Fonction désactivée - le trailer se lance automatiquement après 3.5 secondes
+                // Plus besoin de bouton pause
               }}
             />
 

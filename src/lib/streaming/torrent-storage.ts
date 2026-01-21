@@ -6,7 +6,7 @@
 export interface PlaybackPosition {
   torrentId: string;
   deviceId: string;
-  position: number; // Position en bytes
+  position: number; // Position en secondes (changé depuis bytes pour plus de précision)
   timestamp: number;
 }
 

@@ -39,8 +39,14 @@ export class TorrentsService {
    * HTTP qui retournent un 404, et cela ne peut pas être complètement supprimé.
    */
   async getTorrent(infoHash: string): Promise<ClientTorrentStats | null> {
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'torrents.ts:41',message:'getTorrent appelé',data:{infoHash},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     try {
       const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}`);
+      // #region agent log
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'torrents.ts:44',message:'URL construite',data:{url,infoHash},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       
       // Utiliser un AbortController pour pouvoir annuler la requête si nécessaire
       const controller = new AbortController();
@@ -70,6 +76,9 @@ export class TorrentsService {
       // Note: Le navigateur affichera quand même l'erreur 404 dans la console,
       // mais c'est le comportement par défaut et ne peut pas être complètement supprimé
       if (response.status === 404) {
+        // #region agent log
+        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'torrents.ts:72',message:'404 reçu',data:{infoHash,status:response.status,url},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+        // #endregion
         // Retourner null silencieusement - c'est normal pour un torrent qui n'existe pas encore
         return null;
       }
@@ -94,6 +103,74 @@ export class TorrentsService {
         }
       }
       return null;
+    }
+  }
+
+  /**
+   * Rechercher les médias locaux par TMDB ID
+   */
+  async findLocalMediaByTmdb(tmdbId: number, tmdbType?: string): Promise<Array<{
+    id: string;
+    file_path: string;
+    file_name: string;
+    file_size?: number;
+    category: string;
+    tmdb_id?: number;
+    tmdb_type?: string;
+    slug?: string;
+    poster_url?: string;
+    hero_image_url?: string;
+    synopsis?: string;
+    release_date?: string;
+    genres?: string;
+    vote_average?: number;
+    runtime?: number;
+    info_hash?: string;
+    quality?: string;
+    resolution?: string;
+    language?: string;
+  }>> {
+    try {
+      let url = await this.getRequestUrl('local-media/by-tmdb');
+      const params = new URLSearchParams({ tmdb_id: tmdbId.toString() });
+      if (tmdbType) {
+        params.append('tmdb_type', tmdbType);
+      }
+      url = `${url}?${params.toString()}`;
+      
+      const response = await fetch(url);
+      if (response.status === 404) {
+        return [];
+      }
+      if (!response.ok) {
+        return [];
+      }
+      
+      const data = await handleResponse<Array<{
+        id: string;
+        file_path: string;
+        file_name: string;
+        file_size?: number;
+        category: string;
+        tmdb_id?: number;
+        tmdb_type?: string;
+        slug?: string;
+        poster_url?: string;
+        hero_image_url?: string;
+        synopsis?: string;
+        release_date?: string;
+        genres?: string;
+        vote_average?: number;
+        runtime?: number;
+        info_hash?: string;
+        quality?: string;
+        resolution?: string;
+        language?: string;
+      }>>(response);
+      return data.data || [];
+    } catch (error) {
+      // Ignorer silencieusement les erreurs
+      return [];
     }
   }
 

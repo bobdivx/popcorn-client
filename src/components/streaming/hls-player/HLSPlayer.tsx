@@ -27,7 +27,7 @@ export default function HLSPlayer({
   const hasAutoFullscreenedRef = useRef(false);
   const [hlsDuration, setHlsDuration] = useState<number | undefined>(undefined);
   
-  const { videoRef, hlsRef, isLoading, error, hlsLoaded } = useHlsPlayer({
+  const { videoRef, hlsRef, isLoading, error, hlsLoaded, stopBuffer } = useHlsPlayer({
     src,
     infoHash,
     fileName,
@@ -41,6 +41,15 @@ export default function HLSPlayer({
       setHlsDuration(duration);
     },
   });
+  
+  // Exposer stopBuffer via window pour que VideoPlayerWrapper puisse l'appeler
+  // (solution temporaire, idéalement utiliser forwardRef)
+  useEffect(() => {
+    (window as any).__hlsPlayerStopBuffer = stopBuffer;
+    return () => {
+      delete (window as any).__hlsPlayerStopBuffer;
+    };
+  }, [stopBuffer]);
 
   const isFullscreen = useFullscreen();
   
