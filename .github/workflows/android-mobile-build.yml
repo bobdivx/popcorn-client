@@ -1,0 +1,445 @@
+name: Android Mobile Build (APK + AAB)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:  # Permet de déclencher manuellement depuis l'interface GitHub
+
+jobs:
+  # Job 1: Build APK Mobile
+  build-apk-mobile:
+    runs-on: self-hosted
+    environment: production
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Astro frontend
+        run: npm run build
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-33 build-tools;33.0.0 ndk;25.2.9519653'
+
+      - name: Accept Android licenses
+        run: |
+          yes | sdkmanager --licenses || true
+
+      - name: Setup NDK environment variables
+        run: |
+          NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -type d -name "25.2.9519653" 2>/dev/null | head -n 1)
+          if [ -z "$NDK_PATH" ]; then
+            NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -type d 2>/dev/null | head -n 1)
+          fi
+          if [ -n "$NDK_PATH" ]; then
+            echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+            echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+            echo "Found NDK at: $NDK_PATH"
+          else
+            echo "Warning: NDK not found in $ANDROID_HOME/ndk"
+            ls -la $ANDROID_HOME/ndk/ || echo "NDK directory does not exist"
+          fi
+
+      - name: Install Tauri CLI
+        run: npm install -g @tauri-apps/cli@latest
+
+      - name: Setup Android environment variables
+        run: |
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/tools" >> $GITHUB_PATH
+
+      - name: Initialize Android project
+        run: |
+          echo "Checking if Android project exists..."
+          if [ ! -d "src-tauri/gen/android" ]; then
+            echo "Android project not found, initializing..."
+            npx tauri android init --ci --config src-tauri/tauri.android.mobile.conf.json
+            echo "Android project initialized"
+          else
+            echo "Android project already exists"
+          fi
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+          NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+          JAVA_HOME: ${{ env.JAVA_HOME }}
+          CARGO_TERM_COLOR: always
+
+      - name: Setup signing keystore
+        run: |
+          echo "🔐 Configuration de la signature native..."
+          ANDROID_DIR="src-tauri/gen/android"
+          mkdir -p "$ANDROID_DIR"
+          
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ] || [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ]; then
+            echo "❌ Secrets de signature manquants."
+            exit 1
+          fi
+          
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$ANDROID_DIR/keystore.jks"
+          
+          KEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+          KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
+          
+          if [ -z "$KEY_PASSWORD" ]; then
+            KEY_PASSWORD="$KEYSTORE_PASSWORD"
+          fi
+          
+          cat > "$ANDROID_DIR/keystore.properties" << EOF
+          storeFile=keystore.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=popcorn-key
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Apply signing configuration to build.gradle.kts
+        run: |
+          BUILD_GRADLE="src-tauri/gen/android/app/build.gradle.kts"
+          
+          if [ ! -f "$BUILD_GRADLE" ]; then
+            for i in {1..30}; do
+              if [ -f "$BUILD_GRADLE" ]; then
+                break
+              fi
+              sleep 1
+            done
+          fi
+          
+          if [ ! -f "$BUILD_GRADLE" ]; then
+            echo "❌ build.gradle.kts introuvable après attente"
+            exit 1
+          fi
+          
+          if grep -q "signingConfigs" "$BUILD_GRADLE"; then
+            echo "✅ Configuration de signature déjà présente"
+          else
+            python3 scripts/apply-signing-config.py "$BUILD_GRADLE"
+          fi
+
+      - name: Build Android APK
+        run: npm run tauri:build:android-mobile
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+          NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+          JAVA_HOME: ${{ env.JAVA_HOME }}
+          CARGO_TERM_COLOR: always
+
+      - name: Find APK file
+        id: find-apk
+        run: |
+          APK_PATH=$(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" -type f 2>/dev/null | grep -v "unsigned" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            APK_PATH=$(find src-tauri/gen/android/app/build/outputs/apk -name "*unsigned*.apk" -type f 2>/dev/null | head -n 1)
+          fi
+          if [ -z "$APK_PATH" ]; then
+            APK_PATH=$(find src-tauri/target/aarch64-linux-android/release/bundle/apk -name "*.apk" -type f 2>/dev/null | head -n 1)
+          fi
+          if [ -z "$APK_PATH" ]; then
+            echo "❌ Aucun APK trouvé!"
+            exit 1
+          fi
+          
+          echo "path=$APK_PATH" >> $GITHUB_OUTPUT
+          echo "✅ APK trouvé: $APK_PATH"
+
+      - name: Verify and rename APK
+        id: rename-apk
+        run: |
+          APK_PATH="${{ steps.find-apk.outputs.path }}"
+          BUILD_TOOLS=$(find $ANDROID_HOME/build-tools -maxdepth 1 -type d | sort -V | tail -n 1)
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          
+          if [ -f "$APKSIGNER" ]; then
+            if ! $APKSIGNER verify "$APK_PATH" > /dev/null 2>&1; then
+              echo "❌ ERREUR: L'APK n'est pas signé!"
+              exit 1
+            fi
+          fi
+          
+          PRODUCT_NAME=$(jq -r '.productName' src-tauri/tauri.android.mobile.conf.json)
+          VERSION=$(jq -r '.version' src-tauri/tauri.android.mobile.conf.json)
+          SAFE_NAME=$(echo "$PRODUCT_NAME" | sed 's/ /_/g')
+          NEW_APK_NAME="${SAFE_NAME}-v${VERSION}.apk"
+          
+          FINAL_APK_DIR="./release-apk"
+          mkdir -p "$FINAL_APK_DIR"
+          NEW_APK_PATH="$FINAL_APK_DIR/$NEW_APK_NAME"
+          
+          cp "$APK_PATH" "$NEW_APK_PATH"
+          
+          echo "path=$NEW_APK_PATH" >> $GITHUB_OUTPUT
+          echo "name=$NEW_APK_NAME" >> $GITHUB_OUTPUT
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: popcorn-android-mobile-apk
+          path: ${{ steps.rename-apk.outputs.path }}
+          retention-days: 30
+
+  # Job 2: Build AAB Mobile (dépend de l'APK)
+  build-aab-mobile:
+    needs: build-apk-mobile
+    runs-on: self-hosted
+    environment: production
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Astro frontend
+        run: npm run build
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-33 build-tools;33.0.0 ndk;25.2.9519653'
+
+      - name: Accept Android licenses
+        run: |
+          yes | sdkmanager --licenses || true
+
+      - name: Setup NDK environment variables
+        run: |
+          NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -type d -name "25.2.9519653" 2>/dev/null | head -n 1)
+          if [ -z "$NDK_PATH" ]; then
+            NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -type d 2>/dev/null | head -n 1)
+          fi
+          if [ -n "$NDK_PATH" ]; then
+            echo "ANDROID_NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+            echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
+          fi
+
+      - name: Install Tauri CLI
+        run: npm install -g @tauri-apps/cli@latest
+
+      - name: Setup Android environment variables
+        run: |
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+          echo "$ANDROID_HOME/tools" >> $GITHUB_PATH
+
+      - name: Initialize Android project
+        run: |
+          if [ ! -d "src-tauri/gen/android" ]; then
+            npx tauri android init --ci --config src-tauri/tauri.android.mobile.conf.json
+          fi
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+          NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+          JAVA_HOME: ${{ env.JAVA_HOME }}
+          CARGO_TERM_COLOR: always
+
+      - name: Setup signing keystore
+        run: |
+          ANDROID_DIR="src-tauri/gen/android"
+          mkdir -p "$ANDROID_DIR"
+          
+          if [ -z "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ] || [ -z "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" ]; then
+            echo "❌ Secrets de signature manquants."
+            exit 1
+          fi
+          
+          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > "$ANDROID_DIR/keystore.jks"
+          
+          KEYSTORE_PASSWORD="${{ secrets.ANDROID_KEYSTORE_PASSWORD }}"
+          KEY_PASSWORD="${{ secrets.ANDROID_KEY_PASSWORD }}"
+          
+          if [ -z "$KEY_PASSWORD" ]; then
+            KEY_PASSWORD="$KEYSTORE_PASSWORD"
+          fi
+          
+          cat > "$ANDROID_DIR/keystore.properties" << EOF
+          storeFile=keystore.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=popcorn-key
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Apply signing configuration to build.gradle.kts
+        run: |
+          BUILD_GRADLE="src-tauri/gen/android/app/build.gradle.kts"
+          
+          if [ ! -f "$BUILD_GRADLE" ]; then
+            for i in {1..30}; do
+              if [ -f "$BUILD_GRADLE" ]; then
+                break
+              fi
+              sleep 1
+            done
+          fi
+          
+          if [ ! -f "$BUILD_GRADLE" ]; then
+            echo "❌ build.gradle.kts introuvable"
+            exit 1
+          fi
+          
+          if ! grep -q "signingConfigs" "$BUILD_GRADLE"; then
+            python3 scripts/apply-signing-config.py "$BUILD_GRADLE"
+          fi
+
+      - name: Build Android AAB
+        run: npm run tauri:build:android-mobile:aab
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+          ANDROID_NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+          NDK_HOME: ${{ env.ANDROID_NDK_HOME }}
+          JAVA_HOME: ${{ env.JAVA_HOME }}
+          CARGO_TERM_COLOR: always
+
+      - name: Find AAB file
+        id: find-aab
+        run: |
+          AAB_PATH=$(find src-tauri/gen/android/app/build/outputs/bundle -name "*.aab" -type f 2>/dev/null | head -n 1)
+          if [ -z "$AAB_PATH" ]; then
+            AAB_PATH=$(find src-tauri/target/aarch64-linux-android/release -name "*.aab" -type f 2>/dev/null | head -n 1)
+          fi
+          if [ -z "$AAB_PATH" ]; then
+            echo "❌ Aucun AAB trouvé!"
+            exit 1
+          fi
+          
+          echo "path=$AAB_PATH" >> $GITHUB_OUTPUT
+
+      - name: Generate native debug symbols
+        id: generate-symbols
+        run: |
+          SYMBOLS_DIR="./native-debug-symbols"
+          mkdir -p "$SYMBOLS_DIR/lib/arm64-v8a"
+          
+          SO_COUNT=0
+          while IFS= read -r -d '' so_file; do
+            if [ -f "$so_file" ]; then
+              cp "$so_file" "$SYMBOLS_DIR/lib/arm64-v8a/"
+              SO_COUNT=$((SO_COUNT + 1))
+            fi
+          done < <(find src-tauri/target/aarch64-linux-android/release -name "*.so" -type f -print0 2>/dev/null)
+          
+          if [ $SO_COUNT -eq 0 ]; then
+            while IFS= read -r -d '' so_file; do
+              if [ -f "$so_file" ]; then
+                cp "$so_file" "$SYMBOLS_DIR/lib/arm64-v8a/"
+                SO_COUNT=$((SO_COUNT + 1))
+              fi
+            done < <(find src-tauri/gen/android -name "*.so" -type f -print0 2>/dev/null)
+          fi
+          
+          if [ $SO_COUNT -eq 0 ]; then
+            echo "❌ Aucun fichier .so trouvé"
+            exit 1
+          fi
+          
+          VERSION=$(jq -r '.version' src-tauri/tauri.android.mobile.conf.json)
+          PRODUCT_NAME=$(jq -r '.productName' src-tauri/tauri.android.mobile.conf.json)
+          SAFE_NAME=$(echo "$PRODUCT_NAME" | sed 's/ /_/g')
+          SYMBOLS_ZIP="${SYMBOLS_DIR}/${SAFE_NAME}-v${VERSION}-native-debug-symbols.zip"
+          
+          cd "$SYMBOLS_DIR"
+          zip -r "../$SYMBOLS_ZIP" lib/ > /dev/null
+          cd ..
+          
+          echo "path=$SYMBOLS_ZIP" >> $GITHUB_OUTPUT
+
+      - name: Verify and rename AAB
+        id: rename-aab
+        run: |
+          AAB_PATH="${{ steps.find-aab.outputs.path }}"
+          
+          if ! jarsigner -verify -certs "$AAB_PATH" > /dev/null 2>&1; then
+            echo "❌ ERREUR: L'AAB n'est pas signé!"
+            exit 1
+          fi
+          
+          PRODUCT_NAME=$(jq -r '.productName' src-tauri/tauri.android.mobile.conf.json)
+          VERSION=$(jq -r '.version' src-tauri/tauri.android.mobile.conf.json)
+          SAFE_NAME=$(echo "$PRODUCT_NAME" | sed 's/ /_/g')
+          NEW_AAB_NAME="${SAFE_NAME}-v${VERSION}.aab"
+          
+          FINAL_AAB_DIR="./release-aab"
+          mkdir -p "$FINAL_AAB_DIR"
+          NEW_AAB_PATH="$FINAL_AAB_DIR/$NEW_AAB_NAME"
+          
+          cp "$AAB_PATH" "$NEW_AAB_PATH"
+          
+          if ! jarsigner -verify -certs "$NEW_AAB_PATH" > /dev/null 2>&1; then
+            echo "❌ ERREUR: L'AAB copié n'est pas signé!"
+            exit 1
+          fi
+          
+          echo "path=$NEW_AAB_PATH" >> $GITHUB_OUTPUT
+          echo "name=$NEW_AAB_NAME" >> $GITHUB_OUTPUT
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: popcorn-android-mobile-aab
+          path: ${{ steps.rename-aab.outputs.path }}
+          retention-days: 90
+
+      - name: Upload native debug symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: popcorn-android-mobile-native-symbols
+          path: ${{ steps.generate-symbols.outputs.path }}
+          retention-days: 90
