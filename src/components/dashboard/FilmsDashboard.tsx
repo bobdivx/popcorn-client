@@ -1,61 +1,31 @@
-import { useState, useEffect, useMemo } from 'preact/hooks';
-import { serverApi } from '../../lib/client/server-api';
+import { useMemo, useEffect, useRef } from 'preact/hooks';
 import type { FilmData } from '../../lib/client/types';
 import { HeroSection } from './components/HeroSection';
 import CarouselRow from '../torrents/CarouselRow';
-import { TorrentPoster } from './components/TorrentPoster';
+import { LazyTorrentPoster } from './components/LazyTorrentPoster';
 import type { ContentItem } from '../../lib/client/types';
+import { useInfiniteFilms } from './hooks/useInfiniteFilms';
 
 export default function FilmsDashboard() {
-  const [films, setFilms] = useState<FilmData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { films, loading, error, hasMore, loadMore } = useInfiniteFilms();
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
 
+  // Charger plus d'éléments automatiquement quand on approche de la fin
   useEffect(() => {
-    loadFilms();
-  }, []);
+    if (!loadMoreTriggerRef.current || !hasMore) return;
 
-  const loadFilms = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      console.log('[FILMS DASHBOARD] Chargement des films...');
-      const response = await serverApi.getFilmsData();
-      
-      console.log('[FILMS DASHBOARD] Réponse reçue:', {
-        success: response.success,
-        hasData: !!response.data,
-        dataLength: Array.isArray(response.data) ? response.data.length : 'N/A',
-        error: response.error,
-        message: response.message,
-      });
-      
-      if (response.success && response.data) {
-        if (!Array.isArray(response.data)) {
-          console.error('[FILMS DASHBOARD] Réponse invalide: data n\'est pas un tableau', response.data);
-          setError('Réponse invalide: liste de films attendue');
-          return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMore();
         }
-        console.log(`[FILMS DASHBOARD] ${response.data.length} film(s) reçu(s) avant tri`);
-        // Trier par date de sortie (les plus récents en premier)
-        const sortedFilms = [...response.data].sort((a, b) => {
-          const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
-          const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-          return dateB - dateA; // Plus récent en premier
-        });
-        console.log(`[FILMS DASHBOARD] ${sortedFilms.length} film(s) après tri, mise à jour de l'état`);
-        setFilms(sortedFilms);
-      } else {
-        console.error('[FILMS DASHBOARD] Erreur:', response.message || response.error);
-        setError(response.message || 'Erreur lors du chargement des films');
-      }
-    } catch (err) {
-      console.error('[FILMS DASHBOARD] Exception:', err);
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
-    } finally {
-      setLoading(false);
-    }
-  };
+      },
+      { rootMargin: '500px' }
+    );
+
+    observer.observe(loadMoreTriggerRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
 
   const handlePlay = (item: ContentItem) => {
     window.location.href = `/player/${item.id}`;
@@ -174,7 +144,7 @@ export default function FilmsDashboard() {
               <CarouselRow key={genre} title={genre}>
                 {genreFilms.map((film) => (
                   <div key={film.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                    <TorrentPoster item={{ ...film, type: 'movie' }} />
+                    <LazyTorrentPoster item={{ ...film, type: 'movie' }} />
                   </div>
                 ))}
               </CarouselRow>
@@ -185,11 +155,13 @@ export default function FilmsDashboard() {
           <CarouselRow title="Tous les films">
             {films.map((film) => (
               <div key={film.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                <TorrentPoster item={{ ...film, type: 'movie' }} />
+                <LazyTorrentPoster item={{ ...film, type: 'movie' }} />
               </div>
             ))}
           </CarouselRow>
         )}
+        {/* Trigger pour charger plus d'éléments */}
+        {hasMore && <div ref={loadMoreTriggerRef} className="h-1" />}
       </div>
     </div>
   );

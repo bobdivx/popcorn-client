@@ -1,61 +1,31 @@
-import { useState, useEffect, useMemo } from 'preact/hooks';
-import { serverApi } from '../../lib/client/server-api';
+import { useMemo, useEffect, useRef } from 'preact/hooks';
 import type { SeriesData } from '../../lib/client/types';
 import { HeroSection } from './components/HeroSection';
 import CarouselRow from '../torrents/CarouselRow';
-import { TorrentPoster } from './components/TorrentPoster';
+import { LazyTorrentPoster } from './components/LazyTorrentPoster';
 import type { ContentItem } from '../../lib/client/types';
+import { useInfiniteSeries } from './hooks/useInfiniteSeries';
 
 export default function SeriesDashboard() {
-  const [series, setSeries] = useState<SeriesData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { series, loading, error, hasMore, loadMore } = useInfiniteSeries();
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
 
+  // Charger plus d'éléments automatiquement quand on approche de la fin
   useEffect(() => {
-    loadSeries();
-  }, []);
+    if (!loadMoreTriggerRef.current || !hasMore) return;
 
-  const loadSeries = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      console.log('[SERIES DASHBOARD] Chargement des séries...');
-      const response = await serverApi.getSeriesData();
-      
-      console.log('[SERIES DASHBOARD] Réponse reçue:', {
-        success: response.success,
-        hasData: !!response.data,
-        dataLength: Array.isArray(response.data) ? response.data.length : 'N/A',
-        error: response.error,
-        message: response.message,
-      });
-      
-      if (response.success && response.data) {
-        if (!Array.isArray(response.data)) {
-          console.error('[SERIES DASHBOARD] Réponse invalide: data n\'est pas un tableau', response.data);
-          setError('Réponse invalide: liste de séries attendue');
-          return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMore();
         }
-        console.log(`[SERIES DASHBOARD] ${response.data.length} série(s) reçu(s) avant tri`);
-        // Trier par date de première diffusion (les plus récents en premier)
-        const sortedSeries = [...response.data].sort((a, b) => {
-          const dateA = a.firstAirDate ? new Date(a.firstAirDate).getTime() : 0;
-          const dateB = b.firstAirDate ? new Date(b.firstAirDate).getTime() : 0;
-          return dateB - dateA; // Plus récent en premier
-        });
-        console.log(`[SERIES DASHBOARD] ${sortedSeries.length} série(s) après tri, mise à jour de l'état`);
-        setSeries(sortedSeries);
-      } else {
-        console.error('[SERIES DASHBOARD] Erreur:', response.message || response.error);
-        setError(response.message || 'Erreur lors du chargement des séries');
-      }
-    } catch (err) {
-      console.error('[SERIES DASHBOARD] Exception:', err);
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
-    } finally {
-      setLoading(false);
-    }
-  };
+      },
+      { rootMargin: '500px' }
+    );
+
+    observer.observe(loadMoreTriggerRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
 
   const handlePlay = (item: ContentItem) => {
     window.location.href = `/player/${item.id}`;
@@ -156,6 +126,20 @@ export default function SeriesDashboard() {
     ),
   });
 
+  // Debug: Vérifier les données des séries pour comprendre pourquoi les images ne s'affichent pas
+  if (series.length > 0) {
+    const firstSerie = series[0];
+    console.log('[SERIES DASHBOARD] Première série:', {
+      id: firstSerie.id,
+      title: firstSerie.title,
+      poster: firstSerie.poster,
+      backdrop: firstSerie.backdrop,
+      hasPoster: !!firstSerie.poster,
+      hasBackdrop: !!firstSerie.backdrop,
+      allKeys: Object.keys(firstSerie),
+    });
+  }
+
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Section Hero avec carousel */}
@@ -174,7 +158,7 @@ export default function SeriesDashboard() {
               <CarouselRow key={genre} title={genre}>
                 {genreSeries.map((serie) => (
                   <div key={serie.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                    <TorrentPoster item={{ ...serie, type: 'tv' }} />
+                    <LazyTorrentPoster item={{ ...serie, type: 'tv' }} />
                   </div>
                 ))}
               </CarouselRow>
@@ -185,11 +169,13 @@ export default function SeriesDashboard() {
           <CarouselRow title="Toutes les séries">
             {series.map((serie) => (
               <div key={serie.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                <TorrentPoster item={{ ...serie, type: 'tv' }} />
+                <LazyTorrentPoster item={{ ...serie, type: 'tv' }} />
               </div>
             ))}
           </CarouselRow>
         )}
+        {/* Trigger pour charger plus d'éléments */}
+        {hasMore && <div ref={loadMoreTriggerRef} className="h-1" />}
       </div>
     </div>
   );

@@ -408,15 +408,7 @@ class ServerApiClient {
 
     try {
       const timeoutMs = this.getTimeoutMs(endpoint);
-      // #region agent log
-      const fetchStart = Date.now();
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest',message:'Début fetch',data:{endpoint,url,timeoutMs,retryCount},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
       const response = await this.nativeFetch(url, { ...options, headers }, timeoutMs);
-      // #region agent log
-      const fetchEnd = Date.now();
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest',message:'Fetch terminé',data:{endpoint,durationMs:fetchEnd-fetchStart,status:response.status,ok:response.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-      // #endregion
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -475,16 +467,10 @@ class ServerApiClient {
       };
     } catch (error) {
       const errorDetails = error instanceof Error ? {name:error.name,message:error.message,stack:error.stack} : {value:String(error),type:typeof error};
-      // #region agent log
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest',message:'Erreur réseau',data:{endpoint,retryCount,error:error instanceof Error ? error.message : String(error),isRetryable:this.isRetryableError(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
       // Vérifier si l'erreur est récupérable et retenter si nécessaire
       if (retryCount < maxRetries && this.isRetryableError(error)) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Exponential backoff, max 3s
         console.warn(`[server-api] Erreur réseau récupérable, retry dans ${delay}ms (tentative ${retryCount + 1}/${maxRetries})`);
-        // #region agent log
-        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'server-api.ts:backendRequest',message:'Retry programmé',data:{endpoint,retryCount:retryCount+1,delay},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-        // #endregion
         await new Promise(resolve => setTimeout(resolve, delay));
         return this.backendRequest<T>(endpoint, options, retryCount + 1);
       }

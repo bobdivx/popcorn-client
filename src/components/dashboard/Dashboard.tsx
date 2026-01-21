@@ -3,8 +3,8 @@ import { useResumeWatching } from './hooks/useResumeWatching';
 import type { ContentItem } from '../../lib/client/types';
 import CarouselRow from '../torrents/CarouselRow';
 import { HeroSection } from './components/HeroSection';
-import { ResumePoster } from './components/ResumePoster';
-import { TorrentPoster } from './components/TorrentPoster';
+import { LazyResumePoster } from './components/LazyResumePoster';
+import { LazyTorrentPoster } from './components/LazyTorrentPoster';
 
 export default function Dashboard() {
   const { data, loading, error } = useDashboardData();
@@ -72,7 +72,7 @@ export default function Dashboard() {
           <CarouselRow title="Reprendre la lecture">
             {(resumeWatching.length > 0 ? resumeWatching : data.continueWatching || []).map((item) => (
               <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px] relative">
-                <ResumePoster item={item} />
+                <LazyResumePoster item={item} />
               </div>
             ))}
           </CarouselRow>
@@ -83,7 +83,7 @@ export default function Dashboard() {
           <CarouselRow title="Films populaires">
             {data.popularMovies.map((item) => (
               <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                <TorrentPoster item={item} />
+                <LazyTorrentPoster item={item} />
               </div>
             ))}
           </CarouselRow>
@@ -94,7 +94,7 @@ export default function Dashboard() {
           <CarouselRow title="Séries populaires">
             {data.popularSeries.map((item) => (
               <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                <TorrentPoster item={item} />
+                <LazyTorrentPoster item={item} />
               </div>
             ))}
           </CarouselRow>
@@ -105,7 +105,7 @@ export default function Dashboard() {
           <CarouselRow title="Ajouts récents">
             {data.recentAdditions.map((item) => (
               <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                <TorrentPoster item={item} />
+                <LazyTorrentPoster item={item} />
               </div>
             ))}
           </CarouselRow>

@@ -14,6 +14,19 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(item.poster || null);
   const fetchedRef = useRef(false);
 
+  // Debug: Log les données reçues pour comprendre pourquoi les images ne s'affichent pas
+  useEffect(() => {
+    if (!item.poster && !item.backdrop) {
+      console.warn('[TorrentPoster] Pas d\'image pour:', {
+        id: item.id,
+        title: item.title,
+        poster: item.poster,
+        backdrop: item.backdrop,
+        itemKeys: Object.keys(item),
+      });
+    }
+  }, [item]);
+
   const cardContainerRef = useRef<HTMLDivElement>(null);
 
   // Hook pour Focus Dynamique "Pinned Left"

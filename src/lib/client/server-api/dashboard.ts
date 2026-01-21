@@ -20,33 +20,13 @@ export const dashboardMethods = {
     // - FILM / SERIES proviennent de /api/torrents/list?category=...
     // - continueWatching n'est pas implémenté ici (nécessite stats player)
     try {
-      // #region agent log
-      const clientStart = Date.now();
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.ts:getDashboardData',message:'Début requêtes dashboard',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       const [moviesRes, seriesRes] = await Promise.all([
         (async () => {
-          // #region agent log
-          const reqStart = Date.now();
-          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.ts:getDashboardData',message:'Début requête films',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
-          const res = await this.backendRequest<any[]>('/api/torrents/list?category=films&sort=popular&limit=60&page=1', { method: 'GET' });
-          // #region agent log
-          const reqEnd = Date.now();
-          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.ts:getDashboardData',message:'Fin requête films',data:{durationMs:reqEnd-reqStart,success:res.success},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
+          const res = await this.backendRequest<any[]>('/api/torrents/list?category=films&sort=popular&limit=20&page=1&skip_indexer=true', { method: 'GET' });
           return res;
         })(),
         (async () => {
-          // #region agent log
-          const reqStart = Date.now();
-          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.ts:getDashboardData',message:'Début requête series',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
-          const res = await this.backendRequest<any[]>('/api/torrents/list?category=series&sort=popular&limit=60&page=1', { method: 'GET' });
-          // #region agent log
-          const reqEnd = Date.now();
-          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.ts:getDashboardData',message:'Fin requête series',data:{durationMs:reqEnd-reqStart,success:res.success},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-          // #endregion
+          const res = await this.backendRequest<any[]>('/api/torrents/list?category=series&sort=popular&limit=20&page=1&skip_indexer=true', { method: 'GET' });
           return res;
         })(),
       ]);
@@ -105,6 +85,7 @@ export const dashboardMethods = {
           rating: typeof rating === 'number' ? rating : undefined,
           releaseDate,
           genres,
+          tmdbId: typeof raw?.tmdbId === 'number' ? raw.tmdbId : (typeof raw?.tmdb_id === 'number' ? raw.tmdb_id : null),
           seeds: typeof seeds === 'number' ? seeds : undefined,
           peers: typeof peers === 'number' ? peers : undefined,
           codec,
@@ -143,16 +124,8 @@ export const dashboardMethods = {
         recentAdditions: [...movies.slice(0, 10), ...series.slice(0, 10)],
       };
 
-      // #region agent log
-      const clientEnd = Date.now();
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.ts:getDashboardData',message:'Dashboard terminé',data:{totalDurationMs:clientEnd-clientStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       return { success: true, data: dashboard };
     } catch (e) {
-      // #region agent log
-      const clientEnd = Date.now();
-      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.ts:getDashboardData',message:'Dashboard erreur',data:{totalDurationMs:clientEnd-clientStart,error:e instanceof Error ? e.message : String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
       return {
         success: false,
         error: 'DashboardError',
@@ -168,7 +141,7 @@ export const dashboardMethods = {
     // Unifié : appel direct au backend Rust
     // Note: le backend utilise "films" (minuscules) comme catégorie, pas "FILM"
     // skip_indexer=true pour éviter les requêtes lentes à l'indexer
-    const res = await this.backendRequest<any[]>('/api/torrents/list?category=films&sort=popular&limit=200&page=1&skip_indexer=true', {
+    const res = await this.backendRequest<any[]>('/api/torrents/list?category=films&sort=popular&limit=30&page=1&skip_indexer=true', {
       method: 'GET',
     });
     if (!res.success) {
@@ -177,6 +150,23 @@ export const dashboardMethods = {
     }
     const rows = Array.isArray(res.data) ? res.data : [];
     console.log(`[DASHBOARD] ${rows.length} torrent(s) FILM reçu(s) du backend`);
+    
+    // Debug: Afficher les champs disponibles dans le premier torrent pour comprendre la structure
+    if (rows.length > 0) {
+      const firstRow = rows[0];
+      console.log('[DASHBOARD] Structure du premier torrent FILM:', {
+        keys: Object.keys(firstRow),
+        imageFields: {
+          imageUrl: firstRow?.imageUrl,
+          image_url: firstRow?.image_url,
+          poster_url: firstRow?.poster_url,
+          poster: firstRow?.poster,
+          heroImageUrl: firstRow?.heroImageUrl,
+          hero_image_url: firstRow?.hero_image_url,
+          backdrop: firstRow?.backdrop,
+        },
+      });
+    }
 
     const films: FilmData[] = rows
       .map((raw: any, index: number) => {
@@ -203,12 +193,13 @@ export const dashboardMethods = {
           id,
           title: raw?.cleanTitle || raw?.clean_title || raw?.name || raw?.title || 'Sans titre',
           type: 'movie',
-          poster: raw?.imageUrl || raw?.poster_url || raw?.poster || undefined,
+          poster: raw?.imageUrl || raw?.image_url || raw?.poster_url || raw?.poster || undefined,
           backdrop: raw?.heroImageUrl || raw?.hero_image_url || raw?.backdrop || undefined,
           overview: raw?.synopsis || raw?.overview || undefined,
           rating: typeof raw?.voteAverage === 'number' ? raw.voteAverage : raw?.vote_average,
           releaseDate: raw?.releaseDate || raw?.release_date || undefined,
           genres: Array.isArray(raw?.genres) ? raw.genres : undefined,
+          tmdbId: typeof raw?.tmdbId === 'number' ? raw.tmdbId : (typeof raw?.tmdb_id === 'number' ? raw.tmdb_id : null),
           seeds: typeof raw?.seedCount === 'number' ? raw.seedCount : raw?.seed_count,
           peers: typeof raw?.leechCount === 'number' ? raw.leechCount : raw?.leech_count,
           fileSize: typeof raw?.fileSize === 'number' ? raw.fileSize : raw?.file_size,
@@ -227,7 +218,7 @@ export const dashboardMethods = {
     // Unifié : appel direct au backend Rust
     // Note: le backend utilise "series" (minuscules) comme catégorie, pas "SERIES"
     // skip_indexer=true pour éviter les requêtes lentes à l'indexer
-    const res = await this.backendRequest<any[]>('/api/torrents/list?category=series&sort=popular&limit=200&page=1&skip_indexer=true', {
+    const res = await this.backendRequest<any[]>('/api/torrents/list?category=series&sort=popular&limit=30&page=1&skip_indexer=true', {
       method: 'GET',
     });
     if (!res.success) {
@@ -236,6 +227,23 @@ export const dashboardMethods = {
     }
     const rows = Array.isArray(res.data) ? res.data : [];
     console.log(`[DASHBOARD] ${rows.length} torrent(s) SERIES reçu(s) du backend`);
+    
+    // Debug: Afficher les champs disponibles dans le premier torrent pour comprendre la structure
+    if (rows.length > 0) {
+      const firstRow = rows[0];
+      console.log('[DASHBOARD] Structure du premier torrent SERIES:', {
+        keys: Object.keys(firstRow),
+        imageFields: {
+          imageUrl: firstRow?.imageUrl,
+          image_url: firstRow?.image_url,
+          poster_url: firstRow?.poster_url,
+          poster: firstRow?.poster,
+          heroImageUrl: firstRow?.heroImageUrl,
+          hero_image_url: firstRow?.hero_image_url,
+          backdrop: firstRow?.backdrop,
+        },
+      });
+    }
 
     const series: SeriesData[] = rows
       .map((raw: any, index: number) => {
@@ -262,12 +270,13 @@ export const dashboardMethods = {
           id,
           title: raw?.cleanTitle || raw?.clean_title || raw?.name || raw?.title || 'Sans titre',
           type: 'tv',
-          poster: raw?.imageUrl || raw?.poster_url || raw?.poster || undefined,
+          poster: raw?.imageUrl || raw?.image_url || raw?.poster_url || raw?.poster || undefined,
           backdrop: raw?.heroImageUrl || raw?.hero_image_url || raw?.backdrop || undefined,
           overview: raw?.synopsis || raw?.overview || undefined,
           rating: typeof raw?.voteAverage === 'number' ? raw.voteAverage : raw?.vote_average,
           firstAirDate: raw?.releaseDate || raw?.release_date || undefined,
           genres: Array.isArray(raw?.genres) ? raw.genres : undefined,
+          tmdbId: typeof raw?.tmdbId === 'number' ? raw.tmdbId : (typeof raw?.tmdb_id === 'number' ? raw.tmdb_id : null),
           seeds: typeof raw?.seedCount === 'number' ? raw.seedCount : raw?.seed_count,
           peers: typeof raw?.leechCount === 'number' ? raw.leechCount : raw?.leech_count,
           fileSize: typeof raw?.fileSize === 'number' ? raw.fileSize : raw?.file_size,
@@ -276,6 +285,111 @@ export const dashboardMethods = {
       .filter(Boolean) as SeriesData[];
 
     console.log(`[DASHBOARD] ${series.length} série(s) valide(s) après filtrage`);
+    return { success: true, data: series };
+  },
+
+  /**
+   * Récupère les films avec pagination
+   */
+  async getFilmsDataPaginated(
+    this: ServerApiClientDashboardAccess,
+    page: number = 1,
+    limit: number = 30
+  ): Promise<ApiResponse<FilmData[]>> {
+    const res = await this.backendRequest<any[]>(
+      `/api/torrents/list?category=films&sort=popular&limit=${limit}&page=${page}&skip_indexer=true`,
+      { method: 'GET' }
+    );
+    if (!res.success) {
+      return res as unknown as ApiResponse<FilmData[]>;
+    }
+    const rows = Array.isArray(res.data) ? res.data : [];
+
+    const films: FilmData[] = rows
+      .map((raw: any) => {
+        const rawId = raw?.id;
+        const idAsString = rawId !== undefined && rawId !== null ? String(rawId) : '';
+        const id = raw?.slug || idAsString || raw?.infoHash || raw?.info_hash || raw?.info_hash_hex || '';
+        if (!id) return null;
+        return {
+          id,
+          title: raw?.cleanTitle || raw?.clean_title || raw?.name || raw?.title || 'Sans titre',
+          type: 'movie',
+          poster: raw?.imageUrl || raw?.image_url || raw?.poster_url || raw?.poster || undefined,
+          backdrop: raw?.heroImageUrl || raw?.hero_image_url || raw?.backdrop || undefined,
+          overview: raw?.synopsis || raw?.overview || undefined,
+          rating: typeof raw?.voteAverage === 'number' ? raw.voteAverage : raw?.vote_average,
+          releaseDate: raw?.releaseDate || raw?.release_date || undefined,
+          genres: Array.isArray(raw?.genres) ? raw.genres : undefined,
+          tmdbId: typeof raw?.tmdbId === 'number' ? raw.tmdbId : (typeof raw?.tmdb_id === 'number' ? raw.tmdb_id : null),
+          seeds: typeof raw?.seedCount === 'number' ? raw.seedCount : raw?.seed_count,
+          peers: typeof raw?.leechCount === 'number' ? raw.leechCount : raw?.leech_count,
+          fileSize: typeof raw?.fileSize === 'number' ? raw.fileSize : raw?.file_size,
+        } satisfies FilmData;
+      })
+      .filter(Boolean) as FilmData[];
+
+    return { success: true, data: films };
+  },
+
+  /**
+   * Récupère les séries avec pagination
+   */
+  async getSeriesDataPaginated(
+    this: ServerApiClientDashboardAccess,
+    page: number = 1,
+    limit: number = 30
+  ): Promise<ApiResponse<SeriesData[]>> {
+    const res = await this.backendRequest<any[]>(
+      `/api/torrents/list?category=series&sort=popular&limit=${limit}&page=${page}&skip_indexer=true`,
+      { method: 'GET' }
+    );
+    if (!res.success) {
+      return res as unknown as ApiResponse<SeriesData[]>;
+    }
+    const rows = Array.isArray(res.data) ? res.data : [];
+    
+    // Debug: Afficher les champs disponibles dans le premier torrent pour comprendre la structure
+    if (rows.length > 0) {
+      const firstRow = rows[0];
+      console.log('[DASHBOARD] Structure du premier torrent SERIES (paginated):');
+      console.log('  - imageUrl:', firstRow?.imageUrl);
+      console.log('  - image_url:', firstRow?.image_url);
+      console.log('  - poster_url:', firstRow?.poster_url);
+      console.log('  - poster:', firstRow?.poster);
+      console.log('  - heroImageUrl:', firstRow?.heroImageUrl);
+      console.log('  - hero_image_url:', firstRow?.hero_image_url);
+      console.log('  - backdrop:', firstRow?.backdrop);
+      console.log('  - tmdbId:', firstRow?.tmdbId);
+      console.log('  - tmdb_id:', firstRow?.tmdb_id);
+      console.log('  - Tous les clés:', Object.keys(firstRow));
+      console.log('  - Données complètes (premiers 1000 caractères):', JSON.stringify(firstRow, null, 2).substring(0, 1000));
+    }
+
+    const series: SeriesData[] = rows
+      .map((raw: any) => {
+        const rawId = raw?.id;
+        const idAsString = rawId !== undefined && rawId !== null ? String(rawId) : '';
+        const id = raw?.slug || idAsString || raw?.infoHash || raw?.info_hash || raw?.info_hash_hex || '';
+        if (!id) return null;
+        return {
+          id,
+          title: raw?.cleanTitle || raw?.clean_title || raw?.name || raw?.title || 'Sans titre',
+          type: 'tv',
+          poster: raw?.imageUrl || raw?.image_url || raw?.poster_url || raw?.poster || undefined,
+          backdrop: raw?.heroImageUrl || raw?.hero_image_url || raw?.backdrop || undefined,
+          overview: raw?.synopsis || raw?.overview || undefined,
+          rating: typeof raw?.voteAverage === 'number' ? raw.voteAverage : raw?.vote_average,
+          firstAirDate: raw?.releaseDate || raw?.release_date || undefined,
+          genres: Array.isArray(raw?.genres) ? raw.genres : undefined,
+          tmdbId: typeof raw?.tmdbId === 'number' ? raw.tmdbId : (typeof raw?.tmdb_id === 'number' ? raw.tmdb_id : null),
+          seeds: typeof raw?.seedCount === 'number' ? raw.seedCount : raw?.seed_count,
+          peers: typeof raw?.leechCount === 'number' ? raw.leechCount : raw?.leech_count,
+          fileSize: typeof raw?.fileSize === 'number' ? raw.fileSize : raw?.file_size,
+        } satisfies SeriesData;
+      })
+      .filter(Boolean) as SeriesData[];
+
     return { success: true, data: series };
   },
 };

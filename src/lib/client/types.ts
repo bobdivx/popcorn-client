@@ -97,6 +97,8 @@ export interface ContentItem {
   firstAirDate?: string;
   // Genres (depuis TMDB)
   genres?: string[];
+  // ID TMDB pour identification
+  tmdbId?: number | null;
   // Pour "Reprendre la lecture"
   progress?: number; // Pourcentage de progression (0-100)
   lastWatched?: string; // Date ISO

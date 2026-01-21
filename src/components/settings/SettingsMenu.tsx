@@ -126,18 +126,18 @@ export default function SettingsMenu() {
             <a
               key={card.id}
               href={card.href}
-              class={`settings-card group relative block p-4 sm:p-6 md:p-8 rounded-xl bg-gradient-to-br from-gray-900 to-black border-2 border-gray-800 ${colors.border} transition-all duration-300 hover:shadow-2xl ${colors.shadow} hover:scale-105 focus:outline-none focus:ring-4 focus:ring-opacity-50 min-h-[140px] sm:min-h-[160px] md:min-h-[180px]`}
+              class={`settings-card group relative block p-4 sm:p-6 md:p-8 rounded-xl bg-gradient-to-br from-gray-900 to-black border-2 border-gray-800 ${colors.border} transition-all duration-300 hover:shadow-2xl ${colors.shadow} hover:scale-105 focus:outline-none focus:ring-4 focus:ring-opacity-50 min-h-[140px] sm:min-h-[160px] md:min-h-[180px] overflow-hidden`}
               tabIndex={0}
             >
               <div class="flex items-start gap-3 sm:gap-4 md:gap-5">
                 <div class={`flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 rounded-lg ${colors.bg} flex items-center justify-center transition-colors`}>
                   <IconComponent class={`w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 ${colors.text}`} />
                 </div>
-                <div class="flex-1 min-w-0">
-                  <h3 class={`text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-white mb-1 sm:mb-2 ${colors.text} transition-colors`}>
+                <div class="flex-1 min-w-0 overflow-hidden">
+                  <h3 class={`text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-white mb-1 sm:mb-2 ${colors.text} transition-colors break-words overflow-hidden`}>
                     {card.title}
                   </h3>
-                  <p class="text-xs sm:text-sm md:text-base text-gray-400 line-clamp-2 sm:line-clamp-3">
+                  <p class="text-xs sm:text-sm md:text-base text-gray-400 line-clamp-2 sm:line-clamp-3 break-words overflow-hidden">
                     {card.description}
                   </p>
                 </div>
