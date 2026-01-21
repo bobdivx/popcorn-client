@@ -2,6 +2,7 @@ import { useEffect } from 'preact/hooks';
 import { useSetupStatus } from './hooks/useSetupStatus';
 import { useWizardNavigation } from './hooks/useWizardNavigation';
 import { useWizardActions } from './hooks/useWizardActions';
+import { useWizardSteps } from './hooks/useWizardSteps';
 import { StepIndicator } from './components/StepIndicator';
 import { DisclaimerStep } from './steps/DisclaimerStep';
 import { ServerUrlStep } from './steps/ServerUrlStep';
@@ -17,13 +18,14 @@ import { serverApi } from '../../lib/client/server-api';
 
 export default function Wizard() {
   const { loading, setupStatus, checkSetupStatus } = useSetupStatus();
+  const { steps, totalSteps, getStepNumber, getStepId, getNextStepNumber, getPreviousStepNumber } = useWizardSteps(setupStatus);
   const {
     currentStep,
     setCurrentStep,
     focusedButtonIndex,
     setFocusedButtonIndex,
     buttonRefs,
-  } = useWizardNavigation(setupStatus);
+  } = useWizardNavigation(setupStatus, getStepId, getStepNumber, getNextStepNumber, getPreviousStepNumber);
 
   const {
     saving,
@@ -38,7 +40,7 @@ export default function Wizard() {
   } = useWizardActions();
 
   // Vérifier si l'utilisateur doit être redirigé vers /login
-  // Si l'URL backend est configurée ET qu'il y a des utilisateurs, on redirige vers /login
+  // Si le setup est complet (needsSetup === false et hasUsers === true), rediriger
   useEffect(() => {
     const checkAndRedirect = async () => {
       // Si l'URL backend n'est pas configurée, on reste sur le wizard
@@ -51,8 +53,9 @@ export default function Wizard() {
         return;
       }
 
-      // Si le backend est accessible ET qu'il y a des utilisateurs, rediriger vers /login
-      if (setupStatus.backendReachable && setupStatus.hasUsers) {
+      // Si le backend est accessible ET que le setup est complet (needsSetup === false et hasUsers === true)
+      // rediriger vers /login ou /dashboard selon l'état d'authentification
+      if (setupStatus.backendReachable && setupStatus.needsSetup === false && setupStatus.hasUsers === true) {
         // Vérifier aussi si l'utilisateur est déjà authentifié
         if (serverApi.isAuthenticated()) {
           window.location.href = '/dashboard';
@@ -132,18 +135,20 @@ export default function Wizard() {
             Configuration initiale
           </h2>
 
-          <StepIndicator currentStep={1} totalSteps={9} />
+          <StepIndicator currentStep={1} totalSteps={1} stepLabels={['Serveur']} />
 
           <ServerUrlStep
             focusedButtonIndex={focusedButtonIndex}
             buttonRefs={buttonRefs}
             onNext={async () => {
+              // Rafraîchir le statut après configuration de l'URL
               await checkSetupStatus();
-              // Vérifier si le backend a déjà des utilisateurs après avoir configuré l'URL
+              
+              // Vérifier le statut mis à jour pour déterminer la prochaine étape
               const updatedStatus = await serverApi.getSetupStatus();
               if (updatedStatus.success && updatedStatus.data) {
-                if (updatedStatus.data.backendReachable && updatedStatus.data.hasUsers) {
-                  // Le backend est déjà configuré avec des utilisateurs, rediriger vers /login
+                // Si le backend est déjà complètement configuré, rediriger
+                if (updatedStatus.data.backendReachable && updatedStatus.data.needsSetup === false && updatedStatus.data.hasUsers === true) {
                   if (serverApi.isAuthenticated()) {
                     window.location.href = '/dashboard';
                   } else {
@@ -151,8 +156,20 @@ export default function Wizard() {
                   }
                   return;
                 }
+                
+                // Sinon, passer à la prochaine étape disponible selon le nouveau statut
+                // Le hook useWizardSteps va recalculer les étapes avec le nouveau statut
+                const nextStepNumber = getNextStepNumber('serverUrl');
+                if (nextStepNumber) {
+                  setCurrentStep(nextStepNumber);
+                }
+              } else {
+                // Si la vérification échoue, essayer quand même de passer à l'étape suivante
+                const nextStepNumber = getNextStepNumber('serverUrl');
+                if (nextStepNumber) {
+                  setCurrentStep(nextStepNumber);
+                }
               }
-              setCurrentStep(2);
             }}
           />
 
@@ -204,119 +221,218 @@ export default function Wizard() {
           </div>
         )}
 
-        <StepIndicator currentStep={currentStep} totalSteps={9} />
+        <StepIndicator 
+          currentStep={currentStep} 
+          totalSteps={totalSteps}
+          stepLabels={steps.map(s => s.label)}
+        />
 
-        {currentStep === 1 && (
-          <ServerUrlStep
-            focusedButtonIndex={focusedButtonIndex}
-            buttonRefs={buttonRefs}
-            onNext={async () => {
-              await checkSetupStatus();
-              // Vérifier si le backend a déjà des utilisateurs après avoir configuré l'URL
-              const updatedStatus = await serverApi.getSetupStatus();
-              if (updatedStatus.success && updatedStatus.data) {
-                if (updatedStatus.data.backendReachable && updatedStatus.data.hasUsers) {
-                  // Le backend est déjà configuré avec des utilisateurs, rediriger vers /login
-                  if (serverApi.isAuthenticated()) {
-                    window.location.href = '/dashboard';
-                  } else {
-                    window.location.href = '/login';
-                  }
-                  return;
-                }
-              }
-              setCurrentStep(2);
-            }}
-          />
-        )}
+        {(() => {
+          const currentStepId = getStepId(currentStep);
+          if (!currentStepId) return null;
 
-        {currentStep === 2 && (
-          <DisclaimerStep
-            focusedButtonIndex={focusedButtonIndex}
-            buttonRefs={buttonRefs}
-            onNext={() => setCurrentStep(3)}
-          />
-        )}
+          switch (currentStepId) {
+            case 'serverUrl': {
+              return (
+                <ServerUrlStep
+                  focusedButtonIndex={focusedButtonIndex}
+                  buttonRefs={buttonRefs}
+                  onNext={async () => {
+                    // Rafraîchir le statut après configuration de l'URL
+                    await checkSetupStatus();
+                    
+                    // Vérifier le statut mis à jour pour déterminer la prochaine étape
+                    const updatedStatus = await serverApi.getSetupStatus();
+                    if (updatedStatus.success && updatedStatus.data) {
+                      // Si le backend est déjà complètement configuré, rediriger
+                      if (updatedStatus.data.backendReachable && updatedStatus.data.needsSetup === false && updatedStatus.data.hasUsers === true) {
+                        if (serverApi.isAuthenticated()) {
+                          window.location.href = '/dashboard';
+                        } else {
+                          window.location.href = '/login';
+                        }
+                        return;
+                      }
+                      
+                      // Sinon, passer à la prochaine étape disponible selon le nouveau statut
+                      const nextStepNumber = getNextStepNumber('serverUrl');
+                      if (nextStepNumber) {
+                        setCurrentStep(nextStepNumber);
+                      }
+                    } else {
+                      // Si la vérification échoue, essayer quand même de passer à l'étape suivante
+                      const nextStepNumber = getNextStepNumber('serverUrl');
+                      if (nextStepNumber) {
+                        setCurrentStep(nextStepNumber);
+                      }
+                    }
+                  }}
+                />
+              );
+            }
 
-        {currentStep === 3 && (
-          <AuthStep
-            focusedButtonIndex={focusedButtonIndex}
-            buttonRefs={buttonRefs}
-            onNext={() => setCurrentStep(4)}
-            onStatusChange={checkSetupStatus}
-          />
-        )}
+            case 'disclaimer': {
+              return (
+                <DisclaimerStep
+                  focusedButtonIndex={focusedButtonIndex}
+                  buttonRefs={buttonRefs}
+                  onNext={() => {
+                    const nextStepNumber = getNextStepNumber('disclaimer');
+                    if (nextStepNumber) {
+                      setCurrentStep(nextStepNumber);
+                    }
+                  }}
+                />
+              );
+            }
 
-        {currentStep === 4 && (
-          <WelcomeStep
-            focusedButtonIndex={focusedButtonIndex}
-            buttonRefs={buttonRefs}
-            onNext={(saveToCloud) => {
-              // Stocker la préférence de sauvegarde cloud
-              if (typeof window !== 'undefined') {
-                localStorage.setItem('popcorn_client_save_to_cloud', String(saveToCloud));
-              }
-              setCurrentStep(5);
-            }}
-          />
-        )}
+            case 'auth': {
+              return (
+                <AuthStep
+                  focusedButtonIndex={focusedButtonIndex}
+                  buttonRefs={buttonRefs}
+                  onNext={() => {
+                    const nextStepNumber = getNextStepNumber('auth');
+                    if (nextStepNumber) {
+                      setCurrentStep(nextStepNumber);
+                    }
+                  }}
+                  onStatusChange={checkSetupStatus}
+                />
+              );
+            }
 
-        {currentStep === 5 && (
-          <IndexersStep
-            setupStatus={setupStatus}
-            focusedButtonIndex={focusedButtonIndex}
-            buttonRefs={buttonRefs}
-            onPrevious={() => setCurrentStep(4)}
-            onNext={() => setCurrentStep(6)}
-            onStatusChange={checkSetupStatus}
-          />
-        )}
+            case 'welcome': {
+              return (
+                <WelcomeStep
+                  focusedButtonIndex={focusedButtonIndex}
+                  buttonRefs={buttonRefs}
+                  onNext={(saveToCloud) => {
+                    // Stocker la préférence de sauvegarde cloud
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('popcorn_client_save_to_cloud', String(saveToCloud));
+                    }
+                    const nextStepNumber = getNextStepNumber('welcome');
+                    if (nextStepNumber) {
+                      setCurrentStep(nextStepNumber);
+                    }
+                  }}
+                />
+              );
+            }
 
-        {currentStep === 6 && (
-          <TmdbStep
-            setupStatus={setupStatus}
-            focusedButtonIndex={focusedButtonIndex}
-            buttonRefs={buttonRefs}
-            onPrevious={() => setCurrentStep(5)}
-            onNext={() => setCurrentStep(7)}
-            onSave={handleSaveTmdb}
-            onStatusChange={checkSetupStatus}
-          />
-        )}
+            case 'indexers': {
+              return (
+                <IndexersStep
+                  setupStatus={setupStatus}
+                  focusedButtonIndex={focusedButtonIndex}
+                  buttonRefs={buttonRefs}
+                  onPrevious={() => {
+                    const prevStepNumber = getPreviousStepNumber('indexers');
+                    if (prevStepNumber) {
+                      setCurrentStep(prevStepNumber);
+                    }
+                  }}
+                  onNext={() => {
+                    const nextStepNumber = getNextStepNumber('indexers');
+                    if (nextStepNumber) {
+                      setCurrentStep(nextStepNumber);
+                    }
+                  }}
+                  onStatusChange={checkSetupStatus}
+                />
+              );
+            }
 
-        {currentStep === 7 && (
-          <DownloadLocationStep
-            setupStatus={setupStatus}
-            focusedButtonIndex={focusedButtonIndex}
-            buttonRefs={buttonRefs}
-            onPrevious={() => setCurrentStep(6)}
-            onNext={() => setCurrentStep(8)}
-            onSave={handleSaveDownloadLocation}
-          />
-        )}
+            case 'tmdb': {
+              return (
+                <TmdbStep
+                  setupStatus={setupStatus}
+                  focusedButtonIndex={focusedButtonIndex}
+                  buttonRefs={buttonRefs}
+                  onPrevious={() => {
+                    const prevStepNumber = getPreviousStepNumber('tmdb');
+                    if (prevStepNumber) {
+                      setCurrentStep(prevStepNumber);
+                    }
+                  }}
+                  onNext={() => {
+                    const nextStepNumber = getNextStepNumber('tmdb');
+                    if (nextStepNumber) {
+                      setCurrentStep(nextStepNumber);
+                    }
+                  }}
+                  onSave={handleSaveTmdb}
+                  onStatusChange={checkSetupStatus}
+                />
+              );
+            }
 
-        {currentStep === 8 && (
-          <SyncStep
-            focusedButtonIndex={focusedButtonIndex}
-            buttonRefs={buttonRefs}
-            onPrevious={() => setCurrentStep(7)}
-            onNext={() => setCurrentStep(9)}
-          />
-        )}
+            case 'downloadLocation': {
+              return (
+                <DownloadLocationStep
+                  setupStatus={setupStatus}
+                  focusedButtonIndex={focusedButtonIndex}
+                  buttonRefs={buttonRefs}
+                  onPrevious={() => {
+                    const prevStepNumber = getPreviousStepNumber('downloadLocation');
+                    if (prevStepNumber) {
+                      setCurrentStep(prevStepNumber);
+                    }
+                  }}
+                  onNext={() => {
+                    const nextStepNumber = getNextStepNumber('downloadLocation');
+                    if (nextStepNumber) {
+                      setCurrentStep(nextStepNumber);
+                    }
+                  }}
+                  onSave={handleSaveDownloadLocation}
+                />
+              );
+            }
 
-        {currentStep === 9 && (
-          <CompleteStep
-            focusedButtonIndex={focusedButtonIndex}
-            buttonRefs={buttonRefs}
-            onComplete={() => {
-              // Récupérer la préférence de sauvegarde cloud depuis localStorage
-              const saveToCloud = typeof window !== 'undefined' 
-                ? localStorage.getItem('popcorn_client_save_to_cloud') === 'true'
-                : false;
-              completeSetup(saveToCloud);
-            }}
-          />
-        )}
+            case 'sync': {
+              return (
+                <SyncStep
+                  focusedButtonIndex={focusedButtonIndex}
+                  buttonRefs={buttonRefs}
+                  onPrevious={() => {
+                    const prevStepNumber = getPreviousStepNumber('sync');
+                    if (prevStepNumber) {
+                      setCurrentStep(prevStepNumber);
+                    }
+                  }}
+                  onNext={() => {
+                    const nextStepNumber = getNextStepNumber('sync');
+                    if (nextStepNumber) {
+                      setCurrentStep(nextStepNumber);
+                    }
+                  }}
+                />
+              );
+            }
+
+            case 'complete': {
+              const prevStepNumber = getStepNumber('sync') || getStepNumber('downloadLocation') || getStepNumber('tmdb') || getStepNumber('indexers') || getStepNumber('welcome') || getStepNumber('auth') || getStepNumber('disclaimer') || getStepNumber('serverUrl');
+              return (
+                <CompleteStep
+                  focusedButtonIndex={focusedButtonIndex}
+                  buttonRefs={buttonRefs}
+                  onComplete={() => {
+                    // Récupérer la préférence de sauvegarde cloud depuis localStorage
+                    const saveToCloud = typeof window !== 'undefined' 
+                      ? localStorage.getItem('popcorn_client_save_to_cloud') === 'true'
+                      : false;
+                    completeSetup(saveToCloud);
+                  }}
+                />
+              );
+            }
+
+            default:
+              return null;
+          }
+        })()}
 
         <Footer />
       </div>

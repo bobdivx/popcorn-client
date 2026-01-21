@@ -1,10 +1,12 @@
 interface StepIndicatorProps {
   currentStep: number;
   totalSteps: number;
+  stepLabels?: string[]; // Labels optionnels pour les étapes affichées
 }
 
-export function StepIndicator({ currentStep, totalSteps }: StepIndicatorProps) {
-  const stepLabels = [
+export function StepIndicator({ currentStep, totalSteps, stepLabels }: StepIndicatorProps) {
+  // Labels par défaut si non fournis (pour compatibilité)
+  const defaultLabels = [
     'Disclaimer',
     'Serveur',
     'Auth',
@@ -16,7 +18,13 @@ export function StepIndicator({ currentStep, totalSteps }: StepIndicatorProps) {
     'Terminé',
   ];
 
-  const currentLabel = stepLabels[currentStep - 1] || `Étape ${currentStep}`;
+  // Utiliser les labels fournis ou les labels par défaut
+  // S'assurer que le nombre de labels correspond au nombre d'étapes
+  const labels = stepLabels && stepLabels.length === totalSteps 
+    ? stepLabels 
+    : (stepLabels || defaultLabels).slice(0, totalSteps);
+  
+  const currentLabel = labels[currentStep - 1] || `Étape ${currentStep}`;
   const progressPct = Math.min(100, Math.max(0, Math.round((currentStep / totalSteps) * 100)));
 
   return (
@@ -93,7 +101,7 @@ export function StepIndicator({ currentStep, totalSteps }: StepIndicatorProps) {
                       : 'text-gray-500'
                 }`}
               >
-                {stepLabels[step - 1] || `Étape ${step}`}
+                {labels[step - 1] || `Étape ${step}`}
               </div>
             </div>
           );

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { getBackendUrl, hasBackendUrl, setBackendUrl as saveBackendUrl } from '../../../lib/backend-config.js';
+import { serverApi } from '../../../lib/client/server-api';
 
 interface ServerUrlStepProps {
   focusedButtonIndex: number;
@@ -145,6 +146,38 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext }: Server
       // Sauvegarder l'URL dans localStorage
       saveBackendUrl(normalizedUrl);
       console.log('[ServerUrlStep] URL sauvegardée:', normalizedUrl);
+
+      // Vérifier le statut du backend après configuration de l'URL
+      // Cette vérification permet de détecter rapidement si le backend est accessible
+      // et de gérer les cas d'erreur avant de passer au parent
+      try {
+        const setupStatus = await serverApi.getSetupStatus();
+        if (setupStatus.success && setupStatus.data) {
+          console.log('[ServerUrlStep] Statut du backend après configuration:', setupStatus.data);
+          
+          // Si le backend n'est pas accessible, afficher un message d'erreur
+          if (setupStatus.data.backendReachable === false) {
+            setError('Le backend n\'est pas accessible. Vérifiez que le serveur est démarré et que l\'URL est correcte.');
+            setTesting(false);
+            return;
+          }
+
+          // Si le backend est déjà complètement configuré (needsSetup === false et hasUsers === true),
+          // la redirection sera gérée par le composant parent (Wizard.tsx) via le useEffect
+          if (setupStatus.data.needsSetup === false && setupStatus.data.hasUsers === true) {
+            console.log('[ServerUrlStep] Backend déjà configuré, redirection gérée par le parent');
+            // On continue quand même pour que le parent puisse gérer la redirection
+          }
+        } else {
+          // Si la réponse n'est pas un succès, afficher un avertissement mais continuer
+          console.warn('[ServerUrlStep] Échec de la vérification du statut:', setupStatus.error);
+          // Ne pas bloquer, le parent pourra réessayer
+        }
+      } catch (statusError) {
+        console.warn('[ServerUrlStep] Erreur lors de la vérification du statut:', statusError);
+        // Ne pas bloquer si la vérification du statut échoue, continuer quand même
+        // Le parent pourra réessayer avec checkSetupStatus()
+      }
 
       // Continuer au prochain step
       onNext();
