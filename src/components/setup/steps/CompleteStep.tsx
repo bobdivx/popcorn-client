@@ -34,9 +34,22 @@ export function CompleteStep({ focusedButtonIndex, buttonRefs, onComplete }: Com
         </p>
 
         <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6">
-          <p className="text-white">
+          <p className="text-white mb-4">
             Vous pouvez maintenant commencer à utiliser Popcorn pour rechercher et regarder vos contenus préférés.
           </p>
+          
+          <div className="flex justify-center">
+            <video
+              className="max-w-full h-auto rounded-lg"
+              autoPlay
+              muted
+              playsInline
+              onEnded={onComplete}
+            >
+              <source src="/intro.mp4" type="video/mp4" />
+              Votre navigateur ne supporte pas la lecture de vidéos.
+            </video>
+          </div>
         </div>
 
         <button

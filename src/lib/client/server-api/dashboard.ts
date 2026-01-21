@@ -20,9 +20,35 @@ export const dashboardMethods = {
     // - FILM / SERIES proviennent de /api/torrents/list?category=...
     // - continueWatching n'est pas implémenté ici (nécessite stats player)
     try {
+      // #region agent log
+      const clientStart = Date.now();
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.ts:getDashboardData',message:'Début requêtes dashboard',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       const [moviesRes, seriesRes] = await Promise.all([
-        this.backendRequest<any[]>('/api/torrents/list?category=films&sort=popular&limit=60&page=1', { method: 'GET' }),
-        this.backendRequest<any[]>('/api/torrents/list?category=series&sort=popular&limit=60&page=1', { method: 'GET' }),
+        (async () => {
+          // #region agent log
+          const reqStart = Date.now();
+          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.ts:getDashboardData',message:'Début requête films',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
+          const res = await this.backendRequest<any[]>('/api/torrents/list?category=films&sort=popular&limit=60&page=1', { method: 'GET' });
+          // #region agent log
+          const reqEnd = Date.now();
+          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.ts:getDashboardData',message:'Fin requête films',data:{durationMs:reqEnd-reqStart,success:res.success},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
+          return res;
+        })(),
+        (async () => {
+          // #region agent log
+          const reqStart = Date.now();
+          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.ts:getDashboardData',message:'Début requête series',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
+          const res = await this.backendRequest<any[]>('/api/torrents/list?category=series&sort=popular&limit=60&page=1', { method: 'GET' });
+          // #region agent log
+          const reqEnd = Date.now();
+          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.ts:getDashboardData',message:'Fin requête series',data:{durationMs:reqEnd-reqStart,success:res.success},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+          // #endregion
+          return res;
+        })(),
       ]);
 
       if (!moviesRes.success && !seriesRes.success) {
@@ -117,8 +143,16 @@ export const dashboardMethods = {
         recentAdditions: [...movies.slice(0, 10), ...series.slice(0, 10)],
       };
 
+      // #region agent log
+      const clientEnd = Date.now();
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.ts:getDashboardData',message:'Dashboard terminé',data:{totalDurationMs:clientEnd-clientStart},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       return { success: true, data: dashboard };
     } catch (e) {
+      // #region agent log
+      const clientEnd = Date.now();
+      fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'dashboard.ts:getDashboardData',message:'Dashboard erreur',data:{totalDurationMs:clientEnd-clientStart,error:e instanceof Error ? e.message : String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+      // #endregion
       return {
         success: false,
         error: 'DashboardError',
@@ -133,7 +167,8 @@ export const dashboardMethods = {
   async getFilmsData(this: ServerApiClientDashboardAccess): Promise<ApiResponse<FilmData[]>> {
     // Unifié : appel direct au backend Rust
     // Note: le backend utilise "films" (minuscules) comme catégorie, pas "FILM"
-    const res = await this.backendRequest<any[]>('/api/torrents/list?category=films&sort=popular&limit=200&page=1', {
+    // skip_indexer=true pour éviter les requêtes lentes à l'indexer
+    const res = await this.backendRequest<any[]>('/api/torrents/list?category=films&sort=popular&limit=200&page=1&skip_indexer=true', {
       method: 'GET',
     });
     if (!res.success) {
@@ -191,7 +226,8 @@ export const dashboardMethods = {
   async getSeriesData(this: ServerApiClientDashboardAccess): Promise<ApiResponse<SeriesData[]>> {
     // Unifié : appel direct au backend Rust
     // Note: le backend utilise "series" (minuscules) comme catégorie, pas "SERIES"
-    const res = await this.backendRequest<any[]>('/api/torrents/list?category=series&sort=popular&limit=200&page=1', {
+    // skip_indexer=true pour éviter les requêtes lentes à l'indexer
+    const res = await this.backendRequest<any[]>('/api/torrents/list?category=series&sort=popular&limit=200&page=1&skip_indexer=true', {
       method: 'GET',
     });
     if (!res.success) {
