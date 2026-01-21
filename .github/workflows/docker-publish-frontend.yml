@@ -43,6 +43,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+    # NOTE: Si vous utilisez des "Environment secrets" au lieu de "Repository secrets",
+    # décommentez la ligne suivante et remplacez 'production' par le nom de votre environnement:
+    # environment: production
 
     steps:
       - name: Checkout repository
@@ -65,19 +68,75 @@ jobs:
       - name: Check Docker Hub credentials
         id: check_creds
         run: |
+          echo "🔍 Checking for Docker Hub credentials..."
+          echo "Event: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          
+          # Essayer secrets.DOCKER_USERNAME d'abord
           DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
-          if [ -z "$DOCKER_USER" ]; then
-            DOCKER_USER="${{ vars.DOCKERHUB_USERNAME }}"
+          if [ -n "${DOCKER_USER}" ] && [ "${DOCKER_USER}" != "null" ] && [ "${DOCKER_USER}" != "" ]; then
+            echo "✅ Found DOCKER_USERNAME in repository secrets"
+            echo "username=${DOCKER_USER}" >> $GITHUB_OUTPUT
+            echo "Using Docker Hub username: ${DOCKER_USER}"
+            exit 0
+          else
+            echo "⚠️ secrets.DOCKER_USERNAME is empty or not set"
           fi
           
-          if [ -z "$DOCKER_USER" ]; then
-            echo "ERROR: No Docker Hub username configured!"
-            echo "Please set either secrets.DOCKER_USERNAME or vars.DOCKERHUB_USERNAME"
-            exit 1
+          # Essayer vars.DOCKERHUB_USERNAME
+          DOCKER_USER="${{ vars.DOCKERHUB_USERNAME }}"
+          if [ -n "${DOCKER_USER}" ] && [ "${DOCKER_USER}" != "null" ] && [ "${DOCKER_USER}" != "" ]; then
+            echo "✅ Found DOCKERHUB_USERNAME in repository variables"
+            echo "username=${DOCKER_USER}" >> $GITHUB_OUTPUT
+            echo "Using Docker Hub username: ${DOCKER_USER}"
+            exit 0
+          else
+            echo "⚠️ vars.DOCKERHUB_USERNAME is empty or not set"
           fi
           
-          echo "username=${DOCKER_USER}" >> $GITHUB_OUTPUT
-          echo "Using Docker Hub username: ${DOCKER_USER}"
+          # Si aucun n'est trouvé, afficher une erreur détaillée
+          echo ""
+          echo "❌ ERROR: No Docker Hub username configured!"
+          echo ""
+          echo "📋 Solution: Copy your Environment secrets to Repository secrets"
+          echo ""
+          echo "Go to: Settings > Secrets and variables > Actions > Secrets"
+          echo "Then add:"
+          echo "  - DOCKER_USERNAME (from Environment secrets)"
+          echo "  - DOCKER_PASSWORD (from Environment secrets)"
+          echo ""
+          echo "OR if you want to use Environment secrets, uncomment the 'environment:' line"
+          echo "in the workflow and set it to your environment name."
+          exit 1
+
+      - name: Check Docker password
+        id: check_password
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "🔍 Checking for Docker Hub password/token..."
+          
+          # Essayer dans l'ordre: vars.DOCKER_PASSWORD, secrets.DOCKER_PASSWORD, secrets.DOCKERHUB_TOKEN
+          if [ -n "${{ vars.DOCKER_PASSWORD }}" ] && [ "${{ vars.DOCKER_PASSWORD }}" != "" ]; then
+            echo "✅ Found DOCKER_PASSWORD in vars"
+            echo "password_source=vars" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          if [ -n "${{ secrets.DOCKER_PASSWORD }}" ] && [ "${{ secrets.DOCKER_PASSWORD }}" != "" ]; then
+            echo "✅ Found DOCKER_PASSWORD in secrets"
+            echo "password_source=secrets" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          if [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ] && [ "${{ secrets.DOCKERHUB_TOKEN }}" != "" ]; then
+            echo "✅ Found DOCKERHUB_TOKEN in secrets"
+            echo "password_source=token" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "❌ ERROR: No Docker Hub password/token configured!"
+          echo "Please set one of: vars.DOCKER_PASSWORD, secrets.DOCKER_PASSWORD, or secrets.DOCKERHUB_TOKEN"
+          exit 1
 
       - name: Log in to Docker Hub
         if: github.event_name != 'pull_request'
