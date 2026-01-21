@@ -43,9 +43,7 @@ jobs:
     permissions:
       contents: read
       packages: write
-    # NOTE: Si vous utilisez des "Environment secrets" au lieu de "Repository secrets",
-    # décommentez la ligne suivante et remplacez 'production' par le nom de votre environnement:
-    # environment: production
+    environment: production
 
     steps:
       - name: Checkout repository
