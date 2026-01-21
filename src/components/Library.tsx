@@ -83,6 +83,33 @@ export default function Library({ onItemClick }: LibraryProps) {
     }
   };
 
+  const handleScanLocalMedia = async () => {
+    try {
+      setScanning(true);
+      setScanMessage(null);
+      
+      const response = await serverApi.scanLocalMedia();
+      
+      if (response.success) {
+        setScanMessage('Scan démarré avec succès. La bibliothèque sera mise à jour automatiquement.');
+        // Attendre un peu puis recharger la bibliothèque
+        setTimeout(() => {
+          loadLibrary();
+        }, 2000);
+      } else {
+        setScanMessage(response.message || 'Erreur lors du démarrage du scan');
+      }
+    } catch (err) {
+      setScanMessage(err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setScanning(false);
+      // Effacer le message après 5 secondes
+      setTimeout(() => {
+        setScanMessage(null);
+      }, 5000);
+    }
+  };
+
   // Grouper les items par catégorie
   const groupedItems = useMemo(() => {
     const movies: LibraryMedia[] = [];

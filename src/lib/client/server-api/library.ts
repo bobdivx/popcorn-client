@@ -9,6 +9,7 @@ import type { ApiResponse, LibraryItem } from './types.js';
  */
 interface ServerApiClientLibraryAccess {
   backendRequest<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>>;
+  getCurrentUserId(): string | null;
 }
 
 export const libraryMethods = {
@@ -77,6 +78,10 @@ export const libraryMethods = {
    * Lance le scan et l'enrichissement des fichiers locaux
    */
   async scanLocalMedia(this: ServerApiClientLibraryAccess): Promise<ApiResponse<string>> {
-    return this.backendRequest<string>('/api/library/scan', { method: 'POST' });
+    const userId = this.getCurrentUserId();
+    const url = userId 
+      ? `/api/library/scan?user_id=${encodeURIComponent(userId)}`
+      : '/api/library/scan';
+    return this.backendRequest<string>(url, { method: 'POST' });
   },
 };
