@@ -25,9 +25,9 @@ FROM nginx:alpine
 # Copier les fichiers statiques buildés depuis le stage builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copier la configuration nginx personnalisée (optionnel)
-# Si vous avez besoin d'une config nginx spécifique, créez un fichier nginx.conf
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Configuration nginx : absolute_redirect off pour préserver le port dans les
+# redirections (évite ERR_CONNECTION_REFUSED vers http://host/setup/ sans port).
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Exposer le port 80
 EXPOSE 80

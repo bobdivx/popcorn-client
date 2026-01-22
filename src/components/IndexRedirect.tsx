@@ -187,7 +187,7 @@ export default function IndexRedirect() {
         setLoading(false);
         if (mounted) {
           console.log('[IndexRedirect] Redirecting to /setup due to error');
-          window.location.href = '/setup';
+          redirectTo('/setup');
         }
         return;
       } finally {
@@ -206,10 +206,9 @@ export default function IndexRedirect() {
       setLoading(false);
       // Rediriger vers /setup en cas d'erreur fatale au niveau du useEffect
       try {
-        window.location.href = '/setup';
+        redirectTo('/setup');
       } catch {
-        // Si même window.location échoue, il y a un problème système
-        console.error('[IndexRedirect] Cannot redirect to /setup - window.location failed');
+        console.error('[IndexRedirect] Cannot redirect to /setup - redirectTo failed');
       }
     }
 
