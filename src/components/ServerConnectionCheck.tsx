@@ -47,7 +47,7 @@ export default function ServerConnectionCheck() {
 
     // Ne pas bloquer l'accès aux pages de configuration
     const currentPath = window.location.pathname;
-    const allowedPaths = [SERVER_SETTINGS_PATH, AUDIT_PATH, '/setup', '/disclaimer', DIAG_PATH];
+    const allowedPaths = ['/settings', SERVER_SETTINGS_PATH, AUDIT_PATH, '/setup', '/disclaimer', DIAG_PATH];
     
     // Si on est sur une page de configuration, ne pas afficher l'animation
     // ET ne pas vérifier hasBackendUrl() - ces pages doivent être accessibles même sans URL configurée
@@ -268,7 +268,7 @@ export default function ServerConnectionCheck() {
         
         // Ne pas bloquer l'accès aux pages de configuration en cas d'erreur
         const currentPath = window.location.pathname;
-        const allowedPaths = [SERVER_SETTINGS_PATH, AUDIT_PATH, '/setup', '/disclaimer', '/login', '/register', DIAG_PATH];
+        const allowedPaths = ['/settings', SERVER_SETTINGS_PATH, AUDIT_PATH, '/setup', '/disclaimer', '/login', '/register', DIAG_PATH];
         if (allowedPaths.some(path => currentPath.startsWith(path))) {
           setIsVisible(false);
           return;
@@ -298,7 +298,7 @@ export default function ServerConnectionCheck() {
       
       // Ne pas bloquer l'accès aux pages de configuration en cas d'erreur
       const currentPath = window.location.pathname;
-      const allowedPaths = ['/settings/server', '/settings/audit', '/setup', '/disclaimer', '/login', '/register', DIAG_PATH];
+      const allowedPaths = ['/settings', '/settings/server', '/settings/audit', '/setup', '/disclaimer', '/login', '/register', DIAG_PATH];
       if (allowedPaths.some(path => currentPath.startsWith(path))) {
         setIsVisible(false);
         return;
@@ -317,7 +317,7 @@ export default function ServerConnectionCheck() {
 
   // Ne jamais afficher sur les pages de configuration
   const currentPath = window.location.pathname;
-  const allowedPaths = [SERVER_SETTINGS_PATH, AUDIT_PATH, '/setup', '/disclaimer', DIAG_PATH];
+  const allowedPaths = ['/settings', SERVER_SETTINGS_PATH, AUDIT_PATH, '/setup', '/disclaimer', DIAG_PATH];
   if (allowedPaths.some(path => currentPath.startsWith(path))) {
     return null;
   }

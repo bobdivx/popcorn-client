@@ -56,6 +56,7 @@ export default function Wizard() {
 
   // Vérifier si l'utilisateur doit être redirigé vers /login
   // Si le setup est complet (needsSetup === false et hasUsers === true), rediriger
+  // SAUF si ?force=1 : accès explicite (ex. "Configuration initiale" depuis paramètres) → garder le wizard
   useEffect(() => {
     const checkAndRedirect = async () => {
       // Si l'URL backend n'est pas configurée, on reste sur le wizard
@@ -65,6 +66,12 @@ export default function Wizard() {
 
       // Si le setupStatus n'est pas encore chargé, attendre
       if (loading || !setupStatus) {
+        return;
+      }
+
+      // Accès explicite au wizard (ex. "Configuration initiale" depuis /settings) : ne pas rediriger
+      const forceWizard = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('force') === '1';
+      if (forceWizard) {
         return;
       }
 

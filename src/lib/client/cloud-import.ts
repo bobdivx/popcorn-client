@@ -1,6 +1,7 @@
 import { serverApi } from './server-api.js';
 import { PreferencesManager } from './storage.js';
 import type { UserConfig } from '../api/popcorn-web.js';
+import { isTmdbKeyMaskedOrInvalid } from '../utils/tmdb-key.js';
 
 export type CloudImportPhase = 'idle' | 'running' | 'success' | 'error';
 
@@ -110,35 +111,28 @@ class CloudImportManagerImpl {
           }
         }
 
-        // TMDB
+        // TMDB — ne jamais envoyer une clé masquée (****) au backend
         if (savedConfig.tmdbApiKey) {
           this.setStatus({ message: 'Import clé TMDB…' });
           try {
-            // Nettoyer la clé (trim, supprimer les espaces, etc.)
             const cleanedKey = savedConfig.tmdbApiKey.trim().replace(/\s+/g, '');
-            if (!cleanedKey) {
-              console.warn('[CLOUD IMPORT] ⚠️ Clé TMDB vide après nettoyage');
-            } else if (cleanedKey === '***' || cleanedKey.length < 10) {
-              // Ignorer les clés masquées ou trop courtes (probablement '***' ou une clé invalide)
+            const skipped = isTmdbKeyMaskedOrInvalid(savedConfig.tmdbApiKey);
+            // #region agent log
+            const cloudPreview = cleanedKey.length > 8 ? `${cleanedKey.substring(0, 4)}...${cleanedKey.substring(cleanedKey.length - 4)}` : '****';
+            fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'cloud-import.ts:tmdb',message:'cloud tmdb key',data:{rawLen:savedConfig.tmdbApiKey.length,cleanedLen:cleanedKey.length,preview:cloudPreview,skipped},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+            // #endregion
+            if (skipped) {
               console.warn('[CLOUD IMPORT] ⚠️ Clé TMDB ignorée: clé masquée ou invalide (longueur: ' + cleanedKey.length + ')');
-              console.warn('[CLOUD IMPORT] 💡 La clé TMDB dans votre compte cloud semble être invalide ou masquée. Entrez une nouvelle clé v3 valide (32 caractères) depuis https://www.themoviedb.org/settings/api');
+              console.warn('[CLOUD IMPORT] 💡 La clé TMDB dans votre compte cloud semble invalide ou masquée. Entrez une nouvelle clé v3 valide (32 caractères) depuis https://www.themoviedb.org/settings/api');
             } else {
-              // Logger la longueur de la clé pour diagnostic (sans exposer la clé)
               const keyLength = cleanedKey.length;
-              const keyPreview = keyLength > 8 
-                ? `${cleanedKey.substring(0, 4)}...${cleanedKey.substring(cleanedKey.length - 4)}`
-                : '****';
+              const keyPreview = keyLength > 8 ? `${cleanedKey.substring(0, 4)}...${cleanedKey.substring(cleanedKey.length - 4)}` : '****';
               console.log(`[CLOUD IMPORT] Tentative d'import clé TMDB (longueur: ${keyLength}, preview: ${keyPreview})`);
-              
               const res = await serverApi.saveTmdbKey(cleanedKey);
-              // Sur certaines plateformes (ex: Android) la clé TMDB peut être liée à un user_id backend
-              // et donc impossible à restaurer automatiquement. Dans ce cas, on n'échoue pas l'import complet.
               if (!res.success) {
                 console.warn('[CLOUD IMPORT] ⚠️ Import TMDB ignoré:', res.message || res.error);
-                // Si l'erreur indique que la clé est invalide, donner plus de détails
                 if (res.message?.includes('invalide') || res.message?.includes('401') || res.message?.includes('403')) {
-                  console.warn(`[CLOUD IMPORT] 💡 La clé TMDB du cloud (${keyPreview}, longueur: ${keyLength}) est invalide selon l'API TMDB. Vérifiez qu'il s'agit bien d'une clé v3 "API Key" (32 caractères) depuis https://www.themoviedb.org/settings/api`);
-                  console.warn('[CLOUD IMPORT] 💡 Note: La clé dans votre compte cloud peut être différente de celle dans votre .env local. Mettez à jour la clé dans popcorn-web si nécessaire.');
+                  console.warn(`[CLOUD IMPORT] 💡 La clé TMDB du cloud (${keyPreview}, longueur: ${keyLength}) est invalide. Vérifiez la clé v3 "API Key" sur https://www.themoviedb.org/settings/api`);
                 }
               } else {
                 console.log('[CLOUD IMPORT] ✅ Clé TMDB importée avec succès');

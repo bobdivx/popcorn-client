@@ -20,7 +20,7 @@ export const dashboardMethods = {
     // - FILM / SERIES proviennent de /api/torrents/list?category=...
     // - continueWatching n'est pas implémenté ici (nécessite stats player)
     try {
-      const [moviesRes, seriesRes] = await Promise.all([
+      const [moviesRes, seriesRes, recentMoviesRes, recentSeriesRes] = await Promise.all([
         (async () => {
           const res = await this.backendRequest<any[]>('/api/torrents/list?category=films&sort=popular&limit=20&page=1&skip_indexer=true', { method: 'GET' });
           return res;
@@ -29,13 +29,23 @@ export const dashboardMethods = {
           const res = await this.backendRequest<any[]>('/api/torrents/list?category=series&sort=popular&limit=20&page=1&skip_indexer=true', { method: 'GET' });
           return res;
         })(),
+        (async () => {
+          // Récupérer les ajouts récents (tri par date, sans sort=popular)
+          const res = await this.backendRequest<any[]>('/api/torrents/list?category=films&limit=30&page=1&skip_indexer=true', { method: 'GET' });
+          return res;
+        })(),
+        (async () => {
+          // Récupérer les ajouts récents (tri par date, sans sort=popular)
+          const res = await this.backendRequest<any[]>('/api/torrents/list?category=series&limit=30&page=1&skip_indexer=true', { method: 'GET' });
+          return res;
+        })(),
       ]);
 
-      if (!moviesRes.success && !seriesRes.success) {
+      if (!moviesRes.success && !seriesRes.success && !recentMoviesRes.success && !recentSeriesRes.success) {
         return {
           success: false,
-          error: moviesRes.error || seriesRes.error || 'BackendError',
-          message: moviesRes.message || seriesRes.message || 'Erreur lors du chargement du dashboard',
+          error: moviesRes.error || seriesRes.error || recentMoviesRes.error || recentSeriesRes.error || 'BackendError',
+          message: moviesRes.message || seriesRes.message || recentMoviesRes.message || recentSeriesRes.message || 'Erreur lors du chargement du dashboard',
         };
       }
 
@@ -102,6 +112,20 @@ export const dashboardMethods = {
 
       const movies = Array.isArray(moviesRes.data) ? moviesRes.data.map(toContentItem).filter((i) => i.id) : [];
       const series = Array.isArray(seriesRes.data) ? seriesRes.data.map(toContentItem).filter((i) => i.id) : [];
+      const recentMovies = Array.isArray(recentMoviesRes.data) ? recentMoviesRes.data.map(toContentItem).filter((i) => i.id) : [];
+      const recentSeries = Array.isArray(recentSeriesRes.data) ? recentSeriesRes.data.map(toContentItem).filter((i) => i.id) : [];
+
+      // Créer un Set des IDs des films/séries populaires pour éviter les doublons
+      const popularMovieIds = new Set(movies.map(m => m.id));
+      const popularSeriesIds = new Set(series.map(s => s.id));
+
+      // Filtrer les ajouts récents pour exclure ceux déjà dans les listes populaires
+      const recentMoviesFiltered = recentMovies
+        .filter(m => !popularMovieIds.has(m.id))
+        .slice(0, 10);
+      const recentSeriesFiltered = recentSeries
+        .filter(s => !popularSeriesIds.has(s.id))
+        .slice(0, 10);
 
       const heroCandidate = [...movies, ...series].find((i) => i.backdrop || i.poster) || movies[0] || series[0];
 
@@ -121,7 +145,7 @@ export const dashboardMethods = {
         continueWatching: [],
         popularMovies: movies.slice(0, 20),
         popularSeries: series.slice(0, 20),
-        recentAdditions: [...movies.slice(0, 10), ...series.slice(0, 10)],
+        recentAdditions: [...recentMoviesFiltered, ...recentSeriesFiltered],
       };
 
       return { success: true, data: dashboard };

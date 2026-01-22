@@ -483,12 +483,16 @@ export function createHandlePlay(context: PlayHandlerContext) {
 
     // Si on a déjà un infoHash (torrent local ou déjà ajouté), vérifier d'abord si les fichiers vidéo existent
     if (hasInfoHash && torrent.infoHash && !isExternal) {
+      // Détecter si c'est un média local
+      const isLocalMedia = torrent.infoHash.startsWith('local_');
+      
       addDebugLog('info', '✅ InfoHash disponible, vérification des fichiers vidéo...');
       
       const videos = await loadVideoFiles(torrent.infoHash);
       if (videos.length > 0) {
         addDebugLog('success', '✅ Fichiers vidéo trouvés, démarrage direct de la lecture', {
           files_count: videos.length,
+          isLocalMedia,
         });
         setVideoFiles(videos);
         setSelectedFile(videos[0]);
@@ -498,20 +502,24 @@ export function createHandlePlay(context: PlayHandlerContext) {
         setShowInfo(false);
         stopProgressPolling();
         
-        try {
-          const stats = await clientApi.getTorrent(torrent.infoHash);
-          if (stats) {
-            setTorrentStats(stats);
+        // Pour les médias locaux, ne pas essayer de récupérer les stats depuis l'API
+        if (!isLocalMedia) {
+          try {
+            const stats = await clientApi.getTorrent(torrent.infoHash);
+            if (stats) {
+              setTorrentStats(stats);
+            }
+          } catch (err) {
+            // Ignorer les erreurs
           }
-        } catch (err) {
-          // Ignorer les erreurs
         }
         
         return;
       }
       
-      // Si pas de fichiers, vérifier l'état du torrent
-      try {
+      // Si pas de fichiers, vérifier l'état du torrent (sauf pour les médias locaux)
+      if (!isLocalMedia) {
+        try {
         const stats = await clientApi.getTorrent(torrent.infoHash);
         if (stats) {
           addDebugLog('success', '✅ Torrent trouvé dans le client', {
@@ -553,6 +561,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
         }
       } catch (err) {
         addDebugLog('info', 'Torrent non trouvé dans le client, continuation avec la logique normale');
+      }
       }
     }
 

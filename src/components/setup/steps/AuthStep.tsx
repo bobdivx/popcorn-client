@@ -5,6 +5,7 @@ import { getUserConfig } from '../../../lib/api/popcorn-web';
 import { PreferencesManager } from '../../../lib/client/storage';
 import type { UserConfig } from '../../../lib/api/popcorn-web';
 import { CloudImportManager } from '../../../lib/client/cloud-import';
+import { isTmdbKeyMaskedOrInvalid } from '../../../lib/utils/tmdb-key';
 
 interface AuthStepProps {
   focusedButtonIndex: number;
@@ -245,10 +246,10 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         }
       }
 
-      // Restaurer la clé TMDB
-      if (savedConfig.tmdbApiKey) {
+      // Restaurer la clé TMDB (ne jamais envoyer une clé masquée **** au backend)
+      if (savedConfig.tmdbApiKey && !isTmdbKeyMaskedOrInvalid(savedConfig.tmdbApiKey)) {
         try {
-          await serverApi.saveTmdbKey(savedConfig.tmdbApiKey);
+          await serverApi.saveTmdbKey(savedConfig.tmdbApiKey.trim().replace(/\s+/g, ''));
         } catch (tmdbError) {
           console.warn('[AUTH] Erreur lors de la restauration de la clé TMDB:', tmdbError);
         }

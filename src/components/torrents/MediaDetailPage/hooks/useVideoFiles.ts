@@ -14,9 +14,13 @@ interface UseVideoFilesOptions {
   torrentName: string;
   onError?: (error: Error) => void;
   filePath?: string | null; // Chemin spécifique du fichier (pour torrents multi-épisodes)
+  torrent?: {
+    infoHash?: string | null;
+    downloadPath?: string | null;
+  } | null; // Torrent complet pour accéder au downloadPath pour les médias locaux
 }
 
-export function useVideoFiles({ torrentName, onError, filePath }: UseVideoFilesOptions) {
+export function useVideoFiles({ torrentName, onError, filePath, torrent }: UseVideoFilesOptions) {
   const [videoFiles, setVideoFiles] = useState<TorrentFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<TorrentFile | null>(null);
   const [loadingFiles, setLoadingFiles] = useState(false);
@@ -100,7 +104,29 @@ export function useVideoFiles({ torrentName, onError, filePath }: UseVideoFilesO
     const loadPromise = (async () => {
       setLoadingFiles(true);
       try {
-        // Vérifier d'abord si le torrent existe et est prêt
+        // Détecter si c'est un média local (infoHash commence par "local_")
+        const isLocalMedia = infoHash.startsWith('local_');
+        
+        // Pour les médias locaux, utiliser directement le downloadPath
+        if (isLocalMedia && torrent?.downloadPath) {
+          console.log('[useVideoFiles] 📁 Média local détecté, utilisation du chemin direct:', torrent.downloadPath);
+          const fileName = torrentName || torrent.downloadPath.split(/[/\\]/).pop() || 'video';
+          const localFile: TorrentFile = {
+            path: torrent.downloadPath,
+            name: fileName,
+            size: 0, // Taille inconnue pour les médias locaux
+            is_video: true,
+          };
+          
+          const files = [localFile];
+          filesCacheRef.current.set(infoHash, files);
+          setVideoFiles(files);
+          setSelectedFile(files[0]);
+          setLoadingFiles(false);
+          return files;
+        }
+        
+        // Pour les torrents normaux, vérifier d'abord si le torrent existe et est prêt
         const torrentStats = await clientApi.getTorrent(infoHash);
         if (!torrentStats) {
           console.warn('[useVideoFiles] ⚠️ Torrent non trouvé dans le backend');

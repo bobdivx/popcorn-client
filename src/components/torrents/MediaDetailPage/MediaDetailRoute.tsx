@@ -196,6 +196,119 @@ export default function MediaDetailRoute() {
       setTorrent(null);
 
       try {
+        // Détecter si c'est un média local (slug commence par "local_")
+        const isLocalMedia = contentId.startsWith('local_');
+        
+        // Si c'est un média local, récupérer depuis la bibliothèque
+        if (isLocalMedia) {
+          console.log('[MediaDetailRoute] Détection d\'un média local, récupération depuis la bibliothèque:', contentId);
+          const libraryResponse = await serverApi.getLibrary();
+          if (libraryResponse.success && libraryResponse.data) {
+            const libraryItems = Array.isArray(libraryResponse.data) ? libraryResponse.data : [];
+            // Trouver le média correspondant au slug
+            const localMedia = libraryItems.find((item: any) => 
+              item.info_hash === contentId || item.slug === contentId
+            );
+            
+            if (localMedia && !cancelled) {
+              console.log('[MediaDetailRoute] Média local trouvé:', localMedia);
+              // Convertir le média local en objet Torrent
+              const t: Torrent = {
+                id: localMedia.info_hash || localMedia.slug || contentId,
+                slug: localMedia.slug || null,
+                // Pour les médias locaux, utiliser contentId (qui contient "local_...") si info_hash n'est pas disponible
+                infoHash: localMedia.info_hash || (contentId.startsWith('local_') ? contentId : null),
+                name: localMedia.name || '',
+                cleanTitle: localMedia.name || null,
+                description: localMedia.synopsis || null,
+                category: localMedia.category || null,
+                imageUrl: localMedia.poster_url || null,
+                heroImageUrl: localMedia.hero_image_url || null,
+                trailerKey: null,
+                fileSize: localMedia.file_size || 0,
+                seedCount: 0,
+                leechCount: 0,
+                _externalLink: null,
+                _externalMagnetUri: null,
+                _guid: null,
+                indexerId: null,
+                indexerName: null,
+                language: localMedia.language || null,
+                format: localMedia.source_format || null,
+                codec: localMedia.video_codec || null,
+                quality: {
+                  resolution: localMedia.resolution || null,
+                  source: localMedia.source_format || null,
+                  codec: localMedia.video_codec || null,
+                  audio: localMedia.audio_codec || null,
+                  language: localMedia.language || null,
+                  full: localMedia.quality || null,
+                },
+                synopsis: localMedia.synopsis || null,
+                releaseDate: localMedia.release_date || null,
+                genres: (() => {
+                  if (!localMedia.genres) return null;
+                  if (typeof localMedia.genres === 'string') {
+                    try {
+                      return JSON.parse(localMedia.genres);
+                    } catch {
+                      return [localMedia.genres];
+                    }
+                  }
+                  return Array.isArray(localMedia.genres) ? localMedia.genres : null;
+                })(),
+                voteAverage: localMedia.vote_average || null,
+                runtime: localMedia.runtime || null,
+                tmdbId: localMedia.tmdb_id || null,
+                tmdbType: localMedia.tmdb_type || null,
+                // Chemin du fichier local
+                downloadPath: localMedia.download_path || null,
+              } as Torrent;
+              
+              setTorrent(t);
+              setLoading(false);
+              return;
+            } else {
+              console.warn('[MediaDetailRoute] Média local non trouvé dans la bibliothèque:', contentId);
+              if (!cancelled) {
+                setError('Média local non trouvé dans la bibliothèque. Le fichier peut avoir été supprimé ou déplacé.');
+                setLoading(false);
+                return;
+              }
+            }
+          } else {
+            // Erreur lors de la récupération de la bibliothèque
+            if (!cancelled) {
+              setError(libraryResponse.message || 'Erreur lors de la récupération de la bibliothèque');
+              setLoading(false);
+              return;
+            }
+          }
+        }
+
+        // Détecter si contentId ressemble à un info_hash
+        // Un info_hash fait généralement 40 caractères (hex) ou 32 caractères (base32)
+        const looksLikeInfoHash = !contentId.startsWith('external_') && !isLocalMedia &&
+          (contentId.length === 40 || contentId.length === 32) && 
+          /^[a-fA-F0-9]+$/.test(contentId);
+
+        // Si c'est un info_hash, essayer directement getTorrentById (pour les médias de la bibliothèque)
+        if (looksLikeInfoHash) {
+          const byIdResponse = await serverApi.getTorrentById(contentId);
+          if (byIdResponse.success && byIdResponse.data) {
+            const t: Torrent | null =
+              (byIdResponse.data?.torrent as Torrent) ||
+              (byIdResponse.data as Torrent) ||
+              null;
+
+            if (t && !cancelled) {
+              setTorrent(t);
+              setLoading(false);
+              return;
+            }
+          }
+        }
+
         // 1) Essayer group/<slug> via serverApi (gère automatiquement l'auth et le refresh token)
         const groupResponse = await serverApi.getTorrentGroup(contentId);
         console.log('[MediaDetailRoute] Réponse getTorrentGroup complète:', JSON.stringify(groupResponse, null, 2));
@@ -246,9 +359,31 @@ export default function MediaDetailRoute() {
                 slug: data.slug,
                 mainTitle: data.main_title,
                 variantCount: data.variant_count,
+                contentId,
+                looksLikeInfoHash,
               });
-              // Ne pas essayer getTorrentById avec un slug, car cet endpoint n'existe pas
-              // Le slug n'est pas un info_hash valide
+              
+              // Si le groupe est vide mais que contentId ressemble à un info_hash,
+              // essayer getTorrentById comme fallback (cas des médias de la bibliothèque)
+              if (looksLikeInfoHash) {
+                console.log('[MediaDetailRoute] Tentative de fallback avec getTorrentById pour info_hash:', contentId);
+                const byIdResponse = await serverApi.getTorrentById(contentId);
+                if (byIdResponse.success && byIdResponse.data) {
+                  const t: Torrent | null =
+                    (byIdResponse.data?.torrent as Torrent) ||
+                    (byIdResponse.data as Torrent) ||
+                    null;
+
+                  if (t && !cancelled) {
+                    console.log('[MediaDetailRoute] Torrent trouvé via getTorrentById fallback');
+                    setTorrent(t);
+                    setLoading(false);
+                    return;
+                  }
+                }
+              }
+              
+              // Si pas un info_hash ou si getTorrentById a échoué, afficher l'erreur
               if (!cancelled) {
                 setError('Aucun torrent trouvé pour ce slug. Le torrent peut ne pas encore être synchronisé dans la base de données.');
                 setLoading(false);
@@ -258,37 +393,17 @@ export default function MediaDetailRoute() {
           }
         }
 
-        // 2) Fallback /api/torrents/<id> via serverApi (seulement si pas un slug external_ ET si contentId ressemble à un info_hash)
-        // Un info_hash fait généralement 40 caractères (hex) ou 32 caractères (base32)
-        // Ne pas appeler getTorrentById avec un slug (comme "le-million-2025")
-        const looksLikeInfoHash = !contentId.startsWith('external_') && 
-          (contentId.length === 40 || contentId.length === 32) && 
-          /^[a-fA-F0-9]+$/.test(contentId);
-        
-        if (looksLikeInfoHash) {
-          const byIdResponse = await serverApi.getTorrentById(contentId);
-          if (byIdResponse.success && byIdResponse.data) {
-            const t: Torrent | null =
-              (byIdResponse.data?.torrent as Torrent) ||
-              (byIdResponse.data as Torrent) ||
-              null;
-
-            if (t && !cancelled) {
-              setTorrent(t);
-              setLoading(false);
-              return;
-            }
-          }
-
+        // 2) Fallback final pour les slugs qui ne sont pas des info_hash
+        // (seulement si on n'a pas déjà essayé getTorrentById)
+        if (!looksLikeInfoHash) {
           if (!cancelled) {
-            setError(groupResponse.message || byIdResponse?.message || 'Torrent non trouvé');
+            setError(groupResponse?.message || 'Torrent non trouvé');
             setLoading(false);
-            return;
           }
         } else {
-          // Pour les slugs external_, on ne peut pas utiliser le fallback
+          // Si c'était un info_hash mais qu'on n'a rien trouvé, afficher l'erreur
           if (!cancelled) {
-            setError(groupResponse.message || 'Torrent externe non trouvé');
+            setError(groupResponse?.message || 'Torrent non trouvé');
             setLoading(false);
           }
         }

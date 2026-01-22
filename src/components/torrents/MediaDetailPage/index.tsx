@@ -27,7 +27,10 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
   const isCompletedFromProps = torrent.clientState === 'completed' || 
                                 torrent.clientState === 'seeding' || 
                                 (torrent.clientProgress !== undefined && torrent.clientProgress >= 0.95);
-  const [isAvailableLocally, setIsAvailableLocally] = useState(isCompletedFromProps);
+  // Détecter si c'est un média local (slug ou id commence par "local_")
+  const isLocalMedia = torrent.id?.startsWith('local_') || torrent.slug?.startsWith('local_') || torrent.infoHash?.startsWith('local_');
+  // Pour les médias locaux, ils sont toujours disponibles localement
+  const [isAvailableLocally, setIsAvailableLocally] = useState(isCompletedFromProps || isLocalMedia);
   const [downloadingToClient, setDownloadingToClient] = useState(false);
   const [magnetCopied, setMagnetCopied] = useState(false);
   const [deletingMedia, setDeletingMedia] = useState(false);
@@ -57,6 +60,7 @@ export default function MediaDetailPage({ torrent }: MediaDetailPageProps) {
   // Hooks personnalisés
   const { videoFiles, selectedFile, setVideoFiles, setSelectedFile, loadVideoFiles } = useVideoFiles({
     torrentName: torrent.name,
+    torrent: torrent,
     onError: (error) => {
       console.error('Erreur lors du chargement des fichiers vidéo:', error);
     },

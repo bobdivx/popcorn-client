@@ -6,6 +6,7 @@ import type { TorrentFile } from '../hooks/useVideoFiles';
 import { useFullscreen } from '../../../streaming/hls-player/hooks/useFullscreen';
 import { QualityBadges } from './QualityBadges';
 import { isMobileDevice } from '../../../../lib/utils/device-detection';
+import { usePlayerConfig } from '../../../streaming/hls-player/hooks/usePlayerConfig';
 
 interface VideoPlayerWrapperProps {
   infoHash: string;
@@ -42,6 +43,9 @@ export function VideoPlayerWrapper({
   const isFullscreen = useFullscreen();
   const wrapperElementRef = useRef<HTMLDivElement>(null);
   const isMobile = isMobileDevice();
+  const [showCloseButton, setShowCloseButton] = useState(false);
+  const closeButtonTimeoutRef = useRef<number | null>(null);
+  const playerConfig = usePlayerConfig();
 
   useEffect(() => {
     if (wrapperRef) {
@@ -152,6 +156,66 @@ export function VideoPlayerWrapper({
     loadHlsUrl();
   }, [selectedFile, infoHash]);
 
+  // Gérer l'affichage du bouton Fermer basé sur le mouvement de la souris et les touches
+  useEffect(() => {
+    if (isFullscreen) return; // Ne pas gérer l'affichage en plein écran
+
+    const container = wrapperElementRef.current;
+    if (!container) return;
+
+    const handleMouseMove = () => {
+      setShowCloseButton(true);
+      if (closeButtonTimeoutRef.current) clearTimeout(closeButtonTimeoutRef.current);
+      closeButtonTimeoutRef.current = window.setTimeout(() => {
+        setShowCloseButton(false);
+      }, playerConfig.controlsTimeout || 3000);
+    };
+
+    const handleMouseLeave = () => {
+      if (closeButtonTimeoutRef.current) clearTimeout(closeButtonTimeoutRef.current);
+      setShowCloseButton(false);
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Afficher le bouton lors de l'utilisation de la télécommande (touches directionnelles, OK, etc.)
+      const remoteControlKeys = [
+        'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+        'Enter', 'Space', 'MediaPlayPause',
+        'KeyP', 'KeyM', 'KeyF', 'Escape'
+      ];
+      
+      if (remoteControlKeys.includes(e.code)) {
+        setShowCloseButton(true);
+        if (closeButtonTimeoutRef.current) clearTimeout(closeButtonTimeoutRef.current);
+        closeButtonTimeoutRef.current = window.setTimeout(() => {
+          setShowCloseButton(false);
+        }, playerConfig.controlsTimeout || 3000);
+      }
+    };
+
+    const handleTouchStart = () => {
+      setShowCloseButton(true);
+      if (closeButtonTimeoutRef.current) clearTimeout(closeButtonTimeoutRef.current);
+      closeButtonTimeoutRef.current = window.setTimeout(() => {
+        setShowCloseButton(false);
+      }, playerConfig.controlsTimeout || 3000);
+    };
+
+    container.addEventListener('mousemove', handleMouseMove);
+    container.addEventListener('mouseleave', handleMouseLeave);
+    // Écouter les touches globalement pour capturer les touches de la télécommande
+    window.addEventListener('keydown', handleKeyDown);
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+
+    return () => {
+      container.removeEventListener('mousemove', handleMouseMove);
+      container.removeEventListener('mouseleave', handleMouseLeave);
+      window.removeEventListener('keydown', handleKeyDown);
+      container.removeEventListener('touchstart', handleTouchStart);
+      if (closeButtonTimeoutRef.current) clearTimeout(closeButtonTimeoutRef.current);
+    };
+  }, [isFullscreen, playerConfig.controlsTimeout]);
+
   if (!selectedFile) {
     return (
       <div 
@@ -194,7 +258,9 @@ export function VideoPlayerWrapper({
           <div className="flex items-center justify-between">
             <button
               onClick={onClose}
-              className="inline-flex items-center gap-2 text-white hover:text-white/80 transition-colors"
+              className={`inline-flex items-center gap-2 text-white hover:text-white/80 transition-all duration-300 ${
+                showCloseButton ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+              }`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />

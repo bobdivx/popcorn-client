@@ -1,8 +1,9 @@
 /**
- * MÃ©thodes de configuration (TMDB, torrent config)
+ * Méthodes de configuration (TMDB, torrent config)
  */
 
 import type { ApiResponse } from './types.js';
+import { isTmdbKeyMaskedOrInvalid } from '../../utils/tmdb-key.js';
 
 interface ServerApiClientSettingsAccess {
   backendRequest<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>>;
@@ -34,18 +35,30 @@ export const settingsMethods = {
     if (!cleanedKey) {
       return { success: false, error: 'ValidationError', message: 'La clé API TMDB ne peut pas être vide' };
     }
-    
+    if (isTmdbKeyMaskedOrInvalid(cleanedKey)) {
+      return { success: false, error: 'ValidationError', message: 'Clé masquée ou invalide. Entrez la clé complète (32 caractères) depuis https://www.themoviedb.org/settings/api' };
+    }
+
     // Logger pour diagnostic (masqué)
     const keyPreview = cleanedKey.length > 8 
       ? `${cleanedKey.substring(0, 4)}...${cleanedKey.substring(cleanedKey.length - 4)}`
       : '****';
     console.log(`[TMDB] Sauvegarde clé TMDB (longueur: ${cleanedKey.length}, preview: ${keyPreview})`);
-    
+
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'settings.ts:saveTmdbKey',message:'before POST tmdb key',data:{keyLen:cleanedKey.length,preview:keyPreview,hasUserId:!!userId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+
     const res = await this.backendRequest('/api/tmdb/key', {
       method: 'POST',
       headers: { 'X-User-ID': userId },
       body: JSON.stringify({ api_key: cleanedKey }),
     });
+
+    // #region agent log
+    fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'settings.ts:saveTmdbKey',message:'after POST tmdb key',data:{success:res.success,error:res.error,message:res.message},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+
     if (!res.success) {
       // Améliorer le message d'erreur pour les erreurs de validation
       if (res.message?.includes('invalide') || res.message?.includes('401') || res.message?.includes('403')) {

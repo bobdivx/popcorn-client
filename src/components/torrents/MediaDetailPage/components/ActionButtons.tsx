@@ -117,14 +117,19 @@ export function ActionButtons({
   const isSeeding = !!torrentStats && torrentStats.state === 'seeding';
   const progressPercent = torrentStats ? Math.round(torrentStats.progress * 100) : 0;
 
+  // Détecter si c'est un média local (slug ou id commence par "local_")
+  const isLocalMedia = torrent.id?.startsWith('local_') || torrent.slug?.startsWith('local_') || torrent.infoHash?.startsWith('local_');
+  
   // Afficher le bouton si :
   // - Le torrent n'est pas disponible localement (pas encore téléchargé) → bouton "Télécharger"
   // - OU le torrent est complété (selon torrentStats) → bouton "Lire"
   // - OU le torrent est disponible localement ET a un infoHash → bouton "Lire" (même sans stats)
-  const shouldShowButton = !isAvailableLocally || isCompleted || (isAvailableLocally && hasInfoHash);
+  // - OU c'est un média local → bouton "Lire"
+  const shouldShowButton = !isAvailableLocally || isCompleted || (isAvailableLocally && hasInfoHash) || isLocalMedia;
   
   // Déterminer si on doit afficher "Lire" ou "Télécharger"
-  const shouldShowPlayButton = isCompleted || (isAvailableLocally && hasInfoHash);
+  // Pour les médias locaux, toujours afficher "Lire" car ils sont déjà sur le disque
+  const shouldShowPlayButton = isCompleted || (isAvailableLocally && hasInfoHash) || isLocalMedia;
   
   // Debug: Log pour comprendre pourquoi le bouton n'apparaît pas
   if (hasInfoHash) {

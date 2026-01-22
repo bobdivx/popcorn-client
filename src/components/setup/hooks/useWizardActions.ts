@@ -4,6 +4,7 @@ import { PreferencesManager } from '../../../lib/client/storage';
 import { TokenManager } from '../../../lib/client/storage';
 import { saveUserConfig } from '../../../lib/api/popcorn-web';
 import type { IndexerFormData } from '../../../lib/client/types';
+import { isTmdbKeyMaskedOrInvalid } from '../../../lib/utils/tmdb-key';
 
 export function useWizardActions() {
   const [saving, setSaving] = useState(false);
@@ -38,6 +39,10 @@ export function useWizardActions() {
     setSuccess(null);
 
     try {
+      if (isTmdbKeyMaskedOrInvalid(key)) {
+        setError('Veuillez entrer une clé API TMDB complète (32 caractères), pas une valeur masquée.');
+        return false;
+      }
       const response = await serverApi.saveTmdbKey(key);
       if (response.success) {
         setSuccess('Clé TMDB sauvegardée avec succès');
@@ -121,10 +126,12 @@ export function useWizardActions() {
                   console.warn('[WIZARD] ⚠️ Erreur lors de la récupération des catégories:', catError);
                 }
                 
-                // Sauvegarder dans popcorn-web (saveUserConfig utilise maintenant automatiquement le token cloud)
+                // Sauvegarder dans popcorn-web — ne jamais persister une clé TMDB masquée (****)
+                const rawTmdb = configData.data.tmdbApiKey ?? null;
+                const tmdbApiKey = rawTmdb && !isTmdbKeyMaskedOrInvalid(rawTmdb) ? rawTmdb : null;
                 const saveResult = await saveUserConfig({
                   indexers: configData.data.indexers || [],
-                  tmdbApiKey: configData.data.tmdbApiKey || null,
+                  tmdbApiKey,
                   downloadLocation: configData.data.downloadLocation || null,
                   syncSettings: configData.data.syncSettings || null,
                   indexerCategories: indexerCategories,

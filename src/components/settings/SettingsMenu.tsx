@@ -17,7 +17,7 @@ export default function SettingsMenu() {
       id: 'setup',
       title: 'Configuration initiale',
       description: 'Rouvrir l\'assistant de configuration pour configurer votre client',
-      href: '/setup',
+      href: '/setup?force=1',
       icon: Settings,
       color: 'purple-500',
     },
