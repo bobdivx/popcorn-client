@@ -4,6 +4,7 @@ import { serverApi } from '../../lib/client/server-api';
 import { getLocalProfile, onProfileChanged } from '../../lib/client/profile';
 import Avatar from '../ui/Avatar';
 import { isMobileDevice } from '../../lib/utils/device-detection';
+import { redirectTo } from '../../lib/utils/navigation.js';
 
 type NavTab = { label: string; href: string; match?: 'exact' | 'prefix' };
 
@@ -203,7 +204,7 @@ export default function Navbar() {
     } catch (error) {
       console.error('Erreur lors de la déconnexion:', error);
     } finally {
-      window.location.href = '/login';
+      redirectTo('/login');
     }
   };
 

@@ -8,6 +8,7 @@ import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
 import { hasBackendUrl } from '../lib/backend-config.js';
 import { updateChecker } from '../lib/services/update-checker.js';
+import { redirectTo } from '../lib/utils/navigation.js';
 
 type ConnectionStatus = 'checking' | 'connecting' | 'connected' | 'error';
 
@@ -61,14 +62,14 @@ export default function ServerConnectionCheck() {
     try {
       if (!hasBackendUrl()) {
         setIsVisible(false);
-        window.location.href = '/setup';
+        redirectTo('/setup');
         return;
       }
     } catch (error) {
       // Si hasBackendUrl() plante (localStorage inaccessible), rediriger vers setup
       console.error('[ServerConnectionCheck] hasBackendUrl() failed:', error);
       setIsVisible(false);
-      window.location.href = '/setup';
+      redirectTo('/setup');
       return;
     }
 
@@ -187,7 +188,7 @@ export default function ServerConnectionCheck() {
     if (!serverApi.isAuthenticated()) {
       const currentPath = window.location.pathname;
       if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/setup') {
-        window.location.href = '/login';
+        redirectTo('/login');
       }
       return;
     }
@@ -200,7 +201,7 @@ export default function ServerConnectionCheck() {
         if (setupResponse.success && setupResponse.data) {
           // Ne pas forcer /setup si le backend est momentanément indisponible (reboot)
           if (setupResponse.data.backendReachable !== false && setupResponse.data.needsSetup) {
-            window.location.href = '/setup';
+            redirectTo('/setup');
             return;
           }
         }
@@ -208,12 +209,12 @@ export default function ServerConnectionCheck() {
       
       const currentPath2 = window.location.pathname;
       if (currentPath2 === '/' || currentPath2 === '/login' || currentPath2 === '/register') {
-        window.location.href = '/dashboard';
+        redirectTo('/dashboard');
       }
     } else {
       const currentPath = window.location.pathname;
       if (currentPath !== '/login' && currentPath !== '/register' && currentPath !== '/setup') {
-        window.location.href = '/login';
+        redirectTo('/login');
       }
     }
   };
@@ -327,7 +328,7 @@ export default function ServerConnectionCheck() {
 
   const openDiagnostics = () => {
     try {
-      window.location.href = DIAG_PATH;
+      redirectTo(DIAG_PATH);
     } catch {
       // ignore
     }
@@ -335,7 +336,7 @@ export default function ServerConnectionCheck() {
 
   const openServerSettings = () => {
     try {
-      window.location.href = SERVER_SETTINGS_PATH;
+      redirectTo(SERVER_SETTINGS_PATH);
     } catch {
       // ignore
     }

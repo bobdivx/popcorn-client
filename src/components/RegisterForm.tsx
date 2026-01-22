@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
+import { redirectTo } from '../lib/utils/navigation.js';
 
 interface RegisterFormData {
   email: string;
@@ -63,7 +64,7 @@ export default function RegisterForm() {
       // Inscription réussie
       setSuccess('Inscription réussie ! Redirection...');
       setTimeout(() => {
-        window.location.href = '/login';
+        redirectTo('/login');
       }, 1500);
     } catch (err) {
       setError('Erreur de connexion. Vérifiez votre connexion réseau et l\'URL du serveur dans les paramètres.');

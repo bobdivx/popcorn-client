@@ -171,7 +171,7 @@ export function useWizardActions() {
     }
     
     // Rediriger vers le dashboard
-    window.location.href = '/dashboard';
+    redirectTo('/dashboard');
   };
 
   /**

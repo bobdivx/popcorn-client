@@ -129,7 +129,14 @@ export function getBackendUrl(): string {
     return result;
   }
 
-  // Côté client: priorité localStorage
+  // Côté client: priorité aux variables d'environnement (pour déploiements Docker/CasaOS)
+  // PUBLIC_BACKEND_URL est prioritaire car elle est définie au build/déploiement
+  const envUrl = import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL || '';
+  if (envUrl) {
+    return envUrl;
+  }
+
+  // Fallback: localStorage (pour configuration manuelle utilisateur)
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -137,12 +144,6 @@ export function getBackendUrl(): string {
     }
   } catch (error) {
     console.warn('[backend-config] Erreur lors de la lecture de localStorage:', error);
-    }
-
-  // Fallback: variable d'environnement
-  const envUrl = import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL || '';
-  if (envUrl) {
-    return envUrl;
   }
 
   // Valeur par défaut (détecte Android automatiquement)
@@ -162,7 +163,13 @@ export async function getBackendUrlAsync(): Promise<string> {
            await getDefaultBackendUrlAsync();
   }
 
-  // Côté client: priorité localStorage
+  // Côté client: priorité aux variables d'environnement (pour déploiements Docker/CasaOS)
+  // PUBLIC_BACKEND_URL est prioritaire car elle est définie au build/déploiement
+  if (import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL) {
+    return import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL || '';
+  }
+
+  // Fallback: localStorage (pour configuration manuelle utilisateur)
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -170,11 +177,6 @@ export async function getBackendUrlAsync(): Promise<string> {
     }
   } catch (error) {
     console.warn('[backend-config] Erreur lors de la lecture de localStorage:', error);
-  }
-
-  // Fallback: variable d'environnement
-  if (import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL) {
-    return import.meta.env.BACKEND_URL || import.meta.env.PUBLIC_BACKEND_URL || '';
   }
 
   // Valeur par défaut avec détection améliorée Android

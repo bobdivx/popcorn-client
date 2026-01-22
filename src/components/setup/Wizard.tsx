@@ -16,6 +16,7 @@ import { SyncStep } from './steps/SyncStep';
 import { CompleteStep } from './steps/CompleteStep';
 import { hasBackendUrl } from '../../lib/backend-config.js';
 import { serverApi } from '../../lib/client/server-api';
+import { redirectTo } from '../../lib/utils/navigation.js';
 
 export default function Wizard() {
   const { loading, setupStatus, checkSetupStatus } = useSetupStatus();
@@ -72,9 +73,9 @@ export default function Wizard() {
       if (setupStatus.backendReachable && setupStatus.needsSetup === false && setupStatus.hasUsers === true) {
         // Vérifier aussi si l'utilisateur est déjà authentifié
         if (serverApi.isAuthenticated()) {
-          window.location.href = '/dashboard';
+          redirectTo('/dashboard');
         } else {
-          window.location.href = '/login';
+          redirectTo('/login');
         }
       }
     };
@@ -106,7 +107,7 @@ export default function Wizard() {
 
   const openDiagnostics = () => {
     try {
-      window.location.href = '/settings/diagnostics';
+      redirectTo('/settings/diagnostics');
     } catch {
       // ignore
     }
@@ -164,9 +165,9 @@ export default function Wizard() {
                 // Si le backend est déjà complètement configuré, rediriger
                 if (updatedStatus.data.backendReachable && updatedStatus.data.needsSetup === false && updatedStatus.data.hasUsers === true) {
                   if (serverApi.isAuthenticated()) {
-                    window.location.href = '/dashboard';
+                    redirectTo('/dashboard');
                   } else {
-                    window.location.href = '/login';
+                    redirectTo('/login');
                   }
                   return;
                 }
@@ -261,9 +262,9 @@ export default function Wizard() {
                       // Si le backend est déjà complètement configuré, rediriger
                       if (updatedStatus.data.backendReachable && updatedStatus.data.needsSetup === false && updatedStatus.data.hasUsers === true) {
                         if (serverApi.isAuthenticated()) {
-                          window.location.href = '/dashboard';
+                          redirectTo('/dashboard');
                         } else {
-                          window.location.href = '/login';
+                          redirectTo('/login');
                         }
                         return;
                       }

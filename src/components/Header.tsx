@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
+import { redirectTo } from '../lib/utils/navigation.js';
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -23,7 +24,7 @@ export default function Header() {
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('access_token');
     localStorage.removeItem('refresh_token');
-    window.location.href = '/login';
+    redirectTo('/login');
   };
 
   return (

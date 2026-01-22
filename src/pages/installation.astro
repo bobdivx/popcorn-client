@@ -252,7 +252,7 @@ docker-compose up -d</code></pre>
     // Vérifier l'authentification
     const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
     if (!token) {
-      window.location.href = '/login';
+      window.location.href = window.location.origin + '/login';
     }
 
     // Copier le docker-compose complet

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
+import { redirectTo } from '../lib/utils/navigation.js';
 
 export default function LoginForm() {
   const [email, setEmail] = useState('');
@@ -15,7 +16,7 @@ export default function LoginForm() {
         const setupResponse = await serverApi.getSetupStatus();
         if (setupResponse.success && setupResponse.data?.hasUsers === false) {
           // DB vide, rediriger vers setup
-          window.location.href = '/setup';
+          redirectTo('/setup');
           return;
         }
       } catch (error) {
@@ -59,7 +60,7 @@ export default function LoginForm() {
       }
 
       // Connexion réussie - rediriger vers le dashboard
-      window.location.href = '/dashboard';
+      redirectTo('/dashboard');
     } catch (err) {
       setError('Erreur de connexion. Vérifiez votre connexion réseau et l\'URL du serveur dans les paramètres.');
       console.error('Erreur:', err);

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
 import { getBackendUrl } from '../lib/backend-config';
 import { isTauri } from '../lib/utils/tauri';
+import { redirectTo } from '../lib/utils/navigation.js';
 
 const STORAGE_DIAG_ON_BOOT = 'popcorn_diagnostics_on_boot';
 
@@ -53,7 +54,7 @@ export default function IndexRedirect() {
         try {
           const shouldDiag = localStorage.getItem(STORAGE_DIAG_ON_BOOT) === '1';
           if (shouldDiag) {
-            window.location.href = '/settings/diagnostics';
+            redirectTo('/settings/diagnostics');
             setLoading(false);
             return;
           }
@@ -112,7 +113,7 @@ export default function IndexRedirect() {
             }
             // Après plusieurs tentatives, basculer vers le setup:
             // c'est l'écran qui permet notamment de configurer l'URL du backend.
-            window.location.href = '/setup';
+            redirectTo('/setup');
             setLoading(false);
             return;
           }
@@ -122,7 +123,7 @@ export default function IndexRedirect() {
           // hasUsers est optionnel selon les plateformes; on ne redirige que si le backend indique explicitement "false".
           if ((setupResponse.data as any).hasUsers === false) {
             console.log('[IndexRedirect] DB vide, redirection vers /setup');
-            window.location.href = '/setup';
+            redirectTo('/setup');
             setLoading(false);
             return;
           }
@@ -132,7 +133,7 @@ export default function IndexRedirect() {
         // Ne vérifier l'authentification que si on a un token
         if (!serverApi.isAuthenticated()) {
           setMessage('Redirection vers la connexion...');
-          window.location.href = '/login';
+          redirectTo('/login');
           setLoading(false);
           return;
         }
@@ -148,18 +149,18 @@ export default function IndexRedirect() {
           
           if (setupResponse2.success && setupResponse2.data) {
             if (setupResponse2.data.backendReachable !== false && setupResponse2.data.needsSetup) {
-              window.location.href = '/setup';
+              redirectTo('/setup');
             } else {
-              window.location.href = '/dashboard';
+              redirectTo('/dashboard');
             }
           } else {
             // En cas d'erreur, rediriger vers le dashboard (ne pas bloquer l'utilisateur)
-            window.location.href = '/dashboard';
+            redirectTo('/dashboard');
           }
         } else {
           // Utilisateur non connecté (token invalide ou expiré)
           setMessage('Redirection vers la connexion...');
-          window.location.href = '/login';
+          redirectTo('/login');
         }
       } catch (error) {
         // Logger l'erreur de manière visible (console.error apparaît dans logcat WebView)

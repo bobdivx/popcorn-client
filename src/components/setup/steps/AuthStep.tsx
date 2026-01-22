@@ -126,7 +126,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
       try {
         const setup = await serverApi.getSetupStatus();
         if (setup.success && setup.data && setup.data.needsSetup === false) {
-          window.location.href = '/dashboard';
+          redirectTo('/dashboard');
           return;
         }
       } catch {
