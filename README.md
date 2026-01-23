@@ -21,6 +21,7 @@ Toute la logique métier est gérée par le serveur `popcorn` distant.
 - **Desktop** : Application Tauri (Windows, Linux, macOS)
 - **Web** : Site Astro déployable sur Vercel
 - **Android** : Application Tauri (TV et Mobile)
+- **WebOS** : Application WebOS (téléviseurs LG)
 
 ## 🚀 Installation
 
@@ -94,6 +95,25 @@ npm run tauri:build:android-tv
 npm run tauri:build:android-mobile
 ```
 
+### WebOS
+
+```bash
+# Préparer l'application WebOS (sans créer l'IPK)
+npm run webos:build
+
+# Builder l'IPK (nécessite WebOS SDK ou Docker)
+npm run webos:package
+```
+
+**Note** : Pour créer l'IPK, vous devez avoir installé WebOS SDK ou utiliser Docker. Le workflow GitHub Actions crée automatiquement l'IPK lors des pushes sur `main` ou les tags `v*`.
+
+#### Installation sur TV WebOS
+
+1. Activez le mode développeur sur votre TV LG WebOS
+2. Installez l'application Developer Mode depuis le LG Content Store
+3. Téléchargez le fichier `.ipk` depuis les releases GitHub
+4. Installez l'IPK via Developer Mode ou via l'application Homebrew Channel
+
 ## 📁 Structure
 
 ```
@@ -101,6 +121,10 @@ popcorn-vercel/
 ├── src-tauri/          # Configuration Tauri (desktop/mobile)
 │   ├── src/main.rs     # Point d'entrée Rust (minimal)
 │   └── tauri.conf.json # Configuration Tauri
+├── webos/              # Application WebOS
+│   ├── appinfo.json    # Configuration WebOS
+│   ├── frontend/       # Frontend Astro buildé
+│   └── icon.png        # Icône de l'application
 ├── src/
 │   ├── lib/
 │   │   ├── client/     # Client API REST (server-api.ts)

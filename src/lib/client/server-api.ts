@@ -550,14 +550,9 @@ class ServerApiClient {
     } catch (error) {
       // Améliorer le message d'erreur si c'est une erreur Web Crypto API
       if (error instanceof Error && error.message.includes('Web Crypto API')) {
-        throw new Error(
-          `Failed to generate JWT tokens: ${error.message}. ` +
-          `This usually means: ` +
-          `1. The application is not running in a secure context (HTTPS or localhost), ` +
-          `2. The browser/WebView is too old, or ` +
-          `3. The code is being executed during SSR. ` +
-          `Please ensure the application is accessed via HTTPS or localhost, and that this code only runs in client-side components.`
-        );
+        // Le message d'erreur de generateAccessToken contient déjà les solutions détaillées
+        // On propage simplement l'erreur avec un préfixe clair
+        throw new Error(`Erreur de génération de tokens JWT: ${error.message}`);
       }
       throw error;
     }
