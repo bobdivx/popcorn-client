@@ -38,6 +38,8 @@ import { indexersMethods } from './server-api/indexers.js';
 import { settingsMethods } from './server-api/settings.js';
 import { syncMethods } from './server-api/sync.js';
 import { dashboardMethods } from './server-api/dashboard.js';
+import { twoFactorMethods } from './server-api/two-factor.js';
+import { quickConnectMethods } from './server-api/quick-connect.js';
 
 // Ré-exporter les types pour compatibilité
 export type {
@@ -867,6 +869,33 @@ interface IServerApiClientPublic {
   logout(): void;
   getMe(): Promise<ApiResponse<{ id: string; email: string }>>;
 
+  // Two-Factor Authentication methods
+  getTwoFactorStatus(): Promise<ApiResponse<{ enabled: boolean }>>;
+  enableTwoFactor(): Promise<ApiResponse<{ message: string }>>;
+  disableTwoFactor(): Promise<ApiResponse<{ message: string }>>;
+  sendTwoFactorCode(): Promise<ApiResponse<{ message: string; expiresAt?: number }>>;
+  verifyTwoFactorCode(tempToken: string, code: string): Promise<ApiResponse<{
+    user: { id: string; email: string };
+    accessToken: string;
+    refreshToken: string;
+    jwtSecret?: string;
+  }>>;
+
+  // Quick Connect methods
+  initQuickConnect(): Promise<ApiResponse<{ code: string; secret: string; expiresAt: number }>>;
+  authorizeQuickConnect(code: string): Promise<ApiResponse<{ message: string; secret?: string }>>;
+  getQuickConnectStatus(secret: string): Promise<ApiResponse<{
+    status: 'pending' | 'authorized' | 'used' | 'expired';
+    authorized: boolean;
+    userId?: string;
+  }>>;
+  connectQuickConnect(secret: string): Promise<ApiResponse<{
+    user: { id: string; email: string };
+    accessToken: string;
+    refreshToken: string;
+    jwtSecret?: string;
+  }>>;
+
   // Media methods
   search(params: SearchParams): Promise<ApiResponse<SearchResult[]>>;
   getTorrentGroup(slug: string): Promise<ApiResponse<any>>;
@@ -931,7 +960,9 @@ Object.assign(ServerApiClient.prototype,
   indexersMethods,
   settingsMethods,
   syncMethods,
-  dashboardMethods
+  dashboardMethods,
+  twoFactorMethods,
+  quickConnectMethods
 );
 
 // Augmenter le type ServerApiClient pour inclure toutes les méthodes publiques

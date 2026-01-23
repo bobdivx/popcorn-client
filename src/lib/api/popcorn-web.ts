@@ -217,6 +217,8 @@ export async function loginCloud(email: string, password: string): Promise<{
   accessToken: string;
   refreshToken: string;
   jwtSecret?: string;
+  requires2FA?: boolean;
+  tempToken?: string;
 } | null> {
   const apiUrl = getPopcornWebApiUrl();
   const fullUrl = `${apiUrl}/auth/login`;
@@ -285,6 +287,17 @@ export async function loginCloud(email: string, password: string): Promise<{
       dataKeys: data ? Object.keys(data) : [],
       fullData: JSON.stringify(data, null, 2)
     });
+    
+    // Vérifier si la 2FA est requise
+    if (data?.success && data?.requires2FA) {
+      return {
+        user: { id: '', email: email }, // User sera rempli après vérification 2FA
+        accessToken: '',
+        refreshToken: '',
+        requires2FA: true,
+        tempToken: data.data?.tempToken,
+      };
+    }
     
     if (data?.success && data?.data) {
       const result = {
@@ -535,6 +548,14 @@ export async function saveUserConfig(config: UserConfig, accessToken?: string): 
       }
     }
     
+    // Ne jamais sauvegarder une clé TMDB masquée dans le cloud
+    const { isTmdbKeyMaskedOrInvalid } = await import('../utils/tmdb-key.js');
+    const configToSave = { ...config };
+    if (configToSave.tmdbApiKey && isTmdbKeyMaskedOrInvalid(configToSave.tmdbApiKey)) {
+      console.warn('[POPCORN-WEB] ⚠️ Clé TMDB masquée détectée, ne pas sauvegarder dans le cloud');
+      configToSave.tmdbApiKey = null; // Ne pas sauvegarder la clé masquée
+    }
+    
     // Unifié : appel direct à popcorn-web pour tous les modes (CORS géré par popcorn-web ou native-fetch)
     const apiUrl = `${getPopcornWebApiUrl()}/config/save`;
     
@@ -550,7 +571,7 @@ export async function saveUserConfig(config: UserConfig, accessToken?: string): 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${tokenToUse}`,
         },
-        body: JSON.stringify(config),
+        body: JSON.stringify(configToSave),
       },
       10000
     );

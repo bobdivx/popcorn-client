@@ -196,6 +196,18 @@ export const authMethods = {
         };
       }
 
+      // Si la 2FA est requise, retourner cette information
+      if (result.requires2FA && result.tempToken) {
+        return {
+          success: true,
+          data: {
+            requires2FA: true,
+            tempToken: result.tempToken,
+            message: 'Un code de vérification a été envoyé par email. Veuillez entrer ce code pour compléter la connexion.',
+          } as any,
+        };
+      }
+
       // Stocker les tokens cloud
       console.log('[server-api] Stockage des tokens cloud...', {
         hasAccessToken: !!result.accessToken,

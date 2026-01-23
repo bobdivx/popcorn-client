@@ -2,6 +2,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../../../lib/client/server-api';
 import { getUserConfig } from '../../../lib/api/popcorn-web';
 import type { SetupStatus } from '../../../lib/client/types';
+import { isTmdbKeyMaskedOrInvalid } from '../../../lib/utils/tmdb-key';
 
 interface TmdbStepProps {
   setupStatus: SetupStatus | null;
@@ -37,11 +38,15 @@ export function TmdbStep({
   // On re-tente quelques fois si aucune clé n'est trouvée (évite l'impression "rien ne se passe").
   useEffect(() => {
     if (loading) return;
-    if (tmdbKey && tmdbKey.includes('...')) return; // Déjà une clé masquée affichée
+    // Arrêter si on a déjà une clé masquée (contient ... ou *)
+    if (tmdbKey && (tmdbKey.includes('...') || tmdbKey.includes('*'))) {
+      return;
+    }
 
     let cancelled = false;
     let attempts = 0;
     const maxAttempts = 15; // ~30s (15 * 2s)
+    let cloudKeyChecked = false; // Pour éviter de vérifier le cloud plusieurs fois
 
     const interval = setInterval(async () => {
       if (cancelled) return;
@@ -54,24 +59,45 @@ export function TmdbStep({
       try {
         const res = await serverApi.getTmdbKey();
         if (res.success && res.data?.hasKey && res.data.apiKey) {
-          setTmdbKey(res.data.apiKey);
-          setCloudKeyWarning(null); // Effacer l'avertissement si la clé est maintenant dans le backend
-          onStatusChange?.();
-          clearInterval(interval);
+          // Vérifier que la clé retournée n'est pas masquée
+          if (!isTmdbKeyMaskedOrInvalid(res.data.apiKey)) {
+            setTmdbKey(res.data.apiKey);
+            setCloudKeyWarning(null); // Effacer l'avertissement si la clé est maintenant dans le backend
+            onStatusChange?.();
+            clearInterval(interval);
+          } else {
+            // Clé masquée dans le backend, arrêter les tentatives
+            clearInterval(interval);
+          }
         } else {
-          // Si pas de clé dans le backend, vérifier dans le cloud
-          try {
-            const cloudConfig = await getUserConfig();
-            if (cloudConfig?.tmdbApiKey && !tmdbKey.includes('...')) {
-              const cloudKey = cloudConfig.tmdbApiKey;
-              const masked = cloudKey.length > 8 
-                ? `${cloudKey.substring(0, 4)}...${cloudKey.substring(cloudKey.length - 4)}`
-                : '****';
-              setTmdbKey(masked);
-              setCloudKeyWarning('Une clé TMDB existe dans votre compte cloud mais n\'a pas pu être importée (clé invalide). Entrez une nouvelle clé v3 valide pour la remplacer.');
+          // Si pas de clé dans le backend, vérifier dans le cloud (une seule fois)
+          if (!cloudKeyChecked) {
+            cloudKeyChecked = true;
+            try {
+              const cloudConfig = await getUserConfig();
+              if (cloudConfig?.tmdbApiKey) {
+                // Vérifier si la clé du cloud est masquée ou invalide
+                if (isTmdbKeyMaskedOrInvalid(cloudConfig.tmdbApiKey)) {
+                  // Clé masquée dans le cloud, arrêter les tentatives
+                  const masked = cloudConfig.tmdbApiKey.length > 8 
+                    ? `${cloudConfig.tmdbApiKey.substring(0, 4)}...${cloudConfig.tmdbApiKey.substring(cloudConfig.tmdbApiKey.length - 4)}`
+                    : '****';
+                  setTmdbKey(masked);
+                  setCloudKeyWarning('Une clé TMDB existe dans votre compte cloud mais n\'a pas pu être importée (clé invalide). Entrez une nouvelle clé v3 valide pour la remplacer.');
+                  clearInterval(interval);
+                } else if (!tmdbKey || !tmdbKey.includes('...')) {
+                  // Clé valide dans le cloud, mais pas encore importée - continuer à attendre l'import
+                  // Ne pas arrêter l'interval, continuer à vérifier le backend
+                }
+              } else {
+                // Pas de clé dans le cloud, arrêter après quelques tentatives
+                if (attempts >= 5) {
+                  clearInterval(interval);
+                }
+              }
+            } catch {
+              // ignore
             }
-          } catch {
-            // ignore
           }
         }
       } catch {
@@ -99,13 +125,17 @@ export function TmdbStep({
         try {
           const cloudConfig = await getUserConfig();
           if (cloudConfig?.tmdbApiKey) {
-            // Créer une version masquée de la clé cloud
-            const cloudKey = cloudConfig.tmdbApiKey;
-            const masked = cloudKey.length > 8 
-              ? `${cloudKey.substring(0, 4)}...${cloudKey.substring(cloudKey.length - 4)}`
-              : '****';
-            setTmdbKey(masked);
-            setCloudKeyWarning('Une clé TMDB existe dans votre compte cloud mais n\'a pas pu être importée (clé invalide). Entrez une nouvelle clé v3 valide pour la remplacer.');
+            // Vérifier si la clé du cloud est masquée ou invalide
+            if (isTmdbKeyMaskedOrInvalid(cloudConfig.tmdbApiKey)) {
+              // Créer une version masquée de la clé cloud pour l'affichage
+              const cloudKey = cloudConfig.tmdbApiKey;
+              const masked = cloudKey.length > 8 
+                ? `${cloudKey.substring(0, 4)}...${cloudKey.substring(cloudKey.length - 4)}`
+                : '****';
+              setTmdbKey(masked);
+              setCloudKeyWarning('Une clé TMDB existe dans votre compte cloud mais n\'a pas pu être importée (clé invalide). Entrez une nouvelle clé v3 valide pour la remplacer.');
+            }
+            // Si la clé est valide, ne rien faire ici - elle sera importée par CloudImportManager
           }
         } catch (cloudErr) {
           // Ignorer les erreurs de récupération cloud (CORS, etc.)

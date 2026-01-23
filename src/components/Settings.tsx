@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
 import { PreferencesManager } from '../lib/client/storage';
+import TwoFactorSettings from './settings/TwoFactorSettings';
+import QuickConnectAuthorize from './settings/QuickConnectAuthorize';
 
 export default function Settings() {
   const [serverUrl, setServerUrl] = useState('');
@@ -90,6 +92,12 @@ export default function Settings() {
           </div>
         </div>
       </div>
+
+      {/* Authentification à deux facteurs */}
+      <TwoFactorSettings />
+
+      {/* Connexion rapide */}
+      <QuickConnectAuthorize />
 
       {/* Préférences utilisateur */}
       <div className="card bg-base-200 shadow-lg">

@@ -6,6 +6,7 @@ import { PreferencesManager } from '../../../lib/client/storage';
 import type { UserConfig } from '../../../lib/api/popcorn-web';
 import { CloudImportManager } from '../../../lib/client/cloud-import';
 import { isTmdbKeyMaskedOrInvalid } from '../../../lib/utils/tmdb-key';
+import { QuickConnectStep } from './QuickConnectStep';
 
 interface AuthStepProps {
   focusedButtonIndex: number;
@@ -15,7 +16,7 @@ interface AuthStepProps {
 }
 
 export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChange }: AuthStepProps) {
-  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
+  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'quick-connect'>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSavedConfig, setHasSavedConfig] = useState(false);
@@ -24,6 +25,9 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
   // Login form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [tempToken, setTempToken] = useState<string | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState('');
 
   // Register form state
   const [registerEmail, setRegisterEmail] = useState('');
@@ -41,7 +45,77 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
 
     try {
       console.log('[AUTH] Tentative de connexion cloud pour:', loginEmail);
+      
+      // Si on est en mode 2FA, vérifier le code
+      if (requires2FA && tempToken) {
+        if (!twoFactorCode || twoFactorCode.length !== 6) {
+          setError('Veuillez entrer le code à 6 chiffres reçu par email');
+          setLoading(false);
+          return;
+        }
+        
+        const verifyResponse = await serverApi.verifyTwoFactorCode(tempToken, twoFactorCode);
+        
+        if (!verifyResponse.success) {
+          setError(verifyResponse.message || 'Code de vérification incorrect');
+          setLoading(false);
+          return;
+        }
+        
+        // Connexion réussie avec 2FA, continuer le flow normal
+        setRequires2FA(false);
+        setTempToken(null);
+        setTwoFactorCode('');
+        
+        // Continuer avec le flow normal (récupération config, etc.)
+        const cloudToken = verifyResponse.data?.accessToken || TokenManager.getCloudAccessToken();
+        if (cloudToken) {
+          try {
+            await new Promise(resolve => setTimeout(resolve, 200));
+            const savedConfig = await getUserConfig();
+            const hasSomething =
+              !!(savedConfig?.indexers?.length) ||
+              !!savedConfig?.tmdbApiKey ||
+              !!savedConfig?.downloadLocation ||
+              !!savedConfig?.syncSettings;
+            if (savedConfig && hasSomething) {
+              console.log('[AUTH] Configuration sauvegardée trouvée:', savedConfig);
+              CloudImportManager.startImport(savedConfig).finally(() => {
+                Promise.resolve(onStatusChange?.()).catch(() => {});
+              });
+              onNext();
+              return;
+            }
+          } catch (configError) {
+            console.warn('[AUTH] Impossible de vérifier la configuration sauvegardée:', configError);
+          }
+        }
+        
+        try {
+          const setup = await serverApi.getSetupStatus();
+          if (setup.success && setup.data && setup.data.needsSetup === false) {
+            redirectTo('/dashboard');
+            return;
+          }
+        } catch {
+          // ignore
+        }
+        
+        onNext();
+        return;
+      }
+      
       const response = await serverApi.loginCloud(loginEmail, loginPassword);
+
+      // Vérifier si la 2FA est requise
+      if (response.success && (response.data as any)?.requires2FA) {
+        const data = response.data as any;
+        setRequires2FA(true);
+        setTempToken(data.tempToken || null);
+        setError(null);
+        setLoading(false);
+        return;
+      }
 
       if (!response.success) {
         // Messages d'erreur plus détaillés selon le type d'erreur
@@ -418,10 +492,24 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         >
           Inscription
         </button>
+        <button
+          type="button"
+          className={`flex-1 py-3 px-4 text-center font-semibold transition-colors ${
+            activeTab === 'quick-connect'
+              ? 'text-primary-600 border-b-2 border-primary-600'
+              : 'text-gray-400 hover:text-white'
+          }`}
+          onClick={() => {
+            setActiveTab('quick-connect');
+            setError(null);
+          }}
+        >
+          Connexion rapide
+        </button>
       </div>
 
       {/* Login Form */}
-      {activeTab === 'login' && (
+      {activeTab === 'login' && !requires2FA && (
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <label className="block text-sm font-semibold text-white mb-2">
@@ -468,6 +556,72 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
               ) : (
                 'Se connecter'
               )}
+            </button>
+          </div>
+        </form>
+      )}
+
+      {/* 2FA Code Form */}
+      {activeTab === 'login' && requires2FA && (
+        <form onSubmit={handleLogin} className="space-y-4">
+          <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-4">
+            <h4 className="text-white font-semibold mb-2">Code de vérification requis</h4>
+            <p className="text-gray-300 text-sm">
+              Un code de vérification à 6 chiffres a été envoyé à votre adresse email ({loginEmail}). 
+              Veuillez entrer ce code pour compléter la connexion.
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-white mb-2">
+              Code de vérification
+            </label>
+            <input
+              type="text"
+              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent text-center text-2xl tracking-widest"
+              placeholder="000000"
+              value={twoFactorCode}
+              onInput={(e) => {
+                const value = (e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6);
+                setTwoFactorCode(value);
+              }}
+              required
+              disabled={loading}
+              autocomplete="one-time-code"
+              maxLength={6}
+              autoFocus
+            />
+            <p className="text-gray-400 text-xs mt-2">
+              Entrez le code à 6 chiffres reçu par email
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 pt-4">
+            <button
+              ref={(el) => { buttonRefs.current[0] = el; }}
+              type="submit"
+              className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading || twoFactorCode.length !== 6}
+            >
+              {loading ? (
+                <>
+                  <span className="loading loading-spinner loading-sm"></span>
+                  Vérification...
+                </>
+              ) : (
+                'Vérifier le code'
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRequires2FA(false);
+                setTempToken(null);
+                setTwoFactorCode('');
+                setError(null);
+              }}
+              disabled={loading}
+              className="w-full sm:w-auto px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Retour
             </button>
           </div>
         </form>
@@ -554,6 +708,16 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
             </button>
           </div>
         </form>
+      )}
+
+      {/* Quick Connect */}
+      {activeTab === 'quick-connect' && (
+        <QuickConnectStep
+          focusedButtonIndex={focusedButtonIndex}
+          buttonRefs={buttonRefs}
+          onNext={onNext}
+          onStatusChange={onStatusChange}
+        />
       )}
     </div>
   );
