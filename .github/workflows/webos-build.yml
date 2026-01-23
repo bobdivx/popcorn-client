@@ -16,7 +16,8 @@ on:
 jobs:
   # Job 1: Build frontend Astro
   build-frontend:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    environment: production
     permissions:
       contents: read
 
@@ -46,7 +47,8 @@ jobs:
   # Job 2: Prepare WebOS structure
   prepare-webos:
     needs: build-frontend
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    environment: production
     permissions:
       contents: read
 
@@ -95,7 +97,8 @@ jobs:
   # Job 3: Build IPK with ares-package
   build-ipk:
     needs: prepare-webos
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    environment: production
     permissions:
       contents: read
 
@@ -109,27 +112,58 @@ jobs:
           name: popcorn-webos-structure
           path: webos/
 
-      - name: Build IPK with Docker
+      - name: Check for ares-package
+        id: check-ares
+        run: |
+          if command -v ares-package &> /dev/null; then
+            echo "available=true" >> $GITHUB_OUTPUT
+            echo "method=native" >> $GITHUB_OUTPUT
+            echo "✅ ares-package est disponible nativement"
+          elif command -v docker &> /dev/null; then
+            echo "available=true" >> $GITHUB_OUTPUT
+            echo "method=docker" >> $GITHUB_OUTPUT
+            echo "✅ Docker est disponible"
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+            echo "method=none" >> $GITHUB_OUTPUT
+            echo "⚠️ ares-package et Docker ne sont pas disponibles"
+          fi
+
+      - name: Build IPK (native ares-package)
+        if: steps.check-ares.outputs.method == 'native'
+        run: |
+          cd webos
+          ares-package .
+          if [ $? -ne 0 ]; then
+            echo "❌ Échec du packaging avec ares-package natif"
+            exit 1
+          fi
+
+      - name: Build IPK (with Docker)
+        if: steps.check-ares.outputs.method == 'docker'
         run: |
           # Utiliser une image Docker avec WebOS SDK
-          # Image recommandée: oddstr13/docker-tizen-webos-sdk ou similaire
           docker run --rm \
             -v "${{ github.workspace }}/webos:/workspace" \
             -w /workspace \
             ghcr.io/oddstr13/docker-tizen-webos-sdk:latest \
-            ares-package . || {
-              echo "⚠️ Build avec Docker a échoué, tentative avec ares-cli via npm..."
-              
-              # Fallback: essayer avec ares-cli via npm
-              npm install -g ares-cli || {
-                echo "❌ Impossible d'installer ares-cli"
-                echo "Le build IPK nécessite WebOS SDK (Docker ou installation native)"
-                exit 1
-              }
-              
-              cd webos
-              ares-package .
-            }
+            ares-package .
+          if [ $? -ne 0 ]; then
+            echo "❌ Échec du packaging avec Docker"
+            exit 1
+          fi
+
+      - name: Build IPK (fallback npm)
+        if: steps.check-ares.outputs.available == 'false'
+        run: |
+          echo "⚠️ Tentative d'installation de ares-cli via npm..."
+          npm install -g ares-cli || {
+            echo "❌ Impossible d'installer ares-cli"
+            echo "Le build IPK nécessite WebOS SDK (Docker ou installation native)"
+            exit 1
+          }
+          cd webos
+          ares-package .
 
       - name: Find IPK file
         id: find-ipk
@@ -155,7 +189,8 @@ jobs:
   # Job 4: Create GitHub Release
   create-release:
     needs: [build-ipk]
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
+    environment: production
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
     permissions:
       contents: write
@@ -188,14 +223,22 @@ jobs:
           name: popcorn-webos-ipk
           path: ./artifacts
 
-      - name: Install GitHub CLI
+      - name: Check if GitHub CLI is available
+        id: check-gh
         run: |
-          type -p curl >/dev/null || (apt update && apt install curl -y)
-          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-          && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
-          && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-          && apt update \
-          && apt install gh -y
+          if command -v gh &> /dev/null; then
+            echo "available=true" >> $GITHUB_OUTPUT
+            echo "✅ GitHub CLI est déjà installé"
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+            echo "⚠️ GitHub CLI n'est pas installé, tentative d'installation..."
+            type -p curl >/dev/null || (apt update && apt install curl -y)
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+            && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+            && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+            && apt update \
+            && apt install gh -y || echo "❌ Impossible d'installer GitHub CLI"
+          fi
 
       - name: Check if release exists
         id: check-release
