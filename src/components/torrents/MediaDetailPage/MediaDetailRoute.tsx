@@ -8,18 +8,29 @@ type Torrent = MediaDetailPageProps['torrent'];
 function getContentIdFromLocation(): string {
   if (typeof window === 'undefined') return '';
 
-  // Query params
   const urlParams = new URLSearchParams(window.location.search);
   const fromQuery =
     urlParams.get('slug') || urlParams.get('contentId') || urlParams.get('id') || urlParams.get('infoHash');
   if (fromQuery) return fromQuery;
 
-  // Path fallback: /torrents/<slug> (quand on arrive via 404)
   const pathname = window.location.pathname;
   const torrentsMatch = pathname.match(/^\/torrents\/(.+)$/);
   if (torrentsMatch?.[1]) return torrentsMatch[1];
 
   return '';
+}
+
+function getTmdbIdFromLocation(): number | null {
+  if (typeof window === 'undefined') return null;
+  const v = new URLSearchParams(window.location.search).get('tmdbId');
+  if (!v) return null;
+  const n = parseInt(v, 10);
+  return Number.isNaN(n) ? null : n;
+}
+
+function getTitleFromLocation(): string | null {
+  if (typeof window === 'undefined') return null;
+  return new URLSearchParams(window.location.search).get('title');
 }
 
 function normalizeSeedCount(t: any): number {
@@ -177,15 +188,20 @@ function pickBestTorrentFromGroupPayload(payload: any): Torrent | null {
 
 export default function MediaDetailRoute() {
   const contentId = useMemo(() => getContentIdFromLocation(), []);
+  const tmdbId = useMemo(() => getTmdbIdFromLocation(), []);
+  const titleFromQuery = useMemo(() => getTitleFromLocation(), []);
   const [torrent, setTorrent] = useState<Torrent | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  /** Quand groupe vide (pas encore synchronisé), titre pour "Rechercher sur les indexeurs" */
+  const [emptyGroupMainTitle, setEmptyGroupMainTitle] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setEmptyGroupMainTitle(null);
 
     async function load() {
-      if (!contentId) {
+      if (!contentId && !tmdbId) {
         setLoading(false);
         setError('Aucun contenu spécifié');
         return;
@@ -286,13 +302,36 @@ export default function MediaDetailRoute() {
           }
         }
 
+        // Cas tmdbId : recherche → détail (média peut ne pas être synchronisé)
+        if (tmdbId) {
+          const groupResponse = await serverApi.getTorrentGroupByTmdbId(tmdbId, titleFromQuery ?? undefined);
+          if (groupResponse.success && groupResponse.data) {
+            const data = groupResponse.data as any;
+            const best = pickBestTorrentFromGroupPayload(groupResponse);
+            if (best && !cancelled) {
+              setTorrent(best);
+              setLoading(false);
+              return;
+            }
+            if (data.variants && Array.isArray(data.variants) && data.variants.length === 0 && !cancelled) {
+              setEmptyGroupMainTitle(data.main_title || titleFromQuery || '');
+              setError('Aucun torrent trouvé pour ce slug. Le torrent peut ne pas encore être synchronisé dans la base de données.');
+              setLoading(false);
+              return;
+            }
+          }
+          if (!cancelled) {
+            setError(groupResponse.message || 'Torrent non trouvé');
+            setLoading(false);
+          }
+          return;
+        }
+
         // Détecter si contentId ressemble à un info_hash
-        // Un info_hash fait généralement 40 caractères (hex) ou 32 caractères (base32)
         const looksLikeInfoHash = !contentId.startsWith('external_') && !isLocalMedia &&
-          (contentId.length === 40 || contentId.length === 32) && 
+          (contentId.length === 40 || contentId.length === 32) &&
           /^[a-fA-F0-9]+$/.test(contentId);
 
-        // Si c'est un info_hash, essayer directement getTorrentById (pour les médias de la bibliothèque)
         if (looksLikeInfoHash) {
           const byIdResponse = await serverApi.getTorrentById(contentId);
           if (byIdResponse.success && byIdResponse.data) {
@@ -309,7 +348,7 @@ export default function MediaDetailRoute() {
           }
         }
 
-        // 1) Essayer group/<slug> via serverApi (gère automatiquement l'auth et le refresh token)
+        // 1) Essayer group/<slug> via serverApi
         const groupResponse = await serverApi.getTorrentGroup(contentId);
         console.log('[MediaDetailRoute] Réponse getTorrentGroup complète:', JSON.stringify(groupResponse, null, 2));
         if (groupResponse.success && groupResponse.data) {
@@ -383,8 +422,8 @@ export default function MediaDetailRoute() {
                 }
               }
               
-              // Si pas un info_hash ou si getTorrentById a échoué, afficher l'erreur
               if (!cancelled) {
+                setEmptyGroupMainTitle(data.main_title || '');
                 setError('Aucun torrent trouvé pour ce slug. Le torrent peut ne pas encore être synchronisé dans la base de données.');
                 setLoading(false);
                 return;
@@ -419,7 +458,7 @@ export default function MediaDetailRoute() {
     return () => {
       cancelled = true;
     };
-  }, [contentId]);
+  }, [contentId, tmdbId, titleFromQuery]);
 
   if (loading) {
     return (
@@ -437,12 +476,22 @@ export default function MediaDetailRoute() {
 
   if (error) {
     return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="text-center">
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
           <h1 className="text-2xl font-bold mb-3">{error}</h1>
-          <a href="/dashboard" className="text-blue-400 hover:text-blue-300">
-            Retour au dashboard
-          </a>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+            {emptyGroupMainTitle && (
+              <a
+                href={`/search?q=${encodeURIComponent(emptyGroupMainTitle)}`}
+                className="text-primary-400 hover:text-primary-300 font-medium"
+              >
+                Rechercher sur les indexeurs
+              </a>
+            )}
+            <a href="/dashboard" className="text-blue-400 hover:text-blue-300">
+              Retour au dashboard
+            </a>
+          </div>
         </div>
       </div>
     );

@@ -899,6 +899,7 @@ interface IServerApiClientPublic {
   // Media methods
   search(params: SearchParams): Promise<ApiResponse<SearchResult[]>>;
   getTorrentGroup(slug: string): Promise<ApiResponse<any>>;
+  getTorrentGroupByTmdbId(tmdbId: number, title?: string): Promise<ApiResponse<any>>;
   getTorrentById(id: string): Promise<ApiResponse<any>>;
   getStream(contentId: string): Promise<ApiResponse<StreamResponse>>;
 
