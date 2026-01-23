@@ -41,7 +41,9 @@
     "smoke:backend": "node scripts/smoke-backend.mjs --backend http://127.0.0.1:3000",
     "smoke:android:mobile": "powershell -ExecutionPolicy Bypass -File scripts/android-smoke-test.ps1 -Variant mobile -BackendUrl http://127.0.0.1:3000",
     "smoke:android:tv": "powershell -ExecutionPolicy Bypass -File scripts/android-smoke-test.ps1 -Variant tv -BackendUrl http://127.0.0.1:3000",
-    "patch:android": "node scripts/patch-android-manifest.js"
+    "patch:android": "node scripts/patch-android-manifest.js",
+    "webos:build": "powershell -ExecutionPolicy Bypass -File scripts/webos/build.ps1",
+    "webos:package": "powershell -ExecutionPolicy Bypass -File scripts/webos/build.ps1 -Package"
   },
   "dependencies": {
     "@astrojs/preact": "^4.1.3",

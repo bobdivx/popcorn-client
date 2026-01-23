@@ -43,3 +43,7 @@ keystore.properties
 src-tauri/gen/
 *.apk
 *.aab
+
+# WebOS build artifacts
+webos/frontend/
+webos/*.ipk
