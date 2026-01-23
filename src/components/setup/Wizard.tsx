@@ -472,8 +472,8 @@ export default function Wizard() {
                           if (configResponse.ok) {
                             const configData = await configResponse.json();
                             if (configData.success && configData.data) {
-                              const { saveUserConfig } = await import('../../../lib/api/popcorn-web');
-                              const { isTmdbKeyMaskedOrInvalid } = await import('../../../lib/utils/tmdb-key');
+                              const { saveUserConfig } = await import('../../lib/api/popcorn-web');
+                              const { isTmdbKeyMaskedOrInvalid } = await import('../../lib/utils/tmdb-key');
                               const rawTmdb = configData.data.tmdbApiKey ?? null;
                               const tmdbApiKey = rawTmdb && !isTmdbKeyMaskedOrInvalid(rawTmdb) ? rawTmdb : null;
                               await saveUserConfig({
