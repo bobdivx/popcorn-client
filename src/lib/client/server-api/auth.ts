@@ -83,27 +83,28 @@ export const authMethods = {
       }
       
       // La connexion cloud a réussi et le secret JWT est stocké
-      // On génère des tokens locaux avec les informations de l'utilisateur cloud
-      // Pas besoin de se connecter au backend local car l'utilisateur n'y existe peut-être pas
-      console.log('[server-api] Connexion cloud réussie, génération de tokens locaux...');
+      // Utiliser directement les tokens cloud (déjà stockés par loginCloud)
+      console.log('[server-api] Connexion cloud réussie, utilisation des tokens cloud...');
       
       const user = cloudResponse.data?.user;
       if (user) {
-        const userId = user.id || '';
-        const userEmail = user.email || email;
-        const username = userEmail.split('@')[0] || email || 'user';
+        // Les tokens cloud sont déjà stockés par loginCloud
+        // Utiliser ces tokens directement (même tokens, même secret JWT)
+        const cloudAccessToken = cloudResponse.data?.cloudAccessToken || TokenManager.getCloudAccessToken();
+        const cloudRefreshToken = cloudResponse.data?.cloudRefreshToken || TokenManager.getCloudRefreshToken();
         
-        // Générer des tokens locaux JWT pour l'app
-        const { accessToken, refreshToken } = await this.generateClientTokens(userId, username);
-        this.saveTokens(accessToken, refreshToken);
+        if (cloudAccessToken && cloudRefreshToken) {
+          this.saveTokens(cloudAccessToken, cloudRefreshToken);
+        }
+        
         this.saveUser(user);
         
         return {
           success: true,
           data: {
-            user: { id: userId, email: userEmail },
-            accessToken,
-            refreshToken,
+            user: { id: user.id || '', email: user.email || email },
+            accessToken: cloudAccessToken || '',
+            refreshToken: cloudRefreshToken || '',
           },
         };
       }
@@ -131,23 +132,26 @@ export const authMethods = {
       const cloudResponse = await this.loginCloud(email, password);
       
       if (cloudResponse.success) {
-        // Connexion cloud réussie, générer des tokens locaux
+        // Connexion cloud réussie, utiliser les tokens cloud directement
         const user = cloudResponse.data?.user;
         if (user) {
-          const userId = user.id || '';
-          const userEmail = user.email || email;
-          const username = userEmail.split('@')[0] || email || 'user';
+          // Les tokens cloud sont déjà stockés par loginCloud
+          // Utiliser ces tokens directement (même tokens, même secret JWT)
+          const cloudAccessToken = cloudResponse.data?.cloudAccessToken || TokenManager.getCloudAccessToken();
+          const cloudRefreshToken = cloudResponse.data?.cloudRefreshToken || TokenManager.getCloudRefreshToken();
           
-          const { accessToken, refreshToken } = await this.generateClientTokens(userId, username);
-          this.saveTokens(accessToken, refreshToken);
+          if (cloudAccessToken && cloudRefreshToken) {
+            this.saveTokens(cloudAccessToken, cloudRefreshToken);
+          }
+          
           this.saveUser(user);
           
           return {
             success: true,
             data: {
-              user: { id: userId, email: userEmail },
-              accessToken,
-              refreshToken,
+              user: { id: user.id || '', email: user.email || email },
+              accessToken: cloudAccessToken || '',
+              refreshToken: cloudRefreshToken || '',
             },
           };
         }
@@ -217,39 +221,27 @@ export const authMethods = {
       this.saveUser(result.user);
       console.log('[server-api] Utilisateur sauvegardé');
 
-      // Générer des tokens locaux JWT pour l'app (les tokens cloud restent dans TokenManager)
-      const userId = result.user?.id || '';
-      const username = result.user?.email || email;
-      console.log('[server-api] Génération des tokens locaux...', { userId, username });
+      // Les tokens cloud sont déjà stockés et fonctionnent
+      // Pour les appels au backend local, on peut utiliser les tokens cloud directement
+      // car ils sont valides et signés avec le secret JWT de l'utilisateur
+      // Pas besoin de générer des tokens locaux supplémentaires
+      console.log('[server-api] Utilisation des tokens cloud pour les appels backend local');
       
-      try {
-        const { accessToken, refreshToken } = await this.generateClientTokens(userId, username);
-        console.log('[server-api] Tokens locaux générés', {
-          hasAccessToken: !!accessToken,
-          hasRefreshToken: !!refreshToken,
-        });
-        
-        this.saveTokens(accessToken, refreshToken);
-        console.log('[server-api] Tokens locaux sauvegardés');
+      // Sauvegarder les tokens cloud comme tokens locaux (même tokens, même secret JWT)
+      // Cela permet d'utiliser les mêmes tokens pour popcorn-web et popcorn-server
+      this.saveTokens(result.accessToken, result.refreshToken);
+      console.log('[server-api] Tokens cloud sauvegardés comme tokens locaux');
 
-        return {
-          success: true,
-          data: {
-            user: result.user,
-            accessToken,
-            refreshToken,
-            cloudAccessToken: result.accessToken,
-            cloudRefreshToken: result.refreshToken,
-          },
-        };
-      } catch (tokenError) {
-        console.error('[server-api] Erreur lors de la génération des tokens locaux:', {
-          error: tokenError,
-          message: tokenError instanceof Error ? tokenError.message : String(tokenError),
-          stack: tokenError instanceof Error ? tokenError.stack : undefined,
-        });
-        throw tokenError;
-      }
+      return {
+        success: true,
+        data: {
+          user: result.user,
+          accessToken: result.accessToken, // Utiliser les tokens cloud directement
+          refreshToken: result.refreshToken,
+          cloudAccessToken: result.accessToken,
+          cloudRefreshToken: result.refreshToken,
+        },
+      };
     } catch (e) {
       // Log détaillé pour le diagnostic
       const errorMessage = e instanceof Error ? e.message : String(e);

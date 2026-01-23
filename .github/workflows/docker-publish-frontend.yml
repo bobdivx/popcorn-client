@@ -51,14 +51,20 @@ jobs:
         with:
           fetch-depth: 0  # Nécessaire pour obtenir l'historique complet des commits
 
-      - name: Generate version from commit count
+      - name: Get version from VERSION.json
         id: version
         run: |
-          COMMIT_COUNT=$(git rev-list --count HEAD)
-          VERSION="0.0.${COMMIT_COUNT}"
+          if [ -f "VERSION.json" ]; then
+            VERSION=$(jq -r '.client.version' VERSION.json)
+            echo "✅ Version trouvée dans VERSION.json: ${VERSION}"
+          else
+            # Fallback: utiliser le nombre de commits si VERSION.json n'existe pas
+            COMMIT_COUNT=$(git rev-list --count HEAD)
+            VERSION="0.0.${COMMIT_COUNT}"
+            echo "⚠️ VERSION.json introuvable, utilisation du commit count: ${VERSION}"
+          fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "commit_count=${COMMIT_COUNT}" >> $GITHUB_OUTPUT
-          echo "Generated version: ${VERSION} (from ${COMMIT_COUNT} commits)"
+          echo "Version finale: ${VERSION}"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -150,7 +156,11 @@ jobs:
           images: ${{ steps.check_creds.outputs.username }}/popcorn-frontend
           tags: |
             type=raw,value=${{ steps.version.outputs.version }},enable=${{ github.event_name != 'pull_request' }}
+            type=raw,value=v${{ steps.version.outputs.version }},enable=${{ github.event_name != 'pull_request' }}
             type=raw,value=latest,enable=${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
+            type=semver,pattern={{version}},enable=${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}},enable=${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') }}
             type=sha,prefix=sha-,enable=${{ github.event_name != 'pull_request' }}
             type=ref,event=branch,enable=${{ github.event_name == 'pull_request' }}
             type=ref,event=pr,enable=${{ github.event_name == 'pull_request' }}

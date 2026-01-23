@@ -58,6 +58,13 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
             errorMessage = 'Le service cloud ne répond pas. Vérifiez votre connexion internet.';
           } else if (msg.includes('network') || msg.includes('fetch') || msg.includes('Failed to fetch')) {
             errorMessage = 'Impossible de contacter le service cloud. Vérifiez votre connexion internet.';
+          } else if (msg.includes('Web Crypto API')) {
+            // Si c'est une erreur Web Crypto API, on peut quand même continuer
+            // car les tokens cloud sont stockés (fallback dans loginCloud)
+            // Mais on affiche un avertissement
+            console.warn('[AUTH] Web Crypto API bloquée, mais connexion cloud réussie. Continuation du wizard...');
+            // Ne pas afficher d'erreur, continuer normalement
+            // Le fallback dans loginCloud a déjà géré le cas
           } else {
             errorMessage = `Erreur de connexion: ${msg}`;
           }

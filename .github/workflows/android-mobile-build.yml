@@ -464,12 +464,23 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Version: ${VERSION}"
 
+      - name: Get build date and commit info
+        id: build-info
+        run: |
+          BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          COMMIT_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          COMMIT_FULL="${{ github.sha }}"
+          echo "build_date=${BUILD_DATE}" >> $GITHUB_OUTPUT
+          echo "commit_short=${COMMIT_SHORT}" >> $GITHUB_OUTPUT
+          echo "commit_full=${COMMIT_FULL}" >> $GITHUB_OUTPUT
+
       - name: Determine release tag
         id: tag
         run: |
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG="${{ github.ref_name }}"
           else
+            # Utiliser la version de l'application, pas un format nightly
             TAG="v${{ steps.version.outputs.version }}"
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
@@ -532,13 +543,14 @@ jobs:
           body: |
             ## Android Mobile Release ${{ steps.tag.outputs.tag }}
 
+            **Version:** ${{ steps.version.outputs.version }}
+            **Build Date:** ${{ steps.build-info.outputs.build_date }}
+            **Commit:** ${{ steps.build-info.outputs.commit_short }} (${{ steps.build-info.outputs.commit_full }})
+
             ### Artifacts
             - APK pour installation directe
             - AAB pour publication sur Google Play Store
             - Native debug symbols pour le débogage
-
-            ### Commit
-            ${{ github.sha }}
 
             ### Workflow
             [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})

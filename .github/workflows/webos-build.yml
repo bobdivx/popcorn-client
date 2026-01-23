@@ -245,12 +245,23 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Version: ${VERSION}"
 
+      - name: Get build date and commit info
+        id: build-info
+        run: |
+          BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          COMMIT_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          COMMIT_FULL="${{ github.sha }}"
+          echo "build_date=${BUILD_DATE}" >> $GITHUB_OUTPUT
+          echo "commit_short=${COMMIT_SHORT}" >> $GITHUB_OUTPUT
+          echo "commit_full=${COMMIT_FULL}" >> $GITHUB_OUTPUT
+
       - name: Determine release tag
         id: tag
         run: |
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG="${{ github.ref_name }}"
           else
+            # Utiliser la version de l'application, pas un format nightly
             TAG="v${{ steps.version.outputs.version }}"
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
@@ -301,15 +312,16 @@ jobs:
           body: |
             ## WebOS Release ${{ steps.tag.outputs.tag }}
 
+            **Version:** ${{ steps.version.outputs.version }}
+            **Build Date:** ${{ steps.build-info.outputs.build_date }}
+            **Commit:** ${{ steps.build-info.outputs.commit_short }} (${{ steps.build-info.outputs.commit_full }})
+
             ### Artifacts
             - IPK pour installation sur téléviseurs LG WebOS
 
             ### Installation
             1. Téléchargez le fichier `.ipk`
             2. Installez-le sur votre TV WebOS via Developer Mode ou via l'application Homebrew Channel
-
-            ### Commit
-            ${{ github.sha }}
 
             ### Workflow
             [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
