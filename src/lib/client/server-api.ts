@@ -529,11 +529,38 @@ class ServerApiClient {
    * Génère des tokens JWT côté client (comme en Tauri)
    * Utilisé pour unifier la logique entre web et Android
    * Utilise Web Crypto API pour compatibilité navigateur
+   * 
+   * ⚠️ Cette méthode ne doit être appelée que côté client (navigateur/Tauri)
+   * Ne pas appeler en SSR (Server-Side Rendering)
    */
   private async generateClientTokens(userId: string, username: string): Promise<{ accessToken: string; refreshToken: string }> {
-    const accessToken = await generateAccessToken({ userId, username });
-    const refreshToken = await generateRefreshToken({ userId, username });
-    return { accessToken, refreshToken };
+    // Vérifier qu'on est dans un contexte client (pas SSR)
+    if (typeof window === 'undefined') {
+      throw new Error(
+        'generateClientTokens can only be called in a client context (browser or Tauri). ' +
+        'It cannot be called during SSR. ' +
+        'Make sure this code is only executed in client-side components or use client:only directive in Astro.'
+      );
+    }
+    
+    try {
+      const accessToken = await generateAccessToken({ userId, username });
+      const refreshToken = await generateRefreshToken({ userId, username });
+      return { accessToken, refreshToken };
+    } catch (error) {
+      // Améliorer le message d'erreur si c'est une erreur Web Crypto API
+      if (error instanceof Error && error.message.includes('Web Crypto API')) {
+        throw new Error(
+          `Failed to generate JWT tokens: ${error.message}. ` +
+          `This usually means: ` +
+          `1. The application is not running in a secure context (HTTPS or localhost), ` +
+          `2. The browser/WebView is too old, or ` +
+          `3. The code is being executed during SSR. ` +
+          `Please ensure the application is accessed via HTTPS or localhost, and that this code only runs in client-side components.`
+        );
+      }
+      throw error;
+    }
   }
 
   /**

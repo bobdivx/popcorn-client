@@ -247,6 +247,9 @@ export async function loginCloud(email: string, password: string): Promise<{
       url: fullUrl,
       environment: isTauriEnv ? 'Tauri' : 'Navigateur',
       hasData: !!res.data,
+      dataType: typeof res.data,
+      dataKeys: res.data ? Object.keys(res.data) : [],
+      rawText: res.rawText?.substring(0, 500), // Premiers 500 caractères
     });
 
     if (!res.ok) {
@@ -276,18 +279,35 @@ export async function loginCloud(email: string, password: string): Promise<{
     }
 
     const data = res.data;
-    console.log('[POPCORN-WEB] Données reçues:', { success: data.success, hasData: !!data.data });
+    console.log('[POPCORN-WEB] Données reçues:', { 
+      success: data?.success, 
+      hasData: !!data?.data,
+      dataKeys: data ? Object.keys(data) : [],
+      fullData: JSON.stringify(data, null, 2)
+    });
     
-    if (data.success && data.data) {
-      return {
+    if (data?.success && data?.data) {
+      const result = {
         user: data.data.user,
         accessToken: data.data.accessToken,
         refreshToken: data.data.refreshToken,
         jwtSecret: data.data.jwtSecret,
       };
+      console.log('[POPCORN-WEB] Résultat de connexion:', {
+        hasUser: !!result.user,
+        hasAccessToken: !!result.accessToken,
+        hasRefreshToken: !!result.refreshToken,
+        hasJwtSecret: !!result.jwtSecret,
+      });
+      return result;
     }
 
-    console.error('[POPCORN-WEB] Réponse invalide:', data);
+    console.error('[POPCORN-WEB] Réponse invalide:', {
+      data,
+      success: data?.success,
+      hasData: !!data?.data,
+      dataString: JSON.stringify(data, null, 2)
+    });
     throw new Error('Réponse invalide de l\'API');
   } catch (error) {
     // Si c'est un timeout

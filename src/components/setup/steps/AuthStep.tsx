@@ -63,11 +63,12 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
           }
         }
         
-        console.error('[AUTH] Erreur de connexion cloud:', {
-          error: response.error,
-          message: response.message,
-          fullResponse: response,
-        });
+      console.error('[AUTH] Erreur de connexion cloud:', {
+        error: response.error,
+        message: response.message,
+        fullResponse: response,
+        fullResponseString: JSON.stringify(response, null, 2),
+      });
         
         setError(errorMessage);
         setLoading(false);
@@ -156,6 +157,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         error: err,
         message: err instanceof Error ? err.message : String(err),
         stack: err instanceof Error ? err.stack : undefined,
+        errorString: JSON.stringify(err, Object.getOwnPropertyNames(err), 2),
       });
       
       setError(errorMessage);

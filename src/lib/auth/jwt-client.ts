@@ -3,11 +3,16 @@
  * Utilise Web Crypto API au lieu de jsonwebtoken (Node.js uniquement)
  * 
  * Compatibilité :
- * - ✅ Navigateurs modernes (Chrome, Firefox, Safari, Edge)
- * - ✅ Tauri v2 Android (WebView moderne avec support Web Crypto API)
- * - ✅ Tauri Desktop
+ * - ✅ Navigateurs modernes (Chrome, Firefox, Safari, Edge) - HTTPS requis (ou localhost)
+ * - ✅ Tauri v2 Android (WebView moderne avec support Web Crypto API) - Contexte sécurisé par défaut
+ * - ✅ Tauri Desktop - Contexte sécurisé par défaut
  * 
  * Web Crypto API est disponible dans tous ces environnements via crypto.subtle
+ * 
+ * Note importante pour Android/Tauri :
+ * - Tauri fournit un contexte sécurisé même si l'URL est en HTTP
+ * - crypto.subtle est toujours disponible dans Tauri Android/Desktop
+ * - Aucune restriction HTTPS nécessaire pour les apps Tauri
  */
 
 // Récupérer le secret JWT de l'utilisateur depuis le stockage local
@@ -67,30 +72,101 @@ function base64UrlEncode(str: string): string {
 }
 
 /**
+ * Récupère l'API crypto.subtle disponible selon l'environnement
+ * - Navigateurs/Tauri : crypto.subtle
+ * - Node.js 15+ : crypto.webcrypto.subtle
+ */
+function getCryptoSubtle(): SubtleCrypto {
+  // Vérifier si on est dans Tauri (Android/Desktop) - Tauri fournit toujours un contexte sécurisé
+  const isTauriEnv = typeof window !== 'undefined' && 
+                     ('__TAURI_INTERNALS__' in window || '__TAURI__' in window);
+  
+  // Vérifier si on est dans un navigateur/Tauri (crypto.subtle disponible)
+  if (typeof crypto !== 'undefined') {
+    if (typeof crypto.subtle !== 'undefined' && crypto.subtle !== null) {
+      return crypto.subtle;
+    }
+    // Si crypto existe mais pas crypto.subtle, vérifier le contexte de sécurité
+    // ⚠️ Exception pour Tauri : Tauri fournit un contexte sécurisé même en HTTP
+    if (typeof window !== 'undefined' && !isTauriEnv) {
+      const protocol = window.location?.protocol;
+      if (protocol === 'http:' && window.location?.hostname !== 'localhost' && window.location?.hostname !== '127.0.0.1') {
+        throw new Error(
+          'Web Crypto API requires HTTPS or localhost in browser environments. ' +
+          `Current protocol: ${protocol}. ` +
+          'Please access the application via HTTPS or use localhost. ' +
+          '(Note: Tauri apps have secure context by default, even with HTTP)'
+        );
+      }
+    }
+  }
+  
+  // Vérifier si on est dans Node.js (crypto.webcrypto.subtle disponible depuis Node.js 15+)
+  if (typeof globalThis !== 'undefined') {
+    const nodeCrypto = (globalThis as any).crypto;
+    if (nodeCrypto && nodeCrypto.webcrypto && nodeCrypto.webcrypto.subtle) {
+      return nodeCrypto.webcrypto.subtle;
+    }
+  }
+  
+  // Essayer d'importer le module crypto de Node.js si disponible
+  try {
+    // @ts-ignore - Peut ne pas être disponible dans tous les environnements
+    const nodeCrypto = require('crypto');
+    if (nodeCrypto && nodeCrypto.webcrypto && nodeCrypto.webcrypto.subtle) {
+      return nodeCrypto.webcrypto.subtle;
+    }
+  } catch {
+    // Module crypto non disponible, continuer
+  }
+  
+  // Message d'erreur détaillé selon l'environnement
+  const envInfo = typeof window !== 'undefined' 
+    ? 'navigateur' 
+    : typeof globalThis !== 'undefined' 
+    ? 'Node.js' 
+    : 'inconnu';
+  
+  const cryptoInfo = typeof crypto !== 'undefined' 
+    ? `crypto.subtle=${typeof crypto.subtle}` 
+    : 'crypto=undefined';
+  
+  throw new Error(
+    `Web Crypto API is not available in this ${envInfo} environment. ` +
+    `This code requires: ` +
+    `- A modern browser with HTTPS (or localhost), ` +
+    `- Tauri environment, ` +
+    `- Or Node.js 15+ with crypto.webcrypto.subtle support. ` +
+    `Current: ${cryptoInfo}`
+  );
+}
+
+/**
  * Vérifie si Web Crypto API est disponible
- * Nécessaire pour Tauri et navigateurs
+ * Nécessaire pour Tauri, navigateurs et Node.js 15+
  */
 function isWebCryptoAvailable(): boolean {
-  return typeof crypto !== 'undefined' && 
-         typeof crypto.subtle !== 'undefined' &&
-         crypto.subtle !== null;
+  try {
+    getCryptoSubtle();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Crée un HMAC SHA-256 signature
- * Utilise Web Crypto API (disponible dans navigateurs et Tauri Android/Desktop)
+ * Utilise Web Crypto API (disponible dans navigateurs, Tauri Android/Desktop, et Node.js 15+)
  */
 async function createSignature(header: string, payload: string, secret: string): Promise<string> {
-  // Vérifier que Web Crypto API est disponible
-  if (!isWebCryptoAvailable()) {
-    throw new Error('Web Crypto API is not available. This code requires a modern browser or Tauri environment.');
-  }
+  // Récupérer l'API crypto.subtle selon l'environnement
+  const subtle = getCryptoSubtle();
 
   const encoder = new TextEncoder();
   const keyData = encoder.encode(secret);
   
   // Import la clé pour HMAC
-  const key = await crypto.subtle.importKey(
+  const key = await subtle.importKey(
     'raw',
     keyData,
     { name: 'HMAC', hash: 'SHA-256' },
@@ -100,7 +176,7 @@ async function createSignature(header: string, payload: string, secret: string):
   
   // Signe les données
   const data = encoder.encode(`${header}.${payload}`);
-  const signature = await crypto.subtle.sign('HMAC', key, data);
+  const signature = await subtle.sign('HMAC', key, data);
   
   // Convertit en base64url
   const signatureArray = Array.from(new Uint8Array(signature));
@@ -131,8 +207,17 @@ function getExpirationSeconds(expiresIn: string): number {
 /**
  * Génère un token JWT côté client (compatible navigateur)
  * Utilise le secret JWT de l'utilisateur stocké localement
+ * 
+ * ⚠️ Cette fonction ne doit être appelée que côté client (navigateur/Tauri)
+ * Ne pas appeler en SSR (Server-Side Rendering)
  */
 export async function generateAccessToken(payload: Omit<JWTPayload, 'type' | 'exp' | 'iat'>): Promise<string> {
+  // Vérifier qu'on est dans un contexte client (pas SSR)
+  // En SSR, window est undefined, donc on ne peut pas générer de tokens
+  if (typeof window === 'undefined') {
+    throw new Error('generateAccessToken can only be called in a client context (browser or Tauri). It cannot be called during SSR.');
+  }
+  
   const jwtSecret = getJWTSecretSync();
   
   const normalizedPayload: JWTPayload = {
@@ -155,8 +240,17 @@ export async function generateAccessToken(payload: Omit<JWTPayload, 'type' | 'ex
 /**
  * Génère un token de rafraîchissement (longue durée)
  * Utilise le secret JWT de l'utilisateur stocké localement
+ * 
+ * ⚠️ Cette fonction ne doit être appelée que côté client (navigateur/Tauri)
+ * Ne pas appeler en SSR (Server-Side Rendering)
  */
 export async function generateRefreshToken(payload: Omit<JWTPayload, 'type' | 'exp' | 'iat'>): Promise<string> {
+  // Vérifier qu'on est dans un contexte client (pas SSR)
+  // En SSR, window est undefined, donc on ne peut pas générer de tokens
+  if (typeof window === 'undefined') {
+    throw new Error('generateRefreshToken can only be called in a client context (browser or Tauri). It cannot be called during SSR.');
+  }
+  
   const jwtSecret = getJWTSecretSync();
   
   const normalizedPayload: JWTPayload = {

@@ -193,7 +193,15 @@ export const authMethods = {
       }
 
       // Stocker les tokens cloud
+      console.log('[server-api] Stockage des tokens cloud...', {
+        hasAccessToken: !!result.accessToken,
+        hasRefreshToken: !!result.refreshToken,
+        hasUser: !!result.user,
+        hasJwtSecret: !!result.jwtSecret,
+      });
+      
       TokenManager.setCloudTokens(result.accessToken, result.refreshToken);
+      console.log('[server-api] Tokens cloud stockés');
       
       // Stocker le secret JWT si fourni (important pour les connexions suivantes)
       if (result.jwtSecret) {
@@ -202,24 +210,46 @@ export const authMethods = {
       }
 
       // Stocker user localement pour pouvoir faire les appels backend qui demandent X-User-ID (TMDB/sync)
+      console.log('[server-api] Sauvegarde de l\'utilisateur...', {
+        userId: result.user?.id,
+        userEmail: result.user?.email,
+      });
       this.saveUser(result.user);
+      console.log('[server-api] Utilisateur sauvegardé');
 
       // Générer des tokens locaux JWT pour l'app (les tokens cloud restent dans TokenManager)
       const userId = result.user?.id || '';
       const username = result.user?.email || email;
-      const { accessToken, refreshToken } = await this.generateClientTokens(userId, username);
-      this.saveTokens(accessToken, refreshToken);
+      console.log('[server-api] Génération des tokens locaux...', { userId, username });
+      
+      try {
+        const { accessToken, refreshToken } = await this.generateClientTokens(userId, username);
+        console.log('[server-api] Tokens locaux générés', {
+          hasAccessToken: !!accessToken,
+          hasRefreshToken: !!refreshToken,
+        });
+        
+        this.saveTokens(accessToken, refreshToken);
+        console.log('[server-api] Tokens locaux sauvegardés');
 
-      return {
-        success: true,
-        data: {
-          user: result.user,
-          accessToken,
-          refreshToken,
-          cloudAccessToken: result.accessToken,
-          cloudRefreshToken: result.refreshToken,
-        },
-      };
+        return {
+          success: true,
+          data: {
+            user: result.user,
+            accessToken,
+            refreshToken,
+            cloudAccessToken: result.accessToken,
+            cloudRefreshToken: result.refreshToken,
+          },
+        };
+      } catch (tokenError) {
+        console.error('[server-api] Erreur lors de la génération des tokens locaux:', {
+          error: tokenError,
+          message: tokenError instanceof Error ? tokenError.message : String(tokenError),
+          stack: tokenError instanceof Error ? tokenError.stack : undefined,
+        });
+        throw tokenError;
+      }
     } catch (e) {
       // Log détaillé pour le diagnostic
       const errorMessage = e instanceof Error ? e.message : String(e);
@@ -230,6 +260,7 @@ export const authMethods = {
         message: errorMessage,
         name: errorName,
         stack: e instanceof Error ? e.stack : undefined,
+        errorString: JSON.stringify(e, Object.getOwnPropertyNames(e), 2),
       });
       
       // Messages d'erreur plus clairs

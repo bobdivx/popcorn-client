@@ -148,20 +148,12 @@ export function useHlsPlayer({
 
         // Appel non bloquant à l'API durée (ffprobe). Ne pas retarder le démarrage HLS.
         const durationUrl = `${baseUrl}/api/local/duration?path=${encodedPath}&info_hash=${encodeURIComponent(infoHash)}`;
-        // #region agent log
-        console.log('[useHlsPlayer] duration fetch starting', { baseUrl, hasPath: !!encodedPath, hasInfoHash: !!infoHash });
-        fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'useHlsPlayer.ts:durationFetch', message: 'duration fetch starting', data: { baseUrl, hasPath: !!encodedPath, hasInfoHash: !!infoHash }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H1' }) }).catch(() => {});
-        // #endregion
         const ac = new AbortController();
         const t = setTimeout(() => ac.abort(), 3000);
         fetch(durationUrl, { signal: ac.signal })
           .then((r) => {
             clearTimeout(t);
             if (!r.ok) {
-              // #region agent log
-              console.warn('[useHlsPlayer] duration API !ok:', r.status, r.statusText, durationUrl);
-              fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'useHlsPlayer.ts:durationFetch', message: 'duration API !ok', data: { status: r.status, statusText: r.statusText }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H2' }) }).catch(() => {});
-              // #endregion
               return;
             }
             return r.json();
@@ -170,26 +162,12 @@ export function useHlsPlayer({
             if (!res) return;
             const d = res?.data?.duration;
             if (typeof d === 'number' && d > 0 && isFinite(d)) {
-              const prevBeforeApi = totalDurationRef.current;
               totalDurationRef.current = Math.max(totalDurationRef.current, d);
               onDurationChangeRef.current?.(d);
-              // #region agent log
-              console.log('[useHlsPlayer] duration set from API', d, 'prev was', prevBeforeApi, 'new value', totalDurationRef.current);
-              fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'useHlsPlayer.ts:durationFetch', message: 'duration set from API', data: { duration: d, prevBeforeApi, newValue: totalDurationRef.current }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H4' }) }).catch(() => {});
-              // #endregion
-            } else {
-              // #region agent log
-              console.warn('[useHlsPlayer] duration API 200 but invalid duration', { hasData: !!res?.data, dType: typeof d, d });
-              fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'useHlsPlayer.ts:durationFetch', message: 'duration API 200 but invalid duration', data: { hasData: !!res?.data, dType: typeof d, d }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H4' }) }).catch(() => {});
-              // #endregion
             }
           })
           .catch((e) => {
             clearTimeout(t);
-            // #region agent log
-            console.warn('[useHlsPlayer] duration fetch failed', e);
-            fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'useHlsPlayer.ts:durationFetch', message: 'duration fetch failed', data: { err: String((e as Error)?.message ?? e), name: (e as Error)?.name }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H2' }) }).catch(() => {});
-            // #endregion
           });
 
         // Le backend génère toujours des playlists HLS, donc on utilise toujours HLS.js
@@ -217,10 +195,6 @@ export function useHlsPlayer({
         let durationStableCount = 0;
         const checkDuration = () => {
           const videoDuration = video.duration;
-          const prevBeforeCheck = totalDurationRef.current;
-          // #region agent log
-          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'useHlsPlayer.ts:checkDuration', message: 'checkDuration called', data: { videoDuration: videoDuration || null, prevBeforeCheck, timestamp: Date.now() }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H4' }) }).catch(() => {});
-          // #endregion
           if (videoDuration && isFinite(videoDuration) && videoDuration > 0) {
             // Si la durée vidéo a changé, réinitialiser le compteur de stabilité
             if (videoDuration !== lastVideoDuration) {
@@ -244,17 +218,6 @@ export function useHlsPlayer({
               // La nouvelle valeur est supérieure, l'utiliser
               totalDurationRef.current = newValue;
               onDurationChangeRef.current?.(newValue);
-              // #region agent log
-              fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'useHlsPlayer.ts:checkDuration', message: 'duration update (using Math.max, newValue > prev)', data: { videoDuration, totalDurationRef: totalDurationRef.current, prev, newValue, durationStableCount }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H4' }) }).catch(() => {});
-              // #endregion
-            } else {
-              // La nouvelle valeur n'est pas supérieure, ne pas écraser
-              // Log pour debug si prev est significativement supérieur (probablement depuis l'API)
-              if (prev > videoDuration && prev > 500) {
-                // #region agent log
-                fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'useHlsPlayer.ts:checkDuration', message: 'duration NOT updated (prev > video, preserving API value)', data: { videoDuration, totalDurationRef: totalDurationRef.current, prev, newValue, durationStableCount }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H4' }) }).catch(() => {});
-                // #endregion
-              }
             }
           }
         };
@@ -329,15 +292,7 @@ export function useHlsPlayer({
             if (totalDurationRef.current > prev) {
               onDurationChangeRef.current?.(totalDurationRef.current);
             }
-            // #region agent log
-            fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'useHlsPlayer.ts:MANIFEST_PARSED', message: 'duration update in MANIFEST_PARSED', data: { prev, totalDuration, newValue: totalDurationRef.current }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H2' }) }).catch(() => {});
-            // #endregion
           }
-
-          const segCount = hls.levels?.[0]?.details?.fragments?.length ?? 0;
-          // #region agent log
-          fetch('http://127.0.0.1:7246/ingest/0bc97b62-c537-46ab-80a5-8129f8a58360', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'useHlsPlayer.ts:MANIFEST_PARSED', message: 'duration sources', data: { dataTotalDuration: data?.totalduration ?? null, totalDuration, segmentCount: segCount, videoDuration: video.duration || null, currentRef: totalDurationRef.current }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'H2' }) }).catch(() => {});
-          // #endregion
           
           // Vérifier la durée immédiatement après le parsing du manifest
           checkDuration();

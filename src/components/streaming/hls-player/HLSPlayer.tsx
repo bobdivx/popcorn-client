@@ -26,6 +26,13 @@ export default function HLSPlayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const hasAutoFullscreenedRef = useRef(false);
   const [hlsDuration, setHlsDuration] = useState<number | undefined>(undefined);
+  const hlsDurationRef = useRef<number>(0);
+  
+  // Réinitialiser hlsDurationRef quand on change de vidéo
+  useEffect(() => {
+    hlsDurationRef.current = 0;
+    setHlsDuration(undefined);
+  }, [infoHash, filePath]);
   
   const { videoRef, hlsRef, isLoading, error, hlsLoaded, stopBuffer } = useHlsPlayer({
     src,
@@ -38,7 +45,13 @@ export default function HLSPlayer({
     onLoadingChange,
     canAutoPlay: () => canAutoPlayRef.current ? canAutoPlayRef.current() : true,
     onDurationChange: (duration) => {
-      setHlsDuration(duration);
+      // Toujours utiliser Math.max pour préserver la valeur la plus élevée
+      // Cela garantit que si l'API a défini une valeur supérieure, elle ne sera jamais écrasée
+      const newValue = Math.max(hlsDurationRef.current, duration);
+      if (newValue > hlsDurationRef.current) {
+        hlsDurationRef.current = newValue;
+        setHlsDuration(newValue);
+      }
     },
   });
   
