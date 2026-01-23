@@ -25,6 +25,70 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Increment client version in VERSION.json
+        id: increment_version
+        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v')
+        run: |
+          if [ -f "VERSION.json" ]; then
+            # Lire la version actuelle
+            CURRENT_VERSION=$(jq -r '.client.version' VERSION.json)
+            echo "📦 Version actuelle: ${CURRENT_VERSION}"
+            
+            # Extraire les parties de la version (major.minor.patch)
+            IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+            
+            # Incrémenter le patch
+            patch=$((patch + 1))
+            
+            # Gérer le rollover
+            if [ $patch -ge 100 ]; then
+              patch=0
+              minor=$((minor + 1))
+            fi
+            if [ $minor -ge 100 ]; then
+              minor=0
+              major=$((major + 1))
+            fi
+            
+            NEW_VERSION="${major}.${minor}.${patch}"
+            echo "🚀 Nouvelle version: ${NEW_VERSION}"
+            
+            # Mettre à jour VERSION.json
+            jq --arg v "$NEW_VERSION" '.client.version = $v' VERSION.json > VERSION.json.tmp
+            mv VERSION.json.tmp VERSION.json
+            
+            # Incrémenter aussi le build number
+            BUILD=$(jq -r '.client.build' VERSION.json)
+            BUILD=$((BUILD + 1))
+            jq --argjson b "$BUILD" '.client.build = $b' VERSION.json > VERSION.json.tmp
+            mv VERSION.json.tmp VERSION.json
+            
+            # Synchroniser la version vers les fichiers de config Tauri
+            if [ -f "src-tauri/tauri.android.conf.json" ]; then
+              jq --arg v "$NEW_VERSION" '.version = $v' src-tauri/tauri.android.conf.json > src-tauri/tauri.android.conf.json.tmp
+              mv src-tauri/tauri.android.conf.json.tmp src-tauri/tauri.android.conf.json
+              echo "✅ Version synchronisée vers tauri.android.conf.json"
+            fi
+            
+            echo "✅ Version incrémentée: ${CURRENT_VERSION} → ${NEW_VERSION} (build: ${BUILD})"
+            echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+            echo "build=${BUILD}" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ VERSION.json introuvable, création avec version par défaut"
+            echo '{"client":{"version":"1.0.1","build":1},"server":{"version":"1.0.1","build":1}}' > VERSION.json
+            echo "version=1.0.1" >> $GITHUB_OUTPUT
+            echo "build=1" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit version update
+        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v') && steps.increment_version.outputs.version != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION.json src-tauri/tauri.android.conf.json 2>/dev/null || true
+          git commit -m "chore: bump client version to ${{ steps.increment_version.outputs.version }}" || echo "Aucun changement à commiter"
+          git push || echo "Push échoué (peut-être déjà à jour)"
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:

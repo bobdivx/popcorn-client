@@ -3,6 +3,7 @@ import { serverApi } from '../../lib/client/server-api';
 import { RefreshCw } from 'lucide-preact';
 import type { Indexer } from '../../lib/client/types';
 import { useNativeNotifications } from '../../hooks/useNativeNotifications';
+import { calculateSyncProgress } from '../../lib/utils/sync-progress';
 
 interface SyncSettings {
   sync_frequency_minutes: number;
@@ -654,61 +655,17 @@ export default function TorrentSyncManager() {
   };
 
   const calculateProgress = (currentStats: Record<string, number>, previousStats: Record<string, number>): number => {
-    if (!status?.sync_in_progress) return 0;
+    if (!status) return 0;
     
-    // Calculer la progression en 3 phases :
-    // 1. Fetch (récupération) = 0-33%
-    // 2. Enrichissement TMDB = 33-66%
-    // 3. Insertion DB = 66-100%
-    
-    // PRIORITÉ : Utiliser les stats réels (torrents insérés en DB) pour la progression
-    // car total_processed compte les torrents traités, pas ceux réellement insérés
-    const totalCurrent = Object.values(currentStats || {}).reduce((sum, count) => sum + count, 0);
-    const totalPrevious = Object.values(previousStats || {}).reduce((sum, count) => sum + count, 0);
-    
-    // Si on a une progression détaillée (total_to_process), on est en phases 2-3
-    if (status.progress && status.progress.total_to_process > 0) {
-      // Estimer le total final basé sur total_to_process
-      // Mais utiliser les stats réels pour la progression actuelle
-      // Si on a déjà inséré des torrents, on est au moins à 33% (fin du fetch)
-      const estimatedFinalTotal = status.progress.total_to_process; // Estimation basée sur les torrents récupérés
-      
-      if (totalCurrent > 0) {
-        // On est en phase 2-3 : 33% + (stats_insérés / total_estimé * 67%)
-        // Mais on limite à 100% et on utilise le max entre stats et total_processed pour éviter les incohérences
-        const maxProgress = Math.max(
-          status.progress.total_processed, // Progression du traitement
-          totalCurrent // Progression réelle (insérés)
-        );
-        const phases23Progress = Math.min(1, maxProgress / estimatedFinalTotal);
-        return Math.round(33 + (phases23Progress * 67));
-      } else {
-        // Aucun torrent inséré encore, utiliser total_processed
-        const phases23Progress = status.progress.total_processed / status.progress.total_to_process;
-        return Math.round(33 + (phases23Progress * 67));
-      }
-    }
-    
-    // Sinon, utiliser les torrents récupérés (phase fetch) pour estimer la progression
-    const fetchedTotal = status.progress?.indexer_torrents
-      ? Object.values(status.progress.indexer_torrents).reduce((sum, n) => sum + (n || 0), 0)
-      : 0;
-    
-    if (fetchedTotal > 0) {
-      // Phase 1 (fetch) : estimer à 33% max
-      // On estime qu'on est à 33% quand on a fetch ~1000 torrents
-      return Math.min(33, Math.round((fetchedTotal / 1000) * 33));
-    }
-    
-    // Fallback : utiliser les stats (torrents déjà insérés) - phase 3 terminée
-    if (totalPrevious === 0) {
-      return totalCurrent > 0 ? 10 : 0;
-    }
-    
-    const estimatedTotal = totalPrevious * 2;
-    const progress = Math.min(95, Math.floor((totalCurrent / estimatedTotal) * 100));
-    
-    return progress;
+    // Utiliser la fonction utilitaire partagée pour garantir la cohérence avec Navbar
+    return calculateSyncProgress(
+      {
+        sync_in_progress: status.sync_in_progress,
+        stats: currentStats,
+        progress: status.progress,
+      },
+      previousStats
+    );
   };
 
   if (loading && !status) {
@@ -838,11 +795,16 @@ export default function TorrentSyncManager() {
                         <div class="flex-1">
                           <p class="text-gray-400 text-xs">Indexer actuel</p>
                           <p class="text-white font-semibold text-sm">{status.progress.current_indexer}</p>
+                          {status.progress.indexer_torrents[status.progress.current_indexer] !== undefined && status.progress.total_to_process > 0 && (
+                            <p class="text-gray-500 text-xs mt-1">
+                              {status.progress.indexer_torrents[status.progress.current_indexer].toLocaleString()} bruts → {status.progress.total_to_process} à traiter
+                            </p>
+                          )}
                         </div>
                         {status.progress.indexer_torrents[status.progress.current_indexer] !== undefined && (
                           <div class="text-right">
                             <p class="text-primary font-bold text-lg">{status.progress.indexer_torrents[status.progress.current_indexer]}</p>
-                            <p class="text-gray-400 text-xs">torrents</p>
+                            <p class="text-gray-400 text-xs">récupérés<br/><span class="text-gray-500">(bruts)</span></p>
                           </div>
                         )}
                       </div>
@@ -857,11 +819,16 @@ export default function TorrentSyncManager() {
                         <div class="flex-1">
                           <p class="text-gray-400 text-xs">Catégorie</p>
                           <p class="text-white font-semibold text-sm capitalize">{status.progress.current_category}</p>
+                          {status.progress.category_torrents[status.progress.current_category] !== undefined && status.stats && status.stats[status.progress.current_category] !== undefined && (
+                            <p class="text-gray-500 text-xs mt-1">
+                              {status.progress.category_torrents[status.progress.current_category].toLocaleString()} récupérés → {status.stats[status.progress.current_category].toLocaleString()} synchronisés
+                            </p>
+                          )}
                         </div>
                         {status.progress.category_torrents[status.progress.current_category] !== undefined && (
                           <div class="text-right">
                             <p class="text-primary font-bold text-lg">{status.progress.category_torrents[status.progress.current_category]}</p>
-                            <p class="text-gray-400 text-xs">torrents</p>
+                            <p class="text-gray-400 text-xs">récupérés<br/><span class="text-gray-500">(bruts)</span></p>
                           </div>
                         )}
                       </div>
@@ -884,7 +851,12 @@ export default function TorrentSyncManager() {
                     {status.progress.total_to_process > 0 && (
                       <div class="bg-gray-800/50 rounded-lg p-3">
                         <div class="flex justify-between items-center mb-2">
-                          <p class="text-gray-400 text-xs">Traitement des torrents</p>
+                          <div>
+                            <p class="text-gray-400 text-xs">Traitement des torrents</p>
+                            <p class="text-gray-500 text-xs mt-0.5">
+                              Après filtrage et enrichissement TMDB
+                            </p>
+                          </div>
                           <p class="text-primary font-bold text-sm">
                             {status.progress.total_processed} / {status.progress.total_to_process}
                           </p>
@@ -1050,37 +1022,81 @@ export default function TorrentSyncManager() {
                     </div>
                   );
                 })()}
-                {Object.keys(status.stats || {}).length === 0 && (
-                  <div class="col-span-full">
-                    <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-6 text-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-yellow-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                      <p class="text-yellow-400 font-semibold mb-2">Aucun torrent trouvé</p>
-                      <p class="text-gray-400 text-sm mb-4">La synchronisation est en cours mais aucun résultat n'a été retourné pour le moment.</p>
-                      
-                      {indexers.length > 0 && (
-                        <div class="mt-4 space-y-2">
-                          <p class="text-gray-300 text-xs font-semibold">Indexers interrogés:</p>
-                          <div class="flex flex-wrap gap-2 justify-center">
-                            {indexers.map((indexer) => (
-                              <span key={indexer.id} class="badge badge-info badge-sm">
-                                {indexer.name}
-                              </span>
-                            ))}
-                          </div>
+                {(() => {
+                  // Calculer le total de torrents récupérés depuis progress
+                  const fetchedTotal = status.progress?.indexer_torrents
+                    ? Object.values(status.progress.indexer_torrents).reduce((sum, n) => sum + (n || 0), 0)
+                    : 0;
+                  const hasFetchedTorrents = fetchedTotal > 0;
+                  const hasInsertedTorrents = Object.keys(status.stats || {}).length > 0;
+                  
+                  // Afficher "Aucun torrent trouvé" seulement si vraiment aucun torrent n'a été récupéré
+                  if (!hasFetchedTorrents && !hasInsertedTorrents) {
+                    return (
+                      <div class="col-span-full">
+                        <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-6 text-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-yellow-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                          <p class="text-yellow-400 font-semibold mb-2">Aucun torrent trouvé</p>
+                          <p class="text-gray-400 text-sm mb-4">La synchronisation est en cours mais aucun résultat n'a été retourné pour le moment.</p>
+                          
+                          {indexers.length > 0 && (
+                            <div class="mt-4 space-y-2">
+                              <p class="text-gray-300 text-xs font-semibold">Indexers interrogés:</p>
+                              <div class="flex flex-wrap gap-2 justify-center">
+                                {indexers.map((indexer) => (
+                                  <span key={indexer.id} class="badge badge-info badge-sm">
+                                    {indexer.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          
+                          {elapsedTime > 30 && (
+                            <div class="mt-4 bg-red-900/20 border border-red-500/30 rounded-lg p-3">
+                              <p class="text-red-400 text-xs font-semibold mb-1">⚠️ Aucun résultat après {formatElapsedTime(elapsedTime)}</p>
+                              <p class="text-gray-400 text-xs">Vérifiez les logs du backend ou testez les indexers individuellement.</p>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      
-                      {elapsedTime > 30 && (
-                        <div class="mt-4 bg-red-900/20 border border-red-500/30 rounded-lg p-3">
-                          <p class="text-red-400 text-xs font-semibold mb-1">⚠️ Aucun résultat après {formatElapsedTime(elapsedTime)}</p>
-                          <p class="text-gray-400 text-xs">Vérifiez les logs du backend ou testez les indexers individuellement.</p>
+                      </div>
+                    );
+                  }
+                  
+                  // Si des torrents ont été récupérés mais pas encore insérés, afficher un message de traitement
+                  if (hasFetchedTorrents && !hasInsertedTorrents) {
+                    return (
+                      <div class="col-span-full">
+                        <div class="bg-blue-900/20 border border-blue-500/30 rounded-xl p-6 text-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-blue-400 mb-3 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          <p class="text-blue-400 font-semibold mb-2">Traitement en cours</p>
+                          <p class="text-gray-400 text-sm mb-4">
+                            {fetchedTotal.toLocaleString()} torrent(s) récupéré(s), en cours d'enrichissement et d'insertion en base de données.
+                          </p>
+                          
+                          {indexers.length > 0 && (
+                            <div class="mt-4 space-y-2">
+                              <p class="text-gray-300 text-xs font-semibold">Indexers interrogés:</p>
+                              <div class="flex flex-wrap gap-2 justify-center">
+                                {indexers.map((indexer) => (
+                                  <span key={indexer.id} class="badge badge-info badge-sm">
+                                    {indexer.name}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                )}
+                      </div>
+                    );
+                  }
+                  
+                  return null;
+                })()}
               </div>
 
               {/* Total avec animation */}

@@ -50,7 +50,7 @@ jobs:
     runs-on: self-hosted
     environment: production
     permissions:
-      contents: read
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -62,12 +62,66 @@ jobs:
           name: popcorn-frontend-dist
           path: dist/
 
+      - name: Increment client version in VERSION.json
+        id: increment_version
+        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v')
+        run: |
+          if [ -f "VERSION.json" ]; then
+            # Lire la version actuelle
+            CURRENT_VERSION=$(jq -r '.client.version' VERSION.json)
+            echo "📦 Version actuelle: ${CURRENT_VERSION}"
+            
+            # Extraire les parties de la version (major.minor.patch)
+            IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+            
+            # Incrémenter le patch
+            patch=$((patch + 1))
+            
+            # Gérer le rollover
+            if [ $patch -ge 100 ]; then
+              patch=0
+              minor=$((minor + 1))
+            fi
+            if [ $minor -ge 100 ]; then
+              minor=0
+              major=$((major + 1))
+            fi
+            
+            NEW_VERSION="${major}.${minor}.${patch}"
+            echo "🚀 Nouvelle version: ${NEW_VERSION}"
+            
+            # Mettre à jour VERSION.json
+            jq --arg v "$NEW_VERSION" '.client.version = $v' VERSION.json > VERSION.json.tmp
+            mv VERSION.json.tmp VERSION.json
+            
+            # Incrémenter aussi le build number
+            BUILD=$(jq -r '.client.build' VERSION.json)
+            BUILD=$((BUILD + 1))
+            jq --argjson b "$BUILD" '.client.build = $b' VERSION.json > VERSION.json.tmp
+            mv VERSION.json.tmp VERSION.json
+            
+            echo "✅ Version incrémentée: ${CURRENT_VERSION} → ${NEW_VERSION} (build: ${BUILD})"
+            echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+            echo "build=${BUILD}" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ VERSION.json introuvable, création avec version par défaut"
+            echo '{"client":{"version":"1.0.1","build":1},"server":{"version":"1.0.1","build":1}}' > VERSION.json
+            echo "version=1.0.1" >> $GITHUB_OUTPUT
+            echo "build=1" >> $GITHUB_OUTPUT
+          fi
+
       - name: Get version
         id: version
+        if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/v')
         run: |
-          VERSION=$(jq -r '.client.version' VERSION.json)
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Version: ${VERSION}"
+          if [ -f "VERSION.json" ]; then
+            VERSION=$(jq -r '.client.version' VERSION.json)
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "Version: ${VERSION}"
+          else
+            echo "⚠️ VERSION.json introuvable"
+            exit 1
+          fi
 
       - name: Prepare WebOS structure
         run: |
@@ -87,6 +141,15 @@ jobs:
           
           echo "✅ Structure WebOS préparée"
 
+      - name: Commit version update
+        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v') && steps.increment_version.outputs.version != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION.json
+          git commit -m "chore: bump client version to ${{ steps.increment_version.outputs.version }}" || echo "Aucun changement à commiter"
+          git push || echo "Push échoué (peut-être déjà à jour)"
+
       - name: Upload WebOS structure artifact
         uses: actions/upload-artifact@v4
         with:
@@ -105,6 +168,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
 
       - name: Download WebOS structure artifact
         uses: actions/download-artifact@v4
@@ -241,9 +310,14 @@ jobs:
       - name: Get version
         id: version
         run: |
-          VERSION=$(jq -r '.client.version' VERSION.json)
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
-          echo "Version: ${VERSION}"
+          if [ -f "VERSION.json" ]; then
+            VERSION=$(jq -r '.client.version' VERSION.json)
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "Version: ${VERSION}"
+          else
+            echo "⚠️ VERSION.json introuvable"
+            exit 1
+          fi
 
       - name: Get build date and commit info
         id: build-info
