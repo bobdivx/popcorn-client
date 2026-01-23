@@ -16,6 +16,7 @@ import { SyncStep } from './steps/SyncStep';
 import { CompleteStep } from './steps/CompleteStep';
 import { hasBackendUrl } from '../../lib/backend-config.js';
 import { serverApi } from '../../lib/client/server-api';
+import { TokenManager } from '../../lib/client/storage';
 import { redirectTo } from '../../lib/utils/navigation.js';
 
 export default function Wizard() {
@@ -216,7 +217,11 @@ export default function Wizard() {
 
   const handleSaveTmdb = async (key: string) => {
     const result = await saveTmdbKey(key);
-    if (result) await checkSetupStatus();
+    if (result) {
+      // Forcer l'affichage de l'étape TMDB pour éviter qu'elle disparaisse après la sauvegarde
+      setForceShowStepIds((prev) => (prev.includes('tmdb') ? prev : [...prev, 'tmdb']));
+      await checkSetupStatus();
+    }
   };
 
   const handleSaveDownloadLocation = async (path: string) => {
@@ -445,12 +450,48 @@ export default function Wizard() {
                 <CompleteStep
                   focusedButtonIndex={focusedButtonIndex}
                   buttonRefs={buttonRefs}
-                  onComplete={() => {
+                  onComplete={async () => {
                     // Récupérer la préférence de sauvegarde cloud depuis localStorage
                     const saveToCloud = typeof window !== 'undefined' 
                       ? localStorage.getItem('popcorn_client_save_to_cloud') === 'true'
                       : false;
-                    completeSetup(saveToCloud);
+                    // Sauvegarder la configuration dans popcorn-web si demandé
+                    // La synchronisation est déjà démarrée automatiquement dans CompleteStep
+                    if (saveToCloud) {
+                      try {
+                        const cloudToken = TokenManager.getCloudAccessToken();
+                        if (cloudToken) {
+                          const localToken = TokenManager.getAccessToken();
+                          const configResponse = await fetch('/api/v1/setup/export-config', {
+                            method: 'GET',
+                            headers: {
+                              'Authorization': `Bearer ${localToken}`,
+                              'Content-Type': 'application/json',
+                            },
+                          });
+                          if (configResponse.ok) {
+                            const configData = await configResponse.json();
+                            if (configData.success && configData.data) {
+                              const { saveUserConfig } = await import('../../../lib/api/popcorn-web');
+                              const { isTmdbKeyMaskedOrInvalid } = await import('../../../lib/utils/tmdb-key');
+                              const rawTmdb = configData.data.tmdbApiKey ?? null;
+                              const tmdbApiKey = rawTmdb && !isTmdbKeyMaskedOrInvalid(rawTmdb) ? rawTmdb : null;
+                              await saveUserConfig({
+                                indexers: configData.data.indexers || [],
+                                tmdbApiKey,
+                                downloadLocation: configData.data.downloadLocation || null,
+                                syncSettings: configData.data.syncSettings || null,
+                                indexerCategories: null,
+                              });
+                            }
+                          }
+                        }
+                      } catch (error) {
+                        console.warn('[WIZARD] ⚠️ Erreur lors de la sauvegarde cloud:', error);
+                      }
+                    }
+                    // Rediriger vers le dashboard
+                    redirectTo('/dashboard');
                   }}
                 />
               );

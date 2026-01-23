@@ -159,26 +159,25 @@ export function useWizardActions() {
       }
 
       // Démarrer automatiquement la synchronisation des torrents après le setup
+      // Ne pas attendre la fin - CompleteStep affichera la progression et l'utilisateur pourra choisir
       console.log('[WIZARD] 🚀 Démarrage automatique de la synchronisation des torrents...');
       const syncResponse = await serverApi.startSync();
       if (syncResponse.success) {
         console.log('[WIZARD] ✅ Synchronisation démarrée avec succès');
-        
-        // Attendre que la synchronisation soit terminée
-        console.log('[WIZARD] ⏳ Attente de la fin de la synchronisation...');
-        await waitForSyncComplete();
-        console.log('[WIZARD] ✅ Synchronisation terminée');
+        console.log('[WIZARD] ℹ️ La progression sera affichée dans CompleteStep');
+        // Ne pas attendre la fin ici - CompleteStep gérera l'affichage de la progression
+        // L'utilisateur pourra voir la synchronisation en cours et choisir d'attendre ou d'accéder au dashboard
       } else {
         console.warn('[WIZARD] ⚠️ Impossible de démarrer la synchronisation:', syncResponse.message);
-        // Ne pas bloquer la redirection si la sync ne démarre pas
+        // Ne pas bloquer si la sync ne démarre pas
       }
     } catch (error) {
       console.error('[WIZARD] ❌ Erreur lors du démarrage de la synchronisation:', error);
-      // Ne pas bloquer la redirection en cas d'erreur
+      // Ne pas bloquer en cas d'erreur
     }
     
-    // Rediriger vers le dashboard
-    redirectTo('/dashboard');
+    // Ne pas rediriger automatiquement - CompleteStep gérera la redirection
+    // L'utilisateur pourra voir la synchronisation en cours et choisir quand accéder au dashboard
   };
 
   /**

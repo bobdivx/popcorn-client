@@ -213,6 +213,7 @@ export async function loginCloud(email: string, password: string): Promise<{
   user: {
     id: string;
     email: string;
+    is_admin?: boolean; // Statut admin si disponible
   };
   accessToken: string;
   refreshToken: string;

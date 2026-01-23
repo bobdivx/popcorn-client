@@ -233,6 +233,52 @@ export const authMethods = {
       this.saveUser(result.user);
       console.log('[server-api] Utilisateur sauvegardé');
 
+      // Synchroniser l'utilisateur cloud dans la base de données locale du backend
+      // IMPORTANT: Créer l'utilisateur dans la base locale dès la connexion cloud réussie
+      // avec toutes les informations disponibles pour éviter de créer un utilisateur minimal plus tard
+      if (result.user?.id && result.user?.email) {
+        try {
+          // Utiliser l'email comme username si aucun username n'est fourni
+          const username = result.user.username || result.user.email.split('@')[0];
+          
+          console.log('[server-api] Synchronisation de l\'utilisateur cloud dans la base locale...', {
+            userId: result.user.id,
+            email: result.user.email,
+            username: username,
+          });
+          
+          const syncResponse = await this.backendRequest('/api/client/auth/users/sync-cloud', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-User-ID': result.user.id,
+            },
+            body: JSON.stringify({
+              id: result.user.id,
+              email: result.user.email,
+              username: username,
+              is_admin: result.user.is_admin, // Inclure le statut admin si disponible
+            }),
+          });
+          
+          if (syncResponse.success) {
+            console.log('[server-api] ✅ Utilisateur cloud synchronisé dans la base locale avec succès');
+          } else {
+            console.warn('[server-api] ⚠️ Impossible de synchroniser l\'utilisateur cloud:', syncResponse.message || syncResponse.error);
+            // Ne pas bloquer la connexion, mais logger l'erreur
+          }
+        } catch (syncError) {
+          console.error('[server-api] ❌ Erreur lors de la synchronisation de l\'utilisateur cloud:', syncError);
+          // Ne pas bloquer la connexion si la synchronisation échoue
+          // L'utilisateur sera créé de manière minimale plus tard si nécessaire
+        }
+      } else {
+        console.warn('[server-api] ⚠️ Informations utilisateur incomplètes, impossible de synchroniser:', {
+          hasId: !!result.user?.id,
+          hasEmail: !!result.user?.email,
+        });
+      }
+
       // Les tokens cloud sont déjà stockés et fonctionnent
       // Pour les appels au backend local, on peut utiliser les tokens cloud directement
       // car ils sont valides et signés avec le secret JWT de l'utilisateur
