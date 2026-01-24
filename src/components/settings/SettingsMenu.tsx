@@ -1,6 +1,7 @@
 import { useState } from 'preact/hooks';
 import { Monitor, Search, User, Palette, RefreshCw, Settings, Activity } from 'lucide-preact';
 import PageHeader from '../ui/PageHeader';
+import VersionInfo from './VersionInfo';
 
 interface SettingsCard {
   id: string;
@@ -151,6 +152,11 @@ export default function SettingsMenu() {
             </a>
           );
         })}
+      </div>
+
+      {/* Informations de version */}
+      <div class="mt-8">
+        <VersionInfo client:only="preact" />
       </div>
     </div>
   );

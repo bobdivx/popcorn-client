@@ -32,6 +32,15 @@ fn log_message(message: String) {
     println!("{message}");
 }
 
+#[tauri::command(rename = "get-app-version")]
+fn get_app_version(app: tauri::AppHandle) -> Result<String, String> {
+    // Récupérer la version depuis la configuration Tauri
+    // Cette version est celle définie dans tauri.conf.json ou tauri.android.mobile.conf.json
+    // et synchronisée avec VERSION.json pendant le build GitHub Actions
+    let package_info = app.package_info();
+    Ok(package_info.version.to_string())
+}
+
 #[derive(serde::Serialize)]
 struct NativeFetchResponse {
     status: u16,
@@ -178,7 +187,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
-        .invoke_handler(tauri::generate_handler![get_platform, log_message, native_fetch])
+        .invoke_handler(tauri::generate_handler![get_platform, log_message, native_fetch, get_app_version])
         .setup(|_app| {
             // #region agent log
             println!("[popcorn-debug] Tauri app setup complete, commands registered");

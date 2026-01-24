@@ -1,23 +1,30 @@
 name: Android TV Build (APK + AAB)
 
+# Ce workflow ne se lance QUE manuellement pour éviter les conflits avec le build Mobile
 on:
-  push:
-    branches:
-      - main
-      - master
-    tags:
-      - 'v*'
-  pull_request:
-    branches:
-      - main
-      - master
   workflow_dispatch:  # Permet de déclencher manuellement depuis l'interface GitHub
+    inputs:
+      build_type:
+        description: 'Type de build'
+        required: true
+        default: 'apk'
+        type: choice
+        options:
+          - apk
+          - aab
+          - both
+
+env:
+  # Configuration pour éviter les erreurs DNS EAI_AGAIN avec Azure Blob Storage
+  NODE_OPTIONS: "--dns-result-order=ipv4first"
 
 jobs:
   # Job 1: Build APK TV
   build-apk-tv:
     runs-on: self-hosted
     environment: production
+    # Exécuter si build_type est 'apk' ou 'both'
+    if: ${{ inputs.build_type == 'apk' || inputs.build_type == 'both' }}
     permissions:
       contents: write
 
@@ -27,7 +34,7 @@ jobs:
 
       - name: Increment client version in VERSION.json
         id: increment_version
-        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v')
+        # Toujours incrémenter car c'est un workflow manuel
         run: |
           if [ -f "VERSION.json" ]; then
             # Lire la version actuelle
@@ -81,7 +88,7 @@ jobs:
           fi
 
       - name: Commit version update
-        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v') && steps.increment_version.outputs.version != ''
+        if: steps.increment_version.outputs.version != ''
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -286,11 +293,13 @@ jobs:
           path: ${{ steps.rename-apk.outputs.path }}
           retention-days: 30
 
-  # Job 2: Build AAB TV (dépend de l'APK)
+  # Job 2: Build AAB TV
   build-aab-tv:
     needs: build-apk-tv
     runs-on: self-hosted
     environment: production
+    # Exécuter si build_type est 'aab' ou 'both' (même si APK est skippé)
+    if: ${{ always() && (inputs.build_type == 'aab' || inputs.build_type == 'both') }}
     permissions:
       contents: write
 
@@ -539,7 +548,8 @@ jobs:
     needs: [build-apk-tv, build-aab-tv]
     runs-on: self-hosted
     environment: production
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+    # Exécuter seulement si au moins un des builds a réussi
+    if: ${{ always() && (needs.build-apk-tv.result == 'success' || needs.build-aab-tv.result == 'success') }}
     permissions:
       contents: write
 

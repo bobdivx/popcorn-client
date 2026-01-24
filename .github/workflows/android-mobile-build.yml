@@ -13,6 +13,10 @@ on:
       - master
   workflow_dispatch:  # Permet de déclencher manuellement depuis l'interface GitHub
 
+env:
+  # Configuration pour éviter les erreurs DNS EAI_AGAIN avec Azure Blob Storage
+  NODE_OPTIONS: "--dns-result-order=ipv4first"
+
 jobs:
   # Job 1: Build APK Mobile
   build-apk-mobile:
@@ -117,8 +121,35 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Set version environment variables
+        run: |
+          if [ -f "VERSION.json" ]; then
+            CLIENT_VERSION=$(jq -r '.client.version' VERSION.json)
+            CLIENT_BUILD=$(jq -r '.client.build' VERSION.json)
+            echo "PUBLIC_APP_VERSION=$CLIENT_VERSION" >> $GITHUB_ENV
+            echo "PUBLIC_APP_VERSION_CODE=$CLIENT_BUILD" >> $GITHUB_ENV
+            echo "✅ Versions définies: v$CLIENT_VERSION (build $CLIENT_BUILD)"
+          else
+            echo "⚠️ VERSION.json introuvable, utilisation des valeurs par défaut"
+            echo "PUBLIC_APP_VERSION=1.0.1" >> $GITHUB_ENV
+            echo "PUBLIC_APP_VERSION_CODE=1" >> $GITHUB_ENV
+          fi
+
+      - name: Copy VERSION.json to public directory
+        run: |
+          if [ -f "VERSION.json" ]; then
+            mkdir -p public
+            cp VERSION.json public/VERSION.json
+            echo "✅ VERSION.json copié dans public/"
+          else
+            echo "⚠️ VERSION.json introuvable, impossible de copier"
+          fi
+
       - name: Build Astro frontend
         run: npm run build
+        env:
+          PUBLIC_APP_VERSION: ${{ env.PUBLIC_APP_VERSION }}
+          PUBLIC_APP_VERSION_CODE: ${{ env.PUBLIC_APP_VERSION_CODE }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -334,8 +365,35 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Set version environment variables
+        run: |
+          if [ -f "VERSION.json" ]; then
+            CLIENT_VERSION=$(jq -r '.client.version' VERSION.json)
+            CLIENT_BUILD=$(jq -r '.client.build' VERSION.json)
+            echo "PUBLIC_APP_VERSION=$CLIENT_VERSION" >> $GITHUB_ENV
+            echo "PUBLIC_APP_VERSION_CODE=$CLIENT_BUILD" >> $GITHUB_ENV
+            echo "✅ Versions définies: v$CLIENT_VERSION (build $CLIENT_BUILD)"
+          else
+            echo "⚠️ VERSION.json introuvable, utilisation des valeurs par défaut"
+            echo "PUBLIC_APP_VERSION=1.0.1" >> $GITHUB_ENV
+            echo "PUBLIC_APP_VERSION_CODE=1" >> $GITHUB_ENV
+          fi
+
+      - name: Copy VERSION.json to public directory
+        run: |
+          if [ -f "VERSION.json" ]; then
+            mkdir -p public
+            cp VERSION.json public/VERSION.json
+            echo "✅ VERSION.json copié dans public/"
+          else
+            echo "⚠️ VERSION.json introuvable, impossible de copier"
+          fi
+
       - name: Build Astro frontend
         run: npm run build
+        env:
+          PUBLIC_APP_VERSION: ${{ env.PUBLIC_APP_VERSION }}
+          PUBLIC_APP_VERSION_CODE: ${{ env.PUBLIC_APP_VERSION_CODE }}
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
