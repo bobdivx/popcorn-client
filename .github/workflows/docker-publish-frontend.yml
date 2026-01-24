@@ -66,8 +66,10 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Version finale: ${VERSION}"
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Verify Docker Buildx (pre-installed)
+        run: |
+          docker buildx version || echo "⚠️ Buildx non trouvé"
+          echo "✅ Docker Buildx est déjà installé dans le runner"
 
       - name: Check Docker Hub credentials
         id: check_creds

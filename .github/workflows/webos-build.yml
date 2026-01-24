@@ -25,11 +25,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+      - name: Verify Node.js (pre-installed)
+        run: |
+          node --version
+          npm --version
+          echo "✅ Node.js et npm sont déjà installés dans le runner"
 
       - name: Install dependencies
         run: npm ci
@@ -167,11 +167,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+      - name: Verify Node.js (pre-installed)
+        run: |
+          node --version
+          npm --version
+          echo "✅ Node.js et npm sont déjà installés dans le runner"
 
       - name: Download WebOS structure artifact
         uses: actions/download-artifact@v4

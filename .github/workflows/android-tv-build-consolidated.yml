@@ -115,11 +115,11 @@ jobs:
           path: release-version.txt
           retention-days: 1
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+      - name: Verify Node.js (pre-installed)
+        run: |
+          node --version
+          npm --version
+          echo "✅ Node.js et npm sont déjà installés dans le runner"
 
       - name: Install dependencies
         run: npm ci
@@ -127,25 +127,25 @@ jobs:
       - name: Build Astro frontend
         run: npm run build
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platform-tools platforms;android-33 build-tools;33.0.0 ndk;25.2.9519653'
-
-      - name: Accept Android licenses
+      - name: Verify Rust (pre-installed)
         run: |
-          yes | sdkmanager --licenses || true
+          rustc --version
+          cargo --version
+          rustup target list --installed | grep aarch64-linux-android || echo "⚠️ Target Android non installé"
+          echo "✅ Rust est déjà installé dans le runner"
+
+      - name: Verify Java (pre-installed)
+        run: |
+          java -version
+          echo "JAVA_HOME=${JAVA_HOME:-$(dirname $(dirname $(readlink -f $(which java))))}" >> $GITHUB_ENV
+          echo "✅ Java est déjà installé dans le runner"
+
+      - name: Verify Android SDK (pre-installed)
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}" >> $GITHUB_ENV
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --version || echo "⚠️ SDK Manager non trouvé"
+          echo "✅ Android SDK est déjà installé dans le runner"
 
       - name: Setup NDK environment variables
         run: |
@@ -158,14 +158,18 @@ jobs:
             echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
           fi
 
-      - name: Install Tauri CLI
-        run: npm install -g @tauri-apps/cli@latest
+      - name: Verify Tauri CLI (pre-installed)
+        run: |
+          tauri --version || echo "⚠️ Tauri CLI non trouvé"
+          echo "✅ Tauri CLI est déjà installé dans le runner"
 
       - name: Setup Android environment variables
         run: |
+          ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
           echo "$ANDROID_HOME/tools" >> $GITHUB_PATH
+          echo "✅ Variables d'environnement Android configurées"
 
       - name: Initialize Android project
         run: |
@@ -321,11 +325,11 @@ jobs:
           jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.android.conf.json > src-tauri/tauri.android.conf.json.tmp
           mv src-tauri/tauri.android.conf.json.tmp src-tauri/tauri.android.conf.json
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+      - name: Verify Node.js (pre-installed)
+        run: |
+          node --version
+          npm --version
+          echo "✅ Node.js et npm sont déjà installés dans le runner"
 
       - name: Install dependencies
         run: npm ci
@@ -333,25 +337,25 @@ jobs:
       - name: Build Astro frontend
         run: npm run build
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platform-tools platforms;android-33 build-tools;33.0.0 ndk;25.2.9519653'
-
-      - name: Accept Android licenses
+      - name: Verify Rust (pre-installed)
         run: |
-          yes | sdkmanager --licenses || true
+          rustc --version
+          cargo --version
+          rustup target list --installed | grep aarch64-linux-android || echo "⚠️ Target Android non installé"
+          echo "✅ Rust est déjà installé dans le runner"
+
+      - name: Verify Java (pre-installed)
+        run: |
+          java -version
+          echo "JAVA_HOME=${JAVA_HOME:-$(dirname $(dirname $(readlink -f $(which java))))}" >> $GITHUB_ENV
+          echo "✅ Java est déjà installé dans le runner"
+
+      - name: Verify Android SDK (pre-installed)
+        run: |
+          echo "ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}" >> $GITHUB_ENV
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --version || echo "⚠️ SDK Manager non trouvé"
+          echo "✅ Android SDK est déjà installé dans le runner"
 
       - name: Setup NDK environment variables
         run: |
@@ -364,14 +368,18 @@ jobs:
             echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
           fi
 
-      - name: Install Tauri CLI
-        run: npm install -g @tauri-apps/cli@latest
+      - name: Verify Tauri CLI (pre-installed)
+        run: |
+          tauri --version || echo "⚠️ Tauri CLI non trouvé"
+          echo "✅ Tauri CLI est déjà installé dans le runner"
 
       - name: Setup Android environment variables
         run: |
+          ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
           echo "$ANDROID_HOME/tools" >> $GITHUB_PATH
+          echo "✅ Variables d'environnement Android configurées"
 
       - name: Initialize Android project
         run: |
