@@ -205,21 +205,36 @@ jobs:
             echo "🔧 Installation de ares-cli..."
             npm install -g ares-cli
             
-            # Vérifier que l'installation a réussi
-            if command -v ares-package &> /dev/null; then
+            # Trouver le chemin d'installation global de npm
+            NPM_GLOBAL_BIN=$(npm bin -g)
+            NPM_GLOBAL_PREFIX=$(npm config get prefix)
+            
+            echo "💡 Chemins npm:"
+            echo "  npm bin -g: $NPM_GLOBAL_BIN"
+            echo "  npm prefix: $NPM_GLOBAL_PREFIX"
+            
+            # Ajouter tous les chemins possibles au PATH
+            export PATH="$NPM_GLOBAL_BIN:$NPM_GLOBAL_PREFIX/bin:$PATH"
+            
+            # Vérifier que l'installation a réussi avec npx (plus fiable)
+            if npx -y ares-package --version &> /dev/null; then
+              echo "✅ ares-cli installé avec succès (vérifié via npx)"
+              npx -y ares-package --version || true
+            elif command -v ares-package &> /dev/null; then
               echo "✅ ares-cli installé avec succès"
               ares-package --version || true
             else
               echo "❌ ares-package n'est pas disponible après l'installation"
               echo "💡 Vérification du PATH..."
               echo "PATH: $PATH"
-              echo "npm global bin: $(npm config get prefix)/bin"
               which ares-package || echo "ares-package non trouvé dans PATH"
               
-              # Essayer d'ajouter npm global bin au PATH
-              export PATH="$(npm config get prefix)/bin:$PATH"
-              if command -v ares-package &> /dev/null; then
-                echo "✅ ares-package trouvé après mise à jour du PATH"
+              # Vérifier où ares-cli a été installé
+              npm list -g ares-cli || echo "ares-cli non trouvé dans les packages globaux"
+              
+              # Essayer avec npx comme solution de secours
+              if npx -y ares-package --version &> /dev/null; then
+                echo "✅ ares-package fonctionne via npx"
               else
                 echo "❌ Échec de l'installation de ares-cli"
                 exit 1
@@ -230,18 +245,33 @@ jobs:
       - name: Build IPK
         run: |
           # S'assurer que ares-package est dans le PATH
-          export PATH="$(npm config get prefix)/bin:$PATH"
+          NPM_GLOBAL_BIN=$(npm bin -g)
+          NPM_GLOBAL_PREFIX=$(npm config get prefix)
+          export PATH="$NPM_GLOBAL_BIN:$NPM_GLOBAL_PREFIX/bin:$PATH"
+          
+          # Fonction pour exécuter ares-package (utilise npx si nécessaire)
+          run_ares_package() {
+            if command -v ares-package &> /dev/null; then
+              ares-package "$@"
+            else
+              echo "⚠️ Utilisation de npx pour exécuter ares-package"
+              npx -y ares-package "$@"
+            fi
+          }
           
           # Vérifier que ares-package est disponible
-          if ! command -v ares-package &> /dev/null; then
+          if command -v ares-package &> /dev/null; then
+            echo "✅ ares-package disponible: $(which ares-package)"
+            ares-package --version || true
+          elif npx -y ares-package --version &> /dev/null; then
+            echo "✅ ares-package disponible via npx"
+            npx -y ares-package --version || true
+          else
             echo "❌ ares-package n'est toujours pas disponible"
             echo "PATH actuel: $PATH"
             which ares-package || echo "ares-package non trouvé"
             exit 1
           fi
-          
-          echo "✅ ares-package disponible: $(which ares-package)"
-          ares-package --version || true
           
           # Vérifier que le dossier webos existe
           if [ ! -d "webos" ]; then
@@ -263,7 +293,7 @@ jobs:
           
           echo "📦 Packaging de l'application WebOS en IPK..."
           cd webos
-          ares-package .
+          run_ares_package .
           
           if [ $? -ne 0 ]; then
             echo "❌ Échec du packaging IPK"

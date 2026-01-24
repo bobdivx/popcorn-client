@@ -153,11 +153,6 @@ export default function Navbar() {
             previousStatsRef.current = {};
           }
           
-          // Debug: log pour vérifier les valeurs
-          if (inProgress && progress > 0) {
-            console.log('[NAVBAR SYNC]', { inProgress, progress, stats: data.stats, progressData: data.progress });
-          }
-          
           setSyncProgress({ inProgress, progress });
         } else {
           // Si pas de réponse ou erreur, réinitialiser
