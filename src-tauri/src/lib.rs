@@ -62,7 +62,8 @@ async fn native_fetch(
     body: Option<String>,
     timeout_ms: Option<u64>,
 ) -> Result<NativeFetchResponse, String> {
-    use tauri_plugin_http::reqwest;
+    // Utiliser reqwest directement (pas via tauri-plugin-http) pour contourner les limitations ACL
+    use reqwest;
 
     // #region agent log
     println!("[popcorn-debug] native-fetch ENTRY url={}, method={:?}, has_headers={}, has_body={}", 

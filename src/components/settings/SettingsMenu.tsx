@@ -156,7 +156,7 @@ export default function SettingsMenu() {
 
       {/* Informations de version */}
       <div class="mt-8">
-        <VersionInfo client:only="preact" />
+        <VersionInfo />
       </div>
     </div>
   );
