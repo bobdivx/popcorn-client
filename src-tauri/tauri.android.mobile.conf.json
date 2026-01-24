@@ -1,6 +1,6 @@
 {
   "productName": "Popcorn Mobile",
-  "version": "1.0.29",
+  "version": "1.0.30",
   "identifier": "com.popcorn.client.mobile",
   "build": {
     "beforeDevCommand": "npm run dev",
