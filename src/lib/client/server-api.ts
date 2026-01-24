@@ -415,9 +415,9 @@ class ServerApiClient {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         // Log pour debug : voir la réponse exacte du backend
-        if (typeof window !== 'undefined' && endpoint.includes('/auth/login')) {
+        if (typeof window !== 'undefined' && (endpoint.includes('/auth/login') || endpoint.includes('/sync/start'))) {
           const dataStr = JSON.stringify(data, null, 2);
-          console.error('[server-api] Erreur login backend:', {
+          console.error(`[server-api] Erreur backend (${endpoint}):`, {
             status: response.status,
             statusText: response.statusText,
             url,

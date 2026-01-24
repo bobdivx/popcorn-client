@@ -7,14 +7,6 @@
     "core:default",
     "custom-commands",
     {
-      "identifier": "core:allow-invoke",
-      "allow": [
-        { "name": "native-fetch" },
-        { "name": "get-platform" },
-        { "name": "log-message" }
-      ]
-    },
-    {
       "identifier": "http:default",
       "allow": [
         { "url": "http://*/*" },

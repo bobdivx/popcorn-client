@@ -510,15 +510,26 @@ export default function TorrentSyncManager() {
           loadIndexers();
         }, 1000);
       } else {
+        // Logger la réponse complète pour le debug
+        console.error('[TorrentSyncManager] Erreur lors du démarrage de la sync:', {
+          success: response.success,
+          error: response.error,
+          message: response.message,
+          fullResponse: response,
+        });
+        
         // Améliorer le message d'erreur pour les erreurs 400
-        let errorMessage = response.message || 'Erreur lors du démarrage de la synchronisation';
-        if (response.error === 'BadRequest' || errorMessage.includes('indexer') || errorMessage.includes('TMDB')) {
-          if (errorMessage.includes('indexer')) {
-            errorMessage = '⚠️ Aucun indexer activé dans le backend Rust. Les indexers configurés dans le wizard doivent être synchronisés avec le backend.';
-          } else if (errorMessage.includes('TMDB')) {
-            errorMessage = '⚠️ Aucun token TMDB configuré dans le backend Rust. La clé TMDB doit être synchronisée avec le backend.';
-          }
+        let errorMessage = response.message || response.error || 'Erreur lors du démarrage de la synchronisation';
+        
+        // Messages d'erreur spécifiques selon le contenu
+        if (errorMessage.includes('indexer') || errorMessage.toLowerCase().includes('aucun indexer')) {
+          errorMessage = '⚠️ Aucun indexer activé dans le backend Rust. Les indexers configurés dans le wizard doivent être synchronisés avec le backend.';
+        } else if (errorMessage.includes('TMDB') || errorMessage.toLowerCase().includes('token') || errorMessage.toLowerCase().includes('clé')) {
+          errorMessage = '⚠️ Aucun token TMDB configuré dans le backend Rust. La clé TMDB doit être synchronisée avec le backend.';
+        } else if (errorMessage.includes('déjà en cours') || errorMessage.toLowerCase().includes('already')) {
+          errorMessage = '⚠️ Une synchronisation est déjà en cours. Veuillez attendre qu\'elle se termine.';
         }
+        
         setError(errorMessage);
         // Notification native d'erreur
         await notifySyncError(errorMessage);
