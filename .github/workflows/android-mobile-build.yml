@@ -118,6 +118,17 @@ jobs:
           npm --version
           echo "✅ Node.js et npm sont déjà installés dans le runner"
 
+      - name: Fix npm cache permissions
+        run: |
+          # Corriger les permissions du cache npm si nécessaire
+          if [ -d "$HOME/.npm" ]; then
+            sudo chown -R $(id -u):$(id -g) "$HOME/.npm" || true
+          fi
+          # Créer le cache npm avec les bonnes permissions
+          mkdir -p "$HOME/.npm/_cacache" "$HOME/.npm/_logs"
+          chmod -R u+w "$HOME/.npm" || true
+          echo "✅ Permissions npm corrigées"
+
       - name: Install dependencies
         run: npm ci
 
@@ -161,18 +172,37 @@ jobs:
       - name: Verify Java (pre-installed)
         run: |
           java -version
-          echo "JAVA_HOME=${JAVA_HOME:-$(dirname $(dirname $(readlink -f $(which java))))}" >> $GITHUB_ENV
+          # Trouver JAVA_HOME correctement
+          if [ -z "$JAVA_HOME" ]; then
+            JAVA_PATH=$(readlink -f $(which java) 2>/dev/null || which java)
+            if [ -n "$JAVA_PATH" ]; then
+              JAVA_HOME=$(dirname $(dirname "$JAVA_PATH"))
+              echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+            else
+              # Fallback pour Temurin
+              JAVA_HOME="/usr/lib/jvm/temurin-17-jdk-amd64"
+              echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+            fi
+          else
+            echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+          fi
+          echo "JAVA_HOME=$JAVA_HOME"
           echo "✅ Java est déjà installé dans le runner"
 
       - name: Verify Android SDK (pre-installed)
         run: |
-          echo "ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}" >> $GITHUB_ENV
+          ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
+          ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --version || echo "⚠️ SDK Manager non trouvé"
           echo "✅ Android SDK est déjà installé dans le runner"
 
       - name: Setup NDK environment variables
         run: |
+          ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
           NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -type d -name "25.2.9519653" 2>/dev/null | head -n 1)
           if [ -z "$NDK_PATH" ]; then
             NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -type d 2>/dev/null | head -n 1)
@@ -194,10 +224,15 @@ jobs:
       - name: Setup Android environment variables
         run: |
           ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
+          ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
           echo "$ANDROID_HOME/tools" >> $GITHUB_PATH
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           echo "✅ Variables d'environnement Android configurées"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
       - name: Initialize Android project
         run: |
@@ -271,8 +306,48 @@ jobs:
       - name: Patch AndroidManifest for cleartext traffic
         run: npm run patch:android || echo "⚠️ Patch AndroidManifest non appliqué (peut-être déjà fait)"
 
+      - name: Diagnostic environment before build
+        run: |
+          echo "=== Diagnostic de l'environnement ==="
+          echo "ANDROID_HOME=${ANDROID_HOME}"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}"
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_HOME}"
+          echo "JAVA_HOME=${JAVA_HOME}"
+          echo "PATH=${PATH}"
+          echo ""
+          echo "=== Vérification des outils ==="
+          which java && java -version || echo "❌ Java non trouvé"
+          which sdkmanager && sdkmanager --version || echo "❌ SDK Manager non trouvé"
+          ls -la ${ANDROID_HOME}/build-tools/ || echo "❌ build-tools non trouvé"
+          ls -la ${ANDROID_HOME}/platform-tools/ || echo "❌ platform-tools non trouvé"
+          echo ""
+          echo "=== Vérification Gradle ==="
+          if [ -f "src-tauri/gen/android/gradlew" ]; then
+            chmod +x src-tauri/gen/android/gradlew
+            echo "✅ gradlew trouvé et exécutable"
+          else
+            echo "⚠️ gradlew non trouvé (sera créé par tauri)"
+          fi
+
       - name: Build Android APK
-        run: npm run tauri:build:android-mobile
+        run: |
+          set -e
+          echo "🚀 Démarrage du build Android APK..."
+          echo "ANDROID_HOME=${ANDROID_HOME}"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}"
+          echo "JAVA_HOME=${JAVA_HOME}"
+          npm run tauri:build:android-mobile || {
+            EXIT_CODE=$?
+            echo "❌ Build échoué avec le code: $EXIT_CODE"
+            echo "=== Logs Gradle (si disponibles) ==="
+            if [ -f "src-tauri/gen/android/app/build.gradle.kts" ]; then
+              echo "build.gradle.kts existe"
+            fi
+            if [ -d "src-tauri/gen/android/app/build" ]; then
+              find src-tauri/gen/android/app/build -name "*.log" -type f | head -5 | xargs cat 2>/dev/null || true
+            fi
+            exit $EXIT_CODE
+          }
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
@@ -366,6 +441,17 @@ jobs:
           npm --version
           echo "✅ Node.js et npm sont déjà installés dans le runner"
 
+      - name: Fix npm cache permissions
+        run: |
+          # Corriger les permissions du cache npm si nécessaire
+          if [ -d "$HOME/.npm" ]; then
+            sudo chown -R $(id -u):$(id -g) "$HOME/.npm" || true
+          fi
+          # Créer le cache npm avec les bonnes permissions
+          mkdir -p "$HOME/.npm/_cacache" "$HOME/.npm/_logs"
+          chmod -R u+w "$HOME/.npm" || true
+          echo "✅ Permissions npm corrigées"
+
       - name: Install dependencies
         run: npm ci
 
@@ -409,13 +495,31 @@ jobs:
       - name: Verify Java (pre-installed)
         run: |
           java -version
-          echo "JAVA_HOME=${JAVA_HOME:-$(dirname $(dirname $(readlink -f $(which java))))}" >> $GITHUB_ENV
+          # Trouver JAVA_HOME correctement
+          if [ -z "$JAVA_HOME" ]; then
+            JAVA_PATH=$(readlink -f $(which java) 2>/dev/null || which java)
+            if [ -n "$JAVA_PATH" ]; then
+              JAVA_HOME=$(dirname $(dirname "$JAVA_PATH"))
+              echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+            else
+              # Fallback pour Temurin
+              JAVA_HOME="/usr/lib/jvm/temurin-17-jdk-amd64"
+              echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+            fi
+          else
+            echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+          fi
+          echo "JAVA_HOME=$JAVA_HOME"
           echo "✅ Java est déjà installé dans le runner"
 
       - name: Verify Android SDK (pre-installed)
         run: |
-          echo "ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}" >> $GITHUB_ENV
+          ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
+          ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
           $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --version || echo "⚠️ SDK Manager non trouvé"
           echo "✅ Android SDK est déjà installé dans le runner"
 
@@ -438,10 +542,15 @@ jobs:
       - name: Setup Android environment variables
         run: |
           ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
+          ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
           echo "$ANDROID_HOME/tools" >> $GITHUB_PATH
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
           echo "✅ Variables d'environnement Android configurées"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
       - name: Initialize Android project
         run: |

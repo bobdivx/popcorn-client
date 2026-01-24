@@ -31,6 +31,17 @@ jobs:
           npm --version
           echo "✅ Node.js et npm sont déjà installés dans le runner"
 
+      - name: Fix npm cache permissions
+        run: |
+          # Corriger les permissions du cache npm si nécessaire
+          if [ -d "$HOME/.npm" ]; then
+            sudo chown -R $(id -u):$(id -g) "$HOME/.npm" || true
+          fi
+          # Créer le cache npm avec les bonnes permissions
+          mkdir -p "$HOME/.npm/_cacache" "$HOME/.npm/_logs"
+          chmod -R u+w "$HOME/.npm" || true
+          echo "✅ Permissions npm corrigées"
+
       - name: Install dependencies
         run: npm ci
 
