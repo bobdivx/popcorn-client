@@ -89,6 +89,25 @@ jobs:
           git commit -m "chore: bump client version to ${{ steps.increment_version.outputs.version }}" || echo "Aucun changement à commiter"
           git push || echo "Push échoué (peut-être déjà à jour)"
 
+      - name: Prepare release version artifact
+        id: release_version
+        run: |
+          if [ -n "${{ steps.increment_version.outputs.version }}" ]; then
+            VERSION="${{ steps.increment_version.outputs.version }}"
+          else
+            VERSION=$(jq -r '.version' src-tauri/tauri.android.conf.json)
+          fi
+          echo "$VERSION" > release-version.txt
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📌 Version pour release: $VERSION"
+
+      - name: Upload release version artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-version
+          path: release-version.txt
+          retention-days: 1
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -275,6 +294,20 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Download release version artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-version
+          path: .
+
+      - name: Apply release version to configs
+        run: |
+          VERSION=$(cat release-version.txt)
+          echo "📌 Application de la version $VERSION (alignée avec l'APK TV)"
+          jq --arg v "$VERSION" '.client.version = $v' VERSION.json > VERSION.json.tmp && mv VERSION.json.tmp VERSION.json
+          jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.android.conf.json > src-tauri/tauri.android.conf.json.tmp
+          mv src-tauri/tauri.android.conf.json.tmp src-tauri/tauri.android.conf.json
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -508,10 +541,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Download release version artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-version
+          path: .
+
       - name: Get version
         id: version
         run: |
-          VERSION=$(jq -r '.version' src-tauri/tauri.android.conf.json)
+          VERSION=$(cat release-version.txt)
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Version: ${VERSION}"
 
@@ -531,7 +570,6 @@ jobs:
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG="${{ github.ref_name }}"
           else
-            # Utiliser la version de l'application, pas un format nightly
             TAG="v${{ steps.version.outputs.version }}"
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT

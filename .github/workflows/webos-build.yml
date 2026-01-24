@@ -110,35 +110,26 @@ jobs:
             echo "build=1" >> $GITHUB_OUTPUT
           fi
 
-      - name: Get version
-        id: version
-        if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/v')
+      - name: Resolve version (increment ou VERSION.json)
+        id: resolve_version
         run: |
-          if [ -f "VERSION.json" ]; then
-            VERSION=$(jq -r '.client.version' VERSION.json)
-            echo "version=${VERSION}" >> $GITHUB_OUTPUT
-            echo "Version: ${VERSION}"
+          if [ -n "${{ steps.increment_version.outputs.version }}" ]; then
+            VERSION="${{ steps.increment_version.outputs.version }}"
           else
-            echo "⚠️ VERSION.json introuvable"
-            exit 1
+            VERSION=$(jq -r '.client.version' VERSION.json)
           fi
+          echo "$VERSION" > release-version.txt
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📌 Version: $VERSION"
 
       - name: Prepare WebOS structure
         run: |
-          # Créer le dossier frontend dans webos/
           mkdir -p webos/frontend
-          
-          # Copier le frontend buildé
           cp -r dist/* webos/frontend/
-          
-          # Copier les icônes
           cp src-tauri/icons/icon.png webos/icon.png
           cp src-tauri/icons/icon.png webos/icon-large.png
-          
-          # Mettre à jour appinfo.json avec la version
-          jq --arg version "${{ steps.version.outputs.version }}" '.version = $version' webos/appinfo.json > webos/appinfo.json.tmp
+          jq --arg version "${{ steps.resolve_version.outputs.version }}" '.version = $version' webos/appinfo.json > webos/appinfo.json.tmp
           mv webos/appinfo.json.tmp webos/appinfo.json
-          
           echo "✅ Structure WebOS préparée"
 
       - name: Commit version update
@@ -156,6 +147,13 @@ jobs:
           name: popcorn-webos-structure
           path: webos/
           retention-days: 7
+
+      - name: Upload release version artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-version
+          path: release-version.txt
+          retention-days: 1
 
   # Job 3: Build IPK with ares-package
   build-ipk:
@@ -337,17 +335,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Download release version artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-version
+          path: .
+
       - name: Get version
         id: version
         run: |
-          if [ -f "VERSION.json" ]; then
-            VERSION=$(jq -r '.client.version' VERSION.json)
-            echo "version=${VERSION}" >> $GITHUB_OUTPUT
-            echo "Version: ${VERSION}"
-          else
-            echo "⚠️ VERSION.json introuvable"
-            exit 1
-          fi
+          VERSION=$(cat release-version.txt)
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
 
       - name: Get build date and commit info
         id: build-info
@@ -365,7 +364,6 @@ jobs:
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG="${{ github.ref_name }}"
           else
-            # Utiliser la version de l'application, pas un format nightly
             TAG="v${{ steps.version.outputs.version }}"
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
