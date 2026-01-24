@@ -233,6 +233,9 @@ jobs:
             python3 scripts/apply-signing-config.py "$BUILD_GRADLE"
           fi
 
+      - name: Patch AndroidManifest for cleartext traffic
+        run: npm run patch:android || echo "⚠️ Patch AndroidManifest non appliqué (peut-être déjà fait)"
+
       - name: Build Android APK
         run: npm run tauri:build:android-mobile
         env:

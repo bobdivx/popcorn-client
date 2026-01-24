@@ -221,6 +221,9 @@ jobs:
             python3 scripts/apply-signing-config-tv.py "$BUILD_GRADLE"
           fi
 
+      - name: Patch AndroidManifest for cleartext traffic
+        run: npm run patch:android || echo "⚠️ Patch AndroidManifest non appliqué (peut-être déjà fait)"
+
       - name: Build Android TV APK
         run: npm run tauri:build:android-tv
         env:
@@ -421,6 +424,9 @@ jobs:
           if ! grep -q "signingConfigs" "$BUILD_GRADLE"; then
             python3 scripts/apply-signing-config-tv.py "$BUILD_GRADLE"
           fi
+
+      - name: Patch AndroidManifest for cleartext traffic (AAB)
+        run: npm run patch:android || echo "⚠️ Patch AndroidManifest non appliqué (peut-être déjà fait)"
 
       - name: Build Android TV AAB
         run: npm run tauri:build:android-tv:aab
