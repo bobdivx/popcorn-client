@@ -1,6 +1,6 @@
 {
   "productName": "Popcorn TV",
-  "version": "1.0.1",
+  "version": "1.0.28",
   "identifier": "com.popcorn.client.tv",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -19,7 +19,9 @@
     ],
     "security": {
       "csp": null,
-      "capabilities": ["main"]
+      "capabilities": [
+        "main"
+      ]
     }
   },
   "bundle": {
