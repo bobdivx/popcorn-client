@@ -1,7 +1,7 @@
 {
   "client": {
-    "version": "1.0.50",
-    "build": 50
+    "version": "1.0.51",
+    "build": 51
   },
   "server": {
     "version": "1.0.1",
