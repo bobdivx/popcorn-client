@@ -162,6 +162,10 @@ export function useTrailerImmersive({
       onTrailerStop?.();
     };
 
+    // Utiliser focusin/focusout qui remontent (bubble) dans le DOM
+    // Cela permet de détecter le focus sur les enfants (ex: <a> dans FocusableCard)
+    element.addEventListener('focusin', handleFocus);
+    element.addEventListener('focusout', handleBlur);
     element.addEventListener('focus', handleFocus);
     element.addEventListener('blur', handleBlur);
     element.addEventListener('mouseenter', handleFocus);
@@ -169,6 +173,8 @@ export function useTrailerImmersive({
 
     return () => {
       observer.disconnect();
+      element.removeEventListener('focusin', handleFocus);
+      element.removeEventListener('focusout', handleBlur);
       element.removeEventListener('focus', handleFocus);
       element.removeEventListener('blur', handleBlur);
       element.removeEventListener('mouseenter', handleFocus);

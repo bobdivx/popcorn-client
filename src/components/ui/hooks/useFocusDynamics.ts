@@ -152,19 +152,29 @@ export function useFocusDynamics({
         }
       };
 
+      // Utiliser focusin/focusout qui remontent (bubble) dans le DOM
+      // Cela permet de détecter le focus sur les enfants (ex: <a> dans FocusableCard)
+      element.addEventListener('focusin', handleFocus);
+      element.addEventListener('focusout', handleBlur);
+      
+      // Aussi écouter focus/blur direct pour les cas où l'élément est lui-même focusé
       element.addEventListener('focus', handleFocus);
       element.addEventListener('blur', handleBlur);
 
       // Gérer aussi le focus via mouse (pour compatibilité)
       const handleMouseEnter = () => {
-        if (document.activeElement !== element) {
-          element.focus();
+        // Chercher un élément focusable enfant ou utiliser l'élément lui-même
+        const focusTarget = element.querySelector('a, button, [tabindex]') as HTMLElement || element;
+        if (document.activeElement !== focusTarget && document.activeElement !== element) {
+          focusTarget.focus();
         }
       };
 
       element.addEventListener('mouseenter', handleMouseEnter);
 
       return () => {
+        element.removeEventListener('focusin', handleFocus);
+        element.removeEventListener('focusout', handleBlur);
         element.removeEventListener('focus', handleFocus);
         element.removeEventListener('blur', handleBlur);
         element.removeEventListener('mouseenter', handleMouseEnter);

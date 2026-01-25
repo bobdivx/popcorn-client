@@ -7,6 +7,25 @@
 </head>
 <body>
     <script>
+        // Gestion du relaunch webOS
+        // Quand l'utilisateur revient sur l'app après l'avoir quittée
+        document.addEventListener('webOSRelaunch', function(event) {
+            console.log('[webOS] Relaunch event received', event);
+            // Recharger la page pour réinitialiser l'état
+            window.location.reload();
+        });
+
+        // Gestion de la visibilité (retour de l'arrière-plan)
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                console.log('[webOS] App visible - returned from background');
+                // Si la page est vide ou figée, recharger
+                if (!document.body.innerHTML.trim() || document.body.children.length === 0) {
+                    window.location.reload();
+                }
+            }
+        });
+
         // Redirection directe vers Vercel
         // La navigation TV est intégrée dans le site Vercel
         window.location.href = "https://popcorn-vercel.vercel.app/";

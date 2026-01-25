@@ -49,17 +49,15 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
     disabled: !item.trailerUrl,
   });
 
-  // Synchroniser les refs
+  // Synchroniser les refs des hooks avec le conteneur
   useEffect(() => {
     if (cardContainerRef.current) {
-      if (focusRef.current) {
-        (focusRef.current as any).current = cardContainerRef.current;
-      }
-      if (trailerRef.current) {
-        (trailerRef.current as any).current = cardContainerRef.current;
-      }
+      // Assigner directement le conteneur aux refs des hooks
+      // Les hooks utilisent maintenant focusin/focusout qui remontent dans le DOM
+      (focusRef as any).current = cardContainerRef.current;
+      (trailerRef as any).current = cardContainerRef.current;
     }
-  }, []);
+  }, [focusRef, trailerRef]);
 
   useEffect(() => {
     if (item.poster && item.poster !== imageUrl) {

@@ -71,6 +71,7 @@ export default function TVNavigationProvider() {
       const currentRect = current.getBoundingClientRect();
       const currentCenterX = currentRect.left + currentRect.width / 2;
       const currentCenterY = currentRect.top + currentRect.height / 2;
+      const currentCarousel = current.closest('[data-carousel]');
 
       let bestElement: HTMLElement | null = null;
       let bestScore = Infinity;
@@ -118,6 +119,34 @@ export default function TVNavigationProvider() {
         if (score < bestScore) {
           bestScore = score;
           bestElement = el;
+        }
+      }
+
+      // Logique spéciale pour navigation vers un nouveau carrousel
+      // Quand on descend/monte vers un carrousel différent, prendre la première carte à gauche
+      if (bestElement && (direction === 'down' || direction === 'up')) {
+        const targetCarousel = bestElement.closest('[data-carousel]');
+        
+        // Si on entre dans un nouveau carrousel (différent du carrousel actuel)
+        if (targetCarousel && (!currentCarousel || !currentCarousel.isSameNode(targetCarousel))) {
+          // Trouver la première carte visible à gauche dans ce carrousel
+          const cardsInCarousel = Array.from(targetCarousel.querySelectorAll<HTMLElement>(
+            '[data-torrent-card] a, [data-torrent-card] button, .torrent-poster a, .torrent-poster button'
+          )).filter(el => {
+            const rect = el.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0 && elements.includes(el);
+          });
+          
+          if (cardsInCarousel.length > 0) {
+            // Trier par position X (gauche à droite)
+            cardsInCarousel.sort((a, b) => {
+              const rectA = a.getBoundingClientRect();
+              const rectB = b.getBoundingClientRect();
+              return rectA.left - rectB.left;
+            });
+            // Retourner la première carte (la plus à gauche)
+            return cardsInCarousel[0];
+          }
         }
       }
 
