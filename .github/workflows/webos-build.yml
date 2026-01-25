@@ -250,29 +250,31 @@ jobs:
           
           echo "📁 Préparation du package dans $TEMP_DIR..."
           
-          # Copier les fichiers de l'application dans le répertoire de données
-          mkdir -p "$TEMP_DIR/data/usr/palm/applications/$APP_ID"
-          cp -r webos/* "$TEMP_DIR/data/usr/palm/applications/$APP_ID/"
+          # Structure WebOS IPK : les fichiers doivent être à la RACINE de data.tar.gz
+          # PAS dans /usr/palm/applications/
+          mkdir -p "$TEMP_DIR/data"
+          cp -r webos/* "$TEMP_DIR/data/"
+          
+          # Afficher la structure pour debug
+          echo "📂 Structure de data/:"
+          ls -la "$TEMP_DIR/data/"
           
           # Créer le fichier control
           mkdir -p "$TEMP_DIR/control"
           cat > "$TEMP_DIR/control/control" << EOF
-          Package: $APP_ID
-          Version: $APP_VERSION
-          Section: misc
-          Priority: optional
-          Architecture: all
-          Installed-Size: $(du -sk webos | cut -f1)
-          Maintainer: Popcorn Team
-          Description: Popcorn Client for WebOS
-          webOS-Package-Format-Version: 2
-          webOS-Packager-Version: x.x.x
-          EOF
+Package: $APP_ID
+Version: $APP_VERSION
+Section: misc
+Priority: optional
+Architecture: all
+Installed-Size: $(du -sk webos | cut -f1)
+Maintainer: Popcorn Team
+Description: Popcorn Client for WebOS
+webOS-Package-Format-Version: 2
+webOS-Packager-Version: x.x.x
+EOF
           
-          # Supprimer les espaces en début de ligne dans control
-          sed -i 's/^[[:space:]]*//' "$TEMP_DIR/control/control"
-          
-          # Créer les archives tar
+          # Créer les archives tar (les fichiers doivent être à la racine)
           echo "📦 Création des archives..."
           cd "$TEMP_DIR/data"
           tar -czf ../data.tar.gz .
@@ -280,10 +282,15 @@ jobs:
           tar -czf ../control.tar.gz .
           cd "$TEMP_DIR"
           
+          # Vérifier le contenu de data.tar.gz
+          echo "📂 Contenu de data.tar.gz:"
+          tar -tzf data.tar.gz | head -20
+          
           # Créer le fichier debian-binary
           echo "2.0" > debian-binary
           
           # Créer l'IPK (qui est un ar archive)
+          # L'ordre est important : debian-binary DOIT être en premier
           echo "📦 Création de l'IPK..."
           ar -r "$IPK_NAME" debian-binary control.tar.gz data.tar.gz
           
