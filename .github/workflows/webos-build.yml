@@ -74,6 +74,20 @@ jobs:
       - name: Build Astro frontend
         run: npm run build
 
+      - name: Verify network connectivity
+        run: |
+          echo "🌐 Vérification de la connectivité réseau..."
+          for i in 1 2 3 4 5; do
+            if curl -s --max-time 10 https://github.com > /dev/null; then
+              echo "✅ Connectivité réseau OK"
+              exit 0
+            fi
+            echo "⚠️ Tentative $i/5 échouée, attente 5s..."
+            sleep 5
+          done
+          echo "❌ Problème de connectivité réseau persistant"
+          exit 1
+
       - name: Upload frontend artifact
         uses: actions/upload-artifact@v4
         with:
