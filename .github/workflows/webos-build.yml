@@ -248,56 +248,76 @@ jobs:
           }
           
           # Vérifier que l'installation a réussi
+          # ares-cli expose plusieurs commandes dans node_modules/.bin/
           if [ -f "node_modules/.bin/ares-package" ]; then
-            echo "✅ ares-cli installé localement"
+            echo "✅ ares-cli installé localement (binaire ares-package trouvé)"
             ./node_modules/.bin/ares-package --version || true
+          elif [ -f "node_modules/.bin/ares" ]; then
+            echo "✅ ares-cli installé localement (binaire ares trouvé)"
+            ./node_modules/.bin/ares package --version || true
           elif command -v ares-package &> /dev/null; then
             echo "✅ ares-cli installé globalement"
             ares-package --version || true
-          elif npx -y ares-package --version 2>&1 | grep -q "version"; then
-            echo "✅ ares-package fonctionne via npx"
-            npx -y ares-package --version || true
+          elif command -v ares &> /dev/null; then
+            echo "✅ ares-cli installé globalement (commande ares)"
+            ares package --version || true
+          elif npx ares-cli package --version 2>&1 | grep -qE "(version|ares)"; then
+            echo "✅ ares-cli fonctionne via npx"
+            npx ares-cli package --version || true
           else
-            echo "❌ ares-package n'est pas disponible après installation"
-            echo "💡 Tentative de diagnostic..."
-            npm list ares-cli || echo "ares-cli non trouvé dans node_modules"
-            which ares-package || echo "ares-package non trouvé dans PATH"
-            npx -y ares-package --version 2>&1 || echo "npx échoue aussi"
+            echo "❌ ares-cli n'est pas disponible après installation"
+            echo "💡 Diagnostic:"
+            npm list ares-cli || echo "  - ares-cli non trouvé dans node_modules"
+            ls -la node_modules/.bin/ | grep ares || echo "  - Aucun binaire ares dans node_modules/.bin/"
+            which ares-package || echo "  - ares-package non trouvé dans PATH"
+            which ares || echo "  - ares non trouvé dans PATH"
             exit 1
           fi
 
       - name: Build IPK
         run: |
-          # Fonction pour exécuter ares-package (priorité: local > global > npx)
+          # Fonction pour exécuter ares-package (priorité: local binaire > global > npx ares-cli)
           run_ares_package() {
             if [ -f "node_modules/.bin/ares-package" ]; then
               echo "✅ Utilisation de ares-package depuis node_modules/.bin"
               ./node_modules/.bin/ares-package "$@"
+            elif [ -f "node_modules/.bin/ares" ]; then
+              echo "✅ Utilisation de ares package depuis node_modules/.bin"
+              ./node_modules/.bin/ares package "$@"
             elif command -v ares-package &> /dev/null; then
               echo "✅ Utilisation de ares-package depuis PATH"
               ares-package "$@"
+            elif command -v ares &> /dev/null; then
+              echo "✅ Utilisation de ares package depuis PATH"
+              ares package "$@"
             else
-              echo "✅ Utilisation de npx pour exécuter ares-package"
-              npx -y ares-package "$@"
+              echo "✅ Utilisation de npx ares-cli package"
+              npx ares-cli package "$@"
             fi
           }
           
-          # Vérifier que ares-package est disponible
+          # Vérifier que ares-cli est disponible
           if [ -f "node_modules/.bin/ares-package" ]; then
             echo "✅ ares-package disponible localement"
             ./node_modules/.bin/ares-package --version || true
+          elif [ -f "node_modules/.bin/ares" ]; then
+            echo "✅ ares disponible localement"
+            ./node_modules/.bin/ares package --version || true
           elif command -v ares-package &> /dev/null; then
             echo "✅ ares-package disponible: $(which ares-package)"
             ares-package --version || true
-          elif npx -y ares-package --version 2>&1 | grep -q "version"; then
-            echo "✅ ares-package disponible via npx"
-            npx -y ares-package --version || true
+          elif command -v ares &> /dev/null; then
+            echo "✅ ares disponible: $(which ares)"
+            ares package --version || true
+          elif npx ares-cli package --version 2>&1 | grep -qE "(version|ares)"; then
+            echo "✅ ares-cli disponible via npx"
+            npx ares-cli package --version || true
           else
-            echo "❌ ares-package n'est pas disponible"
+            echo "❌ ares-cli n'est pas disponible"
             echo "💡 Diagnostic:"
-            ls -la node_modules/.bin/ares-package 2>/dev/null || echo "  - node_modules/.bin/ares-package n'existe pas"
+            ls -la node_modules/.bin/ | grep ares || echo "  - Aucun binaire ares dans node_modules/.bin/"
             which ares-package || echo "  - ares-package non trouvé dans PATH"
-            npx -y ares-package --version 2>&1 | head -5 || echo "  - npx échoue"
+            which ares || echo "  - ares non trouvé dans PATH"
             exit 1
           fi
           
