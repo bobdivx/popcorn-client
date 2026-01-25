@@ -2,16 +2,14 @@
   "id": "com.popcorn.client.webos",
   "version": "1.0.26",
   "type": "web",
-  "main": "frontend/index.html",
-  "title": "Popcorn Client",
-  "appDescription": "Client léger Popcorn pour WebOS",
+  "main": "index.html",
+  "title": "Popcorn",
+  "appDescription": "Client Popcorn pour WebOS",
   "icon": "icon.png",
   "largeIcon": "icon-large.png",
   "vendor": "Popcorn",
   "resolution": "1920x1080",
-  "bgColor": "#000000",
-  "iconColor": "#ffffff",
-  "splashBackground": "#000000",
-  "splashColor": "#ffffff",
-  "requiredMemory": 50
+  "disableBackHistoryAPI": true,
+  "transparent": false,
+  "handlesRelaunch": true
 }

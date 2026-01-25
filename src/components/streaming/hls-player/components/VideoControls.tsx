@@ -1,4 +1,4 @@
-import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Minimize, Subtitles } from 'lucide-preact';
+import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Minimize, Subtitles, ArrowLeft, RotateCcw } from 'lucide-preact';
 import { formatTime } from '../utils/formatTime';
 import { SubtitleSelector } from './SubtitleSelector';
 
@@ -46,6 +46,8 @@ interface VideoControlsProps {
   onToggleSubtitleSelector?: () => void;
   onCloseSubtitleSelector?: () => void;
   showLogo?: boolean;
+  onClose?: () => void;
+  onRestart?: () => void;
 }
 
 export function VideoControls({
@@ -74,6 +76,8 @@ export function VideoControls({
   onToggleSubtitleSelector,
   onCloseSubtitleSelector,
   showLogo = true,
+  onClose,
+  onRestart,
 }: VideoControlsProps) {
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
   const volumePercent = volume * 100;
@@ -97,6 +101,20 @@ export function VideoControls({
       <div class={`absolute inset-0 flex flex-col justify-between transition-all duration-300 z-20 ${showControls ? 'opacity-100' : 'opacity-0'} ${showControls ? 'pointer-events-auto' : 'pointer-events-none'}`}>
         <div class={`flex items-center justify-between ${padding.split(' ')[0]} ${padding.split(' ')[1]}`}>
           <div class="flex items-center gap-3 text-white drop-shadow-2xl">
+            {/* Bouton retour */}
+            {onClose && (
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onClose();
+                }} 
+                class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none`}
+                title="Retour"
+              >
+                <ArrowLeft class={`${iconSize} text-white`} />
+              </button>
+            )}
             {showLogo && (
               <img 
                 src="/popcorn_logo.png" 
@@ -124,6 +142,20 @@ export function VideoControls({
             >
               {isPlaying ? <Pause class={`${iconSize} text-white`} /> : <Play class={`${iconSize} text-white ml-0.5`} />}
             </button>
+            {/* Bouton redémarrer depuis le début */}
+            {onRestart && (
+              <button 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onRestart();
+                }} 
+                class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none`}
+                title="Redémarrer depuis le début"
+              >
+                <RotateCcw class={`${iconSize} text-white`} />
+              </button>
+            )}
             <div class="flex items-center gap-2 group/volume">
               <button 
                 onClick={(e) => { e.stopPropagation(); onToggleMute(); }} 

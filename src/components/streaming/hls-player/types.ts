@@ -8,6 +8,7 @@ export interface HLSPlayerProps {
   startFromBeginning?: boolean;
   onError?: (error: Error) => void;
   onLoadingChange?: (loading: boolean) => void;
+  onClose?: () => void;
 }
 
 declare global {

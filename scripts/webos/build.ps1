@@ -54,10 +54,20 @@ $versionContent = Get-Content $VersionFile -Raw | ConvertFrom-Json
 $version = $versionContent.client.version
 Write-Success "Version détectée: $version"
 
-# Étape 3: Build le frontend Astro
-Write-Info "Build du frontend Astro..."
+# Étape 3: Build le frontend Astro avec config webOS (chemins relatifs)
+Write-Info "Build du frontend Astro avec config webOS (chemins relatifs)..."
 Set-Location $ProjectRoot
-npm run build
+
+# Utiliser la config webOS pour les chemins relatifs (requis pour file://)
+$configFile = Join-Path $ProjectRoot "astro.config.webos.mjs"
+if (Test-Path $configFile) {
+    Write-Info "Utilisation de astro.config.webos.mjs"
+    npx astro build --config astro.config.webos.mjs
+} else {
+    Write-Info "Config webOS non trouvée, utilisation de la config par défaut"
+    npm run build
+}
+
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Échec du build Astro"
     exit 1
@@ -69,6 +79,24 @@ if (-not (Test-Path $DistDir)) {
     Write-Error "Le dossier dist/ n'existe pas après le build"
     exit 1
 }
+
+# Étape 4.5: Corriger les chemins absolus en chemins relatifs pour webOS (file://)
+Write-Info "Correction des chemins pour compatibilité webOS (file://)..."
+$htmlFiles = Get-ChildItem -Path $DistDir -Filter "*.html" -Recurse
+foreach ($htmlFile in $htmlFiles) {
+    $content = Get-Content $htmlFile.FullName -Raw
+    # Remplacer /_assets/ par ./_assets/ (chemin relatif ES module)
+    $newContent = $content -replace '="/_assets/', '="./_assets/'
+    # Remplacer /popcorn_logo.png par ./popcorn_logo.png
+    $newContent = $newContent -replace '="/popcorn_logo.png"', '="./popcorn_logo.png"'
+    # Remplacer /favicon.svg par ./favicon.svg
+    $newContent = $newContent -replace '="/favicon.svg"', '="./favicon.svg"'
+    if ($content -ne $newContent) {
+        Set-Content $htmlFile.FullName -Value $newContent -Encoding UTF8
+        Write-Host "  Corrigé: $($htmlFile.Name)" -ForegroundColor Gray
+    }
+}
+Write-Success "Chemins corrigés pour webOS"
 
 # Étape 5: Nettoyer et copier dist/ vers webos/frontend/
 Write-Info "Copie du frontend buildé vers webos/frontend/..."
@@ -113,13 +141,14 @@ if ($Package) {
     }
     
     Set-Location $WebOSDir
-    ares-package .
+    # --no-minify car ares-package a des problèmes avec certains fichiers JS (sw.js)
+    ares-package . -o $ProjectRoot --no-minify
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Échec du packaging IPK"
         exit 1
     }
     
-    $ipkFile = Get-ChildItem -Path $WebOSDir -Filter "*.ipk" | Select-Object -First 1
+    $ipkFile = Get-ChildItem -Path $ProjectRoot -Filter "*.ipk" | Select-Object -First 1
     if ($ipkFile) {
         Write-Success "IPK créé: $($ipkFile.Name)"
         Write-Info "Taille: $([math]::Round($ipkFile.Length / 1MB, 2)) MB"
