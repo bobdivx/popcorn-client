@@ -33,14 +33,14 @@ jobs:
 
       - name: Fix npm cache permissions
         run: |
-          # Corriger les permissions du cache npm si nécessaire
+          # Supprimer complètement le cache npm s'il existe avec de mauvaises permissions
           if [ -d "$HOME/.npm" ]; then
-            sudo chown -R $(id -u):$(id -g) "$HOME/.npm" || true
+            sudo rm -rf "$HOME/.npm" || rm -rf "$HOME/.npm" || true
           fi
-          # Créer le cache npm avec les bonnes permissions
+          # Créer le cache npm avec les bonnes permissions dès le départ
           mkdir -p "$HOME/.npm/_cacache" "$HOME/.npm/_logs"
-          chmod -R u+w "$HOME/.npm" || true
-          echo "✅ Permissions npm corrigées"
+          chmod -R u+w "$HOME/.npm"
+          echo "✅ Cache npm recréé avec les bonnes permissions"
 
       - name: Install dependencies
         run: npm ci
