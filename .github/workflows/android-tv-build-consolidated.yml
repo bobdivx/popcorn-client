@@ -200,9 +200,8 @@ jobs:
           path: ${{ steps.rename-apk.outputs.path }}
           retention-days: 30
 
-  # Job 2: Build AAB TV (dépend de l'APK)
+  # Job 2: Build AAB TV (en parallèle avec APK)
   build-aab-tv:
-    needs: build-apk-tv
     runs-on: self-hosted
     environment: production
     permissions:
@@ -470,14 +469,12 @@ jobs:
 
       - name: Download AAB artifact
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
           name: popcorn-android-tv-aab
           path: ./artifacts
 
       - name: Download native debug symbols
         uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
           name: popcorn-android-tv-native-symbols
           path: ./artifacts
