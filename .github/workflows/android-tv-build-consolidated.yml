@@ -754,6 +754,15 @@ jobs:
       - name: Generate native debug symbols
         id: generate-symbols
         run: |
+          # Installer zip si non disponible
+          if ! command -v zip &> /dev/null; then
+            echo "📦 Installation de zip..."
+            sudo apt-get update -qq && sudo apt-get install -y -qq zip || {
+              echo "⚠️ Impossible d'installer zip, utilisation de tar comme alternative"
+              USE_TAR=true
+            }
+          fi
+          
           SYMBOLS_DIR="./native-debug-symbols"
           mkdir -p "$SYMBOLS_DIR/lib/arm64-v8a"
           
@@ -782,11 +791,18 @@ jobs:
           VERSION=$(jq -r '.version' src-tauri/tauri.android.conf.json)
           PRODUCT_NAME=$(jq -r '.productName' src-tauri/tauri.android.conf.json)
           SAFE_NAME=$(echo "$PRODUCT_NAME" | sed 's/ /_/g')
-          SYMBOLS_ZIP="${SYMBOLS_DIR}/${SAFE_NAME}-v${VERSION}-native-debug-symbols.zip"
           
-          cd "$SYMBOLS_DIR"
-          zip -r "../$SYMBOLS_ZIP" lib/ > /dev/null
-          cd ..
+          if [ "${USE_TAR:-false}" = "true" ]; then
+            SYMBOLS_ZIP="${SYMBOLS_DIR}/${SAFE_NAME}-v${VERSION}-native-debug-symbols.tar.gz"
+            cd "$SYMBOLS_DIR"
+            tar -czf "../$SYMBOLS_ZIP" lib/
+            cd ..
+          else
+            SYMBOLS_ZIP="${SYMBOLS_DIR}/${SAFE_NAME}-v${VERSION}-native-debug-symbols.zip"
+            cd "$SYMBOLS_DIR"
+            zip -r "../$SYMBOLS_ZIP" lib/ > /dev/null
+            cd ..
+          fi
           
           echo "path=$SYMBOLS_ZIP" >> $GITHUB_OUTPUT
 
