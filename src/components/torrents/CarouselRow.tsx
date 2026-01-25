@@ -58,27 +58,61 @@ export default function CarouselRow({ title, children, className = '' }: Carouse
     };
   }, []);
 
-  // Navigation clavier pour défilement horizontal dans le carrousel
+  // Navigation clavier pour défilement horizontal dans le carrousel (TV)
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Navigation horizontale uniquement dans le carrousel
-      if (e.key === 'ArrowLeft' && container.contains(document.activeElement as HTMLElement)) {
+      const activeElement = document.activeElement as HTMLElement;
+      if (!container.contains(activeElement)) return;
+      
+      // Trouver toutes les cartes focusables dans ce carrousel
+      const focusableCards = Array.from(container.querySelectorAll<HTMLElement>(
+        '[data-torrent-card] a, [data-torrent-card] button, ' +
+        '.torrent-poster a, .torrent-poster button, ' +
+        '[tabindex]:not([tabindex="-1"])'
+      )).filter(el => {
+        const rect = el.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      });
+      
+      // Trouver l'index de l'élément actuel
+      const currentCard = activeElement.closest('[data-torrent-card], .torrent-poster');
+      const currentIndex = focusableCards.findIndex(el => 
+        el === activeElement || el.closest('[data-torrent-card], .torrent-poster') === currentCard
+      );
+      
+      if (currentIndex === -1) return;
+      
+      // Navigation horizontale : passer à la carte suivante/précédente
+      if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        scroll('left');
-      } else if (e.key === 'ArrowRight' && container.contains(document.activeElement as HTMLElement)) {
+        e.stopPropagation();
+        const prevIndex = Math.max(0, currentIndex - 1);
+        const prevElement = focusableCards[prevIndex];
+        if (prevElement) {
+          prevElement.focus();
+          prevElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+        }
+      } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        scroll('right');
+        e.stopPropagation();
+        const nextIndex = Math.min(focusableCards.length - 1, currentIndex + 1);
+        const nextElement = focusableCards[nextIndex];
+        if (nextElement) {
+          nextElement.focus();
+          nextElement.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+        }
       }
+      // ArrowUp/ArrowDown : laisser TVNavigationProvider gérer pour changer de rangée
     };
 
-    container.addEventListener('keydown', handleKeyDown);
+    container.addEventListener('keydown', handleKeyDown, true);
     return () => {
-      container.removeEventListener('keydown', handleKeyDown);
+      container.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [scroll]);
+  }, []);
 
   const [isHovered, setIsHovered] = useState(false);
 

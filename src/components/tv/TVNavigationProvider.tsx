@@ -116,11 +116,34 @@ export function TVNavigationProvider() {
       const focusableElements = getFocusableElements();
       if (focusableElements.length === 0) return;
 
-      // Si aucun élément n'a le focus, focus le premier
+      // Si aucun élément n'a le focus, focus le premier élément approprié
       if (!activeElement || !focusableElements.includes(activeElement)) {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
           e.preventDefault();
-          focusableElements[0]?.focus();
+          
+          // Priorité: première carte de contenu
+          const firstCard = document.querySelector(
+            '[data-torrent-card] a, [data-torrent-card] button, ' +
+            '.torrent-poster a, .torrent-poster button'
+          ) as HTMLElement;
+          
+          if (firstCard && focusableElements.includes(firstCard)) {
+            firstCard.focus();
+            firstCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          } else {
+            // Sinon premier élément dans main
+            const mainContent = document.querySelector('main');
+            if (mainContent) {
+              const mainFocusable = focusableElements.find(el => mainContent.contains(el));
+              if (mainFocusable) {
+                mainFocusable.focus();
+                mainFocusable.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                return;
+              }
+            }
+            // Fallback
+            focusableElements[0]?.focus();
+          }
           return;
         }
       }
@@ -201,16 +224,45 @@ export function TVNavigationProvider() {
     // Écouter les événements clavier
     document.addEventListener('keydown', handleKeyDown, true);
 
-    // Focus initial après chargement
+    // Focus initial après chargement - prioriser le contenu principal
     const initialFocus = setTimeout(() => {
       const focusable = getFocusableElements();
       // Ne pas voler le focus si l'utilisateur a déjà focalisé quelque chose
       if (document.activeElement === document.body && focusable.length > 0) {
-        // Chercher un élément principal à focus (nav, premier lien, etc.)
-        const mainNav = document.querySelector('nav a, nav button') as HTMLElement;
-        if (mainNav && focusable.includes(mainNav)) {
-          mainNav.focus();
+        // Priorité 1: Premier TorrentPoster/carte de contenu (pages dashboard)
+        const firstCard = document.querySelector(
+          '[data-torrent-card] a, [data-torrent-card] button, ' +
+          '.torrent-poster a, .torrent-poster button, ' +
+          '[data-focusable]'
+        ) as HTMLElement;
+        
+        if (firstCard && focusable.includes(firstCard)) {
+          firstCard.focus();
+          firstCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
         }
+        
+        // Priorité 2: Premier élément avec data-initial-focus
+        const initialFocusElement = document.querySelector('[data-initial-focus]') as HTMLElement;
+        if (initialFocusElement && focusable.includes(initialFocusElement)) {
+          initialFocusElement.focus();
+          return;
+        }
+        
+        // Priorité 3: Premier bouton/lien dans le contenu principal (pas la nav)
+        const mainContent = document.querySelector('main');
+        if (mainContent) {
+          const mainFocusable = mainContent.querySelector(
+            'button, a[href], [tabindex]:not([tabindex="-1"])'
+          ) as HTMLElement;
+          if (mainFocusable && focusable.includes(mainFocusable)) {
+            mainFocusable.focus();
+            return;
+          }
+        }
+        
+        // Fallback: Premier élément focusable
+        focusable[0]?.focus();
       }
     }, 500);
 
