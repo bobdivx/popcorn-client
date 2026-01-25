@@ -140,6 +140,10 @@ export interface SearchParams {
   type?: 'movie' | 'tv';
   year?: number;
   page?: number;
+  /** 'local' = DB uniquement, 'indexer' = indexeurs uniquement. Omis = recherche en 2 phases (local puis indexer) */
+  source?: 'local' | 'indexer';
+  /** Si fourni, les résultats indexeur sont persistés en DB (media + variants). Par défaut utilise l'utilisateur connecté. */
+  user_id?: string;
 }
 
 export interface SearchResult {
@@ -149,6 +153,8 @@ export interface SearchResult {
   poster?: string;
   year?: number;
   overview?: string;
+  /** TMDB id lorsque disponible (DB locale ou enrichissement indexeurs) */
+  tmdbId?: number;
 }
 
 // ==================== STREAMING ====================

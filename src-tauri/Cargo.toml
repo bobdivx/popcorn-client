@@ -27,6 +27,9 @@ tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+# reqwest direct (pas via tauri-plugin-http) pour contourner les limitations ACL
+# Utiliser rustls-tls au lieu de native-tls pour éviter la dépendance OpenSSL sur Android
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 [features]
 # Cette fonctionnalité est utilisée pour la production ou quand `devPath` n'est pas défini

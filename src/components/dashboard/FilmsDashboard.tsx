@@ -5,9 +5,12 @@ import CarouselRow from '../torrents/CarouselRow';
 import { LazyTorrentPoster } from './components/LazyTorrentPoster';
 import type { ContentItem } from '../../lib/client/types';
 import { useInfiniteFilms } from './hooks/useInfiniteFilms';
+import { useSyncStatus } from './hooks/useSyncStatus';
+import { SyncProgress } from '../setup/components/SyncProgress';
 
 export default function FilmsDashboard() {
   const { films, loading, error, hasMore, loadMore } = useInfiniteFilms();
+  const { isSyncing, loading: syncLoading } = useSyncStatus();
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
 
   // Charger plus d'éléments automatiquement quand on approche de la fin
@@ -99,6 +102,26 @@ export default function FilmsDashboard() {
   }
 
   if (films.length === 0) {
+    // Si une synchronisation est en cours, afficher la progression
+    if (!syncLoading && isSyncing) {
+      return (
+        <div className="min-h-screen bg-black text-white px-4 py-8">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-8">
+              <h2 className="text-3xl font-bold text-white mb-4">
+                Synchronisation en cours
+              </h2>
+              <p className="text-gray-400 text-lg">
+                Les films sont en cours de synchronisation depuis vos indexers.
+              </p>
+            </div>
+            <SyncProgress />
+          </div>
+        </div>
+      );
+    }
+
+    // Sinon, afficher le message d'absence de films
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white px-4">
         <div className="text-center max-w-2xl">

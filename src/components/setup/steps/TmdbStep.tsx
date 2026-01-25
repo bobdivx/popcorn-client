@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { serverApi } from '../../../lib/client/server-api';
 import { getUserConfig } from '../../../lib/api/popcorn-web';
 import type { SetupStatus } from '../../../lib/client/types';
+import { isTmdbKeyMaskedOrInvalid } from '../../../lib/utils/tmdb-key';
 
 interface TmdbStepProps {
   setupStatus: SetupStatus | null;
@@ -28,6 +29,8 @@ export function TmdbStep({
   const [success, setSuccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [cloudKeyWarning, setCloudKeyWarning] = useState<string | null>(null);
+  const [isUserEditing, setIsUserEditing] = useState(false); // Pour savoir si l'utilisateur modifie la clé manuellement
+  const isUserEditingRef = useRef(false); // Ref pour accès synchrone à l'état d'édition
 
   useEffect(() => {
     loadTmdbKey();
@@ -37,14 +40,29 @@ export function TmdbStep({
   // On re-tente quelques fois si aucune clé n'est trouvée (évite l'impression "rien ne se passe").
   useEffect(() => {
     if (loading) return;
-    if (tmdbKey && tmdbKey.includes('...')) return; // Déjà une clé masquée affichée
+    // Ne pas vérifier si l'utilisateur est en train de modifier la clé manuellement
+    if (isUserEditing) return;
+    // Arrêter si on a déjà une clé masquée (contient ... ou *)
+    if (tmdbKey && (tmdbKey.includes('...') || tmdbKey.includes('*'))) {
+      return;
+    }
+    // Arrêter si l'utilisateur a saisi une clé valide (longueur > 20 caractères et pas de masquage)
+    if (tmdbKey && tmdbKey.length > 20 && !tmdbKey.includes('*') && !tmdbKey.includes('...')) {
+      return; // L'utilisateur a probablement saisi une clé valide, ne pas la réinitialiser
+    }
 
     let cancelled = false;
     let attempts = 0;
-    const maxAttempts = 15; // ~30s (15 * 2s)
+    const maxAttempts = 10; // ~20s (10 * 2s) - réduit pour éviter trop de requêtes
+    let cloudKeyChecked = false; // Pour éviter de vérifier le cloud plusieurs fois
 
     const interval = setInterval(async () => {
       if (cancelled) return;
+      // Vérifier la ref pour un accès synchrone
+      if (isUserEditingRef.current || isUserEditing) {
+        clearInterval(interval);
+        return;
+      }
       attempts += 1;
       if (attempts > maxAttempts) {
         clearInterval(interval);
@@ -54,24 +72,50 @@ export function TmdbStep({
       try {
         const res = await serverApi.getTmdbKey();
         if (res.success && res.data?.hasKey && res.data.apiKey) {
-          setTmdbKey(res.data.apiKey);
-          setCloudKeyWarning(null); // Effacer l'avertissement si la clé est maintenant dans le backend
-          onStatusChange?.();
-          clearInterval(interval);
-        } else {
-          // Si pas de clé dans le backend, vérifier dans le cloud
-          try {
-            const cloudConfig = await getUserConfig();
-            if (cloudConfig?.tmdbApiKey && !tmdbKey.includes('...')) {
-              const cloudKey = cloudConfig.tmdbApiKey;
-              const masked = cloudKey.length > 8 
-                ? `${cloudKey.substring(0, 4)}...${cloudKey.substring(cloudKey.length - 4)}`
-                : '****';
-              setTmdbKey(masked);
-              setCloudKeyWarning('Une clé TMDB existe dans votre compte cloud mais n\'a pas pu être importée (clé invalide). Entrez une nouvelle clé v3 valide pour la remplacer.');
+          // Vérifier que la clé retournée n'est pas masquée
+          if (!isTmdbKeyMaskedOrInvalid(res.data.apiKey)) {
+            // Ne pas réinitialiser si l'utilisateur est en train de modifier
+            if (!isUserEditing) {
+              setTmdbKey(res.data.apiKey);
+              setCloudKeyWarning(null); // Effacer l'avertissement si la clé est maintenant dans le backend
+              onStatusChange?.();
+              clearInterval(interval);
             }
-          } catch {
-            // ignore
+          } else {
+            // Clé masquée dans le backend, arrêter les tentatives
+            clearInterval(interval);
+          }
+        } else {
+          // Si pas de clé dans le backend, vérifier dans le cloud (une seule fois)
+          if (!cloudKeyChecked && !isUserEditing) {
+            cloudKeyChecked = true;
+            try {
+              const cloudConfig = await getUserConfig();
+              if (cloudConfig?.tmdbApiKey) {
+                // Vérifier si la clé du cloud est masquée ou invalide
+                if (isTmdbKeyMaskedOrInvalid(cloudConfig.tmdbApiKey)) {
+                  // Clé masquée dans le cloud, arrêter les tentatives
+                  const masked = cloudConfig.tmdbApiKey.length > 8 
+                    ? `${cloudConfig.tmdbApiKey.substring(0, 4)}...${cloudConfig.tmdbApiKey.substring(cloudConfig.tmdbApiKey.length - 4)}`
+                    : '****';
+                  if (!isUserEditing) {
+                    setTmdbKey(masked);
+                    setCloudKeyWarning('Une clé TMDB existe dans votre compte cloud mais n\'a pas pu être importée (clé invalide). Entrez une nouvelle clé v3 valide pour la remplacer.');
+                  }
+                  clearInterval(interval);
+                } else if (!tmdbKey || !tmdbKey.includes('...')) {
+                  // Clé valide dans le cloud, mais pas encore importée - continuer à attendre l'import
+                  // Ne pas arrêter l'interval, continuer à vérifier le backend
+                }
+              } else {
+                // Pas de clé dans le cloud, arrêter après quelques tentatives
+                if (attempts >= 5) {
+                  clearInterval(interval);
+                }
+              }
+            } catch {
+              // ignore
+            }
           }
         }
       } catch {
@@ -83,7 +127,7 @@ export function TmdbStep({
       cancelled = true;
       clearInterval(interval);
     };
-  }, [loading, tmdbKey]);
+  }, [loading, tmdbKey, isUserEditing]);
 
   const loadTmdbKey = async () => {
     try {
@@ -99,13 +143,17 @@ export function TmdbStep({
         try {
           const cloudConfig = await getUserConfig();
           if (cloudConfig?.tmdbApiKey) {
-            // Créer une version masquée de la clé cloud
-            const cloudKey = cloudConfig.tmdbApiKey;
-            const masked = cloudKey.length > 8 
-              ? `${cloudKey.substring(0, 4)}...${cloudKey.substring(cloudKey.length - 4)}`
-              : '****';
-            setTmdbKey(masked);
-            setCloudKeyWarning('Une clé TMDB existe dans votre compte cloud mais n\'a pas pu être importée (clé invalide). Entrez une nouvelle clé v3 valide pour la remplacer.');
+            // Vérifier si la clé du cloud est masquée ou invalide
+            if (isTmdbKeyMaskedOrInvalid(cloudConfig.tmdbApiKey)) {
+              // Créer une version masquée de la clé cloud pour l'affichage
+              const cloudKey = cloudConfig.tmdbApiKey;
+              const masked = cloudKey.length > 8 
+                ? `${cloudKey.substring(0, 4)}...${cloudKey.substring(cloudKey.length - 4)}`
+                : '****';
+              setTmdbKey(masked);
+              setCloudKeyWarning('Une clé TMDB existe dans votre compte cloud mais n\'a pas pu être importée (clé invalide). Entrez une nouvelle clé v3 valide pour la remplacer.');
+            }
+            // Si la clé est valide, ne rien faire ici - elle sera importée par CloudImportManager
           }
         } catch (cloudErr) {
           // Ignorer les erreurs de récupération cloud (CORS, etc.)
@@ -138,12 +186,21 @@ export function TmdbStep({
     try {
       await onSave(tmdbKey);
       setSuccess('Clé TMDB sauvegardée avec succès');
-      // Recharger la clé masquée après sauvegarde
-      await loadTmdbKey();
+      isUserEditingRef.current = false;
+      setIsUserEditing(false);
+      // Ne pas recharger la clé après sauvegarde - elle vient d'être sauvegardée avec succès
+      // Afficher simplement la clé masquée pour indiquer qu'elle est configurée
+      const savedKeyPreview = tmdbKey.length > 8 
+        ? `${tmdbKey.substring(0, 4)}...${tmdbKey.substring(tmdbKey.length - 4)}`
+        : '****';
+      setTmdbKey(savedKeyPreview);
+      setCloudKeyWarning(null); // Effacer l'avertissement
       // Mettre à jour le statut du setup (comme dans IndexersStep)
       await Promise.resolve(onStatusChange?.());
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      isUserEditingRef.current = false;
+      setIsUserEditing(false); // Réactiver les vérifications en cas d'erreur
     } finally {
       setSaving(false);
     }
@@ -217,7 +274,31 @@ export function TmdbStep({
             className="w-full sm:flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
             placeholder={hasExistingKey ? "Entrez une nouvelle clé pour remplacer" : "Entrez votre clé API TMDB"}
             value={tmdbKey}
-            onInput={(e) => setTmdbKey((e.target as HTMLInputElement).value)}
+            onInput={(e) => {
+              isUserEditingRef.current = true;
+              setIsUserEditing(true);
+              setTmdbKey((e.target as HTMLInputElement).value);
+            }}
+            onFocus={() => {
+              isUserEditingRef.current = true;
+              setIsUserEditing(true);
+            }}
+            onBlur={() => {
+              // Ne pas réactiver les vérifications automatiques si l'utilisateur a saisi une clé valide
+              if (tmdbKey && tmdbKey.length > 20 && !tmdbKey.includes('*') && !tmdbKey.includes('...')) {
+                // L'utilisateur a saisi une clé valide, ne pas réactiver les vérifications
+                // Elles seront réactivées après sauvegarde
+                return;
+              }
+              // Attendre un peu avant de réactiver les vérifications automatiques
+              setTimeout(() => {
+                // Ne réactiver que si la clé n'est pas valide (masquée ou trop courte)
+                if (!tmdbKey || tmdbKey.length < 20 || tmdbKey.includes('*') || tmdbKey.includes('...')) {
+                  isUserEditingRef.current = false;
+                  setIsUserEditing(false);
+                }
+              }, 3000);
+            }}
             disabled={saving}
           />
           <button

@@ -11,12 +11,14 @@ interface ServerApiClientMediaAccess {
   backendRequest<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>>;
   getServerUrl(): string;
   getAccessToken(): string | null;
+  getCurrentUserId(): string | null;
 }
 
 export const mediaMethods = {
   /**
    * Recherche de contenu
-   * Unifié : appel direct au backend Rust
+   * Unifié : appel direct au backend Rust.
+   * Si connecté, envoie user_id pour persister les résultats indexeur en DB (comme le sync).
    */
   async search(this: ServerApiClientMediaAccess, params: SearchParams): Promise<ApiResponse<SearchResult[]>> {
     const queryParams = new URLSearchParams();
@@ -24,8 +26,10 @@ export const mediaMethods = {
     if (params.type) queryParams.set('type', params.type);
     if (params.year) queryParams.set('year', params.year.toString());
     if (params.page) queryParams.set('page', params.page.toString());
+    if (params.source) queryParams.set('source', params.source);
+    const uid = params.user_id ?? this.getCurrentUserId();
+    if (uid) queryParams.set('user_id', uid);
 
-    // Le backend Rust expose /api/indexers/search
     const qp = queryParams.toString();
     return this.backendRequest<SearchResult[]>(`/api/indexers/search?${qp}`, { method: 'GET' });
   },
@@ -36,6 +40,19 @@ export const mediaMethods = {
    */
   async getTorrentGroup(this: ServerApiClientMediaAccess, slug: string): Promise<ApiResponse<any>> {
     return this.backendRequest(`/api/torrents/group/${encodeURIComponent(slug)}`, { method: 'GET' });
+  },
+
+  /**
+   * Récupère un groupe par tmdb_id (pour résultats recherche → détail).
+   * Retourne un groupe vide si le média n'est pas encore synchronisé.
+   */
+  async getTorrentGroupByTmdbId(
+    this: ServerApiClientMediaAccess,
+    tmdbId: number,
+    title?: string,
+  ): Promise<ApiResponse<any>> {
+    const q = title ? `?title=${encodeURIComponent(title)}` : '';
+    return this.backendRequest(`/api/torrents/group/by-tmdb/${tmdbId}${q}`, { method: 'GET' });
   },
 
   /**

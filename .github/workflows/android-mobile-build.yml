@@ -13,6 +13,10 @@ on:
       - master
   workflow_dispatch:  # Permet de déclencher manuellement depuis l'interface GitHub
 
+env:
+  # Configuration pour éviter les erreurs DNS EAI_AGAIN avec Azure Blob Storage
+  NODE_OPTIONS: "--dns-result-order=ipv4first"
+
 jobs:
   # Job 1: Build APK Mobile
   build-apk-mobile:
@@ -22,43 +26,227 @@ jobs:
       contents: write
 
     steps:
+      - name: Verify network connectivity
+        run: |
+          echo "🔍 Vérification de la connectivité réseau..."
+          # Test DNS
+          echo "📡 Test DNS..."
+          nslookup api.github.com || echo "⚠️ Problème DNS pour api.github.com"
+          # Test connectivité HTTPS
+          echo "📡 Test connectivité HTTPS..."
+          curl -I --max-time 10 https://api.github.com 2>&1 | head -3 || echo "⚠️ Problème de connectivité API GitHub"
+          # Test téléchargement d'une action
+          echo "📡 Test téléchargement action..."
+          curl -I --max-time 10 "https://api.github.com/repos/actions/checkout/tarball/v4" 2>&1 | head -3 || echo "⚠️ Problème téléchargement action checkout"
+          echo "✅ Vérification réseau terminée"
+
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          fetch-depth: 1
+        continue-on-error: false
+        timeout-minutes: 5
+
+      - name: Increment client version in VERSION.json
+        id: increment_version
+        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v')
+        run: |
+          if [ -f "VERSION.json" ]; then
+            # Lire la version actuelle
+            CURRENT_VERSION=$(jq -r '.client.version' VERSION.json)
+            echo "📦 Version actuelle: ${CURRENT_VERSION}"
+            
+            # Extraire les parties de la version (major.minor.patch)
+            IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+            
+            # Incrémenter le patch
+            patch=$((patch + 1))
+            
+            # Gérer le rollover
+            if [ $patch -ge 100 ]; then
+              patch=0
+              minor=$((minor + 1))
+            fi
+            if [ $minor -ge 100 ]; then
+              minor=0
+              major=$((major + 1))
+            fi
+            
+            NEW_VERSION="${major}.${minor}.${patch}"
+            echo "🚀 Nouvelle version: ${NEW_VERSION}"
+            
+            # Mettre à jour VERSION.json
+            jq --arg v "$NEW_VERSION" '.client.version = $v' VERSION.json > VERSION.json.tmp
+            mv VERSION.json.tmp VERSION.json
+            
+            # Incrémenter aussi le build number
+            BUILD=$(jq -r '.client.build' VERSION.json)
+            BUILD=$((BUILD + 1))
+            jq --argjson b "$BUILD" '.client.build = $b' VERSION.json > VERSION.json.tmp
+            mv VERSION.json.tmp VERSION.json
+            
+            # Synchroniser la version vers les fichiers de config Tauri
+            if [ -f "src-tauri/tauri.android.mobile.conf.json" ]; then
+              jq --arg v "$NEW_VERSION" '.version = $v' src-tauri/tauri.android.mobile.conf.json > src-tauri/tauri.android.mobile.conf.json.tmp
+              mv src-tauri/tauri.android.mobile.conf.json.tmp src-tauri/tauri.android.mobile.conf.json
+              echo "✅ Version synchronisée vers tauri.android.mobile.conf.json"
+            fi
+            
+            echo "✅ Version incrémentée: ${CURRENT_VERSION} → ${NEW_VERSION} (build: ${BUILD})"
+            echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+            echo "build=${BUILD}" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ VERSION.json introuvable, création avec version par défaut"
+            echo '{"client":{"version":"1.0.1","build":1},"server":{"version":"1.0.1","build":1}}' > VERSION.json
+            echo "version=1.0.1" >> $GITHUB_OUTPUT
+            echo "build=1" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit version update
+        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v') && steps.increment_version.outputs.version != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION.json src-tauri/tauri.android.mobile.conf.json 2>/dev/null || true
+          git commit -m "chore: bump client version to ${{ steps.increment_version.outputs.version }}" || echo "Aucun changement à commiter"
+          git push || echo "Push échoué (peut-être déjà à jour)"
+
+      - name: Prepare release version artifact
+        id: release_version
+        run: |
+          if [ -n "${{ steps.increment_version.outputs.version }}" ]; then
+            VERSION="${{ steps.increment_version.outputs.version }}"
+          else
+            VERSION=$(jq -r '.version' src-tauri/tauri.android.mobile.conf.json)
+          fi
+          echo "$VERSION" > release-version.txt
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📌 Version pour release: $VERSION"
+
+      - name: Upload release version artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-version
+          path: release-version.txt
+          retention-days: 1
+
+      - name: Verify Node.js (pre-installed)
+        run: |
+          node --version
+          npm --version
+          echo "✅ Node.js et npm sont déjà installés dans le runner"
+
+      - name: Fix npm cache permissions
+        run: |
+          # Arrêter tous les processus npm qui pourraient utiliser le cache
+          pkill -9 npm || true
+          sleep 2
+          
+          # Trouver et tuer les processus qui utilisent le dossier .npm
+          if command -v fuser &> /dev/null; then
+            sudo fuser -k "$HOME/.npm" 2>/dev/null || true
+            sleep 1
+          fi
+          
+          # Utiliser npm cache clean si possible
+          npm cache clean --force 2>/dev/null || true
+          
+          # Corriger les permissions du dossier .npm (sans supprimer le dossier)
+          if [ -d "$HOME/.npm" ]; then
+            # Corriger les permissions du dossier parent
+            sudo chown -R $(id -u):$(id -g) "$HOME/.npm" 2>/dev/null || true
+            sudo chmod -R u+w "$HOME/.npm" 2>/dev/null || true
+            
+            # Supprimer seulement le contenu du cache, pas le dossier lui-même
+            rm -rf "$HOME/.npm/_cacache"/* "$HOME/.npm/_logs"/* 2>/dev/null || true
+            sudo rm -rf "$HOME/.npm/_cacache"/* "$HOME/.npm/_logs"/* 2>/dev/null || true
+          fi
+          
+          # Créer les dossiers nécessaires avec les bonnes permissions
+          mkdir -p "$HOME/.npm/_cacache" "$HOME/.npm/_logs"
+          chmod -R u+w "$HOME/.npm" 2>/dev/null || sudo chmod -R u+w "$HOME/.npm" 2>/dev/null || true
+          
+          # Vérifier que les permissions sont correctes
+          if [ -w "$HOME/.npm/_cacache" ] && [ -w "$HOME/.npm/_logs" ]; then
+            echo "✅ Cache npm configuré avec les bonnes permissions"
+          else
+            echo "⚠️ Permissions npm partiellement corrigées, mais devrait fonctionner"
+          fi
 
       - name: Install dependencies
         run: npm ci
 
+      - name: Set version environment variables
+        run: |
+          if [ -f "VERSION.json" ]; then
+            CLIENT_VERSION=$(jq -r '.client.version' VERSION.json)
+            CLIENT_BUILD=$(jq -r '.client.build' VERSION.json)
+            echo "PUBLIC_APP_VERSION=$CLIENT_VERSION" >> $GITHUB_ENV
+            echo "PUBLIC_APP_VERSION_CODE=$CLIENT_BUILD" >> $GITHUB_ENV
+            echo "✅ Versions définies: v$CLIENT_VERSION (build $CLIENT_BUILD)"
+          else
+            echo "⚠️ VERSION.json introuvable, utilisation des valeurs par défaut"
+            echo "PUBLIC_APP_VERSION=1.0.1" >> $GITHUB_ENV
+            echo "PUBLIC_APP_VERSION_CODE=1" >> $GITHUB_ENV
+          fi
+
+      - name: Copy VERSION.json to public directory
+        run: |
+          if [ -f "VERSION.json" ]; then
+            mkdir -p public
+            cp VERSION.json public/VERSION.json
+            echo "✅ VERSION.json copié dans public/"
+          else
+            echo "⚠️ VERSION.json introuvable, impossible de copier"
+          fi
+
       - name: Build Astro frontend
         run: npm run build
+        env:
+          PUBLIC_APP_VERSION: ${{ env.PUBLIC_APP_VERSION }}
+          PUBLIC_APP_VERSION_CODE: ${{ env.PUBLIC_APP_VERSION_CODE }}
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platform-tools platforms;android-33 build-tools;33.0.0 ndk;25.2.9519653'
-
-      - name: Accept Android licenses
+      - name: Verify Rust (pre-installed)
         run: |
-          yes | sdkmanager --licenses || true
+          rustc --version
+          cargo --version
+          rustup target list --installed | grep aarch64-linux-android || echo "⚠️ Target Android non installé"
+          echo "✅ Rust est déjà installé dans le runner"
+
+      - name: Verify Java (pre-installed)
+        run: |
+          java -version
+          # Trouver JAVA_HOME correctement
+          if [ -z "$JAVA_HOME" ]; then
+            JAVA_PATH=$(readlink -f $(which java) 2>/dev/null || which java)
+            if [ -n "$JAVA_PATH" ]; then
+              JAVA_HOME=$(dirname $(dirname "$JAVA_PATH"))
+              echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+            else
+              # Fallback pour Temurin
+              JAVA_HOME="/usr/lib/jvm/temurin-17-jdk-amd64"
+              echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+            fi
+          else
+            echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+          fi
+          echo "JAVA_HOME=$JAVA_HOME"
+          echo "✅ Java est déjà installé dans le runner"
+
+      - name: Verify Android SDK (pre-installed)
+        run: |
+          ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
+          ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --version || echo "⚠️ SDK Manager non trouvé"
+          echo "✅ Android SDK est déjà installé dans le runner"
 
       - name: Setup NDK environment variables
         run: |
+          ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
           NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -type d -name "25.2.9519653" 2>/dev/null | head -n 1)
           if [ -z "$NDK_PATH" ]; then
             NDK_PATH=$(find $ANDROID_HOME/ndk -maxdepth 1 -type d 2>/dev/null | head -n 1)
@@ -72,14 +260,73 @@ jobs:
             ls -la $ANDROID_HOME/ndk/ || echo "NDK directory does not exist"
           fi
 
-      - name: Install Tauri CLI
-        run: npm install -g @tauri-apps/cli@latest
+      - name: Verify Tauri CLI (pre-installed)
+        run: |
+          tauri --version || echo "⚠️ Tauri CLI non trouvé"
+          echo "✅ Tauri CLI est déjà installé dans le runner"
 
       - name: Setup Android environment variables
         run: |
+          ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
+          ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
           echo "$ANDROID_HOME/tools" >> $GITHUB_PATH
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "✅ Variables d'environnement Android configurées"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+
+      - name: Fix rustup cache and install Android targets
+        run: |
+          echo "🔧 Correction du cache rustup et installation des targets Android..."
+          
+          # Corriger les permissions du cache rustup
+          RUSTUP_HOME=${RUSTUP_HOME:-$HOME/.rustup}
+          CARGO_HOME=${CARGO_HOME:-$HOME/.cargo}
+          
+          if [ -d "$RUSTUP_HOME" ]; then
+            echo "📁 Correction des permissions de $RUSTUP_HOME..."
+            sudo chown -R $(id -u):$(id -g) "$RUSTUP_HOME" 2>/dev/null || true
+            sudo chmod -R u+w "$RUSTUP_HOME" 2>/dev/null || true
+          fi
+          
+          if [ -d "$CARGO_HOME" ]; then
+            echo "📁 Correction des permissions de $CARGO_HOME..."
+            sudo chown -R $(id -u):$(id -g) "$CARGO_HOME" 2>/dev/null || true
+            sudo chmod -R u+w "$CARGO_HOME" 2>/dev/null || true
+          fi
+          
+          # Nettoyer le cache rustup si nécessaire
+          if [ -d "$RUSTUP_HOME/tmp" ]; then
+            echo "🧹 Nettoyage du cache temporaire rustup..."
+            rm -rf "$RUSTUP_HOME/tmp"/* 2>/dev/null || true
+            sudo rm -rf "$RUSTUP_HOME/tmp"/* 2>/dev/null || true
+          fi
+          
+          # Installer les targets Android nécessaires avant tauri android init
+          echo "📦 Installation des targets Android Rust..."
+          rustup target add aarch64-linux-android || {
+            echo "⚠️ Échec installation aarch64-linux-android, réessai..."
+            rustup self update || true
+            rustup target add aarch64-linux-android
+          }
+          
+          rustup target add armv7-linux-androideabi || {
+            echo "⚠️ Échec installation armv7-linux-androideabi, réessai..."
+            rustup self update || true
+            rustup target add armv7-linux-androideabi
+          }
+          
+          rustup target add i686-linux-android || {
+            echo "⚠️ Échec installation i686-linux-android, réessai..."
+            rustup self update || true
+            rustup target add i686-linux-android
+          }
+          
+          echo "✅ Targets Android installés"
+          rustup target list --installed | grep android || echo "⚠️ Aucun target Android installé"
 
       - name: Initialize Android project
         run: |
@@ -150,8 +397,77 @@ jobs:
             python3 scripts/apply-signing-config.py "$BUILD_GRADLE"
           fi
 
+      - name: Patch AndroidManifest for cleartext traffic
+        run: npm run patch:android || echo "⚠️ Patch AndroidManifest non appliqué (peut-être déjà fait)"
+
+      - name: Diagnostic environment before build
+        run: |
+          echo "=== Diagnostic de l'environnement ==="
+          echo "ANDROID_HOME=${ANDROID_HOME}"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}"
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_HOME}"
+          echo "JAVA_HOME=${JAVA_HOME}"
+          echo "PATH=${PATH}"
+          echo ""
+          echo "=== Vérification des outils ==="
+          which java && java -version || echo "❌ Java non trouvé"
+          which sdkmanager && sdkmanager --version || echo "❌ SDK Manager non trouvé"
+          ls -la ${ANDROID_HOME}/build-tools/ || echo "❌ build-tools non trouvé"
+          ls -la ${ANDROID_HOME}/platform-tools/ || echo "❌ platform-tools non trouvé"
+          echo ""
+          echo "=== Vérification Gradle ==="
+          if [ -f "src-tauri/gen/android/gradlew" ]; then
+            chmod +x src-tauri/gen/android/gradlew
+            echo "✅ gradlew trouvé et exécutable"
+          else
+            echo "⚠️ gradlew non trouvé (sera créé par tauri)"
+          fi
+
+      - name: Fix Android SDK permissions and install missing components
+        run: |
+          echo "🔧 Correction des permissions du SDK Android..."
+          ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
+          
+          # Corriger les permissions du SDK Android
+          if [ -d "$ANDROID_HOME" ]; then
+            echo "📁 Correction des permissions de $ANDROID_HOME..."
+            sudo chown -R $(id -u):$(id -g) "$ANDROID_HOME" 2>/dev/null || {
+              echo "⚠️ Impossible de changer le propriétaire, essai avec chmod..."
+              sudo chmod -R a+w "$ANDROID_HOME" 2>/dev/null || true
+            }
+          fi
+          
+          # Accepter les licences
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
+          
+          # Installer les composants manquants
+          echo "📦 Installation des composants SDK manquants..."
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;35.0.0" "platforms;android-36" 2>/dev/null || {
+            echo "⚠️ Installation via sdkmanager échouée, tentative avec sudo..."
+            sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;35.0.0" "platforms;android-36" 2>/dev/null || true
+          }
+          
+          echo "✅ SDK Android configuré"
+
       - name: Build Android APK
-        run: npm run tauri:build:android-mobile
+        run: |
+          set -e
+          echo "🚀 Démarrage du build Android APK..."
+          echo "ANDROID_HOME=${ANDROID_HOME}"
+          echo "ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT}"
+          echo "JAVA_HOME=${JAVA_HOME}"
+          npm run tauri:build:android-mobile || {
+            EXIT_CODE=$?
+            echo "❌ Build échoué avec le code: $EXIT_CODE"
+            echo "=== Logs Gradle (si disponibles) ==="
+            if [ -f "src-tauri/gen/android/app/build.gradle.kts" ]; then
+              echo "build.gradle.kts existe"
+            fi
+            if [ -d "src-tauri/gen/android/app/build" ]; then
+              find src-tauri/gen/android/app/build -name "*.log" -type f | head -5 | xargs cat 2>/dev/null || true
+            fi
+            exit $EXIT_CODE
+          }
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
@@ -222,40 +538,154 @@ jobs:
       contents: write
 
     steps:
+      - name: Verify network connectivity
+        run: |
+          echo "🔍 Vérification de la connectivité réseau..."
+          # Test DNS
+          echo "📡 Test DNS..."
+          nslookup api.github.com || echo "⚠️ Problème DNS pour api.github.com"
+          # Test connectivité HTTPS
+          echo "📡 Test connectivité HTTPS..."
+          curl -I --max-time 10 https://api.github.com 2>&1 | head -3 || echo "⚠️ Problème de connectivité API GitHub"
+          # Test téléchargement d'une action
+          echo "📡 Test téléchargement action..."
+          curl -I --max-time 10 "https://api.github.com/repos/actions/checkout/tarball/v4" 2>&1 | head -3 || echo "⚠️ Problème téléchargement action checkout"
+          echo "✅ Vérification réseau terminée"
+
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          fetch-depth: 1
+        continue-on-error: false
+        timeout-minutes: 5
+
+      - name: Download release version artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-version
+          path: .
+
+      - name: Apply release version to configs
+        run: |
+          VERSION=$(cat release-version.txt)
+          echo "📌 Application de la version $VERSION (alignée avec l'APK)"
+          jq --arg v "$VERSION" '.client.version = $v' VERSION.json > VERSION.json.tmp && mv VERSION.json.tmp VERSION.json
+          jq --arg v "$VERSION" '.version = $v' src-tauri/tauri.android.mobile.conf.json > src-tauri/tauri.android.mobile.conf.json.tmp
+          mv src-tauri/tauri.android.mobile.conf.json.tmp src-tauri/tauri.android.mobile.conf.json
+
+      - name: Verify Node.js (pre-installed)
+        run: |
+          node --version
+          npm --version
+          echo "✅ Node.js et npm sont déjà installés dans le runner"
+
+      - name: Fix npm cache permissions
+        run: |
+          # Arrêter tous les processus npm qui pourraient utiliser le cache
+          pkill -9 npm || true
+          sleep 2
+          
+          # Trouver et tuer les processus qui utilisent le dossier .npm
+          if command -v fuser &> /dev/null; then
+            sudo fuser -k "$HOME/.npm" 2>/dev/null || true
+            sleep 1
+          fi
+          
+          # Utiliser npm cache clean si possible
+          npm cache clean --force 2>/dev/null || true
+          
+          # Corriger les permissions du dossier .npm (sans supprimer le dossier)
+          if [ -d "$HOME/.npm" ]; then
+            # Corriger les permissions du dossier parent
+            sudo chown -R $(id -u):$(id -g) "$HOME/.npm" 2>/dev/null || true
+            sudo chmod -R u+w "$HOME/.npm" 2>/dev/null || true
+            
+            # Supprimer seulement le contenu du cache, pas le dossier lui-même
+            rm -rf "$HOME/.npm/_cacache"/* "$HOME/.npm/_logs"/* 2>/dev/null || true
+            sudo rm -rf "$HOME/.npm/_cacache"/* "$HOME/.npm/_logs"/* 2>/dev/null || true
+          fi
+          
+          # Créer les dossiers nécessaires avec les bonnes permissions
+          mkdir -p "$HOME/.npm/_cacache" "$HOME/.npm/_logs"
+          chmod -R u+w "$HOME/.npm" 2>/dev/null || sudo chmod -R u+w "$HOME/.npm" 2>/dev/null || true
+          
+          # Vérifier que les permissions sont correctes
+          if [ -w "$HOME/.npm/_cacache" ] && [ -w "$HOME/.npm/_logs" ]; then
+            echo "✅ Cache npm configuré avec les bonnes permissions"
+          else
+            echo "⚠️ Permissions npm partiellement corrigées, mais devrait fonctionner"
+          fi
 
       - name: Install dependencies
         run: npm ci
 
+      - name: Set version environment variables
+        run: |
+          if [ -f "VERSION.json" ]; then
+            CLIENT_VERSION=$(jq -r '.client.version' VERSION.json)
+            CLIENT_BUILD=$(jq -r '.client.build' VERSION.json)
+            echo "PUBLIC_APP_VERSION=$CLIENT_VERSION" >> $GITHUB_ENV
+            echo "PUBLIC_APP_VERSION_CODE=$CLIENT_BUILD" >> $GITHUB_ENV
+            echo "✅ Versions définies: v$CLIENT_VERSION (build $CLIENT_BUILD)"
+          else
+            echo "⚠️ VERSION.json introuvable, utilisation des valeurs par défaut"
+            echo "PUBLIC_APP_VERSION=1.0.1" >> $GITHUB_ENV
+            echo "PUBLIC_APP_VERSION_CODE=1" >> $GITHUB_ENV
+          fi
+
+      - name: Copy VERSION.json to public directory
+        run: |
+          if [ -f "VERSION.json" ]; then
+            mkdir -p public
+            cp VERSION.json public/VERSION.json
+            echo "✅ VERSION.json copié dans public/"
+          else
+            echo "⚠️ VERSION.json introuvable, impossible de copier"
+          fi
+
       - name: Build Astro frontend
         run: npm run build
+        env:
+          PUBLIC_APP_VERSION: ${{ env.PUBLIC_APP_VERSION }}
+          PUBLIC_APP_VERSION_CODE: ${{ env.PUBLIC_APP_VERSION_CODE }}
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
-
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platform-tools platforms;android-33 build-tools;33.0.0 ndk;25.2.9519653'
-
-      - name: Accept Android licenses
+      - name: Verify Rust (pre-installed)
         run: |
-          yes | sdkmanager --licenses || true
+          rustc --version
+          cargo --version
+          rustup target list --installed | grep aarch64-linux-android || echo "⚠️ Target Android non installé"
+          echo "✅ Rust est déjà installé dans le runner"
+
+      - name: Verify Java (pre-installed)
+        run: |
+          java -version
+          # Trouver JAVA_HOME correctement
+          if [ -z "$JAVA_HOME" ]; then
+            JAVA_PATH=$(readlink -f $(which java) 2>/dev/null || which java)
+            if [ -n "$JAVA_PATH" ]; then
+              JAVA_HOME=$(dirname $(dirname "$JAVA_PATH"))
+              echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+            else
+              # Fallback pour Temurin
+              JAVA_HOME="/usr/lib/jvm/temurin-17-jdk-amd64"
+              echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+            fi
+          else
+            echo "JAVA_HOME=$JAVA_HOME" >> $GITHUB_ENV
+          fi
+          echo "JAVA_HOME=$JAVA_HOME"
+          echo "✅ Java est déjà installé dans le runner"
+
+      - name: Verify Android SDK (pre-installed)
+        run: |
+          ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
+          ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --version || echo "⚠️ SDK Manager non trouvé"
+          echo "✅ Android SDK est déjà installé dans le runner"
 
       - name: Setup NDK environment variables
         run: |
@@ -268,14 +698,23 @@ jobs:
             echo "NDK_HOME=$NDK_PATH" >> $GITHUB_ENV
           fi
 
-      - name: Install Tauri CLI
-        run: npm install -g @tauri-apps/cli@latest
+      - name: Verify Tauri CLI (pre-installed)
+        run: |
+          tauri --version || echo "⚠️ Tauri CLI non trouvé"
+          echo "✅ Tauri CLI est déjà installé dans le runner"
 
       - name: Setup Android environment variables
         run: |
+          ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
+          ANDROID_SDK_ROOT=${ANDROID_SDK_ROOT:-$ANDROID_HOME}
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> $GITHUB_PATH
           echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
           echo "$ANDROID_HOME/tools" >> $GITHUB_PATH
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> $GITHUB_ENV
+          echo "✅ Variables d'environnement Android configurées"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
       - name: Initialize Android project
         run: |
@@ -338,6 +777,32 @@ jobs:
             python3 scripts/apply-signing-config.py "$BUILD_GRADLE"
           fi
 
+      - name: Fix Android SDK permissions and install missing components
+        run: |
+          echo "🔧 Correction des permissions du SDK Android..."
+          ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
+          
+          # Corriger les permissions du SDK Android
+          if [ -d "$ANDROID_HOME" ]; then
+            echo "📁 Correction des permissions de $ANDROID_HOME..."
+            sudo chown -R $(id -u):$(id -g) "$ANDROID_HOME" 2>/dev/null || {
+              echo "⚠️ Impossible de changer le propriétaire, essai avec chmod..."
+              sudo chmod -R a+w "$ANDROID_HOME" 2>/dev/null || true
+            }
+          fi
+          
+          # Accepter les licences
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
+          
+          # Installer les composants manquants
+          echo "📦 Installation des composants SDK manquants..."
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;35.0.0" "platforms;android-36" 2>/dev/null || {
+            echo "⚠️ Installation via sdkmanager échouée, tentative avec sudo..."
+            sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;35.0.0" "platforms;android-36" 2>/dev/null || true
+          }
+          
+          echo "✅ SDK Android configuré"
+
       - name: Build Android AAB
         run: npm run tauri:build:android-mobile:aab
         env:
@@ -365,6 +830,15 @@ jobs:
       - name: Generate native debug symbols
         id: generate-symbols
         run: |
+          # Installer zip si non disponible
+          if ! command -v zip &> /dev/null; then
+            echo "📦 Installation de zip..."
+            sudo apt-get update -qq && sudo apt-get install -y -qq zip || {
+              echo "⚠️ Impossible d'installer zip, utilisation de tar comme alternative"
+              USE_TAR=true
+            }
+          fi
+          
           SYMBOLS_DIR="./native-debug-symbols"
           mkdir -p "$SYMBOLS_DIR/lib/arm64-v8a"
           
@@ -393,11 +867,18 @@ jobs:
           VERSION=$(jq -r '.version' src-tauri/tauri.android.mobile.conf.json)
           PRODUCT_NAME=$(jq -r '.productName' src-tauri/tauri.android.mobile.conf.json)
           SAFE_NAME=$(echo "$PRODUCT_NAME" | sed 's/ /_/g')
-          SYMBOLS_ZIP="${SYMBOLS_DIR}/${SAFE_NAME}-v${VERSION}-native-debug-symbols.zip"
           
-          cd "$SYMBOLS_DIR"
-          zip -r "../$SYMBOLS_ZIP" lib/ > /dev/null
-          cd ..
+          if [ "${USE_TAR:-false}" = "true" ]; then
+            SYMBOLS_ZIP="${SYMBOLS_DIR}/${SAFE_NAME}-v${VERSION}-native-debug-symbols.tar.gz"
+            cd "$SYMBOLS_DIR"
+            tar -czf "../$SYMBOLS_ZIP" lib/
+            cd ..
+          else
+            SYMBOLS_ZIP="${SYMBOLS_DIR}/${SAFE_NAME}-v${VERSION}-native-debug-symbols.zip"
+            cd "$SYMBOLS_DIR"
+            zip -r "../$SYMBOLS_ZIP" lib/ > /dev/null
+            cd ..
+          fi
           
           echo "path=$SYMBOLS_ZIP" >> $GITHUB_OUTPUT
 
@@ -454,15 +935,49 @@ jobs:
       contents: write
 
     steps:
+      - name: Verify network connectivity
+        run: |
+          echo "🔍 Vérification de la connectivité réseau..."
+          # Test DNS
+          echo "📡 Test DNS..."
+          nslookup api.github.com || echo "⚠️ Problème DNS pour api.github.com"
+          # Test connectivité HTTPS
+          echo "📡 Test connectivité HTTPS..."
+          curl -I --max-time 10 https://api.github.com 2>&1 | head -3 || echo "⚠️ Problème de connectivité API GitHub"
+          # Test téléchargement d'une action
+          echo "📡 Test téléchargement action..."
+          curl -I --max-time 10 "https://api.github.com/repos/actions/checkout/tarball/v4" 2>&1 | head -3 || echo "⚠️ Problème téléchargement action checkout"
+          echo "✅ Vérification réseau terminée"
+
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+        continue-on-error: false
+        timeout-minutes: 5
+
+      - name: Download release version artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-version
+          path: .
 
       - name: Get version
         id: version
         run: |
-          VERSION=$(jq -r '.version' src-tauri/tauri.android.mobile.conf.json)
+          VERSION=$(cat release-version.txt)
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Version: ${VERSION}"
+
+      - name: Get build date and commit info
+        id: build-info
+        run: |
+          BUILD_DATE=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          COMMIT_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          COMMIT_FULL="${{ github.sha }}"
+          echo "build_date=${BUILD_DATE}" >> $GITHUB_OUTPUT
+          echo "commit_short=${COMMIT_SHORT}" >> $GITHUB_OUTPUT
+          echo "commit_full=${COMMIT_FULL}" >> $GITHUB_OUTPUT
 
       - name: Determine release tag
         id: tag
@@ -532,13 +1047,14 @@ jobs:
           body: |
             ## Android Mobile Release ${{ steps.tag.outputs.tag }}
 
+            **Version:** ${{ steps.version.outputs.version }}
+            **Build Date:** ${{ steps.build-info.outputs.build_date }}
+            **Commit:** ${{ steps.build-info.outputs.commit_short }} (${{ steps.build-info.outputs.commit_full }})
+
             ### Artifacts
             - APK pour installation directe
             - AAB pour publication sur Google Play Store
             - Native debug symbols pour le débogage
-
-            ### Commit
-            ${{ github.sha }}
 
             ### Workflow
             [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})

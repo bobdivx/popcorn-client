@@ -5,6 +5,7 @@ import { getLocalProfile, onProfileChanged } from '../../lib/client/profile';
 import Avatar from '../ui/Avatar';
 import { isMobileDevice } from '../../lib/utils/device-detection';
 import { redirectTo } from '../../lib/utils/navigation.js';
+import { calculateSyncProgress } from '../../lib/utils/sync-progress';
 
 type NavTab = { label: string; href: string; match?: 'exact' | 'prefix' };
 
@@ -29,6 +30,7 @@ export default function Navbar() {
     }
   });
   const [syncProgress, setSyncProgress] = useState<{ inProgress: boolean; progress: number }>({ inProgress: false, progress: 0 });
+  const previousStatsRef = useRef<Record<string, number>>({});
 
   useEffect(() => {
     const updatePath = () => setCurrentPath(window.location.pathname + window.location.search);
@@ -126,52 +128,41 @@ export default function Navbar() {
       try {
         const response = await serverApi.getSyncStatus();
         if (response.success && response.data) {
+          const data = response.data;
           // Vérifier si la sync est en cours (soit via flag, soit via stats)
-          const hasStats = response.data.stats && Object.keys(response.data.stats).length > 0;
-          const inProgress = response.data.sync_in_progress || hasStats;
-          let progress = 0;
+          const hasStats = data.stats && Object.keys(data.stats).length > 0;
+          const inProgress = data.sync_in_progress || hasStats;
           
-          // Calculer la progression même si progress n'est pas encore défini
-          if (response.data.progress) {
-            const p = response.data.progress;
-            // Utiliser les stats réels (torrents insérés en DB) pour la progression
-            const totalTorrents = response.data.stats
-              ? Object.values(response.data.stats).reduce((sum: number, n: number) => sum + (n || 0), 0)
-              : 0;
-            
-            if (p.total_to_process > 0) {
-              // Phase 2-3 (enrichissement + insertion) : utiliser le max entre total_processed et stats réels
-              // car total_processed compte les traités, stats compte les réellement insérés
-              const maxProgress = Math.max(
-                p.total_processed, // Progression du traitement
-                totalTorrents // Progression réelle (insérés en DB)
-              );
-              const phases23Progress = Math.min(1, maxProgress / p.total_to_process);
-              progress = Math.round(33 + (phases23Progress * 67));
-            } else {
-              // Phase 1 (fetch) : utiliser indexer_torrents ou fetched_torrents
-              const fetchedTotal = p.indexer_torrents
-                ? Object.values(p.indexer_torrents).reduce((sum: number, n: number) => sum + (n || 0), 0)
-                : (p.fetched_torrents || 0);
-              
-              if (fetchedTotal > 0) {
-                // Phase fetch : estimer à 33% max
-                progress = Math.min(33, Math.round((fetchedTotal / 1000) * 33));
-              }
-            }
-          } else if (hasStats) {
-            // Si pas de progress mais qu'on a des stats, estimer une progression basique
-            const totalTorrents = Object.values(response.data.stats).reduce((sum: number, n: number) => sum + (n || 0), 0);
-            if (totalTorrents > 0) {
-              // Estimer qu'on est au moins à 33% (fetch terminé) + un peu d'insertion
-              progress = Math.min(100, 33 + Math.min(67, Math.round((totalTorrents / 100) * 10)));
-            }
+          // Initialiser previousStats si c'est le début d'une sync
+          if (Object.keys(previousStatsRef.current).length === 0 && inProgress) {
+            previousStatsRef.current = data.stats || {};
+          }
+          
+          // Utiliser la fonction utilitaire partagée pour calculer la progression
+          const progress = calculateSyncProgress(
+            {
+              sync_in_progress: inProgress,
+              stats: data.stats,
+              progress: data.progress,
+            },
+            previousStatsRef.current
+          );
+          
+          // Réinitialiser previousStats si la sync vient de se terminer
+          if (!inProgress && Object.keys(previousStatsRef.current).length > 0) {
+            previousStatsRef.current = {};
           }
           
           setSyncProgress({ inProgress, progress });
+        } else {
+          // Si pas de réponse ou erreur, réinitialiser
+          previousStatsRef.current = {};
+          setSyncProgress({ inProgress: false, progress: 0 });
         }
       } catch (err) {
-        // Ignorer les erreurs silencieusement
+        // Ignorer les erreurs silencieusement mais réinitialiser
+        previousStatsRef.current = {};
+        setSyncProgress({ inProgress: false, progress: 0 });
       }
     };
 
@@ -368,7 +359,7 @@ export default function Navbar() {
                   tabIndex={0}
                   data-focusable
                 >
-                  {syncProgress.inProgress && syncProgress.progress > 0 && (
+                  {syncProgress.inProgress && (
                     <svg
                       className="absolute inset-0 w-full h-full transform -rotate-90 pointer-events-none"
                       viewBox="0 0 36 36"
@@ -392,8 +383,12 @@ export default function Navbar() {
                         stroke="rgb(59, 130, 246)"
                         strokeWidth="2"
                         strokeDasharray={`${(syncProgress.progress / 100) * 100.53}, 100.53`}
+                        strokeDashoffset="0"
                         strokeLinecap="round"
-                        className="transition-all duration-500"
+                        className="transition-all duration-500 ease-out"
+                        style={{
+                          strokeDasharray: `${(syncProgress.progress / 100) * 100.53}, 100.53`
+                        }}
                       />
                     </svg>
                   )}

@@ -19,7 +19,8 @@ export default function HLSPlayer({
   filePath, 
   startFromBeginning = false, 
   onError, 
-  onLoadingChange 
+  onLoadingChange,
+  onClose 
 }: HLSPlayerProps) {
   const playerConfig = usePlayerConfig();
   const canAutoPlayRef = useRef<(() => boolean) | null>(null);
@@ -137,6 +138,17 @@ export default function HLSPlayer({
     });
   };
 
+  // Fonction pour redémarrer la vidéo depuis le début
+  const handleRestart = () => {
+    const video = videoRef.current;
+    if (video) {
+      video.currentTime = 0;
+      video.play().catch((err) => {
+        console.warn('Impossible de démarrer la lecture:', err);
+      });
+    }
+  };
+
   // Activer le plein écran automatiquement au démarrage sur mobile/Android
   useEffect(() => {
     const video = videoRef.current;
@@ -209,9 +221,65 @@ export default function HLSPlayer({
         }}
       >
         {isLoading && (
-          <div class="absolute inset-0 flex items-center justify-center bg-black z-10">
-            <span class="loading loading-spinner loading-lg text-white"></span>
-            <p class="absolute bottom-4 text-white text-sm">Chargement de la vidéo...</p>
+          <div class="absolute inset-0 flex flex-col items-center justify-center bg-black z-10">
+            {/* Animation du logo Popcorn */}
+            <div class="relative w-32 h-32 mb-6">
+              {/* Cercle de chargement externe */}
+              <div class="absolute inset-0 border-4 border-primary-600/20 rounded-full"></div>
+              <div 
+                class="absolute inset-0 border-4 border-primary-600 border-t-transparent rounded-full"
+                style={{
+                  animation: 'spin 1s linear infinite',
+                }}
+              ></div>
+              {/* Logo Popcorn avec animation pulse */}
+              <div 
+                class="absolute inset-2 flex items-center justify-center"
+                style={{
+                  animation: 'pulse 2s ease-in-out infinite',
+                }}
+              >
+                <img 
+                  src="/popcorn_logo.png" 
+                  alt="Popcorn" 
+                  class="w-full h-full object-contain drop-shadow-lg"
+                  style={{
+                    filter: 'drop-shadow(0 0 10px rgba(220, 38, 38, 0.5))',
+                  }}
+                />
+              </div>
+            </div>
+            <p class="text-white/80 text-lg font-medium">Chargement de la vidéo...</p>
+            {/* Points animés */}
+            <div class="flex gap-1 mt-2">
+              <span 
+                class="w-2 h-2 bg-primary-600 rounded-full"
+                style={{ animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0s' }}
+              ></span>
+              <span 
+                class="w-2 h-2 bg-primary-600 rounded-full"
+                style={{ animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.2s' }}
+              ></span>
+              <span 
+                class="w-2 h-2 bg-primary-600 rounded-full"
+                style={{ animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.4s' }}
+              ></span>
+            </div>
+            {/* Keyframes CSS inline */}
+            <style>{`
+              @keyframes spin {
+                from { transform: rotate(0deg); }
+                to { transform: rotate(360deg); }
+              }
+              @keyframes pulse {
+                0%, 100% { transform: scale(1); opacity: 1; }
+                50% { transform: scale(0.9); opacity: 0.8; }
+              }
+              @keyframes bounce {
+                0%, 80%, 100% { transform: scale(0); }
+                40% { transform: scale(1); }
+              }
+            `}</style>
           </div>
         )}
         <video
@@ -221,6 +289,7 @@ export default function HLSPlayer({
           preload="auto"
           autoplay={playerConfig.autoplay}
           muted={playerConfig.muted}
+          poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect fill='%23000' width='1' height='1'/%3E%3C/svg%3E"
           style={{
             transform: playerConfig.hardwareAcceleration ? 'translateZ(0)' : 'none',
             willChange: 'auto',
@@ -229,6 +298,7 @@ export default function HLSPlayer({
             height: '100%',
             objectFit: 'contain',
             display: 'block',
+            backgroundColor: '#000',
           }}
           onClick={(e: any) => {
             const target = e.target as HTMLElement;
@@ -268,6 +338,8 @@ export default function HLSPlayer({
           onToggleSubtitleSelector={toggleSubtitleSelector}
           onCloseSubtitleSelector={() => setShowSubtitleSelector(false)}
           showLogo={playerConfig.showLogo}
+          onClose={onClose}
+          onRestart={handleRestart}
         />
       </div>
     </div>

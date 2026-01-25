@@ -15,9 +15,9 @@ interface ServerApiClientAccess {
 export const healthMethods = {
   /**
    * Vérifie la santé du serveur avec détails
-   * Retourne des informations détaillées sur l'état de la connexion
+   * Retourne des informations détaillées sur l'état de la connexion et la version
    */
-  async checkServerHealth(this: ServerApiClientAccess): Promise<ApiResponse<{ status: string; reachable: boolean; latency?: number }>> {
+  async checkServerHealth(this: ServerApiClientAccess): Promise<ApiResponse<{ status: string; reachable: boolean; latency?: number; version?: string; build?: number }>> {
     const startTime = Date.now();
     
     // Unifié : appel direct au backend Rust
@@ -53,12 +53,17 @@ export const healthMethods = {
       };
     }
     
+    // Extraire la version et le build depuis la réponse du backend
+    const backendData = res.data || {};
+    
     return {
       success: true,
       data: {
         status: 'ok',
         reachable: true,
         latency,
+        version: backendData.version,
+        build: backendData.build,
       },
     };
   },

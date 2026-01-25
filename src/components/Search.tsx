@@ -14,12 +14,21 @@ interface SearchResultPosterProps {
   onClick?: (result: SearchResult) => void;
 }
 
+/** URL de détail : /torrents?tmdbId=...&title=... si tmdbId, sinon /torrents?slug=... */
+function getDetailUrl(result: SearchResult): string {
+  if (result.tmdbId != null) {
+    return `/torrents?tmdbId=${result.tmdbId}&title=${encodeURIComponent(result.title)}`;
+  }
+  return `/torrents?slug=${encodeURIComponent(result.id)}`;
+}
+
 /**
  * Composant pour afficher un résultat de recherche dans un style moderne
  */
 function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(result.poster || null);
+  const detailUrl = getDetailUrl(result);
 
   useEffect(() => {
     if (result.poster && result.poster !== imageUrl) {
@@ -35,7 +44,7 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
     if (onClick) {
       onClick(result);
     } else {
-      window.location.href = `/player/${result.id}`;
+      window.location.href = detailUrl;
     }
   };
 
@@ -48,7 +57,7 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
       <FocusableCard
         className="w-full"
         onClick={handleClick}
-        href={`/player/${result.id}`}
+        href={detailUrl}
         tabIndex={0}
       >
           <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-lg rounded-lg transform transition-all duration-300 hover:scale-105 hover:shadow-primary focus-within:scale-105 focus-within:shadow-primary-lg focus-within:ring-4 focus-within:ring-primary-600 focus-within:ring-opacity-60">
@@ -113,22 +122,27 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
   );
 }
 
+type SearchPhase = 'idle' | 'local' | 'indexer';
+
 export default function Search({ onResultClick }: SearchProps) {
   const [query, setQuery] = useState('');
   const [type, setType] = useState<'movie' | 'tv' | 'all'>('all');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchPhase, setSearchPhase] = useState<SearchPhase>('idle');
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Focus automatique sur le champ de recherche au chargement (pour TV)
   useEffect(() => {
     if (inputRef.current && typeof window !== 'undefined') {
-      // Petit délai pour s'assurer que le composant est monté
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 100);
+      setTimeout(() => inputRef.current?.focus(), 100);
     }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search).get('q');
+    if (q && q.trim()) setQuery(q.trim());
   }, []);
 
   const handleSearch = async () => {
@@ -137,10 +151,8 @@ export default function Search({ onResultClick }: SearchProps) {
       return;
     }
 
-    // Vérifier le cache
     const cacheKey = `search_${query}_${type}`;
     const cached = CacheManager.get<SearchResult[]>(cacheKey);
-    
     if (cached) {
       setResults(cached);
       return;
@@ -149,44 +161,68 @@ export default function Search({ onResultClick }: SearchProps) {
     try {
       setLoading(true);
       setError(null);
+      setSearchPhase('local');
 
       if (!serverApi.isAuthenticated()) {
         setError('Vous devez être connecté pour rechercher du contenu');
         setLoading(false);
+        setSearchPhase('idle');
         return;
       }
 
-      const response = await serverApi.search({
+      const typeParam = type === 'all' ? undefined : type;
+
+      const localRes = await serverApi.search({
         q: query,
-        type: type === 'all' ? undefined : type,
+        type: typeParam,
+        source: 'local',
       });
 
-      if (!response.success) {
-        setError(response.message || 'Erreur lors de la recherche');
+      if (!localRes.success) {
+        setError(localRes.message || 'Erreur lors de la recherche');
+        setLoading(false);
+        setSearchPhase('idle');
         return;
       }
 
-      if (response.data) {
-        setResults(response.data);
-        // Mettre en cache pour 1 heure
-        CacheManager.set(cacheKey, response.data, 60 * 60 * 1000);
+      const localData = localRes.data ?? [];
+      if (localData.length > 0) {
+        setResults(localData);
+        CacheManager.set(cacheKey, localData, 60 * 60 * 1000);
+        setLoading(false);
+        setSearchPhase('idle');
+        return;
       }
+
+      setSearchPhase('indexer');
+      const indexerRes = await serverApi.search({
+        q: query,
+        type: typeParam,
+        source: 'indexer',
+      });
+
+      if (!indexerRes.success) {
+        setError(indexerRes.message || 'Erreur lors de la recherche sur les indexeurs');
+        setLoading(false);
+        setSearchPhase('idle');
+        return;
+      }
+
+      const indexerData = indexerRes.data ?? [];
+      setResults(indexerData);
+      CacheManager.set(cacheKey, indexerData, 60 * 60 * 1000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleKeyPress = (e: KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch();
+      setSearchPhase('idle');
     }
   };
 
   const handleClear = () => {
     setQuery('');
     setResults([]);
+    setSearchPhase('idle');
     inputRef.current?.focus();
   };
 
@@ -214,7 +250,13 @@ export default function Search({ onResultClick }: SearchProps) {
             </h1>
 
             {/* Barre de recherche moderne */}
-            <div className="flex flex-col sm:flex-row gap-3 tv:gap-4 mb-6">
+            <form
+              className="flex flex-col sm:flex-row gap-3 tv:gap-4 mb-6"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSearch();
+              }}
+            >
               <div className="relative flex-1">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-4 tv:pl-6 pointer-events-none z-10">
                   <SearchIcon className="w-5 h-5 tv:w-7 tv:h-7 text-gray-400" size={24} />
@@ -225,12 +267,22 @@ export default function Search({ onResultClick }: SearchProps) {
                   placeholder="Rechercher un film ou une série..."
                   className="w-full pl-12 tv:pl-16 pr-12 tv:pr-16 py-3 tv:py-4 bg-gray-900/90 backdrop-blur-sm border-2 border-gray-700 rounded-lg text-white placeholder-gray-400 focus:border-primary-600 focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 text-base tv:text-lg min-h-[56px] tv:min-h-[64px] transition-all duration-200"
                   value={query}
-                  onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
-                  onKeyPress={handleKeyPress}
+                  onInput={(e) => {
+                    const el = e.target as HTMLInputElement;
+                    setQuery(el?.value ?? '');
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSearch();
+                    }
+                  }}
                   tabIndex={0}
+                  autoComplete="off"
                 />
                 {query && (
                   <button
+                    type="button"
                     onClick={handleClear}
                     className="absolute inset-y-0 right-0 flex items-center pr-4 tv:pr-6 text-gray-400 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-opacity-50 rounded"
                     tabIndex={0}
@@ -241,7 +293,7 @@ export default function Search({ onResultClick }: SearchProps) {
                 )}
               </div>
               <button
-                onClick={handleSearch}
+                type="submit"
                 disabled={loading || !query.trim()}
                 className="w-full sm:w-auto bg-primary hover:bg-primary-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-8 tv:px-12 py-3 tv:py-4 rounded-lg font-semibold text-base tv:text-lg flex items-center justify-center gap-2 transition-all duration-300 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[56px] tv:min-h-[64px]"
                 tabIndex={0}
@@ -255,11 +307,12 @@ export default function Search({ onResultClick }: SearchProps) {
                   </>
                 )}
               </button>
-            </div>
+            </form>
 
             {/* Filtres de catégories */}
             <div className="flex flex-wrap gap-3 tv:gap-4">
               <button
+                type="button"
                 onClick={() => {
                   setType('all');
                   if (query) handleSearch();
@@ -274,6 +327,7 @@ export default function Search({ onResultClick }: SearchProps) {
                 Tout
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setType('movie');
                   if (query) handleSearch();
@@ -288,6 +342,7 @@ export default function Search({ onResultClick }: SearchProps) {
                 Films
               </button>
               <button
+                type="button"
                 onClick={() => {
                   setType('tv');
                   if (query) handleSearch();
@@ -351,11 +406,33 @@ export default function Search({ onResultClick }: SearchProps) {
         </div>
       )}
 
-      {/* État de chargement */}
+      {/* État de chargement : mascotte Popcorn + étape affichée */}
       {loading && (
-        <div className="flex flex-col items-center justify-center py-20 tv:py-32">
-          <span className="loading loading-spinner loading-lg tv:loading-xl text-primary-600 mb-4"></span>
-          <p className="text-gray-400 text-lg tv:text-xl">Recherche en cours...</p>
+        <div className="flex flex-col items-center justify-center py-20 tv:py-32 px-4">
+          <div className="relative mb-6 tv:mb-8">
+            <div className="w-24 h-24 tv:w-32 tv:h-32 relative">
+              <div className="absolute inset-0 border-2 border-primary-500/30 rounded-full animate-spin" style={{ animationDuration: '3s' }} />
+              <div className="absolute inset-2 border-2 border-primary-400/20 rounded-full animate-spin" style={{ animationDuration: '2s', animationDirection: 'reverse' }} />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <img
+                  src="/popcorn_logo.png"
+                  alt="Popcorn"
+                  className="w-14 h-14 tv:w-20 tv:h-20 object-contain animate-pulse"
+                  style={{ animationDuration: '1.5s' }}
+                />
+              </div>
+            </div>
+          </div>
+          <p className="text-gray-300 text-lg tv:text-xl font-medium text-center max-w-md">
+            {searchPhase === 'local'
+              ? 'Recherche dans la base locale (torrents synchronisés)...'
+              : 'Recherche sur les indexeurs...'}
+          </p>
+          <p className="text-gray-500 text-sm tv:text-base mt-2 text-center">
+            {searchPhase === 'local'
+              ? "Popcorn parcourt d'abord ta bibliothèque."
+              : 'Aucun résultat local. Popcorn interroge les indexeurs.'}
+          </p>
         </div>
       )}
 
@@ -371,6 +448,7 @@ export default function Search({ onResultClick }: SearchProps) {
               Aucun {type === 'all' ? 'contenu' : type === 'movie' ? 'film' : 'série'} trouvé pour "{query}"
             </p>
             <button
+              type="button"
               onClick={handleClear}
               className="bg-primary hover:bg-primary-700 text-white px-8 tv:px-12 py-3 tv:py-4 rounded-lg font-semibold text-base tv:text-lg transition-all duration-300 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv:min-h-[56px]"
               tabIndex={0}
