@@ -278,6 +278,56 @@ jobs:
           echo "ANDROID_HOME=$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
+      - name: Fix rustup cache and install Android targets
+        run: |
+          echo "🔧 Correction du cache rustup et installation des targets Android..."
+          
+          # Corriger les permissions du cache rustup
+          RUSTUP_HOME=${RUSTUP_HOME:-$HOME/.rustup}
+          CARGO_HOME=${CARGO_HOME:-$HOME/.cargo}
+          
+          if [ -d "$RUSTUP_HOME" ]; then
+            echo "📁 Correction des permissions de $RUSTUP_HOME..."
+            sudo chown -R $(id -u):$(id -g) "$RUSTUP_HOME" 2>/dev/null || true
+            sudo chmod -R u+w "$RUSTUP_HOME" 2>/dev/null || true
+          fi
+          
+          if [ -d "$CARGO_HOME" ]; then
+            echo "📁 Correction des permissions de $CARGO_HOME..."
+            sudo chown -R $(id -u):$(id -g) "$CARGO_HOME" 2>/dev/null || true
+            sudo chmod -R u+w "$CARGO_HOME" 2>/dev/null || true
+          fi
+          
+          # Nettoyer le cache rustup si nécessaire
+          if [ -d "$RUSTUP_HOME/tmp" ]; then
+            echo "🧹 Nettoyage du cache temporaire rustup..."
+            rm -rf "$RUSTUP_HOME/tmp"/* 2>/dev/null || true
+            sudo rm -rf "$RUSTUP_HOME/tmp"/* 2>/dev/null || true
+          fi
+          
+          # Installer les targets Android nécessaires avant tauri android init
+          echo "📦 Installation des targets Android Rust..."
+          rustup target add aarch64-linux-android || {
+            echo "⚠️ Échec installation aarch64-linux-android, réessai..."
+            rustup self update || true
+            rustup target add aarch64-linux-android
+          }
+          
+          rustup target add armv7-linux-androideabi || {
+            echo "⚠️ Échec installation armv7-linux-androideabi, réessai..."
+            rustup self update || true
+            rustup target add armv7-linux-androideabi
+          }
+          
+          rustup target add i686-linux-android || {
+            echo "⚠️ Échec installation i686-linux-android, réessai..."
+            rustup self update || true
+            rustup target add i686-linux-android
+          }
+          
+          echo "✅ Targets Android installés"
+          rustup target list --installed | grep android || echo "⚠️ Aucun target Android installé"
+
       - name: Initialize Android project
         run: |
           echo "Checking if Android project exists..."
