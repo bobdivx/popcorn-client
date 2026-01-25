@@ -5,17 +5,18 @@ on:
     branches:
       - main
       - master
+      - webos
     tags:
       - 'v*'
   pull_request:
     branches:
       - main
       - master
-  workflow_dispatch:  # Permet de déclencher manuellement depuis l'interface GitHub
+  workflow_dispatch:
 
 jobs:
-  # Job 1: Build frontend Astro
-  build-frontend:
+  # Job unique: Build IPK avec le dossier webos/ existant
+  build-ipk:
     runs-on: self-hosted
     environment: production
     permissions:
@@ -29,38 +30,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build Astro frontend
-        run: npm run build
-
-      - name: Upload frontend artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: popcorn-frontend-dist
-          path: dist/
-          retention-days: 7
-
-  # Job 2: Prepare WebOS structure
-  prepare-webos:
-    needs: build-frontend
-    runs-on: self-hosted
-    environment: production
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download frontend artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: popcorn-frontend-dist
-          path: dist/
 
       - name: Get version
         id: version
@@ -69,110 +38,9 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Version: ${VERSION}"
 
-      - name: Prepare WebOS structure
+      - name: Prepare WebOS package
         run: |
-          # Créer le dossier frontend dans webos/
-          mkdir -p webos/frontend
-          
-          # Copier le frontend buildé
-          cp -r dist/* webos/frontend/
-          
-          # Copier les icônes
-          cp src-tauri/icons/icon.png webos/icon.png
-          cp src-tauri/icons/icon.png webos/icon-large.png
-          
-          # Mettre à jour appinfo.json avec la version
-          jq --arg version "${{ steps.version.outputs.version }}" '.version = $version' webos/appinfo.json > webos/appinfo.json.tmp
-          mv webos/appinfo.json.tmp webos/appinfo.json
-          
-          echo "✅ Structure WebOS préparée"
-
-      - name: Upload WebOS structure artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: popcorn-webos-structure
-          path: webos/
-          retention-days: 7
-
-  # Job 3: Build IPK with ares-package
-  build-ipk:
-    needs: prepare-webos
-    runs-on: self-hosted
-    environment: production
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download WebOS structure artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: popcorn-webos-structure
-          path: webos/
-
-      - name: Check for ares-package
-        id: check-ares
-        run: |
-          if command -v ares-package &> /dev/null; then
-            echo "available=true" >> $GITHUB_OUTPUT
-            echo "✅ ares-package est disponible nativement"
-          else
-            echo "available=false" >> $GITHUB_OUTPUT
-            echo "⚠️ ares-package n'est pas disponible"
-          fi
-
-      - name: Install ares-cli via npm
-        run: |
-          echo "📦 Installation de ares-cli via npm..."
-          
-          # Vérifier si ares-package est déjà disponible
-          if command -v ares-package &> /dev/null; then
-            echo "✅ ares-package est déjà disponible, pas besoin d'installation"
-            ares-package --version || true
-          else
-            # Installer ares-cli globalement
-            echo "🔧 Installation de ares-cli..."
-            npm install -g ares-cli
-            
-            # Vérifier que l'installation a réussi
-            if command -v ares-package &> /dev/null; then
-              echo "✅ ares-cli installé avec succès"
-              ares-package --version || true
-            else
-              echo "❌ ares-package n'est pas disponible après l'installation"
-              echo "💡 Vérification du PATH..."
-              echo "PATH: $PATH"
-              echo "npm global bin: $(npm config get prefix)/bin"
-              which ares-package || echo "ares-package non trouvé dans PATH"
-              
-              # Essayer d'ajouter npm global bin au PATH
-              export PATH="$(npm config get prefix)/bin:$PATH"
-              if command -v ares-package &> /dev/null; then
-                echo "✅ ares-package trouvé après mise à jour du PATH"
-              else
-                echo "❌ Échec de l'installation de ares-cli"
-                exit 1
-              fi
-            fi
-          fi
-
-      - name: Build IPK
-        run: |
-          # S'assurer que ares-package est dans le PATH
-          export PATH="$(npm config get prefix)/bin:$PATH"
-          
-          # Vérifier que ares-package est disponible
-          if ! command -v ares-package &> /dev/null; then
-            echo "❌ ares-package n'est toujours pas disponible"
-            echo "PATH actuel: $PATH"
-            which ares-package || echo "ares-package non trouvé"
-            exit 1
-          fi
-          
-          echo "✅ ares-package disponible: $(which ares-package)"
-          ares-package --version || true
+          echo "📦 Préparation du package WebOS..."
           
           # Vérifier que le dossier webos existe
           if [ ! -d "webos" ]; then
@@ -186,25 +54,78 @@ jobs:
             exit 1
           fi
           
-          # Vérifier que le frontend existe
-          if [ ! -d "webos/frontend" ]; then
-            echo "❌ Le dossier webos/frontend n'existe pas!"
+          # Vérifier que index.html existe
+          if [ ! -f "webos/index.html" ]; then
+            echo "❌ index.html introuvable dans webos/"
             exit 1
           fi
           
+          # Mettre à jour appinfo.json avec la version
+          jq --arg version "${{ steps.version.outputs.version }}" '.version = $version' webos/appinfo.json > webos/appinfo.json.tmp
+          mv webos/appinfo.json.tmp webos/appinfo.json
+          
+          # Copier les icônes si elles n'existent pas
+          if [ ! -f "webos/icon.png" ]; then
+            if [ -f "src-tauri/icons/icon.png" ]; then
+              cp src-tauri/icons/icon.png webos/icon.png
+              cp src-tauri/icons/icon.png webos/icon-large.png
+              echo "✅ Icônes copiées"
+            else
+              echo "⚠️ Icônes source non trouvées"
+            fi
+          fi
+          
+          echo "📋 Contenu du dossier webos:"
+          ls -la webos/
+          
+          echo "📄 appinfo.json:"
+          cat webos/appinfo.json
+          
+          echo "✅ Package WebOS prêt"
+
+      - name: Install ares-cli
+        run: |
+          echo "📦 Installation de ares-cli..."
+          
+          if command -v ares-package &> /dev/null; then
+            echo "✅ ares-package est déjà disponible"
+            ares-package --version || true
+          else
+            echo "🔧 Installation de @webos-tools/cli..."
+            npm install -g @webos-tools/cli
+            
+            # Mettre à jour le PATH
+            export PATH="$(npm config get prefix)/bin:$PATH"
+            
+            if command -v ares-package &> /dev/null; then
+              echo "✅ ares-cli installé avec succès"
+              ares-package --version || true
+            else
+              echo "❌ Échec de l'installation de ares-cli"
+              exit 1
+            fi
+          fi
+
+      - name: Build IPK
+        run: |
+          # S'assurer que ares-package est dans le PATH
+          export PATH="$(npm config get prefix)/bin:$PATH"
+          
           echo "📦 Packaging de l'application WebOS en IPK..."
           cd webos
-          ares-package .
+          
+          # Utiliser --no-minify pour éviter les erreurs de minification
+          ares-package . --no-minify
           
           if [ $? -ne 0 ]; then
             echo "❌ Échec du packaging IPK"
-            echo "💡 Vérifiez que ares-package fonctionne correctement: ares-package --help"
             exit 1
           fi
           
           echo "✅ IPK créé avec succès"
+          ls -la *.ipk || true
 
-      - name: Find IPK file
+      - name: Find and move IPK file
         id: find-ipk
         run: |
           IPK_FILE=$(find webos -name "*.ipk" -type f | head -n 1)
@@ -213,10 +134,14 @@ jobs:
             exit 1
           fi
           
-          IPK_NAME=$(basename "$IPK_FILE")
-          echo "path=$IPK_FILE" >> $GITHUB_OUTPUT
+          # Déplacer l'IPK à la racine avec un nom standardisé
+          VERSION="${{ steps.version.outputs.version }}"
+          IPK_NAME="Popcorn_WebOS-v${VERSION}.ipk"
+          mv "$IPK_FILE" "./$IPK_NAME"
+          
+          echo "path=./$IPK_NAME" >> $GITHUB_OUTPUT
           echo "name=$IPK_NAME" >> $GITHUB_OUTPUT
-          echo "✅ IPK trouvé: $IPK_NAME"
+          echo "✅ IPK: $IPK_NAME"
 
       - name: Upload IPK artifact
         uses: actions/upload-artifact@v4
@@ -225,12 +150,12 @@ jobs:
           path: ${{ steps.find-ipk.outputs.path }}
           retention-days: 90
 
-  # Job 4: Create GitHub Release
+  # Job 2: Create GitHub Release
   create-release:
     needs: [build-ipk]
     runs-on: self-hosted
     environment: production
-    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/webos' || startsWith(github.ref, 'refs/tags/v'))
     permissions:
       contents: write
 
@@ -251,7 +176,7 @@ jobs:
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG="${{ github.ref_name }}"
           else
-            TAG="v${{ steps.version.outputs.version }}"
+            TAG="v${{ steps.version.outputs.version }}-webos"
           fi
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           echo "Release tag: ${TAG}"
@@ -261,23 +186,6 @@ jobs:
         with:
           name: popcorn-webos-ipk
           path: ./artifacts
-
-      - name: Check if GitHub CLI is available
-        id: check-gh
-        run: |
-          if command -v gh &> /dev/null; then
-            echo "available=true" >> $GITHUB_OUTPUT
-            echo "✅ GitHub CLI est déjà installé"
-          else
-            echo "available=false" >> $GITHUB_OUTPUT
-            echo "⚠️ GitHub CLI n'est pas installé, tentative d'installation..."
-            type -p curl >/dev/null || (apt update && apt install curl -y)
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-            && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
-            && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-            && apt update \
-            && apt install gh -y || echo "❌ Impossible d'installer GitHub CLI"
-          fi
 
       - name: Check if release exists
         id: check-release
@@ -297,22 +205,32 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
-          name: Release ${{ steps.tag.outputs.tag }} - WebOS
+          name: Popcorn WebOS ${{ steps.version.outputs.version }}
           body: |
-            ## WebOS Release ${{ steps.tag.outputs.tag }}
-
-            ### Artifacts
-            - IPK pour installation sur téléviseurs LG WebOS
-
+            ## Popcorn Client pour LG WebOS TV
+            
+            Version: **${{ steps.version.outputs.version }}**
+            
             ### Installation
-            1. Téléchargez le fichier `.ipk`
-            2. Installez-le sur votre TV WebOS via Developer Mode ou via l'application Homebrew Channel
-
+            
+            #### Méthode 1: Developer Mode (recommandé)
+            1. Activez le Developer Mode sur votre TV LG
+            2. Installez `@webos-tools/cli` : `npm install -g @webos-tools/cli`
+            3. Configurez votre TV : `ares-setup-device`
+            4. Installez l'IPK : `ares-install -d <device> Popcorn_WebOS-v${{ steps.version.outputs.version }}.ipk`
+            
+            #### Méthode 2: Homebrew Channel
+            1. Installez Homebrew Channel sur votre TV
+            2. Transférez le fichier .ipk sur une clé USB
+            3. Installez via Homebrew Channel
+            
+            ### Notes
+            - Cette application charge le client Popcorn depuis Vercel
+            - Navigation TV avec télécommande supportée
+            - Résolution: 1920x1080
+            
             ### Commit
-            ${{ github.sha }}
-
-            ### Workflow
-            [View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `${{ github.sha }}`
           files: ./artifacts/**
           draft: false
           prerelease: false
