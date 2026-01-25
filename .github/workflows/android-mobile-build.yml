@@ -26,8 +26,26 @@ jobs:
       contents: write
 
     steps:
+      - name: Verify network connectivity
+        run: |
+          echo "🔍 Vérification de la connectivité réseau..."
+          # Test DNS
+          echo "📡 Test DNS..."
+          nslookup api.github.com || echo "⚠️ Problème DNS pour api.github.com"
+          # Test connectivité HTTPS
+          echo "📡 Test connectivité HTTPS..."
+          curl -I --max-time 10 https://api.github.com 2>&1 | head -3 || echo "⚠️ Problème de connectivité API GitHub"
+          # Test téléchargement d'une action
+          echo "📡 Test téléchargement action..."
+          curl -I --max-time 10 "https://api.github.com/repos/actions/checkout/tarball/v4" 2>&1 | head -3 || echo "⚠️ Problème téléchargement action checkout"
+          echo "✅ Vérification réseau terminée"
+
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+        continue-on-error: false
+        timeout-minutes: 5
 
       - name: Increment client version in VERSION.json
         id: increment_version
@@ -418,8 +436,26 @@ jobs:
       contents: write
 
     steps:
+      - name: Verify network connectivity
+        run: |
+          echo "🔍 Vérification de la connectivité réseau..."
+          # Test DNS
+          echo "📡 Test DNS..."
+          nslookup api.github.com || echo "⚠️ Problème DNS pour api.github.com"
+          # Test connectivité HTTPS
+          echo "📡 Test connectivité HTTPS..."
+          curl -I --max-time 10 https://api.github.com 2>&1 | head -3 || echo "⚠️ Problème de connectivité API GitHub"
+          # Test téléchargement d'une action
+          echo "📡 Test téléchargement action..."
+          curl -I --max-time 10 "https://api.github.com/repos/actions/checkout/tarball/v4" 2>&1 | head -3 || echo "⚠️ Problème téléchargement action checkout"
+          echo "✅ Vérification réseau terminée"
+
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+        continue-on-error: false
+        timeout-minutes: 5
 
       - name: Download release version artifact
         uses: actions/download-artifact@v4
@@ -729,8 +765,26 @@ jobs:
       contents: write
 
     steps:
+      - name: Verify network connectivity
+        run: |
+          echo "🔍 Vérification de la connectivité réseau..."
+          # Test DNS
+          echo "📡 Test DNS..."
+          nslookup api.github.com || echo "⚠️ Problème DNS pour api.github.com"
+          # Test connectivité HTTPS
+          echo "📡 Test connectivité HTTPS..."
+          curl -I --max-time 10 https://api.github.com 2>&1 | head -3 || echo "⚠️ Problème de connectivité API GitHub"
+          # Test téléchargement d'une action
+          echo "📡 Test téléchargement action..."
+          curl -I --max-time 10 "https://api.github.com/repos/actions/checkout/tarball/v4" 2>&1 | head -3 || echo "⚠️ Problème téléchargement action checkout"
+          echo "✅ Vérification réseau terminée"
+
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+        continue-on-error: false
+        timeout-minutes: 5
 
       - name: Download release version artifact
         uses: actions/download-artifact@v4
