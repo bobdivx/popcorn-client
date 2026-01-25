@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import ServerConnectionCheck from '../components/ServerConnectionCheck';
 import Navbar from '../components/layout/Navbar';
+import TVNavigationProvider from '../components/tv/TVNavigationProvider';
 
 interface Props {
   title?: string;
@@ -27,6 +28,7 @@ const { title = 'Popcorn Client' } = Astro.props;
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet" />
   </head>
   <body class="min-h-screen bg-[#121212] text-white flex flex-col overflow-x-hidden">
+    <TVNavigationProvider client:only="preact" />
     <ServerConnectionCheck client:only="preact" />
     <Navbar client:only="preact" />
     <!-- Header (barre en haut) -->
