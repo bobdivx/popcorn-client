@@ -66,9 +66,23 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
           echo "Version finale: ${VERSION}"
 
+      - name: Fix Docker socket permissions
+        run: |
+          echo "🔧 Correction des permissions du socket Docker..."
+          if [ -S /var/run/docker.sock ]; then
+            sudo chmod 666 /var/run/docker.sock 2>/dev/null || {
+              echo "⚠️ chmod échoué, tentative avec chown..."
+              sudo chown $(id -u):docker /var/run/docker.sock 2>/dev/null || true
+            }
+            echo "✅ Permissions du socket Docker corrigées"
+          else
+            echo "⚠️ Socket Docker non trouvé à /var/run/docker.sock"
+          fi
+
       - name: Verify Docker Buildx (pre-installed)
         run: |
           docker buildx version || echo "⚠️ Buildx non trouvé"
+          docker info || echo "⚠️ Docker info échoué"
           echo "✅ Docker Buildx est déjà installé dans le runner"
 
       - name: Check Docker Hub credentials
