@@ -1,12 +1,10 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import HLSPlayer from '../../../streaming/hls-player/HLSPlayer';
-import { clientApi } from '../../../../lib/client/api';
 import { serverApi } from '../../../../lib/client/server-api';
 import type { TorrentFile } from '../hooks/useVideoFiles';
 import { useFullscreen } from '../../../streaming/hls-player/hooks/useFullscreen';
 import { QualityBadges } from './QualityBadges';
 import { isMobileDevice } from '../../../../lib/utils/device-detection';
-import { usePlayerConfig } from '../../../streaming/hls-player/hooks/usePlayerConfig';
 
 interface VideoPlayerWrapperProps {
   infoHash: string;
@@ -43,9 +41,6 @@ export function VideoPlayerWrapper({
   const isFullscreen = useFullscreen();
   const wrapperElementRef = useRef<HTMLDivElement>(null);
   const isMobile = isMobileDevice();
-  const [showCloseButton, setShowCloseButton] = useState(false);
-  const closeButtonTimeoutRef = useRef<number | null>(null);
-  const playerConfig = usePlayerConfig();
 
   useEffect(() => {
     if (wrapperRef) {
@@ -156,66 +151,6 @@ export function VideoPlayerWrapper({
     loadHlsUrl();
   }, [selectedFile, infoHash]);
 
-  // Gérer l'affichage du bouton Fermer basé sur le mouvement de la souris et les touches
-  useEffect(() => {
-    if (isFullscreen) return; // Ne pas gérer l'affichage en plein écran
-
-    const container = wrapperElementRef.current;
-    if (!container) return;
-
-    const handleMouseMove = () => {
-      setShowCloseButton(true);
-      if (closeButtonTimeoutRef.current) clearTimeout(closeButtonTimeoutRef.current);
-      closeButtonTimeoutRef.current = window.setTimeout(() => {
-        setShowCloseButton(false);
-      }, playerConfig.controlsTimeout || 3000);
-    };
-
-    const handleMouseLeave = () => {
-      if (closeButtonTimeoutRef.current) clearTimeout(closeButtonTimeoutRef.current);
-      setShowCloseButton(false);
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Afficher le bouton lors de l'utilisation de la télécommande (touches directionnelles, OK, etc.)
-      const remoteControlKeys = [
-        'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-        'Enter', 'Space', 'MediaPlayPause',
-        'KeyP', 'KeyM', 'KeyF', 'Escape'
-      ];
-      
-      if (remoteControlKeys.includes(e.code)) {
-        setShowCloseButton(true);
-        if (closeButtonTimeoutRef.current) clearTimeout(closeButtonTimeoutRef.current);
-        closeButtonTimeoutRef.current = window.setTimeout(() => {
-          setShowCloseButton(false);
-        }, playerConfig.controlsTimeout || 3000);
-      }
-    };
-
-    const handleTouchStart = () => {
-      setShowCloseButton(true);
-      if (closeButtonTimeoutRef.current) clearTimeout(closeButtonTimeoutRef.current);
-      closeButtonTimeoutRef.current = window.setTimeout(() => {
-        setShowCloseButton(false);
-      }, playerConfig.controlsTimeout || 3000);
-    };
-
-    container.addEventListener('mousemove', handleMouseMove);
-    container.addEventListener('mouseleave', handleMouseLeave);
-    // Écouter les touches globalement pour capturer les touches de la télécommande
-    window.addEventListener('keydown', handleKeyDown);
-    container.addEventListener('touchstart', handleTouchStart, { passive: true });
-
-    return () => {
-      container.removeEventListener('mousemove', handleMouseMove);
-      container.removeEventListener('mouseleave', handleMouseLeave);
-      window.removeEventListener('keydown', handleKeyDown);
-      container.removeEventListener('touchstart', handleTouchStart);
-      if (closeButtonTimeoutRef.current) clearTimeout(closeButtonTimeoutRef.current);
-    };
-  }, [isFullscreen, playerConfig.controlsTimeout]);
-
   if (!selectedFile) {
     return (
       <div 
@@ -227,13 +162,33 @@ export function VideoPlayerWrapper({
           display: visible ? 'block' : 'none',
         }}
       >
-        <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30">
+        <div className="absolute inset-0 flex items-center justify-center bg-black z-30">
           <div className="text-center">
-            <div className="relative w-24 h-24 mb-6 mx-auto">
+            <div className="relative w-32 h-32 mb-6 mx-auto">
+              {/* Cercle de chargement externe */}
               <div className="absolute inset-0 border-4 border-primary-600/20 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+              <div 
+                className="absolute inset-0 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"
+              ></div>
+              {/* Logo Popcorn avec animation pulse */}
+              <div className="absolute inset-2 flex items-center justify-center animate-pulse">
+                <img 
+                  src="/popcorn_logo.png" 
+                  alt="Popcorn" 
+                  className="w-full h-full object-contain"
+                  style={{
+                    filter: 'drop-shadow(0 0 10px rgba(220, 38, 38, 0.5))',
+                  }}
+                />
+              </div>
             </div>
-            <p className="text-white/80 text-lg">Chargement des fichiers vidéo...</p>
+            <p className="text-white/80 text-lg font-medium">Chargement des fichiers vidéo...</p>
+            {/* Points animés */}
+            <div className="flex gap-1 mt-2 justify-center">
+              <span className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></span>
+              <span className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+              <span className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+            </div>
           </div>
         </div>
       </div>
@@ -253,24 +208,10 @@ export function VideoPlayerWrapper({
         backfaceVisibility: 'hidden',
       }}
     >
+      {/* Badges de qualité en haut à droite (mode non plein écran) */}
       {!isFullscreen && (
-        <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/80 to-transparent px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={onClose}
-              className={`inline-flex items-center gap-2 text-white hover:text-white/80 transition-all duration-300 ${
-                showCloseButton ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-              }`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-              Fermer
-            </button>
-            
-            {/* Badges de qualité en haut à droite */}
-            <QualityBadges quality={quality} align="right" />
-          </div>
+        <div className="absolute top-4 right-4 z-10">
+          <QualityBadges quality={quality} align="right" />
         </div>
       )}
       
@@ -292,13 +233,33 @@ export function VideoPlayerWrapper({
           }}
         >
           {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30">
+            <div className="absolute inset-0 flex items-center justify-center bg-black z-30">
               <div className="text-center">
-                <div className="relative w-24 h-24 mb-6 mx-auto">
-                  <div className="absolute inset-0 border-4 border-red-600/20 rounded-full"></div>
-                  <div className="absolute inset-0 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                <div className="relative w-32 h-32 mb-6 mx-auto">
+                  {/* Cercle de chargement externe */}
+                  <div className="absolute inset-0 border-4 border-primary-600/20 rounded-full"></div>
+                  <div 
+                    className="absolute inset-0 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"
+                  ></div>
+                  {/* Logo Popcorn avec animation pulse */}
+                  <div className="absolute inset-2 flex items-center justify-center animate-pulse">
+                    <img 
+                      src="/popcorn_logo.png" 
+                      alt="Popcorn" 
+                      className="w-full h-full object-contain"
+                      style={{
+                        filter: 'drop-shadow(0 0 10px rgba(220, 38, 38, 0.5))',
+                      }}
+                    />
+                  </div>
                 </div>
-                <p className="text-white/80 text-lg">Chargement de la vidéo...</p>
+                <p className="text-white/80 text-lg font-medium">Chargement de la vidéo...</p>
+                {/* Points animés */}
+                <div className="flex gap-1 mt-2 justify-center">
+                  <span className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></span>
+                  <span className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+                  <span className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+                </div>
               </div>
             </div>
           )}
@@ -319,6 +280,7 @@ export function VideoPlayerWrapper({
                 console.error('[VideoPlayerWrapper] HLS Player error:', e);
                 setIsLoading(false);
               }}
+              onClose={onClose}
             />
           )}
         </div>
