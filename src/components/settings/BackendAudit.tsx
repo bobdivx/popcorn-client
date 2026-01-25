@@ -625,8 +625,357 @@ export default function BackendAudit() {
       };
     };
 
+    // 6. Test CORS (vérifier les headers CORS dans les réponses)
+    const testCors = async (): Promise<AuditResult> => {
+      const tests: TestResult[] = [];
+      const methodName = 'Vérification CORS';
+      const url = `${testUrl}${healthEndpoint}`;
+      
+      // Test 1: Vérifier les headers CORS avec fetch standard
+      try {
+        const start = Date.now();
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const ms = Date.now() - start;
+        
+        const corsOrigin = response.headers.get('access-control-allow-origin');
+        const corsMethods = response.headers.get('access-control-allow-methods');
+        const corsHeaders = response.headers.get('access-control-allow-headers');
+        const corsCredentials = response.headers.get('access-control-allow-credentials');
+        
+        const corsOk = corsOrigin !== null || response.type === 'cors' || response.type === 'basic';
+        
+        tests.push({
+          method: 'Headers CORS (fetch standard)',
+          url,
+          ok: corsOk && (response.ok || response.status === 401),
+          ms,
+          status: response.status,
+          message: corsOk ? 'CORS configuré' : 'CORS non détecté',
+          details: JSON.stringify({
+            'access-control-allow-origin': corsOrigin,
+            'access-control-allow-methods': corsMethods,
+            'access-control-allow-headers': corsHeaders,
+            'access-control-allow-credentials': corsCredentials,
+            responseType: response.type,
+          }, null, 2),
+        });
+      } catch (e: any) {
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        const isCorsError = errorMsg.includes('Failed to fetch') || 
+                           errorMsg.includes('CORS') ||
+                           (e instanceof TypeError && errorMsg.includes('fetch'));
+        
+        tests.push({
+          method: 'Headers CORS (fetch standard)',
+          url,
+          ok: false,
+          ms: 0,
+          message: isCorsError ? 'Erreur CORS détectée' : errorMsg,
+          details: `Type erreur: ${e instanceof Error ? e.name : typeof e}`,
+        });
+      }
+
+      // Test 2: Test OPTIONS (preflight CORS)
+      try {
+        const start = Date.now();
+        const response = await fetch(url, {
+          method: 'OPTIONS',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Origin': window.location.origin || 'null',
+          },
+        });
+        const ms = Date.now() - start;
+        
+        const corsOrigin = response.headers.get('access-control-allow-origin');
+        const preflightOk = response.status === 200 || response.status === 204 || corsOrigin !== null;
+        
+        tests.push({
+          method: 'Preflight OPTIONS (CORS)',
+          url,
+          ok: preflightOk,
+          ms,
+          status: response.status,
+          message: preflightOk ? 'Preflight OK' : 'Preflight échoué',
+          details: `Origin: ${window.location.origin || 'null'}, CORS-Allow-Origin: ${corsOrigin || 'non défini'}`,
+        });
+      } catch (e: any) {
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        tests.push({
+          method: 'Preflight OPTIONS (CORS)',
+          url,
+          ok: false,
+          ms: 0,
+          message: errorMsg,
+          details: `Type erreur: ${e instanceof Error ? e.name : typeof e}`,
+        });
+      }
+
+      // Test 3: Test avec origine null (Android WebView)
+      if (isTauri()) {
+        try {
+          const { invoke } = await import('@tauri-apps/api/core');
+          const start = Date.now();
+          
+          const res: any = await invoke('native-fetch', {
+            url,
+            method: 'GET',
+            headers: [
+              ['Content-Type', 'application/json'],
+              ['Origin', 'null'], // Simuler origine null Android
+            ],
+            body: null,
+            timeoutMs: 3000,
+          } as any);
+          
+          const ms = Date.now() - start;
+          const headers = res?.headers || [];
+          const corsHeader = headers.find(([k]: [string, string]) => 
+            k.toLowerCase() === 'access-control-allow-origin'
+          );
+          
+          // Le backend devrait retourner * pour les origines null
+          const nullOriginOk = corsHeader && (corsHeader[1] === '*' || corsHeader[1] === 'null');
+          
+          tests.push({
+            method: 'CORS avec origine null (Android)',
+            url,
+            ok: nullOriginOk && (res?.status === 200 || res?.status === 401),
+            ms,
+            status: res?.status,
+            message: nullOriginOk ? 'CORS null origin géré' : 'CORS null origin non géré',
+            details: corsHeader ? `CORS-Allow-Origin: ${corsHeader[1]}` : 'Header CORS non trouvé',
+          });
+        } catch (e: any) {
+          const errorMsg = e instanceof Error ? e.message : String(e);
+          tests.push({
+            method: 'CORS avec origine null (Android)',
+            url,
+            ok: false,
+            ms: 0,
+            message: errorMsg,
+          });
+        }
+      }
+
+      return {
+        methodName,
+        description: 'Vérification de la configuration CORS (headers, preflight, origines null)',
+        tests,
+        overallOk: tests.some(t => t.ok),
+      };
+    };
+
+    // 7. Test d'authentification (tokens Bearer)
+    const testAuthentication = async (): Promise<AuditResult> => {
+      const tests: TestResult[] = [];
+      const methodName = 'Authentification (Bearer tokens)';
+      const url = `${testUrl}/api/client/health`;
+      
+      // Test 1: Requête sans token (devrait fonctionner pour /health)
+      try {
+        const start = Date.now();
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const ms = Date.now() - start;
+        
+        tests.push({
+          method: 'Requête sans token (endpoint public)',
+          url,
+          ok: response.ok || response.status === 401,
+          ms,
+          status: response.status,
+          message: response.ok ? 'OK (endpoint public)' : `HTTP ${response.status}`,
+          details: response.status === 401 ? 'Authentification requise (normal pour certains endpoints)' : 'Endpoint accessible',
+        });
+      } catch (e: any) {
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        tests.push({
+          method: 'Requête sans token (endpoint public)',
+          url,
+          ok: false,
+          ms: 0,
+          message: errorMsg,
+        });
+      }
+
+      // Test 2: Requête avec token invalide (devrait retourner 401)
+      try {
+        const start = Date.now();
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer invalid-token-test',
+          },
+        });
+        const ms = Date.now() - start;
+        
+        tests.push({
+          method: 'Requête avec token invalide',
+          url,
+          ok: response.status === 401 || response.status === 403,
+          ms,
+          status: response.status,
+          message: response.status === 401 ? '401 Unauthorized (attendu)' : `HTTP ${response.status}`,
+          details: 'Le backend rejette correctement les tokens invalides',
+        });
+      } catch (e: any) {
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        tests.push({
+          method: 'Requête avec token invalide',
+          url,
+          ok: false,
+          ms: 0,
+          message: errorMsg,
+        });
+      }
+
+      // Test 3: Vérifier si un token est stocké
+      try {
+        const accessToken = localStorage.getItem('access_token');
+        const refreshToken = localStorage.getItem('refresh_token');
+        
+        tests.push({
+          method: 'Vérification tokens stockés',
+          url: 'N/A',
+          ok: true,
+          ms: 0,
+          message: accessToken ? 'Token présent' : 'Aucun token stocké',
+          details: `Access token: ${accessToken ? 'présent' : 'absent'}, Refresh token: ${refreshToken ? 'présent' : 'absent'}`,
+        });
+      } catch (e: any) {
+        tests.push({
+          method: 'Vérification tokens stockés',
+          url: 'N/A',
+          ok: false,
+          ms: 0,
+          message: 'Erreur accès localStorage',
+        });
+      }
+
+      return {
+        methodName,
+        description: 'Vérification du système d\'authentification Bearer tokens',
+        tests,
+        overallOk: tests.some(t => t.ok),
+      };
+    };
+
+    // 8. Test configuration Android/Tauri
+    const testAndroidConfig = async (): Promise<AuditResult> => {
+      const tests: TestResult[] = [];
+      const methodName = 'Configuration Android/Tauri';
+      
+      const isAndroid = /Android/i.test(navigator.userAgent);
+      const tauriDetected = isTauri();
+      
+      // Test 1: Détection plateforme
+      tests.push({
+        method: 'Détection plateforme',
+        url: 'N/A',
+        ok: true,
+        ms: 0,
+        message: isAndroid ? 'Android détecté' : 'Autre plateforme',
+        details: `UserAgent: ${navigator.userAgent}, Tauri: ${tauriDetected}`,
+      });
+
+      // Test 2: Vérifier capabilities Tauri (si disponible)
+      if (tauriDetected) {
+        try {
+          const { invoke } = await import('@tauri-apps/api/core');
+          const platform = await invoke('get-platform');
+          
+          tests.push({
+            method: 'Platform Tauri',
+            url: 'N/A',
+            ok: true,
+            ms: 0,
+            message: `Platform: ${platform}`,
+            details: platform === 'android' ? 'Application Android Tauri' : `Application ${platform}`,
+          });
+        } catch (e: any) {
+          tests.push({
+            method: 'Platform Tauri',
+            url: 'N/A',
+            ok: false,
+            ms: 0,
+            message: `Erreur: ${e instanceof Error ? e.message : String(e)}`,
+          });
+        }
+      }
+
+      // Test 3: Vérifier URL backend configurée
+      try {
+        const backendUrl = getBackendUrl();
+        const isEmulatorUrl = backendUrl.includes('10.0.2.2');
+        const isLocalhost = backendUrl.includes('localhost') || backendUrl.includes('127.0.0.1');
+        
+        tests.push({
+          method: 'URL backend configurée',
+          url: backendUrl,
+          ok: true,
+          ms: 0,
+          message: backendUrl ? 'URL configurée' : 'URL non configurée',
+          details: isEmulatorUrl 
+            ? '⚠️ URL émulateur (10.0.2.2) - ne fonctionne que sur émulateur'
+            : isLocalhost
+            ? '⚠️ URL localhost - ne fonctionne pas sur appareil physique Android'
+            : 'URL réseau configurée',
+        });
+      } catch (e: any) {
+        tests.push({
+          method: 'URL backend configurée',
+          url: 'N/A',
+          ok: false,
+          ms: 0,
+          message: 'Erreur lecture configuration',
+        });
+      }
+
+      // Test 4: Recommandations pour Android
+      if (isAndroid && tauriDetected) {
+        const backendUrl = getBackendUrl();
+        const isEmulatorUrl = backendUrl.includes('10.0.2.2');
+        const isLocalhost = backendUrl.includes('localhost') || backendUrl.includes('127.0.0.1');
+        
+        let recommendation = '';
+        if (isEmulatorUrl) {
+          recommendation = '✅ URL émulateur correcte (10.0.2.2)';
+        } else if (isLocalhost) {
+          recommendation = '⚠️ Utilisez l\'IP locale de votre machine (ex: http://192.168.1.100:3000) au lieu de localhost';
+        } else {
+          recommendation = '✅ URL réseau configurée';
+        }
+        
+        tests.push({
+          method: 'Recommandations Android',
+          url: 'N/A',
+          ok: !isLocalhost,
+          ms: 0,
+          message: recommendation,
+          details: 'Sur appareil physique Android, utilisez l\'IP locale de votre machine, pas localhost ou 127.0.0.1',
+        });
+      }
+
+      return {
+        methodName,
+        description: 'Vérification de la configuration Android/Tauri et recommandations',
+        tests,
+        overallOk: tests.every(t => t.ok),
+      };
+    };
+
     // Exécuter tous les tests (diagnostic environnemental EN PREMIER)
     allResults.push(await testEnvironment());
+    allResults.push(await testAndroidConfig());
+    allResults.push(await testCors());
+    allResults.push(await testAuthentication());
     allResults.push(await testNativeFetch());
     allResults.push(await testPluginHttp());
     allResults.push(await testStandardFetch());
@@ -708,9 +1057,10 @@ export default function BackendAudit() {
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <h2 className="text-lg font-bold text-white">Audit de communication (Android)</h2>
+              <h2 className="text-lg font-bold text-white">Audit complet de communication</h2>
               <p className="text-gray-400 text-sm break-words">
-                Teste automatiquement toutes les façons de communiquer avec le backend pour trouver la solution qui fonctionne.
+                Teste automatiquement toutes les façons de communiquer avec le backend, vérifie la configuration CORS, 
+                l'authentification, et la configuration Android/Tauri pour identifier les problèmes et proposer des solutions.
               </p>
               {bestMethod !== 'Aucune méthode ne fonctionne' && (
                 <div className="mt-3 p-3 bg-green-500/20 border border-green-500/50 rounded">
@@ -912,8 +1262,20 @@ export default function BackendAudit() {
           value={report || 'Génération du rapport…'}
         />
         <p className="text-gray-500 text-xs break-words">
-          Ce rapport contient tous les détails des tests pour identifier la bonne méthode de communication.
+          Ce rapport contient tous les détails des tests pour identifier la bonne méthode de communication, 
+          vérifier la configuration CORS, l'authentification, et la configuration Android/Tauri.
         </p>
+        <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded">
+          <p className="text-xs text-blue-300 font-semibold mb-2">💡 Tests inclus :</p>
+          <ul className="text-xs text-blue-200/80 space-y-1 list-disc list-inside">
+            <li>Diagnostic environnemental (Tauri, commandes, plateforme)</li>
+            <li>Configuration Android/Tauri (URL backend, recommandations)</li>
+            <li>Vérification CORS (headers, preflight, origines null)</li>
+            <li>Authentification Bearer tokens</li>
+            <li>Méthodes de communication (native-fetch, plugin-http, fetch standard)</li>
+            <li>URLs alternatives et méthodes HTTP</li>
+          </ul>
+        </div>
       </div>
     </div>
   );
