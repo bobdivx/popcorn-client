@@ -1,20 +1,48 @@
-import { useEffect } from 'preact/hooks';
+import { useEffect, useRef } from 'preact/hooks';
+
+// Constantes pour l'algorithme de navigation spatiale
+const DIRECTION_THRESHOLD_PX = 5; // Seuil en pixels pour considérer qu'un élément est dans une direction
+const SECONDARY_AXIS_PENALTY = 2; // Pénalité pour la distance sur l'axe secondaire
+const INITIAL_FOCUS_DELAY_MS = 100; // Délai initial avant de tenter le focus
+
+// Sélecteur CSS pour les éléments focusables
+const FOCUSABLE_SELECTOR = `a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [data-focusable]`;
+
+// Sélecteur pour les cartes de contenu (priorité pour le focus initial)
+const CONTENT_CARD_SELECTOR = `[data-torrent-card] a, [data-torrent-card] button, .torrent-poster a, .torrent-poster button, [data-focusable]`;
 
 /**
  * Fournisseur de navigation TV global
  * Gère la navigation au clavier/D-pad pour toute l'application
  * Compatible avec webOS, Android TV, et autres plateformes TV
  */
-export function TVNavigationProvider() {
-  useEffect(() => {
-    // Sélecteur pour les éléments focusables
-    const FOCUSABLE_SELECTOR = 
-      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), ' +
-      'textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [data-focusable]';
+export default function TVNavigationProvider() {
+  // Cache des éléments focusables pour optimiser les performances
+  const focusableCacheRef = useRef<HTMLElement[]>([]);
+  const cacheValidRef = useRef(false);
 
-    // Obtenir tous les éléments focusables visibles
+  useEffect(() => {
+    // Invalider le cache quand le DOM change
+    const invalidateCache = () => {
+      cacheValidRef.current = false;
+    };
+
+    // Observer les changements du DOM pour invalider le cache
+    const mutationObserver = new MutationObserver(invalidateCache);
+    mutationObserver.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['disabled', 'tabindex', 'aria-hidden', 'style', 'class'],
+    });
+
+    // Obtenir tous les éléments focusables visibles (avec cache)
     const getFocusableElements = (): HTMLElement[] => {
-      return Array.from(document.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+      if (cacheValidRef.current && focusableCacheRef.current.length > 0) {
+        return focusableCacheRef.current;
+      }
+
+      const elements = Array.from(document.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
         .filter(el => {
           const style = window.getComputedStyle(el);
           const rect = el.getBoundingClientRect();
@@ -28,6 +56,10 @@ export function TVNavigationProvider() {
             !el.closest('.hidden')
           );
         });
+
+      focusableCacheRef.current = elements;
+      cacheValidRef.current = true;
+      return elements;
     };
 
     // Trouver l'élément le plus proche dans une direction
@@ -57,22 +89,22 @@ export function TVNavigationProvider() {
 
         switch (direction) {
           case 'up':
-            isInDirection = centerY < currentCenterY - 5;
+            isInDirection = centerY < currentCenterY - DIRECTION_THRESHOLD_PX;
             primaryDistance = currentCenterY - centerY;
             secondaryDistance = Math.abs(centerX - currentCenterX);
             break;
           case 'down':
-            isInDirection = centerY > currentCenterY + 5;
+            isInDirection = centerY > currentCenterY + DIRECTION_THRESHOLD_PX;
             primaryDistance = centerY - currentCenterY;
             secondaryDistance = Math.abs(centerX - currentCenterX);
             break;
           case 'left':
-            isInDirection = centerX < currentCenterX - 5;
+            isInDirection = centerX < currentCenterX - DIRECTION_THRESHOLD_PX;
             primaryDistance = currentCenterX - centerX;
             secondaryDistance = Math.abs(centerY - currentCenterY);
             break;
           case 'right':
-            isInDirection = centerX > currentCenterX + 5;
+            isInDirection = centerX > currentCenterX + DIRECTION_THRESHOLD_PX;
             primaryDistance = centerX - currentCenterX;
             secondaryDistance = Math.abs(centerY - currentCenterY);
             break;
@@ -81,7 +113,7 @@ export function TVNavigationProvider() {
         if (!isInDirection) continue;
 
         // Score : priorité à la direction primaire, pénalité pour la distance secondaire
-        const score = primaryDistance + secondaryDistance * 2;
+        const score = primaryDistance + secondaryDistance * SECONDARY_AXIS_PENALTY;
 
         if (score < bestScore) {
           bestScore = score;
@@ -90,6 +122,37 @@ export function TVNavigationProvider() {
       }
 
       return bestElement;
+    };
+
+    // Focus sur le premier élément approprié
+    const focusFirstAppropriateElement = (focusableElements: HTMLElement[]) => {
+      // Priorité: première carte de contenu
+      const firstCard = document.querySelector(CONTENT_CARD_SELECTOR) as HTMLElement;
+      
+      if (firstCard && focusableElements.includes(firstCard)) {
+        firstCard.focus();
+        firstCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        return true;
+      }
+      
+      // Sinon premier élément dans main
+      const mainContent = document.querySelector('main');
+      if (mainContent) {
+        const mainFocusable = focusableElements.find(el => mainContent.contains(el));
+        if (mainFocusable) {
+          mainFocusable.focus();
+          mainFocusable.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          return true;
+        }
+      }
+      
+      // Fallback
+      if (focusableElements[0]) {
+        focusableElements[0].focus();
+        return true;
+      }
+      
+      return false;
     };
 
     // Gestionnaire d'événements clavier
@@ -120,30 +183,7 @@ export function TVNavigationProvider() {
       if (!activeElement || !focusableElements.includes(activeElement)) {
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
           e.preventDefault();
-          
-          // Priorité: première carte de contenu
-          const firstCard = document.querySelector(
-            '[data-torrent-card] a, [data-torrent-card] button, ' +
-            '.torrent-poster a, .torrent-poster button'
-          ) as HTMLElement;
-          
-          if (firstCard && focusableElements.includes(firstCard)) {
-            firstCard.focus();
-            firstCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          } else {
-            // Sinon premier élément dans main
-            const mainContent = document.querySelector('main');
-            if (mainContent) {
-              const mainFocusable = focusableElements.find(el => mainContent.contains(el));
-              if (mainFocusable) {
-                mainFocusable.focus();
-                mainFocusable.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                return;
-              }
-            }
-            // Fallback
-            focusableElements[0]?.focus();
-          }
+          focusFirstAppropriateElement(focusableElements);
           return;
         }
       }
@@ -193,25 +233,28 @@ export function TVNavigationProvider() {
     };
 
     // Ajouter les styles de focus visible
+    // Note: !important est nécessaire pour surcharger les styles existants sur TV
     const style = document.createElement('style');
     style.id = 'tv-navigation-styles';
     style.textContent = `
       /* Focus visible pour navigation TV */
-      *:focus-visible {
+      body.tv-navigation-active *:focus-visible {
         outline: 3px solid #a855f7 !important;
         outline-offset: 2px !important;
         box-shadow: 0 0 0 6px rgba(168, 85, 247, 0.3) !important;
       }
       
       /* Animation de focus */
-      a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+      body.tv-navigation-active a:focus-visible,
+      body.tv-navigation-active button:focus-visible,
+      body.tv-navigation-active [tabindex]:focus-visible {
         transform: scale(1.02);
         transition: transform 0.15s ease, outline 0.15s ease, box-shadow 0.15s ease;
       }
       
       /* Cartes avec focus */
-      .torrent-poster:focus-visible,
-      [data-focusable]:focus-visible {
+      body.tv-navigation-active .torrent-poster:focus-visible,
+      body.tv-navigation-active [data-focusable]:focus-visible {
         transform: scale(1.05);
         z-index: 10;
       }
@@ -220,33 +263,40 @@ export function TVNavigationProvider() {
     if (!document.getElementById('tv-navigation-styles')) {
       document.head.appendChild(style);
     }
+    
+    // Ajouter la classe au body pour activer les styles
+    document.body.classList.add('tv-navigation-active');
 
     // Écouter les événements clavier
     document.addEventListener('keydown', handleKeyDown, true);
 
-    // Focus initial après chargement - prioriser le contenu principal
-    const initialFocus = setTimeout(() => {
+    // Focus initial - utiliser MutationObserver pour attendre le contenu
+    let initialFocusAttempts = 0;
+    const maxAttempts = 10;
+    
+    const tryInitialFocus = () => {
       const focusable = getFocusableElements();
+      
       // Ne pas voler le focus si l'utilisateur a déjà focalisé quelque chose
-      if (document.activeElement === document.body && focusable.length > 0) {
+      if (document.activeElement !== document.body) {
+        return true; // Arrêter les tentatives
+      }
+      
+      if (focusable.length > 0) {
         // Priorité 1: Premier TorrentPoster/carte de contenu (pages dashboard)
-        const firstCard = document.querySelector(
-          '[data-torrent-card] a, [data-torrent-card] button, ' +
-          '.torrent-poster a, .torrent-poster button, ' +
-          '[data-focusable]'
-        ) as HTMLElement;
+        const firstCard = document.querySelector(CONTENT_CARD_SELECTOR) as HTMLElement;
         
         if (firstCard && focusable.includes(firstCard)) {
           firstCard.focus();
           firstCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          return;
+          return true;
         }
         
         // Priorité 2: Premier élément avec data-initial-focus
         const initialFocusElement = document.querySelector('[data-initial-focus]') as HTMLElement;
         if (initialFocusElement && focusable.includes(initialFocusElement)) {
           initialFocusElement.focus();
-          return;
+          return true;
         }
         
         // Priorité 3: Premier bouton/lien dans le contenu principal (pas la nav)
@@ -257,18 +307,31 @@ export function TVNavigationProvider() {
           ) as HTMLElement;
           if (mainFocusable && focusable.includes(mainFocusable)) {
             mainFocusable.focus();
-            return;
+            return true;
           }
         }
         
         // Fallback: Premier élément focusable
         focusable[0]?.focus();
+        return true;
       }
-    }, 500);
+      
+      return false;
+    };
+
+    // Tenter le focus initial avec retry
+    const initialFocusInterval = setInterval(() => {
+      initialFocusAttempts++;
+      if (tryInitialFocus() || initialFocusAttempts >= maxAttempts) {
+        clearInterval(initialFocusInterval);
+      }
+    }, INITIAL_FOCUS_DELAY_MS);
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
-      clearTimeout(initialFocus);
+      mutationObserver.disconnect();
+      clearInterval(initialFocusInterval);
+      document.body.classList.remove('tv-navigation-active');
       const existingStyle = document.getElementById('tv-navigation-styles');
       if (existingStyle) {
         existingStyle.remove();
@@ -279,5 +342,3 @@ export function TVNavigationProvider() {
   // Ce composant ne rend rien visuellement
   return null;
 }
-
-export default TVNavigationProvider;
