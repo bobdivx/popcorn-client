@@ -423,6 +423,32 @@ jobs:
             echo "⚠️ gradlew non trouvé (sera créé par tauri)"
           fi
 
+      - name: Fix Android SDK permissions and install missing components
+        run: |
+          echo "🔧 Correction des permissions du SDK Android..."
+          ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
+          
+          # Corriger les permissions du SDK Android
+          if [ -d "$ANDROID_HOME" ]; then
+            echo "📁 Correction des permissions de $ANDROID_HOME..."
+            sudo chown -R $(id -u):$(id -g) "$ANDROID_HOME" 2>/dev/null || {
+              echo "⚠️ Impossible de changer le propriétaire, essai avec chmod..."
+              sudo chmod -R a+w "$ANDROID_HOME" 2>/dev/null || true
+            }
+          fi
+          
+          # Accepter les licences
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
+          
+          # Installer les composants manquants
+          echo "📦 Installation des composants SDK manquants..."
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;35.0.0" "platforms;android-36" 2>/dev/null || {
+            echo "⚠️ Installation via sdkmanager échouée, tentative avec sudo..."
+            sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;35.0.0" "platforms;android-36" 2>/dev/null || true
+          }
+          
+          echo "✅ SDK Android configuré"
+
       - name: Build Android APK
         run: |
           set -e
@@ -750,6 +776,32 @@ jobs:
           if ! grep -q "signingConfigs" "$BUILD_GRADLE"; then
             python3 scripts/apply-signing-config.py "$BUILD_GRADLE"
           fi
+
+      - name: Fix Android SDK permissions and install missing components
+        run: |
+          echo "🔧 Correction des permissions du SDK Android..."
+          ANDROID_HOME=${ANDROID_HOME:-/opt/android-sdk}
+          
+          # Corriger les permissions du SDK Android
+          if [ -d "$ANDROID_HOME" ]; then
+            echo "📁 Correction des permissions de $ANDROID_HOME..."
+            sudo chown -R $(id -u):$(id -g) "$ANDROID_HOME" 2>/dev/null || {
+              echo "⚠️ Impossible de changer le propriétaire, essai avec chmod..."
+              sudo chmod -R a+w "$ANDROID_HOME" 2>/dev/null || true
+            }
+          fi
+          
+          # Accepter les licences
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses 2>/dev/null || true
+          
+          # Installer les composants manquants
+          echo "📦 Installation des composants SDK manquants..."
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;35.0.0" "platforms;android-36" 2>/dev/null || {
+            echo "⚠️ Installation via sdkmanager échouée, tentative avec sudo..."
+            sudo $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "build-tools;35.0.0" "platforms;android-36" 2>/dev/null || true
+          }
+          
+          echo "✅ SDK Android configuré"
 
       - name: Build Android AAB
         run: npm run tauri:build:android-mobile:aab
