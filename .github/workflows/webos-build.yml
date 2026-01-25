@@ -261,18 +261,19 @@ jobs:
           
           # Créer le fichier control
           mkdir -p "$TEMP_DIR/control"
-          cat > "$TEMP_DIR/control/control" << EOF
+          INSTALLED_SIZE=$(du -sk webos | cut -f1)
+          cat > "$TEMP_DIR/control/control" <<CTRLEOF
 Package: $APP_ID
 Version: $APP_VERSION
 Section: misc
 Priority: optional
 Architecture: all
-Installed-Size: $(du -sk webos | cut -f1)
+Installed-Size: $INSTALLED_SIZE
 Maintainer: Popcorn Team
 Description: Popcorn Client for WebOS
 webOS-Package-Format-Version: 2
 webOS-Packager-Version: x.x.x
-EOF
+CTRLEOF
           
           # Créer les archives tar (les fichiers doivent être à la racine)
           echo "📦 Création des archives..."
