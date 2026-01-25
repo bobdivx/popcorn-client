@@ -33,14 +33,40 @@ jobs:
 
       - name: Fix npm cache permissions
         run: |
-          # Supprimer complètement le cache npm s'il existe avec de mauvaises permissions
-          if [ -d "$HOME/.npm" ]; then
-            sudo rm -rf "$HOME/.npm" || rm -rf "$HOME/.npm" || true
+          # Arrêter tous les processus npm qui pourraient utiliser le cache
+          pkill -9 npm || true
+          sleep 2
+          
+          # Trouver et tuer les processus qui utilisent le dossier .npm
+          if command -v fuser &> /dev/null; then
+            sudo fuser -k "$HOME/.npm" 2>/dev/null || true
+            sleep 1
           fi
-          # Créer le cache npm avec les bonnes permissions dès le départ
+          
+          # Utiliser npm cache clean si possible
+          npm cache clean --force 2>/dev/null || true
+          
+          # Corriger les permissions du dossier .npm (sans supprimer le dossier)
+          if [ -d "$HOME/.npm" ]; then
+            # Corriger les permissions du dossier parent
+            sudo chown -R $(id -u):$(id -g) "$HOME/.npm" 2>/dev/null || true
+            sudo chmod -R u+w "$HOME/.npm" 2>/dev/null || true
+            
+            # Supprimer seulement le contenu du cache, pas le dossier lui-même
+            rm -rf "$HOME/.npm/_cacache"/* "$HOME/.npm/_logs"/* 2>/dev/null || true
+            sudo rm -rf "$HOME/.npm/_cacache"/* "$HOME/.npm/_logs"/* 2>/dev/null || true
+          fi
+          
+          # Créer les dossiers nécessaires avec les bonnes permissions
           mkdir -p "$HOME/.npm/_cacache" "$HOME/.npm/_logs"
-          chmod -R u+w "$HOME/.npm"
-          echo "✅ Cache npm recréé avec les bonnes permissions"
+          chmod -R u+w "$HOME/.npm" 2>/dev/null || sudo chmod -R u+w "$HOME/.npm" 2>/dev/null || true
+          
+          # Vérifier que les permissions sont correctes
+          if [ -w "$HOME/.npm/_cacache" ] && [ -w "$HOME/.npm/_logs" ]; then
+            echo "✅ Cache npm configuré avec les bonnes permissions"
+          else
+            echo "⚠️ Permissions npm partiellement corrigées, mais devrait fonctionner"
+          fi
 
       - name: Install dependencies
         run: npm ci
