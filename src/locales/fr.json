@@ -43,7 +43,11 @@
     "unknownError": "Erreur inconnue"
   },
   "demo": {
-    "entryLoading": "Ouverture de la démo..."
+    "entryLoading": "Ouverture de la démo...",
+    "exitDemo": "Quitter le mode démo",
+    "modeActive": "Mode démo actif",
+    "badge": "Démo",
+    "modeActiveDescription": "Les données et actions sont simulées. Pour utiliser votre compte et votre backend, quittez le mode démo."
   },
   "ads": {
     "adLabel": "Publicité",

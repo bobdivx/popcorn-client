@@ -43,7 +43,11 @@
     "unknownError": "Unknown error"
   },
   "demo": {
-    "entryLoading": "Opening demo..."
+    "entryLoading": "Opening demo...",
+    "exitDemo": "Exit demo mode",
+    "modeActive": "Demo mode active",
+    "badge": "Demo",
+    "modeActiveDescription": "Data and actions are simulated. To use your account and backend, exit demo mode."
   },
   "ads": {
     "adLabel": "Advertisement",

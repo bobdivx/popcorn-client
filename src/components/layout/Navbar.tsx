@@ -8,6 +8,7 @@ import { isMobileDevice, isAndroidTV } from '../../lib/utils/device-detection';
 import { calculateSyncProgress } from '../../lib/utils/sync-progress';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { LANGUAGE_NAMES, type SupportedLanguage } from '../../lib/i18n';
+import { isDemoMode, setDemoMode } from '../../lib/backend-config';
 
 type NavTab = { label: string; href: string; match?: 'exact' | 'prefix' };
 
@@ -35,6 +36,10 @@ export default function Navbar() {
   });
   const [syncProgress, setSyncProgress] = useState<{ inProgress: boolean; progress: number }>({ inProgress: false, progress: 0 });
   const previousStatsRef = useRef<Record<string, number>>({});
+  const [demoMode, setDemoModeNav] = useState(false);
+  useEffect(() => {
+    setDemoModeNav(isDemoMode());
+  }, []);
 
   useEffect(() => {
     const updatePath = () => setCurrentPath(window.location.pathname + window.location.search);
@@ -399,8 +404,22 @@ export default function Navbar() {
             <div className="flex-1" />
           )}
 
-          {/* Droite: pastille serveur (desktop), téléchargements, menu ou paramètres, avatar (desktop), horloge */}
+          {/* Droite: pastille serveur (desktop), mode démo, téléchargements, menu ou paramètres, avatar (desktop), horloge */}
           <div className="flex items-center gap-2 sm:gap-3 md:gap-4 flex-shrink-0 min-w-0">
+            {/* Mode démo : bouton pour quitter directement */}
+            {demoMode && (
+              <button
+                type="button"
+                onClick={() => {
+                  setDemoMode(false);
+                  window.location.href = '/';
+                }}
+                className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-600/90 text-white hover:bg-amber-500 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-gray-900"
+                title={t('demo.exitDemo')}
+              >
+                {t('demo.exitDemo')}
+              </button>
+            )}
             {/* Desktop : pastille serveur (mobile : menu serveur dans le hamburger) */}
             <div className="hidden sm:flex items-center">
               <BackendStatusBadge />
