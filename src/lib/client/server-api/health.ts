@@ -18,7 +18,7 @@ export const healthMethods = {
    * Vérifie la santé du serveur avec détails
    * Retourne des informations détaillées sur l'état de la connexion et la version
    */
-  async checkServerHealth(this: ServerApiClientAccess): Promise<ApiResponse<{ status: string; reachable: boolean; latency?: number; version?: string; build?: number; download_dir?: string }>> {
+  async checkServerHealth(this: ServerApiClientAccess): Promise<ApiResponse<{ status: string; reachable: boolean; latency?: number; version?: string; build?: number; download_dir?: string; ffmpeg_available?: boolean; torrent_client_reachable?: boolean; librqbit_version?: string }>> {
     const startTime = Date.now();
     
     // Unifié : appel direct au backend Rust
@@ -66,6 +66,9 @@ export const healthMethods = {
         version: backendData.version,
         build: backendData.build,
         download_dir: backendData.download_dir,
+        ffmpeg_available: backendData.ffmpeg_available,
+        torrent_client_reachable: backendData.torrent_client_reachable,
+        librqbit_version: backendData.librqbit_version,
       },
     };
   },

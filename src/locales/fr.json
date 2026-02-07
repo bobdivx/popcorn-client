@@ -648,8 +648,8 @@
       "description": "Gérez la synchronisation automatique des torrents depuis les indexers"
     },
     "diagnostics": {
-      "title": "Diagnostics réseau",
-      "description": "Vérifiez rapidement l'accès aux routes backend (Android/Desktop)"
+      "title": "Diagnostics",
+      "description": "Tester la connexion backend, la version et les indexers"
     },
     "librqbit": {
       "title": "Client torrent",
@@ -1139,7 +1139,24 @@
       "debugLink": "Debug (provisoire)"
     },
     "diagnostics": {
-      "title": "Diagnostics"
+      "title": "Diagnostics",
+      "healthTitle": "État du backend",
+      "healthSubtitle": "Vérifie la disponibilité, la latence et la version",
+      "check": "Tester",
+      "checking": "Test en cours...",
+      "backendReachable": "Backend accessible",
+      "backendUnreachable": "Backend indisponible",
+      "latency": "Latence",
+      "version": "Version",
+      "downloadDir": "Répertoire de téléchargement",
+      "ffmpeg": "FFmpeg",
+      "torrentClient": "Client torrent",
+      "librqbitVersion": "Version librqbit",
+      "unknown": "Indisponible",
+      "ok": "OK",
+      "ko": "KO",
+      "ffmpegHint": "FFmpeg : vérifiez les logs du serveur en cas d'erreur HLS",
+      "errorGeneric": "Impossible de récupérer l'état du backend"
     },
     "friends": {
       "title": "Amis",

@@ -1,10 +1,11 @@
-import { Settings, Server, Package } from 'lucide-preact';
+import { Settings, Server, Package, Activity } from 'lucide-preact';
 import { useState } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { canAccess } from '../../lib/permissions';
 import SubMenuPanel, { type SubMenuItem } from './SubMenuPanel';
 import ServerSettings from './ServerSettings';
 import VersionInfo from './VersionInfo';
+import DiagnosticsPanel from './DiagnosticsPanel';
 import { serverApi } from '../../lib/client/server-api';
 import { redirectTo } from '../../lib/utils/navigation.js';
 
@@ -140,6 +141,14 @@ const SYSTEM_ITEMS: SubMenuItem[] = [
     icon: Package,
     permission: 'settings.server',
     inlineContent: VersionsSection,
+  },
+  {
+    id: 'diagnostics',
+    titleKey: 'settingsMenu.diagnostics.title',
+    descriptionKey: 'settingsMenu.diagnostics.description',
+    icon: Activity,
+    permission: 'settings.server',
+    inlineContent: DiagnosticsPanel,
   },
 ];
 
