@@ -105,11 +105,11 @@ export function VideoControls({
   const getFocusClass = (index: number) => {
     if (!isTV || focusedOnProgress) return '';
     if (focusedControlIndex !== index) return '';
-    return 'ring-4 ring-red-600 ring-opacity-75 scale-110 z-30';
+    return 'ring-4 ring-purple-600 ring-opacity-75 scale-110 z-30';
   };
   const getProgressFocusClass = () => {
     if (!isTV || !focusedOnProgress) return '';
-    return 'ring-2 ring-red-600 ring-opacity-90 ring-inset';
+    return 'ring-2 ring-purple-600 ring-opacity-90 ring-inset';
   };
 
   return (
