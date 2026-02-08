@@ -205,7 +205,7 @@ export default function HLSPlayer({
     };
   }, [videoRef, hlsLoaded, isFullscreen]);
 
-  const { isTV, focusedControlIndex } = useTVPlayerNavigation({
+  const { isTV, focusedControlIndex, focusedOnProgress, hasBack } = useTVPlayerNavigation({
     showControls,
     setShowControls,
     onPlayPause: handlePlayPause,
@@ -213,6 +213,7 @@ export default function HLSPlayer({
     onVolumeChange: handleVolumeChangeTV,
     onToggleMute: toggleMute,
     onToggleFullscreen: handleToggleFullscreen,
+    onClose,
     duration,
     currentTime,
   });
@@ -349,6 +350,8 @@ export default function HLSPlayer({
           isFullscreen={isFullscreen}
           isTV={isTV}
           focusedControlIndex={focusedControlIndex}
+          focusedOnProgress={focusedOnProgress}
+          hasBackButton={hasBack}
           onPlayPause={handlePlayPause}
           onSeek={baseHandleSeek}
           onVolumeChange={baseHandleVolumeChange}

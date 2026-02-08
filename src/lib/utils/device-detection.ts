@@ -42,6 +42,37 @@ export function isMobileDevice(): boolean {
 }
 
 /**
+ * Détecte si l'appareil est LG WebOS TV
+ */
+export function isWebOSTV(): boolean {
+  if (typeof window === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  if (/webOS|Web0S/i.test(ua)) return true;
+  if (typeof (window as any).webOS !== 'undefined') return true;
+  return false;
+}
+
+/**
+ * Détecte si l'appareil est Apple TV (tvOS)
+ */
+export function isAppleTV(): boolean {
+  if (typeof window === 'undefined') return false;
+  const ua = navigator.userAgent || '';
+  // Apple TV / tvOS : patterns courants
+  if (/AppleTV|Apple TV/i.test(ua)) return true;
+  if (/CPU OS.*like Mac OS X.*Apple TV/i.test(ua)) return true;
+  return false;
+}
+
+/**
+ * Détecte si l'appareil est une plateforme TV (Android TV, WebOS, Apple TV)
+ * Utilisé pour la navigation à la télécommande dans le lecteur vidéo
+ */
+export function isTVPlatform(): boolean {
+  return isAndroidTV() || isWebOSTV() || isAppleTV();
+}
+
+/**
  * Détecte si l'appareil est Android TV
  */
 export function isAndroidTV(): boolean {
@@ -98,7 +129,7 @@ export function isTablet(): boolean {
  * Détermine si le plein écran automatique doit être activé
  */
 export function shouldAutoFullscreen(): boolean {
-  return isAndroidTV() || isMobileDevice();
+  return isTVPlatform() || isMobileDevice();
 }
 
 /**

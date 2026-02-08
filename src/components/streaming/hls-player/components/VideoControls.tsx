@@ -30,6 +30,10 @@ interface VideoControlsProps {
   isFullscreen: boolean;
   isTV?: boolean;
   focusedControlIndex?: number;
+  /** Sur TV : la barre de progression est-elle focalisée (flèches = seek) */
+  focusedOnProgress?: boolean;
+  /** Sur TV : le bouton Retour est-il dans le focus ring */
+  hasBackButton?: boolean;
   onPlayPause: () => void;
   onSeek: (e: any) => void;
   onVolumeChange: (e: any) => void;
@@ -64,6 +68,8 @@ export function VideoControls({
   isFullscreen,
   isTV = false,
   focusedControlIndex = 0,
+  focusedOnProgress = false,
+  hasBackButton = false,
   onPlayPause,
   onSeek,
   onVolumeChange,
@@ -95,9 +101,15 @@ export function VideoControls({
   const padding = isTV ? 'px-8 pt-8 pb-8' : isFullscreen ? 'px-6 pt-6 pb-6' : 'px-4 pt-4 sm:pt-6 pb-4 sm:pb-6';
   const gap = isTV ? 'gap-6' : isFullscreen ? 'gap-5' : 'gap-4';
 
+  // Indices de focus : back(0 si hasBack), play, mute, fullscreen
   const getFocusClass = (index: number) => {
-    if (!isTV || focusedControlIndex !== index) return '';
+    if (!isTV || focusedOnProgress) return '';
+    if (focusedControlIndex !== index) return '';
     return 'ring-4 ring-red-600 ring-opacity-75 scale-110 z-30';
+  };
+  const getProgressFocusClass = () => {
+    if (!isTV || !focusedOnProgress) return '';
+    return 'ring-2 ring-red-600 ring-opacity-90 ring-inset';
   };
 
   return (
@@ -114,8 +126,9 @@ export function VideoControls({
                   e.stopPropagation();
                   onClose();
                 }} 
-                class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none`}
+                class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none ${getFocusClass(0)}`}
                 title="Retour"
+                aria-label="Retour"
               >
                 <ArrowLeft class={`${iconSize} text-white`} />
               </button>
@@ -131,7 +144,7 @@ export function VideoControls({
           </div>
         </div>
         <div class={padding}>
-          <div class={`relative ${progressHeight} bg-white/30 rounded-full cursor-pointer group/progress transition-all mb-6`} onClick={onSeek}>
+          <div class={`relative ${progressHeight} bg-white/30 rounded-full cursor-pointer group/progress transition-all mb-6 ${getProgressFocusClass()}`} onClick={onSeek} role="slider" aria-label="Position" aria-valuenow={Math.round(progressPercent)} aria-valuemin={0} aria-valuemax={100}>
             <div class="absolute left-0 top-0 h-full bg-white/20 rounded-full" style={{ width: '100%' }} />
             <div class="absolute left-0 top-0 h-full bg-purple-600 rounded-full" style={{ width: `${progressPercent}%` }} />
             <div class={`absolute top-1/2 -translate-y-1/2 ${isTV ? 'w-5 h-5' : 'w-3.5 h-3.5'} bg-purple-600 rounded-full opacity-0 group-hover/progress:opacity-100 transition-all border-2 border-white`} style={{ left: `calc(${progressPercent}% - ${progressPercent > 0 && progressPercent < 100 ? (isTV ? '10px' : '7px') : progressPercent === 100 ? (isTV ? '20px' : '14px') : '0px'})` }} />
@@ -143,7 +156,7 @@ export function VideoControls({
                 e.stopPropagation();
                 onPlayPause(); 
               }} 
-              class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none relative z-40 ${getFocusClass(0)}`}
+              class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none relative z-40 ${getFocusClass(hasBackButton ? 1 : 0)}`}
             >
               {isPlaying ? <Pause class={`${iconSize} text-white`} /> : <Play class={`${iconSize} text-white ml-0.5`} />}
             </button>
@@ -179,7 +192,7 @@ export function VideoControls({
             <div class="flex items-center gap-2 group/volume">
               <button 
                 onClick={(e) => { e.stopPropagation(); onToggleMute(); }} 
-                class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${getFocusClass(1)}`}
+                class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${getFocusClass(hasBackButton ? 2 : 1)}`}
               >
                 {isMuted || volume === 0 ? <VolumeX class={`${iconSize} text-white`} /> : volume < 0.5 ? <Volume1 class={`${iconSize} text-white`} /> : <Volume2 class={`${iconSize} text-white`} />}
               </button>
@@ -219,7 +232,7 @@ export function VideoControls({
                 e.stopPropagation();
                 onToggleFullscreen();
               }} 
-              class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none`}
+              class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${getFocusClass(hasBackButton ? 3 : 2)}`}
             >
               {isFullscreen ? <Minimize class={`${iconSize} text-white`} /> : <Maximize class={`${iconSize} text-white`} />}
             </button>

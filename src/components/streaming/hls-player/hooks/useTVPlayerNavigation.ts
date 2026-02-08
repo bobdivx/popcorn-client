@@ -1,5 +1,13 @@
-import { useEffect, useState, useRef } from 'preact/hooks';
-import { isAndroidTV } from '../../../../lib/utils/device-detection';
+import { useEffect, useState, useRef, useMemo } from 'preact/hooks';
+import { isTVPlatform } from '../../../../lib/utils/device-detection';
+
+/** Codes clés pour le bouton Retour sur télécommande TV */
+const BACK_KEY_CODES = [
+  27,   // Escape (standard)
+  8,    // Backspace
+  461,  // VK_BACK - Android TV, LG WebOS Magic Remote
+];
+const BACK_KEYS = ['Escape', 'Backspace', 'Back', 'BrowserBack', 'GoBack'];
 
 interface UseTVPlayerNavigationProps {
   showControls: boolean;
@@ -25,21 +33,34 @@ export function useTVPlayerNavigation({
   onClose,
 }: UseTVPlayerNavigationProps) {
   const [focusedControlIndex, setFocusedControlIndex] = useState(0);
-  const isTV = isAndroidTV();
+  const [focusedOnProgress, setFocusedOnProgress] = useState(false);
+  const isTV = isTVPlatform(); // Android TV, LG WebOS, Apple TV
   const controlsTimeoutRef = useRef<number | null>(null);
 
-  // Afficher les contrôles automatiquement sur Android TV
-  useEffect(() => {
-    if (isTV && !showControls) {
-      setShowControls(true);
+  // Contrôles : Back (si onClose), Play, Mute, Fullscreen
+  const hasBack = !!onClose;
+  const controls = useMemo(() => {
+    const c = [
+      { id: 'playpause', action: onPlayPause },
+      { id: 'mute', action: onToggleMute },
+      { id: 'fullscreen', action: onToggleFullscreen },
+    ];
+    if (hasBack) {
+      c.unshift({ id: 'back', action: onClose! });
     }
-  }, [isTV, showControls, setShowControls]);
+    return c;
+  }, [hasBack, onClose, onPlayPause, onToggleMute, onToggleFullscreen]);
 
-  const controls = [
-    { id: 'playpause', action: onPlayPause },
-    { id: 'mute', action: onToggleMute },
-    { id: 'fullscreen', action: onToggleFullscreen },
-  ];
+  const isBackKey = (e: KeyboardEvent) =>
+    BACK_KEYS.includes(e.key) || BACK_KEY_CODES.includes(e.keyCode ?? e.which);
+
+  const handleBack = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      onToggleFullscreen();
+    }
+  };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -47,14 +68,53 @@ export function useTVPlayerNavigation({
         return;
       }
 
-      switch (e.key) {
+      // Bouton Retour télécommande : toujours fermer et revenir à MediaDetail
+      if (isBackKey(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleBack();
+        return;
+      }
+
+      // Gestion par key ET keyCode pour compatibilité WebOS / Apple TV / LG télécommande classique
+      const kc = e.keyCode ?? e.which;
+      const key = e.key || (kc === 13 ? 'Enter' : kc === 32 ? ' ' : kc === 37 ? 'ArrowLeft' : kc === 38 ? 'ArrowUp' : kc === 39 ? 'ArrowRight' : kc === 40 ? 'ArrowDown' : '');
+
+      // Touches média LG WebOS télécommande classique (Play 415, Pause 19, Rembobiner 412, Avance 417)
+      if (kc === 415 || kc === 19) {
+        e.preventDefault();
+        onPlayPause();
+        return;
+      }
+      if (kc === 412) {
+        e.preventDefault();
+        onSeek('left');
+        return;
+      }
+      if (kc === 417) {
+        e.preventDefault();
+        onSeek('right');
+        return;
+      }
+
+      // Touche pour afficher les contrôles si masqués (sauf volume)
+      if (!showControls && [' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
+        setShowControls(true);
+      }
+
+      switch (key) {
         case ' ':
         case 'Enter':
           e.preventDefault();
           if (showControls) {
-            const control = controls[focusedControlIndex];
-            if (control) {
-              control.action();
+            if (focusedOnProgress) {
+              // Sur la barre de progression, Enter = play/pause
+              onPlayPause();
+            } else {
+              const control = controls[focusedControlIndex];
+              if (control) {
+                control.action();
+              }
             }
           } else {
             onPlayPause();
@@ -64,8 +124,14 @@ export function useTVPlayerNavigation({
           e.preventDefault();
           if (e.shiftKey || e.ctrlKey) {
             onSeek('left');
-          } else if (showControls && focusedControlIndex > 0) {
-            setFocusedControlIndex(focusedControlIndex - 1);
+          } else if (showControls) {
+            if (focusedOnProgress) {
+              onSeek('left');
+            } else if (focusedControlIndex > 0) {
+              setFocusedControlIndex(focusedControlIndex - 1);
+            } else {
+              onSeek('left');
+            }
           } else {
             onSeek('left');
           }
@@ -74,19 +140,33 @@ export function useTVPlayerNavigation({
           e.preventDefault();
           if (e.shiftKey || e.ctrlKey) {
             onSeek('right');
-          } else if (showControls && focusedControlIndex < controls.length - 1) {
-            setFocusedControlIndex(focusedControlIndex + 1);
+          } else if (showControls) {
+            if (focusedOnProgress) {
+              onSeek('right');
+            } else if (focusedControlIndex < controls.length - 1) {
+              setFocusedControlIndex(focusedControlIndex + 1);
+            } else {
+              onSeek('right');
+            }
           } else {
             onSeek('right');
           }
           break;
         case 'ArrowUp':
           e.preventDefault();
-          onVolumeChange('up');
+          if (showControls && !focusedOnProgress) {
+            setFocusedOnProgress(true);
+          } else {
+            onVolumeChange('up');
+          }
           break;
         case 'ArrowDown':
           e.preventDefault();
-          onVolumeChange('down');
+          if (showControls && focusedOnProgress) {
+            setFocusedOnProgress(false);
+          } else {
+            onVolumeChange('down');
+          }
           break;
         case 'm':
         case 'M':
@@ -98,23 +178,35 @@ export function useTVPlayerNavigation({
           e.preventDefault();
           onToggleFullscreen();
           break;
-        case 'Escape':
-          e.preventDefault();
-          if (onClose) {
-            onClose();
-          } else {
-            onToggleFullscreen();
-          }
-          break;
       }
     };
 
+    // LG WebOS : événement personnalisé pour le bouton Retour
+    const handleWebOSBack = () => {
+      handleBack();
+    };
+
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('webosback', handleWebOSBack);
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('webosback', handleWebOSBack);
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     };
-  }, [showControls, focusedControlIndex, onPlayPause, onSeek, onVolumeChange, onToggleMute, onToggleFullscreen, onClose, controls, isTV]);
+  }, [
+    showControls,
+    focusedControlIndex,
+    focusedOnProgress,
+    onPlayPause,
+    onSeek,
+    onVolumeChange,
+    onToggleMute,
+    onToggleFullscreen,
+    onClose,
+    controls,
+    setShowControls,
+  ]);
 
   // Afficher les contrôles automatiquement sur Android TV
   useEffect(() => {
@@ -130,6 +222,7 @@ export function useTVPlayerNavigation({
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     controlsTimeoutRef.current = window.setTimeout(() => {
       setShowControls(false);
+      setFocusedOnProgress(false);
     }, 5000);
 
     return () => {
@@ -141,5 +234,9 @@ export function useTVPlayerNavigation({
     isTV,
     focusedControlIndex,
     setFocusedControlIndex,
+    focusedOnProgress,
+    setFocusedOnProgress,
+    hasBack,
+    controlsCount: controls.length,
   };
 }
