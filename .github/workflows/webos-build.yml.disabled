@@ -1,0 +1,268 @@
+name: WebOS Build (IPK)
+
+on:
+  workflow_dispatch:  # Déclenchement manuel uniquement
+
+jobs:
+  # Job unique: Build IPK avec le dossier webos/ existant
+  build-ipk:
+    runs-on: self-hosted
+    environment: production
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(jq -r '.client.version' VERSION.json)
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build client for WebOS (mode démo pour validation stores)
+        env:
+          PUBLIC_DEMO_BACKEND_URL: https://popcorn-vercel.vercel.app
+        run: |
+          echo "📦 Build Astro avec config webOS (backend démo)..."
+          npx astro build --config astro.config.webos.mjs
+          if [ ! -d "dist" ]; then
+            echo "❌ dist/ introuvable après le build"
+            exit 1
+          fi
+          echo "🔧 Correction des chemins pour webOS (file://)..."
+          find dist -name "*.html" -exec sed -i 's|="/_assets/|="./_assets/|g; s|="/popcorn_logo.png"|="./popcorn_logo.png"|g; s|="/favicon.svg"|="./favicon.svg"|g' {} \;
+          echo "📂 Copie dist/ vers webos/frontend/..."
+          rm -rf webos/frontend
+          mkdir -p webos/frontend
+          cp -r dist/* webos/frontend/
+          echo "✅ Client WebOS (mode démo) prêt"
+
+      - name: Install ImageMagick
+        run: |
+          if ! command -v convert &> /dev/null; then
+            echo "📦 Installation de ImageMagick..."
+            sudo apt-get update && sudo apt-get install -y imagemagick
+          else
+            echo "✅ ImageMagick déjà installé"
+          fi
+
+      - name: Prepare WebOS package
+        run: |
+          echo "📦 Préparation du package WebOS..."
+          
+          # Vérifier que le dossier webos existe
+          if [ ! -d "webos" ]; then
+            echo "❌ Le dossier webos n'existe pas!"
+            exit 1
+          fi
+          
+          # Vérifier que appinfo.json existe
+          if [ ! -f "webos/appinfo.json" ]; then
+            echo "❌ appinfo.json introuvable dans webos/"
+            exit 1
+          fi
+          
+          # Vérifier que index.html existe
+          if [ ! -f "webos/index.html" ]; then
+            echo "❌ index.html introuvable dans webos/"
+            exit 1
+          fi
+          
+          # Mettre à jour appinfo.json : version + main = frontend (client buildé en mode démo)
+          jq --arg version "${{ steps.version.outputs.version }}" '.version = $version | .main = "frontend/index.html"' webos/appinfo.json > webos/appinfo.json.tmp
+          mv webos/appinfo.json.tmp webos/appinfo.json
+          
+          # Générer les icônes aux bonnes dimensions pour webOS
+          # LG QA: fond plein (0% transparence), couleur tuile conforme
+          # icon.png: 80x80 px, icon-large.png: 130x130 px, padding 5px (LG guidelines)
+          SOURCE_ICON=""
+          if [ -f "src-tauri/icons/icon.png" ]; then
+            SOURCE_ICON="src-tauri/icons/icon.png"
+          elif [ -f "public/icon.png" ]; then
+            SOURCE_ICON="public/icon.png"
+          elif [ -f "webos/icon.png" ]; then
+            SOURCE_ICON="webos/icon.png"
+          fi
+          
+          if [ -n "$SOURCE_ICON" ]; then
+            echo "🎨 Génération des icônes webOS (fond plein, couleur tuile #E50914)..."
+            # Fond plein = pas de transparence (exigence LG Content Store)
+            convert -size 80x80 xc:'#E50914' \( "$SOURCE_ICON" -resize 70x70 \) -gravity center -composite webos/icon.png
+            convert -size 130x130 xc:'#E50914' \( "$SOURCE_ICON" -resize 120x120 \) -gravity center -composite webos/icon-large.png
+            echo "✅ Icônes générées (80x80 et 130x130, fond plein)"
+          else
+            echo "⚠️ Aucune icône source trouvée"
+          fi
+          
+          echo "📋 Contenu du dossier webos:"
+          ls -la webos/
+          
+          echo "📄 appinfo.json:"
+          cat webos/appinfo.json
+          
+          echo "✅ Package WebOS prêt"
+
+      - name: Install ares-cli
+        run: |
+          echo "📦 Installation de ares-cli..."
+          
+          if command -v ares-package &> /dev/null; then
+            echo "✅ ares-package est déjà disponible"
+            ares-package --version || true
+          else
+            echo "🔧 Installation de @webos-tools/cli..."
+            npm install -g @webos-tools/cli
+            
+            # Mettre à jour le PATH
+            export PATH="$(npm config get prefix)/bin:$PATH"
+            
+            if command -v ares-package &> /dev/null; then
+              echo "✅ ares-cli installé avec succès"
+              ares-package --version || true
+            else
+              echo "❌ Échec de l'installation de ares-cli"
+              exit 1
+            fi
+          fi
+
+      - name: Build IPK
+        run: |
+          # S'assurer que ares-package est dans le PATH
+          export PATH="$(npm config get prefix)/bin:$PATH"
+          
+          echo "📦 Packaging de l'application WebOS en IPK..."
+          cd webos
+          
+          # Utiliser --no-minify pour éviter les erreurs de minification
+          ares-package . --no-minify
+          
+          if [ $? -ne 0 ]; then
+            echo "❌ Échec du packaging IPK"
+            exit 1
+          fi
+          
+          echo "✅ IPK créé avec succès"
+          ls -la *.ipk || true
+
+      - name: Find and move IPK file
+        id: find-ipk
+        run: |
+          IPK_FILE=$(find webos -name "*.ipk" -type f | head -n 1)
+          if [ -z "$IPK_FILE" ]; then
+            echo "❌ Aucun fichier IPK trouvé!"
+            exit 1
+          fi
+          
+          # Garder le nom original généré par ares-package (format: {app_id}_{version}_all.ipk)
+          # Ce format est requis par le LG Seller Lounge
+          IPK_NAME=$(basename "$IPK_FILE")
+          mv "$IPK_FILE" "./$IPK_NAME"
+          
+          echo "path=./$IPK_NAME" >> $GITHUB_OUTPUT
+          echo "name=$IPK_NAME" >> $GITHUB_OUTPUT
+          echo "✅ IPK: $IPK_NAME"
+
+      - name: Upload IPK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: popcorn-webos-ipk
+          path: ${{ steps.find-ipk.outputs.path }}
+          retention-days: 90
+
+  # Job 2: Create GitHub Release
+  create-release:
+    needs: [build-ipk]
+    runs-on: self-hosted
+    environment: production
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/webos' || startsWith(github.ref, 'refs/tags/v'))
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(jq -r '.client.version' VERSION.json)
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
+
+      - name: Determine release tag
+        id: tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="v${{ steps.version.outputs.version }}-webos"
+          fi
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          echo "Release tag: ${TAG}"
+
+      - name: Download IPK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: popcorn-webos-ipk
+          path: ./artifacts
+
+      - name: Check if release exists
+        id: check-release
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          if gh release view "$TAG" &>/dev/null; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "Release $TAG already exists, will update it"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "Release $TAG does not exist, will create it"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create or update GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Popcorn WebOS ${{ steps.version.outputs.version }}
+          body: |
+            ## Popcorn Client pour LG WebOS TV
+            
+            Version: **${{ steps.version.outputs.version }}**
+            
+            ### Installation
+            
+            #### Méthode 1: Developer Mode (recommandé)
+            1. Activez le Developer Mode sur votre TV LG
+            2. Installez `@webos-tools/cli` : `npm install -g @webos-tools/cli`
+            3. Configurez votre TV : `ares-setup-device`
+            4. Installez l'IPK : `ares-install -d <device> Popcorn_WebOS-v${{ steps.version.outputs.version }}.ipk`
+            
+            #### Méthode 2: Homebrew Channel
+            1. Installez Homebrew Channel sur votre TV
+            2. Transférez le fichier .ipk sur une clé USB
+            3. Installez via Homebrew Channel
+            
+            ### Notes
+            - Cette application charge le client Popcorn depuis Vercel
+            - Navigation TV avec télécommande supportée
+            - Résolution: 1920x1080
+            
+            ### Commit
+            `${{ github.sha }}`
+          files: ./artifacts/**
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

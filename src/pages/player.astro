@@ -1,0 +1,38 @@
+---
+import '../styles/global.css';
+---
+<!doctype html>
+<html lang="fr" data-theme="dark" class="overflow-x-hidden">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redirection… - Popcorn</title>
+  </head>
+  <body class="min-h-screen bg-black text-white flex items-center justify-center">
+    <div class="text-center">
+      <p class="text-white/80">Redirection…</p>
+    </div>
+
+    <script is:inline>
+      (function () {
+        try {
+          var params = new URLSearchParams(window.location.search);
+          var id = params.get('contentId') || params.get('id') || params.get('slug');
+          if (id) {
+            window.location.replace('/torrents?slug=' + encodeURIComponent(id));
+            return;
+          }
+          // fallback: /player/<id>
+          var m = (window.location.pathname || '').match(/^\/player\/(.+)$/);
+          if (m && m[1]) {
+            window.location.replace('/torrents?slug=' + encodeURIComponent(m[1]));
+            return;
+          }
+          window.location.replace('/dashboard');
+        } catch (e) {
+          window.location.replace('/dashboard');
+        }
+      })();
+    </script>
+  </body>
+</html>

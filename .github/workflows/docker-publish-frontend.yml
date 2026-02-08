@@ -1,0 +1,305 @@
+name: Build and Publish Frontend Docker Image
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:  # Permet de déclencher manuellement depuis l'interface GitHub
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: popcorn-frontend
+
+jobs:
+  build-and-push:
+    runs-on: self-hosted
+    permissions:
+      contents: write
+      packages: write
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Increment version in VERSION.json
+        id: increment_version
+        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v')
+        run: |
+          if [ -f "VERSION.json" ]; then
+            # Lire la version actuelle
+            CURRENT_VERSION=$(jq -r '.client.version' VERSION.json)
+            echo "📦 Version actuelle: ${CURRENT_VERSION}"
+            
+            # Extraire les parties de la version (major.minor.patch)
+            IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+            
+            # Incrémenter le patch
+            patch=$((patch + 1))
+            
+            # Gérer le rollover
+            if [ $patch -ge 100 ]; then
+              patch=0
+              minor=$((minor + 1))
+            fi
+            if [ $minor -ge 100 ]; then
+              minor=0
+              major=$((major + 1))
+            fi
+            
+            NEW_VERSION="${major}.${minor}.${patch}"
+            echo "🚀 Nouvelle version: ${NEW_VERSION}"
+            
+            # Mettre à jour VERSION.json
+            jq --arg v "$NEW_VERSION" '.client.version = $v' VERSION.json > VERSION.json.tmp
+            mv VERSION.json.tmp VERSION.json
+            
+            # Incrémenter aussi le build number
+            BUILD=$(jq -r '.client.build' VERSION.json)
+            BUILD=$((BUILD + 1))
+            jq --argjson b "$BUILD" '.client.build = $b' VERSION.json > VERSION.json.tmp
+            mv VERSION.json.tmp VERSION.json
+            
+            echo "✅ Version incrémentée: ${CURRENT_VERSION} → ${NEW_VERSION} (build: ${BUILD})"
+            echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+            echo "build=${BUILD}" >> $GITHUB_OUTPUT
+          else
+            echo "⚠️ VERSION.json introuvable, création avec version par défaut"
+            echo '{"client":{"version":"1.0.1","build":1},"server":{"version":"1.0.1","build":1}}' > VERSION.json
+            echo "version=1.0.1" >> $GITHUB_OUTPUT
+            echo "build=1" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get version from VERSION.json
+        id: version
+        if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/v')
+        run: |
+          if [ -f "VERSION.json" ]; then
+            VERSION=$(jq -r '.client.version' VERSION.json)
+            echo "✅ Version trouvée dans VERSION.json: ${VERSION}"
+          else
+            VERSION="1.0.0"
+            echo "⚠️ VERSION.json introuvable, utilisation de la version par défaut: ${VERSION}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Commit version update
+        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v') && steps.increment_version.outputs.version != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION.json
+          git commit -m "chore: bump client version to ${{ steps.increment_version.outputs.version }} (Docker)" || echo "Aucun changement à commiter"
+          git push || echo "Push échoué (peut-être déjà à jour)"
+
+      - name: Fix Docker socket permissions
+        run: |
+          echo "🔧 Correction des permissions du socket Docker..."
+          if [ -S /var/run/docker.sock ]; then
+            sudo chmod 666 /var/run/docker.sock 2>/dev/null || {
+              echo "⚠️ chmod échoué, tentative avec chown..."
+              sudo chown $(id -u):docker /var/run/docker.sock 2>/dev/null || true
+            }
+            echo "✅ Permissions du socket Docker corrigées"
+          else
+            echo "⚠️ Socket Docker non trouvé à /var/run/docker.sock"
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+          driver-opts: |
+            image=moby/buildkit:latest
+            network=host
+
+      - name: Check Docker Hub credentials
+        id: check_creds
+        run: |
+          echo "🔍 Checking for Docker Hub credentials..."
+          echo "Event: ${{ github.event_name }}"
+          echo "Ref: ${{ github.ref }}"
+          
+          # Essayer secrets.DOCKER_USERNAME d'abord
+          DOCKER_USER="${{ secrets.DOCKER_USERNAME }}"
+          if [ -n "${DOCKER_USER}" ] && [ "${DOCKER_USER}" != "null" ] && [ "${DOCKER_USER}" != "" ]; then
+            echo "✅ Found DOCKER_USERNAME in repository secrets"
+            echo "username=${DOCKER_USER}" >> $GITHUB_OUTPUT
+            echo "Using Docker Hub username: ${DOCKER_USER}"
+            exit 0
+          else
+            echo "⚠️ secrets.DOCKER_USERNAME is empty or not set"
+          fi
+          
+          # Essayer vars.DOCKERHUB_USERNAME
+          DOCKER_USER="${{ vars.DOCKERHUB_USERNAME }}"
+          if [ -n "${DOCKER_USER}" ] && [ "${DOCKER_USER}" != "null" ] && [ "${DOCKER_USER}" != "" ]; then
+            echo "✅ Found DOCKERHUB_USERNAME in repository variables"
+            echo "username=${DOCKER_USER}" >> $GITHUB_OUTPUT
+            echo "Using Docker Hub username: ${DOCKER_USER}"
+            exit 0
+          else
+            echo "⚠️ vars.DOCKERHUB_USERNAME is empty or not set"
+          fi
+          
+          # Si aucun n'est trouvé, afficher une erreur détaillée
+          echo ""
+          echo "❌ ERROR: No Docker Hub username configured!"
+          echo ""
+          echo "📋 Solution: Copy your Environment secrets to Repository secrets"
+          echo ""
+          echo "Go to: Settings > Secrets and variables > Actions > Secrets"
+          echo "Then add:"
+          echo "  - DOCKER_USERNAME (from Environment secrets)"
+          echo "  - DOCKER_PASSWORD (from Environment secrets)"
+          echo ""
+          echo "OR if you want to use Environment secrets, uncomment the 'environment:' line"
+          echo "in the workflow and set it to your environment name."
+          exit 1
+
+      - name: Check Docker password
+        id: check_password
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "🔍 Checking for Docker Hub password/token..."
+          
+          # Essayer dans l'ordre: vars.DOCKER_PASSWORD, secrets.DOCKER_PASSWORD, secrets.DOCKERHUB_TOKEN
+          if [ -n "${{ vars.DOCKER_PASSWORD }}" ] && [ "${{ vars.DOCKER_PASSWORD }}" != "" ]; then
+            echo "✅ Found DOCKER_PASSWORD in vars"
+            echo "password_source=vars" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          if [ -n "${{ secrets.DOCKER_PASSWORD }}" ] && [ "${{ secrets.DOCKER_PASSWORD }}" != "" ]; then
+            echo "✅ Found DOCKER_PASSWORD in secrets"
+            echo "password_source=secrets" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          if [ -n "${{ secrets.DOCKERHUB_TOKEN }}" ] && [ "${{ secrets.DOCKERHUB_TOKEN }}" != "" ]; then
+            echo "✅ Found DOCKERHUB_TOKEN in secrets"
+            echo "password_source=token" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "❌ ERROR: No Docker Hub password/token configured!"
+          echo "Please set one of: vars.DOCKER_PASSWORD, secrets.DOCKER_PASSWORD, or secrets.DOCKERHUB_TOKEN"
+          exit 1
+
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ steps.check_creds.outputs.username }}
+          password: ${{ vars.DOCKER_PASSWORD != '' && vars.DOCKER_PASSWORD || (secrets.DOCKER_PASSWORD != '' && secrets.DOCKER_PASSWORD || secrets.DOCKERHUB_TOKEN) }}
+
+      # Vérification réseau : avertit si Docker Hub est injoignable (ne bloque pas pour laisser le push tenter quand même)
+      # On accepte HTTP 200 ou 401 (401 = registry joignable mais non authentifié, comportement normal)
+      - name: Verify Docker Hub reachability
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        id: docker_hub_reach
+        run: |
+          echo "🔍 Vérification de la connectivité vers Docker Hub..."
+          for i in 1 2 3; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "https://registry-1.docker.io/v2/" 2>/dev/null || echo "000")
+            if [ "$CODE" = "200" ] || [ "$CODE" = "401" ]; then
+              echo "✅ Docker Hub joignable (HTTP $CODE)"
+              echo "reachable=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            echo "Tentative $i/3 échouée (HTTP $CODE), nouvel essai dans 10s..."
+            sleep 10
+          done
+          echo "⚠️ Impossible de joindre Docker Hub (registry-1.docker.io) depuis ce runner."
+          echo "   Le build et le push seront tout de même tentés. Si le push échoue, voir: doc/TROUBLESHOOTING_DOCKER_RUNNER_DNS.md"
+          echo "   (DNS/firewall: ex. 8.8.8.8 dans /etc/docker/daemon.json puis systemctl restart docker)"
+          echo "reachable=false" >> $GITHUB_OUTPUT
+          exit 1
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.check_creds.outputs.username }}/popcorn-frontend
+          tags: |
+            type=raw,value=${{ steps.increment_version.outputs.version || steps.version.outputs.version }},enable=${{ github.event_name != 'pull_request' }}
+            type=raw,value=v${{ steps.increment_version.outputs.version || steps.version.outputs.version }},enable=${{ github.event_name != 'pull_request' }}
+            type=raw,value=latest,enable=${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
+            type=semver,pattern={{version}},enable=${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}},enable=${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') }}
+            type=sha,prefix=sha-,enable=${{ github.event_name != 'pull_request' }}
+            type=ref,event=branch,enable=${{ github.event_name == 'pull_request' }}
+            type=ref,event=pr,enable=${{ github.event_name == 'pull_request' }}
+
+      - name: Log image info
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "✅ Frontend Docker Image will be published!"
+          echo "Repository: ${{ steps.check_creds.outputs.username }}/popcorn-frontend"
+          echo "Tags: ${{ join(steps.meta.outputs.tags, ', ') }}"
+
+      - name: Build and push Docker image (attempt 1)
+        id: build_push
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ steps.check_creds.outputs.username }}/popcorn-frontend:buildcache
+          cache-to: type=registry,ref=${{ steps.check_creds.outputs.username }}/popcorn-frontend:buildcache,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      # Retry en cas d’échec réseau (connection reset by peer, DNS, etc.)
+      - name: Build and push Docker image (retry)
+        id: build_push_retry
+        if: github.event_name != 'pull_request' && steps.build_push.outcome == 'failure'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ steps.check_creds.outputs.username }}/popcorn-frontend:buildcache
+          cache-to: type=registry,ref=${{ steps.check_creds.outputs.username }}/popcorn-frontend:buildcache,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Fail job if build and push failed (including retry)
+        if: github.event_name != 'pull_request' && steps.build_push.outcome == 'failure' && (steps.build_push_retry.outcome == 'failure' || steps.build_push_retry.outcome == 'skipped')
+        run: |
+          echo "Build et push Docker ont echoue (tentative 1 + retry)."
+          echo "Causes frequentes : connexion reset, DNS (10.1.0.1:53), firewall. Verifiez le reseau du runner puis reexecutez le workflow."
+          echo "Documentation : doc/TROUBLESHOOTING_DOCKER_RUNNER_DNS.md"
+          exit 1
+
+      - name: Build Docker image (no push)
+        if: github.event_name == 'pull_request'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+
+      - name: Log success
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "✅ Frontend Docker Image published successfully!"
+          echo "You can find it at: https://hub.docker.com/r/${{ steps.check_creds.outputs.username }}/popcorn-frontend/tags"

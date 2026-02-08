@@ -1,0 +1,24 @@
+---
+import ErrorPage from '../components/errors/ErrorPage';
+---
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark" class="overflow-hidden">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Accès refusé - Popcorn Torrent" />
+    <link rel="icon" type="image/png" href="/popcorn_logo.png" />
+    <title>403 - Accès refusé - Popcorn Torrent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+  </head>
+  <body class="min-h-screen bg-black text-white overflow-hidden">
+    <ErrorPage 
+      client:load
+      code={403}
+      title="Accès refusé"
+      message="Vous n'avez pas les permissions nécessaires pour accéder à cette ressource."
+      showHomeButton={true}
+      showBackButton={true}
+    />
+  </body>
+</html>

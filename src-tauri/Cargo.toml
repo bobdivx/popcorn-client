@@ -1,0 +1,36 @@
+[package]
+name = "popcorn-client"
+version = "1.1.0"
+description = "Popcorn Client Léger - Application Tauri"
+authors = ["you"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.70"
+
+[lib]
+# Requis pour les builds mobile (Android/iOS) : Tauri compile en bibliothèque (cdylib)
+name = "popcorn_client"
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"
+tauri-plugin-process = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-http = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# reqwest direct (pas via tauri-plugin-http) pour contourner les limitations ACL
+# Utiliser rustls-tls au lieu de native-tls pour éviter la dépendance OpenSSL sur Android
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+[features]
+# Cette fonctionnalité est utilisée pour la production ou quand `devPath` n'est pas défini
+custom-protocol = ["tauri/custom-protocol"]

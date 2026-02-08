@@ -1,0 +1,10 @@
+---
+import Layout from '../layouts/Layout.astro';
+import DemandesPage from '../components/demandes/DemandesPage';
+---
+
+<Layout title="Demandes - Popcorn Client">
+  <div class="min-h-screen bg-black text-white">
+    <DemandesPage client:only="preact" />
+  </div>
+</Layout>

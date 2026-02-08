@@ -1,0 +1,322 @@
+import { useMemo, useEffect, useRef, useState, useCallback } from 'preact/hooks';
+import { Download } from 'lucide-preact';
+import type { SeriesData } from '../../lib/client/types';
+import { HeroSection } from './components/HeroSection';
+import CarouselRow from '../torrents/CarouselRow';
+import { LazyTorrentPoster } from './components/LazyTorrentPoster';
+import type { ContentItem } from '../../lib/client/types';
+import { useInfiniteSeries } from './hooks/useInfiniteSeries';
+import { useRecentSeries } from './hooks/useRecentSeries';
+import { useSyncStatus } from './hooks/useSyncStatus';
+import { SyncProgress } from '../setup/components/SyncProgress';
+import { SyncCard } from './components/SyncCard';
+import { useI18n } from '../../lib/i18n/useI18n';
+import { translateGenre } from '../../lib/utils/genre-translation';
+import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
+import { serverApi } from '../../lib/client/server-api';
+import { NotificationContainer } from '../ui/Notification';
+import { useNotifications } from '../torrents/MediaDetailPage/hooks/useNotifications';
+import { resolveHeroTorrent } from './utils/heroDownload';
+import { handleDownload } from '../torrents/MediaDetailPage/actions/download';
+
+export default function SeriesDashboard() {
+  const { t, language } = useI18n();
+  const { series, loading, error, hasMore, loadMore, refetchSilent } = useInfiniteSeries();
+  const { series: recentSeries } = useRecentSeries();
+  const { syncStatus, isSyncing, loading: syncLoading } = useSyncStatus();
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
+  const lastSyncProgressRef = useRef<number>(-1);
+  const { notifications, addNotification, removeNotification } = useNotifications();
+  const [heroDownloading, setHeroDownloading] = useState(false);
+
+  // Rafraîchir la liste des séries au fur et à mesure de la synchronisation torrent
+  useEffect(() => {
+    if (!isSyncing) {
+      lastSyncProgressRef.current = -1;
+      return;
+    }
+    if (!syncStatus) return;
+    const totalProcessed = syncStatus.progress?.total_processed ?? 0;
+    const statsSum = syncStatus.stats
+      ? Object.values(syncStatus.stats).reduce((a, b) => a + b, 0)
+      : 0;
+    const key = totalProcessed + statsSum;
+    if (key > lastSyncProgressRef.current) {
+      lastSyncProgressRef.current = key;
+      if (key > 0) refetchSilent();
+    }
+  }, [isSyncing, syncStatus?.progress?.total_processed, syncStatus?.stats, refetchSilent]);
+
+  // Charger plus d'éléments automatiquement quand on approche de la fin
+  useEffect(() => {
+    if (!loadMoreTriggerRef.current || !hasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin: '500px' }
+    );
+
+    observer.observe(loadMoreTriggerRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
+
+  const handlePlay = (item: ContentItem) => {
+    window.location.href = `/player/${item.id}`;
+  };
+
+  const handleHeroDownload = useCallback(async (item: ContentItem) => {
+    if (heroDownloading) return;
+    setHeroDownloading(true);
+    try {
+      const torrent = await resolveHeroTorrent(item);
+      if (!torrent) {
+        addNotification('error', t('dashboard.downloadUnavailable'));
+        return;
+      }
+      const isExternal = !!torrent._externalLink || torrent.id?.startsWith('external_');
+      await handleDownload({
+        torrent,
+        isExternal,
+        setDownloadingToClient: setHeroDownloading,
+        addNotification,
+      });
+    } finally {
+      setHeroDownloading(false);
+    }
+  }, [heroDownloading, addNotification, t]);
+
+  // Grouper les séries par genre principal uniquement (chaque série dans une seule ligne)
+  const seriesByGenre = useMemo(() => {
+    const grouped: Record<string, SeriesData[]> = {};
+    
+    series.forEach(serie => {
+      if (serie.genres && serie.genres.length > 0) {
+        // Utiliser uniquement le genre principal (premier du tableau)
+        const primaryGenre = serie.genres[0];
+        if (!grouped[primaryGenre]) {
+          grouped[primaryGenre] = [];
+        }
+        grouped[primaryGenre].push(serie);
+      } else {
+        // Séries sans genre dans une catégorie "Autres" (clé interne pour i18n)
+        const otherKey = '__other__';
+        if (!grouped[otherKey]) {
+          grouped[otherKey] = [];
+        }
+        grouped[otherKey].push(serie);
+      }
+    });
+
+    // Trier chaque groupe par date (plus récent en premier)
+    Object.keys(grouped).forEach(genre => {
+      grouped[genre].sort((a, b) => {
+        const dateA = a.firstAirDate ? new Date(a.firstAirDate).getTime() : 0;
+        const dateB = b.firstAirDate ? new Date(b.firstAirDate).getTime() : 0;
+        return dateB - dateA;
+      });
+    });
+
+    return grouped;
+  }, [series]);
+
+  // Préparer les données pour le hero (les 3 séries les plus récentes avec poster)
+  const heroSeries = useMemo(() => {
+    return series
+      .filter(s => s.poster || s.backdrop)
+      .slice(0, 3)
+      .map(s => ({
+        ...s,
+        type: 'tv' as const,
+      }));
+  }, [series]);
+
+  // Résumés localisés pour le hero (langue courante via TMDB)
+  const [heroOverviews, setHeroOverviews] = useState<Record<string, string>>({});
+  const tmdbLang = language === 'fr' ? 'fr-FR' : 'en-US';
+  useEffect(() => {
+    if (heroSeries.length === 0) {
+      setHeroOverviews({});
+      return;
+    }
+    let cancelled = false;
+    const next: Record<string, string> = {};
+    (async () => {
+      for (const item of heroSeries) {
+        if (cancelled || !item.tmdbId) continue;
+        try {
+          const res = await serverApi.getTmdbTvDetail(item.tmdbId, tmdbLang);
+          if (res.success && res.data?.overview) {
+            next[item.id] = res.data.overview;
+          }
+        } catch {
+          // garder l'overview de la liste si l'appel échoue
+        }
+      }
+      if (!cancelled) setHeroOverviews(prev => ({ ...prev, ...next }));
+    })();
+    return () => { cancelled = true; };
+  }, [tmdbLang, heroSeries.map(f => `${f.id}:${f.tmdbId ?? ''}`).join('|')]);
+
+  // Hero items avec overview dans la langue courante (priorité au fetch TMDB)
+  const heroItemsWithOverview = useMemo(() => {
+    return heroSeries.map(f => ({
+      ...f,
+      overview: heroOverviews[f.id] ?? f.overview,
+    }));
+  }, [heroSeries, heroOverviews]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-black">
+        <HLSLoadingSpinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white px-4">
+        <div className="alert alert-error max-w-2xl">
+          <span>{error}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Vérifier s'il y a des torrents synchronisés
+  const totalTorrents = syncStatus?.stats 
+    ? Object.values(syncStatus.stats).reduce((sum, count) => sum + count, 0)
+    : 0;
+  const hasTorrents = totalTorrents > 0;
+
+  // Barre compacte en haut quand une sync est en cours (affiche le contenu en dessous)
+  const showSyncBar = !syncLoading && isSyncing;
+
+  // Contenu principal quand series.length === 0
+  const renderEmptyContent = () => {
+    if (!syncLoading && !isSyncing && !hasTorrents) {
+      return (
+        <div className="flex-1 flex items-center justify-center min-h-[50vh]">
+          <SyncCard type="series" />
+        </div>
+      );
+    }
+    if (isSyncing) {
+      return (
+        <div className="flex flex-col items-center justify-center flex-1 py-16 px-4">
+          <p className="text-gray-400 text-center">
+            {t('sync.seriesSyncDescription')}
+          </p>
+          <p className="text-gray-500 text-sm mt-2 text-center">
+            Les séries apparaîtront au fur et à mesure de la synchronisation.
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 py-16 px-4">
+        <h2 className="text-2xl font-bold text-white mb-2">Aucune série disponible</h2>
+        <p className="text-gray-400 text-center">Aucune série n'est disponible pour le moment.</p>
+      </div>
+    );
+  };
+
+  // Trier les genres par ordre alphabétique
+  const sortedGenres = Object.keys(seriesByGenre).sort((a, b) => {
+    // Mettre "Autres" en dernier
+    if (a === '__other__') return 1;
+    if (b === '__other__') return -1;
+    return a.localeCompare(b);
+  });
+  
+  console.log(`[SERIES DASHBOARD] Affichage: ${series.length} série(s), ${sortedGenres.length} genre(s)`, {
+    genres: sortedGenres,
+    seriesByGenreCounts: Object.fromEntries(
+      Object.entries(seriesByGenre).map(([genre, series]) => [genre, series.length])
+    ),
+  });
+
+  // Debug: Vérifier les données des séries pour comprendre pourquoi les images ne s'affichent pas
+  if (series.length > 0) {
+    const firstSerie = series[0];
+    console.log('[SERIES DASHBOARD] Première série:', {
+      id: firstSerie.id,
+      title: firstSerie.title,
+      poster: firstSerie.poster,
+      backdrop: firstSerie.backdrop,
+      hasPoster: !!firstSerie.poster,
+      hasBackdrop: !!firstSerie.backdrop,
+      allKeys: Object.keys(firstSerie),
+    });
+  }
+
+  return (
+    <div className="min-h-screen bg-black text-white flex flex-col">
+      <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+      {/* Barre de progression compacte en haut quand sync en cours */}
+      {showSyncBar && <SyncProgress compact externalStatus={syncStatus} />}
+
+      {/* Section Hero avec carousel */}
+      {heroItemsWithOverview.length > 0 && (
+        <HeroSection
+          items={heroItemsWithOverview}
+          onPlay={handlePlay}
+          onPrimaryAction={handleHeroDownload}
+          primaryActionDisabled={heroDownloading}
+          primaryButtonLabel={t('common.download')}
+          primaryButtonIcon={<Download className="h-6 w-6 tv:h-8 tv:w-8" size={24} />}
+        />
+      )}
+
+      <div className="pb-8 tv:pb-12 flex-1">
+        {/* Section Ajouts récents (tri par date indexeur) - première ligne */}
+        {recentSeries.length > 0 && (
+          <CarouselRow title={t('dashboard.recentAdditions')} autoScroll={false}>
+            {recentSeries.map((serie) => (
+              <div key={serie.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+                <LazyTorrentPoster item={{ ...serie, type: 'tv' }} />
+              </div>
+            ))}
+          </CarouselRow>
+        )}
+        {/* Contenu vide : SyncCard ou message */}
+        {series.length === 0 ? (
+          renderEmptyContent()
+        ) : sortedGenres.length > 0 ? (
+          sortedGenres.map(genre => {
+            const genreSeries = seriesByGenre[genre];
+            if (genreSeries.length === 0) return null;
+
+            const genreTitle =
+              genre === '__other__' ? t('common.others') : translateGenre(genre, language);
+
+            return (
+              <CarouselRow key={genre} title={genreTitle} autoScroll={false}>
+                {genreSeries.map((serie) => (
+                  <div key={serie.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+                    <LazyTorrentPoster item={{ ...serie, type: 'tv' }} />
+                  </div>
+                ))}
+              </CarouselRow>
+            );
+          })
+        ) : (
+          // Si aucun genre, afficher toutes les séries dans une seule ligne
+          <CarouselRow title={t('sync.allSeries')} autoScroll={false}>
+            {series.map((serie) => (
+              <div key={serie.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+                <LazyTorrentPoster item={{ ...serie, type: 'tv' }} />
+              </div>
+            ))}
+          </CarouselRow>
+        )}
+        {/* Trigger pour charger plus d'éléments */}
+        {series.length > 0 && hasMore && <div ref={loadMoreTriggerRef} className="h-1" />}
+      </div>
+    </div>
+  );
+}

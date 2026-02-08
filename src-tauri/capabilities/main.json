@@ -1,0 +1,18 @@
+{
+  "identifier": "main",
+  "description": "Permissions principales (core + HTTP) pour l'app.",
+  "remote": { "urls": ["http://tauri.localhost/*"] },
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "custom-commands",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "http://*/*" },
+        { "url": "https://*/*" }
+      ]
+    }
+  ]
+}
+

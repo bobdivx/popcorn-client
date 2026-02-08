@@ -1,0 +1,1332 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Animations pour le feedback visuel */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+/* Variables CSS pour thème Glassmorphic */
+:root {
+  --bg-primary: #121212; /* Anthracite */
+  --bg-glass: rgba(255, 255, 255, 0.05); /* Verre dépoli */
+  --bg-glass-hover: rgba(255, 255, 255, 0.1);
+  --bg-glass-active: rgba(255, 255, 255, 0.15);
+  --neon-violet: #a855f7; /* Neon Violet */
+  --neon-violet-glow: rgba(168, 85, 247, 0.5);
+  --blur-glass: blur(20px); /* Effet verre dépoli */
+  --blur-glass-lg: blur(40px); /* Effet verre dépoli fort */
+  
+  /* Safe Area Android (notch, barre de navigation) */
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+}
+
+/* Masquer la scrollbar mais garder le scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE et Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari et Opera */
+}
+
+/* Carousel horizontal : défilement tactile fluide (torrent cards, etc.) */
+.carousel-container {
+  -webkit-overflow-scrolling: touch; /* Momentum scroll sur iOS */
+  overscroll-behavior-x: contain;    /* Empêche la propagation du scroll horizontal */
+  touch-action: pan-x pan-y;         /* Autorise swipe horizontal ET vertical (page) */
+}
+
+/* Scrollbar visible (barre latérale) */
+.scrollbar-visible {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: rgba(255, 255, 255, 0.35) rgba(0, 0, 0, 0.25); /* Firefox */
+}
+
+.scrollbar-visible::-webkit-scrollbar {
+  width: 10px;
+}
+
+.scrollbar-visible::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.28);
+  border-radius: 9999px;
+  border: 2px solid rgba(0, 0, 0, 0.25);
+}
+
+.scrollbar-visible::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.42);
+}
+
+/* Animations globales */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out;
+}
+
+/* Animations pour le spinner HLS réutilisable (noms différents de l'animation HLS originale) */
+@keyframes hls-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes hls-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.9); opacity: 0.8; }
+}
+
+@keyframes hls-bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1); }
+}
+
+/* Animation pour menu dropdown */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+}
+
+.animate-slide-down {
+  animation: slideDown 0.2s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.2s ease-in;
+}
+
+/* Animation pour sidebar mobile */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOutLeft {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-slide-in-left {
+  animation: slideInLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.animate-slide-out-left {
+  animation: slideOutLeft 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Micro-interactions pour les boutons */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.animate-pulse-slow {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Animation pour les onglets actifs */
+@keyframes tabActive {
+  from {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.nav-tab-active {
+  animation: tabActive 0.2s ease-out;
+  position: relative;
+}
+
+.nav-tab-active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.8), transparent);
+  border-radius: 2px;
+  animation: tabActiveGlow 2s ease-in-out infinite;
+}
+
+@keyframes tabActiveGlow {
+  0%, 100% {
+    opacity: 0.6;
+    width: 60%;
+  }
+  50% {
+    opacity: 1;
+    width: 80%;
+  }
+}
+
+/* Amélioration des transitions pour les boutons */
+.gtv-icon-btn,
+.gtv-pill-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+
+.gtv-icon-btn:hover:not(:disabled),
+.gtv-pill-btn:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.05);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+}
+
+.gtv-icon-btn:active:not(:disabled),
+.gtv-pill-btn:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+  transition: all 0.1s ease-out;
+}
+
+/* Animation ripple pour les boutons (effet de clic) */
+@keyframes ripple {
+  0% {
+    transform: scale(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
+.button-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.button-ripple::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.5);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.button-ripple:active::after {
+  width: 300px;
+  height: 300px;
+}
+
+/* Animation pour les cartes et éléments interactifs */
+@keyframes cardHover {
+  from {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  }
+  to {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(168, 85, 247, 0.2);
+  }
+}
+
+.card-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.card-hover:hover {
+  animation: cardHover 0.3s ease-out forwards;
+  z-index: 5;
+}
+
+.card-hover:active {
+  transform: translateY(-2px) scale(1.01);
+  transition: all 0.1s ease-out;
+}
+
+/* Classe utilitaire pour les cartes avec hover amélioré */
+.interactive-card {
+  @apply transition-all duration-300 rounded-lg;
+  will-change: transform, box-shadow;
+}
+
+.interactive-card:hover {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(168, 85, 247, 0.2);
+  z-index: 5;
+}
+
+.interactive-card:active {
+  transform: translateY(-2px) scale(1.01);
+  transition: all 0.1s ease-out;
+}
+
+/* Animation pour les images dans les cartes */
+.card-image {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.interactive-card:hover .card-image {
+  transform: scale(1.05);
+}
+
+/* Animation pour les focus TV - Améliorée */
+@keyframes tvFocus {
+  0% {
+    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7);
+    outline-width: 3px;
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(168, 85, 247, 0.3);
+    outline-width: 4px;
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0);
+    outline-width: 3px;
+  }
+}
+
+[data-focusable]:focus-visible {
+  animation: tvFocus 0.6s ease-out;
+  outline: 3px solid rgba(168, 85, 247, 0.8);
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+/* Focus TV encore plus visible sur grands écrans */
+@media (min-width: 1920px) {
+  [data-focusable]:focus-visible {
+    outline-width: 4px;
+    outline-offset: 4px;
+    animation: tvFocusPulse 1s ease-in-out infinite;
+  }
+}
+
+/* Animation pour les pages */
+@keyframes pageTransition {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-transition {
+  animation: pageTransition 0.4s ease-out;
+}
+
+/* Animation pour les notifications/toasts */
+@keyframes toastSlide {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.toast-animate {
+  animation: toastSlide 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Animation pour les modals */
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.modal-animate {
+  animation: modalFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Animation pour les listes (stagger) */
+@keyframes listItemFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.list-item-animate {
+  animation: listItemFadeIn 0.4s ease-out forwards;
+}
+
+/* Animation pour les chargements */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.loading-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Barre de chargement indéterminée (sync bibliothèque) — collée au header */
+@keyframes library-sync-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100vw);
+  }
+}
+
+.library-sync-bar-indeterminate {
+  position: relative;
+  overflow: hidden;
+}
+
+.library-sync-bar-indeterminate::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  max-width: 280px;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-primary-500, rgb(168 85 247)) 50%,
+    transparent 100%
+  );
+  animation: library-sync-bar 1.8s ease-in-out infinite;
+}
+
+/* Animation pour les badges et notifications */
+@keyframes badgePulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.9;
+  }
+}
+
+.badge-pulse {
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+/* Animation pour les icônes qui changent d'état */
+@keyframes iconRotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.icon-rotate {
+  animation: iconRotate 0.5s ease-out;
+}
+
+/* Animation pour les transitions de page */
+.page-enter {
+  animation: pageTransition 0.4s ease-out;
+}
+
+.page-exit {
+  animation: pageTransition 0.3s ease-in reverse;
+}
+
+/* Styles pour les inputs type TV */
+.form-tv-input {
+  transition: all 0.2s ease;
+}
+
+.form-tv-input:focus {
+  background-color: rgba(255, 255, 255, 0.15);
+  outline: none;
+  border-color: rgb(168, 85, 247);
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.35);
+}
+
+.form-tv-button {
+  transition: all 0.2s ease;
+}
+
+.form-tv-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+}
+
+.form-tv-button:focus:not(:disabled) {
+  outline: none;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.6);
+}
+
+/* Classes utilitaires globales pour Glassmorphic */
+@layer utilities {
+  /* Classes de couleurs principales - remplacent bg-violet */
+  .bg-primary {
+    @apply bg-primary-600;
+  }
+  
+  .bg-primary-hover {
+    @apply hover:bg-primary-700;
+  }
+  
+  .text-primary {
+    @apply text-primary-600;
+  }
+  
+  .border-primary {
+    @apply border-primary-600;
+  }
+  
+  .ring-primary {
+    @apply ring-primary-600;
+  }
+  
+  .shadow-primary {
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3);
+  }
+  
+  .shadow-primary-lg {
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.8), 0 0 40px rgba(168, 85, 247, 0.5);
+  }
+  
+  /* Classes Glassmorphic */
+  .bg-glass {
+    background-color: var(--bg-glass);
+  }
+  
+  .bg-glass-hover {
+    background-color: var(--bg-glass-hover);
+  }
+  
+  .bg-glass-active {
+    background-color: var(--bg-glass-active);
+  }
+  
+  .glass-panel {
+    background-color: var(--bg-glass);
+    backdrop-filter: var(--blur-glass);
+    -webkit-backdrop-filter: var(--blur-glass);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  
+  .glass-panel-lg {
+    background-color: var(--bg-glass);
+    backdrop-filter: var(--blur-glass-lg);
+    -webkit-backdrop-filter: var(--blur-glass-lg);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+  
+  /* Menu dropdown moderne avec fond plus opaque */
+  .dropdown-menu {
+    background: linear-gradient(135deg, rgba(18, 18, 18, 0.95) 0%, rgba(30, 30, 30, 0.98) 100%);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  }
+  
+  /* Menu dropdown pour mobile - encore plus visible */
+  .dropdown-menu-mobile {
+    background: linear-gradient(135deg, rgba(18, 18, 18, 0.98) 0%, rgba(30, 30, 30, 0.99) 100%);
+    backdrop-filter: blur(32px) saturate(180%);
+    -webkit-backdrop-filter: blur(32px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+  }
+  
+  /* Safe Area utilities pour Android (notch, barre de navigation) */
+  .safe-area-top {
+    padding-top: var(--safe-area-inset-top);
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: var(--safe-area-inset-bottom);
+  }
+  
+  .safe-area-left {
+    padding-left: var(--safe-area-inset-left);
+  }
+  
+  .safe-area-right {
+    padding-right: var(--safe-area-inset-right);
+  }
+  
+  .safe-area-x {
+    padding-left: var(--safe-area-inset-left);
+    padding-right: var(--safe-area-inset-right);
+  }
+  
+  .safe-area-y {
+    padding-top: var(--safe-area-inset-top);
+    padding-bottom: var(--safe-area-inset-bottom);
+  }
+  
+  .safe-area {
+    padding-top: var(--safe-area-inset-top);
+    padding-right: var(--safe-area-inset-right);
+    padding-bottom: var(--safe-area-inset-bottom);
+    padding-left: var(--safe-area-inset-left);
+  }
+  
+  /* Focus states pour Android TV - mis à jour avec primary */
+  .focus-tv {
+    @apply focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-60 focus:ring-offset-2 focus:ring-offset-black;
+  }
+  
+  .focus-tv-glow {
+    @apply focus-tv;
+    box-shadow: 0 0 20px rgba(168, 85, 247, 0.8), 0 0 40px rgba(168, 85, 247, 0.5);
+  }
+  
+  .hover-tv:not(:focus) {
+    @apply hover:scale-105 transition-all duration-200;
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3);
+  }
+}
+
+/* Détection TV et désactivation hover */
+@media (pointer: coarse) and (min-width: 1920px) {
+  .hover-tv:hover {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Styles optimisés pour Android TV - Breakpoint 1920px+ */
+/* Animations adaptées pour TV - Plus lentes et plus visibles */
+@media (min-width: 1920px) {
+  .animate-fade-in {
+    animation-duration: 0.6s;
+  }
+  
+  .animate-slide-down {
+    animation-duration: 0.3s;
+  }
+  
+  /* Focus plus visible sur TV */
+  [data-focusable]:focus-visible {
+    outline: 4px solid rgba(168, 85, 247, 0.8);
+    outline-offset: 4px;
+    animation: tvFocusPulse 1s ease-in-out infinite;
+  }
+  
+  /* Transitions plus lentes pour TV */
+  .gtv-icon-btn,
+  .gtv-pill-btn,
+  .nav-tab {
+    transition-duration: 0.3s;
+  }
+  
+  /* Hover plus prononcé sur TV */
+  .gtv-icon-btn:hover:not(:disabled),
+  .gtv-pill-btn:hover:not(:disabled) {
+    transform: translateY(-2px) scale(1.08);
+  }
+  
+  /* Menu dropdown plus grand sur TV */
+  .dropdown-menu,
+  .dropdown-menu-mobile {
+    padding: 1rem;
+    border-radius: 1rem;
+  }
+  
+  .dropdown-menu a,
+  .dropdown-menu-mobile a {
+    padding: 1rem 1.5rem;
+    font-size: 1.125rem;
+    min-height: 56px;
+  }
+  
+  /* Cartes plus grandes et plus espacées sur TV */
+  .card-hover {
+    transition-duration: 0.4s;
+  }
+  
+  .card-hover:hover {
+    transform: translateY(-8px) scale(1.05);
+  }
+}
+
+/* Styles optimisés pour Android TV - Breakpoint 1920px+ */
+@media (min-width: 1920px) {
+  /* Classes utilitaires TV pour espacements */
+  .gap-tv-lg {
+    gap: 2rem !important; /* 32px */
+  }
+  
+  .p-tv-lg {
+    padding: 1.5rem 3rem !important; /* 48px vertical, 48px horizontal */
+  }
+  
+  .px-tv-lg {
+    padding-left: 3rem !important; /* 48px */
+    padding-right: 3rem !important; /* 48px */
+  }
+  
+  .py-tv-lg {
+    padding-top: 1.5rem !important; /* 48px */
+    padding-bottom: 1.5rem !important; /* 48px */
+  }
+  
+  .mb-tv-lg {
+    margin-bottom: 4rem !important; /* 64px */
+  }
+  
+  /* Tailles minimales pour tuiles TV */
+  .min-size-tv {
+    min-width: 300px !important;
+    min-height: 450px !important;
+  }
+  
+  /* Optimisation typographie TV */
+  .text-tv-title {
+    font-size: 3rem !important; /* 48px */
+    line-height: 1.2;
+  }
+  
+  .text-tv-base {
+    font-size: 1.25rem !important; /* 20px */
+    line-height: 1.6;
+  }
+  
+  /* Espacements entre éléments interactifs - minimum 16px sur TV */
+  .card-tv:focus {
+    margin: 0.5rem !important; /* 8px margin pour visibilité */
+    z-index: 10 !important;
+  }
+  
+  /* Grid adaptatif pour TV - réduire le nombre de colonnes */
+  .grid-tv-adaptive {
+    grid-template-columns: repeat(3, minmax(400px, 1fr)) !important;
+    gap: 2rem !important; /* 32px */
+  }
+  
+  /* Augmenter les tailles de texte pour TV - overrides spécifiques */
+  .tv\:text-2xl {
+    font-size: 1.5rem !important; /* 24px */
+    line-height: 2rem !important;
+  }
+  
+  .tv\:text-3xl {
+    font-size: 1.875rem !important; /* 30px */
+    line-height: 2.25rem !important;
+  }
+  
+  .tv\:text-8xl {
+    font-size: 6rem !important; /* 96px */
+    line-height: 1 !important;
+  }
+  
+  /* Augmenter les espacements pour TV */
+  .tv\:gap-4 {
+    gap: 1rem !important; /* 16px */
+  }
+  
+  .tv\:gap-6 {
+    gap: 1.5rem !important; /* 24px */
+  }
+  
+  .tv\:gap-8 {
+    gap: 2rem !important; /* 32px */
+  }
+  
+  .tv\:px-8 {
+    padding-left: 2rem !important; /* 32px */
+    padding-right: 2rem !important; /* 32px */
+  }
+  
+  .tv\:px-16 {
+    padding-left: 4rem !important; /* 64px */
+    padding-right: 4rem !important; /* 64px */
+  }
+  
+  .tv\:px-24 {
+    padding-left: 6rem !important; /* 96px */
+    padding-right: 6rem !important; /* 96px */
+  }
+  
+  .tv\:py-4 {
+    padding-top: 1rem !important; /* 16px */
+    padding-bottom: 1rem !important; /* 16px */
+  }
+  
+  .tv\:min-w-\[400px\] {
+    min-width: 400px !important;
+  }
+  
+  .tv\:w-\[400px\] {
+    width: 400px !important;
+  }
+  
+  .tv\:min-h-\[56px\] {
+    min-height: 56px !important;
+  }
+  
+  .tv\:min-h-\[64px\] {
+    min-height: 64px !important;
+  }
+  
+  .tv\:min-h-\[600px\] {
+    min-height: 600px !important;
+  }
+  
+  .tv\:h-28 {
+    height: 7rem !important; /* 112px */
+  }
+  
+  .tv\:w-14 {
+    width: 3.5rem !important; /* 56px */
+  }
+  
+  .tv\:h-14 {
+    height: 3.5rem !important; /* 56px */
+  }
+  
+  .tv\:w-16 {
+    width: 4rem !important; /* 64px */
+  }
+  
+  .tv\:h-16 {
+    height: 4rem !important; /* 64px */
+  }
+  
+  .tv\:w-12 {
+    width: 3rem !important; /* 48px */
+  }
+  
+  .tv\:h-12 {
+    height: 3rem !important; /* 48px */
+  }
+  
+  .tv\:mb-16 {
+    margin-bottom: 4rem !important; /* 64px */
+  }
+  
+  .tv\:mb-4 {
+    margin-bottom: 1rem !important; /* 16px */
+  }
+  
+  .tv\:pb-12 {
+    padding-bottom: 3rem !important; /* 48px */
+  }
+  
+  .tv\:pb-20 {
+    padding-bottom: 5rem !important; /* 80px */
+  }
+  
+  .tv\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+  
+  .tv\:text-lg {
+    font-size: 1.125rem !important; /* 18px */
+    line-height: 1.75rem !important;
+  }
+  
+  .tv\:text-xl {
+    font-size: 1.25rem !important; /* 20px */
+    line-height: 1.75rem !important;
+  }
+}
+
+/* Conteneur des onglets - permettre l'overflow visible pour le ring */
+.nav-tabs-container {
+  overflow-y: visible !important;
+  /* Padding vertical suffisant pour le ring de 4px + offset */
+  padding: 6px 0;
+}
+
+.nav-tabs-wrapper {
+  overflow-y: visible !important;
+  /* Padding horizontal pour éviter le clipping latéral du ring */
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+/* Styles pour navigation TV */
+.nav-tab {
+  @apply inline-flex items-center justify-center transition-all duration-300 focus:outline-none rounded-full px-5 lg:px-7 py-2 lg:py-3 text-white/80 bg-transparent;
+  min-height: 44px;
+}
+
+/* Styles pour navigation mobile - amélioration de l'affichage sur petits écrans */
+@media (max-width: 768px) {
+  .nav-tab-mobile {
+    min-height: 48px !important;
+    min-width: fit-content !important;
+    padding-left: 1.25rem !important; /* 20px */
+    padding-right: 1.25rem !important; /* 20px */
+    padding-top: 0.875rem !important; /* 14px */
+    padding-bottom: 0.875rem !important; /* 14px */
+    font-size: 1rem !important; /* 16px */
+    font-weight: 600 !important;
+    flex-shrink: 0 !important;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-align: start;
+  }
+  
+  /* Améliorer la visibilité des onglets actifs sur mobile */
+  .nav-tab-mobile.nav-tab-active {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+    font-weight: 700 !important;
+  }
+  
+  /* S'assurer que le conteneur de navigation scroll horizontalement sur mobile */
+  .nav-tab-mobile {
+    display: inline-flex !important;
+  }
+}
+
+/* Padding TV pour nav-tab - doit être dans media query */
+@media (min-width: 1920px) {
+  .nav-tab {
+    padding-left: 2.25rem !important; /* 36px */
+    padding-right: 2.25rem !important; /* 36px */
+    padding-top: 1rem !important; /* 16px */
+    padding-bottom: 1rem !important; /* 16px */
+    min-height: 52px;
+  }
+}
+
+.nav-tab-active {
+  @apply text-white font-bold bg-glass-active;
+}
+
+.nav-tab:focus {
+  @apply bg-glass-hover text-white;
+  /* Utiliser box-shadow avec offset pour éviter le clipping du ring violet */
+  /* ring-4 = 4px, donc on ajoute un offset de 2px pour créer de l'espace */
+  box-shadow: 
+    0 0 0 2px transparent,
+    0 0 0 6px rgba(168, 85, 247, 0.5);
+  /* S'assurer que le ring est visible même avec overflow */
+  position: relative;
+  z-index: 10;
+  /* Marge pour éviter le clipping aux bords */
+  margin: 4px;
+}
+
+.nav-tab:hover {
+  @apply bg-glass-hover text-white;
+}
+
+/* Boutons compacts type Google TV */
+.gtv-icon-btn {
+  @apply inline-flex items-center justify-center rounded-full glass-panel text-white/90 hover:bg-glass-hover focus:outline-none focus:ring-4 focus:ring-primary-600/50;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.5rem;
+}
+
+/* Sur mobile : réduire la taille des boutons d’icônes pour éviter le chevauchement */
+@media (max-width: 640px) {
+  .gtv-icon-btn {
+    min-height: 36px;
+    min-width: 36px;
+    padding: 0.375rem;
+  }
+}
+
+.gtv-pill-btn {
+  @apply inline-flex items-center justify-center rounded-full glass-panel text-white/90 hover:bg-glass-hover focus:outline-none focus:ring-4 focus:ring-primary-600/50 font-semibold;
+  min-height: 44px;
+  padding: 0.6rem 1rem;
+}
+
+.gtv-pill-btn-primary {
+  @apply bg-primary text-white hover:bg-primary-700 shadow-primary;
+}
+
+/* Styles pour cartes interactives TV */
+.card-tv {
+  @apply transition-all duration-200 rounded-lg;
+  min-height: 48px;
+  min-width: 48px;
+}
+
+.card-tv:focus {
+  @apply outline-none ring-4 ring-primary-600 ring-opacity-60 scale-105;
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.8), 0 0 40px rgba(168, 85, 247, 0.5);
+  z-index: 10;
+}
+
+/* Animation ripple pour boutons */
+.ripple-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.ripple-effect {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(168, 85, 247, 0.6);
+  transform: scale(0);
+  animation: ripple 0.6s ease-out;
+  pointer-events: none;
+}
+
+/* Transitions globales pour éléments interactifs */
+* {
+  @apply transition-colors duration-200;
+}
+
+button, a, input, select, textarea {
+  @apply transition-all duration-200;
+}
+
+/* Focus visible global: indispensable TV (D-pad) + clavier */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.35);
+  border-radius: 0.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition-duration: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Optimisations Performance - Animations */
+.card-tv,
+.torrent-poster,
+[data-torrent-card] {
+  will-change: transform, opacity;
+  transform: translateZ(0); /* Force l'accélération GPU */
+  backface-visibility: hidden; /* Optimise les animations 3D */
+}
+
+.card-tv:focus,
+.torrent-poster:focus,
+[data-torrent-card]:focus {
+  will-change: transform, opacity, box-shadow;
+  transform: translate3d(0, 0, 0) scale(1.2); /* Force l'accélération GPU avec translate3d */
+}
+
+/* Isolation des animations pour performance */
+.torrent-poster {
+  contain: layout style paint;
+}
+
+/* Animation focus-pinned-left optimisée */
+.focus-pinned-left {
+  will-change: transform, opacity;
+  transform: translate3d(-10%, 0, 0) scale(1.2);
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 20;
+}
+
+/* Dégradé radial pour trailer immersif */
+.bg-gradient-radial {
+  background: radial-gradient(circle at center, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.5) 50%, transparent 100%);
+}
+
+/* Scroll smooth pour carrousels */
+.scroll-smooth {
+  scroll-behavior: smooth;
+}
+
+/* Animation pour changement de page */
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-enter {
+  animation: pageFadeIn 0.3s ease-out;
+}
+
+/* Animation shimmer pour indicateur de progression actif */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite linear;
+}
+
+/* Typographie - Polices audacieuses pour TV */
+html {
+  font-family: 'Inter', 'Roboto', system-ui, sans-serif;
+  font-weight: 500; /* Poids moyen pour lisibilité TV */
+}
+
+/* Classes typographie TV */
+.text-tv-title {
+  font-size: 3rem; /* 48px */
+  line-height: 1.2;
+  font-weight: 900; /* Très audacieux pour TV */
+}
+
+.text-tv-heading {
+  font-size: 2rem; /* 32px */
+  line-height: 1.3;
+  font-weight: 700; /* Audacieux pour TV */
+}
+
+.text-tv-body {
+  font-size: 1.25rem; /* 20px */
+  line-height: 1.6;
+  font-weight: 500; /* Moyen pour TV */
+}
+
+.text-tv-small {
+  font-size: 1rem; /* 16px */
+  line-height: 1.5;
+  font-weight: 400; /* Normal pour TV */
+}
+
+@media (min-width: 1920px) {
+  .text-tv-title {
+    font-size: 3.5rem !important; /* 56px sur TV */
+  }
+  
+  .text-tv-heading {
+    font-size: 2.5rem !important; /* 40px sur TV */
+  }
+  
+  .text-tv-body {
+    font-size: 1.5rem !important; /* 24px sur TV */
+  }
+  
+  .text-tv-small {
+    font-size: 1.125rem !important; /* 18px sur TV */
+  }
+}
+
+/* Glow effect pour éléments actifs - mis à jour avec Neon Violet (rétrocompatibilité) */
+.glow-violet {
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3);
+}
+
+.glow-violet-lg {
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.8), 0 0 40px rgba(168, 85, 247, 0.5);
+}
+
+/* Rétrocompatibilité - shadow-glow-violet (utiliser shadow-primary maintenant) */
+.shadow-glow-violet {
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3);
+}
+
+.shadow-glow-violet-lg {
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.8), 0 0 40px rgba(168, 85, 247, 0.5);
+}
+
+/* ==========================================================================
+   TV Navigation Global Styles
+   Styles pour la navigation TV sur toutes les pages (webOS, Android TV, etc.)
+   ========================================================================== */
+
+/* Variable CSS pour la couleur de focus TV */
+:root {
+  --tv-focus-color: rgba(168, 85, 247, 0.8);
+  --tv-focus-shadow: 0 0 0 3px var(--tv-focus-color), 0 10px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Transitions pour tous les éléments focusables */
+[data-focusable],
+[data-settings-card],
+[data-settings-item],
+[data-settings-category],
+[data-torrent-card],
+[data-focusable-card],
+.torrent-poster {
+  transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out, outline 0.15s ease-out, background-color 0.15s ease-out;
+}
+
+/* Effet Netflix pour les cartes focusées (torrent, settings, etc.) */
+.tv-card-focused {
+  transform: scale(1.08) !important;
+  z-index: 50 !important;
+  box-shadow: var(--tv-focus-shadow) !important;
+}
+
+/* Focus visible pour les autres éléments (boutons, liens, inputs) */
+.tv-element-focused {
+  outline: 3px solid var(--tv-focus-color) !important;
+  outline-offset: 2px !important;
+}
+
+/* Focus visible amélioré pour les éléments interactifs */
+[data-focusable]:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--tv-focus-color) !important;
+  outline-offset: 2px !important;
+}
+
+/* Masquer l'outline sur les éléments dans les cartes focusées (l'effet est sur la carte) */
+.tv-card-focused a:focus-visible,
+.tv-card-focused button:focus-visible,
+[data-torrent-card].tv-card-focused *:focus-visible,
+[data-settings-card].tv-card-focused *:focus-visible,
+.torrent-poster.tv-card-focused *:focus-visible {
+  outline: none !important;
+}
+
+/* Cartes adjacentes légèrement assombries quand une carte est focus */
+[data-carousel]:has(.tv-card-focused) [data-torrent-card]:not(.tv-card-focused),
+[data-carousel]:has(.tv-card-focused) .torrent-poster:not(.tv-card-focused) {
+  opacity: 0.7;
+}
+
+/* Grilles de settings avec carte focus */
+.grid:has(.tv-card-focused) [data-settings-card]:not(.tv-card-focused) {
+  opacity: 0.7;
+}
+
+/* Fallback pour navigateurs sans :has() - les cartes restent à opacité normale */
+@supports not selector(:has(*)) {
+  [data-carousel] [data-torrent-card],
+  [data-carousel] .torrent-poster,
+  .grid [data-settings-card] {
+    opacity: 1;
+  }
+}
+
+/* Animation de focus pour une transition plus fluide */
+/* Animation TV focus améliorée */
+@keyframes tvFocusPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7);
+    outline-width: 4px;
+  }
+  50% {
+    box-shadow: 0 0 0 12px rgba(168, 85, 247, 0.2);
+    outline-width: 6px;
+  }
+}
+
+@keyframes tvFocusIn {
+  from {
+    transform: scale(1);
+    box-shadow: none;
+  }
+  to {
+    transform: scale(1.08);
+    box-shadow: var(--tv-focus-shadow);
+  }
+}
+
+/* Application de l'animation sur focus */
+.tv-card-focused {
+  animation: tvFocusIn 0.2s ease-out forwards;
+}
+
+/* Styles spécifiques pour les formulaires sur TV */
+form input:focus,
+form select:focus,
+form textarea:focus {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgb(168, 85, 247) !important;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.35) !important;
+}
+
+/* Boutons de formulaire sur TV */
+form button[type="submit"]:focus-visible,
+.form-tv-button:focus-visible {
+  outline: 3px solid var(--tv-focus-color) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.6) !important;
+}

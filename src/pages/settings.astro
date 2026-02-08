@@ -1,0 +1,12 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SettingsMenu from '../components/settings/SettingsMenu';
+---
+
+<Layout title="Paramètres - Popcorn Client">
+  <div class="min-h-screen bg-[#12141a]">
+    <div class="container mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10 max-w-7xl">
+      <SettingsMenu client:only="preact" />
+    </div>
+  </div>
+</Layout>

@@ -1,0 +1,12 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import RequestsAdminManager from '../../components/settings/RequestsAdminManager';
+---
+
+<Layout title="Gestion des demandes - Popcorn">
+  <div class="min-h-screen bg-[#121212] p-4 sm:p-6 md:p-8">
+    <div class="max-w-4xl mx-auto">
+      <RequestsAdminManager client:only="preact" />
+    </div>
+  </div>
+</Layout>

@@ -1,0 +1,53 @@
+{
+  "productName": "Popcorn",
+  "version": "1.2.9",
+  "identifier": "com.popcorn.client.mobile",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build:tauri",
+    "devUrl": "http://localhost:4326",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Popcorn",
+        "width": 1920,
+        "height": 1080,
+        "fullscreen": true,
+        "resizable": true,
+        "minWidth": 400,
+        "minHeight": 800
+      }
+    ],
+    "withGlobalTauri": true,
+    "security": {
+      "csp": null,
+      "capabilities": [
+        "main",
+        "mobile"
+      ]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png"
+    ],
+    "resources": [],
+    "externalBin": [],
+    "copyright": "",
+    "category": "Utility",
+    "shortDescription": "Client lÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ger Popcorn pour Android (Mobile et TV)",
+    "longDescription": "Client lÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ger pour Android - se connecte au serveur Popcorn distant. Fonctionne sur Android Mobile et Android TV avec dÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tection automatique du type d'appareil.",
+    "android": {
+      "versionCode": 110,
+      "autoIncrementVersionCode": false
+    }
+  },
+  "plugins": {}
+}

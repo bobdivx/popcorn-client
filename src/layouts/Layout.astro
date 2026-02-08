@@ -1,0 +1,125 @@
+---
+import '../styles/global.css';
+import ServerConnectionCheck from '../components/ServerConnectionCheck';
+import Navbar from '../components/layout/Navbar';
+import FeedbackFAB from '../components/layout/FeedbackFAB';
+import TVNavigationProvider from '../components/tv/TVNavigationProvider';
+
+interface Props {
+  title?: string;
+}
+
+const { title = 'Popcorn Client' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="fr" id="html-root" data-theme="dark" class="overflow-x-hidden">
+  <head>
+    <meta charset="UTF-8" />
+    <script is:inline>
+      // En tête de console : URL et temps de chargement (après load)
+      (function() {
+        function logPageInfo() {
+          var nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+          var loadMs = nav && nav.loadEventEnd ? Math.round(nav.loadEventEnd - nav.fetchStart) : 0;
+          console.clear();
+          console.log('%c[Page] ' + location.href, 'font-weight: bold');
+          console.log('%c[Temps de chargement] ' + loadMs + ' ms', 'font-weight: bold');
+        }
+        if (document.readyState === 'complete') logPageInfo();
+        else window.addEventListener('load', logPageInfo);
+      })();
+    </script>
+    <meta name="description" content="Popcorn Client - Client léger pour serveur Popcorn" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <link rel="icon" type="image/png" href="/popcorn_logo.png" />
+    <link rel="apple-touch-icon" href="/popcorn_logo.png" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="theme-color" content="#a855f7" />
+    <title>{title}</title>
+    <!-- Google Fonts Inter et Roboto pour typographie audacieuse -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  </head>
+  <body class="min-h-screen bg-[#121212] text-white flex flex-col overflow-x-hidden">
+    <TVNavigationProvider client:only="preact" />
+    <ServerConnectionCheck client:only="preact" />
+    <Navbar client:only="preact" />
+    <FeedbackFAB client:only="preact" />
+    <!-- Header (barre en haut) -->
+    <main class="app-main flex-1 w-full overflow-x-hidden safe-area-top" style="padding-top: calc(5rem + var(--safe-area-inset-top));">
+      <slot />
+    </main>
+    <style>
+      /* Mobile : header plus compact (h-14) */
+      @media (max-width: 639px) {
+        .app-main {
+          padding-top: calc(3.75rem + var(--safe-area-inset-top)) !important;
+        }
+      }
+      @media (min-width: 640px) {
+        .app-main {
+          padding-top: calc(5rem + var(--safe-area-inset-top)) !important;
+        }
+      }
+      @media (min-width: 768px) {
+        .app-main {
+          padding-top: calc(5.5rem + var(--safe-area-inset-top)) !important;
+        }
+      }
+      @media (min-width: 1024px) {
+        .app-main {
+          padding-top: calc(6rem + var(--safe-area-inset-top)) !important;
+        }
+      }
+      @media (min-width: 1920px) {
+        .app-main {
+          padding-top: calc(7rem + var(--safe-area-inset-top)) !important;
+        }
+      }
+    </style>
+    <script is:inline>
+      // Initialisation de la langue et du thème depuis les préférences stockées
+      (function() {
+        if (typeof window !== 'undefined') {
+          try {
+            var stored = localStorage.getItem('popcorn_client_user_preferences');
+            if (stored) {
+              var prefs = JSON.parse(stored);
+              if (prefs.language && ['fr', 'en'].includes(prefs.language)) {
+                document.documentElement.lang = prefs.language;
+              }
+              var theme = prefs.theme || 'auto';
+              if (theme === 'auto') {
+                var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.dataset.theme = prefersDark ? 'dark' : 'light';
+              } else if (theme === 'dark' || theme === 'light') {
+                document.documentElement.dataset.theme = theme;
+              }
+            }
+          } catch (e) {
+            // Ignore les erreurs
+          }
+        }
+      })();
+
+      // Intercepter les routes /player/* et rediriger vers /player avec l'ID en query param
+      // Cela permet de gérer les routes dynamiques en mode static
+      (function() {
+        if (typeof window !== 'undefined') {
+          const pathname = window.location.pathname;
+          const playerMatch = pathname.match(/^\/player\/(.+)$/);
+          if (playerMatch && playerMatch[1]) {
+            const id = playerMatch[1];
+            // Rediriger vers /player avec l'ID en query param (sans recharger si déjà sur /player)
+            if (!window.location.search.includes('id=') && !window.location.search.includes('contentId=')) {
+              window.location.replace('/player?id=' + encodeURIComponent(id));
+            }
+          }
+        }
+      })();
+    </script>
+  </body>
+</html>
+
