@@ -37,13 +37,13 @@ export function FocusableCard({
       }
     };
 
-    // Gestion du focus avec scrollIntoView pour TV
+    // Gestion du focus avec scrollIntoView pour TV - carte centrée verticalement et horizontalement
     const handleFocus = () => {
       if (element) {
         element.scrollIntoView({ 
           behavior: 'smooth', 
-          block: 'nearest',
-          inline: 'nearest'
+          block: 'center',   // Ligne au centre de l'écran
+          inline: 'center'   // Carte au centre horizontalement
         });
         // Assurer que l'élément est toujours visible avec z-index
         element.style.zIndex = '10';

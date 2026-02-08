@@ -42,10 +42,12 @@ export default function TVNavigationProvider() {
     const CAROUSEL_SELECTOR = '[data-carousel]';
     const SETTINGS_CONTAINER_SELECTOR = '[data-tv-settings-container]';
 
-    // Obtenir tous les éléments focusables visibles
-    const getFocusableElements = (): HTMLElement[] => {
-      return Array.from(document.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+    // Obtenir tous les éléments focusables visibles (optionnellement limités à un conteneur, ex. modal)
+    const getFocusableElements = (scope?: HTMLElement | null): HTMLElement[] => {
+      const root = scope || document;
+      return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
         .filter(el => {
+          if (scope && !scope.contains(el)) return false;
           const rect = el.getBoundingClientRect();
           const style = window.getComputedStyle(el);
           return (
@@ -189,8 +191,8 @@ export default function TVNavigationProvider() {
           element.focus();
           element.scrollIntoView({ 
             behavior: 'smooth', 
-            block: 'nearest', 
-            inline: 'center' 
+            block: 'center',   // Ligne/row au centre de l'écran
+            inline: 'center'   // Carte au centre horizontalement
           });
           lastFocusedRef.current = element;
           return;
@@ -201,7 +203,7 @@ export default function TVNavigationProvider() {
           focusable.focus();
           focusable.scrollIntoView({ 
             behavior: 'smooth', 
-            block: 'nearest', 
+            block: 'center', 
             inline: 'center' 
           });
           lastFocusedRef.current = focusable;
@@ -214,7 +216,7 @@ export default function TVNavigationProvider() {
         card.focus();
         card.scrollIntoView({ 
           behavior: 'smooth', 
-          block: 'nearest', 
+          block: 'center', 
           inline: 'center' 
         });
         lastFocusedRef.current = card;
@@ -224,8 +226,8 @@ export default function TVNavigationProvider() {
       element.focus();
       element.scrollIntoView({ 
         behavior: 'smooth', 
-        block: 'nearest', 
-        inline: 'nearest' 
+        block: 'center', 
+        inline: 'center' 
       });
       
       lastFocusedRef.current = element;
@@ -259,10 +261,12 @@ export default function TVNavigationProvider() {
       element.classList.remove('tv-element-focused');
     };
 
-    // Premier élément à focuser (selon la page)
-    const getInitialFocusElement = (): HTMLElement | null => {
-      const focusableElements = getFocusableElements();
+    // Premier élément à focuser (selon la page ou la modal)
+    const getInitialFocusElement = (scope?: HTMLElement | null): HTMLElement | null => {
+      const focusableElements = getFocusableElements(scope);
       if (focusableElements.length === 0) return null;
+
+      if (scope) return focusableElements[0];
 
       // Page Settings : priorité au premier élément du menu (nav) des paramètres
       const settingsContainer = document.querySelector(SETTINGS_CONTAINER_SELECTOR);
@@ -283,16 +287,26 @@ export default function TVNavigationProvider() {
       return focusableElements[0];
     };
 
-    // Navigation dans une direction
-    const navigate = (direction: 'up' | 'down' | 'left' | 'right'): boolean => {
-      const focusableElements = getFocusableElements();
+    // Navigation dans une direction (scope optionnel = modal ou conteneur pour piège à focus)
+    const navigate = (direction: 'up' | 'down' | 'left' | 'right', scope?: HTMLElement | null): boolean => {
+      const focusableElements = getFocusableElements(scope);
       if (focusableElements.length === 0) return false;
 
       const activeElement = document.activeElement as HTMLElement;
       
+      // Si scope défini et focus hors scope, focuser le premier élément du scope
+      if (scope && (!activeElement || activeElement === document.body || !scope.contains(activeElement))) {
+        const first = getInitialFocusElement(scope);
+        if (first) {
+          focusElement(first);
+          return true;
+        }
+        return false;
+      }
+      
       // Si pas de focus actuel, focus le premier élément (priorité Settings = 1er menu)
       if (!activeElement || activeElement === document.body) {
-        const first = getInitialFocusElement();
+        const first = getInitialFocusElement(scope);
         if (first) {
           focusElement(first);
           return true;
@@ -345,10 +359,24 @@ export default function TVNavigationProvider() {
         }
       }
 
-      // Ignorer si modal ouverte (sauf bouton retour)
-      const modal = document.querySelector('[role="dialog"]:not([aria-hidden="true"])');
+      // Modal ouverte : navigation D-pad limitée à l'intérieur de la modal (piège à focus)
+      const modal = document.querySelector<HTMLElement>('[role="dialog"]:not([aria-hidden="true"])');
       if (modal && !isBackButton) {
-        return;
+        const focusInModal = modal.contains(document.activeElement);
+        if (focusInModal && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+          const dir = e.key.replace('Arrow', '').toLowerCase() as 'up' | 'down' | 'left' | 'right';
+          const handled = navigate(dir, modal);
+          if (handled) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          return;
+        }
+        if (focusInModal) {
+          // Enter, Space : laisser passer au switch ci-dessous
+        } else {
+          return; // Focus hors modal = ne pas naviguer dans la page
+        }
       }
 
       // Ignorer si player vidéo actif

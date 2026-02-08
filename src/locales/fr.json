@@ -466,6 +466,7 @@
   },
   "errors": {
     "generic": "Une erreur s'est produite",
+    "insufficientStorage": "Espace disque insuffisant. Libérez de l'espace ou augmentez votre forfait.",
     "network": "Erreur de connexion réseau",
     "unauthorized": "Non autorisé",
     "notFound": "Page non trouvée",
@@ -654,6 +655,10 @@
     "diagnostics": {
       "title": "Diagnostics",
       "description": "Tester la connexion backend, la version et les indexers"
+    },
+    "storage": {
+      "title": "Stockage",
+      "description": "Espace disque utilisé et limite du forfait"
     },
     "librqbit": {
       "title": "Client torrent",
@@ -1161,6 +1166,18 @@
       "ko": "KO",
       "ffmpegHint": "FFmpeg : vérifiez les logs du serveur en cas d'erreur HLS",
       "errorGeneric": "Impossible de récupérer l'état du backend"
+    },
+    "storage": {
+      "title": "Stockage",
+      "subtitle": "Espace disque utilisé par les téléchargements (et limite si forfait)",
+      "used": "Utilisé",
+      "available": "Espace libre",
+      "refresh": "Actualiser",
+      "checking": "Chargement...",
+      "errorGeneric": "Impossible de récupérer les statistiques de stockage",
+      "retentionLabel": "Conserver les médias",
+      "retentionDays": "{days} jours",
+      "retentionDisabled": "Désactivé"
     },
     "friends": {
       "title": "Amis",

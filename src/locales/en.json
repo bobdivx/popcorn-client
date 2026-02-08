@@ -466,6 +466,7 @@
   },
   "errors": {
     "generic": "An error occurred",
+    "insufficientStorage": "Insufficient disk space. Free up space or upgrade your plan.",
     "network": "Network connection error",
     "unauthorized": "Unauthorized",
     "notFound": "Page not found",
@@ -654,6 +655,10 @@
     "diagnostics": {
       "title": "Diagnostics",
       "description": "Test backend connectivity, version and indexers"
+    },
+    "storage": {
+      "title": "Storage",
+      "description": "Disk space used and plan limit"
     },
     "librqbit": {
       "title": "Torrent client",
@@ -1161,6 +1166,18 @@
       "ko": "KO",
       "ffmpegHint": "FFmpeg: check server logs if HLS fails",
       "errorGeneric": "Unable to retrieve backend status"
+    },
+    "storage": {
+      "title": "Storage",
+      "subtitle": "Disk space used by downloads (and limit if plan)",
+      "used": "Used",
+      "available": "Free space",
+      "refresh": "Refresh",
+      "checking": "Loading...",
+      "errorGeneric": "Unable to retrieve storage statistics",
+      "retentionLabel": "Keep media for",
+      "retentionDays": "{days} days",
+      "retentionDisabled": "Disabled"
     },
     "friends": {
       "title": "Friends",

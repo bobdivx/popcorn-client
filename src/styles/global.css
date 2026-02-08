@@ -1095,10 +1095,10 @@ button, a, input, select, textarea {
   contain: layout style paint;
 }
 
-/* Animation focus-pinned-left optimisée */
+/* Animation focus au centre - carte centrée à l'écran */
 .focus-pinned-left {
   will-change: transform, opacity;
-  transform: translate3d(-10%, 0, 0) scale(1.2);
+  transform: translate3d(0, 0, 0) scale(1.2);
   transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 20;
 }

@@ -6,6 +6,17 @@ import type { ApiResponse, SetupStatus } from './types.js';
 import { PreferencesManager } from '../storage.js';
 
 /**
+ * Réponse GET /api/client/storage
+ */
+export interface StorageStatsData {
+  used_bytes: number;
+  total_bytes?: number;
+  available_bytes?: number;
+  /** Rétention en jours (suppression auto). Non défini = désactivé. */
+  storage_retention_days?: number;
+}
+
+/**
  * Interface pour accéder aux méthodes de ServerApiClient
  */
 interface ServerApiClientAccess {
@@ -71,6 +82,13 @@ export const healthMethods = {
         librqbit_version: backendData.librqbit_version,
       },
     };
+  },
+
+  /**
+   * Récupère les statistiques de stockage (utilisé / total / disponible).
+   */
+  async getStorageStats(this: ServerApiClientAccess): Promise<ApiResponse<StorageStatsData>> {
+    return this.backendRequest<StorageStatsData>('/api/client/storage', { method: 'GET' });
   },
 
   /**

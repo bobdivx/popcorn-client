@@ -1000,6 +1000,7 @@ interface IServerApiClientPublic {
   // Health methods
   checkServerHealth(): Promise<ApiResponse<{ status: string }>>;
   getSetupStatus(): Promise<ApiResponse<SetupStatus>>;
+  getStorageStats(): Promise<ApiResponse<{ used_bytes: number; total_bytes?: number; available_bytes?: number }>>;
 
   // Indexers methods
   getIndexers(): Promise<ApiResponse<Indexer[]>>;

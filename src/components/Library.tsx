@@ -364,7 +364,7 @@ export default function Library({ onItemClick }: LibraryProps) {
       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white px-4">
         {/* Barre fine collée au header */}
         <div
-          className="library-sync-bar-indeterminate fixed left-0 right-0 z-40 h-[3px] bg-primary-900/80 top-[3.75rem] sm:top-20 md:top-[5.5rem] lg:top-24 2xl:top-28"
+          className="library-sync-bar-indeterminate fixed left-0 right-0 z-[60] h-[3px] bg-primary-900/80 top-[3.75rem] sm:top-20 md:top-[5.5rem] lg:top-24 2xl:top-28"
           role="progressbar"
           aria-label={t('library.syncInProgress')}
         />
@@ -406,7 +406,7 @@ export default function Library({ onItemClick }: LibraryProps) {
       {/* Barre fine de chargement collée au header (sync bibliothèque) */}
       {syncInProgress && (
         <div
-          className="library-sync-bar-indeterminate fixed left-0 right-0 z-40 h-[3px] bg-primary-900/80 top-[3.75rem] sm:top-20 md:top-[5.5rem] lg:top-24 2xl:top-28"
+          className="library-sync-bar-indeterminate fixed left-0 right-0 z-[60] h-[3px] bg-primary-900/80 top-[3.75rem] sm:top-20 md:top-[5.5rem] lg:top-24 2xl:top-28"
           role="progressbar"
           aria-label={t('library.syncInProgress')}
         />

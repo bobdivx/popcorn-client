@@ -86,19 +86,19 @@ export function useFocusDynamics({
           setIsFocused(true);
           onFocus?.();
 
-          // Appliquer animation Pinned Left
+          // Appliquer animation au focus
           element.style.willChange = 'transform, opacity';
           element.classList.add('focus-pinned-left');
-          element.style.transform = 'scale(1.2) translate3d(-10%, 0, 0)';
+          element.style.transform = 'scale(1.2) translate3d(0, 0, 0)';
           element.style.transition = 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
           element.style.zIndex = '20';
 
-          // Scroll vers la gauche pour ancrer la carte
+          // Scroll pour centrer la carte (ligne au milieu, carte au centre horizontal)
           if (containerRef.current) {
             element.scrollIntoView({ 
               behavior: 'smooth', 
-              block: 'nearest',
-              inline: 'start' // Ancrage à gauche
+              block: 'center',
+              inline: 'center'
             });
           }
 

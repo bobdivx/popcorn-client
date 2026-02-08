@@ -4,7 +4,7 @@ import { serverApi } from '../../lib/client/server-api';
 import { getLocalProfile, onProfileChanged } from '../../lib/client/profile';
 import Avatar from '../ui/Avatar';
 import BackendStatusBadge from './BackendStatusBadge';
-import { isMobileDevice, isAndroidTV } from '../../lib/utils/device-detection';
+import { isMobileDevice, isTVPlatform } from '../../lib/utils/device-detection';
 import { calculateSyncProgress } from '../../lib/utils/sync-progress';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { LANGUAGE_NAMES, type SupportedLanguage } from '../../lib/i18n';
@@ -20,7 +20,7 @@ export default function Navbar() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(() => getLocalProfile());
   const isMobile = isMobileDevice();
-  const isTV = isAndroidTV();
+  const isTV = isTVPlatform();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [useHamburger, setUseHamburger] = useState(false);
   const tabsContainerRef = useRef<HTMLDivElement>(null);
