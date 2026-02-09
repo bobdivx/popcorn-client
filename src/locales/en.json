@@ -54,7 +54,9 @@
     "skip": "Skip",
     "skipIn": "Skip in {seconds}s",
     "start": "Start ad",
-    "unavailable": "Ad unavailable"
+    "unavailable": "Ad unavailable",
+    "trailerWatchOnYoutube": "Watch trailer on YouTube",
+    "trailerEmbedUnsupported": "Embedded playback is not available on this device (e.g. TV)."
   },
   "requests": {
     "myRequests": "My requests",

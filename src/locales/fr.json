@@ -54,7 +54,9 @@
     "skip": "Passer",
     "skipIn": "Passer dans {seconds}s",
     "start": "Démarrer la pub",
-    "unavailable": "Publicité indisponible"
+    "unavailable": "Publicité indisponible",
+    "trailerWatchOnYoutube": "Voir la bande-annonce sur YouTube",
+    "trailerEmbedUnsupported": "La lecture intégrée n'est pas disponible sur cet appareil (ex. TV)."
   },
   "requests": {
     "myRequests": "Mes demandes",

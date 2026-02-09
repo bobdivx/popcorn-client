@@ -216,7 +216,8 @@ export function VideoPlayerWrapper({
 
   useEffect(() => {
     let mounted = true;
-    getPublicAdsSettings()
+    const serverUrl = serverApi.getServerUrl();
+    getPublicAdsSettings(serverUrl)
       .then((cfg) => {
         if (mounted) setAdsConfig(cfg);
       })

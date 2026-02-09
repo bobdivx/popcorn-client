@@ -557,9 +557,11 @@ let cachedAdsConfig: AdsConfig | null = null;
 let cachedAdsConfigAt = 0;
 
 /**
- * Récupère la configuration publique des publicités.
+ * Récupère la configuration publique des publicités (pré-roll).
+ * Sur TV/webOS, l'appel direct à popcorn-web peut échouer (CORS, blocage). On peut passer
+ * l'URL de base du backend (popcorn-server) pour utiliser le proxy GET /api/client/public/settings.
  */
-export async function getPublicAdsSettings(): Promise<AdsConfig | null> {
+export async function getPublicAdsSettings(serverBaseUrlForProxy?: string): Promise<AdsConfig | null> {
   try {
     const now = Date.now();
     if (cachedAdsConfig && now - cachedAdsConfigAt < 5 * 60 * 1000) {
@@ -567,11 +569,22 @@ export async function getPublicAdsSettings(): Promise<AdsConfig | null> {
     }
 
     const apiUrl = `${getPopcornWebApiUrl()}/public/settings`;
-    const res = await requestJson(
+    let res = await requestJson(
       apiUrl,
       { method: 'GET', headers: { 'Content-Type': 'application/json' } },
       8000
     );
+
+    // Fallback : si échec et qu'on a l'URL du serveur (ex. TV/webOS), passer par le proxy
+    if ((!res.ok || !res.data?.success) && serverBaseUrlForProxy) {
+      const proxyUrl = `${serverBaseUrlForProxy.replace(/\/$/, '')}/api/client/public/settings`;
+      res = await requestJson(
+        proxyUrl,
+        { method: 'GET', headers: { 'Content-Type': 'application/json' } },
+        8000
+      );
+    }
+
     if (!res.ok || !res.data?.success) {
       return null;
     }
@@ -581,6 +594,26 @@ export async function getPublicAdsSettings(): Promise<AdsConfig | null> {
     cachedAdsConfigAt = now;
     return adsConfig;
   } catch (error) {
+    if (serverBaseUrlForProxy) {
+      try {
+        const proxyUrl = `${serverBaseUrlForProxy.replace(/\/$/, '')}/api/client/public/settings`;
+        const res = await requestJson(
+          proxyUrl,
+          { method: 'GET', headers: { 'Content-Type': 'application/json' } },
+          8000
+        );
+        if (res.ok && res.data?.success) {
+          const adsConfig = res.data?.data?.adsConfig as AdsConfig | undefined;
+          if (adsConfig) {
+            cachedAdsConfig = adsConfig;
+            cachedAdsConfigAt = Date.now();
+            return adsConfig;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
     return null;
   }
 }
