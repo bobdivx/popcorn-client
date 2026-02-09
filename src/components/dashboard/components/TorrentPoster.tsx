@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { Film, Play, Info, Users, Sprout, CheckCircle2 } from 'lucide-preact';
 import type { ContentItem } from '../../../lib/client/types';
 import { FocusableCard } from '../../ui/FocusableCard';
@@ -10,8 +10,8 @@ interface TorrentPosterProps {
 
 export function TorrentPoster({ item }: TorrentPosterProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(item.poster || null);
-  const cardContainerRef = useRef<HTMLDivElement>(null);
   
   // Récupérer les stats de téléchargement si infoHash est disponible
   const { torrentStats } = useTorrentProgress(item.infoHash);
@@ -26,6 +26,7 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
   const isDownloading = torrentStats && (torrentStats.state === 'downloading' || torrentStats.state === 'queued');
   const isCompleted = torrentStats && (torrentStats.state === 'completed' || torrentStats.state === 'seeding');
   const progressPercent = torrentStats ? Math.round(torrentStats.progress * 100) : 0;
+  const showOverlay = isHovered || isFocused;
 
   const handleClick = (e: MouseEvent | KeyboardEvent) => {
     e.preventDefault();
@@ -47,7 +48,6 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
 
   return (
     <div
-      ref={cardContainerRef}
       data-torrent-card
       className="relative group cursor-pointer torrent-poster min-w-[140px] sm:min-w-[160px] md:min-w-[180px] lg:min-w-[280px] xl:min-w-[320px] tv:min-w-[400px]"
       onMouseEnter={() => setIsHovered(true)}
@@ -58,8 +58,16 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
         onClick={handleClick}
         href={`/player/${item.id}`}
         tabIndex={0}
+        onFocus={() => {
+          setIsFocused(true);
+          setIsHovered(true);
+        }}
+        onBlur={() => {
+          setIsFocused(false);
+          setIsHovered(false);
+        }}
       >
-        <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-lg rounded-lg">
+        <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-lg rounded-lg transform transition-all duration-200 ease-out hover:scale-[1.03] hover:shadow-primary focus-within:shadow-primary-lg will-change-transform">
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -100,7 +108,7 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
         {/* Badge de disponibilité + Stats temps réel (Seeds/Peers) - discret en bas de la tuile */}
         {(item.seeds !== undefined || item.peers !== undefined) && (
           <div className="absolute bottom-2 left-2 lg:bottom-3 lg:left-3 tv:bottom-4 tv:left-4 z-10">
-            <div className={`rounded-lg px-2 py-1 tv:px-3 tv:py-1.5 flex items-center gap-2 tv:gap-3 text-xs tv:text-sm text-white ${
+            <div className={`rounded-lg px-2 py-1 tv:px-3 tv:py-1.5 flex items-center gap-2 tv:gap-3 text-xs tv:text-sm text-white max-w-[calc(100%-0.5rem)] ${
               // Couleur de fond basée sur la disponibilité
               item.seeds !== undefined && item.seeds >= 50 
                 ? 'bg-green-900/80 border border-green-500/50' // Rapide (50+ seeders)
@@ -111,23 +119,23 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
                     : 'bg-red-900/80 border border-red-500/50' // Indisponible (0 seeders)
             }`}>
               {item.seeds !== undefined && (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 min-w-0">
                   <Sprout className={`w-3 h-3 tv:w-4 tv:h-4 ${
                     item.seeds >= 50 ? 'text-green-400' 
                     : item.seeds >= 10 ? 'text-green-400'
                     : item.seeds >= 1 ? 'text-amber-400'
                     : 'text-red-400'
                   }`} size={16} />
-                  <span className="font-semibold">{item.seeds}</span>
+                  <span className="font-semibold truncate">{item.seeds}</span>
                 </div>
               )}
               {item.seeds !== undefined && item.peers !== undefined && (
                 <span className="text-white/50">|</span>
               )}
               {item.peers !== undefined && (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1 min-w-0">
                   <Users className="w-3 h-3 tv:w-4 tv:h-4 text-blue-400" size={16} />
-                  <span className="font-semibold">{item.peers}</span>
+                  <span className="font-semibold truncate">{item.peers}</span>
                 </div>
               )}
             </div>
@@ -135,8 +143,8 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
         )}
 
         {/* Icônes d'action au survol */}
-        {isHovered && (
-          <div className="absolute top-2 right-2 lg:top-3 lg:right-3 tv:top-4 tv:right-4 z-20 flex gap-2 tv:gap-3 pointer-events-auto">
+        {showOverlay && (
+          <div className="absolute bottom-2 right-2 lg:bottom-3 lg:right-3 tv:bottom-4 tv:right-4 z-20 flex gap-2 tv:gap-3 pointer-events-auto">
             {/* Icône lecture */}
             <button
               className="w-9 h-9 lg:w-11 lg:h-11 tv:w-16 tv:h-16 glass-panel hover:bg-glass-hover rounded-full flex items-center justify-center transition-all shadow-primary border border-white/30 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[36px] tv:min-h-[64px]"
@@ -164,8 +172,8 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
         )}
 
         {/* Overlay au survol */}
-        {isHovered && (
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent flex flex-col justify-end p-3 lg:p-4 tv:p-6 transition-opacity pointer-events-none">
+        {showOverlay && (
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent flex flex-col justify-end p-3 lg:p-4 tv:p-6 pb-10 lg:pb-12 tv:pb-16 transition-opacity pointer-events-none">
             <div className="space-y-1.5 lg:space-y-2 tv:space-y-3">
               <h3 className="text-white font-semibold text-sm lg:text-base tv:text-lg line-clamp-1">
                 {item.title}

@@ -229,7 +229,6 @@ export default function Navbar() {
     { label: t('nav.films'), href: '/films/', match: 'prefix' },
     { label: t('nav.series'), href: '/series/', match: 'prefix' },
     { label: t('nav.demandes'), href: '/demandes', match: 'prefix' },
-    { label: t('nav.library'), href: '/library', match: 'prefix' },
   ];
 
   if (loading) return null;

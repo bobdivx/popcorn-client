@@ -2,13 +2,64 @@ import { useState, useEffect, useMemo } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
 import { LibraryPoster } from './library/LibraryPoster';
 import CarouselRow from './torrents/CarouselRow';
-import { RefreshCw } from 'lucide-preact';
+import { RefreshCw, Film, Tv, Layers, Server, HardDrive, Users, Folder } from 'lucide-preact';
 import { useI18n } from '../lib/i18n/useI18n';
 import HLSLoadingSpinner from './ui/HLSLoadingSpinner';
 import { getSharedWithMe, logFriendActivity } from '../lib/api/popcorn-web';
-import { setBackendUrl } from '../lib/backend-config';
 import { HeroSection } from './dashboard/components/HeroSection';
 import type { ContentItem } from '../lib/client/types';
+import { translateGenre } from '../lib/utils/genre-translation';
+
+export type LibraryContentFilter = 'all' | 'movies' | 'series';
+export type LibrarySourceFilter = 'all' | 'popcorn' | 'external' | 'shared' | 'local';
+
+/** info_hash type "local_xxx" = UUID local (source externe/scan). Vrai hash = 40 ou 32 hex = téléchargé via Popconn. */
+function isPopconnDownloadedInfoHash(infoHash: string | null): boolean {
+  if (!infoHash || infoHash.startsWith('local_')) return false;
+  const hex = /^[a-fA-F0-9]+$/;
+  return (infoHash.length === 40 || infoHash.length === 32) && hex.test(infoHash);
+}
+
+function getSourceType(item: LibraryMedia): LibrarySourceFilter {
+  if (item.__shared) return 'shared';
+  if (item.library_source_id) return 'external';
+  if (!item.is_local_only) return 'popcorn';
+  if (isPopconnDownloadedInfoHash(item.info_hash ?? null)) return 'popcorn';
+  return 'local';
+}
+
+/** Ordre de priorité pour l'affichage : Popconn d'abord, puis partagés, externe, local */
+function sourceSortOrder(source: LibrarySourceFilter): number {
+  switch (source) {
+    case 'popcorn': return 0;
+    case 'shared': return 1;
+    case 'external': return 2;
+    case 'local': return 3;
+    case 'all': return 4;
+  }
+}
+
+function isMovie(item: LibraryMedia): boolean {
+  return item.category === 'FILM' || item.tmdb_type === 'movie';
+}
+
+function isSeries(item: LibraryMedia): boolean {
+  return item.category === 'SERIES' || item.tmdb_type === 'tv' || item.tmdb_type === 'series';
+}
+
+function parseGenres(genres: string | null): string[] {
+  if (!genres || !genres.trim()) return [];
+  const trimmed = genres.trim();
+  if (trimmed.startsWith('[')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      return Array.isArray(parsed) ? parsed.map((g: unknown) => String(g)) : [];
+    } catch {
+      return [];
+    }
+  }
+  return trimmed.split(',').map((g) => g.trim()).filter(Boolean);
+}
 
 export interface LibraryMedia {
   info_hash: string;
@@ -36,6 +87,8 @@ export interface LibraryMedia {
   language: string | null;
   source_format: string | null;
   is_local_only: boolean;
+  /** Si présent, le média provient d'une source externe (NAS, dossier partagé). */
+  library_source_id?: string | null;
   /** En mode démo : URL directe du MP4 (hébergé sur popcorn-web). */
   demo_stream_url?: string;
   // Métadonnées côté client pour les médias partagés
@@ -49,17 +102,34 @@ export interface LibraryMedia {
 
 interface LibraryProps {
   onItemClick?: (item: LibraryMedia) => void;
+  initialContentFilter?: LibraryContentFilter;
+  initialSourceFilter?: LibrarySourceFilter;
+  showHero?: boolean;
+  showFilters?: boolean;
+  showSync?: boolean;
 }
 
-export default function Library({ onItemClick }: LibraryProps) {
-  const { t } = useI18n();
+export default function Library({
+  onItemClick,
+  initialContentFilter = 'all',
+  initialSourceFilter = 'all',
+  showHero = true,
+  showFilters = true,
+  showSync = true,
+}: LibraryProps) {
+  const { t, language } = useI18n();
+  const lang = language === 'fr' ? 'fr' : 'en';
   const [items, setItems] = useState<LibraryMedia[]>([]);
   const [sharedByFriends, setSharedByFriends] = useState<Array<{ friendLabel: string; backendUrl: string; localUserId: string | null; items: LibraryMedia[] }>>([]);
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanMessage, setScanMessage] = useState<string | null>(null);
   const [syncInProgress, setSyncInProgress] = useState(false);
+  const [contentFilter, setContentFilter] = useState<LibraryContentFilter>(initialContentFilter);
+  const [sourceFilter, setSourceFilter] = useState<LibrarySourceFilter>(initialSourceFilter);
 
   useEffect(() => {
     loadLibrary();
@@ -80,9 +150,15 @@ export default function Library({ onItemClick }: LibraryProps) {
 
   const loadLibrary = async () => {
     try {
-      setLoading(true);
+      const isInitialLoad = !initialLoadComplete;
+      if (isInitialLoad) {
+        setLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
       setError(null);
 
+      // Toujours notre backend : ma bibliothèque + on ajoute les médias partagés par les amis (affichage uniquement).
       const [response, statusRes] = await Promise.all([
         serverApi.getLibrary(),
         serverApi.getLibrarySyncStatus(),
@@ -97,11 +173,9 @@ export default function Library({ onItemClick }: LibraryProps) {
         return;
       }
 
-      if (response.data) {
-        // Garder tous les médias : existants + en cours de téléchargement (exists: false)
-        const list = Array.isArray(response.data) ? (response.data as unknown as LibraryMedia[]) : [];
-        setItems(list);
-      }
+      // Toujours mettre à jour la liste quand on a une réponse succès (éviter bibliothèque vide si data mal parsée)
+      const list = Array.isArray(response.data) ? (response.data as unknown as LibraryMedia[]) : [];
+      setItems(list);
 
       // Charger les médias partagés par des amis (depuis popcorn-web)
       const shared = await getSharedWithMe();
@@ -147,40 +221,48 @@ export default function Library({ onItemClick }: LibraryProps) {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
-      setLoading(false);
+      const isInitialLoad = !initialLoadComplete;
+      if (isInitialLoad) {
+        setLoading(false);
+        setInitialLoadComplete(true);
+      } else {
+        setIsRefreshing(false);
+      }
     }
   };
 
-  /** Ouvre la page média détail (torrents) : tmdbId pour les séries identifiées, sinon slug/info_hash */
+  /** Ouvre la page média détail : priorité TMDB (tmdbId + type), fallback slug/info_hash. On garde toujours notre backend ; pour un média partagé on passe l'URL du serveur ami uniquement pour la lecture. */
   const handlePlay = (item: LibraryMedia) => {
-    // Si c'est un média partagé, basculer l'URL backend avant la lecture
     if (item.__shared?.backendUrl) {
       try {
-        // Activité (non bloquant) : informer le propriétaire que l'ami a démarré un stream
         void logFriendActivity({
           ownerId: item.__shared.ownerId,
           action: 'stream',
-          mediaId: item.info_hash || undefined,
+          mediaId: item.tmdb_id != null ? String(item.tmdb_id) : item.info_hash || undefined,
           mediaTitle: item.name || undefined,
         });
-        setBackendUrl(item.__shared.backendUrl);
       } catch {
         // ignore
       }
     }
     const isSeries = item.category === 'SERIES' || item.tmdb_type === 'tv' || item.tmdb_type === 'series';
-    // Séries avec tmdb_id : ouvrir la page détail via tmdbId (épisodes, saisons, etc.)
-    if (isSeries && item.tmdb_id != null) {
-      window.location.href = `/torrents?tmdbId=${item.tmdb_id}&type=tv&from=library`;
+    const typeParam = isSeries ? 'tv' : 'movie';
+    let streamBackend = '';
+    if (item.__shared?.backendUrl) {
+      streamBackend = `&streamBackendUrl=${encodeURIComponent(item.__shared.backendUrl)}`;
+      if (item.info_hash) streamBackend += `&infoHash=${encodeURIComponent(item.info_hash)}`;
+      if (item.download_path) streamBackend += `&streamPath=${encodeURIComponent(item.download_path)}`;
+      if (item.name) streamBackend += `&title=${encodeURIComponent(item.name)}`;
+    }
+    // Priorité TMDB : ouvrir par tmdbId + type
+    if (item.tmdb_id != null) {
+      window.location.href = `/torrents?tmdbId=${item.tmdb_id}&type=${typeParam}&from=library${item.name ? `&title=${encodeURIComponent(item.name)}` : ''}${streamBackend}`;
       return;
     }
-    // Pour les médias de la bibliothèque, prioriser l'info_hash car c'est l'identifiant unique
-    // du torrent téléchargé. Le slug peut exister mais ne pas avoir de variants dans la DB.
-    // MediaDetailRoute peut gérer à la fois les slugs et les info_hash.
     if (item.info_hash) {
-      window.location.href = `/torrents?slug=${encodeURIComponent(item.info_hash)}&from=library`;
+      window.location.href = `/torrents?slug=${encodeURIComponent(item.info_hash)}&from=library${streamBackend}`;
     } else if (item.slug) {
-      window.location.href = `/torrents?slug=${encodeURIComponent(item.slug)}&from=library`;
+      window.location.href = `/torrents?slug=${encodeURIComponent(item.slug)}&from=library${streamBackend}`;
     }
   };
 
@@ -221,31 +303,69 @@ export default function Library({ onItemClick }: LibraryProps) {
     return nextSlash === -1 ? after : after.slice(0, nextSlash);
   };
 
-  // Séparer les médias disponibles (exists) des médias en cours de téléchargement
-  const { existingItems, downloadingItems } = useMemo(() => {
-    const existing = items.filter((item) => item.exists);
-    const downloading = items.filter((item) => !item.exists);
-    return { existingItems: existing, downloadingItems: downloading };
-  }, [items]);
+  /** Clé canonique pour déduplication (même fichier = une seule entrée) */
+  const itemDedupKey = (item: LibraryMedia): string => {
+    const path = (item.download_path || '').replace(/\\/g, '/').toLowerCase().trim();
+    if (path) return path;
+    return item.info_hash || item.slug || item.name || '';
+  };
 
-  // Grouper les items existants par catégorie ; pour les séries, une seule carte par série (regroupement par tmdb_id ou par chemin)
-  const groupedItems = useMemo(() => {
-    const movies: LibraryMedia[] = [];
+  // Tous les items : bibliothèque locale + partagés par amis (dédoublonnés par chemin / info_hash)
+  const allExistingItems = useMemo(() => {
+    const local = items.filter((item) => item.exists);
+    const shared = sharedByFriends.flatMap((s) => s.items);
+    const combined = [...local, ...shared];
+    const seen = new Set<string>();
+    return combined.filter((item) => {
+      const key = itemDedupKey(item);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [items, sharedByFriends]);
+
+  const allDownloadingItems = useMemo(() => items.filter((item) => !item.exists), [items]);
+
+  // Filtrer par source et type de contenu
+  const matchesSource = (item: LibraryMedia) => {
+    if (sourceFilter === 'all') return true;
+    return getSourceType(item) === sourceFilter;
+  };
+  const matchesContent = (item: LibraryMedia) => {
+    if (contentFilter === 'all') return true;
+    if (contentFilter === 'movies') return isMovie(item);
+    return isSeries(item);
+  };
+
+  const filteredExisting = useMemo(() => {
+    const list = allExistingItems.filter((i) => matchesSource(i) && matchesContent(i));
+    // Prioriser les médias téléchargés avec Popconn, puis partagés, externe, local
+    return [...list].sort(
+      (a, b) => sourceSortOrder(getSourceType(a)) - sourceSortOrder(getSourceType(b))
+    );
+  }, [allExistingItems, sourceFilter, contentFilter]);
+
+  const filteredDownloading = useMemo(
+    () => allDownloadingItems.filter(matchesContent),
+    [allDownloadingItems, contentFilter]
+  );
+
+  // Séparer films / séries (une carte par série, regroupement par tmdb_id ou chemin)
+  const { movies, series, others } = useMemo(() => {
+    const moviesList: LibraryMedia[] = [];
     const seriesRaw: LibraryMedia[] = [];
-    const others: LibraryMedia[] = [];
+    const othersList: LibraryMedia[] = [];
 
-    existingItems.forEach((item) => {
-      const category = item.category || (item.tmdb_type === 'movie' ? 'FILM' : 'SERIES');
-      if (category === 'FILM' || item.tmdb_type === 'movie') {
-        movies.push(item);
-      } else if (category === 'SERIES' || item.tmdb_type === 'tv' || item.tmdb_type === 'series') {
+    filteredExisting.forEach((item) => {
+      if (isMovie(item)) {
+        moviesList.push(item);
+      } else if (isSeries(item)) {
         seriesRaw.push(item);
       } else {
-        others.push(item);
+        othersList.push(item);
       }
     });
 
-    // Une carte par série : grouper par tmdb_id si présent, sinon par seriesKeyFromPath(download_path)
     const seriesByKey = new Map<string, LibraryMedia[]>();
     for (const item of seriesRaw) {
       const key =
@@ -254,19 +374,46 @@ export default function Library({ onItemClick }: LibraryProps) {
       list.push(item);
       seriesByKey.set(key, list);
     }
-    // Représentant par série : premier avec poster, sinon premier de la liste
-    const series: LibraryMedia[] = [];
+    const seriesList: LibraryMedia[] = [];
     seriesByKey.forEach((list) => {
       const withPoster = list.find((i) => i.poster_url || i.hero_image_url);
-      series.push(withPoster ?? list[0]);
+      seriesList.push(withPoster ?? list[0]);
     });
 
-    return { movies, series, others };
-  }, [items]);
+    return { movies: moviesList, series: seriesList, others: othersList };
+  }, [filteredExisting]);
+
+  // Grouper par genre (premier genre du tableau) pour lignes par genre
+  const moviesByGenre = useMemo(() => {
+    const grouped: Record<string, LibraryMedia[]> = {};
+    movies.forEach((item) => {
+      const genres = parseGenres(item.genres);
+      const primaryGenre = genres[0];
+      const key = primaryGenre && primaryGenre.trim() ? primaryGenre.trim() : '__other__';
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(item);
+    });
+    return grouped;
+  }, [movies]);
+
+  const seriesByGenre = useMemo(() => {
+    const grouped: Record<string, LibraryMedia[]> = {};
+    series.forEach((item) => {
+      const genres = parseGenres(item.genres);
+      const primaryGenre = genres[0];
+      const key = primaryGenre && primaryGenre.trim() ? primaryGenre.trim() : '__other__';
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(item);
+    });
+    return grouped;
+  }, [series]);
+
+  const existingItems = filteredExisting;
+  const downloadingItems = filteredDownloading;
+  const groupedItems = { movies, series, others };
 
   const heroItems = useMemo<ContentItem[]>(() => {
-    if (existingItems.length === 0) return [];
-    return existingItems
+    const withPoster = existingItems
       .filter((item) => item.poster_url || item.hero_image_url)
       .slice(0, 3)
       .map((item) => ({
@@ -283,7 +430,19 @@ export default function Library({ onItemClick }: LibraryProps) {
         releaseDate: item.release_date ?? undefined,
         tmdbId: item.tmdb_id ?? undefined,
       }));
-  }, [existingItems]);
+    if (withPoster.length > 0) return withPoster;
+    // Toujours afficher une image dans le hero : placeholder Bibliothèque
+    return [
+      {
+        id: 'library-placeholder',
+        title: t('library.title'),
+        type: 'movie' as const,
+        poster: '/popcorn_feature_graphic_1024x500.png',
+        backdrop: '/popcorn_feature_graphic_1024x500.png',
+        overview: t('library.emptyDescription'),
+      },
+    ];
+  }, [existingItems, t]);
 
   /** Nombre d'items en chargement prioritaire (première ligne visible) par section */
   const PRIORITY_LOAD_COUNT = 12;
@@ -300,7 +459,7 @@ export default function Library({ onItemClick }: LibraryProps) {
       <CarouselRow key={rowKey} title={title} autoScroll={false}>
         {sectionItems.map((item, index) => (
           <div
-            key={item.tmdb_id != null ? `series-tmdb-${item.tmdb_id}` : item.info_hash}
+            key={`${item.info_hash || item.slug || (item.tmdb_id != null ? `series-tmdb-${item.tmdb_id}` : item.name)}-${index}`}
             className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]"
           >
             <LibraryPoster
@@ -328,7 +487,7 @@ export default function Library({ onItemClick }: LibraryProps) {
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 tv:grid-cols-6 gap-4 tv:gap-6">
           {sectionItems.map((item, index) => (
             <div
-              key={item.tmdb_id != null ? `series-tmdb-${item.tmdb_id}` : item.info_hash}
+              key={`${item.info_hash || item.slug || (item.tmdb_id != null ? `series-tmdb-${item.tmdb_id}` : item.name)}-${index}`}
               className="w-full"
             >
               <LibraryPoster
@@ -365,12 +524,13 @@ export default function Library({ onItemClick }: LibraryProps) {
     );
   }
 
-  if (items.length === 0 && syncInProgress) {
+  const hasAnyContent = items.length > 0 || sharedByFriends.some((s) => s.items.length > 0);
+  if (!hasAnyContent && syncInProgress) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white px-4">
         {/* Barre fine collée au header */}
         <div
-          className="library-sync-bar-indeterminate fixed left-0 right-0 z-[60] h-[3px] bg-primary-900/80 top-[3.75rem] sm:top-20 md:top-[5.5rem] lg:top-24 2xl:top-28"
+          className="library-sync-bar-indeterminate"
           role="progressbar"
           aria-label={t('library.syncInProgress')}
         />
@@ -385,7 +545,7 @@ export default function Library({ onItemClick }: LibraryProps) {
     );
   }
 
-  if (items.length === 0) {
+  if (!hasAnyContent) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white px-4">
         <div className="text-center max-w-2xl tv:max-w-3xl">
@@ -407,69 +567,196 @@ export default function Library({ onItemClick }: LibraryProps) {
     );
   }
 
+  const sectionsContent = (
+    <>
+      {/* 1) En cours de téléchargement en première ligne */}
+      {downloadingItems.length > 0 &&
+        renderSection(t('library.downloadingSection'), downloadingItems, { key: 'downloading' })}
+
+      {/* 2) Lignes par genre — Films */}
+      {(contentFilter === 'all' || contentFilter === 'movies') &&
+        Object.entries(moviesByGenre)
+          .sort(([a], [b]) => (a === '__other__' ? 1 : b === '__other__' ? -1 : a.localeCompare(b)))
+          .map(([genreKey, genreItems]) => {
+            const title =
+              genreKey === '__other__'
+                ? t('library.genreOther')
+                : translateGenre(genreKey, lang);
+            return renderSection(title, genreItems, {
+              key: `movies-${genreKey}`,
+            });
+          })}
+
+      {/* 3) Lignes par genre — Séries */}
+      {(contentFilter === 'all' || contentFilter === 'series') &&
+        Object.entries(seriesByGenre)
+          .sort(([a], [b]) => (a === '__other__' ? 1 : b === '__other__' ? -1 : a.localeCompare(b)))
+          .map(([genreKey, genreItems]) => {
+            const title =
+              genreKey === '__other__'
+                ? t('library.genreOther')
+                : translateGenre(genreKey, lang);
+            return renderSection(title, genreItems, {
+              key: `series-${genreKey}`,
+            });
+          })}
+
+      {/* 4) Autres (sans genre ou catégorie inconnue) */}
+      {groupedItems.others.length > 0 &&
+        renderSection(t('library.others'), groupedItems.others, { key: 'others' })}
+    </>
+  );
+
   return (
     <div className="pb-8 tv:pb-12">
       {/* Barre fine de chargement collée au header (sync bibliothèque) */}
-      {syncInProgress && (
+      {(syncInProgress || isRefreshing) && (
         <div
-          className="library-sync-bar-indeterminate fixed left-0 right-0 z-[60] h-[3px] bg-primary-900/80 top-[3.75rem] sm:top-20 md:top-[5.5rem] lg:top-24 2xl:top-28"
+          className="library-sync-bar-indeterminate"
           role="progressbar"
           aria-label={t('library.syncInProgress')}
         />
       )}
 
-      {/* Hero en premier, comme sur la page Films */}
-      {heroItems.length > 0 && (
-        <HeroSection
-          items={heroItems}
-          onPlay={() => null}
-          onPrimaryAction={(item) => {
-            const match = existingItems.find((it) => (it.info_hash || it.slug || it.name) === item.id);
-            if (match) handlePlay(match);
-          }}
-          primaryButtonLabel={t('library.playLatest')}
-        />
+      {/* Hero en premier (toujours une image : médias ou placeholder Bibliothèque) */}
+      {showHero && heroItems.length > 0 && (
+        <div className="-mx-3 sm:-mx-4 md:-mx-6 lg:-mx-8 xl:-mx-12 tv:-mx-16">
+          <HeroSection
+            items={heroItems}
+            onPlay={() => null}
+            onPrimaryAction={(item) => {
+              if (item.id === 'library-placeholder') return;
+              const match = existingItems.find((it) => (it.info_hash || it.slug || it.name) === item.id);
+              if (match) handlePlay(match);
+            }}
+            primaryButtonLabel={t('library.playLatest')}
+            primaryActionDisabled={heroItems.length === 1 && heroItems[0].id === 'library-placeholder'}
+          />
+        </div>
       )}
 
-      {/* Bouton de synchronisation sous le hero (focusable pour TV) */}
-      <div className="mb-6 tv:mb-8 px-4 tv:px-6">
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            {scanMessage && (
-              <div className={`alert ${scanMessage.includes(t('common.success')) || scanMessage.includes('succès') || scanMessage.includes('success') ? 'alert-success' : 'alert-error'} mb-4`}>
-                <span>{scanMessage}</span>
+      {showFilters ? (
+        <div className="flex gap-4 tv:gap-6 px-4 tv:px-6">
+          {/* Barre verticale (type + source) */}
+          <aside className="sticky top-24 self-start z-10">
+            <div className="flex flex-col items-center gap-3">
+              <div
+                className="flex flex-col items-center gap-2 p-2 rounded-full bg-black/60 border border-white/10 shadow-lg backdrop-blur"
+                role="tablist"
+                aria-label={t('library.title')}
+              >
+                {(
+                  [
+                    { id: 'all' as const, label: t('library.filterAll'), icon: Layers },
+                    { id: 'movies' as const, label: t('library.filterFilms'), icon: Film },
+                    { id: 'series' as const, label: t('library.filterSeries'), icon: Tv },
+                  ] as const
+                ).map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    role="tab"
+                    aria-selected={contentFilter === id}
+                    onClick={() => setContentFilter(id)}
+                    className={`group inline-flex items-center justify-center w-11 h-11 tv:w-12 tv:h-12 rounded-full focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-offset-2 focus:ring-offset-black transition-all ${
+                      contentFilter === id
+                        ? 'bg-white text-black shadow-md'
+                        : 'bg-white/10 text-white/80 hover:bg-white/20'
+                    }`}
+                    title={label}
+                    data-focusable
+                  >
+                    <Icon className="w-5 h-5 tv:w-6 tv:h-6" />
+                    <span className="sr-only">{label}</span>
+                  </button>
+                ))}
+              </div>
+
+              <div
+                className="flex flex-col items-center gap-2 p-2 rounded-full bg-black/50 border border-white/10 backdrop-blur"
+                aria-label={t('library.filterSourceAll')}
+              >
+                {(
+                  [
+                    { id: 'all' as const, label: t('library.filterSourceAll'), icon: Layers },
+                    { id: 'popcorn' as const, label: t('library.filterSourcePopcorn'), icon: Server },
+                    { id: 'external' as const, label: t('library.filterSourceExternal'), icon: HardDrive },
+                    { id: 'shared' as const, label: t('library.filterSourceShared'), icon: Users },
+                    { id: 'local' as const, label: t('library.filterSourceLocal'), icon: Folder },
+                  ] as const
+                ).map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    onClick={() => setSourceFilter(id)}
+                    className={`inline-flex items-center justify-center w-10 h-10 tv:w-11 tv:h-11 rounded-full focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-offset-2 focus:ring-offset-black transition-colors ${
+                      sourceFilter === id
+                        ? 'bg-white text-black shadow-sm'
+                        : 'bg-white/5 text-white/70 hover:bg-white/15'
+                    }`}
+                    title={label}
+                    data-focusable
+                  >
+                    <Icon className="w-4.5 h-4.5 tv:w-5 tv:h-5" />
+                    <span className="sr-only">{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </aside>
+
+          <div className="flex-1 min-w-0">
+            {showSync && (
+              <div className="mt-4 mb-6 tv:mb-8">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex-1">
+                    {scanMessage && (
+                      <div className={`alert ${scanMessage.includes(t('common.success')) || scanMessage.includes('succès') || scanMessage.includes('success') ? 'alert-success' : 'alert-error'} mb-4`}>
+                        <span>{scanMessage}</span>
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleScanLocalMedia}
+                    disabled={scanning}
+                    className="btn btn-primary gap-2 min-h-[48px] tv:min-h-[56px] focus:outline-none focus:ring-4 focus:ring-primary-600"
+                    title={t('library.syncLibrary')}
+                    data-focusable
+                  >
+                    <RefreshCw className={`w-5 h-5 ${scanning ? 'animate-spin' : ''}`} />
+                    {scanning ? t('library.scanning') : t('library.syncLibrary')}
+                  </button>
+                </div>
               </div>
             )}
+            {sectionsContent}
           </div>
-          <button
-            onClick={handleScanLocalMedia}
-            disabled={scanning}
-            className="btn btn-primary gap-2 min-h-[48px] tv:min-h-[56px] focus:outline-none focus:ring-4 focus:ring-primary-600"
-            title={t('library.syncLibrary')}
-            data-focusable
-          >
-            <RefreshCw className={`w-5 h-5 ${scanning ? 'animate-spin' : ''}`} />
-            {scanning ? t('library.scanning') : t('library.syncLibrary')}
-          </button>
         </div>
-      </div>
-
-      {/* En cours de téléchargement : cartes des médias en train d'être téléchargés */}
-      {downloadingItems.length > 0 &&
-        renderSection(t('library.downloadingSection'), downloadingItems, {
-          key: 'downloading',
-        })}
-
-      {/* Films en grille (plusieurs lignes) */}
-      {renderGridSection(t('library.films'), groupedItems.movies)}
-
-      {/* Sections en carrousels (style dashboard) */}
-      {renderSection(t('library.series'), groupedItems.series)}
-      {renderSection(t('library.others'), groupedItems.others)}
-      {sharedByFriends.map((section) =>
-        renderSection(t('library.sharedBy', { name: section.friendLabel }), section.items, {
-          key: section.backendUrl,
-        })
+      ) : (
+        <div className="px-4 tv:px-6">
+          {showSync && (
+            <div className="mt-4 mb-6 tv:mb-8">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex-1">
+                  {scanMessage && (
+                    <div className={`alert ${scanMessage.includes(t('common.success')) || scanMessage.includes('succès') || scanMessage.includes('success') ? 'alert-success' : 'alert-error'} mb-4`}>
+                      <span>{scanMessage}</span>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={handleScanLocalMedia}
+                  disabled={scanning}
+                  className="btn btn-primary gap-2 min-h-[48px] tv:min-h-[56px] focus:outline-none focus:ring-4 focus:ring-primary-600"
+                  title={t('library.syncLibrary')}
+                  data-focusable
+                >
+                  <RefreshCw className={`w-5 h-5 ${scanning ? 'animate-spin' : ''}`} />
+                  {scanning ? t('library.scanning') : t('library.syncLibrary')}
+                </button>
+              </div>
+            </div>
+          )}
+          {sectionsContent}
+        </div>
       )}
     </div>
   );

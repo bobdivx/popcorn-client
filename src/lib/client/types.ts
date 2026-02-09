@@ -217,6 +217,14 @@ export interface ClientTorrentStats {
   files_available?: boolean;
   /** True quand le téléchargement a vraiment démarré (pairs connectés ou débit > 0 ou complété). */
   download_started?: boolean;
+  /** URL du poster TMDB (endpoint enrichi /api/client/torrents/enriched). */
+  poster_url?: string | null;
+  /** URL de l'image hero/backdrop TMDB (endpoint enrichi). */
+  hero_image_url?: string | null;
+  /** Titre TMDB pour l'affichage (endpoint enrichi). */
+  tmdb_title?: string | null;
+  /** Slug du média pour la navigation (endpoint enrichi). */
+  slug?: string | null;
 }
 
 export interface AddTorrentResponse {

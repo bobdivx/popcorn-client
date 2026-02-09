@@ -344,6 +344,39 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         PreferencesManager.setDownloadLocation(savedConfig.downloadLocation);
       }
 
+      // Restaurer les dossiers par type (films, séries) sur le backend
+      if (savedConfig.mediaPaths && (savedConfig.mediaPaths.filmsPath != null || savedConfig.mediaPaths.seriesPath != null || savedConfig.mediaPaths.defaultPath != null)) {
+        try {
+          await serverApi.putMediaPaths({
+            films_path: savedConfig.mediaPaths.filmsPath ?? undefined,
+            series_path: savedConfig.mediaPaths.seriesPath ?? undefined,
+            default_path: savedConfig.mediaPaths.defaultPath ?? undefined,
+          });
+        } catch (mediaPathsErr) {
+          console.warn('[AUTH] Erreur lors de la restauration des dossiers médias:', mediaPathsErr);
+        }
+      }
+
+      // Restaurer les sources de bibliothèque (dossiers externes) sur le backend
+      if (savedConfig.librarySources && savedConfig.librarySources.length > 0) {
+        try {
+          const existing = await serverApi.getLibrarySources();
+          const existingPaths = new Set((existing.success && existing.data ? existing.data : []).map((s) => s.path));
+          for (const cloud of savedConfig.librarySources) {
+            if (!cloud.path?.trim() || existingPaths.has(cloud.path)) continue;
+            const createRes = await serverApi.createLibrarySource({
+              path: cloud.path,
+              category: cloud.category === 'SERIES' ? 'SERIES' : 'FILM',
+              label: cloud.label ?? undefined,
+              share_with_friends: !!cloud.share_with_friends,
+            });
+            if (createRes.success && createRes.data) existingPaths.add(cloud.path);
+          }
+        } catch (librarySourcesErr) {
+          console.warn('[AUTH] Erreur lors de la restauration des sources bibliothèque:', librarySourcesErr);
+        }
+      }
+
       // Restaurer les paramètres de synchronisation (backend Rust)
       if (savedConfig.syncSettings) {
         try {

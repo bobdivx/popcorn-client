@@ -102,4 +102,49 @@ export const settingsMethods = {
   async getClientTorrentConfig(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{ config: { download_dir: string; max_downloads: number; max_upload_slots: number; librqbit_api_url: string; }; download_paths: { films_path: string; films_exists: boolean; films_subdirs_count: number; series_path: string; series_exists: boolean; series_subdirs_count: number; stream_temp_path: string; stream_temp_exists: boolean; }; subdirectory_creation: { enabled: boolean; description: string; example: string; }; }>> {
     return this.backendRequest('/api/admin/client-torrent/config', { method: 'GET' });
   },
+
+  /** GET /api/client/config/media-paths — chemins par type (films, séries), style Jellyfin */
+  async getMediaPaths(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{
+    download_dir_root: string;
+    films_path: string | null;
+    series_path: string | null;
+    default_path: string | null;
+    films_root: string;
+    series_root: string;
+  }>> {
+    return this.backendRequest('/api/client/config/media-paths', { method: 'GET' });
+  },
+
+  /** PUT /api/client/config/media-paths — met à jour les chemins (relatifs à download_dir_root) */
+  async putMediaPaths(this: ServerApiClientSettingsAccess, body: {
+    films_path?: string | null;
+    series_path?: string | null;
+    default_path?: string | null;
+  }): Promise<ApiResponse<{
+    download_dir_root: string;
+    films_path: string | null;
+    series_path: string | null;
+    default_path: string | null;
+    films_root: string;
+    series_root: string;
+  }>> {
+    return this.backendRequest('/api/client/config/media-paths', {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    });
+  },
+
+  /** GET /api/explorer/files — liste dossiers/fichiers (path optionnel, relatif à download_dir) */
+  async listExplorerFiles(this: ServerApiClientSettingsAccess, path?: string): Promise<ApiResponse<Array<{
+    name: string;
+    path: string;
+    is_directory: boolean;
+    size?: number;
+    modified?: number;
+  }>>> {
+    const url = path != null && path !== ''
+      ? `/api/explorer/files?path=${encodeURIComponent(path)}`
+      : '/api/explorer/files';
+    return this.backendRequest(url, { method: 'GET' });
+  },
 };

@@ -32,6 +32,10 @@ interface VideoControlsProps {
   focusedControlIndex?: number;
   /** Sur TV : la barre de progression est-elle focalisée (flèches = seek) */
   focusedOnProgress?: boolean;
+  /** Callback pour synchroniser le focus sur la barre (TV / accessibilité) */
+  setFocusedOnProgress?: (focused: boolean) => void;
+  /** Ref à attacher à la barre de progression (focus télécommande TV) */
+  progressBarRef?: { current: HTMLDivElement | null };
   /** Sur TV : le bouton Retour est-il dans le focus ring */
   hasBackButton?: boolean;
   onPlayPause: () => void;
@@ -69,6 +73,8 @@ export function VideoControls({
   isTV = false,
   focusedControlIndex = 0,
   focusedOnProgress = false,
+  setFocusedOnProgress,
+  progressBarRef,
   hasBackButton = false,
   onPlayPause,
   onSeek,
@@ -144,7 +150,52 @@ export function VideoControls({
           </div>
         </div>
         <div class={padding}>
-          <div class={`relative ${progressHeight} bg-white/30 rounded-full cursor-pointer group/progress transition-all mb-6 ${getProgressFocusClass()}`} onClick={onSeek} role="slider" aria-label="Position" aria-valuenow={Math.round(progressPercent)} aria-valuemin={0} aria-valuemax={100}>
+          <div
+            ref={progressBarRef}
+            tabIndex={0}
+            class={`relative ${progressHeight} bg-white/30 rounded-full cursor-pointer group/progress transition-all mb-6 outline-none focus:outline-none ${getProgressFocusClass()}`}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onSeek(e);
+            }}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              try {
+                (e.currentTarget as HTMLDivElement).setPointerCapture?.(e.pointerId);
+              } catch (err) {}
+              onSeek(e);
+            }}
+            onPointerMove={(e) => {
+              if (e.buttons !== 1) return;
+              e.preventDefault();
+              e.stopPropagation();
+              onSeek(e);
+            }}
+            onPointerUp={(e) => {
+              try {
+                (e.currentTarget as HTMLDivElement).releasePointerCapture?.(e.pointerId);
+              } catch (err) {}
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onSeek(e);
+            }}
+            onTouchStart={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onSeek(e);
+            }}
+            onFocus={() => setFocusedOnProgress?.(true)}
+            onBlur={() => setFocusedOnProgress?.(false)}
+            role="slider"
+            aria-label="Position dans la vidéo"
+            aria-valuenow={Math.round(progressPercent)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          >
             <div class="absolute left-0 top-0 h-full bg-white/20 rounded-full" style={{ width: '100%' }} />
             <div class="absolute left-0 top-0 h-full bg-purple-600 rounded-full" style={{ width: `${progressPercent}%` }} />
             <div class={`absolute top-1/2 -translate-y-1/2 ${isTV ? 'w-5 h-5' : 'w-3.5 h-3.5'} bg-purple-600 rounded-full opacity-0 group-hover/progress:opacity-100 transition-all border-2 border-white`} style={{ left: `calc(${progressPercent}% - ${progressPercent > 0 && progressPercent < 100 ? (isTV ? '10px' : '7px') : progressPercent === 100 ? (isTV ? '20px' : '14px') : '0px'})` }} />

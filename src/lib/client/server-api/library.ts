@@ -8,7 +8,7 @@ import type { ApiResponse, LibraryItem } from './types.js';
  * Interface pour accéder aux méthodes privées de ServerApiClient nécessaires pour la bibliothèque
  */
 interface ServerApiClientLibraryAccess {
-  backendRequest<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>>;
+  backendRequest<T>(endpoint: string, options?: RequestInit, retryCount?: number, baseUrlOverride?: string): Promise<ApiResponse<T>>;
   getCurrentUserId(): string | null;
 }
 
@@ -21,6 +21,34 @@ export const libraryMethods = {
     const userId = this.getCurrentUserId();
     const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
     return this.backendRequest<any[]>('/library', { method: 'GET', headers }) as unknown as ApiResponse<LibraryItem[]>;
+  },
+
+  /**
+   * Récupère la bibliothèque depuis une URL backend donnée (ex. "mon serveur" sur la page Bibliothèque).
+   */
+  async getLibraryFromBaseUrl(this: ServerApiClientLibraryAccess, baseUrl: string): Promise<ApiResponse<LibraryItem[]>> {
+    const userId = this.getCurrentUserId();
+    const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
+    const base = baseUrl.trim().replace(/\/$/, '');
+    return this.backendRequest<any[]>('/library', { method: 'GET', headers }, 0, base) as unknown as ApiResponse<LibraryItem[]>;
+  },
+
+  /**
+   * Récupère le statut de sync bibliothèque depuis une URL backend donnée.
+   */
+  async getLibrarySyncStatusFromBaseUrl(
+    this: ServerApiClientLibraryAccess,
+    baseUrl: string
+  ): Promise<ApiResponse<{ sync_in_progress: boolean; scanning_source_id?: string }>> {
+    const userId = this.getCurrentUserId();
+    const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
+    const base = baseUrl.trim().replace(/\/$/, '');
+    return this.backendRequest<{ sync_in_progress: boolean; scanning_source_id?: string }>(
+      '/api/library/status',
+      { method: 'GET', headers },
+      0,
+      base
+    );
   },
 
   /**
@@ -88,11 +116,85 @@ export const libraryMethods = {
   },
 
   /**
-   * Indique si un scan bibliothèque est en cours (pour afficher une animation)
+   * Indique si un scan bibliothèque est en cours et quelle source est en cours de scan
    */
-  async getLibrarySyncStatus(this: ServerApiClientLibraryAccess): Promise<ApiResponse<{ sync_in_progress: boolean }>> {
+  async getLibrarySyncStatus(
+    this: ServerApiClientLibraryAccess
+  ): Promise<ApiResponse<{ sync_in_progress: boolean; scanning_source_id?: string }>> {
     const userId = this.getCurrentUserId();
     const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
-    return this.backendRequest<{ sync_in_progress: boolean }>('/api/library/status', { method: 'GET', headers });
+    return this.backendRequest<{ sync_in_progress: boolean; scanning_source_id?: string }>('/api/library/status', {
+      method: 'GET',
+      headers,
+    });
+  },
+
+  // ---------- Sources de bibliothèque (dossiers externes : autre NAS, etc.) ----------
+
+  async getLibrarySources(this: ServerApiClientLibraryAccess): Promise<ApiResponse<LibrarySource[]>> {
+    return this.backendRequest<LibrarySource[]>('/api/library/sources', { method: 'GET' });
+  },
+
+  async createLibrarySource(
+    this: ServerApiClientLibraryAccess,
+    body: { path: string; category: 'FILM' | 'SERIES'; label?: string; share_with_friends?: boolean }
+  ): Promise<ApiResponse<LibrarySource>> {
+    return this.backendRequest<LibrarySource>('/api/library/sources', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+
+  async updateLibrarySource(
+    this: ServerApiClientLibraryAccess,
+    id: string,
+    body: { path?: string; category?: string; label?: string; share_with_friends?: boolean }
+  ): Promise<ApiResponse<LibrarySource>> {
+    return this.backendRequest<LibrarySource>(`/api/library/sources/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  },
+
+  async deleteLibrarySource(this: ServerApiClientLibraryAccess, id: string): Promise<ApiResponse<void>> {
+    return this.backendRequest<void>(`/api/library/sources/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  },
+
+  async setLibrarySourceShare(
+    this: ServerApiClientLibraryAccess,
+    id: string,
+    share_with_friends: boolean
+  ): Promise<ApiResponse<void>> {
+    return this.backendRequest<void>(`/api/library/sources/${encodeURIComponent(id)}/share`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ share_with_friends }),
+    });
+  },
+
+  async scanLibrarySource(this: ServerApiClientLibraryAccess, id: string): Promise<ApiResponse<string>> {
+    const userId = this.getCurrentUserId();
+    const url = userId
+      ? `/api/library/sources/${encodeURIComponent(id)}/scan?user_id=${encodeURIComponent(userId)}`
+      : `/api/library/sources/${encodeURIComponent(id)}/scan`;
+    return this.backendRequest<string>(url, { method: 'POST' });
   },
 };
+
+export interface LibrarySource {
+  id: string;
+  path: string;
+  category: string;
+  label: string | null;
+  share_with_friends: boolean;
+  created_at: number;
+  updated_at: number;
+  /** Timestamp du dernier scan réussi (Unix sec). Undefined si jamais scanné. */
+  last_scanned_at?: number | null;
+  /** Nombre de médias (fichiers) indexés pour cette source */
+  media_count?: number;
+  /** Nombre de dossiers distincts contenant au moins un média */
+  folder_count?: number;
+}

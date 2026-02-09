@@ -326,10 +326,17 @@ export function SyncCard({ type = 'all' }: SyncCardProps) {
               </svg>
               <div className="flex-1">
                 <span>{error}</span>
-                {(error.includes('indexer') || error.includes('TMDB') || error.includes('configurer')) && (
+                {(error.includes('indexer') || error.includes('configurer')) && !error.includes('TMDB') && (
                   <div className="mt-2">
                     <a href="/settings/indexers" className="link link-hover text-sm underline">
                       {t('sync.goToSyncSettings')}
+                    </a>
+                  </div>
+                )}
+                {(error.includes('TMDB') || error.includes('tmdb') || error.includes('clé')) && (
+                  <div className="mt-3">
+                    <a href="/settings/indexers" className="btn btn-sm btn-primary">
+                      {t('sync.configureTmdbKey')}
                     </a>
                   </div>
                 )}

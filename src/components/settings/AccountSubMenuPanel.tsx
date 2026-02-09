@@ -15,7 +15,6 @@ import AccountSettings from './AccountSettings';
 import TwoFactorSettings from './TwoFactorSettings';
 import QuickConnectAuthorize from './QuickConnectAuthorize';
 import LocalUsersManager from './LocalUsersManager';
-import FriendsManager from './FriendsManager';
 import SubMenuPanel, { type SubMenuItem } from './SubMenuPanel';
 
 export default function AccountSubMenuPanel() {
@@ -83,14 +82,6 @@ export default function AccountSubMenuPanel() {
       icon: MessageCircle,
       permission: 'settings.account',
       href: '/settings/feedback',
-    },
-    {
-      id: 'friends',
-      titleKey: 'settingsMenu.friends.title',
-      descriptionKey: 'settingsMenu.friends.description',
-      icon: Users,
-      permission: 'settings.friends',
-      inlineContent: FriendsManager,
     },
     {
       id: 'documentation',

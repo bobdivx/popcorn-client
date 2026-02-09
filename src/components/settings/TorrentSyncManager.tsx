@@ -30,6 +30,7 @@ interface SyncProgress {
   category_torrents: Record<string, number>;
   total_processed: number;
   total_to_process: number;
+  fetched_pages?: number;
   errors: string[];
 }
 
@@ -928,7 +929,16 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
           <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <span>{error}</span>
+          <div class="flex-1">
+            <span>{error}</span>
+            {(error.includes('TMDB') || error.includes('tmdb') || error.toLowerCase().includes('clé') || error.toLowerCase().includes('token')) && (
+              <div class="mt-3">
+                <a href="/settings/indexers" class="btn btn-sm btn-primary">
+                  {t('sync.configureTmdbKey')}
+                </a>
+              </div>
+            )}
+          </div>
           <button class="btn btn-sm btn-ghost" onClick={() => setError('')}>×</button>
         </div>
       )}
@@ -1006,9 +1016,46 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
             </a>
           </div>
 
-          {/* Section de synchronisation active avec animations */}
+          {/* Section sync en cours : récupérés → en base (infos fiables) */}
           {status.sync_in_progress && (
-            <div class="space-y-6 animate-fade-in">
+            <div class="space-y-4 animate-fade-in">
+              <p class="text-gray-400 text-xs">{t('torrentSyncManager.fetchThenEnrich')}</p>
+
+              {/* Bannière phase : expliquer pourquoi "0 en base" pendant la récupération */}
+              {status.progress && (() => {
+                const totalToProcess = status.progress.total_to_process ?? 0;
+                const fetchedCount = status.progress.category_torrents
+                  ? Object.values(status.progress.category_torrents).reduce((s, n) => s + (n || 0), 0)
+                  : 0;
+                const isPhaseFetch = totalToProcess === 0 && fetchedCount > 0;
+                if (isPhaseFetch) {
+                  return (
+                    <div class="bg-blue-900/40 border border-blue-500/50 rounded-lg p-4">
+                      <p class="text-blue-300 font-semibold text-sm flex items-center gap-2">
+                        <span class="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+                        {t('torrentSyncManager.phaseFetch')}
+                        {status.progress.current_query && (
+                          <span class="text-blue-200/90 font-normal">— {status.progress.current_query}</span>
+                        )}
+                      </p>
+                      <p class="text-gray-300 text-xs mt-2">{t('torrentSyncManager.phaseFetchExplanation')}</p>
+                    </div>
+                  );
+                }
+                if (totalToProcess > 0) {
+                  return (
+                    <p class="text-green-400/90 text-xs font-medium flex items-center gap-2">
+                      <span class="w-1.5 h-1.5 bg-green-400 rounded-full" />
+                      {t('torrentSyncManager.phaseEnrich')} : {t('torrentSyncManager.phaseEnrichProgress', {
+                        current: (status.progress.total_processed ?? 0).toLocaleString(),
+                        total: totalToProcess.toLocaleString(),
+                      })}
+                    </p>
+                  );
+                }
+                return null;
+              })()}
+
               {/* Informations de progression en temps réel */}
               {status.progress && (
                 <div class="bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-xl p-6 border-2 border-blue-500/50">
@@ -1029,38 +1076,37 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                           <p class="text-white font-semibold text-sm">{status.progress.current_indexer}</p>
                           {status.progress.indexer_torrents[status.progress.current_indexer] !== undefined && status.progress.total_to_process > 0 && (
                             <p class="text-gray-500 text-xs mt-1">
-                              {status.progress.indexer_torrents[status.progress.current_indexer].toLocaleString()} {t('torrentSyncManager.raw')} → {status.progress.total_to_process} {t('torrentSyncManager.toProcess')}
+                              {status.progress.indexer_torrents[status.progress.current_indexer].toLocaleString()} {t('torrentSyncManager.fetchedFromIndexers')} → {status.progress.total_to_process} {t('torrentSyncManager.toProcess')}
                             </p>
                           )}
                         </div>
-                        {status.progress.indexer_torrents[status.progress.current_indexer] !== undefined && (
+                          {status.progress.indexer_torrents[status.progress.current_indexer] !== undefined && (
                           <div class="text-right">
                             <p class="text-primary font-bold text-lg">{status.progress.indexer_torrents[status.progress.current_indexer]}</p>
-                            <p class="text-gray-400 text-xs">{t('torrentSyncManager.fetched')}<br/><span class="text-gray-500">({t('torrentSyncManager.raw')})</span></p>
+                            <p class="text-gray-400 text-xs">{t('torrentSyncManager.fetchedFromIndexers')}</p>
                           </div>
                         )}
                       </div>
                     )}
-                    
-                    {/* Catégorie actuelle */}
+                    {/* Catégorie actuelle : X récupérés → Y en base */}
                     {status.progress.current_category && (
                       <div class="flex items-center gap-3 bg-gray-800/50 rounded-lg p-3">
                         <div class="text-2xl">
                           {status.progress.current_category === 'films' ? '🎬' : status.progress.current_category === 'series' ? '📺' : '📦'}
                         </div>
                         <div class="flex-1">
-                          <p class="text-gray-400 text-xs">Catégorie</p>
+                          <p class="text-gray-400 text-xs">{t('torrentSyncManager.category')}</p>
                           <p class="text-white font-semibold text-sm capitalize">{status.progress.current_category}</p>
                           {status.progress.category_torrents[status.progress.current_category] !== undefined && (
                             <p class="text-gray-500 text-xs mt-1">
-                              {status.progress.category_torrents[status.progress.current_category].toLocaleString()} {t('torrentSyncManager.fetched')} → {(effectiveStats[status.progress.current_category] ?? 0).toLocaleString()} {t('torrentSyncManager.synchronized')}
+                              {status.progress.category_torrents[status.progress.current_category].toLocaleString()} {t('torrentSyncManager.fetchedFromIndexers')} → {(effectiveStats[status.progress.current_category] ?? 0).toLocaleString()} {t('torrentSyncManager.inDatabase')}
                             </p>
                           )}
                         </div>
                         {status.progress.category_torrents[status.progress.current_category] !== undefined && (
                           <div class="text-right">
                             <p class="text-primary font-bold text-lg">{status.progress.category_torrents[status.progress.current_category]}</p>
-                            <p class="text-gray-400 text-xs">{t('torrentSyncManager.fetched')}<br/><span class="text-gray-500">({t('torrentSyncManager.raw')})</span></p>
+                            <p class="text-gray-400 text-xs">→ {(effectiveStats[status.progress.current_category] ?? 0).toLocaleString()} {t('torrentSyncManager.inDatabase')}</p>
                           </div>
                         )}
                       </div>
@@ -1119,138 +1165,89 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                 </div>
               )}
               
-              {/* Indexers actifs */}
+              {/* Indexers en pills compacts */}
               {indexers.length > 0 && (
-                <div class="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-                  <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    {t('torrentSyncManager.activeIndexers')} ({indexers.length})
-                  </h3>
-                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {indexers.map((indexer, idx) => {
-                      const isCurrent = status.progress?.current_indexer === indexer.name;
-                      const torrentCount = status.progress?.indexer_torrents[indexer.name] || 0;
-                      return (
-                        <div 
-                          key={indexer.id} 
-                          class={`rounded-lg p-4 border transition-all duration-300 ${
-                            isCurrent 
-                              ? 'bg-primary/20 border-primary border-2' 
-                              : 'bg-gray-900/50 border-gray-700 hover:border-primary/50'
-                          }`}
-                        >
-                          <div class="flex items-center gap-3">
-                            <div class="relative">
-                              {isCurrent ? (
-                                <>
-                                  <div class="w-3 h-3 bg-primary rounded-full animate-ping"></div>
-                                  <div class="absolute top-0 left-0 w-3 h-3 bg-primary rounded-full"></div>
-                                </>
-                              ) : (
-                                <div class="w-3 h-3 bg-gray-500 rounded-full"></div>
-                              )}
-                            </div>
-                            <div class="flex-1 min-w-0">
-                              <p class="text-white font-semibold text-sm truncate" title={indexer.name}>{indexer.name}</p>
-                              <p class="text-gray-400 text-xs truncate" title={indexer.baseUrl}>{indexer.baseUrl}</p>
-                            </div>
-                            {torrentCount > 0 && (
-                              <div class="text-right">
-                                <p class="text-primary font-bold text-sm">{torrentCount}</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-gray-400 text-xs">{t('torrentSyncManager.activeIndexers')}:</span>
+                  {indexers.map((indexer) => {
+                    const isCurrent = status.progress?.current_indexer === indexer.name;
+                    const n = status.progress?.indexer_torrents?.[indexer.name] ?? 0;
+                    return (
+                      <span
+                        key={indexer.id}
+                        class={`badge badge-sm ${isCurrent ? 'badge-primary' : 'badge-ghost'} transition-all`}
+                        title={indexer.baseUrl}
+                      >
+                        {isCurrent && <span class="w-1 h-1 rounded-full bg-white mr-1 animate-pulse" />}
+                        {indexer.name}
+                        {n > 0 && <span class="ml-1 opacity-80">({n.toLocaleString()})</span>}
+                      </span>
+                    );
+                  })}
                 </div>
               )}
 
-              {/* Barre de progression animée */}
-              <div class="space-y-3">
-                <div class="flex justify-between items-center">
-                  <span class="text-white font-semibold">Progression</span>
-                  <span class="text-primary font-bold text-xl">{progress}%</span>
+              {/* Barre de progression */}
+              <div class="flex items-center gap-3">
+                <div class="flex-1 h-2.5 bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    class="h-full bg-gradient-to-r from-primary to-primary/80 rounded-full transition-all duration-500 ease-out"
+                    style={`width: ${Math.min(100, progress)}%`}
+                  />
                 </div>
-                <div class="relative h-6 bg-gray-800 rounded-full overflow-hidden">
-                  <div 
-                    class="h-full bg-gradient-to-r from-primary via-primary/80 to-primary rounded-full transition-all duration-500 ease-out flex items-center justify-end pr-2"
-                    style={`width: ${progress}%`}
-                  >
-                    {progress > 10 && (
-                      <span class="text-xs text-white font-bold">{progress}%</span>
-                    )}
-                  </div>
-                </div>
+                <span class="text-primary font-bold tabular-nums min-w-[3ch]">{progress}%</span>
               </div>
 
-              {/* Compteurs par catégorie avec animations (effectiveStats = stats + total_processed en cours) */}
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Object.entries(effectiveStats).map(([category, count]) => {
-                  const animatedCount = Math.floor(animatedCounts[category] ?? count);
-                  const previousCount = previousStats[category] || 0;
-                  const newCount = Math.max(0, count - previousCount);
+              {/* Catégories : récupérés (indexeurs) → en base — évite "600 sync mais 0 films" */}
+              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {(['films', 'series', 'others'] as const).map((category) => {
+                  const fetched = status.progress?.category_torrents?.[category] ?? 0;
+                  const inBase = Math.floor(animatedCounts[category] ?? effectiveStats[category] ?? 0);
+                  const isCurrent = status.progress?.current_category === category;
                   const icon = category === 'films' ? '🎬' : category === 'series' ? '📺' : '📦';
-                  
+                  const label = category === 'films' ? t('torrentSyncManager.films') : category === 'series' ? t('torrentSyncManager.series') : t('torrentSyncManager.others');
+                  const enriching = fetched > 0 && inBase === 0;
                   return (
-                    <div 
-                      key={category} 
-                      class="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-6 border-2 border-gray-700 hover:border-primary/50 transition-all duration-300 transform hover:scale-105"
+                    <div
+                      key={category}
+                      class={`rounded-lg p-3 border transition-all duration-300 ${
+                        isCurrent ? 'bg-primary/15 border-primary ring-1 ring-primary/50' : 'bg-gray-800/50 border-gray-700'
+                      }`}
                     >
-                      <div class="flex items-center justify-between mb-3">
-                        <div class="flex items-center gap-2">
-                          <span class="text-3xl">{icon}</span>
-                          <span class="text-white font-semibold text-sm capitalize">
-                            {category === 'films' ? t('torrentSyncManager.films') : category === 'series' ? t('torrentSyncManager.series') : t('torrentSyncManager.others')}
-                          </span>
-                        </div>
-                        {newCount > 0 && (
-                          <span class="badge badge-success badge-sm animate-bounce">
-                            +{newCount.toLocaleString()}
-                          </span>
-                        )}
+                      <div class="flex items-center justify-between gap-2 mb-1.5">
+                        <span class="text-base">{icon}</span>
+                        <span class="text-white font-semibold text-sm">{label}</span>
+                        {isCurrent && <span class="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />}
                       </div>
-                      <div class="text-4xl font-bold text-primary mb-2">
-                        {animatedCount.toLocaleString()}
+                      <div class="flex items-baseline gap-2 flex-wrap text-xs">
+                        <span class="text-gray-400">{t('torrentSyncManager.fetchedFromIndexers')}:</span>
+                        <span class="font-bold text-white">{fetched.toLocaleString()}</span>
+                        <span class="text-gray-500">→</span>
+                        <span class="text-gray-400">{t('torrentSyncManager.inDatabase')}:</span>
+                        <span class="font-bold text-primary tabular-nums">{inBase.toLocaleString()}</span>
                       </div>
-                      <div class="text-xs text-gray-400">
-                        {t('torrentSyncManager.torrentsSynced')}
-                      </div>
+                      {enriching && (
+                        <p class="text-xs text-blue-400 mt-1.5 animate-pulse">{t('torrentSyncManager.enrichingInProgress')}</p>
+                      )}
                     </div>
                   );
                 })}
                 
-                {/* Carte TMDB - Ratio enrichi */}
+                {/* Carte TMDB compacte */}
                 {status.tmdb_stats && (() => {
                   const tmdbTotal = status.tmdb_stats.with_tmdb + status.tmdb_stats.without_tmdb;
                   const tmdbPercentage = tmdbTotal > 0 ? Math.round((status.tmdb_stats.with_tmdb / tmdbTotal) * 100) : 0;
                   return tmdbTotal > 0 && (
-                    <div 
-                      class="bg-gradient-to-br from-blue-800/50 to-purple-900/50 rounded-xl p-6 border-2 border-blue-500/50 hover:border-blue-400 transition-all duration-300 transform hover:scale-105"
-                    >
-                      <div class="flex items-center justify-between mb-3">
-                        <div class="flex items-center gap-2">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <span class="text-white font-semibold text-sm">TMDB</span>
-                        </div>
-                        {tmdbPercentage === 100 && (
-                          <span class="badge badge-success badge-sm">100%</span>
-                        )}
+                    <div class="bg-gradient-to-br from-blue-800/50 to-purple-900/50 rounded-lg p-3 border border-blue-500/50">
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="text-white font-semibold text-sm">TMDB</span>
+                        {tmdbPercentage === 100 && <span class="badge badge-success badge-sm">100%</span>}
                       </div>
-                      <div class="text-4xl font-bold text-blue-400 mb-2">
+                      <div class="text-2xl font-bold text-blue-400 mt-1">
                         {status.tmdb_stats.with_tmdb.toLocaleString()}
+                        <span class="text-gray-400 text-sm font-normal ml-1">/ {tmdbTotal.toLocaleString()}</span>
                       </div>
-                      <div class="text-xs text-gray-400 mb-1">
-                        {language === 'fr' ? 'sur' : 'of'} {tmdbTotal.toLocaleString()} {t('torrentSyncManager.ofTorrents')}
-                      </div>
-                      <div class="text-xs font-semibold text-blue-300">
-                        {tmdbPercentage}% {t('torrentSyncManager.enriched')}
-                      </div>
+                      <div class="text-xs text-blue-300 mt-0.5">{tmdbPercentage}% {t('torrentSyncManager.enriched')}</div>
                     </div>
                   );
                 })()}
@@ -1262,89 +1259,33 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                   const hasFetchedTorrents = fetchedTotal > 0;
                   const hasInsertedTorrents = Object.keys(status.stats || {}).length > 0;
                   
-                  // Afficher "Aucun torrent trouvé" seulement si vraiment aucun torrent n'a été récupéré
-                  if (!hasFetchedTorrents && !hasInsertedTorrents) {
-                    return (
-                      <div class="col-span-full">
-                        <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-6 text-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-yellow-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                          </svg>
-                          <p class="text-yellow-400 font-semibold mb-2">Aucun torrent trouvé</p>
-                          <p class="text-gray-400 text-sm mb-4">La synchronisation est en cours mais aucun résultat n'a été retourné pour le moment.</p>
-                          
-                          {indexers.length > 0 && (
-                            <div class="mt-4 space-y-2">
-                              <p class="text-gray-300 text-xs font-semibold">Indexers interrogés:</p>
-                              <div class="flex flex-wrap gap-2 justify-center">
-                                {indexers.map((indexer) => (
-                                  <span key={indexer.id} class="badge badge-info badge-sm">
-                                    {indexer.name}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          
-                          {elapsedTime > 30 && (
-                            <div class="mt-4 bg-red-900/20 border border-red-500/30 rounded-lg p-3">
-                              <p class="text-red-400 text-xs font-semibold mb-1">{t('torrentSyncManager.noResultsAfter', { time: formatElapsedTime(elapsedTime) })}</p>
-                              <p class="text-gray-400 text-xs">{t('torrentSyncManager.checkBackendLogs')}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }
-                  
-                  // Si des torrents ont été récupérés mais pas encore insérés, afficher un message de traitement
-                  if (hasFetchedTorrents && !hasInsertedTorrents) {
-                    return (
-                      <div class="col-span-full">
-                        <div class="bg-blue-900/20 border border-blue-500/30 rounded-xl p-6 text-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-blue-400 mb-3 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                          </svg>
-                          <p class="text-blue-400 font-semibold mb-2">{t('torrentSyncManager.processingInProgress')}</p>
-                          <p class="text-gray-400 text-sm mb-4">
-                            {t('torrentSyncManager.torrentsFetchedEnriching', { count: fetchedTotal.toLocaleString() })}
-                          </p>
-                          
-                          {indexers.length > 0 && (
-                            <div class="mt-4 space-y-2">
-                              <p class="text-gray-300 text-xs font-semibold">{t('torrentSyncManager.indexersQueried')}</p>
-                              <div class="flex flex-wrap gap-2 justify-center">
-                                {indexers.map((indexer) => (
-                                  <span key={indexer.id} class="badge badge-info badge-sm">
-                                    {indexer.name}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  }
-                  
+                  // "Aucun torrent trouvé" uniquement si vraiment rien récupéré (affiché plus bas en compact)
                   return null;
                 })()}
               </div>
 
-              {/* Total avec animation */}
-              <div class="bg-gradient-to-r from-primary/20 to-primary/10 rounded-xl p-6 border border-primary/30">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-3">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                    </svg>
-                    <span class="text-white font-semibold">{t('torrentSyncManager.totalSynced')}</span>
-                  </div>
-                  <span class="text-primary font-bold text-3xl">
-                    {totalTorrents.toLocaleString()}
-                  </span>
-                </div>
+              {/* Total en base */}
+              <div class="flex justify-between items-center pt-1 border-t border-gray-700">
+                <span class="text-gray-400 text-sm">{t('torrentSyncManager.totalSynced')}</span>
+                <span class="text-primary font-bold text-xl tabular-nums">{totalTorrents.toLocaleString()}</span>
               </div>
+
+              {/* Message si aucun torrent récupéré du tout */}
+              {(() => {
+                const fetchedTotal = status.progress?.indexer_torrents
+                  ? Object.values(status.progress.indexer_torrents).reduce((s, n) => s + (n || 0), 0)
+                  : 0;
+                if (fetchedTotal > 0 || totalTorrents > 0) return null;
+                return (
+                  <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 text-center">
+                    <p class="text-yellow-400 text-sm font-medium">{t('torrentSyncManager.noTorrentsFound')}</p>
+                    <p class="text-gray-400 text-xs mt-1">{t('torrentSyncManager.syncInProgressNoResults')}</p>
+                    {elapsedTime > 30 && (
+                      <p class="text-red-400/90 text-xs mt-2">{t('torrentSyncManager.noResultsAfter', { time: formatElapsedTime(elapsedTime) })}</p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

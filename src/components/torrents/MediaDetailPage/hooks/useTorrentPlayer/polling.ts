@@ -28,6 +28,7 @@ export function createPollTorrentProgress(context: PollingContext) {
     queuedStartTimeRef,
     lastQueuedLogTimeRef,
     lastResumeAttemptRef,
+    getCurrentTorrentStats,
   } = context;
 
   return async (infoHash: string) => {
@@ -52,8 +53,19 @@ export function createPollTorrentProgress(context: PollingContext) {
         // Reset du timer "not found" dès qu'on récupère des stats
         notFoundStartTimeRef.current = null;
 
-        // Mettre à jour les stats (utilisé pour afficher le statut de téléchargement sur la page détail)
-        setTorrentStats(stats);
+        // Ne pas écraser un état queued/downloading par une réponse API invalide (unknown, progress 0)
+        // pour éviter que la carte de stats disparaisse brièvement après un clic sur Télécharger
+        const apiSaysUnknownOrZero =
+          stats.state === 'unknown' || (Number(stats.progress) === 0 && stats.state !== 'completed' && stats.state !== 'seeding');
+        const current = getCurrentTorrentStats?.() ?? null;
+        const hadInProgressState =
+          current && (current.state === 'queued' || current.state === 'downloading');
+        if (apiSaysUnknownOrZero && hadInProgressState) {
+          // Garder l'affichage "En cours", ne pas écraser ; le prochain poll mettra à jour avec les vraies stats
+        } else {
+          // Mettre à jour les stats (utilisé pour afficher le statut de téléchargement sur la page détail)
+          setTorrentStats(stats);
+        }
 
         const progress = stats.progress || 0;
         const state = (stats.state || '').toLowerCase();

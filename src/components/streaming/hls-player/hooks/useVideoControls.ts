@@ -13,6 +13,8 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [bufferedPercent, setBufferedPercent] = useState(0);
+  const [isSeeking, setIsSeeking] = useState(false);
   const [isMuted, setIsMuted] = useState(playerConfig.muted);
   const [volume, setVolume] = useState(playerConfig.volume);
   const controlsTimeoutRef = useRef<number | null>(null);
@@ -43,6 +45,29 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
       if (!video.paused && playerConfig.autoHideControls) setShowControls(false);
     };
 
+    const updateBuffered = () => {
+      const total =
+        duration > 0 && isFinite(duration)
+          ? duration
+          : (video.duration && isFinite(video.duration) ? video.duration : 0);
+      if (!total || !isFinite(total)) {
+        setBufferedPercent(0);
+        return;
+      }
+      try {
+        const buffered = video.buffered;
+        if (!buffered || buffered.length === 0) {
+          setBufferedPercent(0);
+          return;
+        }
+        const end = buffered.end(buffered.length - 1);
+        const percent = Math.max(0, Math.min(100, (end / total) * 100));
+        setBufferedPercent(percent);
+      } catch (e) {
+        setBufferedPercent(0);
+      }
+    };
+
     const handleTimeUpdate = () => {
       setCurrentTime(video.currentTime);
       // Utiliser hlsDuration en priorité si disponible, sinon video.duration
@@ -55,6 +80,7 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
           setDuration(videoDuration);
         }
       }
+      updateBuffered();
     };
 
     const handlePlay = () => {
@@ -81,6 +107,15 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
       setShowControls(true);
     };
 
+    const handleSeeking = () => {
+      setIsSeeking(true);
+    };
+
+    const handleSeeked = () => {
+      setIsSeeking(false);
+      updateBuffered();
+    };
+
     const handleVolumeChange = () => {
       setIsMuted(video.muted);
       setVolume(video.volume);
@@ -95,6 +130,7 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
           setDuration(videoDuration);
         }
       }
+      updateBuffered();
     };
     
     const handleDurationChange = () => {
@@ -114,6 +150,7 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
           setDuration(finalDuration);
         }
       }
+      updateBuffered();
     };
 
     const container = video.parentElement?.parentElement;
@@ -133,8 +170,11 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
     }
 
     video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('progress', updateBuffered);
     video.addEventListener('play', handlePlay);
     video.addEventListener('pause', handlePause);
+    video.addEventListener('seeking', handleSeeking);
+    video.addEventListener('seeked', handleSeeked);
     video.addEventListener('volumechange', handleVolumeChange);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('durationchange', handleDurationChange);
@@ -150,8 +190,11 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
         container.removeEventListener('touchstart', handleTouchStart);
       }
       video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('progress', updateBuffered);
       video.removeEventListener('play', handlePlay);
       video.removeEventListener('pause', handlePause);
+      video.removeEventListener('seeking', handleSeeking);
+      video.removeEventListener('seeked', handleSeeked);
       video.removeEventListener('volumechange', handleVolumeChange);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('durationchange', handleDurationChange);
@@ -177,16 +220,27 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
 
   const handleSeek = (e: any) => {
     const video = videoRef.current;
-    if (!video || !duration) return;
+    if (!video) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
-    const pos = (e.clientX - rect.left) / rect.width;
-    const targetTime = Math.max(0, Math.min(duration, pos * duration));
-    if (typeof video.fastSeek === 'function') {
-      video.fastSeek(targetTime);
-    } else {
-      video.currentTime = targetTime;
-    }
+    const clientX =
+      e?.clientX ??
+      e?.nativeEvent?.clientX ??
+      e?.touches?.[0]?.clientX ??
+      e?.changedTouches?.[0]?.clientX;
+    if (typeof clientX !== 'number') return;
+    const durationValue =
+      duration > 0 && isFinite(duration)
+        ? duration
+        : (video.duration && isFinite(video.duration) ? video.duration : 0);
+    if (!durationValue) return;
+    if (!rect.width) return;
+    const pos = (clientX - rect.left) / rect.width;
+    const targetTime = Math.max(0, Math.min(durationValue, pos * durationValue));
+    // Toujours utiliser currentTime pour le seek : avec HLS.js cela permet de sauter
+    // n'importe où dans la vidéo (le segment est chargé à la demande). fastSeek()
+    // est limité au buffer déjà chargé et peut bloquer les grands sauts.
+    video.currentTime = targetTime;
   };
 
   const handleVolumeChange = (e: any) => {
@@ -216,6 +270,8 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
     isPlaying,
     currentTime,
     duration,
+    bufferedPercent,
+    isSeeking,
     isMuted,
     volume,
     handlePlayPause,

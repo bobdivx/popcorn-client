@@ -34,6 +34,15 @@ function persistDownloadMeta(infoHash: string, torrent: MediaDetailPageProps['to
   });
 }
 
+/** Lie le téléchargement au média TMDB (pour library/téléchargements) si tmdbId/tmdbType disponibles. */
+function bindDownloadIfTmdb(infoHash: string, torrent: MediaDetailPageProps['torrent']): void {
+  const tmdbId = torrent.tmdbId ?? (torrent as { tmdbId?: number }).tmdbId;
+  const tmdbType = (torrent.tmdbType ?? (torrent as { tmdbType?: string }).tmdbType) as 'movie' | 'tv' | undefined;
+  if (infoHash && typeof tmdbId === 'number' && (tmdbType === 'movie' || tmdbType === 'tv')) {
+    clientApi.bindDownloadToMedia(infoHash, tmdbId, tmdbType).catch(() => {});
+  }
+}
+
 /** Message d'erreur backend quand le torrent n'est plus disponible (404) — permet de réessayer une autre variante */
 const TORRENT_NOT_AVAILABLE_MESSAGE = "n'est plus disponible sur l'indexer";
 
@@ -250,7 +259,10 @@ async function downloadFromExternalIndexerOnce(options: {
     const result = await clientApi.addTorrentFile(file, forStreaming, downloadType);
     addNotification('success', 'Torrent ajouté au client avec succès depuis la DB locale !');
     const infoHash = result?.info_hash ?? torrent.infoHash ?? '';
-    if (infoHash) persistDownloadMeta(infoHash, torrent);
+    if (infoHash) {
+      persistDownloadMeta(infoHash, torrent);
+      bindDownloadIfTmdb(infoHash, torrent);
+    }
     window.dispatchEvent(new CustomEvent('torrentAdded', { detail: { infoHash, name: torrent.name } }));
 
     if (result?.info_hash) {
@@ -287,7 +299,10 @@ async function downloadFromExternalIndexerOnce(options: {
     const result = await clientApi.addMagnetLink(magnetUri, torrent.name, forStreaming, downloadType);
     addNotification('success', 'Torrent ajouté au client avec succès !');
     const infoHashMagnet = result?.info_hash ?? torrent.infoHash ?? '';
-    if (infoHashMagnet) persistDownloadMeta(infoHashMagnet, torrent);
+    if (infoHashMagnet) {
+      persistDownloadMeta(infoHashMagnet, torrent);
+      bindDownloadIfTmdb(infoHashMagnet, torrent);
+    }
     window.dispatchEvent(new CustomEvent('torrentAdded', { detail: { infoHash: infoHashMagnet, name: torrent.name } }));
 
     if (result?.info_hash) {
@@ -443,7 +458,10 @@ async function downloadFromExternalIndexer(options: {
       const result = await clientApi.addMagnetLink(jsonResponse.magnetUri, torrent.name, forStreaming, downloadType);
       addNotification('success', 'Torrent ajouté au client via magnet link !');
       const infoHashMagnet2 = result?.info_hash ?? torrent.infoHash ?? '';
-      if (infoHashMagnet2) persistDownloadMeta(infoHashMagnet2, torrent);
+      if (infoHashMagnet2) {
+        persistDownloadMeta(infoHashMagnet2, torrent);
+        bindDownloadIfTmdb(infoHashMagnet2, torrent);
+      }
       window.dispatchEvent(new CustomEvent('torrentAdded', { detail: { infoHash: infoHashMagnet2, name: torrent.name } }));
 
       if (result?.info_hash) {
@@ -479,7 +497,10 @@ async function downloadFromExternalIndexer(options: {
     const result = await clientApi.addTorrentFile(file, forStreaming, downloadType);
     addNotification('success', 'Torrent téléchargé depuis l\'indexer externe et ajouté au client avec succès !');
     const infoHashFile = result?.info_hash ?? torrent.infoHash ?? '';
-    if (infoHashFile) persistDownloadMeta(infoHashFile, torrent);
+    if (infoHashFile) {
+      persistDownloadMeta(infoHashFile, torrent);
+      bindDownloadIfTmdb(infoHashFile, torrent);
+    }
     window.dispatchEvent(new CustomEvent('torrentAdded', { detail: { infoHash: infoHashFile, name: torrent.name } }));
 
     if (result?.info_hash) {
@@ -531,7 +552,10 @@ async function handleMagnetResponse(options: {
   const result = await clientApi.addMagnetLink(magnetUri, torrent.name, forStreaming, downloadType);
   addNotification('success', 'Torrent ajouté au client avec succès !');
   const infoHashMagnet3 = result?.info_hash ?? torrent.infoHash ?? '';
-  if (infoHashMagnet3) persistDownloadMeta(infoHashMagnet3, torrent);
+  if (infoHashMagnet3) {
+    persistDownloadMeta(infoHashMagnet3, torrent);
+    bindDownloadIfTmdb(infoHashMagnet3, torrent);
+  }
   window.dispatchEvent(new CustomEvent('torrentAdded', { detail: { infoHash: infoHashMagnet3, name: torrent.name } }));
 
   if (result?.info_hash) {
@@ -591,7 +615,10 @@ async function handleLocalDownload(options: {
   const result = await clientApi.addTorrentFile(file, forStreaming, downloadType);
   addNotification('success', 'Torrent ajouté au client avec succès !');
   const infoHashLocal = result?.info_hash ?? torrent.infoHash ?? '';
-  if (infoHashLocal) persistDownloadMeta(infoHashLocal, torrent);
+  if (infoHashLocal) {
+    persistDownloadMeta(infoHashLocal, torrent);
+    bindDownloadIfTmdb(infoHashLocal, torrent);
+  }
   window.dispatchEvent(new CustomEvent('torrentAdded', { detail: { infoHash: infoHashLocal, name: torrent.name } }));
 
   if (result?.info_hash) {

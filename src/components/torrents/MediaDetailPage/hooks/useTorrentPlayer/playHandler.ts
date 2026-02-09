@@ -50,6 +50,25 @@ export function createHandlePlay(context: PlayHandlerContext) {
       return;
     }
 
+    // PRIORITÉ 0.5: Média disponible en bibliothèque (fichier sur disque, torrent peut être absent du client) — charger depuis le chemin library puis lancer
+    if (isAvailableLocally && hasInfoHash && torrent.infoHash) {
+      addDebugLog('info', '📚 Média disponible localement, chargement des fichiers depuis la bibliothèque...');
+      const libraryVideos = await loadVideoFiles(torrent.infoHash);
+      if (libraryVideos.length > 0) {
+        addDebugLog('success', '✅ Fichiers trouvés depuis la bibliothèque, lancement de la lecture', {
+          files_count: libraryVideos.length,
+        });
+        setVideoFiles(libraryVideos);
+        setSelectedFile(libraryVideos[0]);
+        setPlayStatus('ready');
+        setProgressMessage('Lancement de la lecture...');
+        setIsPlaying(true);
+        setShowInfo(false);
+        stopProgressPolling();
+        return;
+      }
+    }
+
     // PRIORITÉ 1: Vérifier si le torrent existe dans le client (avec quelques réessais en cas de 404 temporaire)
     if (hasInfoHash && torrent.infoHash) {
       try {
@@ -222,6 +241,9 @@ export function createHandlePlay(context: PlayHandlerContext) {
               const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
               const addResult = await clientApi.addMagnetLink(errorData.magnetUri, torrent.name, forStreaming, downloadType);
               if (addResult.info_hash) {
+                if (typeof torrent.tmdbId === 'number' && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) {
+                  clientApi.bindDownloadToMedia(addResult.info_hash, torrent.tmdbId, torrent.tmdbType).catch(() => {});
+                }
                 setPlayStatus('adding');
                 setProgressMessage('Récupération des métadonnées...');
                 addDebugLog('info', '✅ Torrent ajouté via magnet link, attente des métadonnées...', {
@@ -343,6 +365,9 @@ export function createHandlePlay(context: PlayHandlerContext) {
           const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
           const addResult = await clientApi.addTorrentFile(torrentFile, forStreaming, downloadType);
           if (addResult.info_hash) {
+            if (typeof torrent.tmdbId === 'number' && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) {
+              clientApi.bindDownloadToMedia(addResult.info_hash, torrent.tmdbId, torrent.tmdbType).catch(() => {});
+            }
             setPlayStatus('downloading');
             setProgressMessage('Recherche de peers...');
             addDebugLog('success', '✅ Fichier .torrent ajouté avec succès au backend', {
@@ -401,6 +426,9 @@ export function createHandlePlay(context: PlayHandlerContext) {
           const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
           const addResult = await clientApi.addMagnetLink(constructedMagnet, torrent.name, forStreaming, downloadType);
           if (addResult.info_hash) {
+            if (typeof torrent.tmdbId === 'number' && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) {
+              clientApi.bindDownloadToMedia(addResult.info_hash, torrent.tmdbId, torrent.tmdbType).catch(() => {});
+            }
             setPlayStatus('adding');
             setProgressMessage('Récupération des métadonnées...');
             addDebugLog('info', '✅ Torrent ajouté, attente des métadonnées...', {
@@ -615,6 +643,9 @@ export function createHandlePlay(context: PlayHandlerContext) {
         const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
         const addResult = await clientApi.addMagnetLink(torrent._externalMagnetUri, torrent.name, forStreaming, downloadType);
         if (addResult.info_hash) {
+          if (typeof torrent.tmdbId === 'number' && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) {
+            clientApi.bindDownloadToMedia(addResult.info_hash, torrent.tmdbId, torrent.tmdbType).catch(() => {});
+          }
           setPlayStatus('adding');
           setProgressMessage('Récupération des métadonnées...');
           addDebugLog('info', '✅ Torrent ajouté, attente des métadonnées...', {

@@ -35,6 +35,7 @@
     "serie": "Série",
     "content": "Contenu",
     "download": "Télécharger",
+    "torrents": "Torrents",
     "details": "Détails",
     "other": "Autre",
     "others": "Autres",
@@ -430,7 +431,9 @@
     "torrentsRecentLimitDescription": "Nombre d'éléments dans la section ajouts récents (20-200)"
   },
   "playback": {
-    "nextEpisode": "Épisode suivant"
+    "nextEpisode": "Épisode suivant",
+    "buffering": "Mise en buffer…",
+    "bufferingProgress": "Mise en buffer {percent}%"
   },
   "nav": {
     "menu": "Menu",
@@ -535,7 +538,20 @@
     "others": "Autres",
     "sharedBy": "Partagé par {name}",
     "downloadingSection": "En cours de téléchargement",
-    "downloadingBadge": "En cours"
+    "downloadingBadge": "En cours",
+    "badgePopcorn": "Popconn",
+    "badgeLocal": "Local",
+    "badgeExternalLibrary": "Bibliothèque externe",
+    "badgeSharedByFriend": "Partagé par un ami",
+    "filterAll": "Tous",
+    "filterFilms": "Films",
+    "filterSeries": "Séries",
+    "filterSourceAll": "Toutes sources",
+    "filterSourcePopcorn": "Popconn",
+    "filterSourceExternal": "Bibliothèque externe",
+    "filterSourceShared": "Partagés",
+    "filterSourceLocal": "Local",
+    "genreOther": "Autres"
   },
   "torrentStats": {
     "downloading": "Téléchargement en cours",
@@ -603,7 +619,9 @@
     "actions": "Actions",
     "progress": "Progression",
     "private": "Privé",
-    "statusReason": "Statut détaillé"
+    "statusReason": "Statut détaillé",
+    "notLinkedToTmdb": "Non associé à un média (ajout manuel ou pas encore synchronisé)",
+    "notLinkedToTmdbShort": "Non associé"
   },
   "settingsMenu": {
     "title": "Paramètres",
@@ -612,6 +630,7 @@
       "system": "Système & Configuration",
       "interface": "Interface",
       "content": "Indexer et Téléchargement",
+      "library": "Bibliothèque",
       "discovery": "Découverte & Demandes",
       "account": "Compte & Utilisateurs",
       "playback": "Lecture"
@@ -671,6 +690,51 @@
     "librqbitWeb": {
       "title": "Interface Web librqbit",
       "description": "Ouvrir l'interface web du client torrent dans un nouvel onglet"
+    },
+    "mediaPaths": {
+      "title": "Dossiers de médias",
+      "description": "Définir les dossiers de téléchargement par type (films, séries), comme Jellyfin"
+    },
+    "mediaPathsPanel": {
+      "intro": "Choisissez le dossier dans lequel enregistrer les téléchargements pour chaque type. Les chemins sont relatifs au dossier racine du serveur.",
+      "filmsPath": "Dossier des films",
+      "seriesPath": "Dossier des séries",
+      "browse": "Parcourir",
+      "chooseFolder": "Choisir ce dossier",
+      "loading": "Chargement…",
+      "saveSuccess": "Chemins enregistrés (backend et cloud).",
+      "saveError": "Erreur lors de l'enregistrement.",
+      "browseTitle": "Sélectionner un dossier",
+      "noSubfolders": "Aucun sous-dossier."
+    },
+    "librarySources": {
+      "title": "Dossiers externes (bibliothèque)",
+      "description": "Ajouter des dossiers hors du serveur (ex. autre NAS) pour les inclure dans la bibliothèque"
+    },
+    "librarySourcesPanel": {
+      "intro": "Ajoutez des dossiers contenant des films ou séries (ex. sur un autre NAS). Après validation, un scan et un enrichissement TMDB seront lancés.",
+      "pathPlaceholder": "Ex. \\\\zimacube.local\\Movies ou smb://zimacube.local/Movies",
+      "pathFormatTitle": "Quel format utiliser ?",
+      "pathFormatWindows": "Windows (Explorateur) : ouvrez le dossier dans l’Explorateur, puis copiez le chemin dans la barre d’adresse → \\\\ordinateur\\partage\\dossier",
+      "pathFormatMac": "macOS (Finder) : menu Aller → Se connecter au serveur, entrez l’adresse du serveur → smb://ordinateur/partage/dossier",
+      "pathFormatNote": "Le chemin doit être accessible depuis la machine où tourne le serveur (sous Linux, utilisez le point de montage, ex. /mnt/nas/Movies).",
+      "category": "Type de contenu",
+      "categoryFilm": "Films",
+      "categorySeries": "Séries",
+      "labelOptional": "Libellé (optionnel)",
+      "shareWithFriends": "Partager avec les amis",
+      "addSource": "Ajouter le dossier",
+      "scan": "Lancer le scan",
+      "syncing": "Synchronisation…",
+      "synchronized": "Synchronisé",
+      "delete": "Supprimer",
+      "loading": "Chargement…",
+      "addSuccess": "Dossier ajouté. Scan en cours en arrière-plan.",
+      "addError": "Impossible d'ajouter le dossier.",
+      "scanStarted": "Scan démarré.",
+      "deleteSuccess": "Source supprimée.",
+      "noSources": "Aucun dossier externe. Ajoutez un chemin (films ou séries) pour l'intégrer à la bibliothèque.",
+      "stats": "{mediaCount} médias, {folderCount} dossiers"
     },
     "versions": {
       "title": "Versions",
@@ -1030,6 +1094,7 @@
     "startSync": "Démarrer la synchronisation",
     "configureIndexers": "Configurer les indexers",
     "goToSyncSettings": "Aller aux paramètres de synchronisation →",
+    "configureTmdbKey": "Configurer la clé TMDB",
     "syncInfo": "La synchronisation récupère les torrents depuis vos indexers configurés et les enrichit avec les métadonnées TMDB.",
     "noIndexerActivated": "Aucun indexer activé. Veuillez configurer au moins un indexer dans les paramètres.",
     "tmdbTokenMissing": "Token TMDB manquant. Veuillez configurer votre token TMDB dans les paramètres.",
@@ -1375,7 +1440,15 @@
     "checkBackendLogs": "Vérifiez les logs du backend ou testez les indexers individuellement.",
     "processingInProgress": "Traitement en cours",
     "torrentsFetchedEnriching": "{count} torrent(s) récupéré(s), en cours d'enrichissement et d'insertion en base de données.",
-    "bruts": "bruts"
+    "bruts": "bruts",
+    "fetchedFromIndexers": "récupérés (indexeurs)",
+    "inDatabase": "en base",
+    "fetchThenEnrich": "Récupérés des indexeurs → enrichissement TMDB → insertion en base.",
+    "enrichingInProgress": "Enrichissement en cours…",
+    "phaseFetch": "Phase 1 — Récupération",
+    "phaseFetchExplanation": "Les pages RSS sont récupérées. Aucun film n’est encore en base : l’enrichissement TMDB et l’insertion commenceront une fois la récupération terminée.",
+    "phaseEnrich": "Phase 2 — Enrichissement et insertion",
+    "phaseEnrichProgress": "{current} / {total} traités"
   },
   "backendDiagnostics": {
     "title": "Diagnostics réseau (Android/Desktop)",

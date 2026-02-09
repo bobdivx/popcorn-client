@@ -20,6 +20,8 @@ interface UseTVPlayerNavigationProps {
   onClose?: () => void;
   duration: number;
   currentTime: number;
+  /** Ref de la barre de progression pour y déplacer le focus (télécommande TV) */
+  progressBarRef?: { current: HTMLElement | null };
 }
 
 export function useTVPlayerNavigation({
@@ -31,6 +33,7 @@ export function useTVPlayerNavigation({
   onToggleMute,
   onToggleFullscreen,
   onClose,
+  progressBarRef,
 }: UseTVPlayerNavigationProps) {
   const [focusedControlIndex, setFocusedControlIndex] = useState(0);
   const [focusedOnProgress, setFocusedOnProgress] = useState(false);
@@ -156,6 +159,9 @@ export function useTVPlayerNavigation({
           e.preventDefault();
           if (showControls && !focusedOnProgress) {
             setFocusedOnProgress(true);
+            // Déplacer le focus DOM sur la barre de progression pour que la télécommande
+            // cible bien le slider (navigation D-pad, lecteurs d'écran).
+            progressBarRef?.current?.focus();
           } else {
             onVolumeChange('up');
           }

@@ -13,6 +13,8 @@
  */
 
 const STORAGE_KEY = 'popcorn_backend_url';
+/** URL du "mon serveur" (pour la page Bibliothèque : toujours afficher ma bibliothèque + celle des amis) */
+const MY_BACKEND_STORAGE_KEY = 'popcorn_my_backend_url';
 const DEMO_MODE_STORAGE_KEY = 'popcorn_demo_mode';
 
 /**
@@ -268,10 +270,17 @@ function normalizeBackendUrl(url: string): string {
   }
 }
 
+export interface SetBackendUrlOptions {
+  /** Si true (défaut), enregistre aussi cette URL comme "mon serveur" (pour la page Bibliothèque). Mettre à false quand on bascule vers le serveur d'un ami. */
+  setAsMyBackend?: boolean;
+}
+
 /**
- * Définit l'URL du backend dans localStorage (côté client uniquement)
+ * Définit l'URL du backend dans localStorage (côté client uniquement).
+ * Par défaut, enregistre aussi comme "mon serveur" pour que la page Bibliothèque affiche toujours ma bibliothèque.
+ * Utiliser setAsMyBackend: false quand on bascule vers le serveur d'un ami (ex. clic sur un média partagé).
  */
-export function setBackendUrl(url: string): void {
+export function setBackendUrl(url: string, options?: SetBackendUrlOptions): void {
   if (typeof window === 'undefined') {
     console.warn('[backend-config] setBackendUrl appelé côté serveur, ignoré');
     return;
@@ -295,10 +304,43 @@ export function setBackendUrl(url: string): void {
     }
 
     localStorage.setItem(STORAGE_KEY, normalizedUrl);
+    if (options?.setAsMyBackend !== false) {
+      localStorage.setItem(MY_BACKEND_STORAGE_KEY, normalizedUrl);
+    }
     console.log('[backend-config] URL backend sauvegardée:', normalizedUrl);
   } catch (error) {
     console.error('[backend-config] Erreur lors de la sauvegarde dans localStorage:', error);
     throw error;
+  }
+}
+
+/**
+ * Retourne l'URL du "mon serveur" (celle utilisée pour afficher ma bibliothèque sur la page Bibliothèque).
+ * Si jamais définie, retourne null : la page Bibliothèque utilisera alors l'URL courante ou la config cloud.
+ */
+export function getMyBackendUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = localStorage.getItem(MY_BACKEND_STORAGE_KEY);
+    return stored && stored.trim() !== '' ? stored.trim().replace(/\/$/, '') : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Enregistre uniquement l'URL "mon serveur" sans modifier le backend courant.
+ * Utile quand on récupère "mon serveur" depuis la config cloud.
+ */
+export function setMyBackendUrl(url: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const normalized = url.trim().replace(/\/$/, '');
+    if (normalized) {
+      localStorage.setItem(MY_BACKEND_STORAGE_KEY, normalized);
+    }
+  } catch {
+    // ignore
   }
 }
 

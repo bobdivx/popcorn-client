@@ -446,7 +446,7 @@
   animation: shimmer 2s infinite;
 }
 
-/* Barre de chargement indéterminée (sync bibliothèque) — collée au header */
+/* Barre de chargement indéterminée (sync bibliothèque) — collée au bas du header (mêmes hauteurs que Navbar) */
 @keyframes library-sync-bar {
   0% {
     transform: translateX(-100%);
@@ -456,9 +456,36 @@
   }
 }
 
+/* Barre collée au bas du header : mêmes hauteurs que Navbar (h-14, sm:h-16, md:h-18, lg:h-20, tv:h-24) */
 .library-sync-bar-indeterminate {
-  position: relative;
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  height: 3px;
+  background: rgb(88 28 135 / 0.8); /* primary-900/80 */
   overflow: hidden;
+  top: calc(3.5rem + var(--safe-area-inset-top, 0px)); /* h-14 */
+}
+@media (min-width: 640px) {
+  .library-sync-bar-indeterminate {
+    top: calc(4rem + var(--safe-area-inset-top, 0px)); /* h-16 */
+  }
+}
+@media (min-width: 768px) {
+  .library-sync-bar-indeterminate {
+    top: calc(4.5rem + var(--safe-area-inset-top, 0px)); /* h-18 */
+  }
+}
+@media (min-width: 1024px) {
+  .library-sync-bar-indeterminate {
+    top: calc(5rem + var(--safe-area-inset-top, 0px)); /* h-20 */
+  }
+}
+@media (min-width: 1920px) {
+  .library-sync-bar-indeterminate {
+    top: calc(6rem + var(--safe-area-inset-top, 0px)); /* h-24 */
+  }
 }
 
 .library-sync-bar-indeterminate::after {

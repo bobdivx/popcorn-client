@@ -4,6 +4,8 @@ interface FocusableCardProps {
   children: preact.ComponentChildren;
   className?: string;
   onClick?: (e: MouseEvent | KeyboardEvent) => void;
+  onFocus?: (e: FocusEvent) => void;
+  onBlur?: (e: FocusEvent) => void;
   href?: string;
   tabIndex?: number;
 }
@@ -15,6 +17,8 @@ export function FocusableCard({
   children, 
   className = '', 
   onClick,
+  onFocus,
+  onBlur,
   href,
   tabIndex = 0 
 }: FocusableCardProps) {
@@ -37,15 +41,9 @@ export function FocusableCard({
       }
     };
 
-    // Gestion du focus avec scrollIntoView pour TV - carte centrée verticalement et horizontalement
+    // Gestion du focus pour TV - assurer visibilité et z-index
     const handleFocus = () => {
       if (element) {
-        element.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center',   // Ligne au centre de l'écran
-          inline: 'center'   // Carte au centre horizontalement
-        });
-        // Assurer que l'élément est toujours visible avec z-index
         element.style.zIndex = '10';
       }
     };
@@ -75,6 +73,8 @@ export function FocusableCard({
     tabIndex,
     role: href ? undefined : 'button',
     'aria-label': href ? undefined : 'Card cliquable',
+    onFocus,
+    onBlur,
   };
 
   if (href) {

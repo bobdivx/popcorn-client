@@ -41,6 +41,13 @@ export function useTorrentPlayer(options: UseTorrentPlayerOptions) {
   const queuedStartTimeRef = useRef<number | null>(null);
   const lastQueuedLogTimeRef = useRef<number | null>(null);
   const lastResumeAttemptRef = useRef<number | null>(null);
+  const lastTorrentStatsRef = useRef<{ state?: string; progress?: number } | null>(null);
+  useEffect(() => {
+    lastTorrentStatsRef.current = torrentStats
+      ? { state: torrentStats.state, progress: torrentStats.progress }
+      : null;
+  }, [torrentStats]);
+  const getCurrentTorrentStats = () => lastTorrentStatsRef.current;
 
   // Fonction pour arrêter le polling
   const stopProgressPolling = () => {
@@ -79,6 +86,7 @@ export function useTorrentPlayer(options: UseTorrentPlayerOptions) {
     lastQueuedLogTimeRef,
     lastResumeAttemptRef,
     setCountdownRemaining,
+    getCurrentTorrentStats,
   };
 
   // Créer la fonction de polling

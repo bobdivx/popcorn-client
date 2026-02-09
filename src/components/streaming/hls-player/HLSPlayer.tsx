@@ -11,6 +11,7 @@ import { usePlayerConfig } from './hooks/usePlayerConfig';
 import { shouldAutoFullscreen } from '../../../lib/utils/device-detection';
 import { SkipIntroOverlay } from './components/SkipIntroOverlay';
 import { NextEpisodeOverlay } from './components/NextEpisodeOverlay';
+import { useI18n } from '../../../lib/i18n';
 
 export default function HLSPlayer({ 
   src, 
@@ -19,17 +20,22 @@ export default function HLSPlayer({
   torrentName, 
   torrentId, 
   filePath, 
+  tmdbId,
+  tmdbType,
   startFromBeginning = false, 
   isSeries = false,
   nextEpisodeInfo = null,
   onPlayNextEpisode,
   onError, 
   onLoadingChange,
+  onBufferProgress,
   onClose 
 }: HLSPlayerProps) {
   const playerConfig = usePlayerConfig();
+  const { t } = useI18n();
   const canAutoPlayRef = useRef<(() => boolean) | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
   const hasAutoFullscreenedRef = useRef(false);
   const [hlsDuration, setHlsDuration] = useState<number | undefined>(undefined);
   const hlsDurationRef = useRef<number>(0);
@@ -46,6 +52,8 @@ export default function HLSPlayer({
     fileName,
     torrentId,
     filePath,
+    tmdbId,
+    tmdbType,
     startFromBeginning,
     onError,
     onLoadingChange,
@@ -77,6 +85,8 @@ export default function HLSPlayer({
     isPlaying,
     currentTime,
     duration,
+    bufferedPercent,
+    isSeeking,
     isMuted,
     volume,
     handlePlayPause,
@@ -85,6 +95,12 @@ export default function HLSPlayer({
     toggleMute,
     canAutoPlay,
   } = useVideoControls({ videoRef, hlsLoaded, hlsDuration });
+
+  useEffect(() => {
+    if (onBufferProgress) {
+      onBufferProgress(bufferedPercent);
+    }
+  }, [bufferedPercent, onBufferProgress]);
   
   useEffect(() => {
     canAutoPlayRef.current = canAutoPlay;
@@ -205,7 +221,7 @@ export default function HLSPlayer({
     };
   }, [videoRef, hlsLoaded, isFullscreen]);
 
-  const { isTV, focusedControlIndex, focusedOnProgress, hasBack } = useTVPlayerNavigation({
+  const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack } = useTVPlayerNavigation({
     showControls,
     setShowControls,
     onPlayPause: handlePlayPause,
@@ -216,9 +232,11 @@ export default function HLSPlayer({
     onClose,
     duration,
     currentTime,
+    progressBarRef,
   });
 
   const displayError = error;
+  const shouldShowBuffering = isLoading || (isSeeking && bufferedPercent < 100);
 
   if (displayError) {
     return <ErrorDisplay error={displayError} />;
@@ -249,7 +267,7 @@ export default function HLSPlayer({
           willChange: 'transform',
         }}
       >
-        {isLoading && (
+        {shouldShowBuffering && (
           <div class="absolute inset-0 flex flex-col items-center justify-center bg-black z-10">
             {/* Animation du logo Popcorn */}
             <div class="relative w-32 h-32 mb-6">
@@ -278,7 +296,11 @@ export default function HLSPlayer({
                 />
               </div>
             </div>
-            <p class="text-white/80 text-lg font-medium">Chargement de la vidéo...</p>
+            <p class="text-white/80 text-lg font-medium">
+              {bufferedPercent > 0
+                ? t('playback.bufferingProgress', { percent: Math.round(bufferedPercent) })
+                : t('playback.buffering')}
+            </p>
             {/* Points animés */}
             <div class="flex gap-1 mt-2">
               <span 
@@ -351,6 +373,8 @@ export default function HLSPlayer({
           isTV={isTV}
           focusedControlIndex={focusedControlIndex}
           focusedOnProgress={focusedOnProgress}
+          setFocusedOnProgress={setFocusedOnProgress}
+          progressBarRef={progressBarRef}
           hasBackButton={hasBack}
           onPlayPause={handlePlayPause}
           onSeek={baseHandleSeek}

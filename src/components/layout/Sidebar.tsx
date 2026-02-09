@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
-import { X, Home, Library, Download, Settings, Menu, Film, Tv } from 'lucide-preact';
+import { X, Home, Download, Settings, Menu, Film, Tv } from 'lucide-preact';
 import { serverApi } from '../../lib/client/server-api';
 import { getLocalProfile, onProfileChanged } from '../../lib/client/profile';
 import Avatar from '../ui/Avatar';
@@ -91,7 +91,6 @@ export default function Sidebar() {
     { href: '/dashboard', label: t('nav.home'), icon: Home, paths: ['/dashboard', '/torrents', '/films', '/series'] },
     { href: '/films', label: t('nav.films'), icon: Film, paths: ['/films'] },
     { href: '/series', label: t('nav.series'), icon: Tv, paths: ['/series'] },
-    { href: '/library', label: t('nav.library'), icon: Library, paths: ['/library'] },
     { href: '/downloads', label: t('nav.downloads'), icon: Download, paths: ['/downloads'] },
     { href: '/settings', label: t('nav.settings'), icon: Settings, paths: ['/settings'] },
   ];

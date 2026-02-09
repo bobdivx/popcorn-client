@@ -23,6 +23,9 @@ interface VideoPlayerWrapperProps {
   selectedFile?: TorrentFile;
   torrentName: string;
   torrentId?: string;
+  /** Pour sauvegarder la position par média (tmdb) dans le player */
+  tmdbId?: number;
+  tmdbType?: 'movie' | 'tv';
   startFromBeginning?: boolean;
   /** Contexte série : afficher « Passer le générique » et appliquer auto-skip si activé */
   isSeries?: boolean;
@@ -42,6 +45,8 @@ interface VideoPlayerWrapperProps {
   };
   /** En mode démo : URL directe du MP4 (ex. popcorn-web/public/media), pour lecture sans HLS. */
   directStreamUrl?: string | null;
+  /** Média partagé par un ami : URL du serveur ami pour le stream uniquement (on garde notre backend pour le reste). */
+  streamBackendUrl?: string | null;
 }
 
 export function VideoPlayerWrapper({ 
@@ -49,6 +54,8 @@ export function VideoPlayerWrapper({
   selectedFile, 
   torrentName, 
   torrentId, 
+  tmdbId,
+  tmdbType,
   startFromBeginning = false, 
   isSeries = false,
   nextEpisodeInfo,
@@ -58,7 +65,9 @@ export function VideoPlayerWrapper({
   wrapperRef,
   quality,
   directStreamUrl,
+  streamBackendUrl,
 }: VideoPlayerWrapperProps) {
+  const baseUrl = streamBackendUrl?.trim() || serverApi.getServerUrl();
   const [isLoading, setIsLoading] = useState(true);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [showIntro, setShowIntro] = useState(false);
@@ -144,9 +153,7 @@ export function VideoPlayerWrapper({
     const loadHlsUrl = async () => {
       try {
         setIsLoading(true);
-        // Utiliser l'URL HLS du backend au lieu d'une Blob URL
-        const baseUrl = serverApi.getServerUrl();
-        
+        // Utiliser l'URL HLS du backend (ou streamBackendUrl pour un média partagé par un ami)
         // Utiliser le chemin du fichier (path) si disponible, sinon le nom
         // Le path contient le chemin relatif dans le torrent tel que retourné par le backend
         const filePath = selectedFile.path || selectedFile.name;
@@ -212,12 +219,11 @@ export function VideoPlayerWrapper({
     };
 
     loadHlsUrl();
-  }, [selectedFile, infoHash, directStreamUrl]);
+  }, [selectedFile, infoHash, directStreamUrl, baseUrl]);
 
   useEffect(() => {
     let mounted = true;
-    const serverUrl = serverApi.getServerUrl();
-    getPublicAdsSettings(serverUrl)
+    getPublicAdsSettings(baseUrl)
       .then((cfg) => {
         if (mounted) setAdsConfig(cfg);
       })
@@ -225,7 +231,7 @@ export function VideoPlayerWrapper({
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [baseUrl]);
 
   useEffect(() => {
     if (directStreamUrl) return; // Lecture directe MP4 (démo), pas de HLS
@@ -234,7 +240,6 @@ export function VideoPlayerWrapper({
 
     const preloadHls = () => {
       try {
-        const baseUrl = serverApi.getServerUrl();
         const normalizedPath = hlsFilePath.replace(/\\/g, '/');
         const encodedPath = encodeURIComponent(normalizedPath);
         const hlsUrl = `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8?info_hash=${encodeURIComponent(infoHash)}`;
@@ -286,7 +291,7 @@ export function VideoPlayerWrapper({
         preloadVideoRef.current = null;
       }
     };
-  }, [showPreroll, showIntro, hlsLoaded, infoHash, hlsFilePath, directStreamUrl]);
+  }, [showPreroll, showIntro, hlsLoaded, infoHash, hlsFilePath, directStreamUrl, baseUrl]);
 
   useEffect(() => {
     if (!adsConfig || !selectedFile || !infoHash) return;
@@ -516,6 +521,8 @@ export function VideoPlayerWrapper({
               torrentName={torrentName || selectedFile!.name}
               torrentId={torrentId}
               filePath={selectedFile!.path || selectedFile!.name}
+              tmdbId={tmdbId}
+              tmdbType={tmdbType}
               startFromBeginning={startFromBeginning}
               isSeries={isSeries}
               nextEpisodeInfo={nextEpisodeInfo}

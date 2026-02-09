@@ -58,6 +58,8 @@ export interface PollingContext {
   lastResumeAttemptRef: { current: number | null };
   /** Déclenche le compte à rebours (3s) avant lancement auto à la fin du téléchargement. */
   setCountdownRemaining: (value: number | null) => void;
+  /** Dernière valeur des stats (pour ne pas écraser queued/downloading par unknown/0 dans le polling). */
+  getCurrentTorrentStats: () => { state?: string; progress?: number } | null;
 }
 
 export interface PlayHandlerContext {

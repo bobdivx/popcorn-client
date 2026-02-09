@@ -135,6 +135,23 @@ export function useVideoFiles({ torrentName, onError, filePath, torrent }: UseVi
         const torrentStats = await clientApi.getTorrent(infoHash);
         if (!torrentStats) {
           console.warn('[useVideoFiles] ⚠️ Torrent non trouvé dans le backend');
+          // Si on a un chemin bibliothèque (fichier sur disque sans torrent dans le client), l'utiliser pour lire
+          if (torrent?.downloadPath) {
+            console.log('[useVideoFiles] 📁 Utilisation du chemin bibliothèque (torrent absent du client):', torrent.downloadPath);
+            const fileName = torrentName || torrent.downloadPath.split(/[/\\]/).pop() || 'video';
+            const libraryFile: TorrentFile = {
+              path: torrent.downloadPath,
+              name: fileName,
+              size: 0,
+              is_video: true,
+            };
+            const files = [libraryFile];
+            filesCacheRef.current.set(infoHash, files);
+            setVideoFiles(files);
+            setSelectedFile(files[0]);
+            setLoadingFiles(false);
+            return files;
+          }
           if (retryCount < 5) {
             // Réessayer après 1 seconde
             await new Promise(resolve => setTimeout(resolve, 1000));

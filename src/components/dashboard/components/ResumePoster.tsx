@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { Play, Info } from 'lucide-preact';
 import type { ContentItem } from '../../../lib/client/types';
 import { FocusableCard } from '../../ui/FocusableCard';
@@ -9,8 +9,8 @@ interface ResumePosterProps {
 
 export function ResumePoster({ item }: ResumePosterProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(item.poster || null);
-  const fetchedRef = useRef(false);
 
   useEffect(() => {
     if (item.poster && item.poster !== imageUrl) {
@@ -27,6 +27,7 @@ export function ResumePoster({ item }: ResumePosterProps) {
   };
 
   const progress = item.progress || 0;
+  const showOverlay = isHovered || isFocused;
 
   return (
     <div
@@ -39,8 +40,16 @@ export function ResumePoster({ item }: ResumePosterProps) {
         onClick={handleClick}
         href={`/player/${item.id}`}
         tabIndex={0}
+        onFocus={() => {
+          setIsFocused(true);
+          setIsHovered(true);
+        }}
+        onBlur={() => {
+          setIsFocused(false);
+          setIsHovered(false);
+        }}
       >
-        <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-lg rounded-lg transform transition-all duration-300 hover:scale-105 hover:shadow-primary focus-within:scale-105 focus-within:shadow-primary-lg focus-within:ring-4 focus-within:ring-primary-600 focus-within:ring-opacity-60">
+        <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-lg rounded-lg transform transition-all duration-200 ease-out hover:scale-[1.03] hover:shadow-primary focus-within:shadow-primary-lg will-change-transform">
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -77,8 +86,8 @@ export function ResumePoster({ item }: ResumePosterProps) {
         </div>
 
         {/* Icônes d'action au survol */}
-        {isHovered && (
-          <div className="absolute top-2 right-2 lg:top-3 lg:right-3 tv:top-4 tv:right-4 z-20 flex gap-2 tv:gap-3 pointer-events-auto">
+        {showOverlay && (
+          <div className="absolute bottom-2 right-2 lg:bottom-3 lg:right-3 tv:bottom-4 tv:right-4 z-20 flex gap-2 tv:gap-3 pointer-events-auto">
             {/* Icône lecture */}
             <button
               className="w-9 h-9 lg:w-11 lg:h-11 tv:w-16 tv:h-16 bg-primary/95 hover:bg-primary-500 rounded-full flex items-center justify-center transition-all backdrop-blur-sm shadow-primary hover:scale-110 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[36px] tv:min-h-[64px] glass-panel"
@@ -106,8 +115,8 @@ export function ResumePoster({ item }: ResumePosterProps) {
         )}
 
         {/* Overlay au survol */}
-        {isHovered && (
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent flex flex-col justify-end p-3 lg:p-4 tv:p-6 transition-opacity pointer-events-none">
+        {showOverlay && (
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent flex flex-col justify-end p-3 lg:p-4 tv:p-6 pb-10 lg:pb-12 tv:pb-16 transition-opacity pointer-events-none">
             <div className="space-y-1.5 lg:space-y-2 tv:space-y-3">
               <h3 className="text-white font-semibold text-sm lg:text-base tv:text-lg line-clamp-1">
                 {item.title}

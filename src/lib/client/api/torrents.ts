@@ -35,6 +35,21 @@ export class TorrentsService {
   }
 
   /**
+   * Liste des torrents enrichie avec poster/titre TMDB (get_media_for_download).
+   * À utiliser pour la page /downloads pour afficher immédiatement poster et nom du média.
+   */
+  async listTorrentsEnriched(): Promise<ClientTorrentStats[]> {
+    try {
+      const url = await this.getRequestUrl('torrents/enriched');
+      const response = await fetch(url);
+      const data = await handleResponse<ClientTorrentStats[]>(response);
+      return data.data || [];
+    } catch (error) {
+      throw handleError(error);
+    }
+  }
+
+  /**
    * Récupérer les statistiques d'un torrent spécifique
    * 
    * Note: Cette méthode peut générer des erreurs 404 dans la console du navigateur
@@ -489,6 +504,33 @@ export class TorrentsService {
     });
 
     await handleResponse<void>(response);
+  }
+
+  /**
+   * Lie un téléchargement (info_hash) à un média TMDB pour l'affichage library/téléchargements.
+   * À appeler après addTorrentFile/addMagnetLink quand le contexte a tmdbId/tmdbType (ex. page détail).
+   * Erreurs (ex. 404 si média pas encore en base) sont ignorées pour ne pas bloquer l'UX.
+   */
+  async bindDownloadToMedia(
+    infoHash: string,
+    tmdbId: number,
+    tmdbType: 'movie' | 'tv'
+  ): Promise<void> {
+    try {
+      const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/bind`);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tmdb_id: tmdbId, tmdb_type: tmdbType }),
+      });
+      if (!response.ok) {
+        // 404 = média pas encore synchronisé, on ignore
+        return;
+      }
+      await handleResponse<void>(response);
+    } catch {
+      // Ne pas bloquer l'UX
+    }
   }
 
   /**

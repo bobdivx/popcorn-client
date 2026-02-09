@@ -35,6 +35,7 @@
     "serie": "Series",
     "content": "Content",
     "download": "Download",
+    "torrents": "Torrents",
     "details": "Details",
     "other": "Other",
     "others": "Others",
@@ -430,7 +431,9 @@
     "torrentsRecentLimitDescription": "Number of items in the recent additions section (20-200)"
   },
   "playback": {
-    "nextEpisode": "Next episode"
+    "nextEpisode": "Next episode",
+    "buffering": "Buffering…",
+    "bufferingProgress": "Buffering {percent}%"
   },
   "nav": {
     "menu": "Menu",
@@ -535,7 +538,20 @@
     "others": "Others",
     "sharedBy": "Shared by {name}",
     "downloadingSection": "Downloading",
-    "downloadingBadge": "Downloading"
+    "downloadingBadge": "Downloading",
+    "badgePopcorn": "Popconn",
+    "badgeLocal": "Local",
+    "badgeExternalLibrary": "External library",
+    "badgeSharedByFriend": "Shared by a friend",
+    "filterAll": "All",
+    "filterFilms": "Movies",
+    "filterSeries": "Series",
+    "filterSourceAll": "All sources",
+    "filterSourcePopcorn": "Popconn",
+    "filterSourceExternal": "External library",
+    "filterSourceShared": "Shared",
+    "filterSourceLocal": "Local",
+    "genreOther": "Other"
   },
   "torrentStats": {
     "downloading": "Downloading",
@@ -603,7 +619,9 @@
     "actions": "Actions",
     "progress": "Progress",
     "private": "Private",
-    "statusReason": "Detailed status"
+    "statusReason": "Detailed status",
+    "notLinkedToTmdb": "Not linked to a media (manual add or not synced yet)",
+    "notLinkedToTmdbShort": "Not linked"
   },
   "settingsMenu": {
     "title": "Settings",
@@ -612,6 +630,7 @@
       "system": "System & Configuration",
       "interface": "Interface",
       "content": "Indexers & Downloads",
+      "library": "Library",
       "discovery": "Discovery & Requests",
       "account": "Account & Users",
       "playback": "Playback"
@@ -671,6 +690,51 @@
     "librqbitWeb": {
       "title": "librqbit Web interface",
       "description": "Open the torrent client web interface in a new tab"
+    },
+    "mediaPaths": {
+      "title": "Media folders",
+      "description": "Set download folders by type (movies, series), like Jellyfin"
+    },
+    "mediaPathsPanel": {
+      "intro": "Choose the folder where downloads are saved for each type. Paths are relative to the server root.",
+      "filmsPath": "Movies folder",
+      "seriesPath": "Series folder",
+      "browse": "Browse",
+      "chooseFolder": "Choose this folder",
+      "loading": "Loading…",
+      "saveSuccess": "Paths saved (backend and cloud).",
+      "saveError": "Error saving.",
+      "browseTitle": "Select a folder",
+      "noSubfolders": "No subfolders."
+    },
+    "librarySources": {
+      "title": "External folders (library)",
+      "description": "Add folders outside the server (e.g. another NAS) to include in the library"
+    },
+    "librarySourcesPanel": {
+      "intro": "Add folders containing movies or series (e.g. on another NAS). After validation, a scan and TMDB enrichment will run.",
+      "pathPlaceholder": "e.g. \\\\zimacube.local\\Movies or smb://zimacube.local/Movies",
+      "pathFormatTitle": "Which format to use?",
+      "pathFormatWindows": "Windows (Explorer): open the folder in Explorer, then copy the path from the address bar → \\\\computer\\share\\folder",
+      "pathFormatMac": "macOS (Finder): Go → Connect to Server, enter the server address → smb://computer/share/folder",
+      "pathFormatNote": "The path must be accessible from the machine running the server (on Linux, use the mount point, e.g. /mnt/nas/Movies).",
+      "category": "Content type",
+      "categoryFilm": "Movies",
+      "categorySeries": "Series",
+      "labelOptional": "Label (optional)",
+      "shareWithFriends": "Share with friends",
+      "addSource": "Add folder",
+      "scan": "Run scan",
+      "syncing": "Syncing…",
+      "synchronized": "Synchronized",
+      "delete": "Delete",
+      "loading": "Loading…",
+      "addSuccess": "Folder added. Scan running in background.",
+      "addError": "Could not add folder.",
+      "scanStarted": "Scan started.",
+      "deleteSuccess": "Source removed.",
+      "noSources": "No external folders. Add a path (movies or series) to include it in the library.",
+      "stats": "{mediaCount} media, {folderCount} folders"
     },
     "versions": {
       "title": "Versions",
@@ -1030,6 +1094,7 @@
     "startSync": "Start synchronization",
     "configureIndexers": "Configure indexers",
     "goToSyncSettings": "Go to synchronization settings →",
+    "configureTmdbKey": "Configure TMDB key",
     "syncInfo": "Synchronization retrieves torrents from your configured indexers and enriches them with TMDB metadata.",
     "noIndexerActivated": "No indexer activated. Please configure at least one indexer in settings.",
     "tmdbTokenMissing": "TMDB token missing. Please configure your TMDB token in settings.",
@@ -1375,7 +1440,15 @@
     "checkBackendLogs": "Check backend logs or test indexers individually.",
     "processingInProgress": "Processing in progress",
     "torrentsFetchedEnriching": "{count} torrent(s) fetched, enriching and inserting into database.",
-    "bruts": "raw"
+    "bruts": "raw",
+    "fetchedFromIndexers": "fetched (indexers)",
+    "inDatabase": "in database",
+    "fetchThenEnrich": "Fetched from indexers → TMDB enrichment → inserted into database.",
+    "enrichingInProgress": "Enrichment in progress…",
+    "phaseFetch": "Phase 1 — Fetching",
+    "phaseFetchExplanation": "RSS pages are being fetched. No items in database yet: TMDB enrichment and insertion will start once fetching is complete.",
+    "phaseEnrich": "Phase 2 — Enrichment and insertion",
+    "phaseEnrichProgress": "{current} / {total} processed"
   },
   "backendDiagnostics": {
     "title": "Network Diagnostics (Android/Desktop)",

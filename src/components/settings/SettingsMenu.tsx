@@ -5,10 +5,12 @@ import {
   Globe,
   UserCircle,
   Play,
+  Library,
 } from 'lucide-preact';
 import SystemSubMenuPanel from './SystemSubMenuPanel';
 import InterfaceSubMenuPanel from './InterfaceSubMenuPanel';
 import ContentSubMenuPanel from './ContentSubMenuPanel';
+import LibrarySubMenuPanel from './LibrarySubMenuPanel';
 import DiscoverySubMenuPanel from './DiscoverySubMenuPanel';
 import AccountSubMenuPanel from './AccountSubMenuPanel';
 import PlaybackSettingsPanel from './PlaybackSettingsPanel';
@@ -17,7 +19,7 @@ import { useState, useMemo, useEffect } from 'preact/hooks';
 import type { ComponentType } from 'preact';
 import { canAccess } from '../../lib/permissions';
 
-type CategoryId = 'system' | 'interface' | 'content' | 'discovery' | 'account' | 'playback';
+type CategoryId = 'system' | 'interface' | 'content' | 'library' | 'discovery' | 'account' | 'playback';
 
 interface SettingsItem {
   id: string;
@@ -47,12 +49,13 @@ const CATEGORY_ICONS: Record<CategoryId, any> = {
   system: Monitor,
   interface: Palette,
   content: LayoutGrid,
+  library: Library,
   discovery: Globe,
   account: UserCircle,
   playback: Play,
 };
 
-const VALID_CATEGORIES: CategoryId[] = ['system', 'interface', 'content', 'discovery', 'account', 'playback'];
+const VALID_CATEGORIES: CategoryId[] = ['system', 'interface', 'content', 'library', 'discovery', 'account', 'playback'];
 
 function getInitialCategory(): CategoryId {
   if (typeof window === 'undefined') return 'system';
@@ -99,6 +102,14 @@ export default function SettingsMenu() {
         items: [],
         inlineContent: ContentSubMenuPanel,
         inlinePermissions: ['settings.indexers', 'settings.sync', 'settings.server'],
+      },
+      {
+        id: 'library',
+        labelKey: 'settingsMenu.category.library',
+        icon: CATEGORY_ICONS.library,
+        items: [],
+        inlineContent: LibrarySubMenuPanel,
+        inlinePermissions: ['settings.server', 'settings.friends'],
       },
       {
         id: 'discovery',

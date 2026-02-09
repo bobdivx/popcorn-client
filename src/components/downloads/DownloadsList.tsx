@@ -31,6 +31,40 @@ function buildImageMapFromList(data: { data?: Array<Record<string, unknown>> }):
   return map;
 }
 
+/** Construit une map info_hash -> { posterUrl, backdropUrl, title } depuis /library */
+function buildImageMapFromLibrary(
+  data: { data?: Array<Record<string, unknown>> }
+): {
+  images: Record<string, { posterUrl: string | null; backdropUrl: string | null }>;
+  titles: Record<string, string>;
+} {
+  const images: Record<string, { posterUrl: string | null; backdropUrl: string | null }> = {};
+  const titles: Record<string, string> = {};
+  if (!data?.data || !Array.isArray(data.data)) return { images, titles };
+  for (const item of data.data) {
+    const hash = (item.info_hash ?? item.infoHash) as string | undefined;
+    if (!hash || typeof hash !== 'string') continue;
+    const key = hash.toLowerCase();
+    const image = (item.poster_url ?? item.poster ?? item.image_url ?? item.imageUrl) as
+      | string
+      | undefined;
+    const backdrop = (item.hero_image_url ??
+      item.heroImageUrl ??
+      item.backdrop ??
+      item.backdrop_url) as string | undefined;
+    const posterUrl = image && typeof image === 'string' && image.length > 0 ? image : null;
+    const backdropUrl = backdrop && typeof backdrop === 'string' && backdrop.length > 0 ? backdrop : null;
+    const title = (item.tmdb_title ?? item.title ?? item.name) as string | undefined;
+    if (posterUrl || backdropUrl) {
+      images[key] = { posterUrl, backdropUrl };
+    }
+    if (title && typeof title === 'string' && title.trim()) {
+      titles[key] = title;
+    }
+  }
+  return { images, titles };
+}
+
 /**
  * Filtre et nettoie les logs pour éliminer les répétitions tout en gardant les informations importantes
  * Amélioration : groupe les messages similaires pour réduire les répétitions
@@ -197,12 +231,41 @@ export default function DownloadsList() {
     setSelectedTorrentBackdrop(null);
   }, []);
 
+  const initialLoadDoneRef = useRef(false);
+
   const loadTorrents = useCallback(async () => {
+    const isInitial = !initialLoadDoneRef.current;
     try {
-      const list = await clientApi.listTorrents();
-      setTorrents(list);
-      setError(null);
+      if (isInitial) {
+        const list = await clientApi.listTorrentsEnriched();
+        setTorrents(list);
+        setError(null);
+        const images: Record<string, { posterUrl: string | null; backdropUrl: string | null }> = {};
+        const titles: Record<string, string> = {};
+        for (const t of list) {
+          const key = t.info_hash.toLowerCase();
+          if (t.poster_url || t.hero_image_url) {
+            images[key] = {
+              posterUrl: t.poster_url ?? null,
+              backdropUrl: t.hero_image_url ?? null,
+            };
+          }
+          if (t.tmdb_title && t.tmdb_title.trim()) {
+            titles[key] = t.tmdb_title.trim();
+          }
+        }
+        setImageMap((prev) => ({ ...prev, ...images }));
+        setDisplayTitleMap((prev) => ({ ...prev, ...titles }));
+        initialLoadDoneRef.current = true;
+      } else {
+        const list = await clientApi.listTorrents();
+        setTorrents(list);
+        setError(null);
+      }
     } catch (err) {
+      if (isInitial) {
+        initialLoadDoneRef.current = true;
+      }
       console.error('Erreur lors du chargement des téléchargements:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
@@ -262,6 +325,26 @@ export default function DownloadsList() {
         setImageMap((prev) => ({ ...prev, ...map }));
       } catch {
         // Échec silencieux : CORS ou API indisponible
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [torrents.length, torrents.map((t) => t.info_hash).join(',')]);
+
+  // Fallback via /library pour récupérer les posters TMDB déjà en DB
+  useEffect(() => {
+    if (torrents.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { serverApi } = await import('../../lib/client/server-api');
+        const response = await serverApi.getLibrary();
+        if (cancelled || !response?.success || !Array.isArray(response.data)) return;
+        const { images, titles } = buildImageMapFromLibrary(response as { data?: Array<Record<string, unknown>> });
+        if (cancelled) return;
+        setImageMap((prev) => ({ ...prev, ...images }));
+        setDisplayTitleMap((prev) => ({ ...prev, ...titles }));
+      } catch {
+        // Échec silencieux
       }
     })();
     return () => { cancelled = true; };

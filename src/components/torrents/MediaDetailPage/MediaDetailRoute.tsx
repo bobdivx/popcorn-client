@@ -35,10 +35,17 @@ function getTitleFromLocation(): string | null {
   return new URLSearchParams(window.location.search).get('title');
 }
 
+/** Lit le paramètre `from` dans l'URL (ex. ?from=library). */
+function getFromFromLocation(): string | null {
+  if (typeof window === 'undefined') return null;
+  const from = new URLSearchParams(window.location.search).get('from');
+  return from ? from.toLowerCase() : null;
+}
+
 /** Lit le paramètre `from` et retourne l’URL de retour (ex. /library, /dashboard). */
 function getBackHrefFromLocation(): string | null {
   if (typeof window === 'undefined') return null;
-  const from = new URLSearchParams(window.location.search).get('from');
+  const from = getFromFromLocation();
   if (!from) return null;
   const map: Record<string, string> = {
     library: '/library',
@@ -48,6 +55,25 @@ function getBackHrefFromLocation(): string | null {
     search: '/search',
   };
   return map[from] ?? null;
+}
+
+/** Lit le paramètre streamBackendUrl (média partagé par un ami : streamer depuis son serveur sans changer notre backend). */
+function getStreamBackendUrlFromLocation(): string | null {
+  if (typeof window === 'undefined') return null;
+  const v = new URLSearchParams(window.location.search).get('streamBackendUrl');
+  return v && v.trim() ? v.trim().replace(/\/$/, '') : null;
+}
+
+function getStreamInfoHashFromLocation(): string | null {
+  if (typeof window === 'undefined') return null;
+  const v = new URLSearchParams(window.location.search).get('infoHash');
+  return v && v.trim() ? v.trim() : null;
+}
+
+function getStreamPathFromLocation(): string | null {
+  if (typeof window === 'undefined') return null;
+  const v = new URLSearchParams(window.location.search).get('streamPath');
+  return v ? decodeURIComponent(v) : null;
 }
 
 function normalizeSeedCount(t: any): number {
@@ -272,6 +298,49 @@ export default function MediaDetailRoute() {
     setEmptyGroupMainTitle(null);
 
     async function load() {
+      const streamBackendUrl = getStreamBackendUrlFromLocation();
+      const streamInfoHash = getStreamInfoHashFromLocation();
+      const streamPath = getStreamPathFromLocation();
+      const streamTitle = getTitleFromLocation();
+
+      // Média partagé par un ami : on a tout dans l'URL, pas besoin d'appeler notre backend
+      if (streamBackendUrl && (streamInfoHash || streamPath)) {
+        const sharedTorrent: Torrent = {
+          id: streamInfoHash || `shared_${streamPath?.replace(/[/\\]/g, '_') || 'unknown'}`,
+          slug: null,
+          infoHash: streamInfoHash || null,
+          name: streamTitle || 'Média partagé',
+          cleanTitle: streamTitle || null,
+          description: null,
+          category: null,
+          imageUrl: null,
+          heroImageUrl: null,
+          trailerKey: null,
+          fileSize: 0,
+          seedCount: 0,
+          leechCount: 0,
+          _externalLink: null,
+          _externalMagnetUri: null,
+          _guid: null,
+          indexerId: null,
+          indexerName: null,
+          quality: null,
+          synopsis: null,
+          releaseDate: null,
+          genres: null,
+          voteAverage: null,
+          runtime: null,
+          tmdbId: tmdbId ?? null,
+          tmdbType: null,
+          downloadPath: streamPath || null,
+        };
+        if (!cancelled) {
+          setTorrent(sharedTorrent);
+          setLoading(false);
+        }
+        return;
+      }
+
       if (!contentId && !tmdbId) {
         setLoading(false);
         setError('Aucun contenu spécifié');
@@ -391,7 +460,7 @@ export default function MediaDetailRoute() {
             return;
           }
 
-          // Fallback : série peut être dans la bibliothèque (fichiers locaux) sans être dans le groupe indexé
+          // Fallback : média (série ou film) peut être dans la bibliothèque (fichiers locaux / NAS) sans être dans le groupe indexé
           const libraryResponse = await serverApi.getLibrary();
           if (libraryResponse.success && libraryResponse.data && !cancelled) {
             const libraryItems = Array.isArray(libraryResponse.data) ? libraryResponse.data : [];
@@ -416,6 +485,22 @@ export default function MediaDetailRoute() {
               } catch (_e) {
                 setSeriesEpisodes(null);
               }
+              setLoading(false);
+              return;
+            }
+            // Film(s) en bibliothèque (dossier local / NAS) pour ce tmdbId
+            const moviesInLibrary = libraryItems.filter(
+              (item: any) =>
+                item.tmdb_id === tmdbId &&
+                (item.tmdb_type === 'movie' || item.category === 'MOVIE') &&
+                item.exists
+            );
+            if (moviesInLibrary.length > 0) {
+              const withPoster = moviesInLibrary.find((i: any) => i.poster_url || i.hero_image_url);
+              const main = withPoster ?? moviesInLibrary[0];
+              const variants = moviesInLibrary.map((i: any) => libraryItemToTorrent(i));
+              setTorrent(libraryItemToTorrent(main));
+              setInitialVariants(variants);
               setLoading(false);
               return;
             }
@@ -630,11 +715,14 @@ export default function MediaDetailRoute() {
   }
 
   if (!torrent) return null;
-  const initialTorrentStats: ClientTorrentStats | null =
-    contentId && torrent.infoHash && contentId.toLowerCase().trim() === torrent.infoHash.toLowerCase().trim()
-      ? (getDownloadClientStats(contentId) as ClientTorrentStats | null)
-      : null;
+  // Récupérer les stats client (progression, partage) dès qu'on a un info_hash, pour afficher
+  // le statut de téléchargement et "en partage" que l'on ouvre la page depuis Téléchargements
+  // (infoHash dans l'URL) ou depuis la Bibliothèque (slug dans l'URL, mais torrent.infoHash connu).
+  const initialTorrentStats: ClientTorrentStats | null = torrent.infoHash
+    ? (getDownloadClientStats(torrent.infoHash) as ClientTorrentStats | null)
+    : null;
   const backHref = getBackHrefFromLocation();
+  const streamBackendUrl = getStreamBackendUrlFromLocation();
   return (
     <MediaDetailPage
       torrent={torrent}
@@ -642,6 +730,7 @@ export default function MediaDetailRoute() {
       seriesEpisodes={seriesEpisodes ?? undefined}
       initialTorrentStats={initialTorrentStats ?? undefined}
       backHref={backHref ?? undefined}
+      streamBackendUrl={streamBackendUrl ?? undefined}
     />
   );
 }

@@ -572,9 +572,10 @@ export default function Wizard() {
                           const { isTmdbKeyMaskedOrInvalid } = await import('../../lib/utils/tmdb-key');
                           const { saveUserConfigMerge } = await import('../../lib/api/popcorn-web');
 
+                          // getTmdbKeyExport pour obtenir la clé réelle (getTmdbKey renvoie une clé masquée)
                           const [indexersRes, tmdbRes, syncRes] = await Promise.all([
                             serverApi.getIndexers(),
-                            serverApi.getTmdbKey(),
+                            serverApi.getTmdbKeyExport(),
                             serverApi.getSyncSettings(),
                           ]);
 

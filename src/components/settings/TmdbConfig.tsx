@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
+import { getUserConfig } from '../../lib/api/popcorn-web';
+import { isTmdbKeyMaskedOrInvalid } from '../../lib/utils/tmdb-key';
 
 export default function TmdbConfig() {
   const [tmdbKey, setTmdbKey] = useState('');
@@ -8,6 +10,7 @@ export default function TmdbConfig() {
   const [tmdbTesting, setTmdbTesting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const cloudFallbackDone = useRef(false);
 
   useEffect(() => {
     loadTmdbKey();
@@ -17,15 +20,31 @@ export default function TmdbConfig() {
     try {
       setTmdbLoading(true);
       const response = await serverApi.getTmdbKey();
-      
+
       if (response.success && response.data) {
         const hasKey = response.data.hasKey === true || (response.data as any).hasKey === 1;
         setTmdbHasKey(hasKey);
-        
+
         if (hasKey) {
           setTmdbKey('••••••••••••••••••••••••');
         } else {
           setTmdbKey('');
+          // Fallback: si le backend n'a pas de clé, tenter une fois de récupérer depuis le cloud (après reset / import)
+          if (!cloudFallbackDone.current) {
+            cloudFallbackDone.current = true;
+            try {
+              const cloudConfig = await getUserConfig();
+              if (cloudConfig?.tmdbApiKey && !isTmdbKeyMaskedOrInvalid(cloudConfig.tmdbApiKey)) {
+                const res = await serverApi.saveTmdbKey(cloudConfig.tmdbApiKey.trim().replace(/\s+/g, ''));
+                if (res.success) {
+                  await loadTmdbKey();
+                  return;
+                }
+              }
+            } catch {
+              // Ignorer (pas de token cloud ou erreur réseau)
+            }
+          }
         }
       } else {
         setTmdbHasKey(false);

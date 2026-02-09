@@ -15,13 +15,14 @@ interface SearchResultPosterProps {
   onClick?: (result: SearchResult) => void;
 }
 
-/** URL de détail : Discover si pas de torrent (id tmdb-xxx), sinon page torrents */
+/** URL de détail : priorité TMDB (tmdbId + type), fallback slug. Discover si pas de torrent (id tmdb-xxx). */
 function getDetailUrl(result: SearchResult): string {
   if (result.id?.startsWith('tmdb-') && result.tmdbId != null) {
     return `/discover?tmdbId=${result.tmdbId}&type=${result.type}`;
   }
   if (result.tmdbId != null) {
-    return `/torrents?tmdbId=${result.tmdbId}&title=${encodeURIComponent(result.title)}&from=search`;
+    const typeParam = result.type === 'tv' ? 'tv' : 'movie';
+    return `/torrents?tmdbId=${result.tmdbId}&type=${typeParam}&from=search${result.title ? `&title=${encodeURIComponent(result.title)}` : ''}`;
   }
   return `/torrents?slug=${encodeURIComponent(result.id)}&from=search`;
 }
@@ -38,8 +39,10 @@ function getRequestUrl(result: SearchResult): string | null {
 function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
   const { t } = useI18n();
   const [isHovered, setIsHovered] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(result.poster || null);
   const detailUrl = getDetailUrl(result);
+  const showOverlay = isHovered || isFocused;
 
   useEffect(() => {
     if (result.poster && result.poster !== imageUrl) {
@@ -70,8 +73,16 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
         onClick={handleClick}
         href={detailUrl}
         tabIndex={0}
+        onFocus={() => {
+          setIsFocused(true);
+          setIsHovered(true);
+        }}
+        onBlur={() => {
+          setIsFocused(false);
+          setIsHovered(false);
+        }}
       >
-          <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-lg rounded-lg transform transition-all duration-300 hover:scale-105 hover:shadow-primary focus-within:scale-105 focus-within:shadow-primary-lg focus-within:ring-4 focus-within:ring-primary-600 focus-within:ring-opacity-60">
+          <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-lg rounded-lg transform transition-all duration-200 ease-out hover:scale-[1.03] hover:shadow-primary focus-within:shadow-primary-lg will-change-transform">
           {imageUrl ? (
             <img
               src={imageUrl}
@@ -104,9 +115,9 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
           </div>
 
           {/* Overlay au survol */}
-          {isHovered && (
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent flex flex-col justify-end p-3 lg:p-4 tv:p-6 transition-opacity">
-              <div className="space-y-1.5 lg:space-y-2 tv:space-y-3 pointer-events-none">
+          {showOverlay && (
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent flex flex-col justify-end p-3 lg:p-4 tv:p-6 pb-10 lg:pb-12 tv:pb-16 transition-opacity pointer-events-none">
+              <div className="space-y-1.5 lg:space-y-2 tv:space-y-3">
                 <h3 className="text-white font-semibold text-sm lg:text-base tv:text-lg line-clamp-1">
                   {result.title}
                 </h3>
@@ -125,16 +136,17 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
                   </p>
                 )}
               </div>
-              {getRequestUrl(result) && (
-                <a
-                  href={getRequestUrl(result)!}
-                  onClick={(e) => e.stopPropagation()}
-                  className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-600 text-white text-xs font-medium pointer-events-auto transition-colors"
-                >
-                  {t('requests.requestMedia')}
-                </a>
-              )}
             </div>
+          )}
+
+          {showOverlay && getRequestUrl(result) && (
+            <a
+              href={getRequestUrl(result)!}
+              onClick={(e) => e.stopPropagation()}
+              className="absolute bottom-2 left-2 lg:bottom-3 lg:left-3 tv:bottom-4 tv:left-4 z-20 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-600 text-white text-xs font-medium pointer-events-auto transition-colors"
+            >
+              {t('requests.requestMedia')}
+            </a>
           )}
         </div>
       </FocusableCard>

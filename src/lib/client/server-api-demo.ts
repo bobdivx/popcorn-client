@@ -319,6 +319,25 @@ export function createDemoServerApi(): Record<string, unknown> {
     async getClientTorrentConfig(): Promise<ApiResponse<unknown>> {
       return success({});
     },
+    async getMediaPaths(): Promise<ApiResponse<{ download_dir_root: string; films_path: string | null; series_path: string | null; default_path: string | null; films_root: string; series_root: string }>> {
+      return success({
+        download_dir_root: '/data/downloads',
+        films_path: 'media/films',
+        series_path: 'media/series',
+        default_path: null,
+        films_root: '/data/downloads/media/films',
+        series_root: '/data/downloads/media/series',
+      });
+    },
+    async putMediaPaths(): Promise<ApiResponse<{ download_dir_root: string; films_path: string | null; series_path: string | null; default_path: string | null; films_root: string; series_root: string }>> {
+      return this.getMediaPaths!();
+    },
+    async listExplorerFiles(): Promise<ApiResponse<Array<{ name: string; path: string; is_directory: boolean; size?: number; modified?: number }>>> {
+      return success([
+        { name: 'media', path: 'media', is_directory: true },
+        { name: 'downloads', path: 'downloads', is_directory: true },
+      ]);
+    },
 
     async getTorrentGroup(): Promise<ApiResponse<unknown>> {
       return success({

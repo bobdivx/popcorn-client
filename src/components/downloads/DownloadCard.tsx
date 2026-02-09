@@ -204,11 +204,12 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
               }}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900 relative z-10">
-              <div className="text-center p-4">
-                <Film className="w-12 h-12 mb-2 text-gray-400 mx-auto" size={48} />
-                <p className="text-xs text-gray-400 line-clamp-2">{displayTitle || torrent.name}</p>
-              </div>
+            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900 relative z-10 p-3">
+              <Film className="w-12 h-12 mb-2 text-gray-400 shrink-0" size={48} />
+              <p className="text-xs text-gray-300 line-clamp-2 text-center w-full">{displayTitle || torrent.name}</p>
+              <p className="text-[10px] text-gray-500 mt-1.5 text-center leading-tight" title={t('downloads.notLinkedToTmdb')}>
+                {t('downloads.notLinkedToTmdbShort')}
+              </p>
             </div>
           )}
 

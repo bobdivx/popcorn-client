@@ -908,6 +908,20 @@ export interface UserConfig {
     introSkipSeconds?: number;
     nextEpisodeCountdownSeconds?: number;
   } | null;
+  /** Dossiers de téléchargement par type (films, séries) — style Jellyfin */
+  mediaPaths?: {
+    filmsPath?: string | null;
+    seriesPath?: string | null;
+    defaultPath?: string | null;
+  } | null;
+  /** Dossiers externes (autre NAS, etc.) à inclure dans la bibliothèque */
+  librarySources?: Array<{
+    id: string;
+    path: string;
+    category: string;
+    label?: string | null;
+    share_with_friends: boolean;
+  }> | null;
 }
 
 /**
@@ -1088,6 +1102,13 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
       const syncSettings = c.syncSettings != null && typeof c.syncSettings === 'object' ? c.syncSettings : null;
       const indexerCategories = c.indexerCategories != null && typeof c.indexerCategories === 'object' ? c.indexerCategories : null;
       const playbackSettings = c.playbackSettings != null && typeof c.playbackSettings === 'object' ? c.playbackSettings : null;
+      const mediaPaths = c.mediaPaths != null && typeof c.mediaPaths === 'object' ? c.mediaPaths : null;
+      const librarySources = Array.isArray(c.librarySources)
+        ? c.librarySources.filter(
+            (s: any) =>
+              s && typeof s.path === 'string' && s.path.trim() !== '' && (s.category === 'FILM' || s.category === 'SERIES')
+          )
+        : null;
       return {
         backendUrl: typeof c.backendUrl === 'string' && c.backendUrl.trim() !== '' ? c.backendUrl : null,
         indexers,
@@ -1097,6 +1118,8 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
         syncSettings: syncSettings && Object.keys(syncSettings).length > 0 ? syncSettings : null,
         indexerCategories: indexerCategories && Object.keys(indexerCategories).length > 0 ? indexerCategories : null,
         playbackSettings: playbackSettings && Object.keys(playbackSettings).length > 0 ? playbackSettings : null,
+        mediaPaths: mediaPaths && (mediaPaths.filmsPath != null || mediaPaths.seriesPath != null || mediaPaths.defaultPath != null) ? mediaPaths : null,
+        librarySources: librarySources && librarySources.length > 0 ? librarySources : null,
       };
     }
 

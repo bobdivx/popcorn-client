@@ -124,15 +124,22 @@ export function ActionButtons({
   // Déterminer l'état du bouton de téléchargement (hydraté par les stats du client torrent)
   const isDownloading = !!torrentStats && (torrentStats.state === 'downloading' || torrentStats.state === 'queued');
   const isCompleted = !!torrentStats && (torrentStats.state === 'completed' || torrentStats.state === 'seeding');
-  const progressPercent = torrentStats ? Math.round(torrentStats.progress * 100) : 0;
+  const progressValue = typeof torrentStats?.progress === 'number' ? torrentStats.progress : 0;
+  const progressPercent = torrentStats ? Math.round(progressValue * 100) : 0;
   const progressComplete = !!(torrentStats && torrentStats.progress >= 0.99);
   // Torrent téléchargé = état completed/seeding OU progression >= 99%
   const isDownloadComplete = isCompleted || progressComplete;
   const isSeeding = !!torrentStats && torrentStats.state === 'seeding';
-  // Progression affichée uniquement quand le téléchargement a vraiment démarré (pairs ou débit)
-  const downloadStarted = torrentStats?.download_started === true;
-  const showProgressInButton = downloadStarted && progressPercent > 0;
-  const displayProgressPercent = downloadStarted ? progressPercent : 0;
+  // Afficher l'état dès qu'on a des stats actives (même si download_started n'est pas exposé)
+  const hasActiveDownloadStats = !!torrentStats && !isDownloadComplete && (
+    isDownloading ||
+    progressValue > 0 ||
+    (torrentStats.download_speed ?? 0) > 0 ||
+    (torrentStats.peers_connected ?? 0) > 0 ||
+    (torrentStats.downloaded_bytes ?? 0) > 0
+  );
+  const showProgressInButton = hasActiveDownloadStats;
+  const displayProgressPercent = hasActiveDownloadStats ? progressPercent : 0;
 
   // Détecter si c'est un média local (slug ou id commence par "local_") ou fichier de la bibliothèque (downloadPath)
   const isLocalTorrent =
@@ -189,10 +196,10 @@ export function ActionButtons({
                 <span className="loading loading-spinner loading-sm"></span>
                 Ajout...
               </>
-            ) : isDownloading ? (
+            ) : (isDownloading || hasActiveDownloadStats) ? (
               <>
                 <span className="loading loading-spinner loading-sm"></span>
-                {showProgressInButton ? `En cours... ${progressPercent}%` : 'En file d\'attente'}
+                {showProgressInButton ? `En cours... ${displayProgressPercent}%` : 'En cours... 0%'}
               </>
             ) : countdownRemaining !== null && countdownRemaining > 0 ? (
               <>
@@ -341,7 +348,7 @@ export function ActionButtons({
       </div>
 
       {/* Affichage du statut de téléchargement directement sur la page détail */}
-      {isDownloading && torrentStats && (
+      {hasActiveDownloadStats && torrentStats && (
         <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/10 backdrop-blur-sm">
           <TorrentProgressBar
             progress={torrentStats.progress}
@@ -349,7 +356,7 @@ export function ActionButtons({
             totalBytes={torrentStats.total_bytes}
             downloadSpeed={torrentStats.download_speed}
             etaSeconds={torrentStats.eta_seconds ?? null}
-            statusLabel={downloadStarted ? t('torrentStats.downloading') : t('torrentStats.queued')}
+            statusLabel={torrentStats.state === 'queued' ? t('torrentStats.queued') : t('torrentStats.downloading')}
             variant="full"
             progressColor="blue"
           />

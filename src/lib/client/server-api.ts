@@ -415,8 +415,8 @@ class ServerApiClient {
     };
   }
 
-  private async backendRequest<T>(endpoint: string, options: RequestInit = {}, retryCount = 0): Promise<ApiResponse<T>> {
-    const base = this.getBackendBaseUrl();
+  private async backendRequest<T>(endpoint: string, options: RequestInit = {}, retryCount = 0, baseUrlOverride?: string): Promise<ApiResponse<T>> {
+    const base = baseUrlOverride ?? this.getBackendBaseUrl();
     const url = `${base}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
     const maxRetries = 2; // Maximum 2 retries (3 tentatives au total)
     
@@ -462,7 +462,7 @@ class ServerApiClient {
           const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Exponential backoff, max 3s
           console.warn(`[server-api] Erreur récupérable ${response.status}, retry dans ${delay}ms (tentative ${retryCount + 1}/${maxRetries})`);
           await new Promise(resolve => setTimeout(resolve, delay));
-          return this.backendRequest<T>(endpoint, options, retryCount + 1);
+          return this.backendRequest<T>(endpoint, options, retryCount + 1, baseUrlOverride);
         }
         
         // Extraire le message d'erreur du backend
@@ -505,7 +505,7 @@ class ServerApiClient {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Exponential backoff, max 3s
         console.warn(`[server-api] Erreur réseau récupérable, retry dans ${delay}ms (tentative ${retryCount + 1}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, delay));
-        return this.backendRequest<T>(endpoint, options, retryCount + 1);
+        return this.backendRequest<T>(endpoint, options, retryCount + 1, baseUrlOverride);
       }
       
       // Obtenir un message d'erreur clair pour l'utilisateur
@@ -990,6 +990,8 @@ interface IServerApiClientPublic {
 
   // Library methods
   getLibrary(): Promise<ApiResponse<LibraryItem[]>>;
+  getLibraryFromBaseUrl(baseUrl: string): Promise<ApiResponse<LibraryItem[]>>;
+  getLibrarySyncStatusFromBaseUrl(baseUrl: string): Promise<ApiResponse<{ sync_in_progress: boolean; scanning_source_id?: string }>>;
   addToLibrary(contentId: string, title: string, type: 'movie' | 'tv', encryptedData?: string): Promise<ApiResponse<LibraryItem>>;
   removeFromLibrary(libraryId: string): Promise<ApiResponse<void>>;
   getFavorites(): Promise<ApiResponse<LibraryItem[]>>;
@@ -1022,6 +1024,9 @@ interface IServerApiClientPublic {
   deleteTmdbKey(): Promise<ApiResponse<void>>;
   testTmdbKey(): Promise<ApiResponse<{ valid: boolean; message?: string }>>;
   getClientTorrentConfig(): Promise<ApiResponse<any>>;
+  getMediaPaths(): Promise<ApiResponse<{ download_dir_root: string; films_path: string | null; series_path: string | null; default_path: string | null; films_root: string; series_root: string }>>;
+  putMediaPaths(body: { films_path?: string | null; series_path?: string | null; default_path?: string | null }): Promise<ApiResponse<{ download_dir_root: string; films_path: string | null; series_path: string | null; default_path: string | null; films_root: string; series_root: string }>>;
+  listExplorerFiles(path?: string): Promise<ApiResponse<Array<{ name: string; path: string; is_directory: boolean; size?: number; modified?: number }>>>;
 
   // Sync methods
   getSyncStatus(): Promise<ApiResponse<any>>;

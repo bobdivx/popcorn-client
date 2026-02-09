@@ -9,7 +9,8 @@ import { serverApi } from '../lib/client/server-api';
 import { hasBackendUrl } from '../lib/backend-config.js';
 import { updateChecker } from '../lib/services/update-checker.js';
 import { redirectTo, normalizePath } from '../lib/utils/navigation.js';
-import { loadRuntimeConfig } from '../lib/backend-config.js';
+import { loadRuntimeConfig, setBackendUrl } from '../lib/backend-config.js';
+import { getUserConfig } from '../lib/api/popcorn-web.js';
 
 type ConnectionStatus = 'checking' | 'connecting' | 'connected' | 'error';
 
@@ -46,6 +47,18 @@ export default function ServerConnectionCheck() {
     (async () => {
       // En Docker : charger /config.json (généré depuis PUBLIC_BACKEND_URL) avant toute logique
       await loadRuntimeConfig();
+      if (cancelled) return;
+
+      // Toujours utiliser notre backend : restaurer l'URL depuis la config cloud si l'utilisateur en a une (évite d'utiliser une URL d'ami enregistrée par erreur)
+      try {
+        const cloudConfig = await getUserConfig();
+        if (cloudConfig?.backendUrl?.trim()) {
+          const url = cloudConfig.backendUrl.trim().replace(/\/$/, '');
+          setBackendUrl(url);
+        }
+      } catch {
+        // ignore (utilisateur non connecté au cloud ou CORS)
+      }
       if (cancelled) return;
 
       // Vérifier les mises à jour au démarrage (non-bloquant)

@@ -10,6 +10,8 @@ export interface MediaDetailPageProps {
   initialTorrentStats?: ClientTorrentStats | null;
   /** URL de la page d'origine pour le bouton Retour (ex. /library, /dashboard, /discover). */
   backHref?: string | null;
+  /** Pour un média partagé par un ami : URL du serveur ami pour le stream uniquement (on garde notre backend pour le reste). */
+  streamBackendUrl?: string | null;
   torrent: {
     id: string;
     slug?: string | null;

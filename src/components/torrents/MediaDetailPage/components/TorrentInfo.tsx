@@ -59,6 +59,20 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
 
   return (
     <div className="space-y-4">
+      {/* Chemin du fichier (média en bibliothèque / local) */}
+      {(torrent as any).downloadPath && (
+        <div className="mb-4">
+          <div className="inline-flex flex-col gap-1 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm">
+            <span className="font-semibold text-white/90">
+              {language === 'fr' ? 'Chemin du fichier' : 'File path'}
+            </span>
+            <code className="text-white/80 break-all font-mono text-xs" title={(torrent as any).downloadPath}>
+              {(torrent as any).downloadPath}
+            </code>
+          </div>
+        </div>
+      )}
+
       {/* Indexer - Affiché en premier pour les torrents externes */}
       {indexerName && (
         <div className="mb-4">

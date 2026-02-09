@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from 'preact/hooks';
-import { Download } from 'lucide-preact';
+import { Download, Tv, Library as LibraryIcon } from 'lucide-preact';
 import type { SeriesData } from '../../lib/client/types';
 import { HeroSection } from './components/HeroSection';
 import CarouselRow from '../torrents/CarouselRow';
@@ -18,6 +18,7 @@ import { NotificationContainer } from '../ui/Notification';
 import { useNotifications } from '../torrents/MediaDetailPage/hooks/useNotifications';
 import { resolveHeroTorrent } from './utils/heroDownload';
 import { handleDownload } from '../torrents/MediaDetailPage/actions/download';
+import Library from '../Library';
 
 export default function SeriesDashboard() {
   const { t, language } = useI18n();
@@ -28,6 +29,7 @@ export default function SeriesDashboard() {
   const lastSyncProgressRef = useRef<number>(-1);
   const { notifications, addNotification, removeNotification } = useNotifications();
   const [heroDownloading, setHeroDownloading] = useState(false);
+  const [viewMode, setViewMode] = useState<'torrents' | 'library'>('torrents');
 
   // Rafraîchir la liste des séries au fur et à mesure de la synchronisation torrent
   useEffect(() => {
@@ -67,6 +69,42 @@ export default function SeriesDashboard() {
   const handlePlay = (item: ContentItem) => {
     window.location.href = `/player/${item.id}`;
   };
+
+  const renderViewToggle = (className?: string) => (
+    <div className={className}>
+      <div className="inline-flex items-center gap-1 p-1 rounded-full bg-black/70 border border-white/20 shadow-lg backdrop-blur">
+        <button
+          type="button"
+          onClick={() => setViewMode('torrents')}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+            viewMode === 'torrents' ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'
+          }`}
+        >
+          <Tv className="w-4 h-4" />
+          {t('common.torrents')}
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode('library')}
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+            viewMode === 'library' ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'
+          }`}
+        >
+          <LibraryIcon className="w-4 h-4" />
+          {t('library.title')}
+        </button>
+      </div>
+    </div>
+  );
+
+  if (viewMode === 'library') {
+    return (
+      <div className="pb-8 tv:pb-12">
+        {renderViewToggle('px-4 sm:px-6 lg:px-8 mb-4')}
+        <Library initialContentFilter="series" showHero={false} showFilters={false} showSync={false} />
+      </div>
+    );
+  }
 
   const handleHeroDownload = useCallback(async (item: ContentItem) => {
     if (heroDownloading) return;
@@ -259,17 +297,23 @@ export default function SeriesDashboard() {
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       {/* Barre de progression compacte en haut quand sync en cours */}
       {showSyncBar && <SyncProgress compact externalStatus={syncStatus} />}
+      {renderViewToggle('px-4 sm:px-6 lg:px-8 mb-4')}
 
       {/* Section Hero avec carousel */}
       {heroItemsWithOverview.length > 0 && (
-        <HeroSection
-          items={heroItemsWithOverview}
-          onPlay={handlePlay}
-          onPrimaryAction={handleHeroDownload}
-          primaryActionDisabled={heroDownloading}
-          primaryButtonLabel={t('common.download')}
-          primaryButtonIcon={<Download className="h-6 w-6 tv:h-8 tv:w-8" size={24} />}
-        />
+        <div className="relative">
+          <div className="absolute top-4 right-4 z-20">
+            {renderViewToggle()}
+          </div>
+          <HeroSection
+            items={heroItemsWithOverview}
+            onPlay={handlePlay}
+            onPrimaryAction={handleHeroDownload}
+            primaryActionDisabled={heroDownloading}
+            primaryButtonLabel={t('common.download')}
+            primaryButtonIcon={<Download className="h-6 w-6 tv:h-8 tv:w-8" size={24} />}
+          />
+        </div>
       )}
 
       <div className="pb-8 tv:pb-12 flex-1">

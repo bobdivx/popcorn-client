@@ -13,8 +13,9 @@ import { ActionButtons } from './components/ActionButtons';
 import { TorrentInfo } from './components/TorrentInfo';
 import { QualityBadges } from './components/QualityBadges';
 import { YouTubeVideoPlayer as VideoPlayer } from '../../ui/YouTubeVideoPlayer';
-import { getPlaybackPosition } from '../../../lib/streaming/torrent-storage';
+import { getPlaybackPosition, getPlaybackPositionByMedia } from '../../../lib/streaming/torrent-storage';
 import { getOrCreateDeviceId } from '../../../lib/utils/device-id';
+import { getDownloadClientStats } from '../../../lib/utils/download-meta-storage';
 import { serverApi } from '../../../lib/client/server-api';
 import { PROGRESS_POLL_INTERVAL_MS } from './utils/constants';
 import { startProgressPolling } from './actions/progressPolling';
@@ -255,7 +256,7 @@ function TrailerModal({
   );
 }
 
-export default function MediaDetailPage({ torrent, initialVariants, seriesEpisodes, initialTorrentStats, backHref }: MediaDetailPageProps) {
+export default function MediaDetailPage({ torrent, initialVariants, seriesEpisodes, initialTorrentStats, backHref, streamBackendUrl }: MediaDetailPageProps) {
   // États de base
   const [isPlaying, setIsPlaying] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
@@ -280,6 +281,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   const [showVerificationPanel, setShowVerificationPanel] = useState(false);
   const [showSourceModal, setShowSourceModal] = useState(false);
   const sourceModalFirstButtonRef = useRef<HTMLButtonElement>(null);
+  const backLinkRef = useRef<HTMLAnchorElement>(null);
+  const tvBackHandlerRef = useRef<HTMLDivElement>(null);
   /** Compteur d'échecs consécutifs de getTorrent (hors 404) pour invalider torrentStats si backend injoignable. */
   const getTorrentFailCountRef = useRef<number>(0);
   /** Dernière valeur connue de torrentStats (pour ne pas écraser un état complété par une réponse API invalide type unknown/0). */
@@ -301,8 +304,19 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   const [savedPlaybackPosition, setSavedPlaybackPosition] = useState<number | null>(null);
   const [startFromBeginning, setStartFromBeginning] = useState(true);
 
+  /** Chemin du fichier en bibliothèque (library ou findLocalMediaByTmdb), pour lecture sans torrent dans le client. */
+  const [libraryDownloadPath, setLibraryDownloadPath] = useState<string | null>(null);
+
   // Torrent actif (sélectionné ou défaut) — utilisé pour lecture / téléchargement
   const activeTorrent = selectedTorrent || torrent;
+  // Torrent avec chemin bibliothèque si connu (permet à useVideoFiles de lire depuis le disque sans getTorrent)
+  const activeTorrentWithLibraryPath = useMemo(
+    () =>
+      libraryDownloadPath
+        ? { ...activeTorrent, downloadPath: libraryDownloadPath }
+        : activeTorrent,
+    [activeTorrent, libraryDownloadPath]
+  );
 
   // Constantes dérivées (basées sur le torrent actif pour lecture/téléchargement)
   const isExternal = activeTorrent.id.startsWith('external_');
@@ -325,7 +339,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   // Hooks personnalisés
   const { videoFiles, selectedFile, setVideoFiles, setSelectedFile, loadVideoFiles } = useVideoFiles({
     torrentName: activeTorrent.name,
-    torrent: activeTorrent,
+    torrent: activeTorrentWithLibraryPath,
     onError: (error) => {
       console.error('Erreur lors du chargement des fichiers vidéo:', error);
     },
@@ -433,93 +447,184 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     }
   }, [initialTorrentStats?.state, initialTorrentStats?.progress, hasInfoHash, activeTorrent.infoHash]);
 
-  // Vérifier la position de lecture sauvegardée (torrent actif)
+  // Séries depuis la bibliothèque : le torrent actif (épisode sélectionné) peut être différent du torrent principal.
+  // Synchroniser les stats depuis le stockage pour l'info_hash de l'épisode actif afin d'afficher « Lire » si cet épisode est déjà téléchargé.
+  useEffect(() => {
+    if (!hasInfoHash || !activeTorrent.infoHash) return;
+    const stats = getDownloadClientStats(activeTorrent.infoHash);
+    if (stats && (stats.state === 'completed' || stats.state === 'seeding' || (stats.progress ?? 0) >= 0.99)) {
+      setTorrentStats(stats);
+      loadVideoFiles(activeTorrent.infoHash!)
+        .then((videos) => {
+          if (videos.length > 0) {
+            setVideoFiles(videos);
+            if (!selectedFile) setSelectedFile(videos[0]);
+            setIsAvailableLocally(true);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [activeTorrent.infoHash, hasInfoHash]);
+
+  // Vérifier la position de lecture sauvegardée (torrent actif) : priorité par média (tmdb) si dispo, sinon par torrent
   useEffect(() => {
     const checkSavedPosition = async () => {
-      if (activeTorrent.id && typeof window !== 'undefined') {
-        try {
-          const deviceId = getOrCreateDeviceId();
-          const position = await getPlaybackPosition(activeTorrent.id, deviceId);
-          if (position && position > 0) {
+      if (typeof window === 'undefined') return;
+      const deviceId = getOrCreateDeviceId();
+      try {
+        const tmdbId = activeTorrent.tmdbId;
+        const tmdbType = activeTorrent.tmdbType;
+        if (typeof tmdbId === 'number' && (tmdbType === 'movie' || tmdbType === 'tv')) {
+          const position = await getPlaybackPositionByMedia(tmdbId, tmdbType, deviceId);
+          if (position != null && position > 0) {
             setSavedPlaybackPosition(position);
-          } else {
-            setSavedPlaybackPosition(null);
+            return;
           }
-        } catch (err) {
-          console.debug('Erreur lors de la vérification de la position de lecture:', err);
-          setSavedPlaybackPosition(null);
         }
+        if (activeTorrent.id) {
+          const position = await getPlaybackPosition(activeTorrent.id, deviceId);
+          if (position != null && position > 0) {
+            setSavedPlaybackPosition(position);
+            return;
+          }
+        }
+        setSavedPlaybackPosition(null);
+      } catch (err) {
+        console.debug('Erreur lors de la vérification de la position de lecture:', err);
+        setSavedPlaybackPosition(null);
       }
     };
     checkSavedPosition();
-  }, [activeTorrent.id]);
+  }, [activeTorrent.id, activeTorrent.tmdbId, activeTorrent.tmdbType]);
 
   // Vérifier si le torrent est disponible localement (torrent actif)
   // Note: isAvailableLocally n'est mis à true que lorsque des fichiers sont confirmés (loadVideoFiles ou files_available).
   // Note: Les erreurs 404 dans la console sont normales si le torrent n'est pas encore téléchargé
+  // On utilise d'abord listTorrents() (même source que la page /downloads) pour avoir les stats de téléchargement sur la page détail (slug).
   useEffect(() => {
     if (hasInfoHash && activeTorrent.infoHash) {
       const checkAvailability = async () => {
         try {
           const { clientApi } = await import('../../../lib/client/api');
-          const stats = await clientApi.getTorrent(activeTorrent.infoHash!).catch((err) => {
-            // Ignorer silencieusement les erreurs 404 (torrent non téléchargé)
-            if (err?.response?.status === 404 || err?.message?.includes('404')) {
-              return null;
-            }
-            throw err;
-          });
-          if (stats) {
-            getTorrentFailCountRef.current = 0;
-            // Ne pas écraser un état complété (seeding/completed) par une réponse API invalide (unknown, progress 0)
-            const apiSaysUnknownOrZero =
-              stats.state === 'unknown' || (Number(stats.progress) === 0 && stats.state !== 'completed' && stats.state !== 'seeding');
-            const hadCompletedState =
-              lastTorrentStatsRef.current &&
-              (lastTorrentStatsRef.current.state === 'completed' ||
-                lastTorrentStatsRef.current.state === 'seeding' ||
-                (typeof lastTorrentStatsRef.current.progress === 'number' && lastTorrentStatsRef.current.progress >= 0.95));
-            if (apiSaysUnknownOrZero && hadCompletedState) {
-              return; // garder l'état complété, ne pas écraser
-            }
-            // Toujours mettre à jour torrentStats pour que le bouton "Lire" puisse s'afficher
-            console.log('[MediaDetailPage] checkAvailability: Mise à jour torrentStats', {
-              state: stats.state,
-              progress: stats.progress,
-              isCompleted: stats.state === 'completed' || stats.state === 'seeding' || stats.progress >= 0.95,
-            });
-            setTorrentStats(stats);
-            // Marquer disponible quand le torrent est complété (état ou progression).
-            // Dès que progress >= 99% ou state completed/seeding, les fichiers sont sur disque.
-            const completed = stats.state === 'completed' || stats.state === 'seeding' || stats.progress >= 0.99;
-            if (completed) {
-              setIsAvailableLocally(true);
-              addDebugLog('success', '📚 Torrent disponible localement (fichiers confirmés)', {
-                state: stats.state,
-                progress: `${(stats.progress * 100).toFixed(1)}%`,
-              });
-            }
-          } else if (activeTorrent.tmdbId) {
-            // Si le torrent n'est pas trouvé par info_hash mais qu'on a un TMDB ID, chercher par TMDB ID
-            const localMedia = await clientApi.findLocalMediaByTmdb(activeTorrent.tmdbId, activeTorrent.tmdbType || undefined);
-            if (localMedia.length > 0) {
-              // Médias locaux trouvés par TMDB ID
-              setIsAvailableLocally(true);
-              if (localMedia.length === 1) {
-                addDebugLog('success', `📚 Média local trouvé (TMDB ID: ${activeTorrent.tmdbId})`, {
-                  file: localMedia[0].file_name,
-                  quality: localMedia[0].quality || 'N/A',
-                  resolution: localMedia[0].resolution || 'N/A',
-                });
-              } else {
-                addDebugLog('success', `📚 ${localMedia.length} version(s) locale(s) trouvée(s) (TMDB ID: ${activeTorrent.tmdbId})`, {
-                  versions: localMedia.map(m => ({
-                    file: m.file_name,
-                    quality: m.quality || 'N/A',
-                    resolution: m.resolution || 'N/A',
-                  })),
-                });
+          const ih = activeTorrent.infoHash!.toLowerCase();
+          let fromList: import('../../../lib/client/types').ClientTorrentStats | undefined;
+          // Même source que la page /downloads : récupérer les stats depuis la liste des torrents
+          try {
+            const list = await clientApi.listTorrents();
+            fromList = list.find(
+              (t) => (t.info_hash ?? (t as unknown as { infoHash?: string }).infoHash ?? '').toLowerCase() === ih
+            );
+            if (fromList) {
+              getTorrentFailCountRef.current = 0;
+              setTorrentStats(fromList);
+              const completed = fromList.state === 'completed' || fromList.state === 'seeding' || (fromList.progress ?? 0) >= 0.99;
+              if (completed) {
+                setIsAvailableLocally(true);
               }
+            }
+          } catch (_) {
+            // listTorrents en échec (ex. client non dispo)
+          }
+          // Ne pas appeler getTorrent quand le torrent n'est pas dans la liste : évite le 404 en console.
+          // On s'appuie sur la library et findLocalMediaByTmdb pour afficher "Lire" si le fichier est sur disque.
+          // 1) Vérifier la library (info_hash ou tmdb_id) — fichier sur disque même si torrent supprimé du client
+          if (hasInfoHash && activeTorrent.infoHash) {
+            try {
+              const libRes = await serverApi.getLibrary();
+              if (libRes.success && Array.isArray(libRes.data)) {
+                const ih = activeTorrent.infoHash!.toLowerCase();
+                const tmdbId = activeTorrent.tmdbId;
+                const tmdbType = activeTorrent.tmdbType || 'movie';
+                const item = (libRes.data as any[]).find((i: any) => {
+                  const matchHash = (i.info_hash || i.infoHash || '').toLowerCase() === ih;
+                  const matchTmdb =
+                    tmdbId != null &&
+                    (i.tmdb_id === tmdbId || i.tmdb_id === Number(tmdbId)) &&
+                    (i.tmdb_type || 'movie') === tmdbType;
+                  return matchHash || matchTmdb;
+                });
+                if (item && (item.download_path || item.exists)) {
+                  setIsAvailableLocally(true);
+                  if (item.download_path) {
+                    setLibraryDownloadPath(item.download_path);
+                  }
+                  setTorrentStats((prev) =>
+                    prev ?? {
+                      info_hash: activeTorrent.infoHash!,
+                      name: item.name || activeTorrent.name || '',
+                      state: 'completed',
+                      downloaded_bytes: item.file_size ?? 0,
+                      uploaded_bytes: 0,
+                      total_bytes: item.file_size ?? 0,
+                      progress: 1,
+                      download_speed: 0,
+                      upload_speed: 0,
+                      peers_connected: 0,
+                      peers_total: 0,
+                      seeders: 0,
+                      leechers: 0,
+                      eta_seconds: null,
+                      download_started: true,
+                    }
+                  );
+                  addDebugLog('success', '📚 Média trouvé dans la bibliothèque (library)', {
+                    info_hash: activeTorrent.infoHash,
+                    download_path: item.download_path,
+                    by: (item.info_hash || item.infoHash || '').toLowerCase() === ih ? 'info_hash' : 'tmdb_id',
+                  });
+                }
+              }
+            } catch (_e) {
+              // Ignorer les erreurs (ex. endpoint /library non disponible)
+            }
+          }
+          // 2) Vérifier par TMDB ID (local-media by tmdb) si pas déjà disponible
+          if (activeTorrent.tmdbId) {
+            try {
+              const localMedia = await clientApi.findLocalMediaByTmdb(activeTorrent.tmdbId, activeTorrent.tmdbType || undefined);
+              if (localMedia.length > 0) {
+                setIsAvailableLocally(true);
+                const firstPath = (localMedia[0] as { file_path?: string }).file_path;
+                if (firstPath) {
+                  setLibraryDownloadPath(firstPath);
+                }
+                setTorrentStats((prev) =>
+                  prev ?? {
+                    info_hash: activeTorrent.infoHash!,
+                    name: activeTorrent.name || '',
+                    state: 'completed',
+                    downloaded_bytes: 0,
+                    uploaded_bytes: 0,
+                    total_bytes: 0,
+                    progress: 1,
+                    download_speed: 0,
+                    upload_speed: 0,
+                    peers_connected: 0,
+                    peers_total: 0,
+                    seeders: 0,
+                    leechers: 0,
+                    eta_seconds: null,
+                    download_started: true,
+                  }
+                );
+                if (localMedia.length === 1) {
+                  addDebugLog('success', `📚 Média local trouvé (TMDB ID: ${activeTorrent.tmdbId})`, {
+                    file: localMedia[0].file_name,
+                    quality: localMedia[0].quality || 'N/A',
+                    resolution: localMedia[0].resolution || 'N/A',
+                  });
+                } else {
+                  addDebugLog('success', `📚 ${localMedia.length} version(s) locale(s) trouvée(s) (TMDB ID: ${activeTorrent.tmdbId})`, {
+                    versions: localMedia.map(m => ({
+                      file: m.file_name,
+                      quality: m.quality || 'N/A',
+                      resolution: m.resolution || 'N/A',
+                    })),
+                  });
+                }
+              }
+            } catch (_) {
+              // findLocalMediaByTmdb en échec : on a déjà tenté la library au-dessus
             }
           }
           // Ne pas logger si stats est null (torrent non téléchargé, c'est normal)
@@ -540,7 +645,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
 
       checkAvailability();
     }
-  }, [hasInfoHash, activeTorrent.infoHash, activeTorrent.clientState, activeTorrent.clientProgress, isExternal]);
+  }, [hasInfoHash, activeTorrent.infoHash, activeTorrent.tmdbId, activeTorrent.tmdbType, activeTorrent.clientState, activeTorrent.clientProgress, isExternal]);
 
   // Vérifier si un téléchargement est en cours au montage (torrent actif)
   useEffect(() => {
@@ -568,71 +673,37 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
       if (hasInfoHash && activeTorrent.infoHash && !isPlaying && playStatus === 'idle') {
         try {
           const { clientApi } = await import('../../../lib/client/api');
-          const stats = await clientApi.getTorrent(activeTorrent.infoHash).catch((err) => {
-            // Ignorer silencieusement les erreurs 404 (torrent non téléchargé)
-            if (err?.response?.status === 404 || err?.message?.includes('404')) {
-              return null;
-            }
-            throw err;
-          });
-          if (stats) {
-            // Ne pas écraser un état complété par une réponse API invalide (unknown, progress 0)
-            const apiSaysUnknownOrZero =
-              stats.state === 'unknown' || (Number(stats.progress) === 0 && stats.state !== 'completed' && stats.state !== 'seeding');
-            const hadCompletedState =
-              lastTorrentStatsRef.current &&
-              (lastTorrentStatsRef.current.state === 'completed' ||
-                lastTorrentStatsRef.current.state === 'seeding' ||
-                (typeof lastTorrentStatsRef.current.progress === 'number' && lastTorrentStatsRef.current.progress >= 0.95));
-            if (apiSaysUnknownOrZero && hadCompletedState) {
-              return; // garder l'état complété
-            }
-            // Toujours mettre à jour torrentStats pour que le bouton "Lire" puisse s'afficher
-            console.log('[MediaDetailPage] checkDownloadingTorrent: Mise à jour torrentStats', {
-              state: stats.state,
-              progress: stats.progress,
-              isCompleted: stats.state === 'completed' || stats.state === 'seeding' || stats.progress >= 0.95,
-            });
-            setTorrentStats(stats);
-            
-            // Si la page est rechargée alors qu'un téléchargement est en cours,
-            // redémarrer le polling pour que la progression soit rafraîchie en temps réel
-            const infoHashForPolling = (stats as any).info_hash || activeTorrent.infoHash;
-            if (
-              infoHashForPolling &&
-              (stats.state === 'downloading' || stats.state === 'queued')
-            ) {
-              startProgressPolling(infoHashForPolling, {
-                torrent,
-                pollTorrentProgress,
-                progressPollIntervalRef,
-                PROGRESS_POLL_INTERVAL_MS,
-                setPlayStatus,
-              });
-            }
-            if (stats.state === 'completed' || stats.state === 'seeding' || stats.progress >= 0.95) {
-              // Si le téléchargement est terminé, réinitialiser le flag
-              continueInBackgroundRef.current = false;
-              // Ne marquer disponible que si des fichiers vidéo sont effectivement chargés
-              try {
-                const videos = await loadVideoFiles(activeTorrent.infoHash!);
-                if (videos.length > 0) {
-                  setIsAvailableLocally(true);
-                }
-              } catch (err) {
-                // Ignorer les erreurs de chargement de fichiers
+          const ih = activeTorrent.infoHash.toLowerCase();
+          // Même source que /downloads : rafraîchir les stats depuis la liste (polling)
+          try {
+            const list = await clientApi.listTorrents();
+            const fromList = list.find(
+              (t) => (t.info_hash ?? (t as unknown as { infoHash?: string }).infoHash ?? '').toLowerCase() === ih
+            );
+            if (fromList) {
+              setTorrentStats(fromList);
+              const completed = fromList.state === 'completed' || fromList.state === 'seeding' || (fromList.progress ?? 0) >= 0.95;
+              if (completed) {
+                try {
+                  const videos = await loadVideoFiles(activeTorrent.infoHash!);
+                  if (videos.length > 0) setIsAvailableLocally(true);
+                } catch (_) {}
+                return;
               }
-              return;
+              if (fromList.state === 'downloading' || fromList.state === 'queued') {
+                startProgressPolling(fromList.info_hash, {
+                  torrent,
+                  pollTorrentProgress,
+                  progressPollIntervalRef,
+                  PROGRESS_POLL_INTERVAL_MS,
+                  setPlayStatus,
+                });
+              }
+              return; // stats à jour depuis listTorrents, pas besoin d'appeler getTorrent
             }
-            
-            // Ne pas démarrer automatiquement le polling si le torrent est en téléchargement
-            // Le polling ne sera démarré que lorsque l'utilisateur clique explicitement sur "Télécharger" ou "Lire"
-            // On met juste à jour les stats pour l'affichage, mais on ne démarre pas le téléchargement automatiquement
-            // if (stats.state === 'downloading' || stats.state === 'queued') {
-            //   // Le polling sera démarré uniquement via handleDownload ou handlePlay
-            // }
-          }
-          // Ne pas logger si stats est null (torrent non téléchargé, c'est normal)
+          } catch (_) {}
+          // Ne pas appeler getTorrent quand le torrent n'est pas dans la liste : évite le 404 en console.
+          // listTorrents est la seule source (même que /downloads) ; si pas trouvé, rien à afficher.
         } catch (err) {
           // Ignorer silencieusement les erreurs 404 (torrent non téléchargé)
           if (err instanceof Error && (err.message.includes('404') || err.message.includes('Not Found'))) {
@@ -678,6 +749,27 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
       el.focus();
     }
   }, []);
+
+  // Télécommande : première touche Retour met le focus sur le bouton Retour, deuxième touche navigue
+  useEffect(() => {
+    const el = tvBackHandlerRef.current;
+    if (!el) return;
+    (el as HTMLElement & { _tvBack?: () => void })._tvBack = () => {
+      const backLink = backLinkRef.current;
+      if (backLink && document.activeElement === backLink) {
+        if (backHref) {
+          window.location.href = backHref;
+        } else if (typeof window !== 'undefined' && window.history.length > 1) {
+          window.history.back();
+        }
+      } else if (backLink) {
+        backLink.focus();
+      }
+    };
+    return () => {
+      delete (el as HTMLElement & { _tvBack?: () => void })._tvBack;
+    };
+  }, [backHref]);
 
   // Utiliser directement le trailerKey du torrent s'il est disponible (torrent principal pour la série)
   useEffect(() => {
@@ -914,6 +1006,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         selectedFile={displayFile!}
         torrentName={displayTorrent.cleanTitle || displayTorrent.name}
         torrentId={displayTorrent.id}
+        tmdbId={displayTorrent.tmdbId}
+        tmdbType={displayTorrent.tmdbType}
         startFromBeginning={isTransitioningToNext ? false : startFromBeginning}
         isSeries={!!(seriesEpisodes?.seasons?.length)}
         nextEpisodeInfo={nextEpisodeInfo}
@@ -923,6 +1017,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         wrapperRef={(el) => { videoWrapperRef.current = el; }}
         quality={displayTorrent.quality}
         directStreamUrl={(displayTorrent as any)._demoStreamUrl ?? undefined}
+        streamBackendUrl={streamBackendUrl ?? undefined}
       />
     );
   }
@@ -938,6 +1033,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           selectedFile={displayFile!}
           torrentName={displayTorrent.cleanTitle || displayTorrent.name}
           torrentId={displayTorrent.id}
+          tmdbId={displayTorrent.tmdbId}
+          tmdbType={displayTorrent.tmdbType}
           startFromBeginning={isTransitioningToNext ? false : startFromBeginning}
           isSeries={!!(seriesEpisodes?.seasons?.length)}
           nextEpisodeInfo={nextEpisodeInfo}
@@ -947,6 +1044,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           wrapperRef={(el) => { videoWrapperRef.current = el; }}
           quality={displayTorrent.quality}
           directStreamUrl={(displayTorrent as any)._demoStreamUrl ?? undefined}
+          streamBackendUrl={streamBackendUrl ?? undefined}
         />
       )}
     <div className="relative bg-black text-white">
@@ -977,10 +1075,11 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         <div className="fixed top-0 left-0 right-0 bottom-0 z-0 bg-gradient-to-b from-gray-900 to-black pointer-events-none" />
       )}
 
-      {/* Contenu principal */}
-      <div className="relative z-10">
+      {/* Contenu principal (data-tv-back-handler : première touche Retour = focus sur Retour, deuxième = navigation) */}
+      <div className="relative z-10" ref={tvBackHandlerRef} data-tv-back-handler>
         <div className="relative w-full min-h-[60vh] sm:min-h-[70vh] flex flex-col justify-end px-3 sm:px-4 md:px-6 lg:px-16 pb-8 sm:pb-12 md:pb-16 pt-20 sm:pt-24 md:pt-32">
           <a
+            ref={backLinkRef}
             href={backHref ?? '/dashboard'}
             onClick={(e) => {
               if (!backHref && typeof window !== 'undefined' && window.history.length > 1) {
@@ -988,7 +1087,11 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                 window.history.back();
               }
             }}
-            className="inline-flex items-center gap-2 text-white/80 hover:text-white transition-colors mb-4 sm:mb-6 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 focus:ring-offset-black rounded px-2 py-1"
+            className="inline-flex items-center gap-2 text-white/80 hover:text-white transition-colors mb-4 sm:mb-6 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 focus:ring-offset-black rounded px-2 py-1 min-h-[44px] tv:min-h-[52px]"
+            data-focusable
+            data-media-detail-back
+            tabIndex={0}
+            aria-label="Retour"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -1250,7 +1353,16 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           <DownloadVerificationPanel
             infoHash={verificationInfoHash}
             torrentName={verificationTorrentName ?? torrent.name}
-            onComplete={() => {}}
+            onComplete={(result) => {
+              if (result?.health === 'ok') {
+                // Auto-dismiss quand tout est OK
+                setTimeout(() => {
+                  setShowVerificationPanel(false);
+                  setVerificationInfoHash(null);
+                  setVerificationTorrentName(null);
+                }, 1200);
+              }
+            }}
             onStatsUpdate={setTorrentStats}
             dismissible={true}
             onDismiss={() => {

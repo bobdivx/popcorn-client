@@ -70,6 +70,13 @@ export class ClientApi {
   }
 
   /**
+   * Liste des torrents enrichie (poster, titre TMDB). Pour la page /downloads.
+   */
+  async listTorrentsEnriched(): Promise<ClientTorrentStats[]> {
+    return this._torrents.listTorrentsEnriched();
+  }
+
+  /**
    * Récupérer les statistiques d'un torrent spécifique
    */
   async getTorrent(infoHash: string): Promise<ClientTorrentStats | null> {
@@ -164,6 +171,13 @@ export class ClientApi {
    */
   async resumeTorrent(infoHash: string): Promise<void> {
     return this._torrents.resumeTorrent(infoHash);
+  }
+
+  /**
+   * Lier un téléchargement (info_hash) à un média TMDB (pour library/téléchargements).
+   */
+  async bindDownloadToMedia(infoHash: string, tmdbId: number, tmdbType: 'movie' | 'tv'): Promise<void> {
+    return this._torrents.bindDownloadToMedia(infoHash, tmdbId, tmdbType);
   }
 
   /**
