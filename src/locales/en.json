@@ -533,7 +533,9 @@
     "films": "Films",
     "series": "Series",
     "others": "Others",
-    "sharedBy": "Shared by {name}"
+    "sharedBy": "Shared by {name}",
+    "downloadingSection": "Downloading",
+    "downloadingBadge": "Downloading"
   },
   "torrentStats": {
     "downloading": "Downloading",

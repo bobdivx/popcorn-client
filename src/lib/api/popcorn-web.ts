@@ -568,22 +568,30 @@ export async function getPublicAdsSettings(serverBaseUrlForProxy?: string): Prom
       return cachedAdsConfig;
     }
 
-    const apiUrl = `${getPopcornWebApiUrl()}/public/settings`;
-    let res = await requestJson(
-      apiUrl,
-      { method: 'GET', headers: { 'Content-Type': 'application/json' } },
-      8000
-    );
-
-    // Fallback : si échec et qu'on a l'URL du serveur (ex. TV/webOS), passer par le proxy
-    if ((!res.ok || !res.data?.success) && serverBaseUrlForProxy) {
+    // En priorité : passer par le proxy du backend (CasaOS/Docker, TV) pour éviter CORS / blocage vers popcorn-web
+    if (serverBaseUrlForProxy) {
       const proxyUrl = `${serverBaseUrlForProxy.replace(/\/$/, '')}/api/client/public/settings`;
-      res = await requestJson(
+      const resProxy = await requestJson(
         proxyUrl,
         { method: 'GET', headers: { 'Content-Type': 'application/json' } },
         8000
       );
+      if (resProxy.ok && resProxy.data?.success) {
+        const adsConfig = resProxy.data?.data?.adsConfig as AdsConfig | undefined;
+        if (adsConfig) {
+          cachedAdsConfig = adsConfig;
+          cachedAdsConfigAt = now;
+          return adsConfig;
+        }
+      }
     }
+
+    const apiUrl = `${getPopcornWebApiUrl()}/public/settings`;
+    const res = await requestJson(
+      apiUrl,
+      { method: 'GET', headers: { 'Content-Type': 'application/json' } },
+      8000
+    );
 
     if (!res.ok || !res.data?.success) {
       return null;

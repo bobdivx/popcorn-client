@@ -35,6 +35,21 @@ function getTitleFromLocation(): string | null {
   return new URLSearchParams(window.location.search).get('title');
 }
 
+/** Lit le paramètre `from` et retourne l’URL de retour (ex. /library, /dashboard). */
+function getBackHrefFromLocation(): string | null {
+  if (typeof window === 'undefined') return null;
+  const from = new URLSearchParams(window.location.search).get('from');
+  if (!from) return null;
+  const map: Record<string, string> = {
+    library: '/library',
+    dashboard: '/dashboard',
+    discover: '/discover',
+    downloads: '/downloads',
+    search: '/search',
+  };
+  return map[from] ?? null;
+}
+
 function normalizeSeedCount(t: any): number {
   return Number(t?.seedCount ?? t?.seed_count ?? 0) || 0;
 }
@@ -619,12 +634,14 @@ export default function MediaDetailRoute() {
     contentId && torrent.infoHash && contentId.toLowerCase().trim() === torrent.infoHash.toLowerCase().trim()
       ? (getDownloadClientStats(contentId) as ClientTorrentStats | null)
       : null;
+  const backHref = getBackHrefFromLocation();
   return (
     <MediaDetailPage
       torrent={torrent}
       initialVariants={initialVariants.length > 0 ? initialVariants : undefined}
       seriesEpisodes={seriesEpisodes ?? undefined}
       initialTorrentStats={initialTorrentStats ?? undefined}
+      backHref={backHref ?? undefined}
     />
   );
 }

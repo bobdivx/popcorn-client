@@ -98,10 +98,9 @@ export default function Library({ onItemClick }: LibraryProps) {
       }
 
       if (response.data) {
-        // Filtrer uniquement les médias qui existent réellement
+        // Garder tous les médias : existants + en cours de téléchargement (exists: false)
         const list = Array.isArray(response.data) ? (response.data as unknown as LibraryMedia[]) : [];
-        const existingItems = list.filter(item => item.exists);
-        setItems(existingItems);
+        setItems(list);
       }
 
       // Charger les médias partagés par des amis (depuis popcorn-web)
@@ -172,16 +171,16 @@ export default function Library({ onItemClick }: LibraryProps) {
     const isSeries = item.category === 'SERIES' || item.tmdb_type === 'tv' || item.tmdb_type === 'series';
     // Séries avec tmdb_id : ouvrir la page détail via tmdbId (épisodes, saisons, etc.)
     if (isSeries && item.tmdb_id != null) {
-      window.location.href = `/torrents?tmdbId=${item.tmdb_id}&type=tv`;
+      window.location.href = `/torrents?tmdbId=${item.tmdb_id}&type=tv&from=library`;
       return;
     }
     // Pour les médias de la bibliothèque, prioriser l'info_hash car c'est l'identifiant unique
     // du torrent téléchargé. Le slug peut exister mais ne pas avoir de variants dans la DB.
     // MediaDetailRoute peut gérer à la fois les slugs et les info_hash.
     if (item.info_hash) {
-      window.location.href = `/torrents?slug=${encodeURIComponent(item.info_hash)}`;
+      window.location.href = `/torrents?slug=${encodeURIComponent(item.info_hash)}&from=library`;
     } else if (item.slug) {
-      window.location.href = `/torrents?slug=${encodeURIComponent(item.slug)}`;
+      window.location.href = `/torrents?slug=${encodeURIComponent(item.slug)}&from=library`;
     }
   };
 
@@ -222,13 +221,20 @@ export default function Library({ onItemClick }: LibraryProps) {
     return nextSlash === -1 ? after : after.slice(0, nextSlash);
   };
 
-  // Grouper les items par catégorie ; pour les séries, une seule carte par série (regroupement par tmdb_id ou par chemin)
+  // Séparer les médias disponibles (exists) des médias en cours de téléchargement
+  const { existingItems, downloadingItems } = useMemo(() => {
+    const existing = items.filter((item) => item.exists);
+    const downloading = items.filter((item) => !item.exists);
+    return { existingItems: existing, downloadingItems: downloading };
+  }, [items]);
+
+  // Grouper les items existants par catégorie ; pour les séries, une seule carte par série (regroupement par tmdb_id ou par chemin)
   const groupedItems = useMemo(() => {
     const movies: LibraryMedia[] = [];
     const seriesRaw: LibraryMedia[] = [];
     const others: LibraryMedia[] = [];
 
-    items.forEach((item) => {
+    existingItems.forEach((item) => {
       const category = item.category || (item.tmdb_type === 'movie' ? 'FILM' : 'SERIES');
       if (category === 'FILM' || item.tmdb_type === 'movie') {
         movies.push(item);
@@ -259,8 +265,8 @@ export default function Library({ onItemClick }: LibraryProps) {
   }, [items]);
 
   const heroItems = useMemo<ContentItem[]>(() => {
-    if (items.length === 0) return [];
-    return items
+    if (existingItems.length === 0) return [];
+    return existingItems
       .filter((item) => item.poster_url || item.hero_image_url)
       .slice(0, 3)
       .map((item) => ({
@@ -277,7 +283,7 @@ export default function Library({ onItemClick }: LibraryProps) {
         releaseDate: item.release_date ?? undefined,
         tmdbId: item.tmdb_id ?? undefined,
       }));
-  }, [items]);
+  }, [existingItems]);
 
   /** Nombre d'items en chargement prioritaire (première ligne visible) par section */
   const PRIORITY_LOAD_COUNT = 12;
@@ -411,7 +417,21 @@ export default function Library({ onItemClick }: LibraryProps) {
           aria-label={t('library.syncInProgress')}
         />
       )}
-      {/* Bouton de synchronisation (focusable pour TV) */}
+
+      {/* Hero en premier, comme sur la page Films */}
+      {heroItems.length > 0 && (
+        <HeroSection
+          items={heroItems}
+          onPlay={() => null}
+          onPrimaryAction={(item) => {
+            const match = existingItems.find((it) => (it.info_hash || it.slug || it.name) === item.id);
+            if (match) handlePlay(match);
+          }}
+          primaryButtonLabel={t('library.playLatest')}
+        />
+      )}
+
+      {/* Bouton de synchronisation sous le hero (focusable pour TV) */}
       <div className="mb-6 tv:mb-8 px-4 tv:px-6">
         <div className="flex items-center justify-between">
           <div className="flex-1">
@@ -434,18 +454,11 @@ export default function Library({ onItemClick }: LibraryProps) {
         </div>
       </div>
 
-      {/* Hero style dashboard avec derniers téléchargements */}
-      {heroItems.length > 0 && (
-        <HeroSection
-          items={heroItems}
-          onPlay={() => null}
-          onPrimaryAction={(item) => {
-            const match = items.find((it) => (it.info_hash || it.slug || it.name) === item.id);
-            if (match) handlePlay(match);
-          }}
-          primaryButtonLabel={t('library.playLatest')}
-        />
-      )}
+      {/* En cours de téléchargement : cartes des médias en train d'être téléchargés */}
+      {downloadingItems.length > 0 &&
+        renderSection(t('library.downloadingSection'), downloadingItems, {
+          key: 'downloading',
+        })}
 
       {/* Films en grille (plusieurs lignes) */}
       {renderGridSection(t('library.films'), groupedItems.movies)}

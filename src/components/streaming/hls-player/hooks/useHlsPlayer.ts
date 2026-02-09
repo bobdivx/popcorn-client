@@ -198,10 +198,10 @@ export function useHlsPlayer({
           // Qualité adaptée au player et démarrage rapide
           capLevelToPlayerSize: true,
           startLevel: -1,
-          // Timeouts plus courts pour améliorer la reprise
+          // Timeouts: manifeste plus long pour 4K/NAS (génération HLS peut dépasser 10s)
           fragLoadingTimeOut: 20000,
-          manifestLoadingTimeOut: 10000,
-          levelLoadingTimeOut: 10000,
+          manifestLoadingTimeOut: 60000,
+          levelLoadingTimeOut: 20000,
         });
         hlsRef.current = hls;
 

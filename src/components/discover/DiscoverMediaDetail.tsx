@@ -56,7 +56,7 @@ export default function DiscoverMediaDetail({
           const count = groupData?.variant_count ?? variants.length;
           if (count > 0 || variants.length > 0) {
             // Torrent disponible → rediriger vers la page détail torrent
-            window.location.href = `/torrents?tmdbId=${tmdbId}&type=${mediaType}`;
+            window.location.href = `/torrents?tmdbId=${tmdbId}&type=${mediaType}&from=discover`;
             return;
           }
         }

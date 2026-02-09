@@ -112,7 +112,7 @@ export function HeroSection({
       return `/discover?tmdbId=${item.tmdbId}&type=${item.type}`;
     }
     // Torrent (slug ou id) → page détail torrent
-    return `/torrents/${item.id}`;
+    return `/torrents/${item.id}?from=dashboard`;
   };
 
   const handleMoreInfo = (item: ContentItem) => {

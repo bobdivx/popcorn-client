@@ -8,6 +8,8 @@ export interface MediaDetailPageProps {
   seriesEpisodes?: SeriesEpisodesResponse | null;
   /** Stats client (librqbit) passées depuis la page Téléchargements pour afficher immédiatement Lire / progression. */
   initialTorrentStats?: ClientTorrentStats | null;
+  /** URL de la page d'origine pour le bouton Retour (ex. /library, /dashboard, /discover). */
+  backHref?: string | null;
   torrent: {
     id: string;
     slug?: string | null;

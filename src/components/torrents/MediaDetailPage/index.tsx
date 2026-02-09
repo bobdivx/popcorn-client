@@ -255,7 +255,7 @@ function TrailerModal({
   );
 }
 
-export default function MediaDetailPage({ torrent, initialVariants, seriesEpisodes, initialTorrentStats }: MediaDetailPageProps) {
+export default function MediaDetailPage({ torrent, initialVariants, seriesEpisodes, initialTorrentStats, backHref }: MediaDetailPageProps) {
   // États de base
   const [isPlaying, setIsPlaying] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
@@ -981,7 +981,13 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
       <div className="relative z-10">
         <div className="relative w-full min-h-[60vh] sm:min-h-[70vh] flex flex-col justify-end px-3 sm:px-4 md:px-6 lg:px-16 pb-8 sm:pb-12 md:pb-16 pt-20 sm:pt-24 md:pt-32">
           <a
-            href="/dashboard"
+            href={backHref ?? '/dashboard'}
+            onClick={(e) => {
+              if (!backHref && typeof window !== 'undefined' && window.history.length > 1) {
+                e.preventDefault();
+                window.history.back();
+              }
+            }}
             className="inline-flex items-center gap-2 text-white/80 hover:text-white transition-colors mb-4 sm:mb-6 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-offset-2 focus:ring-offset-black rounded px-2 py-1"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">

@@ -340,7 +340,7 @@ export function DownloadDetailModal({
                 )}
 
                 <a
-                  href={`/torrents?infoHash=${encodeURIComponent(torrent.info_hash)}`}
+                  href={`/torrents?infoHash=${encodeURIComponent(torrent.info_hash)}&from=downloads`}
                   className="flex-1 min-w-[140px] px-6 py-3 tv:px-8 tv:py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg tv:rounded-xl text-base tv:text-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 flex items-center justify-center gap-2"
                   tabIndex={0}
                   data-focusable

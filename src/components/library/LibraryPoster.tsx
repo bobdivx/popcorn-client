@@ -3,16 +3,20 @@ import { Play, Info, Film } from 'lucide-preact';
 import type { LibraryMedia } from '../Library';
 import { FocusableCard } from '../ui/FocusableCard';
 import { useFocusDynamics } from '../ui/hooks/useFocusDynamics';
+import { useI18n } from '../../lib/i18n/useI18n';
 
 interface LibraryPosterProps {
   item: LibraryMedia;
   onPlay: (item: LibraryMedia) => void;
   className?: string;
+  priorityLoad?: boolean;
 }
 
 export function LibraryPoster({ item, onPlay, className, priorityLoad }: LibraryPosterProps) {
+  const { t } = useI18n();
   const [isHovered, setIsHovered] = useState(false);
   const cardContainerRef = useRef<HTMLDivElement>(null);
+  const isDownloading = !item.exists;
 
   // Hook pour Focus Dynamique "Pinned Left"
   const { cardRef: focusRef, isFocused } = useFocusDynamics({
@@ -88,8 +92,16 @@ export function LibraryPoster({ item, onPlay, className, priorityLoad }: Library
             </div>
           )}
 
-          {/* Badge de résolution en haut à droite */}
-          {item.resolution && (
+          {/* Badge "En cours" pour médias en téléchargement */}
+          {isDownloading && (
+            <div className="absolute top-2 left-2 right-2 lg:top-3 lg:left-3 lg:right-3 tv:top-4 tv:left-4 tv:right-4 z-10 flex justify-center">
+              <span className="badge badge-sm badge-warning glass-panel border border-amber-400/50 animate-pulse">
+                {t('library.downloadingBadge')}
+              </span>
+            </div>
+          )}
+          {/* Badge de résolution en haut à droite (masqué si en cours pour éviter la surcharge) */}
+          {item.resolution && !isDownloading && (
             <div className="absolute top-2 right-2 lg:top-3 lg:right-3 tv:top-4 tv:right-4 z-10">
               <span className="badge badge-sm badge-primary glass-panel border border-white/30">
                 {item.resolution}

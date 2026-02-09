@@ -533,7 +533,9 @@
     "films": "Films",
     "series": "Séries",
     "others": "Autres",
-    "sharedBy": "Partagé par {name}"
+    "sharedBy": "Partagé par {name}",
+    "downloadingSection": "En cours de téléchargement",
+    "downloadingBadge": "En cours"
   },
   "torrentStats": {
     "downloading": "Téléchargement en cours",

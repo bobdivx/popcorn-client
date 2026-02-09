@@ -21,9 +21,9 @@ function getDetailUrl(result: SearchResult): string {
     return `/discover?tmdbId=${result.tmdbId}&type=${result.type}`;
   }
   if (result.tmdbId != null) {
-    return `/torrents?tmdbId=${result.tmdbId}&title=${encodeURIComponent(result.title)}`;
+    return `/torrents?tmdbId=${result.tmdbId}&title=${encodeURIComponent(result.title)}&from=search`;
   }
-  return `/torrents?slug=${encodeURIComponent(result.id)}`;
+  return `/torrents?slug=${encodeURIComponent(result.id)}&from=search`;
 }
 
 /** URL page Discover pour demander le média (quand pas de torrent) */
