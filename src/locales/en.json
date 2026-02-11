@@ -672,6 +672,7 @@
         "gpuAcceleration": "Hardware acceleration (FFmpeg)",
         "gpuAvailable": "Available",
         "gpuNotAvailable": "Not available",
+        "gpuNotAvailableHint": "In Docker: expose the GPU in the stack. On CasaOS, use the « Popcornn (VAAPI GPU) » (Intel/AMD) or « Popcornn (Nvidia GPU) » variant so acceleration is available.",
         "refresh": "Refresh",
         "unavailableOrOldBackend": "Unable to load resources. If your server has not been updated recently, this feature may be unavailable (endpoint /api/media/resources)."
       }

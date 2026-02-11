@@ -282,19 +282,26 @@ function ResourcesSection() {
               </span>
             </div>
           )}
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-gray-300">
-              {t('settingsMenu.maintenance.resources.gpuAcceleration')}:
-            </span>
-            {d.gpu_available ? (
-              <span className="text-green-400 font-medium">
-                {t('settingsMenu.maintenance.resources.gpuAvailable')}
-                {d.hwaccels.length > 0 ? ` (${d.hwaccels.join(', ')})` : ''}
+          <div className="flex flex-col gap-1 mt-2">
+            <div className="flex items-center gap-2">
+              <span className="text-gray-300">
+                {t('settingsMenu.maintenance.resources.gpuAcceleration')}:
               </span>
-            ) : (
-              <span className="text-amber-400 font-medium">
-                {t('settingsMenu.maintenance.resources.gpuNotAvailable')}
-              </span>
+              {d.gpu_available ? (
+                <span className="text-green-400 font-medium">
+                  {t('settingsMenu.maintenance.resources.gpuAvailable')}
+                  {d.hwaccels.length > 0 ? ` (${d.hwaccels.join(', ')})` : ''}
+                </span>
+              ) : (
+                <span className="text-amber-400 font-medium">
+                  {t('settingsMenu.maintenance.resources.gpuNotAvailable')}
+                </span>
+              )}
+            </div>
+            {!d.gpu_available && (
+              <p className="text-xs text-gray-500 mt-0.5" title={t('settingsMenu.maintenance.resources.gpuNotAvailableHint')}>
+                {t('settingsMenu.maintenance.resources.gpuNotAvailableHint')}
+              </p>
             )}
           </div>
         </div>

@@ -672,6 +672,7 @@
         "gpuAcceleration": "Accélération matérielle (FFmpeg)",
         "gpuAvailable": "Disponible",
         "gpuNotAvailable": "Non disponible",
+        "gpuNotAvailableHint": "En Docker : monter le GPU dans le stack. l’image par défaut (FFmpeg sans GPU). Pour l’activer : variante « Popcornn (Nvidia GPU) » pour que l'accélération s'affiche. Variantes CasaOS : « Popcornn (VAAPI GPU) » ou « Popcornn (Nvidia GPU) ».",
         "refresh": "Actualiser",
         "unavailableOrOldBackend": "Impossible de charger les ressources. Si votre serveur n'a pas été mis à jour récemment, cette fonctionnalité peut être indisponible (endpoint /api/media/resources)."
       }
