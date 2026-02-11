@@ -42,17 +42,17 @@ function getFromFromLocation(): string | null {
   return from ? from.toLowerCase() : null;
 }
 
-/** Lit le paramètre `from` et retourne l’URL de retour (ex. /library, /dashboard). */
+/** Lit le paramètre `from` et retourne l’URL de retour (fallback si pas d'historique). La priorité est à history.back(). */
 function getBackHrefFromLocation(): string | null {
   if (typeof window === 'undefined') return null;
   const from = getFromFromLocation();
   if (!from) return null;
   const map: Record<string, string> = {
-    library: '/library',
     dashboard: '/dashboard',
     discover: '/discover',
     downloads: '/downloads',
     search: '/search',
+    torrents: '/torrents',
   };
   return map[from] ?? null;
 }

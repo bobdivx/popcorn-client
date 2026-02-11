@@ -757,10 +757,12 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     (el as HTMLElement & { _tvBack?: () => void })._tvBack = () => {
       const backLink = backLinkRef.current;
       if (backLink && document.activeElement === backLink) {
-        if (backHref) {
-          window.location.href = backHref;
-        } else if (typeof window !== 'undefined' && window.history.length > 1) {
+        if (typeof window !== 'undefined' && window.history.length > 1) {
           window.history.back();
+        } else if (backHref) {
+          window.location.href = backHref;
+        } else {
+          window.location.href = '/dashboard';
         }
       } else if (backLink) {
         backLink.focus();
@@ -1082,7 +1084,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
             ref={backLinkRef}
             href={backHref ?? '/dashboard'}
             onClick={(e) => {
-              if (!backHref && typeof window !== 'undefined' && window.history.length > 1) {
+              if (typeof window !== 'undefined' && window.history.length > 1) {
                 e.preventDefault();
                 window.history.back();
               }
