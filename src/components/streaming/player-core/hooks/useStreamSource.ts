@@ -13,6 +13,8 @@ interface UseStreamSourceInput {
   baseUrl: string;
   isDirectMode: boolean;
   isLucieMode?: boolean;
+  /** Bibliothèque partagée : URL du serveur ami ; le flux passera par le proxy local. */
+  streamBackendUrl?: string | null;
 }
 
 export function useStreamSource({
@@ -22,6 +24,7 @@ export function useStreamSource({
   baseUrl,
   isDirectMode,
   isLucieMode = false,
+  streamBackendUrl,
 }: UseStreamSourceInput) {
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [hlsFilePath, setHlsFilePath] = useState<string | null>(null);
@@ -59,6 +62,7 @@ export function useStreamSource({
           fileName: selectedFile.name,
           isDirectMode,
           isLucieMode,
+          streamBackendUrl,
         });
 
         const mode = isLucieMode ? 'lucie' : (isDirectMode ? 'direct' : 'hls');
@@ -106,7 +110,7 @@ export function useStreamSource({
     };
 
     loadStreamUrl();
-  }, [selectedFile, infoHash, directStreamUrl, baseUrl, isDirectMode, isLucieMode]);
+  }, [selectedFile, infoHash, directStreamUrl, baseUrl, isDirectMode, isLucieMode, streamBackendUrl]);
 
   return {
     streamUrl,

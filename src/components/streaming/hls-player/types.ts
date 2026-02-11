@@ -22,6 +22,10 @@ export interface HLSPlayerProps {
   canUseSeekReload?: boolean;
   /** URL du backend de stream (ex. bibliothèque ami). Si absent, utilise l'URL du serveur par défaut. */
   baseUrl?: string;
+  /** Flux depuis un serveur distant (ex. bibliothèque partagée) : buffer plus grand et timeouts augmentés. */
+  isRemoteStream?: boolean;
+  /** Quand défini, les URLs HLS passent par le proxy local /api/remote-stream/proxy (reload seek, etc.). */
+  streamBackendUrl?: string | null;
   /** Ref pour exposer stopBuffer (arrêt du buffer à la fermeture), remplace window.__hlsPlayerStopBuffer. */
   stopBufferRef?: import('preact').RefObject<(() => void) | null>;
 }

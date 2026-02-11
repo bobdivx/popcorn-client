@@ -10,6 +10,7 @@ import {
 } from '../../../../lib/streaming/torrent-storage';
 import { getOrCreateDeviceId } from '../../../../lib/utils/device-id';
 import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
+import { buildProxyUrl } from '../../player-core/utils/buildStreamUrl';
 
 interface UseHlsPlayerProps {
   src: string;
@@ -27,6 +28,10 @@ interface UseHlsPlayerProps {
   onDurationChange?: (duration: number) => void;
   /** URL du backend de stream (ex. bibliothèque ami). Évite les reconstructions implicites via getServerUrl(). */
   baseUrl?: string;
+  /** Flux distant (bibliothèque partagée) : buffer plus grand et timeouts augmentés pour limiter les stalls. */
+  isRemoteStream?: boolean;
+  /** Quand défini, les URLs HLS passent par le proxy local /api/remote-stream/proxy. */
+  streamBackendUrl?: string | null;
 }
 
 export function useHlsPlayer({
@@ -43,10 +48,13 @@ export function useHlsPlayer({
   canAutoPlay,
   onDurationChange,
   baseUrl: baseUrlProp,
+  isRemoteStream = false,
+  streamBackendUrl,
 }: UseHlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [pendingSeekPosition, setPendingSeekPosition] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const currentSrcRef = useRef<string | null>(null);
   const hasStartedPlayingRef = useRef(false);
@@ -88,6 +96,8 @@ export function useHlsPlayer({
   /** 503 sur rechargement de niveau (même URL seek) après un Seek OK : retries avant d’afficher l’erreur */
   const levelReload503RetryCountRef = useRef<number>(0);
   const seekVerifyTimeoutRef = useRef<number | null>(null);
+  /** 503 sur chargement initial (flux distant) : retries avant d'afficher l'erreur */
+  const initialLoad503RetryCountRef = useRef<number>(0);
 
   // Mettre à jour les refs quand les props changent (sans déclencher de réinitialisation)
   useEffect(() => {
@@ -120,19 +130,23 @@ export function useHlsPlayer({
     const filePathChanged = previousFilePathRef.current !== filePath;
     const infoHashChanged = previousInfoHashRef.current !== infoHash;
     const baseUrl = (baseUrlProp && baseUrlProp.trim()) || serverApi.getServerUrl();
+    const useProxy = Boolean(streamBackendUrl?.trim());
     const buildHlsUrl = (forceVod = false, seekSeconds?: number) => {
       const normalizedPath = filePath.replace(/\\/g, '/');
       const encodedPath = encodeURIComponent(normalizedPath);
-      const params = new URLSearchParams({
-        info_hash: infoHash,
-      });
+      const path = `/api/local/stream/${encodedPath}/playlist.m3u8`;
+      const params: Record<string, string> = { info_hash: infoHash };
       if (forceVod) {
-        params.set('force_vod', 'true');
+        params.force_vod = 'true';
         if (Number.isFinite(seekSeconds) && (seekSeconds ?? 0) > 0) {
-          params.set('seek', String(seekSeconds));
+          params.seek = String(seekSeconds);
         }
       }
-      return `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8?${params.toString()}`;
+      if (useProxy && streamBackendUrl) {
+        return buildProxyUrl(baseUrl, streamBackendUrl.trim(), path, params);
+      }
+      const search = new URLSearchParams(params);
+      return `${baseUrl}${path}?${search.toString()}`;
     };
     // Construire l'URL HLS pour vérifier si elle a changé
     const hlsUrl = buildHlsUrl(false);
@@ -181,8 +195,12 @@ export function useHlsPlayer({
       }
     };
 
-    const resolveAndRegisterFileId = async (playlistUrl: string, attempt = 0) => {
-      if (hlsFileIdRef.current) return;
+    const resolveAndRegisterFileId = async (
+      playlistUrl: string,
+      attempt = 0,
+    ): Promise<boolean> => {
+      if (hlsFileIdRef.current) return true;
+      const maxAttempts = isRemoteStream ? 12 : 10;
       try {
         const res = await fetch(playlistUrl, { method: 'HEAD', cache: 'no-store' });
         if (res.ok) {
@@ -190,18 +208,20 @@ export function useHlsPlayer({
           if (fileId) {
             hlsFileIdRef.current = fileId;
             await registerActiveVideo(fileId);
-            return;
+            return true;
           }
         }
       } catch (e) {
         console.warn('[useHlsPlayer] Impossible de récupérer le file_id HLS:', e);
       }
-      if (attempt < 10 && !hlsFileIdRef.current) {
-        const delay = Math.min(1000 + attempt * 500, 4000);
-        fileIdPollTimeoutRef.current = window.setTimeout(() => {
-          resolveAndRegisterFileId(playlistUrl, attempt + 1);
-        }, delay);
-      }
+      if (attempt >= maxAttempts - 1) return false;
+      const delay = isRemoteStream
+        ? Math.min(2000 + attempt * 1000, 8000)
+        : Math.min(1000 + attempt * 500, 4000);
+      await new Promise<void>((r) => {
+        fileIdPollTimeoutRef.current = window.setTimeout(r, delay) as unknown as number;
+      });
+      return resolveAndRegisterFileId(playlistUrl, attempt + 1);
     };
 
     const initializeVideo = async (forceReload = false, useForceVod = false) => {
@@ -284,9 +304,8 @@ export function useHlsPlayer({
           throw new Error('HLS.js n\'est pas disponible ou n\'est pas supporté par ce navigateur');
         }
 
-        // Configuration HLS.js. Buffer large pour 4K/REMUX/NAS où le transcodage peut être plus lent que le temps réel
-        // (sinon la lecture s'arrête ~1 min quand le buffer 60s s'épuise)
-        const maxBufferLength = 120;
+        // Configuration HLS.js. Buffer plus grand et timeouts plus longs pour flux distant (bibliothèque partagée).
+        const maxBufferLength = isRemoteStream ? 300 : 120;
         const hls = new window.Hls({
           enableWorker: true,
           lowLatencyMode: false,
@@ -295,16 +314,16 @@ export function useHlsPlayer({
           maxMaxBufferLength: maxBufferLength,
           maxBufferSize: playerConfig.maxBufferSize * 1000 * 1000,
           maxBufferHole: 0.5,
-          highBufferWatchdogPeriod: 2,
+          highBufferWatchdogPeriod: isRemoteStream ? 3 : 2,
           nudgeOffset: 0.1,
-          nudgeMaxRetry: 15,
+          nudgeMaxRetry: isRemoteStream ? 25 : 15,
           // Qualité adaptée au player et démarrage rapide
           capLevelToPlayerSize: true,
           startLevel: -1,
-          // Timeouts augmentés pour REMUX/NAS (premier segment peut prendre 30s+)
-          fragLoadingTimeOut: 45000,
-          manifestLoadingTimeOut: 30000,
-          levelLoadingTimeOut: 45000,
+          // Timeouts : plus longs pour flux distant (latence réseau)
+          fragLoadingTimeOut: isRemoteStream ? 60000 : 45000,
+          manifestLoadingTimeOut: isRemoteStream ? 45000 : 30000,
+          levelLoadingTimeOut: isRemoteStream ? 60000 : 45000,
         });
         hlsRef.current = hls;
 
@@ -326,6 +345,7 @@ export function useHlsPlayer({
           seekFallbackTriedRef.current = false;
           currentSrcRef.current = seekUrl;
           setIsLoading(true);
+          setPendingSeekPosition(seekSeconds);
           console.log(`[SEEK FLOW] 1️⃣ reloadWithSeek: demande seek à ${seekSeconds}s (${Math.floor(seekSeconds / 60)}:${Math.floor(seekSeconds % 60).toString().padStart(2, '0')}), currentTime actuel: ${video.currentTime}s, pendingSeekRef set à ${seekSeconds}s`);
           try {
             hlsRef.current.loadSource(seekUrl);
@@ -334,6 +354,7 @@ export function useHlsPlayer({
             console.warn('[useHlsPlayer] reloadWithSeek loadSource:', e);
             pendingSeekRef.current = 0;
             seekLoadUrlRef.current = null;
+            setPendingSeekPosition(0);
             setIsLoading(false);
           }
         };
@@ -422,6 +443,7 @@ export function useHlsPlayer({
           console.log(`[SEEK FLOW] MANIFEST_PARSED: pendingSeek=${pendingSeekRef.current}s, video.currentTime=${video.currentTime}s`);
           retryCountRef.current = 0;
           seekLoadRetryCountRef.current = 0;
+          initialLoad503RetryCountRef.current = 0;
           setIsLoading(false);
           onLoadingChangeRef.current?.(false);
           
@@ -568,6 +590,7 @@ export function useHlsPlayer({
                 seekVerifyTimeoutRef.current = null;
                 const now = video.currentTime;
                 if (Math.abs(now - pendingSeek) <= toleranceSec || retries >= maxSeekVerifyRetries) {
+                  setPendingSeekPosition(0);
                   setIsLoading(false);
                   return;
                 }
@@ -707,6 +730,7 @@ export function useHlsPlayer({
                   } catch (e) {
                     pendingSeekRef.current = 0;
                     seekLoadUrlRef.current = null;
+                    setPendingSeekPosition(0);
                     setIsLoading(false);
                   }
                 }
@@ -724,6 +748,7 @@ export function useHlsPlayer({
               console.error('[useHlsPlayer] 503 après 15 retries (5+ min) → abandon du seek, le serveur n\'a pas terminé la génération');
               pendingSeekRef.current = 0;
               seekLoadUrlRef.current = null;
+              setPendingSeekPosition(0);
               setError('Le serveur met trop de temps à générer la vidéo. Réessayez plus tard.');
               setIsLoading(false);
               return;
@@ -810,11 +835,44 @@ export function useHlsPlayer({
               return;
             }
 
+            // 503/202 sur chargement initial (flux distant) : le serveur peut être temporairement occupé
+            const url = currentSrcRef.current;
+            if (
+              (statusCode === 503 || statusCode === 202) &&
+              isRemoteStream &&
+              url &&
+              !seekLoadUrlRef.current &&
+              initialLoad503RetryCountRef.current < 5 &&
+              hlsRef.current
+            ) {
+              initialLoad503RetryCountRef.current += 1;
+              const delays = [3000, 6000, 10000, 15000, 20000];
+              const delayMs = delays[initialLoad503RetryCountRef.current - 1] ?? 20000;
+              console.debug(
+                '[useHlsPlayer] 503/202 flux distant (chargement initial), retry',
+                initialLoad503RetryCountRef.current,
+                'dans',
+                delayMs / 1000,
+                's'
+              );
+              window.setTimeout(() => {
+                if (hlsRef.current && currentSrcRef.current === url) {
+                  try {
+                    hlsRef.current.loadSource(url);
+                  } catch (e) {
+                    initialLoad503RetryCountRef.current = 0;
+                  }
+                }
+              }, delayMs);
+              return;
+            }
+
             console.debug('[useHlsPlayer] Erreur HLS réponse HTTP:', statusCode);
             restoringProgressiveRef.current = false;
             progressiveRestoreRetryCountRef.current = 0;
             segment404RetryCountRef.current = 0;
             levelReload503RetryCountRef.current = 0;
+            initialLoad503RetryCountRef.current = 0;
             try {
               hls.destroy();
             } catch (_) {}
@@ -1107,7 +1165,7 @@ export function useHlsPlayer({
     };
     // IMPORTANT: Utiliser des dépendances stabilisées pour éviter les réinitialisations multiples
     // Seulement infoHash et filePath sont critiques, les autres dépendances sont stables ou gérées via refs
-  }, [hlsLoaded, infoHash, filePath, baseUrlProp]); // baseUrl pour bibliothèque ami / backend distant
+  }, [hlsLoaded, infoHash, filePath, baseUrlProp, streamBackendUrl]);
 
   // Fonction pour arrêter le buffer manuellement (utile lors de la fermeture)
   const stopBuffer = () => {
@@ -1128,6 +1186,7 @@ export function useHlsPlayer({
     videoRef,
     hlsRef,
     isLoading,
+    pendingSeekPosition,
     error,
     hlsLoaded,
     stopBuffer,

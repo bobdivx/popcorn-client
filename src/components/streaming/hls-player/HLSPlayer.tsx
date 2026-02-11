@@ -32,6 +32,8 @@ export default function HLSPlayer({
   onClose,
   canUseSeekReload: canUseSeekReloadProp,
   baseUrl: baseUrlProp,
+  isRemoteStream = false,
+  streamBackendUrl,
   stopBufferRef,
 }: HLSPlayerProps) {
   const playerConfig = usePlayerConfig();
@@ -49,7 +51,7 @@ export default function HLSPlayer({
     setHlsDuration(undefined);
   }, [infoHash, filePath]);
   
-  const { videoRef, hlsRef, isLoading, error, hlsLoaded, stopBuffer, reloadWithSeek } = useHlsPlayer({
+  const { videoRef, hlsRef, isLoading, pendingSeekPosition, error, hlsLoaded, stopBuffer, reloadWithSeek } = useHlsPlayer({
     src,
     infoHash,
     fileName,
@@ -71,6 +73,8 @@ export default function HLSPlayer({
       }
     },
     baseUrl: baseUrlProp,
+    isRemoteStream,
+    streamBackendUrl,
   });
   
   // Exposer stopBuffer via ref pour que le parent (VideoPlayerWrapper) puisse l'appeler à la fermeture
@@ -104,6 +108,7 @@ export default function HLSPlayer({
     hlsLoaded,
     hlsDuration,
     isLoading,
+    pendingSeekPosition,
     // Réactivé pour local_ : la protection active_seek_target côté serveur empêche les 503 en boucle.
     // Maintenant, reloadWithSeek fonctionne correctement pour tous les types de fichiers.
     canUseSeekReload: canUseSeekReloadProp ?? true,

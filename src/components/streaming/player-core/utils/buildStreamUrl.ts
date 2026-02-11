@@ -1,10 +1,13 @@
 export interface BuildStreamUrlInput {
+  /** URL du serveur local (utilisée comme base pour le proxy quand streamBackendUrl est défini). */
   baseUrl: string;
   infoHash: string;
   filePath: string;
   fileName: string;
   isDirectMode: boolean;
   isLucieMode?: boolean;
+  /** Quand défini (bibliothèque partagée), le flux passe par le proxy local /api/remote-stream/proxy. */
+  streamBackendUrl?: string | null;
 }
 
 export interface BuildStreamUrlResult {
@@ -22,6 +25,23 @@ export function normalizeStreamPath(filePath: string): string {
   return normalizedPath;
 }
 
+/** Construit l'URL du proxy local pour un flux distant (backend + path + query). */
+export function buildProxyUrl(
+  localBaseUrl: string,
+  streamBackendUrl: string,
+  remotePath: string,
+  queryParams: Record<string, string>,
+): string {
+  const base = localBaseUrl.replace(/\/$/, '');
+  const params = new URLSearchParams();
+  params.set('backend', streamBackendUrl.trim());
+  params.set('path', remotePath);
+  for (const [k, v] of Object.entries(queryParams)) {
+    if (v != null && v !== '') params.set(k, v);
+  }
+  return `${base}/api/remote-stream/proxy?${params.toString()}`;
+}
+
 export function buildStreamUrl({
   baseUrl,
   infoHash,
@@ -29,6 +49,7 @@ export function buildStreamUrl({
   fileName,
   isDirectMode,
   isLucieMode = false,
+  streamBackendUrl,
 }: BuildStreamUrlInput): BuildStreamUrlResult {
   const normalizedPath = normalizeStreamPath(filePath);
 
@@ -40,17 +61,31 @@ export function buildStreamUrl({
 
   const encodedPath = encodeURIComponent(pathForUrl);
   const infoHashParam = infoHash ? `?info_hash=${encodeURIComponent(infoHash)}` : '';
-  
-  // Construire l'URL selon le mode
+  const useProxy = Boolean(streamBackendUrl?.trim());
+
+  // Construire l'URL selon le mode (avec ou sans proxy pour bibliothèque partagée)
   let streamUrl: string;
-  if (isLucieMode) {
-    // Mode Lucie: manifest JSON
+  if (useProxy) {
+    const backend = streamBackendUrl!.trim();
+    if (isLucieMode) {
+      streamUrl = buildProxyUrl(baseUrl, backend, '/api/lucie/manifest.json', {
+        path: pathForUrl,
+        info_hash: infoHash,
+      });
+    } else if (isDirectMode) {
+      streamUrl = buildProxyUrl(baseUrl, backend, `/api/local/stream/${encodedPath}`, {
+        info_hash: infoHash,
+      });
+    } else {
+      streamUrl = buildProxyUrl(baseUrl, backend, `/api/local/stream/${encodedPath}/playlist.m3u8`, {
+        info_hash: infoHash,
+      });
+    }
+  } else if (isLucieMode) {
     streamUrl = `${baseUrl}/api/lucie/manifest.json?path=${encodedPath}&info_hash=${encodeURIComponent(infoHash)}`;
   } else if (isDirectMode) {
-    // Mode Direct: stream direct
     streamUrl = `${baseUrl}/api/local/stream/${encodedPath}${infoHashParam}`;
   } else {
-    // Mode HLS: playlist M3U8
     streamUrl = `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8${infoHashParam}`;
   }
 

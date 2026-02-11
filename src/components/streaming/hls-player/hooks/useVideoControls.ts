@@ -7,6 +7,8 @@ interface UseVideoControlsProps {
   hlsLoaded: boolean;
   hlsDuration?: number;
   isLoading?: boolean;
+  /** Position de seek en cours (reload avec seek=) : afficher cette position pendant le buffering au lieu de 0 */
+  pendingSeekPosition?: number;
   canUseSeekReload?: boolean;
   /** Si fourni, appelé quand l'utilisateur seek au-delà du buffer (ex. >90s) pour recharger avec seek= */
   reloadWithSeek?: (seekSeconds: number) => void;
@@ -17,6 +19,7 @@ export function useVideoControls({
   hlsLoaded,
   hlsDuration,
   isLoading = false,
+  pendingSeekPosition = 0,
   canUseSeekReload = true,
   reloadWithSeek,
 }: UseVideoControlsProps) {
@@ -362,10 +365,14 @@ export function useVideoControls({
     return playerConfig.autoplay;
   };
 
+  // Pendant un reload-with-seek, garder la barre de progression à la position demandée au lieu de 0
+  const displayCurrentTime =
+    pendingSeekPosition > 0 && isLoading ? pendingSeekPosition : currentTime;
+
   return {
     showControls,
     isPlaying,
-    currentTime,
+    currentTime: displayCurrentTime,
     duration,
     bufferedPercent,
     isSeeking,

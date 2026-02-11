@@ -12,6 +12,7 @@ import { usePlayerConfig } from '../../../streaming/hls-player/hooks/usePlayerCo
 import PlayerLoadingOverlay from '../../../streaming/player-core/components/PlayerLoadingOverlay';
 import UnifiedPlayer from '../../../streaming/player-core/components/UnifiedPlayer';
 import { useStreamSource } from '../../../streaming/player-core/hooks/useStreamSource';
+import { buildProxyUrl } from '../../../streaming/player-core/utils/buildStreamUrl';
 import { canUseSeekReload as computeCanUseSeekReload } from '../../../streaming/player-core/utils/streamSourceUtils';
 import { emitPlaybackStep } from '../../../streaming/player-core/observability/playbackEvents';
 import { useI18n } from '../../../../lib/i18n/useI18n';
@@ -72,7 +73,7 @@ export function VideoPlayerWrapper({
   directStreamUrl,
   streamBackendUrl,
 }: VideoPlayerWrapperProps) {
-  const baseUrl = streamBackendUrl?.trim() || serverApi.getServerUrl();
+  const baseUrl = serverApi.getServerUrl();
   const [forceHlsFallback, setForceHlsFallback] = useState(false);
   const [showFallbackMessage, setShowFallbackMessage] = useState(false);
   const [showPreroll, setShowPreroll] = useState(false);
@@ -106,6 +107,7 @@ export function VideoPlayerWrapper({
     baseUrl,
     isDirectMode: effectiveDirectMode,
     isLucieMode: useLucieForThisSource,
+    streamBackendUrl,
   });
   
   const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';
@@ -168,7 +170,10 @@ export function VideoPlayerWrapper({
       try {
         const normalizedPath = hlsFilePath.replace(/\\/g, '/');
         const encodedPath = encodeURIComponent(normalizedPath);
-        const hlsUrl = `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8?info_hash=${encodeURIComponent(infoHash)}`;
+        const path = `/api/local/stream/${encodedPath}/playlist.m3u8`;
+        const hlsUrl = streamBackendUrl?.trim()
+          ? buildProxyUrl(baseUrl, streamBackendUrl.trim(), path, { info_hash: infoHash })
+          : `${baseUrl}${path}?info_hash=${encodeURIComponent(infoHash)}`;
 
         const backgroundVideo = document.createElement('video');
         backgroundVideo.style.display = 'none';
@@ -217,7 +222,7 @@ export function VideoPlayerWrapper({
         preloadVideoRef.current = null;
       }
     };
-  }, [showPreroll, showIntro, hlsLoaded, infoHash, hlsFilePath, directStreamUrl, baseUrl, effectiveDirectMode]);
+  }, [showPreroll, showIntro, hlsLoaded, infoHash, hlsFilePath, directStreamUrl, baseUrl, effectiveDirectMode, streamBackendUrl]);
 
   useEffect(() => {
     if (!adsConfig || !selectedFile || !infoHash) return;
@@ -265,6 +270,7 @@ export function VideoPlayerWrapper({
   if (!directStreamUrl && !effectiveDirectMode && showIntro && selectedFile && hlsFilePath && infoHash) {
     return (
       <IntroVideoWithHlsPreload
+        hlsStreamUrl={streamUrl}
         onEnded={() => {
           // Marquer l'intro comme vue (seulement si on n'est pas en mode "toujours afficher")
           try {
@@ -408,6 +414,8 @@ export function VideoPlayerWrapper({
                 filePath: selectedFile?.path ?? selectedFile?.name ?? null,
               }),
               baseUrl,
+              isRemoteStream: !!streamBackendUrl?.trim(),
+              streamBackendUrl: streamBackendUrl ?? undefined,
               stopBufferRef,
             }}
             lucieProps={{

@@ -9,6 +9,8 @@ interface IntroVideoWithHlsPreloadProps {
   hlsInfoHash?: string;
   hlsFilePath?: string;
   hlsFileName?: string;
+  /** URL de la playlist HLS (ex. proxy pour bibliothèque partagée). Si fournie, utilisée telle quelle. */
+  hlsStreamUrl?: string | null;
   onHlsReady?: (hlsInstance: any) => void;
 }
 
@@ -18,6 +20,7 @@ export default function IntroVideoWithHlsPreload({
   hlsInfoHash,
   hlsFilePath,
   hlsFileName,
+  hlsStreamUrl,
   onHlsReady,
 }: IntroVideoWithHlsPreloadProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -58,11 +61,10 @@ export default function IntroVideoWithHlsPreload({
     const preloadHls = async () => {
       try {
         setHlsPreloadStatus('Préchargement de la playlist...');
-        
         const baseUrl = serverApi.getServerUrl();
         const normalizedPath = hlsFilePath.replace(/\\/g, '/');
         const encodedPath = encodeURIComponent(normalizedPath);
-        const hlsUrl = `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8?info_hash=${encodeURIComponent(hlsInfoHash)}`;
+        const hlsUrl = (hlsStreamUrl && hlsStreamUrl.trim()) || `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8?info_hash=${encodeURIComponent(hlsInfoHash)}`;
 
         console.log('[IntroVideoWithHlsPreload] Préchargement HLS:', {
           hlsUrl,
