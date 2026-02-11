@@ -1041,6 +1041,21 @@ interface IServerApiClientPublic {
 
   // System methods
   resetBackendDatabase(): Promise<ApiResponse<void>>;
+  forceCacheCleanup(): Promise<ApiResponse<{ cleaned_count: number }>>;
+  getTranscodingConfig(): Promise<ApiResponse<{ max_concurrent_transcodings: number }>>;
+  updateTranscodingConfig(body: {
+    max_concurrent_transcodings: number;
+  }): Promise<ApiResponse<{ max_concurrent_transcodings: number }>>;
+  getSystemResources(): Promise<
+    ApiResponse<{
+      process_memory_mb: number;
+      process_cpu_usage_percent: number;
+      system_memory_total_mb: number | null;
+      system_memory_used_mb: number | null;
+      gpu_available: boolean;
+      hwaccels: string[];
+    }>
+  >;
 
   // Dashboard methods
   getDashboardData(): Promise<ApiResponse<DashboardData>>;

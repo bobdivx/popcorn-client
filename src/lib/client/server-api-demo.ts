@@ -454,6 +454,36 @@ export function createDemoServerApi(): Record<string, unknown> {
     async resetBackendDatabase(): Promise<ApiResponse<void>> {
       return success(undefined);
     },
+    async forceCacheCleanup(): Promise<ApiResponse<{ cleaned_count: number }>> {
+      return success({ cleaned_count: 0 });
+    },
+    async getTranscodingConfig(): Promise<ApiResponse<{ max_concurrent_transcodings: number }>> {
+      return success({ max_concurrent_transcodings: 2 });
+    },
+    async updateTranscodingConfig(_body: {
+      max_concurrent_transcodings: number;
+    }): Promise<ApiResponse<{ max_concurrent_transcodings: number }>> {
+      return success({ max_concurrent_transcodings: _body.max_concurrent_transcodings });
+    },
+    async getSystemResources(): Promise<
+      ApiResponse<{
+        process_memory_mb: number;
+        process_cpu_usage_percent: number;
+        system_memory_total_mb: number | null;
+        system_memory_used_mb: number | null;
+        gpu_available: boolean;
+        hwaccels: string[];
+      }>
+    > {
+      return success({
+        process_memory_mb: 128.5,
+        process_cpu_usage_percent: 2.1,
+        system_memory_total_mb: 16384,
+        system_memory_used_mb: 8192,
+        gpu_available: false,
+        hwaccels: [],
+      });
+    },
 
     async discoverMovies(): Promise<ApiResponse<unknown>> {
       return success({ results: MOCK_MOVIES });

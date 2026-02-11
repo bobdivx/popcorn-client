@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
+import { useI18n } from '../../../../lib/i18n/useI18n';
 import { useHlsLoader } from './useHlsLoader';
 import { usePlayerConfig } from './usePlayerConfig';
 import { clientApi } from '../../../../lib/client/api';
@@ -32,6 +33,8 @@ interface UseHlsPlayerProps {
   isRemoteStream?: boolean;
   /** Quand défini, les URLs HLS passent par le proxy local /api/remote-stream/proxy. */
   streamBackendUrl?: string | null;
+  /** Appelé quand le serveur a arrêté d'autres transcodages pour libérer de la place (en-tête X-Transcodings-Evicted). */
+  onTranscodingsEvicted?: (count: number) => void;
 }
 
 export function useHlsPlayer({
@@ -50,7 +53,9 @@ export function useHlsPlayer({
   baseUrl: baseUrlProp,
   isRemoteStream = false,
   streamBackendUrl,
+  onTranscodingsEvicted,
 }: UseHlsPlayerProps) {
+  const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,6 +78,7 @@ export function useHlsPlayer({
   // Refs pour les callbacks et configs qui changent mais ne doivent pas déclencher de réinitialisation
   const onErrorRef = useRef(onError);
   const onLoadingChangeRef = useRef(onLoadingChange);
+  const onTranscodingsEvictedRef = useRef(onTranscodingsEvicted);
   const canAutoPlayRef = useRef(canAutoPlay);
   const startFromBeginningRef = useRef(startFromBeginning);
   const torrentIdRef = useRef(torrentId);
@@ -101,9 +107,10 @@ export function useHlsPlayer({
 
   // Mettre à jour les refs quand les props changent (sans déclencher de réinitialisation)
   useEffect(() => {
-    onErrorRef.current = onError;
-    onLoadingChangeRef.current = onLoadingChange;
-    canAutoPlayRef.current = canAutoPlay;
+  onErrorRef.current = onError;
+  onLoadingChangeRef.current = onLoadingChange;
+  onTranscodingsEvictedRef.current = onTranscodingsEvicted;
+  canAutoPlayRef.current = canAutoPlay;
     startFromBeginningRef.current = startFromBeginning;
     torrentIdRef.current = torrentId;
     tmdbIdRef.current = tmdbId;
@@ -201,8 +208,15 @@ export function useHlsPlayer({
     ): Promise<boolean> => {
       if (hlsFileIdRef.current) return true;
       const maxAttempts = isRemoteStream ? 12 : 10;
+      const headTimeoutMs = 120_000;
+      const ac = new AbortController();
+      const timeoutId = window.setTimeout(() => ac.abort(), headTimeoutMs);
       try {
-        const res = await fetch(playlistUrl, { method: 'HEAD', cache: 'no-store' });
+        const res = await fetch(playlistUrl, {
+          method: 'HEAD',
+          cache: 'no-store',
+          signal: ac.signal,
+        });
         if (res.ok) {
           const fileId = res.headers.get('x-hls-file-id');
           if (fileId) {
@@ -213,6 +227,8 @@ export function useHlsPlayer({
         }
       } catch (e) {
         console.warn('[useHlsPlayer] Impossible de récupérer le file_id HLS:', e);
+      } finally {
+        window.clearTimeout(timeoutId);
       }
       if (attempt >= maxAttempts - 1) return false;
       const delay = isRemoteStream
@@ -263,16 +279,19 @@ export function useHlsPlayer({
         blobUrlRef.current = hlsUrl;
         currentSrcRef.current = hlsUrl;
 
-        // Appel non bloquant à l'API durée (ffprobe). Ignoré pour flux local (backend n'expose pas /api/local/duration).
-        const isLocalStream = hlsUrl.includes('/api/local/');
-        if (!isLocalStream) {
+        // Appel non bloquant à l'API durée (ffprobe). Essentiel en HLS progressif (bibliothèque) :
+        // la playlist ne contient que les segments déjà générés, donc video.duration = durée du buffer.
+        // Pour les médias local_ (bibliothèque), ne pas appeler l'API : le chemin peut être côté client
+        // et le backend renverrait 404 ; la durée viendra de X-Video-Duration ou de la balise vidéo.
+        const isLocalMedia = infoHash.startsWith('local_');
+        if (!isLocalMedia) {
           const encodedPathParam = encodeURIComponent(filePath.replace(/\\/g, '/'));
           const durationUrl = `${baseUrl}/api/local/duration?path=${encodedPathParam}&info_hash=${encodeURIComponent(infoHash)}`;
-          const ac = new AbortController();
-          const t = setTimeout(() => ac.abort(), 10000);
-          fetch(durationUrl, { signal: ac.signal })
+          const durationAc = new AbortController();
+          const durationT = setTimeout(() => durationAc.abort(), 10000);
+          fetch(durationUrl, { signal: durationAc.signal })
             .then((r) => {
-              clearTimeout(t);
+              clearTimeout(durationT);
               if (!r.ok) {
                 const err = new Error(`API returned ${r.status}`) as Error & { status?: number };
                 err.status = r.status;
@@ -290,7 +309,7 @@ export function useHlsPlayer({
               }
             })
             .catch((e) => {
-              clearTimeout(t);
+              clearTimeout(durationT);
               const status = (e as Error & { status?: number }).status;
               if (status !== 404) {
                 const message = e instanceof Error ? e.message : String(e);
@@ -324,6 +343,27 @@ export function useHlsPlayer({
           fragLoadingTimeOut: isRemoteStream ? 60000 : 45000,
           manifestLoadingTimeOut: isRemoteStream ? 45000 : 30000,
           levelLoadingTimeOut: isRemoteStream ? 60000 : 45000,
+          // Détecter les en-têtes playlist : X-Transcodings-Evicted et X-Video-Duration (durée réelle pour médias local_)
+          xhrSetup: (xhr: XMLHttpRequest, url: string) => {
+            xhr.addEventListener('load', () => {
+              if (xhr.status === 200 && url.indexOf('segment') === -1) {
+                const evicted = xhr.getResponseHeader('X-Transcodings-Evicted');
+                if (evicted) {
+                  const n = parseInt(evicted, 10);
+                  if (!Number.isNaN(n) && n > 0) onTranscodingsEvictedRef.current?.(n);
+                }
+                const durationHeader = xhr.getResponseHeader('X-Video-Duration');
+                if (durationHeader) {
+                  const d = parseFloat(durationHeader);
+                  if (!Number.isNaN(d) && d > 0 && isFinite(d)) {
+                    apiDurationRef.current = d;
+                    totalDurationRef.current = d;
+                    onDurationChangeRef.current?.(d);
+                  }
+                }
+              }
+            });
+          },
         });
         hlsRef.current = hls;
 
@@ -878,10 +918,10 @@ export function useHlsPlayer({
             } catch (_) {}
             hlsRef.current = null;
             seekLoadUrlRef.current = null;
-            const msg = `Erreur serveur HLS (HTTP ${statusCode})`;
-            setError(msg);
+            const defaultMsg = `Erreur serveur HLS (HTTP ${statusCode})`;
+            setError(defaultMsg);
             setIsLoading(false);
-            onErrorRef.current?.(new Error(msg));
+            onErrorRef.current?.(new Error(defaultMsg));
             return;
           }
 
@@ -1085,6 +1125,15 @@ export function useHlsPlayer({
 
         const handleBeforeUnload = () => {
           savePositionAndStopBuffer();
+          const fileId = hlsFileIdRef.current;
+          if (fileId && activeVideoRegisteredRef.current && typeof navigator.sendBeacon === 'function') {
+            const url = `${baseUrl}/api/media/cache/unregister`;
+            const sent = navigator.sendBeacon(
+              url,
+              new Blob([JSON.stringify({ file_id: fileId })], { type: 'application/json' }),
+            );
+            if (sent) activeVideoRegisteredRef.current = false;
+          }
           void unregisterActiveVideo();
         };
 

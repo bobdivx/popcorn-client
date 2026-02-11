@@ -130,30 +130,31 @@ export function useVideoFiles({ torrentName, onError, filePath, torrent }: UseVi
           setLoadingFiles(false);
           return files;
         }
+
+        // Si on a un chemin bibliothèque (média "disponible localement"), l'utiliser sans appeler getTorrent
+        // pour éviter un 404 quand le torrent n'est pas sur ce backend (ex. bibliothèque partagée / autre machine).
+        if (torrent?.downloadPath) {
+          console.log('[useVideoFiles] 📁 Utilisation du chemin bibliothèque (sans appel getTorrent):', torrent.downloadPath);
+          const fileName = torrentName || torrent.downloadPath.split(/[/\\]/).pop() || 'video';
+          const libraryFile: TorrentFile = {
+            path: torrent.downloadPath,
+            name: fileName,
+            size: 0,
+            is_video: true,
+          };
+          const files = [libraryFile];
+          filesCacheRef.current.set(infoHash, files);
+          setVideoFiles(files);
+          setSelectedFile(files[0]);
+          setLoadingFiles(false);
+          return files;
+        }
         
-        // Pour les torrents normaux, vérifier d'abord si le torrent existe et est prêt
+        // Pour les torrents normaux (sans chemin bibliothèque), vérifier si le torrent existe sur le backend
         const torrentStats = await clientApi.getTorrent(infoHash);
         if (!torrentStats) {
           console.warn('[useVideoFiles] ⚠️ Torrent non trouvé dans le backend');
-          // Si on a un chemin bibliothèque (fichier sur disque sans torrent dans le client), l'utiliser pour lire
-          if (torrent?.downloadPath) {
-            console.log('[useVideoFiles] 📁 Utilisation du chemin bibliothèque (torrent absent du client):', torrent.downloadPath);
-            const fileName = torrentName || torrent.downloadPath.split(/[/\\]/).pop() || 'video';
-            const libraryFile: TorrentFile = {
-              path: torrent.downloadPath,
-              name: fileName,
-              size: 0,
-              is_video: true,
-            };
-            const files = [libraryFile];
-            filesCacheRef.current.set(infoHash, files);
-            setVideoFiles(files);
-            setSelectedFile(files[0]);
-            setLoadingFiles(false);
-            return files;
-          }
           if (retryCount < 5) {
-            // Réessayer après 1 seconde
             await new Promise(resolve => setTimeout(resolve, 1000));
             return loadVideoFiles(infoHash, retryCount + 1);
           }

@@ -442,7 +442,10 @@
     "nextEpisode": "Épisode suivant",
     "buffering": "Mise en buffer…",
     "bufferingProgress": "Mise en buffer {percent}%",
-    "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct."
+    "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct.",
+    "maxTranscodingsReached": "Nombre maximum de transcodages atteint. Arrêtez les autres lectures en cours.",
+    "maxTranscodingsReachedWithList": "Nombre maximum de transcodages atteint (max {max}). Arrêtez les autres lectures ou attendez qu'elles se terminent. Transcodages en cours : {list}",
+    "transcodingsEvicted": "D'autres transcodages ont été arrêtés pour libérer de la place."
   },
   "nav": {
     "menu": "Menu",
@@ -642,7 +645,36 @@
       "library": "Bibliothèque",
       "discovery": "Découverte & Demandes",
       "account": "Compte & Utilisateurs",
-      "playback": "Lecture"
+      "playback": "Lecture",
+      "maintenance": "Maintenance"
+    },
+    "maintenance": {
+      "forceCleanup": {
+        "title": "Forcer le nettoyage du cache",
+        "description": "Supprime les répertoires de cache HLS/transcodage inactifs (vidéos non en cours de lecture). Libère de l'espace et arrête les processus ffmpeg orphelins.",
+        "action": "Forcer le nettoyage",
+        "success": "Nettoyage effectué.",
+        "successCount": "Nettoyage effectué. {count} élément(s) supprimé(s)."
+      },
+      "transcodingConfig": {
+        "title": "Nombre max de transcodages",
+        "description": "Limite le nombre de flux HLS/FFmpeg simultanés. Réduire cette valeur limite la charge CPU (ex. sur NAS).",
+        "maxLabel": "Transcodages simultanés max",
+        "range": "Entre {min} et {max}",
+        "saveSuccess": "Paramètre enregistré."
+      },
+      "resources": {
+        "title": "Ressources utilisées",
+        "description": "Mémoire et CPU du serveur, et disponibilité de l'accélération matérielle (GPU) pour FFmpeg.",
+        "processMemory": "Mémoire processus",
+        "processCpu": "CPU processus",
+        "systemMemory": "Mémoire système",
+        "gpuAcceleration": "Accélération matérielle (FFmpeg)",
+        "gpuAvailable": "Disponible",
+        "gpuNotAvailable": "Non disponible",
+        "refresh": "Actualiser",
+        "unavailableOrOldBackend": "Impossible de charger les ressources. Si votre serveur n'a pas été mis à jour récemment, cette fonctionnalité peut être indisponible (endpoint /api/media/resources)."
+      }
     },
     "setup": {
       "title": "Configuration initiale",

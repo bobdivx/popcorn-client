@@ -63,6 +63,9 @@ export default function HLSPlayer({
     onError,
     onLoadingChange,
     canAutoPlay: () => canAutoPlayRef.current ? canAutoPlayRef.current() : true,
+    onTranscodingsEvicted: () => {
+      setTranscodingsEvictedMessage(t('playback.transcodingsEvicted'));
+    },
     onDurationChange: (duration) => {
       // Toujours utiliser Math.max pour préserver la valeur la plus élevée
       // Cela garantit que si l'API a défini une valeur supérieure, elle ne sera jamais écrasée
@@ -138,6 +141,7 @@ export default function HLSPlayer({
   } = useHlsTracks({ videoRef, hlsRef, hlsLoaded, src });
 
   const [showControls, setShowControls] = useState(baseShowControls);
+  const [transcodingsEvictedMessage, setTranscodingsEvictedMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setShowControls(baseShowControls);
@@ -254,6 +258,13 @@ export default function HLSPlayer({
     progressBarRef,
   });
 
+  // Message informatif "autres transcodages arrêtés" : afficher 5 s puis masquer
+  useEffect(() => {
+    if (!transcodingsEvictedMessage) return;
+    const tId = window.setTimeout(() => setTranscodingsEvictedMessage(null), 5000);
+    return () => clearTimeout(tId);
+  }, [transcodingsEvictedMessage]);
+
   const displayError = error;
   const shouldShowBuffering = isLoading || (isSeeking && bufferedPercent < 100);
 
@@ -286,6 +297,14 @@ export default function HLSPlayer({
           willChange: 'transform',
         }}
       >
+        {transcodingsEvictedMessage && (
+          <div
+            class="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 px-4 py-2 rounded-lg bg-black/80 text-white text-sm text-center shadow-lg toast-animate max-w-[90%]"
+            role="status"
+          >
+            {transcodingsEvictedMessage}
+          </div>
+        )}
         {shouldShowBuffering && (
           <div class="absolute inset-0 flex flex-col items-center justify-center bg-black z-10">
             {/* Animation du logo Popcorn */}

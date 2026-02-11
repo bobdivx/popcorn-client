@@ -6,8 +6,10 @@ import {
   UserCircle,
   Play,
   Library,
+  Wrench,
 } from 'lucide-preact';
 import SystemSubMenuPanel from './SystemSubMenuPanel';
+import MaintenanceSubMenuPanel from './MaintenanceSubMenuPanel';
 import InterfaceSubMenuPanel from './InterfaceSubMenuPanel';
 import ContentSubMenuPanel from './ContentSubMenuPanel';
 import LibrarySubMenuPanel from './LibrarySubMenuPanel';
@@ -19,7 +21,7 @@ import { useState, useMemo, useEffect } from 'preact/hooks';
 import type { ComponentType } from 'preact';
 import { canAccess } from '../../lib/permissions';
 
-type CategoryId = 'system' | 'interface' | 'content' | 'library' | 'discovery' | 'account' | 'playback';
+type CategoryId = 'system' | 'interface' | 'content' | 'library' | 'discovery' | 'account' | 'playback' | 'maintenance';
 
 interface SettingsItem {
   id: string;
@@ -53,9 +55,10 @@ const CATEGORY_ICONS: Record<CategoryId, any> = {
   discovery: Globe,
   account: UserCircle,
   playback: Play,
+  maintenance: Wrench,
 };
 
-const VALID_CATEGORIES: CategoryId[] = ['system', 'interface', 'content', 'library', 'discovery', 'account', 'playback'];
+const VALID_CATEGORIES: CategoryId[] = ['system', 'interface', 'content', 'library', 'discovery', 'account', 'playback', 'maintenance'];
 
 function getInitialCategory(): CategoryId {
   if (typeof window === 'undefined') return 'system';
@@ -77,6 +80,14 @@ export default function SettingsMenu() {
         icon: CATEGORY_ICONS.system,
         items: [],
         inlineContent: SystemSubMenuPanel,
+        inlinePermission: 'settings.server',
+      },
+      {
+        id: 'maintenance',
+        labelKey: 'settingsMenu.category.maintenance',
+        icon: CATEGORY_ICONS.maintenance,
+        items: [],
+        inlineContent: MaintenanceSubMenuPanel,
         inlinePermission: 'settings.server',
       },
       {
