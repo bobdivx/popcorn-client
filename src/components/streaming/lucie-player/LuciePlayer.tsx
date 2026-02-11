@@ -1,19 +1,18 @@
 import { useEffect, useState, useRef } from 'preact/hooks';
-import { useVideoControls } from './hooks/useVideoControls';
-import { useFullscreen, toggleFullscreen } from './hooks/useFullscreen';
-import { ErrorDisplay } from './components/ErrorDisplay';
-import { VideoControls } from './components/VideoControls';
-import type { HLSPlayerProps } from './types';
-import { useHlsPlayer } from './hooks/useHlsPlayer';
-import { useTVPlayerNavigation } from './hooks/useTVPlayerNavigation';
-import { useHlsTracks } from './hooks/useHlsTracks';
-import { usePlayerConfig } from './hooks/usePlayerConfig';
+import { useVideoControls } from '../hls-player/hooks/useVideoControls';
+import { useFullscreen, toggleFullscreen } from '../hls-player/hooks/useFullscreen';
+import { ErrorDisplay } from '../hls-player/components/ErrorDisplay';
+import { VideoControls } from '../hls-player/components/VideoControls';
+import type { LuciePlayerProps } from './types';
+import { useLuciePlayer } from './hooks/useLuciePlayer';
+import { useTVPlayerNavigation } from '../hls-player/hooks/useTVPlayerNavigation';
+import { usePlayerConfig } from '../hls-player/hooks/usePlayerConfig';
 import { shouldAutoFullscreen } from '../../../lib/utils/device-detection';
-import { SkipIntroOverlay } from './components/SkipIntroOverlay';
-import { NextEpisodeOverlay } from './components/NextEpisodeOverlay';
+import { SkipIntroOverlay } from '../hls-player/components/SkipIntroOverlay';
+import { NextEpisodeOverlay } from '../hls-player/components/NextEpisodeOverlay';
 import { useI18n } from '../../../lib/i18n';
 
-export default function HLSPlayer({ 
+export default function LuciePlayer({ 
   src, 
   infoHash, 
   fileName, 
@@ -30,26 +29,18 @@ export default function HLSPlayer({
   onLoadingChange,
   onBufferProgress,
   onClose,
-  canUseSeekReload: canUseSeekReloadProp,
   baseUrl: baseUrlProp,
   stopBufferRef,
-}: HLSPlayerProps) {
+}: LuciePlayerProps) {
   const playerConfig = usePlayerConfig();
   const { t } = useI18n();
   const canAutoPlayRef = useRef<(() => boolean) | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const hasAutoFullscreenedRef = useRef(false);
-  const [hlsDuration, setHlsDuration] = useState<number | undefined>(undefined);
-  const hlsDurationRef = useRef<number>(0);
+  const [lucieDuration, setLucieDuration] = useState<number | undefined>(undefined);
   
-  // Réinitialiser hlsDurationRef quand on change de vidéo
-  useEffect(() => {
-    hlsDurationRef.current = 0;
-    setHlsDuration(undefined);
-  }, [infoHash, filePath]);
-  
-  const { videoRef, hlsRef, isLoading, error, hlsLoaded, stopBuffer, reloadWithSeek } = useHlsPlayer({
+  const { videoRef, isLoading, error, lucieLoaded, manifest, stopBuffer } = useLuciePlayer({
     src,
     infoHash,
     fileName,
@@ -62,18 +53,12 @@ export default function HLSPlayer({
     onLoadingChange,
     canAutoPlay: () => canAutoPlayRef.current ? canAutoPlayRef.current() : true,
     onDurationChange: (duration) => {
-      // Toujours utiliser Math.max pour préserver la valeur la plus élevée
-      // Cela garantit que si l'API a défini une valeur supérieure, elle ne sera jamais écrasée
-      const newValue = Math.max(hlsDurationRef.current, duration);
-      if (newValue > hlsDurationRef.current) {
-        hlsDurationRef.current = newValue;
-        setHlsDuration(newValue);
-      }
+      setLucieDuration(duration);
     },
     baseUrl: baseUrlProp,
   });
   
-  // Exposer stopBuffer via ref pour que le parent (VideoPlayerWrapper) puisse l'appeler à la fermeture
+  // Exposer stopBuffer via ref pour que le parent puisse l'appeler à la fermeture
   useEffect(() => {
     if (stopBufferRef) {
       (stopBufferRef as { current: (() => void) | null }).current = stopBuffer;
@@ -101,13 +86,11 @@ export default function HLSPlayer({
     canAutoPlay,
   } = useVideoControls({
     videoRef,
-    hlsLoaded,
-    hlsDuration,
+    hlsLoaded: lucieLoaded,
+    hlsDuration: lucieDuration,
     isLoading,
-    // Réactivé pour local_ : la protection active_seek_target côté serveur empêche les 503 en boucle.
-    // Maintenant, reloadWithSeek fonctionne correctement pour tous les types de fichiers.
-    canUseSeekReload: canUseSeekReloadProp ?? true,
-    reloadWithSeek,
+    canUseSeekReload: false, // Pas de reload avec seek pour Lucie
+    reloadWithSeek: () => {}, // Pas utilisé pour Lucie
   });
 
   useEffect(() => {
@@ -119,18 +102,6 @@ export default function HLSPlayer({
   useEffect(() => {
     canAutoPlayRef.current = canAutoPlay;
   }, [canAutoPlay]);
-
-  const {
-    audioTracks,
-    subtitleTracks,
-    currentAudioTrack,
-    currentSubtitleTrack,
-    showSubtitleSelector,
-    changeAudioTrack,
-    changeSubtitleTrack,
-    toggleSubtitleSelector,
-    setShowSubtitleSelector,
-  } = useHlsTracks({ videoRef, hlsRef, hlsLoaded, src });
 
   const [showControls, setShowControls] = useState(baseShowControls);
 
@@ -160,10 +131,9 @@ export default function HLSPlayer({
   };
 
   const handleToggleFullscreen = () => {
-    // Utiliser video-player-wrapper en priorité car c'est le conteneur principal
     const container = document.getElementById('video-player-wrapper') || 
                       containerRef.current ||
-                      document.getElementById('hls-player-container');
+                      document.getElementById('lucie-player-container');
     if (!container) {
       console.warn('Aucun conteneur trouvé pour le plein écran');
       return;
@@ -173,7 +143,6 @@ export default function HLSPlayer({
     });
   };
 
-  // Fonction pour redémarrer la vidéo depuis le début
   const handleRestart = () => {
     const video = videoRef.current;
     if (video) {
@@ -210,20 +179,18 @@ export default function HLSPlayer({
   // Activer le plein écran automatiquement au démarrage sur mobile/Android
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !hlsLoaded || hasAutoFullscreenedRef.current) return;
+    if (!video || !lucieLoaded || hasAutoFullscreenedRef.current) return;
 
     const handleFirstPlay = () => {
       if (shouldAutoFullscreen() && !isFullscreen) {
-        // Utiliser video-player-wrapper en priorité pour le plein écran automatique
         const container = document.getElementById('video-player-wrapper') || containerRef.current;
         if (container) {
           hasAutoFullscreenedRef.current = true;
-          // Petit délai pour s'assurer que la vidéo est bien prête
           setTimeout(() => {
             toggleFullscreen(container).catch((err) => {
               console.warn('Impossible d\'activer le plein écran automatique:', err);
             });
-          }, 300); // Délai un peu plus long pour laisser le temps au navigateur
+          }, 300);
         }
       }
     };
@@ -233,7 +200,7 @@ export default function HLSPlayer({
     return () => {
       video.removeEventListener('play', handleFirstPlay);
     };
-  }, [videoRef, hlsLoaded, isFullscreen]);
+  }, [videoRef, lucieLoaded, isFullscreen]);
 
   const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack } = useTVPlayerNavigation({
     showControls,
@@ -260,7 +227,7 @@ export default function HLSPlayer({
     <div 
       ref={containerRef}
       class="w-full h-full flex flex-col relative bg-black group" 
-      id="hls-player-container" 
+      id="lucie-player-container" 
       style={{ 
         width: '100%', 
         height: '100%',
@@ -315,6 +282,10 @@ export default function HLSPlayer({
                 ? t('playback.bufferingProgress', { percent: Math.round(bufferedPercent) })
                 : t('playback.buffering')}
             </p>
+            {/* Badge Lucie */}
+            <div class="mt-4 px-3 py-1 bg-purple-600/20 border border-purple-500/50 rounded-full">
+              <span class="text-purple-300 text-sm font-semibold">Lucie Player</span>
+            </div>
             {/* Points animés */}
             <div class="flex gap-1 mt-2">
               <span 
@@ -397,15 +368,15 @@ export default function HLSPlayer({
           onToggleFullscreen={handleToggleFullscreen}
           onSeekTV={handleSeekTV}
           onVolumeChangeTV={handleVolumeChangeTV}
-          audioTracks={audioTracks}
-          subtitleTracks={subtitleTracks}
-          currentAudioTrack={currentAudioTrack}
-          currentSubtitleTrack={currentSubtitleTrack}
-          showSubtitleSelector={showSubtitleSelector}
-          onChangeAudioTrack={changeAudioTrack}
-          onChangeSubtitleTrack={changeSubtitleTrack}
-          onToggleSubtitleSelector={toggleSubtitleSelector}
-          onCloseSubtitleSelector={() => setShowSubtitleSelector(false)}
+          audioTracks={[]} // Pas de sélection de pistes audio pour Lucie
+          subtitleTracks={[]} // Pas de sous-titres pour Lucie (pour l'instant)
+          currentAudioTrack={-1}
+          currentSubtitleTrack={-1}
+          showSubtitleSelector={false}
+          onChangeAudioTrack={() => {}}
+          onChangeSubtitleTrack={() => {}}
+          onToggleSubtitleSelector={() => {}}
+          onCloseSubtitleSelector={() => {}}
           showLogo={playerConfig.showLogo}
           onClose={onClose}
           onRestart={handleRestart}
@@ -415,7 +386,7 @@ export default function HLSPlayer({
               : undefined
           }
         />
-        {/* Overlays skip intro / épisode suivant au-dessus des contrôles (z-30) pour rester cliquables */}
+        {/* Overlays skip intro / épisode suivant */}
         {showSkipIntro && (
           <div class="absolute inset-0 z-30 pointer-events-none">
             <SkipIntroOverlay onSkip={handleSkipIntro} visible={showSkipIntro} />

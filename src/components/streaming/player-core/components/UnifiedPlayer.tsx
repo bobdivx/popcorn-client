@@ -1,11 +1,18 @@
 import HLSPlayer from '../../hls-player/HLSPlayer';
 import type { HLSPlayerProps } from '../../hls-player/types';
+import LuciePlayer from '../../lucie-player/LuciePlayer';
+import type { LuciePlayerProps } from '../../lucie-player/types';
 import DirectVideoPlayer from './DirectVideoPlayer';
 import PlayerLoadingOverlay from './PlayerLoadingOverlay';
 
+/**
+ * Façade unique du lecteur (direct, HLS ou Lucie).
+ * Les politiques seek/buffer/source sont injectées via hlsProps/lucieProps (canUseSeekReload, baseUrl, stopBufferRef).
+ */
 interface UnifiedPlayerProps {
   src: string | null;
   useDirectPlayer: boolean;
+  useLuciePlayer?: boolean; // Nouveau: utiliser le lecteur Lucie
   loading: boolean;
   loadingMessage: string;
   closeLabel: string;
@@ -13,6 +20,7 @@ interface UnifiedPlayerProps {
   onDirectError: (event: Event) => void;
   onDirectLoadedData: () => void;
   hlsProps: Omit<HLSPlayerProps, 'src'>;
+  lucieProps?: Omit<LuciePlayerProps, 'src'>; // Nouveau: props pour Lucie
   onHlsError: (error: Error) => void;
   onHlsLoadingChange: (loading: boolean) => void;
 }
@@ -20,6 +28,7 @@ interface UnifiedPlayerProps {
 export default function UnifiedPlayer({
   src,
   useDirectPlayer,
+  useLuciePlayer = false,
   loading,
   loadingMessage,
   closeLabel,
@@ -27,6 +36,7 @@ export default function UnifiedPlayer({
   onDirectError,
   onDirectLoadedData,
   hlsProps,
+  lucieProps,
   onHlsError,
   onHlsLoadingChange,
 }: UnifiedPlayerProps) {
@@ -41,6 +51,13 @@ export default function UnifiedPlayer({
           onClose={onClose}
           onLoadedData={onDirectLoadedData}
           onError={onDirectError}
+        />
+      ) : src && useLuciePlayer && lucieProps ? (
+        <LuciePlayer
+          src={src}
+          {...lucieProps}
+          onLoadingChange={onHlsLoadingChange}
+          onError={onHlsError}
         />
       ) : src ? (
         <HLSPlayer

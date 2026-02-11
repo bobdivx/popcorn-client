@@ -12,6 +12,8 @@ import { usePlayerConfig } from '../../../streaming/hls-player/hooks/usePlayerCo
 import PlayerLoadingOverlay from '../../../streaming/player-core/components/PlayerLoadingOverlay';
 import UnifiedPlayer from '../../../streaming/player-core/components/UnifiedPlayer';
 import { useStreamSource } from '../../../streaming/player-core/hooks/useStreamSource';
+import { canUseSeekReload as computeCanUseSeekReload } from '../../../streaming/player-core/utils/streamSourceUtils';
+import { emitPlaybackStep } from '../../../streaming/player-core/observability/playbackEvents';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 
 /** Info épisode suivant (série) pour le bouton « Épisode suivant » */
@@ -72,6 +74,7 @@ export function VideoPlayerWrapper({
 }: VideoPlayerWrapperProps) {
   const baseUrl = streamBackendUrl?.trim() || serverApi.getServerUrl();
   const [forceHlsFallback, setForceHlsFallback] = useState(false);
+  const [showFallbackMessage, setShowFallbackMessage] = useState(false);
   const [showPreroll, setShowPreroll] = useState(false);
   const [adsConfig, setAdsConfig] = useState<AdsConfig | null>(null);
   const hlsPreloadRef = useRef<any>(null);
@@ -79,10 +82,15 @@ export function VideoPlayerWrapper({
   const { hlsLoaded } = useHlsLoader();
   const isFullscreen = useFullscreen();
   const wrapperElementRef = useRef<HTMLDivElement>(null);
+  const stopBufferRef = useRef<(() => void) | null>(null);
   const isMobile = isMobileDevice();
   const { t } = useI18n();
   const playerConfig = usePlayerConfig();
   const isDirectMode = playerConfig.streamingMode === 'direct';
+  const isLucieMode = playerConfig.streamingMode === 'lucie';
+  // Désactiver Lucie pour la bibliothèque (local_) : la MSE ne remplit pas le buffer avec les segments actuels.
+  // Utiliser HLS pour que la lecture fonctionne. Lucie reste utilisé pour les torrents si config = lucie.
+  const useLucieForThisSource = isLucieMode && !forceHlsFallback && !infoHash?.startsWith('local_');
   const effectiveDirectMode = isDirectMode && !forceHlsFallback;
   const {
     streamUrl,
@@ -97,6 +105,7 @@ export function VideoPlayerWrapper({
     directStreamUrl,
     baseUrl,
     isDirectMode: effectiveDirectMode,
+    isLucieMode: useLucieForThisSource,
   });
   
   const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';
@@ -109,17 +118,13 @@ export function VideoPlayerWrapper({
     }
   }, [wrapperRef]);
 
-  // Arrêter le buffer HLS lors de la fermeture du lecteur
+  // Arrêter le buffer HLS lors de la fermeture du lecteur (via ref typée)
   useEffect(() => {
-    if (!visible) {
-      // Arrêter le buffer quand le lecteur est fermé
-      const stopBuffer = (window as any).__hlsPlayerStopBuffer;
-      if (stopBuffer && typeof stopBuffer === 'function') {
-        try {
-          stopBuffer();
-        } catch (e) {
-          console.warn('[VideoPlayerWrapper] Erreur lors de l\'arrêt du buffer:', e);
-        }
+    if (!visible && stopBufferRef.current) {
+      try {
+        stopBufferRef.current();
+      } catch (e) {
+        console.warn('[VideoPlayerWrapper] Erreur lors de l\'arrêt du buffer:', e);
       }
     }
   }, [visible]);
@@ -127,10 +132,9 @@ export function VideoPlayerWrapper({
   // Arrêter le buffer lors du démontage du composant
   useEffect(() => {
     return () => {
-      const stopBuffer = (window as any).__hlsPlayerStopBuffer;
-      if (stopBuffer && typeof stopBuffer === 'function') {
+      if (stopBufferRef.current) {
         try {
-          stopBuffer();
+          stopBufferRef.current();
         } catch (e) {
           console.warn('[VideoPlayerWrapper] Erreur lors de l\'arrêt du buffer au démontage:', e);
         }
@@ -342,6 +346,16 @@ export function VideoPlayerWrapper({
         </div>
       )}
 
+      {/* Message unique après fallback direct → HLS */}
+      {showFallbackMessage && (
+        <div
+          className="absolute top-4 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded bg-black/80 text-white text-sm"
+          role="status"
+        >
+          {t('playback.streamingFallbackToHls')}
+        </div>
+      )}
+
       <div 
         className={`absolute inset-0 ${isFullscreen ? 'p-0' : isMobile ? 'pt-12 pb-1 px-0' : 'pt-16 pb-1 px-1'}`}
       >
@@ -355,6 +369,7 @@ export function VideoPlayerWrapper({
           <UnifiedPlayer
             src={streamUrl}
             useDirectPlayer={Boolean(directStreamUrl || effectiveDirectMode)}
+            useLuciePlayer={useLucieForThisSource && !directStreamUrl && !effectiveDirectMode}
             loading={isLoading}
             loadingMessage="Chargement de la vidéo..."
             closeLabel={t('common.close')}
@@ -364,8 +379,12 @@ export function VideoPlayerWrapper({
               console.error('[VideoPlayerWrapper] Direct video error:', e);
               if (!directStreamUrl && isDirectMode && !forceHlsFallback) {
                 console.warn('[VideoPlayerWrapper] Fallback automatique vers HLS après échec du mode direct.');
+                emitPlaybackStep('fallback_direct_to_hls', { message: 'Direct stream failed' });
+                emitPlaybackStep('fallback_message_shown');
                 setIsLoading(true);
                 setForceHlsFallback(true);
+                setShowFallbackMessage(true);
+                window.setTimeout(() => setShowFallbackMessage(false), 5000);
                 return;
               }
               setIsLoading(false);
@@ -383,10 +402,33 @@ export function VideoPlayerWrapper({
               nextEpisodeInfo,
               onPlayNextEpisode,
               onClose,
+              canUseSeekReload: computeCanUseSeekReload({
+                infoHash,
+                streamBackendUrl,
+                filePath: selectedFile?.path ?? selectedFile?.name ?? null,
+              }),
+              baseUrl,
+              stopBufferRef,
+            }}
+            lucieProps={{
+              infoHash,
+              fileName: selectedFile?.path || selectedFile?.name || torrentName || 'video',
+              torrentName: torrentName || selectedFile?.name || 'video',
+              torrentId,
+              filePath: selectedFile?.path || selectedFile?.name || torrentName || 'video',
+              tmdbId,
+              tmdbType,
+              startFromBeginning,
+              isSeries,
+              nextEpisodeInfo,
+              onPlayNextEpisode,
+              onClose,
+              baseUrl,
+              stopBufferRef,
             }}
             onHlsLoadingChange={(loading) => setIsLoading(loading)}
             onHlsError={(e) => {
-              console.error('[VideoPlayerWrapper] HLS Player error:', e);
+              console.error('[VideoPlayerWrapper] Player error:', e);
               setIsLoading(false);
             }}
           />

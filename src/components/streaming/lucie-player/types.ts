@@ -1,5 +1,5 @@
-export interface HLSPlayerProps {
-  src: string;
+export interface LuciePlayerProps {
+  src: string; // URL de base pour récupérer les segments et le manifest
   infoHash?: string;
   fileName: string;
   torrentName?: string;
@@ -18,16 +18,36 @@ export interface HLSPlayerProps {
   onLoadingChange?: (loading: boolean) => void;
   onBufferProgress?: (percent: number) => void;
   onClose?: () => void;
-  /** Désactivé pour local_, UNC et ami pour éviter 503 en boucle (seek natif uniquement). */
-  canUseSeekReload?: boolean;
   /** URL du backend de stream (ex. bibliothèque ami). Si absent, utilise l'URL du serveur par défaut. */
   baseUrl?: string;
-  /** Ref pour exposer stopBuffer (arrêt du buffer à la fermeture), remplace window.__hlsPlayerStopBuffer. */
+  /** Ref pour exposer stopBuffer (arrêt du buffer à la fermeture) */
   stopBufferRef?: import('preact').RefObject<(() => void) | null>;
+}
+
+/**
+ * Structure du fichier JSON manifest retourné par le serveur
+ */
+export interface LucieManifest {
+  /** Durée totale de la vidéo en secondes */
+  duration: number;
+  /** Nombre total de segments */
+  segmentCount: number;
+  /** Durée de chaque segment en secondes (toujours 5s) */
+  segmentDuration: number;
+  /** Codec vidéo utilisé (ex: "vp9") */
+  videoCodec: string;
+  /** Codec audio utilisé (ex: "opus") */
+  audioCodec: string;
+  /** Largeur de la vidéo */
+  width: number;
+  /** Hauteur de la vidéo */
+  height: number;
+  /** ID unique du fichier pour le tracking */
+  fileId?: string;
 }
 
 declare global {
   interface Window {
-    Hls?: any;
+    MediaSource?: typeof MediaSource;
   }
 }

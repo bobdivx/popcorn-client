@@ -9,6 +9,7 @@ import {
   savePlaybackPositionByMedia,
 } from '../../../../lib/streaming/torrent-storage';
 import { getOrCreateDeviceId } from '../../../../lib/utils/device-id';
+import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
 
 interface UseHlsPlayerProps {
   src: string;
@@ -24,6 +25,8 @@ interface UseHlsPlayerProps {
   onLoadingChange?: (loading: boolean) => void;
   canAutoPlay?: () => boolean;
   onDurationChange?: (duration: number) => void;
+  /** URL du backend de stream (ex. bibliothèque ami). Évite les reconstructions implicites via getServerUrl(). */
+  baseUrl?: string;
 }
 
 export function useHlsPlayer({
@@ -39,6 +42,7 @@ export function useHlsPlayer({
   onLoadingChange,
   canAutoPlay,
   onDurationChange,
+  baseUrl: baseUrlProp,
 }: UseHlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<any>(null);
@@ -76,6 +80,14 @@ export function useHlsPlayer({
   const seekLoadUrlRef = useRef<string | null>(null);
   const seekLoadRetryCountRef = useRef<number>(0);
   const seekFallbackTriedRef = useRef<boolean>(false);
+  /** Restauration playlist progressive après 503 sur fallback : retries dédiés */
+  const restoringProgressiveRef = useRef<boolean>(false);
+  const progressiveRestoreRetryCountRef = useRef<number>(0);
+  /** 404 sur un segment (progressive) : retry par rechargement de la playlist */
+  const segment404RetryCountRef = useRef<number>(0);
+  /** 503 sur rechargement de niveau (même URL seek) après un Seek OK : retries avant d’afficher l’erreur */
+  const levelReload503RetryCountRef = useRef<number>(0);
+  const seekVerifyTimeoutRef = useRef<number | null>(null);
 
   // Mettre à jour les refs quand les props changent (sans déclencher de réinitialisation)
   useEffect(() => {
@@ -107,8 +119,7 @@ export function useHlsPlayer({
     // Réinitialiser le compteur de retry seulement si le fichier ou l'infoHash change vraiment
     const filePathChanged = previousFilePathRef.current !== filePath;
     const infoHashChanged = previousInfoHashRef.current !== infoHash;
-    
-    const baseUrl = serverApi.getServerUrl();
+    const baseUrl = (baseUrlProp && baseUrlProp.trim()) || serverApi.getServerUrl();
     const buildHlsUrl = (forceVod = false, seekSeconds?: number) => {
       const normalizedPath = filePath.replace(/\\/g, '/');
       const encodedPath = encodeURIComponent(normalizedPath);
@@ -232,33 +243,41 @@ export function useHlsPlayer({
         blobUrlRef.current = hlsUrl;
         currentSrcRef.current = hlsUrl;
 
-        // Appel non bloquant à l'API durée (ffprobe). Ne pas retarder le démarrage HLS.
-        const encodedPathParam = encodeURIComponent(filePath.replace(/\\/g, '/'));
-        const durationUrl = `${baseUrl}/api/local/duration?path=${encodedPathParam}&info_hash=${encodeURIComponent(infoHash)}`;
-        const ac = new AbortController();
-        const t = setTimeout(() => ac.abort(), 10000);
-        fetch(durationUrl, { signal: ac.signal })
-          .then((r) => {
-            clearTimeout(t);
-            if (!r.ok) {
-              throw new Error(`API returned ${r.status}`);
-            }
-            return r.json();
-          })
-          .then((res: { success?: boolean; data?: { duration: number } } | undefined) => {
-            if (!res) return;
-            const d = res?.data?.duration;
-            if (typeof d === 'number' && d > 0 && isFinite(d)) {
-              apiDurationRef.current = d;
-              totalDurationRef.current = d;
-              onDurationChangeRef.current?.(d);
-            }
-          })
-          .catch((e) => {
-            clearTimeout(t);
-            const message = e instanceof Error ? e.message : String(e);
-            console.warn('[useHlsPlayer] Could not fetch duration:', message);
-          });
+        // Appel non bloquant à l'API durée (ffprobe). Ignoré pour flux local (backend n'expose pas /api/local/duration).
+        const isLocalStream = hlsUrl.includes('/api/local/');
+        if (!isLocalStream) {
+          const encodedPathParam = encodeURIComponent(filePath.replace(/\\/g, '/'));
+          const durationUrl = `${baseUrl}/api/local/duration?path=${encodedPathParam}&info_hash=${encodeURIComponent(infoHash)}`;
+          const ac = new AbortController();
+          const t = setTimeout(() => ac.abort(), 10000);
+          fetch(durationUrl, { signal: ac.signal })
+            .then((r) => {
+              clearTimeout(t);
+              if (!r.ok) {
+                const err = new Error(`API returned ${r.status}`) as Error & { status?: number };
+                err.status = r.status;
+                throw err;
+              }
+              return r.json();
+            })
+            .then((res: { success?: boolean; data?: { duration: number } } | undefined) => {
+              if (!res) return;
+              const d = res?.data?.duration;
+              if (typeof d === 'number' && d > 0 && isFinite(d)) {
+                apiDurationRef.current = d;
+                totalDurationRef.current = d;
+                onDurationChangeRef.current?.(d);
+              }
+            })
+            .catch((e) => {
+              clearTimeout(t);
+              const status = (e as Error & { status?: number }).status;
+              if (status !== 404) {
+                const message = e instanceof Error ? e.message : String(e);
+                console.warn('[useHlsPlayer] Could not fetch duration:', message);
+              }
+            });
+        }
 
         // Le backend génère toujours des playlists HLS, donc on utilise toujours HLS.js
         if (!window.Hls || !window.Hls.isSupported()) {
@@ -303,11 +322,14 @@ export function useHlsPlayer({
           pendingSeekRef.current = seekSeconds;
           seekLoadUrlRef.current = seekUrl;
           seekLoadRetryCountRef.current = 0;
+          levelReload503RetryCountRef.current = 0;
           seekFallbackTriedRef.current = false;
           currentSrcRef.current = seekUrl;
           setIsLoading(true);
+          console.log(`[SEEK FLOW] 1️⃣ reloadWithSeek: demande seek à ${seekSeconds}s (${Math.floor(seekSeconds / 60)}:${Math.floor(seekSeconds % 60).toString().padStart(2, '0')}), currentTime actuel: ${video.currentTime}s, pendingSeekRef set à ${seekSeconds}s`);
           try {
             hlsRef.current.loadSource(seekUrl);
+            console.log(`[SEEK FLOW] 2️⃣ loadSource: URL chargée avec seek=${seekSeconds}s`);
           } catch (e) {
             console.warn('[useHlsPlayer] reloadWithSeek loadSource:', e);
             pendingSeekRef.current = 0;
@@ -393,7 +415,13 @@ export function useHlsPlayer({
 
         hls.on(window.Hls.Events.MANIFEST_PARSED, (event: any, data: any) => {
           // Réinitialiser le compteur de retry en cas de succès
+          const hadSeekRetries = seekLoadRetryCountRef.current > 0 && pendingSeekRef.current > 0;
+          if (hadSeekRetries) {
+            console.debug('[useHlsPlayer] Seek OK: playlist reçue après', seekLoadRetryCountRef.current, 'retry(s)');
+          }
+          console.log(`[SEEK FLOW] MANIFEST_PARSED: pendingSeek=${pendingSeekRef.current}s, video.currentTime=${video.currentTime}s`);
           retryCountRef.current = 0;
+          seekLoadRetryCountRef.current = 0;
           setIsLoading(false);
           onLoadingChangeRef.current?.(false);
           
@@ -517,13 +545,40 @@ export function useHlsPlayer({
         // Écouter LEVEL_LOADED pour obtenir la durée complète quand un niveau est complètement chargé
         // NOTE: La durée depuis les fragments peut être celle du buffer, donc on privilégie video.duration
         hls.on(window.Hls.Events.LEVEL_LOADED, (event: any, data: any) => {
+          segment404RetryCountRef.current = 0;
+          levelReload503RetryCountRef.current = 0;
           const pendingSeek = pendingSeekRef.current;
+          console.log(`[SEEK FLOW] 3️⃣ LEVEL_LOADED: pendingSeek=${pendingSeek}s, video.currentTime=${video.currentTime}s`);
           if (pendingSeek > 0 && Number.isFinite(pendingSeek)) {
             pendingSeekRef.current = 0;
-            if (video.currentTime !== pendingSeek) {
-              video.currentTime = pendingSeek;
-            }
-            setIsLoading(false);
+            restoringProgressiveRef.current = false;
+            progressiveRestoreRetryCountRef.current = 0;
+            try {
+              hls.startLoad(pendingSeek);
+            } catch (_) {}
+            const oldTime = video.currentTime;
+            video.currentTime = pendingSeek;
+            console.log(`[SEEK FLOW] 4️⃣ LEVEL_LOADED: video.currentTime mis à jour de ${oldTime}s à ${pendingSeek}s (${Math.floor(pendingSeek / 60)}:${Math.floor(pendingSeek % 60).toString().padStart(2, '0')})`);
+            const maxSeekVerifyRetries = 25;
+            const toleranceSec = 1;
+            let retries = 0;
+            const runVerify = () => {
+              if (seekVerifyTimeoutRef.current != null) clearTimeout(seekVerifyTimeoutRef.current);
+              seekVerifyTimeoutRef.current = window.setTimeout(() => {
+                seekVerifyTimeoutRef.current = null;
+                const now = video.currentTime;
+                if (Math.abs(now - pendingSeek) <= toleranceSec || retries >= maxSeekVerifyRetries) {
+                  setIsLoading(false);
+                  return;
+                }
+                retries += 1;
+                video.currentTime = pendingSeek;
+                runVerify();
+              }, retries === 0 ? 100 : 200);
+            };
+            runVerify();
+          } else {
+            console.log(`[SEEK FLOW] ⚠️ LEVEL_LOADED: pendingSeek=${pendingSeek} invalide ou déjà traité, pas de mise à jour de currentTime`);
           }
           if (data && data.details) {
             let levelDuration = 0;
@@ -632,11 +687,19 @@ export function useHlsPlayer({
 
           // Jellyfin bindEventsToHlsPlayer: erreur réseau avec code >= 400 → destroy
           if (data.type === HlsErrorTypes?.NETWORK_ERROR && typeof statusCode === 'number' && statusCode >= 400) {
-            // 503/202 = playlist seek en cours de génération côté backend : retry automatique
+            // 503/202 = playlist seek en cours de génération côté backend (cf. Jellyfin: nouveau stream URL avec position)
             const seekUrl = seekLoadUrlRef.current;
-            if ((statusCode === 503 || statusCode === 202) && pendingSeekRef.current > 0 && seekUrl && seekLoadRetryCountRef.current < 2) {
+            // 503/202 = playlist seek en cours de génération (backend peut prendre 2-5 min pour un long film avec seek lointain)
+            if ((statusCode === 503 || statusCode === 202) && pendingSeekRef.current > 0 && seekUrl && seekLoadRetryCountRef.current < 15) {
               seekLoadRetryCountRef.current += 1;
-              console.debug('[useHlsPlayer] 503/202 sur reloadWithSeek, retry', seekLoadRetryCountRef.current, 'dans 3s');
+              const retryAfterHeader = data?.response?.headers?.['Retry-After'] ?? data?.response?.headers?.['retry-after'];
+              const retryAfterSec = typeof retryAfterHeader === 'string' ? parseInt(retryAfterHeader, 10) : NaN;
+              const baseDelays = [4000, 8000, 12000, 20000, 35000, 55000]; // Jusqu'à 55s entre retries
+              const delayMs = Number.isFinite(retryAfterSec) && retryAfterSec > 0
+                ? retryAfterSec * 1000
+                : baseDelays[Math.min(seekLoadRetryCountRef.current - 1, baseDelays.length - 1)];
+              emitPlaybackStep('retry_503', { attempt: seekLoadRetryCountRef.current });
+              console.debug('[useHlsPlayer] 503/202 sur reloadWithSeek, retry', seekLoadRetryCountRef.current, 'dans', delayMs / 1000, 's');
               window.setTimeout(() => {
                 if (hlsRef.current && seekLoadUrlRef.current === seekUrl) {
                   try {
@@ -647,30 +710,111 @@ export function useHlsPlayer({
                     setIsLoading(false);
                   }
                 }
-              }, 3000);
+              }, delayMs);
               return;
             }
-            // Après retries, fallback sur une playlist force_vod sans paramètre seek, puis seek local
+            // Après 15 retries (environ 5 minutes), abandonner et afficher une erreur
             if (
               (statusCode === 503 || statusCode === 202) &&
               pendingSeekRef.current > 0 &&
-              !seekFallbackTriedRef.current &&
+              seekUrl &&
+              seekLoadRetryCountRef.current >= 15 &&
               hlsRef.current
             ) {
-              const fallbackUrl = buildHlsUrl(true);
-              seekFallbackTriedRef.current = true;
+              console.error('[useHlsPlayer] 503 après 15 retries (5+ min) → abandon du seek, le serveur n\'a pas terminé la génération');
+              pendingSeekRef.current = 0;
               seekLoadUrlRef.current = null;
-              seekLoadRetryCountRef.current = 0;
-              currentSrcRef.current = fallbackUrl;
-              console.debug('[useHlsPlayer] Fallback reloadWithSeek -> force_vod sans seek');
-              try {
-                hlsRef.current.loadSource(fallbackUrl);
-                return;
-              } catch (e) {
-                console.warn('[useHlsPlayer] Fallback reloadWithSeek impossible:', e);
-              }
+              setError('Le serveur met trop de temps à générer la vidéo. Réessayez plus tard.');
+              setIsLoading(false);
+              return;
             }
+            // 503 pendant restauration progressive : retry avec délai (éviter boucle fallback ↔ progressive)
+            if (
+              (statusCode === 503 || statusCode === 202) &&
+              restoringProgressiveRef.current &&
+              hlsRef.current
+            ) {
+              if (progressiveRestoreRetryCountRef.current < 2) {
+                progressiveRestoreRetryCountRef.current += 1;
+                const originalUrl = buildHlsUrl(false);
+                const delayMs = 4000;
+                console.debug('[useHlsPlayer] 503 sur playlist progressive, retry', progressiveRestoreRetryCountRef.current, 'dans', delayMs / 1000, 's');
+                window.setTimeout(() => {
+                  if (hlsRef.current) {
+                    try {
+                      currentSrcRef.current = originalUrl;
+                      hlsRef.current.loadSource(originalUrl);
+                      setIsLoading(true);
+                    } catch (e) {
+                      restoringProgressiveRef.current = false;
+                      progressiveRestoreRetryCountRef.current = 0;
+                    }
+                  }
+                }, delayMs);
+                return;
+              }
+              restoringProgressiveRef.current = false;
+              // ne pas remettre progressiveRestoreRetryCountRef à 0 pour éviter de ré-entrer le bloc fallback ci-dessous
+            }
+            // 503 sur rechargement de niveau (même URL seek) après Seek OK : pendingSeekRef est déjà à 0, retry avant de détruire
+            const isSeekUrl = seekLoadUrlRef.current && (currentSrcRef.current === seekLoadUrlRef.current || (data?.response?.url && String(data.response.url).includes('force_vod=true') && String(data.response.url).includes('seek=')));
+            if (
+              (statusCode === 503 || statusCode === 202) &&
+              isSeekUrl &&
+              levelReload503RetryCountRef.current < 3 &&
+              hlsRef.current
+            ) {
+              levelReload503RetryCountRef.current += 1;
+              const urlToReload = seekLoadUrlRef.current || currentSrcRef.current;
+              const delayMs = 2000;
+              console.debug('[useHlsPlayer] 503 sur rechargement niveau (seek), retry', levelReload503RetryCountRef.current, 'dans', delayMs / 1000, 's');
+              window.setTimeout(() => {
+                if (hlsRef.current && urlToReload) {
+                  try {
+                    hlsRef.current.loadSource(urlToReload);
+                  } catch (e) {
+                    levelReload503RetryCountRef.current = 0;
+                  }
+                }
+              }, delayMs);
+              return;
+            }
+            // NOTE : Cette section "503 sur fallback -> playlist progressive" a été supprimée.
+            // Maintenant qu'on n'utilise plus le fallback "force_vod sans seek", on n'a plus besoin
+            // de revenir à la playlist progressive. Le client attend simplement que le serveur
+            // finisse la génération du seek.
+            // 404 sur un segment (playlist progressive : segment pas encore écrit) → retry par rechargement playlist
+            if (
+              statusCode === 404 &&
+              data.frag &&
+              hlsRef.current &&
+              segment404RetryCountRef.current < 2
+            ) {
+              segment404RetryCountRef.current += 1;
+              const url = currentSrcRef.current;
+              console.debug(
+                '[useHlsPlayer] 404 segment, rechargement playlist (retry',
+                segment404RetryCountRef.current,
+                ')'
+              );
+              window.setTimeout(() => {
+                if (hlsRef.current && url) {
+                  try {
+                    hlsRef.current.loadSource(url);
+                    setIsLoading(true);
+                  } catch (e) {
+                    segment404RetryCountRef.current = 0;
+                  }
+                }
+              }, 2000);
+              return;
+            }
+
             console.debug('[useHlsPlayer] Erreur HLS réponse HTTP:', statusCode);
+            restoringProgressiveRef.current = false;
+            progressiveRestoreRetryCountRef.current = 0;
+            segment404RetryCountRef.current = 0;
+            levelReload503RetryCountRef.current = 0;
             try {
               hls.destroy();
             } catch (_) {}
@@ -916,7 +1060,10 @@ export function useHlsPlayer({
           }
           // Nettoyer tous les event listeners
           cleanupFunctions.forEach(cleanup => cleanup());
-          // Annuler les retries en cours
+          if (seekVerifyTimeoutRef.current !== null) {
+            clearTimeout(seekVerifyTimeoutRef.current);
+            seekVerifyTimeoutRef.current = null;
+          }
           if (retryTimeoutRef.current !== null) {
             clearTimeout(retryTimeoutRef.current);
             retryTimeoutRef.current = null;
@@ -960,7 +1107,7 @@ export function useHlsPlayer({
     };
     // IMPORTANT: Utiliser des dépendances stabilisées pour éviter les réinitialisations multiples
     // Seulement infoHash et filePath sont critiques, les autres dépendances sont stables ou gérées via refs
-  }, [hlsLoaded, infoHash, filePath]); // Retirer videoRef, fileName, torrentId, startFromBeginning, canAutoPlay, playerConfig, onError, onLoadingChange car ils ne devraient pas déclencher une réinitialisation
+  }, [hlsLoaded, infoHash, filePath, baseUrlProp]); // baseUrl pour bibliothèque ami / backend distant
 
   // Fonction pour arrêter le buffer manuellement (utile lors de la fermeture)
   const stopBuffer = () => {

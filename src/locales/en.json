@@ -421,9 +421,13 @@
     "nextEpisodeCountdownSeconds": "Show next episode before end (seconds)",
     "nextEpisodeCountdownDescription": "Number of seconds before end to show the button",
     "streamingMode": "Streaming mode",
-    "streamingModeDescription": "Choose the playback system: HLS (recommended) or direct stream (alternative mode).",
+    "streamingModeDescription": "Choose the playback system: HLS (recommended), Lucie (WebM) or direct stream (alternative mode).",
     "streamingModeHls": "HLS (adaptive, recommended)",
+    "streamingModeHlsDescription": "Adaptive streaming with .ts segments (compatible with all media)",
+    "streamingModeLucie": "Lucie (WebM segments)",
+    "streamingModeLucieDescription": "5-second WebM segments with VP9+Opus (modern, requires browser support)",
     "streamingModeDirect": "Direct (non-HLS alternative)",
+    "streamingModeDirectDescription": "Direct playback without transcoding (limited to natively supported formats)",
     "librarySection": "Library display",
     "showZeroSeedTorrents": "Show torrents with no seeders",
     "showZeroSeedTorrentsDescription": "Include torrents with 0 seeders on Films and Series pages (some may be unavailable)",
@@ -437,7 +441,8 @@
   "playback": {
     "nextEpisode": "Next episode",
     "buffering": "Buffering…",
-    "bufferingProgress": "Buffering {percent}%"
+    "bufferingProgress": "Buffering {percent}%",
+    "streamingFallbackToHls": "Switched to HLS playback due to direct stream issue."
   },
   "nav": {
     "menu": "Menu",

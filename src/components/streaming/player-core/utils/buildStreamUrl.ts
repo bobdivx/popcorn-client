@@ -4,6 +4,7 @@ export interface BuildStreamUrlInput {
   filePath: string;
   fileName: string;
   isDirectMode: boolean;
+  isLucieMode?: boolean;
 }
 
 export interface BuildStreamUrlResult {
@@ -27,6 +28,7 @@ export function buildStreamUrl({
   filePath,
   fileName,
   isDirectMode,
+  isLucieMode = false,
 }: BuildStreamUrlInput): BuildStreamUrlResult {
   const normalizedPath = normalizeStreamPath(filePath);
 
@@ -38,9 +40,19 @@ export function buildStreamUrl({
 
   const encodedPath = encodeURIComponent(pathForUrl);
   const infoHashParam = infoHash ? `?info_hash=${encodeURIComponent(infoHash)}` : '';
-  const streamUrl = isDirectMode
-    ? `${baseUrl}/api/local/stream/${encodedPath}${infoHashParam}`
-    : `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8${infoHashParam}`;
+  
+  // Construire l'URL selon le mode
+  let streamUrl: string;
+  if (isLucieMode) {
+    // Mode Lucie: manifest JSON
+    streamUrl = `${baseUrl}/api/lucie/manifest.json?path=${encodedPath}&info_hash=${encodeURIComponent(infoHash)}`;
+  } else if (isDirectMode) {
+    // Mode Direct: stream direct
+    streamUrl = `${baseUrl}/api/local/stream/${encodedPath}${infoHashParam}`;
+  } else {
+    // Mode HLS: playlist M3U8
+    streamUrl = `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8${infoHashParam}`;
+  }
 
   return {
     streamUrl,

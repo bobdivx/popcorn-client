@@ -421,9 +421,13 @@
     "nextEpisodeCountdownSeconds": "Afficher « Épisode suivant » avant la fin (secondes)",
     "nextEpisodeCountdownDescription": "Nombre de secondes avant la fin pour afficher le bouton",
     "streamingMode": "Mode de streaming",
-    "streamingModeDescription": "Choisissez le système de lecture : HLS (recommandé) ou flux direct (mode alternatif).",
+    "streamingModeDescription": "Choisissez le système de lecture : HLS (recommandé), Lucie (WebM) ou flux direct (mode alternatif).",
     "streamingModeHls": "HLS (adaptatif, recommandé)",
+    "streamingModeHlsDescription": "Streaming adaptatif avec segments .ts (compatible avec tous les médias)",
+    "streamingModeLucie": "Lucie (WebM segments)",
+    "streamingModeLucieDescription": "Segments WebM de 5 secondes avec VP9+Opus (moderne, nécessite support navigateur)",
     "streamingModeDirect": "Direct (alternative sans HLS)",
+    "streamingModeDirectDescription": "Lecture directe sans transcodage (limité aux formats supportés nativement)",
     "librarySection": "Affichage de la bibliothèque",
     "showZeroSeedTorrents": "Afficher les torrents sans seeders",
     "showZeroSeedTorrentsDescription": "Inclure les torrents avec 0 seeder dans les pages Films et Séries (certains peuvent être indisponibles)",
@@ -437,7 +441,8 @@
   "playback": {
     "nextEpisode": "Épisode suivant",
     "buffering": "Mise en buffer…",
-    "bufferingProgress": "Mise en buffer {percent}%"
+    "bufferingProgress": "Mise en buffer {percent}%",
+    "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct."
   },
   "nav": {
     "menu": "Menu",

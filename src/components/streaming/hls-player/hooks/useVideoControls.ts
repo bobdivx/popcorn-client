@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
+import { emitPlaybackStep } from '../../../streaming/player-core/observability/playbackEvents';
 import { usePlayerConfig } from './usePlayerConfig';
 
 interface UseVideoControlsProps {
@@ -95,9 +96,11 @@ export function useVideoControls({
     };
 
     const handlePlay = () => {
+      console.log(`[PLAYBACK STATE] 🎬 handlePlay: video.paused=${video.paused}, userPausedRef=${userPausedRef.current}, currentTime=${video.currentTime}s`);
       if (userPausedRef.current) {
         requestAnimationFrame(() => {
           if (userPausedRef.current && !video.paused) {
+            console.log(`[PLAYBACK STATE] ⏸️ handlePlay: userPausedRef=true, forçage de pause`);
             video.pause();
           }
         });
@@ -114,15 +117,18 @@ export function useVideoControls({
     };
     
     const handlePause = () => {
+      console.log(`[PLAYBACK STATE] ⏸️ handlePause: currentTime=${video.currentTime}s`);
       setIsPlaying(false);
       setShowControls(true);
     };
 
     const handleSeeking = () => {
+      console.log(`[PLAYBACK STATE] 🔍 handleSeeking: currentTime=${video.currentTime}s`);
       setIsSeeking(true);
     };
 
     const handleSeeked = () => {
+      console.log(`[PLAYBACK STATE] ✅ handleSeeked: currentTime=${video.currentTime}s`);
       setIsSeeking(false);
       updateBuffered();
     };
@@ -180,6 +186,20 @@ export function useVideoControls({
       container.addEventListener('touchstart', handleTouchStart, { passive: true });
     }
 
+    // Logs pour suivre l'état de lecture
+    const handlePlaying = () => {
+      console.log(`[PLAYBACK STATE] ▶️ handlePlaying: vidéo EN COURS DE LECTURE, currentTime=${video.currentTime}s (${Math.floor(video.currentTime / 60)}:${Math.floor(video.currentTime % 60).toString().padStart(2, '0')}), paused=${video.paused}, readyState=${video.readyState}`);
+    };
+    const handleCanPlay = () => {
+      console.log(`[PLAYBACK STATE] ✅ handleCanPlay: vidéo PRÊTE À JOUER, currentTime=${video.currentTime}s, paused=${video.paused}`);
+    };
+    const handleWaiting = () => {
+      console.log(`[PLAYBACK STATE] ⏳ handleWaiting: vidéo EN ATTENTE DE DONNÉES, currentTime=${video.currentTime}s`);
+    };
+    const handleStalled = () => {
+      console.log(`[PLAYBACK STATE] 🛑 handleStalled: chargement BLOQUÉ, currentTime=${video.currentTime}s`);
+    };
+
     video.addEventListener('timeupdate', handleTimeUpdate);
     video.addEventListener('progress', updateBuffered);
     video.addEventListener('play', handlePlay);
@@ -189,6 +209,10 @@ export function useVideoControls({
     video.addEventListener('volumechange', handleVolumeChange);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('durationchange', handleDurationChange);
+    video.addEventListener('playing', handlePlaying);
+    video.addEventListener('canplay', handleCanPlay);
+    video.addEventListener('waiting', handleWaiting);
+    video.addEventListener('stalled', handleStalled);
 
     // Initialiser le volume
     video.volume = playerConfig.volume;
@@ -209,6 +233,10 @@ export function useVideoControls({
       video.removeEventListener('volumechange', handleVolumeChange);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('durationchange', handleDurationChange);
+      video.removeEventListener('playing', handlePlaying);
+      video.removeEventListener('canplay', handleCanPlay);
+      video.removeEventListener('waiting', handleWaiting);
+      video.removeEventListener('stalled', handleStalled);
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     };
   }, [videoRef, hlsLoaded, playerConfig, hlsDuration]);
@@ -230,8 +258,12 @@ export function useVideoControls({
   };
 
   const handleSeek = (e: any) => {
+    console.log(`[SEEK FLOW] 0️⃣ handleSeek APPELÉ, event type=${e?.type}, currentTarget=${e?.currentTarget?.tagName}`);
     const video = videoRef.current;
-    if (!video) return;
+    if (!video) {
+      console.log(`[SEEK FLOW] ❌ handleSeek: video ref null, abandon`);
+      return;
+    }
 
     const rect = e.currentTarget.getBoundingClientRect();
     const clientX =
@@ -239,15 +271,25 @@ export function useVideoControls({
       e?.nativeEvent?.clientX ??
       e?.touches?.[0]?.clientX ??
       e?.changedTouches?.[0]?.clientX;
-    if (typeof clientX !== 'number') return;
+    if (typeof clientX !== 'number') {
+      console.log(`[SEEK FLOW] ❌ handleSeek: clientX invalide (${typeof clientX}), abandon`);
+      return;
+    }
     const durationValue =
       duration > 0 && isFinite(duration)
         ? duration
         : (video.duration && isFinite(video.duration) ? video.duration : 0);
-    if (!durationValue) return;
-    if (!rect.width) return;
+    if (!durationValue) {
+      console.log(`[SEEK FLOW] ❌ handleSeek: durationValue=0, abandon`);
+      return;
+    }
+    if (!rect.width) {
+      console.log(`[SEEK FLOW] ❌ handleSeek: rect.width=0, abandon`);
+      return;
+    }
     const pos = (clientX - rect.left) / rect.width;
     const targetTime = Math.max(0, Math.min(durationValue, pos * durationValue));
+    console.log(`[SEEK FLOW] handleSeek: targetTime calculé=${targetTime}s (${Math.floor(targetTime / 60)}:${Math.floor(targetTime % 60).toString().padStart(2, '0')}), pos=${(pos * 100).toFixed(1)}%, duration=${durationValue}s`);
 
     // Si la cible est au-delà du buffer (ex. playlist progressive limitée à ~90s),
     // recharger la source avec force_vod et seek= pour que le backend renvoie une playlist à partir de targetTime.
@@ -261,21 +303,40 @@ export function useVideoControls({
     // Si le mode reloadWithSeek backend est désactivé (ex: certains médias locaux),
     // laisser le seek natif HTML5/HLS gérer la récupération sans forcer de reload backend.
     if (!canUseSeekReload) {
+      console.log(`[SEEK FLOW] handleSeek: seek natif (canUseSeekReload=false), targetTime=${targetTime}s`);
+      emitPlaybackStep('seek_native', { position: targetTime });
       video.currentTime = targetTime;
       return;
     }
 
     if (reloadWithSeek && targetTime > 0 && !isLoading) {
-      // Éviter les reloadWithSeek trop tôt: attendre un buffer initial minimal.
+      // Pour les gros sauts (> 60s), toujours utiliser reloadWithSeek (ignore buffer minimal)
+      // Pour les petits sauts, attendre un buffer minimal avant de reload
       const minBufferedForReload = 20; // secondes
       const margin = 2; // secondes
       const isBeyondBufferedWindow = targetTime > bufferedEnd + margin;
-      if (bufferedEnd >= minBufferedForReload && isBeyondBufferedWindow) {
+      const isLargeJump = Math.abs(targetTime - video.currentTime) > 60; // Saut > 1 minute
+      
+      // Si c'est un gros saut OU (buffer suffisant ET au-delà du buffer)
+      if (isLargeJump || (bufferedEnd >= minBufferedForReload && isBeyondBufferedWindow)) {
+        console.log(`[SEEK FLOW] handleSeek: appel reloadWithSeek pour targetTime=${targetTime}s (${Math.floor(targetTime / 60)}:${Math.floor(targetTime % 60).toString().padStart(2, '0')}), isLargeJump=${isLargeJump}, bufferedEnd=${bufferedEnd}s`);
+        emitPlaybackStep('seek_reload', { position: targetTime });
         reloadWithSeek(targetTime);
         return;
+      } else {
+        console.log(`[SEEK FLOW] handleSeek: condition reloadWithSeek non remplie, seek natif. targetTime=${targetTime}s, bufferedEnd=${bufferedEnd}s, isLargeJump=${isLargeJump}`);
       }
     }
 
+    // Ne pas appliquer un seek natif si un reloadWithSeek est déjà en cours :
+    // le buffer ne couvre pas encore la cible et le navigateur clamp serait à l'ancienne position.
+    if (isLoading) {
+      console.log(`[SEEK FLOW] handleSeek: reload en cours, pas de seek natif (targetTime=${targetTime}s)`);
+      return;
+    }
+
+    console.log(`[SEEK FLOW] handleSeek: seek natif (petit saut), targetTime=${targetTime}s, currentTime=${video.currentTime}s`);
+    emitPlaybackStep('seek_native', { position: targetTime });
     video.currentTime = targetTime;
   };
 

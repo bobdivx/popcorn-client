@@ -36,7 +36,7 @@ function getPlaybackConfig(): Pick<
         nextEpisodeCountdownSeconds:
           parsed.nextEpisodeCountdownSeconds ?? DEFAULT_PLAYER_CONFIG.nextEpisodeCountdownSeconds,
         streamingMode:
-          parsed.streamingMode === 'direct' || parsed.streamingMode === 'hls'
+          parsed.streamingMode === 'direct' || parsed.streamingMode === 'hls' || parsed.streamingMode === 'lucie'
             ? parsed.streamingMode
             : DEFAULT_PLAYER_CONFIG.streamingMode,
       };
@@ -131,7 +131,7 @@ export default function PlaybackSettingsPanel() {
     showSaved();
   };
 
-  const handleStreamingMode = (value: 'hls' | 'direct') => {
+  const handleStreamingMode = (value: 'hls' | 'direct' | 'lucie') => {
     const next = { ...config, streamingMode: value };
     setConfig(next);
     savePlaybackToLocalStorage(next);
@@ -226,7 +226,23 @@ export default function PlaybackSettingsPanel() {
               checked={config.streamingMode === 'hls'}
               onChange={() => handleStreamingMode('hls')}
             />
-            <span className="text-white font-medium">{t('interfaceSettings.streamingModeHls')}</span>
+            <div className="flex flex-col">
+              <span className="text-white font-medium">{t('interfaceSettings.streamingModeHls')}</span>
+              <span className="text-xs text-gray-500">{t('interfaceSettings.streamingModeHlsDescription')}</span>
+            </div>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="radio"
+              name="streaming-mode"
+              className="radio radio-primary"
+              checked={config.streamingMode === 'lucie'}
+              onChange={() => handleStreamingMode('lucie')}
+            />
+            <div className="flex flex-col">
+              <span className="text-white font-medium">{t('interfaceSettings.streamingModeLucie')}</span>
+              <span className="text-xs text-gray-500">{t('interfaceSettings.streamingModeLucieDescription')}</span>
+            </div>
           </label>
           <label className="flex items-center gap-3 cursor-pointer">
             <input
@@ -236,7 +252,10 @@ export default function PlaybackSettingsPanel() {
               checked={config.streamingMode === 'direct'}
               onChange={() => handleStreamingMode('direct')}
             />
-            <span className="text-white font-medium">{t('interfaceSettings.streamingModeDirect')}</span>
+            <div className="flex flex-col">
+              <span className="text-white font-medium">{t('interfaceSettings.streamingModeDirect')}</span>
+              <span className="text-xs text-gray-500">{t('interfaceSettings.streamingModeDirectDescription')}</span>
+            </div>
           </label>
         </div>
       </section>

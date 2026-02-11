@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { TorrentFile } from '../../../torrents/MediaDetailPage/hooks/useVideoFiles';
+import { emitPlaybackStep } from '../observability/playbackEvents';
 import { buildStreamUrl } from '../utils/buildStreamUrl';
 
 const STORAGE_INTRO_ALWAYS_SHOW = 'popcorn_intro_always_show';
@@ -11,6 +12,7 @@ interface UseStreamSourceInput {
   directStreamUrl?: string | null;
   baseUrl: string;
   isDirectMode: boolean;
+  isLucieMode?: boolean;
 }
 
 export function useStreamSource({
@@ -19,6 +21,7 @@ export function useStreamSource({
   directStreamUrl,
   baseUrl,
   isDirectMode,
+  isLucieMode = false,
 }: UseStreamSourceInput) {
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [hlsFilePath, setHlsFilePath] = useState<string | null>(null);
@@ -55,8 +58,10 @@ export function useStreamSource({
           filePath,
           fileName: selectedFile.name,
           isDirectMode,
+          isLucieMode,
         });
 
+        const mode = isLucieMode ? 'lucie' : (isDirectMode ? 'direct' : 'hls');
         console.log('[VideoPlayerWrapper] Construction URL stream:', {
           filePath,
           normalizedPath,
@@ -64,7 +69,7 @@ export function useStreamSource({
           path: selectedFile.path,
           infoHash: infoHash.substring(0, 12) + '...',
           baseUrl,
-          mode: isDirectMode ? 'direct' : 'hls',
+          mode,
         });
 
         console.log('[VideoPlayerWrapper] URL stream construite:', {
@@ -76,10 +81,13 @@ export function useStreamSource({
         });
 
         setStreamUrl(streamUrl);
-        setHlsFilePath(isDirectMode ? 'direct' : normalizedPath);
+        setHlsFilePath((isDirectMode || isLucieMode) ? 'direct' : normalizedPath);
         setIsLoading(false);
+        const sourceType = infoHash?.startsWith('local_') ? 'local_' : (directStreamUrl ? 'direct_demo' : 'torrent');
+        const playbackMode = isLucieMode ? 'lucie' : (isDirectMode ? 'direct' : 'hls');
+        emitPlaybackStep('source_selected', { sourceType, mode: playbackMode });
 
-        if (!isDirectMode) {
+        if (!isDirectMode && !isLucieMode) {
           try {
             const alwaysShow = localStorage.getItem(STORAGE_INTRO_ALWAYS_SHOW) === '1';
             const introSkipped = localStorage.getItem(STORAGE_INTRO_SKIPPED) === '1';
@@ -98,7 +106,7 @@ export function useStreamSource({
     };
 
     loadStreamUrl();
-  }, [selectedFile, infoHash, directStreamUrl, baseUrl, isDirectMode]);
+  }, [selectedFile, infoHash, directStreamUrl, baseUrl, isDirectMode, isLucieMode]);
 
   return {
     streamUrl,
