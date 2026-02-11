@@ -27,6 +27,8 @@ export interface PlayerConfig {
   introSkipSeconds: number;
   /** Secondes avant la fin pour afficher le bouton « Épisode suivant » */
   nextEpisodeCountdownSeconds: number;
+  /** Système de streaming: HLS (adaptatif) ou direct (range). */
+  streamingMode: 'hls' | 'direct';
 }
 
 export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
@@ -52,6 +54,7 @@ export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
   nextEpisodeButtonEnabled: true,
   introSkipSeconds: 90,
   nextEpisodeCountdownSeconds: 90,
+  streamingMode: 'hls',
 };
 
 export function usePlayerConfig(): PlayerConfig {

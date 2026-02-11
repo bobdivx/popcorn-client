@@ -9,7 +9,11 @@ const PLAYER_CONFIG_KEY = 'playerConfig';
 
 function getPlaybackConfig(): Pick<
   PlayerConfig,
-  'skipIntroEnabled' | 'nextEpisodeButtonEnabled' | 'introSkipSeconds' | 'nextEpisodeCountdownSeconds'
+  | 'skipIntroEnabled'
+  | 'nextEpisodeButtonEnabled'
+  | 'introSkipSeconds'
+  | 'nextEpisodeCountdownSeconds'
+  | 'streamingMode'
 > {
   if (typeof window === 'undefined') {
     return {
@@ -17,6 +21,7 @@ function getPlaybackConfig(): Pick<
       nextEpisodeButtonEnabled: DEFAULT_PLAYER_CONFIG.nextEpisodeButtonEnabled,
       introSkipSeconds: DEFAULT_PLAYER_CONFIG.introSkipSeconds,
       nextEpisodeCountdownSeconds: DEFAULT_PLAYER_CONFIG.nextEpisodeCountdownSeconds,
+      streamingMode: DEFAULT_PLAYER_CONFIG.streamingMode,
     };
   }
   try {
@@ -30,6 +35,10 @@ function getPlaybackConfig(): Pick<
         introSkipSeconds: parsed.introSkipSeconds ?? DEFAULT_PLAYER_CONFIG.introSkipSeconds,
         nextEpisodeCountdownSeconds:
           parsed.nextEpisodeCountdownSeconds ?? DEFAULT_PLAYER_CONFIG.nextEpisodeCountdownSeconds,
+        streamingMode:
+          parsed.streamingMode === 'direct' || parsed.streamingMode === 'hls'
+            ? parsed.streamingMode
+            : DEFAULT_PLAYER_CONFIG.streamingMode,
       };
     }
   } catch {
@@ -40,6 +49,7 @@ function getPlaybackConfig(): Pick<
     nextEpisodeButtonEnabled: DEFAULT_PLAYER_CONFIG.nextEpisodeButtonEnabled,
     introSkipSeconds: DEFAULT_PLAYER_CONFIG.introSkipSeconds,
     nextEpisodeCountdownSeconds: DEFAULT_PLAYER_CONFIG.nextEpisodeCountdownSeconds,
+    streamingMode: DEFAULT_PLAYER_CONFIG.streamingMode,
   };
 }
 
@@ -70,24 +80,28 @@ export default function PlaybackSettingsPanel() {
     window.setTimeout(() => setSaved(false), 1500);
   };
 
+  const savePlaybackSettingsToCloud = (next: ReturnType<typeof getPlaybackConfig>) => {
+    const cloudToken = TokenManager.getCloudAccessToken();
+    if (!cloudToken) return;
+    saveUserConfigMerge(
+      {
+        playbackSettings: {
+          skipIntroEnabled: next.skipIntroEnabled,
+          nextEpisodeButtonEnabled: next.nextEpisodeButtonEnabled,
+          introSkipSeconds: next.introSkipSeconds,
+          nextEpisodeCountdownSeconds: next.nextEpisodeCountdownSeconds,
+          streamingMode: next.streamingMode,
+        },
+      },
+      cloudToken
+    ).catch(() => {});
+  };
+
   const handleSkipIntroEnabled = (value: boolean) => {
     const next = { ...config, skipIntroEnabled: value };
     setConfig(next);
     savePlaybackToLocalStorage(next);
-    const cloudToken = TokenManager.getCloudAccessToken();
-    if (cloudToken) {
-      saveUserConfigMerge(
-        {
-          playbackSettings: {
-            skipIntroEnabled: value,
-            nextEpisodeButtonEnabled: config.nextEpisodeButtonEnabled,
-            introSkipSeconds: config.introSkipSeconds,
-            nextEpisodeCountdownSeconds: config.nextEpisodeCountdownSeconds,
-          },
-        },
-        cloudToken
-      ).catch(() => {});
-    }
+    savePlaybackSettingsToCloud(next);
     showSaved();
   };
 
@@ -95,20 +109,7 @@ export default function PlaybackSettingsPanel() {
     const next = { ...config, nextEpisodeButtonEnabled: value };
     setConfig(next);
     savePlaybackToLocalStorage(next);
-    const cloudToken = TokenManager.getCloudAccessToken();
-    if (cloudToken) {
-      saveUserConfigMerge(
-        {
-          playbackSettings: {
-            skipIntroEnabled: config.skipIntroEnabled,
-            nextEpisodeButtonEnabled: value,
-            introSkipSeconds: config.introSkipSeconds,
-            nextEpisodeCountdownSeconds: config.nextEpisodeCountdownSeconds,
-          },
-        },
-        cloudToken
-      ).catch(() => {});
-    }
+    savePlaybackSettingsToCloud(next);
     showSaved();
   };
 
@@ -117,20 +118,7 @@ export default function PlaybackSettingsPanel() {
     const next = { ...config, introSkipSeconds: clamped };
     setConfig(next);
     savePlaybackToLocalStorage(next);
-    const cloudToken = TokenManager.getCloudAccessToken();
-    if (cloudToken) {
-      saveUserConfigMerge(
-        {
-          playbackSettings: {
-            skipIntroEnabled: config.skipIntroEnabled,
-            nextEpisodeButtonEnabled: config.nextEpisodeButtonEnabled,
-            introSkipSeconds: clamped,
-            nextEpisodeCountdownSeconds: config.nextEpisodeCountdownSeconds,
-          },
-        },
-        cloudToken
-      ).catch(() => {});
-    }
+    savePlaybackSettingsToCloud(next);
     showSaved();
   };
 
@@ -139,20 +127,15 @@ export default function PlaybackSettingsPanel() {
     const next = { ...config, nextEpisodeCountdownSeconds: clamped };
     setConfig(next);
     savePlaybackToLocalStorage(next);
-    const cloudToken = TokenManager.getCloudAccessToken();
-    if (cloudToken) {
-      saveUserConfigMerge(
-        {
-          playbackSettings: {
-            skipIntroEnabled: config.skipIntroEnabled,
-            nextEpisodeButtonEnabled: config.nextEpisodeButtonEnabled,
-            introSkipSeconds: config.introSkipSeconds,
-            nextEpisodeCountdownSeconds: clamped,
-          },
-        },
-        cloudToken
-      ).catch(() => {});
-    }
+    savePlaybackSettingsToCloud(next);
+    showSaved();
+  };
+
+  const handleStreamingMode = (value: 'hls' | 'direct') => {
+    const next = { ...config, streamingMode: value };
+    setConfig(next);
+    savePlaybackToLocalStorage(next);
+    savePlaybackSettingsToCloud(next);
     showSaved();
   };
 
@@ -225,6 +208,37 @@ export default function PlaybackSettingsPanel() {
           <span className="text-gray-500 text-sm">s</span>
         </div>
         <p className="text-xs text-gray-500 mt-1">{t('interfaceSettings.introSkipSecondsDescription')}</p>
+      </section>
+
+      {/* Mode de streaming */}
+      <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
+        <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+          <Play className="w-5 h-5 text-primary-400" />
+          {t('interfaceSettings.streamingMode')}
+        </h3>
+        <p className="text-sm text-gray-400 mb-4">{t('interfaceSettings.streamingModeDescription')}</p>
+        <div className="flex flex-col gap-3">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="radio"
+              name="streaming-mode"
+              className="radio radio-primary"
+              checked={config.streamingMode === 'hls'}
+              onChange={() => handleStreamingMode('hls')}
+            />
+            <span className="text-white font-medium">{t('interfaceSettings.streamingModeHls')}</span>
+          </label>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="radio"
+              name="streaming-mode"
+              className="radio radio-primary"
+              checked={config.streamingMode === 'direct'}
+              onChange={() => handleStreamingMode('direct')}
+            />
+            <span className="text-white font-medium">{t('interfaceSettings.streamingModeDirect')}</span>
+          </label>
+        </div>
       </section>
 
       {/* Bouton Épisode suivant */}

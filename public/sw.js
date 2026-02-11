@@ -185,21 +185,15 @@ async function handleHLSRequest(request) {
     }
   }
   
-  // Pour les playlists (.m3u8), toujours vérifier le réseau d'abord
+  // Pour les playlists (.m3u8), toujours aller au réseau, NE JAMAIS mettre en cache.
+  // Les playlists contiennent des URLs de segments avec file_id ; un cache obsolète
+  // servirait un ancien file_id → 404 sur les segments → bufferStalledError.
   if (url.pathname.endsWith('.m3u8')) {
     try {
-      const networkResponse = await fetch(request);
-      if (networkResponse.ok) {
-        // Mettre à jour le cache avec la nouvelle playlist (seulement pour GET)
-        cache.put(request, networkResponse.clone());
-      }
-      return networkResponse;
+      return await fetch(request);
     } catch (error) {
-      // Si le réseau échoue, utiliser le cache
       const cachedResponse = await cache.match(request);
-      if (cachedResponse) {
-        return cachedResponse;
-      }
+      if (cachedResponse) return cachedResponse;
       throw error;
     }
   }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
+import { invalidateLibraryCache } from '../lib/client/server-api/library';
 import { LibraryPoster } from './library/LibraryPoster';
 import CarouselRow from './torrents/CarouselRow';
 import { RefreshCw, Film, Tv, Layers, Server, HardDrive, Users, Folder } from 'lucide-preact';
@@ -22,7 +23,7 @@ function isPopconnDownloadedInfoHash(infoHash: string | null): boolean {
 
 function getSourceType(item: LibraryMedia): LibrarySourceFilter {
   if (item.__shared) return 'shared';
-  if (item.library_source_id) return 'external';
+  if (item.is_external_source) return 'external';
   if (!item.is_local_only) return 'popcorn';
   if (isPopconnDownloadedInfoHash(item.info_hash ?? null)) return 'popcorn';
   return 'local';
@@ -87,8 +88,12 @@ export interface LibraryMedia {
   language: string | null;
   source_format: string | null;
   is_local_only: boolean;
-  /** Si présent, le média provient d'une source externe (NAS, dossier partagé). */
+  /** Vrai si le média provient d'une source externe (NAS, partage réseau). */
+  is_external_source?: boolean;
+  /** Identifiant de source de bibliothèque (locale ou externe) si applicable. */
   library_source_id?: string | null;
+  /** Nom de la source de bibliothèque (pour badge externe). */
+  library_source_label?: string | null;
   /** En mode démo : URL directe du MP4 (hébergé sur popcorn-web). */
   demo_stream_url?: string;
   // Métadonnées côté client pour les médias partagés
@@ -177,47 +182,68 @@ export default function Library({
       const list = Array.isArray(response.data) ? (response.data as unknown as LibraryMedia[]) : [];
       setItems(list);
 
-      // Charger les médias partagés par des amis (depuis popcorn-web)
-      const shared = await getSharedWithMe();
-      if (shared && shared.length > 0) {
-        const sections: Array<{ friendLabel: string; backendUrl: string; localUserId: string | null; items: LibraryMedia[] }> = [];
-        for (const s of shared) {
-          if (!s.backendUrl) continue;
-          try {
-            const res = await fetch(`${s.backendUrl.replace(/\/$/, '')}/library`, {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-                ...(s.localUserId ? { 'X-User-ID': s.localUserId } : {}),
-              } as any,
-            });
-            const json = await res.json().catch(() => null);
-            const data = json && typeof json === 'object' && 'data' in json ? (json as any).data : json;
-            const list = Array.isArray(data) ? (data as LibraryMedia[]) : [];
-            const existing = list.filter((it) => it && (it as any).exists);
-            const friendLabel = s.email || s.friendId;
-            sections.push({
-              friendLabel,
-              backendUrl: s.backendUrl,
-              localUserId: s.localUserId,
-              items: existing.map((it) => ({
-                ...it,
-                __shared: {
-                  backendUrl: s.backendUrl!,
-                  ownerId: s.friendId,
-                  friendLabel,
-                  localUserId: s.localUserId,
-                },
-              })),
-            });
-          } catch {
-            // ignore: backend ami indisponible
+      // Ne pas bloquer l'affichage local sur les backends amis (parfois lents/offline).
+      void (async () => {
+        const shared = await getSharedWithMe();
+        if (!shared || shared.length === 0) {
+          setSharedByFriends([]);
+          return;
+        }
+
+        const sections = await Promise.all(
+          shared.map(async (s) => {
+            if (!s.backendUrl) return null;
+            try {
+              const controller = new AbortController();
+              const timeoutId = window.setTimeout(() => controller.abort(), 4000);
+              const res = await fetch(`${s.backendUrl.replace(/\/$/, '')}/library`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...(s.localUserId ? { 'X-User-ID': s.localUserId } : {}),
+                } as any,
+                signal: controller.signal,
+              });
+              window.clearTimeout(timeoutId);
+
+              const json = await res.json().catch(() => null);
+              const data = json && typeof json === 'object' && 'data' in json ? (json as any).data : json;
+              const list = Array.isArray(data) ? (data as LibraryMedia[]) : [];
+              const existing = list.filter((it) => it && (it as any).exists);
+              const friendLabel = s.email || s.friendId;
+              return {
+                friendLabel,
+                backendUrl: s.backendUrl,
+                localUserId: s.localUserId,
+                items: existing.map((it) => ({
+                  ...it,
+                  __shared: {
+                    backendUrl: s.backendUrl!,
+                    ownerId: s.friendId,
+                    friendLabel,
+                    localUserId: s.localUserId,
+                  },
+                })),
+              };
+            } catch {
+              return null;
+            }
+          })
+        );
+
+        const validSections: Array<{
+          friendLabel: string;
+          backendUrl: string;
+          localUserId: string | null;
+          items: LibraryMedia[];
+        }> = [];
+        for (const section of sections) {
+          if (section) {
+            validSections.push(section);
           }
         }
-        setSharedByFriends(sections);
-      } else {
-        setSharedByFriends([]);
-      }
+        setSharedByFriends(validSections);
+      })();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
@@ -270,6 +296,7 @@ export default function Library({
     try {
       setScanning(true);
       setScanMessage(null);
+      invalidateLibraryCache();
       
       const response = await serverApi.scanLocalMedia();
       

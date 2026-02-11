@@ -26,6 +26,7 @@ export async function applyPlaybackSettingsFromCloud(
     if (typeof ps.nextEpisodeButtonEnabled === 'boolean') merged.nextEpisodeButtonEnabled = ps.nextEpisodeButtonEnabled;
     if (typeof ps.introSkipSeconds === 'number') merged.introSkipSeconds = ps.introSkipSeconds;
     if (typeof ps.nextEpisodeCountdownSeconds === 'number') merged.nextEpisodeCountdownSeconds = ps.nextEpisodeCountdownSeconds;
+    if (ps.streamingMode === 'hls' || ps.streamingMode === 'direct') merged.streamingMode = ps.streamingMode;
 
     localStorage.setItem(PLAYER_CONFIG_KEY, JSON.stringify(merged));
     return { type: 'playbackSettings', success: true };

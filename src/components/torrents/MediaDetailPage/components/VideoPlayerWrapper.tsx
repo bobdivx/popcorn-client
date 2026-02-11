@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
-import HLSPlayer from '../../../streaming/hls-player/HLSPlayer';
 import { serverApi } from '../../../../lib/client/server-api';
 import type { TorrentFile } from '../hooks/useVideoFiles';
 import { useFullscreen } from '../../../streaming/hls-player/hooks/useFullscreen';
@@ -9,6 +8,10 @@ import IntroVideoWithHlsPreload from '../../../IntroVideoWithHlsPreload';
 import PrerollPlayer from '../../../streaming/hls-player/components/PrerollPlayer';
 import { getPublicAdsSettings, type AdsConfig } from '../../../../lib/api/popcorn-web';
 import { useHlsLoader } from '../../../streaming/hls-player/hooks/useHlsLoader';
+import { usePlayerConfig } from '../../../streaming/hls-player/hooks/usePlayerConfig';
+import PlayerLoadingOverlay from '../../../streaming/player-core/components/PlayerLoadingOverlay';
+import UnifiedPlayer from '../../../streaming/player-core/components/UnifiedPlayer';
+import { useStreamSource } from '../../../streaming/player-core/hooks/useStreamSource';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 
 /** Info épisode suivant (série) pour le bouton « Épisode suivant » */
@@ -68,12 +71,9 @@ export function VideoPlayerWrapper({
   streamBackendUrl,
 }: VideoPlayerWrapperProps) {
   const baseUrl = streamBackendUrl?.trim() || serverApi.getServerUrl();
-  const [isLoading, setIsLoading] = useState(true);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [showIntro, setShowIntro] = useState(false);
+  const [forceHlsFallback, setForceHlsFallback] = useState(false);
   const [showPreroll, setShowPreroll] = useState(false);
   const [adsConfig, setAdsConfig] = useState<AdsConfig | null>(null);
-  const [hlsFilePath, setHlsFilePath] = useState<string | null>(null);
   const hlsPreloadRef = useRef<any>(null);
   const preloadVideoRef = useRef<HTMLVideoElement | null>(null);
   const { hlsLoaded } = useHlsLoader();
@@ -81,9 +81,24 @@ export function VideoPlayerWrapper({
   const wrapperElementRef = useRef<HTMLDivElement>(null);
   const isMobile = isMobileDevice();
   const { t } = useI18n();
+  const playerConfig = usePlayerConfig();
+  const isDirectMode = playerConfig.streamingMode === 'direct';
+  const effectiveDirectMode = isDirectMode && !forceHlsFallback;
+  const {
+    streamUrl,
+    hlsFilePath,
+    isLoading,
+    setIsLoading,
+    showIntro,
+    setShowIntro,
+  } = useStreamSource({
+    selectedFile,
+    infoHash,
+    directStreamUrl,
+    baseUrl,
+    isDirectMode: effectiveDirectMode,
+  });
   
-  // Constantes pour contrôler l'affichage de l'intro
-  const STORAGE_INTRO_ALWAYS_SHOW = 'popcorn_intro_always_show';
   const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';
   const STORAGE_ADS_SESSION = 'popcorn_ads_preroll_session';
   const STORAGE_ADS_DAY = 'popcorn_ads_preroll_day';
@@ -124,102 +139,9 @@ export function VideoPlayerWrapper({
   }, []);
 
   useEffect(() => {
-    // Mode démo : URL directe du MP4 (pas de HLS)
-    if (directStreamUrl) {
-      setBlobUrl(directStreamUrl);
-      setHlsFilePath('direct');
-      setIsLoading(false);
-      return;
-    }
-
-    if (!selectedFile) {
-      console.warn('[VideoPlayerWrapper] Fichier manquant:', {
-        hasSelectedFile: !!selectedFile,
-        hasInfoHash: !!infoHash,
-      });
-      return;
-    }
-    
-    if (!infoHash || infoHash.trim().length === 0) {
-      console.error('[VideoPlayerWrapper] ❌ InfoHash manquant ou invalide. Impossible de construire l\'URL HLS.', {
-        infoHash,
-        fileName: selectedFile.name,
-        filePath: selectedFile.path,
-      });
-      setIsLoading(false);
-      return;
-    }
-
-    const loadHlsUrl = async () => {
-      try {
-        setIsLoading(true);
-        // Utiliser l'URL HLS du backend (ou streamBackendUrl pour un média partagé par un ami)
-        // Utiliser le chemin du fichier (path) si disponible, sinon le nom
-        // Le path contient le chemin relatif dans le torrent tel que retourné par le backend
-        const filePath = selectedFile.path || selectedFile.name;
-        
-        // Normaliser le chemin : remplacer les backslashes par des slashes pour l'URL
-        // Le backend s'attend à recevoir le chemin tel qu'il est dans le torrent
-        let normalizedPath = filePath.replace(/\\/g, '/');
-        
-        // S'assurer que le chemin ne commence pas par un slash (sauf si c'est un chemin absolu)
-        if (normalizedPath.startsWith('/') && !normalizedPath.startsWith('//')) {
-          normalizedPath = normalizedPath.substring(1);
-        }
-        
-        console.log('[VideoPlayerWrapper] Construction URL HLS:', {
-          filePath,
-          normalizedPath,
-          name: selectedFile.name,
-          path: selectedFile.path,
-          infoHash: infoHash.substring(0, 12) + '...',
-          baseUrl,
-        });
-        
-        // Encoder le chemin pour l'URL (chaque segment doit être encodé séparément pour éviter les problèmes)
-        // Utiliser encodeURIComponent sur le chemin normalisé
-        const encodedPath = encodeURIComponent(normalizedPath);
-        
-        // Passer l'info_hash en query parameter pour que le backend puisse utiliser get_file_path
-        // qui utilise le download_path depuis la DB ou le handle (plus fiable que la recherche dans les dossiers)
-        const infoHashParam = infoHash ? `?info_hash=${encodeURIComponent(infoHash)}` : '';
-        const hlsUrl = `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8${infoHashParam}`;
-        
-        console.log('[VideoPlayerWrapper] URL HLS construite:', {
-          encodedPath,
-          hlsUrl,
-          normalizedPath,
-          infoHash: infoHash.substring(0, 12) + '...',
-        });
-        
-        setBlobUrl(hlsUrl);
-        setHlsFilePath(normalizedPath);
-        setIsLoading(false);
-        
-        // Vérifier si l'intro doit être affichée
-        // Option 1: Toujours afficher (si STORAGE_INTRO_ALWAYS_SHOW = '1')
-        // Option 2: Seulement la première fois (si STORAGE_INTRO_SKIPPED n'est pas '1')
-        try {
-          const alwaysShow = localStorage.getItem(STORAGE_INTRO_ALWAYS_SHOW) === '1';
-          const introSkipped = localStorage.getItem(STORAGE_INTRO_SKIPPED) === '1';
-          
-          if (alwaysShow || !introSkipped) {
-            // Afficher l'intro avec préchargement HLS avant de jouer la vidéo
-            setShowIntro(true);
-          }
-        } catch (e) {
-          // En cas d'erreur localStorage, afficher l'intro par défaut
-          console.warn('[VideoPlayerWrapper] Erreur localStorage, affichage intro par défaut:', e);
-          setShowIntro(true);
-        }
-      } catch (error) {
-        console.error('[VideoPlayerWrapper] Erreur lors de la création de l\'URL HLS:', error);
-        setIsLoading(false);
-      }
-    };
-
-    loadHlsUrl();
-  }, [selectedFile, infoHash, directStreamUrl, baseUrl]);
+    // Réinitialiser le fallback quand on change de média/session de lecture.
+    setForceHlsFallback(false);
+  }, [infoHash, selectedFile?.path, directStreamUrl, visible]);
 
   useEffect(() => {
     let mounted = true;
@@ -234,7 +156,7 @@ export function VideoPlayerWrapper({
   }, [baseUrl]);
 
   useEffect(() => {
-    if (directStreamUrl) return; // Lecture directe MP4 (démo), pas de HLS
+    if (directStreamUrl || effectiveDirectMode) return; // Lecture directe, pas de préchargement HLS
     if (!showPreroll || showIntro) return;
     if (!hlsLoaded || !infoHash || !hlsFilePath || !window.Hls) return;
 
@@ -291,7 +213,7 @@ export function VideoPlayerWrapper({
         preloadVideoRef.current = null;
       }
     };
-  }, [showPreroll, showIntro, hlsLoaded, infoHash, hlsFilePath, directStreamUrl, baseUrl]);
+  }, [showPreroll, showIntro, hlsLoaded, infoHash, hlsFilePath, directStreamUrl, baseUrl, effectiveDirectMode]);
 
   useEffect(() => {
     if (!adsConfig || !selectedFile || !infoHash) return;
@@ -335,8 +257,8 @@ export function VideoPlayerWrapper({
     }
   };
 
-  // Afficher l'intro avec préchargement HLS si nécessaire (pas en mode lecture directe / démo)
-  if (!directStreamUrl && showIntro && selectedFile && hlsFilePath && infoHash) {
+  // Afficher l'intro avec préchargement HLS si nécessaire (pas en mode lecture directe)
+  if (!directStreamUrl && !effectiveDirectMode && showIntro && selectedFile && hlsFilePath && infoHash) {
     return (
       <IntroVideoWithHlsPreload
         onEnded={() => {
@@ -388,35 +310,7 @@ export function VideoPlayerWrapper({
           display: visible ? 'block' : 'none',
         }}
       >
-        <div className="absolute inset-0 flex items-center justify-center bg-black z-30">
-          <div className="text-center">
-            <div className="relative w-32 h-32 mb-6 mx-auto">
-              {/* Cercle de chargement externe */}
-              <div className="absolute inset-0 border-4 border-primary-600/20 rounded-full"></div>
-              <div 
-                className="absolute inset-0 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"
-              ></div>
-              {/* Logo Popcorn avec animation pulse */}
-              <div className="absolute inset-2 flex items-center justify-center animate-pulse">
-                <img 
-                  src="/popcorn_logo.png" 
-                  alt="Popcorn" 
-                  className="w-full h-full object-contain"
-                  style={{
-                    filter: 'drop-shadow(0 0 10px rgba(220, 38, 38, 0.5))',
-                  }}
-                />
-              </div>
-            </div>
-            <p className="text-white/80 text-lg font-medium">Chargement des fichiers vidéo...</p>
-            {/* Points animés */}
-            <div className="flex gap-1 mt-2 justify-center">
-              <span className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></span>
-              <span className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
-              <span className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
-            </div>
-          </div>
-        </div>
+        <PlayerLoadingOverlay message="Chargement des fichiers vidéo..." />
       </div>
     );
   }
@@ -458,85 +352,44 @@ export function VideoPlayerWrapper({
             height: '100%',
           }}
         >
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black z-30">
-              <div className="text-center">
-                <div className="relative w-32 h-32 mb-6 mx-auto">
-                  {/* Cercle de chargement externe */}
-                  <div className="absolute inset-0 border-4 border-primary-600/20 rounded-full"></div>
-                  <div 
-                    className="absolute inset-0 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"
-                  ></div>
-                  {/* Logo Popcorn avec animation pulse */}
-                  <div className="absolute inset-2 flex items-center justify-center animate-pulse">
-                    <img 
-                      src="/popcorn_logo.png" 
-                      alt="Popcorn" 
-                      className="w-full h-full object-contain"
-                      style={{
-                        filter: 'drop-shadow(0 0 10px rgba(220, 38, 38, 0.5))',
-                      }}
-                    />
-                  </div>
-                </div>
-                <p className="text-white/80 text-lg font-medium">Chargement de la vidéo...</p>
-                {/* Points animés */}
-                <div className="flex gap-1 mt-2 justify-center">
-                  <span className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></span>
-                  <span className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
-                  <span className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {blobUrl && directStreamUrl ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-black">
-              <video
-                src={blobUrl}
-                className="max-w-full max-h-full w-full h-full object-contain"
-                controls
-                autoPlay
-                playsInline
-                onError={(e) => {
-                  console.error('[VideoPlayerWrapper] Direct video error:', e);
-                  setIsLoading(false);
-                }}
-                onLoadedData={() => setIsLoading(false)}
-              />
-              <button
-                type="button"
-                onClick={onClose}
-                className="absolute top-4 left-4 z-20 rounded-lg bg-black/60 px-3 py-2 text-white hover:bg-black/80 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                aria-label={t('common.close')}
-              >
-                {t('common.close')}
-              </button>
-            </div>
-          ) : blobUrl ? (
-            <HLSPlayer
-              src={blobUrl}
-              infoHash={infoHash}
-              fileName={selectedFile!.path || selectedFile!.name}
-              torrentName={torrentName || selectedFile!.name}
-              torrentId={torrentId}
-              filePath={selectedFile!.path || selectedFile!.name}
-              tmdbId={tmdbId}
-              tmdbType={tmdbType}
-              startFromBeginning={startFromBeginning}
-              isSeries={isSeries}
-              nextEpisodeInfo={nextEpisodeInfo}
-              onPlayNextEpisode={onPlayNextEpisode}
-              onLoadingChange={(loading) => {
-                setIsLoading(loading);
-              }}
-              onError={(e) => {
-                console.error('[VideoPlayerWrapper] HLS Player error:', e);
-                setIsLoading(false);
-              }}
-              onClose={onClose}
-            />
-          ) : null}
+          <UnifiedPlayer
+            src={streamUrl}
+            useDirectPlayer={Boolean(directStreamUrl || effectiveDirectMode)}
+            loading={isLoading}
+            loadingMessage="Chargement de la vidéo..."
+            closeLabel={t('common.close')}
+            onClose={onClose}
+            onDirectLoadedData={() => setIsLoading(false)}
+            onDirectError={(e) => {
+              console.error('[VideoPlayerWrapper] Direct video error:', e);
+              if (!directStreamUrl && isDirectMode && !forceHlsFallback) {
+                console.warn('[VideoPlayerWrapper] Fallback automatique vers HLS après échec du mode direct.');
+                setIsLoading(true);
+                setForceHlsFallback(true);
+                return;
+              }
+              setIsLoading(false);
+            }}
+            hlsProps={{
+              infoHash,
+              fileName: selectedFile?.path || selectedFile?.name || torrentName || 'video',
+              torrentName: torrentName || selectedFile?.name || 'video',
+              torrentId,
+              filePath: selectedFile?.path || selectedFile?.name || torrentName || 'video',
+              tmdbId,
+              tmdbType,
+              startFromBeginning,
+              isSeries,
+              nextEpisodeInfo,
+              onPlayNextEpisode,
+              onClose,
+            }}
+            onHlsLoadingChange={(loading) => setIsLoading(loading)}
+            onHlsError={(e) => {
+              console.error('[VideoPlayerWrapper] HLS Player error:', e);
+              setIsLoading(false);
+            }}
+          />
         </div>
       </div>
     </div>

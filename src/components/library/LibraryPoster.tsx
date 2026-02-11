@@ -16,6 +16,7 @@ export function LibraryPoster({ item, onPlay, className, priorityLoad }: Library
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const isDownloading = !item.exists;
+  const externalLabel = item.library_source_label?.trim() || t('library.badgeExternalLibrary');
 
   const handleClick = (e: MouseEvent | KeyboardEvent) => {
     e.preventDefault();
@@ -100,10 +101,10 @@ export function LibraryPoster({ item, onPlay, className, priorityLoad }: Library
                 <Users className="w-3 h-3 lg:w-3.5 lg:h-3.5 shrink-0" />
                 <span className="truncate">{item.__shared.friendLabel || t('library.badgeSharedByFriend')}</span>
               </span>
-            ) : item.library_source_id ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] lg:text-xs font-medium bg-sky-600/90 text-white border border-sky-400/50 shadow-sm" title={t('library.badgeExternalLibrary')}>
+            ) : item.is_external_source ? (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] lg:text-xs font-medium bg-sky-600/90 text-white border border-sky-400/50 shadow-sm" title={externalLabel}>
                 <FolderOpen className="w-3 h-3 lg:w-3.5 lg:h-3.5 shrink-0" />
-                <span className="truncate">{t('library.badgeExternalLibrary')}</span>
+                <span className="truncate">{externalLabel}</span>
               </span>
             ) : (() => {
               const isPopconn = !item.is_local_only || (item.info_hash && !item.info_hash.startsWith('local_') && /^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$/.test(item.info_hash));

@@ -46,7 +46,7 @@ export default function HLSPlayer({
     setHlsDuration(undefined);
   }, [infoHash, filePath]);
   
-  const { videoRef, hlsRef, isLoading, error, hlsLoaded, stopBuffer } = useHlsPlayer({
+  const { videoRef, hlsRef, isLoading, error, hlsLoaded, stopBuffer, reloadWithSeek } = useHlsPlayer({
     src,
     infoHash,
     fileName,
@@ -94,7 +94,16 @@ export default function HLSPlayer({
     handleVolumeChange: baseHandleVolumeChange,
     toggleMute,
     canAutoPlay,
-  } = useVideoControls({ videoRef, hlsLoaded, hlsDuration });
+  } = useVideoControls({
+    videoRef,
+    hlsLoaded,
+    hlsDuration,
+    isLoading,
+    // Les médias locaux (info_hash local_) posent encore des 503 fréquents avec seek backend.
+    // On privilégie un seek local clampé au buffer.
+    canUseSeekReload: !(infoHash?.startsWith('local_') ?? false),
+    reloadWithSeek,
+  });
 
   useEffect(() => {
     if (onBufferProgress) {

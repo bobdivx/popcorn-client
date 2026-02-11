@@ -5,9 +5,20 @@ interface UseVideoControlsProps {
   videoRef: { current: HTMLVideoElement | null };
   hlsLoaded: boolean;
   hlsDuration?: number;
+  isLoading?: boolean;
+  canUseSeekReload?: boolean;
+  /** Si fourni, appelé quand l'utilisateur seek au-delà du buffer (ex. >90s) pour recharger avec seek= */
+  reloadWithSeek?: (seekSeconds: number) => void;
 }
 
-export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoControlsProps) {
+export function useVideoControls({
+  videoRef,
+  hlsLoaded,
+  hlsDuration,
+  isLoading = false,
+  canUseSeekReload = true,
+  reloadWithSeek,
+}: UseVideoControlsProps) {
   const playerConfig = usePlayerConfig();
   const [showControls, setShowControls] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -237,9 +248,34 @@ export function useVideoControls({ videoRef, hlsLoaded, hlsDuration }: UseVideoC
     if (!rect.width) return;
     const pos = (clientX - rect.left) / rect.width;
     const targetTime = Math.max(0, Math.min(durationValue, pos * durationValue));
-    // Toujours utiliser currentTime pour le seek : avec HLS.js cela permet de sauter
-    // n'importe où dans la vidéo (le segment est chargé à la demande). fastSeek()
-    // est limité au buffer déjà chargé et peut bloquer les grands sauts.
+
+    // Si la cible est au-delà du buffer (ex. playlist progressive limitée à ~90s),
+    // recharger la source avec force_vod et seek= pour que le backend renvoie une playlist à partir de targetTime.
+    let bufferedEnd = 0;
+    try {
+      if (video.buffered && video.buffered.length > 0) {
+        bufferedEnd = video.buffered.end(video.buffered.length - 1);
+      }
+    } catch (_) {}
+
+    // Si le mode reloadWithSeek backend est désactivé (ex: certains médias locaux),
+    // laisser le seek natif HTML5/HLS gérer la récupération sans forcer de reload backend.
+    if (!canUseSeekReload) {
+      video.currentTime = targetTime;
+      return;
+    }
+
+    if (reloadWithSeek && targetTime > 0 && !isLoading) {
+      // Éviter les reloadWithSeek trop tôt: attendre un buffer initial minimal.
+      const minBufferedForReload = 20; // secondes
+      const margin = 2; // secondes
+      const isBeyondBufferedWindow = targetTime > bufferedEnd + margin;
+      if (bufferedEnd >= minBufferedForReload && isBeyondBufferedWindow) {
+        reloadWithSeek(targetTime);
+        return;
+      }
+    }
+
     video.currentTime = targetTime;
   };
 

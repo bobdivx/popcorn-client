@@ -4,6 +4,21 @@
 
 import type { ApiResponse, LibraryItem } from './types.js';
 
+/** TTL du cache bibliothèque côté client (ms). Réduit les appels répétés quand on change d'onglet Films/Séries → Bibliothèque. */
+const LIBRARY_CACHE_TTL_MS = 45_000;
+
+type LibraryCacheEntry = { data: ApiResponse<LibraryItem[]>; at: number };
+
+/** Cache en mémoire de la réponse GET /library (clé = userId ou ''). Invalidation manuelle via invalidateLibraryCache(). */
+let libraryCache: { key: string; entry: LibraryCacheEntry } | null = null;
+
+/**
+ * Invalide le cache client de la bibliothèque (à appeler après un scan/sync pour forcer un prochain rechargement).
+ */
+export function invalidateLibraryCache(): void {
+  libraryCache = null;
+}
+
 /**
  * Interface pour accéder aux méthodes privées de ServerApiClient nécessaires pour la bibliothèque
  */
@@ -16,11 +31,19 @@ export const libraryMethods = {
   /**
    * Récupère la bibliothèque de l'utilisateur
    * Envoie X-User-ID pour que le backend utilise la clé TMDB de l'utilisateur (enrichissement).
+   * Utilise un cache client (TTL 45s) pour afficher rapidement l'onglet Bibliothèque.
    */
   async getLibrary(this: ServerApiClientLibraryAccess): Promise<ApiResponse<LibraryItem[]>> {
     const userId = this.getCurrentUserId();
+    const cacheKey = userId ?? '';
+    const now = Date.now();
+    if (libraryCache && libraryCache.key === cacheKey && now - libraryCache.entry.at < LIBRARY_CACHE_TTL_MS) {
+      return libraryCache.entry.data;
+    }
     const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
-    return this.backendRequest<any[]>('/library', { method: 'GET', headers }) as unknown as ApiResponse<LibraryItem[]>;
+    const data = await this.backendRequest<any[]>('/library', { method: 'GET', headers }) as unknown as ApiResponse<LibraryItem[]>;
+    libraryCache = { key: cacheKey, entry: { data, at: now } };
+    return data;
   },
 
   /**
@@ -174,6 +197,18 @@ export const libraryMethods = {
     });
   },
 
+  async setLibrarySourceEnabled(
+    this: ServerApiClientLibraryAccess,
+    id: string,
+    is_enabled: boolean
+  ): Promise<ApiResponse<void>> {
+    return this.backendRequest<void>(`/api/library/sources/${encodeURIComponent(id)}/enabled`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_enabled }),
+    });
+  },
+
   async scanLibrarySource(this: ServerApiClientLibraryAccess, id: string): Promise<ApiResponse<string>> {
     const userId = this.getCurrentUserId();
     const url = userId
@@ -189,6 +224,7 @@ export interface LibrarySource {
   category: string;
   label: string | null;
   share_with_friends: boolean;
+  is_enabled?: boolean;
   created_at: number;
   updated_at: number;
   /** Timestamp du dernier scan réussi (Unix sec). Undefined si jamais scanné. */

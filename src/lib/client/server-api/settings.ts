@@ -147,4 +147,18 @@ export const settingsMethods = {
       : '/api/explorer/files';
     return this.backendRequest(url, { method: 'GET' });
   },
+
+  /** GET /api/library/sources/explorer — explorateur complet pour choisir une source de bibliothèque */
+  async listLibrarySourceExplorerFiles(this: ServerApiClientSettingsAccess, path?: string): Promise<ApiResponse<Array<{
+    name: string;
+    path: string;
+    is_directory: boolean;
+    size?: number;
+    modified?: number;
+  }>>> {
+    const url = path != null && path !== ''
+      ? `/api/library/sources/explorer?path=${encodeURIComponent(path)}`
+      : '/api/library/sources/explorer';
+    return this.backendRequest(url, { method: 'GET' });
+  },
 };

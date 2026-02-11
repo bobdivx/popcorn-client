@@ -126,9 +126,15 @@ export function isTablet(): boolean {
 }
 
 /**
- * Détermine si le plein écran automatique doit être activé
+ * Détermine si le plein écran automatique doit être activé.
+ * Jellyfin-style: webOS + Android utilisent fullscreen auto pour masquer les barres.
  */
 export function shouldAutoFullscreen(): boolean {
+  // Tauri Android: toujours activer fullscreen auto (priorité)
+  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+    const platform = (window as any).__TAURI_METADATA__?.platform;
+    if (platform === 'android') return true;
+  }
   return isTVPlatform() || isMobileDevice();
 }
 

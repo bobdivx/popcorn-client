@@ -30,6 +30,7 @@ export default function SeriesDashboard() {
   const { notifications, addNotification, removeNotification } = useNotifications();
   const [heroDownloading, setHeroDownloading] = useState(false);
   const [viewMode, setViewMode] = useState<'torrents' | 'library'>('torrents');
+  const [autoViewChecked, setAutoViewChecked] = useState(false);
 
   // Rafraîchir la liste des séries au fur et à mesure de la synchronisation torrent
   useEffect(() => {
@@ -48,6 +49,34 @@ export default function SeriesDashboard() {
       if (key > 0) refetchSilent();
     }
   }, [isSyncing, syncStatus?.progress?.total_processed, syncStatus?.stats, refetchSilent]);
+
+  // Fallback UX: si l'onglet Torrents est vide mais que la bibliothèque locale a des séries,
+  // basculer automatiquement vers la vue Bibliothèque.
+  useEffect(() => {
+    if (loading || autoViewChecked || viewMode !== 'torrents') return;
+
+    const checkLibraryFallback = async () => {
+      try {
+        const res = await serverApi.getLibrary();
+        if (!res.success || !Array.isArray(res.data)) {
+          setAutoViewChecked(true);
+          return;
+        }
+        const hasLibrarySeries = res.data.some((item: any) => {
+          const category = String(item?.category ?? '').toUpperCase();
+          const tmdbType = String(item?.tmdb_type ?? '').toLowerCase();
+          return category === 'SERIES' || tmdbType === 'tv' || tmdbType === 'series';
+        });
+        if (series.length === 0 && hasLibrarySeries) {
+          setViewMode('library');
+        }
+      } finally {
+        setAutoViewChecked(true);
+      }
+    };
+
+    checkLibraryFallback();
+  }, [loading, series.length, autoViewChecked, viewMode]);
 
   // Charger plus d'éléments automatiquement quand on approche de la fin
   useEffect(() => {
@@ -297,7 +326,7 @@ export default function SeriesDashboard() {
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       {/* Barre de progression compacte en haut quand sync en cours */}
       {showSyncBar && <SyncProgress compact externalStatus={syncStatus} />}
-      {renderViewToggle('px-4 sm:px-6 lg:px-8 mb-4')}
+      {heroItemsWithOverview.length === 0 && renderViewToggle('px-4 sm:px-6 lg:px-8 mb-4')}
 
       {/* Section Hero avec carousel */}
       {heroItemsWithOverview.length > 0 && (

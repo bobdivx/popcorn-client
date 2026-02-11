@@ -907,6 +907,7 @@ export interface UserConfig {
     nextEpisodeButtonEnabled?: boolean;
     introSkipSeconds?: number;
     nextEpisodeCountdownSeconds?: number;
+    streamingMode?: 'hls' | 'direct';
   } | null;
   /** Dossiers de téléchargement par type (films, séries) — style Jellyfin */
   mediaPaths?: {

@@ -1,5 +1,12 @@
 import { useState, useEffect } from 'preact/hooks';
 
+/** Applique la config HLS.js type Jellyfin (htmlVideoPlayer requireHlsPlayer) */
+function applyJellyfinHlsDefaults(Hls: typeof import('hls.js').default) {
+  Hls.DefaultConfig.lowLatencyMode = false;
+  Hls.DefaultConfig.backBufferLength = Infinity;
+  Hls.DefaultConfig.liveBackBufferLength = 90;
+}
+
 export function useHlsLoader() {
   const [hlsLoaded, setHlsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -8,6 +15,7 @@ export function useHlsLoader() {
     if (typeof window === 'undefined') return;
 
     if (window.Hls) {
+      applyJellyfinHlsDefaults(window.Hls);
       setHlsLoaded(true);
       return;
     }
@@ -17,6 +25,7 @@ export function useHlsLoader() {
       const checkInterval = setInterval(() => {
         if (window.Hls) {
           clearInterval(checkInterval);
+          applyJellyfinHlsDefaults(window.Hls);
           setHlsLoaded(true);
         }
       }, 100);
@@ -26,7 +35,9 @@ export function useHlsLoader() {
 
     // Utiliser la version installée via npm
     import('hls.js').then((HlsModule) => {
-      window.Hls = HlsModule.default;
+      const Hls = HlsModule.default;
+      applyJellyfinHlsDefaults(Hls);
+      window.Hls = Hls;
       setHlsLoaded(true);
     }).catch((err) => {
       console.error('Erreur lors du chargement de HLS.js:', err);
@@ -36,6 +47,7 @@ export function useHlsLoader() {
       script.async = true;
       script.onload = () => {
         if (window.Hls) {
+          applyJellyfinHlsDefaults(window.Hls);
           setHlsLoaded(true);
         } else {
           setError('Hls.js chargé mais non disponible');
