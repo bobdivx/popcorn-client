@@ -658,7 +658,7 @@
       },
       "transcodingConfig": {
         "title": "Max concurrent transcodings",
-        "description": "Limits how many HLS/FFmpeg streams can run at once. Lower values reduce CPU load (e.g. on NAS).",
+        "description": "Limits how many HLS/FFmpeg streams can run at once. Lower values reduce CPU load. On NAS (e.g. ZimaCube), setting 1 is recommended to avoid high resource usage.",
         "maxLabel": "Max concurrent transcodings",
         "range": "Between {min} and {max}",
         "saveSuccess": "Setting saved."

@@ -658,7 +658,7 @@
       },
       "transcodingConfig": {
         "title": "Nombre max de transcodages",
-        "description": "Limite le nombre de flux HLS/FFmpeg simultanés. Réduire cette valeur limite la charge CPU (ex. sur NAS).",
+        "description": "Limite le nombre de flux HLS/FFmpeg simultanés. Réduire cette valeur limite la charge CPU. Sur NAS (ex. ZimaCube), mettre 1 est recommandé pour éviter une consommation excessive.",
         "maxLabel": "Transcodages simultanés max",
         "range": "Entre {min} et {max}",
         "saveSuccess": "Paramètre enregistré."

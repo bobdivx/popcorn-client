@@ -1,11 +1,12 @@
 # Script de build WebOS
-# Usage: .\scripts\webos\build.ps1 [-Demo] [-Package]
-# Build le frontend Astro et prépare l'application WebOS
-# -Demo : utilise le backend de validation (popcorn-vercel) pour les builds stores
-# Optionnellement package l'IPK si ares-package est disponible
+# Usage: .\scripts\webos\build.ps1 [-Demo] [-Simple] [-Package]
+# -Simple : app minimaliste qui affiche uniquement https://client.popcornn.app (pas de build Astro)
+# -Demo   : utilise le backend de validation (popcorn-vercel) pour les builds stores (build complet)
+# -Package: crée l'IPK avec ares-package
 
 param(
     [switch]$Demo = $false,
+    [switch]$Simple = $false,
     [switch]$Package = $false
 )
 
@@ -56,73 +57,97 @@ $versionContent = Get-Content $VersionFile -Raw | ConvertFrom-Json
 $version = $versionContent.client.version
 Write-Success "Version détectée: $version"
 
-# Étape 3: Build le frontend Astro avec config webOS (chemins relatifs)
-if ($Demo) {
-    $env:PUBLIC_DEMO_BACKEND_URL = "https://popcorn-vercel.vercel.app"
-    Write-Info "Mode démo activé : backend de validation (PUBLIC_DEMO_BACKEND_URL)"
-}
-Write-Info "Build du frontend Astro avec config webOS (chemins relatifs)..."
 Set-Location $ProjectRoot
 
-# Utiliser la config webOS pour les chemins relatifs (requis pour file://)
-$configFile = Join-Path $ProjectRoot "astro.config.webos.mjs"
-if (Test-Path $configFile) {
-    Write-Info "Utilisation de astro.config.webos.mjs"
-    npx astro build --config astro.config.webos.mjs
-} else {
-    Write-Info "Config webOS non trouvée, utilisation de la config par défaut"
-    npm run build
-}
-
-if ($LASTEXITCODE -ne 0) {
-    Write-Err "Échec du build Astro"
-    exit 1
-}
-Write-Success "Frontend Astro buildé avec succès"
-
-# Étape 4: Vérifier que dist/ existe
-if (-not (Test-Path $DistDir)) {
-    Write-Err "Le dossier dist/ n'existe pas après le build"
-    exit 1
-}
-
-# Étape 4.5: Corriger les chemins absolus en chemins relatifs pour webOS (file://)
-Write-Info "Correction des chemins pour compatibilité webOS (file://)..."
-$htmlFiles = Get-ChildItem -Path $DistDir -Filter "*.html" -Recurse
-foreach ($htmlFile in $htmlFiles) {
-    $content = Get-Content $htmlFile.FullName -Raw
-    # Remplacer /_assets/ par ./_assets/ (chemin relatif ES module)
-    $newContent = $content -replace '="/_assets/', '="./_assets/'
-    # Remplacer /popcorn_logo.png par ./popcorn_logo.png
-    $newContent = $newContent -replace '="/popcorn_logo.png"', '="./popcorn_logo.png"'
-    # Remplacer /favicon.svg par ./favicon.svg
-    $newContent = $newContent -replace '="/favicon.svg"', '="./favicon.svg"'
-    if ($content -ne $newContent) {
-        Set-Content $htmlFile.FullName -Value $newContent -Encoding UTF8
-        Write-Host "  Corrigé: $($htmlFile.Name)" -ForegroundColor Gray
+if ($Simple) {
+    # Mode simple : pas de build Astro, l'app affiche juste client.popcornn.app
+    Write-Info "Mode simple : app = redirection vers https://client.popcornn.app"
+    if (Test-Path $FrontendDir) {
+        Remove-Item $FrontendDir -Recurse -Force
+        Write-Info "Suppression de webos/frontend/ (inutile en mode simple)"
     }
-}
-Write-Success "Chemins corrigés pour webOS"
+    $appInfo = Get-Content $AppInfoFile -Raw | ConvertFrom-Json
+    $appInfo.version = $version
+    $appInfo.main = "index.html"
+    $appInfo | ConvertTo-Json -Depth 10 | Set-Content $AppInfoFile -Encoding UTF8
+    Write-Success "appinfo.json mis à jour (main = index.html)"
+} else {
+    # Build complet : frontend Astro dans webos/frontend/
+    # Étape 3: Build le frontend Astro avec config webOS (chemins relatifs)
+    if ($Demo) {
+        $env:PUBLIC_DEMO_BACKEND_URL = "https://popcorn-vercel.vercel.app"
+        Write-Info "Mode démo activé : backend de validation (PUBLIC_DEMO_BACKEND_URL)"
+    }
+    $env:SITE = $null
+    $env:ASTRO_SITE = $null
+    Write-Info "Build du frontend Astro avec config webOS (chemins relatifs)..."
 
-# Étape 5: Nettoyer et copier dist/ vers webos/frontend/
-Write-Info "Copie du frontend buildé vers webos/frontend/..."
-if (Test-Path $FrontendDir) {
-    Remove-Item $FrontendDir -Recurse -Force
-}
-New-Item -ItemType Directory -Path $FrontendDir -Force | Out-Null
-Copy-Item "$DistDir\*" -Destination $FrontendDir -Recurse -Force
-Write-Success "Frontend copié vers webos/frontend/"
+    $configFile = Join-Path $ProjectRoot "astro.config.webos.mjs"
+    if (Test-Path $configFile) {
+        Write-Info "Utilisation de astro.config.webos.mjs"
+        npx astro build --config astro.config.webos.mjs
+    } else {
+        Write-Info "Config webOS non trouvée, utilisation de la config par défaut"
+        npm run build
+    }
 
-# Étape 6: Mettre à jour appinfo.json avec la version (et main en mode démo)
-Write-Info "Mise à jour de appinfo.json avec la version $version"
-$appInfo = Get-Content $AppInfoFile -Raw | ConvertFrom-Json
-$appInfo.version = $version
-if ($Demo) {
-    $appInfo.main = "frontend/index.html"
-    Write-Info "Mode démo : main = frontend/index.html"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Err "Échec du build Astro"
+        exit 1
+    }
+    Write-Success "Frontend Astro buildé avec succès"
+
+    if (-not (Test-Path $DistDir)) {
+        Write-Err "Le dossier dist/ n'existe pas après le build"
+        exit 1
+    }
+
+    Write-Info "Correction des chemins pour compatibilité webOS (file://)..."
+    $htmlFiles = Get-ChildItem -Path $DistDir -Filter "*.html" -Recurse
+    foreach ($htmlFile in $htmlFiles) {
+        $content = Get-Content $htmlFile.FullName -Raw
+        $newContent = $content -replace '="/_assets/', '="./_assets/'
+        $newContent = $newContent -replace '="https?://[^"]+/_assets/', '="./_assets/'
+        $newContent = $newContent -replace '="/popcorn_logo.png"', '="./popcorn_logo.png"'
+        $newContent = $newContent -replace '="/favicon.svg"', '="./favicon.svg"'
+        if ($content -ne $newContent) {
+            Set-Content $htmlFile.FullName -Value $newContent -Encoding UTF8
+            Write-Host "  Corrigé: $($htmlFile.Name)" -ForegroundColor Gray
+        }
+    }
+    $jsFiles = Get-ChildItem -Path $DistDir -Filter "*.js" -Recurse -ErrorAction SilentlyContinue
+    foreach ($jsFile in $jsFiles) {
+        $content = Get-Content $jsFile.FullName -Raw -ErrorAction SilentlyContinue
+        if (-not $content) { continue }
+        $newContent = $content -replace 'https?://[^"'']+/_assets/', './_assets/'
+        if ($content -ne $newContent) {
+            Set-Content $jsFile.FullName -Value $newContent -Encoding UTF8 -NoNewline
+            Write-Host "  Corrigé (JS): $($jsFile.Name)" -ForegroundColor Gray
+        }
+    }
+    Write-Success "Chemins corrigés pour webOS"
+
+    Write-Info "Copie du frontend buildé vers webos/frontend/..."
+    if (Test-Path $FrontendDir) {
+        Remove-Item $FrontendDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Path $FrontendDir -Force | Out-Null
+    Copy-Item "$DistDir\*" -Destination $FrontendDir -Recurse -Force
+    Write-Success "Frontend copié vers webos/frontend/"
+
+    Write-Info "Mise à jour de appinfo.json avec la version $version"
+    $appInfo = Get-Content $AppInfoFile -Raw | ConvertFrom-Json
+    $appInfo.version = $version
+    if ($Demo) {
+        $appInfo.main = "frontend/index.html"
+        Write-Info "Mode démo : main = frontend/index.html"
+    } else {
+        $appInfo.main = "index.html"
+        Write-Info "Main = index.html (redirection client.popcornn.app)"
+    }
+    $appInfo | ConvertTo-Json -Depth 10 | Set-Content $AppInfoFile -Encoding UTF8
+    Write-Success "appinfo.json mis à jour"
 }
-$appInfo | ConvertTo-Json -Depth 10 | Set-Content $AppInfoFile -Encoding UTF8
-Write-Success "appinfo.json mis à jour"
 
 # Étape 7: Générer les icônes webOS (fond plein - exigence LG Content Store QA)
 $iconPath = Join-Path $WebOSDir "icon.png"
@@ -195,6 +220,10 @@ if ($Package) {
 
 Write-Section "Build WebOS terminé avec succès"
 Write-Success "L'application WebOS est prête dans le dossier webos/"
+if ($Simple) {
+    Write-Info "L'app lance index.html → https://client.popcornn.app"
+}
 if (-not $Package) {
     Write-Info "Pour créer l'IPK, exécutez: .\scripts\webos\build.ps1 -Package"
+    if ($Simple) { Write-Info "  ou: .\scripts\webos\build.ps1 -Simple -Package (IPK minimal)" }
 }

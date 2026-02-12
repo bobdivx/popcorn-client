@@ -15,6 +15,8 @@ export default defineConfig({
   ],
   // Mode static pour WebOS
   output: 'static',
+  // Pas d'URL absolue (évite https://client.popcornn.app/... sur la TV en file://)
+  site: undefined,
   // Base relative pour file://
   base: './',
   // Désactiver le trailing slash
