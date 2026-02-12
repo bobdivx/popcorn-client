@@ -52,6 +52,9 @@ export default function Navbar() {
 
     loadUser();
 
+    // Masquer le fallback de chargement (Layout.astro) une fois l'app montée
+    window.dispatchEvent(new Event('popcorn-app-ready'));
+
     return () => {
       window.removeEventListener('scroll', handleScroll);
       window.removeEventListener('popstate', updatePath);

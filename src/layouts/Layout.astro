@@ -209,7 +209,10 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         setTimeout(function() {
           if (!fallback || fallback.style.display === 'none') return;
           if (!errEl || !errEl.textContent) {
-            showError('Aucune erreur capturee. Sur webOS (file://) les modules JS peuvent etre bloques. Quittez et rouvrez l app.');
+            var isWebOSEnv = document.documentElement.getAttribute('data-webos') === 'true';
+            showError(isWebOSEnv
+              ? 'Aucune erreur capturee. Sur webOS (file://) les modules JS peuvent etre bloques. Quittez et rouvrez l app.'
+              : 'Chargement lent. Si la page ne s\'affiche pas, rechargez.');
           }
         }, 5000);
         // Sur webOS uniquement : charger le bundle principal en différé (file:// peut bloquer les modules)
