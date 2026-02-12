@@ -104,6 +104,11 @@ export function useHlsPlayer({
   const seekVerifyTimeoutRef = useRef<number | null>(null);
   /** 503 sur chargement initial (flux distant) : retries avant d'afficher l'erreur */
   const initialLoad503RetryCountRef = useRef<number>(0);
+  /** Timer : après une pause prolongée, désenregistrer la vidéo pour libérer les ressources côté serveur */
+  const pauseUnregisterTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /** Délai après lequel une vidéo en pause est désenregistrée (libère transcodage + cache serveur) */
+  const PAUSE_UNREGISTER_DELAY_MS = 5 * 60 * 1000; // 5 min
 
   // Mettre à jour les refs quand les props changent (sans déclencher de réinitialisation)
   useEffect(() => {
@@ -472,6 +477,38 @@ export function useHlsPlayer({
         cleanupFunctions.push(() => {
           video.removeEventListener('waiting', handleWaiting);
           if (waitingTimeoutId !== null) clearTimeout(waitingTimeoutId);
+        });
+
+        // Après une pause prolongée, désenregistrer pour libérer transcodage et cache côté serveur
+        const handlePause = () => {
+          if (pauseUnregisterTimeoutRef.current !== null) clearTimeout(pauseUnregisterTimeoutRef.current);
+          pauseUnregisterTimeoutRef.current = window.setTimeout(() => {
+            pauseUnregisterTimeoutRef.current = null;
+            activeVideoRegisteredRef.current = false;
+            void unregisterActiveVideo();
+          }, PAUSE_UNREGISTER_DELAY_MS);
+        };
+        const handlePlay = () => {
+          if (pauseUnregisterTimeoutRef.current !== null) {
+            clearTimeout(pauseUnregisterTimeoutRef.current);
+            pauseUnregisterTimeoutRef.current = null;
+          }
+          // Ré-enregistrer si on avait désenregistré après une longue pause (le serveur aura nettoyé, la reprise relancera le transcodage)
+          if (!activeVideoRegisteredRef.current && hlsFileIdRef.current) {
+            registerActiveVideo(hlsFileIdRef.current).then(() => {
+              activeVideoRegisteredRef.current = true;
+            });
+          }
+        };
+        video.addEventListener('pause', handlePause);
+        video.addEventListener('play', handlePlay);
+        cleanupFunctions.push(() => {
+          video.removeEventListener('pause', handlePause);
+          video.removeEventListener('play', handlePlay);
+          if (pauseUnregisterTimeoutRef.current !== null) {
+            clearTimeout(pauseUnregisterTimeoutRef.current);
+            pauseUnregisterTimeoutRef.current = null;
+          }
         });
 
         hls.on(window.Hls.Events.MANIFEST_PARSED, (event: any, data: any) => {
@@ -1174,6 +1211,10 @@ export function useHlsPlayer({
           if (retryTimeoutRef.current !== null) {
             clearTimeout(retryTimeoutRef.current);
             retryTimeoutRef.current = null;
+          }
+          if (pauseUnregisterTimeoutRef.current !== null) {
+            clearTimeout(pauseUnregisterTimeoutRef.current);
+            pauseUnregisterTimeoutRef.current = null;
           }
           // Plus besoin de révoquer les Blob URLs, on utilise des URLs HLS
           blobUrlRef.current = null;

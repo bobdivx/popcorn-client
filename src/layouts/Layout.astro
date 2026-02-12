@@ -14,7 +14,7 @@ const isWebOS = import.meta.env.WEBOS === 'true';
 ---
 
 <!doctype html>
-<html lang="fr" id="html-root" data-theme="dark" class="overflow-x-hidden">
+<html lang="fr" id="html-root" data-theme="dark" class="overflow-x-hidden" data-webos={isWebOS ? 'true' : undefined}>
   <head>
     <meta charset="UTF-8" />
     <script is:inline>
@@ -212,17 +212,19 @@ const isWebOS = import.meta.env.WEBOS === 'true';
             showError('Aucune erreur capturee. Sur webOS (file://) les modules JS peuvent etre bloques. Quittez et rouvrez l app.');
           }
         }, 5000);
-        // Test: le bundle principal se charge en type=module ? (webOS peut bloquer file:// + module)
-        setTimeout(function() {
-          var script = document.createElement('script');
-          // En http(s), charger depuis la racine du site (évite 404 sur /settings/ où ./_assets → settings/_assets)
-          var isHttp = (typeof window !== 'undefined' && (window.location.protocol === 'http:' || window.location.protocol === 'https:'));
-          script.src = isHttp ? (window.location.origin + '/_assets/client.js') : './_assets/client.js';
-          script.type = 'module';
-          script.onload = function() { console.log('[Popcorn] Module _assets/client.js load OK'); };
-          script.onerror = function(e) { console.error('[Popcorn] Module _assets/client.js load FAIL', e); };
-          document.head.appendChild(script);
-        }, 500);
+        // Sur webOS uniquement : charger le bundle principal en différé (file:// peut bloquer les modules)
+        // Sur le build normal, Astro injecte déjà le script avec nom hashé (_assets/client-XXX.js)
+        if (document.documentElement.getAttribute('data-webos') === 'true') {
+          setTimeout(function() {
+            var script = document.createElement('script');
+            var isHttp = (typeof window !== 'undefined' && (window.location.protocol === 'http:' || window.location.protocol === 'https:'));
+            script.src = isHttp ? (window.location.origin + '/_assets/client.js') : './_assets/client.js';
+            script.type = 'module';
+            script.onload = function() { console.log('[Popcorn] Module _assets/client.js load OK'); };
+            script.onerror = function(e) { console.error('[Popcorn] Module _assets/client.js load FAIL', e); };
+            document.head.appendChild(script);
+          }, 500);
+        }
       })();
     </script>
   </body>
