@@ -40,7 +40,14 @@ export function redirectTo(path: string): void {
   }
   
   lastRedirect = { path: normalizedPath, timestamp: now };
-  
+
+  // Sous file:// (webOS, app packagée), les routes sont des fichiers .html
+  if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
+    const file = normalizedPath === '/' ? 'index.html' : `${normalizedPath.slice(1)}.html`;
+    window.location.href = file;
+    return;
+  }
+
   // Utiliser window.location.origin pour préserver le port
   window.location.href = `${window.location.origin}${normalizedPath}`;
 }

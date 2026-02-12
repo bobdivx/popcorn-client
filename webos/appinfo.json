@@ -1,6 +1,6 @@
 {
     "id":  "com.popcorn.client.webos",
-    "version":  "1.1.57",
+    "version":  "1.2.23",
     "type":  "web",
     "main":  "frontend/index.html",
     "title":  "Popcorn",
@@ -11,5 +11,5 @@
     "resolution":  "1920x1080",
     "disableBackHistoryAPI":  true,
     "transparent":  false,
-    "handlesRelaunch":  true
+    "handlesRelaunch":  false
 }

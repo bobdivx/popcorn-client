@@ -69,6 +69,12 @@ export default function Wizard() {
     return false;
   };
 
+  // Signaler que l'app a rendu (masquer l'écran de chargement initial, évite écran noir webOS)
+  useEffect(() => {
+    const t = setTimeout(() => window.dispatchEvent(new Event('popcorn-app-ready')), 100);
+    return () => clearTimeout(t);
+  }, []);
+
   // Navigation "forcée" vers une étape potentiellement masquée (édition post-import cloud)
   useEffect(() => {
     if (!pendingNavStepId) return;

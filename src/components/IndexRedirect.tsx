@@ -38,6 +38,14 @@ export default function IndexRedirect() {
     checkAndRedirect();
   };
 
+  // Signaler que l'app a rendu du contenu (masquer l'écran de chargement initial, évite écran noir webOS)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      window.dispatchEvent(new Event('popcorn-app-ready'));
+    }, 100);
+    return () => clearTimeout(t);
+  }, []);
+
   useEffect(() => {
     // Vérifier si l'intro a déjà été vue
     const introSkipped = localStorage.getItem(STORAGE_INTRO_SKIPPED) === '1';

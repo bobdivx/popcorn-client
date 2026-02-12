@@ -13,6 +13,12 @@ export default function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [checkingUsers, setCheckingUsers] = useState(true);
 
+  // Signaler que l'app a rendu (masquer l'écran de chargement initial, évite écran noir webOS)
+  useEffect(() => {
+    const t = setTimeout(() => window.dispatchEvent(new Event('popcorn-app-ready')), 100);
+    return () => clearTimeout(t);
+  }, []);
+
   // Vérifier si la DB est vide (pas d'utilisateurs) et rediriger vers setup
   useEffect(() => {
     const checkUsers = async () => {
