@@ -28,6 +28,7 @@ export default function HLSPlayer({
   onPlayNextEpisode,
   onError, 
   onLoadingChange,
+  onLoadingMessageChange,
   onBufferProgress,
   onClose,
   canUseSeekReload: canUseSeekReloadProp,
@@ -50,8 +51,8 @@ export default function HLSPlayer({
     hlsDurationRef.current = 0;
     setHlsDuration(undefined);
   }, [infoHash, filePath]);
-  
-  const { videoRef, hlsRef, isLoading, pendingSeekPosition, error, hlsLoaded, stopBuffer, reloadWithSeek } = useHlsPlayer({
+
+  const { videoRef, hlsRef, isLoading, pendingSeekPosition, error, hlsLoaded, loadingStatusMessage, stopBuffer, reloadWithSeek } = useHlsPlayer({
     src,
     infoHash,
     fileName,
@@ -79,7 +80,12 @@ export default function HLSPlayer({
     isRemoteStream,
     streamBackendUrl,
   });
-  
+
+  // Propager le message d'overlay (ex. « Préparation en cours » pendant retries 503)
+  useEffect(() => {
+    onLoadingMessageChange?.(loadingStatusMessage ?? null);
+  }, [loadingStatusMessage, onLoadingMessageChange]);
+
   // Exposer stopBuffer via ref pour que le parent (VideoPlayerWrapper) puisse l'appeler à la fermeture
   useEffect(() => {
     if (stopBufferRef) {
@@ -103,6 +109,7 @@ export default function HLSPlayer({
     volume,
     handlePlayPause,
     handleSeek: baseHandleSeek,
+    seekToTargetTime,
     handleVolumeChange: baseHandleVolumeChange,
     toggleMute,
     canAutoPlay,
@@ -147,14 +154,12 @@ export default function HLSPlayer({
     setShowControls(baseShowControls);
   }, [baseShowControls]);
 
-  const handleSeekTV = (direction: 'left' | 'right') => {
-    const video = videoRef.current;
-    if (!video || !duration) return;
-    const seekAmount = 10;
-    const newTime = direction === 'left' 
-      ? Math.max(0, currentTime - seekAmount)
-      : Math.min(duration, currentTime + seekAmount);
-    video.currentTime = newTime;
+  const handleSeekTV = (direction: 'left' | 'right', stepSeconds = 10) => {
+    if (!duration) return;
+    const newTime = direction === 'left'
+      ? Math.max(0, currentTime - stepSeconds)
+      : Math.min(duration, currentTime + stepSeconds);
+    seekToTargetTime(newTime);
   };
 
   const handleVolumeChangeTV = (direction: 'up' | 'down') => {

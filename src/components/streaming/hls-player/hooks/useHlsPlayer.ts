@@ -61,6 +61,8 @@ export function useHlsPlayer({
   const [isLoading, setIsLoading] = useState(true);
   const [pendingSeekPosition, setPendingSeekPosition] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  /** Message d’overlay pendant les retries 503 (ex. « Préparation de la lecture en cours… ») */
+  const [loadingStatusMessage, setLoadingStatusMessage] = useState<string | null>(null);
   const currentSrcRef = useRef<string | null>(null);
   const hasStartedPlayingRef = useRef(false);
   const blobUrlRef = useRef<string | null>(null);
@@ -102,7 +104,7 @@ export function useHlsPlayer({
   /** 503 sur rechargement de niveau (même URL seek) après un Seek OK : retries avant d’afficher l’erreur */
   const levelReload503RetryCountRef = useRef<number>(0);
   const seekVerifyTimeoutRef = useRef<number | null>(null);
-  /** 503 sur chargement initial (flux distant) : retries avant d'afficher l'erreur */
+  /** 503 sur chargement initial (tous flux) : retries avant d'afficher l'erreur */
   const initialLoad503RetryCountRef = useRef<number>(0);
   /** Timer : après une pause prolongée, désenregistrer la vidéo pour libérer les ressources côté serveur */
   const pauseUnregisterTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -138,6 +140,7 @@ export function useHlsPlayer({
     const video = videoRef.current;
     if (!video || !hlsLoaded || !infoHash || !filePath) return;
 
+    setLoadingStatusMessage(null);
     // Réinitialiser le compteur de retry seulement si le fichier ou l'infoHash change vraiment
     const filePathChanged = previousFilePathRef.current !== filePath;
     const infoHashChanged = previousInfoHashRef.current !== infoHash;
@@ -521,6 +524,7 @@ export function useHlsPlayer({
           retryCountRef.current = 0;
           seekLoadRetryCountRef.current = 0;
           initialLoad503RetryCountRef.current = 0;
+          setLoadingStatusMessage(null);
           setIsLoading(false);
           onLoadingChangeRef.current?.(false);
           
@@ -591,6 +595,47 @@ export function useHlsPlayer({
             }
           };
 
+          // Démarrer la lecture seulement quand on a assez de buffer (évite stall après ~3 s).
+          // Doit être appelé APRÈS que la position sauvegardée soit appliquée, sinon on play() puis
+          // un seek vers la position coupe le buffer et provoque une pause.
+          const MIN_BUFFER_BEFORE_PLAY_SEC = 10;
+          const MAX_WAIT_FOR_BUFFER_MS = 20000;
+          const startDelayedPlayWhenReady = () => {
+            if (!video.paused || (canAutoPlayRef.current !== undefined && !canAutoPlayRef.current())) return;
+            let intervalId: ReturnType<typeof setInterval> | null = null;
+            const timeoutId = window.setTimeout(() => {
+              if (intervalId !== null) clearInterval(intervalId);
+              intervalId = null;
+              if (video.paused) video.play().catch(() => {});
+            }, MAX_WAIT_FOR_BUFFER_MS);
+            // Attendre que currentTime soit bien à jour (position sauvegardée) avant de mesurer le buffer
+            const startCheck = () => {
+              intervalId = window.setInterval(() => {
+                if (video.buffered.length > 0) {
+                  const pos = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+                  let bufAhead = 0;
+                  for (let i = 0; i < video.buffered.length; i++) {
+                    if (video.buffered.start(i) <= pos && pos < video.buffered.end(i)) {
+                      bufAhead = video.buffered.end(i) - pos;
+                      break;
+                    }
+                  }
+                  if (bufAhead >= MIN_BUFFER_BEFORE_PLAY_SEC) {
+                    if (intervalId !== null) clearInterval(intervalId);
+                    intervalId = null;
+                    clearTimeout(timeoutId);
+                    if (video.paused) video.play().catch(() => {});
+                  }
+                }
+              }, 200);
+            };
+            startCheck();
+            cleanupFunctions.push(() => {
+              if (intervalId !== null) clearInterval(intervalId);
+              clearTimeout(timeoutId);
+            });
+          };
+
           if (startFromBeginningRef.current) {
             setCurrentTimeIfNeeded(0);
             if (playerConfig.skipIntroEnabled && playerConfig.introSkipSeconds > 0) {
@@ -602,24 +647,27 @@ export function useHlsPlayer({
                 if (introEnd > 0) setCurrentTimeIfNeeded(introEnd);
               }, 200);
             }
+            startDelayedPlayWhenReady();
           } else if (torrentIdRef.current) {
-            // Charger la position sauvegardée (maintenant en secondes directement)
+            // Appliquer la position sauvegardée AVANT de lancer la vérification buffer → play
             const deviceId = getOrCreateDeviceId();
+            let playWhenReadyScheduled = false;
+            const schedulePlayWhenReady = () => {
+              if (playWhenReadyScheduled) return;
+              playWhenReadyScheduled = true;
+              setTimeout(startDelayedPlayWhenReady, 150);
+            };
             getPlaybackPosition(torrentIdRef.current, deviceId).then(async (positionSeconds) => {
               if (positionSeconds && positionSeconds > 0) {
-                // La position est maintenant directement en secondes
-                // Utiliser la durée totale si disponible, sinon video.duration
                 const videoDuration = totalDuration > 0 ? totalDuration : (video.duration || 0);
                 if (videoDuration > 0) {
                   totalDurationRef.current = videoDuration;
-                  // Limiter la position à 95% de la durée pour éviter les problèmes de fin de vidéo
                   const maxPosition = videoDuration * 0.95;
                   const finalPosition = Math.min(positionSeconds, maxPosition);
                   if (finalPosition > 1) {
                     setCurrentTimeIfNeeded(finalPosition);
                   }
                 } else {
-                  // Si la durée n'est pas encore disponible, attendre un peu et réessayer
                   setTimeout(() => {
                     const retryDuration = totalDurationRef.current > 0 ? totalDurationRef.current : (video.duration || 0);
                     if (retryDuration > 0) {
@@ -632,12 +680,14 @@ export function useHlsPlayer({
                   }, 1000);
                 }
               }
+              schedulePlayWhenReady();
+            }).catch(() => {
+              schedulePlayWhenReady();
             });
-          }
-
-          // Jellyfin bindEventsToHlsPlayer: play immédiatement sur MANIFEST_PARSED
-          if (video.paused && (canAutoPlayRef.current === undefined || canAutoPlayRef.current())) {
-            video.play().catch(() => {});
+            // Au cas où la promesse met trop de temps (ex. storage lent)
+            window.setTimeout(schedulePlayWhenReady, 2000);
+          } else {
+            startDelayedPlayWhenReady();
           }
         });
         
@@ -912,21 +962,21 @@ export function useHlsPlayer({
               return;
             }
 
-            // 503/202 sur chargement initial (flux distant) : le serveur peut être temporairement occupé
+            // 503/202 sur chargement initial : playlist/transcode en cours côté backend (tous flux, ex. bibliothèque)
             const url = currentSrcRef.current;
             if (
               (statusCode === 503 || statusCode === 202) &&
-              isRemoteStream &&
               url &&
               !seekLoadUrlRef.current &&
               initialLoad503RetryCountRef.current < 5 &&
               hlsRef.current
             ) {
               initialLoad503RetryCountRef.current += 1;
+              setLoadingStatusMessage(t('playback.preparingStream'));
               const delays = [3000, 6000, 10000, 15000, 20000];
               const delayMs = delays[initialLoad503RetryCountRef.current - 1] ?? 20000;
               console.debug(
-                '[useHlsPlayer] 503/202 flux distant (chargement initial), retry',
+                '[useHlsPlayer] 503/202 chargement initial, retry',
                 initialLoad503RetryCountRef.current,
                 'dans',
                 delayMs / 1000,
@@ -948,8 +998,8 @@ export function useHlsPlayer({
             restoringProgressiveRef.current = false;
             progressiveRestoreRetryCountRef.current = 0;
             segment404RetryCountRef.current = 0;
-            levelReload503RetryCountRef.current = 0;
             initialLoad503RetryCountRef.current = 0;
+            setLoadingStatusMessage(null);
             try {
               hls.destroy();
             } catch (_) {}
@@ -1279,6 +1329,7 @@ export function useHlsPlayer({
     pendingSeekPosition,
     error,
     hlsLoaded,
+    loadingStatusMessage,
     stopBuffer,
     reloadWithSeek,
   };

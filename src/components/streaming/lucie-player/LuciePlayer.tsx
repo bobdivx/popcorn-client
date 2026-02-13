@@ -81,6 +81,7 @@ export default function LuciePlayer({
     volume,
     handlePlayPause,
     handleSeek: baseHandleSeek,
+    seekToTargetTime,
     handleVolumeChange: baseHandleVolumeChange,
     toggleMute,
     canAutoPlay,
@@ -109,14 +110,12 @@ export default function LuciePlayer({
     setShowControls(baseShowControls);
   }, [baseShowControls]);
 
-  const handleSeekTV = (direction: 'left' | 'right') => {
-    const video = videoRef.current;
-    if (!video || !duration) return;
-    const seekAmount = 10;
-    const newTime = direction === 'left' 
-      ? Math.max(0, currentTime - seekAmount)
-      : Math.min(duration, currentTime + seekAmount);
-    video.currentTime = newTime;
+  const handleSeekTV = (direction: 'left' | 'right', stepSeconds = 10) => {
+    if (!duration) return;
+    const newTime = direction === 'left'
+      ? Math.max(0, currentTime - stepSeconds)
+      : Math.min(duration, currentTime + stepSeconds);
+    seekToTargetTime(newTime);
   };
 
   const handleVolumeChangeTV = (direction: 'up' | 'down') => {

@@ -190,6 +190,7 @@ export function ActionButtons({
                 : onDownload
             }
             disabled={countdownRemaining !== null && countdownRemaining > 0}
+            title={shouldShowPlayButton && hasSavedPosition ? t('dashboard.resumeWatching') : undefined}
             data-focusable
             data-media-detail-primary-action
             tabIndex={0}
@@ -213,7 +214,7 @@ export function ActionButtons({
             ) : shouldShowPlayButton ? (
               <>
                 <Play className="h-5 w-5" size={20} />
-                Lire
+                {hasSavedPosition ? t('playback.resumeLabel') : t('playback.playLabel')}
               </>
             ) : (
               <>

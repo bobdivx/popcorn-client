@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useMemo } from 'preact/hooks';
 import { isTVPlatform } from '../../../../lib/utils/device-detection';
+import { useSeekStepAcceleration } from './useSeekStepAcceleration';
 
 /** Codes clés pour le bouton Retour sur télécommande TV */
 const BACK_KEY_CODES = [
@@ -13,7 +14,8 @@ interface UseTVPlayerNavigationProps {
   showControls: boolean;
   setShowControls: (show: boolean) => void;
   onPlayPause: () => void;
-  onSeek: (direction: 'left' | 'right') => void;
+  /** direction + pas optionnel en secondes (10, 30 ou 60 selon maintien de la touche) */
+  onSeek: (direction: 'left' | 'right', stepSeconds?: number) => void;
   onVolumeChange: (direction: 'up' | 'down') => void;
   onToggleMute: () => void;
   onToggleFullscreen: () => void;
@@ -39,6 +41,7 @@ export function useTVPlayerNavigation({
   const [focusedOnProgress, setFocusedOnProgress] = useState(false);
   const isTV = isTVPlatform(); // Android TV, LG WebOS, Apple TV
   const controlsTimeoutRef = useRef<number | null>(null);
+  const { getSeekStep, recordKeyDown, recordKeyUp } = useSeekStepAcceleration();
 
   // Contrôles : Back (si onClose), Play, Mute, Fullscreen
   const hasBack = !!onClose;
@@ -91,12 +94,14 @@ export function useTVPlayerNavigation({
       }
       if (kc === 412) {
         e.preventDefault();
-        onSeek('left');
+        recordKeyDown('left');
+        onSeek('left', getSeekStep('left'));
         return;
       }
       if (kc === 417) {
         e.preventDefault();
-        onSeek('right');
+        recordKeyDown('right');
+        onSeek('right', getSeekStep('right'));
         return;
       }
 
@@ -123,38 +128,50 @@ export function useTVPlayerNavigation({
             onPlayPause();
           }
           break;
-        case 'ArrowLeft':
+        case 'ArrowLeft': {
           e.preventDefault();
+          const stepLeft = getSeekStep('left');
           if (e.shiftKey || e.ctrlKey) {
-            onSeek('left');
+            recordKeyDown('left');
+            onSeek('left', stepLeft);
           } else if (showControls) {
             if (focusedOnProgress) {
-              onSeek('left');
+              recordKeyDown('left');
+              onSeek('left', stepLeft);
             } else if (focusedControlIndex > 0) {
               setFocusedControlIndex(focusedControlIndex - 1);
             } else {
-              onSeek('left');
+              recordKeyDown('left');
+              onSeek('left', stepLeft);
             }
           } else {
-            onSeek('left');
+            recordKeyDown('left');
+            onSeek('left', stepLeft);
           }
           break;
-        case 'ArrowRight':
+        }
+        case 'ArrowRight': {
           e.preventDefault();
+          const stepRight = getSeekStep('right');
           if (e.shiftKey || e.ctrlKey) {
-            onSeek('right');
+            recordKeyDown('right');
+            onSeek('right', stepRight);
           } else if (showControls) {
             if (focusedOnProgress) {
-              onSeek('right');
+              recordKeyDown('right');
+              onSeek('right', stepRight);
             } else if (focusedControlIndex < controls.length - 1) {
               setFocusedControlIndex(focusedControlIndex + 1);
             } else {
-              onSeek('right');
+              recordKeyDown('right');
+              onSeek('right', stepRight);
             }
           } else {
-            onSeek('right');
+            recordKeyDown('right');
+            onSeek('right', stepRight);
           }
           break;
+        }
         case 'ArrowUp':
           e.preventDefault();
           if (showControls && !focusedOnProgress) {
@@ -192,11 +209,21 @@ export function useTVPlayerNavigation({
       handleBack();
     };
 
+    const handleKeyUp = (e: KeyboardEvent) => {
+      const kc = e.keyCode ?? e.which;
+      const key = e.key || (kc === 37 ? 'ArrowLeft' : kc === 39 ? 'ArrowRight' : '');
+      if (key === 'ArrowLeft' || key === 'ArrowRight' || kc === 412 || kc === 417) {
+        recordKeyUp();
+      }
+    };
+
     window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('webosback', handleWebOSBack);
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('webosback', handleWebOSBack);
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     };
@@ -212,6 +239,9 @@ export function useTVPlayerNavigation({
     onClose,
     controls,
     setShowControls,
+    getSeekStep,
+    recordKeyDown,
+    recordKeyUp,
   ]);
 
   // Afficher les contrôles automatiquement sur Android TV

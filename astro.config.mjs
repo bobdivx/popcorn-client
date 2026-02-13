@@ -25,7 +25,7 @@ export default defineConfig({
       extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
     },
     // Pré-bundler les dépendances pour éviter 504 Outdated Optimize Dep
-    // (Preact: indexer-definitions, qrcode/html5-qrcode: setup wizard ServerUrlStep)
+    // (Preact, qrcode/html5-qrcode: setup wizard, hls.js: player)
     optimizeDeps: {
       include: [
         'preact',
@@ -33,6 +33,7 @@ export default defineConfig({
         'preact/compat',
         'qrcode',
         'html5-qrcode',
+        'hls.js',
       ],
     },
     server: {

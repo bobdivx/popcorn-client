@@ -78,6 +78,8 @@ export function VideoPlayerWrapper({
   const [showFallbackMessage, setShowFallbackMessage] = useState(false);
   const [showPreroll, setShowPreroll] = useState(false);
   const [adsConfig, setAdsConfig] = useState<AdsConfig | null>(null);
+  /** Message d’overlay pendant le chargement HLS (ex. « Préparation en cours » pendant retries 503) */
+  const [hlsLoadingMessage, setHlsLoadingMessage] = useState<string | null>(null);
   const hlsPreloadRef = useRef<any>(null);
   const preloadVideoRef = useRef<HTMLVideoElement | null>(null);
   const { hlsLoaded } = useHlsLoader();
@@ -377,7 +379,7 @@ export function VideoPlayerWrapper({
             useDirectPlayer={Boolean(directStreamUrl || effectiveDirectMode)}
             useLuciePlayer={useLucieForThisSource && !directStreamUrl && !effectiveDirectMode}
             loading={isLoading}
-            loadingMessage="Chargement de la vidéo..."
+            loadingMessage={hlsLoadingMessage ?? t('playback.loadingVideo')}
             closeLabel={t('common.close')}
             onClose={onClose}
             onDirectLoadedData={() => setIsLoading(false)}
@@ -415,6 +417,7 @@ export function VideoPlayerWrapper({
               }),
               baseUrl,
               isRemoteStream: !!streamBackendUrl?.trim(),
+              onLoadingMessageChange: setHlsLoadingMessage,
               streamBackendUrl: streamBackendUrl ?? undefined,
               stopBufferRef,
             }}
@@ -437,6 +440,16 @@ export function VideoPlayerWrapper({
             onHlsLoadingChange={(loading) => setIsLoading(loading)}
             onHlsError={(e) => {
               console.error('[VideoPlayerWrapper] Player error:', e);
+              if (isLucieMode && !forceHlsFallback) {
+                console.warn('[VideoPlayerWrapper] Fallback automatique vers HLS après échec Lucie (ex. manifest 404).');
+                emitPlaybackStep('fallback_lucie_to_hls', { message: e?.message ?? 'Lucie failed' });
+                emitPlaybackStep('fallback_message_shown');
+                setIsLoading(true);
+                setForceHlsFallback(true);
+                setShowFallbackMessage(true);
+                window.setTimeout(() => setShowFallbackMessage(false), 5000);
+                return;
+              }
               setIsLoading(false);
             }}
           />

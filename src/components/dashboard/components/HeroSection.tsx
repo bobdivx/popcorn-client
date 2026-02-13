@@ -14,6 +14,8 @@ interface HeroSectionProps {
   onPrimaryAction?: (item: ContentItem) => void | Promise<void>;
   /** Désactiver le bouton principal */
   primaryActionDisabled?: boolean;
+  /** Ne pas remonter sous l'élément au-dessus (ex: barre switch) — désactive les marges négatives */
+  noOverlap?: boolean;
 }
 
 const MIN_SWIPE_DISTANCE = 50;
@@ -25,6 +27,7 @@ export function HeroSection({
   primaryButtonIcon,
   onPrimaryAction,
   primaryActionDisabled = false,
+  noOverlap = false,
 }: HeroSectionProps) {
   const { t } = useI18n();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -160,7 +163,7 @@ export function HeroSection({
 
   return (
     <div
-      className="relative w-full h-[70vh] min-h-[380px] sm:min-h-[500px] tv:min-h-[600px] max-h-[800px] mb-8 overflow-hidden -mt-8 sm:-mt-20 md:-mt-32 touch-pan-y"
+      className={`relative w-full h-[70vh] min-h-[380px] sm:min-h-[500px] tv:min-h-[600px] max-h-[800px] mb-8 overflow-hidden touch-pan-y ${noOverlap ? '' : '-mt-8 sm:-mt-20 md:-mt-32'}`}
       style={{ touchAction: 'pan-y' }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}

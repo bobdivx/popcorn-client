@@ -441,8 +441,12 @@
   },
   "playback": {
     "nextEpisode": "Épisode suivant",
+    "playLabel": "Lire",
+    "resumeLabel": "Reprendre",
     "buffering": "Mise en buffer…",
     "bufferingProgress": "Mise en buffer {percent}%",
+    "loadingVideo": "Chargement de la vidéo…",
+    "preparingStream": "Préparation de la lecture en cours…",
     "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct.",
     "maxTranscodingsReached": "Nombre maximum de transcodages atteint. Arrêtez les autres lectures en cours.",
     "maxTranscodingsReachedWithList": "Nombre maximum de transcodages atteint (max {max}). Arrêtez les autres lectures ou attendez qu'elles se terminent. Transcodages en cours : {list}",

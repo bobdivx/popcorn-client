@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'preact/hooks';
+import Hls from 'hls.js';
 
 /** Applique la config HLS.js type Jellyfin (htmlVideoPlayer requireHlsPlayer) */
-function applyJellyfinHlsDefaults(Hls: typeof import('hls.js').default) {
-  Hls.DefaultConfig.lowLatencyMode = false;
-  Hls.DefaultConfig.backBufferLength = Infinity;
-  Hls.DefaultConfig.liveBackBufferLength = 90;
+function applyJellyfinHlsDefaults(HlsClass: typeof Hls) {
+  HlsClass.DefaultConfig.lowLatencyMode = false;
+  HlsClass.DefaultConfig.backBufferLength = Infinity;
+  HlsClass.DefaultConfig.liveBackBufferLength = 90;
 }
 
 export function useHlsLoader() {
@@ -33,31 +34,15 @@ export function useHlsLoader() {
       return;
     }
 
-    // Utiliser la version installée via npm
-    import('hls.js').then((HlsModule) => {
-      const Hls = HlsModule.default;
+    // Import statique : évite le 504 "Outdated Optimize Dep" de Vite en dev
+    try {
       applyJellyfinHlsDefaults(Hls);
-      window.Hls = Hls;
+      (window as unknown as { Hls: typeof Hls }).Hls = Hls;
       setHlsLoaded(true);
-    }).catch((err) => {
+    } catch (err) {
       console.error('Erreur lors du chargement de HLS.js:', err);
-      // Fallback: charger depuis CDN
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/hls.js@latest';
-      script.async = true;
-      script.onload = () => {
-        if (window.Hls) {
-          applyJellyfinHlsDefaults(window.Hls);
-          setHlsLoaded(true);
-        } else {
-          setError('Hls.js chargé mais non disponible');
-        }
-      };
-      script.onerror = () => {
-        setError('Impossible de charger Hls.js');
-      };
-      document.body.appendChild(script);
-    });
+      setError('Impossible de charger Hls.js');
+    }
 
     return () => {};
   }, []);

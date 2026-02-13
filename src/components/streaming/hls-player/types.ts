@@ -16,6 +16,8 @@ export interface HLSPlayerProps {
   onPlayNextEpisode?: () => void;
   onError?: (error: Error) => void;
   onLoadingChange?: (loading: boolean) => void;
+  /** Message d’overlay pendant le chargement (ex. pendant retries 503). Null = message par défaut. */
+  onLoadingMessageChange?: (message: string | null) => void;
   onBufferProgress?: (percent: number) => void;
   onClose?: () => void;
   /** Désactivé pour local_, UNC et ami pour éviter 503 en boucle (seek natif uniquement). */

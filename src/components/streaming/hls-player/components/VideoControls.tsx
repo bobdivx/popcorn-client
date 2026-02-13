@@ -43,7 +43,7 @@ interface VideoControlsProps {
   onVolumeChange: (e: any) => void;
   onToggleMute: () => void;
   onToggleFullscreen: () => void;
-  onSeekTV?: (direction: 'left' | 'right') => void;
+  onSeekTV?: (direction: 'left' | 'right', stepSeconds?: number) => void;
   onVolumeChangeTV?: (direction: 'up' | 'down') => void;
   audioTracks?: AudioTrack[];
   subtitleTracks?: SubtitleTrack[];

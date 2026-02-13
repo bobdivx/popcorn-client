@@ -111,48 +111,53 @@ export default function FilmsDashboard() {
     window.location.href = `/player/${item.id}`;
   };
 
-  const renderViewToggle = (className?: string) => (
-    <div className={className}>
-      <div className="inline-flex items-center gap-1 p-1 rounded-full bg-black/70 border border-white/20 shadow-lg backdrop-blur">
-        <button
-          ref={switchTorrentRef}
-          type="button"
-          data-focusable
-          tabIndex={0}
-          onClick={() => setViewMode('torrents')}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors min-h-[44px] tv:min-h-[52px] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black ${
-            viewMode === 'torrents' ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'
-          }`}
-          aria-pressed={viewMode === 'torrents'}
-          aria-label={t('common.torrents')}
-        >
-          <Film className="w-4 h-4" />
-          {t('common.torrents')}
-        </button>
-        <button
-          ref={switchLibraryRef}
-          type="button"
-          data-focusable
-          tabIndex={0}
-          onClick={() => setViewMode('library')}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors min-h-[44px] tv:min-h-[52px] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black ${
-            viewMode === 'library' ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'
-          }`}
-          aria-pressed={viewMode === 'library'}
-          aria-label={t('library.title')}
-        >
-          <LibraryIcon className="w-4 h-4" />
-          {t('library.title')}
-        </button>
-      </div>
+  const switchBarClasses = 'relative z-30 shrink-0 w-full px-4 py-3 sm:px-6 sm:py-3 lg:px-8 bg-black flex items-center justify-center min-[640px]:justify-start';
+  const showSyncBar = !syncLoading && isSyncing;
+
+  const renderViewToggle = () => (
+    <div className="w-full max-w-[280px] sm:max-w-none sm:w-auto flex rounded-full bg-white/10 border border-white/20 p-1 min-h-[48px] sm:min-h-[44px] tv:min-h-[52px]">
+      <button
+        ref={switchTorrentRef}
+        type="button"
+        data-focusable
+        tabIndex={0}
+        onClick={() => setViewMode('torrents')}
+        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-2 rounded-full text-sm font-semibold transition-colors min-h-[44px] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black sm:min-w-[7rem] ${
+          viewMode === 'torrents' ? 'bg-white text-black shadow' : 'text-white/90 hover:bg-white/10'
+        }`}
+        aria-pressed={viewMode === 'torrents'}
+        aria-label={t('common.torrents')}
+      >
+        <Film className="w-4 h-4 shrink-0" />
+        <span className="truncate">{t('common.torrents')}</span>
+      </button>
+      <button
+        ref={switchLibraryRef}
+        type="button"
+        data-focusable
+        tabIndex={0}
+        onClick={() => setViewMode('library')}
+        className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-2 rounded-full text-sm font-semibold transition-colors min-h-[44px] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black sm:min-w-[7rem] ${
+          viewMode === 'library' ? 'bg-white text-black shadow' : 'text-white/90 hover:bg-white/10'
+        }`}
+        aria-pressed={viewMode === 'library'}
+        aria-label={t('library.title')}
+      >
+        <LibraryIcon className="w-4 h-4 shrink-0" />
+        <span className="truncate">{t('library.title')}</span>
+      </button>
     </div>
   );
 
   if (viewMode === 'library') {
     return (
-      <div className="pb-8 tv:pb-12">
-        {renderViewToggle('px-4 sm:px-6 lg:px-8 mb-4')}
-        <Library initialContentFilter="movies" showHero={false} showFilters={false} showSync={false} />
+      <div className="min-h-screen bg-black text-white flex flex-col">
+        <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+        {showSyncBar && <SyncProgress compact externalStatus={syncStatus} />}
+        <div className={switchBarClasses}>{renderViewToggle()}</div>
+        <div className="pb-8 tv:pb-12 flex-1">
+          <Library initialContentFilter="movies" showHero={false} showFilters={false} showSync={false} />
+        </div>
       </div>
     );
   }
@@ -282,9 +287,6 @@ export default function FilmsDashboard() {
     : 0;
   const hasTorrents = totalTorrents > 0;
 
-  // Barre compacte en haut quand une sync est en cours (affiche le contenu en dessous)
-  const showSyncBar = !syncLoading && isSyncing;
-
   // Contenu principal quand films.length === 0
   const renderEmptyContent = () => {
     if (!syncLoading && !isSyncing && !hasTorrents) {
@@ -327,15 +329,21 @@ export default function FilmsDashboard() {
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       {/* Barre de progression compacte en haut quand sync en cours */}
       {showSyncBar && <SyncProgress compact externalStatus={syncStatus} />}
-      {/* Switch Torrent / Bibliothèque : toujours sous le header, accessible à la télécommande */}
-      <div className="px-4 sm:px-6 lg:px-8 py-3 flex items-center">
-        {renderViewToggle()}
-      </div>
+      {/* Switch : barre sous le header quand pas de hero */}
+      {heroItemsWithOverview.length === 0 && (
+        <div className={switchBarClasses}>{renderViewToggle()}</div>
+      )}
 
-      {/* Section Hero avec carousel (toujours en dessous du header et du switch) */}
+      {/* Section Hero : switch à droite de la carte (mobile, tablette, PC), aligné en haut à droite */}
       {heroItemsWithOverview.length > 0 && (
         <div className="relative">
+          <div className="absolute top-3 right-3 sm:top-4 sm:right-4 md:top-5 md:right-5 z-30 flex items-center justify-end w-auto max-w-[calc(100%-1.5rem)] sm:max-w-none">
+            <div className="bg-black/60 backdrop-blur-sm rounded-full border border-white/20 p-1 shadow-lg">
+              {renderViewToggle()}
+            </div>
+          </div>
           <HeroSection
+            noOverlap
             items={heroItemsWithOverview}
             onPlay={handlePlay}
             onPrimaryAction={handleHeroDownload}

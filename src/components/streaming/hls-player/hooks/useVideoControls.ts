@@ -260,42 +260,17 @@ export function useVideoControls({
     }
   };
 
-  const handleSeek = (e: any) => {
-    console.log(`[SEEK FLOW] 0️⃣ handleSeek APPELÉ, event type=${e?.type}, currentTarget=${e?.currentTarget?.tagName}`);
+  /** Seek vers une position en secondes (utilisé par clic sur la barre et par télécommande avec pas 10/30/60s). */
+  const seekToTargetTime = (targetTime: number) => {
     const video = videoRef.current;
-    if (!video) {
-      console.log(`[SEEK FLOW] ❌ handleSeek: video ref null, abandon`);
-      return;
-    }
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clientX =
-      e?.clientX ??
-      e?.nativeEvent?.clientX ??
-      e?.touches?.[0]?.clientX ??
-      e?.changedTouches?.[0]?.clientX;
-    if (typeof clientX !== 'number') {
-      console.log(`[SEEK FLOW] ❌ handleSeek: clientX invalide (${typeof clientX}), abandon`);
-      return;
-    }
+    if (!video) return;
     const durationValue =
       duration > 0 && isFinite(duration)
         ? duration
         : (video.duration && isFinite(video.duration) ? video.duration : 0);
-    if (!durationValue) {
-      console.log(`[SEEK FLOW] ❌ handleSeek: durationValue=0, abandon`);
-      return;
-    }
-    if (!rect.width) {
-      console.log(`[SEEK FLOW] ❌ handleSeek: rect.width=0, abandon`);
-      return;
-    }
-    const pos = (clientX - rect.left) / rect.width;
-    const targetTime = Math.max(0, Math.min(durationValue, pos * durationValue));
-    console.log(`[SEEK FLOW] handleSeek: targetTime calculé=${targetTime}s (${Math.floor(targetTime / 60)}:${Math.floor(targetTime % 60).toString().padStart(2, '0')}), pos=${(pos * 100).toFixed(1)}%, duration=${durationValue}s`);
+    if (!durationValue) return;
+    const clamped = Math.max(0, Math.min(durationValue, targetTime));
 
-    // Si la cible est au-delà du buffer (ex. playlist progressive limitée à ~90s),
-    // recharger la source avec force_vod et seek= pour que le backend renvoie une playlist à partir de targetTime.
     let bufferedEnd = 0;
     try {
       if (video.buffered && video.buffered.length > 0) {
@@ -303,44 +278,48 @@ export function useVideoControls({
       }
     } catch (_) {}
 
-    // Si le mode reloadWithSeek backend est désactivé (ex: certains médias locaux),
-    // laisser le seek natif HTML5/HLS gérer la récupération sans forcer de reload backend.
     if (!canUseSeekReload) {
-      console.log(`[SEEK FLOW] handleSeek: seek natif (canUseSeekReload=false), targetTime=${targetTime}s`);
-      emitPlaybackStep('seek_native', { position: targetTime });
-      video.currentTime = targetTime;
+      emitPlaybackStep('seek_native', { position: clamped });
+      video.currentTime = clamped;
       return;
     }
 
-    if (reloadWithSeek && targetTime > 0 && !isLoading) {
-      // Pour les gros sauts (> 60s), toujours utiliser reloadWithSeek (ignore buffer minimal)
-      // Pour les petits sauts, attendre un buffer minimal avant de reload
-      const minBufferedForReload = 20; // secondes
-      const margin = 2; // secondes
-      const isBeyondBufferedWindow = targetTime > bufferedEnd + margin;
-      const isLargeJump = Math.abs(targetTime - video.currentTime) > 60; // Saut > 1 minute
-      
-      // Si c'est un gros saut OU (buffer suffisant ET au-delà du buffer)
+    if (reloadWithSeek && clamped > 0 && !isLoading) {
+      const minBufferedForReload = 20;
+      const margin = 2;
+      const isBeyondBufferedWindow = clamped > bufferedEnd + margin;
+      const isLargeJump = Math.abs(clamped - video.currentTime) > 60;
       if (isLargeJump || (bufferedEnd >= minBufferedForReload && isBeyondBufferedWindow)) {
-        console.log(`[SEEK FLOW] handleSeek: appel reloadWithSeek pour targetTime=${targetTime}s (${Math.floor(targetTime / 60)}:${Math.floor(targetTime % 60).toString().padStart(2, '0')}), isLargeJump=${isLargeJump}, bufferedEnd=${bufferedEnd}s`);
-        emitPlaybackStep('seek_reload', { position: targetTime });
-        reloadWithSeek(targetTime);
+        emitPlaybackStep('seek_reload', { position: clamped });
+        reloadWithSeek(clamped);
         return;
-      } else {
-        console.log(`[SEEK FLOW] handleSeek: condition reloadWithSeek non remplie, seek natif. targetTime=${targetTime}s, bufferedEnd=${bufferedEnd}s, isLargeJump=${isLargeJump}`);
       }
     }
 
-    // Ne pas appliquer un seek natif si un reloadWithSeek est déjà en cours :
-    // le buffer ne couvre pas encore la cible et le navigateur clamp serait à l'ancienne position.
-    if (isLoading) {
-      console.log(`[SEEK FLOW] handleSeek: reload en cours, pas de seek natif (targetTime=${targetTime}s)`);
-      return;
-    }
+    if (isLoading) return;
+    emitPlaybackStep('seek_native', { position: clamped });
+    video.currentTime = clamped;
+  };
 
-    console.log(`[SEEK FLOW] handleSeek: seek natif (petit saut), targetTime=${targetTime}s, currentTime=${video.currentTime}s`);
-    emitPlaybackStep('seek_native', { position: targetTime });
-    video.currentTime = targetTime;
+  const handleSeek = (e: any) => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clientX =
+      e?.clientX ??
+      e?.nativeEvent?.clientX ??
+      e?.touches?.[0]?.clientX ??
+      e?.changedTouches?.[0]?.clientX;
+    if (typeof clientX !== 'number') return;
+    const durationValue =
+      duration > 0 && isFinite(duration)
+        ? duration
+        : (video.duration && isFinite(video.duration) ? video.duration : 0);
+    if (!durationValue || !rect.width) return;
+    const pos = (clientX - rect.left) / rect.width;
+    const targetTime = Math.max(0, Math.min(durationValue, pos * durationValue));
+    seekToTargetTime(targetTime);
   };
 
   const handleVolumeChange = (e: any) => {
@@ -380,6 +359,7 @@ export function useVideoControls({
     volume,
     handlePlayPause,
     handleSeek,
+    seekToTargetTime,
     handleVolumeChange,
     toggleMute,
     canAutoPlay,
