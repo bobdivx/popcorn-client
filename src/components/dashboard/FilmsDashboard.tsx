@@ -31,6 +31,18 @@ export default function FilmsDashboard() {
   const [heroDownloading, setHeroDownloading] = useState(false);
   const [viewMode, setViewMode] = useState<'torrents' | 'library'>('torrents');
   const [autoViewChecked, setAutoViewChecked] = useState(false);
+  const switchTorrentRef = useRef<HTMLButtonElement>(null);
+  const switchLibraryRef = useRef<HTMLButtonElement>(null);
+
+  // À l'arrivée sur la page, focus sur le switch (accessible télécommande / clavier)
+  useEffect(() => {
+    if (loading) return;
+    const el = viewMode === 'torrents' ? switchTorrentRef.current : switchLibraryRef.current;
+    if (el) {
+      const t = setTimeout(() => el.focus(), 0);
+      return () => clearTimeout(t);
+    }
+  }, [loading, viewMode]);
 
   // Rafraîchir la liste des films au fur et à mesure de la synchronisation torrent
   useEffect(() => {
@@ -103,21 +115,31 @@ export default function FilmsDashboard() {
     <div className={className}>
       <div className="inline-flex items-center gap-1 p-1 rounded-full bg-black/70 border border-white/20 shadow-lg backdrop-blur">
         <button
+          ref={switchTorrentRef}
           type="button"
+          data-focusable
+          tabIndex={0}
           onClick={() => setViewMode('torrents')}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors min-h-[44px] tv:min-h-[52px] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black ${
             viewMode === 'torrents' ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'
           }`}
+          aria-pressed={viewMode === 'torrents'}
+          aria-label={t('common.torrents')}
         >
           <Film className="w-4 h-4" />
           {t('common.torrents')}
         </button>
         <button
+          ref={switchLibraryRef}
           type="button"
+          data-focusable
+          tabIndex={0}
           onClick={() => setViewMode('library')}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+          className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition-colors min-h-[44px] tv:min-h-[52px] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black ${
             viewMode === 'library' ? 'bg-white text-black' : 'text-white/80 hover:bg-white/10'
           }`}
+          aria-pressed={viewMode === 'library'}
+          aria-label={t('library.title')}
         >
           <LibraryIcon className="w-4 h-4" />
           {t('library.title')}
@@ -305,14 +327,14 @@ export default function FilmsDashboard() {
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       {/* Barre de progression compacte en haut quand sync en cours */}
       {showSyncBar && <SyncProgress compact externalStatus={syncStatus} />}
-      {heroItemsWithOverview.length === 0 && renderViewToggle('px-4 sm:px-6 lg:px-8 mb-4')}
+      {/* Switch Torrent / Bibliothèque : toujours sous le header, accessible à la télécommande */}
+      <div className="px-4 sm:px-6 lg:px-8 py-3 flex items-center">
+        {renderViewToggle()}
+      </div>
 
-      {/* Section Hero avec carousel */}
+      {/* Section Hero avec carousel (toujours en dessous du header et du switch) */}
       {heroItemsWithOverview.length > 0 && (
         <div className="relative">
-          <div className="absolute top-4 right-4 z-20">
-            {renderViewToggle()}
-          </div>
           <HeroSection
             items={heroItemsWithOverview}
             onPlay={handlePlay}
