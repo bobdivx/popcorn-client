@@ -17,7 +17,9 @@ export interface MediaDetailPageProps {
     slug?: string | null;
     infoHash: string | null;
     name: string;
-    cleanTitle?: string; // Titre nettoyé parsé par le backend
+    /** Titre TMDB (main_title du groupe) — prioritaire pour l'affichage. */
+    mainTitle?: string | null;
+    cleanTitle?: string; // Titre nettoyé parsé par le backend (peut contenir des restes type VFI, HDR10...)
     description?: string | null;
     category?: string;
     imageUrl?: string | null;

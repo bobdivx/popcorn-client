@@ -202,11 +202,12 @@ export function DownloadVerificationPanel({
           {loading && !timedOut && (
             <Loader2 class="size-6 animate-spin text-slate-400" aria-hidden />
           )}
-          {dismissible && isDone && onDismiss && (
+          {dismissible && onDismiss && (
             <button
               type="button"
               onClick={onDismiss}
               class="rounded-md px-2 py-1 text-sm text-slate-400 hover:bg-slate-700/60 hover:text-white focus:outline-none focus:ring-2 focus:ring-slate-500"
+              title={t('common.close')}
             >
               {t('common.close')}
             </button>

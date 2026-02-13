@@ -1,9 +1,10 @@
-import { Play, RotateCw, Download, Link2, Check, Trash2, Loader2, Zap, Upload, Film } from 'lucide-preact';
+import { Play, RotateCw, Download, Link2, Check, Trash2, Loader2, Zap, Upload, XCircle } from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
 import { TorrentProgressBar, TorrentSpeedDisplay, PeersIndicator } from '../../ui';
 import RequestButton from '../../../requests/RequestButton';
 import { useI18n } from '../../../../lib/i18n/useI18n';
+import { formatBytes, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
 
 interface ActionButtonsProps {
   torrent: MediaDetailPageProps['torrent'];
@@ -15,9 +16,6 @@ interface ActionButtonsProps {
   magnetCopied: boolean;
   downloadingToClient: boolean;
   deletingMedia: boolean;
-  trailerKey: string | null;
-  isLoadingTrailer: boolean;
-  isPlayingTrailer?: boolean;
   savedPlaybackPosition?: number | null;
   torrentStats?: ClientTorrentStats | null;
   /** Compte à rebours (s) avant lancement auto à la fin du téléchargement (3, 2, 1). */
@@ -29,9 +27,10 @@ interface ActionButtonsProps {
   onPlayFromBeginning?: () => void;
   onDownload: () => void;
   onDownloadTorrent: () => void;
+  /** Annuler le téléchargement en cours (retirer le torrent du client). Affiché à la place de Télécharger quand un téléchargement est en cours. */
+  onCancelDownload?: () => void;
   onCopyMagnet: () => void;
   onDeleteMedia: () => void;
-  onPlayTrailer: () => void;
 }
 
 /**
@@ -103,9 +102,6 @@ export function ActionButtons({
   magnetCopied,
   downloadingToClient,
   deletingMedia,
-  trailerKey,
-  isLoadingTrailer,
-  isPlayingTrailer = false,
   savedPlaybackPosition,
   torrentStats,
   countdownRemaining = null,
@@ -114,22 +110,23 @@ export function ActionButtons({
   onPlayFromBeginning,
   onDownload,
   onDownloadTorrent,
+  onCancelDownload,
   onCopyMagnet,
   onDeleteMedia,
-  onPlayTrailer,
 }: ActionButtonsProps) {
   const { t } = useI18n();
   const hasSavedPosition = savedPlaybackPosition !== null && savedPlaybackPosition !== undefined && savedPlaybackPosition > 0;
 
   // Déterminer l'état du bouton de téléchargement (hydraté par les stats du client torrent)
-  const isDownloading = !!torrentStats && (torrentStats.state === 'downloading' || torrentStats.state === 'queued');
-  const isCompleted = !!torrentStats && (torrentStats.state === 'completed' || torrentStats.state === 'seeding');
+  const stateLower = typeof torrentStats?.state === 'string' ? torrentStats.state.toLowerCase() : '';
+  const isDownloading = !!torrentStats && (stateLower === 'downloading' || stateLower === 'queued');
+  const isCompleted = !!torrentStats && (stateLower === 'completed' || stateLower === 'seeding');
   const progressValue = typeof torrentStats?.progress === 'number' ? torrentStats.progress : 0;
   const progressPercent = torrentStats ? Math.round(progressValue * 100) : 0;
   const progressComplete = !!(torrentStats && torrentStats.progress >= 0.99);
   // Torrent téléchargé = état completed/seeding OU progression >= 99%
   const isDownloadComplete = isCompleted || progressComplete;
-  const isSeeding = !!torrentStats && torrentStats.state === 'seeding';
+  const isSeeding = !!torrentStats && stateLower === 'seeding';
   // Afficher l'état dès qu'on a des stats actives (même si download_started n'est pas exposé)
   const hasActiveDownloadStats = !!torrentStats && !isDownloadComplete && (
     isDownloading ||
@@ -138,8 +135,11 @@ export function ActionButtons({
     (torrentStats.peers_connected ?? 0) > 0 ||
     (torrentStats.downloaded_bytes ?? 0) > 0
   );
+  // Téléchargement en cours = stats actives OU phase "Ajout..." → on affiche "Annuler le téléchargement" si onCancelDownload est fourni
+  const isDownloadInProgress = (!!torrentStats && !isDownloadComplete) || downloadingToClient;
   const showProgressInButton = hasActiveDownloadStats;
   const displayProgressPercent = hasActiveDownloadStats ? progressPercent : 0;
+  const showProgressNextToCancel = (isDownloadInProgress && !!onCancelDownload && !!torrentStats) && hasActiveDownloadStats;
 
   // Détecter si c'est un média local (slug ou id commence par "local_") ou fichier de la bibliothèque (downloadPath)
   const isLocalTorrent =
@@ -181,11 +181,15 @@ export function ActionButtons({
   return (
     <div className="mb-6">
       <div className="flex flex-wrap gap-3 items-center">
-        {/* Bouton Télécharger / En cours / Lire */}
-        {shouldShowButton && (
+        {/* Bouton Télécharger / En cours / Lire (Annuler = icône dans la carte de progression) */}
+        {shouldShowButton && !(isDownloadInProgress && onCancelDownload && showProgressNextToCancel) && (
           <button
-            onClick={shouldShowPlayButton ? onPlay : onDownload}
-            disabled={!!downloadingToClient || (isDownloading && !shouldShowPlayButton) || (countdownRemaining !== null && countdownRemaining > 0)}
+            onClick={
+              shouldShowPlayButton
+                ? onPlay
+                : onDownload
+            }
+            disabled={countdownRemaining !== null && countdownRemaining > 0}
             data-focusable
             data-media-detail-primary-action
             tabIndex={0}
@@ -196,7 +200,7 @@ export function ActionButtons({
                 <span className="loading loading-spinner loading-sm"></span>
                 Ajout...
               </>
-            ) : (isDownloading || hasActiveDownloadStats) ? (
+            ) : (isDownloading || hasActiveDownloadStats) && !onCancelDownload ? (
               <>
                 <span className="loading loading-spinner loading-sm"></span>
                 {showProgressInButton ? `En cours... ${displayProgressPercent}%` : 'En cours... 0%'}
@@ -218,6 +222,62 @@ export function ActionButtons({
               </>
             )}
           </button>
+        )}
+        {/* Progression en cours : carte avec pourcentage + bouton Annuler (icône seule) */}
+        {showProgressNextToCancel && torrentStats && onCancelDownload && (
+          <div
+            className="flex items-start gap-3 min-w-[200px] max-w-[340px] flex-1 p-4 rounded-xl border border-primary-500/30 bg-gradient-to-br from-primary-900/40 to-primary-950/60 backdrop-blur-sm shadow-lg"
+            aria-label={t('downloads.progress')}
+          >
+            <div className="flex flex-col gap-2 flex-1 min-w-0">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-white/80 text-sm font-medium truncate">
+                  {torrentStats.state === 'queued' ? t('torrentStats.queued') : t('torrentStats.downloading')}
+                </span>
+                <span className="text-2xl font-bold tabular-nums text-primary-200 shrink-0">
+                  {displayProgressPercent}%
+                </span>
+              </div>
+              <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                <div
+                  className="bg-primary-500 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(100, displayProgressPercent)}%` }}
+                  role="progressbar"
+                  aria-valuenow={displayProgressPercent}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/60">
+                {(torrentStats.download_speed ?? 0) > 0 && (
+                  <span>
+                    {((torrentStats.download_speed! / (1024 * 1024)).toFixed(1))} MB/s
+                  </span>
+                )}
+                {torrentStats.eta_seconds != null && torrentStats.eta_seconds > 0 && (
+                  <span>
+                    {t('torrentStats.eta')} {formatTimeRemaining(torrentStats.eta_seconds)}
+                  </span>
+                )}
+                {torrentStats.total_bytes > 0 && (
+                  <span>
+                    {formatBytes(torrentStats.downloaded_bytes ?? 0)} / {formatBytes(torrentStats.total_bytes)}
+                  </span>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onCancelDownload}
+              title={t('downloads.cancelDownload')}
+              aria-label={t('downloads.cancelDownload')}
+              data-focusable
+              data-media-detail-primary-action
+              className="shrink-0 p-2.5 rounded-lg text-white/80 hover:text-white hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
+            >
+              <XCircle className="h-6 w-6" size={24} />
+            </button>
+          </div>
         )}
         {/* Pack : téléchargement d'un seul épisode (prochainement via priorité fichiers librqbit) */}
         {isPackWithMultipleFiles && !shouldShowPlayButton && (
@@ -268,32 +328,8 @@ export function ActionButtons({
         )
       )}
 
-      {/* Bouton Bande-annonce */}
-      {trailerKey && !isPlayingTrailer && (
-        <button
-          onClick={onPlayTrailer}
-          disabled={isLoadingTrailer}
-          data-focusable
-          tabIndex={0}
-          className="inline-flex items-center gap-2 bg-glass hover:bg-glass-hover text-white px-6 py-3 rounded-lg font-semibold text-lg transition-all duration-200 border border-white/30 glass-panel focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px]"
-          title="Lire la bande-annonce"
-        >
-          {isLoadingTrailer ? (
-            <>
-              <span className="loading loading-spinner loading-sm"></span>
-              Chargement...
-            </>
-          ) : (
-            <>
-              <Film className="h-5 w-5" size={20} />
-              Bande-annonce
-            </>
-          )}
-        </button>
-      )}
-
-      {/* Bouton Demander (request) - masqué si déjà dispo localement */}
-      {!isAvailableLocally && !isLocalTorrent && torrent.tmdbId && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv') && (
+      {/* Bouton Demander (request) - masqué si déjà dispo localement ou si un téléchargement est en cours (bouton principal = "Annuler le téléchargement") */}
+      {!isAvailableLocally && !isLocalTorrent && !isDownloadInProgress && torrent.tmdbId && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv') && (
         <RequestButton
           tmdbId={torrent.tmdbId}
           mediaType={torrent.tmdbType as 'movie' | 'tv'}
@@ -322,8 +358,8 @@ export function ActionButtons({
         </button>
       )}
 
-      {/* Bouton Supprimer */}
-      {isAvailableLocally && hasInfoHash && !isExternal && (
+      {/* Bouton Supprimer (torrent complété = Lire affiché) : supprimer du client et du disque */}
+      {((isAvailableLocally || isDownloadComplete) && hasInfoHash && !isExternal) && (
         <button
           onClick={onDeleteMedia}
           disabled={deletingMedia}
@@ -347,8 +383,8 @@ export function ActionButtons({
       )}
       </div>
 
-      {/* Affichage du statut de téléchargement directement sur la page détail */}
-      {hasActiveDownloadStats && torrentStats && (
+      {/* Affichage du statut de téléchargement (détail sous les boutons, sauf si la carte compacte est affichée à côté d'Annuler) */}
+      {hasActiveDownloadStats && torrentStats && !showProgressNextToCancel && (
         <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/10 backdrop-blur-sm">
           <TorrentProgressBar
             progress={torrentStats.progress}

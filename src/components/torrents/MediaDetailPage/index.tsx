@@ -1,15 +1,16 @@
 import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
+import { Film } from 'lucide-preact';
+import { useI18n } from '../../../lib/i18n/useI18n';
 import { NotificationContainer } from '../../ui/Notification';
 import type { MediaDetailPageProps } from './types';
 import { useTorrentPlayer } from './hooks/useTorrentPlayer';
 import { useVideoFiles } from './hooks/useVideoFiles';
 import { useDebug } from './hooks/useDebug';
 import { useNotifications } from './hooks/useNotifications';
-import { createTorrentActions } from './actions/torrentActions';
 import { ProgressOverlay } from './components/ProgressOverlay';
 import { EnhancedProgressOverlay } from './components/EnhancedProgressOverlay';
 import { VideoPlayerWrapper } from './components/VideoPlayerWrapper';
-import { ActionButtons } from './components/ActionButtons';
+import { MediaDetailActionButtons } from './components/MediaDetailActionButtons';
 import { TorrentInfo } from './components/TorrentInfo';
 import { QualityBadges } from './components/QualityBadges';
 import { YouTubeVideoPlayer as VideoPlayer } from '../../ui/YouTubeVideoPlayer';
@@ -177,86 +178,8 @@ function SourceSelectModal({
   );
 }
 
-// Composant modal pour la bande-annonce avec support TV
-function TrailerModal({ 
-  trailerKey, 
-  onClose, 
-  closeButtonRef 
-}: { 
-  trailerKey: string; 
-  onClose: () => void; 
-  closeButtonRef: { current: HTMLButtonElement | null };
-}) {
-  // Focus sur le bouton de fermeture à l'ouverture pour la navigation TV
-  useEffect(() => {
-    if (closeButtonRef.current) {
-      closeButtonRef.current.focus();
-    }
-  }, []);
-
-  // Gestion du bouton retour TV et Escape (pas Backspace dans un champ de saisie)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const inInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable);
-      if (e.key === 'Backspace' && inInput) return; // Laisser supprimer le texte
-      if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'BrowserBack' || e.key === 'GoBack') {
-        e.preventDefault();
-        e.stopPropagation();
-        onClose();
-      }
-    };
-
-    const handleWebOSBack = () => {
-      onClose();
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    if (typeof window !== 'undefined' && (window as any).webOS) {
-      window.addEventListener('webosback', handleWebOSBack);
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      if (typeof window !== 'undefined' && (window as any).webOS) {
-        window.removeEventListener('webosback', handleWebOSBack);
-      }
-    };
-  }, [onClose]);
-
-  return (
-    <div className="fixed inset-0 z-[9999] bg-black" role="dialog" aria-modal="true" aria-label="Bande-annonce">
-      <div className="relative w-full h-full flex items-center justify-center">
-        <div className="w-full h-full max-w-[1920px] max-h-[1080px]">
-          <VideoPlayer
-            youtubeKey={trailerKey}
-            autoplay={true}
-            muted={false}
-            loop={false}
-            controls={true}
-            cover={false}
-            className="w-full h-full"
-          />
-        </div>
-        {/* Bouton fermer */}
-        <button
-          ref={closeButtonRef}
-          onClick={onClose}
-          className="absolute top-4 right-4 z-10 w-12 h-12 tv:w-16 tv:h-16 bg-black/70 hover:bg-black/90 text-white rounded-full flex items-center justify-center transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-white/50 shadow-lg tv-element-focused"
-          aria-label="Fermer la bande-annonce"
-          data-focusable
-          tabIndex={0}
-        >
-          <svg className="w-6 h-6 tv:w-8 tv:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      </div>
-    </div>
-  );
-}
-
 export default function MediaDetailPage({ torrent, initialVariants, seriesEpisodes, initialTorrentStats, backHref, streamBackendUrl }: MediaDetailPageProps) {
+  const { t } = useI18n();
   // États de base
   const [isPlaying, setIsPlaying] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
@@ -271,16 +194,17 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   const [isAvailableLocally, setIsAvailableLocally] = useState(isCompletedFromProps || isLocalMedia);
   const [downloadingToClient, setDownloadingToClient] = useState(false);
   const [magnetCopied, setMagnetCopied] = useState(false);
-  const [deletingMedia, setDeletingMedia] = useState(false);
   const [trailerKey, setTrailerKey] = useState<string | null>(torrent.trailerKey || null);
   const [isLoadingTrailer, setIsLoadingTrailer] = useState(false);
   const [isPlayingTrailer, setIsPlayingTrailer] = useState(false);
   const trailerCloseButtonRef = useRef<HTMLButtonElement>(null);
+  const hasAutoPlayedTrailerRef = useRef(false);
   const [verificationInfoHash, setVerificationInfoHash] = useState<string | null>(null);
   const [verificationTorrentName, setVerificationTorrentName] = useState<string | null>(null);
   const [showVerificationPanel, setShowVerificationPanel] = useState(false);
   const [showSourceModal, setShowSourceModal] = useState(false);
   const sourceModalFirstButtonRef = useRef<HTMLButtonElement>(null);
+  const mediaDetailActionsRef = useRef<{ handleDownload: (variant?: MediaDetailPageProps['torrent']) => void } | null>(null);
   const backLinkRef = useRef<HTMLAnchorElement>(null);
   const tvBackHandlerRef = useRef<HTMLDivElement>(null);
   /** Compteur d'échecs consécutifs de getTorrent (hors 404) pour invalider torrentStats si backend injoignable. */
@@ -390,42 +314,12 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   );
   const shouldShowPlayButton = isLocalTorrent || (isAvailableLocally && hasInfoHash) || isDownloadComplete;
 
-  // Actions torrent (utilise le torrent actif ; handleDownload accepte un variant optionnel pour la modal Sources)
-  const { handleDownload, handleDownloadTorrent, handleCopyMagnet, handleDeleteMedia: deleteMediaAction } = createTorrentActions({
-    torrent: activeTorrent,
-    isExternal,
-    setDownloadingToClient,
-    setMagnetCopied,
-    addNotification,
-    setPlayStatus,
-    pollTorrentProgress,
-    progressPollIntervalRef,
-    PROGRESS_POLL_INTERVAL_MS,
-    setTorrentStats,
-    onPlayAfterDownload: handlePlay,
-    variants: allVariants,
-  });
-
   // Garder une ref à jour avec torrentStats pour éviter d'écraser un état complété par une réponse API invalide (unknown/0)
   useEffect(() => {
     lastTorrentStatsRef.current = torrentStats
       ? { state: torrentStats.state, progress: torrentStats.progress }
       : null;
   }, [torrentStats]);
-
-  const handleDeleteMedia = async () => {
-    if (!hasInfoHash || !activeTorrent.infoHash) {
-      addNotification('error', 'Impossible de supprimer : infoHash manquant');
-      return;
-    }
-
-    setDeletingMedia(true);
-    try {
-      await deleteMediaAction(activeTorrent.infoHash!, setIsAvailableLocally, addDebugLog);
-    } finally {
-      setDeletingMedia(false);
-    }
-  };
 
   // Quand on arrive depuis la page Téléchargements avec des stats (complété), précharger les fichiers vidéo pour que « Lire » soit utilisable
   useEffect(() => {
@@ -670,7 +564,9 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         }
       }
 
-      if (hasInfoHash && activeTorrent.infoHash && !isPlaying && playStatus === 'idle') {
+      // Toujours rafraîchir les stats depuis listTorrents quand on n'est pas en lecture,
+      // y compris pendant "adding" / "downloading", pour que la progression s'affiche sans recharger la page.
+      if (hasInfoHash && activeTorrent.infoHash && !isPlaying) {
         try {
           const { clientApi } = await import('../../../lib/client/api');
           const ih = activeTorrent.infoHash.toLowerCase();
@@ -720,9 +616,9 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     };
 
     checkDownloadingTorrent();
-    // Polling de découverte : détecte les torrents ajoutés depuis librqbit Web UI ou un autre onglet
-    const DISCOVERY_MS = 10_000;
-    const iv = setInterval(checkDownloadingTorrent, DISCOVERY_MS);
+    // Polling des stats : met à jour progression / état du téléchargement sans recharger la page
+    const STATS_POLL_MS = 5_000;
+    const iv = setInterval(checkDownloadingTorrent, STATS_POLL_MS);
     return () => clearInterval(iv);
   }, [hasInfoHash, activeTorrent.infoHash, activeTorrent.clientState, activeTorrent.clientProgress, isPlaying, playStatus]);
 
@@ -783,6 +679,44 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
       setIsPlayingTrailer(false);
     }
   }, [torrent.trailerKey]);
+
+  // Lancer automatiquement la bande-annonce dans la zone héros après quelques secondes (une seule fois par page)
+  useEffect(() => {
+    if (!trailerKey || hasAutoPlayedTrailerRef.current) return;
+    const delayMs = 2500;
+    const t = setTimeout(() => {
+      hasAutoPlayedTrailerRef.current = true;
+      setIsPlayingTrailer(true);
+      setTimeout(() => trailerCloseButtonRef.current?.focus(), 100);
+    }, delayMs);
+    return () => clearTimeout(t);
+  }, [trailerKey]);
+
+  // Fermer la bande-annonce (héros) avec Escape ou touche Retour
+  useEffect(() => {
+    if (!isPlayingTrailer) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const inInput = target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || (target?.isContentEditable ?? false);
+      if (e.key === 'Backspace' && inInput) return;
+      if (e.key === 'Escape' || e.key === 'Backspace' || e.key === 'BrowserBack' || e.key === 'GoBack') {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsPlayingTrailer(false);
+      }
+    };
+    const handleWebOSBack = () => setIsPlayingTrailer(false);
+    document.addEventListener('keydown', handleKeyDown);
+    if (typeof window !== 'undefined' && (window as any).webOS) {
+      window.addEventListener('webosback', handleWebOSBack);
+    }
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (typeof window !== 'undefined' && (window as any).webOS) {
+        window.removeEventListener('webosback', handleWebOSBack);
+      }
+    };
+  }, [isPlayingTrailer]);
 
   // Initialiser la sélection saison/épisode au premier chargement (première saison, premier épisode)
   useEffect(() => {
@@ -1006,7 +940,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
       <VideoPlayerWrapper
         infoHash={displayInfoHash}
         selectedFile={displayFile!}
-        torrentName={displayTorrent.cleanTitle || displayTorrent.name}
+        torrentName={displayTorrent.mainTitle || displayTorrent.cleanTitle || displayTorrent.name}
         torrentId={displayTorrent.id}
         tmdbId={displayTorrent.tmdbId}
         tmdbType={displayTorrent.tmdbType}
@@ -1033,7 +967,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         <VideoPlayerWrapper
           infoHash={displayInfoHash}
           selectedFile={displayFile!}
-          torrentName={displayTorrent.cleanTitle || displayTorrent.name}
+          torrentName={displayTorrent.mainTitle || displayTorrent.cleanTitle || displayTorrent.name}
           torrentId={displayTorrent.id}
           tmdbId={displayTorrent.tmdbId}
           tmdbType={displayTorrent.tmdbType}
@@ -1050,36 +984,89 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         />
       )}
     <div className="relative bg-black text-white">
-      {/* Hero section */}
-      {/* Afficher le trailer seulement s'il est disponible ET qu'on veut le jouer */}
-      {/* Modal plein écran pour la bande-annonce */}
-      {isPlayingTrailer && trailerKey ? (
-        <TrailerModal
-          trailerKey={trailerKey}
-          onClose={() => setIsPlayingTrailer(false)}
-          closeButtonRef={trailerCloseButtonRef}
-        />
-      ) : (heroImageUrl || imageUrl) ? (
-        <div className="fixed top-0 left-0 right-0 bottom-0 z-0 overflow-hidden pointer-events-none">
-          <div
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-            style={{
-              backgroundImage: `url(${heroImageUrl || imageUrl})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-            }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/40 to-black" />
-        </div>
-      ) : (
-        <div className="fixed top-0 left-0 right-0 bottom-0 z-0 bg-gradient-to-b from-gray-900 to-black pointer-events-none" />
-      )}
+      {/* Hero section : fond = bande-annonce (vidéo) ou image selon état */}
+      <div className="fixed top-0 left-0 right-0 bottom-0 z-0 overflow-hidden">
+        {isPlayingTrailer && trailerKey ? (
+          <>
+            <div className="absolute inset-0 w-full h-full [&_iframe]:absolute [&_iframe]:inset-0 [&_iframe]:w-full [&_iframe]:h-full">
+              <VideoPlayer
+                youtubeKey={trailerKey}
+                autoplay={true}
+                muted={true}
+                loop={true}
+                controls={true}
+                cover={true}
+                className="absolute inset-0 w-full h-full object-cover"
+              />
+            </div>
+            <div className="absolute inset-0 pointer-events-none bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
+            <div className="absolute inset-0 pointer-events-none bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+            <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-black/30 to-black" />
+          </>
+        ) : (heroImageUrl || imageUrl) ? (
+          <>
+            <div
+              className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
+              style={{
+                backgroundImage: `url(${heroImageUrl || imageUrl})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/40 to-black pointer-events-none" />
+          </>
+        ) : (
+          <div className="absolute inset-0 bg-gradient-to-b from-gray-900 to-black pointer-events-none" />
+        )}
+      </div>
 
       {/* Contenu principal (data-tv-back-handler : première touche Retour = focus sur Retour, deuxième = navigation) */}
       <div className="relative z-10" ref={tvBackHandlerRef} data-tv-back-handler>
         <div className="relative w-full min-h-[60vh] sm:min-h-[70vh] flex flex-col justify-end px-3 sm:px-4 md:px-6 lg:px-16 pb-8 sm:pb-12 md:pb-16 pt-20 sm:pt-24 md:pt-32">
+          {/* Bouton Bande-annonce ou Fermer sur la carte héros (haut droite) */}
+          {trailerKey && (
+            isPlayingTrailer ? (
+              <button
+                ref={trailerCloseButtonRef}
+                type="button"
+                onClick={() => setIsPlayingTrailer(false)}
+                title={t('common.close')}
+                aria-label={t('common.close')}
+                data-focusable
+                tabIndex={0}
+                className="absolute top-4 right-3 sm:top-6 sm:right-4 md:right-6 lg:right-16 inline-flex items-center justify-center bg-black/60 hover:bg-black/80 text-white backdrop-blur-sm p-2.5 rounded-lg border border-white/30 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2 focus:ring-offset-black transition-colors min-h-[44px] min-w-[44px]"
+              >
+                <svg className="h-5 w-5 sm:h-6 sm:w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPlayingTrailer(true);
+                  setTimeout(() => trailerCloseButtonRef.current?.focus(), 100);
+                }}
+                disabled={isLoadingTrailer}
+                title={t('ads.trailerPlay')}
+                aria-label={t('ads.trailerPlay')}
+                data-focusable
+                tabIndex={0}
+                className="absolute top-4 right-3 sm:top-6 sm:right-4 md:right-6 lg:right-16 inline-flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white backdrop-blur-sm px-4 py-2.5 rounded-lg font-semibold text-sm border border-white/30 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2 focus:ring-offset-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
+              >
+                {isLoadingTrailer ? (
+                  <span className="loading loading-spinner loading-sm" />
+                ) : (
+                  <>
+                    <Film className="h-5 w-5 shrink-0" size={20} />
+                    <span className="hidden sm:inline">{t('ads.trailerPlay')}</span>
+                  </>
+                )}
+              </button>
+            )
+          )}
           <a
             ref={backLinkRef}
             href={backHref ?? '/dashboard'}
@@ -1105,7 +1092,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
             <div className="mb-4 sm:mb-6">
               <div className="flex items-baseline gap-4 flex-wrap">
                 <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight">
-                  {torrent.cleanTitle ? torrent.cleanTitle : torrent.name}
+                  {torrent.mainTitle || torrent.cleanTitle || torrent.name}
                 </h1>
                 {torrent.releaseDate && (
                   <div className="flex items-center">
@@ -1209,9 +1196,10 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
               </div>
             ) : null}
 
-            {/* Boutons d'action */}
-            <ActionButtons
+            {/* Boutons d'action (logique centralisée dans MediaDetailActionButtons) */}
+            <MediaDetailActionButtons
               torrent={selectedTorrent || torrent}
+              activeTorrent={activeTorrent}
               allVariants={allVariants}
               isAvailableLocally={Boolean(isAvailableLocally)}
               canStream={Boolean(canStream)}
@@ -1219,98 +1207,55 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
               hasInfoHash={hasInfoHash}
               magnetCopied={magnetCopied}
               downloadingToClient={downloadingToClient}
-              deletingMedia={deletingMedia}
-              trailerKey={trailerKey}
-              isLoadingTrailer={isLoadingTrailer}
-              isPlayingTrailer={isPlayingTrailer}
               savedPlaybackPosition={savedPlaybackPosition}
               torrentStats={torrentStats}
               countdownRemaining={countdownRemaining}
               isPackWithMultipleFiles={Boolean(isPackSelected && videoFiles.length > 1)}
-              onPlayAuto={async (bestTorrent) => {
-                // Sélectionner le meilleur torrent
-                setSelectedTorrent(bestTorrent);
-                setStartFromBeginning(true);
-                
-                // Réinitialiser le flag de continuation en arrière-plan
-                continueInBackgroundRef.current = false;
-                
-                // Utiliser le torrent sélectionné pour la lecture
-                const wrapperElement = videoWrapperRef.current || (document.getElementById('video-player-wrapper') as HTMLDivElement);
-                
-                if (wrapperElement && !document.fullscreenElement) {
-                  try {
-                    await wrapperElement.requestFullscreen();
-                  } catch (err) {
-                    console.warn('Impossible d\'activer le plein écran:', err);
-                  }
-                }
-                
-                // Attendre un court délai pour que le state soit mis à jour, puis jouer
-                setTimeout(() => {
-                  handlePlay();
-                }, 150);
+              setTorrentStats={setTorrentStats}
+              setPlayStatus={setPlayStatus}
+              setDownloadingToClient={setDownloadingToClient}
+              setMagnetCopied={setMagnetCopied}
+              addNotification={addNotification}
+              addDebugLog={addDebugLog}
+              setIsAvailableLocally={setIsAvailableLocally}
+              progressPollIntervalRef={progressPollIntervalRef}
+              pollTorrentProgress={pollTorrentProgress}
+              handlePlay={handlePlay}
+              stopProgressPolling={stopProgressPolling}
+              setProgressMessage={setProgressMessage}
+              setErrorMessage={setErrorMessage}
+              onOpenSourceModal={allVariants.length > 1 ? () => setShowSourceModal(true) : undefined}
+              onActionsReady={(actions) => {
+                mediaDetailActionsRef.current = actions;
               }}
               onPlay={async () => {
-                if (savedPlaybackPosition && savedPlaybackPosition > 0) {
-                  setStartFromBeginning(false);
-                } else {
-                  setStartFromBeginning(true);
+                if (savedPlaybackPosition && savedPlaybackPosition > 0) setStartFromBeginning(false);
+                else setStartFromBeginning(true);
+                const el = videoWrapperRef.current || (document.getElementById('video-player-wrapper') as HTMLDivElement);
+                if (el && !document.fullscreenElement) {
+                  try { await el.requestFullscreen(); } catch (_) {}
                 }
-                
-                let wrapperElement = videoWrapperRef.current;
-                if (!wrapperElement) {
-                  wrapperElement = document.getElementById('video-player-wrapper') as HTMLDivElement;
-                }
-                
-                if (wrapperElement && !document.fullscreenElement) {
-                  try {
-                    await wrapperElement.requestFullscreen();
-                  } catch (err) {
-                    console.warn('Impossible d\'activer le plein écran:', err);
-                  }
-                }
-                
-                // Réinitialiser le flag de continuation en arrière-plan quand on clique sur "Lire"
                 continueInBackgroundRef.current = false;
                 handlePlay();
               }}
               onPlayFromBeginning={async () => {
                 setStartFromBeginning(true);
-                
-                let wrapperElement = videoWrapperRef.current;
-                if (!wrapperElement) {
-                  wrapperElement = document.getElementById('video-player-wrapper') as HTMLDivElement;
+                const el = videoWrapperRef.current || (document.getElementById('video-player-wrapper') as HTMLDivElement);
+                if (el && !document.fullscreenElement) {
+                  try { await el.requestFullscreen(); } catch (_) {}
                 }
-                
-                if (wrapperElement && !document.fullscreenElement) {
-                  try {
-                    await wrapperElement.requestFullscreen();
-                  } catch (err) {
-                    console.warn('Impossible d\'activer le plein écran:', err);
-                  }
-                }
-                
-                // Réinitialiser le flag de continuation en arrière-plan quand on joue depuis le début
                 continueInBackgroundRef.current = false;
                 handlePlay();
               }}
-              onDownload={
-                allVariants.length > 1
-                  ? () => setShowSourceModal(true)
-                  : () => handleDownload()
-              }
-              onDownloadTorrent={handleDownloadTorrent}
-              onCopyMagnet={handleCopyMagnet}
-              onDeleteMedia={handleDeleteMedia}
-              onPlayTrailer={() => {
-                if (trailerKey) {
-                  setIsPlayingTrailer(true);
-                  // Focuser le bouton de fermeture après un court délai pour la navigation TV
-                  setTimeout(() => {
-                    trailerCloseButtonRef.current?.focus();
-                  }, 100);
+              onPlayAuto={async (bestTorrent) => {
+                setSelectedTorrent(bestTorrent);
+                setStartFromBeginning(true);
+                continueInBackgroundRef.current = false;
+                const el = videoWrapperRef.current || (document.getElementById('video-player-wrapper') as HTMLDivElement);
+                if (el && !document.fullscreenElement) {
+                  try { await el.requestFullscreen(); } catch (_) {}
                 }
+                setTimeout(() => handlePlay(), 150);
               }}
             />
 
@@ -1342,7 +1287,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           variants={allVariants}
           onSelect={(variant) => {
             setShowSourceModal(false);
-            handleDownload(variant);
+            mediaDetailActionsRef.current?.handleDownload(variant);
           }}
           onClose={() => setShowSourceModal(false)}
           firstButtonRef={sourceModalFirstButtonRef}

@@ -6,6 +6,8 @@ export interface DeleteOptions {
   setIsAvailableLocally: (value: boolean) => void;
   addNotification: (type: 'success' | 'error' | 'info', message: string) => void;
   addDebugLog?: (type: 'success' | 'error', message: string, data?: any) => void;
+  /** Si true, ne pas afficher de boîte de confirmation (la confirmation a été faite via une modal). */
+  skipConfirm?: boolean;
 }
 
 /** Média local (bibliothèque) : identifié par un infoHash préfixé "local_". */
@@ -20,7 +22,7 @@ export async function handleDeleteMedia(
   infoHash: string,
   options: DeleteOptions
 ): Promise<void> {
-  const { setIsAvailableLocally, addNotification, addDebugLog } = options;
+  const { setIsAvailableLocally, addNotification, addDebugLog, skipConfirm } = options;
 
   if (!infoHash) {
     addNotification('error', 'Impossible de supprimer : infoHash manquant');
@@ -28,14 +30,13 @@ export async function handleDeleteMedia(
   }
 
   const isLocal = isLocalMedia(infoHash);
-  const confirmed = window.confirm(
-    isLocal
-      ? 'Êtes-vous sûr de vouloir supprimer ce média local ?\n\nLe fichier sera supprimé de votre disque. Cette action est irréversible.'
-      : 'Êtes-vous sûr de vouloir supprimer ce torrent du client backend ?\n\nCette action est irréversible.'
-  );
-
-  if (!confirmed) {
-    return;
+  if (!skipConfirm) {
+    const confirmed = window.confirm(
+      isLocal
+        ? 'Êtes-vous sûr de vouloir supprimer ce média local ?\n\nLe fichier sera supprimé de votre disque. Cette action est irréversible.'
+        : 'Êtes-vous sûr de vouloir supprimer ce torrent du client backend ?\n\nCette action est irréversible.'
+    );
+    if (!confirmed) return;
   }
 
   try {

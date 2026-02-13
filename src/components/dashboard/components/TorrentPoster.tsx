@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
-import { Film, Play, Info, Users, Sprout, CheckCircle2 } from 'lucide-preact';
+import { Film, Users, Sprout, CheckCircle2 } from 'lucide-preact';
 import type { ContentItem } from '../../../lib/client/types';
 import { FocusableCard } from '../../ui/FocusableCard';
 import { useTorrentProgress } from '../hooks/useTorrentProgress';
@@ -139,35 +139,6 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
                 </div>
               )}
             </div>
-          </div>
-        )}
-
-        {/* Icônes d'action au survol */}
-        {showOverlay && (
-          <div className="absolute bottom-2 right-2 lg:bottom-3 lg:right-3 tv:bottom-4 tv:right-4 z-20 flex gap-2 tv:gap-3 pointer-events-auto">
-            {/* Icône lecture */}
-            <button
-              className="w-9 h-9 lg:w-11 lg:h-11 tv:w-16 tv:h-16 glass-panel hover:bg-glass-hover rounded-full flex items-center justify-center transition-all shadow-primary border border-white/30 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[36px] tv:min-h-[64px]"
-              onClick={(e: MouseEvent) => {
-                e.stopPropagation();
-                handleClick(e);
-              }}
-              title="Lire"
-            >
-              <Play className="h-4 w-4 lg:h-5 lg:w-5 tv:h-8 tv:w-8 text-white" size={20} />
-            </button>
-            
-            {/* Icône info */}
-            <button
-              className="w-9 h-9 lg:w-11 lg:h-11 tv:w-16 tv:h-16 glass-panel hover:bg-glass-hover rounded-full flex items-center justify-center transition-all shadow-primary border border-white/30 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[36px] tv:min-h-[64px]"
-              onClick={(e: MouseEvent) => {
-                e.stopPropagation();
-                handleClick(e);
-              }}
-              title="Plus d'infos"
-            >
-              <Info className="h-4 w-4 lg:h-5 lg:w-5 tv:h-8 tv:w-8 text-white" size={20} />
-            </button>
           </div>
         )}
 

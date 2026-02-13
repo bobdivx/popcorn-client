@@ -228,12 +228,15 @@ function pickBestTorrentFromGroupPayload(payload: any): Torrent | null {
 
 /** Convertit un item de la bibliothèque (getLibrary) en objet Torrent pour la page détail */
 function libraryItemToTorrent(localMedia: any): Torrent {
+  // name est déjà le titre TMDB (tmdb_title || file_name) côté backend
+  const displayTitle = localMedia.name || '';
   return {
     id: localMedia.info_hash || localMedia.slug || '',
     slug: localMedia.slug || null,
     infoHash: localMedia.info_hash || null,
-    name: localMedia.name || '',
-    cleanTitle: localMedia.name || null,
+    name: displayTitle,
+    mainTitle: displayTitle || null,
+    cleanTitle: displayTitle || null,
     description: localMedia.synopsis || null,
     category: localMedia.category || null,
     imageUrl: localMedia.poster_url || null,
@@ -371,13 +374,15 @@ export default function MediaDetailRoute() {
             if (localMedia && !cancelled) {
               console.log('[MediaDetailRoute] Média local trouvé:', localMedia);
               // Convertir le média local en objet Torrent
+              const displayTitle = localMedia.name || '';
               const t: Torrent = {
                 id: localMedia.info_hash || localMedia.slug || contentId,
                 slug: localMedia.slug || null,
                 // Pour les médias locaux, utiliser contentId (qui contient "local_...") si info_hash n'est pas disponible
                 infoHash: localMedia.info_hash || (contentId.startsWith('local_') ? contentId : null),
-                name: localMedia.name || '',
-                cleanTitle: localMedia.name || null,
+                name: displayTitle,
+                mainTitle: displayTitle || null,
+                cleanTitle: displayTitle || null,
                 description: localMedia.synopsis || null,
                 category: localMedia.category || null,
                 imageUrl: localMedia.poster_url || null,
@@ -455,7 +460,7 @@ export default function MediaDetailRoute() {
           const emptyGroupTitle = data?.main_title || titleFromQuery || '';
 
           if (best && !cancelled) {
-            setTorrent(best);
+            setTorrent({ ...best, mainTitle: data?.main_title ?? undefined });
             setLoading(false);
             return;
           }
@@ -525,9 +530,10 @@ export default function MediaDetailRoute() {
 
         if (looksLikeInfoHash) {
           const byIdResponse = await serverApi.getTorrentById(contentId);
+          const byIdData = byIdResponse?.data as any;
           const best = pickBestTorrentFromGroupPayload(byIdResponse);
           if (best && !cancelled) {
-            setTorrent(best);
+            setTorrent({ ...best, mainTitle: byIdData?.main_title ?? undefined });
             setLoading(false);
             return;
           }
@@ -548,10 +554,13 @@ export default function MediaDetailRoute() {
           });
           
           const best = pickBestTorrentFromGroupPayload(groupResponse);
+          const mainTitle = data?.main_title ?? undefined;
           if (best && !cancelled) {
+            setTorrent({ ...best, mainTitle });
             console.log('[MediaDetailRoute] Torrent final sélectionné:', {
               id: best.id,
               name: best.name,
+              mainTitle,
               hasExternalLink: !!(best as any)._externalLink,
               externalLink: (best as any)._externalLink,
               hasExternalMagnetUri: !!(best as any)._externalMagnetUri,
@@ -559,13 +568,12 @@ export default function MediaDetailRoute() {
               guid: (best as any)._guid,
               allKeys: Object.keys(best as any),
             });
-            setTorrent(best);
             // Toutes les variantes pour la page (séries : sélection par épisode)
             const variants = (data?.variants ?? []) as any[];
             if (variants.length > 0) {
-              setInitialVariants(variants.map((v: any) => convertVariantToTorrent(v)));
+              setInitialVariants(variants.map((v: any) => ({ ...convertVariantToTorrent(v), mainTitle })));
             } else {
-              setInitialVariants([best]);
+              setInitialVariants([{ ...best, mainTitle }]);
             }
             // Épisodes par saison si c'est une série
             if (best.tmdbType === 'tv' || (best as any).tmdb_type === 'tv') {
@@ -614,10 +622,11 @@ export default function MediaDetailRoute() {
               if (looksLikeInfoHash) {
                 console.log('[MediaDetailRoute] Tentative de fallback avec getTorrentById pour info_hash:', contentId);
                 const byIdResponse = await serverApi.getTorrentById(contentId);
+                const byIdData = byIdResponse?.data as any;
                 const best = pickBestTorrentFromGroupPayload(byIdResponse);
                 if (best && !cancelled) {
                   console.log('[MediaDetailRoute] Torrent trouvé via getTorrentById fallback');
-                  setTorrent(best);
+                  setTorrent({ ...best, mainTitle: byIdData?.main_title ?? data?.main_title ?? undefined });
                   setLoading(false);
                   return;
                 }

@@ -57,7 +57,8 @@
     "start": "Start ad",
     "unavailable": "Ad unavailable",
     "trailerWatchOnYoutube": "Watch trailer on YouTube",
-    "trailerEmbedUnsupported": "Embedded playback is not available on this device (e.g. TV)."
+    "trailerEmbedUnsupported": "Embedded playback is not available on this device (e.g. TV).",
+    "trailerPlay": "Play trailer"
   },
   "requests": {
     "myRequests": "My requests",
@@ -606,6 +607,10 @@
     "verificationTimeout": "Verification pending (timeout). Download may still be in progress.",
     "nopeersWarning": "No peers found. This torrent may not be available right now.",
     "cancelAndRemove": "Cancel and remove",
+    "cancelDownload": "Cancel download",
+    "confirmDeleteTorrentTitle": "Delete torrent",
+    "confirmDeleteTorrentMessage": "Remove this torrent from the client and delete the files from disk? This action cannot be undone.",
+    "removing": "Removing...",
     "states": {
       "queued": "Queued",
       "downloading": "Downloading",

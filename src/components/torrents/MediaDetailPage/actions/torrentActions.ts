@@ -73,13 +73,15 @@ export function createTorrentActions(options: TorrentActionsOptions) {
     handleDeleteMedia: async (
       infoHash: string,
       setIsAvailableLocally: (value: boolean) => void,
-      addDebugLog?: (type: 'success' | 'error', message: string, data?: any) => void
+      addDebugLog?: (type: 'success' | 'error', message: string, data?: any) => void,
+      skipConfirm?: boolean
     ) => {
       const deleteOptions: DeleteOptions = {
         torrent,
         setIsAvailableLocally,
         addNotification,
         addDebugLog,
+        skipConfirm,
       };
       return handleDeleteMedia(infoHash, deleteOptions);
     },
