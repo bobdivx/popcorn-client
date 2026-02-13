@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { useHlsLoader } from './useHlsLoader';
-import { usePlayerConfig } from './usePlayerConfig';
+import { usePlayerConfig } from '../../player-shared/hooks/usePlayerConfig';
 import { clientApi } from '../../../../lib/client/api';
 import { serverApi } from '../../../../lib/client/server-api';
 import {

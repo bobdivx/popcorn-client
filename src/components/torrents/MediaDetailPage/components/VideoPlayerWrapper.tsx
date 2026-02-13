@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { serverApi } from '../../../../lib/client/server-api';
 import type { TorrentFile } from '../hooks/useVideoFiles';
-import { useFullscreen } from '../../../streaming/hls-player/hooks/useFullscreen';
+import { useFullscreen } from '../../../streaming/player-shared/hooks/useFullscreen';
 import { QualityBadges } from './QualityBadges';
 import { isMobileDevice } from '../../../../lib/utils/device-detection';
 import IntroVideoWithHlsPreload from '../../../IntroVideoWithHlsPreload';
 import PrerollPlayer from '../../../streaming/hls-player/components/PrerollPlayer';
 import { getPublicAdsSettings, type AdsConfig } from '../../../../lib/api/popcorn-web';
 import { useHlsLoader } from '../../../streaming/hls-player/hooks/useHlsLoader';
-import { usePlayerConfig } from '../../../streaming/hls-player/hooks/usePlayerConfig';
-import PlayerLoadingOverlay from '../../../streaming/player-core/components/PlayerLoadingOverlay';
+import { usePlayerConfig } from '../../../streaming/player-shared/hooks/usePlayerConfig';
+import PlayerLoadingOverlay from '../../../streaming/player-shared/components/PlayerLoadingOverlay';
 import UnifiedPlayer from '../../../streaming/player-core/components/UnifiedPlayer';
 import { useStreamSource } from '../../../streaming/player-core/hooks/useStreamSource';
 import { buildProxyUrl } from '../../../streaming/player-core/utils/buildStreamUrl';
@@ -113,6 +113,7 @@ export function VideoPlayerWrapper({
   });
   
   const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';
+  const STORAGE_INTRO_ALWAYS_SHOW = 'popcorn_intro_always_show';
   const STORAGE_ADS_SESSION = 'popcorn_ads_preroll_session';
   const STORAGE_ADS_DAY = 'popcorn_ads_preroll_day';
 

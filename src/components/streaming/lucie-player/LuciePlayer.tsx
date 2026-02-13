@@ -1,15 +1,15 @@
 import { useEffect, useState, useRef } from 'preact/hooks';
-import { useVideoControls } from '../hls-player/hooks/useVideoControls';
-import { useFullscreen, toggleFullscreen } from '../hls-player/hooks/useFullscreen';
-import { ErrorDisplay } from '../hls-player/components/ErrorDisplay';
-import { VideoControls } from '../hls-player/components/VideoControls';
+import { useVideoControls } from '../player-shared/hooks/useVideoControls';
+import { useFullscreen, toggleFullscreen } from '../player-shared/hooks/useFullscreen';
+import { ErrorDisplay } from '../player-shared/components/ErrorDisplay';
+import { VideoControls } from '../player-shared/components/VideoControls';
 import type { LuciePlayerProps } from './types';
 import { useLuciePlayer } from './hooks/useLuciePlayer';
-import { useTVPlayerNavigation } from '../hls-player/hooks/useTVPlayerNavigation';
-import { usePlayerConfig } from '../hls-player/hooks/usePlayerConfig';
+import { useTVPlayerNavigation } from '../player-shared/hooks/useTVPlayerNavigation';
+import { usePlayerConfig } from '../player-shared/hooks/usePlayerConfig';
 import { shouldAutoFullscreen } from '../../../lib/utils/device-detection';
-import { SkipIntroOverlay } from '../hls-player/components/SkipIntroOverlay';
-import { NextEpisodeOverlay } from '../hls-player/components/NextEpisodeOverlay';
+import { SkipIntroOverlay } from '../player-shared/components/SkipIntroOverlay';
+import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
 import { useI18n } from '../../../lib/i18n';
 
 export default function LuciePlayer({ 

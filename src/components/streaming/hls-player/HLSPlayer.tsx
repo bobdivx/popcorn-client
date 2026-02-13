@@ -1,16 +1,16 @@
 import { useEffect, useState, useRef } from 'preact/hooks';
-import { useVideoControls } from './hooks/useVideoControls';
-import { useFullscreen, toggleFullscreen } from './hooks/useFullscreen';
-import { ErrorDisplay } from './components/ErrorDisplay';
-import { VideoControls } from './components/VideoControls';
+import { useVideoControls } from '../player-shared/hooks/useVideoControls';
+import { useFullscreen, toggleFullscreen } from '../player-shared/hooks/useFullscreen';
+import { ErrorDisplay } from '../player-shared/components/ErrorDisplay';
+import { VideoControls } from '../player-shared/components/VideoControls';
 import type { HLSPlayerProps } from './types';
 import { useHlsPlayer } from './hooks/useHlsPlayer';
-import { useTVPlayerNavigation } from './hooks/useTVPlayerNavigation';
+import { useTVPlayerNavigation } from '../player-shared/hooks/useTVPlayerNavigation';
 import { useHlsTracks } from './hooks/useHlsTracks';
-import { usePlayerConfig } from './hooks/usePlayerConfig';
+import { usePlayerConfig } from '../player-shared/hooks/usePlayerConfig';
 import { shouldAutoFullscreen } from '../../../lib/utils/device-detection';
-import { SkipIntroOverlay } from './components/SkipIntroOverlay';
-import { NextEpisodeOverlay } from './components/NextEpisodeOverlay';
+import { SkipIntroOverlay } from '../player-shared/components/SkipIntroOverlay';
+import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
 import { useI18n } from '../../../lib/i18n';
 
 export default function HLSPlayer({ 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { usePlayerConfig } from './usePlayerConfig';
+import { usePlayerConfig } from '../../player-shared/hooks/usePlayerConfig';
 
 interface AudioTrack {
   id: number;

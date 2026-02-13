@@ -14,7 +14,7 @@ const isWebOS = import.meta.env.WEBOS === 'true';
 ---
 
 <!doctype html>
-<html lang="fr" id="html-root" data-theme="dark" class="overflow-x-hidden" data-webos={isWebOS ? 'true' : undefined}>
+<html lang="fr" id="html-root" data-theme="dark" class="overflow-x-hidden" data-webos={isWebOS ? 'true' : undefined} data-dev={import.meta.env.DEV ? 'true' : undefined}>
   <head>
     <meta charset="UTF-8" />
     <script is:inline>
@@ -203,9 +203,12 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         window.addEventListener('popcorn-app-ready', hide, { once: true });
         window.addEventListener('astro:page-load', hide, { once: true });
         window.addEventListener('astro:after-swap', hide, { once: true });
+        var isDev = document.documentElement.getAttribute('data-dev') === 'true';
+        var hintDelay = isDev ? 15000 : 8000;
+        var slowMsgDelay = isDev ? 20000 : 5000;
         setTimeout(function() {
           if (fallback && fallback.style.display !== 'none' && hint) hint.style.display = 'block';
-        }, 8000);
+        }, hintDelay);
         setTimeout(function() {
           if (!fallback || fallback.style.display === 'none') return;
           if (!errEl || !errEl.textContent) {
@@ -214,7 +217,7 @@ const isWebOS = import.meta.env.WEBOS === 'true';
               ? 'Aucune erreur capturee. Sur webOS (file://) les modules JS peuvent etre bloques. Quittez et rouvrez l app.'
               : 'Chargement lent. Si la page ne s\'affiche pas, rechargez.');
           }
-        }, 5000);
+        }, slowMsgDelay);
         // Sur webOS uniquement : charger le bundle principal en différé (file:// peut bloquer les modules)
         // Sur le build normal, Astro injecte déjà le script avec nom hashé (_assets/client-XXX.js)
         if (document.documentElement.getAttribute('data-webos') === 'true') {

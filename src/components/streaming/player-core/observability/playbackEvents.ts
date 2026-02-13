@@ -13,6 +13,7 @@ export type PlaybackEventStep =
   | 'seek_reload'
   | 'retry_503'
   | 'fallback_direct_to_hls'
+  | 'fallback_lucie_to_hls'
   | 'fallback_message_shown'
   | 'error';
 

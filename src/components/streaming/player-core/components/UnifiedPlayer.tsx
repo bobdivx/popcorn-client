@@ -2,8 +2,8 @@ import HLSPlayer from '../../hls-player/HLSPlayer';
 import type { HLSPlayerProps } from '../../hls-player/types';
 import LuciePlayer from '../../lucie-player/LuciePlayer';
 import type { LuciePlayerProps } from '../../lucie-player/types';
-import DirectVideoPlayer from './DirectVideoPlayer';
-import PlayerLoadingOverlay from './PlayerLoadingOverlay';
+import DirectVideoPlayer from '../../direct-player/DirectVideoPlayer';
+import PlayerLoadingOverlay from '../../player-shared/components/PlayerLoadingOverlay';
 
 /**
  * Façade unique du lecteur (direct, HLS ou Lucie).
