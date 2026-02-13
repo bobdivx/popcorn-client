@@ -684,6 +684,18 @@
         "gpuNotAvailableHint": "In Docker: expose the GPU in the stack. On CasaOS, use the « Popcornn (VAAPI GPU) » (Intel/AMD) or « Popcornn (Nvidia GPU) » variant so acceleration is available.",
         "refresh": "Refresh",
         "unavailableOrOldBackend": "Unable to load resources. If your server has not been updated recently, this feature may be unavailable (endpoint /api/media/resources)."
+      },
+      "resourcesMonitorDev": {
+        "title": "Resource monitor",
+        "description": "Real-time server CPU and memory usage.",
+        "pause": "Pause",
+        "resume": "Resume",
+        "cpuHistory": "CPU (last 10 min)",
+        "memoryHistory": "Process memory (last 10 min)",
+        "tipsTitle": "Improvement tips",
+        "tipSyncInterval": "Increase sync interval (Settings > Sync) to reduce idle load.",
+        "tipLibraryScan": "Reduce library scan frequency or set interval to 0 if not needed.",
+        "tipStartupScan": "Library scan at startup is disabled by default; keep POPCORN_LIBRARY_SCAN_ON_STARTUP unset."
       }
     },
     "setup": {

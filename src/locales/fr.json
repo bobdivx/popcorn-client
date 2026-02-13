@@ -684,6 +684,18 @@
         "gpuNotAvailableHint": "En Docker : monter le GPU dans le stack. l’image par défaut (FFmpeg sans GPU). Pour l’activer : variante « Popcornn (Nvidia GPU) » pour que l'accélération s'affiche. Variantes CasaOS : « Popcornn (VAAPI GPU) » ou « Popcornn (Nvidia GPU) ».",
         "refresh": "Actualiser",
         "unavailableOrOldBackend": "Impossible de charger les ressources. Si votre serveur n'a pas été mis à jour récemment, cette fonctionnalité peut être indisponible (endpoint /api/media/resources)."
+      },
+      "resourcesMonitorDev": {
+        "title": "Monitor ressources",
+        "description": "Consommation CPU et mémoire du serveur en temps réel.",
+        "pause": "Pause",
+        "resume": "Reprendre",
+        "cpuHistory": "CPU (dernières 10 min)",
+        "memoryHistory": "Mémoire processus (dernières 10 min)",
+        "tipsTitle": "Pistes d'amélioration",
+        "tipSyncInterval": "Augmenter l'intervalle de synchronisation (Paramètres > Sync) pour réduire la charge au repos.",
+        "tipLibraryScan": "Réduire la fréquence du scan bibliothèque ou le désactiver (intervalle à 0) si inutile.",
+        "tipStartupScan": "Le scan bibliothèque au démarrage est désactivé par défaut ; garder POPCORN_LIBRARY_SCAN_ON_STARTUP non défini."
       }
     },
     "setup": {

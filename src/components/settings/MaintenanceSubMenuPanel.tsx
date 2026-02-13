@@ -1,9 +1,10 @@
-import { Wrench, Sliders, Activity, Cpu } from 'lucide-preact';
+import { Wrench, Sliders, Activity, Cpu, TrendingUp } from 'lucide-preact';
 import { useState, useEffect } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { canAccess } from '../../lib/permissions';
 import SubMenuPanel, { type SubMenuItem } from './SubMenuPanel';
 import { serverApi } from '../../lib/client/server-api';
+import ResourceMonitorDev from './ResourceMonitorDev';
 
 const MIN_MAX_TRANSCODINGS = 1;
 const MAX_MAX_TRANSCODINGS = 16;
@@ -344,6 +345,14 @@ const MAINTENANCE_ITEMS: SubMenuItem[] = [
     icon: Activity,
     permission: 'settings.server',
     inlineContent: ResourcesSection,
+  },
+  {
+    id: 'resources-monitor-dev',
+    titleKey: 'settingsMenu.maintenance.resourcesMonitorDev.title',
+    descriptionKey: 'settingsMenu.maintenance.resourcesMonitorDev.description',
+    icon: TrendingUp,
+    permission: 'settings.server',
+    inlineContent: ResourceMonitorDev,
   },
 ];
 
