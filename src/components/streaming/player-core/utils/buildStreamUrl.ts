@@ -8,6 +8,8 @@ export interface BuildStreamUrlInput {
   isLucieMode?: boolean;
   /** Quand défini (bibliothèque partagée), le flux passe par le proxy local /api/remote-stream/proxy. */
   streamBackendUrl?: string | null;
+  /** Hauteur max en pixels pour le transcode HLS (720, 480, 360). Non utilisé en mode direct/Lucie. */
+  maxHeight?: number | null;
 }
 
 export interface BuildStreamUrlResult {
@@ -50,6 +52,7 @@ export function buildStreamUrl({
   isDirectMode,
   isLucieMode = false,
   streamBackendUrl,
+  maxHeight,
 }: BuildStreamUrlInput): BuildStreamUrlResult {
   const normalizedPath = normalizeStreamPath(filePath);
 
@@ -60,8 +63,14 @@ export function buildStreamUrl({
       : normalizedPath;
 
   const encodedPath = encodeURIComponent(pathForUrl);
-  const infoHashParam = infoHash ? `?info_hash=${encodeURIComponent(infoHash)}` : '';
   const useProxy = Boolean(streamBackendUrl?.trim());
+
+  const infoHashParam = infoHash ? `?info_hash=${encodeURIComponent(infoHash)}` : '';
+  const hlsQueryParams: Record<string, string> = { info_hash: infoHash };
+  if (maxHeight != null && maxHeight > 0) {
+    hlsQueryParams.max_height = String(maxHeight);
+  }
+  const hlsQueryString = new URLSearchParams(hlsQueryParams).toString();
 
   // Construire l'URL selon le mode (avec ou sans proxy pour bibliothèque partagée)
   let streamUrl: string;
@@ -77,16 +86,16 @@ export function buildStreamUrl({
         info_hash: infoHash,
       });
     } else {
-      streamUrl = buildProxyUrl(baseUrl, backend, `/api/local/stream/${encodedPath}/playlist.m3u8`, {
-        info_hash: infoHash,
-      });
+      const params: Record<string, string> = { info_hash: infoHash };
+      if (maxHeight != null && maxHeight > 0) params.max_height = String(maxHeight);
+      streamUrl = buildProxyUrl(baseUrl, backend, `/api/local/stream/${encodedPath}/playlist.m3u8`, params);
     }
   } else if (isLucieMode) {
     streamUrl = `${baseUrl}/api/lucie/manifest.json?path=${encodedPath}&info_hash=${encodeURIComponent(infoHash)}`;
   } else if (isDirectMode) {
     streamUrl = `${baseUrl}/api/local/stream/${encodedPath}${infoHashParam}`;
   } else {
-    streamUrl = `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8${infoHashParam}`;
+    streamUrl = `${baseUrl}/api/local/stream/${encodedPath}/playlist.m3u8?${hlsQueryString}`;
   }
 
   return {

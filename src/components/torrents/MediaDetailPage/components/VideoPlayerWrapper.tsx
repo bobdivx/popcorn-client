@@ -95,6 +95,8 @@ export function VideoPlayerWrapper({
   // Utiliser HLS pour que la lecture fonctionne. Lucie reste utilisé pour les torrents si config = lucie.
   const useLucieForThisSource = isLucieMode && !forceHlsFallback && !infoHash?.startsWith('local_');
   const effectiveDirectMode = isDirectMode && !forceHlsFallback;
+  /** Qualité stream HLS : hauteur max en pixels (720, 480, 360) ou null = source. Modifiable dans le player. */
+  const [streamQuality, setStreamQuality] = useState<number | null>(null);
   const {
     streamUrl,
     hlsFilePath,
@@ -110,6 +112,7 @@ export function VideoPlayerWrapper({
     isDirectMode: effectiveDirectMode,
     isLucieMode: useLucieForThisSource,
     streamBackendUrl,
+    maxHeight: streamQuality,
   });
   
   const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';
@@ -148,8 +151,9 @@ export function VideoPlayerWrapper({
   }, []);
 
   useEffect(() => {
-    // Réinitialiser le fallback quand on change de média/session de lecture.
+    // Réinitialiser le fallback et la qualité quand on change de média/session de lecture.
     setForceHlsFallback(false);
+    setStreamQuality(null);
   }, [infoHash, selectedFile?.path, directStreamUrl, visible]);
 
   useEffect(() => {
@@ -424,6 +428,9 @@ export function VideoPlayerWrapper({
               onLoadingMessageChange: setHlsLoadingMessage,
               streamBackendUrl: streamBackendUrl ?? undefined,
               stopBufferRef,
+              maxHeight: streamQuality,
+              streamQuality,
+              onQualityChange: setStreamQuality,
             }}
             lucieProps={{
               infoHash,

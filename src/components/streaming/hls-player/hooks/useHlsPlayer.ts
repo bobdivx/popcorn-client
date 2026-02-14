@@ -35,6 +35,8 @@ interface UseHlsPlayerProps {
   streamBackendUrl?: string | null;
   /** Appelé quand le serveur a arrêté d'autres transcodages pour libérer de la place (en-tête X-Transcodings-Evicted). */
   onTranscodingsEvicted?: (count: number) => void;
+  /** Hauteur max en pixels pour le transcode (720, 480, 360). null/undefined = résolution source. */
+  maxHeight?: number | null;
 }
 
 export function useHlsPlayer({
@@ -54,6 +56,7 @@ export function useHlsPlayer({
   isRemoteStream = false,
   streamBackendUrl,
   onTranscodingsEvicted,
+  maxHeight,
 }: UseHlsPlayerProps) {
   const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -158,6 +161,9 @@ export function useHlsPlayer({
         if (Number.isFinite(seekSeconds) && (seekSeconds ?? 0) > 0) {
           params.seek = String(seekSeconds);
         }
+      }
+      if (maxHeight != null && maxHeight > 0) {
+        params.max_height = String(maxHeight);
       }
       if (useProxy && streamBackendUrl) {
         return buildProxyUrl(baseUrl, streamBackendUrl.trim(), path, params);
@@ -378,6 +384,18 @@ export function useHlsPlayer({
           },
         });
         hlsRef.current = hls;
+
+        // Changement de qualité (même fichier, autre max_height) : conserver la position
+        if (
+          currentSrcRef.current != null &&
+          currentSrcRef.current !== hlsUrl &&
+          video.currentTime > 0 &&
+          !filePathChanged &&
+          !infoHashChanged
+        ) {
+          pendingSeekRef.current = video.currentTime;
+          setPendingSeekPosition(video.currentTime);
+        }
 
         hls.loadSource(hlsUrl);
         hls.attachMedia(video);
@@ -674,6 +692,8 @@ export function useHlsPlayer({
               setTimeout(startDelayedPlayWhenReady, 150);
             };
             if (pendingSeekRef.current > 0) {
+              // Position déjà définie (ex. changement de qualité) : l'appliquer puis lancer la lecture
+              applyResumePosition(pendingSeekRef.current);
               schedulePlayWhenReady();
             } else {
             getPlaybackPosition(torrentIdRef.current, deviceId).then(async (positionSeconds) => {
@@ -1379,8 +1399,8 @@ export function useHlsPlayer({
       retryCountRef.current = 0;
     };
     // IMPORTANT: Utiliser des dépendances stabilisées pour éviter les réinitialisations multiples
-    // Seulement infoHash et filePath sont critiques, les autres dépendances sont stables ou gérées via refs
-  }, [hlsLoaded, infoHash, filePath, baseUrlProp, streamBackendUrl]);
+    // maxHeight : changement de qualité → nouvelle URL, repositionnement après chargement
+  }, [hlsLoaded, infoHash, filePath, baseUrlProp, streamBackendUrl, maxHeight]);
 
   // Fonction pour arrêter le buffer manuellement (utile lors de la fermeture).
   // Appelle le cleanup complet : pause vidéo + unregister backend (arrêt FFmpeg) + destroy HLS.

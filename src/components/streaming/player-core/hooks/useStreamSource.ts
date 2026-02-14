@@ -15,6 +15,8 @@ interface UseStreamSourceInput {
   isLucieMode?: boolean;
   /** Bibliothèque partagée : URL du serveur ami ; le flux passera par le proxy local. */
   streamBackendUrl?: string | null;
+  /** Qualité stream HLS : hauteur max en pixels (720, 480, 360). null = source. */
+  maxHeight?: number | null;
 }
 
 export function useStreamSource({
@@ -25,6 +27,7 @@ export function useStreamSource({
   isDirectMode,
   isLucieMode = false,
   streamBackendUrl,
+  maxHeight,
 }: UseStreamSourceInput) {
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [hlsFilePath, setHlsFilePath] = useState<string | null>(null);
@@ -63,6 +66,7 @@ export function useStreamSource({
           isDirectMode,
           isLucieMode,
           streamBackendUrl,
+          maxHeight: maxHeight ?? undefined,
         });
 
         const mode = isLucieMode ? 'lucie' : (isDirectMode ? 'direct' : 'hls');
@@ -110,7 +114,7 @@ export function useStreamSource({
     };
 
     loadStreamUrl();
-  }, [selectedFile, infoHash, directStreamUrl, baseUrl, isDirectMode, isLucieMode, streamBackendUrl]);
+  }, [selectedFile, infoHash, directStreamUrl, baseUrl, isDirectMode, isLucieMode, streamBackendUrl, maxHeight]);
 
   return {
     streamUrl,

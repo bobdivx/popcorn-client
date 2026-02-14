@@ -24,7 +24,9 @@ export async function handleClosePlayer(
   setProgressMessage: (message: string) => void,
   addDebugLog: (type: 'info' | 'success' | 'error' | 'warning', message: string, data?: any) => void,
   infoHash?: string | null,
-  isExternal?: boolean
+  isExternal?: boolean,
+  /** Média depuis la bibliothèque : ne pas tenter de supprimer le torrent (évite 502, fichiers déjà sur disque). */
+  fromLibrary?: boolean
 ) {
   // Sortir du plein écran si on y est
   if (document.fullscreenElement) {
@@ -43,9 +45,9 @@ export async function handleClosePlayer(
   setProgressMessage('');
   addDebugLog('info', '🎬 Fermeture du lecteur vidéo');
   
-  // Si c'est un torrent externe, on peut éventuellement le supprimer automatiquement
-  // pour libérer l'espace mémoire (optionnel)
-  if (isExternal && infoHash) {
+  // Si c'est un torrent externe et pas depuis la bibliothèque, supprimer automatiquement pour libérer l'espace.
+  // Depuis la bibliothèque : le torrent n'est pas forcément géré par le client ou ne doit pas être supprimé (502).
+  if (isExternal && infoHash && !fromLibrary) {
     try {
       const { clientApi } = await import('../../../../../lib/client/api');
       addDebugLog('info', '🗑️ Suppression automatique du torrent de streaming externe', { infoHash });

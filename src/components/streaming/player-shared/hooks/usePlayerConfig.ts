@@ -41,7 +41,7 @@ export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
   autoHideControls: true,
   controlsTimeout: 3000,
   showLogo: true,
-  autoFullscreen: false,
+  autoFullscreen: true,
   autoplay: true,
   muted: false,
   volume: 1.0,

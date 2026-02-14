@@ -452,7 +452,13 @@
     "maxTranscodingsReachedWithList": "Nombre maximum de transcodages atteint (max {max}). Arrêtez les autres lectures ou attendez qu'elles se terminent. Transcodages en cours : {list}",
     "transcodingsEvicted": "D'autres transcodages ont été arrêtés pour libérer de la place.",
     "seekBack": "-{seconds} s",
-    "seekForward": "+{seconds} s"
+    "seekForward": "+{seconds} s",
+    "quality": "Qualité",
+    "qualityAuto": "Auto",
+    "quality1080": "1080p",
+    "quality720": "720p",
+    "quality480": "480p",
+    "quality360": "360p"
   },
   "nav": {
     "menu": "Menu",

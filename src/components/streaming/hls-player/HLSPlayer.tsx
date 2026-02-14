@@ -36,6 +36,9 @@ export default function HLSPlayer({
   isRemoteStream = false,
   streamBackendUrl,
   stopBufferRef,
+  maxHeight,
+  streamQuality,
+  onQualityChange,
 }: HLSPlayerProps) {
   const playerConfig = usePlayerConfig();
   const { t } = useI18n();
@@ -55,6 +58,7 @@ export default function HLSPlayer({
   const { videoRef, hlsRef, isLoading, pendingSeekPosition, error, hlsLoaded, loadingStatusMessage, stopBuffer, reloadWithSeek } = useHlsPlayer({
     src,
     infoHash,
+    maxHeight: maxHeight ?? undefined,
     fileName,
     torrentId,
     filePath,
@@ -236,7 +240,8 @@ export default function HLSPlayer({
     if (!video || !hlsLoaded || hasAutoFullscreenedRef.current) return;
 
     const handleFirstPlay = () => {
-      if (shouldAutoFullscreen() && !isFullscreen) {
+      const wantAutoFullscreen = shouldAutoFullscreen() || playerConfig.autoFullscreen;
+      if (wantAutoFullscreen && !isFullscreen) {
         // Utiliser video-player-wrapper en priorité pour le plein écran automatique
         const container = document.getElementById('video-player-wrapper') || containerRef.current;
         if (container) {
@@ -256,7 +261,7 @@ export default function HLSPlayer({
     return () => {
       video.removeEventListener('play', handleFirstPlay);
     };
-  }, [videoRef, hlsLoaded, isFullscreen]);
+  }, [videoRef, hlsLoaded, isFullscreen, playerConfig.autoFullscreen]);
 
   const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack } = useTVPlayerNavigation({
     showControls,
@@ -464,6 +469,9 @@ export default function HLSPlayer({
           showLogo={playerConfig.showLogo}
           onClose={onClose}
           onRestart={handleRestart}
+          showQualitySelector={onQualityChange != null}
+          streamQuality={streamQuality ?? null}
+          onQualityChange={onQualityChange}
           onPlayNextEpisode={
             nextEpisodeInfo && onPlayNextEpisode && (playerConfig.nextEpisodeButtonEnabled ?? true)
               ? onPlayNextEpisode

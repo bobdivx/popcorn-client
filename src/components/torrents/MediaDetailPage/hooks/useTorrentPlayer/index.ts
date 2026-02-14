@@ -183,7 +183,8 @@ export function useTorrentPlayer(options: UseTorrentPlayerOptions) {
       setProgressMessage,
       addDebugLog,
       currentInfoHash,
-      isExternal
+      isExternal,
+      isAvailableLocally
     );
   };
 

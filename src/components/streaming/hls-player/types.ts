@@ -30,6 +30,12 @@ export interface HLSPlayerProps {
   streamBackendUrl?: string | null;
   /** Ref pour exposer stopBuffer (arrêt du buffer à la fermeture), remplace window.__hlsPlayerStopBuffer. */
   stopBufferRef?: import('preact').RefObject<(() => void) | null>;
+  /** Hauteur max en pixels pour le transcode (720, 480, 360). null = résolution source. */
+  maxHeight?: number | null;
+  /** Qualité actuelle affichée (pour le sélecteur). */
+  streamQuality?: number | null;
+  /** Callback quand l'utilisateur change la qualité dans le player. */
+  onQualityChange?: (height: number | null) => void;
 }
 
 declare global {

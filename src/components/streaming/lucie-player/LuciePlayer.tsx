@@ -181,7 +181,8 @@ export default function LuciePlayer({
     if (!video || !lucieLoaded || hasAutoFullscreenedRef.current) return;
 
     const handleFirstPlay = () => {
-      if (shouldAutoFullscreen() && !isFullscreen) {
+      const wantAutoFullscreen = shouldAutoFullscreen() || playerConfig.autoFullscreen;
+      if (wantAutoFullscreen && !isFullscreen) {
         const container = document.getElementById('video-player-wrapper') || containerRef.current;
         if (container) {
           hasAutoFullscreenedRef.current = true;
@@ -199,7 +200,7 @@ export default function LuciePlayer({
     return () => {
       video.removeEventListener('play', handleFirstPlay);
     };
-  }, [videoRef, lucieLoaded, isFullscreen]);
+  }, [videoRef, lucieLoaded, isFullscreen, playerConfig.autoFullscreen]);
 
   const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack } = useTVPlayerNavigation({
     showControls,
