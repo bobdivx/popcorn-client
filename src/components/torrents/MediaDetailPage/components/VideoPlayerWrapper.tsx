@@ -382,7 +382,10 @@ export function VideoPlayerWrapper({
             loading={isLoading}
             loadingMessage={hlsLoadingMessage ?? t('playback.loadingVideo')}
             closeLabel={t('common.close')}
-            onClose={onClose}
+            onClose={() => {
+              stopBufferRef.current?.();
+              onClose();
+            }}
             onDirectLoadedData={() => setIsLoading(false)}
             onDirectError={(e) => {
               console.error('[VideoPlayerWrapper] Direct video error:', e);

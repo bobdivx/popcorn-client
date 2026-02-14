@@ -98,6 +98,8 @@ export function useHlsPlayer({
   const seekFallbackTriedRef = useRef<boolean>(false);
   /** Restauration playlist progressive après 503 sur fallback : retries dédiés */
   const restoringProgressiveRef = useRef<boolean>(false);
+  /** Référence vers la logique de cleanup complète (save + unregister + destroy) pour stopBuffer */
+  const fullCleanupRef = useRef<(() => void) | null>(null);
   const progressiveRestoreRetryCountRef = useRef<number>(0);
   /** 404 sur un segment (progressive) : retry par rechargement de la playlist */
   const segment404RetryCountRef = useRef<number>(0);
@@ -289,10 +291,12 @@ export function useHlsPlayer({
 
         // Appel non bloquant à l'API durée (ffprobe). Essentiel en HLS progressif (bibliothèque) :
         // la playlist ne contient que les segments déjà générés, donc video.duration = durée du buffer.
-        // Pour les médias local_ (bibliothèque), ne pas appeler l'API : le chemin peut être côté client
-        // et le backend renverrait 404 ; la durée viendra de X-Video-Duration ou de la balise vidéo.
+        // Ne pas appeler si : local_, streamBackendUrl, ou chemin Windows (D:/...) alors que le serveur
+        // peut être Docker/Linux sans accès à ce chemin → 404. La durée viendra de X-Video-Duration ou video.duration.
         const isLocalMedia = infoHash.startsWith('local_');
-        if (!isLocalMedia) {
+        const isWindowsAbsolutePath = /^[A-Za-z]:[/\\]/.test((filePath || '').replace(/\\/g, '/'));
+        const skipDurationApi = isLocalMedia || isRemoteStream || !!streamBackendUrl || isWindowsAbsolutePath;
+        if (!skipDurationApi) {
           const encodedPathParam = encodeURIComponent(filePath.replace(/\\/g, '/'));
           const durationUrl = `${baseUrl}/api/local/duration?path=${encodedPathParam}&info_hash=${encodeURIComponent(infoHash)}`;
           const durationAc = new AbortController();
@@ -595,6 +599,16 @@ export function useHlsPlayer({
             }
           };
 
+          // Appliquer la position de reprise ET dire à HLS.js de charger depuis cette position.
+          // Sans hls.startLoad(), HLS charge depuis 0 → buffer [0,X], currentTime=102 hors buffer → image figée.
+          const applyResumePosition = (finalPosition: number) => {
+            pendingSeekRef.current = finalPosition;
+            setCurrentTimeIfNeeded(finalPosition);
+            try {
+              hls.startLoad(finalPosition);
+            } catch (_) {}
+          };
+
           // Démarrer la lecture seulement quand on a assez de buffer (évite stall après ~3 s).
           // Doit être appelé APRÈS que la position sauvegardée soit appliquée, sinon on play() puis
           // un seek vers la position coupe le buffer et provoque une pause.
@@ -650,6 +664,8 @@ export function useHlsPlayer({
             startDelayedPlayWhenReady();
           } else if (torrentIdRef.current) {
             // Appliquer la position sauvegardée AVANT de lancer la vérification buffer → play
+            // Ne PAS appeler getPlaybackPosition si pendingSeekRef > 0 : on est en plein reloadWithSeek,
+            // la position explicite (seek utilisateur) doit primer sur la position sauvegardée.
             const deviceId = getOrCreateDeviceId();
             let playWhenReadyScheduled = false;
             const schedulePlayWhenReady = () => {
@@ -657,6 +673,9 @@ export function useHlsPlayer({
               playWhenReadyScheduled = true;
               setTimeout(startDelayedPlayWhenReady, 150);
             };
+            if (pendingSeekRef.current > 0) {
+              schedulePlayWhenReady();
+            } else {
             getPlaybackPosition(torrentIdRef.current, deviceId).then(async (positionSeconds) => {
               if (positionSeconds && positionSeconds > 0) {
                 const videoDuration = totalDuration > 0 ? totalDuration : (video.duration || 0);
@@ -665,7 +684,7 @@ export function useHlsPlayer({
                   const maxPosition = videoDuration * 0.95;
                   const finalPosition = Math.min(positionSeconds, maxPosition);
                   if (finalPosition > 1) {
-                    setCurrentTimeIfNeeded(finalPosition);
+                    applyResumePosition(finalPosition);
                   }
                 } else {
                   setTimeout(() => {
@@ -674,7 +693,7 @@ export function useHlsPlayer({
                       const maxPosition = retryDuration * 0.95;
                       const finalPosition = Math.min(positionSeconds, maxPosition);
                       if (finalPosition > 1) {
-                        setCurrentTimeIfNeeded(finalPosition);
+                        applyResumePosition(finalPosition);
                       }
                     }
                   }, 1000);
@@ -686,6 +705,7 @@ export function useHlsPlayer({
             });
             // Au cas où la promesse met trop de temps (ex. storage lent)
             window.setTimeout(schedulePlayWhenReady, 2000);
+            }
           } else {
             startDelayedPlayWhenReady();
           }
@@ -841,6 +861,27 @@ export function useHlsPlayer({
             const seekUrl = seekLoadUrlRef.current;
             // 503/202 = playlist seek en cours de génération (backend peut prendre 2-5 min pour un long film avec seek lointain)
             if ((statusCode === 503 || statusCode === 202) && pendingSeekRef.current > 0 && seekUrl && seekLoadRetryCountRef.current < 15) {
+              // Après 3 retries, essayer un seek natif au lieu de continuer (évite blocage si transcodage pas prêt)
+              if (
+                seekLoadRetryCountRef.current >= 3 &&
+                !seekFallbackTriedRef.current &&
+                hlsRef.current?.media
+              ) {
+                seekFallbackTriedRef.current = true;
+                const seekTarget = pendingSeekRef.current;
+                pendingSeekRef.current = 0;
+                seekLoadUrlRef.current = null;
+                setPendingSeekPosition(0);
+                setIsLoading(false);
+                emitPlaybackStep('seek_native_fallback', { position: seekTarget, reason: '503_after_retries' });
+                console.warn('[useHlsPlayer] 503 après 3 retries → fallback seek natif à', seekTarget, 's (transcodage peut ne pas être prêt)');
+                const video = hlsRef.current.media;
+                video.currentTime = seekTarget;
+                try {
+                  hlsRef.current.startLoad(seekTarget);
+                } catch (_) {}
+                return;
+              }
               seekLoadRetryCountRef.current += 1;
               const retryAfterHeader = data?.response?.headers?.['Retry-After'] ?? data?.response?.headers?.['retry-after'];
               const retryAfterSec = typeof retryAfterHeader === 'string' ? parseInt(retryAfterHeader, 10) : NaN;
@@ -1151,6 +1192,23 @@ export function useHlsPlayer({
               }
               return;
             }
+            // bufferAppendError = SourceBuffer.appendBuffer a échoué (segment corrompu, codec, etc.)
+            // Tenter recoverMediaError puis startLoad pour reconstruire le buffer.
+            if (data.details === 'bufferAppendError') {
+              console.debug('[useHlsPlayer] bufferAppendError, tentative recoverMediaError + startLoad');
+              try {
+                if (typeof hls.recoverMediaError === 'function') {
+                  hls.recoverMediaError();
+                }
+                const pos = Number.isFinite(video.currentTime) && video.currentTime >= 0 ? video.currentTime : undefined;
+                hls.startLoad(pos);
+              } catch (e) {
+                console.warn('[useHlsPlayer] recoverMediaError/startLoad après bufferAppendError:', e);
+              }
+              return;
+            }
+            // fragParsingError : fréquent avec MKV transcodé en HLS (surtout lors des seeks), non bloquant
+            if (data.details === 'fragParsingError') return;
             console.warn('[useHlsPlayer] Erreur HLS non-fatale:', {
               type: data.type,
               details: data.details,
@@ -1240,7 +1298,7 @@ export function useHlsPlayer({
           document.removeEventListener('visibilitychange', handleVisibilityChange);
         });
 
-        return () => {
+        const fullCleanup = () => {
           reloadWithSeekRef.current = null;
           seekLoadUrlRef.current = null;
           seekFallbackTriedRef.current = false;
@@ -1268,17 +1326,23 @@ export function useHlsPlayer({
           }
           // Plus besoin de révoquer les Blob URLs, on utilise des URLs HLS
           blobUrlRef.current = null;
+          // Arrêter la lecture immédiatement (évite l'audio qui continue après fermeture)
+          if (video) {
+            video.pause();
+            video.src = '';
+            video.load();
+          }
           if (hlsRef.current) {
             try {
               hlsRef.current.destroy();
             } catch (e) {}
             hlsRef.current = null;
           }
-          video.src = '';
-          video.load();
           // Réinitialiser le compteur de retry
           retryCountRef.current = 0;
         };
+        fullCleanupRef.current = fullCleanup;
+        return fullCleanup;
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : 'Erreur inconnue';
         setError(errorMsg);
@@ -1288,10 +1352,22 @@ export function useHlsPlayer({
       }
     };
 
-    initializeVideo();
-    
-    // Nettoyer les retries lors du démontage
+    let cleanupFromInit: (() => void) | null = null;
+    void initializeVideo().then((fn) => {
+      cleanupFromInit = fn;
+    });
+
+    // Nettoyer lors du démontage ou changement de deps : appeler le cleanup complet
     return () => {
+      const cleanup = fullCleanupRef.current ?? cleanupFromInit;
+      if (cleanup) {
+        fullCleanupRef.current = null;
+        try {
+          cleanup();
+        } catch (e) {
+          console.warn('[useHlsPlayer] Erreur lors du cleanup:', e);
+        }
+      }
       if (retryTimeoutRef.current !== null) {
         clearTimeout(retryTimeoutRef.current);
         retryTimeoutRef.current = null;
@@ -1300,21 +1376,49 @@ export function useHlsPlayer({
         clearTimeout(fileIdPollTimeoutRef.current);
         fileIdPollTimeoutRef.current = null;
       }
-      // Réinitialiser le compteur de retry
       retryCountRef.current = 0;
     };
     // IMPORTANT: Utiliser des dépendances stabilisées pour éviter les réinitialisations multiples
     // Seulement infoHash et filePath sont critiques, les autres dépendances sont stables ou gérées via refs
   }, [hlsLoaded, infoHash, filePath, baseUrlProp, streamBackendUrl]);
 
-  // Fonction pour arrêter le buffer manuellement (utile lors de la fermeture)
+  // Fonction pour arrêter le buffer manuellement (utile lors de la fermeture).
+  // Appelle le cleanup complet : pause vidéo + unregister backend (arrêt FFmpeg) + destroy HLS.
   const stopBuffer = () => {
+    const cleanup = fullCleanupRef.current;
+    if (cleanup) {
+      fullCleanupRef.current = null; // éviter double exécution
+      try {
+        cleanup();
+      } catch (e) {
+        console.warn('[useHlsPlayer] Erreur lors de l\'arrêt du buffer:', e);
+      }
+      return;
+    }
+    // Fallback si HLS pas encore initialisé
     if (hlsRef.current && hlsRef.current.media) {
       try {
         hlsRef.current.stopLoad();
+        const video = hlsRef.current.media;
+        if (video) {
+          video.pause();
+          video.src = '';
+          video.load();
+        }
       } catch (e) {
         console.warn('[useHlsPlayer] Erreur lors de l\'arrêt manuel du buffer:', e);
       }
+    }
+    // Toujours tenter unregister au cas où (file_id peut exister sans HLS prêt)
+    const fileId = hlsFileIdRef.current;
+    if (fileId && activeVideoRegisteredRef.current) {
+      activeVideoRegisteredRef.current = false;
+      const baseUrl = (baseUrlProp && baseUrlProp.trim()) || serverApi.getServerUrl();
+      fetch(`${baseUrl}/api/media/cache/unregister`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_id: fileId }),
+      }).catch(() => {});
     }
   };
 

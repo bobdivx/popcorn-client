@@ -100,18 +100,11 @@ export function useTVPlayerNavigation({
         case 'ArrowLeft': {
           e.preventDefault();
           const stepLeft = getSeekStep('left');
-          if (e.shiftKey || e.ctrlKey) {
+          if (focusedOnProgress) {
             recordKeyDown('left');
             onSeek('left', stepLeft);
-          } else if (showControls) {
-            if (focusedOnProgress) {
-              recordKeyDown('left');
-              onSeek('left', stepLeft);
-            } else if (focusedControlIndex > 0) setFocusedControlIndex(focusedControlIndex - 1);
-            else {
-              recordKeyDown('left');
-              onSeek('left', stepLeft);
-            }
+          } else if (showControls && focusedControlIndex > 0) {
+            setFocusedControlIndex(focusedControlIndex - 1);
           } else {
             recordKeyDown('left');
             onSeek('left', stepLeft);
@@ -121,18 +114,11 @@ export function useTVPlayerNavigation({
         case 'ArrowRight': {
           e.preventDefault();
           const stepRight = getSeekStep('right');
-          if (e.shiftKey || e.ctrlKey) {
+          if (focusedOnProgress) {
             recordKeyDown('right');
             onSeek('right', stepRight);
-          } else if (showControls) {
-            if (focusedOnProgress) {
-              recordKeyDown('right');
-              onSeek('right', stepRight);
-            } else if (focusedControlIndex < controls.length - 1) setFocusedControlIndex(focusedControlIndex + 1);
-            else {
-              recordKeyDown('right');
-              onSeek('right', stepRight);
-            }
+          } else if (showControls && focusedControlIndex < controls.length - 1) {
+            setFocusedControlIndex(focusedControlIndex + 1);
           } else {
             recordKeyDown('right');
             onSeek('right', stepRight);

@@ -236,7 +236,7 @@ export default function LuciePlayer({
       }}
     >
       <div 
-        class="relative flex-1 bg-black overflow-hidden" 
+        class="relative flex-1 min-h-0 bg-black overflow-hidden" 
         style={{ 
           width: '100%', 
           height: '100%',

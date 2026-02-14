@@ -75,7 +75,10 @@ export default function BackendStatusBadge({
 
   useEffect(() => {
     checkHealth();
-    const interval = setInterval(checkHealth, 20_000);
+    const interval = setInterval(() => {
+      // Déléguer le travail à la prochaine tâche pour éviter [Violation] 'setInterval' handler took Xms
+      setTimeout(checkHealth, 0);
+    }, 20_000);
     return () => clearInterval(interval);
   }, []);
 

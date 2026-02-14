@@ -149,6 +149,8 @@ export default function HLSPlayer({
 
   const [showControls, setShowControls] = useState(baseShowControls);
   const [transcodingsEvictedMessage, setTranscodingsEvictedMessage] = useState<string | null>(null);
+  const [seekFeedback, setSeekFeedback] = useState<{ direction: 'left' | 'right'; seconds: number } | null>(null);
+  const seekFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setShowControls(baseShowControls);
@@ -160,6 +162,13 @@ export default function HLSPlayer({
       ? Math.max(0, currentTime - stepSeconds)
       : Math.min(duration, currentTime + stepSeconds);
     seekToTargetTime(newTime);
+    // Retour visuel seek : afficher "-10 s" ou "+10 s" pendant ~800 ms
+    if (seekFeedbackTimeoutRef.current) clearTimeout(seekFeedbackTimeoutRef.current);
+    setSeekFeedback({ direction, seconds: stepSeconds });
+    seekFeedbackTimeoutRef.current = setTimeout(() => {
+      setSeekFeedback(null);
+      seekFeedbackTimeoutRef.current = null;
+    }, 800);
   };
 
   const handleVolumeChangeTV = (direction: 'up' | 'down') => {
@@ -270,6 +279,13 @@ export default function HLSPlayer({
     return () => clearTimeout(tId);
   }, [transcodingsEvictedMessage]);
 
+  // Cleanup seek feedback timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (seekFeedbackTimeoutRef.current) clearTimeout(seekFeedbackTimeoutRef.current);
+    };
+  }, []);
+
   const displayError = error;
   const shouldShowBuffering = isLoading || (isSeeking && bufferedPercent < 100);
 
@@ -291,7 +307,7 @@ export default function HLSPlayer({
       }}
     >
       <div 
-        class="relative flex-1 bg-black overflow-hidden" 
+        class="relative flex-1 min-h-0 bg-black overflow-hidden" 
         style={{ 
           width: '100%', 
           height: '100%',
@@ -308,6 +324,16 @@ export default function HLSPlayer({
             role="status"
           >
             {transcodingsEvictedMessage}
+          </div>
+        )}
+        {seekFeedback && (
+          <div
+            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-6 py-3 rounded-lg bg-black/85 text-white text-2xl font-semibold shadow-lg animate-pulse"
+            role="status"
+          >
+            {seekFeedback.direction === 'left'
+              ? t('playback.seekBack', { seconds: seekFeedback.seconds })
+              : t('playback.seekForward', { seconds: seekFeedback.seconds })}
           </div>
         )}
         {shouldShowBuffering && (

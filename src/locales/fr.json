@@ -450,7 +450,9 @@
     "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct.",
     "maxTranscodingsReached": "Nombre maximum de transcodages atteint. Arrêtez les autres lectures en cours.",
     "maxTranscodingsReachedWithList": "Nombre maximum de transcodages atteint (max {max}). Arrêtez les autres lectures ou attendez qu'elles se terminent. Transcodages en cours : {list}",
-    "transcodingsEvicted": "D'autres transcodages ont été arrêtés pour libérer de la place."
+    "transcodingsEvicted": "D'autres transcodages ont été arrêtés pour libérer de la place.",
+    "seekBack": "-{seconds} s",
+    "seekForward": "+{seconds} s"
   },
   "nav": {
     "menu": "Menu",

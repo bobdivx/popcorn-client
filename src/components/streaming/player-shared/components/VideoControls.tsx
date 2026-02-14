@@ -178,16 +178,6 @@ export function VideoControls({
                 (e.currentTarget as HTMLDivElement).releasePointerCapture?.(e.pointerId);
               } catch (err) {}
             }}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onSeek(e);
-            }}
-            onTouchStart={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onSeek(e);
-            }}
             onFocus={() => setFocusedOnProgress?.(true)}
             onBlur={() => setFocusedOnProgress?.(false)}
             role="slider"
