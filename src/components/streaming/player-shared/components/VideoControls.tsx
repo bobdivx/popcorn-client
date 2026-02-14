@@ -222,14 +222,14 @@ export function VideoControls({
             <div class="absolute left-0 top-0 h-full bg-purple-600 rounded-full" style={{ width: `${progressPercent}%` }} />
             <div class={`absolute top-1/2 -translate-y-1/2 ${isTV ? 'w-5 h-5' : 'w-3.5 h-3.5'} bg-purple-600 rounded-full opacity-0 group-hover/progress:opacity-100 transition-all border-2 border-white`} style={{ left: `calc(${progressPercent}% - ${progressPercent > 0 && progressPercent < 100 ? (isTV ? '10px' : '7px') : progressPercent === 100 ? (isTV ? '20px' : '14px') : '0px'})` }} />
           </div>
-          <div class={`flex items-center ${gap} relative z-30`}>
+          <div class={`flex items-center ${gap} relative z-30 overflow-x-auto min-w-0 scrollbar-visible`}>
             <button 
               onClick={(e) => { 
                 e.preventDefault();
                 e.stopPropagation();
                 onPlayPause(); 
               }} 
-              class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none relative z-40 ${getFocusClass(hasBackButton ? 1 : 0)}`}
+              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none relative z-40 ${getFocusClass(hasBackButton ? 1 : 0)}`}
             >
               {isPlaying ? <Pause class={`${iconSize} text-white`} /> : <Play class={`${iconSize} text-white ml-0.5`} />}
             </button>
@@ -241,7 +241,7 @@ export function VideoControls({
                   e.stopPropagation();
                   onRestart();
                 }} 
-                class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none`}
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none`}
                 title="Redémarrer depuis le début"
               >
                 <RotateCcw class={`${iconSize} text-white`} />
@@ -255,17 +255,17 @@ export function VideoControls({
                   e.stopPropagation();
                   onPlayNextEpisode();
                 }} 
-                class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none`}
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none`}
                 title={t('playback.nextEpisode')}
                 aria-label={t('playback.nextEpisode')}
               >
                 <SkipForward class={`${iconSize} text-white`} />
               </button>
             )}
-            <div class="flex items-center gap-2 group/volume">
+            <div class="flex items-center gap-2 group/volume flex-shrink-0">
               <button 
                 onClick={(e) => { e.stopPropagation(); onToggleMute(); }} 
-                class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${getFocusClass(hasBackButton ? 2 : 1)}`}
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${getFocusClass(hasBackButton ? 2 : 1)}`}
               >
                 {isMuted || volume === 0 ? <VolumeX class={`${iconSize} text-white`} /> : volume < 0.5 ? <Volume1 class={`${iconSize} text-white`} /> : <Volume2 class={`${iconSize} text-white`} />}
               </button>
@@ -280,19 +280,19 @@ export function VideoControls({
                 </div>
               )}
             </div>
-            <div class={`flex items-center gap-2 text-white ${textSize} font-medium`}>
+            <div class={`flex items-center gap-2 text-white ${textSize} font-medium flex-shrink-0`}>
               <span>{formatTime(currentTime)}</span>
               <span class="text-white/50">/</span>
               <span class="text-white/70">{formatTime(duration)}</span>
             </div>
-            <div class="flex-1" />
+            <div class="flex-1 min-w-2" />
             {(audioTracks.length > 0 || subtitleTracks.length > 0) && onToggleSubtitleSelector && (
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleSubtitleSelector();
                 }} 
-                class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${
                   currentSubtitleTrack !== -1 ? 'bg-red-600/30 border-red-500/50' : ''
                 }`}
                 title="Langues et sous-titres"
@@ -301,13 +301,13 @@ export function VideoControls({
               </button>
             )}
             {showQualitySelector && onQualityChange && (
-              <div class="relative">
+              <div class="relative flex-shrink-0">
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
                     setShowQualityMenu((v) => !v);
                   }} 
-                  class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none min-w-0`}
+                  class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none min-w-[3rem] touch-manipulation`}
                   title={t('playback.quality')}
                   aria-label={t('playback.quality')}
                   aria-expanded={showQualityMenu}
@@ -359,7 +359,7 @@ export function VideoControls({
                 e.stopPropagation();
                 onToggleFullscreen();
               }} 
-              class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${getFocusClass(hasBackButton ? 3 : 2)}`}
+              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${getFocusClass(hasBackButton ? 3 : 2)}`}
             >
               {isFullscreen ? <Minimize class={`${iconSize} text-white`} /> : <Maximize class={`${iconSize} text-white`} />}
             </button>
