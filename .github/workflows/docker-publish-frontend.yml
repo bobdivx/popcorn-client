@@ -5,12 +5,14 @@ on:
     branches:
       - main
       - master
+      - dev
     tags:
       - 'v*'
   pull_request:
     branches:
       - main
       - master
+      - dev
   workflow_dispatch:  # Permet de déclencher manuellement depuis l'interface GitHub
 
 env:
@@ -33,7 +35,7 @@ jobs:
 
       - name: Increment version in VERSION.json
         id: increment_version
-        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
         run: |
           if [ -f "VERSION.json" ]; then
             # Lire la version actuelle
@@ -81,7 +83,7 @@ jobs:
 
       - name: Get version from VERSION.json
         id: version
-        if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/v')
+        if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/dev'
         run: |
           if [ -f "VERSION.json" ]; then
             VERSION=$(jq -r '.client.version' VERSION.json)
@@ -93,7 +95,7 @@ jobs:
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Commit version update
-        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v') && steps.increment_version.outputs.version != ''
+        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && steps.increment_version.outputs.version != ''
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -233,8 +235,9 @@ jobs:
           images: ${{ steps.check_creds.outputs.username }}/popcorn-frontend
           tags: |
             type=raw,value=${{ steps.increment_version.outputs.version || steps.version.outputs.version }},enable=${{ github.event_name != 'pull_request' }}
-            type=raw,value=v${{ steps.increment_version.outputs.version || steps.version.outputs.version }},enable=${{ github.event_name != 'pull_request' }}
+            type=raw,value=v${{ steps.increment_version.outputs.version || steps.version.outputs.version }},enable=${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
             type=raw,value=latest,enable=${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
+            type=raw,value=dev,enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/dev' }}
             type=semver,pattern={{version}},enable=${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') }}
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') }}
             type=semver,pattern={{major}},enable=${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') }}
