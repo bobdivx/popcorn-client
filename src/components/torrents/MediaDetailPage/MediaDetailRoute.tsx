@@ -47,6 +47,10 @@ function getBackHrefFromLocation(): string | null {
   if (typeof window === 'undefined') return null;
   const from = getFromFromLocation();
   if (!from) return null;
+  if (from === 'library') {
+    const type = new URLSearchParams(window.location.search).get('type');
+    return type === 'tv' ? '/series?view=library' : '/films?view=library';
+  }
   const map: Record<string, string> = {
     dashboard: '/dashboard',
     discover: '/discover',
@@ -146,6 +150,7 @@ function convertVariantToTorrent(variant: any): Torrent {
     category: variant.category || null,
     imageUrl: variant.poster_url || variant.posterUrl || variant.image_url || variant.imageUrl || null,
     heroImageUrl: variant.hero_image_url || variant.heroImageUrl || null,
+    logoUrl: variant.logo_url || variant.logoUrl || null,
     trailerKey: variant.trailer_key || variant.trailerKey || null,
     fileSize: variant.file_size || variant.fileSize || 0,
     seedCount: variant.seed_count || variant.seedCount || 0,
@@ -241,6 +246,7 @@ function libraryItemToTorrent(localMedia: any): Torrent {
     category: localMedia.category || null,
     imageUrl: localMedia.poster_url || null,
     heroImageUrl: localMedia.hero_image_url || null,
+    logoUrl: localMedia.logo_url || localMedia.logoUrl || null,
     trailerKey: null,
     fileSize: localMedia.file_size || 0,
     seedCount: 0,

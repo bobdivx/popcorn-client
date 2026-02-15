@@ -17,7 +17,11 @@ export default function HLSPlayer({
   src, 
   infoHash, 
   fileName, 
-  torrentName, 
+  torrentName,
+  posterUrl,
+  logoUrl,
+  synopsis,
+  releaseDate,
   torrentId, 
   filePath, 
   tmdbId,
@@ -437,6 +441,10 @@ export default function HLSPlayer({
         />
         <VideoControls
           torrentName={torrentName}
+          posterUrl={posterUrl}
+          logoUrl={logoUrl}
+          synopsis={synopsis}
+          releaseDate={releaseDate}
           showControls={showControls}
           isPlaying={isPlaying}
           currentTime={currentTime}

@@ -53,6 +53,14 @@ interface VideoPlayerWrapperProps {
   directStreamUrl?: string | null;
   /** Média partagé par un ami : URL du serveur ami pour le stream uniquement (on garde notre backend pour le reste). */
   streamBackendUrl?: string | null;
+  /** URL du poster (affiché en overlay pause avec le synopsis). */
+  posterUrl?: string | null;
+  /** URL du logo du média (TMDB) — affiché à la place du logo Popcorn si fourni. */
+  logoUrl?: string | null;
+  /** Synopsis du média (affiché en overlay pause avec le poster). */
+  synopsis?: string | null;
+  /** Année de sortie (badge overlay pause). */
+  releaseDate?: string | null;
 }
 
 export function VideoPlayerWrapper({ 
@@ -72,6 +80,10 @@ export function VideoPlayerWrapper({
   quality,
   directStreamUrl,
   streamBackendUrl,
+  posterUrl,
+  logoUrl,
+  synopsis,
+  releaseDate,
 }: VideoPlayerWrapperProps) {
   const baseUrl = serverApi.getServerUrl();
   const [forceHlsFallback, setForceHlsFallback] = useState(false);
@@ -409,6 +421,10 @@ export function VideoPlayerWrapper({
               infoHash,
               fileName: selectedFile?.path || selectedFile?.name || torrentName || 'video',
               torrentName: torrentName || selectedFile?.name || 'video',
+              posterUrl: posterUrl ?? undefined,
+              logoUrl: logoUrl ?? undefined,
+              synopsis: synopsis ?? undefined,
+              releaseDate: releaseDate ?? undefined,
               torrentId,
               filePath: selectedFile?.path || selectedFile?.name || torrentName || 'video',
               tmdbId,
@@ -436,6 +452,10 @@ export function VideoPlayerWrapper({
               infoHash,
               fileName: selectedFile?.path || selectedFile?.name || torrentName || 'video',
               torrentName: torrentName || selectedFile?.name || 'video',
+              posterUrl: posterUrl ?? undefined,
+              logoUrl: logoUrl ?? undefined,
+              synopsis: synopsis ?? undefined,
+              releaseDate: releaseDate ?? undefined,
               torrentId,
               filePath: selectedFile?.path || selectedFile?.name || torrentName || 'video',
               tmdbId,

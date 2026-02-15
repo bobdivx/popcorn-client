@@ -56,6 +56,14 @@ interface VideoControlsProps {
   onToggleSubtitleSelector?: () => void;
   onCloseSubtitleSelector?: () => void;
   showLogo?: boolean;
+  /** URL du poster (affiche avec synopsis en overlay quand en pause) */
+  posterUrl?: string | null;
+  /** URL du logo du média (TMDB) — affiché à la place du logo Popcorn si fourni. */
+  logoUrl?: string | null;
+  /** Synopsis du média (affiche avec poster en overlay quand en pause) */
+  synopsis?: string | null;
+  /** Année de sortie (badge style Media Detail) */
+  releaseDate?: string | null;
   onClose?: () => void;
   onRestart?: () => void;
   /** Afficher le bouton « Épisode suivant » (séries) */
@@ -98,6 +106,10 @@ export function VideoControls({
   onToggleSubtitleSelector,
   onCloseSubtitleSelector,
   showLogo = true,
+  posterUrl,
+  logoUrl,
+  synopsis,
+  releaseDate,
   onClose,
   onRestart,
   onPlayNextEpisode,
@@ -131,13 +143,13 @@ export function VideoControls({
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
   const volumePercent = volume * 100;
 
-  const buttonSize = isTV ? 'w-16 h-16' : isFullscreen ? 'w-14 h-14' : 'w-12 h-12';
-  const iconSize = isTV ? 'w-8 h-8' : isFullscreen ? 'w-7 h-7' : 'w-6 h-6';
-  const progressHeight = isTV ? 'h-2' : isFullscreen ? 'h-1.5' : 'h-1.5';
-  const textSize = isTV ? 'text-lg' : isFullscreen ? 'text-base' : 'text-sm';
-  const titleSize = isTV ? 'text-3xl' : isFullscreen ? 'text-2xl' : 'text-lg sm:text-xl';
-  const padding = isTV ? 'px-8 pt-8 pb-8' : isFullscreen ? 'px-6 pt-6 pb-6' : 'px-4 pt-4 sm:pt-6 pb-4 sm:pb-6';
-  const gap = isTV ? 'gap-6' : isFullscreen ? 'gap-5' : 'gap-4';
+  const buttonSize = isTV ? 'w-20 h-20' : isFullscreen ? 'w-[4.5rem] h-[4.5rem] min-w-[4.5rem] min-h-[4.5rem]' : 'w-16 h-16 min-w-16 min-h-16';
+  const iconSize = isTV ? 'w-10 h-10' : isFullscreen ? 'w-9 h-9' : 'w-8 h-8';
+  const progressHeight = isTV ? 'h-3' : isFullscreen ? 'h-2.5' : 'h-2';
+  const textSize = isTV ? 'text-xl' : isFullscreen ? 'text-lg' : 'text-base';
+  const titleSize = isTV ? 'text-4xl' : isFullscreen ? 'text-3xl md:text-4xl' : 'text-2xl sm:text-3xl';
+  const padding = isTV ? 'px-10 pt-10 pb-10' : isFullscreen ? 'px-8 pt-8 pb-8 md:px-12 md:pt-10 md:pb-10' : 'px-6 pt-6 pb-6 sm:px-8 sm:pt-8 sm:pb-8';
+  const gap = isTV ? 'gap-8' : isFullscreen ? 'gap-6' : 'gap-5';
 
   // Indices de focus : back(0 si hasBack), play, mute, fullscreen
   const getFocusClass = (index: number) => {
@@ -150,12 +162,50 @@ export function VideoControls({
     return 'ring-2 ring-purple-600 ring-opacity-90 ring-inset';
   };
 
+  const showPausedOverlay = !isPlaying && showControls && (posterUrl || synopsis);
+
   return (
     <>
       <div class={`absolute inset-0 pointer-events-none transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0'}`} style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0.3) 50%, transparent 100%)' }} />
+      {/* Overlay pause : poster + synopsis à gauche (style Media Detail) */}
+      {showPausedOverlay && (
+        <div class="absolute inset-0 flex flex-col justify-end z-15 pointer-events-none">
+          <div class="w-full h-full bg-gradient-to-r from-black via-black/90 to-transparent pointer-events-none" aria-hidden="true" />
+          <div class="absolute inset-0 flex flex-col justify-end px-4 sm:px-6 md:px-10 lg:px-16 pb-12 sm:pb-16 md:pb-20">
+            <div class="max-w-5xl xl:max-w-6xl flex flex-col sm:flex-row items-start gap-6 sm:gap-8 md:gap-10 w-full">
+              {posterUrl && (
+                <div class="flex-shrink-0 w-40 h-56 sm:w-48 sm:h-72 md:w-56 md:h-80 lg:w-64 lg:h-96 rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/20">
+                  <img src={posterUrl} alt="" class="w-full h-full object-cover" />
+                </div>
+              )}
+              <div class="flex-1 min-w-0 flex flex-col gap-4">
+                {(torrentName || releaseDate) && (
+                  <div class="flex items-baseline gap-3 sm:gap-4 flex-wrap">
+                    {torrentName && (
+                      <h2 class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight drop-shadow-2xl">
+                        {torrentName}
+                      </h2>
+                    )}
+                    {releaseDate && (
+                      <span class="inline-flex items-center justify-center px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-800/90 backdrop-blur-md text-white/95 text-base sm:text-lg font-semibold rounded-lg border border-white/30 shadow-lg">
+                        {new Date(releaseDate).getFullYear()}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {synopsis && (
+                  <p class="text-white/95 text-base sm:text-lg md:text-xl lg:text-2xl leading-relaxed line-clamp-4 sm:line-clamp-5 md:line-clamp-6 drop-shadow-lg max-w-2xl">
+                    {synopsis}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       <div class={`absolute inset-0 flex flex-col justify-between transition-all duration-300 z-20 ${showControls ? 'opacity-100' : 'opacity-0'} ${showControls ? 'pointer-events-auto' : 'pointer-events-none'}`}>
         <div class={`flex items-center justify-between ${padding.split(' ')[0]} ${padding.split(' ')[1]}`}>
-          <div class="flex items-center gap-3 text-white drop-shadow-2xl">
+          <div class="flex items-center gap-3 text-white drop-shadow-2xl min-w-0 flex-1">
             {/* Bouton retour */}
             {onClose && (
               <button 
@@ -164,28 +214,37 @@ export function VideoControls({
                   e.stopPropagation();
                   onClose();
                 }} 
-                class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none ${getFocusClass(0)}`}
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none ${getFocusClass(0)}`}
                 title="Retour"
                 aria-label="Retour"
               >
                 <ArrowLeft class={`${iconSize} text-white`} />
               </button>
             )}
-            {showLogo && (
+            {torrentName && <h3 class={`${titleSize} font-semibold tracking-wide truncate`}>{torrentName}</h3>}
+          </div>
+          {showLogo && (
+            logoUrl ? (
+              <img 
+                src={logoUrl} 
+                alt="" 
+                class={`flex-shrink-0 ${isTV ? 'w-20 h-20 max-h-20' : isFullscreen ? 'w-16 h-16 md:w-20 md:h-20 max-h-20' : 'w-14 h-14 sm:w-16 sm:h-16 max-h-16'} object-contain object-center opacity-95`}
+                style="max-width: 12rem;"
+              />
+            ) : (
               <img 
                 src="/popcorn_logo.png" 
                 alt="Popcorn" 
-                class={`${isTV ? 'w-12 h-12' : isFullscreen ? 'w-10 h-10' : 'w-8 h-8'} object-contain opacity-90`}
+                class={`flex-shrink-0 ${isTV ? 'w-20 h-20' : isFullscreen ? 'w-16 h-16 md:w-20 md:h-20' : 'w-14 h-14 sm:w-16 sm:h-16'} object-contain opacity-90`}
               />
-            )}
-            {torrentName && <h3 class={`${titleSize} font-semibold tracking-wide`}>{torrentName}</h3>}
-          </div>
+            )
+          )}
         </div>
         <div class={padding}>
           <div
             ref={progressBarRef}
             tabIndex={0}
-            class={`relative ${progressHeight} bg-white/30 rounded-full cursor-pointer group/progress transition-all mb-6 outline-none focus:outline-none ${getProgressFocusClass()}`}
+            class={`relative ${progressHeight} bg-white/30 rounded-full cursor-pointer group/progress transition-all mb-8 outline-none focus:outline-none ${getProgressFocusClass()}`}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -220,7 +279,7 @@ export function VideoControls({
           >
             <div class="absolute left-0 top-0 h-full bg-white/20 rounded-full" style={{ width: '100%' }} />
             <div class="absolute left-0 top-0 h-full bg-purple-600 rounded-full" style={{ width: `${progressPercent}%` }} />
-            <div class={`absolute top-1/2 -translate-y-1/2 ${isTV ? 'w-5 h-5' : 'w-3.5 h-3.5'} bg-purple-600 rounded-full opacity-0 group-hover/progress:opacity-100 transition-all border-2 border-white`} style={{ left: `calc(${progressPercent}% - ${progressPercent > 0 && progressPercent < 100 ? (isTV ? '10px' : '7px') : progressPercent === 100 ? (isTV ? '20px' : '14px') : '0px'})` }} />
+            <div class={`absolute top-1/2 -translate-y-1/2 ${isTV ? 'w-6 h-6' : 'w-4 h-4'} bg-purple-600 rounded-full opacity-0 group-hover/progress:opacity-100 transition-all border-2 border-white`} style={{ left: `calc(${progressPercent}% - ${progressPercent > 0 && progressPercent < 100 ? (isTV ? '12px' : '8px') : progressPercent === 100 ? (isTV ? '24px' : '16px') : '0px'})` }} />
           </div>
           <div class={`flex items-center ${gap} relative z-30 overflow-x-auto min-w-0 scrollbar-visible`}>
             <button 
@@ -270,12 +329,12 @@ export function VideoControls({
                 {isMuted || volume === 0 ? <VolumeX class={`${iconSize} text-white`} /> : volume < 0.5 ? <Volume1 class={`${iconSize} text-white`} /> : <Volume2 class={`${iconSize} text-white`} />}
               </button>
               {!isTV && (
-                <div class="hidden group-hover/volume:flex items-center w-20 h-1.5 bg-white/30 rounded-full cursor-pointer" onClick={onVolumeChange}>
+                <div class="hidden group-hover/volume:flex items-center w-24 h-2 bg-white/30 rounded-full cursor-pointer" onClick={onVolumeChange}>
                   <div class="h-full bg-white rounded-full" style={{ width: `${volumePercent}%` }} />
                 </div>
               )}
               {isTV && (
-                <div class="flex items-center w-32 h-2 bg-white/30 rounded-full">
+                <div class="flex items-center w-40 h-2.5 bg-white/30 rounded-full">
                   <div class="h-full bg-white rounded-full" style={{ width: `${volumePercent}%` }} />
                 </div>
               )}

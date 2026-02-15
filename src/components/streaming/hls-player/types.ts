@@ -3,6 +3,10 @@ export interface HLSPlayerProps {
   infoHash?: string;
   fileName: string;
   torrentName?: string;
+  posterUrl?: string;
+  logoUrl?: string;
+  synopsis?: string;
+  releaseDate?: string;
   torrentId?: string;
   filePath?: string;
   /** Pour sauvegarder la position par média (tmdb), reprise même avec un autre info_hash */
