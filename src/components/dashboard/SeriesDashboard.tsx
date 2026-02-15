@@ -29,10 +29,26 @@ export default function SeriesDashboard() {
   const lastSyncProgressRef = useRef<number>(-1);
   const { notifications, addNotification, removeNotification } = useNotifications();
   const [heroDownloading, setHeroDownloading] = useState(false);
-  const [viewMode, setViewMode] = useState<'torrents' | 'library'>('torrents');
+  const [viewMode, setViewMode] = useState<'torrents' | 'library'>(() => {
+    if (typeof window === 'undefined') return 'torrents';
+    return new URLSearchParams(window.location.search).get('view') === 'library' ? 'library' : 'torrents';
+  });
   const [autoViewChecked, setAutoViewChecked] = useState(false);
   const switchTorrentRef = useRef<HTMLButtonElement>(null);
   const switchLibraryRef = useRef<HTMLButtonElement>(null);
+
+  const setViewModeAndUrl = useCallback((mode: 'torrents' | 'library') => {
+    setViewMode(mode);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      if (mode === 'library') {
+        url.searchParams.set('view', 'library');
+      } else {
+        url.searchParams.delete('view');
+      }
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, []);
 
   // À l'arrivée sur la page, focus sur le switch (accessible télécommande / clavier)
   useEffect(() => {
@@ -80,7 +96,7 @@ export default function SeriesDashboard() {
           return category === 'SERIES' || tmdbType === 'tv' || tmdbType === 'series';
         });
         if (series.length === 0 && hasLibrarySeries) {
-          setViewMode('library');
+          setViewModeAndUrl('library');
         }
       } finally {
         setAutoViewChecked(true);
@@ -121,7 +137,7 @@ export default function SeriesDashboard() {
         type="button"
         data-focusable
         tabIndex={0}
-        onClick={() => setViewMode('torrents')}
+        onClick={() => setViewModeAndUrl('torrents')}
         className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-2 rounded-full text-sm font-semibold transition-colors min-h-[44px] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black sm:min-w-[7rem] ${
           viewMode === 'torrents' ? 'bg-white text-black shadow' : 'text-white/90 hover:bg-white/10'
         }`}
@@ -136,7 +152,7 @@ export default function SeriesDashboard() {
         type="button"
         data-focusable
         tabIndex={0}
-        onClick={() => setViewMode('library')}
+        onClick={() => setViewModeAndUrl('library')}
         className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2.5 sm:py-2 rounded-full text-sm font-semibold transition-colors min-h-[44px] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black sm:min-w-[7rem] ${
           viewMode === 'library' ? 'bg-white text-black shadow' : 'text-white/90 hover:bg-white/10'
         }`}

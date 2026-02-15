@@ -286,9 +286,9 @@ export default function Library({
       return;
     }
     if (item.info_hash) {
-      window.location.href = `/torrents?slug=${encodeURIComponent(item.info_hash)}&from=library${streamBackend}`;
+      window.location.href = `/torrents?slug=${encodeURIComponent(item.info_hash)}&type=${typeParam}&from=library${streamBackend}`;
     } else if (item.slug) {
-      window.location.href = `/torrents?slug=${encodeURIComponent(item.slug)}&from=library${streamBackend}`;
+      window.location.href = `/torrents?slug=${encodeURIComponent(item.slug)}&type=${typeParam}&from=library${streamBackend}`;
     }
   };
 

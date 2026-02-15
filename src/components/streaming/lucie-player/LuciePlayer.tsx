@@ -16,7 +16,11 @@ export default function LuciePlayer({
   src, 
   infoHash, 
   fileName, 
-  torrentName, 
+  torrentName,
+  posterUrl,
+  logoUrl,
+  synopsis,
+  releaseDate,
   torrentId, 
   filePath, 
   tmdbId,
@@ -348,6 +352,10 @@ export default function LuciePlayer({
         />
         <VideoControls
           torrentName={torrentName}
+          posterUrl={posterUrl}
+          logoUrl={logoUrl}
+          synopsis={synopsis}
+          releaseDate={releaseDate}
           showControls={showControls}
           isPlaying={isPlaying}
           currentTime={currentTime}

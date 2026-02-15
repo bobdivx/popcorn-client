@@ -244,12 +244,12 @@ export function useTVPlayerNavigation({
     recordKeyUp,
   ]);
 
-  // Afficher les contrôles automatiquement sur Android TV
+  // Sur TV : afficher les contrôles au montage uniquement. Ne pas forcer la réaffichage
+  // quand ils se cachent (sinon ils ne se cachent jamais). Le keydown handler affiche
+  // déjà les contrôles quand l'utilisateur appuie sur une touche.
   useEffect(() => {
-    if (isTV && !showControls) {
-      setShowControls(true);
-    }
-  }, [isTV, showControls, setShowControls]);
+    if (isTV) setShowControls(true);
+  }, [isTV, setShowControls]);
 
   // Auto-masquer les contrôles après 5 secondes sur TV
   useEffect(() => {

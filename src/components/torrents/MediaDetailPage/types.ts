@@ -24,6 +24,7 @@ export interface MediaDetailPageProps {
     category?: string;
     imageUrl?: string | null;
     heroImageUrl?: string | null;
+    logoUrl?: string | null;
     trailerKey?: string | null;
     fileSize: number;
     seedCount: number;

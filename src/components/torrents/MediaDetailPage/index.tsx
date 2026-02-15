@@ -954,6 +954,10 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         quality={displayTorrent.quality}
         directStreamUrl={(displayTorrent as any)._demoStreamUrl ?? undefined}
         streamBackendUrl={streamBackendUrl ?? undefined}
+        posterUrl={displayTorrent.imageUrl ?? null}
+        logoUrl={displayTorrent.logoUrl ?? null}
+        synopsis={displayTorrent.synopsis ?? displayTorrent.description ?? null}
+        releaseDate={displayTorrent.releaseDate ?? null}
       />
     );
   }
@@ -981,6 +985,10 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           quality={displayTorrent.quality}
           directStreamUrl={(displayTorrent as any)._demoStreamUrl ?? undefined}
           streamBackendUrl={streamBackendUrl ?? undefined}
+          posterUrl={displayTorrent.imageUrl ?? null}
+          logoUrl={displayTorrent.logoUrl ?? null}
+          synopsis={displayTorrent.synopsis ?? displayTorrent.description ?? null}
+          releaseDate={displayTorrent.releaseDate ?? null}
         />
       )}
     <div className="relative bg-black text-white">

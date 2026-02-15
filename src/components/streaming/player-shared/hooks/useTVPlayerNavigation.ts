@@ -166,9 +166,12 @@ export function useTVPlayerNavigation({
     };
   }, [showControls, focusedControlIndex, focusedOnProgress, onPlayPause, onSeek, onVolumeChange, onToggleMute, onToggleFullscreen, onClose, controls, setShowControls, getSeekStep, recordKeyDown, recordKeyUp]);
 
+  // Sur TV : afficher les contrôles au montage uniquement. Ne pas forcer la réaffichage
+  // quand ils se cachent (sinon ils ne se cachent jamais). Le keydown handler affiche
+  // déjà les contrôles quand l'utilisateur appuie sur une touche.
   useEffect(() => {
-    if (isTV && !showControls) setShowControls(true);
-  }, [isTV, showControls, setShowControls]);
+    if (isTV) setShowControls(true);
+  }, [isTV, setShowControls]);
 
   useEffect(() => {
     if (!isTV || !showControls) return;
