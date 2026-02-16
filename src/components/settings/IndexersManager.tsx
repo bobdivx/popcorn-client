@@ -3,6 +3,7 @@ import { serverApi } from '../../lib/client/server-api';
 import type { Indexer, IndexerFormData } from '../../lib/client/types';
 import { IndexerCard } from './IndexerCard';
 import { IndexerTestModal, formatProgressEvent } from './IndexerTestModal';
+import { CookieWizardModal } from './CookieWizardModal';
 import { getIndexerDefinitions, type IndexerDefinition } from '../../lib/api/popcorn-web';
 import {
   filterAndSortIndexerDefinitions,
@@ -11,6 +12,7 @@ import {
 import { useI18n } from '../../lib/i18n/useI18n';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
 import { syncIndexersToCloud } from '../../lib/utils/cloud-sync';
+import { normalizeCookieInput } from '../../lib/utils/cookie-format';
 
 const STORAGE_KEY_USE_JACKETT = 'popcorn-indexer-use-jackett';
 
@@ -65,6 +67,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
   const [testing, setTesting] = useState<string | null>(null);
   const [testProgress, setTestProgress] = useState<Record<string, { index: number; total: number; lastQuery?: string; lastCount?: number; lastSuccess?: boolean }>>({});
   const [testModalOpen, setTestModalOpen] = useState(false);
+  const [cookieWizardOpen, setCookieWizardOpen] = useState(false);
   const [testModalIndexer, setTestModalIndexer] = useState<{ id: string; name: string } | null>(null);
   const [testProgressLog, setTestProgressLog] = useState<string[]>([]);
   const [testRunning, setTestRunning] = useState(false);
@@ -734,7 +737,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
                 </div>
               );
             }
-            const isPassword = (field.type || '').toLowerCase() === 'password';
+            const isPassword = name !== 'cookie' && (field.type || '').toLowerCase() === 'password';
             return (
               <div key={name} class="form-control">
                 <label class="label">
@@ -742,18 +745,65 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
                     {fieldLabel(field)}
                     {field.required && <span class="text-red-400 ml-1">*</span>}
                   </span>
+                  {name === 'cookie' && (
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-ghost text-primary-400 hover:text-primary-300 border border-primary-500/50"
+                      onClick={() => setCookieWizardOpen(true)}
+                    >
+                      {t('indexersManager.form.cookieWizardOpen')}
+                    </button>
+                  )}
                 </label>
                 <input
                   type={isPassword ? 'password' : 'text'}
                   class="input input-bordered bg-gray-800 border-gray-700 text-white"
                   value={formData.extraConfig?.[name] ?? ''}
-                  onInput={(e) => setFormData({
-                    ...formData,
-                    extraConfig: { ...(formData.extraConfig || {}), [name]: (e.target as HTMLInputElement).value },
-                  })}
+                  onInput={(e) => {
+                    const v = (e.target as HTMLInputElement).value;
+                    const final = name === 'cookie' ? normalizeCookieInput(v) : v;
+                    setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), [name]: final } });
+                  }}
                   required={!!field.required}
-                  placeholder={field.placeholder}
+                  placeholder={field.placeholder || (name === 'cookie' ? t('indexersManager.form.cookiePlaceholder') : undefined)}
                 />
+                {name === 'cookie' && (
+                  <>
+                    <div
+                      class="mt-2 rounded-lg border-2 border-dashed border-gray-600 bg-gray-800/50 p-4 text-center text-sm text-gray-400 hover:border-primary-500/50 hover:bg-gray-800 transition-colors"
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add('border-primary-500', 'bg-primary-500/10'); }}
+                      onDragLeave={(e) => { e.currentTarget.classList.remove('border-primary-500', 'bg-primary-500/10'); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.currentTarget.classList.remove('border-primary-500', 'bg-primary-500/10');
+                        const text = e.dataTransfer?.getData?.('text/plain')?.trim();
+                        if (text) setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), cookie: normalizeCookieInput(text) } });
+                      }}
+                      onPaste={(e) => {
+                        const text = e.clipboardData?.getData?.('text/plain')?.trim();
+                        if (text) { e.preventDefault(); setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), cookie: normalizeCookieInput(text) } }); }
+                      }}
+                      tabIndex={0}
+                      role="button"
+                    >
+                      {t('indexersManager.form.cookieDropZone')}
+                    </div>
+                    <button
+                      type="button"
+                      class="mt-2 btn btn-sm btn-ghost text-primary-400 border border-primary-500/50"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          if (text?.trim()) setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), cookie: normalizeCookieInput(text.trim()) } });
+                        } catch (_) {}
+                      }}
+                    >
+                      {t('indexersManager.form.cookiePasteButton')}
+                    </button>
+                    <p class="text-sm text-gray-400 mt-1 ml-1">{t('indexersManager.form.cookieHelp')}</p>
+                  </>
+                )}
               </div>
             );
           })}
@@ -804,7 +854,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
             </div>
           )}
 
-          {effectiveDef?.protocol === 'custom' && (
+          {(selectedDefinition || (editingIndexer?.indexerTypeId && definitions.find((d) => d.id === editingIndexer?.indexerTypeId)) || null)?.protocol === 'custom' && (
             <div class="form-control">
               <label class="label cursor-pointer gap-2">
                 <input
@@ -872,6 +922,10 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
       )}
 
       {/* Modale de test d'indexer : retour visuel en cours + résultats au fur et à mesure */}
+      <CookieWizardModal
+        isOpen={cookieWizardOpen}
+        onClose={() => setCookieWizardOpen(false)}
+      />
       <IndexerTestModal
         isOpen={testModalOpen}
         onClose={closeTestModal}

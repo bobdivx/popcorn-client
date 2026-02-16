@@ -217,18 +217,28 @@ export default function PrerollPlayer({ config, onEnded, onSkip }: PrerollPlayer
     }
   };
 
-  // AdSense display (google_display): load script and fill slot
+  // AdSense display (google_display): load script and fill slot only when container has size (avoid availableWidth=0)
+  const adDisplaySlotRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (config.type !== 'google_display' || !config.googleAdClient || !config.googleAdSlot) return;
     const client = config.googleAdClient;
-    const slot = config.googleAdSlot;
 
     let cancelled = false;
+    let rafCount = 0;
+    const maxRaf = 120; // ~2s max wait for layout
     const run = () => {
       if (cancelled) return;
-      const w = window as any;
-      w.adsbygoogle = w.adsbygoogle || [];
-      w.adsbygoogle.push({});
+      const el = adDisplaySlotRef.current;
+      if (el && el.offsetWidth > 0) {
+        const w = window as any;
+        w.adsbygoogle = w.adsbygoogle || [];
+        w.adsbygoogle.push({});
+        return;
+      }
+      if (rafCount < maxRaf) {
+        rafCount++;
+        requestAnimationFrame(run);
+      }
     };
 
     const scriptId = 'adsbygoogle-script';
@@ -240,11 +250,11 @@ export default function PrerollPlayer({ config, onEnded, onSkip }: PrerollPlayer
       script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(client)}`;
       script.crossOrigin = 'anonymous';
       script.onload = () => {
-        if (!cancelled) run();
+        if (!cancelled) requestAnimationFrame(run);
       };
       document.head.appendChild(script);
     } else {
-      run();
+      requestAnimationFrame(run);
     }
     return () => {
       cancelled = true;
@@ -377,10 +387,14 @@ export default function PrerollPlayer({ config, onEnded, onSkip }: PrerollPlayer
       )}
 
       {config.type === 'google_display' && config.googleAdClient && config.googleAdSlot && (
-        <div class="w-full h-full min-h-[200px] flex items-center justify-center bg-black/40 overflow-auto">
+        <div
+          ref={adDisplaySlotRef}
+          class="absolute inset-0 w-full h-full flex items-center justify-center bg-black/40 overflow-auto"
+          style={{ width: '100vw', height: '100vh', minHeight: '200px' }}
+        >
           <ins
             class="adsbygoogle"
-            style={{ display: 'block' }}
+            style={{ display: 'block', minWidth: '320px', minHeight: '100px' }}
             data-ad-client={config.googleAdClient}
             data-ad-slot={config.googleAdSlot}
             data-ad-format="auto"

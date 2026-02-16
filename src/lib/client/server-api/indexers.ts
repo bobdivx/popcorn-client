@@ -160,6 +160,15 @@ export const indexersMethods = {
     const dec = new TextDecoder();
     let buf = '';
     let finalData: any = null;
+    function processBlock(block: string): void {
+      const m = block.match(/^data:\s*(.+)$/m);
+      if (!m) return;
+      try {
+        const event = JSON.parse(m[1].trim()) as { type: string; query?: string; index?: number; total?: number; count?: number; success?: boolean; error?: string; message?: string; totalResults?: number; successfulQueries?: number; failedQueries?: number; testQueries?: string[]; sampleResults?: any[]; apiKeyTest?: { valid: boolean; message: string } };
+        if ((event.type === 'query_done' || event.type === 'api_key_test_done') && onProgress) onProgress(event);
+        if (event.type === 'complete') finalData = event;
+      } catch (_) {}
+    }
     try {
       for (;;) {
         const { done, value } = await reader.read();
@@ -167,16 +176,9 @@ export const indexersMethods = {
         buf += dec.decode(value, { stream: true });
         const lines = buf.split('\n\n');
         buf = lines.pop() ?? '';
-        for (const block of lines) {
-          const m = block.match(/^data:\s*(.+)$/m);
-          if (!m) continue;
-          try {
-            const event = JSON.parse(m[1].trim()) as { type: string; query?: string; index?: number; total?: number; count?: number; success?: boolean; error?: string; message?: string; totalResults?: number; successfulQueries?: number; failedQueries?: number; testQueries?: string[]; sampleResults?: any[]; apiKeyTest?: { valid: boolean; message: string } };
-            if ((event.type === 'query_done' || event.type === 'api_key_test_done') && onProgress) onProgress(event);
-            if (event.type === 'complete') finalData = event;
-          } catch (_) {}
-        }
+        for (const block of lines) processBlock(block);
       }
+      if (buf.trim()) processBlock(buf);
     } finally {
       reader.releaseLock();
     }

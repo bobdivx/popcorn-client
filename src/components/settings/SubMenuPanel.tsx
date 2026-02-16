@@ -108,19 +108,19 @@ export default function SubMenuPanel({ items, visibleItems, onParentBack }: SubM
                   href={href}
                   {...externalProps}
                   data-focusable
-                  className="settings-content-item group flex items-center gap-4 px-4 py-3 rounded-xl text-white transition-all duration-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#1a1c20] focus:bg-white/10 min-h-[56px] tv:min-h-[64px]"
+                  className="settings-content-item group flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 rounded-xl text-white transition-all duration-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#1a1c20] focus:bg-white/10 min-h-[52px] sm:min-h-[56px] tv:min-h-[64px] min-w-0"
                   tabIndex={0}
                 >
-                  <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-white/15 transition-colors">
-                    <Icon className="w-5 h-5 text-gray-300 group-hover:text-white" />
+                  <div className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-white/15 transition-colors">
+                    <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-300 group-hover:text-white" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <span className="block font-medium text-white truncate">{item.title ?? t(item.titleKey)}</span>
-                    <span className="block text-sm text-gray-400 truncate mt-0.5">
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <span className="block font-medium text-white truncate text-sm sm:text-base">{item.title ?? t(item.titleKey)}</span>
+                    <span className="block text-xs sm:text-sm text-gray-400 truncate mt-0.5">
                       {item.description ?? t(item.descriptionKey)}
                     </span>
                   </div>
-                  <ArrowRight className="w-5 h-5 text-gray-500 flex-shrink-0 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 flex-shrink-0 group-hover:translate-x-1 transition-transform" />
                 </a>
               </li>
             );
@@ -132,19 +132,19 @@ export default function SubMenuPanel({ items, visibleItems, onParentBack }: SubM
                 type="button"
                 onClick={() => setSelectedId(item.id)}
                 data-focusable
-                className="settings-content-item group flex items-center gap-4 px-4 py-3 rounded-xl text-white w-full text-left transition-all duration-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#1a1c20] focus:bg-white/10 min-h-[56px] tv:min-h-[64px]"
+                className="settings-content-item group flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 rounded-xl text-white w-full text-left transition-all duration-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#1a1c20] focus:bg-white/10 min-h-[52px] sm:min-h-[56px] tv:min-h-[64px] min-w-0"
                 tabIndex={0}
               >
-                <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-white/15 transition-colors">
-                  <Icon className="w-5 h-5 text-gray-300 group-hover:text-white" />
+                <div className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-white/15 transition-colors">
+                  <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-300 group-hover:text-white" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <span className="block font-medium text-white truncate">{item.title ?? t(item.titleKey)}</span>
-                  <span className="block text-sm text-gray-400 truncate mt-0.5">
+                <div className="flex-1 min-w-0 overflow-hidden">
+                  <span className="block font-medium text-white truncate text-sm sm:text-base">{item.title ?? t(item.titleKey)}</span>
+                  <span className="block text-xs sm:text-sm text-gray-400 truncate mt-0.5">
                     {item.description ?? t(item.descriptionKey)}
                   </span>
                 </div>
-                <ArrowRight className="w-5 h-5 text-gray-500 flex-shrink-0 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 flex-shrink-0 group-hover:translate-x-1 transition-transform" />
               </button>
             </li>
           );

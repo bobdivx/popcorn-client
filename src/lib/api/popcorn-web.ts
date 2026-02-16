@@ -927,6 +927,8 @@ export interface UserConfig {
     label?: string | null;
     share_with_friends: boolean;
   }> | null;
+  /** URL pour ouvrir la page FlareSolverr dans le navigateur (synchronisée cloud) */
+  flaresolverrOpenUrl?: string | null;
 }
 
 /**
@@ -1028,6 +1030,7 @@ export async function saveUserConfigMerge(
     ...partial,
     indexers: partial.indexers !== undefined ? partial.indexers : current?.indexers ?? [],
     indexerCategories: partial.indexerCategories !== undefined ? partial.indexerCategories : current?.indexerCategories ?? undefined,
+    flaresolverrOpenUrl: partial.flaresolverrOpenUrl !== undefined ? partial.flaresolverrOpenUrl : current?.flaresolverrOpenUrl ?? undefined,
   };
   return saveUserConfig(merged, accessToken);
 }
@@ -1125,6 +1128,7 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
         playbackSettings: playbackSettings && Object.keys(playbackSettings).length > 0 ? playbackSettings : null,
         mediaPaths: mediaPaths && (mediaPaths.filmsPath != null || mediaPaths.seriesPath != null || mediaPaths.defaultPath != null) ? mediaPaths : null,
         librarySources: librarySources && librarySources.length > 0 ? librarySources : null,
+        flaresolverrOpenUrl: typeof c.flaresolverrOpenUrl === 'string' && c.flaresolverrOpenUrl.trim() !== '' ? c.flaresolverrOpenUrl.trim() : null,
       };
     }
 

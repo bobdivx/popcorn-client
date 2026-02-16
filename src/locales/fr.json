@@ -656,32 +656,32 @@
     "title": "Paramètres",
     "subtitle": "Configurez votre application selon vos préférences",
     "category": {
-      "system": "Système & Configuration",
+      "system": "Système",
       "interface": "Interface",
-      "content": "Indexer et Téléchargement",
+      "content": "Indexers",
       "library": "Bibliothèque",
-      "discovery": "Découverte & Demandes",
-      "account": "Compte & Utilisateurs",
+      "discovery": "Découverte",
+      "account": "Compte",
       "playback": "Lecture",
       "maintenance": "Maintenance"
     },
     "maintenance": {
       "forceCleanup": {
-        "title": "Forcer le nettoyage du cache",
+        "title": "Nettoyage cache",
         "description": "Supprime les répertoires de cache HLS/transcodage inactifs (vidéos non en cours de lecture). Libère de l'espace et arrête les processus ffmpeg orphelins.",
         "action": "Forcer le nettoyage",
         "success": "Nettoyage effectué.",
         "successCount": "Nettoyage effectué. {count} élément(s) supprimé(s)."
       },
       "transcodingConfig": {
-        "title": "Nombre max de transcodages",
+        "title": "Transcodages",
         "description": "Limite le nombre de flux HLS/FFmpeg simultanés. Réduire cette valeur limite la charge CPU. Sur NAS (ex. ZimaCube), mettre 1 est recommandé pour éviter une consommation excessive.",
         "maxLabel": "Transcodages simultanés max",
         "range": "Entre {min} et {max}",
         "saveSuccess": "Paramètre enregistré."
       },
       "resources": {
-        "title": "Ressources utilisées",
+        "title": "Ressources",
         "description": "Mémoire et CPU du serveur, et disponibilité de l'accélération matérielle (GPU) pour FFmpeg.",
         "processMemory": "Mémoire processus",
         "processCpu": "CPU processus",
@@ -707,19 +707,19 @@
       }
     },
     "setup": {
-      "title": "Configuration initiale",
+      "title": "Configuration",
       "description": "Rouvrir l'assistant de configuration pour configurer votre client"
     },
     "uiPreferences": {
-      "title": "Préférences UI",
+      "title": "Préférences",
       "description": "Personnalisez l'interface : thème, langue, affichage"
     },
     "server": {
-      "title": "Configuration du Serveur",
+      "title": "Serveur",
       "description": "Configurez l'URL du serveur Popcorn auquel se connecter"
     },
     "tmdb": {
-      "title": "Configuration TMDB",
+      "title": "TMDB",
       "description": "Clé API TMDB pour enrichir les métadonnées"
     },
     "indexers": {
@@ -733,8 +733,30 @@
     "indexerParams": {
       "description": "Fréquence, auto-sync, mots-clés"
     },
+    "flaresolverr": {
+      "title": "FlareSolverr",
+      "description": "Contourner Cloudflare pour les indexers custom"
+    },
+    "flaresolverrPanel": {
+      "intro": "FlareSolverr permet d'accéder aux indexers dont le site affiche une vérification Cloudflare (« Checking your browser »).",
+      "configureBackend": "L'URL FlareSolverr se configure côté serveur (variable d'environnement FLARESOLVERR_URL, ex. dans Docker/CasaOS).",
+      "perIndexer": "Pour chaque indexer de type « custom » concerné, cochez « Utiliser FlareSolverr » dans le formulaire d'ajout ou d'édition de l'indexer.",
+      "statusConfigured": "FlareSolverr est configuré sur ce serveur.",
+      "statusNotConfigured": "FlareSolverr n'est pas configuré sur ce serveur. Définissez FLARESOLVERR_URL (ex. http://flaresolverr:9191) pour l'activer.",
+      "testConnectivity": "Test de connectivité",
+      "testChecking": "Vérification en cours…",
+      "testOperational": "FlareSolverr est opérationnel et joignable.",
+      "testUnreachable": "FlareSolverr ne répond pas ou n'est pas joignable.",
+      "docLink": "Documentation (CasaOS / Docker)",
+      "openUrlLabel": "URL pour ouvrir la page FlareSolverr",
+      "openUrlPlaceholder": "ex. http://localhost:9191",
+      "save": "Enregistrer",
+      "saveSuccess": "Enregistré.",
+      "saveError": "Erreur lors de l'enregistrement.",
+      "openPage": "Ouvrir la page FlareSolverr"
+    },
     "syncCategories": {
-      "title": "Catégories à synchroniser",
+      "title": "Catégories sync",
       "description": "Films, séries, genres par indexer",
       "selectorDescription": "Sélectionnez les catégories que vous souhaitez synchroniser pour cet indexer"
     },
@@ -743,7 +765,7 @@
       "subtitle": "Gérer les définitions d'indexeurs partagées (pays, langue). Création, modification et suppression selon vos droits."
     },
     "sync": {
-      "title": "Synchronisation Torrents",
+      "title": "Sync torrents",
       "description": "Gérez la synchronisation automatique des torrents depuis les indexers"
     },
     "diagnostics": {
@@ -759,11 +781,11 @@
       "description": "Configuration et surveillance du client torrent intégré"
     },
     "librqbitWeb": {
-      "title": "Interface Web librqbit",
+      "title": "librqbit Web",
       "description": "Ouvrir l'interface web du client torrent dans un nouvel onglet"
     },
     "mediaPaths": {
-      "title": "Dossiers de médias",
+      "title": "Dossiers médias",
       "description": "Définir les dossiers de téléchargement par type (films, séries), comme Jellyfin"
     },
     "mediaPathsPanel": {
@@ -779,7 +801,7 @@
       "noSubfolders": "Aucun sous-dossier."
     },
     "librarySources": {
-      "title": "Dossiers externes (bibliothèque)",
+      "title": "Dossiers externes",
       "description": "Ajouter des dossiers hors du serveur (ex. autre NAS) pour les inclure dans la bibliothèque"
     },
     "librarySourcesPanel": {
@@ -964,12 +986,42 @@
     "errorDeleting": "Erreur lors de la suppression",
     "errorTesting": "Erreur lors du test de connexion",
     "syncStarted": "Synchronisation démarrée. Les résultats apparaîtront dans quelques instants.",
+    "cookieWizard": {
+      "title": "Obtenir le cookie de session",
+      "tabSimple": "Méthode simple (extension)",
+      "tabManual": "Guide pas à pas (F12)",
+      "simpleIntro": "Utilisez une extension navigateur pour copier le cookie (y compris HttpOnly). Cookie-Editor est gratuit et open source.",
+      "simpleStep1": "Installez l'extension Cookie-Editor : Chrome ou Firefox (voir liens ci-dessous).",
+      "simpleStep2": "Ouvrez le site du trackeur dans un onglet et connectez-vous (reCAPTCHA si demandé).",
+      "simpleStep3": "Cliquez sur l'icône Cookie-Editor dans la barre du navigateur. Repérez le cookie de session (souvent nommé comme le site ou « session »), cliquez sur l'icône copier à côté de sa valeur.",
+      "simpleStep4": "Revenez dans Popcorn et collez (Ctrl+V) dans le champ « Cookie (session) », ou utilisez la zone de dépôt ci-dessous.",
+      "extensionName": "Cookie-Editor",
+      "extensionChrome": "Installer pour Chrome",
+      "extensionFirefox": "Installer pour Firefox",
+      "extensionNote": "D'autres extensions (ex. EditThisCookie) fonctionnent aussi. L'important est de pouvoir copier la valeur du cookie de session depuis la page du trackeur connecté.",
+      "manualIntro": "Si vous préférez récupérer le cookie à la main (outils de développement), suivez les étapes ci‑dessous. Des captures d'écran peuvent être ajoutées plus tard.",
+      "manualStep1Title": "Ouvrir le site du trackeur",
+      "manualStep1Text": "Ouvrez l'URL du trackeur (la même que l'URL de base de l'indexer) dans votre navigateur. Connectez-vous avec votre compte si nécessaire (et validez le reCAPTCHA s'il s'affiche).",
+      "manualStep2Title": "Ouvrir les outils de développement",
+      "manualStep2Text": "Appuyez sur F12 (ou clic droit → Inspecter). Allez dans l'onglet « Application » (Chrome/Edge) ou « Stockage » (Firefox), puis « Cookies » et sélectionnez le site du trackeur.",
+      "manualStep3Title": "Copier le cookie",
+      "manualStep3Text": "Repérez le cookie de session (souvent nommé comme le site ou « session »). Clic droit sur la valeur → Copier, ou double-cliquez pour sélectionner et copiez (Ctrl+C). Vous pouvez aussi copier toute la ligne « Cookie » si votre navigateur l'affiche.",
+      "manualStep4Title": "Coller dans Popcorn",
+      "manualStep4Text": "Revenez dans Popcorn, dans le formulaire de l'indexer, et collez (Ctrl+V) dans le champ « Cookie (session) ». Enregistrez. Le cookie expire après un moment ; en cas d'échec plus tard, refaites ces étapes et mettez à jour le champ.",
+      "screenshotPlaceholder": "Capture d'écran à venir"
+    },
     "form": {
       "name": "Nom",
       "baseUrl": "URL de base",
       "apiKey": "Clé API",
       "username": "Nom d'utilisateur",
       "password": "Mot de passe",
+      "cookie": "Cookie (session)",
+      "cookiePlaceholder": "Coller la valeur du cookie de session ici",
+      "cookieDropZone": "Glissez le cookie ici ou collez (Ctrl+V)",
+      "cookiePasteButton": "Coller depuis le presse-papiers",
+      "cookieHelp": "Ce trackeur utilise une connexion par cookie. Pour l'obtenir : (1) Ouvrez le site du trackeur dans votre navigateur et connectez-vous (reCAPTCHA si demandé). (2) Ouvrez les outils de développement (F12) → onglet Application (ou Stockage) → Cookies → sélectionnez le site. (3) Repérez le cookie de session (souvent le nom du site ou « session ») et copiez toute sa valeur. (4) Collez-la ici. Le cookie expire après un certain temps ; en cas d'échec de recherche, reconnectez-vous sur le site et mettez à jour ce champ.",
+      "cookieWizardOpen": "Guide : comment obtenir le cookie",
       "jackettName": "Identifiant de l'indexeur (optionnel)",
       "useFlareSolverr": "Utiliser FlareSolverr (Cloudflare)",
       "useFlareSolverrHelp": "Recommandé si le site affiche une vérification Cloudflare. Le backend doit avoir FLARESOLVERR_URL configuré.",

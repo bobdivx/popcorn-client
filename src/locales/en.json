@@ -656,32 +656,32 @@
     "title": "Settings",
     "subtitle": "Configure your application according to your preferences",
     "category": {
-      "system": "System & Configuration",
+      "system": "System",
       "interface": "Interface",
-      "content": "Indexers & Downloads",
+      "content": "Indexers",
       "library": "Library",
-      "discovery": "Discovery & Requests",
-      "account": "Account & Users",
+      "discovery": "Discovery",
+      "account": "Account",
       "playback": "Playback",
       "maintenance": "Maintenance"
     },
     "maintenance": {
       "forceCleanup": {
-        "title": "Force cache cleanup",
+        "title": "Cache cleanup",
         "description": "Removes inactive HLS/transcoding cache directories (videos not currently playing). Frees space and stops orphaned ffmpeg processes.",
         "action": "Force cleanup",
         "success": "Cleanup completed.",
         "successCount": "Cleanup completed. {count} item(s) removed."
       },
       "transcodingConfig": {
-        "title": "Max concurrent transcodings",
+        "title": "Transcodings",
         "description": "Limits how many HLS/FFmpeg streams can run at once. Lower values reduce CPU load. On NAS (e.g. ZimaCube), setting 1 is recommended to avoid high resource usage.",
         "maxLabel": "Max concurrent transcodings",
         "range": "Between {min} and {max}",
         "saveSuccess": "Setting saved."
       },
       "resources": {
-        "title": "Resource usage",
+        "title": "Resources",
         "description": "Server memory and CPU, and whether hardware acceleration (GPU) is available for FFmpeg.",
         "processMemory": "Process memory",
         "processCpu": "Process CPU",
@@ -707,19 +707,19 @@
       }
     },
     "setup": {
-      "title": "Initial setup",
+      "title": "Setup",
       "description": "Reopen the setup wizard to configure your client"
     },
     "uiPreferences": {
-      "title": "UI Preferences",
+      "title": "Preferences",
       "description": "Customize the interface: theme, language, display"
     },
     "server": {
-      "title": "Server Configuration",
+      "title": "Server",
       "description": "Configure the Popcorn server URL to connect to"
     },
     "tmdb": {
-      "title": "TMDB Configuration",
+      "title": "TMDB",
       "description": "TMDB API key for metadata enrichment"
     },
     "indexers": {
@@ -733,8 +733,30 @@
     "indexerParams": {
       "description": "Frequency, auto-sync, keywords"
     },
+    "flaresolverr": {
+      "title": "FlareSolverr",
+      "description": "Bypass Cloudflare for custom indexers"
+    },
+    "flaresolverrPanel": {
+      "intro": "FlareSolverr lets you access indexers whose site shows a Cloudflare challenge (« Checking your browser »).",
+      "configureBackend": "The FlareSolverr URL is set on the server (FLARESOLVERR_URL environment variable, e.g. in Docker/CasaOS).",
+      "perIndexer": "For each affected « custom » indexer, check « Use FlareSolverr » in the indexer add/edit form.",
+      "statusConfigured": "FlareSolverr is configured on this server.",
+      "statusNotConfigured": "FlareSolverr is not configured on this server. Set FLARESOLVERR_URL (e.g. http://flaresolverr:9191) to enable it.",
+      "testConnectivity": "Connectivity test",
+      "testChecking": "Checking…",
+      "testOperational": "FlareSolverr is operational and reachable.",
+      "testUnreachable": "FlareSolverr is not responding or unreachable.",
+      "docLink": "Documentation (CasaOS / Docker)",
+      "openUrlLabel": "URL to open FlareSolverr page",
+      "openUrlPlaceholder": "e.g. http://localhost:9191",
+      "save": "Save",
+      "saveSuccess": "Saved.",
+      "saveError": "Error saving.",
+      "openPage": "Open FlareSolverr page"
+    },
     "syncCategories": {
-      "title": "Categories to sync",
+      "title": "Sync categories",
       "description": "Films, series, genres per indexer",
       "selectorDescription": "Select the categories you want to sync for this indexer"
     },
@@ -743,7 +765,7 @@
       "subtitle": "Manage shared indexer definitions (country, language). Create, edit and delete according to your permissions."
     },
     "sync": {
-      "title": "Torrent Synchronization",
+      "title": "Torrent sync",
       "description": "Manage automatic torrent synchronization from indexers"
     },
     "diagnostics": {
@@ -759,12 +781,12 @@
       "description": "Configure and monitor the integrated torrent client"
     },
     "librqbitWeb": {
-      "title": "librqbit Web interface",
+      "title": "librqbit Web",
       "description": "Open the torrent client web interface in a new tab"
     },
     "mediaPaths": {
       "title": "Media folders",
-      "description": "Set download folders by type (movies, series), like Jellyfin"
+      "description": "Set download folders by type (movies, series)"
     },
     "mediaPathsPanel": {
       "intro": "Choose the folder where downloads are saved for each type. Paths are relative to the server root.",
@@ -779,7 +801,7 @@
       "noSubfolders": "No subfolders."
     },
     "librarySources": {
-      "title": "External folders (library)",
+      "title": "External folders",
       "description": "Add folders outside the server (e.g. another NAS) to include in the library"
     },
     "librarySourcesPanel": {
@@ -964,12 +986,42 @@
     "errorDeleting": "Error deleting",
     "errorTesting": "Error testing connection",
     "syncStarted": "Synchronization started. Results will appear shortly.",
+    "cookieWizard": {
+      "title": "Get session cookie",
+      "tabSimple": "Simple method (extension)",
+      "tabManual": "Step-by-step (F12)",
+      "simpleIntro": "Use a browser extension to copy the cookie (including HttpOnly). Cookie-Editor is free and open source.",
+      "simpleStep1": "Install the Cookie-Editor extension: Chrome or Firefox (see links below).",
+      "simpleStep2": "Open the tracker site in a tab and log in (complete reCAPTCHA if shown).",
+      "simpleStep3": "Click the Cookie-Editor icon in the browser bar. Find the session cookie (often named after the site or \"session\"), click the copy icon next to its value.",
+      "simpleStep4": "Return to Popcorn and paste (Ctrl+V) into the \"Cookie (session)\" field, or use the drop zone below.",
+      "extensionName": "Cookie-Editor",
+      "extensionChrome": "Install for Chrome",
+      "extensionFirefox": "Install for Firefox",
+      "extensionNote": "Other extensions (e.g. EditThisCookie) work too. The key is being able to copy the session cookie value from the logged-in tracker page.",
+      "manualIntro": "If you prefer to get the cookie manually (Developer Tools), follow the steps below. Screenshots can be added later.",
+      "manualStep1Title": "Open the tracker site",
+      "manualStep1Text": "Open the tracker URL (same as the indexer base URL) in your browser. Log in with your account if needed (and complete reCAPTCHA if it appears).",
+      "manualStep2Title": "Open Developer Tools",
+      "manualStep2Text": "Press F12 (or right-click → Inspect). Go to the Application tab (Chrome/Edge) or Storage (Firefox), then Cookies and select the tracker site.",
+      "manualStep3Title": "Copy the cookie",
+      "manualStep3Text": "Find the session cookie (often named after the site or \"session\"). Right-click the value → Copy, or double-click to select and copy (Ctrl+C). You can also copy the full Cookie line if your browser shows it.",
+      "manualStep4Title": "Paste in Popcorn",
+      "manualStep4Text": "Return to Popcorn, in the indexer form, and paste (Ctrl+V) into the \"Cookie (session)\" field. Save. The cookie expires after a while; if search fails later, repeat these steps and update the field.",
+      "screenshotPlaceholder": "Screenshot to be added"
+    },
     "form": {
       "name": "Name",
       "baseUrl": "Base URL",
       "apiKey": "API Key",
       "username": "Username",
       "password": "Password",
+      "cookie": "Cookie (session)",
+      "cookiePlaceholder": "Paste the session cookie value here",
+      "cookieDropZone": "Drop cookie here or paste (Ctrl+V)",
+      "cookiePasteButton": "Paste from clipboard",
+      "cookieHelp": "This indexer uses cookie-based login. To get it: (1) Open the indexer site in your browser and log in (complete reCAPTCHA if shown). (2) Open Developer Tools (F12) → Application (or Storage) tab → Cookies → select the site. (3) Find the session cookie (often the site name or \"session\") and copy its full value. (4) Paste it here. The cookie expires after a while; if search starts failing, log in again on the site and update this field.",
+      "cookieWizardOpen": "Guide: how to get the cookie",
       "jackettName": "Indexer ID (optional)",
       "useFlareSolverr": "Use FlareSolverr (Cloudflare)",
       "useFlareSolverrHelp": "Recommended if the site shows a Cloudflare challenge. Backend must have FLARESOLVERR_URL configured.",

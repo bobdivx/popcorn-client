@@ -15,6 +15,8 @@ function getStoredUseJackett(): boolean {
   try { return localStorage.getItem(STORAGE_KEY_USE_JACKETT) === 'true'; } catch { return false; }
 }
 import { IndexerDefinitionDocsModal } from '../../indexers/IndexerDefinitionDocsModal';
+import { CookieWizardModal } from '../../settings/CookieWizardModal';
+import { normalizeCookieInput } from '../../../lib/utils/cookie-format';
 
 interface IndexersStepProps {
   setupStatus: SetupStatus | null;
@@ -59,6 +61,7 @@ export function IndexersStep({
   const [selectedDefinition, setSelectedDefinition] = useState<IndexerDefinition | null>(null);
   const [hasCloudToken, setHasCloudToken] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
+  const [showCookieWizard, setShowCookieWizard] = useState(false);
   const [definitionSearchQuery, setDefinitionSearchQuery] = useState('');
   const [definitionFilterLanguage, setDefinitionFilterLanguage] = useState('');
   const [definitionFilterCountry, setDefinitionFilterCountry] = useState('');
@@ -399,6 +402,7 @@ export function IndexersStep({
 
   return (
     <div className="space-y-6">
+      <CookieWizardModal isOpen={showCookieWizard} onClose={() => setShowCookieWizard(false)} />
       <IndexerDefinitionDocsModal isOpen={showDocs} onClose={() => setShowDocs(false)} />
       <h3 className="text-2xl font-bold text-white">Configuration des indexers</h3>
       
@@ -751,11 +755,71 @@ export function IndexersStep({
                 </div>
               );
             }
-            const isPassword = (field.type || '').toLowerCase() === 'password';
+            const isPassword = name !== 'cookie' && (field.type || '').toLowerCase() === 'password';
             return (
               <div key={name} className="space-y-2">
-                <label className="block text-sm font-semibold text-white">{fieldLabel(field)}{field.required && <span className="text-red-400 ml-1">*</span>}</label>
-                <input type={isPassword ? 'password' : 'text'} className={inputClass} value={formData.extraConfig?.[name] ?? ''} onInput={(e) => setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), [name]: (e.target as HTMLInputElement).value } })} required={!!field.required} placeholder={field.placeholder} />
+                <div className="flex items-center justify-between gap-2">
+                  <label className="block text-sm font-semibold text-white">{fieldLabel(field)}{field.required && <span className="text-red-400 ml-1">*</span>}</label>
+                  {name === 'cookie' && (
+                    <button
+                      type="button"
+                      className="text-sm font-medium px-3 py-1.5 rounded border border-primary-500/50 text-primary-400 hover:text-primary-300 hover:bg-primary-500/10"
+                      onClick={() => setShowCookieWizard(true)}
+                    >
+                      {t('indexersManager.form.cookieWizardOpen')}
+                    </button>
+                  )}
+                </div>
+                <input
+                  type={isPassword ? 'password' : 'text'}
+                  className={inputClass}
+                  value={formData.extraConfig?.[name] ?? ''}
+                  onInput={(e) => {
+                    const v = (e.target as HTMLInputElement).value;
+                    const final = name === 'cookie' ? normalizeCookieInput(v) : v;
+                    setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), [name]: final } });
+                  }}
+                  required={!!field.required}
+                  placeholder={field.placeholder || (name === 'cookie' ? t('indexersManager.form.cookiePlaceholder') : '')}
+                />
+                {name === 'cookie' && (
+                  <>
+                    <div
+                      className="mt-2 rounded-lg border-2 border-dashed border-gray-600 bg-gray-800/50 p-4 text-center text-sm text-gray-400 hover:border-primary-500/50 hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                      tabIndex={0}
+                      role="button"
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); (e.currentTarget as HTMLElement).classList.add('!border-primary-500', '!bg-primary-500/10'); }}
+                      onDragLeave={(e) => { (e.currentTarget as HTMLElement).classList.remove('!border-primary-500', '!bg-primary-500/10'); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const el = e.currentTarget as HTMLElement;
+                        el.classList.remove('!border-primary-500', '!bg-primary-500/10');
+                        const text = e.dataTransfer?.getData?.('text/plain')?.trim();
+                        if (text) setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), cookie: normalizeCookieInput(text) } });
+                      }}
+                      onPaste={(e) => {
+                        const text = e.clipboardData?.getData?.('text/plain')?.trim();
+                        if (text) { e.preventDefault(); setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), cookie: normalizeCookieInput(text) } }); }
+                      }}
+                    >
+                      {t('indexersManager.form.cookieDropZone')}
+                    </div>
+                    <button
+                      type="button"
+                      className="mt-2 text-sm px-3 py-1.5 rounded border border-primary-500/50 text-primary-400 hover:bg-primary-500/10"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          if (text?.trim()) setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), cookie: normalizeCookieInput(text.trim()) } });
+                        } catch (_) {}
+                      }}
+                    >
+                      {t('indexersManager.form.cookiePasteButton')}
+                    </button>
+                    <p className="text-sm text-gray-400">{t('indexersManager.form.cookieHelp')}</p>
+                  </>
+                )}
               </div>
             );
           }) : (
