@@ -1098,8 +1098,20 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
 
           <div className="max-w-4xl">
             <div className="mb-4 sm:mb-6">
+              {torrent.logoUrl && (
+                <img
+                  src={torrent.logoUrl}
+                  alt=""
+                  className="max-h-14 sm:max-h-16 md:max-h-20 lg:max-h-24 xl:max-h-28 w-auto object-contain object-left mb-3 sm:mb-4 drop-shadow-2xl"
+                  style={{ maxWidth: 'min(24rem, 85vw)' }}
+                />
+              )}
               <div className="flex items-baseline gap-4 flex-wrap">
-                <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight">
+                <h1 className={`font-bold leading-tight ${
+                  torrent.logoUrl
+                    ? 'text-lg sm:text-xl md:text-2xl lg:text-3xl text-white/90'
+                    : 'text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl text-white'
+                }`}>
                   {torrent.mainTitle || torrent.cleanTitle || torrent.name}
                 </h1>
                 {torrent.releaseDate && (

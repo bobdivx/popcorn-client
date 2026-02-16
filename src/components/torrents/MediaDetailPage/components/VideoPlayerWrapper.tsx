@@ -250,7 +250,8 @@ export function VideoPlayerWrapper({
     const hasMedia =
       (adsConfig.type === 'image' && !!adsConfig.imageUrl) ||
       (adsConfig.type === 'video' && !!adsConfig.videoUrl) ||
-      (adsConfig.type === 'google' && !!adsConfig.googleAdTagUrl);
+      (adsConfig.type === 'google' && !!adsConfig.googleAdTagUrl) ||
+      (adsConfig.type === 'google_display' && !!adsConfig.googleAdClient && !!adsConfig.googleAdSlot);
 
     if (!adsConfig.enabled || !hasMedia) return;
 

@@ -532,6 +532,8 @@ export interface IndexerDefinition {
   caps?: Record<string, unknown> | null;
   /** Configuration optionnelle pour un flux RSS personnalisé */
   rssConfig?: { urlTemplate: string; params?: string[]; format?: string } | null;
+  /** True si cette définition est un proxy Jackett (nécessite Jackett installé ; option "Utiliser Jackett") */
+  isJackettProxy?: boolean;
 }
 
 /**
@@ -540,11 +542,13 @@ export interface IndexerDefinition {
 export interface AdsConfig {
   enabled: boolean;
   adId?: string | null;
-  type: 'image' | 'video' | 'google';
+  type: 'image' | 'video' | 'google' | 'google_display';
   imageUrl: string | null;
   videoUrl: string | null;
   clickUrl: string | null;
   googleAdTagUrl: string | null;
+  googleAdClient: string | null;
+  googleAdSlot: string | null;
   showSkip: boolean;
   skipDelaySeconds: number;
   maxDurationSeconds: number;

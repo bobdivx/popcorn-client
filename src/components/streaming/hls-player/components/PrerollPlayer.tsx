@@ -211,11 +211,45 @@ export default function PrerollPlayer({ config, onEnded, onSkip }: PrerollPlayer
   };
 
   const handleClick = () => {
-    if (config.type === 'google') return;
+    if (config.type === 'google' || config.type === 'google_display') return;
     if (clickUrl) {
       window.open(clickUrl.toString(), '_blank', 'noopener,noreferrer');
     }
   };
+
+  // AdSense display (google_display): load script and fill slot
+  useEffect(() => {
+    if (config.type !== 'google_display' || !config.googleAdClient || !config.googleAdSlot) return;
+    const client = config.googleAdClient;
+    const slot = config.googleAdSlot;
+
+    let cancelled = false;
+    const run = () => {
+      if (cancelled) return;
+      const w = window as any;
+      w.adsbygoogle = w.adsbygoogle || [];
+      w.adsbygoogle.push({});
+    };
+
+    const scriptId = 'adsbygoogle-script';
+    let script = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (!script) {
+      script = document.createElement('script');
+      script.id = scriptId;
+      script.async = true;
+      script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(client)}`;
+      script.crossOrigin = 'anonymous';
+      script.onload = () => {
+        if (!cancelled) run();
+      };
+      document.head.appendChild(script);
+    } else {
+      run();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [config.type, config.googleAdClient, config.googleAdSlot]);
 
   const renderSkip = () => {
     if (!showSkip) return null;
@@ -339,6 +373,19 @@ export default function PrerollPlayer({ config, onEnded, onSkip }: PrerollPlayer
               {t('ads.unavailable')}
             </div>
           )}
+        </div>
+      )}
+
+      {config.type === 'google_display' && config.googleAdClient && config.googleAdSlot && (
+        <div class="w-full h-full min-h-[200px] flex items-center justify-center bg-black/40 overflow-auto">
+          <ins
+            class="adsbygoogle"
+            style={{ display: 'block' }}
+            data-ad-client={config.googleAdClient}
+            data-ad-slot={config.googleAdSlot}
+            data-ad-format="auto"
+            data-full-width-responsive="true"
+          />
         </div>
       )}
     </div>

@@ -524,7 +524,9 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
       const response = await serverApi.startSync();
       
       if (response.success) {
-        // Notification native de démarrage
+        const msg = (response.data && typeof response.data === 'string' ? response.data : null) || t('torrentSyncManager.syncStarted');
+        setSuccess(msg);
+        setTimeout(() => setSuccess(''), 5000);
         await notifySyncStart();
         setPreviousStats({});
         setTimeout(() => {

@@ -12,7 +12,9 @@ interface IndexerCardProps {
   onEdit?: () => void;
   onDelete?: () => void;
   onTest?: () => void;
+  onSync?: () => void;
   isTesting?: boolean;
+  isSyncing?: boolean;
   testProgress?: { index: number; total: number; lastQuery?: string; lastCount?: number; lastSuccess?: boolean };
   testResult?: { 
     success: boolean; 
@@ -58,7 +60,9 @@ export function IndexerCard({
   onEdit,
   onDelete,
   onTest,
+  onSync,
   isTesting = false,
+  isSyncing = false,
   testProgress,
   testResult,
   children,
@@ -431,8 +435,25 @@ export function IndexerCard({
         </div>
       )}
 
-      {(onEdit || onDelete || onTest) && (
+      {(onEdit || onDelete || onTest || onSync) && (
         <div class="flex flex-wrap gap-4 sm:gap-5 mt-8">
+          {onSync && isEnabled && (
+            <button
+              type="button"
+              class="bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 sm:py-5 sm:px-8 md:py-5 md:px-10 rounded-lg text-lg sm:text-xl md:text-2xl transition-all duration-200 min-h-[56px] sm:min-h-[64px] md:min-h-[72px] focus:outline-none focus:ring-4 focus:ring-green-500 focus:ring-offset-2 focus:ring-offset-gray-900 flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={onSync}
+              disabled={isSyncing}
+            >
+              {isSyncing ? (
+                <>
+                  <span class="loading loading-spinner loading-sm"></span>
+                  {t('indexerCard.syncing')}
+                </>
+              ) : (
+                `🔄 ${t('indexerCard.syncButton')}`
+              )}
+            </button>
+          )}
           {onTest && (
             <button
               class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 px-6 sm:py-5 sm:px-8 md:py-5 md:px-10 rounded-lg text-lg sm:text-xl md:text-2xl transition-all duration-200 min-h-[56px] sm:min-h-[64px] md:min-h-[72px] focus:outline-none focus:ring-4 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-900 flex-1 disabled:opacity-50 disabled:cursor-not-allowed"

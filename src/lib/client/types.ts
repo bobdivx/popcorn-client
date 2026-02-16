@@ -38,6 +38,10 @@ export interface IndexerFormData {
   priority: number;
   indexerTypeId?: string | null;
   configJson?: string | null;
+  /** Champs supplémentaires (username, password, etc.) issus de la définition ui.fields, sérialisés dans configJson à la sauvegarde */
+  extraConfig?: Record<string, string>;
+  /** Pour indexers custom : utiliser FlareSolverr pour contourner Cloudflare (sérialisé dans configJson) */
+  useFlareSolverr?: boolean;
 }
 
 export interface Indexer {
@@ -90,6 +94,7 @@ export interface ContentItem {
   type: 'movie' | 'tv';
   poster?: string;
   backdrop?: string;
+  logo?: string;
   year?: number;
   overview?: string;
   rating?: number;

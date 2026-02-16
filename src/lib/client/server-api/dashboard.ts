@@ -41,6 +41,7 @@ function toContentItem(raw: any): ContentItem {
   const title = raw?.cleanTitle || raw?.clean_title || raw?.name || '';
   const poster = raw?.imageUrl || raw?.image_url || raw?.poster_url || undefined;
   const backdrop = raw?.heroImageUrl || raw?.hero_image_url || undefined;
+  const logo = raw?.logoUrl || raw?.logo_url || undefined;
   const overview = raw?.synopsis || raw?.overview || undefined;
   const rating = typeof raw?.voteAverage === 'number' ? raw.voteAverage : raw?.vote_average;
   const releaseDate = raw?.releaseDate || raw?.release_date || undefined;
@@ -75,6 +76,7 @@ function toContentItem(raw: any): ContentItem {
     type,
     poster,
     backdrop,
+    logo,
     overview,
     rating: typeof rating === 'number' ? rating : undefined,
     releaseDate,
@@ -373,6 +375,7 @@ export const dashboardMethods = {
           type: 'movie',
           poster: raw?.imageUrl || raw?.image_url || raw?.poster_url || raw?.poster || undefined,
           backdrop: raw?.heroImageUrl || raw?.hero_image_url || raw?.backdrop || undefined,
+          logo: raw?.logoUrl || raw?.logo_url || undefined,
           overview: raw?.synopsis || raw?.overview || undefined,
           rating: typeof raw?.voteAverage === 'number' ? raw.voteAverage : raw?.vote_average,
           releaseDate: raw?.releaseDate || raw?.release_date || undefined,
@@ -452,6 +455,7 @@ export const dashboardMethods = {
           type: 'tv',
           poster: raw?.imageUrl || raw?.image_url || raw?.poster_url || raw?.poster || undefined,
           backdrop: raw?.heroImageUrl || raw?.hero_image_url || raw?.backdrop || undefined,
+          logo: raw?.logoUrl || raw?.logo_url || undefined,
           overview: raw?.synopsis || raw?.overview || undefined,
           rating: typeof raw?.voteAverage === 'number' ? raw.voteAverage : raw?.vote_average,
           firstAirDate: raw?.releaseDate || raw?.release_date || undefined,
@@ -508,6 +512,7 @@ export const dashboardMethods = {
           type: 'movie',
           poster: raw?.imageUrl || raw?.image_url || raw?.poster_url || raw?.poster || undefined,
           backdrop: raw?.heroImageUrl || raw?.hero_image_url || raw?.backdrop || undefined,
+          logo: raw?.logoUrl || raw?.logo_url || undefined,
           overview: raw?.synopsis || raw?.overview || undefined,
           rating: typeof raw?.voteAverage === 'number' ? raw.voteAverage : raw?.vote_average,
           releaseDate: raw?.releaseDate || raw?.release_date || undefined,
@@ -579,6 +584,7 @@ export const dashboardMethods = {
           type: 'tv',
           poster: raw?.imageUrl || raw?.image_url || raw?.poster_url || raw?.poster || undefined,
           backdrop: raw?.heroImageUrl || raw?.hero_image_url || raw?.backdrop || undefined,
+          logo: raw?.logoUrl || raw?.logo_url || undefined,
           overview: raw?.synopsis || raw?.overview || undefined,
           rating: typeof raw?.voteAverage === 'number' ? raw.voteAverage : raw?.vote_average,
           firstAirDate: raw?.releaseDate || raw?.release_date || undefined,

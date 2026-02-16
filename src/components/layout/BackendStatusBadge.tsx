@@ -73,10 +73,10 @@ export default function BackendStatusBadge({
     }
   };
 
+  // Ne pas mettre [status] en dépendance : checkHealth() fait setStatus(), ce qui relancerait l'effet en boucle.
   useEffect(() => {
     checkHealth();
     const interval = setInterval(() => {
-      // Déléguer le travail à la prochaine tâche pour éviter [Violation] 'setInterval' handler took Xms
       setTimeout(checkHealth, 0);
     }, 20_000);
     return () => clearInterval(interval);

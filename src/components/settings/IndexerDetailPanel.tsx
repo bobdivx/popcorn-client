@@ -25,6 +25,7 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
   const [testRunning, setTestRunning] = useState(false);
   const [testFinalResult, setTestFinalResult] = useState<any>(null);
   const [testErrorMessage, setTestErrorMessage] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
 
   const handleEdit = () => setShowEdit(true);
   const handleEditClose = () => {
@@ -116,6 +117,15 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
     setTestErrorMessage(null);
   };
 
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      await serverApi.startSync(indexer.id);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   if (showEdit) {
     return (
       <IndexersManager
@@ -137,7 +147,9 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
         onEdit={handleEdit}
         onDelete={handleDelete}
         onTest={handleTest}
+        onSync={handleSync}
         isTesting={testing}
+        isSyncing={syncing}
         testProgress={testProgress}
         testResult={testResult}
       />
