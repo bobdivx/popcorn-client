@@ -61,6 +61,10 @@ interface VideoPlayerWrapperProps {
   synopsis?: string | null;
   /** Année de sortie (badge overlay pause). */
   releaseDate?: string | null;
+  /** Utiliser la route /api/stream-torrent (option payante) avec token. */
+  useStreamTorrentMode?: boolean;
+  /** Token cloud pour stream-torrent (?access_token=). */
+  streamingTorrentToken?: string | null;
 }
 
 export function VideoPlayerWrapper({ 
@@ -84,6 +88,8 @@ export function VideoPlayerWrapper({
   logoUrl,
   synopsis,
   releaseDate,
+  useStreamTorrentMode = false,
+  streamingTorrentToken,
 }: VideoPlayerWrapperProps) {
   const baseUrl = serverApi.getServerUrl();
   const [forceHlsFallback, setForceHlsFallback] = useState(false);
@@ -92,6 +98,9 @@ export function VideoPlayerWrapper({
   const [adsConfig, setAdsConfig] = useState<AdsConfig | null>(null);
   /** Message d’overlay pendant le chargement HLS (ex. « Préparation en cours » pendant retries 503) */
   const [hlsLoadingMessage, setHlsLoadingMessage] = useState<string | null>(null);
+  /** En mode stream-torrent : nombre de tentatives du lecteur direct (remount pour réessayer après 503). */
+  const [directStreamRetryCount, setDirectStreamRetryCount] = useState(0);
+  const directStreamRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hlsPreloadRef = useRef<any>(null);
   const preloadVideoRef = useRef<HTMLVideoElement | null>(null);
   const { hlsLoaded } = useHlsLoader();
@@ -125,6 +134,8 @@ export function VideoPlayerWrapper({
     isLucieMode: useLucieForThisSource,
     streamBackendUrl,
     maxHeight: streamQuality,
+    streamingTorrentMode: useStreamTorrentMode,
+    streamingTorrentToken: streamingTorrentToken ?? undefined,
   });
   
   const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';
@@ -149,9 +160,11 @@ export function VideoPlayerWrapper({
     }
   }, [visible]);
 
-  // Arrêter le buffer lors du démontage du composant
+  // Arrêter le buffer et annuler le retry stream-torrent lors du démontage du composant
   useEffect(() => {
     return () => {
+      directStreamRetryTimeoutRef.current && clearTimeout(directStreamRetryTimeoutRef.current);
+      directStreamRetryTimeoutRef.current = null;
       if (stopBufferRef.current) {
         try {
           stopBufferRef.current();
@@ -163,9 +176,10 @@ export function VideoPlayerWrapper({
   }, []);
 
   useEffect(() => {
-    // Réinitialiser le fallback et la qualité quand on change de média/session de lecture.
+    // Réinitialiser le fallback, la qualité et les retries stream-torrent quand on change de média/session de lecture.
     setForceHlsFallback(false);
     setStreamQuality(null);
+    setDirectStreamRetryCount(0);
   }, [infoHash, selectedFile?.path, directStreamUrl, visible]);
 
   useEffect(() => {
@@ -250,7 +264,8 @@ export function VideoPlayerWrapper({
     const hasMedia =
       (adsConfig.type === 'image' && !!adsConfig.imageUrl) ||
       (adsConfig.type === 'video' && !!adsConfig.videoUrl) ||
-      (adsConfig.type === 'google' && !!adsConfig.googleAdTagUrl);
+      (adsConfig.type === 'google' && !!adsConfig.googleAdTagUrl) ||
+      (adsConfig.type === 'google_display' && !!adsConfig.googleAdClient && !!adsConfig.googleAdSlot);
 
     if (!adsConfig.enabled || !hasMedia) return;
 
@@ -392,8 +407,9 @@ export function VideoPlayerWrapper({
           }}
         >
           <UnifiedPlayer
+            key={useStreamTorrentMode ? `stream-torrent-${directStreamRetryCount}` : undefined}
             src={streamUrl}
-            useDirectPlayer={Boolean(directStreamUrl || effectiveDirectMode)}
+            useDirectPlayer={Boolean(directStreamUrl || effectiveDirectMode || useStreamTorrentMode)}
             useLuciePlayer={useLucieForThisSource && !directStreamUrl && !effectiveDirectMode}
             loading={isLoading}
             loadingMessage={hlsLoadingMessage ?? t('playback.loadingVideo')}
@@ -405,6 +421,23 @@ export function VideoPlayerWrapper({
             onDirectLoadedData={() => setIsLoading(false)}
             onDirectError={(e) => {
               console.error('[VideoPlayerWrapper] Direct video error:', e);
+              if (useStreamTorrentMode) {
+                const maxRetries = 3;
+                if (directStreamRetryCount < maxRetries - 1) {
+                  directStreamRetryTimeoutRef.current && clearTimeout(directStreamRetryTimeoutRef.current);
+                  setHlsLoadingMessage(t('playback.streamPreparingRetry') ?? 'Préparation du flux, nouvelle tentative…');
+                  setIsLoading(true);
+                  directStreamRetryTimeoutRef.current = window.setTimeout(() => {
+                    directStreamRetryTimeoutRef.current = null;
+                    setDirectStreamRetryCount((c) => c + 1);
+                    setHlsLoadingMessage(null);
+                  }, 5000);
+                  return;
+                }
+                setHlsLoadingMessage(null);
+                setIsLoading(false);
+                return;
+              }
               if (!directStreamUrl && isDirectMode && !forceHlsFallback) {
                 console.warn('[VideoPlayerWrapper] Fallback automatique vers HLS après échec du mode direct.');
                 emitPlaybackStep('fallback_direct_to_hls', { message: 'Direct stream failed' });
@@ -447,6 +480,7 @@ export function VideoPlayerWrapper({
               maxHeight: streamQuality,
               streamQuality,
               onQualityChange: setStreamQuality,
+              useStreamTorrentUrl: useStreamTorrentMode,
             }}
             lucieProps={{
               infoHash,

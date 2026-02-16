@@ -18,6 +18,8 @@ export interface FilterSortOptions {
   filterCountry?: string;
   /** Langue du site pour prioriser l'ordre : indexeurs dans cette langue en premier */
   userLocale?: SupportedLanguage;
+  /** Si false (défaut), exclut les définitions "proxy Jackett" (isJackettProxy). Si true, affiche aussi les indexeurs Jackett. */
+  useJackett?: boolean;
 }
 
 /**
@@ -64,6 +66,7 @@ export function filterAndSortIndexerDefinitions(
     filterLanguage = '',
     filterCountry = '',
     userLocale = 'en',
+    useJackett = false,
   } = options;
 
   const search = searchQuery.trim().toLowerCase();
@@ -71,6 +74,10 @@ export function filterAndSortIndexerDefinitions(
   const filterCtry = filterCountry.trim().toUpperCase();
 
   let result = definitions;
+
+  if (!useJackett) {
+    result = result.filter((def) => !def.isJackettProxy);
+  }
 
   if (search) {
     result = result.filter((def) => {

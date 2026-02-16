@@ -17,6 +17,9 @@ interface UseStreamSourceInput {
   streamBackendUrl?: string | null;
   /** Qualité stream HLS : hauteur max en pixels (720, 480, 360). null = source. */
   maxHeight?: number | null;
+  /** Mode streaming torrent (option payante) + token pour /api/stream-torrent. */
+  streamingTorrentMode?: boolean;
+  streamingTorrentToken?: string | null;
 }
 
 export function useStreamSource({
@@ -28,6 +31,8 @@ export function useStreamSource({
   isLucieMode = false,
   streamBackendUrl,
   maxHeight,
+  streamingTorrentMode = false,
+  streamingTorrentToken,
 }: UseStreamSourceInput) {
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [hlsFilePath, setHlsFilePath] = useState<string | null>(null);
@@ -63,10 +68,13 @@ export function useStreamSource({
           infoHash,
           filePath,
           fileName: selectedFile.name,
-          isDirectMode,
+          fileIndex: selectedFile.index,
+          isDirectMode: streamingTorrentMode ? true : isDirectMode,
           isLucieMode,
           streamBackendUrl,
           maxHeight: maxHeight ?? undefined,
+          streamingTorrentMode,
+          streamingTorrentToken,
         });
 
         const mode = isLucieMode ? 'lucie' : (isDirectMode ? 'direct' : 'hls');
@@ -89,8 +97,9 @@ export function useStreamSource({
         });
 
         setStreamUrl(streamUrl);
-        setHlsFilePath((isDirectMode || isLucieMode) ? 'direct' : normalizedPath);
-        setIsLoading(false);
+        setHlsFilePath((isDirectMode || isLucieMode || streamingTorrentMode) ? 'direct' : normalizedPath);
+        // En mode direct / stream-torrent, garder loading true jusqu'à onLoadedData du lecteur (retour visuel chargement).
+        if (!isDirectMode && !isLucieMode && !streamingTorrentMode) setIsLoading(false);
         const sourceType = infoHash?.startsWith('local_') ? 'local_' : (directStreamUrl ? 'direct_demo' : 'torrent');
         const playbackMode = isLucieMode ? 'lucie' : (isDirectMode ? 'direct' : 'hls');
         emitPlaybackStep('source_selected', { sourceType, mode: playbackMode });
@@ -114,7 +123,7 @@ export function useStreamSource({
     };
 
     loadStreamUrl();
-  }, [selectedFile, infoHash, directStreamUrl, baseUrl, isDirectMode, isLucieMode, streamBackendUrl, maxHeight]);
+  }, [selectedFile, infoHash, directStreamUrl, baseUrl, isDirectMode, isLucieMode, streamBackendUrl, maxHeight, streamingTorrentMode, streamingTorrentToken]);
 
   return {
     streamUrl,

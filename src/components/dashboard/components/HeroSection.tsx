@@ -233,6 +233,15 @@ export function HeroSection({
       {/* Contenu (key pour transition à chaque slide) */}
       <div key={`content-${currentIndex}`} className="relative z-10 h-full flex flex-col justify-end px-4 sm:px-6 lg:px-16 tv:px-24 pb-16 tv:pb-20 hero-slide-enter">
         <div className="max-w-2xl tv:max-w-3xl">
+          {/* Logo du média (style Netflix) — prioritaire quand disponible */}
+          {currentItem.logo && (
+            <img
+              src={currentItem.logo}
+              alt=""
+              className="max-h-12 sm:max-h-14 md:max-h-16 lg:max-h-20 tv:max-h-24 w-auto object-contain object-left mb-4 tv:mb-6 drop-shadow-2xl"
+              style={{ maxWidth: 'min(20rem, 75vw)' }}
+            />
+          )}
           {/* Badge catégorie */}
           <div className="mb-4 tv:mb-6">
             <span className="inline-flex items-center gap-2 tv:gap-3 text-white">
@@ -245,8 +254,12 @@ export function HeroSection({
             </span>
           </div>
 
-          {/* Titre */}
-          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl tv:text-8xl font-bold text-white mb-4 tv:mb-6 drop-shadow-2xl">
+          {/* Titre — plus discret quand le logo est affiché */}
+          <h1 className={`font-bold mb-4 tv:mb-6 drop-shadow-2xl ${
+            currentItem.logo
+              ? 'text-xl sm:text-2xl md:text-3xl lg:text-4xl tv:text-5xl text-white/90'
+              : 'text-4xl sm:text-5xl md:text-6xl lg:text-7xl tv:text-8xl text-white'
+          }`}>
             {currentItem.title}
           </h1>
 

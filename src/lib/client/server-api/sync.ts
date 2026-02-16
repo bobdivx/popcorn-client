@@ -15,12 +15,14 @@ export const syncMethods = {
     if (!userId) return { success: false, error: 'Unauthorized', message: 'Connecte-toi avant la sync.' };
     return this.backendRequest(`/api/sync/status?user_id=${encodeURIComponent(userId)}`, { method: 'GET' });
   },
-  async startSync(this: ServerApiClientSyncAccess): Promise<ApiResponse<void>> {
+  async startSync(this: ServerApiClientSyncAccess, indexerId?: string): Promise<ApiResponse<string>> {
     const userId = this.getCurrentUserId();
     if (!userId) return { success: false, error: 'Unauthorized', message: 'Connecte-toi avant la sync.' };
-    return this.backendRequest<void>('/api/sync/start', {
+    const body: { user_id: string; indexer_id?: string } = { user_id: userId };
+    if (indexerId) body.indexer_id = indexerId;
+    return this.backendRequest<string>('/api/sync/start', {
       method: 'POST',
-      body: JSON.stringify({ user_id: userId }),
+      body: JSON.stringify(body),
     });
   },
   async stopSync(this: ServerApiClientSyncAccess): Promise<ApiResponse<void>> {

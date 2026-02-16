@@ -211,11 +211,55 @@ export default function PrerollPlayer({ config, onEnded, onSkip }: PrerollPlayer
   };
 
   const handleClick = () => {
-    if (config.type === 'google') return;
+    if (config.type === 'google' || config.type === 'google_display') return;
     if (clickUrl) {
       window.open(clickUrl.toString(), '_blank', 'noopener,noreferrer');
     }
   };
+
+  // AdSense display (google_display): load script and fill slot only when container has size (avoid availableWidth=0)
+  const adDisplaySlotRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (config.type !== 'google_display' || !config.googleAdClient || !config.googleAdSlot) return;
+    const client = config.googleAdClient;
+
+    let cancelled = false;
+    let rafCount = 0;
+    const maxRaf = 120; // ~2s max wait for layout
+    const run = () => {
+      if (cancelled) return;
+      const el = adDisplaySlotRef.current;
+      if (el && el.offsetWidth > 0) {
+        const w = window as any;
+        w.adsbygoogle = w.adsbygoogle || [];
+        w.adsbygoogle.push({});
+        return;
+      }
+      if (rafCount < maxRaf) {
+        rafCount++;
+        requestAnimationFrame(run);
+      }
+    };
+
+    const scriptId = 'adsbygoogle-script';
+    let script = document.getElementById(scriptId) as HTMLScriptElement | null;
+    if (!script) {
+      script = document.createElement('script');
+      script.id = scriptId;
+      script.async = true;
+      script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(client)}`;
+      script.crossOrigin = 'anonymous';
+      script.onload = () => {
+        if (!cancelled) requestAnimationFrame(run);
+      };
+      document.head.appendChild(script);
+    } else {
+      requestAnimationFrame(run);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [config.type, config.googleAdClient, config.googleAdSlot]);
 
   const renderSkip = () => {
     if (!showSkip) return null;
@@ -339,6 +383,23 @@ export default function PrerollPlayer({ config, onEnded, onSkip }: PrerollPlayer
               {t('ads.unavailable')}
             </div>
           )}
+        </div>
+      )}
+
+      {config.type === 'google_display' && config.googleAdClient && config.googleAdSlot && (
+        <div
+          ref={adDisplaySlotRef}
+          class="absolute inset-0 w-full h-full flex items-center justify-center bg-black/40 overflow-auto"
+          style={{ width: '100vw', height: '100vh', minHeight: '200px' }}
+        >
+          <ins
+            class="adsbygoogle"
+            style={{ display: 'block', minWidth: '320px', minHeight: '100px' }}
+            data-ad-client={config.googleAdClient}
+            data-ad-slot={config.googleAdSlot}
+            data-ad-format="auto"
+            data-full-width-responsive="true"
+          />
         </div>
       )}
     </div>

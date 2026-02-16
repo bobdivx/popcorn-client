@@ -194,8 +194,8 @@ export default function SettingsMenu() {
         aria-label={t('settingsMenu.title')}
         data-tv-settings-nav
       >
-        <div className="px-4 pt-6 pb-2">
-          <h1 className="text-xl lg:text-2xl font-semibold text-white tracking-tight">
+        <div className="px-4 pt-6 pb-2 min-w-0">
+          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-white tracking-tight truncate">
             {t('settingsMenu.title')}
           </h1>
           <p className="text-xs text-gray-500 mt-1 hidden sm:block">
@@ -213,7 +213,7 @@ export default function SettingsMenu() {
                   onClick={() => setSelectedCategory(cat.id)}
                   data-settings-category
                   data-focusable
-                  className={`settings-nav-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#16181c] min-h-[48px] tv:min-h-[56px] ${
+                  className={`settings-nav-item w-full flex items-center gap-3 px-3 sm:px-4 py-3 rounded-xl text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#16181c] min-h-[48px] tv:min-h-[56px] min-w-0 ${
                     isSelected
                       ? 'bg-white/15 text-white'
                       : 'text-gray-300 hover:bg-white/10 hover:text-white'
@@ -228,7 +228,7 @@ export default function SettingsMenu() {
                     }`}
                     aria-hidden
                   />
-                  <span className="font-medium truncate">{t(cat.labelKey)}</span>
+                  <span className="font-medium truncate min-w-0">{t(cat.labelKey)}</span>
                 </button>
               </li>
             );
@@ -240,11 +240,11 @@ export default function SettingsMenu() {
       <div className="settings-content flex-1 flex flex-col min-w-0 bg-[#1a1c20]">
         {currentCategory && (
           <>
-            <div className="flex-shrink-0 px-6 pt-6 pb-2 border-b border-white/10">
-              <p className="text-xs font-medium text-primary-400 uppercase tracking-wider">
+            <div className="flex-shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-2 border-b border-white/10 min-w-0">
+              <p className="text-xs font-medium text-primary-400 uppercase tracking-wider hidden sm:block">
                 {t('settingsMenu.title')}
               </p>
-              <h2 className="text-xl lg:text-2xl font-semibold text-white mt-1">
+              <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold text-white mt-0 sm:mt-1 truncate">
                 {t(currentCategory.labelKey)}
               </h2>
             </div>

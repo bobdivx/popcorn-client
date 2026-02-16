@@ -43,6 +43,7 @@ export default function HLSPlayer({
   maxHeight,
   streamQuality,
   onQualityChange,
+  useStreamTorrentUrl: useStreamTorrentUrlProp,
 }: HLSPlayerProps) {
   const playerConfig = usePlayerConfig();
   const { t } = useI18n();
@@ -87,6 +88,7 @@ export default function HLSPlayer({
     baseUrl: baseUrlProp,
     isRemoteStream,
     streamBackendUrl,
+    useStreamTorrentUrl: useStreamTorrentUrlProp,
   });
 
   // Propager le message d'overlay (ex. « Préparation en cours » pendant retries 503)
@@ -297,10 +299,8 @@ export default function HLSPlayer({
 
   const displayError = error;
   const shouldShowBuffering = isLoading || (isSeeking && bufferedPercent < 100);
-
-  if (displayError) {
-    return <ErrorDisplay error={displayError} />;
-  }
+  /** En cas d'erreur, garder les contrôles visibles pour permettre d'appuyer sur Retour */
+  const effectiveShowControls = showControls || !!displayError;
 
   return (
     <div 
@@ -343,6 +343,11 @@ export default function HLSPlayer({
             {seekFeedback.direction === 'left'
               ? t('playback.seekBack', { seconds: seekFeedback.seconds })
               : t('playback.seekForward', { seconds: seekFeedback.seconds })}
+          </div>
+        )}
+        {displayError && (
+          <div class="absolute inset-0 z-10 flex items-center justify-center bg-black/90">
+            <ErrorDisplay error={displayError} />
           </div>
         )}
         {shouldShowBuffering && (
@@ -445,7 +450,7 @@ export default function HLSPlayer({
           logoUrl={logoUrl}
           synopsis={synopsis}
           releaseDate={releaseDate}
-          showControls={showControls}
+          showControls={effectiveShowControls}
           isPlaying={isPlaying}
           currentTime={currentTime}
           duration={duration}

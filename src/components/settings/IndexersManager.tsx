@@ -3,6 +3,7 @@ import { serverApi } from '../../lib/client/server-api';
 import type { Indexer, IndexerFormData } from '../../lib/client/types';
 import { IndexerCard } from './IndexerCard';
 import { IndexerTestModal, formatProgressEvent } from './IndexerTestModal';
+import { CookieWizardModal } from './CookieWizardModal';
 import { getIndexerDefinitions, type IndexerDefinition } from '../../lib/api/popcorn-web';
 import {
   filterAndSortIndexerDefinitions,
@@ -11,6 +12,18 @@ import {
 import { useI18n } from '../../lib/i18n/useI18n';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
 import { syncIndexersToCloud } from '../../lib/utils/cloud-sync';
+import { normalizeCookieInput } from '../../lib/utils/cookie-format';
+
+const STORAGE_KEY_USE_JACKETT = 'popcorn-indexer-use-jackett';
+
+function getStoredUseJackett(): boolean {
+  try {
+    const v = localStorage.getItem(STORAGE_KEY_USE_JACKETT);
+    return v === 'true';
+  } catch {
+    return false;
+  }
+}
 
 interface IndexersManagerProps {
   /** Afficher uniquement le formulaire d'édition pour cet indexer (mode "détail") */
@@ -36,6 +49,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
   const [definitionSearchQuery, setDefinitionSearchQuery] = useState('');
   const [definitionFilterLanguage, setDefinitionFilterLanguage] = useState('');
   const [definitionFilterCountry, setDefinitionFilterCountry] = useState('');
+  const [useJackett, setUseJackett] = useState(false);
   const [editingIndexer, setEditingIndexer] = useState<Indexer | null>(null);
   const [formData, setFormData] = useState<IndexerFormData>({
     name: '',
@@ -46,11 +60,14 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
     isDefault: false,
     priority: 0,
     indexerTypeId: null,
+    extraConfig: {},
+    useFlareSolverr: false,
   });
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState<string | null>(null);
   const [testProgress, setTestProgress] = useState<Record<string, { index: number; total: number; lastQuery?: string; lastCount?: number; lastSuccess?: boolean }>>({});
   const [testModalOpen, setTestModalOpen] = useState(false);
+  const [cookieWizardOpen, setCookieWizardOpen] = useState(false);
   const [testModalIndexer, setTestModalIndexer] = useState<{ id: string; name: string } | null>(null);
   const [testProgressLog, setTestProgressLog] = useState<string[]>([]);
   const [testRunning, setTestRunning] = useState(false);
@@ -68,9 +85,15 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
     sampleResult?: any;
     apiKeyTest?: { valid: boolean; message: string };
   }>>({});
+  const [syncingIndexerId, setSyncingIndexerId] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     loadIndexers();
+  }, []);
+
+  useEffect(() => {
+    setUseJackett(getStoredUseJackett());
   }, []);
 
   // Mode édition standalone (depuis sous-menu)
@@ -121,13 +144,19 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
     e.preventDefault();
     setSaving(true);
     setError(null);
-
+    const configObj: Record<string, string | boolean> = { ...(formData.extraConfig || {}) };
+      const def = formData.indexerTypeId ? definitions.find((d) => d.id === formData.indexerTypeId) : null;
+      if (def?.protocol === 'custom' && formData.useFlareSolverr) configObj.useFlareSolverr = true;
+      const payload: IndexerFormData = {
+        ...formData,
+        configJson: Object.keys(configObj).length > 0 ? JSON.stringify(configObj) : null,
+      };
     try {
       let response;
       if (editingIndexer) {
-        response = await serverApi.updateIndexer(editingIndexer.id, formData);
+        response = await serverApi.updateIndexer(editingIndexer.id, payload);
       } else {
-        response = await serverApi.createIndexer(formData);
+        response = await serverApi.createIndexer(payload);
       }
 
       if (response.success) {
@@ -144,6 +173,8 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
           isDefault: false,
           priority: 0,
           indexerTypeId: null,
+          extraConfig: {},
+          useFlareSolverr: false,
         });
         await loadIndexers();
         await syncIndexersToCloud();
@@ -194,6 +225,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
         filterLanguage: definitionFilterLanguage,
         filterCountry: definitionFilterCountry,
         userLocale,
+        useJackett,
       }),
     [
       definitions,
@@ -201,8 +233,16 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
       definitionFilterLanguage,
       definitionFilterCountry,
       userLocale,
+      useJackett,
     ]
   );
+
+  const toggleUseJackett = (value: boolean) => {
+    setUseJackett(value);
+    try {
+      localStorage.setItem(STORAGE_KEY_USE_JACKETT, String(value));
+    } catch {}
+  };
 
   const handleSelectDefinition = (definition: IndexerDefinition) => {
     setSelectedDefinition(definition);
@@ -238,31 +278,73 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
       }
     }
     
+    // Valeurs par défaut depuis ui.fields (baseUrl, apiKey, username, password, etc.)
+    // Pour baseUrl uniquement : utiliser default si présent, sinon placeholder (ex. "https://hdf.world") pour pré-remplir
+    const uiFields = Array.isArray(definition.ui?.fields) ? definition.ui.fields : [];
+    let defaultBaseUrl = baseUrl;
+    let defaultApiKey = '';
+    const extraConfig: Record<string, string> = {};
+    for (const field of uiFields) {
+      const name = field?.name;
+      const defaultVal = field?.default ?? '';
+      if (name === 'baseUrl') {
+        defaultBaseUrl = defaultVal || (field?.placeholder ?? '') || defaultBaseUrl;
+      } else if (name === 'apiKey') {
+        defaultApiKey = defaultVal;
+      } else if (name) {
+        extraConfig[name] = typeof defaultVal === 'string' ? defaultVal : '';
+      }
+    }
+
     // Déterminer le nom Jackett si c'est un protocole torznab
     let jackettIndexerName = '';
     if (definition.protocol === 'torznab') {
-      // Pour torznab, le nom de l'indexer Jackett est souvent le même que le nom de la définition
       jackettIndexerName = definition.name;
     }
-    
+
     setFormData({
       name: definition.name,
-      baseUrl: baseUrl,
-      apiKey: '',
+      baseUrl: defaultBaseUrl,
+      apiKey: defaultApiKey,
       jackettIndexerName: jackettIndexerName,
       isEnabled: true,
       isDefault: false,
       priority: 0,
-      indexerTypeId: definition.id, // Utiliser l'ID de la définition comme indexerTypeId
+      indexerTypeId: definition.id,
+      extraConfig,
+      useFlareSolverr: false,
     });
     
     setShowDefinitionSelector(false);
     setShowForm(true);
   };
 
-  const handleEdit = (indexer: Indexer) => {
+  const handleEdit = async (indexer: Indexer) => {
     setEditingIndexer(indexer);
     setSelectedDefinition(null);
+    let extraConfig: Record<string, string> = {};
+    let useFlareSolverr = false;
+    if (indexer.configJson) {
+      try {
+        const parsed = JSON.parse(indexer.configJson);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          useFlareSolverr = parsed.useFlareSolverr === true;
+          for (const [k, v] of Object.entries(parsed)) {
+            if (k !== 'useFlareSolverr' && typeof v === 'string') extraConfig[k] = v;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    if (definitions.length === 0 && indexer.indexerTypeId) {
+      try {
+        const defs = await getIndexerDefinitions();
+        if (defs?.length) setDefinitions(defs);
+      } catch {
+        /* ignore */
+      }
+    }
     setFormData({
       name: indexer.name,
       baseUrl: indexer.baseUrl,
@@ -272,6 +354,8 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
       isDefault: indexer.isDefault,
       priority: indexer.priority,
       indexerTypeId: indexer.indexerTypeId || null,
+      extraConfig,
+      useFlareSolverr,
     });
     setShowForm(true);
   };
@@ -292,6 +376,26 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.unknownError'));
+    }
+  };
+
+  const handleSync = async (id: string) => {
+    setSyncingIndexerId(id);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const response = await serverApi.startSync(id);
+      if (response.success) {
+        const msg = (response.data && typeof response.data === 'string' ? response.data : null) || t('indexersManager.syncStarted');
+        setSuccessMessage(msg);
+        setTimeout(() => setSuccessMessage(null), 5000);
+      } else {
+        setError(response.message || t('indexersManager.errorTesting'));
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('common.unknownError'));
+    } finally {
+      setSyncingIndexerId(null);
     }
   };
 
@@ -394,6 +498,11 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
           <span>{error}</span>
         </div>
       )}
+      {successMessage && (
+        <div class="alert alert-success">
+          <span>{successMessage}</span>
+        </div>
+      )}
 
       {!showForm && !showDefinitionSelector ? (
         <>
@@ -434,7 +543,9 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
                   onEdit={() => handleEdit(indexer)}
                   onDelete={() => handleDelete(indexer.id)}
                   onTest={() => handleTest(indexer.id)}
+                  onSync={() => handleSync(indexer.id)}
                   isTesting={testing === indexer.id}
+                  isSyncing={syncingIndexerId === indexer.id}
                   testProgress={testProgress[indexer.id]}
                   testResult={testResults[indexer.id]}
                 />
@@ -447,6 +558,24 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
           <div class="mb-6">
             <h2 class="text-2xl font-bold text-white">{t('indexersManager.selectIndexer')}</h2>
           </div>
+
+          {definitions.length > 0 && (
+            <div class="mb-4 p-4 rounded-lg bg-white/5 border border-white/10">
+              <label class="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-primary mt-0.5"
+                  checked={useJackett}
+                  onChange={(e) => toggleUseJackett((e.target as HTMLInputElement).checked)}
+                  aria-describedby="use-jackett-desc"
+                />
+                <div>
+                  <span class="font-medium text-white">{t('indexersManager.useJackettLabel')}</span>
+                  <p id="use-jackett-desc" class="text-sm text-gray-400 mt-1">{t('indexersManager.useJackettDescription')}</p>
+                </div>
+              </label>
+            </div>
+          )}
 
           {definitions.length > 0 && (
             <div class="flex flex-col sm:flex-row gap-3 flex-wrap mb-4">
@@ -534,13 +663,23 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
         </div>
       ) : (
         <form onSubmit={handleSubmit} class="space-y-4">
+          {(() => {
+            const effectiveDef = selectedDefinition || (editingIndexer?.indexerTypeId && definitions.find((d) => d.id === editingIndexer?.indexerTypeId)) || null;
+            const uiFields = Array.isArray(effectiveDef?.ui?.fields) ? effectiveDef!.ui!.fields : [];
+            const fieldLabel = (field: { name?: string; label?: string }) => {
+              if (field.label) return field.label;
+              const key = `indexersManager.form.${field.name}` as keyof typeof t;
+              return t(key as any) || field.name || '';
+            };
+            return (
+              <>
           <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold text-white">
               {editingIndexer ? t('indexersManager.editIndexer') : t('indexersManager.addIndexer')}
             </h2>
-            {selectedDefinition && (
+            {(selectedDefinition || effectiveDef) && (
               <div class="badge badge-primary">
-                {t('indexersManager.basedOn')}: {selectedDefinition.name}
+                {t('indexersManager.basedOn')}: {(selectedDefinition || effectiveDef)!.name}
               </div>
             )}
           </div>
@@ -558,6 +697,119 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
             />
           </div>
 
+          {uiFields.map((field: { name?: string; label?: string; type?: string; required?: boolean; placeholder?: string }) => {
+            const name = field?.name;
+            if (!name) return null;
+            if (name === 'baseUrl') {
+              return (
+                <div key={name} class="form-control">
+                  <label class="label">
+                    <span class="label-text text-white">{fieldLabel(field)}</span>
+                  </label>
+                  <input
+                    type="url"
+                    class="input input-bordered bg-gray-800 border-gray-700 text-white"
+                    value={formData.baseUrl}
+                    onInput={(e) => setFormData({ ...formData, baseUrl: (e.target as HTMLInputElement).value })}
+                    required
+                    placeholder={field.placeholder}
+                  />
+                </div>
+              );
+            }
+            if (name === 'apiKey') {
+              return (
+                <div key={name} class="form-control">
+                  <label class="label">
+                    <span class="label-text text-white">
+                      {fieldLabel(field)}
+                      {effectiveDef?.requiresApiKey && <span class="text-red-400 ml-1">*</span>}
+                    </span>
+                  </label>
+                  <input
+                    type="password"
+                    class="input input-bordered bg-gray-800 border-gray-700 text-white"
+                    value={formData.apiKey}
+                    onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })}
+                    required={effectiveDef?.requiresApiKey ?? false}
+                    placeholder={field.placeholder || (effectiveDef?.requiresApiKey ? t('indexersManager.required') : t('indexersManager.optional'))}
+                  />
+                </div>
+              );
+            }
+            const isPassword = name !== 'cookie' && (field.type || '').toLowerCase() === 'password';
+            return (
+              <div key={name} class="form-control">
+                <label class="label">
+                  <span class="label-text text-white">
+                    {fieldLabel(field)}
+                    {field.required && <span class="text-red-400 ml-1">*</span>}
+                  </span>
+                  {name === 'cookie' && (
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-ghost text-primary-400 hover:text-primary-300 border border-primary-500/50"
+                      onClick={() => setCookieWizardOpen(true)}
+                    >
+                      {t('indexersManager.form.cookieWizardOpen')}
+                    </button>
+                  )}
+                </label>
+                <input
+                  type={isPassword ? 'password' : 'text'}
+                  class="input input-bordered bg-gray-800 border-gray-700 text-white"
+                  value={formData.extraConfig?.[name] ?? ''}
+                  onInput={(e) => {
+                    const v = (e.target as HTMLInputElement).value;
+                    const final = name === 'cookie' ? normalizeCookieInput(v) : v;
+                    setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), [name]: final } });
+                  }}
+                  required={!!field.required}
+                  placeholder={field.placeholder || (name === 'cookie' ? t('indexersManager.form.cookiePlaceholder') : undefined)}
+                />
+                {name === 'cookie' && (
+                  <>
+                    <div
+                      class="mt-2 rounded-lg border-2 border-dashed border-gray-600 bg-gray-800/50 p-4 text-center text-sm text-gray-400 hover:border-primary-500/50 hover:bg-gray-800 transition-colors"
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add('border-primary-500', 'bg-primary-500/10'); }}
+                      onDragLeave={(e) => { e.currentTarget.classList.remove('border-primary-500', 'bg-primary-500/10'); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        e.currentTarget.classList.remove('border-primary-500', 'bg-primary-500/10');
+                        const text = e.dataTransfer?.getData?.('text/plain')?.trim();
+                        if (text) setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), cookie: normalizeCookieInput(text) } });
+                      }}
+                      onPaste={(e) => {
+                        const text = e.clipboardData?.getData?.('text/plain')?.trim();
+                        if (text) { e.preventDefault(); setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), cookie: normalizeCookieInput(text) } }); }
+                      }}
+                      tabIndex={0}
+                      role="button"
+                    >
+                      {t('indexersManager.form.cookieDropZone')}
+                    </div>
+                    <button
+                      type="button"
+                      class="mt-2 btn btn-sm btn-ghost text-primary-400 border border-primary-500/50"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          if (text?.trim()) setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), cookie: normalizeCookieInput(text.trim()) } });
+                        } catch (_) {}
+                      }}
+                    >
+                      {t('indexersManager.form.cookiePasteButton')}
+                    </button>
+                    <p class="text-sm text-gray-400 mt-1 ml-1">{t('indexersManager.form.cookieHelp')}</p>
+                  </>
+                )}
+              </div>
+            );
+          })}
+
+          {uiFields.length === 0 && (
+            <>
           <div class="form-control">
             <label class="label">
               <span class="label-text text-white">{t('indexersManager.form.baseUrl')}</span>
@@ -570,25 +822,23 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
               required
             />
           </div>
-
           <div class="form-control">
             <label class="label">
-              <span class="label-text text-white">
-                {t('indexersManager.form.apiKey')}
-                {selectedDefinition?.requiresApiKey && (
-                  <span class="text-red-400 ml-1">*</span>
-                )}
-              </span>
+              <span class="label-text text-white">{t('indexersManager.form.apiKey')}</span>
             </label>
             <input
-              type="text"
+              type="password"
               class="input input-bordered bg-gray-800 border-gray-700 text-white"
               value={formData.apiKey}
               onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })}
-              required={selectedDefinition?.requiresApiKey || false}
-              placeholder={selectedDefinition?.requiresApiKey ? t('indexersManager.required') : t('indexersManager.optional')}
+              placeholder={t('indexersManager.optional')}
             />
           </div>
+            </>
+          )}
+              </>
+            );
+          })()}
 
           {(selectedDefinition?.protocol === 'torznab' || editingIndexer?.jackettIndexerName) && (
             <div class="form-control">
@@ -601,6 +851,21 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
                 value={formData.jackettIndexerName}
                 onInput={(e) => setFormData({ ...formData, jackettIndexerName: (e.target as HTMLInputElement).value })}
               />
+            </div>
+          )}
+
+          {(selectedDefinition || (editingIndexer?.indexerTypeId && definitions.find((d) => d.id === editingIndexer?.indexerTypeId)) || null)?.protocol === 'custom' && (
+            <div class="form-control">
+              <label class="label cursor-pointer gap-2">
+                <input
+                  type="checkbox"
+                  class="checkbox checkbox-primary"
+                  checked={formData.useFlareSolverr ?? false}
+                  onChange={(e) => setFormData({ ...formData, useFlareSolverr: (e.target as HTMLInputElement).checked })}
+                />
+                <span class="label-text text-white">{t('indexersManager.form.useFlareSolverr')}</span>
+              </label>
+              <p class="text-sm text-gray-400 mt-1 ml-6">{t('indexersManager.form.useFlareSolverrHelp')}</p>
             </div>
           )}
 
@@ -657,6 +922,10 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
       )}
 
       {/* Modale de test d'indexer : retour visuel en cours + résultats au fur et à mesure */}
+      <CookieWizardModal
+        isOpen={cookieWizardOpen}
+        onClose={() => setCookieWizardOpen(false)}
+      />
       <IndexerTestModal
         isOpen={testModalOpen}
         onClose={closeTestModal}

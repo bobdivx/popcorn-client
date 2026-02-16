@@ -9,7 +9,14 @@ import {
   getUniqueLanguagesAndCountries,
 } from '../../../lib/utils/indexer-definitions-filter';
 import { Info } from 'lucide-preact';
+
+const STORAGE_KEY_USE_JACKETT = 'popcorn-indexer-use-jackett';
+function getStoredUseJackett(): boolean {
+  try { return localStorage.getItem(STORAGE_KEY_USE_JACKETT) === 'true'; } catch { return false; }
+}
 import { IndexerDefinitionDocsModal } from '../../indexers/IndexerDefinitionDocsModal';
+import { CookieWizardModal } from '../../settings/CookieWizardModal';
+import { normalizeCookieInput } from '../../../lib/utils/cookie-format';
 
 interface IndexersStepProps {
   setupStatus: SetupStatus | null;
@@ -42,6 +49,8 @@ export function IndexersStep({
     isDefault: false,
     priority: 0,
     indexerTypeId: null,
+    extraConfig: {},
+    useFlareSolverr: false,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,12 +61,18 @@ export function IndexersStep({
   const [selectedDefinition, setSelectedDefinition] = useState<IndexerDefinition | null>(null);
   const [hasCloudToken, setHasCloudToken] = useState(false);
   const [showDocs, setShowDocs] = useState(false);
+  const [showCookieWizard, setShowCookieWizard] = useState(false);
   const [definitionSearchQuery, setDefinitionSearchQuery] = useState('');
   const [definitionFilterLanguage, setDefinitionFilterLanguage] = useState('');
   const [definitionFilterCountry, setDefinitionFilterCountry] = useState('');
+  const [useJackett, setUseJackett] = useState(false);
 
   useEffect(() => {
     setHasCloudToken(TokenManager.getCloudAccessToken() !== null);
+  }, []);
+
+  useEffect(() => {
+    setUseJackett(getStoredUseJackett());
   }, []);
 
   useEffect(() => {
@@ -136,6 +151,8 @@ export function IndexersStep({
           isDefault: false,
           priority: 0,
           indexerTypeId: null,
+          extraConfig: {},
+          useFlareSolverr: false,
         });
       }
     } catch (err) {
@@ -150,6 +167,8 @@ export function IndexersStep({
         isDefault: false,
         priority: 0,
         indexerTypeId: null,
+        extraConfig: {},
+        useFlareSolverr: false,
       });
     } finally {
       setLoadingDefinitions(false);
@@ -168,6 +187,7 @@ export function IndexersStep({
         filterLanguage: definitionFilterLanguage,
         filterCountry: definitionFilterCountry,
         userLocale,
+        useJackett,
       }),
     [
       definitions,
@@ -175,8 +195,14 @@ export function IndexersStep({
       definitionFilterLanguage,
       definitionFilterCountry,
       userLocale,
+      useJackett,
     ]
   );
+
+  const toggleUseJackett = (value: boolean) => {
+    setUseJackett(value);
+    try { localStorage.setItem(STORAGE_KEY_USE_JACKETT, String(value)); } catch {}
+  };
 
   const handleSelectDefinition = (definition: IndexerDefinition) => {
     setSelectedDefinition(definition);
@@ -198,16 +224,29 @@ export function IndexersStep({
         baseUrl = '';
       }
     }
+    const uiFields = Array.isArray(definition.ui?.fields) ? definition.ui!.fields : [];
+    let defaultBaseUrl = baseUrl;
+    let defaultApiKey = '';
+    const extraConfig: Record<string, string> = {};
+    for (const field of uiFields) {
+      const name = field?.name;
+      const val = field?.default ?? '';
+      if (name === 'baseUrl') defaultBaseUrl = val || defaultBaseUrl;
+      else if (name === 'apiKey') defaultApiKey = val;
+      else if (name) extraConfig[name] = typeof val === 'string' ? val : '';
+    }
     const jackettIndexerName = definition.protocol === 'torznab' ? definition.name : '';
     setFormData({
       name: definition.name,
-      baseUrl,
-      apiKey: '',
+      baseUrl: defaultBaseUrl,
+      apiKey: defaultApiKey,
       jackettIndexerName,
       isEnabled: true,
       isDefault: false,
       priority: 0,
       indexerTypeId: definition.id,
+      extraConfig,
+      useFlareSolverr: false,
     });
     setShowDefinitionSelector(false);
     setShowForm(true);
@@ -215,6 +254,21 @@ export function IndexersStep({
 
   const handleEdit = (indexer: Indexer) => {
     setEditingIndexer(indexer);
+    let extraConfig: Record<string, string> = {};
+    let useFlareSolverr = false;
+    if (indexer.configJson) {
+      try {
+        const parsed = JSON.parse(indexer.configJson);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          useFlareSolverr = parsed.useFlareSolverr === true;
+          for (const [k, v] of Object.entries(parsed)) {
+            if (k !== 'useFlareSolverr' && typeof v === 'string') extraConfig[k] = v;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     setFormData({
       name: indexer.name,
       baseUrl: indexer.baseUrl,
@@ -224,6 +278,8 @@ export function IndexersStep({
       isDefault: indexer.isDefault,
       priority: indexer.priority || 0,
       indexerTypeId: indexer.indexerTypeId ?? null,
+      extraConfig,
+      useFlareSolverr,
     });
     setShowForm(true);
     setError(null);
@@ -256,13 +312,19 @@ export function IndexersStep({
     e.preventDefault();
     setSaving(true);
     setError(null);
-
+    const configObj: Record<string, string | boolean> = { ...(formData.extraConfig || {}) };
+      const def = formData.indexerTypeId ? definitions.find((d) => d.id === formData.indexerTypeId) : null;
+      if (def?.protocol === 'custom' && formData.useFlareSolverr) configObj.useFlareSolverr = true;
+      const payload: IndexerFormData = {
+        ...formData,
+        configJson: Object.keys(configObj).length > 0 ? JSON.stringify(configObj) : null,
+      };
     try {
       let response;
       if (editingIndexer) {
-        response = await serverApi.updateIndexer(editingIndexer.id, formData);
+        response = await serverApi.updateIndexer(editingIndexer.id, payload);
       } else {
-        response = await serverApi.createIndexer(formData);
+        response = await serverApi.createIndexer(payload);
       }
 
       if (response.success) {
@@ -293,6 +355,8 @@ export function IndexersStep({
           isDefault: false,
           priority: 0,
           indexerTypeId: null,
+          extraConfig: {},
+          useFlareSolverr: false,
         });
         await loadIndexers();
         onStatusChange();
@@ -320,6 +384,8 @@ export function IndexersStep({
       isDefault: false,
       priority: 0,
       indexerTypeId: null,
+      extraConfig: {},
+      useFlareSolverr: false,
     });
     setError(null);
   };
@@ -336,6 +402,7 @@ export function IndexersStep({
 
   return (
     <div className="space-y-6">
+      <CookieWizardModal isOpen={showCookieWizard} onClose={() => setShowCookieWizard(false)} />
       <IndexerDefinitionDocsModal isOpen={showDocs} onClose={() => setShowDocs(false)} />
       <h3 className="text-2xl font-bold text-white">Configuration des indexers</h3>
       
@@ -393,6 +460,23 @@ export function IndexersStep({
             {t('setupIndexersStep.manualHint')}
           </p>
           {definitions.length > 0 && (
+            <div className="p-4 rounded-lg bg-white/5 border border-white/10">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-1 rounded border-gray-600 bg-gray-800 text-primary-500 focus:ring-primary-500"
+                  checked={useJackett}
+                  onChange={(e) => toggleUseJackett((e.target as HTMLInputElement).checked)}
+                  aria-describedby="setup-use-jackett-desc"
+                />
+                <div>
+                  <span className="font-medium text-white">{t('indexersManager.useJackettLabel')}</span>
+                  <p id="setup-use-jackett-desc" className="text-sm text-gray-400 mt-1">{t('indexersManager.useJackettDescription')}</p>
+                </div>
+              </label>
+            </div>
+          )}
+          {definitions.length > 0 && (
             <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
               <input
                 type="search"
@@ -448,6 +532,8 @@ export function IndexersStep({
                     isDefault: false,
                     priority: 0,
                     indexerTypeId: null,
+                    extraConfig: {},
+                    useFlareSolverr: false,
                   });
                 }}
               >
@@ -489,6 +575,9 @@ export function IndexersStep({
                         {def.requiresApiKey && (
                           <span className="px-2 py-0.5 bg-yellow-900/50 text-yellow-300 text-xs rounded">{t('setupIndexersStep.apiKeyRequired')}</span>
                         )}
+                        {def.requiresAuth && (
+                          <span className="px-2 py-0.5 bg-blue-900/50 text-blue-300 text-xs rounded">{t('indexersManager.authRequired')}</span>
+                        )}
                       </div>
                     </div>
                     <span className="text-primary-400 text-sm font-medium">{t('setupIndexersStep.select')}</span>
@@ -512,6 +601,8 @@ export function IndexersStep({
                       isDefault: false,
                       priority: 0,
                       indexerTypeId: null,
+                      extraConfig: {},
+                      useFlareSolverr: false,
                     });
                   }}
                 >
@@ -628,48 +719,144 @@ export function IndexersStep({
             </div>
           )}
 
+          {(() => {
+            const effectiveDef = selectedDefinition || (editingIndexer?.indexerTypeId && definitions.find((d) => d.id === editingIndexer?.indexerTypeId)) || null;
+            const uiFields = Array.isArray(effectiveDef?.ui?.fields) ? effectiveDef!.ui!.fields : [];
+            const fieldLabel = (field: { name?: string; label?: string }) => field?.label || (field?.name ? t(`indexersManager.form.${field.name}` as any) : '') || field?.name || '';
+            const inputClass = 'w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent';
+            return (
+              <>
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-white">Nom</label>
+            <label className="block text-sm font-semibold text-white">{t('indexersManager.form.name')}</label>
             <input
               type="text"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
+              className={inputClass}
               value={formData.name}
               onInput={(e) => setFormData({ ...formData, name: (e.target as HTMLInputElement).value })}
               required
             />
           </div>
-
+          {uiFields.length > 0 ? uiFields.map((field: { name?: string; label?: string; type?: string; required?: boolean; placeholder?: string }) => {
+            const name = field?.name;
+            if (!name) return null;
+            if (name === 'baseUrl') {
+              return (
+                <div key={name} className="space-y-2">
+                  <label className="block text-sm font-semibold text-white">{fieldLabel(field)}</label>
+                  <input type="url" className={inputClass} value={formData.baseUrl} onInput={(e) => setFormData({ ...formData, baseUrl: (e.target as HTMLInputElement).value })} required placeholder={field.placeholder} />
+                </div>
+              );
+            }
+            if (name === 'apiKey') {
+              return (
+                <div key={name} className="space-y-2">
+                  <label className="block text-sm font-semibold text-white">{fieldLabel(field)}{effectiveDef?.requiresApiKey && <span className="text-red-400 ml-1">*</span>}</label>
+                  <input type="password" className={inputClass} value={formData.apiKey} onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })} required={effectiveDef?.requiresApiKey ?? false} placeholder={field.placeholder} />
+                </div>
+              );
+            }
+            const isPassword = name !== 'cookie' && (field.type || '').toLowerCase() === 'password';
+            return (
+              <div key={name} className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="block text-sm font-semibold text-white">{fieldLabel(field)}{field.required && <span className="text-red-400 ml-1">*</span>}</label>
+                  {name === 'cookie' && (
+                    <button
+                      type="button"
+                      className="text-sm font-medium px-3 py-1.5 rounded border border-primary-500/50 text-primary-400 hover:text-primary-300 hover:bg-primary-500/10"
+                      onClick={() => setShowCookieWizard(true)}
+                    >
+                      {t('indexersManager.form.cookieWizardOpen')}
+                    </button>
+                  )}
+                </div>
+                <input
+                  type={isPassword ? 'password' : 'text'}
+                  className={inputClass}
+                  value={formData.extraConfig?.[name] ?? ''}
+                  onInput={(e) => {
+                    const v = (e.target as HTMLInputElement).value;
+                    const final = name === 'cookie' ? normalizeCookieInput(v) : v;
+                    setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), [name]: final } });
+                  }}
+                  required={!!field.required}
+                  placeholder={field.placeholder || (name === 'cookie' ? t('indexersManager.form.cookiePlaceholder') : '')}
+                />
+                {name === 'cookie' && (
+                  <>
+                    <div
+                      className="mt-2 rounded-lg border-2 border-dashed border-gray-600 bg-gray-800/50 p-4 text-center text-sm text-gray-400 hover:border-primary-500/50 hover:bg-gray-800 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/50"
+                      tabIndex={0}
+                      role="button"
+                      onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); (e.currentTarget as HTMLElement).classList.add('!border-primary-500', '!bg-primary-500/10'); }}
+                      onDragLeave={(e) => { (e.currentTarget as HTMLElement).classList.remove('!border-primary-500', '!bg-primary-500/10'); }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const el = e.currentTarget as HTMLElement;
+                        el.classList.remove('!border-primary-500', '!bg-primary-500/10');
+                        const text = e.dataTransfer?.getData?.('text/plain')?.trim();
+                        if (text) setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), cookie: normalizeCookieInput(text) } });
+                      }}
+                      onPaste={(e) => {
+                        const text = e.clipboardData?.getData?.('text/plain')?.trim();
+                        if (text) { e.preventDefault(); setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), cookie: normalizeCookieInput(text) } }); }
+                      }}
+                    >
+                      {t('indexersManager.form.cookieDropZone')}
+                    </div>
+                    <button
+                      type="button"
+                      className="mt-2 text-sm px-3 py-1.5 rounded border border-primary-500/50 text-primary-400 hover:bg-primary-500/10"
+                      onClick={async () => {
+                        try {
+                          const text = await navigator.clipboard.readText();
+                          if (text?.trim()) setFormData({ ...formData, extraConfig: { ...(formData.extraConfig || {}), cookie: normalizeCookieInput(text.trim()) } });
+                        } catch (_) {}
+                      }}
+                    >
+                      {t('indexersManager.form.cookiePasteButton')}
+                    </button>
+                    <p className="text-sm text-gray-400">{t('indexersManager.form.cookieHelp')}</p>
+                  </>
+                )}
+              </div>
+            );
+          }) : (
+            <>
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-white">URL de base</label>
-            <input
-              type="url"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-              value={formData.baseUrl}
-              onInput={(e) => setFormData({ ...formData, baseUrl: (e.target as HTMLInputElement).value })}
-              required
-            />
+            <label className="block text-sm font-semibold text-white">{t('indexersManager.form.baseUrl')}</label>
+            <input type="url" className={inputClass} value={formData.baseUrl} onInput={(e) => setFormData({ ...formData, baseUrl: (e.target as HTMLInputElement).value })} required />
           </div>
-
           <div className="space-y-2">
-            <label className="block text-sm font-semibold text-white">Clé API</label>
-            <input
-              type="text"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-              value={formData.apiKey}
-              onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })}
-              required
-            />
+            <label className="block text-sm font-semibold text-white">{t('indexersManager.form.apiKey')}</label>
+            <input type="password" className={inputClass} value={formData.apiKey} onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })} placeholder={t('indexersManager.optional')} />
           </div>
-
+            </>
+          )}
+          {(effectiveDef?.protocol === 'torznab' || formData.jackettIndexerName !== undefined) && (
           <div className="space-y-2">
             <label className="block text-sm font-semibold text-white">{t('indexersManager.form.jackettName')}</label>
-            <input
-              type="text"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-              value={formData.jackettIndexerName}
-              onInput={(e) => setFormData({ ...formData, jackettIndexerName: (e.target as HTMLInputElement).value })}
-            />
+            <input type="text" className={inputClass} value={formData.jackettIndexerName} onInput={(e) => setFormData({ ...formData, jackettIndexerName: (e.target as HTMLInputElement).value })} />
           </div>
+          )}
+          {effectiveDef?.protocol === 'custom' && (
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 text-primary-600 bg-gray-900 border-gray-700 rounded focus:ring-primary-600"
+                  checked={formData.useFlareSolverr ?? false}
+                  onChange={(e) => setFormData({ ...formData, useFlareSolverr: (e.target as HTMLInputElement).checked })}
+                />
+                <span className="text-white">{t('indexersManager.form.useFlareSolverr')}</span>
+              </label>
+              <p className="text-sm text-gray-400 ml-6">{t('indexersManager.form.useFlareSolverrHelp')}</p>
+            </div>
+          )}
+              </>
+            );
+          })()}
 
           <div className="space-y-2">
             <label className="block text-sm font-semibold text-white">Priorité</label>

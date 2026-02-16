@@ -4,12 +4,18 @@ export interface BuildStreamUrlInput {
   infoHash: string;
   filePath: string;
   fileName: string;
+  /** Index du fichier dans le torrent (pour la route stream-torrent). */
+  fileIndex?: number | null;
   isDirectMode: boolean;
   isLucieMode?: boolean;
   /** Quand défini (bibliothèque partagée), le flux passe par le proxy local /api/remote-stream/proxy. */
   streamBackendUrl?: string | null;
   /** Hauteur max en pixels pour le transcode HLS (720, 480, 360). Non utilisé en mode direct/Lucie. */
   maxHeight?: number | null;
+  /** Mode streaming torrent (option payante) : URL /api/stream-torrent avec token. */
+  streamingTorrentMode?: boolean;
+  /** Token cloud pour la route stream-torrent (passé en ?access_token= pour la balise video). */
+  streamingTorrentToken?: string | null;
 }
 
 export interface BuildStreamUrlResult {
@@ -49,12 +55,29 @@ export function buildStreamUrl({
   infoHash,
   filePath,
   fileName,
+  fileIndex,
   isDirectMode,
   isLucieMode = false,
   streamBackendUrl,
   maxHeight,
+  streamingTorrentMode,
+  streamingTorrentToken,
 }: BuildStreamUrlInput): BuildStreamUrlResult {
   const normalizedPath = normalizeStreamPath(filePath);
+
+  // Mode streaming torrent (option payante) : route dédiée avec token
+  if (streamingTorrentMode && infoHash && streamingTorrentToken && typeof fileIndex === 'number') {
+    const idx = fileIndex;
+    const encName = encodeURIComponent(fileName || 'video');
+    const tokenParam = `access_token=${encodeURIComponent(streamingTorrentToken)}`;
+    const streamUrlSt = `${baseUrl.replace(/\/$/, '')}/api/stream-torrent/${infoHash}/${idx}/${encName}?${tokenParam}`;
+    return {
+      streamUrl: streamUrlSt,
+      normalizedPath,
+      encodedPath: encName,
+      pathForUrl: fileName || normalizedPath,
+    };
+  }
 
   // Mode direct: la route backend directe n'accepte pas toujours les chemins absolus Windows //?/...
   const pathForUrl =

@@ -19,6 +19,8 @@ export interface UseTorrentPlayerOptions {
   hasInfoHash: boolean;
   hasMagnetLink: boolean;
   canStream: boolean;
+  /** Abonnement streaming torrent actif : ajout avec for_streaming + only_files pour un seul fichier. */
+  streamingTorrentActive?: boolean;
   isAvailableLocally: boolean;
   setIsAvailableLocally: (value: boolean) => void;
   loadVideoFiles: (infoHash: string, retryCount?: number) => Promise<any[]>;
@@ -77,6 +79,7 @@ export interface PlayHandlerContext {
   isExternal: boolean;
   hasInfoHash: boolean;
   hasMagnetLink: boolean;
+  streamingTorrentActive?: boolean;
   isAvailableLocally: boolean;
   loadVideoFiles: (infoHash: string, retryCount?: number) => Promise<any[]>;
   videoFiles: any[];

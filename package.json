@@ -65,7 +65,7 @@
     "@tauri-apps/plugin-http": "^2.5.6",
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@types/qrcode": "^1.5.6",
-    "astro": "^5.16.6",
+    "astro": "^5.17.2",
     "bcryptjs": "^2.4.3",
     "daisyui": "^4.12.10",
     "hls.js": "^1.6.15",
@@ -78,7 +78,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@astrojs/vercel": "^9.0.2",
+    "@astrojs/vercel": "^9.0.4",
     "@tauri-apps/api": "^2.9.1",
     "@tauri-apps/cli": "^2.9.6",
     "@types/bcryptjs": "^2.4.6",

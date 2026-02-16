@@ -9,6 +9,8 @@ import { calculateSyncProgress } from '../../lib/utils/sync-progress';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { LANGUAGE_NAMES, type SupportedLanguage } from '../../lib/i18n';
 import { isDemoMode, setDemoMode } from '../../lib/backend-config';
+import { TokenManager } from '../../lib/client/storage';
+import { loadSubscription } from '../../lib/subscription-store';
 
 type NavTab = { label: string; href: string; match?: 'exact' | 'prefix' };
 
@@ -51,6 +53,11 @@ export default function Navbar() {
     window.addEventListener('popstate', updatePath);
 
     loadUser();
+
+    // Charger le statut d'abonnement cloud une fois (partagé avec toutes les pages)
+    if (TokenManager.getCloudAccessToken()) {
+      loadSubscription().catch(() => {});
+    }
 
     // Masquer le fallback de chargement (Layout.astro) une fois l'app montée
     window.dispatchEvent(new Event('popcorn-app-ready'));

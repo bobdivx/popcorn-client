@@ -1,7 +1,28 @@
 import { clientApi } from '../../../../../lib/client/api';
 import { serverApi } from '../../../../../lib/client/server-api';
+import { getCachedSubscription, loadSubscription } from '../../../../../lib/subscription-store';
 import { PROGRESS_POLL_INTERVAL_MS } from '../../utils/constants';
 import type { PlayHandlerContext } from './types';
+
+/** Résout l'éligibilité streaming au moment du clic (lit le store, ou charge si pas encore fait). */
+async function resolveStreamingActiveOnce(
+  initial: boolean,
+  cache: { value: boolean | null }
+): Promise<boolean> {
+  if (cache.value !== null) return cache.value;
+  const cached = getCachedSubscription();
+  if (cached !== null) {
+    cache.value = cached.streamingTorrent === true;
+    return cache.value;
+  }
+  try {
+    const data = await loadSubscription();
+    cache.value = data?.streamingTorrent === true;
+  } catch {
+    cache.value = initial;
+  }
+  return cache.value;
+}
 
 export function createHandlePlay(context: PlayHandlerContext) {
   const {
@@ -9,6 +30,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
     isExternal,
     hasInfoHash,
     hasMagnetLink,
+    streamingTorrentActive = false,
     isAvailableLocally,
     loadVideoFiles,
     videoFiles,
@@ -30,6 +52,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
 
   return async () => {
     setErrorMessage(null);
+    const streamingCache: { value: boolean | null } = { value: null };
     addDebugLog('info', '🎯 === DÉBUT: Clic sur bouton Lire ===', {
       hasInfoHash,
       isExternal,
@@ -236,9 +259,8 @@ export function createHandlePlay(context: PlayHandlerContext) {
             // Si l'API retourne un magnet link en cas d'erreur, l'utiliser
             if (errorData.isMagnet && errorData.magnetUri) {
               addDebugLog('info', '📥 L\'API a retourné un magnet link (fallback)', { magnetUri: errorData.magnetUri });
-              // Toujours télécharger dans downloads/media, pas en streaming
-              const forStreaming = false;
-              const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+              const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
+              const downloadType = forStreaming ? undefined : (torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film'));
               const addResult = await clientApi.addMagnetLink(errorData.magnetUri, torrent.name, forStreaming, downloadType);
               if (addResult.info_hash) {
                 if (typeof torrent.tmdbId === 'number' && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) {
@@ -272,8 +294,21 @@ export function createHandlePlay(context: PlayHandlerContext) {
                       const videos = await loadVideoFiles(addResult.info_hash);
                       if (videos.length > 0) {
                         addDebugLog('success', '✅ Fichiers vidéo trouvés', { files_count: videos.length });
+                        if (forStreaming) {
+                          window.setTimeout(() => {
+                            clientApi.updateOnlyFiles(addResult.info_hash, [videos[0].index]).catch(() => {});
+                          }, 15000);
+                        }
                         setVideoFiles(videos);
                         setSelectedFile(videos[0]);
+                        if (forStreaming) {
+                          setPlayStatus('ready');
+                          setProgressMessage('Lancement de la lecture...');
+                          setIsPlaying(true);
+                          setShowInfo(false);
+                          stopProgressPolling();
+                          return;
+                        }
                       }
                       
                       progressPollIntervalRef.current = window.setInterval(() => {
@@ -360,9 +395,8 @@ export function createHandlePlay(context: PlayHandlerContext) {
           setPlayStatus('adding');
           setProgressMessage('Ajout du fichier torrent...');
           
-          // Toujours télécharger dans downloads/media, pas en streaming
-          const forStreaming = false;
-          const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+          const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
+          const downloadType = forStreaming ? undefined : (torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film'));
           const addResult = await clientApi.addTorrentFile(torrentFile, forStreaming, downloadType);
           if (addResult.info_hash) {
             if (typeof torrent.tmdbId === 'number' && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) {
@@ -378,11 +412,25 @@ export function createHandlePlay(context: PlayHandlerContext) {
             // Les métadonnées sont généralement immédiatement disponibles avec un fichier .torrent
             const videos = await loadVideoFiles(addResult.info_hash);
             if (videos.length > 0) {
+              if (forStreaming) {
+                // Retarder updateOnlyFiles : le torrent est encore "initializing", librqbit renverrait 500
+                window.setTimeout(() => {
+                  clientApi.updateOnlyFiles(addResult.info_hash, [videos[0].index]).catch(() => {});
+                }, 15000);
+              }
               addDebugLog('success', '✅ Fichiers vidéo trouvés', {
                 files_count: videos.length,
               });
               setVideoFiles(videos);
               setSelectedFile(videos[0]);
+              if (forStreaming) {
+                setPlayStatus('ready');
+                setProgressMessage('Lancement de la lecture...');
+                setIsPlaying(true);
+                setShowInfo(false);
+                stopProgressPolling();
+                return;
+              }
             } else {
               // Même avec un fichier .torrent, parfois les fichiers ne sont pas immédiatement disponibles
               addDebugLog('info', '⏳ Fichiers vidéo non encore disponibles, démarrage du polling...');
@@ -421,9 +469,8 @@ export function createHandlePlay(context: PlayHandlerContext) {
         setProgressMessage('Ajout du torrent via infoHash...');
 
         try {
-          // Toujours télécharger dans downloads/media, pas en streaming
-          const forStreaming = false;
-          const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+          const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
+          const downloadType = forStreaming ? undefined : (torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film'));
           const addResult = await clientApi.addMagnetLink(constructedMagnet, torrent.name, forStreaming, downloadType);
           if (addResult.info_hash) {
             if (typeof torrent.tmdbId === 'number' && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) {
@@ -464,11 +511,24 @@ export function createHandlePlay(context: PlayHandlerContext) {
                   // Essayer de charger les fichiers (peut prendre un peu de temps si pas encore prêts)
                   const videos = await loadVideoFiles(addResult.info_hash);
                   if (videos.length > 0) {
+                    if (forStreaming) {
+                      window.setTimeout(() => {
+                        clientApi.updateOnlyFiles(addResult.info_hash, [videos[0].index]).catch(() => {});
+                      }, 15000);
+                    }
                     addDebugLog('success', '✅ Fichiers vidéo trouvés', {
                       files_count: videos.length,
                     });
                     setVideoFiles(videos);
                     setSelectedFile(videos[0]);
+                    if (forStreaming) {
+                      setPlayStatus('ready');
+                      setProgressMessage('Lancement de la lecture...');
+                      setIsPlaying(true);
+                      setShowInfo(false);
+                      stopProgressPolling();
+                      return;
+                    }
                   } else if (hasFiles) {
                     // On a des fichiers mais pas encore de vidéo, réessayer après 1 seconde
                     addDebugLog('info', '⏳ Fichiers disponibles mais pas encore de vidéo, réessai...', {
@@ -638,9 +698,8 @@ export function createHandlePlay(context: PlayHandlerContext) {
       addDebugLog('info', 'Utilisation du magnet link direct');
 
       try {
-        // Toujours télécharger dans downloads/media, pas en streaming
-        const forStreaming = false;
-        const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+        const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
+        const downloadType = forStreaming ? undefined : (torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film'));
         const addResult = await clientApi.addMagnetLink(torrent._externalMagnetUri, torrent.name, forStreaming, downloadType);
         if (addResult.info_hash) {
           if (typeof torrent.tmdbId === 'number' && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) {
@@ -680,11 +739,24 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 // Essayer de charger les fichiers (peut prendre un peu de temps si pas encore prêts)
                 const videos = await loadVideoFiles(addResult.info_hash);
                 if (videos.length > 0) {
+                  if (forStreaming) {
+                    window.setTimeout(() => {
+                      clientApi.updateOnlyFiles(addResult.info_hash, [videos[0].index]).catch(() => {});
+                    }, 15000);
+                  }
                   addDebugLog('success', '✅ Fichiers vidéo trouvés', {
                     files_count: videos.length,
                   });
                   setVideoFiles(videos);
                   setSelectedFile(videos[0]);
+                  if (forStreaming) {
+                    setPlayStatus('ready');
+                    setProgressMessage('Lancement de la lecture...');
+                    setIsPlaying(true);
+                    setShowInfo(false);
+                    stopProgressPolling();
+                    return;
+                  }
                 } else if (hasFiles) {
                   // On a des fichiers mais pas encore de vidéo, réessayer après 1 seconde
                   addDebugLog('info', '⏳ Fichiers disponibles mais pas encore de vidéo, réessai...', {

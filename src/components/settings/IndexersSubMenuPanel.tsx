@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'preact/hooks';
-import { Search, Plus, Settings } from 'lucide-preact';
+import { Search, Plus, Settings, Shield } from 'lucide-preact';
 import { serverApi } from '../../lib/client/server-api';
 import type { Indexer } from '../../lib/client/types';
 import { canAccess } from '../../lib/permissions';
@@ -7,6 +7,7 @@ import SubMenuPanel, { type SubMenuItem } from './SubMenuPanel';
 import IndexerDetailPanel from './IndexerDetailPanel';
 import IndexersManager from './IndexersManager';
 import TorrentSyncManager from './TorrentSyncManager';
+import FlareSolverrPanel from './FlareSolverrPanel';
 import { useI18n } from '../../lib/i18n/useI18n';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
 
@@ -70,6 +71,14 @@ export default function IndexersSubMenuPanel({ onParentBack }: IndexersSubMenuPa
       icon: Settings,
       permission: 'settings.indexers',
       inlineContent: () => <TorrentSyncManager section="settings" />,
+    });
+    list.push({
+      id: 'flaresolverr',
+      titleKey: 'settingsMenu.flaresolverr.title',
+      descriptionKey: 'settingsMenu.flaresolverr.description',
+      icon: Shield,
+      permission: 'settings.indexers',
+      inlineContent: (props: { onBack?: () => void }) => <FlareSolverrPanel onBack={props.onBack} />,
     });
     return list;
   }, [indexers, t]);

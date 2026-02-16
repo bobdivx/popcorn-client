@@ -29,7 +29,7 @@ export const healthMethods = {
    * Vérifie la santé du serveur avec détails
    * Retourne des informations détaillées sur l'état de la connexion et la version
    */
-  async checkServerHealth(this: ServerApiClientAccess): Promise<ApiResponse<{ status: string; reachable: boolean; latency?: number; version?: string; build?: number; download_dir?: string; ffmpeg_available?: boolean; torrent_client_reachable?: boolean; librqbit_version?: string }>> {
+  async checkServerHealth(this: ServerApiClientAccess): Promise<ApiResponse<{ status: string; reachable: boolean; latency?: number; version?: string; build?: number; download_dir?: string; ffmpeg_available?: boolean; torrent_client_reachable?: boolean; librqbit_version?: string; flaresolverr_configured?: boolean }>> {
     const startTime = Date.now();
     
     // Unifié : appel direct au backend Rust
@@ -80,6 +80,7 @@ export const healthMethods = {
         ffmpeg_available: backendData.ffmpeg_available,
         torrent_client_reachable: backendData.torrent_client_reachable,
         librqbit_version: backendData.librqbit_version,
+        flaresolverr_configured: backendData.flaresolverr_configured,
       },
     };
   },
@@ -168,5 +169,17 @@ export const healthMethods = {
         backendReachable: true,
       },
     };
+  },
+
+  /**
+   * Teste si FlareSolverr est joigniable et fonctionnel (côté serveur).
+   */
+  async testFlareSolverr(this: ServerApiClientAccess): Promise<
+    ApiResponse<{ reachable: boolean; message?: string }>
+  > {
+    return this.backendRequest<{ reachable: boolean; message?: string }>(
+      '/api/client/flaresolverr/test',
+      { method: 'GET' }
+    );
   },
 };

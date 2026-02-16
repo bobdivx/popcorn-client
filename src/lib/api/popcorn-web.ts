@@ -532,6 +532,8 @@ export interface IndexerDefinition {
   caps?: Record<string, unknown> | null;
   /** Configuration optionnelle pour un flux RSS personnalisé */
   rssConfig?: { urlTemplate: string; params?: string[]; format?: string } | null;
+  /** True si cette définition est un proxy Jackett (nécessite Jackett installé ; option "Utiliser Jackett") */
+  isJackettProxy?: boolean;
 }
 
 /**
@@ -540,11 +542,13 @@ export interface IndexerDefinition {
 export interface AdsConfig {
   enabled: boolean;
   adId?: string | null;
-  type: 'image' | 'video' | 'google';
+  type: 'image' | 'video' | 'google' | 'google_display';
   imageUrl: string | null;
   videoUrl: string | null;
   clickUrl: string | null;
   googleAdTagUrl: string | null;
+  googleAdClient: string | null;
+  googleAdSlot: string | null;
   showSkip: boolean;
   skipDelaySeconds: number;
   maxDurationSeconds: number;
@@ -923,6 +927,8 @@ export interface UserConfig {
     label?: string | null;
     share_with_friends: boolean;
   }> | null;
+  /** URL pour ouvrir la page FlareSolverr dans le navigateur (synchronisée cloud) */
+  flaresolverrOpenUrl?: string | null;
 }
 
 /**
@@ -1024,6 +1030,7 @@ export async function saveUserConfigMerge(
     ...partial,
     indexers: partial.indexers !== undefined ? partial.indexers : current?.indexers ?? [],
     indexerCategories: partial.indexerCategories !== undefined ? partial.indexerCategories : current?.indexerCategories ?? undefined,
+    flaresolverrOpenUrl: partial.flaresolverrOpenUrl !== undefined ? partial.flaresolverrOpenUrl : current?.flaresolverrOpenUrl ?? undefined,
   };
   return saveUserConfig(merged, accessToken);
 }
@@ -1121,6 +1128,7 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
         playbackSettings: playbackSettings && Object.keys(playbackSettings).length > 0 ? playbackSettings : null,
         mediaPaths: mediaPaths && (mediaPaths.filmsPath != null || mediaPaths.seriesPath != null || mediaPaths.defaultPath != null) ? mediaPaths : null,
         librarySources: librarySources && librarySources.length > 0 ? librarySources : null,
+        flaresolverrOpenUrl: typeof c.flaresolverrOpenUrl === 'string' && c.flaresolverrOpenUrl.trim() !== '' ? c.flaresolverrOpenUrl.trim() : null,
       };
     }
 
@@ -1183,6 +1191,51 @@ export async function getCloudMediaRequests(accessToken?: string): Promise<Cloud
     if (!res.ok || !res.data?.success) return null;
     const list = res.data?.data?.requests;
     return Array.isArray(list) ? (list as CloudMediaRequest[]) : [];
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Réponse de GET /api/v1/subscription/me (abonnement + options par compte).
+ */
+export interface SubscriptionMe {
+  subscription: {
+    id: string;
+    planId: string;
+    planName: string;
+    planSlug: string;
+    storageGb: number;
+    status: string;
+    flyAppName: string | null;
+    flyRegion: string | null;
+    currentPeriodEnd: number | null;
+    stripeSubscriptionId: string | null;
+  } | null;
+  backendUrl: string | null;
+  streamingTorrent: boolean;
+}
+
+/**
+ * Récupère l'abonnement et les options du compte (dont streaming torrent).
+ */
+export async function getSubscriptionMe(accessToken?: string): Promise<SubscriptionMe | null> {
+  try {
+    const token = accessToken ?? TokenManager.getCloudAccessToken() ?? undefined;
+    if (!token) return null;
+    const apiUrl = `${getPopcornWebApiUrl()}/subscription/me`;
+    const res = await requestWithTokenRefresh(
+      apiUrl,
+      { method: 'GET', headers: { 'Content-Type': 'application/json' } },
+      10000
+    );
+    if (!res.ok || !res.data?.success) return null;
+    const d = res.data?.data;
+    return {
+      subscription: d?.subscription ?? null,
+      backendUrl: d?.backendUrl ?? null,
+      streamingTorrent: d?.streamingTorrent === true,
+    };
   } catch {
     return null;
   }

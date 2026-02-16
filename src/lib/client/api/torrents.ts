@@ -402,22 +402,25 @@ export class TorrentsService {
    * Ajouter un torrent depuis un lien magnet
    * @param magnetUri - L'URI magnet du torrent
    * @param name - Le nom du torrent
-   * @param forStreaming - DEPRECATED: Ne plus utiliser, toujours false. Les téléchargements vont dans media/films ou media/series
+   * @param forStreaming - true pour streaming (output temporaire), false pour téléchargement media/films ou media/series
    * @param downloadType - Type de téléchargement: "film" ou "serie" (détermine le chemin: media/films ou media/series)
    * @param customDownloadPath - Chemin personnalisé (optionnel)
+   * @param onlyFiles - Indices de fichiers à télécharger uniquement (ex. [0] pour un seul fichier en streaming)
    */
   async addMagnetLink(
-    magnetUri: string, 
-    name: string, 
+    magnetUri: string,
+    name: string,
     forStreaming: boolean = false,
     downloadType?: string,
-    customDownloadPath?: string
+    customDownloadPath?: string,
+    onlyFiles?: number[]
   ): Promise<AddTorrentResponse> {
     try {
       const request: AddMagnetRequest = {
         magnet_uri: magnetUri,
         name: name,
         for_streaming: forStreaming,
+        ...(onlyFiles != null && onlyFiles.length > 0 ? { only_files: onlyFiles } : {}),
       };
 
       const url = await this.getRequestUrl('torrents/magnet');
@@ -479,6 +482,21 @@ export class TorrentsService {
       method: 'DELETE',
     });
 
+    await handleResponse<void>(response);
+  }
+
+  /**
+   * Restreindre le téléchargement aux fichiers dont les indices sont fournis (ex. streaming : un seul fichier vidéo).
+   * À appeler après ajout si only_files n'a pas été fourni à l'ajout (métadonnées pas encore disponibles).
+   */
+  async updateOnlyFiles(infoHash: string, onlyFiles: number[]): Promise<void> {
+    if (onlyFiles.length === 0) return;
+    const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/update_only_files`);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ only_files: onlyFiles }),
+    });
     await handleResponse<void>(response);
   }
 

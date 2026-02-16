@@ -298,29 +298,32 @@ class ServerApiClient {
   }
 
   /**
-   * Détecte si une erreur est récupérable (peut être retentée)
+   * Détecte si une erreur est récupérable (peut être retentée).
+   * Connexion refusée / Failed to fetch : pas de retry (backend injoignable, évite le spam de requêtes et de logs).
    */
   private isRetryableError(error: unknown, response?: Response): boolean {
-    // Erreurs réseau temporaires (timeout, connexion refusée, etc.)
+    // Erreurs réseau sans réponse (connexion refusée, failed to fetch) : ne pas retenter
     if (error instanceof Error) {
       const msg = error.message.toLowerCase();
       if (
-        error.name === 'AbortError' ||
-        msg.includes('timeout') ||
-        msg.includes('network') ||
-        msg.includes('connection') ||
         msg.includes('failed to fetch') ||
-        msg.includes('networkerror')
+        msg.includes('networkerror') ||
+        msg.includes('connection refused') ||
+        msg.includes('err_connection_refused')
       ) {
+        return false;
+      }
+      // Timeout / Abort : retenter une fois peut aider
+      if (error.name === 'AbortError' || msg.includes('timeout')) {
         return true;
       }
     }
-    
+
     // Erreurs HTTP 5xx (erreurs serveur temporaires)
     if (response && response.status >= 500 && response.status < 600) {
       return true;
     }
-    
+
     return false;
   }
 
@@ -429,8 +432,9 @@ class ServerApiClient {
       };
     }
 
-    // Logger l'URL utilisée pour le diagnostic
-    if (retryCount === 0) {
+    // Logger l'URL pour le diagnostic (sauf health/sync pour limiter le bruit quand le backend est down)
+    const isPollingEndpoint = endpoint.includes('/health') || endpoint.includes('/sync/status');
+    if (retryCount === 0 && !isPollingEndpoint) {
       console.log('[server-api] Requête vers:', url);
     }
 
@@ -1032,7 +1036,7 @@ interface IServerApiClientPublic {
 
   // Sync methods
   getSyncStatus(): Promise<ApiResponse<any>>;
-  startSync(): Promise<ApiResponse<void>>;
+  startSync(indexerId?: string): Promise<ApiResponse<string>>;
   stopSync(): Promise<ApiResponse<void>>;
   getSyncSettings(): Promise<ApiResponse<any>>;
   updateSyncSettings(settings: any): Promise<ApiResponse<void>>;

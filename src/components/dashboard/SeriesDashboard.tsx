@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from 'preact/hooks';
-import { Download, Tv, Library as LibraryIcon } from 'lucide-preact';
+import { Download, Tv, Library as LibraryIcon, Play } from 'lucide-preact';
 import type { SeriesData } from '../../lib/client/types';
 import { HeroSection } from './components/HeroSection';
 import CarouselRow from '../torrents/CarouselRow';
@@ -18,6 +18,7 @@ import { NotificationContainer } from '../ui/Notification';
 import { useNotifications } from '../torrents/MediaDetailPage/hooks/useNotifications';
 import { resolveHeroTorrent } from './utils/heroDownload';
 import { handleDownload } from '../torrents/MediaDetailPage/actions/download';
+import { useSubscriptionMe } from '../torrents/MediaDetailPage/hooks/useSubscriptionMe';
 import Library from '../Library';
 
 export default function SeriesDashboard() {
@@ -28,6 +29,7 @@ export default function SeriesDashboard() {
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
   const lastSyncProgressRef = useRef<number>(-1);
   const { notifications, addNotification, removeNotification } = useNotifications();
+  const { streamingTorrentActive } = useSubscriptionMe();
   const [heroDownloading, setHeroDownloading] = useState(false);
   const [viewMode, setViewMode] = useState<'torrents' | 'library'>(() => {
     if (typeof window === 'undefined') return 'torrents';
@@ -362,10 +364,10 @@ export default function SeriesDashboard() {
             noOverlap
             items={heroItemsWithOverview}
             onPlay={handlePlay}
-            onPrimaryAction={handleHeroDownload}
-            primaryActionDisabled={heroDownloading}
-            primaryButtonLabel={t('common.download')}
-            primaryButtonIcon={<Download className="h-6 w-6 tv:h-8 tv:w-8" size={24} />}
+            onPrimaryAction={streamingTorrentActive ? handlePlay : handleHeroDownload}
+            primaryActionDisabled={!streamingTorrentActive && heroDownloading}
+            primaryButtonLabel={streamingTorrentActive ? t('common.watch') : t('common.download')}
+            primaryButtonIcon={streamingTorrentActive ? <Play className="h-6 w-6 tv:h-8 tv:w-8" size={24} /> : <Download className="h-6 w-6 tv:h-8 tv:w-8" size={24} />}
           />
         </div>
       )}
