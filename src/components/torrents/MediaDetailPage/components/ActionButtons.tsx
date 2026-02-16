@@ -1,4 +1,4 @@
-import { Play, RotateCw, Download, Link2, Check, Trash2, Loader2, Zap, Upload, XCircle } from 'lucide-preact';
+import { Play, RotateCw, Download, Link2, Check, Trash2, Loader2, Zap, Upload, XCircle, Radio } from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
 import { TorrentProgressBar, TorrentSpeedDisplay, PeersIndicator } from '../../ui';
@@ -10,9 +10,13 @@ interface ActionButtonsProps {
   torrent: MediaDetailPageProps['torrent'];
   allVariants?: MediaDetailPageProps['torrent'][];
   isAvailableLocally: boolean;
+  /** En mode streaming (Lire) : masquer le panneau "En file d'attente" / progression téléchargement. */
+  isStreamingThisTorrent?: boolean;
   canStream: boolean;
   isExternal: boolean;
   hasInfoHash: boolean;
+  /** Option streaming torrent active (abonnement) : afficher Lire en priorité avec icône streaming */
+  streamingTorrentActive?: boolean;
   magnetCopied: boolean;
   downloadingToClient: boolean;
   deletingMedia: boolean;
@@ -96,9 +100,11 @@ function selectBestTorrent(variants: MediaDetailPageProps['torrent'][]): MediaDe
 export function ActionButtons({
   torrent,
   isAvailableLocally,
+  isStreamingThisTorrent = false,
   canStream,
   isExternal,
   hasInfoHash,
+  streamingTorrentActive = false,
   magnetCopied,
   downloadingToClient,
   deletingMedia,
@@ -139,7 +145,8 @@ export function ActionButtons({
   const isDownloadInProgress = (!!torrentStats && !isDownloadComplete) || downloadingToClient;
   const showProgressInButton = hasActiveDownloadStats;
   const displayProgressPercent = hasActiveDownloadStats ? progressPercent : 0;
-  const showProgressNextToCancel = (isDownloadInProgress && !!onCancelDownload && !!torrentStats) && hasActiveDownloadStats;
+  // En mode streaming (Lire), ne pas afficher le panneau de progression téléchargement (réservé au mode "Télécharger").
+  const showProgressNextToCancel = !isStreamingThisTorrent && (isDownloadInProgress && !!onCancelDownload && !!torrentStats) && hasActiveDownloadStats;
 
   // Détecter si c'est un média local (slug ou id commence par "local_") ou fichier de la bibliothèque (downloadPath)
   const isLocalTorrent =
@@ -153,15 +160,26 @@ export function ActionButtons({
   // - OU le torrent est complété (selon torrentStats) → bouton "Lire"
   // - OU le torrent est disponible localement ET a un infoHash → bouton "Lire" (même sans stats)
   // - OU c'est un média local → bouton "Lire"
-  const shouldShowButton = !isAvailableLocally || isDownloadComplete || (isAvailableLocally && hasInfoHash) || isLocalTorrent;
+  // - OU option streaming torrent active ET hasInfoHash → bouton "Lire" (streaming)
+  const shouldShowButton = !isAvailableLocally || isDownloadComplete || (isAvailableLocally && hasInfoHash) || isLocalTorrent || (streamingTorrentActive && hasInfoHash);
   
-  // Afficher "Lire" quand le torrent est téléchargé (hydraté par les stats du client torrent).
-  // Dès que state=seeding/completed OU progress>=99%, les fichiers sont sur disque → on peut lire.
-  // Pas besoin de peers_connected ou files_available : un torrent à 100% a ses fichiers.
+  // Afficher "Lire" quand le torrent est téléchargé, ou en streaming si abonnement actif.
   const shouldShowPlayButton =
     isLocalTorrent ||
     (isAvailableLocally && hasInfoHash) ||
-    isDownloadComplete;
+    isDownloadComplete ||
+    (streamingTorrentActive && hasInfoHash);
+  // Lire en mode streaming (sans fichier local) = on affiche l'icône Radio à côté du label
+  const isPlayStreamingMode = shouldShowPlayButton && streamingTorrentActive && hasInfoHash && !isAvailableLocally && !isDownloadComplete;
+
+  // Quand abonnement streaming actif : afficher le bouton Télécharger à côté de Lire (sauf si déjà téléchargé)
+  const showDownloadButtonAlongsidePlay =
+    streamingTorrentActive &&
+    hasInfoHash &&
+    shouldShowPlayButton &&
+    !isDownloadComplete &&
+    !showProgressNextToCancel &&
+    !downloadingToClient;
 
   // Debug: Log pour diagnostiquer l'affichage du bouton Lire/Télécharger
   if (hasInfoHash && import.meta.env.DEV) {
@@ -190,7 +208,7 @@ export function ActionButtons({
                 : onDownload
             }
             disabled={countdownRemaining !== null && countdownRemaining > 0}
-            title={shouldShowPlayButton && hasSavedPosition ? t('dashboard.resumeWatching') : undefined}
+            title={isPlayStreamingMode ? t('playback.playStreamingLabel') : (shouldShowPlayButton && hasSavedPosition ? t('dashboard.resumeWatching') : undefined)}
             data-focusable
             data-media-detail-primary-action
             tabIndex={0}
@@ -214,6 +232,7 @@ export function ActionButtons({
             ) : shouldShowPlayButton ? (
               <>
                 <Play className="h-5 w-5" size={20} />
+                {isPlayStreamingMode && <Radio className="h-4 w-4 text-primary-200" size={16} aria-hidden />}
                 {hasSavedPosition ? t('playback.resumeLabel') : t('playback.playLabel')}
               </>
             ) : (
@@ -222,6 +241,20 @@ export function ActionButtons({
                 {isPackWithMultipleFiles ? 'Télécharger toute la saison' : 'Télécharger'}
               </>
             )}
+          </button>
+        )}
+        {/* Bouton Télécharger à côté de Lire quand abonnement streaming actif (fichier pas encore téléchargé) */}
+        {showDownloadButtonAlongsidePlay && (
+          <button
+            type="button"
+            onClick={onDownload}
+            data-focusable
+            tabIndex={0}
+            className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-lg font-semibold text-lg transition-all duration-200 border border-white/30 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv-element-focused"
+            title={isPackWithMultipleFiles ? t('playback.downloadFullSeason') : t('common.download')}
+          >
+            <Download className="h-5 w-5" size={20} />
+            {isPackWithMultipleFiles ? t('playback.downloadFullSeason') : t('common.download')}
           </button>
         )}
         {/* Progression en cours : carte avec pourcentage + bouton Annuler (icône seule) */}
@@ -384,8 +417,8 @@ export function ActionButtons({
       )}
       </div>
 
-      {/* Affichage du statut de téléchargement (détail sous les boutons, sauf si la carte compacte est affichée à côté d'Annuler) */}
-      {hasActiveDownloadStats && torrentStats && !showProgressNextToCancel && (
+      {/* Affichage du statut de téléchargement (détail sous les boutons) — masqué en mode streaming. */}
+      {!isStreamingThisTorrent && hasActiveDownloadStats && torrentStats && !showProgressNextToCancel && (
         <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/10 backdrop-blur-sm">
           <TorrentProgressBar
             progress={torrentStats.progress}

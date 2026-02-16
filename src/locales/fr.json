@@ -35,6 +35,7 @@
     "serie": "Série",
     "content": "Contenu",
     "download": "Télécharger",
+    "watch": "Regarder",
     "torrents": "Torrents",
     "details": "Détails",
     "other": "Autre",
@@ -442,11 +443,14 @@
   "playback": {
     "nextEpisode": "Épisode suivant",
     "playLabel": "Lire",
+    "playStreamingLabel": "Lire en streaming (téléchargement en cours)",
+    "downloadFullSeason": "Télécharger toute la saison",
     "resumeLabel": "Reprendre",
     "buffering": "Mise en buffer…",
     "bufferingProgress": "Mise en buffer {percent}%",
     "loadingVideo": "Chargement de la vidéo…",
     "preparingStream": "Préparation de la lecture en cours…",
+    "streamPreparingRetry": "Préparation du flux, nouvelle tentative…",
     "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct.",
     "maxTranscodingsReached": "Nombre maximum de transcodages atteint. Arrêtez les autres lectures en cours.",
     "maxTranscodingsReachedWithList": "Nombre maximum de transcodages atteint (max {max}). Arrêtez les autres lectures ou attendez qu'elles se terminent. Transcodages en cours : {list}",
@@ -867,6 +871,22 @@
     "documentation": {
       "title": "Documentation",
       "description": "Guide utilisateur et aide (s'ouvre sur le site)"
+    },
+    "subscription": {
+      "title": "Abonnement(s)",
+      "description": "Consulter le statut de vos abonnements et options",
+      "notConnected": "Connectez-vous à votre compte cloud pour voir vos abonnements.",
+      "connectToCloud": "Se connecter sur le site",
+      "plan": "Abonnement stockage",
+      "planName": "Forfait",
+      "status": "Statut",
+      "storage": "Stockage cloud",
+      "periodEnd": "Fin de période",
+      "noStoragePlan": "Aucun abonnement stockage actif.",
+      "streamingTorrentOption": "Option streaming torrent",
+      "streamingTorrentActive": "Active : vous pouvez lire un torrent en streaming sans le télécharger entièrement.",
+      "streamingTorrentInactive": "Inactive. Gérée sur le site (compte cloud).",
+      "manageOnWeb": "Gérer mon compte sur le site"
     },
     "quickLinks": "Liens rapides"
   },

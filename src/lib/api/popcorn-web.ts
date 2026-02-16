@@ -1197,6 +1197,51 @@ export async function getCloudMediaRequests(accessToken?: string): Promise<Cloud
 }
 
 /**
+ * Réponse de GET /api/v1/subscription/me (abonnement + options par compte).
+ */
+export interface SubscriptionMe {
+  subscription: {
+    id: string;
+    planId: string;
+    planName: string;
+    planSlug: string;
+    storageGb: number;
+    status: string;
+    flyAppName: string | null;
+    flyRegion: string | null;
+    currentPeriodEnd: number | null;
+    stripeSubscriptionId: string | null;
+  } | null;
+  backendUrl: string | null;
+  streamingTorrent: boolean;
+}
+
+/**
+ * Récupère l'abonnement et les options du compte (dont streaming torrent).
+ */
+export async function getSubscriptionMe(accessToken?: string): Promise<SubscriptionMe | null> {
+  try {
+    const token = accessToken ?? TokenManager.getCloudAccessToken() ?? undefined;
+    if (!token) return null;
+    const apiUrl = `${getPopcornWebApiUrl()}/subscription/me`;
+    const res = await requestWithTokenRefresh(
+      apiUrl,
+      { method: 'GET', headers: { 'Content-Type': 'application/json' } },
+      10000
+    );
+    if (!res.ok || !res.data?.success) return null;
+    const d = res.data?.data;
+    return {
+      subscription: d?.subscription ?? null,
+      backendUrl: d?.backendUrl ?? null,
+      streamingTorrent: d?.streamingTorrent === true,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Sauvegarde les demandes de médias dans le cloud (remplace la liste existante).
  */
 export async function saveCloudMediaRequests(

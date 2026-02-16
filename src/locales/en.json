@@ -35,6 +35,7 @@
     "serie": "Series",
     "content": "Content",
     "download": "Download",
+    "watch": "Watch",
     "torrents": "Torrents",
     "details": "Details",
     "other": "Other",
@@ -442,11 +443,14 @@
   "playback": {
     "nextEpisode": "Next episode",
     "playLabel": "Play",
+    "playStreamingLabel": "Play in streaming (downloading)",
+    "downloadFullSeason": "Download full season",
     "resumeLabel": "Resume",
     "buffering": "Buffering…",
     "bufferingProgress": "Buffering {percent}%",
     "loadingVideo": "Loading video…",
     "preparingStream": "Preparing playback…",
+    "streamPreparingRetry": "Preparing stream, retrying…",
     "streamingFallbackToHls": "Switched to HLS playback due to direct stream issue.",
     "maxTranscodingsReached": "Maximum number of transcodings reached. Stop other ongoing playback.",
     "maxTranscodingsReachedWithList": "Maximum number of transcodings reached (max {max}). Stop other playback or wait for it to finish. Active transcodings: {list}",
@@ -867,6 +871,22 @@
     "documentation": {
       "title": "Documentation",
       "description": "User guide and help (opens on the website)"
+    },
+    "subscription": {
+      "title": "Subscription(s)",
+      "description": "View your subscription and option status",
+      "notConnected": "Sign in to your cloud account to see your subscriptions.",
+      "connectToCloud": "Sign in on the website",
+      "plan": "Storage subscription",
+      "planName": "Plan",
+      "status": "Status",
+      "storage": "Cloud storage",
+      "periodEnd": "Period end",
+      "noStoragePlan": "No active storage subscription.",
+      "streamingTorrentOption": "Streaming torrent option",
+      "streamingTorrentActive": "Active: you can stream a torrent without downloading it fully.",
+      "streamingTorrentInactive": "Inactive. Managed on the website (cloud account).",
+      "manageOnWeb": "Manage my account on the website"
     },
     "quickLinks": "Quick links"
   },

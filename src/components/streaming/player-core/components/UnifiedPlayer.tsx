@@ -51,6 +51,13 @@ export default function UnifiedPlayer({
           onClose={onClose}
           onLoadedData={onDirectLoadedData}
           onError={onDirectError}
+          loading={loading}
+          loadingMessage={loadingMessage}
+          posterUrl={hlsProps.posterUrl}
+          logoUrl={hlsProps.logoUrl}
+          synopsis={hlsProps.synopsis}
+          releaseDate={hlsProps.releaseDate}
+          torrentName={hlsProps.torrentName ?? hlsProps.fileName}
         />
       ) : src && useLuciePlayer && lucieProps ? (
         <LuciePlayer

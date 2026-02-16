@@ -37,6 +37,8 @@ interface UseHlsPlayerProps {
   onTranscodingsEvicted?: (count: number) => void;
   /** Hauteur max en pixels pour le transcode (720, 480, 360). null/undefined = résolution source. */
   maxHeight?: number | null;
+  /** Quand true, src est l'URL stream-torrent : utiliser src tel quel pour HLS. */
+  useStreamTorrentUrl?: boolean;
 }
 
 export function useHlsPlayer({
@@ -57,6 +59,7 @@ export function useHlsPlayer({
   streamBackendUrl,
   onTranscodingsEvicted,
   maxHeight,
+  useStreamTorrentUrl: useStreamTorrentUrlProp,
 }: UseHlsPlayerProps) {
   const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -143,7 +146,11 @@ export function useHlsPlayer({
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !hlsLoaded || !infoHash || !filePath) return;
+    if (!video || !hlsLoaded) return;
+
+    /** Mode stream-torrent (option payante) : utiliser src tel quel (proxy vers librqbit), ne pas reconstruire en local/stream. */
+    const useStreamTorrentUrl = useStreamTorrentUrlProp === true || (typeof src === 'string' && src.includes('/api/stream-torrent/'));
+    if (!useStreamTorrentUrl && (!infoHash || !filePath)) return;
 
     setLoadingStatusMessage(null);
     // Réinitialiser le compteur de retry seulement si le fichier ou l'infoHash change vraiment
@@ -152,10 +159,10 @@ export function useHlsPlayer({
     const baseUrl = (baseUrlProp && baseUrlProp.trim()) || serverApi.getServerUrl();
     const useProxy = Boolean(streamBackendUrl?.trim());
     const buildHlsUrl = (forceVod = false, seekSeconds?: number) => {
-      const normalizedPath = filePath.replace(/\\/g, '/');
+      const normalizedPath = (filePath || '').replace(/\\/g, '/');
       const encodedPath = encodeURIComponent(normalizedPath);
       const path = `/api/local/stream/${encodedPath}/playlist.m3u8`;
-      const params: Record<string, string> = { info_hash: infoHash };
+      const params: Record<string, string> = { info_hash: infoHash || '' };
       if (forceVod) {
         params.force_vod = 'true';
         if (Number.isFinite(seekSeconds) && (seekSeconds ?? 0) > 0) {
@@ -171,8 +178,8 @@ export function useHlsPlayer({
       const search = new URLSearchParams(params);
       return `${baseUrl}${path}?${search.toString()}`;
     };
-    // Construire l'URL HLS pour vérifier si elle a changé
-    const hlsUrl = buildHlsUrl(false);
+    // En mode stream-torrent, utiliser src tel quel (proxy vers librqbit). Sinon construire l'URL HLS locale.
+    const hlsUrl = useStreamTorrentUrl ? src : buildHlsUrl(false);
     
     // Si l'URL est la même que la précédente, ne pas réinitialiser le player
     if (currentSrcRef.current === hlsUrl && hlsRef.current && !filePathChanged && !infoHashChanged) {
@@ -263,20 +270,20 @@ export function useHlsPlayer({
       try {
         setIsLoading(true);
         
-        // Utiliser l'URL HLS du backend. force_vod quand 503 (playlist en cours de génération)
-        const hlsUrl = buildHlsUrl(useForceVod);
-        void resolveAndRegisterFileId(hlsUrl);
+        // Utiliser l'URL HLS : en mode stream-torrent garder src, sinon buildHlsUrl (force_vod pour 503)
+        const effectiveHlsUrl = useStreamTorrentUrl ? src : buildHlsUrl(useForceVod);
+        void resolveAndRegisterFileId(effectiveHlsUrl);
 
         // Si l'URL est la même que celle déjà chargée, ne pas réinitialiser
-        if (!forceReload && currentSrcRef.current === hlsUrl && hlsRef.current) {
-          console.log('[useHlsPlayer] URL HLS identique, réutilisation du player existant:', hlsUrl);
+        if (!forceReload && currentSrcRef.current === effectiveHlsUrl && hlsRef.current) {
+          console.log('[useHlsPlayer] URL HLS identique, réutilisation du player existant:', effectiveHlsUrl);
           setIsLoading(false);
           return;
         }
 
         console.log('[useHlsPlayer] Construction URL HLS:', {
           filePath,
-          hlsUrl,
+          hlsUrl: effectiveHlsUrl,
           infoHash,
           retryCount: retryCountRef.current,
           previousUrl: currentSrcRef.current,
@@ -292,16 +299,15 @@ export function useHlsPlayer({
           hlsRef.current = null;
         }
 
-        blobUrlRef.current = hlsUrl;
-        currentSrcRef.current = hlsUrl;
+        blobUrlRef.current = effectiveHlsUrl;
+        currentSrcRef.current = effectiveHlsUrl;
 
         // Appel non bloquant à l'API durée (ffprobe). Essentiel en HLS progressif (bibliothèque) :
         // la playlist ne contient que les segments déjà générés, donc video.duration = durée du buffer.
-        // Ne pas appeler si : local_, streamBackendUrl, ou chemin Windows (D:/...) alors que le serveur
-        // peut être Docker/Linux sans accès à ce chemin → 404. La durée viendra de X-Video-Duration ou video.duration.
-        const isLocalMedia = infoHash.startsWith('local_');
+        // Ne pas appeler si : local_, stream-torrent (fichier pas sur disque), streamBackendUrl, ou chemin Windows.
+        const isLocalMedia = (infoHash || '').startsWith('local_');
         const isWindowsAbsolutePath = /^[A-Za-z]:[/\\]/.test((filePath || '').replace(/\\/g, '/'));
-        const skipDurationApi = isLocalMedia || isRemoteStream || !!streamBackendUrl || isWindowsAbsolutePath;
+        const skipDurationApi = useStreamTorrentUrl || isLocalMedia || isRemoteStream || !!streamBackendUrl || isWindowsAbsolutePath;
         if (!skipDurationApi) {
           const encodedPathParam = encodeURIComponent(filePath.replace(/\\/g, '/'));
           const durationUrl = `${baseUrl}/api/local/duration?path=${encodedPathParam}&info_hash=${encodeURIComponent(infoHash)}`;
@@ -388,7 +394,7 @@ export function useHlsPlayer({
         // Changement de qualité (même fichier, autre max_height) : conserver la position
         if (
           currentSrcRef.current != null &&
-          currentSrcRef.current !== hlsUrl &&
+          currentSrcRef.current !== effectiveHlsUrl &&
           video.currentTime > 0 &&
           !filePathChanged &&
           !infoHashChanged
@@ -397,13 +403,18 @@ export function useHlsPlayer({
           setPendingSeekPosition(video.currentTime);
         }
 
-        hls.loadSource(hlsUrl);
+        hls.loadSource(effectiveHlsUrl);
         hls.attachMedia(video);
 
-        // Permet de recharger la playlist avec seek= pour avancer au-delà du buffer (ex. >90s)
+        // Permet de recharger la playlist avec seek= pour avancer au-delà du buffer (ex. >90s).
+        // En mode stream-torrent, pas de reload avec seek (librqbit gère le range), on met à jour currentTime.
         reloadWithSeekRef.current = (seekSeconds: number) => {
-          const seekUrl = buildHlsUrl(true, seekSeconds);
           if (!hlsRef.current || !hlsRef.current.media) return;
+          if (useStreamTorrentUrl) {
+            video.currentTime = seekSeconds;
+            return;
+          }
+          const seekUrl = buildHlsUrl(true, seekSeconds);
           if (currentSrcRef.current === seekUrl) {
             video.currentTime = seekSeconds;
             return;
@@ -1024,24 +1035,35 @@ export function useHlsPlayer({
             }
 
             // 503/202 sur chargement initial : playlist/transcode en cours côté backend (tous flux, ex. bibliothèque)
+            // stream-torrent : plus de retries (torrent peut rester en "initializing" longtemps)
             const url = currentSrcRef.current;
+            const isStreamTorrent = typeof url === 'string' && url.includes('/api/stream-torrent/');
+            const maxInitialRetries = isStreamTorrent ? 10 : 5;
             if (
               (statusCode === 503 || statusCode === 202) &&
               url &&
               !seekLoadUrlRef.current &&
-              initialLoad503RetryCountRef.current < 5 &&
+              initialLoad503RetryCountRef.current < maxInitialRetries &&
               hlsRef.current
             ) {
               initialLoad503RetryCountRef.current += 1;
               setLoadingStatusMessage(t('playback.preparingStream'));
-              const delays = [3000, 6000, 10000, 15000, 20000];
-              const delayMs = delays[initialLoad503RetryCountRef.current - 1] ?? 20000;
+              const retryAfterHeader = data?.response?.headers?.['Retry-After'] ?? data?.response?.headers?.['retry-after'];
+              const retryAfterSec = typeof retryAfterHeader === 'string' ? parseInt(retryAfterHeader, 10) : NaN;
+              const defaultDelays = [3000, 6000, 10000, 15000, 20000];
+              const streamTorrentDelays = [5000, 5000, 10000, 10000, 15000, 15000, 20000, 20000, 25000, 25000];
+              const delays = isStreamTorrent ? streamTorrentDelays : defaultDelays;
+              const defaultDelayMs = delays[initialLoad503RetryCountRef.current - 1] ?? (isStreamTorrent ? 25000 : 20000);
+              const delayMs =
+                Number.isFinite(retryAfterSec) && retryAfterSec > 0 ? retryAfterSec * 1000 : defaultDelayMs;
               console.debug(
                 '[useHlsPlayer] 503/202 chargement initial, retry',
                 initialLoad503RetryCountRef.current,
+                '/',
+                maxInitialRetries,
                 'dans',
                 delayMs / 1000,
-                's'
+                's' + (isStreamTorrent ? ' (stream-torrent)' : '')
               );
               window.setTimeout(() => {
                 if (hlsRef.current && currentSrcRef.current === url) {
@@ -1080,7 +1102,7 @@ export function useHlsPlayer({
               fatal: data.fatal,
               frag: data.frag,
               response: data.response,
-              hlsUrl,
+              hlsUrl: effectiveHlsUrl,
             });
 
             // Jellyfin: MEDIA_ERROR → handleHlsJsMediaError (recover ou swap audio)
@@ -1140,7 +1162,7 @@ export function useHlsPlayer({
                 type: data.type,
                 details: data.details,
                 statusCode,
-                hlsUrl,
+                hlsUrl: effectiveHlsUrl,
               });
               
               // Détruire l'instance HLS actuelle
@@ -1399,8 +1421,8 @@ export function useHlsPlayer({
       retryCountRef.current = 0;
     };
     // IMPORTANT: Utiliser des dépendances stabilisées pour éviter les réinitialisations multiples
-    // maxHeight : changement de qualité → nouvelle URL, repositionnement après chargement
-  }, [hlsLoaded, infoHash, filePath, baseUrlProp, streamBackendUrl, maxHeight]);
+    // maxHeight : changement de qualité → nouvelle URL ; src / useStreamTorrentUrlProp : mode stream-torrent
+  }, [hlsLoaded, src, infoHash, filePath, baseUrlProp, streamBackendUrl, maxHeight, useStreamTorrentUrlProp]);
 
   // Fonction pour arrêter le buffer manuellement (utile lors de la fermeture).
   // Appelle le cleanup complet : pause vidéo + unregister backend (arrêt FFmpeg) + destroy HLS.

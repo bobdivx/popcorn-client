@@ -18,6 +18,8 @@ import { getPlaybackPosition, getPlaybackPositionByMedia } from '../../../lib/st
 import { getOrCreateDeviceId } from '../../../lib/utils/device-id';
 import { getDownloadClientStats } from '../../../lib/utils/download-meta-storage';
 import { serverApi } from '../../../lib/client/server-api';
+import { TokenManager } from '../../../lib/client/storage';
+import { useSubscriptionMe } from './hooks/useSubscriptionMe';
 import { PROGRESS_POLL_INTERVAL_MS } from './utils/constants';
 import { startProgressPolling } from './actions/progressPolling';
 import { DownloadVerificationPanel } from '../../downloads/DownloadVerificationPanel';
@@ -270,6 +272,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   });
   const { notifications, addNotification, removeNotification } = useNotifications();
   const { debugLogs, showDebug, setShowDebug, addDebugLog, clearDebugLogs } = useDebug();
+  const { streamingTorrentActive } = useSubscriptionMe();
 
   // Hook useTorrentPlayer (utilise le torrent actif = sélection saison/épisode)
   const {
@@ -294,6 +297,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     hasInfoHash,
     hasMagnetLink,
     canStream: Boolean(canStream),
+    streamingTorrentActive: streamingTorrentActive ?? false,
     isAvailableLocally: Boolean(isAvailableLocally),
     setIsAvailableLocally,
     loadVideoFiles,
@@ -825,11 +829,11 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   // Afficher l'overlay de progression UNIQUEMENT pour le streaming (bouton "Lire")
   // Pas pour le téléchargement (bouton "Télécharger") - le statut sera affiché sur la page détail
   // L'overlay ne doit s'afficher que si on a cliqué sur "Lire" ET que le torrent n'est pas encore prêt
-  // Si le torrent est disponible localement et qu'on clique sur "Lire", on lance directement la lecture sans overlay
+  // Si playStatus === 'ready' et qu'on a des fichiers, ne jamais afficher l'overlay (lecteur doit s'afficher)
   const shouldShowOverlay = !canShowVideoPlayer && 
                             playStatus !== 'idle' && 
                             playStatus !== 'error' && 
-                            playStatus !== 'ready' && // 'ready' signifie qu'on peut lancer directement la lecture
+                            playStatus !== 'ready' && // 'ready' = on peut lancer la lecture, afficher le lecteur
                             !continueInBackgroundRef.current &&
                             isPlaying; // L'overlay ne s'affiche que si on est en mode streaming (isPlaying = true)
 
@@ -938,6 +942,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   if (canShowVideoPlayer && !shouldShowOverlay && displayInfoHash) {
     return (
       <VideoPlayerWrapper
+        key={`player-${displayInfoHash}-${displayFile?.path ?? displayFile?.name ?? ''}`}
         infoHash={displayInfoHash}
         selectedFile={displayFile!}
         torrentName={displayTorrent.mainTitle || displayTorrent.cleanTitle || displayTorrent.name}
@@ -958,6 +963,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         logoUrl={displayTorrent.logoUrl ?? null}
         synopsis={displayTorrent.synopsis ?? displayTorrent.description ?? null}
         releaseDate={displayTorrent.releaseDate ?? null}
+        useStreamTorrentMode={streamingTorrentActive && !isAvailableLocally}
+        streamingTorrentToken={TokenManager.getCloudAccessToken()}
       />
     );
   }
@@ -969,6 +976,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
       {/* Pendant le téléchargement (isPlaying = false), ne pas rendre le composant pour éviter de déclencher le lecteur HLS */}
       {displayInfoHash && !shouldShowOverlay && isPlaying && canShowVideoPlayer && (
         <VideoPlayerWrapper
+          key={`player-${displayInfoHash}-${displayFile?.path ?? displayFile?.name ?? ''}`}
           infoHash={displayInfoHash}
           selectedFile={displayFile!}
           torrentName={displayTorrent.mainTitle || displayTorrent.cleanTitle || displayTorrent.name}
@@ -989,6 +997,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           logoUrl={displayTorrent.logoUrl ?? null}
           synopsis={displayTorrent.synopsis ?? displayTorrent.description ?? null}
           releaseDate={displayTorrent.releaseDate ?? null}
+          useStreamTorrentMode={streamingTorrentActive && !isAvailableLocally}
+          streamingTorrentToken={TokenManager.getCloudAccessToken()}
         />
       )}
     <div className="relative bg-black text-white">
@@ -1221,6 +1231,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
               torrent={selectedTorrent || torrent}
               activeTorrent={activeTorrent}
               allVariants={allVariants}
+              isPlaying={isPlaying}
               isAvailableLocally={Boolean(isAvailableLocally)}
               canStream={Boolean(canStream)}
               isExternal={isExternal}

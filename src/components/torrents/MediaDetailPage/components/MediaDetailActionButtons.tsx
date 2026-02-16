@@ -1,5 +1,6 @@
 import { useEffect } from 'preact/hooks';
 import { useMediaDetailActions } from '../hooks/useMediaDetailActions';
+import { useSubscriptionMe } from '../hooks/useSubscriptionMe';
 import type { MediaDetailPageProps } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
 import { ActionButtons } from './ActionButtons';
@@ -13,6 +14,8 @@ export interface MediaDetailActionButtonsProps {
   /** Torrent actif pour les actions (doit avoir infoHash pour download/cancel/delete) */
   activeTorrent: MediaDetailPageProps['torrent'];
   allVariants: MediaDetailPageProps['torrent'][];
+  /** En mode streaming (lecture en cours) : masquer le panneau de progression téléchargement. */
+  isPlaying?: boolean;
   isAvailableLocally: boolean;
   canStream: boolean;
   isExternal: boolean;
@@ -59,6 +62,7 @@ export function MediaDetailActionButtons({
   torrent,
   activeTorrent,
   allVariants,
+  isPlaying = false,
   isAvailableLocally,
   canStream,
   isExternal,
@@ -89,6 +93,7 @@ export function MediaDetailActionButtons({
   onActionsReady,
 }: MediaDetailActionButtonsProps) {
   const { t } = useI18n();
+  const { streamingTorrentActive } = useSubscriptionMe();
 
   const actions = useMediaDetailActions({
     activeTorrent,
@@ -127,9 +132,11 @@ export function MediaDetailActionButtons({
         torrent={torrent}
         allVariants={allVariants}
         isAvailableLocally={isAvailableLocally}
+        isStreamingThisTorrent={isPlaying}
         canStream={canStream}
         isExternal={isExternal}
         hasInfoHash={hasInfoHash}
+        streamingTorrentActive={streamingTorrentActive}
         magnetCopied={magnetCopied}
         downloadingToClient={downloadingToClient}
         deletingMedia={actions.deletingMedia}

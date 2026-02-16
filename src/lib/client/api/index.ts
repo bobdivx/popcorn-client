@@ -181,6 +181,13 @@ export class ClientApi {
   }
 
   /**
+   * Restreindre le téléchargement aux fichiers donnés (ex. streaming : un seul fichier vidéo).
+   */
+  async updateOnlyFiles(infoHash: string, onlyFiles: number[]): Promise<void> {
+    return this._torrents.updateOnlyFiles(infoHash, onlyFiles);
+  }
+
+  /**
    * Récupérer les logs d'un torrent
    * @param filtered - Si true, filtre et résume les logs répétitifs (par défaut: true pour le debug)
    */

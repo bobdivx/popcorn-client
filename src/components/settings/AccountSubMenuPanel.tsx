@@ -10,15 +10,25 @@ import {
   Users,
   MessageCircle,
   BookOpen,
+  CreditCard,
 } from 'lucide-preact';
 import AccountSettings from './AccountSettings';
 import TwoFactorSettings from './TwoFactorSettings';
 import QuickConnectAuthorize from './QuickConnectAuthorize';
 import LocalUsersManager from './LocalUsersManager';
+import SubscriptionStatusPanel from './SubscriptionStatusPanel';
 import SubMenuPanel, { type SubMenuItem } from './SubMenuPanel';
 
 export default function AccountSubMenuPanel() {
   const subItems: SubMenuItem[] = [
+    {
+      id: 'subscription',
+      titleKey: 'settingsMenu.subscription.title',
+      descriptionKey: 'settingsMenu.subscription.description',
+      icon: CreditCard,
+      permission: 'settings.account',
+      inlineContent: SubscriptionStatusPanel,
+    },
     {
       id: 'profile',
       titleKey: 'account.profile',
