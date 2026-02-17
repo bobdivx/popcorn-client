@@ -132,7 +132,25 @@ function patchManifest(manifestPath) {
     modified = true;
   }
 
-  // 5. Ajouter le banner TV dans l'activité principale (requis pour détection TV par Play Console)
+  // 5. Ajouter la catégorie LEANBACK_LAUNCHER (OBLIGATOIRE pour Android TV sur Play Console)
+  // Sans cette catégorie, Google Play affiche "0 appareils" pour Télévision.
+  // L'activité principale doit avoir LEANBACK_LAUNCHER dans son intent-filter launcher.
+  if (!content.includes('android.intent.category.LEANBACK_LAUNCHER')) {
+    console.log('🔧 Ajout: catégorie LEANBACK_LAUNCHER (obligatoire pour compatibilité Android TV)');
+    // Accepter divers formats (espaces, retours à la ligne)
+    const launcherCategoryRe = /<category\s+android:name="android\.intent\.category\.LAUNCHER"\s*\/>/;
+    if (content.match(launcherCategoryRe)) {
+      content = content.replace(
+        launcherCategoryRe,
+        '<category android:name="android.intent.category.LAUNCHER" />\n                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />'
+      );
+      modified = true;
+    } else {
+      console.warn('⚠️ Balise category LAUNCHER introuvable dans le manifest, LEANBACK_LAUNCHER non ajouté');
+    }
+  }
+
+  // 6. Ajouter le banner TV dans l'activité principale (requis pour détection TV par Play Console)
   // Le banner doit être déclaré dans l'activité avec android:banner
   // Google Play Console exige un banner TV (320x180dp) pour détecter la compatibilité TV
   const mainActivityPattern = /(<activity[^>]*android:name="[^"]*MainActivity"[^>]*)(>)/;
@@ -147,7 +165,7 @@ function patchManifest(manifestPath) {
     modified = true;
   }
   
-  // 6. S'assurer que les features critiques ne sont pas déclarées comme requises
+  // 7. S'assurer que les features critiques ne sont pas déclarées comme requises
   // Liste des features qui ne doivent pas être requises pour compatibilité large
   const optionalFeatures = [
     'android.hardware.camera',
