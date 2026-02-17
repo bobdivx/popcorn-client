@@ -445,7 +445,13 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                 });
                 if (item && (item.download_path || item.exists)) {
                   setIsAvailableLocally(true);
-                  if (item.download_path) {
+                  const hasExistingPath = !!(activeTorrent as any).downloadPath;
+                  // #region agent log
+                  fetch('http://127.0.0.1:7728/ingest/04a4339e-516d-43b3-aa22-e137dbb068b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f'},body:JSON.stringify({sessionId:'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f',location:'MediaDetailPage.tsx:getLibrary',message:'Library item found',data:{activeTorrentDownloadPath:(activeTorrent as any).downloadPath,itemDownloadPath:item.download_path,hasExistingPath,willSet:!!(item.download_path&&!hasExistingPath)},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+                  // #endregion
+                  // Ne pas écraser si le torrent a déjà un chemin ; ne pas utiliser un chemin qui est un dossier (streaming a besoin du fichier)
+                  const pathIsFile = item.download_path && /\.(mkv|mp4|avi|webm|mov|m4v|wmv|ts|m2ts)$/i.test(item.download_path.replace(/\\/g, '/'));
+                  if (item.download_path && !hasExistingPath && pathIsFile) {
                     setLibraryDownloadPath(item.download_path);
                   }
                   setTorrentStats((prev) =>
@@ -484,8 +490,19 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
               const localMedia = await clientApi.findLocalMediaByTmdb(activeTorrent.tmdbId, activeTorrent.tmdbType || undefined);
               if (localMedia.length > 0) {
                 setIsAvailableLocally(true);
-                const firstPath = (localMedia[0] as { file_path?: string }).file_path;
-                if (firstPath) {
+                const hasExistingPathTmdb = !!(activeTorrent as any).downloadPath;
+                const currentName = (activeTorrent.name || '').toLowerCase();
+                const matchByName = currentName
+                  ? localMedia.find((m: any) => (m.file_name || m.name || '').toLowerCase().includes(currentName.split(/[.\s\-_]+/)[0] || '') || currentName.includes((m.file_name || m.name || '').toLowerCase().split(/[.\s\-_]+/)[0] || ''))
+                  : null;
+                const chosen = matchByName ?? localMedia[0];
+                const firstPath = (chosen as { file_path?: string }).file_path;
+                // #region agent log
+                fetch('http://127.0.0.1:7728/ingest/04a4339e-516d-43b3-aa22-e137dbb068b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f'},body:JSON.stringify({sessionId:'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f',location:'MediaDetailPage.tsx:findLocalMediaByTmdb',message:'Local media by tmdb',data:{activeTorrentDownloadPath:(activeTorrent as any).downloadPath,firstPath,chosenFileName:(chosen as any).file_name,hasExistingPathTmdb,willSet:!!(firstPath&&!hasExistingPathTmdb)},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
+                // #endregion
+                // Ne pas écraser le chemin si le torrent en a déjà un ; ne pas utiliser un chemin qui est un dossier
+                const firstPathIsFile = firstPath && /\.(mkv|mp4|avi|webm|mov|m4v|wmv|ts|m2ts)$/i.test(firstPath.replace(/\\/g, '/'));
+                if (!hasExistingPathTmdb && firstPathIsFile) {
                   setLibraryDownloadPath(firstPath);
                 }
                 setTorrentStats((prev) =>
@@ -1005,6 +1022,9 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         releaseDate={displayTorrent.releaseDate ?? null}
         useStreamTorrentMode={streamingTorrentActive && !isAvailableLocally}
         streamingTorrentToken={TokenManager.getCloudAccessToken()}
+        playStatus={playStatus}
+        progressMessage={progressMessage}
+        torrentStats={torrentStats}
       />
     );
   }
@@ -1033,6 +1053,9 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           quality={displayTorrent.quality}
           directStreamUrl={(displayTorrent as any)._demoStreamUrl ?? undefined}
           streamBackendUrl={streamBackendUrl ?? undefined}
+          playStatus={playStatus}
+          progressMessage={progressMessage}
+          torrentStats={torrentStats}
           posterUrl={displayTorrent.imageUrl ?? null}
           logoUrl={displayTorrent.logoUrl ?? null}
           synopsis={displayTorrent.synopsis ?? displayTorrent.description ?? null}

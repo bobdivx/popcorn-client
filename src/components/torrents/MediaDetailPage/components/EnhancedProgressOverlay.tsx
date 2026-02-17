@@ -1,5 +1,6 @@
 import type { PlayStatus, DebugLog } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
+import { getLoadingStep, LOADING_STEPS } from '../../../streaming/player-shared/utils/streamingSteps';
 import { DebugConsole } from './DebugConsole';
 import { formatTimeRemaining, formatBytes } from '../../../../lib/utils/formatBytes';
 
@@ -37,7 +38,9 @@ export function EnhancedProgressOverlay({
   const progressPercentage = torrentStats?.progress ? torrentStats.progress * 100 : 0;
   const downloadSpeed = torrentStats?.download_speed ? (torrentStats.download_speed / (1024 * 1024)).toFixed(1) : '0.0';
   const isDownloading = playStatus === 'downloading' && torrentStats && torrentStats.download_speed > 0;
-  
+  const currentStep = getLoadingStep(playStatus, progressMessage, torrentStats);
+  const isWaitingSeeders = playStatus === 'downloading' && (!torrentStats || (progressPercentage === 0 && !torrentStats?.download_speed));
+
   const downloadedFormatted = torrentStats?.downloaded_bytes ? formatBytes(torrentStats.downloaded_bytes) : '0 B';
   const totalFormatted = torrentStats?.total_bytes ? formatBytes(torrentStats.total_bytes) : '0 B';
   const timeRemaining = torrentStats?.eta_seconds ? formatTimeRemaining(torrentStats.eta_seconds) : '--:--';
@@ -93,25 +96,86 @@ export function EnhancedProgressOverlay({
           </div>
         )}
 
-        {/* Spinner amélioré */}
+        {/* Spinner + indicateur d'étapes */}
         {playStatus !== 'error' && (
           <div className="flex flex-col items-center">
-            <div className="relative w-28 h-28 mb-8">
-              <div className="absolute inset-0 border-4 border-primary-600/20 rounded-full"></div>
-              <div className="absolute inset-0 border-4 border-transparent border-t-primary-600 border-r-primary-600 rounded-full animate-spin" style={{ animationDuration: '1s' }}></div>
-              {(playStatus === 'downloading' || playStatus === 'buffering' || playStatus === 'adding') && (
+            {/* Indicateur d'étapes (barre avec 4 phases) */}
+            {(playStatus === 'adding' || playStatus === 'downloading' || playStatus === 'buffering') && (
+              <div className="w-full max-w-sm mb-8">
+                <div className="flex justify-between gap-1">
+                  {LOADING_STEPS.map((step, i) => {
+                    const stepNum = i + 1;
+                    const isActive = currentStep === stepNum;
+                    const isDone = currentStep > stepNum;
+                    return (
+                      <div key={step.label} className="flex flex-1 flex-col items-center">
+                        <div
+                          className={`
+                            w-full h-1.5 rounded-full transition-all duration-300
+                            ${isDone ? 'bg-primary-500' : isActive ? 'bg-primary-500 animate-pulse' : 'bg-white/20'}
+                          `}
+                        />
+                        <div className="mt-2 flex flex-col items-center">
+                          <span
+                            className={`
+                              text-xs font-medium transition-colors
+                              ${isActive ? 'text-primary-400' : isDone ? 'text-white/70' : 'text-white/40'}
+                            `}
+                          >
+                            {isActive && (
+                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary-400 animate-ping mr-1 align-middle" />
+                            )}
+                            {step.label}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="relative w-28 h-28 mb-6">
+              {/* Cercle de fond */}
+              <div className="absolute inset-0 border-4 border-primary-600/20 rounded-full" />
+              {/* Spinner principal */}
+              <div
+                className="absolute inset-0 border-4 border-transparent border-t-primary-600 border-r-primary-600 rounded-full animate-spin"
+                style={{ animationDuration: '1s' }}
+              />
+              {/* Contenu central : % seulement quand on a une vraie progression, sinon animation par phase */}
+              {(playStatus === 'downloading' || playStatus === 'buffering') && torrentStats && (progressPercentage > 0 || isDownloading) ? (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="text-primary-600 text-3xl font-bold drop-shadow-lg">
                     {progressPercentage.toFixed(0)}%
                   </span>
                 </div>
-              )}
+              ) : playStatus === 'adding' ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-4xl animate-pulse" title="Préparation">
+                    📥
+                  </span>
+                </div>
+              ) : isWaitingSeeders ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-4xl animate-pulse" title="En attente de seeders">
+                    🔗
+                  </span>
+                </div>
+              ) : (playStatus === 'downloading' || playStatus === 'buffering') ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-primary-600 text-3xl font-bold drop-shadow-lg">
+                    {progressPercentage.toFixed(0)}%
+                  </span>
+                </div>
+              ) : null}
+              {/* Badge vitesse quand téléchargement actif */}
               {isDownloading && (
                 <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2">
                   <div className="flex items-center gap-2 bg-green-500/20 backdrop-blur-sm px-3 py-1 rounded-full border border-green-500/30">
                     <div className="relative w-2 h-2">
-                      <div className="absolute inset-0 bg-green-500 rounded-full animate-ping"></div>
-                      <div className="absolute inset-0 bg-green-500 rounded-full"></div>
+                      <div className="absolute inset-0 bg-green-500 rounded-full animate-ping" />
+                      <div className="absolute inset-0 bg-green-500 rounded-full" />
                     </div>
                     <span className="text-green-400 text-xs font-semibold">{downloadSpeed} MB/s</span>
                   </div>
@@ -119,9 +183,9 @@ export function EnhancedProgressOverlay({
               )}
             </div>
 
-            <h2 className="text-white text-3xl font-bold mb-4 text-center tracking-tight">
+            <h2 className="text-white text-3xl font-bold mb-2 text-center tracking-tight">
               {playStatus === 'adding' && 'Préparation en cours...'}
-              {playStatus === 'downloading' && 'Téléchargement en cours'}
+              {playStatus === 'downloading' && (isWaitingSeeders ? 'En attente de seeders...' : 'Téléchargement en cours')}
               {playStatus === 'buffering' && 'Mise en buffer...'}
               {playStatus === 'ready' && 'Téléchargement terminé'}
             </h2>
@@ -129,6 +193,14 @@ export function EnhancedProgressOverlay({
             {progressMessage && (
               <p className="text-white/60 text-center text-base mb-6 font-light max-w-md">
                 {progressMessage}
+              </p>
+            )}
+
+            {/* Rappel seeders/peers quand on attend */}
+            {isWaitingSeeders && torrentStats && (
+              <p className="text-white/50 text-sm text-center mb-4">
+                Peers connectés : {torrentStats.peers_connected ?? 0} / {torrentStats.peers_total ?? 0}
+                {(torrentStats.seeders ?? 0) > 0 && ` · Seeders : ${torrentStats.seeders}`}
               </p>
             )}
 

@@ -166,7 +166,7 @@
     },
     "serverUrl": {
       "title": "Configuration du serveur",
-      "description": "Entrez l'URL de votre serveur Popcorn backend",
+      "description": "Entrez l'URL de votre serveur Popcornn backend",
       "placeholder": "https://votre-serveur.com",
       "testConnection": "Tester la connexion",
       "connectionSuccess": "Connexion réussie !",
@@ -178,8 +178,8 @@
       "connectClientTitle": "Connecter ce client",
       "choiceQuestion": "Comment souhaitez-vous procéder ?",
       "choiceFirstTime": "C'est ma première installation",
-      "choiceFirstTimeDesc": "Je n'ai jamais configuré Popcorn. Je veux entrer l'URL du serveur ici ou faire la configuration depuis mon téléphone.",
-      "choiceAlreadyConfigured": "J'ai déjà configuré Popcorn",
+      "choiceFirstTimeDesc": "Je n'ai jamais configuré Popcornn. Je veux entrer l'URL du serveur ici ou faire la configuration depuis mon téléphone.",
+      "choiceAlreadyConfigured": "J'ai déjà configuré Popcornn",
       "choiceAlreadyConfiguredDesc": "Un autre appareil (téléphone, TV, ordinateur) est déjà connecté. Je veux scanner son QR code ou entrer le code pour récupérer la configuration.",
       "mobileWelcome": "Bienvenue !",
       "mobileChoiceIntro": "Choisissez comment connecter cet appareil :",
@@ -198,25 +198,26 @@
       "qrScanError": "Impossible de scanner le QR code",
       "qrScanErrorHelp": "Vérifiez que le QR code est bien visible et que la caméra fonctionne correctement. Vous pouvez aussi entrer le code manuellement ci-dessous.",
       "tvInstructionsTitle": "Connectez avec votre téléphone",
-      "tvStep1": "Sur votre téléphone, ouvrez l’app Popcorn ou le site popcorn-web (déjà connecté à votre compte).",
+      "tvStep1": "Sur votre téléphone, ouvrez l’app Popcornn ou le site popcorn-web (déjà connecté à votre compte).",
       "tvStep2": "Scannez ce QR code ou ouvrez le lien affiché.",
       "tvStep3": "Sur la page qui s’ouvre : connectez-vous si besoin, configurez l’URL du serveur si ce n’est pas encore fait, puis cliquez sur « Autoriser ».",
-      "tvStep4": "Ou entrez le code à 6 caractères ci-dessous sur votre téléphone.",
+      "tvStep4": "Allez sur popcorn-web et saisissez ce code pour autoriser cet appareil.",
       "tvQrAlsoSetupFromPhone": "Vous pouvez faire toute la première configuration depuis votre téléphone : ouvrez le lien (QR ou code), connectez-vous à votre compte, renseignez l’URL du serveur si besoin, puis autorisez ce code.",
       "tvWaitingAuth": "En attente d'autorisation depuis votre téléphone...",
       "tvAuthorized": "Autorisé ! Connexion en cours...",
       "tvExpiresIn": "Expire dans",
       "tvSeconds": "secondes",
-      "tvOrEnterCode": "Ou entrez ce code sur votre téléphone",
+      "tvOrEnterCode": "Code à saisir sur popcorn-web (même que dans le QR)",
+      "openPopcornWebToAuthorize": "Ouvrir popcorn-web pour autoriser (code déjà inclus)",
       "errors": {
         "backendRequired": "Veuillez entrer une URL de serveur",
         "invalidUrl": "L'URL n'est pas valide",
         "invalidUrlFormat": "Format d'URL invalide. Utilisez : http://192.168.1.100:3000 ou https://votre-domaine.com",
         "invalidProtocol": "Le protocole doit être http:// ou https://",
         "connectionFailed": "Impossible de se connecter au serveur",
-        "connectionFailedDetails": "Vérifiez que :\n• Le serveur Popcorn est démarré\n• L'adresse IP est correcte\n• Votre appareil et le serveur sont sur le même réseau Wi-Fi",
+        "connectionFailedDetails": "Vérifiez que :\n• Le serveur Popcornn est démarré\n• L'adresse IP est correcte\n• Votre appareil et le serveur sont sur le même réseau Wi-Fi",
         "backendNotAccessible": "Le serveur n'est pas accessible",
-        "backendNotAccessibleDetails": "Vérifiez que le serveur Popcorn est démarré et que l'URL est correcte",
+        "backendNotAccessibleDetails": "Vérifiez que le serveur Popcornn est démarré et que l'URL est correcte",
         "saveError": "Erreur lors de la sauvegarde de la configuration",
         "quickConnectInitError": "Impossible de démarrer la connexion rapide",
         "quickConnectInitErrorDetails": "Vérifiez votre connexion internet et réessayez",
@@ -542,8 +543,8 @@
     "startSearchDescription": "Recherchez des films ou des séries en utilisant la barre de recherche ci-dessus",
     "searchingLocal": "Recherche dans la base locale (torrents synchronisés)...",
     "searchingIndexers": "Recherche sur les indexeurs...",
-    "localSearchNote": "Popcorn parcourt d'abord ta bibliothèque.",
-    "indexerSearchNote": "Aucun résultat local. Popcorn interroge les indexeurs.",
+    "localSearchNote": "Popcornn parcourt d'abord ta bibliothèque.",
+    "indexerSearchNote": "Aucun résultat local. Popcornn interroge les indexeurs.",
     "mustBeLoggedIn": "Vous devez être connecté pour rechercher du contenu",
     "content": "contenu",
     "noTorrentsUseRequest": "Aucun torrent trouvé pour cette recherche. Vous pouvez demander ces médias pour qu'ils soient ajoutés.",
@@ -568,7 +569,7 @@
     "sharedBy": "Partagé par {name}",
     "downloadingSection": "En cours de téléchargement",
     "downloadingBadge": "En cours",
-    "badgePopcorn": "Popconn",
+    "badgePopcorn": "Popcornn",
     "badgeLocal": "Local",
     "badgeExternalLibrary": "Bibliothèque externe",
     "badgeSharedByFriend": "Partagé par un ami",
@@ -576,7 +577,7 @@
     "filterFilms": "Films",
     "filterSeries": "Séries",
     "filterSourceAll": "Toutes sources",
-    "filterSourcePopcorn": "Popconn",
+    "filterSourcePopcorn": "Popcornn",
     "filterSourceExternal": "Bibliothèque externe",
     "filterSourceShared": "Partagés",
     "filterSourceLocal": "Local",
@@ -725,7 +726,7 @@
     },
     "server": {
       "title": "Serveur",
-      "description": "Configurez l'URL du serveur Popcorn auquel se connecter"
+      "description": "Configurez l'URL du serveur Popcornn auquel se connecter"
     },
     "tmdb": {
       "title": "TMDB",
@@ -1056,7 +1057,7 @@
       "simpleStep1": "Installez l'extension Cookie-Editor : Chrome ou Firefox (voir liens ci-dessous).",
       "simpleStep2": "Ouvrez le site du trackeur dans un onglet et connectez-vous (reCAPTCHA si demandé).",
       "simpleStep3": "Cliquez sur l'icône Cookie-Editor dans la barre du navigateur. Repérez le cookie de session (souvent nommé comme le site ou « session »), cliquez sur l'icône copier à côté de sa valeur.",
-      "simpleStep4": "Revenez dans Popcorn et collez (Ctrl+V) dans le champ « Cookie (session) », ou utilisez la zone de dépôt ci-dessous.",
+      "simpleStep4": "Revenez dans Popcornn et collez (Ctrl+V) dans le champ « Cookie (session) », ou utilisez la zone de dépôt ci-dessous.",
       "extensionName": "Cookie-Editor",
       "extensionChrome": "Installer pour Chrome",
       "extensionFirefox": "Installer pour Firefox",
@@ -1068,8 +1069,8 @@
       "manualStep2Text": "Appuyez sur F12 (ou clic droit → Inspecter). Allez dans l'onglet « Application » (Chrome/Edge) ou « Stockage » (Firefox), puis « Cookies » et sélectionnez le site du trackeur.",
       "manualStep3Title": "Copier le cookie",
       "manualStep3Text": "Repérez le cookie de session (souvent nommé comme le site ou « session »). Clic droit sur la valeur → Copier, ou double-cliquez pour sélectionner et copiez (Ctrl+C). Vous pouvez aussi copier toute la ligne « Cookie » si votre navigateur l'affiche.",
-      "manualStep4Title": "Coller dans Popcorn",
-      "manualStep4Text": "Revenez dans Popcorn, dans le formulaire de l'indexer, et collez (Ctrl+V) dans le champ « Cookie (session) ». Enregistrez. Le cookie expire après un moment ; en cas d'échec plus tard, refaites ces étapes et mettez à jour le champ.",
+      "manualStep4Title": "Coller dans Popcornn",
+      "manualStep4Text": "Revenez dans Popcornn, dans le formulaire de l'indexer, et collez (Ctrl+V) dans le champ « Cookie (session) ». Enregistrez. Le cookie expire après un moment ; en cas d'échec plus tard, refaites ces étapes et mettez à jour le champ.",
       "screenshotPlaceholder": "Capture d'écran à venir"
     },
     "form": {
@@ -1250,7 +1251,7 @@
   },
   "legacySettings": {
     "serverConfig": "Configuration du serveur",
-    "serverConfigDesc": "Configurez l'URL du serveur Popcorn auquel se connecter",
+    "serverConfigDesc": "Configurez l'URL du serveur Popcornn auquel se connecter",
     "serverUrl": "URL du serveur",
     "serverUrlExample": "Exemple: http://192.168.1.100:4321 ou https://popcorn.example.com",
     "urlRequired": "URL du serveur requise",
@@ -1344,7 +1345,7 @@
     "canWaitOrAccess": "Vous pouvez attendre la fin de la synchronisation ou accéder directement au dashboard.",
     "checkingSyncStatus": "⏳ Vérification de l'état de la synchronisation...",
     "syncTorrentsInProgress": "🔄 Synchronisation des torrents en cours...",
-    "canStartUsing": "Vous pouvez maintenant commencer à utiliser Popcorn pour rechercher et regarder vos contenus préférés.",
+    "canStartUsing": "Vous pouvez maintenant commencer à utiliser Popcornn pour rechercher et regarder vos contenus préférés.",
     "browserNoVideo": "Votre navigateur ne supporte pas la lecture de vidéos."
   },
   "syncProgress": {
@@ -1366,12 +1367,12 @@
   },
   "completeStep": {
     "configurationComplete": "Configuration terminée !",
-    "clientReady": "Votre client Popcorn est maintenant configuré et prêt à l'emploi.",
+    "clientReady": "Votre client Popcornn est maintenant configuré et prêt à l'emploi.",
     "checkingStatus": "⏳ Vérification de l'état de la synchronisation...",
     "syncInProgress": "🔄 Synchronisation des torrents en cours...",
     "waitOrAccess": "Vous pouvez attendre la fin de la synchronisation ou accéder directement au dashboard.",
     "syncComplete": "✅ Synchronisation terminée",
-    "canStartUsing": "Vous pouvez maintenant commencer à utiliser Popcorn pour rechercher et regarder vos contenus préférés.",
+    "canStartUsing": "Vous pouvez maintenant commencer à utiliser Popcornn pour rechercher et regarder vos contenus préférés.",
     "browserNoVideo": "Votre navigateur ne supporte pas la lecture de vidéos.",
     "accessDashboardNow": "Accéder au dashboard maintenant"
   },
@@ -1472,7 +1473,7 @@
     },
     "server": {
       "title": "Serveur",
-      "subtitle": "Configurez l'URL du serveur Popcorn auquel se connecter"
+      "subtitle": "Configurez l'URL du serveur Popcornn auquel se connecter"
     },
     "quickConnect": {
       "title": "Connexion rapide",

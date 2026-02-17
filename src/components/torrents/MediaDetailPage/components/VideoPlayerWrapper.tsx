@@ -10,6 +10,7 @@ import { getPublicAdsSettings, type AdsConfig } from '../../../../lib/api/popcor
 import { useHlsLoader } from '../../../streaming/hls-player/hooks/useHlsLoader';
 import { usePlayerConfig } from '../../../streaming/player-shared/hooks/usePlayerConfig';
 import PlayerLoadingOverlay from '../../../streaming/player-shared/components/PlayerLoadingOverlay';
+import { getLoadingStep } from '../../../streaming/player-shared/utils/streamingSteps';
 import UnifiedPlayer from '../../../streaming/player-core/components/UnifiedPlayer';
 import { useStreamSource } from '../../../streaming/player-core/hooks/useStreamSource';
 import { buildProxyUrl } from '../../../streaming/player-core/utils/buildStreamUrl';
@@ -65,6 +66,12 @@ interface VideoPlayerWrapperProps {
   useStreamTorrentMode?: boolean;
   /** Token cloud pour stream-torrent (?access_token=). */
   streamingTorrentToken?: string | null;
+  /** Statut de lecture (pour l'indicateur d'étapes dans l'overlay du lecteur). */
+  playStatus?: string;
+  /** Message de progression (ex. "Recherche de peers..."). */
+  progressMessage?: string;
+  /** Stats du torrent (pour déduire l'étape courante). */
+  torrentStats?: { progress?: number; download_speed?: number } | null;
 }
 
 export function VideoPlayerWrapper({ 
@@ -90,6 +97,9 @@ export function VideoPlayerWrapper({
   releaseDate,
   useStreamTorrentMode = false,
   streamingTorrentToken,
+  playStatus,
+  progressMessage,
+  torrentStats,
 }: VideoPlayerWrapperProps) {
   const baseUrl = serverApi.getServerUrl();
   const [forceHlsFallback, setForceHlsFallback] = useState(false);
@@ -137,6 +147,9 @@ export function VideoPlayerWrapper({
     streamingTorrentMode: useStreamTorrentMode,
     streamingTorrentToken: streamingTorrentToken ?? undefined,
   });
+
+  const loadingStepFromStatus = getLoadingStep(playStatus ?? '', progressMessage ?? '', torrentStats ?? null);
+  const loadingStep = loadingStepFromStatus > 0 ? loadingStepFromStatus : isLoading ? 4 : 0;
   
   const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';
   const STORAGE_INTRO_ALWAYS_SHOW = 'popcorn_intro_always_show';
@@ -354,7 +367,14 @@ export function VideoPlayerWrapper({
           display: visible ? 'block' : 'none',
         }}
       >
-        <PlayerLoadingOverlay message="Chargement des fichiers vidéo..." />
+        <PlayerLoadingOverlay
+          message="Chargement des fichiers vidéo..."
+          loadingStep={loadingStep}
+          progressMessage={progressMessage}
+          torrentStats={torrentStats ?? undefined}
+          onCancel={onClose}
+          cancelLabel={t('downloads.cancelDownload')}
+        />
       </div>
     );
   }
@@ -413,17 +433,22 @@ export function VideoPlayerWrapper({
             useLuciePlayer={useLucieForThisSource && !directStreamUrl && !effectiveDirectMode}
             loading={isLoading}
             loadingMessage={hlsLoadingMessage ?? t('playback.loadingVideo')}
+            loadingStep={loadingStep}
+            progressMessage={progressMessage ?? undefined}
+            torrentStats={torrentStats ?? undefined}
             closeLabel={t('common.close')}
+            cancelLabel={t('downloads.cancelDownload')}
             onClose={() => {
               stopBufferRef.current?.();
               onClose();
             }}
             onDirectLoadedData={() => setIsLoading(false)}
             onDirectError={(e) => {
-              console.error('[VideoPlayerWrapper] Direct video error:', e);
               if (useStreamTorrentMode) {
                 const maxRetries = 3;
                 if (directStreamRetryCount < maxRetries - 1) {
+                  // 503 / flux pas encore prêt : normal au démarrage, on réessaie automatiquement
+                  console.warn('[VideoPlayerWrapper] Flux pas encore prêt (503?), nouvelle tentative dans 5s…', e);
                   directStreamRetryTimeoutRef.current && clearTimeout(directStreamRetryTimeoutRef.current);
                   setHlsLoadingMessage(t('playback.streamPreparingRetry') ?? 'Préparation du flux, nouvelle tentative…');
                   setIsLoading(true);
@@ -434,10 +459,12 @@ export function VideoPlayerWrapper({
                   }, 5000);
                   return;
                 }
+                console.error('[VideoPlayerWrapper] Direct video error après', maxRetries, 'tentatives:', e);
                 setHlsLoadingMessage(null);
                 setIsLoading(false);
                 return;
               }
+              console.error('[VideoPlayerWrapper] Direct video error:', e);
               if (!directStreamUrl && isDirectMode && !forceHlsFallback) {
                 console.warn('[VideoPlayerWrapper] Fallback automatique vers HLS après échec du mode direct.');
                 emitPlaybackStep('fallback_direct_to_hls', { message: 'Direct stream failed' });

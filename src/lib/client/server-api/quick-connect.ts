@@ -5,7 +5,6 @@
 import type { ApiResponse } from './types.js';
 import { getPopcornWebApiUrl } from '../../api/popcorn-web.js';
 import { TokenManager } from '../storage.js';
-import { isTauri } from '../../utils/tauri.js';
 
 /**
  * Interface pour accéder aux méthodes nécessaires pour quick-connect
@@ -22,125 +21,31 @@ async function requestPopcornWeb<T>(
 ): Promise<ApiResponse<T>> {
   const apiUrl = getPopcornWebApiUrl();
   const fullUrl = `${apiUrl}${endpoint}`;
-  
+
   const cloudToken = TokenManager.getCloudAccessToken();
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(options.headers as any),
   };
-  
   if (cloudToken) {
     headers['Authorization'] = `Bearer ${cloudToken}`;
   }
-  
+
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
-    
-    let response: Response;
-    try {
-      response = await fetch(fullUrl, {
-        ...options,
-        headers,
-        signal: controller.signal,
-      });
-    } catch (error) {
-      clearTimeout(timeoutId);
-      if (isTauri() && (error instanceof TypeError || (error instanceof Error && error.message.includes('Failed to fetch')))) {
-        try {
-          const { invoke } = await import('@tauri-apps/api/core');
-          const method = (options.method || 'GET') as string;
-          const headerPairs: Array<[string, string]> = [];
-          const headersObj = new Headers(headers);
-          headersObj.forEach((value, key) => headerPairs.push([key, value]));
-          
-          const body = typeof options.body === 'string' ? options.body : undefined;
-          
-          try {
-            const nativeRes = await invoke('native-fetch', {
-              url: fullUrl,
-              method,
-              headers: headerPairs,
-              body,
-              timeoutMs: 10000,
-            } as any);
-            
-            const response = new Response(nativeRes?.body ?? '', {
-              status: nativeRes?.status ?? 0,
-              headers: (() => {
-                const h = new Headers();
-                for (const [k, v] of (nativeRes?.headers || []) as Array<[string, string]>) {
-                  if (k) h.set(k, v);
-                }
-                return h;
-              })(),
-            });
-            
-            const rawText = await response.text().catch(() => '');
-            const data = rawText ? JSON.parse(rawText) : {};
-            
-            if (response.ok) {
-              return {
-                success: true,
-                data: data.data || data,
-              };
-            }
-            
-            return {
-              success: false,
-              error: data.error || 'UnknownError',
-              message: data.message || `Erreur ${response.status}`,
-            };
-          } catch (invokeError) {
-            const errorMsg = invokeError instanceof Error ? invokeError.message : String(invokeError);
-            if (errorMsg.includes('not found') || errorMsg.includes('Command native-fetch')) {
-              const { fetch: httpFetch } = await import('@tauri-apps/plugin-http');
-              const httpResponse = await httpFetch(fullUrl, {
-                method: method as any,
-                headers: Object.fromEntries(headerPairs),
-                body: body,
-              } as any);
-              
-              const responseBody = await httpResponse.text();
-              const data = responseBody ? JSON.parse(responseBody) : {};
-              
-              if (httpResponse.ok) {
-                return {
-                  success: true,
-                  data: data.data || data,
-                };
-              }
-              
-              return {
-                success: false,
-                error: data.error || 'UnknownError',
-                message: data.message || `Erreur ${httpResponse.status}`,
-              };
-            }
-            throw invokeError;
-          }
-        } catch (tauriError) {
-          return {
-            success: false,
-            error: 'NetworkError',
-            message: tauriError instanceof Error ? tauriError.message : 'Erreur réseau',
-          };
-        }
-      }
-      throw error;
-    }
-    
+    const response = await fetch(fullUrl, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
     clearTimeout(timeoutId);
+
     const rawText = await response.text().catch(() => '');
     const data = rawText ? JSON.parse(rawText) : {};
-    
     if (response.ok) {
-      return {
-        success: true,
-        data: data.data || data,
-      };
+      return { success: true, data: data.data ?? data };
     }
-    
     return {
       success: false,
       error: data.error || 'UnknownError',

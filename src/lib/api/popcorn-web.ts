@@ -6,22 +6,22 @@
 import { isTauri } from '../utils/tauri.js';
 import { TokenManager } from '../client/storage.js';
 
+// URL unique : apex. En Vercel (popcorn-web), ne pas activer la redirection apex→www,
+// sinon la preflight CORS reçoit une 307 et l’API sur www peut renvoyer 404.
 const POPCORN_WEB_BASE =
   import.meta.env.PUBLIC_POPCORN_WEB_URL ||
   import.meta.env.POPCORN_WEB_URL ||
-  'https://popcorn-web-five.vercel.app';
+  'https://popcornn.app';
 
 /**
  * Obtient l'URL de base du site popcorn-web (sans /api/v1).
- * Utilisée pour les liens vers la documentation, la page d'accueil, etc.
  */
 export function getPopcornWebBaseUrl(): string {
   return POPCORN_WEB_BASE.replace(/\/$/, '');
 }
 
 /**
- * Obtient l'URL de base de l'API popcorn-web
- * URL fixe pointant vers le déploiement Vercel
+ * Obtient l'URL de base de l'API popcorn-web.
  */
 export function getPopcornWebApiUrl(): string {
   return getPopcornWebBaseUrl() + '/api/v1';

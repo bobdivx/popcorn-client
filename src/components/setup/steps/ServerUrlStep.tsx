@@ -2,12 +2,11 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { getBackendUrl, hasBackendUrl, setBackendUrl as saveBackendUrl } from '../../../lib/backend-config.js';
 import { STORAGE_BACKEND_START_RESULT, type BackendStartResult } from '../../IndexRedirect';
 import { serverApi } from '../../../lib/client/server-api';
+import { getPopcornWebBaseUrl } from '../../../lib/api/popcorn-web';
 import { useI18n } from '../../../lib/i18n';
+import { redirectTo } from '../../../lib/utils/navigation.js';
 import { shouldDisplayQRCode } from '../../../lib/utils/device-detection';
 import QRCode from 'qrcode';
-
-// URL de base de popcorn-web
-const POPCORN_WEB_URL = 'https://popcorn-web-five.vercel.app';
 
 interface ServerUrlStepProps {
   focusedButtonIndex: number;
@@ -72,22 +71,23 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
     };
   }, []);
 
-  // Démarrer Quick Connect (TV/Desktop) seulement après que l'utilisateur a choisi
+  // Démarrer Quick Connect pour tous les devices (TV, Desktop, Mobile) quand "déjà configuré"
+  // Le code est affiché ici et saisi sur popcorn-web, pas dans le client
   useEffect(() => {
-    if (!installationChoice || isScannerMode) return;
+    if (installationChoice !== 'alreadyConfigured') return;
     initQuickConnect();
-  }, [installationChoice, isScannerMode]);
+  }, [installationChoice]);
 
-  // Sur TV : centrer le QR code dans la vue au moment où il s'affiche (télécommande = focus qui fait défiler)
+  // Centrer le QR code dans la vue au moment où il s'affiche (TV télécommande ou mobile scroll)
   useEffect(() => {
-    if (!quickConnectQrUrl || isScannerMode) return;
+    if (!quickConnectQrUrl) return;
     const el = qrCodeContainerRef.current;
     if (!el) return;
     const t = setTimeout(() => {
       el.scrollIntoView({ block: 'center', behavior: 'auto' });
     }, 100);
     return () => clearTimeout(t);
-  }, [quickConnectQrUrl, isScannerMode]);
+  }, [quickConnectQrUrl]);
 
   const loadBackendUrl = () => {
     try {
@@ -274,7 +274,7 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
         setQuickConnectExpiresAt(expiresAt);
 
         // Générer le QR code pointant vers popcorn-web (sans URL backend)
-        const quickConnectUrl = `${POPCORN_WEB_URL}/quick-connect?code=${code}`;
+        const quickConnectUrl = `${getPopcornWebBaseUrl()}/quick-connect?code=${code}`;
         console.log('[ServerUrlStep] URL Quick Connect:', quickConnectUrl);
 
         try {
@@ -364,10 +364,8 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
         return;
       }
 
-      // Connexion réussie
-      if (onStatusChange) {
-        await onStatusChange();
-      }
+      // Connexion réussie : appeler onNext() sans onStatusChange() pour éviter un re-render
+      // du Wizard (étape 1 à nouveau) avant que onNext ait pu rediriger ou passer à l'étape suivante
       onNext();
     } catch (err) {
       setQuickConnectError(`${t('wizard.serverUrl.errors.connectionError')}\n\n${t('wizard.serverUrl.errors.connectionErrorDetails')}`);
@@ -494,12 +492,10 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
           console.log('[ServerUrlStep] URL du backend récupérée:', connectResponse.data.backendUrl);
           saveBackendUrl(connectResponse.data.backendUrl);
           setBackendUrl(connectResponse.data.backendUrl);
-          
-          // Connexion réussie
-          if (onStatusChange) {
-            await onStatusChange();
-          }
-          onNext();
+          // Connexion quick-connect réussie : redirection directe vers le dashboard (tokens déjà sauvegardés par connectQuickConnect)
+          setAuthorizingCode(false);
+          redirectTo('/dashboard');
+          return;
         } else {
           setQuickConnectError(`${t('wizard.serverUrl.errors.noBackendUrlInCloud')}\n\n${t('wizard.serverUrl.errors.noBackendUrlInCloudDetails')}`);
           setAuthorizingCode(false);
@@ -598,8 +594,8 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
         </h3>
       </div>
       
-      {/* ===== MODE SCANNER (Mobile) ===== */}
-      {isScannerMode && !showManualConfig && (
+      {/* Mode mobile "première installation" uniquement (déjà configuré = même flux QR+code que TV) */}
+      {isScannerMode && !showManualConfig && installationChoice === 'firstTime' && (
         <>
           {/* Message d'accueil clair avec deux options */}
           <div className="space-y-4">
@@ -775,8 +771,8 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
         </>
       )}
 
-      {/* ===== MODE QR CODE (TV/Desktop) ===== */}
-      {!isScannerMode && !showManualConfig && (
+      {/* ===== Quick Connect (tous devices) : afficher le code + QR, à saisir sur popcorn-web ===== */}
+      {installationChoice === 'alreadyConfigured' && !showManualConfig && (
         <>
           {/* Layout TV : zone QR centrée pour que la télécommande ne le pousse pas hors écran */}
           <div className={quickConnectCode && quickConnectQrUrl ? 'flex flex-col min-h-[80vh]' : undefined}>
@@ -914,6 +910,18 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
                     <p className="text-xs text-gray-500 mt-3">
                       {t('wizard.serverUrl.tvStep4')}
                     </p>
+                    {/* Bouton : ouvrir popcorn-web avec le code dans l’URL (comme le QR) */}
+                    <a
+                      href={`${getPopcornWebBaseUrl()}/quick-connect?code=${quickConnectCode}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center justify-center gap-2 w-full sm:w-auto mt-4 px-5 py-3 bg-primary-600 hover:bg-primary-500 text-white font-semibold rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-primary-400"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                      {t('wizard.serverUrl.openPopcornWebToAuthorize')}
+                    </a>
                   </div>
 
                   {/* Compteur de temps restant - Plus visible */}

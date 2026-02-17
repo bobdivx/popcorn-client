@@ -101,6 +101,13 @@ export default function Wizard() {
   // Si le setup est complet (needsSetup === false et hasUsers === true), rediriger
   // SAUF si ?force=1 : accès explicite (ex. "Configuration initiale" depuis paramètres) → garder le wizard
   useEffect(() => {
+    const forceWizard = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('force') === '1';
+    // Déjà connecté (backend URL + tokens) : redirection immédiate (évite de revoir le wizard après quick-connect ou au refresh)
+    if (!forceWizard && hasBackendUrl() && serverApi.isAuthenticated()) {
+      redirectTo('/dashboard');
+      return;
+    }
+
     const checkAndRedirect = async () => {
       // Si l'URL backend n'est pas configurée, on reste sur le wizard
       if (!hasBackendUrl()) {
@@ -112,8 +119,6 @@ export default function Wizard() {
         return;
       }
 
-      // Accès explicite au wizard (ex. "Configuration initiale" depuis /settings) : ne pas rediriger
-      const forceWizard = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('force') === '1';
       if (forceWizard) {
         return;
       }
@@ -220,14 +225,12 @@ export default function Wizard() {
             buttonRefs={buttonRefs}
             onStatusChange={checkSetupStatus}
             onNext={async () => {
-              // Rafraîchir le statut après configuration de l'URL
-              await checkSetupStatus();
-              
-              // Vérifier le statut mis à jour pour déterminer la prochaine étape
-              const updatedStatus = await serverApi.getSetupStatus();
-              if (updatedStatus.success && updatedStatus.data) {
-                // Si le backend est déjà complètement configuré, rediriger
-                if (updatedStatus.data.backendReachable && updatedStatus.data.needsSetup === false && updatedStatus.data.hasUsers === true && !forceAllSteps) {
+              // Appel direct pour ne pas mettre à jour setupStatus avant la décision : évite un re-render
+              // qui afficherait le wizard complet à l'étape 1 avant la redirection
+              const response = await serverApi.getSetupStatus();
+              if (response.success && response.data) {
+                const d = response.data;
+                if (d.backendReachable && d.needsSetup === false && d.hasUsers === true && !forceAllSteps) {
                   if (serverApi.isAuthenticated()) {
                     redirectTo('/dashboard');
                   } else {
@@ -235,20 +238,10 @@ export default function Wizard() {
                   }
                   return;
                 }
-                
-                // Passer à la prochaine étape (ou continuer si ?force=1)
-                // Le hook useWizardSteps va recalculer les étapes avec le nouveau statut
-                const nextStepNumber = getNextStepNumber('serverUrl');
-                if (nextStepNumber) {
-                  setCurrentStep(nextStepNumber);
-                }
-              } else {
-                // Si la vérification échoue, essayer quand même de passer à l'étape suivante
-                const nextStepNumber = getNextStepNumber('serverUrl');
-                if (nextStepNumber) {
-                  setCurrentStep(nextStepNumber);
-                }
               }
+              await checkSetupStatus();
+              const nextStepNumber = getNextStepNumber('serverUrl');
+              if (nextStepNumber) setCurrentStep(nextStepNumber);
             }}
           />
 
@@ -340,15 +333,9 @@ export default function Wizard() {
                   buttonRefs={buttonRefs}
                   onStatusChange={checkSetupStatus}
                   onNext={async () => {
-                    // Rafraîchir le statut après configuration de l'URL
-                    await checkSetupStatus();
-                    
-                    // Vérifier le statut mis à jour pour déterminer la prochaine étape
-                    const updatedStatus = await serverApi.getSetupStatus();
-                    if (updatedStatus.success && updatedStatus.data) {
-                      // Si le backend est déjà complètement configuré, rediriger
-                      // SAUF si ?force=1 : l'utilisateur veut refaire toutes les étapes
-                      if (updatedStatus.data.backendReachable && updatedStatus.data.needsSetup === false && updatedStatus.data.hasUsers === true && !forceAllSteps) {
+                    const updatedStatus = await checkSetupStatus();
+                    if (updatedStatus) {
+                      if (updatedStatus.backendReachable && updatedStatus.needsSetup === false && updatedStatus.hasUsers === true && !forceAllSteps) {
                         if (serverApi.isAuthenticated()) {
                           redirectTo('/dashboard');
                         } else {
@@ -356,18 +343,11 @@ export default function Wizard() {
                         }
                         return;
                       }
-                      
-                      // Passer à la prochaine étape (ou continuer si ?force=1)
                       const nextStepNumber = getNextStepNumber('serverUrl');
-                      if (nextStepNumber) {
-                        setCurrentStep(nextStepNumber);
-                      }
+                      if (nextStepNumber) setCurrentStep(nextStepNumber);
                     } else {
-                      // Si la vérification échoue, essayer quand même de passer à l'étape suivante
                       const nextStepNumber = getNextStepNumber('serverUrl');
-                      if (nextStepNumber) {
-                        setCurrentStep(nextStepNumber);
-                      }
+                      if (nextStepNumber) setCurrentStep(nextStepNumber);
                     }
                   }}
                 />

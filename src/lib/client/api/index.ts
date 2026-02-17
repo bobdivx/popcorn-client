@@ -188,6 +188,13 @@ export class ClientApi {
   }
 
   /**
+   * Notifier que la lecture en streaming est terminée (suppression du cache côté backend si stream_cache).
+   */
+  async notifyStreamingEnded(infoHash: string): Promise<void> {
+    return this._torrents.notifyStreamingEnded(infoHash);
+  }
+
+  /**
    * Récupérer les logs d'un torrent
    * @param filtered - Si true, filtre et résume les logs répétitifs (par défaut: true pour le debug)
    */
