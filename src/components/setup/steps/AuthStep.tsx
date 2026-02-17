@@ -108,7 +108,8 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         return;
       }
       
-      const response = await serverApi.loginCloud(loginEmail, loginPassword);
+      // Utiliser login() pour gérer à la fois comptes locaux (backend) et cloud
+      const response = await serverApi.login(loginEmail, loginPassword);
 
       // Vérifier si la 2FA est requise
       if (response.success && (response.data as any)?.requires2FA) {
