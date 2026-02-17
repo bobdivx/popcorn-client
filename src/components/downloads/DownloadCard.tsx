@@ -169,7 +169,8 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
     >
       <FocusableCard
         className="w-full max-w-full"
-        tabIndex={showOverlay ? -1 : 0}
+        tabIndex={0}
+        ariaLabel={displayTitle || torrent.name}
         onClick={(e) => {
           if (onOpenDetail && !(e.target as HTMLElement).closest('button, a')) {
             onOpenDetail(torrent, posterUrl, backdropUrl);

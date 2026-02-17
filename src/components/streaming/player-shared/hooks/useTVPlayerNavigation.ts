@@ -57,6 +57,15 @@ export function useTVPlayerNavigation({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // Quand les contrôles sont masqués : OK/Retour sur webOS peut envoyer le même code que Retour (461).
+      // Interpréter comme "afficher les contrôles" au lieu de quitter (évite de quitter au premier appui sur OK).
+      if (!showControls && isBackKey(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowControls(true);
+        setFocusedControlIndex(hasBack ? 1 : 0); // focus sur Play/Pause, pas sur Retour
+        return;
+      }
       if (isBackKey(e)) {
         e.preventDefault();
         e.stopPropagation();

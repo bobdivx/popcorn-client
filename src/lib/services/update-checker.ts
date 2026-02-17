@@ -26,7 +26,6 @@ class UpdateChecker {
         // Structure: { client: { version: "...", build: ... }, server: { ... } }
         this.currentVersion = data.client?.version || data.version || data.VERSION || null;
         if (this.currentVersion) {
-          console.log(`[UpdateChecker] Version chargée depuis /VERSION.json: ${this.currentVersion}`);
           return;
         }
       }
@@ -39,12 +38,10 @@ class UpdateChecker {
       const { getVersion } = await import('@tauri-apps/api/app');
       this.currentVersion = await getVersion();
       if (this.currentVersion) {
-        console.log(`[UpdateChecker] Version chargée depuis Tauri: ${this.currentVersion}`);
         return;
       }
-    } catch (e) {
+    } catch (_e) {
       // Ce n'est pas une erreur si on n'est pas dans un environnement Tauri
-      console.log('[UpdateChecker] Version Tauri non disponible (normal si pas dans Tauri)');
     }
 
     // Si aucune méthode n'a fonctionné
@@ -73,7 +70,6 @@ class UpdateChecker {
   private async parseDownloadsPage(): Promise<VersionInfo | null> {
     // Ne pas vérifier les mises à jour en développement (évite les erreurs CORS)
     if (this.isDevelopment()) {
-      console.log('[UpdateChecker] Vérification des mises à jour désactivée en développement');
       return null;
     }
 
@@ -148,7 +144,6 @@ class UpdateChecker {
    */
   async checkForUpdate(): Promise<VersionInfo | null> {
     if (this.checkInProgress) {
-      console.log('[UpdateChecker] Vérification déjà en cours');
       return null;
     }
 
@@ -167,17 +162,14 @@ class UpdateChecker {
       const latestVersionInfo = await this.parseDownloadsPage();
 
       if (!latestVersionInfo) {
-        console.debug('[UpdateChecker] Aucune version trouvée sur la page de téléchargements');
         return null;
       }
 
       const comparison = this.compareVersions(latestVersionInfo.version, this.currentVersion);
 
       if (comparison > 0) {
-        console.log(`[UpdateChecker] Nouvelle version disponible: ${latestVersionInfo.version} (actuelle: ${this.currentVersion})`);
         return latestVersionInfo;
       } else {
-        console.log(`[UpdateChecker] Version à jour: ${this.currentVersion}`);
         return null;
       }
     } catch (error) {

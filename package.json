@@ -55,7 +55,9 @@
     "android:build:demo:mobile": "powershell -ExecutionPolicy Bypass -File scripts/android/build/build.ps1 -Demo mobile",
     "tauri:build:ios": "cross-env TAURI_PLATFORM=ios tauri ios build --ci -c src-tauri/tauri.ios.conf.json",
     "ios:build": "cross-env TAURI_PLATFORM=ios tauri ios build --ci -c src-tauri/tauri.ios.conf.json",
-    "ios:build:demo": "cross-env TAURI_PLATFORM=ios PUBLIC_DEMO_BACKEND_URL=https://popcorn-vercel.vercel.app tauri ios build --ci -c src-tauri/tauri.ios.conf.json"
+    "ios:build:demo": "cross-env TAURI_PLATFORM=ios PUBLIC_DEMO_BACKEND_URL=https://popcorn-vercel.vercel.app tauri ios build --ci -c src-tauri/tauri.ios.conf.json",
+    "create:keystore": "powershell -ExecutionPolicy Bypass -File scripts/create-keystore.ps1",
+    "encode:keystore": "powershell -ExecutionPolicy Bypass -File scripts/encode-keystore.ps1"
   },
   "dependencies": {
     "@astrojs/preact": "^4.1.3",

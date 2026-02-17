@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
+import { launchYouTube, shouldLaunchNativeYouTube } from '../../lib/utils/youtube-launcher';
 
 interface YouTubeVideoPlayerProps {
   youtubeKey: string;
@@ -12,20 +13,17 @@ interface YouTubeVideoPlayerProps {
   cover?: boolean; // Mode cover pour remplir l'écran comme une image de fond
 }
 
-/** Détecte webOS (LG), TV ou autres appareils où l'iframe YouTube est souvent bloquée ou indisponible. */
+/** Détecte les appareils où l'iframe YouTube est souvent bloquée (SmartTV, etc.) */
 function isEmbedUnsupported(): boolean {
   if (typeof navigator === 'undefined') return false;
   const ua = navigator.userAgent || '';
-  return (
-    /Web0S|webOS|NetCast|TV Safari|SmartTV|Large Screen/i.test(ua) ||
-    (typeof (window as any).webOS !== 'undefined')
-  );
+  return /NetCast|TV Safari|SmartTV|Large Screen/i.test(ua);
 }
 
 /**
  * Composant réutilisable pour afficher une vidéo YouTube en embed
- * Utilisé pour les bandes annonces dans le Hero et les pages de détails.
- * Sur webOS/TV, affiche un lien vers YouTube (l'iframe n'est en général pas supportée).
+ * Sur desktop : iframe YouTube.
+ * Sur webOS, Android, iOS et TV : bouton qui ouvre l'app YouTube native ou le navigateur.
  */
 export function YouTubeVideoPlayer({
   youtubeKey,
@@ -39,11 +37,11 @@ export function YouTubeVideoPlayer({
 }: YouTubeVideoPlayerProps) {
   const { t } = useI18n();
   const [isLoaded, setIsLoaded] = useState(false);
-  const [useFallback, setUseFallback] = useState(false);
+  const [useLaunchButton, setUseLaunchButton] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
-    setUseFallback(isEmbedUnsupported());
+    setUseLaunchButton(shouldLaunchNativeYouTube() || isEmbedUnsupported());
   }, []);
 
   useEffect(() => {
@@ -54,32 +52,35 @@ export function YouTubeVideoPlayer({
     return null;
   }
 
-  const watchUrl = `https://www.youtube.com/watch?v=${youtubeKey}`;
-
-  // Sur webOS/TV : afficher un lien vers YouTube au lieu de l'iframe
-  if (useFallback) {
-    const fallbackContent = (
-      <a
-        href={watchUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex flex-col items-center justify-center gap-2 rounded-lg bg-black/60 p-4 text-center text-sm text-white hover:bg-black/80 hover:underline focus:outline-none focus:ring-2 focus:ring-yellow-500"
+  // Sur TV, mobile et plateformes sans iframe : bouton qui lance YouTube (app native ou navigateur)
+  if (useLaunchButton) {
+    const launchContent = (
+      <button
+        type="button"
+        onClick={() => launchYouTube(youtubeKey)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            launchYouTube(youtubeKey);
+          }
+        }}
+        className="flex flex-col items-center justify-center gap-2 rounded-lg bg-black/60 p-4 text-center text-sm text-white hover:bg-black/80 hover:underline focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-black"
         style={{ minHeight: cover ? '100%' : 120 }}
       >
         <span className="opacity-90">{t('ads.trailerEmbedUnsupported')}</span>
         <span className="font-medium text-yellow-400">{t('ads.trailerWatchOnYoutube')}</span>
-      </a>
+      </button>
     );
     if (cover) {
       return (
         <div className={`relative w-full h-full overflow-hidden ${className}`} style={{ position: 'relative', width: '100%', height: '100%' }}>
-          {fallbackContent}
+          {launchContent}
         </div>
       );
     }
     return (
       <div className={`relative w-full h-full ${className}`} style={{ aspectRatio: '16/9' }}>
-        {fallbackContent}
+        {launchContent}
       </div>
     );
   }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import type { ContentItem } from '../../../lib/client/types';
 import { useI18n } from '../../../lib/i18n/useI18n';
+import { getHighQualityTmdbImageUrl } from '../../../lib/utils/tmdb-images';
 import { YouTubeVideoPlayer } from '../../ui/YouTubeVideoPlayer';
 
 interface HeroSectionProps {
@@ -158,7 +159,8 @@ export function HeroSection({
     return null;
   }
 
-  const currentImageUrl = imageUrls[currentItem.id] || currentItem.poster || currentItem.backdrop;
+  const rawImageUrl = imageUrls[currentItem.id] || currentItem.poster || currentItem.backdrop;
+  const currentImageUrl = getHighQualityTmdbImageUrl(rawImageUrl) ?? rawImageUrl;
   const currentTrailerKey = trailerKeys[currentItem.id];
 
   return (

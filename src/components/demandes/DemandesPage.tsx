@@ -166,10 +166,13 @@ export default function DemandesPage() {
     return (
     <div
       key={item.id}
-      className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px] cursor-pointer group"
+      data-torrent-card
+      data-focusable
+      className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px] cursor-pointer group torrent-poster overflow-visible"
       onClick={() => handleItemClick(item)}
       role="button"
       tabIndex={0}
+      aria-label={item.title}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
@@ -242,7 +245,7 @@ export default function DemandesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen bg-black text-white" data-page="demandes">
       {/* En-tête */}
       <div className="px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 pt-4 sm:pt-6 pb-4">
         <h1 className="text-2xl sm:text-3xl md:text-4xl tv:text-5xl font-bold text-white mb-2">
@@ -265,7 +268,7 @@ export default function DemandesPage() {
         />
       )}
 
-      <div className="pb-8 tv:pb-12 -mt-4">
+      <div className="pb-8 tv:pb-12 pt-2 tv:pt-4 overflow-visible">
         {/* Films populaires */}
         {popularMovies.length > 0 && (
           <CarouselRow title={t('discover.popularMovies')} autoScroll={false}>

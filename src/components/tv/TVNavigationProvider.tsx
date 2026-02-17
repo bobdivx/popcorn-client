@@ -287,12 +287,12 @@ export default function TVNavigationProvider() {
       return focusableElements[0];
     };
 
-    // Navigation dans une direction (scope optionnel = modal ou conteneur pour piège à focus)
-    const navigate = (direction: 'up' | 'down' | 'left' | 'right', scope?: HTMLElement | null): boolean => {
+    // Navigation dans une direction (scope optionnel = modal ou conteneur pour piège à focus, fromEl = élément de référence pour la recherche spatiale, ex. input qu'on quitte)
+    const navigate = (direction: 'up' | 'down' | 'left' | 'right', scope?: HTMLElement | null, fromEl?: HTMLElement | null): boolean => {
       const focusableElements = getFocusableElements(scope);
       if (focusableElements.length === 0) return false;
 
-      const activeElement = document.activeElement as HTMLElement;
+      const activeElement = (fromEl ?? document.activeElement) as HTMLElement;
       
       // Si scope défini et focus hors scope, focuser le premier élément du scope
       if (scope && (!activeElement || activeElement === document.body || !scope.contains(activeElement))) {
@@ -304,8 +304,8 @@ export default function TVNavigationProvider() {
         return false;
       }
       
-      // Si pas de focus actuel, focus le premier élément (priorité Settings = 1er menu)
-      if (!activeElement || activeElement === document.body) {
+      // Si pas de focus actuel et pas de fromEl, focus le premier élément (priorité Settings = 1er menu)
+      if ((!activeElement || activeElement === document.body) && !fromEl) {
         const first = getInitialFocusElement(scope);
         if (first) {
           focusElement(first);
@@ -314,7 +314,9 @@ export default function TVNavigationProvider() {
         return false;
       }
 
-      const nextElement = findClosestElement(activeElement, focusableElements, direction);
+      // Exclure l'élément actuel (ou fromEl) des candidats pour éviter de se re-focuser
+      const candidates = focusableElements.filter((el) => el !== activeElement);
+      const nextElement = findClosestElement(activeElement, candidates, direction);
       if (nextElement) {
         focusElement(nextElement);
         return true;
@@ -345,17 +347,40 @@ export default function TVNavigationProvider() {
       
       // Dans un input/textarea/contenteditable :
       // - Backspace = supprimer du texte, ne jamais interpréter comme "retour"
-      // - Escape = quitter le champ (blur), ne pas fermer la modal d'un coup
+      // - Escape = quitter le champ et naviguer vers le haut
+      // - ArrowUp/ArrowDown = quitter le champ et naviguer (les télécommandes TV n'ont souvent pas Escape)
       if (inEditable) {
         if (e.key === 'Backspace' || e.keyCode === 8) {
           return; // Laisser le comportement par défaut (suppression du caractère)
         }
         if (e.key === 'Escape' || e.keyCode === 27) {
-          target.blur();
-          return; // Premier Escape = blur, second (hors champ) = retour
-        }
-        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+          const handled = navigate('up', undefined, target);
+          if (handled) {
+            e.preventDefault();
+            e.stopPropagation();
+          } else {
+            target.blur();
+          }
           return;
+        }
+        if (e.key === 'ArrowUp') {
+          const handled = navigate('up', undefined, target);
+          if (handled) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          return;
+        }
+        if (e.key === 'ArrowDown') {
+          const handled = navigate('down', undefined, target);
+          if (handled) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          return;
+        }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+          return; // Laisser le curseur se déplacer dans le texte
         }
       }
 

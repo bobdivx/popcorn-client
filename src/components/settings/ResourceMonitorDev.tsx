@@ -1,8 +1,9 @@
 /**
- * Monitor de ressources (CPU / mémoire) en temps réel.
+ * Ressources et monitor en temps réel (CPU, mémoire, GPU).
+ * Fusionne l'affichage snapshot + graphiques + conseils.
  * S'appuie sur GET /api/media/resources (backend sysinfo).
  */
-import { Activity, Cpu, TrendingUp } from 'lucide-preact';
+import { Activity, Cpu } from 'lucide-preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
@@ -51,8 +52,8 @@ export default function ResourceMonitorDev() {
   const [paused, setPaused] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchResources = async () => {
-    if (paused) return;
+  const fetchResources = async (force = false) => {
+    if (paused && !force) return;
     try {
       const res = await serverApi.getSystemResources();
       if (res.success && res.data) {
@@ -101,14 +102,47 @@ export default function ResourceMonitorDev() {
   const avgCpu = historyCpu.length ? historyCpu.reduce((a, b) => a + b, 0) / historyCpu.length : 0;
   const highCpuSustained = avgCpu > 20;
 
+  if (error && !d) {
+    return (
+      <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
+        <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+          <Activity className="w-5 h-5 text-primary-400" />
+          {t('settingsMenu.maintenance.resources.title')}
+        </h3>
+        <p className="text-sm text-red-400">{error}</p>
+        <button
+          type="button"
+          onClick={() => fetchResources(true)}
+          className="btn btn-primary mt-3"
+          data-focusable
+          tabIndex={0}
+        >
+          {t('common.retry')}
+        </button>
+      </section>
+    );
+  }
+
+  if (!d) {
+    return (
+      <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
+        <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+          <Activity className="w-5 h-5 text-primary-400" />
+          {t('settingsMenu.maintenance.resources.title')}
+        </h3>
+        <p className="text-sm text-gray-400">{t('common.loading')}</p>
+      </section>
+    );
+  }
+
   return (
-    <section className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 sm:p-6">
+    <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
       <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-1">
-        <TrendingUp className="w-5 h-5 text-amber-400" />
-        {t('settingsMenu.maintenance.resourcesMonitorDev.title')}
+        <Activity className="w-5 h-5 text-primary-400" />
+        {t('settingsMenu.maintenance.resources.title')}
       </h3>
-      <p className="text-xs text-amber-200/80 mb-4">
-        {t('settingsMenu.maintenance.resourcesMonitorDev.description')}
+      <p className="text-sm text-gray-400 mb-4">
+        {t('settingsMenu.maintenance.resources.description')}
       </p>
       {error && (
         <p className="text-sm text-red-400 mb-3">{error}</p>
@@ -116,8 +150,8 @@ export default function ResourceMonitorDev() {
       {d && (
         <div className="flex flex-col gap-4">
           <div className="grid gap-3 text-sm">
-            <div className="flex items-center gap-2">
-              <Cpu className="w-4 h-4 text-amber-400" />
+            <div className="flex items-center gap-2 flex-wrap">
+              <Cpu className="w-4 h-4 text-gray-400" />
               <span className="text-gray-300">
                 {t('settingsMenu.maintenance.resources.processCpu')}:{' '}
                 <strong className="text-white">{d.process_cpu_usage_percent.toFixed(1)} %</strong>
@@ -125,9 +159,20 @@ export default function ResourceMonitorDev() {
               <button
                 type="button"
                 onClick={() => setPaused((p) => !p)}
-                className="ml-2 text-xs px-2 py-0.5 rounded bg-white/10 hover:bg-white/20"
+                className="text-xs px-2 py-0.5 rounded bg-white/10 hover:bg-white/20"
+                data-focusable
+                tabIndex={0}
               >
                 {paused ? t('settingsMenu.maintenance.resourcesMonitorDev.resume') : t('settingsMenu.maintenance.resourcesMonitorDev.pause')}
+              </button>
+              <button
+                type="button"
+                onClick={() => fetchResources(true)}
+                className="text-xs px-2 py-0.5 rounded bg-white/10 hover:bg-white/20"
+                data-focusable
+                tabIndex={0}
+              >
+                {t('settingsMenu.maintenance.resources.refresh')}
               </button>
             </div>
             {historyCpu.length >= 2 && (
@@ -137,7 +182,7 @@ export default function ResourceMonitorDev() {
               </div>
             )}
             <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-amber-400" />
+              <Activity className="w-4 h-4 text-gray-400" />
               <span className="text-gray-300">
                 {t('settingsMenu.maintenance.resources.processMemory')}:{' '}
                 <strong className="text-white">{d.process_memory_mb.toFixed(1)} Mo</strong>
@@ -161,10 +206,32 @@ export default function ResourceMonitorDev() {
                 </span>
               </div>
             )}
+            <div className="flex flex-col gap-1 mt-2">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-300">
+                  {t('settingsMenu.maintenance.resources.gpuAcceleration')}:
+                </span>
+                {d.gpu_available ? (
+                  <span className="text-green-400 font-medium">
+                    {t('settingsMenu.maintenance.resources.gpuAvailable')}
+                    {d.hwaccels?.length ? ` (${d.hwaccels.join(', ')})` : ''}
+                  </span>
+                ) : (
+                  <span className="text-amber-400 font-medium">
+                    {t('settingsMenu.maintenance.resources.gpuNotAvailable')}
+                  </span>
+                )}
+              </div>
+              {!d.gpu_available && (
+                <p className="text-xs text-gray-500 mt-0.5" title={t('settingsMenu.maintenance.resources.gpuNotAvailableHint')}>
+                  {t('settingsMenu.maintenance.resources.gpuNotAvailableHint')}
+                </p>
+              )}
+            </div>
           </div>
           {(highCpuIdle || highCpuSustained) && (
             <div className="rounded-lg bg-amber-500/20 border border-amber-500/40 p-3 text-sm text-amber-100">
-              <p className="font-medium mb-1">{t('settingsMenu.maintenance.resourcesMonitorDev.tipsTitle')}</p>
+              <p id="tips-heading" className="font-medium mb-1">{t('settingsMenu.maintenance.resourcesMonitorDev.tipsTitle')}</p>
               <ul className="list-disc list-inside text-amber-200/90 space-y-0.5">
                 {highCpuIdle && <li>{t('settingsMenu.maintenance.resourcesMonitorDev.tipSyncInterval')}</li>}
                 {highCpuSustained && <li>{t('settingsMenu.maintenance.resourcesMonitorDev.tipLibraryScan')}</li>}

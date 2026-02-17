@@ -731,6 +731,13 @@ export default function Library({
           </aside>
 
           <div className="flex-1 min-w-0">
+            {/* Nombre de médias reçus du serveur (exists) — correspond au log backend "X médias trouvés au total" */}
+            <p className="text-sm text-gray-400 mt-2 mb-1 px-0" title={t('library.seriesGroupedHint')}>
+              {t('library.mediaCount', { count: existingItems.length })}
+              {existingItems.length > 0 && (movies.length + series.length) < existingItems.length && (
+                <span className="ml-2 text-gray-500">({t('library.seriesGroupedShort')})</span>
+              )}
+            </p>
             {showSync && (
               <div className="mt-4 mb-6 tv:mb-8">
                 <div className="flex items-center justify-between gap-4">
@@ -759,6 +766,12 @@ export default function Library({
         </div>
       ) : (
         <div className="px-4 tv:px-6">
+          <p className="text-sm text-gray-400 mt-2 mb-1" title={t('library.seriesGroupedHint')}>
+            {t('library.mediaCount', { count: existingItems.length })}
+            {existingItems.length > 0 && (movies.length + series.length) < existingItems.length && (
+              <span className="ml-2 text-gray-500">({t('library.seriesGroupedShort')})</span>
+            )}
+          </p>
           {showSync && (
             <div className="mt-4 mb-6 tv:mb-8">
               <div className="flex items-center justify-between gap-4">

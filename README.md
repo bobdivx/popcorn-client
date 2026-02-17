@@ -117,21 +117,17 @@ npm run webos:package
 ## 📁 Structure
 
 ```
-popcorn-vercel/
+popcorn-client/
+├── docs/               # Documentation (build, Android, WebOS, Lucie, etc.)
+├── docker/             # Docker (Dockerfile, nginx.conf, entrypoint)
+│   └── Dockerfile      # Build : docker build -f docker/Dockerfile .
+├── scripts/            # Scripts (Android, WebOS, keystore, etc.)
 ├── src-tauri/          # Configuration Tauri (desktop/mobile)
-│   ├── src/main.rs     # Point d'entrée Rust (minimal)
-│   └── tauri.conf.json # Configuration Tauri
 ├── webos/              # Application WebOS
-│   ├── appinfo.json    # Configuration WebOS
-│   ├── frontend/       # Frontend Astro buildé
-│   └── icon.png        # Icône de l'application
 ├── src/
 │   ├── lib/
-│   │   ├── client/     # Client API REST (server-api.ts)
-│   │   ├── encryption/ # Chiffrement E2E (e2e.ts)
-│   │   └── storage/    # Stockage local (storage.ts)
-│   ├── components/     # Composants Preact
-│   └── pages/          # Pages Astro
+│   ├── components/
+│   └── pages/
 └── package.json
 ```
 
@@ -149,9 +145,13 @@ popcorn-vercel/
 
 ## 📚 Documentation
 
-- [Configuration des variables d'environnement](./README-ENV.md)
-- [Instructions de build desktop](./BUILD_INSTRUCTIONS.md)
-- [Guide de démarrage rapide desktop](./QUICK_START_DESKTOP.md)
+Toute la documentation est dans **`docs/`** :
+
+- [Configuration des variables d'environnement](docs/README-ENV.md)
+- [Instructions de build desktop](docs/BUILD_INSTRUCTIONS.md)
+- [Guide de démarrage rapide desktop](docs/QUICK_START_DESKTOP.md)
+- [Signature Android](docs/ANDROID_SIGNING.md)
+- Autres guides : `docs/` (build, WebOS, Lucie, etc.)
 
 ## 🆚 Différences avec popcorn (serveur)
 

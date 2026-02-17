@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'preact/hooks';
 import { Film } from 'lucide-preact';
 import { useI18n } from '../../../lib/i18n/useI18n';
 import { NotificationContainer } from '../../ui/Notification';
@@ -24,6 +24,8 @@ import { PROGRESS_POLL_INTERVAL_MS } from './utils/constants';
 import { startProgressPolling } from './actions/progressPolling';
 import { DownloadVerificationPanel } from '../../downloads/DownloadVerificationPanel';
 import type { SeriesEpisodesResponse } from '../../../lib/client/server-api/media';
+import { isTVPlatform } from '../../../lib/utils/device-detection';
+import { getHighQualityTmdbImageUrl } from '../../../lib/utils/tmdb-images';
 
 /** Retourne l'épisode suivant (saison + id variante + titre) ou null. */
 function getNextEpisode(
@@ -642,13 +644,22 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     return () => window.removeEventListener('torrentAdded', onTorrentAdded);
   }, []);
 
-  // Focus par défaut sur le bouton Télécharger/Lire pour la télécommande TV
+  // Focus par défaut sur Lire si affiché, sinon sur Télécharger (télécommande TV : webOS, Android TV, etc.)
   useEffect(() => {
-    const el = document.querySelector('[data-media-detail-primary-action]') as HTMLButtonElement | null;
-    if (el && !el.disabled) {
-      el.focus();
-    }
-  }, []);
+    if (!isTVPlatform()) return;
+    const t = setTimeout(() => {
+      const playEl = document.querySelector('[data-media-detail-action="play"]') as HTMLButtonElement | null;
+      const downloadEl = document.querySelector('[data-media-detail-action="download"]') as HTMLButtonElement | null;
+      const el =
+        playEl && !playEl.disabled
+          ? playEl
+          : downloadEl && !downloadEl.disabled
+            ? downloadEl
+            : null;
+      if (el) el.focus();
+    }, 150);
+    return () => clearTimeout(t);
+  }, [activeTorrent?.id, torrentStats, isAvailableLocally, isPlaying]);
 
   // Télécommande : première touche Retour met le focus sur le bouton Retour, deuxième touche navigue
   useEffect(() => {
@@ -691,7 +702,6 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     const t = setTimeout(() => {
       hasAutoPlayedTrailerRef.current = true;
       setIsPlayingTrailer(true);
-      setTimeout(() => trailerCloseButtonRef.current?.focus(), 100);
     }, delayMs);
     return () => clearTimeout(t);
   }, [trailerKey]);
@@ -741,17 +751,47 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     activeInfoHash.trim().length > 0
   );
 
-  // Synchroniser selectedTorrent quand l'utilisateur choisit un épisode (séries)
+  // Extraire SxxExx depuis un chemin ou un nom (ex. "Series S01E05.mkv" ou "series/Name/S01/E05.mkv")
+  const parseSeasonEpisodeFromVariant = useCallback((v: any): { season: number; episode: number } | null => {
+    const text = [v.downloadPath, v.name, (v as any).cleanTitle].filter(Boolean).join(' ').toLowerCase();
+    // S01E05, s1e5, 1x05, S1-E5
+    const m = text.match(/(?:s(\d{1,2})[.\s-]*e(\d{1,2})|(\d{1,2})x(\d{1,2}))/i);
+    if (m) {
+      const s = parseInt(m[1] ?? m[3], 10);
+      const e = parseInt(m[2] ?? m[4], 10);
+      if (!Number.isNaN(s) && !Number.isNaN(e)) return { season: s, episode: e };
+    }
+    return null;
+  }, []);
+
+  // Synchroniser selectedTorrent (et libraryDownloadPath) quand l'utilisateur choisit un épisode (séries)
   useEffect(() => {
     if (!seriesEpisodes?.seasons?.length || selectedEpisodeVariantId == null) return;
-    const variant = allVariants.find((v: any) => v.id === selectedEpisodeVariantId);
+    let variant = allVariants.find((v: any) => v.id === selectedEpisodeVariantId);
+    // Fallback pour la bibliothèque : les variants ont id "local_xxx", pas l'id TMDB → matcher par SxxExx
+    if (!variant) {
+      const season = seriesEpisodes.seasons.find((s) =>
+        s.episodes.some((e) => e.id === selectedEpisodeVariantId)
+      );
+      const ep = season?.episodes.find((e) => e.id === selectedEpisodeVariantId);
+      if (ep != null) {
+        variant = allVariants.find((v: any) => {
+          const se = parseSeasonEpisodeFromVariant(v);
+          return se && se.season === ep.season && se.episode === ep.episode;
+        });
+      }
+    }
     if (variant) {
       setSelectedTorrent(variant);
       setCurrentSeedCount(variant.seedCount ?? 0);
       setCurrentLeechCount(variant.leechCount ?? 0);
       setCurrentFileSize(variant.fileSize ?? 0);
+      // Mettre à jour le chemin bibliothèque pour la lecture (séries depuis library)
+      if (variant.downloadPath) {
+        setLibraryDownloadPath(variant.downloadPath);
+      }
     }
-  }, [seriesEpisodes, selectedEpisodeVariantId, allVariants]);
+  }, [seriesEpisodes, selectedEpisodeVariantId, allVariants, parseSeasonEpisodeFromVariant]);
 
   // Pack complet (épisode 0) : charger la liste des fichiers du torrent pour lister les épisodes
   const isPackSelected = Boolean(
@@ -1026,7 +1066,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
             <div
               className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
               style={{
-                backgroundImage: `url(${heroImageUrl || imageUrl})`,
+                backgroundImage: `url(${getHighQualityTmdbImageUrl(heroImageUrl || imageUrl) || heroImageUrl || imageUrl})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
               }}
@@ -1065,7 +1105,6 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                 type="button"
                 onClick={() => {
                   setIsPlayingTrailer(true);
-                  setTimeout(() => trailerCloseButtonRef.current?.focus(), 100);
                 }}
                 disabled={isLoadingTrailer}
                 title={t('ads.trailerPlay')}
@@ -1143,6 +1182,14 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
             {/* Sélecteur Saison / Épisode (séries) */}
             {seriesEpisodes?.seasons?.length ? (
               <div className="mb-6 space-y-4">
+                {/* Indication du nombre d'épisodes réellement en bibliothèque (série depuis library) */}
+                {isLocalTorrent && allVariants.length > 0 && (
+                  <p className="text-sm text-white/70 mb-2">
+                    {allVariants.length === 1
+                      ? t('library.episodesInLibrary', { count: 1 })
+                      : t('library.episodesInLibrary_plural', { count: allVariants.length })}
+                  </p>
+                )}
                 <div>
                   <span className="text-sm font-semibold text-white/80 block mb-2">Saison</span>
                   <div className="flex flex-wrap gap-2">

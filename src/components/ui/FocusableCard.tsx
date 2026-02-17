@@ -8,6 +8,8 @@ interface FocusableCardProps {
   onBlur?: (e: FocusEvent) => void;
   href?: string;
   tabIndex?: number;
+  /** Libellé pour la télécommande / lecteur d'écran (ex. titre du média) */
+  ariaLabel?: string;
 }
 
 /**
@@ -20,7 +22,8 @@ export function FocusableCard({
   onFocus,
   onBlur,
   href,
-  tabIndex = 0 
+  tabIndex = 0,
+  ariaLabel,
 }: FocusableCardProps) {
   const cardRef = useRef<HTMLDivElement | HTMLAnchorElement>(null);
 
@@ -72,7 +75,8 @@ export function FocusableCard({
     className: baseClasses,
     tabIndex,
     role: href ? undefined : 'button',
-    'aria-label': href ? undefined : 'Card cliquable',
+    'aria-label': ariaLabel ?? (href ? undefined : 'Card cliquable'),
+    'data-focusable': true,
     onFocus,
     onBlur,
   };

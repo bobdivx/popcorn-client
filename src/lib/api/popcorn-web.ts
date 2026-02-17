@@ -24,11 +24,7 @@ export function getPopcornWebBaseUrl(): string {
  * URL fixe pointant vers le déploiement Vercel
  */
 export function getPopcornWebApiUrl(): string {
-  const finalUrl = getPopcornWebBaseUrl() + '/api/v1';
-  if (import.meta.env.DEV) {
-    console.log('[POPCORN-WEB] URL de l\'API:', finalUrl);
-  }
-  return finalUrl;
+  return getPopcornWebBaseUrl() + '/api/v1';
 }
 
 async function fetchJsonWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
@@ -227,13 +223,6 @@ export async function loginCloud(email: string, password: string): Promise<{
   const apiUrl = getPopcornWebApiUrl();
   const fullUrl = `${apiUrl}/auth/login`;
   
-  // Log pour debug
-  const isTauriEnv = isTauri();
-  console.log('[POPCORN-WEB] Tentative de connexion à:', fullUrl, {
-    environment: isTauriEnv ? 'Tauri (Android/Desktop)' : 'Navigateur',
-    email: email.substring(0, 3) + '***', // Masquer l'email complet
-  });
-  
   try {
     const res = await requestJson(
       fullUrl,
@@ -246,17 +235,6 @@ export async function loginCloud(email: string, password: string): Promise<{
       },
       10000
     );
-
-    console.log('[POPCORN-WEB] Réponse reçue:', {
-      status: res.status,
-      ok: res.ok,
-      url: fullUrl,
-      environment: isTauriEnv ? 'Tauri' : 'Navigateur',
-      hasData: !!res.data,
-      dataType: typeof res.data,
-      dataKeys: res.data ? Object.keys(res.data) : [],
-      rawText: res.rawText?.substring(0, 500), // Premiers 500 caractères
-    });
 
     if (!res.ok) {
       // Si l'API n'est pas disponible (erreur serveur)
@@ -285,12 +263,6 @@ export async function loginCloud(email: string, password: string): Promise<{
     }
 
     const data = res.data;
-    console.log('[POPCORN-WEB] Données reçues:', { 
-      success: data?.success, 
-      hasData: !!data?.data,
-      dataKeys: data ? Object.keys(data) : [],
-      fullData: JSON.stringify(data, null, 2)
-    });
     
     // Vérifier si la 2FA est requise
     if (data?.success && data?.requires2FA) {
@@ -304,19 +276,12 @@ export async function loginCloud(email: string, password: string): Promise<{
     }
     
     if (data?.success && data?.data) {
-      const result = {
+      return {
         user: data.data.user,
         accessToken: data.data.accessToken,
         refreshToken: data.data.refreshToken,
         jwtSecret: data.data.jwtSecret,
       };
-      console.log('[POPCORN-WEB] Résultat de connexion:', {
-        hasUser: !!result.user,
-        hasAccessToken: !!result.accessToken,
-        hasRefreshToken: !!result.refreshToken,
-        hasJwtSecret: !!result.jwtSecret,
-      });
-      return result;
     }
 
     console.error('[POPCORN-WEB] Réponse invalide:', {
@@ -712,10 +677,6 @@ export async function getIndexerDefinitions(): Promise<IndexerDefinition[] | nul
     const apiUrl = getPopcornWebApiUrl();
     const fullUrl = `${apiUrl}/indexer-definitions`;
     
-    if (import.meta.env.DEV) {
-      console.log('[POPCORN-WEB] Récupération des définitions d\'indexers depuis:', fullUrl);
-    }
-    
     const res = await requestJson(
       fullUrl,
       {
@@ -760,9 +721,6 @@ export async function getIndexerDefinitions(): Promise<IndexerDefinition[] | nul
     );
     
     if (isCorsError) {
-      if (import.meta.env.DEV) {
-        console.log('[POPCORN-WEB] ℹ️ CORS bloque l\'accès en mode navigateur web (normal). Les définitions seront récupérables en Tauri Android/Desktop.');
-      }
       return null;
     }
     
@@ -963,9 +921,6 @@ export async function saveUserConfig(config: UserConfig, accessToken?: string): 
     // Unifié : appel direct à popcorn-web pour tous les modes (CORS géré par popcorn-web ou native-fetch)
     const apiUrl = `${getPopcornWebApiUrl()}/config/save`;
     
-    if (import.meta.env.DEV) {
-      console.log('[POPCORN-WEB] Sauvegarde de la configuration à:', apiUrl);
-    }
     
     // Utiliser requestWithTokenRefresh pour gérer automatiquement le refresh du token en cas d'erreur 401
     const res = await requestWithTokenRefresh(
@@ -1055,9 +1010,6 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
     // Unifié : appel direct à popcorn-web pour tous les modes (CORS géré par popcorn-web ou native-fetch)
     const apiUrl = `${getPopcornWebApiUrl()}/config/save`;
     
-    if (import.meta.env.DEV) {
-      console.log('[POPCORN-WEB] Appel à:', apiUrl);
-    }
     
     const res = await requestWithTokenRefresh(
       apiUrl,
@@ -1075,9 +1027,6 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
       // Détecter les erreurs CORS (status 0 avec corsError dans data)
       if (res.status === 0 && res.data?.corsError) {
         // En mode navigateur web, CORS bloque l'accès - c'est normal et non bloquant
-        if (import.meta.env.DEV) {
-          console.log('[POPCORN-WEB] ℹ️ CORS bloque l\'accès en mode navigateur web (normal). La configuration sera récupérable en Tauri Android/Desktop.');
-        }
         return null;
       }
       
@@ -1090,9 +1039,6 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
       // Le proxy retourne maintenant 404 au lieu de 401 pour les cas "pas de config"
       if (res.status === 401 || res.status === 404) {
         // Ne pas logger comme warning, c'est normal pour une première connexion
-        if (import.meta.env.DEV) {
-          console.log('[POPCORN-WEB] ℹ️ Aucune configuration sauvegardée (normal pour première connexion)');
-        }
         return null;
       }
       
@@ -1150,9 +1096,6 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
     if (isCorsError) {
       // En mode navigateur web, CORS bloque l'accès direct - c'est normal
       // La config sera récupérable en Tauri Android/Desktop via native-fetch
-      if (import.meta.env.DEV) {
-        console.log('[POPCORN-WEB] ℹ️ CORS bloque l\'accès en mode navigateur web (normal). La configuration sera récupérable en Tauri Android/Desktop.');
-      }
       return null;
     }
 

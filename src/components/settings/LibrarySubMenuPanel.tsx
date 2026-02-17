@@ -1,8 +1,9 @@
-import { FolderOpen, FolderPlus, Users } from 'lucide-preact';
+import { Film, FolderOpen, FolderPlus, Users } from 'lucide-preact';
 import { canAccess } from '../../lib/permissions';
 import SubMenuPanel, { type SubMenuItem } from './SubMenuPanel';
 import MediaPathsPanel from './MediaPathsPanel';
 import LibrarySourcesPanel from './LibrarySourcesPanel';
+import LibraryMediaPanel from './LibraryMediaPanel';
 import FriendsManager from './FriendsManager';
 
 const LIBRARY_ITEMS: SubMenuItem[] = [
@@ -21,6 +22,14 @@ const LIBRARY_ITEMS: SubMenuItem[] = [
     icon: FolderPlus,
     permission: 'settings.server',
     inlineContent: LibrarySourcesPanel,
+  },
+  {
+    id: 'library-media',
+    titleKey: 'settingsMenu.libraryMedia.title',
+    descriptionKey: 'settingsMenu.libraryMedia.description',
+    icon: Film,
+    permission: 'settings.server',
+    inlineContent: LibraryMediaPanel,
   },
   {
     id: 'friends',
