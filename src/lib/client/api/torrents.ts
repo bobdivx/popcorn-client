@@ -525,6 +525,23 @@ export class TorrentsService {
   }
 
   /**
+   * Notifier que la lecture en streaming est terminée (lecteur fermé).
+   * Le backend supprime le torrent et les fichiers uniquement s'ils sont dans stream_cache.
+   * N'interrompt pas l'UX en cas d'erreur (fire-and-forget).
+   */
+  async notifyStreamingEnded(infoHash: string): Promise<void> {
+    try {
+      const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/streaming-ended`);
+      const response = await fetch(url, { method: 'POST' });
+      if (!response.ok) {
+        return;
+      }
+    } catch {
+      // Ne pas bloquer la fermeture du lecteur
+    }
+  }
+
+  /**
    * Lie un téléchargement (info_hash) à un média TMDB pour l'affichage library/téléchargements.
    * À appeler après addTorrentFile/addMagnetLink quand le contexte a tmdbId/tmdbType (ex. page détail).
    * Erreurs (ex. 404 si média pas encore en base) sont ignorées pour ne pas bloquer l'UX.

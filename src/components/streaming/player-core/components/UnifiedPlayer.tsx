@@ -3,7 +3,9 @@ import type { HLSPlayerProps } from '../../hls-player/types';
 import LuciePlayer from '../../lucie-player/LuciePlayer';
 import type { LuciePlayerProps } from '../../lucie-player/types';
 import DirectVideoPlayer from '../../direct-player/DirectVideoPlayer';
-import PlayerLoadingOverlay from '../../player-shared/components/PlayerLoadingOverlay';
+import PlayerLoadingOverlay, {
+  type PlayerLoadingTorrentStats,
+} from '../../player-shared/components/PlayerLoadingOverlay';
 
 /**
  * Façade unique du lecteur (direct, HLS ou Lucie).
@@ -15,7 +17,15 @@ interface UnifiedPlayerProps {
   useLuciePlayer?: boolean; // Nouveau: utiliser le lecteur Lucie
   loading: boolean;
   loadingMessage: string;
+  /** Étape (1-4) pour l'indicateur d'étapes streaming dans l'overlay. */
+  loadingStep?: number;
+  /** Message de détail (ex. "Recherche de peers...") pour l'overlay. */
+  progressMessage?: string;
+  /** Stats du client torrent pour affichage en temps réel dans l'overlay. */
+  torrentStats?: PlayerLoadingTorrentStats | null;
   closeLabel: string;
+  /** Libellé du bouton Annuler dans l'overlay de chargement (télécommande). */
+  cancelLabel?: string;
   onClose: () => void;
   onDirectError: (event: Event) => void;
   onDirectLoadedData: () => void;
@@ -31,7 +41,11 @@ export default function UnifiedPlayer({
   useLuciePlayer = false,
   loading,
   loadingMessage,
+  loadingStep = 0,
+  progressMessage,
+  torrentStats,
   closeLabel,
+  cancelLabel,
   onClose,
   onDirectError,
   onDirectLoadedData,
@@ -42,7 +56,16 @@ export default function UnifiedPlayer({
 }: UnifiedPlayerProps) {
   return (
     <>
-      {loading && <PlayerLoadingOverlay message={loadingMessage} />}
+      {loading && (
+        <PlayerLoadingOverlay
+          message={loadingMessage}
+          loadingStep={loadingStep}
+          progressMessage={progressMessage}
+          torrentStats={torrentStats}
+          onCancel={onClose}
+          cancelLabel={cancelLabel ?? closeLabel}
+        />
+      )}
 
       {src && useDirectPlayer ? (
         <DirectVideoPlayer

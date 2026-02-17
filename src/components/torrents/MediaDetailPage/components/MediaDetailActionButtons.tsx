@@ -3,6 +3,7 @@ import { useMediaDetailActions } from '../hooks/useMediaDetailActions';
 import { useSubscriptionMe } from '../hooks/useSubscriptionMe';
 import type { MediaDetailPageProps } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
+import { getStreamingInfoHash } from '../../../../lib/streamingInfoHashStorage';
 import { ActionButtons } from './ActionButtons';
 import { Modal } from '../../../ui/Modal';
 import { useI18n } from '../../../../lib/i18n/useI18n';
@@ -94,6 +95,10 @@ export function MediaDetailActionButtons({
 }: MediaDetailActionButtonsProps) {
   const { t } = useI18n();
   const { streamingTorrentActive } = useSubscriptionMe();
+  const streamingInfoHash = getStreamingInfoHash();
+  const isStreamingThisTorrent =
+    isPlaying ||
+    (streamingTorrentActive && !!activeTorrent?.infoHash && streamingInfoHash === activeTorrent.infoHash);
 
   const actions = useMediaDetailActions({
     activeTorrent,
@@ -132,7 +137,7 @@ export function MediaDetailActionButtons({
         torrent={torrent}
         allVariants={allVariants}
         isAvailableLocally={isAvailableLocally}
-        isStreamingThisTorrent={isPlaying}
+        isStreamingThisTorrent={isStreamingThisTorrent}
         canStream={canStream}
         isExternal={isExternal}
         hasInfoHash={hasInfoHash}

@@ -38,6 +38,7 @@ export default defineConfig({
     },
     server: {
       host: true, // Écouter sur 0.0.0.0 pour accès via IP (ex. 10.1.0.86:4326), évite "Failed to fetch dynamically imported module"
+      allowedHosts: ['astro.briseteia.me'],
       fs: {
         strict: false,
       },

@@ -65,12 +65,15 @@ export function buildStreamUrl({
 }: BuildStreamUrlInput): BuildStreamUrlResult {
   const normalizedPath = normalizeStreamPath(filePath);
 
-  // Mode streaming torrent (option payante) : route dédiée avec token
+  // Mode streaming torrent (option payante) : route dédiée avec token.
+  // Contrairement au HLS local, ce flux est direct (proxy vers librqbit) : pas de transcodage côté backend,
+  // donc max_height n'est pas appliqué ici. On l'ajoute quand même en query pour cohérence et évolution future.
   if (streamingTorrentMode && infoHash && streamingTorrentToken && typeof fileIndex === 'number') {
     const idx = fileIndex;
     const encName = encodeURIComponent(fileName || 'video');
     const tokenParam = `access_token=${encodeURIComponent(streamingTorrentToken)}`;
-    const streamUrlSt = `${baseUrl.replace(/\/$/, '')}/api/stream-torrent/${infoHash}/${idx}/${encName}?${tokenParam}`;
+    const qualityParam = maxHeight != null && maxHeight > 0 ? `&max_height=${maxHeight}` : '';
+    const streamUrlSt = `${baseUrl.replace(/\/$/, '')}/api/stream-torrent/${infoHash}/${idx}/${encName}?${tokenParam}${qualityParam}`;
     return {
       streamUrl: streamUrlSt,
       normalizedPath,

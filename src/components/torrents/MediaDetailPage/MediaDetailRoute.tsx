@@ -84,6 +84,36 @@ function normalizeSeedCount(t: any): number {
   return Number(t?.seedCount ?? t?.seed_count ?? 0) || 0;
 }
 
+/** Normalise un titre/fichier pour comparaison (lowercase, sans extension). */
+function normalizeTitleForMatch(s: string): string {
+  return (s || '').toLowerCase().replace(/\.[a-z0-9]+$/i, '').trim();
+}
+
+/** True si le chemin ressemble à un fichier (contient une extension vidéo), pas seulement un dossier. */
+function pathLooksLikeFile(p: string | null | undefined): boolean {
+  if (!p || !p.trim()) return false;
+  const lower = p.replace(/\\/g, '/').trim().toLowerCase();
+  return /\.(mkv|mp4|avi|webm|mov|m4v|wmv|ts|m2ts)$/i.test(lower) || /\.[a-z0-9]{2,4}$/.test(lower);
+}
+
+/** Retourne true si le variant correspond au titre demandé (ex. nom de fichier bibliothèque). */
+function variantMatchesTitle(variant: any, titleHint: string): boolean {
+  if (!titleHint || titleHint.trim().length === 0) return false;
+  const hintNorm = normalizeTitleForMatch(titleHint);
+  const nameNorm = normalizeTitleForMatch(variant?.name ?? variant?.clean_title ?? '');
+  const cleanNorm = normalizeTitleForMatch(variant?.clean_title ?? '');
+  if (!hintNorm) return false;
+  // Premier segment (ex. "mercy" depuis "mercy.2026.multi...") pour matcher le titre du film
+  const hintFirstWord = hintNorm.split(/[.\s\-_]+/)[0] ?? hintNorm;
+  if (hintFirstWord.length < 2) return false;
+  return (
+    nameNorm.includes(hintFirstWord) ||
+    hintNorm.includes(nameNorm.split(/[.\s\-_]+/)[0] ?? '') ||
+    (nameNorm.includes(hintNorm) || hintNorm.includes(nameNorm)) ||
+    (cleanNorm.includes(hintFirstWord) || cleanNorm.includes(hintNorm))
+  );
+}
+
 /**
  * Convertit un variant du backend en objet torrent pour le frontend
  */
@@ -175,7 +205,7 @@ function convertVariantToTorrent(variant: any): Torrent {
   } as Torrent;
 }
 
-function pickBestTorrentFromGroupPayload(payload: any): Torrent | null {
+function pickBestTorrentFromGroupPayload(payload: any, titleHint?: string | null): Torrent | null {
   // Payloads possibles selon backend / versions:
   // - { success, torrents: [...] }
   // - { success, data: { torrents: [...] } }
@@ -197,7 +227,26 @@ function pickBestTorrentFromGroupPayload(payload: any): Torrent | null {
     data;
 
   if (Array.isArray(torrents) && torrents.length > 0) {
-    const best = torrents.slice().sort((a: any, b: any) => normalizeSeedCount(b) - normalizeSeedCount(a))[0];
+    // #region agent log
+    const variantNames = torrents.map((t: any) => ({ name: t?.name ?? t?.clean_title, seeds: normalizeSeedCount(t) }));
+    fetch('http://127.0.0.1:7728/ingest/04a4339e-516d-43b3-aa22-e137dbb068b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f'},body:JSON.stringify({sessionId:'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f',location:'MediaDetailRoute.tsx:pickBest',message:'Variants in group',data:{titleHint:titleHint ?? null,variantCount:torrents.length,variantNames},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
+    let best: any;
+    if (titleHint && titleHint.trim().length > 0) {
+      const matching = torrents.filter((t: any) => variantMatchesTitle(t, titleHint));
+      if (matching.length > 0) {
+        best = matching.slice().sort((a: any, b: any) => normalizeSeedCount(b) - normalizeSeedCount(a))[0];
+        // #region agent log
+        fetch('http://127.0.0.1:7728/ingest/04a4339e-516d-43b3-aa22-e137dbb068b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f'},body:JSON.stringify({sessionId:'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f',location:'MediaDetailRoute.tsx:pickBest',message:'Selected matching variant by title',data:{titleHint,name:best?.name,infoHash:best?.info_hash??best?.infoHash},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+        // #endregion
+      }
+    }
+    if (!best) {
+      best = torrents.slice().sort((a: any, b: any) => normalizeSeedCount(b) - normalizeSeedCount(a))[0];
+      // #region agent log
+      fetch('http://127.0.0.1:7728/ingest/04a4339e-516d-43b3-aa22-e137dbb068b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f'},body:JSON.stringify({sessionId:'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f',location:'MediaDetailRoute.tsx:pickBest',message:'Selected best by seeds (no title match)',data:{name:best?.name,infoHash:best?.info_hash??best?.infoHash},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+    }
     // Convertir le variant en objet torrent avec toutes les données nettoyées
     const converted = convertVariantToTorrent(best);
     console.log('[MediaDetailRoute] Meilleur torrent sélectionné et converti:', {
@@ -460,9 +509,72 @@ export default function MediaDetailRoute() {
 
         // Cas tmdbId : recherche → détail (média peut ne pas être synchronisé)
         if (tmdbId) {
+          const fromParam = getFromFromLocation();
+
+          // Depuis la bibliothèque avec un titre (nom de fichier) : privilégier l'entrée bibliothèque qui correspond
+          if (fromParam === 'library' && titleFromQuery && titleFromQuery.trim().length > 0) {
+            const libraryResponse = await serverApi.getLibrary();
+            if (libraryResponse.success && libraryResponse.data && !cancelled) {
+              const libraryItems = Array.isArray(libraryResponse.data) ? libraryResponse.data : [];
+              const titleNorm = normalizeTitleForMatch(titleFromQuery);
+              const hintFirst = titleNorm.split(/[.\s\-_]+/)[0] ?? '';
+              const matchByTitle = (item: any) => {
+                const name = (item.name || item.file_name || '').toString();
+                const nameNorm = normalizeTitleForMatch(name);
+                return name && (nameNorm.includes(hintFirst) || titleNorm.includes(nameNorm.split(/[.\s\-_]+/)[0] ?? ''));
+              };
+              const typeParam = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').get('type');
+              const isSeries = typeParam === 'tv';
+              if (isSeries) {
+                const seriesInLibrary = libraryItems.filter(
+                  (item: any) =>
+                    item.tmdb_id === tmdbId &&
+                    (item.tmdb_type === 'tv' || item.tmdb_type === 'series' || item.category === 'SERIES') &&
+                    item.exists
+                );
+                const matchingByTitle = seriesInLibrary.filter(matchByTitle);
+                const seriesCandidates = matchingByTitle.length > 0 ? matchingByTitle : seriesInLibrary;
+                const toUse = seriesCandidates.find((i: any) => pathLooksLikeFile(i.download_path)) ?? seriesCandidates[0];
+                if (toUse) {
+                  const variants = seriesInLibrary.map((i: any) => libraryItemToTorrent(i));
+                  setTorrent(libraryItemToTorrent(toUse));
+                  setInitialVariants(variants);
+                  try {
+                    const episodesRes = await serverApi.getSeriesEpisodesByTmdbId(tmdbId);
+                    if (episodesRes.success && episodesRes.data && !cancelled) setSeriesEpisodes(episodesRes.data);
+                  } catch { setSeriesEpisodes(null); }
+                  setLoading(false);
+                  return;
+                }
+              } else {
+                const moviesInLibrary = libraryItems.filter(
+                  (item: any) =>
+                    item.tmdb_id === tmdbId &&
+                    (item.tmdb_type === 'movie' || item.category === 'MOVIE') &&
+                    item.exists
+                );
+                const matchingByTitle = moviesInLibrary.filter(matchByTitle);
+                const candidates = matchingByTitle.length > 0 ? matchingByTitle : moviesInLibrary;
+                // Privilégier une entrée dont download_path est un fichier (pas seulement le dossier)
+                const toUse = candidates.find((i: any) => pathLooksLikeFile(i.download_path)) ?? candidates[0];
+                if (toUse) {
+                  const t = libraryItemToTorrent(toUse);
+                  // #region agent log
+                  fetch('http://127.0.0.1:7728/ingest/04a4339e-516d-43b3-aa22-e137dbb068b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f'},body:JSON.stringify({sessionId:'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f',location:'MediaDetailRoute.tsx:libraryMovies',message:'Torrent from library (title)',data:{toUseDownloadPath:toUse.download_path,torrentDownloadPath:(t as any).downloadPath,name:toUse.name},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
+                  // #endregion
+                  const variants = moviesInLibrary.map((i: any) => libraryItemToTorrent(i));
+                  setTorrent(t);
+                  setInitialVariants(variants);
+                  setLoading(false);
+                  return;
+                }
+              }
+            }
+          }
+
           const groupResponse = await serverApi.getTorrentGroupByTmdbId(tmdbId, titleFromQuery ?? undefined);
           let best = groupResponse.success && groupResponse.data
-            ? pickBestTorrentFromGroupPayload(groupResponse)
+            ? pickBestTorrentFromGroupPayload(groupResponse, titleFromQuery ?? undefined)
             : null;
           const data = groupResponse?.data as any;
           const emptyGroupTitle = data?.main_title || titleFromQuery || '';

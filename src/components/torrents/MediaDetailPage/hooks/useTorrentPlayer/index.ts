@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'preact/hooks';
 import type { ClientTorrentStats } from '../../../../../lib/client/types';
+import { clearStreamingInfoHash } from '../../../../../lib/streamingInfoHashStorage';
 import type { PlayStatus } from '../../types';
 import type { UseTorrentPlayerOptions, PollingContext, PlayHandlerContext } from './types';
 import { stopProgressPolling as stopProgressPollingUtil, handleClosePlayer as handleClosePlayerUtil } from './utils';
@@ -177,6 +178,10 @@ export function useTorrentPlayer(options: UseTorrentPlayerOptions) {
   // Fonction pour fermer le lecteur
   const handleClosePlayer = async () => {
     const currentInfoHash = torrentStats?.info_hash || torrent.infoHash;
+    if (streamingTorrentActive && currentInfoHash) {
+      clientApi.notifyStreamingEnded(currentInfoHash).catch(() => {});
+      clearStreamingInfoHash(currentInfoHash);
+    }
     await handleClosePlayerUtil(
       stopProgressPolling,
       setIsPlaying,
@@ -186,7 +191,8 @@ export function useTorrentPlayer(options: UseTorrentPlayerOptions) {
       addDebugLog,
       currentInfoHash,
       isExternal,
-      isAvailableLocally
+      isAvailableLocally,
+      streamingTorrentActive
     );
   };
 

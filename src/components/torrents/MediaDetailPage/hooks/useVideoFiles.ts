@@ -134,6 +134,9 @@ export function useVideoFiles({ torrentName, onError, filePath, torrent }: UseVi
         // Si on a un chemin bibliothèque (média "disponible localement"), l'utiliser sans appeler getTorrent
         // pour éviter un 404 quand le torrent n'est pas sur ce backend (ex. bibliothèque partagée / autre machine).
         if (torrent?.downloadPath) {
+          // #region agent log
+          fetch('http://127.0.0.1:7728/ingest/04a4339e-516d-43b3-aa22-e137dbb068b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f'},body:JSON.stringify({sessionId:'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f',location:'useVideoFiles.ts:libraryPath',message:'Using library path',data:{downloadPath:torrent.downloadPath,infoHash},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
+          // #endregion
           console.log('[useVideoFiles] 📁 Utilisation du chemin bibliothèque (sans appel getTorrent):', torrent.downloadPath);
           const fileName = torrentName || torrent.downloadPath.split(/[/\\]/).pop() || 'video';
           const libraryFile: TorrentFile = {
@@ -153,7 +156,8 @@ export function useVideoFiles({ torrentName, onError, filePath, torrent }: UseVi
         // Pour les torrents normaux (sans chemin bibliothèque), vérifier si le torrent existe sur le backend
         const torrentStats = await clientApi.getTorrent(infoHash);
         if (!torrentStats) {
-          console.warn('[useVideoFiles] ⚠️ Torrent non trouvé dans le backend');
+          // Normal pour un variant externe pas encore ajouté : pas de warn pour éviter le bruit en console
+          console.log('[useVideoFiles] Torrent pas encore dans le client', retryCount > 0 ? `(réessai ${retryCount}/5)` : '');
           if (retryCount < 5) {
             await new Promise(resolve => setTimeout(resolve, 1000));
             return loadVideoFiles(infoHash, retryCount + 1);

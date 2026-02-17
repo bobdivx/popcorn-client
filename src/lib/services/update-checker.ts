@@ -3,6 +3,7 @@
  * Vérifie au démarrage si une nouvelle version est disponible
  */
 
+import { getPopcornWebBaseUrl } from '../api/popcorn-web.js';
 import { notificationService } from './notification-service.js';
 
 interface VersionInfo {
@@ -65,59 +66,53 @@ class UpdateChecker {
   }
 
   /**
-   * Parse la page de téléchargements pour extraire les versions disponibles
+   * Retourne l'URL de base alternative (apex ↔ www) pour contourner 307/CORS selon la config Vercel.
+   */
+  private static getAlternatePopcornBase(base: string): string {
+    const u = base.replace(/\/$/, '');
+    if (u === 'https://popcornn.app') return 'https://www.popcornn.app';
+    if (u === 'https://www.popcornn.app') return 'https://popcornn.app';
+    return u;
+  }
+
+  /**
+   * Parse la page de téléchargements pour extraire les versions disponibles.
+   * On essaie www en premier pour éviter la requête apex qui renvoie 307 → CORS quand Vercel redirige.
    */
   private async parseDownloadsPage(): Promise<VersionInfo | null> {
-    // Ne pas vérifier les mises à jour en développement (évite les erreurs CORS)
     if (this.isDevelopment()) {
       return null;
     }
 
-    try {
-      const downloadsUrl = 'https://popcorn-web-five.vercel.app/downloads';
-      const response = await fetch(downloadsUrl);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+    const base = getPopcornWebBaseUrl();
+    const other = UpdateChecker.getAlternatePopcornBase(base);
+    const urlsToTry = [`${base}/downloads`, `${other}/downloads`];
 
-      const html = await response.text();
-      
-      // Chercher les versions dans le HTML (format attendu: v1.0.X ou version dans les liens APK)
-      const versionRegex = /(?:v|version[:\s]+)(\d+\.\d+\.\d+)/gi;
-      const matches = html.match(versionRegex);
-      
-      if (!matches || matches.length === 0) {
-        return null;
+    for (const downloadsUrl of urlsToTry) {
+      try {
+        const response = await fetch(downloadsUrl);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const html = await response.text();
+        const versionRegex = /(?:v|version[:\s]+)(\d+\.\d+\.\d+)/gi;
+        const matches = html.match(versionRegex);
+        if (!matches || matches.length === 0) {
+          continue;
+        }
+        const latestVersion = matches[0].replace(/[^\d.]/g, '');
+        const apkLinkRegex = /href=["']([^"']*\.apk[^"']*)["']/i;
+        const apkMatch = html.match(apkLinkRegex);
+        const downloadUrl = apkMatch ? apkMatch[1] : undefined;
+        return {
+          version: latestVersion,
+          downloadUrl: downloadUrl ? (downloadUrl.startsWith('http') ? downloadUrl : `${downloadsUrl.replace(/\/downloads$/, '')}${downloadUrl}`) : undefined,
+        };
+      } catch (_e) {
+        continue;
       }
-
-      // Extraire la version la plus récente (première occurrence généralement)
-      const latestVersion = matches[0].replace(/[^\d.]/g, '');
-      
-      // Chercher un lien de téléchargement APK
-      const apkLinkRegex = /href=["']([^"']*\.apk[^"']*)["']/i;
-      const apkMatch = html.match(apkLinkRegex);
-      const downloadUrl = apkMatch ? apkMatch[1] : undefined;
-
-      return {
-        version: latestVersion,
-        downloadUrl: downloadUrl ? (downloadUrl.startsWith('http') ? downloadUrl : `${downloadsUrl}${downloadUrl}`) : undefined,
-      };
-    } catch (error) {
-      // En production, logguer l'erreur seulement si ce n'est pas une erreur CORS
-      const isCorsError = error instanceof TypeError && 
-        (error.message?.includes('Failed to fetch') || 
-         error.message?.includes('CORS') ||
-         error.message?.includes('blocked by CORS'));
-      
-      if (isCorsError) {
-        // En Docker / iframe / autre origine, CORS empêche le fetch ; normal, ne pas polluer la console
-        console.debug('[UpdateChecker] Impossible de vérifier les mises à jour (CORS)');
-      } else {
-        console.error('[UpdateChecker] Erreur lors du parsing de la page de téléchargements:', error);
-      }
-      return null;
     }
+    return null;
   }
 
   /**

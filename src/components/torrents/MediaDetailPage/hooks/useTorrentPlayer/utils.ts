@@ -26,7 +26,9 @@ export async function handleClosePlayer(
   infoHash?: string | null,
   isExternal?: boolean,
   /** Média depuis la bibliothèque : ne pas tenter de supprimer le torrent (évite 502, fichiers déjà sur disque). */
-  fromLibrary?: boolean
+  fromLibrary?: boolean,
+  /** Mode streaming actif : le nettoyage est fait via POST streaming-ended (notifyStreamingEnded), ne pas appeler DELETE ici (évite 502). */
+  isStreamingTorrent?: boolean
 ) {
   // Sortir du plein écran si on y est
   if (document.fullscreenElement) {
@@ -45,17 +47,22 @@ export async function handleClosePlayer(
   setProgressMessage('');
   addDebugLog('info', '🎬 Fermeture du lecteur vidéo');
   
+  // En mode streaming, le nettoyage est déjà fait par notifyStreamingEnded (POST streaming-ended).
+  // Ne pas appeler DELETE ici pour éviter 502 (torrent déjà supprimé ou session librqbit incohérente).
+  if (isStreamingTorrent) {
+    return;
+  }
   // Si c'est un torrent externe et pas depuis la bibliothèque, supprimer automatiquement pour libérer l'espace.
   // Depuis la bibliothèque : le torrent n'est pas forcément géré par le client ou ne doit pas être supprimé (502).
   if (isExternal && infoHash && !fromLibrary) {
     try {
       const { clientApi } = await import('../../../../../lib/client/api');
-      addDebugLog('info', '🗑️ Suppression automatique du torrent de streaming externe', { infoHash });
+      addDebugLog('info', '🗑️ Suppression automatique du torrent externe', { infoHash });
       await clientApi.removeTorrent(infoHash, true); // deleteFiles = true pour nettoyer
-      addDebugLog('success', '✅ Torrent de streaming supprimé (nettoyé)');
+      addDebugLog('success', '✅ Torrent supprimé (nettoyé)');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
-      addDebugLog('warning', '⚠️ Impossible de supprimer le torrent de streaming', { error: errorMsg });
+      addDebugLog('warning', '⚠️ Impossible de supprimer le torrent', { error: errorMsg });
       // Ne pas bloquer la fermeture du lecteur si la suppression échoue
     }
   }
