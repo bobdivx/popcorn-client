@@ -33,7 +33,7 @@ import { generateAccessToken, generateRefreshToken } from '../auth/jwt-client.js
 // Imports des modules de méthodes
 import { authMethods } from './server-api/auth.js';
 import { mediaMethods } from './server-api/media.js';
-import { libraryMethods } from './server-api/library.js';
+import { libraryMethods, type LibraryMediaEntry } from './server-api/library.js';
 import { healthMethods } from './server-api/health.js';
 import { indexersMethods } from './server-api/indexers.js';
 import { settingsMethods } from './server-api/settings.js';
@@ -432,12 +432,6 @@ class ServerApiClient {
       };
     }
 
-    // Logger l'URL pour le diagnostic (sauf health/sync pour limiter le bruit quand le backend est down)
-    const isPollingEndpoint = endpoint.includes('/health') || endpoint.includes('/sync/status');
-    if (retryCount === 0 && !isPollingEndpoint) {
-      console.log('[server-api] Requête vers:', url);
-    }
-
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...(options.headers || {}),
@@ -821,19 +815,6 @@ class ServerApiClient {
     }
 
     // Log pour debug : voir la structure de la réponse AVANT transformation
-    if (typeof window !== 'undefined' && response.url?.includes('/api/torrents/group/')) {
-      console.log('[server-api] handleResponse AVANT transformation pour /api/torrents/group:', {
-        url: response.url,
-        originalData: data,
-        hasData: !!data.data,
-        hasSuccess: !!data.success,
-        dataType: typeof data.data,
-        dataKeys: data.data ? Object.keys(data.data) : [],
-        originalDataKeys: Object.keys(data),
-        fullOriginalData: JSON.stringify(data, null, 2),
-      });
-    }
-
     // Gérer la double imbrication : si data.data existe et contient success, utiliser data.data
     // Sinon, utiliser data directement
     let responseData = data.data || data;
@@ -843,19 +824,6 @@ class ServerApiClient {
       responseData = responseData.data || responseData;
     }
     
-    // Log pour debug : voir la structure de la réponse APRÈS transformation
-    if (typeof window !== 'undefined' && response.url?.includes('/api/torrents/group/')) {
-      console.log('[server-api] handleResponse APRÈS transformation pour /api/torrents/group:', {
-        responseData,
-        hasVariants: !!(responseData as any)?.variants,
-        hasTorrents: !!(responseData as any)?.torrents,
-        variantsCount: (responseData as any)?.variants?.length,
-        torrentsCount: (responseData as any)?.torrents?.length,
-        responseDataKeys: responseData ? Object.keys(responseData) : [],
-        fullResponseData: JSON.stringify(responseData, null, 2),
-      });
-    }
-
     return {
       success: true,
       data: responseData,
@@ -1033,6 +1001,10 @@ interface IServerApiClientPublic {
   listExplorerFiles(path?: string): Promise<ApiResponse<Array<{ name: string; path: string; is_directory: boolean; size?: number; modified?: number }>>>;
   listLibrarySourceExplorerFiles(path?: string): Promise<ApiResponse<Array<{ name: string; path: string; is_directory: boolean; size?: number; modified?: number }>>>;
   setLibrarySourceEnabled(id: string, is_enabled: boolean): Promise<ApiResponse<void>>;
+  getLibraryMedia(): Promise<ApiResponse<LibraryMediaEntry[]>>;
+  updateLibraryMedia(id: string, file_path: string): Promise<ApiResponse<LibraryMediaEntry>>;
+  deleteLibraryMedia(id: string): Promise<ApiResponse<void>>;
+  deleteLibraryMediaFile(id: string): Promise<ApiResponse<void>>;
 
   // Sync methods
   getSyncStatus(): Promise<ApiResponse<any>>;

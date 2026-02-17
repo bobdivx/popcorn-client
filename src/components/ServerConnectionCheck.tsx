@@ -10,7 +10,7 @@ import { hasBackendUrl } from '../lib/backend-config.js';
 import { updateChecker } from '../lib/services/update-checker.js';
 import { redirectTo, normalizePath } from '../lib/utils/navigation.js';
 import { loadRuntimeConfig, setBackendUrl } from '../lib/backend-config.js';
-import { getUserConfig } from '../lib/api/popcorn-web.js';
+import { getUserConfig, getSharedWithMe } from '../lib/api/popcorn-web.js';
 
 type ConnectionStatus = 'checking' | 'connecting' | 'connected' | 'error';
 
@@ -55,6 +55,14 @@ export default function ServerConnectionCheck() {
         if (cloudConfig?.backendUrl?.trim()) {
           const url = cloudConfig.backendUrl.trim().replace(/\/$/, '');
           setBackendUrl(url);
+        } else {
+          // Compte local (utilisateur invité) : si pas de backendUrl en config, utiliser celui d'un ami qui partage avec moi
+          const shared = await getSharedWithMe();
+          const firstBackend = shared?.find((s) => s.backendUrl?.trim());
+          if (firstBackend?.backendUrl?.trim()) {
+            const url = firstBackend.backendUrl.trim().replace(/\/$/, '');
+            setBackendUrl(url);
+          }
         }
       } catch {
         // ignore (utilisateur non connecté au cloud ou CORS)
@@ -286,6 +294,9 @@ export default function ServerConnectionCheck() {
         // Vérifier si l'utilisateur est authentifié
         setTimeout(async () => {
           setIsVisible(false);
+          try {
+            window.dispatchEvent(new CustomEvent('backendReconnected'));
+          } catch (_) {}
           handleConnectionSuccess(response);
         }, 500);
       } else {
@@ -398,11 +409,17 @@ export default function ServerConnectionCheck() {
             <div className="absolute inset-0 border-4 border-blue-500/30 rounded-full animate-spin" style={{ animationDuration: '3s' }}></div>
             <div className="absolute inset-2 border-4 border-purple-500/30 rounded-full animate-spin" style={{ animationDuration: '2s', animationDirection: 'reverse' }}></div>
             
-            {/* Icône centrale */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-4xl md:text-6xl animate-bounce" style={{ animationDuration: '2s' }}>
-                🍿
-              </div>
+            {/* Logo Popcorn (même que les autres animations de chargement) */}
+            <div className="absolute inset-2 flex items-center justify-center">
+              <img
+                src="/popcorn_logo.png"
+                alt="Popcornn"
+                className="w-full h-full object-contain drop-shadow-lg animate-pulse"
+                style={{
+                  animationDuration: '2s',
+                  filter: 'drop-shadow(0 0 10px rgba(220, 38, 38, 0.5))',
+                }}
+              />
             </div>
           </div>
         </div>
@@ -410,7 +427,7 @@ export default function ServerConnectionCheck() {
           {/* Titre */}
           <div className="text-center space-y-3 sm:space-y-4 tv:space-y-6">
             <h1 className="text-2xl sm:text-3xl md:text-5xl tv:text-6xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-pulse">
-              Popcorn Torrent
+              Popcornn
             </h1>
             
             {/* Message de statut */}

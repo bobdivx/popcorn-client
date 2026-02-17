@@ -181,21 +181,6 @@ export function ActionButtons({
     !showProgressNextToCancel &&
     !downloadingToClient;
 
-  // Debug: Log pour diagnostiquer l'affichage du bouton Lire/Télécharger
-  if (hasInfoHash && import.meta.env.DEV) {
-    console.log('[ActionButtons] État du bouton:', {
-      isAvailableLocally,
-      isDownloadComplete,
-      hasTorrentStats: !!torrentStats,
-      torrentStatsState: torrentStats?.state,
-      torrentStatsProgress: torrentStats?.progress,
-      progressPercent,
-      shouldShowButton,
-      shouldShowPlayButton,
-      isDownloading,
-    });
-  }
-
   return (
     <div className="mb-6">
       <div className="flex flex-wrap gap-3 items-center">
@@ -211,8 +196,9 @@ export function ActionButtons({
             title={isPlayStreamingMode ? t('playback.playStreamingLabel') : (shouldShowPlayButton && hasSavedPosition ? t('dashboard.resumeWatching') : undefined)}
             data-focusable
             data-media-detail-primary-action
+            data-media-detail-action={shouldShowPlayButton ? 'play' : 'download'}
             tabIndex={0}
-            className="inline-flex items-center gap-2 bg-primary hover:bg-primary-700 text-white px-6 py-3 rounded-lg font-semibold text-lg transition-all duration-200 border border-primary-500/50 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px] tv-element-focused"
+            className="inline-flex items-center gap-2 bg-primary hover:bg-primary-700 text-white px-6 py-3 rounded-lg font-semibold text-lg transition-all duration-200 border border-primary-500/50 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px]"
           >
             {downloadingToClient ? (
               <>
@@ -249,8 +235,9 @@ export function ActionButtons({
             type="button"
             onClick={onDownload}
             data-focusable
+            data-media-detail-action="download"
             tabIndex={0}
-            className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-lg font-semibold text-lg transition-all duration-200 border border-white/30 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv-element-focused"
+            className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-lg font-semibold text-lg transition-all duration-200 border border-white/30 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px]"
             title={isPackWithMultipleFiles ? t('playback.downloadFullSeason') : t('common.download')}
           >
             <Download className="h-5 w-5" size={20} />

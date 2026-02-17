@@ -580,7 +580,12 @@
     "filterSourceExternal": "Bibliothèque externe",
     "filterSourceShared": "Partagés",
     "filterSourceLocal": "Local",
-    "genreOther": "Autres"
+    "genreOther": "Autres",
+    "mediaCount": "{count} média(s) sur disque",
+    "seriesGroupedHint": "Les séries sont regroupées : une carte = une série (plusieurs épisodes).",
+    "seriesGroupedShort": "séries regroupées",
+    "episodesInLibrary": "{count} épisode en bibliothèque",
+    "episodesInLibrary_plural": "{count} épisodes en bibliothèque"
   },
   "torrentStats": {
     "downloading": "Téléchargement en cours",
@@ -807,6 +812,43 @@
     "librarySources": {
       "title": "Dossiers externes",
       "description": "Ajouter des dossiers hors du serveur (ex. autre NAS) pour les inclure dans la bibliothèque"
+    },
+    "libraryMedia": {
+      "title": "Médias de la bibliothèque",
+      "description": "Voir le nombre de médias, modifier les chemins ou supprimer une entrée de la base"
+    },
+    "libraryMediaPanel": {
+      "intro": "Liste des fichiers indexés dans la bibliothèque (films et épisodes). Vous pouvez corriger un chemin si le fichier a été déplacé ou retirer une entrée de l'index (le fichier sur disque n'est pas supprimé).",
+      "loading": "Chargement…",
+      "totalCount": "{count} entrée(s) en base",
+      "filmsCount": "Films : {count}",
+      "seriesCount": "Séries (fichiers) : {count}",
+      "localCount": "Local : {count}",
+      "externalCount": "Externe : {count}",
+      "filter": "Filtrer",
+      "filterType": "Type",
+      "filterSource": "Source",
+      "sourceLocal": "Source locale (dossier de téléchargement)",
+      "sourceExternal": "Bibliothèques externes",
+      "noMedia": "Aucun média indexé pour ce filtre.",
+      "colTitle": "Titre / Fichier",
+      "colPath": "Chemin",
+      "colCategory": "Type",
+      "colSource": "Source",
+      "colActions": "Actions",
+      "editPath": "Modifier le chemin",
+      "removeFromLibrary": "Retirer de la bibliothèque",
+      "removeFromLibraryConfirm": "Retirer cette entrée de la bibliothèque ? Le fichier sur disque ne sera pas supprimé.",
+      "removeFromLibrarySuccess": "Entrée retirée de la bibliothèque.",
+      "deleteFileAndLibrary": "Supprimer le fichier",
+      "deleteFileConfirm": "Supprimer le fichier du disque et retirer de la bibliothèque ? Cette action est irréversible. (Uniquement pour les médias du répertoire local.)",
+      "deleteFileSuccess": "Fichier supprimé et entrée retirée de la bibliothèque.",
+      "deleteFileError": "Impossible de supprimer le fichier (répertoire local uniquement).",
+      "updateSuccess": "Chemin mis à jour.",
+      "updateError": "Impossible de mettre à jour le chemin.",
+      "deleteConfirm": "Retirer cette entrée de la bibliothèque ? Le fichier sur disque ne sera pas supprimé.",
+      "deleteSuccess": "Entrée retirée de la bibliothèque.",
+      "deleteError": "Impossible de supprimer l'entrée."
     },
     "librarySourcesPanel": {
       "intro": "Ajoutez des dossiers contenant des films ou séries (ex. sur un autre NAS). Après validation, un scan et un enrichissement TMDB seront lancés.",

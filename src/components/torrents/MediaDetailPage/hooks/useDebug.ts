@@ -9,7 +9,6 @@ export function useDebug() {
     const time = new Date().toLocaleTimeString();
     setDebugLogs((prev) => {
       const newLogs = [...prev.slice(-49), { time, type, message, data }];
-      console.log(`[DEBUG ${time}] ${type.toUpperCase()}: ${message}`, data || '');
       return newLogs;
     });
   }, []);

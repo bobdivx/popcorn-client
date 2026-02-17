@@ -580,7 +580,12 @@
     "filterSourceExternal": "External library",
     "filterSourceShared": "Shared",
     "filterSourceLocal": "Local",
-    "genreOther": "Other"
+    "genreOther": "Other",
+    "mediaCount": "{count} media on disk",
+    "seriesGroupedHint": "Series are grouped: one card = one series (multiple episodes).",
+    "seriesGroupedShort": "series grouped",
+    "episodesInLibrary": "{count} episode in library",
+    "episodesInLibrary_plural": "{count} episodes in library"
   },
   "torrentStats": {
     "downloading": "Downloading",
@@ -807,6 +812,43 @@
     "librarySources": {
       "title": "External folders",
       "description": "Add folders outside the server (e.g. another NAS) to include in the library"
+    },
+    "libraryMedia": {
+      "title": "Library media",
+      "description": "View media count, edit paths or remove an entry from the database"
+    },
+    "libraryMediaPanel": {
+      "intro": "List of files indexed in the library (movies and episodes). You can fix a path if the file was moved or remove an entry from the index (the file on disk is not deleted).",
+      "loading": "Loading…",
+      "totalCount": "{count} entry/entries in database",
+      "filmsCount": "Movies: {count}",
+      "seriesCount": "Series (files): {count}",
+      "localCount": "Local: {count}",
+      "externalCount": "External: {count}",
+      "filter": "Filter",
+      "filterType": "Type",
+      "filterSource": "Source",
+      "sourceLocal": "Local source (download folder)",
+      "sourceExternal": "External libraries",
+      "noMedia": "No media indexed for this filter.",
+      "colTitle": "Title / File",
+      "colPath": "Path",
+      "colCategory": "Type",
+      "colSource": "Source",
+      "colActions": "Actions",
+      "editPath": "Edit path",
+      "removeFromLibrary": "Remove from library",
+      "removeFromLibraryConfirm": "Remove this entry from the library? The file on disk will not be deleted.",
+      "removeFromLibrarySuccess": "Entry removed from library.",
+      "deleteFileAndLibrary": "Delete file",
+      "deleteFileConfirm": "Delete the file from disk and remove from library? This action cannot be undone. (Local download folder only.)",
+      "deleteFileSuccess": "File deleted and entry removed from library.",
+      "deleteFileError": "Could not delete file (local folder only).",
+      "updateSuccess": "Path updated.",
+      "updateError": "Could not update path.",
+      "deleteConfirm": "Remove this entry from the library? The file on disk will not be deleted.",
+      "deleteSuccess": "Entry removed from library.",
+      "deleteError": "Could not remove entry."
     },
     "librarySourcesPanel": {
       "intro": "Add folders containing movies or series (e.g. on another NAS). After validation, a scan and TMDB enrichment will run.",

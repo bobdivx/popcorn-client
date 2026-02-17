@@ -5,6 +5,7 @@ import { CacheManager } from '../lib/client/storage';
 import { FocusableCard } from './ui/FocusableCard';
 import CarouselRow from './torrents/CarouselRow';
 import { useI18n } from '../lib/i18n/useI18n';
+import { isTVPlatform } from '../lib/utils/device-detection';
 
 interface SearchProps {
   onResultClick?: (result: SearchResult) => void;
@@ -166,12 +167,39 @@ export default function Search({ onResultClick }: SearchProps) {
   const [searchPhase, setSearchPhase] = useState<SearchPhase>('idle');
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const prevLoadingRef = useRef(false);
 
   useEffect(() => {
     if (inputRef.current && typeof window !== 'undefined') {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, []);
+
+  // Organiser les résultats par type (déclaré avant le useEffect qui en dépend)
+  const movies = results.filter(r => r.type === 'movie');
+  const series = results.filter(r => r.type === 'tv');
+  const allResults = type === 'all' ? results : (type === 'movie' ? movies : series);
+
+  // Après validation de la recherche (OK / Enter) : déplacer le focus sur le premier résultat (TV / télécommande)
+  useEffect(() => {
+    const hadLoading = prevLoadingRef.current;
+    prevLoadingRef.current = loading;
+    if (!isTVPlatform()) return;
+    const hasResults = allResults.length > 0 || tmdbFallbackResults.length > 0;
+    if (!hasResults || loading) return;
+    const focusOnInput = document.activeElement === inputRef.current;
+    const justFinishedLoading = hadLoading;
+    if (!justFinishedLoading && !focusOnInput) return;
+    const t = setTimeout(() => {
+      const first = document.querySelector<HTMLElement>(
+        '[data-search-results] a[href], [data-search-results] [data-focusable], [data-search-results] [tabindex="0"]'
+      );
+      if (first) {
+        first.focus();
+      }
+    }, 200);
+    return () => clearTimeout(t);
+  }, [loading, allResults.length, tmdbFallbackResults.length]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -291,11 +319,6 @@ export default function Search({ onResultClick }: SearchProps) {
     setSearchPhase('idle');
     inputRef.current?.focus();
   };
-
-  // Organiser les résultats par type pour affichage en carrousels
-  const movies = results.filter(r => r.type === 'movie');
-  const series = results.filter(r => r.type === 'tv');
-  const allResults = type === 'all' ? results : (type === 'movie' ? movies : series);
 
   return (
     <div className="min-h-screen bg-black text-white w-full">
@@ -441,7 +464,7 @@ export default function Search({ onResultClick }: SearchProps) {
 
       {/* Résultats organisés en carrousels */}
       {!loading && query && allResults.length > 0 && (
-        <div className="pb-8 tv:pb-12">
+        <div className="pb-8 tv:pb-12" data-search-results>
           {type === 'all' ? (
             <>
               {movies.length > 0 && (
@@ -507,7 +530,7 @@ export default function Search({ onResultClick }: SearchProps) {
 
       {/* Aucun torrent trouvé mais résultats TMDB : proposer "Demander" */}
       {!loading && query && allResults.length === 0 && !error && tmdbFallbackResults.length > 0 && (
-        <div className="pb-8 tv:pb-12 container mx-auto px-4 sm:px-6 lg:px-8 tv:px-16">
+        <div className="pb-8 tv:pb-12 container mx-auto px-4 sm:px-6 lg:px-8 tv:px-16" data-search-results>
           <p className="text-gray-400 text-base tv:text-lg mb-4">
             {t('search.noTorrentsUseRequest')}
           </p>

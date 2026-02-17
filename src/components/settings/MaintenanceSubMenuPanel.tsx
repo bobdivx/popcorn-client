@@ -1,4 +1,4 @@
-import { Wrench, Sliders, Activity, Cpu, TrendingUp } from 'lucide-preact';
+import { Wrench, Sliders, Activity } from 'lucide-preact';
 import { useState, useEffect } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { canAccess } from '../../lib/permissions';
@@ -178,149 +178,6 @@ function TranscodingConfigSection() {
   );
 }
 
-function ResourcesSection() {
-  const { t } = useI18n();
-  const [data, setData] = useState<{
-    process_memory_mb: number;
-    process_cpu_usage_percent: number;
-    system_memory_total_mb: number | null;
-    system_memory_used_mb: number | null;
-    gpu_available: boolean;
-    hwaccels: string[];
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchResources = () => {
-    setLoading(true);
-    setError(null);
-    serverApi
-      .getSystemResources()
-      .then((res) => {
-        if (res.success && res.data) setData(res.data);
-        else setError(t('settingsMenu.maintenance.resources.unavailableOrOldBackend'));
-      })
-      .catch(() => setError(t('settingsMenu.maintenance.resources.unavailableOrOldBackend')))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    fetchResources();
-  }, []);
-
-  if (loading && !data) {
-    return (
-      <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-        <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
-          <Activity className="w-5 h-5 text-primary-400" />
-          {t('settingsMenu.maintenance.resources.title')}
-        </h3>
-        <p className="text-sm text-gray-400">{t('common.loading')}</p>
-      </section>
-    );
-  }
-
-  if (error && !data) {
-    return (
-      <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-        <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
-          <Activity className="w-5 h-5 text-primary-400" />
-          {t('settingsMenu.maintenance.resources.title')}
-        </h3>
-        <p className="text-sm text-red-400">{error}</p>
-        <button
-          type="button"
-          onClick={fetchResources}
-          className="btn btn-primary mt-3"
-          data-focusable
-          tabIndex={0}
-        >
-          {t('common.retry')}
-        </button>
-      </section>
-    );
-  }
-
-  const d = data!;
-  const sysMemTotal = d.system_memory_total_mb ?? 0;
-  const sysMemUsed = d.system_memory_used_mb ?? 0;
-  const sysMemPct = sysMemTotal > 0 ? Math.round((sysMemUsed / sysMemTotal) * 100) : null;
-
-  return (
-    <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-      <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
-        <Activity className="w-5 h-5 text-primary-400" />
-        {t('settingsMenu.maintenance.resources.title')}
-      </h3>
-      <p className="text-sm text-gray-400 mb-4">
-        {t('settingsMenu.maintenance.resources.description')}
-      </p>
-      <div className="flex flex-col gap-3">
-        <div className="grid gap-2 text-sm">
-          <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-gray-400" />
-            <span className="text-gray-300">
-              {t('settingsMenu.maintenance.resources.processMemory')}:{' '}
-              <strong className="text-white">{d.process_memory_mb.toFixed(1)} Mo</strong>
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Cpu className="w-4 h-4 text-gray-400" />
-            <span className="text-gray-300">
-              {t('settingsMenu.maintenance.resources.processCpu')}:{' '}
-              <strong className="text-white">{d.process_cpu_usage_percent.toFixed(1)} %</strong>
-            </span>
-          </div>
-          {sysMemTotal > 0 && (
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-gray-400" />
-              <span className="text-gray-300">
-                {t('settingsMenu.maintenance.resources.systemMemory')}:{' '}
-                <strong className="text-white">
-                  {sysMemUsed.toFixed(0)} / {sysMemTotal.toFixed(0)} Mo
-                  {sysMemPct != null ? ` (${sysMemPct} %)` : ''}
-                </strong>
-              </span>
-            </div>
-          )}
-          <div className="flex flex-col gap-1 mt-2">
-            <div className="flex items-center gap-2">
-              <span className="text-gray-300">
-                {t('settingsMenu.maintenance.resources.gpuAcceleration')}:
-              </span>
-              {d.gpu_available ? (
-                <span className="text-green-400 font-medium">
-                  {t('settingsMenu.maintenance.resources.gpuAvailable')}
-                  {d.hwaccels.length > 0 ? ` (${d.hwaccels.join(', ')})` : ''}
-                </span>
-              ) : (
-                <span className="text-amber-400 font-medium">
-                  {t('settingsMenu.maintenance.resources.gpuNotAvailable')}
-                </span>
-              )}
-            </div>
-            {!d.gpu_available && (
-              <p className="text-xs text-gray-500 mt-0.5" title={t('settingsMenu.maintenance.resources.gpuNotAvailableHint')}>
-                {t('settingsMenu.maintenance.resources.gpuNotAvailableHint')}
-              </p>
-            )}
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={fetchResources}
-          disabled={loading}
-          className="btn btn-secondary self-start disabled:opacity-60"
-          data-focusable
-          tabIndex={0}
-        >
-          {loading ? t('common.loading') : t('settingsMenu.maintenance.resources.refresh')}
-        </button>
-      </div>
-    </section>
-  );
-}
-
 const MAINTENANCE_ITEMS: SubMenuItem[] = [
   {
     id: 'force-cleanup',
@@ -343,14 +200,6 @@ const MAINTENANCE_ITEMS: SubMenuItem[] = [
     titleKey: 'settingsMenu.maintenance.resources.title',
     descriptionKey: 'settingsMenu.maintenance.resources.description',
     icon: Activity,
-    permission: 'settings.server',
-    inlineContent: ResourcesSection,
-  },
-  {
-    id: 'resources-monitor-dev',
-    titleKey: 'settingsMenu.maintenance.resourcesMonitorDev.title',
-    descriptionKey: 'settingsMenu.maintenance.resourcesMonitorDev.description',
-    icon: TrendingUp,
     permission: 'settings.server',
     inlineContent: ResourceMonitorDev,
   },

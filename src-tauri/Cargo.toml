@@ -31,6 +31,13 @@ serde_json = "1.0"
 # Utiliser rustls-tls au lieu de native-tls pour éviter la dépendance OpenSSL sur Android
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
+# Profil pour générer les binaires avec symboles de débogage natifs (upload Play Console).
+# Utilisé uniquement pour le zip "native debug symbols", pas pour l'AAB (reste en release strippé).
+[profile.release-with-symbols]
+inherits = "release"
+strip = false
+debug = true
+
 [features]
 # Cette fonctionnalité est utilisée pour la production ou quand `devPath` n'est pas défini
 custom-protocol = ["tauri/custom-protocol"]

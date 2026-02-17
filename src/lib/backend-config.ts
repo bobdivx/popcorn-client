@@ -307,7 +307,6 @@ export function setBackendUrl(url: string, options?: SetBackendUrlOptions): void
     if (options?.setAsMyBackend !== false) {
       localStorage.setItem(MY_BACKEND_STORAGE_KEY, normalizedUrl);
     }
-    console.log('[backend-config] URL backend sauvegardée:', normalizedUrl);
   } catch (error) {
     console.error('[backend-config] Erreur lors de la sauvegarde dans localStorage:', error);
     throw error;

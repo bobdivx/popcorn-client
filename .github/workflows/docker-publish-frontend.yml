@@ -223,7 +223,7 @@ jobs:
             sleep 10
           done
           echo "⚠️ Impossible de joindre Docker Hub (registry-1.docker.io) depuis ce runner."
-          echo "   Le build et le push seront tout de même tentés. Si le push échoue, voir: doc/TROUBLESHOOTING_DOCKER_RUNNER_DNS.md"
+          echo "   Le build et le push seront tout de même tentés. Si le push échoue, voir: docs/TROUBLESHOOTING_DOCKER_RUNNER_DNS.md"
           echo "   (DNS/firewall: ex. 8.8.8.8 dans /etc/docker/daemon.json puis systemctl restart docker)"
           echo "reachable=false" >> $GITHUB_OUTPUT
           exit 1
@@ -259,7 +259,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./docker/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -274,7 +274,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./docker/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -287,7 +287,7 @@ jobs:
         run: |
           echo "Build et push Docker ont echoue (tentative 1 + retry)."
           echo "Causes frequentes : connexion reset, DNS (10.1.0.1:53), firewall. Verifiez le reseau du runner puis reexecutez le workflow."
-          echo "Documentation : doc/TROUBLESHOOTING_DOCKER_RUNNER_DNS.md"
+          echo "Documentation : docs/TROUBLESHOOTING_DOCKER_RUNNER_DNS.md"
           exit 1
 
       - name: Build Docker image (no push)
@@ -295,7 +295,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./docker/Dockerfile
           push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

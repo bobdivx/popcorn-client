@@ -1,6 +1,6 @@
 {
     "id":  "com.popcorn.client.webos",
-    "version":  "1.2.24",
+    "version":  "1.2.47",
     "type":  "web",
     "main":  "index.html",
     "title":  "Popcorn",

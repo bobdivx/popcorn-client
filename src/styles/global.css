@@ -51,6 +51,16 @@
   -webkit-overflow-scrolling: touch; /* Momentum scroll sur iOS */
   overscroll-behavior-x: contain;    /* Empêche la propagation du scroll horizontal */
   touch-action: pan-x pan-y;         /* Autorise swipe horizontal ET vertical (page) */
+  /* Garder overflow-y visible pour ne pas couper la bordure de focus en haut/bas */
+  overflow-y: visible !important;
+}
+
+/* Page Demandes : éviter que la bordure de focus soit coupée (conteneur + cartes) */
+[data-page="demandes"] [data-carousel] {
+  overflow-y: visible !important;
+}
+[data-page="demandes"] [data-torrent-card].torrent-poster {
+  overflow: visible !important;
 }
 
 /* Scrollbar visible (barre latérale) */
@@ -1117,9 +1127,15 @@ button, a, input, select, textarea {
   transform: translate3d(0, 0, 0) scale(1.2); /* Force l'accélération GPU avec translate3d */
 }
 
-/* Isolation des animations pour performance */
+/* Isolation des animations pour performance (sans paint sur focus pour ne pas couper l'outline) */
 .torrent-poster {
   contain: layout style paint;
+}
+
+/* Carte focusée : ne pas clip l'outline en haut/bas (contain: paint coupe le focus ring) */
+[data-torrent-card].tv-card-focused,
+.torrent-poster.tv-card-focused {
+  contain: layout style !important;
 }
 
 /* Animation focus au centre - carte centrée à l'écran */
@@ -1244,8 +1260,10 @@ html {
 
 /* Variable CSS pour la couleur de focus TV */
 :root {
-  --tv-focus-color: rgba(168, 85, 247, 0.8);
+  --tv-focus-color: rgba(168, 85, 247, 0.9);
   --tv-focus-shadow: 0 0 0 3px var(--tv-focus-color), 0 10px 40px rgba(0, 0, 0, 0.5);
+  --tv-focus-outline: 4px solid var(--tv-focus-color);
+  --tv-focus-outline-offset: 4px;
 }
 
 /* Transitions pour tous les éléments focusables */
@@ -1259,11 +1277,25 @@ html {
   transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out, outline 0.15s ease-out, background-color 0.15s ease-out;
 }
 
-/* Effet Netflix pour les cartes focusées (torrent, settings, etc.) */
+/* Effet Netflix pour les cartes focusées (torrent, settings, etc.) - anneau bien visible */
 .tv-card-focused {
-  transform: scale(1.08) !important;
+  transform: scale(1.06) !important;
   z-index: 50 !important;
-  box-shadow: var(--tv-focus-shadow) !important;
+  box-shadow: 0 0 0 4px var(--tv-focus-color), 0 12px 48px rgba(0, 0, 0, 0.55) !important;
+  outline: var(--tv-focus-outline) !important;
+  outline-offset: var(--tv-focus-outline-offset) !important;
+  border-radius: 0.5rem !important;
+  /* Éviter que le parent ou contain ne coupe l'outline en haut/bas */
+  overflow: visible !important;
+}
+
+/* Sur grand écran / TV : anneau encore plus visible */
+@media (min-width: 1920px) {
+  .tv-card-focused {
+    outline-width: 5px !important;
+    outline-offset: 6px !important;
+    box-shadow: 0 0 0 5px var(--tv-focus-color), 0 16px 56px rgba(0, 0, 0, 0.6) !important;
+  }
 }
 
 /* Focus visible pour les autres éléments (boutons, liens, inputs) */

@@ -133,7 +133,7 @@ export default function CarouselRow({
       <div
         ref={scrollContainerRef}
         data-carousel
-        className="flex gap-1 sm:gap-1.5 md:gap-2 lg:gap-4 xl:gap-6 tv:gap-8 overflow-x-auto overflow-y-visible scrollbar-hide px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 py-2 scroll-smooth carousel-container"
+        className="flex gap-1 sm:gap-1.5 md:gap-2 lg:gap-4 xl:gap-6 tv:gap-8 overflow-x-auto overflow-y-visible scrollbar-hide px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 py-3 tv:py-4 scroll-smooth carousel-container"
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
@@ -141,7 +141,7 @@ export default function CarouselRow({
         }}
       >
         {childrenArray.map((child, index) => (
-          <div key={index} className="flex-shrink-0">
+          <div key={index} className="flex-shrink-0 py-1 tv:py-2 overflow-visible">
             {child}
           </div>
         ))}

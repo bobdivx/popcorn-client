@@ -4,7 +4,7 @@ import { serverApi } from '../../lib/client/server-api';
 import { getUserConfig, saveUserConfigMerge } from '../../lib/api/popcorn-web';
 import { useI18n } from '../../lib/i18n/useI18n';
 
-const DOC_URL = 'https://github.com/bobdivx/popcorn-web/blob/main/doc/CASAOS_GUIDE.md#flaresolverr-indexers-derrière-cloudflare';
+const DOC_URL = 'https://github.com/bobdivx/popcorn-web/blob/main/docs/CASAOS_GUIDE.md#flaresolverr-indexers-derrière-cloudflare';
 const DEFAULT_OPEN_URL = 'http://localhost:9191';
 
 interface FlareSolverrPanelProps {

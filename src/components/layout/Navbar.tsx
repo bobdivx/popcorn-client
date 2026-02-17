@@ -49,7 +49,8 @@ export default function Navbar() {
 
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
 
-    window.addEventListener('scroll', handleScroll);
+    // passive: true améliore la fluidité du scroll (ne bloque pas le main thread)
+    window.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('popstate', updatePath);
 
     loadUser();

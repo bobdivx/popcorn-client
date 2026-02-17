@@ -58,6 +58,7 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
         onClick={handleClick}
         href={`/player/${item.id}`}
         tabIndex={0}
+        ariaLabel={item.title}
         onFocus={() => {
           setIsFocused(true);
           setIsHovered(true);

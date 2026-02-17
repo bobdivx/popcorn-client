@@ -216,6 +216,49 @@ export const libraryMethods = {
       : `/api/library/sources/${encodeURIComponent(id)}/scan`;
     return this.backendRequest<string>(url, { method: 'POST' });
   },
+
+  /** Liste tous les médias indexés (local_media) pour la gestion dans Paramètres > Bibliothèque */
+  async getLibraryMedia(
+    this: ServerApiClientLibraryAccess
+  ): Promise<ApiResponse<LibraryMediaEntry[]>> {
+    return this.backendRequest<LibraryMediaEntry[]>('/api/library/media', { method: 'GET' });
+  },
+
+  /** Met à jour le chemin d'un média (ne déplace pas le fichier sur disque) */
+  async updateLibraryMedia(
+    this: ServerApiClientLibraryAccess,
+    id: string,
+    file_path: string
+  ): Promise<ApiResponse<LibraryMediaEntry>> {
+    return this.backendRequest<LibraryMediaEntry>(
+      `/api/library/media/${encodeURIComponent(id)}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_path }),
+      }
+    );
+  },
+
+  /** Supprime un média de la base (ne supprime pas le fichier sur disque) */
+  async deleteLibraryMedia(
+    this: ServerApiClientLibraryAccess,
+    id: string
+  ): Promise<ApiResponse<void>> {
+    return this.backendRequest<void>(`/api/library/media/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /** Supprime le fichier sur disque puis l'entrée en base (répertoire de téléchargement local uniquement) */
+  async deleteLibraryMediaFile(
+    this: ServerApiClientLibraryAccess,
+    id: string
+  ): Promise<ApiResponse<void>> {
+    return this.backendRequest<void>(`/api/library/media/${encodeURIComponent(id)}/file`, {
+      method: 'DELETE',
+    });
+  },
 };
 
 export interface LibrarySource {
@@ -233,4 +276,20 @@ export interface LibrarySource {
   media_count?: number;
   /** Nombre de dossiers distincts contenant au moins un média */
   folder_count?: number;
+}
+
+/** Média indexé dans la bibliothèque (local_media) — pour la gestion dans Paramètres > Bibliothèque */
+export interface LibraryMediaEntry {
+  id: string;
+  file_path: string;
+  file_name: string;
+  file_size: number | null;
+  category: string;
+  tmdb_id: number | null;
+  tmdb_type: string | null;
+  tmdb_title: string | null;
+  slug: string | null;
+  poster_url: string | null;
+  hero_image_url: string | null;
+  library_source_id: string | null;
 }

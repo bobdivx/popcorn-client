@@ -46,6 +46,7 @@ export function LibraryPoster({ item, onPlay, className, priorityLoad }: Library
         className="w-full"
         onClick={handleClick}
         tabIndex={0}
+        ariaLabel={displayTitle}
         onFocus={() => {
           setIsFocused(true);
           setIsHovered(true);

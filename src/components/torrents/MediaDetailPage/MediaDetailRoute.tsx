@@ -295,6 +295,8 @@ export default function MediaDetailRoute() {
   const [torrent, setTorrent] = useState<Torrent | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  /** Incrémenté quand le backend revient (backendReconnected) pour relancer le chargement. */
+  const [retryKey, setRetryKey] = useState(0);
   /** Quand groupe vide (pas encore synchronisé), titre pour "Rechercher sur les indexeurs" */
   const [emptyGroupMainTitle, setEmptyGroupMainTitle] = useState<string | null>(null);
   /** Toutes les variantes du groupe (pour séries) */
@@ -674,7 +676,14 @@ export default function MediaDetailRoute() {
     return () => {
       cancelled = true;
     };
-  }, [contentId, tmdbId, titleFromQuery]);
+  }, [contentId, tmdbId, titleFromQuery, retryKey]);
+
+  // Quand le backend redevient disponible, relancer le chargement pour mettre à jour la page
+  useEffect(() => {
+    const onReconnected = () => setRetryKey((k) => k + 1);
+    window.addEventListener('backendReconnected', onReconnected);
+    return () => window.removeEventListener('backendReconnected', onReconnected);
+  }, []);
 
   if (loading) {
     return (
