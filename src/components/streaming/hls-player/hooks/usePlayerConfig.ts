@@ -29,6 +29,8 @@ export interface PlayerConfig {
   nextEpisodeCountdownSeconds: number;
   /** Système de streaming: HLS (adaptatif), direct (range) ou Lucie (WebM segments). */
   streamingMode: 'hls' | 'direct' | 'lucie';
+  /** En mode streaming torrent : télécharger le média en entier (sinon uniquement la partie lue). Réservé aux abonnés. */
+  streamingDownloadFull?: boolean;
 }
 
 export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
@@ -55,6 +57,7 @@ export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
   introSkipSeconds: 90,
   nextEpisodeCountdownSeconds: 90,
   streamingMode: 'hls',
+  streamingDownloadFull: false,
 };
 
 export function usePlayerConfig(): PlayerConfig {
@@ -65,7 +68,11 @@ export function usePlayerConfig(): PlayerConfig {
     if (savedConfig) {
       try {
         const parsed = JSON.parse(savedConfig);
-        setConfig({ ...DEFAULT_PLAYER_CONFIG, ...parsed });
+        setConfig({
+          ...DEFAULT_PLAYER_CONFIG,
+          ...parsed,
+          streamingDownloadFull: parsed.streamingDownloadFull === true,
+        });
       } catch (err) {
         console.warn('[usePlayerConfig] Erreur lors du chargement de la configuration:', err);
       }

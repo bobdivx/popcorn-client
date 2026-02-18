@@ -134,9 +134,6 @@ export function useVideoFiles({ torrentName, onError, filePath, torrent }: UseVi
         // Si on a un chemin bibliothèque (média "disponible localement"), l'utiliser sans appeler getTorrent
         // pour éviter un 404 quand le torrent n'est pas sur ce backend (ex. bibliothèque partagée / autre machine).
         if (torrent?.downloadPath) {
-          // #region agent log
-          fetch('http://127.0.0.1:7728/ingest/04a4339e-516d-43b3-aa22-e137dbb068b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f'},body:JSON.stringify({sessionId:'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f',location:'useVideoFiles.ts:libraryPath',message:'Using library path',data:{downloadPath:torrent.downloadPath,infoHash},timestamp:Date.now(),hypothesisId:'H5'})}).catch(()=>{});
-          // #endregion
           console.log('[useVideoFiles] 📁 Utilisation du chemin bibliothèque (sans appel getTorrent):', torrent.downloadPath);
           const fileName = torrentName || torrent.downloadPath.split(/[/\\]/).pop() || 'video';
           const libraryFile: TorrentFile = {

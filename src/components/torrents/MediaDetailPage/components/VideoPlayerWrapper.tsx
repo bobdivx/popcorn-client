@@ -149,7 +149,8 @@ export function VideoPlayerWrapper({
   });
 
   const loadingStepFromStatus = getLoadingStep(playStatus ?? '', progressMessage ?? '', torrentStats ?? null);
-  const loadingStep = loadingStepFromStatus > 0 ? loadingStepFromStatus : isLoading ? 4 : 0;
+  // Quand on attend le flux (isLoading sans étape précise), afficher l’étape 1 (en file d’attente), pas la 4
+  const loadingStep = loadingStepFromStatus > 0 ? loadingStepFromStatus : isLoading ? 1 : 0;
   
   const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';
   const STORAGE_INTRO_ALWAYS_SHOW = 'popcorn_intro_always_show';
@@ -445,10 +446,12 @@ export function VideoPlayerWrapper({
             onDirectLoadedData={() => setIsLoading(false)}
             onDirectError={(e) => {
               if (useStreamTorrentMode) {
-                const maxRetries = 3;
+                // Le flux peut mettre 30–60 s à être prêt (torrent initializing côté librqbit) : plus de tentatives et délai 5 s
+                const maxRetries = 12;
+                const retryDelayMs = 5000;
                 if (directStreamRetryCount < maxRetries - 1) {
                   // 503 / flux pas encore prêt : normal au démarrage, on réessaie automatiquement
-                  console.warn('[VideoPlayerWrapper] Flux pas encore prêt (503?), nouvelle tentative dans 5s…', e);
+                  console.warn('[VideoPlayerWrapper] Flux pas encore prêt (503?), nouvelle tentative dans', retryDelayMs / 1000, 's…', e);
                   directStreamRetryTimeoutRef.current && clearTimeout(directStreamRetryTimeoutRef.current);
                   setHlsLoadingMessage(t('playback.streamPreparingRetry') ?? 'Préparation du flux, nouvelle tentative…');
                   setIsLoading(true);
@@ -456,11 +459,11 @@ export function VideoPlayerWrapper({
                     directStreamRetryTimeoutRef.current = null;
                     setDirectStreamRetryCount((c) => c + 1);
                     setHlsLoadingMessage(null);
-                  }, 5000);
+                  }, retryDelayMs);
                   return;
                 }
                 console.error('[VideoPlayerWrapper] Direct video error après', maxRetries, 'tentatives:', e);
-                setHlsLoadingMessage(null);
+                setHlsLoadingMessage(t('playback.torrentUnavailableOnIndexer') ?? 'Ce torrent n\'est plus disponible sur l\'indexeur. Choisissez une autre source.');
                 setIsLoading(false);
                 return;
               }

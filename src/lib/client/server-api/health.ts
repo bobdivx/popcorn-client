@@ -93,6 +93,21 @@ export const healthMethods = {
   },
 
   /**
+   * Met à jour le délai de rétention des torrents (abonnement streaming).
+   * @param storageRetentionDays Nombre de jours avant suppression auto, null = garder indéfiniment, 0 = supprimer après lecture.
+   */
+  async patchStorageRetention(
+    this: ServerApiClientAccess,
+    storageRetentionDays: number | null
+  ): Promise<ApiResponse<StorageStatsData>> {
+    return this.backendRequest<StorageStatsData>('/api/client/storage/retention', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storage_retention_days: storageRetentionDays }),
+    });
+  },
+
+  /**
    * Vérifie rapidement si le backend est accessible (pour le démarrage de l'app)
    * Version optimisée avec timeout court pour éviter les ANR sur Android
    */

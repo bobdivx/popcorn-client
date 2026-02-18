@@ -2,19 +2,24 @@ import { useState, useEffect } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n';
 import { PreferencesManager, TokenManager } from '../../lib/client/storage';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
-import { SkipForward, ListVideo, Play } from 'lucide-preact';
+import { serverApi } from '../../lib/client/server-api';
+import { SkipForward, ListVideo, Play, Download, HardDrive } from 'lucide-preact';
 import { DEFAULT_PLAYER_CONFIG, type PlayerConfig } from '../streaming/hls-player/hooks/usePlayerConfig';
+import { useSubscriptionMe } from '../torrents/MediaDetailPage/hooks/useSubscriptionMe';
 
 const PLAYER_CONFIG_KEY = 'playerConfig';
 
-function getPlaybackConfig(): Pick<
+type PlaybackConfigStored = Pick<
   PlayerConfig,
   | 'skipIntroEnabled'
   | 'nextEpisodeButtonEnabled'
   | 'introSkipSeconds'
   | 'nextEpisodeCountdownSeconds'
   | 'streamingMode'
-> {
+  | 'streamingDownloadFull'
+>;
+
+function getPlaybackConfig(): PlaybackConfigStored {
   if (typeof window === 'undefined') {
     return {
       skipIntroEnabled: DEFAULT_PLAYER_CONFIG.skipIntroEnabled,
@@ -22,6 +27,7 @@ function getPlaybackConfig(): Pick<
       introSkipSeconds: DEFAULT_PLAYER_CONFIG.introSkipSeconds,
       nextEpisodeCountdownSeconds: DEFAULT_PLAYER_CONFIG.nextEpisodeCountdownSeconds,
       streamingMode: DEFAULT_PLAYER_CONFIG.streamingMode,
+      streamingDownloadFull: DEFAULT_PLAYER_CONFIG.streamingDownloadFull ?? false,
     };
   }
   try {
@@ -39,6 +45,7 @@ function getPlaybackConfig(): Pick<
           parsed.streamingMode === 'direct' || parsed.streamingMode === 'hls' || parsed.streamingMode === 'lucie'
             ? parsed.streamingMode
             : DEFAULT_PLAYER_CONFIG.streamingMode,
+        streamingDownloadFull: parsed.streamingDownloadFull === true,
       };
     }
   } catch {
@@ -50,6 +57,7 @@ function getPlaybackConfig(): Pick<
     introSkipSeconds: DEFAULT_PLAYER_CONFIG.introSkipSeconds,
     nextEpisodeCountdownSeconds: DEFAULT_PLAYER_CONFIG.nextEpisodeCountdownSeconds,
     streamingMode: DEFAULT_PLAYER_CONFIG.streamingMode,
+    streamingDownloadFull: DEFAULT_PLAYER_CONFIG.streamingDownloadFull ?? false,
   };
 }
 
@@ -67,20 +75,32 @@ function savePlaybackToLocalStorage(partial: Partial<PlayerConfig>) {
 
 export default function PlaybackSettingsPanel() {
   const { t } = useI18n();
+  const { streamingTorrentActive } = useSubscriptionMe();
   const [config, setConfig] = useState(getPlaybackConfig);
   const [autoplay, setAutoplay] = useState(() => PreferencesManager.getPreferences().autoplay ?? false);
   const [saved, setSaved] = useState(false);
+  const [retentionDays, setRetentionDays] = useState<number | null | undefined>(undefined);
 
   useEffect(() => {
     setConfig(getPlaybackConfig());
   }, []);
+
+  useEffect(() => {
+    if (streamingTorrentActive) {
+      serverApi.getStorageStats().then((res) => {
+        if (res.success && res.data) {
+          setRetentionDays(res.data.storage_retention_days ?? null);
+        }
+      });
+    }
+  }, [streamingTorrentActive]);
 
   const showSaved = () => {
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1500);
   };
 
-  const savePlaybackSettingsToCloud = (next: ReturnType<typeof getPlaybackConfig>) => {
+  const savePlaybackSettingsToCloud = (next: PlaybackConfigStored) => {
     const cloudToken = TokenManager.getCloudAccessToken();
     if (!cloudToken) return;
     saveUserConfigMerge(
@@ -91,6 +111,7 @@ export default function PlaybackSettingsPanel() {
           introSkipSeconds: next.introSkipSeconds,
           nextEpisodeCountdownSeconds: next.nextEpisodeCountdownSeconds,
           streamingMode: next.streamingMode,
+          streamingDownloadFull: next.streamingDownloadFull,
         },
       },
       cloudToken
@@ -143,6 +164,38 @@ export default function PlaybackSettingsPanel() {
     PreferencesManager.updatePreferences({ autoplay: value });
     setAutoplay(value);
     showSaved();
+  };
+
+  const handleStreamingDownloadFull = (value: boolean) => {
+    const next = { ...config, streamingDownloadFull: value };
+    setConfig(next);
+    savePlaybackToLocalStorage(next);
+    savePlaybackSettingsToCloud(next);
+    showSaved();
+  };
+
+  const RETENTION_OPTIONS: { value: number | null; labelKey: string; days?: number }[] = [
+    { value: null, labelKey: 'interfaceSettings.streamingRetentionKeep' },
+    { value: 0, labelKey: 'interfaceSettings.streamingRetentionDontKeep' },
+    { value: 7, labelKey: 'interfaceSettings.streamingRetentionDays', days: 7 },
+    { value: 14, labelKey: 'interfaceSettings.streamingRetentionDays', days: 14 },
+    { value: 30, labelKey: 'interfaceSettings.streamingRetentionDays', days: 30 },
+    { value: 90, labelKey: 'interfaceSettings.streamingRetentionDays', days: 90 },
+  ];
+
+  const handleRetentionChange = async (value: number | null) => {
+    const res = await serverApi.patchStorageRetention(value);
+    if (res.success && res.data) {
+      setRetentionDays(res.data.storage_retention_days ?? null);
+      const cloudToken = TokenManager.getCloudAccessToken();
+      if (cloudToken) {
+        saveUserConfigMerge(
+          { playbackSettings: { streamingRetentionDays: value } },
+          cloudToken
+        ).catch(() => {});
+      }
+      showSaved();
+    }
   };
 
   return (
@@ -209,6 +262,63 @@ export default function PlaybackSettingsPanel() {
         </div>
         <p className="text-xs text-gray-500 mt-1">{t('interfaceSettings.introSkipSecondsDescription')}</p>
       </section>
+
+      {/* Téléchargement complet en mode streaming (réservé abonnés) */}
+      <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
+        <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+          <Download className="w-5 h-5 text-primary-400" />
+          {t('interfaceSettings.streamingDownloadFull')}
+        </h3>
+        <p className="text-sm text-gray-400 mb-4">{t('interfaceSettings.streamingDownloadFullDescription')}</p>
+        {!streamingTorrentActive ? (
+          <p className="text-sm text-amber-400/90 mb-2">{t('interfaceSettings.streamingDownloadFullRequiresSubscription')}</p>
+        ) : null}
+        <label className={`flex items-center gap-3 ${streamingTorrentActive ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+          <input
+            type="checkbox"
+            className="toggle toggle-primary"
+            checked={config.streamingDownloadFull ?? false}
+            disabled={!streamingTorrentActive}
+            onChange={(e) => streamingTorrentActive && handleStreamingDownloadFull((e.target as HTMLInputElement).checked)}
+          />
+          <span className="text-white font-medium">
+            {config.streamingDownloadFull ? t('common.yes') : t('common.no')}
+          </span>
+        </label>
+      </section>
+
+      {/* Rétention des torrents (abonnement streaming actif) */}
+      {streamingTorrentActive && (
+        <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
+          <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+            <HardDrive className="w-5 h-5 text-primary-400" />
+            {t('interfaceSettings.streamingRetention')}
+          </h3>
+          <p className="text-sm text-gray-400 mb-4">{t('interfaceSettings.streamingRetentionDescription')}</p>
+          <div className="flex flex-wrap gap-2">
+            {RETENTION_OPTIONS.map((opt) => (
+              <button
+                key={opt.value ?? 'keep'}
+                type="button"
+                onClick={() => handleRetentionChange(opt.value)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  retentionDays !== undefined && retentionDays === opt.value
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-white/10 text-white/80 hover:bg-white/20'
+                }`}
+              >
+                {opt.value == null
+                  ? t('interfaceSettings.streamingRetentionKeep' as 'interfaceSettings.streamingRetentionKeep')
+                  : opt.value === 0
+                    ? t('interfaceSettings.streamingRetentionDontKeep' as 'interfaceSettings.streamingRetentionDontKeep')
+                    : t('interfaceSettings.streamingRetentionDays' as 'interfaceSettings.streamingRetentionDays', {
+                        days: opt.days ?? opt.value,
+                      })}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Mode de streaming */}
       <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">

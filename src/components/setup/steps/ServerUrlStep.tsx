@@ -15,7 +15,7 @@ interface ServerUrlStepProps {
   onStatusChange?: () => void | Promise<void>;
 }
 
-export type InstallationChoice = 'firstTime' | 'alreadyConfigured';
+export type InstallationChoice = 'firstTime' | 'alreadyConfigured' | 'localAccount';
 
 export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChange }: ServerUrlStepProps) {
   const { t } = useI18n();
@@ -53,7 +53,26 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
   useEffect(() => {
     const displayQR = shouldDisplayQRCode();
     setIsScannerMode(!displayQR);
-    loadBackendUrl();
+    // Préremplir l'URL du backend depuis l'invitation (compte local) si présente dans l'URL
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlFromInvitation = params.get('backendUrl');
+      if (urlFromInvitation && urlFromInvitation.trim()) {
+        const trimmed = urlFromInvitation.trim();
+        try {
+          new URL(trimmed);
+          saveBackendUrl(trimmed);
+          setBackendUrl(trimmed);
+        } catch {
+          // URL invalide, ignorer
+        }
+      }
+    }
+    if (typeof window === 'undefined' || !new URLSearchParams(window.location.search).get('backendUrl')) {
+      loadBackendUrl();
+    } else {
+      setLoading(false);
+    }
     try {
       const raw = sessionStorage.getItem(STORAGE_BACKEND_START_RESULT);
       if (raw) {
@@ -570,6 +589,26 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
               </div>
             </div>
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              setInstallationChoice('localAccount');
+              setShowManualConfig(true);
+            }}
+            className="text-left p-5 rounded-xl border-2 border-gray-600/50 bg-white/5 hover:bg-white/10 hover:border-primary-600/50 transition-all focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            <div className="flex items-start gap-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-gray-600/50 flex items-center justify-center">
+                <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                </svg>
+              </div>
+              <div>
+                <h4 className="text-lg font-bold text-white mb-1">{t('wizard.serverUrl.choiceLocalAccount')}</h4>
+                <p className="text-gray-400 text-sm">{t('wizard.serverUrl.choiceLocalAccountDesc')}</p>
+              </div>
+            </div>
+          </button>
         </div>
       </div>
     );
@@ -590,7 +629,9 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
           </svg>
         </button>
         <h3 className="text-xl font-bold text-white">
-          {installationChoice === 'firstTime' ? t('wizard.serverUrl.choiceFirstTime') : t('wizard.serverUrl.choiceAlreadyConfigured')}
+          {installationChoice === 'firstTime' && t('wizard.serverUrl.choiceFirstTime')}
+          {installationChoice === 'alreadyConfigured' && t('wizard.serverUrl.choiceAlreadyConfigured')}
+          {installationChoice === 'localAccount' && t('wizard.serverUrl.choiceLocalAccount')}
         </h3>
       </div>
       
@@ -1007,9 +1048,16 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
         <>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setShowManualConfig(false)}
+              onClick={() => {
+                if (installationChoice === 'localAccount') {
+                  setInstallationChoice(null);
+                  setShowManualConfig(false);
+                } else {
+                  setShowManualConfig(false);
+                }
+              }}
               className="p-2 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-gray-800"
-              title="Retour au QR code"
+              title={installationChoice === 'localAccount' ? t('common.back') : t('wizard.serverUrl.backToQrOrCode')}
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />

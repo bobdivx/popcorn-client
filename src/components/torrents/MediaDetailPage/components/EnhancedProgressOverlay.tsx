@@ -35,7 +35,14 @@ export function EnhancedProgressOverlay({
   onCopyLogs,
   onClearLogs,
 }: EnhancedProgressOverlayProps) {
-  const progressPercentage = torrentStats?.progress ? torrentStats.progress * 100 : 0;
+  const progressFromBytes =
+    torrentStats?.total_bytes != null &&
+    torrentStats.total_bytes > 0 &&
+    torrentStats?.downloaded_bytes != null
+      ? (torrentStats.downloaded_bytes / torrentStats.total_bytes) * 100
+      : null;
+  const progressPercentage =
+    progressFromBytes != null ? progressFromBytes : (torrentStats?.progress ?? 0) * 100;
   const downloadSpeed = torrentStats?.download_speed ? (torrentStats.download_speed / (1024 * 1024)).toFixed(1) : '0.0';
   const isDownloading = playStatus === 'downloading' && torrentStats && torrentStats.download_speed > 0;
   const currentStep = getLoadingStep(playStatus, progressMessage, torrentStats);
@@ -147,7 +154,7 @@ export function EnhancedProgressOverlay({
               {(playStatus === 'downloading' || playStatus === 'buffering') && torrentStats && (progressPercentage > 0 || isDownloading) ? (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="text-primary-600 text-3xl font-bold drop-shadow-lg">
-                    {progressPercentage.toFixed(0)}%
+                    {progressPercentage < 1 ? progressPercentage.toFixed(1) : progressPercentage.toFixed(0)}%
                   </span>
                 </div>
               ) : playStatus === 'adding' ? (
@@ -165,7 +172,7 @@ export function EnhancedProgressOverlay({
               ) : (playStatus === 'downloading' || playStatus === 'buffering') ? (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="text-primary-600 text-3xl font-bold drop-shadow-lg">
-                    {progressPercentage.toFixed(0)}%
+                    {progressPercentage < 1 ? progressPercentage.toFixed(1) : progressPercentage.toFixed(0)}%
                   </span>
                 </div>
               ) : null}

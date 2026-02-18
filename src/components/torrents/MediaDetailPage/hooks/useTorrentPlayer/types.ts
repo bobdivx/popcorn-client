@@ -48,6 +48,8 @@ export interface PollingContext {
   addDebugLog: (type: 'info' | 'success' | 'error' | 'warning', message: string, data?: any) => void;
   playStatus: PlayStatus;
   isPlaying: boolean;
+  /** Ref pour lire isPlaying à jour (évite closure stale quand le polling tourne dans un interval créé avant setIsPlaying(true)). */
+  isPlayingRef: { current: boolean };
   videoFiles: any[];
   selectedFile: any;
   torrent: { name: string };

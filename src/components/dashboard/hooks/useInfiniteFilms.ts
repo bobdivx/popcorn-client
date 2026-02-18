@@ -31,7 +31,7 @@ export function useInfiniteFilms() {
         pageNum,
         limit,
         language,
-        'popular',
+        'release_date',
         minSeeds,
         prefs.mediaLanguages,
         prefs.minQuality
@@ -43,12 +43,8 @@ export function useInfiniteFilms() {
           return;
         }
 
-        // Les données sont déjà triées par l'API, mais on peut les trier à nouveau pour être sûr
-        const sortedFilms = [...response.data].sort((a, b) => {
-          const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
-          const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-          return dateB - dateA;
-        });
+        // Déjà triés par date de sortie (release_date) côté API
+        const sortedFilms = response.data;
 
         if (isInitial) {
           setFilms(sortedFilms);

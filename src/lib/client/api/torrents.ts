@@ -501,6 +501,36 @@ export class TorrentsService {
   }
 
   /**
+   * Attendre que le flux stream-torrent soit prêt (librqbit a quitté "initializing").
+   * À appeler avant d'ouvrir le lecteur en mode stream-torrent pour que la première requête vidéo reçoive 200.
+   * @param accessToken - Token cloud (entitlement streaming torrent)
+   */
+  async streamTorrentReady(
+    infoHash: string,
+    fileId: number,
+    filename: string,
+    accessToken: string
+  ): Promise<void> {
+    if (!accessToken) throw new Error('Token requis pour stream-torrent');
+    const base = (await this.getRequestUrl('torrents')).replace(/\/api\/client\/torrents$/, '');
+    const url = `${base}/api/stream-torrent/ready/${encodeURIComponent(infoHash)}/${fileId}/${encodeURIComponent(filename)}?access_token=${encodeURIComponent(accessToken)}`;
+    const maxAttempts = 4;
+    const retryDelayMs = 2000;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const response = await fetch(url);
+      if (response.ok) return;
+      const status = response.status;
+      const text = await response.text();
+      const retryable = status === 502 || status === 503;
+      if (retryable && attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, retryDelayMs));
+        continue;
+      }
+      throw new Error(text || `Flux non prêt (${status})`);
+    }
+  }
+
+  /**
    * Mettre en pause un torrent
    */
   async pauseTorrent(infoHash: string): Promise<void> {

@@ -59,46 +59,69 @@ export const authMethods = {
 
   /**
    * Connexion utilisateur
-   * Détecte automatiquement si un secret JWT existe :
-   * - Si OUI : connexion au backend local
-   * - Si NON : connexion au cloud pour récupérer le secret, puis génération de tokens locaux
+   * - Si pas de secret JWT : tente d'abord le backend (compte local), puis le cloud
+   * - Si secret JWT présent : tente le backend puis le cloud en secours
    */
   async login(this: ServerApiClientAuthAccess, email: string, password: string): Promise<ApiResponse<AuthResponse>> {
     // Log pour debug : voir ce qui est envoyé
     if (typeof window !== 'undefined') {
       console.log('[server-api] Tentative de login:', { email, passwordLength: password?.length || 0 });
     }
-    
-    // Vérifier si un secret JWT existe déjà dans localStorage
+
     const hasJWTSecret = typeof window !== 'undefined' && TokenManager.getJWTSecret() !== null;
-    
+
+    // Sans secret JWT : tenter d'abord le backend (compte local invité), puis le cloud
     if (!hasJWTSecret) {
-      // Pas de secret JWT : se connecter au cloud pour le récupérer
-      console.log('[server-api] Aucun secret JWT trouvé, connexion au cloud pour le récupérer...');
+      console.log('[server-api] Aucun secret JWT, tentative de connexion au backend (compte local possible)...');
+      const backendRes = await this.backendRequest<{ user: { id: string; email?: string; username?: string }; jwt_secret?: string }>(
+        '/api/client/auth/login',
+        { method: 'POST', body: JSON.stringify({ email, password }) }
+      );
+
+      if (backendRes.success && backendRes.data?.user) {
+        const user = backendRes.data.user;
+        const userId = user.id || '';
+        const username = user.username || user.email || email.split('@')[0] || 'user';
+        // Secret fourni par le backend ou généré côté client pour les comptes locaux
+        let secret = backendRes.data.jwt_secret;
+        if (!secret && typeof crypto !== 'undefined' && crypto.getRandomValues) {
+          const arr = new Uint8Array(32);
+          crypto.getRandomValues(arr);
+          secret = Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
+        }
+        if (secret) {
+          TokenManager.setJWTSecret(secret);
+        }
+        const { accessToken, refreshToken } = await this.generateClientTokens(userId, username);
+        this.saveTokens(accessToken, refreshToken);
+        this.saveUser({ id: userId, email: user.email || email, username });
+        console.log('[server-api] Connexion backend (compte local) réussie');
+        return {
+          success: true,
+          data: {
+            user: { id: userId, email: user.email || email },
+            accessToken,
+            refreshToken,
+          },
+        };
+      }
+
+      // Backend a échoué ou pas d'utilisateur : essayer le cloud
+      console.log('[server-api] Backend échoué ou pas de compte local, connexion au cloud...');
       const cloudResponse = await this.loginCloud(email, password);
-      
+
       if (!cloudResponse.success) {
-        // Si la connexion cloud échoue, retourner l'erreur
         return cloudResponse;
       }
-      
-      // La connexion cloud a réussi et le secret JWT est stocké
-      // Utiliser directement les tokens cloud (déjà stockés par loginCloud)
-      console.log('[server-api] Connexion cloud réussie, utilisation des tokens cloud...');
-      
+
       const user = cloudResponse.data?.user;
       if (user) {
-        // Les tokens cloud sont déjà stockés par loginCloud
-        // Utiliser ces tokens directement (même tokens, même secret JWT)
         const cloudAccessToken = cloudResponse.data?.cloudAccessToken || TokenManager.getCloudAccessToken();
         const cloudRefreshToken = cloudResponse.data?.cloudRefreshToken || TokenManager.getCloudRefreshToken();
-        
         if (cloudAccessToken && cloudRefreshToken) {
           this.saveTokens(cloudAccessToken, cloudRefreshToken);
         }
-        
         this.saveUser(user);
-        
         return {
           success: true,
           data: {
@@ -108,8 +131,6 @@ export const authMethods = {
           },
         };
       }
-      
-      // Si pas d'utilisateur dans la réponse cloud, retourner la réponse cloud telle quelle
       return cloudResponse;
     }
     

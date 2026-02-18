@@ -276,6 +276,21 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   const { debugLogs, showDebug, setShowDebug, addDebugLog, clearDebugLogs } = useDebug();
   const { streamingTorrentActive } = useSubscriptionMe();
 
+  // En mode streaming : garder l'URL stream-torrent pendant la lecture même si isAvailableLocally
+  // passe à true (fichier en stream_cache), pour éviter de basculer sur HLS local (transcodage, timeout).
+  const useStreamTorrentMode = (streamingTorrentActive ?? false) && (!isAvailableLocally || isPlaying);
+
+  // Log des paramètres streaming en console (visible dans l’onglet Console pour debug)
+  useEffect(() => {
+    const token = typeof TokenManager?.getCloudAccessToken === 'function' ? TokenManager.getCloudAccessToken() : null;
+    console.debug('[MediaDetail] Paramètres streaming', {
+      streamingTorrentActive: streamingTorrentActive ?? false,
+      useStreamTorrentMode,
+      isAvailableLocally: Boolean(isAvailableLocally),
+      hasCloudToken: !!token,
+    });
+  }, [streamingTorrentActive, isAvailableLocally, useStreamTorrentMode]);
+
   // Hook useTorrentPlayer (utilise le torrent actif = sélection saison/épisode)
   const {
     playStatus,
@@ -446,9 +461,6 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                 if (item && (item.download_path || item.exists)) {
                   setIsAvailableLocally(true);
                   const hasExistingPath = !!(activeTorrent as any).downloadPath;
-                  // #region agent log
-                  fetch('http://127.0.0.1:7728/ingest/04a4339e-516d-43b3-aa22-e137dbb068b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f'},body:JSON.stringify({sessionId:'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f',location:'MediaDetailPage.tsx:getLibrary',message:'Library item found',data:{activeTorrentDownloadPath:(activeTorrent as any).downloadPath,itemDownloadPath:item.download_path,hasExistingPath,willSet:!!(item.download_path&&!hasExistingPath)},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-                  // #endregion
                   // Ne pas écraser si le torrent a déjà un chemin ; ne pas utiliser un chemin qui est un dossier (streaming a besoin du fichier)
                   const pathIsFile = item.download_path && /\.(mkv|mp4|avi|webm|mov|m4v|wmv|ts|m2ts)$/i.test(item.download_path.replace(/\\/g, '/'));
                   if (item.download_path && !hasExistingPath && pathIsFile) {
@@ -497,9 +509,6 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                   : null;
                 const chosen = matchByName ?? localMedia[0];
                 const firstPath = (chosen as { file_path?: string }).file_path;
-                // #region agent log
-                fetch('http://127.0.0.1:7728/ingest/04a4339e-516d-43b3-aa22-e137dbb068b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f'},body:JSON.stringify({sessionId:'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f',location:'MediaDetailPage.tsx:findLocalMediaByTmdb',message:'Local media by tmdb',data:{activeTorrentDownloadPath:(activeTorrent as any).downloadPath,firstPath,chosenFileName:(chosen as any).file_name,hasExistingPathTmdb,willSet:!!(firstPath&&!hasExistingPathTmdb)},timestamp:Date.now(),hypothesisId:'H3'})}).catch(()=>{});
-                // #endregion
                 // Ne pas écraser le chemin si le torrent en a déjà un ; ne pas utiliser un chemin qui est un dossier
                 const firstPathIsFile = firstPath && /\.(mkv|mp4|avi|webm|mov|m4v|wmv|ts|m2ts)$/i.test(firstPath.replace(/\\/g, '/'));
                 if (!hasExistingPathTmdb && firstPathIsFile) {
@@ -605,7 +614,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
               if (completed) {
                 try {
                   const videos = await loadVideoFiles(activeTorrent.infoHash!);
-                  if (videos.length > 0) setIsAvailableLocally(true);
+                  // En mode streaming actif, ne pas marquer "disponible localement" pour garder l'URL stream-torrent (évite bascule HLS / 502).
+                  if (videos.length > 0 && !streamingTorrentActive) setIsAvailableLocally(true);
                 } catch (_) {}
                 return;
               }
@@ -643,7 +653,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     const STATS_POLL_MS = 5_000;
     const iv = setInterval(checkDownloadingTorrent, STATS_POLL_MS);
     return () => clearInterval(iv);
-  }, [hasInfoHash, activeTorrent.infoHash, activeTorrent.clientState, activeTorrent.clientProgress, isPlaying, playStatus]);
+  }, [hasInfoHash, activeTorrent.infoHash, activeTorrent.clientState, activeTorrent.clientProgress, isPlaying, playStatus, streamingTorrentActive]);
 
   // Afficher le panneau de vérification quand un téléchargement vient d'être ajouté (événement torrentAdded)
   useEffect(() => {
@@ -712,15 +722,11 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     }
   }, [torrent.trailerKey]);
 
-  // Lancer automatiquement la bande-annonce dans la zone héros après quelques secondes (une seule fois par page)
+  // Lancer automatiquement la bande-annonce (sans clic)
   useEffect(() => {
     if (!trailerKey || hasAutoPlayedTrailerRef.current) return;
-    const delayMs = 2500;
-    const t = setTimeout(() => {
-      hasAutoPlayedTrailerRef.current = true;
-      setIsPlayingTrailer(true);
-    }, delayMs);
-    return () => clearTimeout(t);
+    hasAutoPlayedTrailerRef.current = true;
+    setIsPlayingTrailer(true);
   }, [trailerKey]);
 
   // Fermer la bande-annonce (héros) avec Escape ou touche Retour
@@ -1020,7 +1026,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         logoUrl={displayTorrent.logoUrl ?? null}
         synopsis={displayTorrent.synopsis ?? displayTorrent.description ?? null}
         releaseDate={displayTorrent.releaseDate ?? null}
-        useStreamTorrentMode={streamingTorrentActive && !isAvailableLocally}
+        useStreamTorrentMode={useStreamTorrentMode}
         streamingTorrentToken={TokenManager.getCloudAccessToken()}
         playStatus={playStatus}
         progressMessage={progressMessage}
@@ -1060,7 +1066,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           logoUrl={displayTorrent.logoUrl ?? null}
           synopsis={displayTorrent.synopsis ?? displayTorrent.description ?? null}
           releaseDate={displayTorrent.releaseDate ?? null}
-          useStreamTorrentMode={streamingTorrentActive && !isAvailableLocally}
+          useStreamTorrentMode={useStreamTorrentMode}
           streamingTorrentToken={TokenManager.getCloudAccessToken()}
         />
       )}

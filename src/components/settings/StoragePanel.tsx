@@ -103,9 +103,11 @@ export default function StoragePanel() {
             )}
             <p className="text-sm text-gray-400">
               {t('settingsPages.storage.retentionLabel')}:{' '}
-              {data.storage_retention_days != null && data.storage_retention_days > 0
-                ? t('settingsPages.storage.retentionDays', { days: data.storage_retention_days })
-                : t('settingsPages.storage.retentionDisabled')}
+              {data.storage_retention_days === 0
+                ? t('settingsPages.storage.retentionDontKeep')
+                : data.storage_retention_days != null && data.storage_retention_days > 0
+                  ? t('settingsPages.storage.retentionDays', { days: data.storage_retention_days })
+                  : t('settingsPages.storage.retentionDisabled')}
             </p>
           </div>
         )}
