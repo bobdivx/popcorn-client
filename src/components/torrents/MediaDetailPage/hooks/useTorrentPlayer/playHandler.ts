@@ -1,9 +1,41 @@
 import { clientApi } from '../../../../../lib/client/api';
 import { serverApi } from '../../../../../lib/client/server-api';
+import { TokenManager } from '../../../../../lib/client/storage';
 import { setStreamingInfoHash } from '../../../../../lib/streamingInfoHashStorage';
 import { getCachedSubscription, loadSubscription } from '../../../../../lib/subscription-store';
 import { PROGRESS_POLL_INTERVAL_MS } from '../../utils/constants';
 import type { PlayHandlerContext } from './types';
+
+/** En mode stream-torrent, attend que le flux soit prêt (déclencheur côté backend) avant d'ouvrir le lecteur. */
+async function waitForStreamReady(
+  streamingTorrentActive: boolean,
+  infoHash: string,
+  file: { index?: number; name: string },
+  setProgressMessage: (m: string) => void,
+  setPlayStatus: (s: string) => void,
+  setErrorMessage: (e: string | null) => void,
+  addDebugLog: (level: string, msg: string, data?: any) => void
+): Promise<boolean> {
+  if (!streamingTorrentActive) return true;
+  const token = TokenManager.getCloudAccessToken();
+  if (!token) {
+    addDebugLog('warning', 'Stream torrent actif mais pas de token cloud');
+    return true;
+  }
+  setProgressMessage('Préparation du flux…');
+  try {
+    await clientApi.streamTorrentReady(infoHash, file.index ?? 0, file.name, token);
+    addDebugLog('success', 'Flux stream-torrent prêt');
+    return true;
+  } catch (e) {
+    addDebugLog('error', 'Flux stream-torrent indisponible', e);
+    setPlayStatus('error');
+    setErrorMessage(
+      'Le flux n\'est pas encore prêt (torrent en initialisation). Attendez 1 à 2 minutes puis réessayez.'
+    );
+    return false;
+  }
+}
 
 /** Résout l'éligibilité streaming au moment du clic (lit le store, ou charge si pas encore fait). */
 async function resolveStreamingActiveOnce(
@@ -42,9 +74,10 @@ function getStreamingDownloadFull(): boolean {
   return false;
 }
 
-/** Appelle updateOnlyFiles après délai, avec réessais en cas de 502 (torrent encore "initializing"). */
+/** Appelle updateOnlyFiles dès que le torrent peut l'accepter, avec réessais en cas de 502/503 (initializing). */
 function scheduleUpdateOnlyFilesWithRetry(infoHash: string, fileIndex: number) {
-  const delays = [15000, 15000, 30000]; // 15s, puis +15s, puis +30s en cas d'échec
+  // Premier essai après 1,5 s (laisse le temps au torrent de sortir d'initializing), puis 3s, 6s, 10s, 15s
+  const delays = [1500, 3000, 6000, 10000, 15000];
   let attempt = 0;
   const run = () => {
     clientApi.updateOnlyFiles(infoHash, [fileIndex]).catch(() => {
@@ -104,6 +137,15 @@ export function createHandlePlay(context: PlayHandlerContext) {
         files_count: videoFiles.length,
       });
       await markStreamingIfActive();
+      if (streamingTorrentActive && !getStreamingDownloadFull()) {
+        const idx = selectedFile.index ?? 0;
+        scheduleUpdateOnlyFilesWithRetry(torrent.infoHash, idx);
+      }
+      const ok = await waitForStreamReady(
+        streamingTorrentActive, torrent.infoHash, selectedFile,
+        setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
+      );
+      if (!ok) return;
       setPlayStatus('ready');
       setProgressMessage('Lancement de la lecture...');
       setIsPlaying(true);
@@ -123,6 +165,11 @@ export function createHandlePlay(context: PlayHandlerContext) {
         setVideoFiles(libraryVideos);
         setSelectedFile(libraryVideos[0]);
         await markStreamingIfActive();
+        const okLib = await waitForStreamReady(
+          streamingTorrentActive, torrent.infoHash!, libraryVideos[0],
+          setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
+        );
+        if (!okLib) return;
         setPlayStatus('ready');
         setProgressMessage('Lancement de la lecture...');
         setIsPlaying(true);
@@ -182,6 +229,11 @@ export function createHandlePlay(context: PlayHandlerContext) {
               setVideoFiles(videos);
               setSelectedFile(videos[0]);
               await markStreamingIfActive();
+              const ok1 = await waitForStreamReady(
+                streamingTorrentActive, torrent.infoHash!, videos[0],
+                setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
+              );
+              if (!ok1) return;
               setPlayStatus('ready');
               setProgressMessage('Lancement de la lecture...');
               setIsPlaying(true);
@@ -299,6 +351,14 @@ export function createHandlePlay(context: PlayHandlerContext) {
 
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
+            const errorMsg = typeof errorData?.error === 'string' ? errorData.error : '';
+            // 404 ou message indexeur : torrent indisponible, ne pas fallback magnet (créerait un torrent "initializing" sans métadonnées)
+            if (response.status === 404 || (response.status === 502 && (errorMsg.includes('indexer') || errorMsg.includes('404') || errorMsg.includes('indisponible')))) {
+              setErrorMessage(errorMsg || 'Ce torrent n\'est plus disponible sur l\'indexeur. Choisissez une autre source.');
+              setPlayStatus('idle');
+              setProgressMessage(null);
+              return;
+            }
             // Si l'API retourne un magnet link en cas d'erreur, l'utiliser
             if (errorData.isMagnet && errorData.magnetUri) {
               addDebugLog('info', '📥 L\'API a retourné un magnet link (fallback)', { magnetUri: errorData.magnetUri });
@@ -339,12 +399,17 @@ export function createHandlePlay(context: PlayHandlerContext) {
                       if (videos.length > 0) {
                         addDebugLog('success', '✅ Fichiers vidéo trouvés', { files_count: videos.length });
                         if (forStreaming && !getStreamingDownloadFull()) {
-                          scheduleUpdateOnlyFilesWithRetry(addResult.info_hash, videos[0].index);
+                          scheduleUpdateOnlyFilesWithRetry(addResult.info_hash, videos[0].index ?? 0);
                         }
                         setVideoFiles(videos);
                         setSelectedFile(videos[0]);
                         if (forStreaming) {
                           await markStreamingIfActive();
+                          const okM = await waitForStreamReady(
+                            streamingTorrentActive, addResult.info_hash, videos[0],
+                            setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
+                          );
+                          if (!okM) return;
                           setPlayStatus('ready');
                           setProgressMessage('Lancement de la lecture...');
                           setIsPlaying(true);
@@ -457,7 +522,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
             const videos = await loadVideoFiles(addResult.info_hash);
             if (videos.length > 0) {
               if (forStreaming && !getStreamingDownloadFull()) {
-                scheduleUpdateOnlyFilesWithRetry(addResult.info_hash, videos[0].index);
+                scheduleUpdateOnlyFilesWithRetry(addResult.info_hash, videos[0].index ?? 0);
               }
               addDebugLog('success', '✅ Fichiers vidéo trouvés', {
                 files_count: videos.length,
@@ -466,6 +531,11 @@ export function createHandlePlay(context: PlayHandlerContext) {
               setSelectedFile(videos[0]);
               if (forStreaming) {
                 await markStreamingIfActive();
+                const okT = await waitForStreamReady(
+                  streamingTorrentActive, addResult.info_hash, videos[0],
+                  setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
+                );
+                if (!okT) return;
                 setPlayStatus('ready');
                 setProgressMessage('Lancement de la lecture...');
                 setIsPlaying(true);
@@ -555,7 +625,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                   const videos = await loadVideoFiles(addResult.info_hash);
                   if (videos.length > 0) {
                     if (forStreaming && !getStreamingDownloadFull()) {
-                      scheduleUpdateOnlyFilesWithRetry(addResult.info_hash, videos[0].index);
+                      scheduleUpdateOnlyFilesWithRetry(addResult.info_hash, videos[0].index ?? 0);
                     }
                     addDebugLog('success', '✅ Fichiers vidéo trouvés', {
                       files_count: videos.length,
@@ -564,6 +634,11 @@ export function createHandlePlay(context: PlayHandlerContext) {
                     setSelectedFile(videos[0]);
                     if (forStreaming) {
                       await markStreamingIfActive();
+                      const okMag = await waitForStreamReady(
+                        streamingTorrentActive, addResult.info_hash, videos[0],
+                        setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
+                      );
+                      if (!okMag) return;
                       setPlayStatus('ready');
                       setProgressMessage('Lancement de la lecture...');
                       setIsPlaying(true);
@@ -665,6 +740,13 @@ export function createHandlePlay(context: PlayHandlerContext) {
         setVideoFiles(videos);
         setSelectedFile(videos[0]);
         await markStreamingIfActive();
+        if (!isLocalMedia) {
+          const okH = await waitForStreamReady(
+            streamingTorrentActive, torrent.infoHash!, videos[0],
+            setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
+          );
+          if (!okH) return;
+        }
         setPlayStatus('ready');
         setProgressMessage('Lancement de la lecture...');
         setIsPlaying(true);
@@ -704,6 +786,11 @@ export function createHandlePlay(context: PlayHandlerContext) {
               setVideoFiles(videos2);
               setSelectedFile(videos2[0]);
               await markStreamingIfActive();
+              const ok2 = await waitForStreamReady(
+                streamingTorrentActive, torrent.infoHash!, videos2[0],
+                setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
+              );
+              if (!ok2) return;
               setPlayStatus('ready');
               setProgressMessage('Lancement de la lecture...');
               setIsPlaying(true);
@@ -785,7 +872,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 const videos = await loadVideoFiles(addResult.info_hash);
                 if (videos.length > 0) {
                   if (forStreaming && !getStreamingDownloadFull()) {
-                    scheduleUpdateOnlyFilesWithRetry(addResult.info_hash, videos[0].index);
+                    scheduleUpdateOnlyFilesWithRetry(addResult.info_hash, videos[0].index ?? 0);
                   }
                   addDebugLog('success', '✅ Fichiers vidéo trouvés', {
                     files_count: videos.length,
@@ -794,6 +881,11 @@ export function createHandlePlay(context: PlayHandlerContext) {
                   setSelectedFile(videos[0]);
                   if (forStreaming) {
                     await markStreamingIfActive();
+                    const okC = await waitForStreamReady(
+                      streamingTorrentActive, addResult.info_hash, videos[0],
+                      setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
+                    );
+                    if (!okC) return;
                     setPlayStatus('ready');
                     setProgressMessage('Lancement de la lecture...');
                     setIsPlaying(true);

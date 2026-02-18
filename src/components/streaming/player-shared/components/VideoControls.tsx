@@ -146,13 +146,13 @@ export function VideoControls({
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
   const volumePercent = volume * 100;
 
-  const buttonSize = isTV ? 'w-20 h-20' : isFullscreen ? 'w-[4.5rem] h-[4.5rem] min-w-[4.5rem] min-h-[4.5rem]' : 'w-16 h-16 min-w-16 min-h-16';
-  const iconSize = isTV ? 'w-10 h-10' : isFullscreen ? 'w-9 h-9' : 'w-8 h-8';
+  const buttonSize = isTV ? 'w-20 h-20' : isFullscreen ? 'w-[4.5rem] h-[4.5rem] min-w-[4.5rem] min-h-[4.5rem]' : 'w-11 h-11 min-w-11 min-h-11 sm:w-14 sm:h-14 sm:min-w-14 sm:min-h-14 md:w-16 md:h-16 md:min-w-16 md:min-h-16';
+  const iconSize = isTV ? 'w-10 h-10' : isFullscreen ? 'w-9 h-9' : 'w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8';
   const progressHeight = isTV ? 'h-3' : isFullscreen ? 'h-2.5' : 'h-2';
-  const textSize = isTV ? 'text-xl' : isFullscreen ? 'text-lg' : 'text-base';
-  const titleSize = isTV ? 'text-4xl' : isFullscreen ? 'text-3xl md:text-4xl' : 'text-2xl sm:text-3xl';
-  const padding = isTV ? 'px-10 pt-10 pb-10' : isFullscreen ? 'px-8 pt-8 pb-8 md:px-12 md:pt-10 md:pb-10' : 'px-6 pt-6 pb-6 sm:px-8 sm:pt-8 sm:pb-8';
-  const gap = isTV ? 'gap-8' : isFullscreen ? 'gap-6' : 'gap-5';
+  const textSize = isTV ? 'text-xl' : isFullscreen ? 'text-lg' : 'text-xs sm:text-sm md:text-base';
+  const titleSize = isTV ? 'text-4xl' : isFullscreen ? 'text-3xl md:text-4xl' : 'text-lg sm:text-2xl md:text-3xl';
+  const padding = isTV ? 'px-10 pt-10 pb-10' : isFullscreen ? 'px-8 pt-8 pb-8 md:px-12 md:pt-10 md:pb-10' : 'px-3 pt-3 pb-3 sm:px-6 sm:pt-6 sm:pb-6 md:px-8 md:pt-8 md:pb-8';
+  const gap = isTV ? 'gap-8' : isFullscreen ? 'gap-6' : 'gap-2 sm:gap-4 md:gap-5';
 
   // Indices de focus : back(0 si hasBack), play, mute, fullscreen
   const getFocusClass = (index: number) => {
@@ -174,30 +174,31 @@ export function VideoControls({
       {showPausedOverlay && (
         <div class="absolute inset-0 flex flex-col justify-end z-15 pointer-events-none">
           <div class="w-full h-full bg-gradient-to-r from-black via-black/90 to-transparent pointer-events-none" aria-hidden="true" />
-          <div class="absolute inset-0 flex flex-col justify-end px-4 sm:px-6 md:px-10 lg:px-16 pb-12 sm:pb-16 md:pb-20">
-            <div class="max-w-5xl xl:max-w-6xl flex flex-col sm:flex-row items-start gap-6 sm:gap-8 md:gap-10 w-full">
+          {/* pb-40 sur mobile pour laisser la barre de contrôle visible (évite chevauchement) */}
+          <div class="absolute inset-0 flex flex-col justify-end px-3 sm:px-6 md:px-10 lg:px-16 pb-40 sm:pb-16 md:pb-20">
+            <div class="max-w-5xl xl:max-w-6xl flex flex-col sm:flex-row items-start gap-3 sm:gap-6 md:gap-8 w-full">
               {posterUrl && (
-                <div class="flex-shrink-0 w-40 h-56 sm:w-48 sm:h-72 md:w-56 md:h-80 lg:w-64 lg:h-96 rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/20">
+                <div class="flex-shrink-0 w-20 h-28 sm:w-40 sm:h-56 md:w-48 md:h-72 lg:w-56 lg:h-80 xl:w-64 xl:h-96 rounded-lg sm:rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/20 max-h-[25vh] sm:max-h-none">
                   <img src={posterUrl} alt="" class="w-full h-full object-cover" />
                 </div>
               )}
-              <div class="flex-1 min-w-0 flex flex-col gap-4">
+              <div class="flex-1 min-w-0 flex flex-col gap-2 sm:gap-4">
                 {(torrentName || releaseDate) && (
-                  <div class="flex items-baseline gap-3 sm:gap-4 flex-wrap">
+                  <div class="flex items-baseline gap-2 sm:gap-4 flex-wrap">
                     {torrentName && (
-                      <h2 class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight drop-shadow-2xl">
+                      <h2 class="text-lg sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight drop-shadow-2xl">
                         {torrentName}
                       </h2>
                     )}
                     {releaseDate && (
-                      <span class="inline-flex items-center justify-center px-3 py-1.5 sm:px-4 sm:py-2 bg-gray-800/90 backdrop-blur-md text-white/95 text-base sm:text-lg font-semibold rounded-lg border border-white/30 shadow-lg">
+                      <span class="inline-flex items-center justify-center px-2 py-1 sm:px-4 sm:py-2 bg-gray-800/90 backdrop-blur-md text-white/95 text-xs sm:text-lg font-semibold rounded-lg border border-white/30 shadow-lg">
                         {new Date(releaseDate).getFullYear()}
                       </span>
                     )}
                   </div>
                 )}
                 {synopsis && (
-                  <p class="text-white/95 text-base sm:text-lg md:text-xl lg:text-2xl leading-relaxed line-clamp-4 sm:line-clamp-5 md:line-clamp-6 drop-shadow-lg max-w-2xl">
+                  <p class="text-white/95 text-xs sm:text-base md:text-xl lg:text-2xl leading-relaxed line-clamp-2 sm:line-clamp-4 md:line-clamp-6 drop-shadow-lg max-w-2xl">
                     {synopsis}
                   </p>
                 )}
@@ -231,14 +232,14 @@ export function VideoControls({
               <img 
                 src={logoUrl} 
                 alt="" 
-                class={`flex-shrink-0 ${isTV ? 'w-20 h-20 max-h-20' : isFullscreen ? 'w-16 h-16 md:w-20 md:h-20 max-h-20' : 'w-14 h-14 sm:w-16 sm:h-16 max-h-16'} object-contain object-center opacity-95`}
+                class={`flex-shrink-0 ${isTV ? 'w-20 h-20 max-h-20' : isFullscreen ? 'w-16 h-16 md:w-20 md:h-20 max-h-20' : 'w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16 max-h-16'} object-contain object-center opacity-95`}
                 style="max-width: 12rem;"
               />
             ) : (
               <img 
                 src="/popcorn_logo.png" 
                 alt="Popcorn" 
-                class={`flex-shrink-0 ${isTV ? 'w-20 h-20' : isFullscreen ? 'w-16 h-16 md:w-20 md:h-20' : 'w-14 h-14 sm:w-16 sm:h-16'} object-contain opacity-90`}
+                class={`flex-shrink-0 ${isTV ? 'w-20 h-20' : isFullscreen ? 'w-16 h-16 md:w-20 md:h-20' : 'w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16'} object-contain opacity-90`}
               />
             )
           )}
@@ -247,7 +248,7 @@ export function VideoControls({
           <div
             ref={progressBarRef}
             tabIndex={0}
-            class={`relative ${progressHeight} bg-white/30 rounded-full cursor-pointer group/progress transition-all mb-8 outline-none focus:outline-none ${getProgressFocusClass()}`}
+            class={`relative ${progressHeight} bg-white/30 rounded-full cursor-pointer group/progress transition-all mb-4 sm:mb-6 md:mb-8 outline-none focus:outline-none ${getProgressFocusClass()}`}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();

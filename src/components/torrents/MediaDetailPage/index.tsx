@@ -276,6 +276,21 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   const { debugLogs, showDebug, setShowDebug, addDebugLog, clearDebugLogs } = useDebug();
   const { streamingTorrentActive } = useSubscriptionMe();
 
+  // En mode streaming : garder l'URL stream-torrent pendant la lecture même si isAvailableLocally
+  // passe à true (fichier en stream_cache), pour éviter de basculer sur HLS local (transcodage, timeout).
+  const useStreamTorrentMode = (streamingTorrentActive ?? false) && (!isAvailableLocally || isPlaying);
+
+  // Log des paramètres streaming en console (visible dans l’onglet Console pour debug)
+  useEffect(() => {
+    const token = typeof TokenManager?.getCloudAccessToken === 'function' ? TokenManager.getCloudAccessToken() : null;
+    console.debug('[MediaDetail] Paramètres streaming', {
+      streamingTorrentActive: streamingTorrentActive ?? false,
+      useStreamTorrentMode,
+      isAvailableLocally: Boolean(isAvailableLocally),
+      hasCloudToken: !!token,
+    });
+  }, [streamingTorrentActive, isAvailableLocally, useStreamTorrentMode]);
+
   // Hook useTorrentPlayer (utilise le torrent actif = sélection saison/épisode)
   const {
     playStatus,
@@ -599,7 +614,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
               if (completed) {
                 try {
                   const videos = await loadVideoFiles(activeTorrent.infoHash!);
-                  if (videos.length > 0) setIsAvailableLocally(true);
+                  // En mode streaming actif, ne pas marquer "disponible localement" pour garder l'URL stream-torrent (évite bascule HLS / 502).
+                  if (videos.length > 0 && !streamingTorrentActive) setIsAvailableLocally(true);
                 } catch (_) {}
                 return;
               }
@@ -637,7 +653,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     const STATS_POLL_MS = 5_000;
     const iv = setInterval(checkDownloadingTorrent, STATS_POLL_MS);
     return () => clearInterval(iv);
-  }, [hasInfoHash, activeTorrent.infoHash, activeTorrent.clientState, activeTorrent.clientProgress, isPlaying, playStatus]);
+  }, [hasInfoHash, activeTorrent.infoHash, activeTorrent.clientState, activeTorrent.clientProgress, isPlaying, playStatus, streamingTorrentActive]);
 
   // Afficher le panneau de vérification quand un téléchargement vient d'être ajouté (événement torrentAdded)
   useEffect(() => {
@@ -1010,7 +1026,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         logoUrl={displayTorrent.logoUrl ?? null}
         synopsis={displayTorrent.synopsis ?? displayTorrent.description ?? null}
         releaseDate={displayTorrent.releaseDate ?? null}
-        useStreamTorrentMode={streamingTorrentActive && !isAvailableLocally}
+        useStreamTorrentMode={useStreamTorrentMode}
         streamingTorrentToken={TokenManager.getCloudAccessToken()}
         playStatus={playStatus}
         progressMessage={progressMessage}
@@ -1050,7 +1066,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           logoUrl={displayTorrent.logoUrl ?? null}
           synopsis={displayTorrent.synopsis ?? displayTorrent.description ?? null}
           releaseDate={displayTorrent.releaseDate ?? null}
-          useStreamTorrentMode={streamingTorrentActive && !isAvailableLocally}
+          useStreamTorrentMode={useStreamTorrentMode}
           streamingTorrentToken={TokenManager.getCloudAccessToken()}
         />
       )}

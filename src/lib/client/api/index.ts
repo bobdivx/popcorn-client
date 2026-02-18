@@ -188,6 +188,18 @@ export class ClientApi {
   }
 
   /**
+   * Attendre que le flux stream-torrent soit prêt avant d'ouvrir le lecteur.
+   */
+  async streamTorrentReady(
+    infoHash: string,
+    fileId: number,
+    filename: string,
+    accessToken: string
+  ): Promise<void> {
+    return this._torrents.streamTorrentReady(infoHash, fileId, filename, accessToken);
+  }
+
+  /**
    * Notifier que la lecture en streaming est terminée (suppression du cache côté backend si stream_cache).
    */
   async notifyStreamingEnded(infoHash: string): Promise<void> {

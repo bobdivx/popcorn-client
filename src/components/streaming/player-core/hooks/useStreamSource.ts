@@ -68,7 +68,7 @@ export function useStreamSource({
           infoHash,
           filePath,
           fileName: selectedFile.name,
-          fileIndex: selectedFile.index,
+          fileIndex: selectedFile.index ?? 0,
           isDirectMode: streamingTorrentMode ? true : isDirectMode,
           isLucieMode,
           streamBackendUrl,

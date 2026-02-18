@@ -466,6 +466,8 @@
     "streamPreparingRetry": "Préparation du flux, nouvelle tentative…",
     "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct.",
     "errorStream": "Impossible de lire la vidéo. Vérifiez la connexion au serveur.",
+    "torrentUnavailableOnIndexer": "Ce torrent n'est plus disponible sur l'indexeur ou n'a pas pu être récupéré. Choisissez une autre source.",
+    "streamNotReadyYet": "Le flux n'est pas encore prêt (torrent en cours d'initialisation). Attendez 1 à 2 minutes puis réessayez.",
     "progressBarDownloaded": "Vert = déjà téléchargé par le client",
     "maxTranscodingsReached": "Nombre maximum de transcodages atteint. Arrêtez les autres lectures en cours.",
     "maxTranscodingsReachedWithList": "Nombre maximum de transcodages atteint (max {max}). Arrêtez les autres lectures ou attendez qu'elles se terminent. Transcodages en cours : {list}",

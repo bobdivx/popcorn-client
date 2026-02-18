@@ -466,6 +466,8 @@
     "streamPreparingRetry": "Preparing stream, retrying…",
     "streamingFallbackToHls": "Switched to HLS playback due to direct stream issue.",
     "errorStream": "Unable to play video. Check server connection.",
+    "torrentUnavailableOnIndexer": "This torrent is no longer available on the indexer or could not be retrieved. Choose another source.",
+    "streamNotReadyYet": "Stream is not ready yet (torrent still initializing). Wait 1–2 minutes and try again.",
     "progressBarDownloaded": "Green = already downloaded by client",
     "maxTranscodingsReached": "Maximum number of transcodings reached. Stop other ongoing playback.",
     "maxTranscodingsReachedWithList": "Maximum number of transcodings reached (max {max}). Stop other playback or wait for it to finish. Active transcodings: {list}",

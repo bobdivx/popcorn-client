@@ -63,6 +63,47 @@ export function useTorrentPlayer(options: UseTorrentPlayerOptions) {
     };
   }, []);
 
+  // Pendant que le lecteur est ouvert : rafraîchir les stats avec la MÊME source que la page Téléchargements (listTorrents)
+  // pour que l’overlay affiche exactement la même progression (%, downloaded/total) que /downloads
+  const statsRefreshIntervalRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!isPlaying) {
+      if (statsRefreshIntervalRef.current != null) {
+        window.clearInterval(statsRefreshIntervalRef.current);
+        statsRefreshIntervalRef.current = null;
+      }
+      return;
+    }
+    const infoHash = (torrent.infoHash || '').trim().toLowerCase();
+    if (!infoHash) return;
+
+    const refreshStats = () => {
+      clientApi
+        .listTorrents()
+        .then((list) => {
+          const found = list.find((t) => (t.info_hash || '').toLowerCase() === infoHash);
+          if (found) {
+            setTorrentStats(found);
+            return;
+          }
+          // Si absent de la liste (ex. tout juste ajouté), fallback sur getTorrent comme avant
+          clientApi.getTorrent(infoHash).then((stats) => {
+            if (stats) setTorrentStats(stats);
+          }).catch(() => {});
+        })
+        .catch(() => {});
+    };
+    refreshStats();
+    const interval = window.setInterval(refreshStats, 3000);
+    statsRefreshIntervalRef.current = interval;
+    return () => {
+      if (statsRefreshIntervalRef.current != null) {
+        window.clearInterval(statsRefreshIntervalRef.current);
+        statsRefreshIntervalRef.current = null;
+      }
+    };
+  }, [isPlaying, torrent.infoHash]);
+
   // Créer le contexte pour le polling
   const pollingContext: PollingContext = {
     setPlayStatus,
