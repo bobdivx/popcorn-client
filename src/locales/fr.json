@@ -115,6 +115,7 @@
     "statusError": "Hors ligne",
     "statusChecking": "…",
     "menuTitle": "Serveur local",
+    "versionLabel": "Version",
     "startServer": "Démarrer le serveur",
     "stopServer": "Arrêter le serveur",
     "restartServer": "Redémarrer le serveur"
@@ -434,6 +435,9 @@
     "streamingModeLucieDescription": "Segments WebM de 5 secondes avec VP9+Opus (moderne, nécessite support navigateur)",
     "streamingModeDirect": "Direct (alternative sans HLS)",
     "streamingModeDirectDescription": "Lecture directe sans transcodage (limité aux formats supportés nativement)",
+    "streamingDownloadFull": "Télécharger le média en entier en mode streaming",
+    "streamingDownloadFullDescription": "C’est l’abonnement actif qui permet d’utiliser le mode streaming. Ce réglage choisit uniquement, lorsque vous lisez en streaming : télécharger tout le fichier en arrière-plan ou seulement la partie lue.",
+    "streamingDownloadFullRequiresSubscription": "Le mode streaming (et cette option) nécessitent un abonnement actif avec l’option streaming torrent.",
     "librarySection": "Affichage de la bibliothèque",
     "showZeroSeedTorrents": "Afficher les torrents sans seeders",
     "showZeroSeedTorrentsDescription": "Inclure les torrents avec 0 seeder dans les pages Films et Séries (certains peuvent être indisponibles)",
@@ -456,6 +460,8 @@
     "preparingStream": "Préparation de la lecture en cours…",
     "streamPreparingRetry": "Préparation du flux, nouvelle tentative…",
     "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct.",
+    "errorStream": "Impossible de lire la vidéo. Vérifiez la connexion au serveur.",
+    "progressBarDownloaded": "Vert = déjà téléchargé par le client",
     "maxTranscodingsReached": "Nombre maximum de transcodages atteint. Arrêtez les autres lectures en cours.",
     "maxTranscodingsReachedWithList": "Nombre maximum de transcodages atteint (max {max}). Arrêtez les autres lectures ou attendez qu'elles se terminent. Transcodages en cours : {list}",
     "transcodingsEvicted": "D'autres transcodages ont été arrêtés pour libérer de la place.",
@@ -530,7 +536,7 @@
     "noContent": "Aucun contenu n'est disponible pour le moment.",
     "moviesGenre": "Films - {genre}",
     "seriesGenre": "Séries - {genre}",
-    "playNew": "► Lire",
+    "playNew": "Lire",
     "downloadUnavailable": "Impossible de démarrer le téléchargement pour ce contenu."
   },
   "search": {

@@ -3,10 +3,10 @@
  * - webOS : API Application Manager (app YouTube ou navigateur TV)
  * - Android : scheme vnd.youtube: (app YouTube)
  * - iOS : scheme youtube:// (app YouTube)
- * - Autres : ouverture de l'URL web
+ * - Autres : nouvel onglet avec l'URL (ou navigation directe sur TV/NAS où window.open est souvent bloqué)
  */
 
-import { isWebOSTV } from './device-detection';
+import { isWebOSTV, isTVPlatform } from './device-detection';
 
 declare global {
   interface Window {
@@ -26,6 +26,12 @@ declare global {
 const YOUTUBE_APP_ID = 'youtube.leanback.v4';
 const BROWSER_APP_ID = 'com.webos.app.browser';
 
+/** User-agents où l'iframe YouTube est souvent bloquée (SmartTV, NAS kiosk, etc.) */
+function isEmbedRestrictedUA(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /NetCast|TV Safari|SmartTV|Large Screen|webOS|Web0S/i.test(navigator.userAgent || '');
+}
+
 function isWebOSAvailable(): boolean {
   return typeof window !== 'undefined' && typeof window.webOS?.service?.request === 'function';
 }
@@ -40,11 +46,17 @@ function isIOS(): boolean {
   return /iPhone|iPad|iPod/i.test(navigator.userAgent || '');
 }
 
+/** Sur TV/NAS, window.open est souvent bloqué : on navigue dans la fenêtre actuelle. */
+function shouldNavigateInPlace(): boolean {
+  return isTVPlatform() || isWebOSTV() || isEmbedRestrictedUA();
+}
+
 /**
  * Lance une vidéo YouTube de la façon la plus adaptée à la plateforme.
- * - webOS : app YouTube native ou navigateur TV via API
+ * - webOS : API Application Manager (app YouTube ou navigateur TV)
  * - Android : app YouTube via vnd.youtube:
  * - iOS : app YouTube via youtube:
+ * - webOS sans API / TV / NAS : navigation directe (window.open souvent bloqué)
  * - Autres : nouvel onglet avec l'URL
  */
 export function launchYouTube(videoId: string): void {
@@ -52,7 +64,7 @@ export function launchYouTube(videoId: string): void {
 
   const watchUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-  // webOS : API Application Manager
+  // webOS : API Application Manager (uniquement si window.webOS est disponible)
   if (isWebOSTV() && isWebOSAvailable()) {
     launchYouTubeOnWebOS(videoId);
     return;
@@ -70,7 +82,12 @@ export function launchYouTube(videoId: string): void {
     return;
   }
 
-  // Fallback : ouverture web
+  // Fallback : TV, NAS, webOS sans API → navigation directe (évite popup bloquée)
+  if (shouldNavigateInPlace()) {
+    window.location.href = watchUrl;
+    return;
+  }
+
   window.open(watchUrl, '_blank');
 }
 
@@ -87,7 +104,7 @@ function launchYouTubeOnWebOS(videoId: string): void {
         params: { target: watchUrl },
       },
       onSuccess: () => console.log('[webOS] Browser launched with YouTube URL'),
-      onFailure: () => window.open(watchUrl, '_blank'),
+      onFailure: () => { window.location.href = watchUrl; },
     });
   };
 
@@ -103,13 +120,14 @@ function launchYouTubeOnWebOS(videoId: string): void {
 }
 
 /**
- * Indique si on doit privilégier le lancement dans l'app native plutôt qu'un iframe.
- * Vrai sur : webOS, Android TV, Android mobile, iOS.
+ * Indique si on doit afficher le bouton "Ouvrir YouTube" au lieu de l'iframe embed.
+ * Uniquement vrai sur les plateformes où l'iframe ne fonctionne pas : TV (webOS, Android TV, Apple TV)
+ * et user-agents restreints (SmartTV, NetCast, etc.).
+ * Sur mobile (Android Chrome, iPhone Safari), l'iframe fonctionne → on affiche l'embed.
  */
 export function shouldLaunchNativeYouTube(): boolean {
   if (typeof window === 'undefined') return false;
-  if (isWebOSTV()) return true;
-  if (isAndroid()) return true;
-  if (isIOS()) return true;
+  if (isTVPlatform()) return true;
+  if (isEmbedRestrictedUA()) return true;
   return false;
 }

@@ -149,7 +149,8 @@ export function VideoPlayerWrapper({
   });
 
   const loadingStepFromStatus = getLoadingStep(playStatus ?? '', progressMessage ?? '', torrentStats ?? null);
-  const loadingStep = loadingStepFromStatus > 0 ? loadingStepFromStatus : isLoading ? 4 : 0;
+  // Quand on attend le flux (isLoading sans étape précise), afficher l’étape 1 (en file d’attente), pas la 4
+  const loadingStep = loadingStepFromStatus > 0 ? loadingStepFromStatus : isLoading ? 1 : 0;
   
   const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';
   const STORAGE_INTRO_ALWAYS_SHOW = 'popcorn_intro_always_show';

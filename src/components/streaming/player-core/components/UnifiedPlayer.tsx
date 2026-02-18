@@ -81,6 +81,7 @@ export default function UnifiedPlayer({
           synopsis={hlsProps.synopsis}
           releaseDate={hlsProps.releaseDate}
           torrentName={hlsProps.torrentName ?? hlsProps.fileName}
+          torrentStats={torrentStats}
         />
       ) : src && useLuciePlayer && lucieProps ? (
         <LuciePlayer

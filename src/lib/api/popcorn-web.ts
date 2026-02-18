@@ -6,8 +6,8 @@
 import { isTauri } from '../utils/tauri.js';
 import { TokenManager } from '../client/storage.js';
 
-// URL unique : apex. En Vercel (popcorn-web), ne pas activer la redirection apex→www,
-// sinon la preflight CORS reçoit une 307 et l’API sur www peut renvoyer 404.
+// URL canonique du site popcorn-web (auth, abonnements, API cloud). Par défaut : popcornn.app.
+// Override via PUBLIC_POPCORN_WEB_URL ou POPCORN_WEB_URL au build si déploiement custom.
 const POPCORN_WEB_BASE =
   import.meta.env.PUBLIC_POPCORN_WEB_URL ||
   import.meta.env.POPCORN_WEB_URL ||
@@ -870,6 +870,8 @@ export interface UserConfig {
     introSkipSeconds?: number;
     nextEpisodeCountdownSeconds?: number;
     streamingMode?: 'hls' | 'direct';
+    /** En mode streaming torrent : télécharger le média en entier (réservé abonnés). */
+    streamingDownloadFull?: boolean;
   } | null;
   /** Dossiers de téléchargement par type (films, séries) — style Jellyfin */
   mediaPaths?: {
@@ -1165,21 +1167,33 @@ export interface SubscriptionMe {
 export async function getSubscriptionMe(accessToken?: string): Promise<SubscriptionMe | null> {
   try {
     const token = accessToken ?? TokenManager.getCloudAccessToken() ?? undefined;
-    if (!token) return null;
+    if (!token) {
+      console.warn('[Popcorn] Statut abonnement: aucun token cloud (connexion cloud requise pour récupérer l\'abonnement).');
+      return null;
+    }
     const apiUrl = `${getPopcornWebApiUrl()}/subscription/me`;
     const res = await requestWithTokenRefresh(
       apiUrl,
       { method: 'GET', headers: { 'Content-Type': 'application/json' } },
       10000
     );
-    if (!res.ok || !res.data?.success) return null;
+    if (!res.ok) {
+      console.warn('[Popcorn] Statut abonnement: erreur API', res.status, res.data?.message ?? res.data?.error ?? res.data);
+      return null;
+    }
+    if (!res.data?.success) {
+      console.warn('[Popcorn] Statut abonnement: réponse invalide (success=false)', res.data);
+      return null;
+    }
     const d = res.data?.data;
     return {
       subscription: d?.subscription ?? null,
       backendUrl: d?.backendUrl ?? null,
       streamingTorrent: d?.streamingTorrent === true,
     };
-  } catch {
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn('[Popcorn] Statut abonnement: échec (réseau ou CORS)', msg);
     return null;
   }
 }

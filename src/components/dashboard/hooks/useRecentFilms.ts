@@ -5,7 +5,7 @@ import { useI18n } from '../../../lib/i18n/useI18n';
 import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-config';
 
 /**
- * Charge les films triés par date d'ajout sur l'indexeur (ajouts récents)
+ * Charge les films triés par date de sortie (plus récents en premier)
  */
 export function useRecentFilms() {
   const { language } = useI18n();
@@ -22,7 +22,7 @@ export function useRecentFilms() {
           1,
           prefs.torrentsRecentLimit,
           language,
-          'recent',
+          'release_date',
           prefs.showZeroSeedTorrents ? 0 : 1,
           prefs.mediaLanguages,
           prefs.minQuality

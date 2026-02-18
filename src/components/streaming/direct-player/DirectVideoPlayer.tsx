@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
 import { useVideoControls } from '../player-shared/hooks/useVideoControls';
 import { useFullscreen } from '../player-shared/hooks/useFullscreen';
 import { useTVPlayerNavigation } from '../player-shared/hooks/useTVPlayerNavigation';
 import { usePlayerConfig } from '../player-shared/hooks/usePlayerConfig';
 import { VideoControls } from '../player-shared/components/VideoControls';
 import { useI18n } from '../../../lib/i18n';
+import type { PlayerLoadingTorrentStats } from '../player-shared/components/PlayerLoadingOverlay';
 
 interface DirectVideoPlayerProps {
   src: string;
@@ -21,6 +22,8 @@ interface DirectVideoPlayerProps {
   synopsis?: string | null;
   releaseDate?: string | null;
   torrentName?: string;
+  /** Stats du client torrent pour afficher la partie téléchargée sur la barre de progression. */
+  torrentStats?: PlayerLoadingTorrentStats | null;
 }
 
 export default function DirectVideoPlayer({
@@ -36,15 +39,30 @@ export default function DirectVideoPlayer({
   synopsis,
   releaseDate,
   torrentName = '',
+  torrentStats,
 }: DirectVideoPlayerProps) {
   const { t } = useI18n();
   const playerConfig = usePlayerConfig();
+
+  /** Progression téléchargement (0–1) pour la barre verte. Utilise downloaded_bytes/total_bytes ou state completed/seeding pour éviter les incohérences (ex. fichier 100% téléchargé mais progress incorrect). */
+  const torrentProgress = useMemo(() => {
+    if (!torrentStats) return null;
+    const s = torrentStats;
+    if (s.state === 'completed' || s.state === 'seeding') return 1.0;
+    if (s.total_bytes != null && s.total_bytes > 0 && s.downloaded_bytes != null) {
+      return Math.min(1, s.downloaded_bytes / s.total_bytes);
+    }
+    const p = s.progress;
+    if (p == null) return null;
+    return p > 1 ? p / 100 : p; // normaliser si API renvoie 0–100
+  }, [torrentStats]);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const [loaded, setLoaded] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   const isFullscreen = useFullscreen();
 
@@ -184,7 +202,7 @@ export default function DirectVideoPlayer({
         }}
       >
         {shouldShowBuffering && (
-          <div class="absolute inset-0 flex flex-col items-center justify-center bg-black z-10">
+          <div class="absolute inset-0 flex flex-col items-center justify-center bg-black z-10 pointer-events-none">
             <div class="relative w-32 h-32 mb-6">
               <div class="absolute inset-0 border-4 border-primary-600/20 rounded-full" />
               <div
@@ -252,7 +270,10 @@ export default function DirectVideoPlayer({
             display: 'block',
             backgroundColor: '#000',
           }}
-          onError={(e) => onError(e as Event)}
+          onError={(e) => {
+            setHasError(true);
+            onError(e as Event);
+          }}
           onClick={(e: Event) => {
             const target = (e.target as HTMLElement);
             if (target.closest('.pointer-events-auto')) return;
@@ -261,13 +282,43 @@ export default function DirectVideoPlayer({
             handlePlayPause();
           }}
         />
+        {/* Overlay d’erreur : toujours visible avec bouton Fermer pour ne pas bloquer l’utilisateur */}
+        {hasError && (
+          <div class="absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/90 pointer-events-auto p-6">
+            <div class="flex flex-col items-center max-w-md text-center">
+              <div class="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 class="text-white text-xl font-semibold mb-2">{t('common.error')}</h3>
+              <p class="text-white/80 text-sm mb-6">{t('playback.errorStream')}</p>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onClose();
+                }}
+                class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-primary-600 hover:bg-primary-700 text-white font-medium focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black min-h-[44px]"
+                aria-label={closeLabel}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                {closeLabel}
+              </button>
+            </div>
+          </div>
+        )}
         <VideoControls
           torrentName={torrentName}
           posterUrl={posterUrl ?? undefined}
           logoUrl={logoUrl ?? undefined}
           synopsis={synopsis ?? undefined}
           releaseDate={releaseDate ?? undefined}
-          showControls={effectiveShowControls}
+          torrentProgress={torrentProgress}
+          showControls={hasError ? true : effectiveShowControls}
           isPlaying={isPlaying}
           currentTime={currentTime}
           duration={duration}

@@ -2,19 +2,23 @@ import { useState, useEffect } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n';
 import { PreferencesManager, TokenManager } from '../../lib/client/storage';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
-import { SkipForward, ListVideo, Play } from 'lucide-preact';
+import { SkipForward, ListVideo, Play, Download } from 'lucide-preact';
 import { DEFAULT_PLAYER_CONFIG, type PlayerConfig } from '../streaming/hls-player/hooks/usePlayerConfig';
+import { useSubscriptionMe } from '../torrents/MediaDetailPage/hooks/useSubscriptionMe';
 
 const PLAYER_CONFIG_KEY = 'playerConfig';
 
-function getPlaybackConfig(): Pick<
+type PlaybackConfigStored = Pick<
   PlayerConfig,
   | 'skipIntroEnabled'
   | 'nextEpisodeButtonEnabled'
   | 'introSkipSeconds'
   | 'nextEpisodeCountdownSeconds'
   | 'streamingMode'
-> {
+  | 'streamingDownloadFull'
+>;
+
+function getPlaybackConfig(): PlaybackConfigStored {
   if (typeof window === 'undefined') {
     return {
       skipIntroEnabled: DEFAULT_PLAYER_CONFIG.skipIntroEnabled,
@@ -22,6 +26,7 @@ function getPlaybackConfig(): Pick<
       introSkipSeconds: DEFAULT_PLAYER_CONFIG.introSkipSeconds,
       nextEpisodeCountdownSeconds: DEFAULT_PLAYER_CONFIG.nextEpisodeCountdownSeconds,
       streamingMode: DEFAULT_PLAYER_CONFIG.streamingMode,
+      streamingDownloadFull: DEFAULT_PLAYER_CONFIG.streamingDownloadFull ?? false,
     };
   }
   try {
@@ -39,6 +44,7 @@ function getPlaybackConfig(): Pick<
           parsed.streamingMode === 'direct' || parsed.streamingMode === 'hls' || parsed.streamingMode === 'lucie'
             ? parsed.streamingMode
             : DEFAULT_PLAYER_CONFIG.streamingMode,
+        streamingDownloadFull: parsed.streamingDownloadFull === true,
       };
     }
   } catch {
@@ -50,6 +56,7 @@ function getPlaybackConfig(): Pick<
     introSkipSeconds: DEFAULT_PLAYER_CONFIG.introSkipSeconds,
     nextEpisodeCountdownSeconds: DEFAULT_PLAYER_CONFIG.nextEpisodeCountdownSeconds,
     streamingMode: DEFAULT_PLAYER_CONFIG.streamingMode,
+    streamingDownloadFull: DEFAULT_PLAYER_CONFIG.streamingDownloadFull ?? false,
   };
 }
 
@@ -67,6 +74,7 @@ function savePlaybackToLocalStorage(partial: Partial<PlayerConfig>) {
 
 export default function PlaybackSettingsPanel() {
   const { t } = useI18n();
+  const { streamingTorrentActive } = useSubscriptionMe();
   const [config, setConfig] = useState(getPlaybackConfig);
   const [autoplay, setAutoplay] = useState(() => PreferencesManager.getPreferences().autoplay ?? false);
   const [saved, setSaved] = useState(false);
@@ -80,7 +88,7 @@ export default function PlaybackSettingsPanel() {
     window.setTimeout(() => setSaved(false), 1500);
   };
 
-  const savePlaybackSettingsToCloud = (next: ReturnType<typeof getPlaybackConfig>) => {
+  const savePlaybackSettingsToCloud = (next: PlaybackConfigStored) => {
     const cloudToken = TokenManager.getCloudAccessToken();
     if (!cloudToken) return;
     saveUserConfigMerge(
@@ -91,6 +99,7 @@ export default function PlaybackSettingsPanel() {
           introSkipSeconds: next.introSkipSeconds,
           nextEpisodeCountdownSeconds: next.nextEpisodeCountdownSeconds,
           streamingMode: next.streamingMode,
+          streamingDownloadFull: next.streamingDownloadFull,
         },
       },
       cloudToken
@@ -142,6 +151,14 @@ export default function PlaybackSettingsPanel() {
   const handleAutoplayChange = (value: boolean) => {
     PreferencesManager.updatePreferences({ autoplay: value });
     setAutoplay(value);
+    showSaved();
+  };
+
+  const handleStreamingDownloadFull = (value: boolean) => {
+    const next = { ...config, streamingDownloadFull: value };
+    setConfig(next);
+    savePlaybackToLocalStorage(next);
+    savePlaybackSettingsToCloud(next);
     showSaved();
   };
 
@@ -208,6 +225,30 @@ export default function PlaybackSettingsPanel() {
           <span className="text-gray-500 text-sm">s</span>
         </div>
         <p className="text-xs text-gray-500 mt-1">{t('interfaceSettings.introSkipSecondsDescription')}</p>
+      </section>
+
+      {/* Téléchargement complet en mode streaming (réservé abonnés) */}
+      <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
+        <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+          <Download className="w-5 h-5 text-primary-400" />
+          {t('interfaceSettings.streamingDownloadFull')}
+        </h3>
+        <p className="text-sm text-gray-400 mb-4">{t('interfaceSettings.streamingDownloadFullDescription')}</p>
+        {!streamingTorrentActive ? (
+          <p className="text-sm text-amber-400/90 mb-2">{t('interfaceSettings.streamingDownloadFullRequiresSubscription')}</p>
+        ) : null}
+        <label className={`flex items-center gap-3 ${streamingTorrentActive ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+          <input
+            type="checkbox"
+            className="toggle toggle-primary"
+            checked={config.streamingDownloadFull ?? false}
+            disabled={!streamingTorrentActive}
+            onChange={(e) => streamingTorrentActive && handleStreamingDownloadFull((e.target as HTMLInputElement).checked)}
+          />
+          <span className="text-white font-medium">
+            {config.streamingDownloadFull ? t('common.yes') : t('common.no')}
+          </span>
+        </label>
       </section>
 
       {/* Mode de streaming */}

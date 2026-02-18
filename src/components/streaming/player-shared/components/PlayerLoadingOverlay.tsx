@@ -36,7 +36,18 @@ export default function PlayerLoadingOverlay({
   onCancel,
   cancelLabel = 'Annuler',
 }: PlayerLoadingOverlayProps) {
-  const progressPercent = torrentStats?.progress != null ? Math.round(torrentStats.progress * 100) : 0;
+  const progressFromBytes =
+    torrentStats?.total_bytes != null &&
+    torrentStats.total_bytes > 0 &&
+    torrentStats?.downloaded_bytes != null
+      ? (torrentStats.downloaded_bytes / torrentStats.total_bytes) * 100
+      : null;
+  const progressPercent =
+    progressFromBytes != null
+      ? Math.round(progressFromBytes * 10) / 10
+      : torrentStats?.progress != null
+        ? Math.round(torrentStats.progress * 100 * 10) / 10
+        : 0;
   const downloadSpeedMb = torrentStats?.download_speed
     ? (torrentStats.download_speed / (1024 * 1024)).toFixed(1)
     : null;
@@ -79,9 +90,13 @@ export default function PlayerLoadingOverlay({
         </div>
 
         {/* Stats réelles du torrent (progression, vitesse, ETA, peers) */}
-        {torrentStats && (torrentStats.progress != null || (torrentStats.download_speed ?? 0) > 0) && (
+        {torrentStats &&
+          (torrentStats.progress != null ||
+            (torrentStats.download_speed ?? 0) > 0 ||
+            (torrentStats.downloaded_bytes != null && torrentStats.total_bytes != null && torrentStats.total_bytes > 0)) && (
           <div className="mt-6 w-full max-w-xs space-y-2">
-            {torrentStats.progress != null && (
+            {(torrentStats.progress != null ||
+              (downloadedFormatted != null && totalFormatted != null)) && (
               <>
                 <div className="flex justify-between text-sm text-white/70">
                   <span>{progressPercent}%</span>

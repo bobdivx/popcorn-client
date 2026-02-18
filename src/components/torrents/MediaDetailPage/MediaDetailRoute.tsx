@@ -227,25 +227,15 @@ function pickBestTorrentFromGroupPayload(payload: any, titleHint?: string | null
     data;
 
   if (Array.isArray(torrents) && torrents.length > 0) {
-    // #region agent log
-    const variantNames = torrents.map((t: any) => ({ name: t?.name ?? t?.clean_title, seeds: normalizeSeedCount(t) }));
-    fetch('http://127.0.0.1:7728/ingest/04a4339e-516d-43b3-aa22-e137dbb068b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f'},body:JSON.stringify({sessionId:'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f',location:'MediaDetailRoute.tsx:pickBest',message:'Variants in group',data:{titleHint:titleHint ?? null,variantCount:torrents.length,variantNames},timestamp:Date.now(),hypothesisId:'H2'})}).catch(()=>{});
-    // #endregion
     let best: any;
     if (titleHint && titleHint.trim().length > 0) {
       const matching = torrents.filter((t: any) => variantMatchesTitle(t, titleHint));
       if (matching.length > 0) {
         best = matching.slice().sort((a: any, b: any) => normalizeSeedCount(b) - normalizeSeedCount(a))[0];
-        // #region agent log
-        fetch('http://127.0.0.1:7728/ingest/04a4339e-516d-43b3-aa22-e137dbb068b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f'},body:JSON.stringify({sessionId:'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f',location:'MediaDetailRoute.tsx:pickBest',message:'Selected matching variant by title',data:{titleHint,name:best?.name,infoHash:best?.info_hash??best?.infoHash},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-        // #endregion
       }
     }
     if (!best) {
       best = torrents.slice().sort((a: any, b: any) => normalizeSeedCount(b) - normalizeSeedCount(a))[0];
-      // #region agent log
-      fetch('http://127.0.0.1:7728/ingest/04a4339e-516d-43b3-aa22-e137dbb068b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f'},body:JSON.stringify({sessionId:'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f',location:'MediaDetailRoute.tsx:pickBest',message:'Selected best by seeds (no title match)',data:{name:best?.name,infoHash:best?.info_hash??best?.infoHash},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-      // #endregion
     }
     // Convertir le variant en objet torrent avec toutes les données nettoyées
     const converted = convertVariantToTorrent(best);
@@ -559,9 +549,6 @@ export default function MediaDetailRoute() {
                 const toUse = candidates.find((i: any) => pathLooksLikeFile(i.download_path)) ?? candidates[0];
                 if (toUse) {
                   const t = libraryItemToTorrent(toUse);
-                  // #region agent log
-                  fetch('http://127.0.0.1:7728/ingest/04a4339e-516d-43b3-aa22-e137dbb068b2',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f'},body:JSON.stringify({sessionId:'09d52ad2-0d7a-43d5-a9d1-53bb0a5e643f',location:'MediaDetailRoute.tsx:libraryMovies',message:'Torrent from library (title)',data:{toUseDownloadPath:toUse.download_path,torrentDownloadPath:(t as any).downloadPath,name:toUse.name},timestamp:Date.now(),hypothesisId:'H1'})}).catch(()=>{});
-                  // #endregion
                   const variants = moviesInLibrary.map((i: any) => libraryItemToTorrent(i));
                   setTorrent(t);
                   setInitialVariants(variants);

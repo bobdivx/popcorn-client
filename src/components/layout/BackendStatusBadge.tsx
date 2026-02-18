@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { isTauri } from '../../lib/utils/tauri';
-import { hasBackendUrl } from '../../lib/backend-config';
+import { getBackendUrl, hasBackendUrl } from '../../lib/backend-config';
 import { serverApi } from '../../lib/client/server-api';
 
 type BackendStatus = 'ok' | 'error' | 'checking' | 'unknown';
@@ -28,6 +28,7 @@ export default function BackendStatusBadge({
   const [showBadge, setShowBadge] = useState(true);
   const [canControlServer, setCanControlServer] = useState(false);
   const [status, setStatus] = useState<BackendStatus>('checking');
+  const [backendVersion, setBackendVersion] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState<'start' | 'stop' | 'restart' | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
@@ -57,14 +58,16 @@ export default function BackendStatusBadge({
   const checkHealth = async () => {
     setStatus('checking');
     setLastError(null);
+    setBackendVersion(null);
     if (!hasBackendUrl()) {
       setStatus('unknown');
       return;
     }
     try {
-      const res = await serverApi.getSetupStatus();
+      const res = await serverApi.checkServerHealth();
       if (res.success && res.data) {
-        setStatus(res.data.backendReachable ? 'ok' : 'error');
+        setStatus(res.data.reachable ? 'ok' : 'error');
+        setBackendVersion(res.data.version ?? null);
       } else {
         setStatus('error');
       }
@@ -137,6 +140,19 @@ export default function BackendStatusBadge({
             <span>{statusLabel}</span>
           </span>
         </p>
+        {hasBackendUrl() && (() => {
+          const url = getBackendUrl();
+          return url ? (
+            <p className="text-xs text-white/60 mt-1 break-all" title={url}>
+              {url}
+            </p>
+          ) : null;
+        })()}
+        {isOk && backendVersion && (
+          <p className="text-xs text-white/50 mt-0.5">
+            {t('backend.versionLabel')} {backendVersion}
+          </p>
+        )}
         {lastError && (
           <p className="text-xs text-red-400 mt-1 truncate" title={lastError}>{lastError}</p>
         )}

@@ -25,6 +25,23 @@ async function resolveStreamingActiveOnce(
   return cache.value;
 }
 
+const PLAYER_CONFIG_KEY = 'playerConfig';
+
+/** True si l'utilisateur a choisi de télécharger le média en entier en mode streaming (réglage Lecture). */
+function getStreamingDownloadFull(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const stored = window.localStorage.getItem(PLAYER_CONFIG_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored) as { streamingDownloadFull?: boolean };
+      return parsed.streamingDownloadFull === true;
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+}
+
 /** Appelle updateOnlyFiles après délai, avec réessais en cas de 502 (torrent encore "initializing"). */
 function scheduleUpdateOnlyFilesWithRetry(infoHash: string, fileIndex: number) {
   const delays = [15000, 15000, 30000]; // 15s, puis +15s, puis +30s en cas d'échec
@@ -321,7 +338,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                       const videos = await loadVideoFiles(addResult.info_hash);
                       if (videos.length > 0) {
                         addDebugLog('success', '✅ Fichiers vidéo trouvés', { files_count: videos.length });
-                        if (forStreaming) {
+                        if (forStreaming && !getStreamingDownloadFull()) {
                           scheduleUpdateOnlyFilesWithRetry(addResult.info_hash, videos[0].index);
                         }
                         setVideoFiles(videos);
@@ -439,7 +456,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
             // Les métadonnées sont généralement immédiatement disponibles avec un fichier .torrent
             const videos = await loadVideoFiles(addResult.info_hash);
             if (videos.length > 0) {
-              if (forStreaming) {
+              if (forStreaming && !getStreamingDownloadFull()) {
                 scheduleUpdateOnlyFilesWithRetry(addResult.info_hash, videos[0].index);
               }
               addDebugLog('success', '✅ Fichiers vidéo trouvés', {
@@ -537,7 +554,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                   // Essayer de charger les fichiers (peut prendre un peu de temps si pas encore prêts)
                   const videos = await loadVideoFiles(addResult.info_hash);
                   if (videos.length > 0) {
-                    if (forStreaming) {
+                    if (forStreaming && !getStreamingDownloadFull()) {
                       scheduleUpdateOnlyFilesWithRetry(addResult.info_hash, videos[0].index);
                     }
                     addDebugLog('success', '✅ Fichiers vidéo trouvés', {
@@ -767,7 +784,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 // Essayer de charger les fichiers (peut prendre un peu de temps si pas encore prêts)
                 const videos = await loadVideoFiles(addResult.info_hash);
                 if (videos.length > 0) {
-                  if (forStreaming) {
+                  if (forStreaming && !getStreamingDownloadFull()) {
                     scheduleUpdateOnlyFilesWithRetry(addResult.info_hash, videos[0].index);
                   }
                   addDebugLog('success', '✅ Fichiers vidéo trouvés', {

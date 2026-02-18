@@ -483,7 +483,7 @@ export const dashboardMethods = {
     page: number = 1,
     limit: number = 30,
     language?: string,
-    sort: 'popular' | 'recent' = 'popular',
+    sort: 'popular' | 'recent' | 'release_date' = 'release_date',
     minSeeds: number = 0,
     mediaLanguages: string[] = [],
     minQuality: string = ''

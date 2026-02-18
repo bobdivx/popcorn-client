@@ -66,7 +66,7 @@ class UpdateChecker {
   }
 
   /**
-   * Retourne l'URL de base alternative (apex ↔ www) pour contourner 307/CORS selon la config Vercel.
+   * Retourne l'URL de base alternative (apex ↔ www) pour popcornn.app si besoin de contourner une redirection.
    */
   private static getAlternatePopcornBase(base: string): string {
     const u = base.replace(/\/$/, '');
@@ -76,8 +76,7 @@ class UpdateChecker {
   }
 
   /**
-   * Parse la page de téléchargements pour extraire les versions disponibles.
-   * On essaie www en premier pour éviter la requête apex qui renvoie 307 → CORS quand Vercel redirige.
+   * Parse la page de téléchargements sur popcornn.app pour extraire les versions disponibles.
    */
   private async parseDownloadsPage(): Promise<VersionInfo | null> {
     if (this.isDevelopment()) {

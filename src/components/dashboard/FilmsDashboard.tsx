@@ -235,10 +235,15 @@ export default function FilmsDashboard() {
     return grouped;
   }, [films]);
 
-  // Préparer les données pour le hero (les 3 films les plus récents avec poster)
+  // Préparer les données pour le hero (les 3 films les plus récents par date de sortie, avec poster)
   const heroFilms = useMemo(() => {
-    return films
+    return [...films]
       .filter(f => f.poster || f.backdrop)
+      .sort((a, b) => {
+        const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+        const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+        return dateB - dateA;
+      })
       .slice(0, 3)
       .map(f => ({
         ...f,
@@ -373,7 +378,7 @@ export default function FilmsDashboard() {
       )}
 
       <div className="pb-8 tv:pb-12 flex-1">
-        {/* Section Ajouts récents (tri par date indexeur) - première ligne */}
+        {/* Section Ajouts récents (tri par date de sortie du film) - première ligne */}
         {recentFilms.length > 0 && (
           <CarouselRow title={t('dashboard.recentAdditions')} autoScroll={false}>
             {recentFilms.map((film) => (

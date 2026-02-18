@@ -74,6 +74,8 @@ interface VideoControlsProps {
   streamQuality?: number | null;
   /** Callback changement de qualité. */
   onQualityChange?: (height: number | null) => void;
+  /** Progression du téléchargement torrent (0–1) pour afficher les parties déjà téléchargées sur la barre. */
+  torrentProgress?: number | null;
 }
 
 export function VideoControls({
@@ -116,6 +118,7 @@ export function VideoControls({
   showQualitySelector = false,
   streamQuality = null,
   onQualityChange,
+  torrentProgress,
 }: VideoControlsProps) {
   const { t } = useI18n();
   const [showQualityMenu, setShowQualityMenu] = useState(false);
@@ -278,9 +281,24 @@ export function VideoControls({
             aria-valuemax={100}
           >
             <div class="absolute left-0 top-0 h-full bg-white/20 rounded-full" style={{ width: '100%' }} />
+            {/* Partie déjà téléchargée par le client torrent : segment vert visible entre position actuelle et fin du téléchargement */}
+            {torrentProgress != null && torrentProgress > 0 && (
+              <div
+                class="absolute left-0 top-0 h-full rounded-full bg-emerald-400/80"
+                style={{ width: `${Math.min(100, torrentProgress * 100)}%` }}
+                title={t('playback.progressBarDownloaded')}
+                aria-hidden
+              />
+            )}
             <div class="absolute left-0 top-0 h-full bg-purple-600 rounded-full" style={{ width: `${progressPercent}%` }} />
             <div class={`absolute top-1/2 -translate-y-1/2 ${isTV ? 'w-6 h-6' : 'w-4 h-4'} bg-purple-600 rounded-full opacity-0 group-hover/progress:opacity-100 transition-all border-2 border-white`} style={{ left: `calc(${progressPercent}% - ${progressPercent > 0 && progressPercent < 100 ? (isTV ? '12px' : '8px') : progressPercent === 100 ? (isTV ? '24px' : '16px') : '0px'})` }} />
           </div>
+          {/* Légende : vert = téléchargé par le client (visible quand les contrôles sont affichés) */}
+          {torrentProgress != null && torrentProgress > 0 && (
+            <p class="text-white/50 text-xs mt-1 mb-1 select-none" aria-hidden="true">
+              {t('playback.progressBarDownloaded')}
+            </p>
+          )}
           <div class={`flex items-center ${gap} relative z-30 overflow-x-auto min-w-0 scrollbar-visible`}>
             <button 
               onClick={(e) => { 
