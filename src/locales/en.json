@@ -427,7 +427,7 @@
     "introSkipSecondsDescription": "Intro duration in seconds (button and auto-skip)",
     "nextEpisodeCountdownSeconds": "Show next episode before end (seconds)",
     "nextEpisodeCountdownDescription": "Number of seconds before end to show the button",
-    "streamingMode": "Streaming mode",
+    "streamingMode": "Default player",
     "streamingModeDescription": "Choose the playback system: HLS (recommended), Lucie (WebM) or direct stream (alternative mode).",
     "streamingModeHls": "HLS (adaptive, recommended)",
     "streamingModeHlsDescription": "Adaptive streaming with .ts segments (compatible with all media)",
@@ -438,6 +438,11 @@
     "streamingDownloadFull": "Download full media while streaming",
     "streamingDownloadFullDescription": "An active subscription is what enables streaming mode. This setting only controls, when you stream: download the entire file in the background or only the part being played.",
     "streamingDownloadFullRequiresSubscription": "Streaming mode (and this option) require an active subscription with the streaming torrent option.",
+    "streamingRetention": "Torrent retention",
+    "streamingRetentionDescription": "How long to keep torrents downloaded while streaming. After this delay, they are automatically deleted to free up space.",
+    "streamingRetentionKeep": "Keep indefinitely",
+    "streamingRetentionDontKeep": "Don't keep (delete after playback)",
+    "streamingRetentionDays": "{days} days",
     "librarySection": "Library display",
     "showZeroSeedTorrents": "Show torrents with no seeders",
     "showZeroSeedTorrentsDescription": "Include torrents with 0 seeders on Films and Series pages (some may be unavailable)",
@@ -1465,6 +1470,7 @@
       "errorGeneric": "Unable to retrieve storage statistics",
       "retentionLabel": "Keep media for",
       "retentionDays": "{days} days",
+      "retentionDontKeep": "Don't keep (remove after playback)",
       "retentionDisabled": "Disabled"
     },
     "friends": {

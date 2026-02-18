@@ -974,7 +974,8 @@ interface IServerApiClientPublic {
   // Health methods
   checkServerHealth(): Promise<ApiResponse<{ status: string }>>;
   getSetupStatus(): Promise<ApiResponse<SetupStatus>>;
-  getStorageStats(): Promise<ApiResponse<{ used_bytes: number; total_bytes?: number; available_bytes?: number }>>;
+  getStorageStats(): Promise<ApiResponse<{ used_bytes: number; total_bytes?: number; available_bytes?: number; storage_retention_days?: number }>>;
+  patchStorageRetention(storageRetentionDays: number | null): Promise<ApiResponse<{ used_bytes: number; total_bytes?: number; available_bytes?: number; storage_retention_days?: number }>>;
 
   // Indexers methods
   getIndexers(): Promise<ApiResponse<Indexer[]>>;

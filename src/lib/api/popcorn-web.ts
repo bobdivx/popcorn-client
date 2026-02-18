@@ -872,6 +872,8 @@ export interface UserConfig {
     streamingMode?: 'hls' | 'direct';
     /** En mode streaming torrent : télécharger le média en entier (réservé abonnés). */
     streamingDownloadFull?: boolean;
+    /** Délai de rétention des torrents en jours (abonnement streaming). null = garder indéfiniment. */
+    streamingRetentionDays?: number | null;
   } | null;
   /** Dossiers de téléchargement par type (films, séries) — style Jellyfin */
   mediaPaths?: {

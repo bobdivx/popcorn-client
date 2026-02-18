@@ -427,7 +427,7 @@
     "introSkipSecondsDescription": "Durée du générique en secondes (bouton et saut automatique)",
     "nextEpisodeCountdownSeconds": "Afficher « Épisode suivant » avant la fin (secondes)",
     "nextEpisodeCountdownDescription": "Nombre de secondes avant la fin pour afficher le bouton",
-    "streamingMode": "Mode de streaming",
+    "streamingMode": "Lecteur par défaut",
     "streamingModeDescription": "Choisissez le système de lecture : HLS (recommandé), Lucie (WebM) ou flux direct (mode alternatif).",
     "streamingModeHls": "HLS (adaptatif, recommandé)",
     "streamingModeHlsDescription": "Streaming adaptatif avec segments .ts (compatible avec tous les médias)",
@@ -438,6 +438,11 @@
     "streamingDownloadFull": "Télécharger le média en entier en mode streaming",
     "streamingDownloadFullDescription": "C’est l’abonnement actif qui permet d’utiliser le mode streaming. Ce réglage choisit uniquement, lorsque vous lisez en streaming : télécharger tout le fichier en arrière-plan ou seulement la partie lue.",
     "streamingDownloadFullRequiresSubscription": "Le mode streaming (et cette option) nécessitent un abonnement actif avec l’option streaming torrent.",
+    "streamingRetention": "Rétention des torrents",
+    "streamingRetentionDescription": "Durée de conservation des torrents téléchargés en streaming. Après ce délai, ils sont supprimés automatiquement pour libérer de l'espace.",
+    "streamingRetentionKeep": "Garder indéfiniment",
+    "streamingRetentionDontKeep": "Ne pas garder (supprimer après lecture)",
+    "streamingRetentionDays": "{days} jours",
     "librarySection": "Affichage de la bibliothèque",
     "showZeroSeedTorrents": "Afficher les torrents sans seeders",
     "showZeroSeedTorrentsDescription": "Inclure les torrents avec 0 seeder dans les pages Films et Séries (certains peuvent être indisponibles)",
@@ -1465,6 +1470,7 @@
       "errorGeneric": "Impossible de récupérer les statistiques de stockage",
       "retentionLabel": "Conserver les médias",
       "retentionDays": "{days} jours",
+      "retentionDontKeep": "Ne pas garder (supprimer après lecture)",
       "retentionDisabled": "Désactivé"
     },
     "friends": {
