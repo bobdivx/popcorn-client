@@ -174,8 +174,8 @@ export function VideoControls({
       {showPausedOverlay && (
         <div class="absolute inset-0 flex flex-col justify-end z-15 pointer-events-none">
           <div class="w-full h-full bg-gradient-to-r from-black via-black/90 to-transparent pointer-events-none" aria-hidden="true" />
-          {/* pb-40 sur mobile pour laisser la barre de contrôle visible (évite chevauchement) */}
-          <div class="absolute inset-0 flex flex-col justify-end px-3 sm:px-6 md:px-10 lg:px-16 pb-40 sm:pb-16 md:pb-20">
+          {/* Padding bas important pour que synopsis + poster restent au-dessus de la barre de progression et des boutons (pas de chevauchement) */}
+          <div class="absolute inset-0 flex flex-col justify-end px-3 sm:px-6 md:px-10 lg:px-16 pb-40 sm:pb-28 md:pb-32 lg:pb-36 xl:pb-44">
             <div class="max-w-5xl xl:max-w-6xl flex flex-col sm:flex-row items-start gap-3 sm:gap-6 md:gap-8 w-full">
               {posterUrl && (
                 <div class="flex-shrink-0 w-20 h-28 sm:w-40 sm:h-56 md:w-48 md:h-72 lg:w-56 lg:h-80 xl:w-64 xl:h-96 rounded-lg sm:rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/20 max-h-[25vh] sm:max-h-none">
@@ -282,10 +282,10 @@ export function VideoControls({
             aria-valuemax={100}
           >
             <div class="absolute left-0 top-0 h-full bg-white/20 rounded-full" style={{ width: '100%' }} />
-            {/* Partie déjà téléchargée par le client torrent : segment vert visible entre position actuelle et fin du téléchargement */}
+            {/* Partie déjà téléchargée par le client torrent : segment visible (couleur assortie au violet) */}
             {torrentProgress != null && torrentProgress > 0 && (
               <div
-                class="absolute left-0 top-0 h-full rounded-full bg-emerald-400/80"
+                class="absolute left-0 top-0 h-full rounded-full bg-cyan-400/80"
                 style={{ width: `${Math.min(100, torrentProgress * 100)}%` }}
                 title={t('playback.progressBarDownloaded')}
                 aria-hidden
@@ -294,12 +294,6 @@ export function VideoControls({
             <div class="absolute left-0 top-0 h-full bg-purple-600 rounded-full" style={{ width: `${progressPercent}%` }} />
             <div class={`absolute top-1/2 -translate-y-1/2 ${isTV ? 'w-6 h-6' : 'w-4 h-4'} bg-purple-600 rounded-full opacity-0 group-hover/progress:opacity-100 transition-all border-2 border-white`} style={{ left: `calc(${progressPercent}% - ${progressPercent > 0 && progressPercent < 100 ? (isTV ? '12px' : '8px') : progressPercent === 100 ? (isTV ? '24px' : '16px') : '0px'})` }} />
           </div>
-          {/* Légende : vert = téléchargé par le client (visible quand les contrôles sont affichés) */}
-          {torrentProgress != null && torrentProgress > 0 && (
-            <p class="text-white/50 text-xs mt-1 mb-1 select-none" aria-hidden="true">
-              {t('playback.progressBarDownloaded')}
-            </p>
-          )}
           <div class={`flex items-center ${gap} relative z-30 overflow-x-auto min-w-0 scrollbar-visible`}>
             <button 
               onClick={(e) => { 

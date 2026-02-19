@@ -177,7 +177,7 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
           }
         }}
       >
-        <div className="relative aspect-[2/3] overflow-hidden bg-gray-900 shadow-lg rounded-lg w-full">
+        <div className="relative aspect-[2/3] overflow-hidden bg-gray-900 shadow-lg rounded-lg tv:rounded-xl w-full">
           {/* Image backdrop en arrière-plan avec blur */}
           {backdropUrl && (
             <div
@@ -205,73 +205,64 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
               }}
             />
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900 relative z-10 p-3">
-              <Film className="w-12 h-12 mb-2 text-gray-400 shrink-0" size={48} />
-              <p className="text-xs text-gray-300 line-clamp-2 text-center w-full">{displayTitle || torrent.name}</p>
-              <p className="text-[10px] text-gray-500 mt-1.5 text-center leading-tight" title={t('downloads.notLinkedToTmdb')}>
+            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900 relative z-10 p-2 tv:p-3">
+              <Film className="w-8 h-8 tv:w-10 tv:h-10 mb-1 tv:mb-2 text-gray-400 shrink-0" size={40} />
+              <p className="text-[10px] tv:text-xs text-gray-300 line-clamp-2 text-center w-full">{displayTitle || torrent.name}</p>
+              <p className="text-[9px] tv:text-[10px] text-gray-500 mt-1 text-center leading-tight" title={t('downloads.notLinkedToTmdb')}>
                 {t('downloads.notLinkedToTmdbShort')}
               </p>
             </div>
           )}
 
-          {/* Badge d'état en haut à gauche */}
-          <div className="absolute top-2 left-2 lg:top-3 lg:left-3 tv:top-4 tv:left-4 z-20">
-            <TorrentStatusBadge state={torrent.state} className="px-2 py-1 text-xs tv:text-sm shadow-lg" />
+          {/* Badge d'état en haut à gauche - compact sur TV */}
+          <div className="absolute top-1.5 left-1.5 lg:top-2 lg:left-2 tv:top-2 tv:left-2 z-20">
+            <TorrentStatusBadge state={torrent.state} className="px-1.5 py-0.5 tv:px-2 tv:py-1 text-[10px] tv:text-xs shadow-lg" />
           </div>
 
-          {/* Badges de stats conditionnelles en haut à droite */}
-          <div className="absolute top-2 right-2 lg:top-3 lg:right-3 tv:top-4 tv:right-4 z-20 flex flex-col gap-1.5 tv:gap-2 items-end">
-            {/* Download speed - uniquement si > 0 */}
+          {/* Badges de stats - plus compacts sur TV */}
+          <div className="absolute top-1.5 right-1.5 lg:top-2 lg:right-2 tv:top-2 tv:right-2 z-20 flex flex-col gap-1 tv:gap-1.5 items-end">
             {torrent.download_speed > 0 && (
-              <div className="bg-blue-600/90 backdrop-blur-sm rounded-lg px-2 py-1 tv:px-3 tv:py-1.5 flex items-center gap-1.5 tv:gap-2 text-xs tv:text-sm text-white shadow-lg">
-                <Download className="w-3 h-3 tv:w-4 tv:h-4" size={16} />
+              <div className="bg-blue-600/90 backdrop-blur-sm rounded px-1.5 py-0.5 tv:px-2 tv:py-1 flex items-center gap-1 text-[10px] tv:text-xs text-white shadow-lg">
+                <Download className="w-2.5 h-2.5 tv:w-3 tv:h-3" size={14} />
                 <span className="font-semibold">{formatSpeed(torrent.download_speed)}</span>
               </div>
             )}
-            
-            {/* Upload speed - uniquement si > 0 */}
             {torrent.upload_speed > 0 && (
-              <div className="bg-green-600/90 backdrop-blur-sm rounded-lg px-2 py-1 tv:px-3 tv:py-1.5 flex items-center gap-1.5 tv:gap-2 text-xs tv:text-sm text-white shadow-lg">
-                <Upload className="w-3 h-3 tv:w-4 tv:h-4" size={16} />
+              <div className="bg-green-600/90 backdrop-blur-sm rounded px-1.5 py-0.5 tv:px-2 tv:py-1 flex items-center gap-1 text-[10px] tv:text-xs text-white shadow-lg">
+                <Upload className="w-2.5 h-2.5 tv:w-3 tv:h-3" size={14} />
                 <span className="font-semibold">{formatSpeed(torrent.upload_speed)}</span>
               </div>
             )}
-            
-            {/* Seeds - uniquement si > 0 */}
             {torrent.seeders > 0 && (
-              <div className="bg-green-500/90 backdrop-blur-sm rounded-lg px-2 py-1 tv:px-3 tv:py-1.5 flex items-center gap-1.5 tv:gap-2 text-xs tv:text-sm text-white shadow-lg">
-                <Sprout className="w-3 h-3 tv:w-4 tv:h-4" size={16} />
+              <div className="bg-green-500/90 backdrop-blur-sm rounded px-1.5 py-0.5 tv:px-2 tv:py-1 flex items-center gap-1 text-[10px] tv:text-xs text-white shadow-lg">
+                <Sprout className="w-2.5 h-2.5 tv:w-3 tv:h-3" size={14} />
                 <span className="font-semibold">{torrent.seeders}</span>
               </div>
             )}
-            
-            {/* Peers - uniquement si > 0 */}
             {(torrent.peers_connected > 0 || torrent.peers_total > 0) && (
-              <div className="bg-blue-500/90 backdrop-blur-sm rounded-lg px-2 py-1 tv:px-3 tv:py-1.5 flex items-center gap-1.5 tv:gap-2 text-xs tv:text-sm text-white shadow-lg">
-                <Users className="w-3 h-3 tv:w-4 tv:h-4" size={16} />
+              <div className="bg-blue-500/90 backdrop-blur-sm rounded px-1.5 py-0.5 tv:px-2 tv:py-1 flex items-center gap-1 text-[10px] tv:text-xs text-white shadow-lg">
+                <Users className="w-2.5 h-2.5 tv:w-3 tv:h-3" size={14} />
                 <span className="font-semibold">{torrent.peers_connected || torrent.peers_total}</span>
               </div>
             )}
           </div>
 
-          {/* Barre de progression en bas */}
-          <div className="absolute bottom-0 left-0 right-0 h-1.5 tv:h-2 bg-gray-900/50 z-20">
+          {/* Barre de progression - fine sur TV */}
+          <div className="absolute bottom-0 left-0 right-0 h-1 tv:h-1.5 bg-gray-900/50 z-20">
             <div
               className={`${progressColor} h-full transition-all duration-500 ${showPulse ? 'animate-pulse' : ''}`}
               style={{ width: `${torrent.progress * 100}%` }}
             />
           </div>
 
-          {/* Overlay au survol/focus avec infos et actions */}
+          {/* Overlay au survol/focus - plus compact sur TV */}
           {showOverlay && (
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent flex flex-col justify-end p-3 lg:p-4 tv:p-6 transition-opacity pointer-events-none z-30">
-              <div className="space-y-2 tv:space-y-3">
-                <h3 className="text-white font-semibold text-sm lg:text-base tv:text-lg line-clamp-2">
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent flex flex-col justify-end p-2 lg:p-3 tv:p-3 transition-opacity pointer-events-none z-30">
+              <div className="space-y-1 tv:space-y-2">
+                <h3 className="text-white font-semibold text-xs lg:text-sm tv:text-sm line-clamp-2">
                   {displayTitle}
                 </h3>
-                
-                {/* Infos de progression */}
-                <div className="flex items-center gap-2 text-xs lg:text-sm tv:text-base text-gray-300">
+                <div className="flex flex-wrap items-center gap-1.5 tv:gap-2 text-[10px] tv:text-xs text-gray-300">
                   <span>{formatBytes(torrent.downloaded_bytes)} / {formatBytes(torrent.total_bytes)}</span>
                   <span>•</span>
                   <span className="font-semibold">{(torrent.progress * 100).toFixed(1)}%</span>
@@ -283,7 +274,7 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
                   )}
                 </div>
                 {torrent.status_reason && (
-                  <div className="text-xs lg:text-sm tv:text-base text-yellow-300 mt-1 line-clamp-2">
+                  <div className="text-[10px] tv:text-xs text-yellow-300 mt-0.5 line-clamp-2">
                     {torrent.status_reason}
                   </div>
                 )}
@@ -291,19 +282,19 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
             </div>
           )}
 
-          {/* Badge privé si applicable */}
+          {/* Badge privé - compact sur TV */}
           {torrent.is_private && (
-            <div className="absolute bottom-2 left-2 lg:bottom-3 lg:left-3 tv:bottom-4 tv:left-4 z-20">
-              <div className="bg-orange-600/90 backdrop-blur-sm rounded-lg px-2 py-1 tv:px-3 tv:py-1.5 text-xs tv:text-sm text-white shadow-lg flex items-center gap-1">
+            <div className="absolute bottom-1.5 left-1.5 lg:bottom-2 lg:left-2 tv:bottom-2 tv:left-2 z-20">
+              <div className="bg-orange-600/90 backdrop-blur-sm rounded px-1.5 py-0.5 tv:px-2 tv:py-1 text-[10px] tv:text-xs text-white shadow-lg flex items-center gap-1">
                 <span>🔒</span>
                 <span className="font-medium">{t('downloads.private')}</span>
               </div>
             </div>
           )}
         </div>
-        {/* Titre nettoyé sous le poster */}
+        {/* Titre sous le poster - compact sur TV */}
         {displayTitle && (
-          <p className="mt-2 text-xs sm:text-sm tv:text-base text-gray-300 line-clamp-2 px-0.5" title={displayTitle}>
+          <p className="mt-1.5 tv:mt-2 text-[10px] sm:text-xs tv:text-xs text-gray-300 line-clamp-2 px-0.5" title={displayTitle}>
             {displayTitle}
           </p>
         )}

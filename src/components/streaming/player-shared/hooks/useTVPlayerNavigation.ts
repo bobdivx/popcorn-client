@@ -143,8 +143,13 @@ export function useTVPlayerNavigation({
           break;
         case 'ArrowDown':
           e.preventDefault();
-          if (showControls && focusedOnProgress) setFocusedOnProgress(false);
-          else onVolumeChange('down');
+          if (showControls && focusedOnProgress) {
+            setFocusedOnProgress(false);
+            setFocusedControlIndex(hasBack ? 1 : 0);
+          } else if (showControls && !focusedOnProgress && focusedControlIndex === 0) {
+            setFocusedOnProgress(true);
+            progressBarRef?.current?.focus();
+          } else onVolumeChange('down');
           break;
         case 'm':
         case 'M':
@@ -164,11 +169,12 @@ export function useTVPlayerNavigation({
       const key = e.key || (kc === 37 ? 'ArrowLeft' : kc === 39 ? 'ArrowRight' : '');
       if (key === 'ArrowLeft' || key === 'ArrowRight' || kc === 412 || kc === 417) recordKeyUp();
     };
-    window.addEventListener('keydown', handleKeyDown);
+    // Capture phase : intercepter les flèches avant que le navigateur ne déplace le focus (ex. depuis la barre de progression).
+    window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('webosback', handleWebOSBack);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('webosback', handleWebOSBack);
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
@@ -181,6 +187,14 @@ export function useTVPlayerNavigation({
   useEffect(() => {
     if (isTV) setShowControls(true);
   }, [isTV, setShowControls]);
+
+  // Sur TV : mettre le focus sur la barre de progression quand les contrôles s'affichent (au montage ou réaffichage).
+  useEffect(() => {
+    if (!isTV || !showControls) return;
+    setFocusedOnProgress(true);
+    const id = setTimeout(() => progressBarRef?.current?.focus(), 100);
+    return () => clearTimeout(id);
+  }, [isTV, showControls]);
 
   useEffect(() => {
     if (!isTV || !showControls) return;

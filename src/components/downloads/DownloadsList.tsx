@@ -758,7 +758,7 @@ export default function DownloadsList() {
 
   if (loading && torrents.length === 0) {
     return (
-      <div className="min-h-screen bg-black text-white">
+      <div className="min-h-screen bg-page text-white">
         <div className="flex flex-col items-center justify-center py-20 tv:py-32">
           <HLSLoadingSpinner size="lg" text={t('downloads.loadingDownloads')} />
         </div>
@@ -768,7 +768,7 @@ export default function DownloadsList() {
 
   if (error && torrents.length === 0) {
     return (
-      <div className="min-h-screen bg-black text-white">
+      <div className="min-h-screen bg-page text-white">
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 tv:px-16 py-12 tv:py-16">
           <div className="bg-primary-900/20 border border-primary-500 rounded-lg p-6 tv:p-8 max-w-2xl mx-auto glass-panel">
             <p className="text-primary-300 text-base tv:text-lg mb-4">{error}</p>
@@ -786,31 +786,31 @@ export default function DownloadsList() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white w-full">
-      {/* Section Hero moderne */}
-      <div className="relative w-full min-h-[250px] tv:min-h-[300px] mb-8 overflow-hidden bg-gradient-to-b from-primary-900/20 via-black to-black">
+    <div className="min-h-screen bg-page text-white w-full">
+      {/* Section Hero - plus compacte sur TV pour laisser la place aux cartes */}
+      <div className="relative w-full min-h-[200px] sm:min-h-[250px] tv:min-h-[180px] mb-6 tv:mb-8 overflow-hidden bg-gradient-to-b from-primary-900/20 via-black to-black">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute inset-0" style={{
             backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(124, 58, 237, 0.3) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(124, 58, 237, 0.2) 0%, transparent 50%)'
           }}></div>
         </div>
         
-        <div className="relative z-10 h-full flex flex-col justify-center px-4 sm:px-6 lg:px-16 tv:px-24 py-8 tv:py-12">
-          <div className="max-w-6xl tv:max-w-7xl mx-auto w-full">
-            {/* Titre */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl tv:text-8xl font-bold text-white mb-6 tv:mb-8 drop-shadow-2xl">
+        <div className="relative z-10 h-full flex flex-col justify-center px-4 sm:px-6 lg:px-16 tv:px-20 py-6 tv:py-8">
+          <div className="max-w-6xl tv:max-w-[1800px] mx-auto w-full">
+            {/* Titre - taille raisonnable sur TV */}
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl tv:text-5xl font-bold text-white mb-4 tv:mb-5 drop-shadow-2xl">
               {t('downloads.title')}
             </h1>
 
-            {/* Barre d'actions : regroupée, lisible et navigable à la télécommande */}
+            {/* Barre d'actions - plus compacte sur TV */}
             <div
               ref={toolbarRef}
               role="toolbar"
               aria-label={t('downloads.actions') ?? 'Actions'}
-              className="flex flex-wrap items-stretch gap-2 tv:gap-3 tv:flex-nowrap rounded-2xl tv:rounded-3xl bg-gray-800/50 border border-gray-700/60 p-3 tv:p-4 shadow-inner"
+              className="flex flex-wrap items-stretch gap-2 tv:gap-2 tv:flex-nowrap rounded-xl tv:rounded-2xl bg-gray-800/50 border border-gray-700/60 p-2.5 tv:p-3 shadow-inner"
             >
               {/* Groupe Ajouter */}
-              <div className="flex flex-wrap tv:flex-nowrap gap-2 tv:gap-3 items-stretch">
+              <div className="flex flex-wrap tv:flex-nowrap gap-2 items-stretch">
                 <label className="cursor-pointer flex">
                   <input
                     type="file"
@@ -822,11 +822,11 @@ export default function DownloadsList() {
                   />
                   <span
                     className={`
-                      inline-flex items-center gap-2 px-4 py-2.5 tv:px-6 tv:py-4 rounded-xl tv:rounded-2xl
+                      inline-flex items-center gap-1.5 tv:gap-2 px-3 py-2 tv:px-4 tv:py-2.5 rounded-lg tv:rounded-xl
                       bg-blue-600 hover:bg-blue-500 active:bg-blue-700
                       disabled:bg-gray-700 disabled:opacity-60 disabled:cursor-not-allowed
-                      text-white font-medium text-sm tv:text-base
-                      min-h-[44px] tv:min-h-[56px]
+                      text-white font-medium text-xs tv:text-sm
+                      min-h-[40px] tv:min-h-[44px]
                       transition-colors duration-200
                       focus-within:outline-none focus-within:ring-2 focus-within:ring-white focus-within:ring-offset-2 focus-within:ring-offset-gray-900
                       outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900
@@ -834,7 +834,7 @@ export default function DownloadsList() {
                     `}
                     tabIndex={0}
                   >
-                    <FileText className="w-4 h-4 tv:w-5 tv:h-5 shrink-0" size={20} />
+                    <FileText className="w-3.5 h-3.5 tv:w-4 tv:h-4 shrink-0" size={18} />
                     <span>{addingTorrent ? t('downloads.adding') : t('downloads.addTorrentFile')}</span>
                   </span>
                 </label>
@@ -843,38 +843,38 @@ export default function DownloadsList() {
                   onClick={() => setShowAddMagnetModal(true)}
                   disabled={addingTorrent}
                   tabIndex={0}
-                  className="inline-flex items-center gap-2 px-4 py-2.5 tv:px-6 tv:py-4 rounded-xl tv:rounded-2xl bg-purple-600 hover:bg-purple-500 active:bg-purple-700 disabled:bg-gray-700 disabled:opacity-60 text-white font-medium text-sm tv:text-base min-h-[44px] tv:min-h-[56px] transition-colors duration-200 outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-900"
+                  className="inline-flex items-center gap-1.5 tv:gap-2 px-3 py-2 tv:px-4 tv:py-2.5 rounded-lg tv:rounded-xl bg-purple-600 hover:bg-purple-500 active:bg-purple-700 disabled:bg-gray-700 disabled:opacity-60 text-white font-medium text-xs tv:text-sm min-h-[40px] tv:min-h-[44px] transition-colors duration-200 outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-900"
                 >
-                  <Link2 className="w-4 h-4 tv:w-5 tv:h-5 shrink-0" size={20} />
+                  <Link2 className="w-3.5 h-3.5 tv:w-4 tv:h-4 shrink-0" size={18} />
                   <span>{t('downloads.addMagnetLink')}</span>
                 </button>
               </div>
 
-              <div className="hidden tv:block w-px bg-gray-600/80 self-stretch min-h-[32px]" aria-hidden="true" />
+              <div className="hidden tv:block w-px bg-gray-600/80 self-stretch min-h-[28px]" aria-hidden="true" />
 
               {/* Logs client */}
               <button
                 type="button"
                 onClick={() => setShowSessionLogsModal(true)}
                 tabIndex={0}
-                className="inline-flex items-center gap-2 px-4 py-2.5 tv:px-6 tv:py-4 rounded-xl tv:rounded-2xl bg-gray-600 hover:bg-gray-500 active:bg-gray-700 text-white font-medium text-sm tv:text-base min-h-[44px] tv:min-h-[56px] transition-colors duration-200 outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-900"
+                className="inline-flex items-center gap-1.5 tv:gap-2 px-3 py-2 tv:px-4 tv:py-2.5 rounded-lg tv:rounded-xl bg-gray-600 hover:bg-gray-500 active:bg-gray-700 text-white font-medium text-xs tv:text-sm min-h-[40px] tv:min-h-[44px] transition-colors duration-200 outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-900"
               >
-                <LogsIcon className="w-4 h-4 tv:w-5 tv:h-5 shrink-0" size={20} />
+                <LogsIcon className="w-3.5 h-3.5 tv:w-4 tv:h-4 shrink-0" size={18} />
                 <span>{t('downloads.clientLogs') ?? 'Logs client'}</span>
               </button>
 
               {torrents.length > 0 && (
                 <>
-                  <div className="hidden tv:block w-px bg-gray-600/80 self-stretch min-h-[32px]" aria-hidden="true" />
-                  <div className="flex flex-wrap tv:flex-nowrap gap-2 tv:gap-3 items-stretch">
+                  <div className="hidden tv:block w-px bg-gray-600/80 self-stretch min-h-[28px]" aria-hidden="true" />
+                  <div className="flex flex-wrap tv:flex-nowrap gap-2 items-stretch">
                     <button
                       type="button"
                       onClick={handlePauseAll}
                       disabled={torrents.every(t => t.state === 'paused' || t.state === 'completed' || t.state === 'seeding')}
                       tabIndex={0}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 tv:px-6 tv:py-4 rounded-xl tv:rounded-2xl bg-amber-600 hover:bg-amber-500 active:bg-amber-700 disabled:bg-gray-700 disabled:opacity-60 text-white font-medium text-sm tv:text-base min-h-[44px] tv:min-h-[56px] transition-colors duration-200 outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-900"
+                      className="inline-flex items-center gap-1.5 tv:gap-2 px-3 py-2 tv:px-4 tv:py-2.5 rounded-lg tv:rounded-xl bg-amber-600 hover:bg-amber-500 active:bg-amber-700 disabled:bg-gray-700 disabled:opacity-60 text-white font-medium text-xs tv:text-sm min-h-[40px] tv:min-h-[44px] transition-colors duration-200 outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-900"
                     >
-                      <Pause className="w-4 h-4 tv:w-5 tv:h-5 shrink-0" size={20} />
+                      <Pause className="w-3.5 h-3.5 tv:w-4 tv:h-4 shrink-0" size={18} />
                       <span>{t('downloads.pauseAll')}</span>
                     </button>
                     <button
@@ -882,18 +882,18 @@ export default function DownloadsList() {
                       onClick={handleResumeAll}
                       disabled={torrents.every(t => t.state !== 'paused')}
                       tabIndex={0}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 tv:px-6 tv:py-4 rounded-xl tv:rounded-2xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:bg-gray-700 disabled:opacity-60 text-white font-medium text-sm tv:text-base min-h-[44px] tv:min-h-[56px] transition-colors duration-200 outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-900"
+                      className="inline-flex items-center gap-1.5 tv:gap-2 px-3 py-2 tv:px-4 tv:py-2.5 rounded-lg tv:rounded-xl bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 disabled:bg-gray-700 disabled:opacity-60 text-white font-medium text-xs tv:text-sm min-h-[40px] tv:min-h-[44px] transition-colors duration-200 outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-900"
                     >
-                      <Play className="w-4 h-4 tv:w-5 tv:h-5 shrink-0" size={20} />
+                      <Play className="w-3.5 h-3.5 tv:w-4 tv:h-4 shrink-0" size={18} />
                       <span>{t('downloads.resumeAll')}</span>
                     </button>
                     <button
                       type="button"
                       onClick={handleRemoveAll}
                       tabIndex={0}
-                      className="inline-flex items-center gap-2 px-4 py-2.5 tv:px-6 tv:py-4 rounded-xl tv:rounded-2xl bg-primary hover:bg-primary-600 active:bg-primary-800 text-white font-medium text-sm tv:text-base min-h-[44px] tv:min-h-[56px] transition-colors duration-200 outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-900"
+                      className="inline-flex items-center gap-1.5 tv:gap-2 px-3 py-2 tv:px-4 tv:py-2.5 rounded-lg tv:rounded-xl bg-primary hover:bg-primary-600 active:bg-primary-800 text-white font-medium text-xs tv:text-sm min-h-[40px] tv:min-h-[44px] transition-colors duration-200 outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-900"
                     >
-                      <Trash2 className="w-4 h-4 tv:w-5 tv:h-5 shrink-0" size={20} />
+                      <Trash2 className="w-3.5 h-3.5 tv:w-4 tv:h-4 shrink-0" size={18} />
                       <span>{t('downloads.removeAll')}</span>
                     </button>
                   </div>
@@ -901,9 +901,9 @@ export default function DownloadsList() {
               )}
             </div>
 
-            {/* Stats session librqbit (optionnel) */}
+            {/* Stats session librqbit - plus compact sur TV */}
             {sessionStats && (
-              <div className="mt-4 tv:mt-6 flex flex-wrap items-center gap-4 tv:gap-6 text-sm tv:text-base text-gray-300">
+              <div className="mt-3 tv:mt-4 flex flex-wrap items-center gap-3 tv:gap-4 text-xs tv:text-sm text-gray-300">
                 {(sessionStats.download_speed as { human_readable?: string } | undefined)?.human_readable != null && (
                   <span className="flex items-center gap-1.5">
                     <Download className="w-4 h-4 text-blue-400" size={16} />
@@ -927,11 +927,11 @@ export default function DownloadsList() {
         </div>
       </div>
 
-      {/* Contenu principal */}
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 tv:px-16 pb-8 tv:pb-12">
+      {/* Contenu principal - grille plus dense sur TV */}
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 tv:px-12 pb-8 tv:pb-10">
         {/* Message d'erreur */}
         {error && !showAddMagnetModal && (
-          <div className="bg-yellow-900/20 border border-yellow-500 rounded-lg p-4 tv:p-6 mb-6">
+          <div className="bg-yellow-900/20 border border-yellow-500 rounded-lg p-4 tv:p-5 mb-4 tv:mb-6">
             <div className="flex items-start justify-between">
               <p className="text-yellow-300 text-sm tv:text-base flex-1">{error}</p>
               <button
@@ -948,27 +948,27 @@ export default function DownloadsList() {
 
         {/* État vide */}
         {torrents.length === 0 && !loading && (
-          <div className="flex flex-col items-center justify-center py-20 tv:py-32 px-4">
-            <div className="text-center max-w-2xl tv:max-w-3xl">
-              <div className="text-6xl tv:text-8xl mb-4 tv:mb-6">📥</div>
-              <h2 className="text-2xl tv:text-3xl font-bold text-white mb-4 tv:mb-6">
+          <div className="flex flex-col items-center justify-center py-16 tv:py-24 px-4">
+            <div className="text-center max-w-2xl">
+              <div className="text-5xl tv:text-6xl mb-3 tv:mb-4">📥</div>
+              <h2 className="text-xl tv:text-2xl font-bold text-white mb-3 tv:mb-4">
                 {t('downloads.noActiveDownloads')}
               </h2>
-              <p className="text-gray-400 text-base tv:text-lg mb-6 tv:mb-8">
+              <p className="text-gray-400 text-sm tv:text-base mb-4 tv:mb-6">
                 {t('downloads.torrentsWillAppear')}
               </p>
             </div>
           </div>
         )}
 
-        {/* Liste des téléchargements */}
+        {/* Liste des téléchargements - plus de colonnes sur TV pour cartes plus petites */}
         {torrents.length > 0 && (
           <>
-            <div className="text-sm tv:text-base text-gray-400 mb-4 tv:mb-6">
+            <div className="text-xs tv:text-sm text-gray-400 mb-3 tv:mb-4">
               {t('downloads.activeDownloads', { count: torrents.length, plural: torrents.length > 1 ? 's' : '' })}
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 tv:grid-cols-4 gap-3 md:gap-4 tv:gap-5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 tv:grid-cols-6 gap-2 sm:gap-3 md:gap-4 tv:gap-4">
               {torrents.map((torrent) => {
                 const key = torrent.info_hash.toLowerCase();
                 const images = imageMap[key];

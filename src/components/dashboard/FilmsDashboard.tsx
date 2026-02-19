@@ -129,7 +129,7 @@ export default function FilmsDashboard() {
     window.location.href = `/player/${item.id}`;
   };
 
-  const switchBarClasses = 'relative z-30 shrink-0 w-full px-4 py-3 sm:px-6 sm:py-3 lg:px-8 bg-black flex items-center justify-center min-[640px]:justify-start';
+  const switchBarClasses = 'relative z-30 shrink-0 w-full px-4 py-3 sm:px-6 sm:py-3 lg:px-8 bg-page flex items-center justify-center min-[640px]:justify-start';
   const showSyncBar = !syncLoading && isSyncing;
 
   const renderViewToggle = () => (
@@ -169,7 +169,7 @@ export default function FilmsDashboard() {
 
   if (viewMode === 'library') {
     return (
-      <div className="min-h-screen bg-black text-white flex flex-col">
+      <div className="min-h-screen bg-page text-white flex flex-col">
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {showSyncBar && <SyncProgress compact externalStatus={syncStatus} />}
         <div className={switchBarClasses}>{renderViewToggle()}</div>
@@ -288,7 +288,7 @@ export default function FilmsDashboard() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-black">
+      <div className="flex justify-center items-center min-h-screen bg-page">
         <HLSLoadingSpinner size="lg" />
       </div>
     );
@@ -296,7 +296,7 @@ export default function FilmsDashboard() {
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white px-4">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-page text-white px-4">
         <div className="alert alert-error max-w-2xl">
           <span>{error}</span>
         </div>
@@ -348,7 +348,7 @@ export default function FilmsDashboard() {
   });
   
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col">
+    <div className="min-h-screen bg-page text-white flex flex-col">
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
       {/* Barre de progression compacte en haut quand sync en cours */}
       {showSyncBar && <SyncProgress compact externalStatus={syncStatus} />}

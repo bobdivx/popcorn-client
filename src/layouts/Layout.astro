@@ -47,7 +47,7 @@ const isWebOS = import.meta.env.WEBOS === 'true';
       </>
     )}
   </head>
-  <body class="min-h-screen bg-[#121212] text-white flex flex-col overflow-x-hidden">
+  <body class="min-h-screen bg-page text-white flex flex-col overflow-x-hidden">
     <script is:inline>
       // Placeholder: les handlers seront enregistres apres que le DOM du fallback existe
       window._popcornShowError = function(msg) {
@@ -76,7 +76,7 @@ const isWebOS = import.meta.env.WEBOS === 'true';
       })();
     </script>
     <!-- Indicateur de chargement immédiat (même style que HLSLoadingSpinner / chargement des pages) -->
-    <div id="popcorn-loading-fallback" class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#121212]" aria-hidden="true">
+    <div id="popcorn-loading-fallback" class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-page" aria-hidden="true">
       <div class="relative w-32 h-32 mb-6">
         <div class="absolute inset-0 rounded-full border-4 border-primary/20"></div>
         <div class="absolute inset-0 rounded-full border-4 border-primary border-t-transparent" style="animation: hls-spin 1s linear infinite"></div>

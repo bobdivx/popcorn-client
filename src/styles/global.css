@@ -21,6 +21,8 @@
 /* Variables CSS pour thème Glassmorphic */
 :root {
   --bg-primary: #121212; /* Anthracite */
+  /* Fond unifié de toutes les pages (identique à /settings) */
+  --page-bg: #12141a;
   --bg-glass: rgba(255, 255, 255, 0.05); /* Verre dépoli */
   --bg-glass-hover: rgba(255, 255, 255, 0.1);
   --bg-glass-active: rgba(255, 255, 255, 0.15);
@@ -582,6 +584,11 @@
 
 /* Classes utilitaires globales pour Glassmorphic */
 @layer utilities {
+  /* Fond de page unifié (settings, downloads, dashboard, etc.) */
+  .bg-page {
+    background-color: var(--page-bg);
+  }
+
   /* Classes de couleurs principales - remplacent bg-violet */
   .bg-primary {
     @apply bg-primary-600;
