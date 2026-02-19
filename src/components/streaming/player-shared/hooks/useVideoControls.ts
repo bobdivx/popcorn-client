@@ -43,6 +43,15 @@ export function useVideoControls({
     const video = videoRef.current;
     if (!video || !hlsLoaded) return;
 
+    // Synchroniser l'état play/pause avec la vidéo (évite un bouton play fixe si la vidéo est déjà en lecture ou en pause)
+    setIsPlaying(!video.paused);
+
+    // Si la vidéo est déjà en lecture (ex. autoplay, reprise), programmer le masquage des contrôles après quelques secondes (TV et desktop)
+    if (!video.paused && playerConfig.autoHideControls) {
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+      controlsTimeoutRef.current = window.setTimeout(() => setShowControls(false), playerConfig.controlsTimeout);
+    }
+
     const handleMouseMove = () => {
       setShowControls(true);
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);

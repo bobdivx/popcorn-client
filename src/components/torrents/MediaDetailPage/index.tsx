@@ -207,6 +207,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   const [verificationTorrentName, setVerificationTorrentName] = useState<string | null>(null);
   const [showVerificationPanel, setShowVerificationPanel] = useState(false);
   const [showSourceModal, setShowSourceModal] = useState(false);
+  /** Incrémenté à la fermeture du lecteur pour rafraîchir stats et disponibilité (torrent supprimé ou complété après stream). */
+  const [refreshAfterClose, setRefreshAfterClose] = useState(0);
   const sourceModalFirstButtonRef = useRef<HTMLButtonElement>(null);
   const mediaDetailActionsRef = useRef<{ handleDownload: (variant?: MediaDetailPageProps['torrent']) => void } | null>(null);
   const backLinkRef = useRef<HTMLAnchorElement>(null);
@@ -328,6 +330,12 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     addDebugLog,
   });
 
+  /** Ferme le lecteur puis déclenche un rafraîchissement des stats et de la disponibilité (carte à jour après stream). */
+  const handleClosePlayerAndRefresh = useCallback(async () => {
+    await handleClosePlayer();
+    setRefreshAfterClose((r) => r + 1);
+  }, [handleClosePlayer]);
+
   const isDownloadComplete = !!torrentStats && (
     torrentStats.state === 'completed' ||
     torrentStats.state === 'seeding' ||
@@ -436,6 +444,9 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
               if (completed) {
                 setIsAvailableLocally(true);
               }
+            } else {
+              setTorrentStats(null);
+              setIsAvailableLocally(false);
             }
           } catch (_) {
             // listTorrents en échec (ex. client non dispo)
@@ -571,7 +582,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
 
       checkAvailability();
     }
-  }, [hasInfoHash, activeTorrent.infoHash, activeTorrent.tmdbId, activeTorrent.tmdbType, activeTorrent.clientState, activeTorrent.clientProgress, isExternal]);
+  }, [hasInfoHash, activeTorrent.infoHash, activeTorrent.tmdbId, activeTorrent.tmdbType, activeTorrent.clientState, activeTorrent.clientProgress, isExternal, refreshAfterClose]);
 
   // Vérifier si un téléchargement est en cours au montage (torrent actif)
   useEffect(() => {
@@ -1016,7 +1027,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         isSeries={!!(seriesEpisodes?.seasons?.length)}
         nextEpisodeInfo={nextEpisodeInfo}
         onPlayNextEpisode={onPlayNextEpisode}
-        onClose={handleClosePlayer}
+        onClose={handleClosePlayerAndRefresh}
         visible={true}
         wrapperRef={(el) => { videoWrapperRef.current = el; }}
         quality={displayTorrent.quality}
@@ -1053,7 +1064,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           isSeries={!!(seriesEpisodes?.seasons?.length)}
           nextEpisodeInfo={nextEpisodeInfo}
           onPlayNextEpisode={onPlayNextEpisode}
-          onClose={handleClosePlayer}
+          onClose={handleClosePlayerAndRefresh}
           visible={true}
           wrapperRef={(el) => { videoWrapperRef.current = el; }}
           quality={displayTorrent.quality}
@@ -1070,7 +1081,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           streamingTorrentToken={TokenManager.getCloudAccessToken()}
         />
       )}
-    <div className="relative bg-black text-white">
+    <div className="relative bg-page text-white">
       {/* Hero section : fond = bande-annonce (vidéo) ou image selon état */}
       <div className="fixed top-0 left-0 right-0 bottom-0 z-0 overflow-hidden">
         {isPlayingTrailer && trailerKey ? (
