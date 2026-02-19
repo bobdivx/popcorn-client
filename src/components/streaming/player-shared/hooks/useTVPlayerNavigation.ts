@@ -109,46 +109,37 @@ export function useTVPlayerNavigation({
         case 'ArrowLeft': {
           e.preventDefault();
           const stepLeft = getSeekStep('left');
-          if (focusedOnProgress) {
-            recordKeyDown('left');
-            onSeek('left', stepLeft);
-          } else if (showControls && focusedControlIndex > 0) {
-            setFocusedControlIndex(focusedControlIndex - 1);
-          } else {
-            recordKeyDown('left');
-            onSeek('left', stepLeft);
-          }
+          recordKeyDown('left');
+          onSeek('left', stepLeft);
           break;
         }
         case 'ArrowRight': {
           e.preventDefault();
           const stepRight = getSeekStep('right');
-          if (focusedOnProgress) {
-            recordKeyDown('right');
-            onSeek('right', stepRight);
-          } else if (showControls && focusedControlIndex < controls.length - 1) {
-            setFocusedControlIndex(focusedControlIndex + 1);
-          } else {
-            recordKeyDown('right');
-            onSeek('right', stepRight);
-          }
+          recordKeyDown('right');
+          onSeek('right', stepRight);
           break;
         }
         case 'ArrowUp':
           e.preventDefault();
           if (showControls && !focusedOnProgress) {
-            setFocusedOnProgress(true);
-            progressBarRef?.current?.focus();
+            if (focusedControlIndex === 0) {
+              setFocusedOnProgress(true);
+              progressBarRef?.current?.focus();
+            } else {
+              setFocusedControlIndex(focusedControlIndex - 1);
+            }
           } else onVolumeChange('up');
           break;
         case 'ArrowDown':
           e.preventDefault();
           if (showControls && focusedOnProgress) {
             setFocusedOnProgress(false);
-            setFocusedControlIndex(hasBack ? 1 : 0);
-          } else if (showControls && !focusedOnProgress && focusedControlIndex === 0) {
-            setFocusedOnProgress(true);
-            progressBarRef?.current?.focus();
+            setFocusedControlIndex(0);
+          } else if (showControls && !focusedOnProgress && focusedControlIndex < controls.length - 1) {
+            setFocusedControlIndex(focusedControlIndex + 1);
+          } else if (showControls && !focusedOnProgress && focusedControlIndex === controls.length - 1) {
+            onVolumeChange('down');
           } else onVolumeChange('down');
           break;
         case 'm':
