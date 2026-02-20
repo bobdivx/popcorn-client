@@ -54,41 +54,44 @@ export default function DiscoverSlidersManager() {
   }
 
   return (
-    <div class="space-y-6">
-      <h1 class="text-2xl font-bold text-white">{t('discover.sliders')}</h1>
+    <div class="space-y-6 min-w-0">
+      <h1 class="text-lg sm:text-2xl font-bold text-white truncate">{t('discover.sliders')}</h1>
 
-      <div class="glass-panel rounded-xl p-4 sm:p-6 text-gray-300 text-sm sm:text-base leading-relaxed">
-        <p>{t('discover.slidersExplanation')}</p>
+      <div class="glass-panel rounded-xl p-4 sm:p-6 text-gray-300 text-sm sm:text-base leading-relaxed min-w-0 overflow-hidden">
+        <p class="break-words">{t('discover.slidersExplanation')}</p>
       </div>
 
-      <button onClick={handleInitialize} class="btn btn-primary btn-sm">
-        <RefreshCw class="w-4 h-4" />
-        {t('discover.initializeDefaults')}
+      <button
+        onClick={handleInitialize}
+        class="btn btn-primary btn-sm w-full sm:w-auto min-w-0 inline-flex items-center justify-center gap-2"
+      >
+        <RefreshCw class="w-4 h-4 flex-shrink-0" />
+        <span class="truncate">{t('discover.initializeDefaults')}</span>
       </button>
 
       {error && (
-        <div class="alert alert-error">
-          <span>{error}</span>
-          <button class="btn btn-sm btn-ghost" onClick={loadSliders}>
+        <div class="alert alert-error flex flex-col sm:flex-row sm:items-center gap-2 min-w-0 overflow-hidden">
+          <span class="break-words flex-1 min-w-0">{error}</span>
+          <button class="btn btn-sm btn-ghost flex-shrink-0" onClick={loadSliders}>
             {t('common.retry')}
           </button>
         </div>
       )}
 
       {sliders.length === 0 && (
-        <p class="text-gray-400">{t('discover.noSliders')}</p>
+        <p class="text-gray-400 break-words">{t('discover.noSliders')}</p>
       )}
 
-      <div class="space-y-4">
+      <div class="space-y-4 min-w-0">
         {sliders.map((s) => (
           <div
             key={s.id}
-            class="glass-panel rounded-xl p-4 sm:p-6 flex items-center gap-4"
+            class="glass-panel rounded-xl p-4 sm:p-6 flex items-center gap-4 min-w-0 overflow-hidden"
           >
             <Sliders class="w-5 h-5 text-primary-400 flex-shrink-0" />
-            <div class="flex-1 min-w-0">
+            <div class="flex-1 min-w-0 overflow-hidden">
               <p class="font-medium text-white truncate">{s.title}</p>
-              <p class="text-sm text-gray-400">
+              <p class="text-sm text-gray-400 truncate">
                 {s.slider_type} · Position {s.position} · {s.enabled ? t('discover.enabled') : t('discover.disabled')}
               </p>
             </div>

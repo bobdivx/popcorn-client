@@ -54,35 +54,35 @@ export default function BlacklistManager() {
   }
 
   return (
-    <div class="space-y-6">
-      <h1 class="text-2xl font-bold text-white">{t('blacklist.title')}</h1>
+    <div class="space-y-6 min-w-0">
+      <h1 class="text-lg sm:text-2xl font-bold text-white truncate">{t('blacklist.title')}</h1>
 
-      <div class="glass-panel rounded-xl p-4 sm:p-6 text-gray-300 text-sm sm:text-base leading-relaxed">
-        <p>{t('blacklist.explanation')}</p>
+      <div class="glass-panel rounded-xl p-4 sm:p-6 text-gray-300 text-sm sm:text-base leading-relaxed min-w-0 overflow-hidden">
+        <p class="break-words">{t('blacklist.explanation')}</p>
       </div>
 
       {error && (
-        <div class="alert alert-error">
-          <span>{error}</span>
-          <button class="btn btn-sm btn-ghost" onClick={loadItems}>
+        <div class="alert alert-error flex flex-col sm:flex-row sm:items-center gap-2 min-w-0 overflow-hidden">
+          <span class="break-words flex-1 min-w-0">{error}</span>
+          <button class="btn btn-sm btn-ghost flex-shrink-0" onClick={loadItems}>
             {t('common.retry')}
           </button>
         </div>
       )}
 
       {items.length === 0 && (
-        <p class="text-gray-400">{t('blacklist.noItems')}</p>
+        <p class="text-gray-400 break-words">{t('blacklist.noItems')}</p>
       )}
 
-      <div class="space-y-4">
+      <div class="space-y-4 min-w-0">
         {items.map((item) => (
           <div
             key={item.id}
-            class="glass-panel rounded-xl p-4 sm:p-6 flex items-center justify-between gap-4"
+            class="glass-panel rounded-xl p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0 overflow-hidden"
           >
-            <div class="flex items-center gap-3 flex-1 min-w-0">
+            <div class="flex items-center gap-3 flex-1 min-w-0 overflow-hidden">
               <Ban class="w-5 h-5 text-red-400 flex-shrink-0" />
-              <div class="min-w-0">
+              <div class="min-w-0 overflow-hidden">
                 <p class="font-medium text-white truncate">
                   TMDB #{item.tmdb_id} ({item.media_type})
                 </p>
@@ -93,8 +93,9 @@ export default function BlacklistManager() {
             </div>
             <button
               onClick={() => handleRemove(item.tmdb_id, item.media_type)}
-              class="btn btn-error btn-sm"
+              class="btn btn-error btn-sm flex-shrink-0 min-w-[44px]"
               title={t('blacklist.removeFromBlacklist')}
+              aria-label={t('blacklist.removeFromBlacklist')}
             >
               <Trash2 class="w-4 h-4" />
             </button>

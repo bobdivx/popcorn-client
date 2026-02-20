@@ -69,7 +69,7 @@ export function FocusableCard({
     };
   }, [onClick, href]);
 
-  const baseClasses = `card-tv focus-tv-glow transition-all duration-300 ${className}`;
+  const baseClasses = `card-tv focus-tv-glow ds-focus-glow ds-active-glow transition-all duration-300 ${className}`;
   const commonProps: any = {
     ref: cardRef as any,
     className: baseClasses,

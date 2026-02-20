@@ -52,9 +52,13 @@ export default function PermissionGuard({ permission, children }: PermissionGuar
     return () => clearTimeout(timeoutId);
   }, [permission]);
 
-  // Afficher un loader pendant la vérification initiale
+  // Afficher un loader pendant la vérification initiale (évite une page vide)
   if (isChecking) {
-    return null; // Ou un loader si nécessaire
+    return (
+      <div className="flex items-center justify-center min-h-[120px]" aria-busy="true">
+        <span className="loading loading-spinner loading-md text-[var(--ds-accent-violet)]" />
+      </div>
+    );
   }
 
   if (!hasAccess) {

@@ -61,7 +61,7 @@ export default function SubMenuPanel({ items, visibleItems, onParentBack }: SubM
             onClick={handleParentBack}
             data-focusable
             tabIndex={0}
-            className="flex items-center gap-2 text-gray-400 hover:text-white mb-4 text-sm font-medium tv:min-h-[48px] tv:py-2"
+            className="flex items-center gap-2 ds-text-secondary hover:text-[var(--ds-text-primary)] mb-4 text-sm font-medium tv:min-h-[48px] tv:py-2 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] rounded-lg"
           >
             <ChevronLeft className="w-4 h-4" />
             {t('common.back')}
@@ -86,7 +86,7 @@ export default function SubMenuPanel({ items, visibleItems, onParentBack }: SubM
           onClick={onParentBack}
           data-focusable
           tabIndex={0}
-          className="flex items-center gap-2 text-gray-400 hover:text-white mb-4 text-sm font-medium tv:min-h-[48px] tv:py-2"
+          className="flex items-center gap-2 ds-text-secondary hover:text-[var(--ds-text-primary)] mb-4 text-sm font-medium tv:min-h-[48px] tv:py-2 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] rounded-lg"
         >
           <ChevronLeft className="w-4 h-4" />
           {t('common.back')}
@@ -100,6 +100,7 @@ export default function SubMenuPanel({ items, visibleItems, onParentBack }: SubM
           const externalProps = item.isExternal
             ? { target: '_blank' as const, rel: 'noopener noreferrer' }
             : {};
+          const itemClass = "settings-content-item group flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 rounded-[var(--ds-radius-lg)] text-[var(--ds-text-primary)] transition-all duration-200 hover:bg-[var(--ds-surface-elevated)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] min-h-[52px] sm:min-h-[56px] tv:min-h-[64px] min-w-0 border border-transparent";
 
           if (isLink) {
             return (
@@ -108,19 +109,19 @@ export default function SubMenuPanel({ items, visibleItems, onParentBack }: SubM
                   href={href}
                   {...externalProps}
                   data-focusable
-                  className="settings-content-item group flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 rounded-xl text-white transition-all duration-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#1a1c20] focus:bg-white/10 min-h-[52px] sm:min-h-[56px] tv:min-h-[64px] min-w-0"
+                  className={itemClass}
                   tabIndex={0}
                 >
-                  <div className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-white/15 transition-colors">
-                    <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-300 group-hover:text-white" />
+                  <div className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[var(--ds-accent-violet-muted)] flex items-center justify-center text-[var(--ds-accent-violet)] group-hover:opacity-90 transition-opacity">
+                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
                   <div className="flex-1 min-w-0 overflow-hidden">
-                    <span className="block font-medium text-white truncate text-sm sm:text-base">{item.title ?? t(item.titleKey)}</span>
-                    <span className="block text-xs sm:text-sm text-gray-400 truncate mt-0.5">
+                    <span className="block font-medium text-[var(--ds-text-primary)] truncate text-sm sm:text-base">{item.title ?? t(item.titleKey)}</span>
+                    <span className="block text-xs sm:text-sm ds-text-secondary truncate mt-0.5">
                       {item.description ?? t(item.descriptionKey)}
                     </span>
                   </div>
-                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 flex-shrink-0 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--ds-text-tertiary)] flex-shrink-0 group-hover:translate-x-1 transition-transform" />
                 </a>
               </li>
             );
@@ -132,19 +133,19 @@ export default function SubMenuPanel({ items, visibleItems, onParentBack }: SubM
                 type="button"
                 onClick={() => setSelectedId(item.id)}
                 data-focusable
-                className="settings-content-item group flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 rounded-xl text-white w-full text-left transition-all duration-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#1a1c20] focus:bg-white/10 min-h-[52px] sm:min-h-[56px] tv:min-h-[64px] min-w-0"
+                className={itemClass + " w-full text-left"}
                 tabIndex={0}
               >
-                <div className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-white/15 transition-colors">
-                  <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-gray-300 group-hover:text-white" />
+                <div className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[var(--ds-accent-violet-muted)] flex items-center justify-center text-[var(--ds-accent-violet)] group-hover:opacity-90 transition-opacity">
+                  <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
                 <div className="flex-1 min-w-0 overflow-hidden">
-                  <span className="block font-medium text-white truncate text-sm sm:text-base">{item.title ?? t(item.titleKey)}</span>
-                  <span className="block text-xs sm:text-sm text-gray-400 truncate mt-0.5">
+                  <span className="block font-medium text-[var(--ds-text-primary)] truncate text-sm sm:text-base">{item.title ?? t(item.titleKey)}</span>
+                  <span className="block text-xs sm:text-sm ds-text-secondary truncate mt-0.5">
                     {item.description ?? t(item.descriptionKey)}
                   </span>
                 </div>
-                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500 flex-shrink-0 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--ds-text-tertiary)] flex-shrink-0 group-hover:translate-x-1 transition-transform" />
               </button>
             </li>
           );

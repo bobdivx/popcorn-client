@@ -1,36 +1,29 @@
 ---
-import Layout from '../../layouts/Layout.astro';
+import SettingsLayout from '../../layouts/SettingsLayout.astro';
 import TorrentSyncManager from '../../components/settings/TorrentSyncManager';
-import LibraryDisplaySettingsPanel from '../../components/settings/LibraryDisplaySettingsPanel';
-import TranslatedPageHeader from '../../components/ui/TranslatedPageHeader';
-import TranslatedButton from '../../components/ui/TranslatedButton';
 import PermissionGuard from '../../components/ui/PermissionGuard';
+import DsPageHeader from '../../components/ui/DsPageHeader';
+import TranslatedButton from '../../components/ui/TranslatedButton';
 ---
 
-<Layout title="Synchronisation des Torrents - Popcorn Client">
-  <div class="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
-    <div class="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-8 sm:py-10 md:py-12">
-      <TranslatedPageHeader
+<SettingsLayout title="Synchronisation des Torrents - Popcorn Client">
+  <div class="ds-container max-w-5xl py-6 px-4 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="settingsPages.sync.title"
+      subtitleKey="settingsPages.sync.subtitle"
+    >
+      <TranslatedButton
         client:only="preact"
-        titleKey="settingsPages.sync.title"
-        subtitleKey="settingsPages.sync.subtitle"
-        backHref="/settings"
-      >
-        <TranslatedButton
-          client:only="preact"
-          href="/settings/indexers"
-          translationKey="settingsPages.sync.configureIndexers"
-          className="btn btn-ghost glass-panel hover:bg-white/10 border border-white/10 text-xs sm:text-sm md:text-base px-3 sm:px-4 md:px-6 py-2 sm:py-3 min-h-[44px] sm:min-h-[48px] focus:outline-none focus:ring-4 focus:ring-primary-600/50 transition-colors"
-        />
-      </TranslatedPageHeader>
-
-      <PermissionGuard client:only="preact" permission="settings.sync">
-        {/* Section Synchronisation */}
-        <div class="mb-8 sm:mb-10 md:mb-12">
-          <TorrentSyncManager client:only="preact" />
-          <LibraryDisplaySettingsPanel client:only="preact" />
-        </div>
-      </PermissionGuard>
-    </div>
+        href="/settings/indexers"
+        translationKey="settingsPages.sync.configureIndexers"
+        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-[var(--ds-radius-full)] bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] border border-[var(--ds-border)] hover:bg-white/10 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)]"
+      />
+    </DsPageHeader>
+    <PermissionGuard client:only="preact" permission="settings.sync">
+      <div class="space-y-6">
+        <TorrentSyncManager client:only="preact" />
+      </div>
+    </PermissionGuard>
   </div>
-</Layout>
+</SettingsLayout>

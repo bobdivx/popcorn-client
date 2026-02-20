@@ -494,22 +494,23 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
   return (
     <div class="space-y-6">
       {error && (
-        <div class="alert alert-error">
-          <span>{error}</span>
+        <div class="ds-status-badge ds-status-badge--error w-full max-w-xl" role="alert">
+          {error}
         </div>
       )}
       {successMessage && (
-        <div class="alert alert-success">
-          <span>{successMessage}</span>
+        <div class="ds-status-badge ds-status-badge--success w-fit" role="status">
+          {successMessage}
         </div>
       )}
 
       {!showForm && !showDefinitionSelector ? (
         <>
           <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-white">{t('indexersManager.title')}</h2>
-            <button 
-              class="btn btn-primary" 
+            <h2 class="ds-title-section text-[var(--ds-text-primary)]">{t('indexersManager.title')}</h2>
+            <button
+              type="button"
+              class="min-h-[44px] px-4 py-2.5 rounded-[var(--ds-radius-sm)] font-semibold bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               onClick={handleAddIndexer}
               disabled={loadingDefinitions}
             >
@@ -525,8 +526,8 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
           </div>
 
           {indexers.length === 0 ? (
-            <div class="text-center py-12">
-              <p class="text-gray-400">{t('indexersManager.noIndexers')}</p>
+            <div class="ds-card rounded-[var(--ds-radius-lg)] px-4 py-12 text-center">
+              <p class="ds-text-secondary">{t('indexersManager.noIndexers')}</p>
             </div>
           ) : (
             <div class="space-y-4">
@@ -556,11 +557,11 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
       ) : showDefinitionSelector ? (
         <div class="space-y-4">
           <div class="mb-6">
-            <h2 class="text-2xl font-bold text-white">{t('indexersManager.selectIndexer')}</h2>
+            <h2 class="ds-title-section text-[var(--ds-text-primary)]">{t('indexersManager.selectIndexer')}</h2>
           </div>
 
           {definitions.length > 0 && (
-            <div class="mb-4 p-4 rounded-lg bg-white/5 border border-white/10">
+            <div class="mb-4 p-4 rounded-[var(--ds-radius-lg)] border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]">
               <label class="flex items-start gap-3 cursor-pointer">
                 <input
                   type="checkbox"

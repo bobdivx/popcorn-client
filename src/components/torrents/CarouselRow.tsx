@@ -109,7 +109,7 @@ export default function CarouselRow({
           <div className="hidden xs:flex gap-1.5 sm:gap-2 tv:gap-4 ml-auto">
             <button
               onClick={() => scroll('left')}
-              className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 tv:w-14 tv:h-14 rounded-full glass-panel hover:bg-glass-hover border border-white/30 flex items-center justify-center text-white transition-all hover:scale-110 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[28px] tv:min-h-[56px]"
+              className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 tv:w-14 tv:h-14 rounded-full glass-panel hover:bg-glass-hover border border-white/30 flex items-center justify-center text-white transition-all hover:scale-110 ds-focus-glow ds-active-glow min-h-[28px] tv:min-h-[56px]"
               aria-label="Défiler vers la gauche"
               tabIndex={0}
             >
@@ -119,7 +119,7 @@ export default function CarouselRow({
             </button>
             <button
               onClick={() => scroll('right')}
-              className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 tv:w-14 tv:h-14 rounded-full glass-panel hover:bg-glass-hover border border-white/30 flex items-center justify-center text-white transition-all hover:scale-110 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[28px] tv:min-h-[56px]"
+              className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 tv:w-14 tv:h-14 rounded-full glass-panel hover:bg-glass-hover border border-white/30 flex items-center justify-center text-white transition-all hover:scale-110 ds-focus-glow ds-active-glow min-h-[28px] tv:min-h-[56px]"
               aria-label="Défiler vers la droite"
               tabIndex={0}
             >
@@ -138,6 +138,8 @@ export default function CarouselRow({
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
           scrollBehavior: 'smooth',
+          // Réduit les violations "non-passive touchstart" en déclarant le défilement horizontal
+          touchAction: 'pan-x',
         }}
       >
         {childrenArray.map((child, index) => (

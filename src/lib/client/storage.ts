@@ -300,6 +300,15 @@ export class TokenManager {
   }
 
   /**
+   * Supprime uniquement les tokens cloud (pour arrêter le polling feedback après 401 sans déconnecter le backend).
+   */
+  static clearCloudTokens(): void {
+    if (typeof window === 'undefined') return;
+    localStorage.removeItem(this.CLOUD_ACCESS_TOKEN_KEY);
+    localStorage.removeItem(this.CLOUD_REFRESH_TOKEN_KEY);
+  }
+
+  /**
    * Récupère les informations utilisateur stockées dans localStorage
    * (même clé que ServerApiClient.STORAGE_USER_KEY = 'popcorn_user')
    */

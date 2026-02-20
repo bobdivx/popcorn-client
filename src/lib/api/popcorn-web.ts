@@ -1888,7 +1888,13 @@ export async function getFeedbackUnreadCount(): Promise<number | null> {
       { method: 'GET', headers: { 'Content-Type': 'application/json' } },
       8000
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // 401 = token cloud expiré ou invalide : invalider les tokens cloud pour arrêter le polling (évite des 401 en boucle)
+      if (res.status === 401) {
+        TokenManager.clearCloudTokens();
+      }
+      return null;
+    }
     return res.data?.data?.unreadCount ?? 0;
   } catch (error) {
     return null;

@@ -1,16 +1,19 @@
 ---
-import Layout from '../../layouts/Layout.astro';
+import SettingsLayout from '../../layouts/SettingsLayout.astro';
 import FriendsManager from '../../components/settings/FriendsManager';
 import PermissionGuard from '../../components/ui/PermissionGuard';
+import DsPageHeader from '../../components/ui/DsPageHeader';
 ---
 
-<Layout title="Friends - Popcorn">
-  <div class="min-h-screen bg-[#121212] p-4 sm:p-6 md:p-8">
-    <div class="max-w-6xl mx-auto">
-      <PermissionGuard client:only="preact" permission="settings.friends">
-        <FriendsManager client:only="preact" />
-      </PermissionGuard>
-    </div>
+<SettingsLayout title="Friends - Popcorn">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="settingsPages.friends.title"
+      subtitleKey="settingsPages.friends.subtitle"
+    />
+    <PermissionGuard client:only="preact" permission="settings.friends">
+      <FriendsManager client:only="preact" />
+    </PermissionGuard>
   </div>
-</Layout>
-
+</SettingsLayout>

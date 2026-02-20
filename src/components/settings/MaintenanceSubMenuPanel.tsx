@@ -2,14 +2,13 @@ import { Wrench, Sliders, Activity } from 'lucide-preact';
 import { useState, useEffect } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { canAccess } from '../../lib/permissions';
-import SubMenuPanel, { type SubMenuItem } from './SubMenuPanel';
 import { serverApi } from '../../lib/client/server-api';
 import ResourceMonitorDev from './ResourceMonitorDev';
 
 const MIN_MAX_TRANSCODINGS = 1;
 const MAX_MAX_TRANSCODINGS = 16;
 
-function ForceCleanupSection() {
+function ForceCleanupSection({ embedded = false }: { embedded?: boolean }) {
   const { t } = useI18n();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -41,13 +40,9 @@ function ForceCleanupSection() {
     }
   };
 
-  return (
-    <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-      <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
-        <Wrench className="w-5 h-5 text-primary-400" />
-        {t('settingsMenu.maintenance.forceCleanup.title')}
-      </h3>
-      <p className="text-sm text-gray-400 mb-4">{t('settingsMenu.maintenance.forceCleanup.description')}</p>
+  const content = (
+    <>
+      <p className="text-sm ds-text-secondary mb-4">{t('settingsMenu.maintenance.forceCleanup.description')}</p>
       <div className="flex flex-col gap-3">
         <button
           type="button"
@@ -68,11 +63,22 @@ function ForceCleanupSection() {
           </p>
         )}
       </div>
+    </>
+  );
+
+  if (embedded) return <div className="min-w-0">{content}</div>;
+  return (
+    <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
+      <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+        <Wrench className="w-5 h-5 text-primary-400" />
+        {t('settingsMenu.maintenance.forceCleanup.title')}
+      </h3>
+      {content}
     </section>
   );
 }
 
-function TranscodingConfigSection() {
+function TranscodingConfigSection({ embedded = false }: { embedded?: boolean }) {
   const { t } = useI18n();
   const [value, setValue] = useState<number>(2);
   const [loading, setLoading] = useState(false);
@@ -121,18 +127,14 @@ function TranscodingConfigSection() {
     }
   };
 
-  return (
-    <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-      <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
-        <Sliders className="w-5 h-5 text-primary-400" />
-        {t('settingsMenu.maintenance.transcodingConfig.title')}
-      </h3>
-      <p className="text-sm text-gray-400 mb-4">
+  const content = (
+    <>
+      <p className="text-sm ds-text-secondary mb-4">
         {t('settingsMenu.maintenance.transcodingConfig.description')}
       </p>
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-3 flex-wrap">
-          <label htmlFor="max-transcodings" className="text-sm text-gray-300">
+          <label htmlFor="max-transcodings" className="text-sm text-[var(--ds-text-secondary)]">
             {t('settingsMenu.maintenance.transcodingConfig.maxLabel')}
           </label>
           <input
@@ -145,10 +147,10 @@ function TranscodingConfigSection() {
               const v = parseInt((e.target as HTMLInputElement).value, 10);
               if (!Number.isNaN(v)) setValue(v);
             }}
-            className="w-20 rounded-lg bg-white/10 border border-white/20 text-white px-3 py-2 text-sm"
+            className="w-20 rounded-lg bg-[var(--ds-surface)] border-[var(--ds-border)] text-[var(--ds-text-primary)] px-3 py-2 text-sm"
             disabled={fetching}
           />
-          <span className="text-xs text-gray-500">
+          <span className="text-xs ds-text-tertiary">
             {t('settingsMenu.maintenance.transcodingConfig.range', {
               min: MIN_MAX_TRANSCODINGS,
               max: MAX_MAX_TRANSCODINGS,
@@ -174,40 +176,54 @@ function TranscodingConfigSection() {
           </p>
         )}
       </div>
+    </>
+  );
+
+  if (embedded) return <div className="min-w-0">{content}</div>;
+  return (
+    <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
+      <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+        <Sliders className="w-5 h-5 text-primary-400" />
+        {t('settingsMenu.maintenance.transcodingConfig.title')}
+      </h3>
+      {content}
     </section>
   );
 }
 
-const MAINTENANCE_ITEMS: SubMenuItem[] = [
-  {
-    id: 'force-cleanup',
-    titleKey: 'settingsMenu.maintenance.forceCleanup.title',
-    descriptionKey: 'settingsMenu.maintenance.forceCleanup.description',
-    icon: Wrench,
-    permission: 'settings.server',
-    inlineContent: ForceCleanupSection,
-  },
-  {
-    id: 'transcoding-config',
-    titleKey: 'settingsMenu.maintenance.transcodingConfig.title',
-    descriptionKey: 'settingsMenu.maintenance.transcodingConfig.description',
-    icon: Sliders,
-    permission: 'settings.server',
-    inlineContent: TranscodingConfigSection,
-  },
-  {
-    id: 'resources',
-    titleKey: 'settingsMenu.maintenance.resources.title',
-    descriptionKey: 'settingsMenu.maintenance.resources.description',
-    icon: Activity,
-    permission: 'settings.server',
-    inlineContent: ResourceMonitorDev,
-  },
-];
+import { DsSettingsSectionCard } from '../ui/design-system';
 
 export default function MaintenanceSubMenuPanel() {
-  const visibleItems = MAINTENANCE_ITEMS.filter(
-    (item) => !item.permission || canAccess(item.permission as any)
+  const { t } = useI18n();
+  const canServer = canAccess('settings.server' as any);
+
+  if (!canServer) return null;
+
+  return (
+    <div className="space-y-6 sm:space-y-8">
+      <DsSettingsSectionCard
+        icon={Wrench}
+        title={t('settingsMenu.maintenance.forceCleanup.title')}
+        accent="violet"
+      >
+        <ForceCleanupSection embedded />
+      </DsSettingsSectionCard>
+
+      <DsSettingsSectionCard
+        icon={Sliders}
+        title={t('settingsMenu.maintenance.transcodingConfig.title')}
+        accent="violet"
+      >
+        <TranscodingConfigSection embedded />
+      </DsSettingsSectionCard>
+
+      <DsSettingsSectionCard
+        icon={Activity}
+        title={t('settingsMenu.maintenance.resources.title')}
+        accent="yellow"
+      >
+        <ResourceMonitorDev embedded />
+      </DsSettingsSectionCard>
+    </div>
   );
-  return <SubMenuPanel items={MAINTENANCE_ITEMS} visibleItems={visibleItems} />;
 }

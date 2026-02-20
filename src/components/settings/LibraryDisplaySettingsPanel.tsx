@@ -31,7 +31,12 @@ function clampNumber(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, Math.round(value)));
 }
 
-export default function LibraryDisplaySettingsPanel() {
+interface LibraryDisplaySettingsPanelProps {
+  /** Si true, pas de section ni titre (contenu seul pour DsSettingsSectionCard) */
+  embedded?: boolean;
+}
+
+export default function LibraryDisplaySettingsPanel({ embedded = false }: LibraryDisplaySettingsPanelProps) {
   const { t } = useI18n();
   const [config, setConfig] = useState<LibraryDisplayConfig>(() => getLibraryDisplayConfig());
   const [saved, setSaved] = useState(false);
@@ -68,17 +73,17 @@ export default function LibraryDisplaySettingsPanel() {
 
   if (loading) return null;
 
-  return (
-    <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6 mt-6">
-      <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
-        <LayoutGrid className="w-5 h-5 text-primary-400" />
-        {t('interfaceSettings.librarySection')}
-        {hasCloud ? (
-          <Cloud className="w-4 h-4 text-green-400" title="Synchronisé avec le cloud" />
-        ) : (
-          <CloudOff className="w-4 h-4 text-gray-500" title="Non synchronisé" />
-        )}
-      </h3>
+  const content = (
+    <>
+      {embedded && (
+        <div className="flex items-center gap-2 mb-4">
+          {hasCloud ? (
+            <Cloud className="w-4 h-4 text-green-400" title="Synchronisé avec le cloud" />
+          ) : (
+            <CloudOff className="w-4 h-4 text-gray-500" title="Non synchronisé" />
+          )}
+        </div>
+      )}
       {saved && (
         <p className="text-sm text-green-400 mb-4">
           {t('common.success')} {hasCloud && '(synchronisé cloud)'}
@@ -189,6 +194,23 @@ export default function LibraryDisplaySettingsPanel() {
           />
         </div>
       </div>
+    </>
+  );
+
+  if (embedded) return <div className="min-w-0">{content}</div>;
+
+  return (
+    <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6 mt-6">
+      <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+        <LayoutGrid className="w-5 h-5 text-primary-400" />
+        {t('interfaceSettings.librarySection')}
+        {hasCloud ? (
+          <Cloud className="w-4 h-4 text-green-400" title="Synchronisé avec le cloud" />
+        ) : (
+          <CloudOff className="w-4 h-4 text-gray-500" title="Non synchronisé" />
+        )}
+      </h3>
+      {content}
     </section>
   );
 }

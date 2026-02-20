@@ -1,15 +1,19 @@
 ---
-import Layout from '../../layouts/Layout.astro';
+import SettingsLayout from '../../layouts/SettingsLayout.astro';
 import LocalUsersManager from '../../components/settings/LocalUsersManager';
 import PermissionGuard from '../../components/ui/PermissionGuard';
+import DsPageHeader from '../../components/ui/DsPageHeader';
 ---
 
-<Layout title="Utilisateurs locaux - Popcorn">
-  <div class="min-h-screen bg-[#121212] p-4 sm:p-6 md:p-8">
-    <div class="max-w-6xl mx-auto">
-      <PermissionGuard client:only="preact" permission="settings.local_users">
-        <LocalUsersManager client:only="preact" />
-      </PermissionGuard>
-    </div>
+<SettingsLayout title="Utilisateurs locaux - Popcorn">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="settingsMenu.localUsers.title"
+      subtitleKey="settingsMenu.localUsers.description"
+    />
+    <PermissionGuard client:only="preact" permission="settings.local_users">
+      <LocalUsersManager client:only="preact" />
+    </PermissionGuard>
   </div>
-</Layout>
+</SettingsLayout>

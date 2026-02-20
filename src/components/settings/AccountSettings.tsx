@@ -4,6 +4,7 @@ import Avatar from '../ui/Avatar';
 import { getLocalProfile, updateLocalProfile, type LocalProfile } from '../../lib/client/profile';
 import { redirectTo } from '../../lib/utils/navigation.js';
 import { useI18n } from '../../lib/i18n';
+import { DsCard, DsCardSection } from '../ui/design-system';
 
 export type AccountSection = 'profile' | 'info' | 'interface' | 'logout' | 'all';
 
@@ -50,24 +51,24 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
 
   if (loading) {
     return (
-      <div class="flex justify-center items-center min-h-[400px]">
-        <span class="loading loading-spinner loading-lg text-white"></span>
+      <div class="flex justify-center items-center min-h-[200px]">
+        <span class="loading loading-spinner loading-lg text-[var(--ds-accent-violet)]" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div class="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300">
-        <span>{error}</span>
+      <div class="ds-status-badge ds-status-badge--error w-full max-w-xl" role="alert">
+        {error}
       </div>
     );
   }
 
   if (!user) {
     return (
-      <div class="text-center py-12">
-        <p class="text-gray-400">Aucune information utilisateur disponible</p>
+      <div class="ds-card rounded-[var(--ds-radius-lg)] px-4 py-6 text-center">
+        <p class="ds-text-secondary">{t('account.noUserInfo')}</p>
       </div>
     );
   }
@@ -104,45 +105,41 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
 
   return (
     <div class="space-y-6 sm:space-y-8">
-      {/* Profil local (UI) */}
       {showProfile && (
-      <div class="glass-panel rounded-2xl shadow-2xl border border-white/10 p-6 sm:p-8 md:p-12 tv:p-16">
-        <h2 class="text-2xl sm:text-3xl md:text-4xl tv:text-5xl font-black text-white mb-6 sm:mb-8 tv:mb-12">{t('account.profile')}</h2>
+        <DsCard variant="elevated">
+          <DsCardSection title={t('account.profile')}>
 
         {saved && (
-          <div class="alert alert-success mb-6">
-            <span>{t('common.success')}</span>
+          <div class="ds-status-badge ds-status-badge--success mb-6 w-fit" role="status">
+            {t('common.success')}
           </div>
         )}
 
         {error && (
-          <div class="alert alert-error mb-6">
-            <span>{error}</span>
+          <div class="ds-status-badge ds-status-badge--error mb-6 w-fit max-w-xl" role="alert">
+            {error}
           </div>
         )}
 
-        <div class="flex flex-col sm:flex-row gap-6 sm:gap-8 items-start">
-          <div class="flex items-center gap-4">
-            <Avatar
-              email={user.email}
-              displayName={displayName}
-              profile={profile}
-              sizeClassName="w-20 h-20 sm:w-24 sm:h-24 tv:w-28 tv:h-28"
-              className="rounded-2xl"
-            />
-            <div class="text-sm text-gray-400">
-              <div class="font-semibold text-white">{t('account.avatar')}</div>
-            </div>
-          </div>
-
-          <div class="flex-1 w-full space-y-4">
-            <div class="form-control">
-              <label class="label">
-                <span class="label-text text-white font-semibold">Nom affiché</span>
-              </label>
-              <input
-                type="text"
-                class="input input-bordered bg-black/30 border-white/10 text-white form-tv-input tv:text-lg tv:min-h-[56px]"
+            <div class="flex flex-col sm:flex-row gap-6 sm:gap-8 items-start">
+              <div class="flex items-center gap-4">
+                <Avatar
+                  email={user.email}
+                  displayName={displayName}
+                  profile={profile}
+                  sizeClassName="w-20 h-20 sm:w-24 sm:h-24 tv:w-28 tv:h-28"
+                  className="rounded-[var(--ds-radius-lg)]"
+                />
+                <div class="text-sm ds-text-secondary">
+                  <div class="font-semibold text-[var(--ds-text-primary)]">{t('account.avatar')}</div>
+                </div>
+              </div>
+              <div class="flex-1 w-full space-y-4">
+                <div>
+                  <label class="block text-sm font-semibold text-[var(--ds-text-secondary)] mb-2">Nom affiché</label>
+                  <input
+                    type="text"
+                    class="w-full px-4 py-3 bg-[var(--ds-surface)] border border-[var(--ds-border)] rounded-[var(--ds-radius-sm)] text-[var(--ds-text-primary)] form-tv-input tv:text-lg tv:min-h-[56px] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]"
                 placeholder="Ex: Alex"
                 value={displayName}
                 onInput={(e) => setDisplayName((e.target as HTMLInputElement).value)}
@@ -169,97 +166,80 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
                   onInput={(e) => setAvatarUrl((e.target as HTMLInputElement).value)}
                   onBlur={() => persist({ avatarDataUrl: avatarUrl.trim() || undefined })}
                 />
-                <label class="btn btn-ghost glass-panel hover:bg-white/10 border border-white/10">
-                  Importer…
-                  <input
-                    type="file"
-                    accept="image/*"
-                    class="hidden"
-                    onChange={(e) => handlePickFile((e.target as HTMLInputElement).files?.[0] || null)}
-                  />
-                </label>
-                <button
-                  type="button"
-                  class="btn btn-ghost border border-white/10 hover:bg-white/10 form-tv-button tv:min-h-[56px] tv:px-6 tv:py-3"
-                  onClick={() => {
-                    setAvatarUrl('');
-                    persist({ avatarDataUrl: undefined });
-                  }}
-                  tabIndex={0}
-                  data-focusable
-                >
-                  Supprimer
-                </button>
+                    <label class="inline-flex items-center justify-center min-h-[44px] px-4 py-2 rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] text-sm font-medium hover:bg-white/10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]">
+                      Importer…
+                      <input type="file" accept="image/*" class="hidden" onChange={(e) => handlePickFile((e.target as HTMLInputElement).files?.[0] || null)} />
+                    </label>
+                    <button
+                      type="button"
+                      class="min-h-[44px] px-4 py-2 rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] text-sm font-medium hover:bg-white/10 form-tv-button tv:min-h-[56px] tv:px-6 tv:py-3 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]"
+                      onClick={() => { setAvatarUrl(''); persist({ avatarDataUrl: undefined }); }}
+                      tabIndex={0}
+                      data-focusable
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                  <p class="ds-text-tertiary text-xs mt-1">Conseil TV: privilégiez une image carrée (≥ 256×256).</p>
+                </div>
               </div>
-              <label class="label">
-                <span class="label-text-alt text-gray-400">
-                  Conseil TV: privilégiez une image carrée (≥ 256×256).
-                </span>
-              </label>
             </div>
-          </div>
-        </div>
-      </div>
+          </DsCardSection>
+        </DsCard>
       )}
 
-      {/* Informations serveur */}
       {showInfo && (
-      <div class="glass-panel rounded-2xl shadow-2xl border border-white/10 p-6 sm:p-8 md:p-12">
-        <h2 class="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-6 sm:mb-8">Informations du compte</h2>
-        <div class="space-y-6">
-          <div>
-            <label class="block text-sm font-semibold text-gray-400 mb-2">Email</label>
-            <p class="text-white text-lg">{user.email}</p>
-          </div>
-          <div>
-            <label class="block text-sm font-semibold text-gray-400 mb-2">ID</label>
-            <p class="text-gray-300 font-mono text-sm break-all">{user.id}</p>
-          </div>
-        </div>
-      </div>
+        <DsCard variant="elevated">
+          <DsCardSection title="Informations du compte">
+            <div class="space-y-6">
+              <div>
+                <label class="block text-sm font-semibold ds-text-secondary mb-2">Email</label>
+                <p class="text-[var(--ds-text-primary)] text-lg">{user.email}</p>
+              </div>
+              <div>
+                <label class="block text-sm font-semibold ds-text-secondary mb-2">ID</label>
+                <p class="ds-text-secondary font-mono text-sm break-all">{user.id}</p>
+              </div>
+            </div>
+          </DsCardSection>
+        </DsCard>
       )}
 
-      {/* Lien vers préférences interface (langue, thème, etc.) */}
       {showInterface && (
-      <div class="glass-panel rounded-2xl shadow-2xl border border-white/10 p-6 sm:p-8 md:p-12 tv:p-16">
-        <h2 class="text-2xl sm:text-3xl md:text-4xl tv:text-5xl font-black text-white mb-6 sm:mb-8 tv:mb-12">{t('account.interfaceSettings')}</h2>
-        <p class="text-gray-400 mb-6">{t('account.interfaceSettingsDescription')}</p>
-        <a
-          href="/settings?category=interface"
-          class="btn btn-primary btn-lg tv:min-h-[64px] tv:px-8 tv:py-4"
-          tabIndex={0}
-          data-focusable
-        >
-          {t('account.openInterfaceSettings')}
-        </a>
-      </div>
+        <DsCard variant="elevated">
+          <DsCardSection title={t('account.interfaceSettings')}>
+            <p class="ds-text-secondary mb-6">{t('account.interfaceSettingsDescription')}</p>
+            <a
+              href="/settings?category=interface"
+              class="inline-flex items-center justify-center min-h-[48px] px-6 py-3 rounded-[var(--ds-radius-sm)] font-semibold bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] hover:opacity-95 tv:min-h-[64px] tv:px-8 tv:py-4 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)]"
+              tabIndex={0}
+              data-focusable
+            >
+              {t('account.openInterfaceSettings')}
+            </a>
+          </DsCardSection>
+        </DsCard>
       )}
 
-      {/* Déconnexion */}
       {showLogout && (
-      <div class="glass-panel rounded-2xl shadow-2xl border border-red-900/30 p-6 sm:p-8 md:p-12">
-        <h2 class="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-4">{t('common.logout')}</h2>
-        <p class="text-gray-400 mb-6">
-          Se déconnecter de ce compte sur cet appareil.
-        </p>
-        <button
-          type="button"
-          data-focusable
-          tabIndex={0}
-          onClick={async () => {
-            try {
-              await serverApi.logout();
-            } catch (err) {
-              console.error('Erreur lors de la déconnexion:', err);
-            } finally {
-              redirectTo('/login');
-            }
-          }}
-          class="btn btn-error btn-lg px-8 py-4 tv:px-12 tv:py-6 text-lg tv:text-xl font-semibold focus:outline-none focus:ring-4 focus:ring-red-600/50 tv:min-h-[64px]"
-        >
-          {t('account.logout')}
-        </button>
-      </div>
+        <DsCard variant="elevated" className="border border-[var(--ds-accent-red-muted)]">
+          <DsCardSection>
+            <h3 class="ds-title-section text-[var(--ds-text-primary)] mb-4">{t('common.logout')}</h3>
+            <p class="ds-text-secondary mb-6">Se déconnecter de ce compte sur cet appareil.</p>
+            <button
+              type="button"
+              data-focusable
+              tabIndex={0}
+              onClick={async () => {
+                try { await serverApi.logout(); } catch (err) { console.error('Erreur lors de la déconnexion:', err); }
+                finally { redirectTo('/login'); }
+              }}
+              class="min-h-[48px] px-8 py-4 tv:px-12 tv:py-6 text-lg tv:text-xl font-semibold rounded-[var(--ds-radius-sm)] bg-[var(--ds-accent-red)] text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-red)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] tv:min-h-[64px]"
+            >
+              {t('account.logout')}
+            </button>
+          </DsCardSection>
+        </DsCard>
       )}
     </div>
   );

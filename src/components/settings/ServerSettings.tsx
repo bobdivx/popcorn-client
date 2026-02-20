@@ -4,6 +4,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { HelpCircle, X } from 'lucide-preact';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web.js';
 import { TokenManager } from '../../lib/client/storage.js';
+import { DsCard, DsCardSection } from '../ui/design-system';
 
 export default function ServerSettings() {
   const { t } = useI18n();
@@ -205,162 +206,148 @@ export default function ServerSettings() {
   };
 
   return (
-    <div class="space-y-6">
-      {/* Titre avec icône aide */}
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-white">{t('serverSettings.title')}</h3>
-        <button
-          type="button"
-          onClick={() => setShowInfoModal(true)}
-          className="p-2 rounded-lg text-gray-400 hover:text-primary-400 hover:bg-white/5 transition-colors"
-          title={t('serverSettings.info.title')}
-          aria-label={t('serverSettings.info.title')}
-        >
-          <HelpCircle className="w-5 h-5" />
-        </button>
-      </div>
-
-      {/* Modal Informations */}
-      {showInfoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70" onClick={() => setShowInfoModal(false)}>
-          <div
-            className="bg-[#1a1c20] border border-white/10 rounded-2xl p-6 max-w-md w-full shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-white">{t('serverSettings.info.title')}</h3>
-              <button
-                type="button"
-                onClick={() => setShowInfoModal(false)}
-                className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
-                aria-label={t('common.close')}
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="space-y-3 text-sm text-gray-300">
-              <p>• {t('serverSettings.info.point1')}</p>
-              <p>• {t('serverSettings.info.point2')}</p>
-              <p>• {t('serverSettings.info.point3')}</p>
-              <p>• {t('serverSettings.info.point4')}</p>
-            </div>
-            <div className="mt-6">
-              <button
-                type="button"
-                onClick={() => setShowInfoModal(false)}
-                className="btn btn-primary w-full"
-              >
-                {t('common.close')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Messages d'erreur et de succès */}
+    <div class="space-y-6 sm:space-y-8">
+      {/* Messages d'état */}
       {error && (
-        <div class="p-4 bg-red-900/30 border border-red-600 rounded-lg">
-          <span class="text-red-300">{error}</span>
+        <div className="ds-status-badge ds-status-badge--error w-full max-w-xl" role="alert">
+          {error}
         </div>
       )}
-
       {success && (
-        <div class="p-4 bg-green-900/30 border border-green-600 rounded-lg">
-          <span class="text-green-300">{success}</span>
+        <div className="ds-status-badge ds-status-badge--success w-full max-w-xl" role="status">
+          {success}
         </div>
       )}
-
-      {/* Chargement */}
       {loading && (
-        <div class="p-4 bg-gray-900/30 border border-gray-600 rounded-lg">
-          <p class="text-gray-300">
-            <span class="loading loading-spinner loading-sm"></span> {t('serverSettings.loadingConfig')}
-          </p>
+        <div className="ds-card rounded-[var(--ds-radius-lg)] px-4 py-3 flex items-center gap-2">
+          <span className="loading loading-spinner loading-sm text-[var(--ds-accent-violet)]" />
+          <span className="ds-text-secondary text-sm">{t('serverSettings.loadingConfig')}</span>
         </div>
       )}
-
-      {/* Configuration actuelle */}
       {!loading && savedBackendUrl && (
-        <div class="p-4 bg-blue-900/30 border border-blue-600 rounded-lg">
-          <p class="text-blue-300">
+        <div className="ds-card rounded-[var(--ds-radius-lg)] px-4 py-3 border border-[var(--ds-border)]">
+          <p className="text-sm text-[var(--ds-text-primary)]">
             <strong>{t('serverSettings.currentUrl')}</strong> {savedBackendUrl}
           </p>
-          <p class="text-blue-400 text-sm mt-2">
-            {t('serverSettings.urlStoredInfo')}
-          </p>
+          <p className="ds-text-secondary text-xs mt-1">{t('serverSettings.urlStoredInfo')}</p>
         </div>
       )}
 
       {/* Carte de configuration */}
-      <div class="p-4 sm:p-6 md:p-8 rounded-xl bg-gradient-to-br from-gray-900 to-black border-2 border-gray-800">
-        <div class="space-y-6">
-          <div>
-            <label class="block text-sm font-medium text-gray-300 mb-2">
-              {t('serverSettings.backendUrl')}
-            </label>
-            <input
-              type="text"
-              value={backendUrl}
-              onInput={(e) => {
-                setBackendUrl((e.target as HTMLInputElement).value);
-                setError('');
-                setSuccess('');
-              }}
-              placeholder={t('serverSettings.backendUrlPlaceholder')}
-              class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-              disabled={saving || testing || loading}
-            />
-            <p class="mt-2 text-sm text-gray-400">
-              {t('serverSettings.examples')}
-            </p>
+      <DsCard variant="elevated">
+        <DsCardSection>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="ds-title-section text-[var(--ds-text-primary)]">{t('serverSettings.title')}</h3>
+            <button
+              type="button"
+              onClick={() => setShowInfoModal(true)}
+              className="p-2 rounded-lg text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-primary)] hover:bg-white/5 transition-colors"
+              title={t('serverSettings.info.title')}
+              aria-label={t('serverSettings.info.title')}
+            >
+              <HelpCircle className="w-5 h-5" />
+            </button>
           </div>
-
-          <div class="flex flex-col sm:flex-row gap-4">
-            <button
-              onClick={handleTest}
-              disabled={testing || saving || loading || !backendUrl.trim()}
-              class="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 min-h-[48px] focus:outline-none focus:ring-4 focus:ring-blue-500"
-            >
-              {testing ? (
-                <span class="flex items-center gap-2">
-                  <span class="loading loading-spinner loading-sm"></span>
-                  {t('serverSettings.testing')}
-                </span>
-              ) : (
-                t('serverSettings.testConnection')
-              )}
-            </button>
-
-            <button
-              onClick={handleSave}
-              disabled={saving || testing || loading || !backendUrl.trim()}
-              class="bg-primary hover:bg-primary-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 min-h-[48px] focus:outline-none focus:ring-4 focus:ring-primary-500 flex-1"
-            >
-              {saving ? (
-                <span class="flex items-center gap-2">
-                  <span class="loading loading-spinner loading-sm"></span>
-                  {t('serverSettings.saving')}
-                </span>
-              ) : testing ? (
-                t('serverSettings.testing')
-              ) : (
-                t('serverSettings.testAndSave')
-              )}
-            </button>
-
-            {savedBackendUrl && (
-              <button
-                onClick={handleReset}
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-[var(--ds-text-secondary)] mb-2">
+                {t('serverSettings.backendUrl')}
+              </label>
+              <input
+                type="text"
+                value={backendUrl}
+                onInput={(e) => {
+                  setBackendUrl((e.target as HTMLInputElement).value);
+                  setError('');
+                  setSuccess('');
+                }}
+                placeholder={t('serverSettings.backendUrlPlaceholder')}
+                className="w-full px-4 py-3 bg-[var(--ds-surface)] border border-[var(--ds-border)] rounded-[var(--ds-radius-sm)] text-[var(--ds-text-primary)] placeholder-[var(--ds-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:border-transparent transition-all"
                 disabled={saving || testing || loading}
-                class="bg-gray-700 hover:bg-gray-600 disabled:bg-gray-800 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 min-h-[48px] focus:outline-none focus:ring-4 focus:ring-gray-500"
+              />
+              <p className="mt-2 ds-text-tertiary text-sm">{t('serverSettings.examples')}</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <button
+                onClick={handleTest}
+                disabled={testing || saving || loading || !backendUrl.trim()}
+                className="min-h-[48px] px-6 py-3 rounded-[var(--ds-radius-sm)] font-semibold text-[var(--ds-text-on-accent)] transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                style={{ backgroundColor: 'var(--ds-accent-violet)' }}
               >
-                {t('serverSettings.reset')}
+                {testing ? (
+                  <>
+                    <span className="loading loading-spinner loading-sm" />
+                    {t('serverSettings.testing')}
+                  </>
+                ) : (
+                  t('serverSettings.testConnection')
+                )}
               </button>
-            )}
+              <button
+                onClick={handleSave}
+                disabled={saving || testing || loading || !backendUrl.trim()}
+                className="min-h-[48px] flex-1 px-6 py-3 rounded-[var(--ds-radius-sm)] font-semibold bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] hover:opacity-95 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {saving ? (
+                  <>
+                    <span className="loading loading-spinner loading-sm" />
+                    {t('serverSettings.saving')}
+                  </>
+                ) : testing ? (
+                  t('serverSettings.testing')
+                ) : (
+                  t('serverSettings.testAndSave')
+                )}
+              </button>
+              {savedBackendUrl && (
+                <button
+                  onClick={handleReset}
+                  disabled={saving || testing || loading}
+                  className="min-h-[48px] px-6 py-3 rounded-[var(--ds-radius-sm)] font-semibold bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] border border-[var(--ds-border)] hover:bg-white/10 transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {t('serverSettings.reset')}
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      </div>
+        </DsCardSection>
+      </DsCard>
 
+      {/* Modal Informations */}
+      {showInfoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--ds-surface-overlay)]" onClick={() => setShowInfoModal(false)}>
+          <DsCard variant="elevated" className="max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <DsCardSection>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="ds-title-section text-[var(--ds-text-primary)]">{t('serverSettings.info.title')}</h3>
+                <button
+                  type="button"
+                  onClick={() => setShowInfoModal(false)}
+                  className="p-2 rounded-lg text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-primary)] hover:bg-white/10 transition-colors"
+                  aria-label={t('common.close')}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="space-y-3 text-sm ds-text-secondary">
+                <p>• {t('serverSettings.info.point1')}</p>
+                <p>• {t('serverSettings.info.point2')}</p>
+                <p>• {t('serverSettings.info.point3')}</p>
+                <p>• {t('serverSettings.info.point4')}</p>
+              </div>
+              <div className="mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowInfoModal(false)}
+                  className="w-full min-h-[48px] rounded-[var(--ds-radius-sm)] font-semibold bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)]"
+                >
+                  {t('common.close')}
+                </button>
+              </div>
+            </DsCardSection>
+          </DsCard>
+        </div>
+      )}
     </div>
   );
 }

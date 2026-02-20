@@ -1009,7 +1009,7 @@ interface IServerApiClientPublic {
 
   // Sync methods
   getSyncStatus(): Promise<ApiResponse<any>>;
-  startSync(indexerId?: string): Promise<ApiResponse<string>>;
+  startSync(indexerIds?: string | string[]): Promise<ApiResponse<string>>;
   stopSync(): Promise<ApiResponse<void>>;
   getSyncSettings(): Promise<ApiResponse<any>>;
   updateSyncSettings(settings: any): Promise<ApiResponse<void>>;

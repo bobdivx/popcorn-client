@@ -241,10 +241,11 @@
   will-change: transform;
 }
 
+/* Même violet que l’icône Paramètres / design system (#D1C4E9) */
 .gtv-icon-btn:hover:not(:disabled),
 .gtv-pill-btn:hover:not(:disabled) {
   transform: translateY(-1px) scale(1.05);
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
 }
 
 .gtv-icon-btn:active:not(:disabled),
@@ -344,32 +345,31 @@
 /* Animation pour les focus TV - Améliorée */
 @keyframes tvFocus {
   0% {
-    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.3);
     outline-width: 3px;
   }
   50% {
-    box-shadow: 0 0 0 8px rgba(168, 85, 247, 0.3);
+    box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.2);
     outline-width: 4px;
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
     outline-width: 3px;
   }
 }
 
 [data-focusable]:focus-visible {
   animation: tvFocus 0.6s ease-out;
-  outline: 3px solid rgba(168, 85, 247, 0.8);
+  outline: 3px solid rgba(255, 255, 255, 0.4);
   outline-offset: 2px;
   border-radius: 0.5rem;
 }
 
-/* Focus TV encore plus visible sur grands écrans */
+/* Focus TV encore plus visible sur grands écrans — halo blanc */
 @media (min-width: 1920px) {
   [data-focusable]:focus-visible {
     outline-width: 4px;
     outline-offset: 4px;
-    animation: tvFocusPulse 1s ease-in-out infinite;
   }
 }
 
@@ -532,6 +532,127 @@
 .badge-pulse {
   animation: badgePulse 2s ease-in-out infinite;
 }
+
+/* Carte indexer en cours de synchronisation (page Sync) — bien visible sur fond violet */
+@keyframes syncCardActive {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.6), 0 0 16px rgba(255, 255, 255, 0.3);
+    filter: brightness(1);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.95), 0 0 32px rgba(255, 255, 255, 0.5);
+    filter: brightness(1.08);
+  }
+}
+
+/* Cartes indexeur : animation moderne quand cette carte est en cours de sync */
+.sync-indexer-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.sync-indexer-card--syncing {
+  --sync-card-shine: linear-gradient(
+    105deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(255, 255, 255, 0.08) 45%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.08) 55%,
+    transparent 60%,
+    transparent 100%
+  );
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.2),
+    0 8px 24px -8px rgba(0, 0, 0, 0.25),
+    0 0 40px -12px rgba(209, 196, 233, 0.4);
+  animation: sync-card-glow 2.5s ease-in-out infinite;
+}
+
+.sync-indexer-card--syncing::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--sync-card-shine);
+  background-size: 200% 100%;
+  animation: sync-card-shimmer 2.2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes sync-card-glow {
+  0%, 100% {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.2),
+      0 8px 24px -8px rgba(0, 0, 0, 0.25),
+      0 0 40px -12px rgba(209, 196, 233, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(255, 255, 255, 0.35),
+      0 8px 28px -6px rgba(0, 0, 0, 0.3),
+      0 0 56px -8px rgba(209, 196, 233, 0.5);
+  }
+}
+
+@keyframes sync-card-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.sync-indexer-card__badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ds-accent-violet);
+  animation: sync-badge-dot-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes sync-badge-dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.2); }
+}
+
+.sync-indexer-card__track {
+  position: relative;
+}
+
+.sync-indexer-card__bar {
+  height: 100%;
+  border-radius: inherit;
+  min-width: 0;
+}
+
+.sync-indexer-card__bar--indeterminate {
+  width: 100%;
+  min-width: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.2) 0%,
+    rgba(255, 255, 255, 0.5) 25%,
+    rgba(255, 255, 255, 0.9) 50%,
+    rgba(255, 255, 255, 0.5) 75%,
+    rgba(255, 255, 255, 0.2) 100%
+  );
+  background-size: 200% 100%;
+  animation: sync-bar-flow 1.8s linear infinite;
+}
+
+@keyframes sync-bar-flow {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Section TMDB / progression pendant la sync — pulse léger pour indiquer l’activité */
+@keyframes syncSectionPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.92; }
+}
+
+.sync-section-active {
+  animation: syncSectionPulse 2s ease-in-out infinite;
+}
+
 
 /* Animation pour les icônes qui changent d'état */
 @keyframes iconRotate {
@@ -732,11 +853,10 @@
     animation-duration: 0.3s;
   }
   
-  /* Focus plus visible sur TV */
+  /* Focus plus visible sur TV — halo blanc */
   [data-focusable]:focus-visible {
-    outline: 4px solid rgba(168, 85, 247, 0.8);
+    outline: 4px solid rgba(255, 255, 255, 0.4);
     outline-offset: 4px;
-    animation: tvFocusPulse 1s ease-in-out infinite;
   }
   
   /* Transitions plus lentes pour TV */
@@ -1023,11 +1143,9 @@
 
 .nav-tab:focus {
   @apply bg-glass-hover text-white;
-  /* Utiliser box-shadow avec offset pour éviter le clipping du ring violet */
-  /* ring-4 = 4px, donc on ajoute un offset de 2px pour créer de l'espace */
-  box-shadow: 
+  box-shadow:
     0 0 0 2px transparent,
-    0 0 0 6px rgba(168, 85, 247, 0.5);
+    0 0 0 6px rgba(255, 255, 255, 0.35);
   /* S'assurer que le ring est visible même avec overflow */
   position: relative;
   z-index: 10;
@@ -1039,9 +1157,9 @@
   @apply bg-glass-hover text-white;
 }
 
-/* Boutons compacts type Google TV */
+/* Boutons compacts type Google TV — focus = halo blanc (norme design, voir .ds-focus-glow) */
 .gtv-icon-btn {
-  @apply inline-flex items-center justify-center rounded-full glass-panel text-white/90 hover:bg-glass-hover focus:outline-none focus:ring-4 focus:ring-primary-600/50;
+  @apply inline-flex items-center justify-center rounded-full glass-panel text-white/90 hover:bg-glass-hover focus:outline-none;
   min-height: 44px;
   min-width: 44px;
   padding: 0.5rem;
@@ -1057,7 +1175,7 @@
 }
 
 .gtv-pill-btn {
-  @apply inline-flex items-center justify-center rounded-full glass-panel text-white/90 hover:bg-glass-hover focus:outline-none focus:ring-4 focus:ring-primary-600/50 font-semibold;
+  @apply inline-flex items-center justify-center rounded-full glass-panel text-white/90 hover:bg-glass-hover focus:outline-none font-semibold;
   min-height: 44px;
   padding: 0.6rem 1rem;
 }
@@ -1103,10 +1221,10 @@ button, a, input, select, textarea {
   @apply transition-all duration-200;
 }
 
-/* Focus visible global: indispensable TV (D-pad) + clavier */
+/* Focus visible global — halo blanc (norme design) */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.35);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35);
   border-radius: 0.75rem;
 }
 
@@ -1265,11 +1383,11 @@ html {
    Styles pour la navigation TV sur toutes les pages (webOS, Android TV, etc.)
    ========================================================================== */
 
-/* Variable CSS pour la couleur de focus TV */
+/* Variable CSS pour la couleur de focus TV — halo blanc (norme design) */
 :root {
-  --tv-focus-color: rgba(168, 85, 247, 0.9);
-  --tv-focus-shadow: 0 0 0 3px var(--tv-focus-color), 0 10px 40px rgba(0, 0, 0, 0.5);
-  --tv-focus-outline: 4px solid var(--tv-focus-color);
+  --tv-focus-color: rgba(255, 255, 255, 0.4);
+  --tv-focus-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4);
+  --tv-focus-outline: 4px solid rgba(255, 255, 255, 0.4);
   --tv-focus-outline-offset: 4px;
 }
 
@@ -1284,25 +1402,28 @@ html {
   transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out, outline 0.15s ease-out, background-color 0.15s ease-out;
 }
 
-/* Effet Netflix pour les cartes focusées (torrent, settings, etc.) - anneau bien visible */
+/* Cartes focusées (torrent, settings) — halo blanc scintillant (norme design) */
 .tv-card-focused {
   transform: scale(1.06) !important;
   z-index: 50 !important;
-  box-shadow: 0 0 0 4px var(--tv-focus-color), 0 12px 48px rgba(0, 0, 0, 0.55) !important;
-  outline: var(--tv-focus-outline) !important;
-  outline-offset: var(--tv-focus-outline-offset) !important;
   border-radius: 0.5rem !important;
-  /* Éviter que le parent ou contain ne coupe l'outline en haut/bas */
   overflow: visible !important;
+  animation: tv-halo-pulse 2s ease-in-out infinite !important;
+}
+@keyframes tv-halo-pulse {
+  0%, 100% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); outline: 4px solid rgba(255, 255, 255, 0.25); outline-offset: 4px; }
+  50% { box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4); outline: 4px solid rgba(255, 255, 255, 0.5); outline-offset: 4px; }
 }
 
-/* Sur grand écran / TV : anneau encore plus visible */
+/* Sur grand écran / TV : même halo blanc un peu plus marqué */
 @media (min-width: 1920px) {
   .tv-card-focused {
-    outline-width: 5px !important;
-    outline-offset: 6px !important;
-    box-shadow: 0 0 0 5px var(--tv-focus-color), 0 16px 56px rgba(0, 0, 0, 0.6) !important;
+    animation: tv-halo-pulse-lg 2s ease-in-out infinite !important;
   }
+}
+@keyframes tv-halo-pulse-lg {
+  0%, 100% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); outline: 5px solid rgba(255, 255, 255, 0.25); outline-offset: 6px; }
+  50% { box-shadow: 0 4px 24px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.45); outline: 5px solid rgba(255, 255, 255, 0.5); outline-offset: 6px; }
 }
 
 /* Focus visible pour les autres éléments (boutons, liens, inputs) */
@@ -1351,48 +1472,34 @@ textarea:focus-visible {
   }
 }
 
-/* Animation de focus pour une transition plus fluide */
-/* Animation TV focus améliorée */
-@keyframes tvFocusPulse {
-  0%, 100% {
-    box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7);
-    outline-width: 4px;
-  }
-  50% {
-    box-shadow: 0 0 0 12px rgba(168, 85, 247, 0.2);
-    outline-width: 6px;
-  }
-}
-
+/* Entrée en focus : transition courte puis halo blanc scintillant */
 @keyframes tvFocusIn {
   from {
     transform: scale(1);
-    box-shadow: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
   to {
-    transform: scale(1.08);
-    box-shadow: var(--tv-focus-shadow);
+    transform: scale(1.06);
+    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4);
   }
 }
-
-/* Application de l'animation sur focus */
 .tv-card-focused {
-  animation: tvFocusIn 0.2s ease-out forwards;
+  animation: tvFocusIn 0.2s ease-out forwards, tv-halo-pulse 2s ease-in-out 0.2s infinite !important;
 }
 
-/* Styles spécifiques pour les formulaires sur TV */
+/* Styles spécifiques pour les formulaires sur TV — halo blanc */
 form input:focus,
 form select:focus,
 form textarea:focus {
   background-color: rgba(255, 255, 255, 0.15) !important;
-  border-color: rgb(168, 85, 247) !important;
-  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.35) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25) !important;
 }
 
-/* Boutons de formulaire sur TV */
+/* Boutons de formulaire sur TV — halo blanc */
 form button[type="submit"]:focus-visible,
 .form-tv-button:focus-visible {
   outline: 3px solid var(--tv-focus-color) !important;
   outline-offset: 2px !important;
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.6) !important;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2) !important;
 }

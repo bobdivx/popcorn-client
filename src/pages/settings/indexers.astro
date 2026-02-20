@@ -1,33 +1,19 @@
 ---
-import Layout from '../../layouts/Layout.astro';
-import IndexersManager from '../../components/settings/IndexersManager';
-import TmdbConfig from '../../components/settings/TmdbConfig';
-import TranslatedPageHeader from '../../components/ui/TranslatedPageHeader';
+import SettingsLayout from '../../layouts/SettingsLayout.astro';
+import IndexersPageContent from '../../components/settings/IndexersPageContent';
 import PermissionGuard from '../../components/ui/PermissionGuard';
+import DsPageHeader from '../../components/ui/DsPageHeader';
 ---
 
-<Layout title="Gestion des Indexers - Popcorn Client">
-  <div class="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
-    <div class="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-8 sm:py-10 md:py-12">
-      <TranslatedPageHeader
-        client:only="preact"
-        titleKey="settingsPages.indexers.title"
-        subtitleKey="settingsPages.indexers.subtitle"
-        backHref="/settings"
-      />
-
-      <PermissionGuard client:only="preact" permission="settings.indexers">
-        <div class="space-y-8 sm:space-y-10 md:space-y-12">
-          <!-- Section Configuration TMDB (obligatoire) -->
-          <TmdbConfig client:only="preact" />
-
-          <!-- Section Indexers modulaires (basés sur JSON) -->
-          <div class="glass-panel rounded-2xl shadow-2xl border border-white/10 p-6 sm:p-8 md:p-12">
-            <h2 class="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-6 sm:mb-8">Indexers</h2>
-            <IndexersManager client:only="preact" />
-          </div>
-        </div>
-      </PermissionGuard>
-    </div>
+<SettingsLayout title="Gestion des Indexers - Popcorn Client">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="settingsPages.indexers.title"
+      subtitleKey="settingsPages.indexers.subtitle"
+    />
+    <PermissionGuard client:only="preact" permission="settings.indexers">
+      <IndexersPageContent client:only="preact" />
+    </PermissionGuard>
   </div>
-</Layout>
+</SettingsLayout>

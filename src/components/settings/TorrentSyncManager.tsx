@@ -1,7 +1,15 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import { syncSyncSettingsToCloud } from '../../lib/utils/cloud-sync';
-import { RefreshCw, Sparkles } from 'lucide-preact';
+import {
+  getSyncStatusStore,
+  subscribeSyncStatusStore,
+  refreshSyncStatusStore,
+} from '../../lib/sync-status-store';
+import { RefreshCw, Sparkles, ChevronRight, FileDown, Code2, List, Settings, RotateCw } from 'lucide-preact';
+
+const iconProps = { size: 20, strokeWidth: 1.5 };
+const iconPropsSm = { size: 18, strokeWidth: 1.5 };
 import { suggestTmdbEnrichmentRules } from '../../lib/api/popcorn-web';
 import { TokenManager } from '../../lib/client/storage';
 import type { Indexer } from '../../lib/client/types';
@@ -9,6 +17,8 @@ import { useNativeNotifications } from '../../hooks/useNativeNotifications';
 import { calculateSyncProgress } from '../../lib/utils/sync-progress';
 import { useI18n } from '../../lib/i18n/useI18n';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
+import { Modal } from '../ui/Modal';
+import { DsNavTabs, DsIconButton, DsMetricCard, DsCard, DsCardSection, DsBarChart } from '../ui/design-system';
 
 interface SyncSettings {
   sync_frequency_minutes: number;
@@ -32,6 +42,8 @@ interface SyncProgress {
   total_to_process: number;
   fetched_pages?: number;
   errors: string[];
+  log_lines?: string[];
+  sync_trigger?: string | null;
 }
 
 interface TmdbStats {
@@ -45,14 +57,198 @@ interface SyncStatus {
   last_sync_date: number | null;
   settings: SyncSettings;
   stats: Record<string, number>;
+  /** indexer_name -> category -> count */
+  stats_by_indexer?: Record<string, Record<string, number>>;
   sync_start_time?: number | null;
   progress?: SyncProgress;
   tmdb_stats?: TmdbStats;
+  /** Stats TMDB par indexer (pour la modale détail : enrichissement de cet indexer uniquement) */
+  tmdb_stats_by_indexer?: Record<string, TmdbStats>;
 }
 
 interface TorrentSyncManagerProps {
   /** Afficher uniquement les paramètres (pour le sous-menu Indexers) */
   section?: 'all' | 'settings';
+}
+
+/** Contenu de la modale Détails indexer : stats indexer + section Enrichissement TMDB + lancer sync (cet indexer) */
+function IndexerDetailsModalContent({
+  idx,
+  status,
+  totalTorrents,
+  hasCloudToken,
+  geminiLoading,
+  onImproveWithGemini,
+  onStartSyncForIndexer,
+  syncing,
+  onClose,
+  t,
+  language,
+}: {
+  idx: Indexer;
+  status: SyncStatus | null;
+  totalTorrents: number;
+  hasCloudToken: boolean;
+  geminiLoading: boolean;
+  onImproveWithGemini: () => void;
+  onStartSyncForIndexer?: (indexerId: string) => Promise<void>;
+  syncing?: boolean;
+  onClose: () => void;
+  t: (key: string, opts?: Record<string, string | number>) => string;
+  language: string;
+}) {
+  const byCat = status?.stats_by_indexer?.[idx.name] ?? status?.stats_by_indexer?.[idx.id];
+  const films = Number(byCat?.films ?? 0);
+  const series = Number(byCat?.series ?? 0);
+  const others = Number(byCat?.others ?? 0);
+  const total = films + series + others;
+  const isCurrent = status?.progress?.current_indexer === idx.name || status?.progress?.current_indexer === idx.id;
+  const hasError = status?.sync_in_progress && isCurrent && status?.progress?.errors && status.progress.errors.length > 0;
+  // Enrichissement TMDB pour cet indexer uniquement (pas les stats globales)
+  const tmdb = status?.tmdb_stats_by_indexer?.[idx.name] ?? status?.tmdb_stats_by_indexer?.[idx.id];
+  const tmdbTotal = tmdb ? tmdb.with_tmdb + tmdb.without_tmdb : 0;
+
+  return (
+    <div class="space-y-5 text-sm min-w-0 max-w-full overflow-hidden">
+      <div class="min-w-0">
+        <p class="text-[var(--ds-text-primary)] font-semibold text-base mb-3 truncate" title={idx.name}>{idx.name}</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div class="ds-box-surface p-3 text-center">
+            <div class="text-2xl">🎬</div>
+            <div class="text-[var(--ds-text-primary)] font-bold text-lg">{films.toLocaleString()}</div>
+            <div class="text-[var(--ds-text-secondary)] text-xs">{t('torrentSyncManager.filmsCount')}</div>
+          </div>
+          <div class="ds-box-surface p-3 text-center">
+            <div class="text-2xl">📺</div>
+            <div class="text-[var(--ds-text-primary)] font-bold text-lg">{series.toLocaleString()}</div>
+            <div class="text-[var(--ds-text-secondary)] text-xs">{t('torrentSyncManager.seriesCount')}</div>
+          </div>
+          <div class="ds-box-surface p-3 text-center">
+            <div class="text-2xl">📦</div>
+            <div class="text-[var(--ds-text-primary)] font-bold text-lg">{others.toLocaleString()}</div>
+            <div class="text-[var(--ds-text-secondary)] text-xs">{t('torrentSyncManager.othersCount')}</div>
+          </div>
+        </div>
+        <div class="flex justify-between items-center pt-3 mt-3 border-t border-[var(--ds-border)]">
+          <span class="text-[var(--ds-text-secondary)]">{t('torrentSyncManager.totalInDb')}</span>
+          <span class="font-bold text-[var(--ds-accent-violet)]">{total.toLocaleString()}</span>
+        </div>
+        {idx.baseUrl && (
+          <div class="mt-3">
+            <span class="text-[var(--ds-text-tertiary)] text-xs">{t('torrentSyncManager.sourceUrl')}</span>
+            <p class="text-[var(--ds-text-secondary)] text-xs truncate mt-0.5" title={idx.baseUrl}>{idx.baseUrl}</p>
+          </div>
+        )}
+        {hasError && status?.progress?.errors && status.progress.errors.length > 0 && (
+          <div class="mt-3 ds-box-error p-3">
+            <p class="text-[var(--ds-accent-red)] text-xs font-semibold mb-1">{t('torrentSyncManager.lastErrors')}</p>
+            <ul class="list-disc list-inside text-xs text-[var(--ds-text-secondary)] space-y-0.5">
+              {status.progress.errors.slice(-3).map((err, i) => (
+                <li key={i} class="truncate" title={err}>{err}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {/* Section Enrichissement TMDB : uniquement pour cet indexer */}
+      {tmdb && tmdbTotal > 0 && (
+        <div class="pt-4 border-t border-[var(--ds-border)]">
+          <h4 class="text-[var(--ds-text-primary)] font-semibold mb-3 flex items-center gap-2">
+            <span class="flex items-center justify-center w-7 h-7 rounded-full text-[var(--ds-text-on-accent)] bg-[var(--ds-accent-violet)]">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </span>
+            {t('torrentSyncManager.tmdbEnrichmentThisIndexer')}
+          </h4>
+          <div class="grid grid-cols-2 gap-3 mb-3">
+            <div class="ds-box-accent-green rounded-[var(--ds-radius-lg)] p-3">
+              <div class="text-[var(--ds-text-on-accent)]/70 text-xs font-semibold">{t('torrentSyncManager.withTmdb')}</div>
+              <div class="text-[var(--ds-text-on-accent)] font-bold text-xl">{tmdb.with_tmdb.toLocaleString()}</div>
+              <div class="text-[var(--ds-text-on-accent)]/60 text-xs">
+                {total > 0 ? `${Math.round((tmdb.with_tmdb / total) * 100)}% ${t('torrentSyncManager.ofTorrents')}` : '0%'}
+              </div>
+            </div>
+            <div class={`rounded-[var(--ds-radius-lg)] p-3 border border-black/10 ${tmdb.without_tmdb > 0 ? 'ds-box-accent-yellow' : 'ds-box-accent'}`}>
+              <div class="text-[var(--ds-text-on-accent)]/70 text-xs font-semibold">{t('torrentSyncManager.withoutTmdb')}</div>
+              <div class="text-[var(--ds-text-on-accent)] font-bold text-xl">{tmdb.without_tmdb.toLocaleString()}</div>
+              <div class="text-[var(--ds-text-on-accent)]/60 text-xs">
+                {total > 0 ? `${Math.round((tmdb.without_tmdb / total) * 100)}% ${t('torrentSyncManager.ofTorrents')}` : '0%'}
+              </div>
+            </div>
+          </div>
+          {tmdb.without_tmdb > 0 && (
+            <>
+              <p class="text-amber-500 text-xs font-semibold mb-2">
+                {t('torrentSyncManager.torrentsWithoutTmdb')} ({tmdb.missing_tmdb.length > 0 ? tmdb.missing_tmdb.length : tmdb.without_tmdb})
+              </p>
+              <div class="ds-box-surface p-3 max-h-48 overflow-y-auto mb-2">
+                <div class="space-y-1.5">
+                  {tmdb.missing_tmdb.length > 0 ? (
+                    tmdb.missing_tmdb.map(([name, category], i) => (
+                      <div key={i} class="flex items-center gap-2 text-xs">
+                        <span class="text-[var(--ds-text-tertiary)] w-14 truncate">{category === 'films' ? '🎬' : category === 'series' ? '📺' : '📦'} {category}</span>
+                        <span class="text-[var(--ds-text-secondary)] flex-1 truncate" title={name}>{name}</span>
+                      </div>
+                    ))
+                  ) : (
+                    <p class="text-[var(--ds-text-tertiary)] text-xs text-center py-2">{t('torrentSyncManager.noneWithoutTmdb')}</p>
+                  )}
+                </div>
+              </div>
+              {tmdb.without_tmdb > 50 && <p class="text-[var(--ds-text-secondary)] text-xs mb-2">{t('torrentSyncManager.displayingFirst')}</p>}
+              <p class="text-[var(--ds-text-secondary)] text-xs mb-2">{t('torrentSyncManager.tipNoTmdb')}</p>
+              {hasCloudToken && (
+                <button
+                  type="button"
+                  class="ds-btn-accent btn btn-sm gap-2 px-4 py-2.5 font-semibold text-[var(--ds-text-on-accent)] disabled:opacity-50 min-h-[var(--ds-touch-target-sm)]"
+                  onClick={onImproveWithGemini}
+                  disabled={geminiLoading || (status?.sync_in_progress ?? false)}
+                  title={t('torrentSyncManager.improveWithGemini')}
+                >
+                  {geminiLoading ? <span class="loading loading-spinner loading-sm" /> : <Sparkles {...iconPropsSm} />}
+                  {t('torrentSyncManager.improveWithGemini')}
+                </button>
+              )}
+            </>
+          )}
+          {tmdb.without_tmdb === 0 && tmdb.with_tmdb > 0 && (
+            <div class="ds-box-accent-green rounded-[var(--ds-radius-lg)] p-3">
+              <p class="text-[var(--ds-text-on-accent)] text-xs font-semibold flex items-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {t('torrentSyncManager.allHaveTmdb')}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div class="flex flex-wrap items-center justify-end gap-2 pt-4 border-t border-[var(--ds-border)]">
+        {onStartSyncForIndexer && (
+          <button
+            type="button"
+            class="ds-btn-accent btn btn-sm gap-2 px-4 py-2.5 font-semibold text-[var(--ds-text-on-accent)] disabled:opacity-50 min-h-[var(--ds-touch-target-sm)]"
+            onClick={() => onStartSyncForIndexer(idx.id)}
+            disabled={(syncing ?? false) || (status?.sync_in_progress ?? false)}
+            title={t('torrentSyncManager.launchSyncThisIndexer')}
+          >
+            {syncing ? <span class="loading loading-spinner loading-sm" /> : null}
+            {t('torrentSyncManager.launchSyncThisIndexer')}
+          </button>
+        )}
+        <button
+          type="button"
+          class="ds-btn-secondary btn btn-sm px-4 py-2.5 font-semibold text-[var(--ds-text-primary)] min-h-[var(--ds-touch-target-sm)]"
+          onClick={onClose}
+        >
+          {t('torrentSyncManager.close')}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManagerProps = {}) {
@@ -73,6 +269,14 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
   const [seriesQueriesText, setSeriesQueriesText] = useState('');
   const [geminiLoading, setGeminiLoading] = useState(false);
   const [hasCloudToken, setHasCloudToken] = useState(false);
+  /** null = tous les indexers sélectionnés (défaut), string[] = seulement ceux-ci */
+  const [selectedIndexerIdsForSync, setSelectedIndexerIdsForSync] = useState<string[] | null>(null);
+  /** Indexer dont on affiche la modale de détails */
+  const [selectedIndexerForModal, setSelectedIndexerForModal] = useState<Indexer | null>(null);
+  /** Panneau Paramètres ouvert/replié */
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Onglet actif : Vue d'ensemble | Paramètres */
+  const [syncView, setSyncView] = useState<'overview' | 'settings'>('overview');
 
   // Hook pour les notifications natives
   const {
@@ -82,14 +286,59 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
     notifySyncComplete,
   } = useNativeNotifications();
 
-  // Évite les appels concurrents (polling + clics) et réduit les boucles de logs
-  const loadStatusInFlight = useRef(false);
   const loadIndexersInFlight = useRef(false);
-  const lastLoggedSettingsKey = useRef<string>('');
+  const prevSyncInProgressRef = useRef<boolean>(false);
 
   useEffect(() => {
-    loadStatus();
+    refreshSyncStatusStore();
     loadIndexers();
+  }, []);
+
+  useEffect(() => {
+    const defaultStatus: SyncStatus = {
+      sync_in_progress: false,
+      last_sync_date: null,
+      settings: {
+        sync_frequency_minutes: 60,
+        is_enabled: 0,
+        last_sync_date: null,
+        sync_in_progress: 0,
+        max_torrents_per_category: 0,
+        sync_queries_films: [],
+        sync_queries_series: [],
+      },
+      stats: {},
+      stats_by_indexer: {},
+      sync_start_time: null,
+    };
+    const unsub = subscribeSyncStatusStore((storeState) => {
+      const newData = storeState.status;
+      const isNowInProgress = newData?.sync_in_progress ?? false;
+      const wasInProgress = prevSyncInProgressRef.current;
+      prevSyncInProgressRef.current = isNowInProgress;
+      if (newData) {
+        if (!wasInProgress && isNowInProgress) {
+          setPreviousStats(newData.stats || {});
+        }
+        if (wasInProgress && !isNowInProgress) {
+          const newStats = newData.stats || {};
+          const totalAdded = Object.values(newStats).reduce((sum, c) => sum + (c || 0), 0);
+          setPreviousStats((prev) => {
+            const prevTotal = Object.values(prev).reduce((sum, c) => sum + (c || 0), 0);
+            if (totalAdded - prevTotal > 0) notifySyncComplete(totalAdded - prevTotal).catch(console.error);
+            return {};
+          });
+          loadIndexers();
+          setAnimatedCounts({});
+          setSyncStartTime(null);
+          setElapsedTime(0);
+        }
+        setStatus(newData as SyncStatus);
+      } else {
+        setStatus(defaultStatus);
+      }
+    });
+    return unsub;
   }, []);
 
   useEffect(() => {
@@ -161,23 +410,17 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
     }
   }, [status?.stats, status?.sync_in_progress, status?.progress?.current_category, status?.progress?.total_processed]);
 
-  // Rafraîchir le statut automatiquement si une sync est en cours
+  // Sync du store : mise à jour de syncStartTime / previousStats quand la sync démarre ou se termine
   useEffect(() => {
     if (status?.sync_in_progress) {
       if (!syncStartTime && status.sync_start_time) {
         setSyncStartTime(status.sync_start_time);
         setAnimatedCounts({});
       }
-      // Rafraîchir toutes les 2 secondes pendant la sync
-      const interval = setInterval(() => {
-        loadStatus();
-      }, 2000);
-      return () => clearInterval(interval);
     } else {
-      // Si la sync vient de se terminer, recharger le statut une dernière fois
       if (syncStartTime) {
         setTimeout(() => {
-          loadStatus();
+          refreshSyncStatusStore();
           loadIndexers();
         }, 1000);
         setSyncStartTime(null);
@@ -282,235 +525,6 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
     }
   };
 
-  const loadStatus = async () => {
-    if (loadStatusInFlight.current) return;
-    loadStatusInFlight.current = true;
-    
-    try {
-      // Ne pas mettre loading à true si on a déjà un statut (pour ne pas bloquer l'interface)
-      // Si on n'a pas de statut, créer un statut par défaut IMMÉDIATEMENT pour éviter le blocage
-      if (!status) {
-        // Créer un statut par défaut immédiatement pour que l'interface s'affiche
-        setStatus({
-          sync_in_progress: false,
-          last_sync_date: null,
-          settings: {
-            sync_frequency_minutes: 60,
-            is_enabled: 0,
-            last_sync_date: null,
-            sync_in_progress: 0,
-            max_torrents_per_category: 1000,
-            sync_queries_films: [],
-            sync_queries_series: [],
-          },
-          stats: {},
-          sync_start_time: null,
-        });
-        // Ne pas mettre loading à true pour ne pas bloquer l'interface
-        // setLoading(true); // DÉSACTIVÉ pour éviter le blocage
-      }
-      setError('');
-      
-      // Ajouter un timeout côté client pour éviter de bloquer trop longtemps
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => {
-          reject(new Error('Timeout'));
-        }, 3000); // Réduire à 3 secondes pour être plus réactif
-      });
-      
-      const response = await Promise.race([
-        serverApi.getSyncStatus(),
-        timeoutPromise,
-      ]) as any;
-      
-      if (response.success && response.data) {
-        const newStats = response.data.stats || {};
-        
-        // Log pour debug : vérifier si settings est présent
-        if (!response.data.settings) {
-          console.warn('[TORRENT SYNC MANAGER] ⚠️ Pas de settings dans la réponse:', response.data);
-          // Si pas de settings, créer des valeurs par défaut pour éviter les erreurs
-          response.data.settings = {
-            sync_frequency_minutes: 60,
-            is_enabled: 0,
-            last_sync_date: null,
-            sync_in_progress: 0,
-            max_torrents_per_category: 1000,
-            sync_queries_films: [],
-            sync_queries_series: [],
-          };
-        } else {
-          // S'assurer que sync_queries_films et sync_queries_series sont des tableaux
-          if (!Array.isArray(response.data.settings.sync_queries_films)) {
-            response.data.settings.sync_queries_films = [];
-          }
-          if (!Array.isArray(response.data.settings.sync_queries_series)) {
-            response.data.settings.sync_queries_series = [];
-          }
-          
-          const settingsKey = JSON.stringify({
-            sync_frequency_minutes: response.data.settings.sync_frequency_minutes,
-            is_enabled: response.data.settings.is_enabled,
-            max_torrents_per_category: response.data.settings.max_torrents_per_category,
-            sync_queries_films: response.data.settings.sync_queries_films,
-            sync_queries_series: response.data.settings.sync_queries_series,
-          });
-          if (lastLoggedSettingsKey.current !== settingsKey) {
-            console.log('[TORRENT SYNC MANAGER] ✅ Settings récupérés:', {
-              sync_frequency_minutes: response.data.settings.sync_frequency_minutes,
-              is_enabled: response.data.settings.is_enabled,
-              max_torrents_per_category: response.data.settings.max_torrents_per_category,
-              sync_queries_films: response.data.settings.sync_queries_films,
-              sync_queries_series: response.data.settings.sync_queries_series,
-            });
-            lastLoggedSettingsKey.current = settingsKey;
-          }
-        }
-        
-        // Initialiser previousStats si c'est le début d'une sync
-        if (Object.keys(previousStats).length === 0 && response.data.sync_in_progress) {
-          setPreviousStats(newStats);
-        }
-
-        if (response.data.sync_in_progress) {
-          if (response.data.sync_start_time) {
-            setSyncStartTime(response.data.sync_start_time);
-            if (!syncStartTime) {
-              setPreviousStats(newStats);
-            }
-          } else {
-            setSyncStartTime(null);
-          }
-        } else if (!response.data.sync_in_progress && syncStartTime) {
-          setSyncStartTime(null);
-          setPreviousStats({});
-        }
-
-        // Si la synchronisation vient de se terminer
-        const wasInProgress = status?.sync_in_progress || false;
-        const isNowInProgress = response.data.sync_in_progress;
-        
-        if (wasInProgress && !isNowInProgress) {
-          // Notification native de complétion
-          const totalAdded = Object.values(newStats).reduce((sum, count) => sum + (count || 0), 0);
-          const previousTotal = Object.values(previousStats).reduce((sum, count) => sum + (count || 0), 0);
-          const newTorrents = totalAdded - previousTotal;
-          if (newTorrents > 0) {
-            notifySyncComplete(newTorrents).catch(console.error);
-          }
-          loadIndexers();
-          setAnimatedCounts({});
-        }
-
-        // Notification de progression (toutes les 10-20 torrents)
-        if (isNowInProgress && response.data.progress) {
-          const totalProcessed = response.data.progress.total_processed || 0;
-          if (totalProcessed > 0 && totalProcessed % 15 === 0) {
-            notifySyncProgress(totalProcessed).catch(console.error);
-          }
-        }
-        
-        setStatus(response.data);
-        setError('');
-      } else {
-        // Si c'est un timeout, une erreur réseau ou backend indisponible, utiliser des valeurs par défaut
-        if (response.error === 'Timeout' || response.error === 'NetworkError' || response.error === 'BackendUnavailable') {
-          const errorMsg = response.error === 'BackendUnavailable' 
-            ? 'Le backend Rust n\'est pas accessible. Vérifiez qu\'il est démarré sur le port 3000.'
-            : 'Le backend ne répond pas. Utilisation des valeurs par défaut. Vérifiez que le backend est démarré.';
-          setError(errorMsg);
-          console.warn('[TORRENT SYNC MANAGER] ⚠️', errorMsg);
-          
-          // Créer un statut par défaut pour permettre l'affichage de l'interface
-          if (!status) {
-            setStatus({
-              sync_in_progress: false,
-              last_sync_date: null,
-              settings: {
-                sync_frequency_minutes: 60,
-                is_enabled: 0,
-                last_sync_date: null,
-                sync_in_progress: 0,
-                max_torrents_per_category: 1000,
-              },
-              stats: {},
-              sync_start_time: null,
-            });
-          }
-        } else {
-          setError(response.message || 'Erreur lors du chargement du statut');
-          // Même en cas d'erreur, essayer de garder les paramètres précédents si disponibles
-          if (status?.settings) {
-            console.log('[TORRENT SYNC MANAGER] ⚠️ Erreur mais conservation des paramètres précédents');
-          } else if (!status) {
-            // Créer un statut par défaut si on n'a pas de statut précédent
-            setStatus({
-              sync_in_progress: false,
-              last_sync_date: null,
-              settings: {
-                sync_frequency_minutes: 60,
-                is_enabled: 0,
-                last_sync_date: null,
-                sync_in_progress: 0,
-                max_torrents_per_category: 1000,
-              },
-              stats: {},
-              sync_start_time: null,
-            });
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Erreur lors du chargement du statut:', err);
-      const errorMsg = err instanceof Error ? err.message : 'Erreur lors du chargement du statut';
-      
-      // Si c'est un timeout, utiliser des valeurs par défaut pour ne pas bloquer l'interface
-      if (errorMsg === 'Timeout' || errorMsg.includes('timeout') || errorMsg.includes('Timeout')) {
-        console.warn('[TORRENT SYNC MANAGER] ⚠️ Timeout lors du chargement du statut, utilisation de valeurs par défaut');
-        setError('Le backend ne répond pas rapidement. L\'interface reste accessible.');
-        
-        // S'assurer qu'on a un statut (déjà créé au début, mais on le recrée au cas où)
-        if (!status) {
-          setStatus({
-            sync_in_progress: false,
-            last_sync_date: null,
-            settings: {
-              sync_frequency_minutes: 60,
-              is_enabled: 0,
-              last_sync_date: null,
-              sync_in_progress: 0,
-              max_torrents_per_category: 1000,
-            },
-            stats: {},
-            sync_start_time: null,
-          });
-        }
-      } else {
-        setError(errorMsg);
-        // Même en cas d'erreur, s'assurer qu'on a un statut
-        if (!status) {
-          setStatus({
-            sync_in_progress: false,
-            last_sync_date: null,
-            settings: {
-              sync_frequency_minutes: 60,
-              is_enabled: 0,
-              last_sync_date: null,
-              sync_in_progress: 0,
-              max_torrents_per_category: 1000,
-            },
-            stats: {},
-            sync_start_time: null,
-          });
-        }
-      }
-    } finally {
-      // Toujours mettre loading à false pour débloquer l'interface
-      setLoading(false);
-      loadStatusInFlight.current = false;
-    }
-  };
-
   const startSync = async () => {
     try {
       setSyncing(true);
@@ -521,7 +535,13 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
       console.log('[SYNC MANAGER] 🔄 Synchronisation des indexers avant démarrage de la sync...');
       await syncIndexersToBackend();
       
-      const response = await serverApi.startSync();
+      const indexerIdsToSync =
+        selectedIndexerIdsForSync === null || selectedIndexerIdsForSync.length === indexers.length
+          ? undefined
+          : selectedIndexerIdsForSync.length > 0
+            ? selectedIndexerIdsForSync
+            : undefined;
+      const response = await serverApi.startSync(indexerIdsToSync);
       
       if (response.success) {
         const msg = (response.data && typeof response.data === 'string' ? response.data : null) || t('torrentSyncManager.syncStarted');
@@ -529,10 +549,12 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
         setTimeout(() => setSuccess(''), 5000);
         await notifySyncStart();
         setPreviousStats({});
+        refreshSyncStatusStore();
+        setTimeout(() => refreshSyncStatusStore(), 600);
         setTimeout(() => {
-          loadStatus();
+          refreshSyncStatusStore();
           loadIndexers();
-        }, 1000);
+        }, 1500);
       } else {
         // Logger la réponse complète pour le debug
         console.error('[TorrentSyncManager] Erreur lors du démarrage de la sync:', {
@@ -569,6 +591,39 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
     }
   };
 
+  /** Lance la synchronisation pour un seul indexer (depuis la modale détail). */
+  const startSyncForIndexer = async (indexerId: string) => {
+    try {
+      setSyncing(true);
+      setError('');
+      setSuccess('');
+      await syncIndexersToBackend();
+      const response = await serverApi.startSync(indexerId);
+      if (response.success) {
+        const msg = (response.data && typeof response.data === 'string' ? response.data : null) || t('torrentSyncManager.syncStarted');
+        setSuccess(msg);
+        setTimeout(() => setSuccess(''), 5000);
+        await notifySyncStart();
+        setPreviousStats({});
+        refreshSyncStatusStore();
+        setTimeout(() => refreshSyncStatusStore(), 600);
+        setTimeout(() => {
+          refreshSyncStatusStore();
+          loadIndexers();
+        }, 1500);
+      } else {
+        setError(response.message || response.error || 'Erreur lors du démarrage de la synchronisation');
+        await notifySyncError(response.message || response.error || '');
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Erreur lors du démarrage de la synchronisation';
+      setError(errorMsg);
+      await notifySyncError(errorMsg);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const stopSync = async () => {
     try {
       setSyncing(true);
@@ -579,10 +634,33 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
       
       if (response.success) {
         setSuccess(t('torrentSyncManager.syncStopped'));
+        // Mise à jour optimiste : l'interface reflète l'arrêt immédiat (plus de progression sur les cartes)
+        setStatus((prev) => prev ? {
+          ...prev,
+          sync_in_progress: false,
+          sync_start_time: null,
+          progress: {
+            current_indexer: null,
+            current_category: null,
+            current_query: null,
+            indexer_torrents: {},
+            category_torrents: {},
+            total_processed: 0,
+            total_to_process: 0,
+            fetched_pages: 0,
+            errors: [],
+          },
+        } : prev);
+        setSyncStartTime(null);
+        setPreviousStats({});
+        setElapsedTime(0);
+        setAnimatedCounts({});
+        // Recharger tout de suite pour confirmer l'état serveur
+        refreshSyncStatusStore();
+        loadIndexers();
         setTimeout(() => {
-          loadStatus();
-          loadIndexers();
-        }, 1000);
+          refreshSyncStatusStore();
+        }, 500);
       } else {
         setError(response.message || t('torrentSyncManager.errorStopping'));
       }
@@ -603,7 +681,7 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
       
       if (response.success) {
         setSuccess(t('torrentSyncManager.settingsSaved'));
-        loadStatus();
+        refreshSyncStatusStore();
         syncSyncSettingsToCloud();
       } else {
         setError(response.message || t('torrentSyncManager.errorUpdating'));
@@ -637,7 +715,7 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
           ? t('torrentSyncManager.improveWithGeminiSuccess') + ` (${result.inserted} règle(s))`
           : t('torrentSyncManager.improveWithGeminiSuccess');
         setSuccess(msg);
-        loadStatus();
+        refreshSyncStatusStore();
       } else {
         const msg = result.message || result.error || t('torrentSyncManager.improveWithGeminiError');
         const isAdminOnly =
@@ -676,7 +754,7 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
         const count = typeof response.data === 'number' ? response.data : 0;
         setSuccess(t('torrentSyncManager.torrentsCleared', { count }));
         setTimeout(() => {
-          loadStatus();
+          refreshSyncStatusStore();
           loadIndexers();
         }, 1000);
       } else {
@@ -751,15 +829,43 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
     );
   }
 
+  // Sans status mais chargement terminé : afficher quand même la structure (onglets) pour que le design soit visible
   if (!status && !loading) {
     return (
-      <div class="alert alert-error">
-        <span>{t('errors.generic')}</span>
-        {error && (
-          <div class="mt-2 text-sm">
-            <strong>{t('common.error')}:</strong> {error}
-          </div>
-        )}
+      <div class="space-y-6">
+        <header class="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <p class="text-white font-semibold text-lg">{t('torrentSyncManager.noSyncInProgress')}</p>
+        </header>
+        <DsNavTabs
+          activeId={syncView}
+          onChange={(id) => setSyncView(id as 'overview' | 'settings')}
+          tabs={[
+            {
+              id: 'overview',
+              label: t('torrentSyncManager.tabOverview'),
+              content: (
+                <DsCard variant="elevated">
+                  <DsCardSection className="text-center">
+                    <p class="ds-text-secondary mb-2">{t('errors.generic')}</p>
+                    {error && <p class="text-sm text-red-300">{error}</p>}
+                    <p class="text-sm mt-4 text-white/70">{t('torrentSyncManager.startBackendToSeeData')}</p>
+                  </DsCardSection>
+                </DsCard>
+              ),
+            },
+            {
+              id: 'settings',
+              label: t('torrentSyncManager.tabSettings'),
+              content: (
+                <DsCard variant="elevated">
+                  <DsCardSection className="text-center">
+                    <p class="ds-text-secondary">{t('torrentSyncManager.settingsAvailableWhenBackendConnected')}</p>
+                  </DsCardSection>
+                </DsCard>
+              ),
+            },
+          ]}
+        />
       </div>
     );
   }
@@ -784,9 +890,8 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
           </div>
         )}
         {status.settings ? (
-          <div class="card bg-base-200">
-            <div class="card-body p-6">
-              <h2 class="card-title text-2xl mb-4">{t('torrentSyncManager.settings')}</h2>
+          <DsCard variant="elevated" className="mb-0">
+            <DsCardSection title={t('torrentSyncManager.settings')}>
               <div class="space-y-4">
                 <div>
                   <label class="label">
@@ -810,7 +915,7 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                     {status.settings?.sync_frequency_minutes &&
                      ![15, 30, 60, 120, 240, 480, 1440].includes(status.settings.sync_frequency_minutes) && (
                       <option value={String(status.settings.sync_frequency_minutes)}>
-                        {formatFrequency(status.settings.sync_frequency_minutes)} ({language === 'fr' ? 'personnalisé' : 'custom'})
+                        {formatFrequency(status.settings.sync_frequency_minutes)} ({t('torrentSyncManager.custom')})
                       </option>
                     )}
                   </select>
@@ -838,18 +943,19 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                   <input
                     type="number"
                     class="input input-bordered w-full"
-                    min="1"
+                    min="0"
                     max="100000"
-                    value={status.settings.max_torrents_per_category || 1000}
+                    value={status.settings.max_torrents_per_category ?? 0}
                     onChange={(e) => {
-                      const value = parseInt((e.target as HTMLInputElement).value);
-                      if (value >= 1 && value <= 100000) {
+                      const value = parseInt((e.target as HTMLInputElement).value, 10);
+                      if (!Number.isNaN(value) && value >= 0 && value <= 100000) {
                         updateSettings({ max_torrents_per_category: value });
                       }
                     }}
                   />
+                  <p class="text-xs text-gray-400 mt-1">{t('torrentSyncManager.maxTorrentsPerCategoryHint')}</p>
                 </div>
-                <div class="divider">{language === 'fr' ? 'Avancé' : 'Advanced'}</div>
+                <div class="divider">{t('torrentSyncManager.advanced')}</div>
                 <div>
                   <label class="label cursor-pointer">
                     <span class="label-text">{t('torrentSyncManager.rssIncremental')}</span>
@@ -891,16 +997,16 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                   <p class="text-xs text-gray-400 mt-1">{t('torrentSyncManager.seriesKeywordsNote')}</p>
                 </div>
               </div>
-            </div>
-          </div>
+            </DsCardSection>
+          </DsCard>
         ) : (
-          <div class="card bg-base-200">
-            <div class="card-body p-6">
-              <div class="alert alert-warning">
-                <span>{t('torrentSyncManager.settingsNotAvailable')}</span>
+          <DsCard variant="elevated">
+            <DsCardSection>
+              <div class="ds-status-badge ds-status-badge--warning w-fit" role="status">
+                {t('torrentSyncManager.settingsNotAvailable')}
               </div>
-            </div>
-          </div>
+            </DsCardSection>
+          </DsCard>
         )}
       </div>
     );
@@ -923,8 +1029,10 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
   const hasTorrents = totalTorrents > 0 ||
     (status.tmdb_stats && (status.tmdb_stats.with_tmdb > 0 || status.tmdb_stats.without_tmdb > 0));
 
+  const syncInProgress = status.sync_in_progress === true;
+
   return (
-    <div class="space-y-6">
+    <div class="space-y-6 min-w-0 max-w-full overflow-x-hidden">
       {/* Messages d'alerte */}
       {error && (
         <div class="alert alert-error animate-fade-in">
@@ -955,75 +1063,187 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
         </div>
       )}
 
-      {/* Carte principale de synchronisation */}
-      <div class="card bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 border-2 border-gray-700 shadow-2xl">
-        <div class="card-body p-6">
-          {/* En-tête avec statut */}
-          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div class="flex-1">
-              <h2 class="text-2xl sm:text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                {status.sync_in_progress ? (
-                  <>
-                    <span class="loading loading-spinner loading-md text-primary animate-spin"></span>
-                    <span class="animate-pulse">{t('torrentSyncManager.synchronizationInProgress')}</span>
-                  </>
-                ) : (
-                  <>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <span>{t('torrentSyncManager.status')}</span>
-                  </>
-                )}
-              </h2>
-              <p class="text-gray-400 text-sm">
-                {status.sync_in_progress 
-                  ? t('torrentSyncManager.elapsedSince', { time: formatElapsedTime(elapsedTime) })
-                  : status.last_sync_date 
-                    ? t('torrentSyncManager.lastSync', { date: formatDate(status.last_sync_date) })
-                    : t('torrentSyncManager.neverSynced')}
-              </p>
+      {/* Bannière "En cours depuis" — au-dessus de la toolbar, avec animation */}
+      {syncInProgress && (
+        <div class="sync-elapsed-banner" role="status" aria-live="polite">
+          <span class="sync-elapsed-banner__dot" aria-hidden="true" />
+          <span>
+            {t('torrentSyncManager.elapsedSinceLabel')}{' '}
+            <span class="sync-elapsed-banner__time">{formatElapsedTime(elapsedTime)}</span>
+          </span>
+        </div>
+      )}
+
+      {/* Barre Sync : indexer en cours (si sync) | onglets | outils | CTA — statut détaillé dans le panneau "Ce qui se passe" */}
+      <div class="sync-toolbar mb-6">
+        {syncInProgress && (status.progress?.current_indexer ?? '').trim() && (
+          <span class="flex-shrink-0 text-xs font-semibold text-white/80 px-2 py-0.5 rounded-full bg-white/10 truncate max-w-[120px]" title={status.progress?.current_indexer ?? ''}>
+            {status.progress?.current_indexer?.trim()}
+          </span>
+        )}
+      <DsNavTabs
+        activeId={syncView}
+        onChange={(id) => setSyncView(id as 'overview' | 'settings')}
+        className="flex-1 min-w-0"
+        rightContent={
+          <>
+            <div class="sync-toolbar__tools" role="group" aria-label={t('torrentSyncManager.toolsAriaLabel')}>
+              <DsIconButton icon={RefreshCw} onClick={() => refreshSyncStatusStore()} disabled={loading} title={t('torrentSyncManager.refresh')} ariaLabel={t('torrentSyncManager.refresh')} iconClass={loading ? 'animate-spin' : ''} size="sm" />
+              <DsIconButton icon={FileDown} onClick={async () => { const res = await serverApi.downloadSyncLog(); if (!res.success) setError(res.message || t('torrentSyncManager.downloadLogError')); }} title={t('torrentSyncManager.downloadLog')} ariaLabel={t('torrentSyncManager.downloadLog')} size="sm" />
+              <DsIconButton icon={Code2} href="/settings/debug-sync" title={t('settingsPages.debugSync.debugLink')} ariaLabel={t('settingsPages.debugSync.debugLink')} size="sm" />
             </div>
-            
-            {/* Badge de statut retiré (doublon visuel) */}
+            <span class="sync-toolbar__separator" aria-hidden="true" />
+            {syncInProgress ? (
+              <button type="button" class="sync-toolbar__btn sync-toolbar__btn--danger" onClick={stopSync} disabled={syncing} aria-busy={syncing} title={t('torrentSyncManager.stopSync')}>
+                {syncing ? <span class="loading loading-spinner loading-sm" /> : null}
+                {t('torrentSyncManager.stopSync')}
+              </button>
+            ) : (
+              <button type="button" class="sync-toolbar__btn sync-toolbar__btn--primary" onClick={startSync} disabled={syncing || (selectedIndexerIdsForSync !== null && selectedIndexerIdsForSync.length === 0)} aria-busy={syncing} title={t('torrentSyncManager.fullScan')}>
+                {syncing ? <span class="loading loading-spinner loading-sm" /> : <RotateCw size={16} strokeWidth={1.5} />}
+                {t('torrentSyncManager.fullScan')}
+              </button>
+            )}
+          </>
+        }
+        tabs={[
+          {
+            id: 'overview',
+            label: t('torrentSyncManager.tabOverview'),
+            content: (
+              <>
+                <h2 class="ds-title-page mb-6">{t('torrentSyncManager.progressTitle')}</h2>
 
-            {/* Bouton actualiser */}
-            <button
-              class="btn btn-sm btn-ghost"
-              onClick={loadStatus}
-              disabled={loading}
-            >
-              <RefreshCw class={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-            {/* Télécharger le journal de synchronisation */}
-            <button
-              class="btn btn-sm btn-ghost"
-              onClick={async () => {
-                const res = await serverApi.downloadSyncLog();
-                if (!res.success) setError(res.message || t('torrentSyncManager.downloadLogError'));
-              }}
-              title={t('torrentSyncManager.downloadLog')}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              <span class="hidden sm:inline">{t('torrentSyncManager.downloadLog')}</span>
-            </button>
-            <a
-              href="/settings/debug-sync"
-              class="btn btn-sm btn-ghost text-gray-400 hover:text-white"
-              title={t('settingsPages.debugSync.debugLink')}
-            >
-              <span class="hidden sm:inline">{t('settingsPages.debugSync.debugLink')}</span>
-            </a>
+      {/* Panneau "Ce qui se passe" : uniquement pendant une sync — cet emplacement reste vide sinon */}
+      {syncInProgress && (
+        <div class="sync-activity-panel mb-6 rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] overflow-hidden">
+          <h3 class="sync-activity-panel__title px-4 py-3 text-sm font-semibold text-[var(--ds-text-primary)] border-b border-[var(--ds-border)]">
+            {t('torrentSyncManager.activityTitle')}
+          </h3>
+          <div class="sync-activity-panel__body px-4 py-3 text-sm">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mb-3">
+              {status.progress?.sync_trigger && (
+                <span class="font-medium text-[var(--ds-text-secondary)]">
+                  {status.progress.sync_trigger === 'scheduled'
+                    ? t('torrentSyncManager.syncTriggerScheduled')
+                    : t('torrentSyncManager.syncTriggerManual')}
+                </span>
+              )}
+              {(status.progress?.current_indexer ?? '').trim() && (
+                <span class="text-[var(--ds-text-tertiary)]">
+                  {t('torrentSyncManager.currentIndexer')}: <strong class="text-[var(--ds-text-primary)]">{status.progress?.current_indexer}</strong>
+                </span>
+              )}
+              {(status.progress?.current_category ?? '').trim() && (
+                <span class="text-[var(--ds-text-tertiary)]">
+                  {t('torrentSyncManager.category')}: <strong class="text-[var(--ds-text-primary)]">{status.progress?.current_category}</strong>
+                </span>
+              )}
+            </div>
+            {Array.isArray(status.progress?.log_lines) && status.progress.log_lines.length > 0 && (
+              <div class="sync-activity-panel__log">
+                <p class="text-xs font-semibold text-[var(--ds-text-tertiary)] mb-1.5">{t('torrentSyncManager.activityLogTitle')}</p>
+                <div class="sync-activity-panel__log-lines rounded-lg bg-[var(--ds-surface)] border border-[var(--ds-border)] p-3 max-h-40 overflow-y-auto font-mono text-xs text-[var(--ds-text-secondary)] space-y-0.5">
+                  {status.progress.log_lines.slice(-12).map((line, i) => (
+                    <div key={i} class="truncate" title={line}>
+                      {line.replace(/^\[\d+\]\s*/, '')}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
+        </div>
+      )}
 
-          {/* Section sync en cours : récupérés → en base (infos fiables) */}
-          {status.sync_in_progress && (
-            <div class="space-y-4 animate-fade-in">
-              <p class="text-gray-400 text-xs">{t('torrentSyncManager.fetchThenEnrich')}</p>
+      {/* Résumé en tête : Films / Séries / Autres */}
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+        <DsMetricCard icon="🎬" label={t('torrentSyncManager.films')} value={status.stats?.films ?? 0} accent="yellow" className="rounded-xl" />
+        <DsMetricCard icon="📺" label={t('torrentSyncManager.series')} value={status.stats?.series ?? 0} accent="violet" className="rounded-xl" />
+        <DsMetricCard icon="📦" label={t('torrentSyncManager.others')} value={status.stats?.others ?? 0} accent="green" className="rounded-xl" />
+      </div>
 
-              {/* Bannière phase : expliquer pourquoi "0 en base" pendant la récupération */}
+      {/* Cartes indexeurs (une par indexer) */}
+      {indexers.length > 0 && (
+        <div class="space-y-4 mb-6">
+          {indexers.map((indexer) => {
+            const currentKey = (status.progress?.current_indexer ?? '').trim();
+            const isCurrent = !!currentKey && (currentKey === (indexer.name ?? '').trim() || currentKey === indexer.id || currentKey.toLowerCase() === (indexer.name ?? '').trim().toLowerCase());
+            const fetched = status.progress?.indexer_torrents?.[indexer.name] ?? status.progress?.indexer_torrents?.[indexer.id] ?? 0;
+            const byCat = status.stats_by_indexer?.[indexer.name] ?? status.stats_by_indexer?.[indexer.id];
+            const films = byCat?.films ?? 0;
+            const series = byCat?.series ?? 0;
+            const others = byCat?.others ?? 0;
+            const hasError = status.sync_in_progress && isCurrent && status.progress?.errors && status.progress.errors.length > 0;
+            const totalSynced = films + series + others;
+            const progressPercent = hasError ? Math.min(progress, 99) : status.sync_in_progress && isCurrent ? progress : totalSynced > 0 ? 100 : 0;
+            const subtitle = status.sync_in_progress && isCurrent
+              ? t('torrentSyncManager.newContentsFound', { count: fetched })
+              : totalSynced > 0
+                ? t('torrentSyncManager.filmsSeriesSynced', { films, series })
+                : t('torrentSyncManager.noContentInDatabase');
+            const isSyncingThisCard = status.sync_in_progress && isCurrent;
+            return (
+              <button
+                key={indexer.id}
+                type="button"
+                onClick={() => setSelectedIndexerForModal(indexer)}
+                class={`sync-indexer-card w-full text-left rounded-xl p-5 sm:p-6 transition-all duration-300 hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] ${isSyncingThisCard ? 'sync-indexer-card--syncing' : ''} ${hasError ? 'sync-card-error' : 'ds-box-accent'}`}
+                title={t('torrentSyncManager.clickForDetails')}
+              >
+                <div class="relative min-w-0">
+                  <span class="absolute top-0 right-0 flex items-center gap-2">
+                    {isSyncingThisCard && (
+                      <span class="sync-indexer-card__badge flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[var(--ds-text-on-accent)] text-xs font-bold whitespace-nowrap bg-white/90 shadow-sm">
+                        <span class="sync-indexer-card__badge-dot" aria-hidden="true" />
+                        {t('torrentSyncManager.inProgress')}
+                      </span>
+                    )}
+                    <span class="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center shrink-0 bg-[var(--ds-surface-elevated)]">
+                      <ChevronRight {...iconProps} class="text-[var(--ds-text-primary)]" />
+                    </span>
+                  </span>
+                  <h3 class={`text-base sm:text-lg md:text-xl font-bold text-[var(--ds-text-on-accent)] truncate ${isSyncingThisCard ? 'pr-28 sm:pr-32' : 'pr-12 sm:pr-14'}`}>{indexer.name}</h3>
+                  <p class="text-[var(--ds-text-on-accent)]/60 text-xs sm:text-sm mt-0.5 truncate">{subtitle}</p>
+                  <div class="mt-4">
+                    <div class="flex justify-between text-xs font-semibold text-[#1C1C1E] mb-1.5">
+                      <span>{t('torrentSyncManager.progressLabel')}</span>
+                      <span class="tabular-nums">{progressPercent}%</span>
+                    </div>
+                    <div class="h-2.5 rounded-full overflow-hidden bg-black/10 sync-indexer-card__track">
+                      {isSyncingThisCard && totalSynced === 0 ? (
+                        <div class="sync-indexer-card__bar sync-indexer-card__bar--indeterminate" />
+                      ) : (
+                        <div class="sync-indexer-card__bar transition-all duration-500 bg-[var(--ds-surface)]" style={{ width: `${Math.min(100, progressPercent)}%` }} />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Graphique répartition */}
+      {(status.stats?.films ?? 0) + (status.stats?.series ?? 0) + (status.stats?.others ?? 0) > 0 && (
+        <DsCard variant="elevated" className="mb-6">
+          <DsCardSection title={t('torrentSyncManager.distributionChart')}>
+            <DsBarChart
+              items={[
+                { label: t('torrentSyncManager.films'), value: status.stats?.films ?? 0, color: 'var(--ds-accent-yellow)' },
+                { label: t('torrentSyncManager.series'), value: status.stats?.series ?? 0, color: 'var(--ds-accent-violet)' },
+                { label: t('torrentSyncManager.others'), value: status.stats?.others ?? 0, color: 'var(--ds-accent-green)' },
+              ]}
+            />
+          </DsCardSection>
+        </DsCard>
+      )}
+
+      {/* Pendant la sync : phase + carte "Récupérés → TMDB → base" + Total synchronisé */}
+      {status.sync_in_progress && (
+        <section class="sync-section-active p-4 sm:p-6 mb-6 rounded-xl overflow-hidden min-w-0 bg-[var(--ds-surface-elevated)]">
+              {/* Bannière phase */}
               {status.progress && (() => {
                 const totalToProcess = status.progress.total_to_process ?? 0;
                 const fetchedCount = status.progress.category_torrents
@@ -1032,21 +1252,21 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                 const isPhaseFetch = totalToProcess === 0 && fetchedCount > 0;
                 if (isPhaseFetch) {
                   return (
-                    <div class="bg-blue-900/40 border border-blue-500/50 rounded-lg p-4">
-                      <p class="text-blue-300 font-semibold text-sm flex items-center gap-2">
-                        <span class="w-2 h-2 bg-blue-400 rounded-full animate-pulse" />
+                    <div class="rounded-xl p-3 border border-[var(--ds-accent-violet)]/50 mb-4 bg-[var(--ds-accent-violet-muted)]">
+                      <p class="text-[var(--ds-text-on-accent)] font-medium text-sm flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full animate-pulse bg-[var(--ds-accent-violet)]" />
                         {t('torrentSyncManager.phaseFetch')}
                         {status.progress.current_query && (
-                          <span class="text-blue-200/90 font-normal">— {status.progress.current_query}</span>
+                          <span class="text-[var(--ds-text-secondary)] font-normal">— {status.progress.current_query}</span>
                         )}
                       </p>
-                      <p class="text-gray-300 text-xs mt-2">{t('torrentSyncManager.phaseFetchExplanation')}</p>
+                      <p class="text-[var(--ds-text-secondary)] text-xs mt-1">{t('torrentSyncManager.phaseFetchExplanation')}</p>
                     </div>
                   );
                 }
                 if (totalToProcess > 0) {
                   return (
-                    <p class="text-green-400/90 text-xs font-medium flex items-center gap-2">
+                    <p class="text-green-400 text-sm font-medium flex items-center gap-2 mb-4">
                       <span class="w-1.5 h-1.5 bg-green-400 rounded-full" />
                       {t('torrentSyncManager.phaseEnrich')} : {t('torrentSyncManager.phaseEnrichProgress', {
                         current: (status.progress.total_processed ?? 0).toLocaleString(),
@@ -1058,517 +1278,205 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                 return null;
               })()}
 
-              {/* Informations de progression en temps réel */}
-              {status.progress && (
-                <div class="bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-xl p-6 border-2 border-blue-500/50">
-                  <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    {t('torrentSyncManager.synchronizationInProgress')}
-                  </h3>
-                  
-                  <div class="space-y-3">
-                    {/* Indexer actuel */}
-                    {status.progress.current_indexer && (
-                      <div class="flex items-center gap-3 bg-gray-800/50 rounded-lg p-3">
-                        <div class="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-                        <div class="flex-1">
-                          <p class="text-gray-400 text-xs">{t('torrentSyncManager.currentIndexer')}</p>
-                          <p class="text-white font-semibold text-sm">{status.progress.current_indexer}</p>
-                          {status.progress.indexer_torrents[status.progress.current_indexer] !== undefined && status.progress.total_to_process > 0 && (
-                            <p class="text-gray-500 text-xs mt-1">
-                              {status.progress.indexer_torrents[status.progress.current_indexer].toLocaleString()} {t('torrentSyncManager.fetchedFromIndexers')} → {status.progress.total_to_process} {t('torrentSyncManager.toProcess')}
-                            </p>
-                          )}
-                        </div>
-                          {status.progress.indexer_torrents[status.progress.current_indexer] !== undefined && (
-                          <div class="text-right">
-                            <p class="text-primary font-bold text-lg">{status.progress.indexer_torrents[status.progress.current_indexer]}</p>
-                            <p class="text-gray-400 text-xs">{t('torrentSyncManager.fetchedFromIndexers')}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {/* Catégorie actuelle : X récupérés → Y en base */}
-                    {status.progress.current_category && (
-                      <div class="flex items-center gap-3 bg-gray-800/50 rounded-lg p-3">
-                        <div class="text-2xl">
-                          {status.progress.current_category === 'films' ? '🎬' : status.progress.current_category === 'series' ? '📺' : '📦'}
-                        </div>
-                        <div class="flex-1">
-                          <p class="text-gray-400 text-xs">{t('torrentSyncManager.category')}</p>
-                          <p class="text-white font-semibold text-sm capitalize">{status.progress.current_category}</p>
-                          {status.progress.category_torrents[status.progress.current_category] !== undefined && (
-                            <p class="text-gray-500 text-xs mt-1">
-                              {status.progress.category_torrents[status.progress.current_category].toLocaleString()} {t('torrentSyncManager.fetchedFromIndexers')} → {(effectiveStats[status.progress.current_category] ?? 0).toLocaleString()} {t('torrentSyncManager.inDatabase')}
-                            </p>
-                          )}
-                        </div>
-                        {status.progress.category_torrents[status.progress.current_category] !== undefined && (
-                          <div class="text-right">
-                            <p class="text-primary font-bold text-lg">{status.progress.category_torrents[status.progress.current_category]}</p>
-                            <p class="text-gray-400 text-xs">→ {(effectiveStats[status.progress.current_category] ?? 0).toLocaleString()} {t('torrentSyncManager.inDatabase')}</p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Requête actuelle */}
-                    {status.progress.current_query && (
-                      <div class="flex items-center gap-3 bg-gray-800/50 rounded-lg p-3">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                        <div class="flex-1">
-                          <p class="text-gray-400 text-xs">{t('torrentSyncManager.searchQuery')}</p>
-                          <p class="text-white font-semibold text-sm">"{status.progress.current_query}"</p>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Progression du traitement */}
-                    {status.progress.total_to_process > 0 && (
-                      <div class="bg-gray-800/50 rounded-lg p-3">
-                        <div class="flex justify-between items-center mb-2">
-                          <div>
-                            <p class="text-gray-400 text-xs">Traitement des torrents</p>
-                            <p class="text-gray-500 text-xs mt-0.5">
-                              Après filtrage et enrichissement TMDB
-                            </p>
-                          </div>
-                          <p class="text-primary font-bold text-sm">
-                            {status.progress.total_processed} / {status.progress.total_to_process}
-                          </p>
-                        </div>
-                        <div class="relative h-2 bg-gray-700 rounded-full overflow-hidden">
-                          <div 
-                            class="h-full bg-gradient-to-r from-primary to-primary/80 rounded-full transition-all duration-300"
-                            style={`width: ${Math.min(100, (status.progress.total_processed / status.progress.total_to_process) * 100)}%`}
-                          ></div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Erreurs récentes */}
-                    {status.progress.errors && status.progress.errors.length > 0 && (
-                      <div class="bg-red-900/20 border border-red-500/30 rounded-lg p-3">
-                        <p class="text-red-400 text-xs font-semibold mb-2">
-                          ⚠️ {t('torrentSyncManager.recentErrors')} ({status.progress.errors.length})
-                        </p>
-                        <div class="space-y-1 max-h-32 overflow-y-auto">
-                          {status.progress.errors.slice(-5).map((error, idx) => (
-                            <p key={idx} class="text-red-300 text-xs truncate" title={error}>{error}</p>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              {/* Indexers en pills compacts */}
-              {indexers.length > 0 && (
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="text-gray-400 text-xs">{t('torrentSyncManager.activeIndexers')}:</span>
-                  {indexers.map((indexer) => {
-                    const isCurrent = status.progress?.current_indexer === indexer.name;
-                    const n = status.progress?.indexer_torrents?.[indexer.name] ?? 0;
-                    return (
-                      <span
-                        key={indexer.id}
-                        class={`badge badge-sm ${isCurrent ? 'badge-primary' : 'badge-ghost'} transition-all`}
-                        title={indexer.baseUrl}
-                      >
-                        {isCurrent && <span class="w-1 h-1 rounded-full bg-white mr-1 animate-pulse" />}
-                        {indexer.name}
-                        {n > 0 && <span class="ml-1 opacity-80">({n.toLocaleString()})</span>}
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Barre de progression */}
-              <div class="flex items-center gap-3">
-                <div class="flex-1 h-2.5 bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    class="h-full bg-gradient-to-r from-primary to-primary/80 rounded-full transition-all duration-500 ease-out"
-                    style={`width: ${Math.min(100, progress)}%`}
+              {/* Carte unique : Récupérés → enrichissement TMDB → en base (graphique + TMDB) */}
+              <DsCard variant="elevated" className="rounded-xl overflow-hidden mb-4">
+                <DsCardSection title={t('torrentSyncManager.fetchThenEnrich')}>
+                  {/* Graphique Films / Séries / Autres (en base) — même style que Répartition */}
+                  <DsBarChart
+                    items={[
+                      { label: `🎬 ${t('torrentSyncManager.films')}`, value: Math.floor(animatedCounts.films ?? effectiveStats.films ?? 0), color: 'var(--ds-accent-yellow)' },
+                      { label: `📺 ${t('torrentSyncManager.series')}`, value: Math.floor(animatedCounts.series ?? effectiveStats.series ?? 0), color: 'var(--ds-accent-violet)' },
+                      { label: `📦 ${t('torrentSyncManager.others')}`, value: Math.floor(animatedCounts.others ?? effectiveStats.others ?? 0), color: 'var(--ds-accent-green)' },
+                    ]}
                   />
-                </div>
-                <span class="text-primary font-bold tabular-nums min-w-[3ch]">{progress}%</span>
+                  {/* Ligne récap récupérés (indexeurs) → en base */}
+                  <p class="text-xs text-[var(--ds-text-secondary)] mt-3 flex flex-wrap gap-x-3 gap-y-1">
+                    <span>{t('torrentSyncManager.fetchedFromIndexers')}:</span>
+                    <span class="tabular-nums">
+                      {t('torrentSyncManager.films')} {(status.progress?.category_torrents?.films ?? 0).toLocaleString()} → {(effectiveStats.films ?? 0).toLocaleString()}
+                      {' · '}
+                      {t('torrentSyncManager.series')} {(status.progress?.category_torrents?.series ?? 0).toLocaleString()} → {(effectiveStats.series ?? 0).toLocaleString()}
+                      {' · '}
+                      {t('torrentSyncManager.others')} {(status.progress?.category_torrents?.others ?? 0).toLocaleString()} → {(effectiveStats.others ?? 0).toLocaleString()}
+                    </span>
+                  </p>
+                  {/* TMDB : enrichis / total */}
+                  {status.tmdb_stats && (() => {
+                    const tmdbTotal = status.tmdb_stats.with_tmdb + status.tmdb_stats.without_tmdb;
+                    const tmdbPercentage = tmdbTotal > 0 ? Math.round((status.tmdb_stats.with_tmdb / tmdbTotal) * 100) : 0;
+                    return tmdbTotal > 0 && (
+                      <div class="mt-4 pt-3 border-t border-[var(--ds-border)] flex flex-wrap items-center justify-between gap-2">
+                        <span class="font-semibold text-[var(--ds-text-primary)]">TMDB</span>
+                        <span class="tabular-nums text-sm">
+                          <span class="font-bold text-[var(--ds-accent-violet)]">{status.tmdb_stats.with_tmdb.toLocaleString()}</span>
+                          <span class="text-[var(--ds-text-secondary)]"> / {tmdbTotal.toLocaleString()}</span>
+                          <span class="text-[var(--ds-text-secondary)] ml-1">· {tmdbPercentage}% {t('torrentSyncManager.enriched')}</span>
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </DsCardSection>
+              </DsCard>
+
+              {/* Total synchronisé : carte avec graphique (comme Répartition) */}
+              <div class="mt-4 pt-4 border-t border-white/10">
+                <DsCard variant="elevated" className="rounded-xl overflow-hidden">
+                  <DsCardSection title={t('torrentSyncManager.totalSynced')}>
+                    <DsBarChart
+                      items={[
+                        { label: t('torrentSyncManager.films'), value: effectiveStats.films ?? 0, color: 'var(--ds-accent-yellow)' },
+                        { label: t('torrentSyncManager.series'), value: effectiveStats.series ?? 0, color: 'var(--ds-accent-violet)' },
+                        { label: t('torrentSyncManager.others'), value: effectiveStats.others ?? 0, color: 'var(--ds-accent-green)' },
+                      ]}
+                    />
+                    <p class="text-sm text-[var(--ds-text-secondary)] mt-3 font-semibold tabular-nums">
+                      {totalTorrents.toLocaleString()} {t('torrentSyncManager.synchronized')}
+                    </p>
+                  </DsCardSection>
+                </DsCard>
               </div>
 
-              {/* Catégories : récupérés (indexeurs) → en base — évite "600 sync mais 0 films" */}
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {(['films', 'series', 'others'] as const).map((category) => {
-                  const fetched = status.progress?.category_torrents?.[category] ?? 0;
-                  const inBase = Math.floor(animatedCounts[category] ?? effectiveStats[category] ?? 0);
-                  const isCurrent = status.progress?.current_category === category;
-                  const icon = category === 'films' ? '🎬' : category === 'series' ? '📺' : '📦';
-                  const label = category === 'films' ? t('torrentSyncManager.films') : category === 'series' ? t('torrentSyncManager.series') : t('torrentSyncManager.others');
-                  const enriching = fetched > 0 && inBase === 0;
-                  return (
-                    <div
-                      key={category}
-                      class={`rounded-lg p-3 border transition-all duration-300 ${
-                        isCurrent ? 'bg-primary/15 border-primary ring-1 ring-primary/50' : 'bg-gray-800/50 border-gray-700'
-                      }`}
-                    >
-                      <div class="flex items-center justify-between gap-2 mb-1.5">
-                        <span class="text-base">{icon}</span>
-                        <span class="text-white font-semibold text-sm">{label}</span>
-                        {isCurrent && <span class="w-1.5 h-1.5 bg-primary rounded-full animate-pulse" />}
-                      </div>
-                      <div class="flex items-baseline gap-2 flex-wrap text-xs">
-                        <span class="text-gray-400">{t('torrentSyncManager.fetchedFromIndexers')}:</span>
-                        <span class="font-bold text-white">{fetched.toLocaleString()}</span>
-                        <span class="text-gray-500">→</span>
-                        <span class="text-gray-400">{t('torrentSyncManager.inDatabase')}:</span>
-                        <span class="font-bold text-primary tabular-nums">{inBase.toLocaleString()}</span>
-                      </div>
-                      {enriching && (
-                        <p class="text-xs text-blue-400 mt-1.5 animate-pulse">{t('torrentSyncManager.enrichingInProgress')}</p>
-                      )}
-                    </div>
-                  );
-                })}
-                
-                {/* Carte TMDB compacte */}
-                {status.tmdb_stats && (() => {
-                  const tmdbTotal = status.tmdb_stats.with_tmdb + status.tmdb_stats.without_tmdb;
-                  const tmdbPercentage = tmdbTotal > 0 ? Math.round((status.tmdb_stats.with_tmdb / tmdbTotal) * 100) : 0;
-                  return tmdbTotal > 0 && (
-                    <div class="bg-gradient-to-br from-blue-800/50 to-purple-900/50 rounded-lg p-3 border border-blue-500/50">
-                      <div class="flex items-center justify-between gap-2">
-                        <span class="text-white font-semibold text-sm">TMDB</span>
-                        {tmdbPercentage === 100 && <span class="badge badge-success badge-sm">100%</span>}
-                      </div>
-                      <div class="text-2xl font-bold text-blue-400 mt-1">
-                        {status.tmdb_stats.with_tmdb.toLocaleString()}
-                        <span class="text-gray-400 text-sm font-normal ml-1">/ {tmdbTotal.toLocaleString()}</span>
-                      </div>
-                      <div class="text-xs text-blue-300 mt-0.5">{tmdbPercentage}% {t('torrentSyncManager.enriched')}</div>
-                    </div>
-                  );
-                })()}
-                {(() => {
-                  // Calculer le total de torrents récupérés depuis progress
-                  const fetchedTotal = status.progress?.indexer_torrents
-                    ? Object.values(status.progress.indexer_torrents).reduce((sum, n) => sum + (n || 0), 0)
-                    : 0;
-                  const hasFetchedTorrents = fetchedTotal > 0;
-                  const hasInsertedTorrents = Object.keys(status.stats || {}).length > 0;
-                  
-                  // "Aucun torrent trouvé" uniquement si vraiment rien récupéré (affiché plus bas en compact)
-                  return null;
-                })()}
-              </div>
-
-              {/* Total en base */}
-              <div class="flex justify-between items-center pt-1 border-t border-gray-700">
-                <span class="text-gray-400 text-sm">{t('torrentSyncManager.totalSynced')}</span>
-                <span class="text-primary font-bold text-xl tabular-nums">{totalTorrents.toLocaleString()}</span>
-              </div>
-
-              {/* Message si aucun torrent récupéré du tout */}
               {(() => {
                 const fetchedTotal = status.progress?.indexer_torrents
                   ? Object.values(status.progress.indexer_torrents).reduce((s, n) => s + (n || 0), 0)
                   : 0;
                 if (fetchedTotal > 0 || totalTorrents > 0) return null;
                 return (
-                  <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 text-center">
-                    <p class="text-yellow-400 text-sm font-medium">{t('torrentSyncManager.noTorrentsFound')}</p>
-                    <p class="text-gray-400 text-xs mt-1">{t('torrentSyncManager.syncInProgressNoResults')}</p>
+                  <div class="rounded-xl p-3 text-center mt-3 border border-amber-500/40 bg-amber-500/15">
+                    <p class="text-amber-400 text-sm font-medium">{t('torrentSyncManager.noTorrentsFound')}</p>
+                    <p class="text-[var(--ds-text-secondary)] text-xs mt-1">{t('torrentSyncManager.syncInProgressNoResults')}</p>
                     {elapsedTime > 30 && (
-                      <p class="text-red-400/90 text-xs mt-2">{t('torrentSyncManager.noResultsAfter', { time: formatElapsedTime(elapsedTime) })}</p>
+                      <p class="text-red-400 text-xs mt-2">{t('torrentSyncManager.noResultsAfter', { time: formatElapsedTime(elapsedTime) })}</p>
                     )}
                   </div>
                 );
               })()}
-            </div>
+        </section>
+      )}
+
+      {/* Résumé Enrichissement TMDB : détails dans la modale d’un indexer (pas sur la page principale) */}
+      {!status.sync_in_progress && status.tmdb_stats && totalTorrents > 0 && (
+        <p class="text-[var(--ds-text-secondary)] text-sm mb-6">
+          {t('torrentSyncManager.tmdbEnrichmentPrefix')}
+          <span class="text-[var(--ds-text-primary)]">{status.tmdb_stats.with_tmdb.toLocaleString()}</span> {t('torrentSyncManager.withTmdb').toLowerCase()}, <span class="text-[var(--ds-text-primary)]">{status.tmdb_stats.without_tmdb.toLocaleString()}</span> {t('torrentSyncManager.withoutTmdb').toLowerCase()}.
+          {t('torrentSyncManager.clickIndexerCardAbove')}
+        </p>
+      )}
+
+      {!status.sync_in_progress && (
+        <>
+          {totalTorrents === 0 && (
+            <section class="rounded-xl p-8 text-center mb-8 border border-amber-500/30 bg-[var(--ds-surface-elevated)]">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-amber-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <p class="text-amber-400 font-semibold mb-1">{t('torrentSyncManager.noTorrentsSynced')}</p>
+              <p class="text-[var(--ds-text-secondary)] text-sm mb-4">{t('torrentSyncManager.lastSyncNoResults')}</p>
+              {indexers.length > 0 ? (
+                <p class="text-[var(--ds-text-primary)] text-sm">{t('torrentSyncManager.activeIndexersCount', { count: indexers.length })}</p>
+              ) : (
+                <p class="text-[var(--ds-accent-red)] text-sm">{t('torrentSyncManager.noIndexerActivated')}</p>
+              )}
+            </section>
           )}
+        </>
+      )}
 
-          {/* Section inactive */}
-          {!status.sync_in_progress && (
-            <div class="space-y-4">
-              {/* Statistiques rapides */}
-              {totalTorrents > 0 && (
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {Object.entries(status.stats || {}).map(([category, count]) => {
-                    const icon = category === 'films' ? '🎬' : category === 'series' ? '📺' : '📦';
-                    return (
-                      <div key={category} class="bg-gray-800/50 rounded-lg p-4 text-center border border-gray-700">
-                        <div class="text-3xl mb-1">{icon}</div>
-                        <div class="text-white font-bold text-xl">{count.toLocaleString()}</div>
-                        <div class="text-gray-400 text-xs capitalize">
-                          {category === 'films' ? t('torrentSyncManager.films') : category === 'series' ? t('torrentSyncManager.series') : t('torrentSyncManager.others')}
-                        </div>
-                      </div>
-                    );
-                  })}
-                  
-                  {/* Carte TMDB - Ratio enrichi (section inactive) */}
-                  {status.tmdb_stats && (() => {
-                    const tmdbTotal = status.tmdb_stats.with_tmdb + status.tmdb_stats.without_tmdb;
-                    const tmdbPercentage = tmdbTotal > 0 ? Math.round((status.tmdb_stats.with_tmdb / tmdbTotal) * 100) : 0;
-                    return tmdbTotal > 0 && (
-                      <div class="bg-gradient-to-br from-blue-800/50 to-purple-900/50 rounded-lg p-4 text-center border-2 border-blue-500/50">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto mb-1 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <div class="text-white font-bold text-xl mb-1">
-                          {status.tmdb_stats.with_tmdb.toLocaleString()}
-                        </div>
-                        <div class="text-gray-300 text-xs mb-1">
-                          {language === 'fr' ? 'sur' : 'of'} {tmdbTotal.toLocaleString()}
-                        </div>
-                        <div class="text-blue-300 font-semibold text-xs">
-                          {tmdbPercentage}% {language === 'fr' ? 'avec TMDB' : 'with TMDB'}
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
-
-              {/* Statistiques TMDB */}
-              {status.tmdb_stats && totalTorrents > 0 && (
-                <div class="bg-gradient-to-br from-blue-900/30 to-purple-900/30 rounded-xl p-6 border-2 border-blue-500/50">
-                  <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    {language === 'fr' ? 'Enrichissement TMDB' : 'TMDB Enrichment'}
-                  </h3>
-                  
-                  <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div class="bg-green-900/30 rounded-lg p-4 border border-green-500/30">
-                      <div class="text-green-400 text-sm font-semibold mb-1">{t('torrentSyncManager.withTmdb')}</div>
-                      <div class="text-white font-bold text-2xl">{status.tmdb_stats.with_tmdb.toLocaleString()}</div>
-                      <div class="text-gray-400 text-xs mt-1">
-                        {totalTorrents > 0 
-                          ? `${Math.round((status.tmdb_stats.with_tmdb / totalTorrents) * 100)}% ${t('torrentSyncManager.ofTorrents')}`
-                          : '0%'}
-                      </div>
-                    </div>
-                    
-                    <div class={`rounded-lg p-4 border ${
-                      status.tmdb_stats.without_tmdb > 0 
-                        ? 'bg-yellow-900/30 border-yellow-500/30' 
-                        : 'bg-gray-900/30 border-gray-700'
-                    }`}>
-                      <div class={`text-sm font-semibold mb-1 ${
-                        status.tmdb_stats.without_tmdb > 0 ? 'text-yellow-400' : 'text-gray-400'
-                      }`}>
-                        {t('torrentSyncManager.withoutTmdb')}
-                      </div>
-                      <div class={`font-bold text-2xl ${
-                        status.tmdb_stats.without_tmdb > 0 ? 'text-yellow-300' : 'text-gray-300'
-                      }`}>
-                        {status.tmdb_stats.without_tmdb.toLocaleString()}
-                      </div>
-                      <div class="text-gray-400 text-xs mt-1">
-                        {totalTorrents > 0 
-                          ? `${Math.round((status.tmdb_stats.without_tmdb / totalTorrents) * 100)}% ${t('torrentSyncManager.ofTorrents')}`
-                          : '0%'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Liste des torrents sans TMDB ID */}
-                  {status.tmdb_stats.without_tmdb > 0 && (
-                    <div class="mt-4">
-                      <div class="flex items-center justify-between mb-3">
-                        <p class="text-yellow-400 text-sm font-semibold">
-                          {t('torrentSyncManager.torrentsWithoutTmdb')} ({status.tmdb_stats.missing_tmdb.length > 0 ? status.tmdb_stats.missing_tmdb.length : status.tmdb_stats.without_tmdb})
-                        </p>
-                        {status.tmdb_stats.without_tmdb > 50 && (
-                          <p class="text-gray-400 text-xs">
-                            {t('torrentSyncManager.displayingFirst')}
-                          </p>
-                        )}
-                      </div>
-                      <div class="bg-gray-900/50 rounded-lg p-3 max-h-64 overflow-y-auto">
-                        <div class="space-y-2">
-                          {status.tmdb_stats.missing_tmdb.length > 0 ? (
-                            status.tmdb_stats.missing_tmdb.map(([name, category], idx) => (
-                              <div key={idx} class="flex items-center gap-2 text-sm">
-                                <span class="text-gray-400 text-xs w-16 capitalize truncate">
-                                  {category === 'films' ? '🎬' : category === 'series' ? '📺' : '📦'} {category}
-                                </span>
-                                <span class="text-gray-300 flex-1 truncate" title={name}>{name}</span>
-                              </div>
-                            ))
-                          ) : (
-                            <p class="text-gray-400 text-sm text-center py-2">
-                              {t('torrentSyncManager.noneWithoutTmdb')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      {status.tmdb_stats.without_tmdb > 0 && (
-                        <p class="text-gray-400 text-xs mt-2">
-                          {t('torrentSyncManager.tipNoTmdb')}
-                        </p>
-                      )}
-                      {status.tmdb_stats.without_tmdb > 0 && hasCloudToken && (
-                        <div class="mt-3">
-                          <button
-                            type="button"
-                            class="btn btn-sm btn-primary gap-2"
-                            onClick={improveWithGemini}
-                            disabled={geminiLoading || status.sync_in_progress}
-                            title={t('torrentSyncManager.improveWithGemini')}
-                          >
-                            {geminiLoading ? (
-                              <span class="loading loading-spinner loading-sm"></span>
-                            ) : (
-                              <Sparkles class="w-4 h-4" />
-                            )}
-                            {t('torrentSyncManager.improveWithGemini')}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Message de succès si tous les torrents ont un ID TMDB */}
-                  {status.tmdb_stats.without_tmdb === 0 && status.tmdb_stats.with_tmdb > 0 && (
-                    <div class="mt-4 bg-green-900/20 border border-green-500/30 rounded-lg p-3">
-                      <p class="text-green-400 text-sm font-semibold flex items-center gap-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {t('torrentSyncManager.allHaveTmdb')}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {totalTorrents === 0 && (
-                <div class="text-center py-12 bg-gray-800/30 rounded-xl border border-yellow-500/30">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-20 w-20 mx-auto text-yellow-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <p class="text-yellow-400 text-lg font-semibold mb-2">{t('torrentSyncManager.noTorrentsSynced')}</p>
-                  <p class="text-gray-400 text-sm mb-4">{t('torrentSyncManager.lastSyncNoResults')}</p>
-                  
-                  {indexers.length > 0 ? (
-                    <div class="mt-6 space-y-3">
-                      <p class="text-gray-300 text-sm font-semibold">{t('torrentSyncManager.activeIndexersCount', { count: indexers.length })}</p>
-                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {indexers.map((indexer) => (
-                          <div key={indexer.id} class="bg-gray-900/50 rounded-lg p-3 border border-gray-700">
-                            <div class="flex items-center gap-2">
-                              <div class="w-2 h-2 bg-green-400 rounded-full"></div>
-                              <div class="flex-1 min-w-0">
-                                <p class="text-white text-sm font-medium truncate" title={indexer.name}>{indexer.name}</p>
-                                <p class="text-gray-500 text-xs truncate" title={indexer.baseUrl}>{indexer.baseUrl}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div class="mt-6 bg-red-900/20 border border-red-500/30 rounded-lg p-4">
-                      <p class="text-red-400 text-sm font-semibold mb-2">{t('torrentSyncManager.noIndexerActivated')}</p>
-                      <p class="text-gray-400 text-xs mb-3">{t('torrentSyncManager.mustConfigureIndexer')}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Actions */}
-          <div class="flex flex-wrap gap-3 mt-6">
-            {status.sync_in_progress ? (
-              <button
-                class="btn btn-error flex-1 sm:flex-none"
-                onClick={stopSync}
-                disabled={syncing}
-              >
-                {syncing ? (
-                  <>
-                    <span class="loading loading-spinner loading-sm"></span>
-                    {t('torrentSyncManager.stopping')}
-                  </>
-                ) : (
-                  <>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
-                    </svg>
-                    {t('torrentSyncManager.stopSync')}
-                  </>
-                )}
-              </button>
-            ) : (
-              <>
-                <button
-                  class="btn btn-primary flex-1 sm:flex-none"
-                  onClick={startSync}
-                  disabled={syncing}
-                >
-                  {syncing ? (
-                    <>
-                      <span class="loading loading-spinner loading-sm"></span>
-                      {t('sync.starting')}
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw class="w-4 h-4" />
-                      {t('torrentSyncManager.launchSync')}
-                    </>
-                  )}
-                </button>
-                {hasTorrents && (
-                  <button
-                    class="btn btn-error flex-1 sm:flex-none"
-                    onClick={clearTorrents}
-                    disabled={syncing || status.sync_in_progress}
-                    title={t('torrentSyncManager.clearTorrents')}
-                  >
-                    {syncing ? (
-                      <>
-                        <span class="loading loading-spinner loading-sm"></span>
-                        {t('torrentSyncManager.clearing')}
-                      </>
-                    ) : (
-                      <>
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        {t('torrentSyncManager.clearTorrents')}
-                      </>
-                    )}
-                  </button>
-                )}
               </>
+            ),
+          },
+          {
+            id: 'settings',
+            label: t('torrentSyncManager.tabSettings'),
+            content: (
+              <>
+      <DsCard className="mb-6 sm:mb-8">
+        {!status.sync_in_progress && indexers.length > 0 && (
+          <div class="p-4 sm:p-6 border-b border-white/10">
+            <h3 class="text-base font-semibold text-white mb-4 flex items-center gap-2">
+<span class="flex items-center justify-center w-8 h-8 rounded-full text-[var(--ds-text-on-accent)] shrink-0 bg-[var(--ds-accent-violet)]">
+              <List {...iconPropsSm} />
+            </span>
+              {t('torrentSyncManager.syncIndexersTitle')}
+            </h3>
+            <label class="label cursor-pointer justify-start gap-3 mb-2">
+              <input
+                type="checkbox"
+                class="checkbox checkbox-sm"
+                checked={selectedIndexerIdsForSync === null}
+                onChange={(e) => {
+                  if ((e.target as HTMLInputElement).checked) setSelectedIndexerIdsForSync(null);
+                  else setSelectedIndexerIdsForSync(indexers.map((i) => i.id));
+                }}
+              />
+              <span class="label-text text-white/80">{t('torrentSyncManager.allIndexers')}</span>
+            </label>
+            {selectedIndexerIdsForSync !== null && (
+              <div class="flex flex-wrap gap-2 ml-0 sm:ml-6 mt-2 min-w-0 max-w-full">
+                {indexers.map((idx) => (
+                  <label key={idx.id} class="label cursor-pointer gap-2 rounded-[var(--ds-radius-full)] px-3 py-2 border border-[var(--ds-border)] bg-[var(--ds-surface)]">
+                    <input
+                      type="checkbox"
+                      class="checkbox checkbox-sm"
+                      checked={selectedIndexerIdsForSync.includes(idx.id)}
+                      onChange={(e) => {
+                        const checked = (e.target as HTMLInputElement).checked;
+                        setSelectedIndexerIdsForSync((prev) => {
+                          if (prev === null) return [idx.id];
+                          if (checked) return prev.includes(idx.id) ? prev : [...prev, idx.id];
+                          return prev.filter((id) => id !== idx.id);
+                        });
+                      }}
+                    />
+                    <span class="text-sm text-white/80 truncate max-w-[140px]" title={idx.name}>{idx.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+            {selectedIndexerIdsForSync !== null && selectedIndexerIdsForSync.length === 0 && (
+              <p class="text-amber-400 text-xs mt-2 ml-6">{t('torrentSyncManager.selectAtLeastOneIndexer')}</p>
             )}
           </div>
-
-          {/* Paramètres de synchronisation (visible sur la page Sync) */}
-          {status.settings && (
-            <div class="mt-6 pt-6 border-t border-gray-700">
-              <h3 class="text-lg font-semibold text-white mb-4">{t('torrentSyncManager.settings')}</h3>
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        )}
+        {/* Bouton Vider (même carte) */}
+        {hasTorrents && !status.sync_in_progress && (
+          <div class="px-4 sm:px-6 py-4 border-b border-white/10">
+            <button class="btn btn-sm gap-2 rounded-xl border border-red-500/40 bg-red-900/20 text-red-300 hover:bg-red-900/40 hover:border-red-500/60" onClick={clearTorrents} disabled={syncing}>
+              {syncing ? <span class="loading loading-spinner loading-sm" /> : (
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              )}
+              {t('torrentSyncManager.clearTorrents')}
+            </button>
+          </div>
+        )}
+        {/* Sous-carte : Paramètres (repliables, style EduFlow) */}
+        {status.settings && (
+          <div class="p-4 sm:p-6">
+            <button
+              type="button"
+              class="flex items-center justify-between w-full text-left mb-4 rounded-xl py-2 px-3 -mx-3 hover:bg-white/5 transition-colors"
+              onClick={() => setSettingsOpen((o) => !o)}
+            >
+              <h3 class="text-base font-semibold text-white flex items-center gap-2">
+                <span class="flex items-center justify-center w-8 h-8 rounded-full text-[var(--ds-text-on-accent)] shrink-0 bg-[var(--ds-accent-violet)]">
+                  <Settings {...iconPropsSm} />
+                </span>
+                {t('torrentSyncManager.settings')}
+              </h3>
+              <svg xmlns="http://www.w3.org/2000/svg" class={`w-5 h-5 text-white/70 transition-transform ${settingsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {settingsOpen && (
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
                 <div>
-                  <label class="label py-0">
-                    <span class="label-text font-semibold">{t('torrentSyncManager.syncFrequency')}</span>
-                  </label>
+                  <label class="label py-0"><span class="label-text font-medium text-white/90">{t('torrentSyncManager.syncFrequency')}</span></label>
                   <select
-                    class="select select-bordered w-full select-sm"
+                    class="select w-full select-sm rounded-[var(--ds-radius-full)] border-[var(--ds-border)] text-[var(--ds-text-primary)] bg-[var(--ds-surface)]"
                     value={String(status.settings?.sync_frequency_minutes ?? 60)}
-                    onChange={(e) => {
-                      const value = parseInt((e.target as HTMLSelectElement).value);
-                      updateSettings({ sync_frequency_minutes: value });
-                    }}
+                    onChange={(e) => updateSettings({ sync_frequency_minutes: parseInt((e.target as HTMLSelectElement).value) })}
                   >
                     <option value="15">15 {t('torrentSyncManager.minutes')}</option>
                     <option value="30">30 {t('torrentSyncManager.minutes')}</option>
@@ -1577,51 +1485,68 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                     <option value="240">4 {t('torrentSyncManager.hours')}</option>
                     <option value="480">8 {t('torrentSyncManager.hours')}</option>
                     <option value="1440">24 {t('torrentSyncManager.hours')}</option>
-                    {status.settings?.sync_frequency_minutes &&
-                     ![15, 30, 60, 120, 240, 480, 1440].includes(status.settings.sync_frequency_minutes) && (
-                      <option value={String(status.settings.sync_frequency_minutes)}>
-                        {formatFrequency(status.settings.sync_frequency_minutes)} ({language === 'fr' ? 'personnalisé' : 'custom'})
-                      </option>
+                    {status.settings?.sync_frequency_minutes && ![15, 30, 60, 120, 240, 480, 1440].includes(status.settings.sync_frequency_minutes) && (
+                      <option value={String(status.settings.sync_frequency_minutes)}>{formatFrequency(status.settings.sync_frequency_minutes)} ({t('torrentSyncManager.custom')})</option>
                     )}
                   </select>
                 </div>
                 <div>
-                  <label class="label py-0">
-                    <span class="label-text font-semibold">{t('torrentSyncManager.maxTorrentsPerCategory')}</span>
-                  </label>
+                  <label class="label py-0"><span class="label-text font-medium text-white/90">{t('torrentSyncManager.maxTorrentsPerCategory')}</span></label>
                   <input
                     type="number"
-                    class="input input-bordered w-full input-sm"
-                    min={1}
+                    class="input w-full input-sm rounded-[var(--ds-radius-full)] border-[var(--ds-border)] text-[var(--ds-text-primary)] bg-[var(--ds-surface)]"
+                    min={0}
                     max={100000}
-                    value={status.settings.max_torrents_per_category || 1000}
+                    value={status.settings.max_torrents_per_category ?? 0}
                     onBlur={(e) => {
-                      const value = parseInt((e.target as HTMLInputElement).value, 10);
-                      if (!Number.isNaN(value) && value >= 1 && value <= 100000) {
-                        updateSettings({ max_torrents_per_category: value });
-                      }
+                      const v = parseInt((e.target as HTMLInputElement).value, 10);
+                      if (!Number.isNaN(v) && v >= 0 && v <= 100000) updateSettings({ max_torrents_per_category: v });
                     }}
                   />
-                  <p class="text-xs text-gray-400 mt-1">{t('torrentSyncManager.maxTorrentsPerCategoryHint')}</p>
+                  <p class="text-xs text-white/50 mt-0.5">{t('torrentSyncManager.maxTorrentsPerCategoryHint')}</p>
                 </div>
                 <div class="flex items-end pb-1">
-                  <label class="label cursor-pointer flex-1 flex items-center gap-3">
-                    <input
-                      type="checkbox"
-                      class="toggle toggle-primary toggle-sm"
-                      checked={status.settings.is_enabled === 1}
-                      onChange={(e) => {
-                        updateSettings({ is_enabled: (e.target as HTMLInputElement).checked ? 1 : 0 });
-                      }}
-                    />
-                    <span class="label-text">{t('torrentSyncManager.autoSyncEnabled')}</span>
+                  <label class="label cursor-pointer gap-3">
+                    <input type="checkbox" class="toggle toggle-sm" checked={status.settings.is_enabled === 1} onChange={(e) => updateSettings({ is_enabled: (e.target as HTMLInputElement).checked ? 1 : 0 })} />
+                    <span class="label-text text-white/90">{t('torrentSyncManager.autoSyncEnabled')}</span>
                   </label>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
+      </DsCard>
+              </>
+            ),
+          },
+        ]}
+      />
       </div>
+
+      {/* Modal détails indexer (hors onglets pour rester visible au changement d’onglet) */}
+      {selectedIndexerForModal != null && (
+        <Modal
+          key={selectedIndexerForModal.id}
+          isOpen={true}
+          onClose={() => setSelectedIndexerForModal(null)}
+          title={t('torrentSyncManager.indexerDetails')}
+          size="lg"
+        >
+          <IndexerDetailsModalContent
+            idx={selectedIndexerForModal}
+            status={status}
+            totalTorrents={totalTorrents}
+            hasCloudToken={hasCloudToken}
+            geminiLoading={geminiLoading}
+            onImproveWithGemini={improveWithGemini}
+            onStartSyncForIndexer={startSyncForIndexer}
+            syncing={syncing}
+            onClose={() => setSelectedIndexerForModal(null)}
+            t={t}
+            language={language}
+          />
+        </Modal>
+      )}
     </div>
   );
 }

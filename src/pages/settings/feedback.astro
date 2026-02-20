@@ -1,23 +1,19 @@
 ---
-import Layout from '../../layouts/Layout.astro';
+import SettingsLayout from '../../layouts/SettingsLayout.astro';
 import FeedbackChat from '../../components/settings/FeedbackChat';
-import TranslatedPageHeader from '../../components/ui/TranslatedPageHeader';
 import PermissionGuard from '../../components/ui/PermissionGuard';
+import DsPageHeader from '../../components/ui/DsPageHeader';
 ---
 
-<Layout title="Feedback - Popcorn Client">
-  <div class="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
-    <div class="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-8 sm:py-10 md:py-12">
-      <TranslatedPageHeader
-        client:only="preact"
-        titleKey="settingsPages.feedback.title"
-        subtitleKey="settingsPages.feedback.subtitle"
-        backHref="/settings"
-      />
-
-      <PermissionGuard client:only="preact" permission="settings.account">
-        <FeedbackChat client:only="preact" />
-      </PermissionGuard>
-    </div>
+<SettingsLayout title="Feedback - Popcorn Client">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="settingsPages.feedback.title"
+      subtitleKey="settingsPages.feedback.subtitle"
+    />
+    <PermissionGuard client:only="preact" permission="settings.account">
+      <FeedbackChat client:only="preact" />
+    </PermissionGuard>
   </div>
-</Layout>
+</SettingsLayout>

@@ -1,25 +1,21 @@
 ---
-import Layout from '../../layouts/Layout.astro';
+import SettingsLayout from '../../layouts/SettingsLayout.astro';
 import LibRbitSettings from '../../components/settings/LibRbitSettings';
-import TranslatedPageHeader from '../../components/ui/TranslatedPageHeader';
 import PermissionGuard from '../../components/ui/PermissionGuard';
+import DsPageHeader from '../../components/ui/DsPageHeader';
 ---
 
-<Layout title="Client torrent - Popcorn Client">
-  <div class="min-h-screen bg-gradient-to-br from-gray-900 via-black to-gray-900">
-    <div class="container mx-auto px-4 sm:px-6 md:px-8 lg:px-12 py-8 sm:py-10 md:py-12">
-      <TranslatedPageHeader
-        client:only="preact"
-        titleKey="settingsPages.librqbit.title"
-        subtitleKey="settingsPages.librqbit.subtitle"
-        backHref="/settings"
-      />
-
-      <PermissionGuard client:only="preact" permission="settings.server">
-        <div class="space-y-8 sm:space-y-10 md:space-y-12">
-          <LibRbitSettings client:only="preact" />
-        </div>
-      </PermissionGuard>
-    </div>
+<SettingsLayout title="Client torrent - Popcorn Client">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="settingsPages.librqbit.title"
+      subtitleKey="settingsPages.librqbit.subtitle"
+    />
+    <PermissionGuard client:only="preact" permission="settings.server">
+      <div class="space-y-6 sm:space-y-8">
+        <LibRbitSettings client:only="preact" />
+      </div>
+    </PermissionGuard>
   </div>
-</Layout>
+</SettingsLayout>

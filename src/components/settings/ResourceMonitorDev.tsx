@@ -43,7 +43,12 @@ function Sparkline({ values, maxVal, height = 32, color = 'rgb(34 197 94)' }: {
   );
 }
 
-export default function ResourceMonitorDev() {
+interface ResourceMonitorDevProps {
+  /** Si true, pas de section ni titre (contenu seul pour DsSettingsSectionCard) */
+  embedded?: boolean;
+}
+
+export default function ResourceMonitorDev({ embedded = false }: ResourceMonitorDevProps) {
   const { t } = useI18n();
   const [data, setData] = useState<SystemResourcesResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -102,13 +107,20 @@ export default function ResourceMonitorDev() {
   const avgCpu = historyCpu.length ? historyCpu.reduce((a, b) => a + b, 0) / historyCpu.length : 0;
   const highCpuSustained = avgCpu > 20;
 
-  if (error && !d) {
-    return (
+  const wrap = (content: import('preact').ComponentChildren) =>
+    embedded ? <div className="min-w-0">{content}</div> : (
       <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
         <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
           <Activity className="w-5 h-5 text-primary-400" />
           {t('settingsMenu.maintenance.resources.title')}
         </h3>
+        {content}
+      </section>
+    );
+
+  if (error && !d) {
+    return wrap(
+      <>
         <p className="text-sm text-red-400">{error}</p>
         <button
           type="button"
@@ -119,29 +131,17 @@ export default function ResourceMonitorDev() {
         >
           {t('common.retry')}
         </button>
-      </section>
+      </>
     );
   }
 
   if (!d) {
-    return (
-      <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-        <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
-          <Activity className="w-5 h-5 text-primary-400" />
-          {t('settingsMenu.maintenance.resources.title')}
-        </h3>
-        <p className="text-sm text-gray-400">{t('common.loading')}</p>
-      </section>
-    );
+    return wrap(<p className="text-sm ds-text-secondary">{t('common.loading')}</p>);
   }
 
-  return (
-    <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-      <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-1">
-        <Activity className="w-5 h-5 text-primary-400" />
-        {t('settingsMenu.maintenance.resources.title')}
-      </h3>
-      <p className="text-sm text-gray-400 mb-4">
+  return wrap(
+    <>
+      <p className="text-sm ds-text-secondary mb-4">
         {t('settingsMenu.maintenance.resources.description')}
       </p>
       {error && (
@@ -241,6 +241,6 @@ export default function ResourceMonitorDev() {
           )}
         </div>
       )}
-    </section>
+    </>
   );
 }

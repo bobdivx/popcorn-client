@@ -4,6 +4,7 @@ import { PreferencesManager, TokenManager } from '../../lib/client/storage';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
 import { serverApi } from '../../lib/client/server-api';
 import { SkipForward, ListVideo, Play, Download, HardDrive } from 'lucide-preact';
+import { DsSettingsSectionCard } from '../ui/design-system';
 import { DEFAULT_PLAYER_CONFIG, type PlayerConfig } from '../streaming/hls-player/hooks/usePlayerConfig';
 import { useSubscriptionMe } from '../torrents/MediaDetailPage/hooks/useSubscriptionMe';
 
@@ -201,207 +202,156 @@ export default function PlaybackSettingsPanel() {
   return (
     <div className="flex-1 py-4 px-4 sm:px-6 space-y-6 overflow-y-auto scrollbar-visible">
       {saved && (
-        <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500/20 text-primary-400 text-sm">
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path
-              fillRule="evenodd"
-              d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-              clipRule="evenodd"
-            />
-          </svg>
+        <div className="ds-status-badge ds-status-badge--success w-fit" role="status">
           {t('common.success')}
         </div>
       )}
 
-      {/* Lecture automatique */}
-      <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-        <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
-          <Play className="w-5 h-5 text-primary-400" />
-          {t('interfaceSettings.autoplay')}
-        </h3>
-        <p className="text-sm text-gray-400 mb-4">{t('interfaceSettings.autoplayDescription')}</p>
-        <label className="flex items-center gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            className="toggle toggle-primary"
-            checked={autoplay}
-            onChange={(e) => handleAutoplayChange((e.target as HTMLInputElement).checked)}
-          />
-          <span className="text-white font-medium">{autoplay ? t('common.yes') : t('common.no')}</span>
-        </label>
-      </section>
-
-      {/* Saut du générique */}
-      <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-        <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
-          <SkipForward className="w-5 h-5 text-primary-400" />
-          {t('interfaceSettings.skipIntro')}
-        </h3>
-        <p className="text-sm text-gray-400 mb-4">{t('interfaceSettings.skipIntroDescription')}</p>
-        <label className="flex items-center gap-3 cursor-pointer mb-4">
-          <input
-            type="checkbox"
-            className="toggle toggle-primary"
-            checked={config.skipIntroEnabled}
-            onChange={(e) => handleSkipIntroEnabled((e.target as HTMLInputElement).checked)}
-          />
-          <span className="text-white font-medium">{t('interfaceSettings.skipIntroAuto')}</span>
-        </label>
-        <p className="text-sm text-gray-400 mb-2">{t('interfaceSettings.skipIntroAutoDescription')}</p>
-        <div className="flex items-center gap-3 mt-2">
-          <label className="text-sm text-gray-400">{t('interfaceSettings.introSkipSeconds')}</label>
-          <input
-            type="number"
-            min={30}
-            max={300}
-            value={config.introSkipSeconds}
-            onChange={(e) => handleIntroSkipSeconds(Number((e.target as HTMLInputElement).value))}
-            className="w-24 px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm"
-          />
-          <span className="text-gray-500 text-sm">s</span>
+      <DsSettingsSectionCard icon={Play} title={t('interfaceSettings.autoplay')} accent="violet">
+        <div className="min-w-0">
+          <p className="text-sm ds-text-secondary mb-4">{t('interfaceSettings.autoplayDescription')}</p>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="toggle toggle-primary"
+              checked={autoplay}
+              onChange={(e) => handleAutoplayChange((e.target as HTMLInputElement).checked)}
+            />
+            <span className="font-medium text-[var(--ds-text-primary)]">{autoplay ? t('common.yes') : t('common.no')}</span>
+          </label>
         </div>
-        <p className="text-xs text-gray-500 mt-1">{t('interfaceSettings.introSkipSecondsDescription')}</p>
-      </section>
+      </DsSettingsSectionCard>
 
-      {/* Téléchargement complet en mode streaming (réservé abonnés) */}
-      <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-        <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
-          <Download className="w-5 h-5 text-primary-400" />
-          {t('interfaceSettings.streamingDownloadFull')}
-        </h3>
-        <p className="text-sm text-gray-400 mb-4">{t('interfaceSettings.streamingDownloadFullDescription')}</p>
-        {!streamingTorrentActive ? (
-          <p className="text-sm text-amber-400/90 mb-2">{t('interfaceSettings.streamingDownloadFullRequiresSubscription')}</p>
-        ) : null}
-        <label className={`flex items-center gap-3 ${streamingTorrentActive ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
-          <input
-            type="checkbox"
-            className="toggle toggle-primary"
-            checked={config.streamingDownloadFull ?? false}
-            disabled={!streamingTorrentActive}
-            onChange={(e) => streamingTorrentActive && handleStreamingDownloadFull((e.target as HTMLInputElement).checked)}
-          />
-          <span className="text-white font-medium">
-            {config.streamingDownloadFull ? t('common.yes') : t('common.no')}
-          </span>
-        </label>
-      </section>
-
-      {/* Rétention des torrents (abonnement streaming actif) */}
-      {streamingTorrentActive && (
-        <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-          <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
-            <HardDrive className="w-5 h-5 text-primary-400" />
-            {t('interfaceSettings.streamingRetention')}
-          </h3>
-          <p className="text-sm text-gray-400 mb-4">{t('interfaceSettings.streamingRetentionDescription')}</p>
-          <div className="flex flex-wrap gap-2">
-            {RETENTION_OPTIONS.map((opt) => (
-              <button
-                key={opt.value ?? 'keep'}
-                type="button"
-                onClick={() => handleRetentionChange(opt.value)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                  retentionDays !== undefined && retentionDays === opt.value
-                    ? 'bg-primary-500 text-white'
-                    : 'bg-white/10 text-white/80 hover:bg-white/20'
-                }`}
-              >
-                {opt.value == null
-                  ? t('interfaceSettings.streamingRetentionKeep' as 'interfaceSettings.streamingRetentionKeep')
-                  : opt.value === 0
-                    ? t('interfaceSettings.streamingRetentionDontKeep' as 'interfaceSettings.streamingRetentionDontKeep')
-                    : t('interfaceSettings.streamingRetentionDays' as 'interfaceSettings.streamingRetentionDays', {
-                        days: opt.days ?? opt.value,
-                      })}
-              </button>
-            ))}
+      <DsSettingsSectionCard icon={SkipForward} title={t('interfaceSettings.skipIntro')} accent="violet">
+        <div className="min-w-0">
+          <p className="text-sm ds-text-secondary mb-4">{t('interfaceSettings.skipIntroDescription')}</p>
+          <label className="flex items-center gap-3 cursor-pointer mb-4">
+            <input
+              type="checkbox"
+              className="toggle toggle-primary"
+              checked={config.skipIntroEnabled}
+              onChange={(e) => handleSkipIntroEnabled((e.target as HTMLInputElement).checked)}
+            />
+            <span className="font-medium text-[var(--ds-text-primary)]">{t('interfaceSettings.skipIntroAuto')}</span>
+          </label>
+          <p className="text-sm ds-text-secondary mb-2">{t('interfaceSettings.skipIntroAutoDescription')}</p>
+          <div className="flex items-center gap-3 mt-2">
+            <label className="text-sm ds-text-secondary">{t('interfaceSettings.introSkipSeconds')}</label>
+            <input
+              type="number"
+              min={30}
+              max={300}
+              value={config.introSkipSeconds}
+              onChange={(e) => handleIntroSkipSeconds(Number((e.target as HTMLInputElement).value))}
+              className="w-24 px-3 py-2 rounded-lg bg-[var(--ds-surface)] border-[var(--ds-border)] text-[var(--ds-text-primary)] text-sm"
+            />
+            <span className="ds-text-tertiary text-sm">s</span>
           </div>
-        </section>
+          <p className="text-xs ds-text-tertiary mt-1">{t('interfaceSettings.introSkipSecondsDescription')}</p>
+        </div>
+      </DsSettingsSectionCard>
+
+      <DsSettingsSectionCard icon={Download} title={t('interfaceSettings.streamingDownloadFull')} accent="violet">
+        <div className="min-w-0">
+          <p className="text-sm ds-text-secondary mb-4">{t('interfaceSettings.streamingDownloadFullDescription')}</p>
+          {!streamingTorrentActive && (
+            <p className="text-sm text-amber-400/90 mb-2">{t('interfaceSettings.streamingDownloadFullRequiresSubscription')}</p>
+          )}
+          <label className={`flex items-center gap-3 ${streamingTorrentActive ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
+            <input
+              type="checkbox"
+              className="toggle toggle-primary"
+              checked={config.streamingDownloadFull ?? false}
+              disabled={!streamingTorrentActive}
+              onChange={(e) => streamingTorrentActive && handleStreamingDownloadFull((e.target as HTMLInputElement).checked)}
+            />
+            <span className="font-medium text-[var(--ds-text-primary)]">
+              {config.streamingDownloadFull ? t('common.yes') : t('common.no')}
+            </span>
+          </label>
+        </div>
+      </DsSettingsSectionCard>
+
+      {streamingTorrentActive && (
+        <DsSettingsSectionCard icon={HardDrive} title={t('interfaceSettings.streamingRetention')} accent="violet">
+          <div className="min-w-0">
+            <p className="text-sm ds-text-secondary mb-4">{t('interfaceSettings.streamingRetentionDescription')}</p>
+            <div className="flex flex-wrap gap-2">
+              {RETENTION_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value ?? 'keep'}
+                  type="button"
+                  onClick={() => handleRetentionChange(opt.value)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    retentionDays !== undefined && retentionDays === opt.value
+                      ? 'bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)]'
+                      : 'bg-white/10 text-white/80 hover:bg-white/20'
+                  }`}
+                >
+                  {opt.value == null
+                    ? t('interfaceSettings.streamingRetentionKeep' as 'interfaceSettings.streamingRetentionKeep')
+                    : opt.value === 0
+                      ? t('interfaceSettings.streamingRetentionDontKeep' as 'interfaceSettings.streamingRetentionDontKeep')
+                      : t('interfaceSettings.streamingRetentionDays' as 'interfaceSettings.streamingRetentionDays', {
+                          days: opt.days ?? opt.value,
+                        })}
+                </button>
+              ))}
+            </div>
+          </div>
+        </DsSettingsSectionCard>
       )}
 
-      {/* Mode de streaming */}
-      <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-        <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
-          <Play className="w-5 h-5 text-primary-400" />
-          {t('interfaceSettings.streamingMode')}
-        </h3>
-        <p className="text-sm text-gray-400 mb-4">{t('interfaceSettings.streamingModeDescription')}</p>
-        <div className="flex flex-col gap-3">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="radio"
-              name="streaming-mode"
-              className="radio radio-primary"
-              checked={config.streamingMode === 'hls'}
-              onChange={() => handleStreamingMode('hls')}
-            />
-            <div className="flex flex-col">
-              <span className="text-white font-medium">{t('interfaceSettings.streamingModeHls')}</span>
-              <span className="text-xs text-gray-500">{t('interfaceSettings.streamingModeHlsDescription')}</span>
-            </div>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="radio"
-              name="streaming-mode"
-              className="radio radio-primary"
-              checked={config.streamingMode === 'lucie'}
-              onChange={() => handleStreamingMode('lucie')}
-            />
-            <div className="flex flex-col">
-              <span className="text-white font-medium">{t('interfaceSettings.streamingModeLucie')}</span>
-              <span className="text-xs text-gray-500">{t('interfaceSettings.streamingModeLucieDescription')}</span>
-            </div>
-          </label>
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="radio"
-              name="streaming-mode"
-              className="radio radio-primary"
-              checked={config.streamingMode === 'direct'}
-              onChange={() => handleStreamingMode('direct')}
-            />
-            <div className="flex flex-col">
-              <span className="text-white font-medium">{t('interfaceSettings.streamingModeDirect')}</span>
-              <span className="text-xs text-gray-500">{t('interfaceSettings.streamingModeDirectDescription')}</span>
-            </div>
-          </label>
+      <DsSettingsSectionCard icon={Play} title={t('interfaceSettings.streamingMode')} accent="violet">
+        <div className="min-w-0">
+          <p className="text-sm ds-text-secondary mb-4">{t('interfaceSettings.streamingModeDescription')}</p>
+          <div className="flex flex-col gap-3">
+            {(['hls', 'lucie', 'direct'] as const).map((mode) => (
+              <label key={mode} className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="radio"
+                  name="streaming-mode"
+                  className="radio radio-primary"
+                  checked={config.streamingMode === mode}
+                  onChange={() => handleStreamingMode(mode)}
+                />
+                <div className="flex flex-col">
+                  <span className="font-medium text-[var(--ds-text-primary)]">{t(`interfaceSettings.streamingMode${mode.charAt(0).toUpperCase() + mode.slice(1)}`)}</span>
+                  <span className="text-xs ds-text-tertiary">{t(`interfaceSettings.streamingMode${mode.charAt(0).toUpperCase() + mode.slice(1)}Description`)}</span>
+                </div>
+              </label>
+            ))}
+          </div>
         </div>
-      </section>
+      </DsSettingsSectionCard>
 
-      {/* Bouton Épisode suivant */}
-      <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-        <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
-          <ListVideo className="w-5 h-5 text-primary-400" />
-          {t('interfaceSettings.nextEpisodeButton')}
-        </h3>
-        <p className="text-sm text-gray-400 mb-4">{t('interfaceSettings.nextEpisodeButtonDescription')}</p>
-        <label className="flex items-center gap-3 cursor-pointer mb-4">
-          <input
-            type="checkbox"
-            className="toggle toggle-primary"
-            checked={config.nextEpisodeButtonEnabled}
-            onChange={(e) => handleNextEpisodeButtonEnabled((e.target as HTMLInputElement).checked)}
-          />
-          <span className="text-white font-medium">{t('interfaceSettings.nextEpisodeButton')}</span>
-        </label>
-        <div className="flex items-center gap-3 mt-2">
-          <label className="text-sm text-gray-400">{t('interfaceSettings.nextEpisodeCountdownSeconds')}</label>
-          <input
-            type="number"
-            min={30}
-            max={300}
-            value={config.nextEpisodeCountdownSeconds}
-            onChange={(e) =>
-              handleNextEpisodeCountdownSeconds(Number((e.target as HTMLInputElement).value))
-            }
-            className="w-24 px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm"
-          />
-          <span className="text-gray-500 text-sm">s</span>
+      <DsSettingsSectionCard icon={ListVideo} title={t('interfaceSettings.nextEpisodeButton')} accent="violet">
+        <div className="min-w-0">
+          <p className="text-sm ds-text-secondary mb-4">{t('interfaceSettings.nextEpisodeButtonDescription')}</p>
+          <label className="flex items-center gap-3 cursor-pointer mb-4">
+            <input
+              type="checkbox"
+              className="toggle toggle-primary"
+              checked={config.nextEpisodeButtonEnabled}
+              onChange={(e) => handleNextEpisodeButtonEnabled((e.target as HTMLInputElement).checked)}
+            />
+            <span className="font-medium text-[var(--ds-text-primary)]">{t('interfaceSettings.nextEpisodeButton')}</span>
+          </label>
+          <div className="flex items-center gap-3 mt-2">
+            <label className="text-sm ds-text-secondary">{t('interfaceSettings.nextEpisodeCountdownSeconds')}</label>
+            <input
+              type="number"
+              min={30}
+              max={300}
+              value={config.nextEpisodeCountdownSeconds}
+              onChange={(e) => handleNextEpisodeCountdownSeconds(Number((e.target as HTMLInputElement).value))}
+              className="w-24 px-3 py-2 rounded-lg bg-[var(--ds-surface)] border-[var(--ds-border)] text-[var(--ds-text-primary)] text-sm"
+            />
+            <span className="ds-text-tertiary text-sm">s</span>
+          </div>
+          <p className="text-xs ds-text-tertiary mt-1">{t('interfaceSettings.nextEpisodeCountdownDescription')}</p>
         </div>
-        <p className="text-xs text-gray-500 mt-1">{t('interfaceSettings.nextEpisodeCountdownDescription')}</p>
-      </section>
+      </DsSettingsSectionCard>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
 import { FolderOpen, Folder, Loader2 } from 'lucide-preact';
+import { DsCard, DsCardSection } from '../ui/design-system';
 
 type MediaPathType = 'films' | 'series';
 
@@ -132,62 +133,65 @@ export default function MediaPathsPanel({ onBack }: MediaPathsPanelProps) {
 
   return (
     <div className="space-y-6">
-      <p className="text-gray-400 text-sm">{t('settingsMenu.mediaPathsPanel.intro')}</p>
+      <p className="ds-text-secondary text-sm">{t('settingsMenu.mediaPathsPanel.intro')}</p>
 
       {message && (
         <div
-          className={`rounded-lg px-4 py-2 text-sm ${
-            message.type === 'success' ? 'bg-green-900/30 text-green-200' : 'bg-red-900/30 text-red-200'
-          }`}
+          className={`ds-status-badge w-fit ${message.type === 'success' ? 'ds-status-badge--success' : 'ds-status-badge--error'}`}
+          role={message.type === 'success' ? 'status' : 'alert'}
         >
           {message.text}
         </div>
       )}
 
-      <div className="space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-white/5 rounded-xl border border-white/10">
+      <DsCard variant="elevated">
+        <DsCardSection>
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] bg-[var(--ds-surface)]">
           <div className="flex-1 min-w-0">
-            <label className="block text-sm font-medium text-gray-300 mb-1">
+            <label className="block text-sm font-medium text-[var(--ds-text-secondary)] mb-1">
               {t('settingsMenu.mediaPathsPanel.filmsPath')}
             </label>
-            <code className="block text-sm text-white truncate bg-black/20 px-2 py-1.5 rounded">
+            <code className="block text-sm text-[var(--ds-text-primary)] truncate bg-[var(--ds-surface-elevated)] px-2 py-1.5 rounded-[var(--ds-radius-sm)]">
               {data.films_path || 'media/films (défaut)'}
             </code>
-            <p className="text-xs text-gray-500 mt-1 truncate">{data.films_root}</p>
+            <p className="ds-text-tertiary text-xs mt-1 truncate">{data.films_root}</p>
           </div>
           <button
             type="button"
             onClick={() => openBrowse('films')}
-            className="btn btn-sm btn-outline border-gray-600 text-gray-200 hover:bg-white/10 shrink-0"
+            className="min-h-[40px] px-3 py-2 rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] text-[var(--ds-text-primary)] hover:bg-white/10 shrink-0 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]"
           >
-            <FolderOpen className="w-4 h-4 mr-1" />
+            <FolderOpen className="w-4 h-4 mr-1 inline" />
             {t('settingsMenu.mediaPathsPanel.browse')}
           </button>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 bg-white/5 rounded-xl border border-white/10">
-          <div className="flex-1 min-w-0">
-            <label className="block text-sm font-medium text-gray-300 mb-1">
-              {t('settingsMenu.mediaPathsPanel.seriesPath')}
-            </label>
-            <code className="block text-sm text-white truncate bg-black/20 px-2 py-1.5 rounded">
-              {data.series_path || 'media/series (défaut)'}
-            </code>
-            <p className="text-xs text-gray-500 mt-1 truncate">{data.series_root}</p>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] bg-[var(--ds-surface)]">
+              <div className="flex-1 min-w-0">
+                <label className="block text-sm font-medium text-[var(--ds-text-secondary)] mb-1">
+                  {t('settingsMenu.mediaPathsPanel.seriesPath')}
+                </label>
+                <code className="block text-sm text-[var(--ds-text-primary)] truncate bg-[var(--ds-surface-elevated)] px-2 py-1.5 rounded-[var(--ds-radius-sm)]">
+                  {data.series_path || 'media/series (défaut)'}
+                </code>
+                <p className="ds-text-tertiary text-xs mt-1 truncate">{data.series_root}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => openBrowse('series')}
+                className="min-h-[40px] px-3 py-2 rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] text-[var(--ds-text-primary)] hover:bg-white/10 shrink-0 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]"
+              >
+                <FolderOpen className="w-4 h-4 mr-1 inline" />
+                {t('settingsMenu.mediaPathsPanel.browse')}
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => openBrowse('series')}
-            className="btn btn-sm btn-outline border-gray-600 text-gray-200 hover:bg-white/10 shrink-0"
-          >
-            <FolderOpen className="w-4 h-4 mr-1" />
-            {t('settingsMenu.mediaPathsPanel.browse')}
-          </button>
-        </div>
-      </div>
+        </DsCardSection>
+      </DsCard>
 
-      <p className="text-xs text-gray-500">
-        Racine serveur : <code className="bg-black/20 px-1 rounded">{data.download_dir_root}</code>
+      <p className="ds-text-tertiary text-xs">
+        Racine serveur : <code className="bg-[var(--ds-surface-elevated)] px-1 rounded-[var(--ds-radius-sm)] text-[var(--ds-text-primary)]">{data.download_dir_root}</code>
       </p>
 
       {/* Modal Parcourir */}

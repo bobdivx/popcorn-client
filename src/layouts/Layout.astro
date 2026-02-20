@@ -1,5 +1,7 @@
 ---
 import '../styles/global.css';
+import '../styles/design-system.css';
+import { ClientRouter } from 'astro:transitions';
 import ServerConnectionCheck from '../components/ServerConnectionCheck';
 import Navbar from '../components/layout/Navbar';
 import FeedbackFAB from '../components/layout/FeedbackFAB';
@@ -38,6 +40,16 @@ const isWebOS = import.meta.env.WEBOS === 'true';
     <meta name="generator" content={Astro.generator} />
     <meta name="theme-color" content="#a855f7" />
     <title>{title}</title>
+    <ClientRouter />
+    <script is:inline>
+      /* Masquer le bandeau "Chargement" après chaque navigation (View Transitions remplace le body, donc ce script doit être dans le head pour survivre). */
+      document.addEventListener('astro:after-swap', function() {
+        requestAnimationFrame(function() {
+          var el = document.getElementById('popcorn-loading-fallback');
+          if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 0.15s'; setTimeout(function() { el.style.display = 'none'; }, 150); }
+        });
+      });
+    </script>
     <!-- Google Fonts : désactivés sur webOS (file://) pour éviter blocage réseau et écran noir -->
     {!isWebOS && (
       <>
@@ -197,12 +209,17 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         function hide() {
           if (!fallback) return;
           fallback.style.opacity = '0';
-          fallback.style.transition = 'opacity 0.3s ease';
-          setTimeout(function() { fallback.style.display = 'none'; }, 300);
+          fallback.style.transition = 'opacity 0.15s ease';
+          setTimeout(function() { fallback.style.display = 'none'; }, 150);
         }
         window.addEventListener('popcorn-app-ready', hide, { once: true });
-        window.addEventListener('astro:page-load', hide, { once: true });
-        window.addEventListener('astro:after-swap', hide, { once: true });
+        window.addEventListener('astro:page-load', function onLoad() {
+          hide();
+          try { sessionStorage.setItem('popcorn-has-loaded', '1'); } catch (e) {}
+        }, { once: true });
+        try {
+          if (sessionStorage.getItem('popcorn-has-loaded')) hide();
+        } catch (e) {}
         var isDev = document.documentElement.getAttribute('data-dev') === 'true';
         var hintDelay = isDev ? 15000 : 8000;
         var slowMsgDelay = isDev ? 20000 : 5000;

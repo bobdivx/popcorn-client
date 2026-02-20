@@ -1,0 +1,604 @@
+/**
+ * Design System — Tokens et utilitaires réutilisables
+ * Appliquer partout (Sync, Settings, etc.) pour une UX cohérente type dashboard pro.
+ * Référence : expérience type Education / Learning Dashboard (navigation claire, cartes, switches).
+ */
+
+:root {
+  /* Surfaces */
+  --ds-surface: #1C1C1E;
+  --ds-surface-elevated: #2C2C2E;
+  --ds-surface-overlay: rgba(0, 0, 0, 0.4);
+
+  /* Accents (couleurs de cartes / CTAs) */
+  --ds-accent-violet: #D1C4E9;
+  --ds-accent-violet-muted: rgba(209, 196, 233, 0.25);
+  --ds-accent-green: #C8E6C9;
+  --ds-accent-yellow: #FFF9C4;
+  --ds-accent-red: #ef4444;
+  --ds-accent-red-muted: rgba(239, 68, 68, 0.2);
+
+  /* Texte */
+  --ds-text-primary: #ffffff;
+  --ds-text-secondary: rgba(255, 255, 255, 0.65);
+  --ds-text-tertiary: rgba(255, 255, 255, 0.45);
+  --ds-text-on-accent: #1C1C1E;
+
+  /* Bordures */
+  --ds-border: rgba(255, 255, 255, 0.1);
+  --ds-border-strong: rgba(255, 255, 255, 0.2);
+
+  /* Rayons (cohérents sur toute l’app) */
+  --ds-radius-sm: 12px;
+  --ds-radius-md: 20px;
+  --ds-radius-lg: 32px;
+  --ds-radius-full: 9999px;
+
+  /* Espacements (grille 4px) */
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 20px;
+  --ds-space-6: 24px;
+  --ds-space-8: 32px;
+
+  /* Icônes */
+  --ds-icon-size-sm: 18px;
+  --ds-icon-size-md: 20px;
+  --ds-icon-size-lg: 24px;
+  --ds-icon-stroke: 1.5;
+
+  /* Boutons ronds (touch-friendly) */
+  --ds-touch-target: 44px;
+  --ds-touch-target-sm: 40px;
+}
+
+/* Cartes — fond élevé, 32px radius, légère élévation (style Learning Dashboard) */
+.ds-card {
+  background-color: var(--ds-surface-elevated);
+  border-radius: var(--ds-radius-lg);
+  border: 1px solid var(--ds-border);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.ds-card-section {
+  padding: var(--ds-space-6);
+}
+@media (max-width: 640px) {
+  .ds-card-section {
+    padding: var(--ds-space-4);
+  }
+}
+
+/* Variante carte accent (violet clair pour CTA / highlight) */
+.ds-card-accent {
+  background-color: var(--ds-accent-violet);
+  color: var(--ds-text-on-accent);
+  border: none;
+}
+
+.ds-card-accent .ds-text-secondary {
+  color: rgba(28, 28, 30, 0.65);
+}
+
+/* Segmented control (style Learning Dashboard) : groupe de pills, un seul actif violet */
+.ds-nav-tabs {
+  display: inline-flex;
+  gap: 0;
+  overflow-x: auto;
+  padding: 4px;
+  margin-bottom: var(--ds-space-6);
+  background-color: rgba(255, 255, 255, 0.06);
+  border-radius: var(--ds-radius-full);
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  width: fit-content;
+  max-width: 100%;
+}
+.ds-nav-tabs--inline {
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+.sync-toolbar .ds-nav-tabs--inline {
+  background-color: transparent;
+  padding: 0;
+  border: none;
+}
+.sync-toolbar .ds-nav-tabs--inline .ds-nav-tab {
+  color: var(--ds-text-secondary);
+}
+.sync-toolbar .ds-nav-tabs--inline .ds-nav-tab:hover {
+  color: var(--ds-text-primary);
+  background-color: rgba(255, 255, 255, 0.08);
+}
+.sync-toolbar .ds-nav-tabs--inline .ds-nav-tab[aria-selected="true"] {
+  background-color: var(--ds-accent-violet);
+  color: var(--ds-text-on-accent);
+}
+.ds-nav-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.ds-nav-tab {
+  padding: 10px 20px;
+  border-radius: var(--ds-radius-full);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  background-color: transparent;
+  color: var(--ds-text-secondary);
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s, color 0.2s;
+}
+.ds-nav-tabs--inline .ds-nav-tab {
+  padding: 8px 16px;
+  font-size: 0.875rem;
+  min-width: 6.5rem;
+  text-align: center;
+}
+
+/* Barre Sync : statut + onglets + outils + CTA — une ligne, wrap sur petit écran */
+.sync-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--ds-space-2);
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--ds-space-2) var(--ds-space-3);
+  background-color: var(--ds-surface-elevated);
+  border: 1px solid var(--ds-border);
+  border-radius: var(--ds-radius-sm);
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.sync-toolbar::-webkit-scrollbar {
+  display: none;
+}
+.sync-toolbar__status {
+  flex-shrink: 0;
+  max-width: 180px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--ds-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 var(--ds-space-2);
+}
+.sync-toolbar__tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 2px 4px;
+  background-color: rgba(255, 255, 255, 0.06);
+  border-radius: var(--ds-radius-full);
+  border: 1px solid var(--ds-border);
+}
+.sync-toolbar__btn {
+  min-height: 36px;
+  padding: 0 var(--ds-space-4);
+  border-radius: var(--ds-radius-full);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--ds-space-2);
+  transition: background-color 0.15s, opacity 0.15s, transform 0.1s, box-shadow 0.15s ease, outline 0.2s ease;
+  cursor: pointer;
+  border: none;
+  flex-shrink: 0;
+  touch-action: manipulation;
+}
+.sync-toolbar__btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 2px;
+  animation: ds-halo-pulse 2s ease-in-out infinite;
+}
+.sync-toolbar__btn:active:not(:disabled) {
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4);
+  transform: scale(0.98);
+}
+.sync-toolbar__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.sync-toolbar__btn--primary {
+  background-color: var(--ds-accent-violet);
+  color: var(--ds-text-on-accent);
+}
+.sync-toolbar__btn--primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+.sync-toolbar__btn--danger {
+  background-color: var(--ds-accent-red);
+  color: white;
+}
+.sync-toolbar__btn--danger:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.sync-toolbar__separator {
+  width: 1px;
+  height: 20px;
+  background-color: var(--ds-border);
+  flex-shrink: 0;
+  margin: 0 var(--ds-space-1);
+}
+
+.ds-nav-tab:hover {
+  color: var(--ds-text-primary);
+  background-color: rgba(255, 255, 255, 0.06);
+}
+.ds-nav-tab[aria-selected="true"] {
+  background-color: var(--ds-accent-violet);
+  color: var(--ds-text-on-accent);
+}
+
+/* Bouton icône rond (header, cartes) */
+.ds-icon-btn {
+  width: var(--ds-touch-target);
+  height: var(--ds-touch-target);
+  border-radius: var(--ds-radius-full);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--ds-surface-elevated);
+  color: var(--ds-text-secondary);
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background-color 0.2s, color 0.2s, box-shadow 0.15s ease, outline 0.2s ease, transform 0.1s ease;
+}
+.ds-icon-btn:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: var(--ds-text-primary);
+}
+.ds-icon-btn:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 2px;
+  animation: ds-halo-pulse 2s ease-in-out infinite;
+}
+.ds-icon-btn:active {
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4);
+  transform: scale(0.98);
+}
+@media (max-width: 640px) {
+  .ds-icon-btn {
+    width: var(--ds-touch-target-sm);
+    height: var(--ds-touch-target-sm);
+  }
+}
+
+/* Page / conteneur principal */
+.ds-page {
+  background-color: var(--ds-surface);
+  min-height: 100vh;
+  color: var(--ds-text-primary);
+}
+
+.ds-container {
+  width: 100%;
+  max-width: 1200px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--ds-space-4);
+  padding-right: var(--ds-space-4);
+  padding-top: var(--ds-space-6);
+  padding-bottom: var(--ds-space-8);
+}
+@media (min-width: 640px) {
+  .ds-container {
+    padding-left: var(--ds-space-6);
+    padding-right: var(--ds-space-6);
+    padding-top: var(--ds-space-8);
+    padding-bottom: var(--ds-space-8);
+  }
+}
+
+/* Titres */
+.ds-title-page {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin: 0 0 var(--ds-space-4) 0;
+}
+@media (min-width: 640px) {
+  .ds-title-page {
+    font-size: 1.875rem;
+    margin-bottom: var(--ds-space-6);
+  }
+}
+
+.ds-title-section {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0 0 var(--ds-space-3) 0;
+}
+
+.ds-title-card {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* Textes secondaires */
+.ds-text-secondary {
+  color: var(--ds-text-secondary);
+  font-size: 0.875rem;
+}
+
+.ds-text-tertiary {
+  color: var(--ds-text-tertiary);
+  font-size: 0.75rem;
+}
+
+/* Séparateur */
+.ds-divider {
+  height: 1px;
+  background-color: var(--ds-border);
+  margin: 0;
+  border: none;
+}
+
+/* Animations d'entrée (cartes, listes) */
+@keyframes ds-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ds-card-animate {
+  animation: ds-fade-in-up 0.35s ease-out forwards;
+}
+
+.ds-card-animate-stagger > * {
+  opacity: 0;
+  animation: ds-fade-in-up 0.35s ease-out forwards;
+}
+
+.ds-card-animate-stagger > *:nth-child(1) { animation-delay: 0.05s; }
+.ds-card-animate-stagger > *:nth-child(2) { animation-delay: 0.1s; }
+.ds-card-animate-stagger > *:nth-child(3) { animation-delay: 0.15s; }
+.ds-card-animate-stagger > *:nth-child(4) { animation-delay: 0.2s; }
+.ds-card-animate-stagger > *:nth-child(5) { animation-delay: 0.25s; }
+.ds-card-animate-stagger > *:nth-child(6) { animation-delay: 0.3s; }
+.ds-card-animate-stagger > *:nth-child(7) { animation-delay: 0.35s; }
+.ds-card-animate-stagger > *:nth-child(8) { animation-delay: 0.4s; }
+.ds-card-animate-stagger > *:nth-child(9) { animation-delay: 0.45s; }
+.ds-card-animate-stagger > *:nth-child(n+10) { animation-delay: 0.5s; }
+
+/* Bannière "En cours depuis" — au-dessus de la toolbar, avec animation */
+@keyframes sync-elapsed-dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.15); }
+}
+@keyframes sync-elapsed-time-tick {
+  0%, 90% { opacity: 1; }
+  95% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+.sync-elapsed-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--ds-space-2);
+  padding: var(--ds-space-2) var(--ds-space-3);
+  margin-bottom: var(--ds-space-2);
+  background: linear-gradient(135deg, rgba(209, 196, 233, 0.15) 0%, rgba(209, 196, 233, 0.06) 100%);
+  border: 1px solid rgba(209, 196, 233, 0.35);
+  border-radius: var(--ds-radius-sm);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--ds-text-primary);
+  animation: ds-fade-in-up 0.3s ease-out;
+}
+.sync-elapsed-banner__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--ds-accent-violet);
+  flex-shrink: 0;
+  animation: sync-elapsed-dot-pulse 1.5s ease-in-out infinite;
+}
+.sync-elapsed-banner__time {
+  font-variant-numeric: tabular-nums;
+  animation: sync-elapsed-time-tick 1s ease-in-out infinite;
+}
+/* Badges de statut (Vue d'ensemble paramètres) */
+.ds-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--ds-radius-full);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+/* Norme design : halo blanc scintillant (bouton Paramètres, focus, clic) */
+@keyframes ds-halo-pulse {
+  0%, 100% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
+  50% { box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4); }
+}
+
+/* Indicateur "sync en cours" = même halo blanc scintillant */
+.ds-sync-active-pulse {
+  animation: ds-halo-pulse 2s ease-in-out infinite;
+}
+
+/* Focus : même animation halo blanc scintillant que le bouton Paramètres */
+.ds-focus-glow {
+  transition: box-shadow 0.2s ease, outline 0.2s ease;
+}
+.ds-focus-glow:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 2px;
+  animation: ds-halo-pulse 2s ease-in-out infinite;
+}
+
+/* Clic : même halo blanc (pic de l’animation) + léger scale */
+.ds-active-glow {
+  transition: box-shadow 0.15s ease, transform 0.1s ease;
+}
+.ds-active-glow:active {
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+.ds-active-glow:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+/* Cartes torrent / poster : halo blanc au focus et au clic (même norme) */
+[data-torrent-card]:focus-within,
+[data-torrent-card]:focus-visible,
+.torrent-poster:focus-within,
+.torrent-poster:focus-visible {
+  animation: ds-halo-pulse 2s ease-in-out infinite;
+  transition: box-shadow 0.2s ease;
+}
+[data-torrent-card]:active,
+.torrent-poster:active {
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+
+/* Carte Sync en cours (Vue d'ensemble paramètres) — même halo blanc scintillant */
+.overview-card--sync-in-progress {
+  opacity: 1;
+  animation: ds-halo-pulse 2s ease-in-out infinite;
+}
+.overview-card--sync-in-progress .ds-card {
+  position: relative;
+  overflow: hidden;
+}
+.overview-card--sync-in-progress .ds-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: var(--ds-radius-lg) 0 0 var(--ds-radius-lg);
+  background: linear-gradient(180deg, var(--ds-accent-violet), rgba(209, 196, 233, 0.5));
+  animation: overview-card-bar-pulse 1.5s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+@keyframes overview-card-bar-pulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+.overview-card--sync-in-progress .ds-card-section {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+}
+.overview-card-icon--syncing {
+  animation: overview-card-icon-pulse 1.5s ease-in-out infinite;
+}
+@keyframes overview-card-icon-pulse {
+  0%, 100% { opacity: 1; filter: brightness(1); }
+  50% { opacity: 0.9; filter: brightness(1.15); }
+}
+.overview-card-sync-spinner {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.overview-card-sync-spinner .loading-spinner {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-width: 2px;
+}
+.overview-card--sync-in-progress .ds-status-badge {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.ds-status-badge--success {
+  background-color: rgba(200, 230, 201, 0.3);
+  color: #81c784;
+}
+.ds-status-badge--warning {
+  background-color: rgba(255, 249, 196, 0.35);
+  color: #d4c84a;
+}
+.ds-status-badge--error {
+  background-color: var(--ds-accent-red-muted);
+  color: var(--ds-accent-red);
+}
+.ds-status-badge--neutral {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--ds-text-secondary);
+}
+
+/* Boîtes sur fond accent (modales, cartes indexeur) — réutilisables */
+.ds-box-surface {
+  background-color: var(--ds-surface);
+  border-radius: var(--ds-radius-lg);
+  border: 1px solid var(--ds-border);
+}
+.ds-box-elevated {
+  background-color: var(--ds-surface-elevated);
+  border-radius: var(--ds-radius-lg);
+  border: 1px solid var(--ds-border);
+}
+.ds-box-accent {
+  background-color: var(--ds-accent-violet);
+  color: var(--ds-text-on-accent);
+}
+.ds-box-accent-green {
+  background-color: var(--ds-accent-green);
+  color: var(--ds-text-on-accent);
+  border: 1px solid rgba(200, 230, 201, 0.5);
+}
+.ds-box-accent-yellow {
+  background-color: var(--ds-accent-yellow);
+  color: var(--ds-text-on-accent);
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+.ds-box-error {
+  background-color: var(--ds-accent-red-muted);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--ds-radius-lg);
+}
+.ds-btn-accent {
+  background-color: var(--ds-accent-violet);
+  color: var(--ds-text-on-accent);
+  border: 1px solid rgba(209, 196, 233, 0.5);
+  border-radius: var(--ds-radius-full);
+}
+.ds-btn-accent:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+.ds-btn-secondary {
+  background-color: var(--ds-surface-elevated);
+  color: var(--ds-text-primary);
+  border: 1px solid var(--ds-border-strong);
+  border-radius: var(--ds-radius-full);
+}
+.ds-btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Carte indexer en erreur (sync) */
+.sync-card-error {
+  background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);
+}
+
+/* Zone Settings — responsive */
+.settings-page {
+  flex-direction: row;
+}
+.settings-content-area {
+  -webkit-overflow-scrolling: touch;
+}

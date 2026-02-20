@@ -89,93 +89,97 @@ export default function RequestsAdminManager() {
   }
 
   return (
-    <div class="space-y-6">
-      <h1 class="text-2xl font-bold text-white">{t('requestsAdmin.title')}</h1>
+    <div class="space-y-6 min-w-0">
+      <h1 class="text-lg sm:text-2xl font-bold text-white truncate">{t('requestsAdmin.title')}</h1>
 
-      <div class="glass-panel rounded-xl p-4 sm:p-6 text-gray-300 text-sm sm:text-base leading-relaxed">
-        <p>{t('requestsAdmin.explanation')}</p>
+      <div class="glass-panel rounded-xl p-4 sm:p-6 text-gray-300 text-sm sm:text-base leading-relaxed min-w-0 overflow-hidden">
+        <p class="break-words">{t('requestsAdmin.explanation')}</p>
       </div>
 
-      <div class="flex gap-2">
+      <div class="flex flex-wrap gap-2 min-w-0">
         {['pending', 'approved', 'declined', 'all'].map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            class={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-ghost'}`}
+            class={`btn btn-sm min-w-0 ${filter === f ? 'btn-primary' : 'btn-ghost'}`}
           >
-            {f === 'pending' && t('requests.statusPending')}
-            {f === 'approved' && t('requests.statusApproved')}
-            {f === 'declined' && t('requests.statusDeclined')}
-            {f === 'all' && t('common.all')}
+            <span class="truncate max-w-[120px] sm:max-w-none">
+              {f === 'pending' && t('requests.statusPending')}
+              {f === 'approved' && t('requests.statusApproved')}
+              {f === 'declined' && t('requests.statusDeclined')}
+              {f === 'all' && t('common.all')}
+            </span>
           </button>
         ))}
       </div>
 
       {error && (
-        <div class="alert alert-error">
-          <span>{error}</span>
-          <button class="btn btn-sm btn-ghost" onClick={loadRequests}>
+        <div class="alert alert-error flex flex-col sm:flex-row sm:items-center gap-2 min-w-0 overflow-hidden">
+          <span class="break-words flex-1 min-w-0">{error}</span>
+          <button class="btn btn-sm btn-ghost flex-shrink-0" onClick={loadRequests}>
             {t('common.retry')}
           </button>
         </div>
       )}
 
       {filter === 'pending' && pendingRequests.length === 0 && (
-        <p class="text-gray-400">{t('requestsAdmin.noPendingRequests')}</p>
+        <p class="text-gray-400 break-words">{t('requestsAdmin.noPendingRequests')}</p>
       )}
 
       {requests.length === 0 && filter !== 'pending' && (
-        <p class="text-gray-400">{t('requests.noRequests')}</p>
+        <p class="text-gray-400 break-words">{t('requests.noRequests')}</p>
       )}
 
-      <div class="space-y-4">
+      <div class="space-y-4 min-w-0">
         {requests.map((req) => (
           <div
             key={req.id}
-            class="glass-panel rounded-xl p-4 sm:p-6 flex flex-col gap-4"
+            class="glass-panel rounded-xl p-4 sm:p-6 flex flex-col gap-4 min-w-0 overflow-hidden"
           >
-            <div class="flex items-center gap-3 flex-1">
-              <div class="text-gray-400">
-                {req.media_type === 'movie' ? (
-                  <Film class="w-4 h-4" />
-                ) : (
-                  <Tv class="w-4 h-4" />
-                )}
+            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 flex-1 min-w-0">
+              <div class="flex items-center gap-3 flex-1 min-w-0">
+                <div class="text-gray-400 flex-shrink-0">
+                  {req.media_type === 'movie' ? (
+                    <Film class="w-4 h-4" />
+                  ) : (
+                    <Tv class="w-4 h-4" />
+                  )}
+                </div>
+                <div class="flex-1 min-w-0 overflow-hidden">
+                  <p class="font-medium text-white truncate">
+                    TMDB #{req.tmdb_id} ({req.media_type === 'movie' ? t('common.film') : t('common.serie')})
+                  </p>
+                  <p class="text-sm text-gray-400 truncate">
+                    {new Date(req.created_at * 1000).toLocaleDateString()} · {req.requested_by}
+                  </p>
+                </div>
               </div>
-              <div class="flex-1 min-w-0">
-                <p class="font-medium text-white">
-                  TMDB #{req.tmdb_id} ({req.media_type === 'movie' ? t('common.film') : t('common.serie')})
-                </p>
-                <p class="text-sm text-gray-400">
-                  {new Date(req.created_at * 1000).toLocaleDateString()} · {req.requested_by}
-                </p>
-              </div>
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-shrink-0">
                 {req.status === STATUS_PENDING && (
                   <>
                     <span class="text-amber-400">
                       <Clock class="w-5 h-5 inline" />
                     </span>
-                    <span class="text-sm text-amber-400">{t('requests.statusPending')}</span>
+                    <span class="text-sm text-amber-400 whitespace-nowrap">{t('requests.statusPending')}</span>
                   </>
                 )}
                 {req.status === STATUS_APPROVED && (
                   <>
-                    <CheckCircle class="w-5 h-5 text-green-400" />
-                    <span class="text-sm text-green-400">{t('requests.statusApproved')}</span>
+                    <CheckCircle class="w-5 h-5 text-green-400 flex-shrink-0" />
+                    <span class="text-sm text-green-400 whitespace-nowrap">{t('requests.statusApproved')}</span>
                   </>
                 )}
                 {req.status === STATUS_DECLINED && (
                   <>
-                    <XCircle class="w-5 h-5 text-red-400" />
-                    <span class="text-sm text-red-400">{t('requests.statusDeclined')}</span>
+                    <XCircle class="w-5 h-5 text-red-400 flex-shrink-0" />
+                    <span class="text-sm text-red-400 whitespace-nowrap">{t('requests.statusDeclined')}</span>
                   </>
                 )}
               </div>
             </div>
 
             {req.status === STATUS_PENDING && (
-              <div class="flex flex-col sm:flex-row gap-2">
+              <div class="flex flex-col gap-2 min-w-0">
                 <input
                   type="text"
                   placeholder={t('requestsAdmin.notes')}
@@ -186,39 +190,39 @@ export default function RequestsAdminManager() {
                       [req.id]: (e.target as HTMLInputElement).value,
                     }))
                   }
-                  class="input input-bordered flex-1"
+                  class="input input-bordered flex-1 min-w-0 w-full"
                 />
-                <div class="flex gap-2">
+                <div class="flex flex-wrap gap-2">
                   <button
                     onClick={() => handleApprove(req.id)}
                     disabled={actioning === req.id}
-                    class="btn btn-success btn-sm"
+                    class="btn btn-success btn-sm flex-1 sm:flex-none min-w-0 inline-flex items-center justify-center gap-1"
                   >
                     {actioning === req.id ? (
                       <span class="loading loading-spinner loading-sm"></span>
                     ) : (
-                      <CheckCircle class="w-4 h-4" />
+                      <CheckCircle class="w-4 h-4 flex-shrink-0" />
                     )}
-                    {t('requestsAdmin.approve')}
+                    <span class="truncate">{t('requestsAdmin.approve')}</span>
                   </button>
                   <button
                     onClick={() => handleDecline(req.id)}
                     disabled={actioning === req.id}
-                    class="btn btn-error btn-sm"
+                    class="btn btn-error btn-sm flex-1 sm:flex-none min-w-0 inline-flex items-center justify-center gap-1"
                   >
                     {actioning === req.id ? (
                       <span class="loading loading-spinner loading-sm"></span>
                     ) : (
-                      <XCircle class="w-4 h-4" />
+                      <XCircle class="w-4 h-4 flex-shrink-0" />
                     )}
-                    {t('requestsAdmin.decline')}
+                    <span class="truncate">{t('requestsAdmin.decline')}</span>
                   </button>
                 </div>
               </div>
             )}
 
             {req.notes && (
-              <p class="text-sm text-gray-400">{req.notes}</p>
+              <p class="text-sm text-gray-400 break-words">{req.notes}</p>
             )}
           </div>
         ))}

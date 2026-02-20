@@ -285,7 +285,7 @@ export function createDemoServerApi(): Record<string, unknown> {
       return success({
         sync_frequency_minutes: 60,
         is_enabled: true,
-        max_torrents_per_category: 100,
+        max_torrents_per_category: 0,
       });
     },
     async updateSyncSettings(): Promise<ApiResponse<void>> {

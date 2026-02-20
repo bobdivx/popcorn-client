@@ -185,24 +185,24 @@ export default function SettingsMenu() {
 
   return (
     <div
-      className="settings-android-tv flex flex-col lg:flex-row min-h-[70vh] bg-[#1a1c20] rounded-2xl overflow-hidden border border-white/5"
+      className="settings-android-tv flex flex-col lg:flex-row min-h-[70vh] ds-card overflow-hidden"
       data-tv-settings-container
     >
-      {/* Panneau gauche : menu principal (catégories) */}
+      {/* Panneau gauche : menu (style Learning Dashboard, accent violet pour sélection) */}
       <nav
-        className="settings-nav flex-shrink-0 w-full lg:w-72 xl:w-80 border-b lg:border-b-0 lg:border-r border-white/10 bg-[#16181c]"
+        className="settings-nav flex-shrink-0 w-full lg:w-72 xl:w-80 border-b lg:border-b-0 lg:border-r border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]"
         aria-label={t('settingsMenu.title')}
         data-tv-settings-nav
       >
         <div className="px-4 pt-6 pb-2 min-w-0">
-          <h1 className="text-lg sm:text-xl lg:text-2xl font-semibold text-white tracking-tight truncate">
+          <h1 className="ds-title-page truncate">
             {t('settingsMenu.title')}
           </h1>
-          <p className="text-xs text-gray-500 mt-1 hidden sm:block">
+          <p className="ds-text-secondary text-xs mt-1 hidden sm:block">
             {t('settingsMenu.subtitle')}
           </p>
         </div>
-        <ul className="py-2 px-2 space-y-0.5 scrollbar-hide overflow-y-auto max-h-[50vh] lg:max-h-none lg:min-h-0">
+        <ul className="py-2 px-2 space-y-1 scrollbar-hide overflow-y-auto max-h-[50vh] lg:max-h-none lg:min-h-0">
           {visibleCategories.map((cat) => {
             const Icon = cat.icon;
             const isSelected = cat.id === selectedCategory;
@@ -213,10 +213,10 @@ export default function SettingsMenu() {
                   onClick={() => setSelectedCategory(cat.id)}
                   data-settings-category
                   data-focusable
-                  className={`settings-nav-item w-full flex items-center gap-3 px-3 sm:px-4 py-3 rounded-xl text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#16181c] min-h-[48px] tv:min-h-[56px] min-w-0 ${
+                  className={`settings-nav-item w-full flex items-center gap-3 px-3 sm:px-4 py-3 rounded-2xl text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] min-h-[48px] tv:min-h-[56px] min-w-0 ${
                     isSelected
-                      ? 'bg-white/15 text-white'
-                      : 'text-gray-300 hover:bg-white/10 hover:text-white'
+                      ? 'bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)]'
+                      : 'text-[var(--ds-text-secondary)] hover:bg-white/10 hover:text-[var(--ds-text-primary)]'
                   }`}
                   tabIndex={0}
                   aria-current={isSelected ? 'true' : undefined}
@@ -224,11 +224,11 @@ export default function SettingsMenu() {
                 >
                   <Icon
                     className={`w-6 h-6 tv:w-7 tv:h-7 flex-shrink-0 ${
-                      isSelected ? 'text-white' : 'text-gray-400'
+                      isSelected ? 'opacity-100' : 'opacity-80'
                     }`}
                     aria-hidden
                   />
-                  <span className="font-medium truncate min-w-0">{t(cat.labelKey)}</span>
+                  <span className="font-semibold truncate min-w-0">{t(cat.labelKey)}</span>
                 </button>
               </li>
             );
@@ -236,15 +236,15 @@ export default function SettingsMenu() {
         </ul>
       </nav>
 
-      {/* Panneau droit : sous-menu (éléments de la catégorie) */}
-      <div className="settings-content flex-1 flex flex-col min-w-0 bg-[#1a1c20]">
+      {/* Panneau droit : contenu (cartes 32px, titres design system) */}
+      <div className="settings-content flex-1 flex flex-col min-w-0 bg-[var(--ds-surface-elevated)]">
         {currentCategory && (
           <>
-            <div className="flex-shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-2 border-b border-white/10 min-w-0">
-              <p className="text-xs font-medium text-primary-400 uppercase tracking-wider hidden sm:block">
+            <div className="flex-shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-2 border-b border-[var(--ds-border)] min-w-0">
+              <p className="ds-text-tertiary text-xs font-medium uppercase tracking-wider hidden sm:block">
                 {t('settingsMenu.title')}
               </p>
-              <h2 className="text-lg sm:text-xl lg:text-2xl font-semibold text-white mt-0 sm:mt-1 truncate">
+              <h2 className="ds-title-page truncate mt-0 sm:mt-1">
                 {t(currentCategory.labelKey)}
               </h2>
             </div>
@@ -255,7 +255,7 @@ export default function SettingsMenu() {
               })()
             ) : (
             <ul
-              className="flex-1 py-4 px-4 sm:px-6 space-y-0.5 overflow-y-auto scrollbar-visible"
+              className="flex-1 py-4 px-4 sm:px-6 space-y-1 overflow-y-auto scrollbar-visible"
               role="list"
             >
               {currentItems.map((item) => {
@@ -271,22 +271,22 @@ export default function SettingsMenu() {
                       {...externalProps}
                       data-settings-item
                       data-focusable
-                      className="settings-content-item group flex items-center gap-4 px-4 py-3 rounded-xl text-white transition-all duration-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#1a1c20] focus:bg-white/10 min-h-[56px] tv:min-h-[64px]"
+                      className="settings-content-item group flex items-center gap-4 px-4 py-3 rounded-2xl text-[var(--ds-text-primary)] transition-all duration-200 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] focus:bg-white/10 min-h-[56px] tv:min-h-[64px]"
                       tabIndex={0}
                     >
-                      <div className="flex-shrink-0 w-10 h-10 tv:w-12 tv:h-12 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-white/15 transition-colors">
-                        <Icon className="w-5 h-5 tv:w-6 tv:h-6 text-gray-300 group-hover:text-white" aria-hidden />
+                      <div className="flex-shrink-0 w-10 h-10 tv:w-12 tv:h-12 rounded-xl bg-white/10 flex items-center justify-center group-hover:bg-white/15 transition-colors">
+                        <Icon className="w-5 h-5 tv:w-6 tv:h-6 text-[var(--ds-text-secondary)] group-hover:text-[var(--ds-text-primary)]" aria-hidden />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <span className="block font-medium text-white truncate">
+                        <span className="block font-semibold truncate">
                           {t(item.titleKey)}
                         </span>
-                        <span className="block text-sm text-gray-400 truncate mt-0.5">
+                        <span className="block text-sm text-[var(--ds-text-secondary)] truncate mt-0.5">
                           {t(item.descriptionKey)}
                         </span>
                       </div>
                       <svg
-                        className="w-5 h-5 text-gray-500 flex-shrink-0 group-hover:translate-x-1 transition-transform"
+                        className="w-5 h-5 text-[var(--ds-text-tertiary)] flex-shrink-0 group-hover:translate-x-1 transition-transform"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"

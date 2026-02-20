@@ -4,8 +4,15 @@ import { serverApi } from '../../lib/client/server-api';
 import { getLocalProfile, onProfileChanged } from '../../lib/client/profile';
 import Avatar from '../ui/Avatar';
 import BackendStatusBadge from './BackendStatusBadge';
+import { DsProgressRing } from '../ui/design-system';
 import { isMobileDevice, isTVPlatform } from '../../lib/utils/device-detection';
 import { calculateSyncProgress } from '../../lib/utils/sync-progress';
+import {
+  getSyncStatusStore,
+  subscribeSyncStatusStore,
+  startSyncStatusPolling,
+  refreshSyncStatusStore,
+} from '../../lib/sync-status-store';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { LANGUAGE_NAMES, type SupportedLanguage } from '../../lib/i18n';
 import { isDemoMode, setDemoMode } from '../../lib/backend-config';
@@ -36,9 +43,31 @@ export default function Navbar() {
       return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
     }
   });
-  const [syncProgress, setSyncProgress] = useState<{ inProgress: boolean; progress: number }>({ inProgress: false, progress: 0 });
+  const [storeState, setStoreState] = useState(() => getSyncStatusStore());
   const previousStatsRef = useRef<Record<string, number>>({});
   const [demoMode, setDemoModeNav] = useState(false);
+
+  useEffect(() => {
+    const status = storeState.status;
+    if (!status) return;
+    if (status.sync_in_progress && Object.keys(previousStatsRef.current).length === 0) {
+      previousStatsRef.current = status.stats || {};
+    }
+    if (!status.sync_in_progress && Object.keys(previousStatsRef.current).length > 0) {
+      previousStatsRef.current = {};
+    }
+  }, [storeState.status?.sync_in_progress]);
+
+  const syncProgress = (() => {
+    const status = storeState.status;
+    if (!status) return { inProgress: false, progress: 0 };
+    const inProgress = status.sync_in_progress === true;
+    const progress = calculateSyncProgress(
+      { sync_in_progress: inProgress, stats: status.stats, progress: status.progress },
+      previousStatsRef.current
+    );
+    return { inProgress, progress };
+  })();
   useEffect(() => {
     setDemoModeNav(isDemoMode());
   }, []);
@@ -153,65 +182,19 @@ export default function Navbar() {
     return () => window.clearInterval(i);
   }, []);
 
-  // Vérifier le statut de synchronisation pour afficher le cercle de progression
+  // Statut de sync unifié : abonnement au store + démarrage du polling quand l'utilisateur est connecté
   useEffect(() => {
     if (!user) {
-      setSyncProgress({ inProgress: false, progress: 0 });
-      return;
+      setStoreState({ status: null, loading: false });
+      return undefined;
     }
-
-    const checkSyncStatus = async () => {
-      try {
-        const response = await serverApi.getSyncStatus();
-        if (response.success && response.data) {
-          const data = response.data;
-          // Vérifier si la sync est en cours uniquement via le flag sync_in_progress
-          // Les stats peuvent persister après la fin d'une sync, donc on ne doit pas les utiliser
-          // pour déterminer si la sync est en cours
-          const inProgress = data.sync_in_progress === true;
-          
-          // Initialiser previousStats si c'est le début d'une sync
-          if (Object.keys(previousStatsRef.current).length === 0 && inProgress) {
-            previousStatsRef.current = data.stats || {};
-          }
-          
-          // Utiliser la fonction utilitaire partagée pour calculer la progression
-          const progress = calculateSyncProgress(
-            {
-              sync_in_progress: inProgress,
-              stats: data.stats,
-              progress: data.progress,
-            },
-            previousStatsRef.current
-          );
-          
-          // Réinitialiser previousStats si la sync vient de se terminer
-          if (!inProgress && Object.keys(previousStatsRef.current).length > 0) {
-            previousStatsRef.current = {};
-          }
-          
-          setSyncProgress({ inProgress, progress });
-        } else {
-          // Si pas de réponse ou erreur, réinitialiser
-          previousStatsRef.current = {};
-          setSyncProgress({ inProgress: false, progress: 0 });
-        }
-      } catch (err) {
-        // Ignorer les erreurs silencieusement mais réinitialiser
-        previousStatsRef.current = {};
-        setSyncProgress({ inProgress: false, progress: 0 });
-      }
+    const unsub = subscribeSyncStatusStore((s) => setStoreState({ ...s }));
+    const stopPolling = startSyncStatusPolling();
+    return () => {
+      unsub();
+      stopPolling();
     };
-
-    checkSyncStatus();
-
-    // Au repos : 30 s. Pendant une sync : 2 s.
-    const POLL_ACTIVE_MS = 2000;
-    const POLL_IDLE_MS = 30000;
-    const intervalMs = syncProgress?.inProgress ? POLL_ACTIVE_MS : POLL_IDLE_MS;
-    const interval = setInterval(checkSyncStatus, intervalMs);
-    return () => clearInterval(interval);
-  }, [user, syncProgress?.inProgress]);
+  }, [user]);
 
   const loadUser = async () => {
     if (!serverApi.isAuthenticated()) {
@@ -277,13 +260,13 @@ export default function Navbar() {
             {user ? (
                 <a
                   href="/search"
-                  className={`gtv-icon-btn transition-all duration-200 hover:scale-110 ${isActive('/search') ? 'bg-glass-active scale-110' : ''}`}
+                  className={`gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative inline-flex items-center justify-center transition-all duration-200 hover:scale-110 ${isActive('/search') ? 'bg-glass-active scale-110' : ''}`}
                   aria-label={t('nav.search')}
                   tabIndex={0}
                   data-focusable
                 >
-                <SearchIcon className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 transition-transform duration-200" />
-              </a>
+                  <SearchIcon className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 relative z-10" />
+                </a>
             ) : null}
           </div>
 
@@ -438,53 +421,49 @@ export default function Navbar() {
               <>
                 <a
                   href="/downloads"
-                  className="gtv-icon-btn flex-shrink-0 inline-flex transition-all duration-200 hover:scale-110"
+                  className="gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative inline-flex items-center justify-center transition-all duration-200 hover:scale-110"
                   aria-label={t('nav.downloads')}
                   tabIndex={0}
                   data-focusable
                 >
-                  <Download className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 transition-transform duration-200" />
+                  <Download className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 relative z-10" />
                 </a>
                 {/* Emplacement paramètres : hamburger si menu replié, sinon icône paramètres */}
                 {useHamburger ? (
                   <button
                     type="button"
                     onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                    className={`gtv-icon-btn flex-shrink-0 transition-all duration-300 ${mobileMenuOpen ? 'bg-primary-600 rotate-90' : ''}`}
+                    className={`gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative inline-flex items-center justify-center transition-all duration-300 ${mobileMenuOpen ? 'bg-primary-600 rotate-90' : ''}`}
                     aria-label={t('nav.menu') || 'Menu'}
                     aria-expanded={mobileMenuOpen}
                     tabIndex={0}
                     data-focusable
                   >
                     {mobileMenuOpen ? (
-                      <X className="w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300" />
+                      <X className="w-4 h-4 sm:w-5 sm:h-5 relative z-10" />
                     ) : (
-                      <Menu className="w-4 h-4 sm:w-5 sm:h-5 transition-transform duration-300" />
+                      <Menu className="w-4 h-4 sm:w-5 sm:h-5 relative z-10" />
                     )}
                   </button>
                 ) : (
                   <a
                     href="/settings"
-                    className={`gtv-icon-btn flex-shrink-0 relative ${isTV ? 'inline-flex' : 'hidden sm:inline-flex'} transition-all duration-200 hover:scale-110 ${isActivePrefix('/settings') ? 'bg-glass-active scale-110' : ''}`}
+                    className={`gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative inline-flex items-center justify-center ${isTV ? 'inline-flex' : 'hidden sm:inline-flex'} transition-all duration-200 hover:scale-110 ${isActivePrefix('/settings') ? 'bg-glass-active scale-110' : ''} ${syncProgress.inProgress ? 'ds-sync-active-pulse' : ''}`}
                     aria-label={t('nav.settings')}
                     tabIndex={0}
                     data-focusable
                   >
                     {syncProgress.inProgress && (
-                      <svg
-                        className="absolute inset-0 w-full h-full transform -rotate-90 pointer-events-none"
-                        viewBox="0 0 36 36"
-                        style={{ width: '100%', height: '100%' }}
-                      >
-                        <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255, 255, 255, 0.1)" strokeWidth="2" />
-                        <circle
-                          cx="18" cy="18" r="16" fill="none" stroke="rgb(59, 130, 246)" strokeWidth="2"
-                          strokeDasharray={`${(syncProgress.progress / 100) * 100.53}, 100.53`}
-                          strokeDashoffset="0" strokeLinecap="round"
-                          className="transition-all duration-500 ease-out"
-                          style={{ strokeDasharray: `${(syncProgress.progress / 100) * 100.53}, 100.53` }}
+                      <span className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden>
+                        <DsProgressRing
+                          value={syncProgress.progress}
+                          size={40}
+                          strokeWidth={2}
+                          color="var(--ds-accent-violet)"
+                          trackColor="rgba(255, 255, 255, 0.15)"
+                          className="w-full h-full max-w-[40px] max-h-[40px]"
                         />
-                      </svg>
+                      </span>
                     )}
                     <SettingsIcon className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 relative z-10" />
                   </a>
@@ -492,17 +471,19 @@ export default function Navbar() {
 
                 <a
                   href="/settings/account"
-                  className={`cursor-pointer focus:outline-none focus:ring-4 focus:ring-primary-600/50 rounded-full transition-all duration-200 hover:scale-110 hover:ring-2 hover:ring-primary-600/30 ${user ? 'hidden sm:inline-flex' : ''}`}
+                  className={`gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative inline-flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110 ${user ? 'hidden sm:inline-flex' : ''}`}
                   tabIndex={0}
                   data-focusable
                   aria-label={t('nav.account')}
                 >
-                  <Avatar
-                    email={user.email}
-                    displayName={profile.displayName}
-                    profile={profile}
-                    sizeClassName="w-7 h-7 sm:w-9 sm:h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 tv:w-14 tv:h-14 transition-transform duration-200"
-                  />
+                  <span className="relative z-10">
+                    <Avatar
+                      email={user.email}
+                      displayName={profile.displayName}
+                      profile={profile}
+                      sizeClassName="w-7 h-7 sm:w-9 sm:h-9 md:w-10 md:h-10 lg:w-11 lg:h-11 tv:w-14 tv:h-14 transition-transform duration-200"
+                    />
+                  </span>
                 </a>
 
                 <div className="hidden lg:flex flex-col items-end leading-none pl-2">
