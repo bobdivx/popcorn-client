@@ -436,11 +436,20 @@ class ServerApiClient {
       'Content-Type': 'application/json',
       ...(options.headers || {}),
     };
-    // Indiquer au backend si la requête vient du client cloud ou d'un client local
-    if (typeof window !== 'undefined' && window.location?.hostname) {
-      const h = (window.location.hostname || '').toLowerCase();
-      const isCloud = h === 'client.popcornn.app' || h.endsWith('.client.popcornn.app');
-      (headers as Record<string, string>)['X-Popcorn-Client-Origin'] = isCloud ? 'cloud' : 'local';
+    // Indiquer au backend si la requête vient du client cloud ou d'un client local.
+    // On n'envoie le header que en same-origin pour éviter les erreurs CORS avec les backends
+    // qui n'incluent pas encore x-popcorn-client-origin dans Access-Control-Allow-Headers.
+    if (typeof window !== 'undefined' && window.location?.origin) {
+      try {
+        const requestOrigin = new URL(url).origin;
+        if (requestOrigin === window.location.origin) {
+          const h = (window.location.hostname || '').toLowerCase();
+          const isCloud = h === 'client.popcornn.app' || h.endsWith('.client.popcornn.app');
+          (headers as Record<string, string>)['X-Popcorn-Client-Origin'] = isCloud ? 'cloud' : 'local';
+        }
+      } catch {
+        // URL invalide, ne pas ajouter le header
+      }
     }
 
     try {
