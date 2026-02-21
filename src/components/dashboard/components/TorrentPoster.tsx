@@ -90,11 +90,19 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
           </div>
         )}
 
-        {/* Logo Popcorn en haut à gauche */}
-        <div className="absolute top-1 left-1 lg:top-2 lg:left-2 tv:top-3 tv:left-3 z-10">
-          <div className="w-6 h-6 lg:w-8 lg:h-8 tv:w-12 tv:h-12 bg-primary rounded flex items-center justify-center shadow-primary transition-all duration-200">
-            <span className="text-white text-xs lg:text-sm tv:text-base font-bold">P</span>
-          </div>
+        {/* Badge indexer en haut à gauche (design system) */}
+        <div className="absolute top-1 left-1 lg:top-2 lg:left-2 tv:top-3 tv:left-3 z-10 max-w-[calc(100%-0.5rem)]">
+          <span
+            className="inline-flex items-center px-1.5 py-0.5 lg:px-2 lg:py-1 tv:px-2.5 tv:py-1 rounded-[var(--ds-radius-sm)] text-[10px] lg:text-xs tv:text-sm font-semibold truncate border transition-all duration-200 shadow-sm"
+            style={{
+              backgroundColor: 'var(--ds-accent-violet-muted)',
+              color: 'var(--ds-accent-violet)',
+              borderColor: 'var(--ds-accent-violet)',
+            }}
+            title={item.indexerName || undefined}
+          >
+            {item.indexerName && item.indexerName.trim() ? item.indexerName.trim() : 'Popcorn'}
+          </span>
         </div>
 
         {/* Icône de complétion en haut à droite */}
@@ -109,7 +117,7 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
         {/* Badge de disponibilité + Stats temps réel (Seeds/Peers) - discret en bas de la tuile */}
         {(item.seeds !== undefined || item.peers !== undefined) && (
           <div className="absolute bottom-2 left-2 lg:bottom-3 lg:left-3 tv:bottom-4 tv:left-4 z-10">
-            <div className={`rounded-lg px-2 py-1 tv:px-3 tv:py-1.5 flex items-center gap-2 tv:gap-3 text-xs tv:text-sm text-white max-w-[calc(100%-0.5rem)] ${
+            <div className={`rounded-lg px-2 py-1 tv:px-3 tv:py-1.5 flex items-center gap-2 tv:gap-3 text-xs tv:text-sm text-white flex-wrap ${
               // Couleur de fond basée sur la disponibilité
               item.seeds !== undefined && item.seeds >= 50 
                 ? 'bg-green-900/80 border border-green-500/50' // Rapide (50+ seeders)
@@ -120,23 +128,23 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
                     : 'bg-red-900/80 border border-red-500/50' // Indisponible (0 seeders)
             }`}>
               {item.seeds !== undefined && (
-                <div className="flex items-center gap-1 min-w-0">
-                  <Sprout className={`w-3 h-3 tv:w-4 tv:h-4 ${
+                <div className="flex items-center gap-1 shrink-0">
+                  <Sprout className={`w-3 h-3 tv:w-4 tv:h-4 flex-shrink-0 ${
                     item.seeds >= 50 ? 'text-green-400' 
                     : item.seeds >= 10 ? 'text-green-400'
                     : item.seeds >= 1 ? 'text-amber-400'
                     : 'text-red-400'
                   }`} size={16} />
-                  <span className="font-semibold truncate">{item.seeds}</span>
+                  <span className="font-semibold whitespace-nowrap">{item.seeds}</span>
                 </div>
               )}
               {item.seeds !== undefined && item.peers !== undefined && (
-                <span className="text-white/50">|</span>
+                <span className="text-white/50 shrink-0">|</span>
               )}
               {item.peers !== undefined && (
-                <div className="flex items-center gap-1 min-w-0">
-                  <Users className="w-3 h-3 tv:w-4 tv:h-4 text-blue-400" size={16} />
-                  <span className="font-semibold truncate">{item.peers}</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Users className="w-3 h-3 tv:w-4 tv:h-4 text-blue-400 flex-shrink-0" size={16} />
+                  <span className="font-semibold whitespace-nowrap">{item.peers}</span>
                 </div>
               )}
             </div>

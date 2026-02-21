@@ -33,6 +33,8 @@ interface UnifiedPlayerProps {
   lucieProps?: Omit<LuciePlayerProps, 'src'>; // Nouveau: props pour Lucie
   onHlsError: (error: Error) => void;
   onHlsLoadingChange: (loading: boolean) => void;
+  /** Appelé périodiquement et à la fermeture avec la progression (pour Reprendre / Revoir). */
+  onProgress?: (currentTime: number, duration: number) => void;
 }
 
 export default function UnifiedPlayer({
@@ -53,6 +55,7 @@ export default function UnifiedPlayer({
   lucieProps,
   onHlsError,
   onHlsLoadingChange,
+  onProgress,
 }: UnifiedPlayerProps) {
   return (
     <>
@@ -82,6 +85,7 @@ export default function UnifiedPlayer({
           releaseDate={hlsProps.releaseDate}
           torrentName={hlsProps.torrentName ?? hlsProps.fileName}
           torrentStats={torrentStats}
+          onProgress={onProgress}
         />
       ) : src && useLuciePlayer && lucieProps ? (
         <LuciePlayer
@@ -89,6 +93,7 @@ export default function UnifiedPlayer({
           {...lucieProps}
           onLoadingChange={onHlsLoadingChange}
           onError={onHlsError}
+          onProgress={onProgress}
         />
       ) : src ? (
         <HLSPlayer
@@ -96,6 +101,7 @@ export default function UnifiedPlayer({
           {...hlsProps}
           onLoadingChange={onHlsLoadingChange}
           onError={onHlsError}
+          onProgress={onProgress}
         />
       ) : null}
     </>

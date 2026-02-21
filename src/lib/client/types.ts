@@ -111,6 +111,8 @@ export interface ContentItem {
   // Stats temps réel pour améliorations "Mieux que Netflix"
   seeds?: number; // Nombre de seeds du torrent
   peers?: number; // Nombre de peers du torrent
+  /** Nom de l'indexer source (ex. YTS, EZTV) pour affichage sur la carte */
+  indexerName?: string;
   codec?: 'x264' | 'x265' | 'AV1'; // Codec vidéo
   quality?: 'Remux' | '4K' | '1080p' | '720p' | '480p'; // Qualité vidéo
   fileSize?: number; // Taille du fichier en bytes

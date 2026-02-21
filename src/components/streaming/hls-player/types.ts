@@ -42,6 +42,8 @@ export interface HLSPlayerProps {
   onQualityChange?: (height: number | null) => void;
   /** Quand true, src est l'URL stream-torrent (proxy librqbit) : utiliser src tel quel pour HLS, ne pas reconstruire en /api/local/stream. */
   useStreamTorrentUrl?: boolean;
+  /** Appelé périodiquement et à la fermeture avec la progression (pour Reprendre / Revoir). */
+  onProgress?: (currentTime: number, duration: number) => void;
 }
 
 declare global {

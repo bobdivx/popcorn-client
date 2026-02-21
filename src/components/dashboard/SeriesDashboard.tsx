@@ -4,9 +4,12 @@ import type { SeriesData } from '../../lib/client/types';
 import { HeroSection } from './components/HeroSection';
 import CarouselRow from '../torrents/CarouselRow';
 import { LazyTorrentPoster } from './components/LazyTorrentPoster';
+import { LazyResumePoster } from './components/LazyResumePoster';
 import type { ContentItem } from '../../lib/client/types';
 import { useInfiniteSeries } from './hooks/useInfiniteSeries';
 import { useRecentSeries } from './hooks/useRecentSeries';
+import { useFavoritesItems } from './hooks/useFavoritesItems';
+import { useResumeWatching } from './hooks/useResumeWatching';
 import { useSyncStatus } from './hooks/useSyncStatus';
 import { SyncProgress } from '../setup/components/SyncProgress';
 import { SyncCard } from './components/SyncCard';
@@ -25,7 +28,16 @@ export default function SeriesDashboard() {
   const { t, language } = useI18n();
   const { series, loading, error, hasMore, loadMore, refetchSilent } = useInfiniteSeries();
   const { series: recentSeries } = useRecentSeries();
+  const { items: favoritesItems } = useFavoritesItems();
+  const { resumeWatching, rewatchWatching, watchedIds } = useResumeWatching();
   const { syncStatus, isSyncing, loading: syncLoading } = useSyncStatus();
+  const resumeSeries = useMemo(() => resumeWatching.filter((item) => item.type === 'tv'), [resumeWatching]);
+  const rewatchSeries = useMemo(() => rewatchWatching.filter((item) => item.type === 'tv'), [rewatchWatching]);
+  const favoritesSeries = useMemo(() => favoritesItems.filter((item) => item.type === 'tv'), [favoritesItems]);
+  const isWatched = useCallback(
+    (item: ContentItem) => watchedIds.has(item.id) || (item.tmdbId != null && watchedIds.has(String(item.tmdbId))),
+    [watchedIds]
+  );
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
   const lastSyncProgressRef = useRef<number>(-1);
   const { notifications, addNotification, removeNotification } = useNotifications();
@@ -201,11 +213,13 @@ export default function SeriesDashboard() {
     }
   }, [heroDownloading, addNotification, t]);
 
-  // Grouper les séries par genre principal uniquement (chaque série dans une seule ligne)
+  // Grouper les séries par genre principal (exclure les déjà vus des lignes genre)
   const seriesByGenre = useMemo(() => {
     const grouped: Record<string, SeriesData[]> = {};
-    
+    const watched = new Set(watchedIds);
+
     series.forEach(serie => {
+      if (watched.has(serie.id) || (serie.tmdbId != null && watched.has(String(serie.tmdbId)))) return;
       if (serie.genres && serie.genres.length > 0) {
         // Utiliser uniquement le genre principal (premier du tableau)
         const primaryGenre = serie.genres[0];
@@ -233,12 +247,17 @@ export default function SeriesDashboard() {
     });
 
     return grouped;
-  }, [series]);
+  }, [series, watchedIds]);
 
-  // Préparer les données pour le hero (les 3 séries les plus récentes avec poster)
+  // Préparer les données pour le hero (les 3 séries les plus récentes par date de sortie TMDB, avec poster)
   const heroSeries = useMemo(() => {
-    return series
+    return [...series]
       .filter(s => s.poster || s.backdrop)
+      .sort((a, b) => {
+        const dateA = a.firstAirDate ? new Date(a.firstAirDate).getTime() : 0;
+        const dateB = b.firstAirDate ? new Date(b.firstAirDate).getTime() : 0;
+        return dateB - dateA;
+      })
       .slice(0, 3)
       .map(s => ({
         ...s,
@@ -373,10 +392,40 @@ export default function SeriesDashboard() {
       )}
 
       <div className="pb-8 tv:pb-12 flex-1">
-        {/* Section Ajouts récents (tri par date indexeur) - première ligne */}
-        {recentSeries.length > 0 && (
+        {/* Section Reprendre la lecture — en tête de page */}
+        {resumeSeries.length > 0 && (
+          <CarouselRow title={t('dashboard.resumeWatching')} autoScroll={false}>
+            {resumeSeries.map((item) => (
+              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px] relative">
+                <LazyResumePoster item={item} />
+              </div>
+            ))}
+          </CarouselRow>
+        )}
+        {/* Section Revoir (séries déjà terminées) */}
+        {rewatchSeries.length > 0 && (
+          <CarouselRow title={t('dashboard.rewatch')} autoScroll={false}>
+            {rewatchSeries.map((item) => (
+              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px] relative">
+                <LazyResumePoster item={item} />
+              </div>
+            ))}
+          </CarouselRow>
+        )}
+        {/* Section À regarder plus tard (favoris séries) */}
+        {favoritesSeries.length > 0 && (
+          <CarouselRow title={t('dashboard.watchLater')} autoScroll={false}>
+            {favoritesSeries.map((item) => (
+              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+                <LazyTorrentPoster item={item} />
+              </div>
+            ))}
+          </CarouselRow>
+        )}
+        {/* Section Ajouts récents (tri par date indexeur, cachés : déjà vus) */}
+        {recentSeries.filter((s) => !isWatched(s)).length > 0 && (
           <CarouselRow title={t('dashboard.recentAdditions')} autoScroll={false}>
-            {recentSeries.map((serie) => (
+            {recentSeries.filter((s) => !isWatched(s)).map((serie) => (
               <div key={serie.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                 <LazyTorrentPoster item={{ ...serie, type: 'tv' }} />
               </div>

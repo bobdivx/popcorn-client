@@ -24,6 +24,8 @@ interface DirectVideoPlayerProps {
   torrentName?: string;
   /** Stats du client torrent pour afficher la partie téléchargée sur la barre de progression. */
   torrentStats?: PlayerLoadingTorrentStats | null;
+  /** Appelé périodiquement et à la fermeture avec la progression (pour Reprendre / Revoir). */
+  onProgress?: (currentTime: number, duration: number) => void;
 }
 
 export default function DirectVideoPlayer({
@@ -40,6 +42,7 @@ export default function DirectVideoPlayer({
   releaseDate,
   torrentName = '',
   torrentStats,
+  onProgress,
 }: DirectVideoPlayerProps) {
   const { t } = useI18n();
   const playerConfig = usePlayerConfig();
@@ -90,6 +93,16 @@ export default function DirectVideoPlayer({
   useEffect(() => {
     setShowControls(baseShowControls);
   }, [baseShowControls]);
+
+  // Reprendre / Revoir : enregistrer la progression périodiquement et à la fermeture
+  useEffect(() => {
+    if (!onProgress || duration <= 0) return;
+    const id = setInterval(() => onProgress(currentTime, duration), 15000);
+    return () => {
+      clearInterval(id);
+      onProgress(currentTime, duration);
+    };
+  }, [onProgress, currentTime, duration]);
 
   const handleToggleFullscreen = () => {
     const container =

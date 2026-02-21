@@ -44,6 +44,7 @@ export default function HLSPlayer({
   streamQuality,
   onQualityChange,
   useStreamTorrentUrl: useStreamTorrentUrlProp,
+  onProgress,
 }: HLSPlayerProps) {
   const playerConfig = usePlayerConfig();
   const { t } = useI18n();
@@ -144,6 +145,17 @@ export default function HLSPlayer({
   useEffect(() => {
     canAutoPlayRef.current = canAutoPlay;
   }, [canAutoPlay]);
+
+  // Reprendre / Revoir : enregistrer la progression périodiquement et à la fermeture
+  const effectiveDuration = duration > 0 ? duration : (hlsDuration ?? 0);
+  useEffect(() => {
+    if (!onProgress || effectiveDuration <= 0) return;
+    const id = setInterval(() => onProgress(currentTime, effectiveDuration), 15000);
+    return () => {
+      clearInterval(id);
+      onProgress(currentTime, effectiveDuration);
+    };
+  }, [onProgress, currentTime, effectiveDuration]);
 
   const {
     audioTracks,

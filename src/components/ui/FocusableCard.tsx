@@ -84,7 +84,7 @@ export function FocusableCard({
 
   if (href) {
     return (
-      <a href={href} {...commonProps}>
+      <a href={href} data-astro-prefetch="tap" {...commonProps}>
         {children}
       </a>
     );

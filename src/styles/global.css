@@ -818,14 +818,15 @@
     padding-left: var(--safe-area-inset-left);
   }
   
-  /* Focus states pour Android TV - mis à jour avec primary */
-  .focus-tv {
-    @apply focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-60 focus:ring-offset-2 focus:ring-offset-black;
-  }
-  
-  .focus-tv-glow {
-    @apply focus-tv;
-    box-shadow: 0 0 20px rgba(168, 85, 247, 0.8), 0 0 40px rgba(168, 85, 247, 0.5);
+  /* Focus states TV — même halo blanc pulsé que le reste de l’app (header, menu, cartes) */
+  .focus-tv:focus-visible,
+  .focus-tv-glow:focus-visible {
+    outline: 3px solid rgba(255, 255, 255, 0.4) !important;
+    outline-offset: 2px !important;
+    box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4) !important;
+    animation: tv-halo-pulse 2s ease-in-out infinite !important;
+    --tw-ring-width: 0;
+    --tw-ring-offset-width: 0;
   }
   
   .hover-tv:not(:focus) {
@@ -1224,11 +1225,13 @@ button, a, input, select, textarea {
   @apply transition-all duration-200;
 }
 
-/* Focus visible global — halo blanc (norme design) */
+/* Focus visible global — halo blanc pulsé (header, menu, settings, cartes, tous boutons/liens) */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35);
-  border-radius: 0.75rem;
+  outline: 3px solid rgba(255, 255, 255, 0.4) !important;
+  outline-offset: 2px !important;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4) !important;
+  animation: tv-halo-pulse 2s ease-in-out infinite !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1260,9 +1263,15 @@ button, a, input, select, textarea {
   contain: layout style paint;
 }
 
-/* Carte focusée : ne pas clip l'outline en haut/bas (contain: paint coupe le focus ring) */
+/* Carte focusée : ne pas clip l'outline (contain: paint coupe le focus ring) — clavier et TV */
 [data-torrent-card].tv-card-focused,
-.torrent-poster.tv-card-focused {
+.torrent-poster.tv-card-focused,
+[data-torrent-card]:focus,
+[data-torrent-card]:focus-visible,
+[data-torrent-card]:focus-within,
+.torrent-poster:focus,
+.torrent-poster:focus-visible,
+.torrent-poster:focus-within {
   contain: layout style !important;
 }
 
@@ -1429,21 +1438,28 @@ html {
   50% { box-shadow: 0 4px 24px rgba(255, 255, 255, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.45); outline: 5px solid rgba(255, 255, 255, 0.5); outline-offset: 6px; }
 }
 
-/* Focus visible pour les autres éléments (boutons, liens, inputs) */
+/* Focus visible global : halo blanc scintillant (boutons, liens, inputs) */
 .tv-element-focused {
   outline: 3px solid var(--tv-focus-color) !important;
   outline-offset: 2px !important;
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4) !important;
+  animation: tv-halo-pulse 2s ease-in-out infinite !important;
 }
 
-/* Focus visible amélioré pour les éléments interactifs (sauf .ds-focus-glow et cartes torrent = halo blanc) */
+/* Focus visible pour tous les éléments interactifs — halo blanc pulsé (header, menu settings, boutons, liens, cartes) */
 [data-focusable]:focus-visible,
+[data-settings-card]:focus-visible,
+[data-settings-item]:focus-visible,
 button:focus-visible,
-a:not(.ds-focus-glow):focus-visible,
+a:focus-visible,
 input:focus-visible,
 select:focus-visible,
-textarea:focus-visible {
+textarea:focus-visible,
+[tabindex]:focus-visible {
   outline: 3px solid var(--tv-focus-color) !important;
   outline-offset: 2px !important;
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4) !important;
+  animation: tv-halo-pulse 2s ease-in-out infinite !important;
 }
 
 /* Cartes torrent / poster : halo blanc visible au focus (cohérent avec design-system et .tv-card-focused) */
@@ -1457,13 +1473,15 @@ textarea:focus-visible {
   animation: tv-halo-pulse 2s ease-in-out infinite;
 }
 
-/* Masquer l'outline sur les éléments dans les cartes focusées (l'effet est sur la carte) */
+/* Masquer le halo sur les éléments à l’intérieur des cartes focusées (le halo est sur la carte) */
 .tv-card-focused a:focus-visible,
 .tv-card-focused button:focus-visible,
 [data-torrent-card].tv-card-focused *:focus-visible,
 [data-settings-card].tv-card-focused *:focus-visible,
 .torrent-poster.tv-card-focused *:focus-visible {
   outline: none !important;
+  box-shadow: none !important;
+  animation: none !important;
 }
 
 /* Cartes adjacentes légèrement assombries quand une carte est focus */
@@ -1472,8 +1490,8 @@ textarea:focus-visible {
   opacity: 0.7;
 }
 
-/* Grilles de settings avec carte focus */
-.grid:has(.tv-card-focused) [data-settings-card]:not(.tv-card-focused) {
+/* Grilles de settings : assombrir les cartes non focusées (jamais la carte qui contient le focus) */
+.grid:has(.tv-card-focused) [data-settings-card]:not(.tv-card-focused):not(:focus-within) {
   opacity: 0.7;
 }
 
@@ -1510,12 +1528,13 @@ form textarea:focus {
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.25) !important;
 }
 
-/* Boutons de formulaire sur TV — halo blanc */
+/* Boutons de formulaire — même halo blanc pulsé que le reste */
 form button[type="submit"]:focus-visible,
 .form-tv-button:focus-visible {
   outline: 3px solid var(--tv-focus-color) !important;
   outline-offset: 2px !important;
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2) !important;
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4) !important;
+  animation: tv-halo-pulse 2s ease-in-out infinite !important;
 }
 
 /* ==========================================================================

@@ -173,6 +173,7 @@ export default function SettingsOverview() {
               key={item.id}
               href={item.href}
               data-astro-prefetch
+              data-settings-card
               className={`block min-w-0 rounded-[var(--ds-radius-lg)] overflow-hidden transition-all hover:scale-[1.01] hover:shadow-lg ${focusGlowClass} ${isSyncCardInProgress ? 'overview-card--sync-in-progress' : ''}`}
             >
               <DsCard variant="elevated" className="h-full">

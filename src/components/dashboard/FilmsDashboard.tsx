@@ -4,10 +4,12 @@ import type { FilmData } from '../../lib/client/types';
 import { HeroSection } from './components/HeroSection';
 import CarouselRow from '../torrents/CarouselRow';
 import { LazyTorrentPoster } from './components/LazyTorrentPoster';
+import { LazyResumePoster } from './components/LazyResumePoster';
 import type { ContentItem } from '../../lib/client/types';
 import { useInfiniteFilms } from './hooks/useInfiniteFilms';
 import { useRecentFilms } from './hooks/useRecentFilms';
 import { useFavoritesItems } from './hooks/useFavoritesItems';
+import { useResumeWatching } from './hooks/useResumeWatching';
 import { useSyncStatus } from './hooks/useSyncStatus';
 import { SyncProgress } from '../setup/components/SyncProgress';
 import { SyncCard } from './components/SyncCard';
@@ -27,7 +29,14 @@ export default function FilmsDashboard() {
   const { films, loading, error, hasMore, loadMore, refetchSilent } = useInfiniteFilms();
   const { films: recentFilms } = useRecentFilms();
   const { items: favoritesItems } = useFavoritesItems();
+  const { resumeWatching, rewatchWatching, watchedIds } = useResumeWatching();
   const { syncStatus, isSyncing, loading: syncLoading } = useSyncStatus();
+  const resumeFilms = useMemo(() => resumeWatching.filter((item) => item.type === 'movie'), [resumeWatching]);
+  const rewatchFilms = useMemo(() => rewatchWatching.filter((item) => item.type === 'movie'), [rewatchWatching]);
+  const isWatched = useCallback(
+    (item: ContentItem) => watchedIds.has(item.id) || (item.tmdbId != null && watchedIds.has(String(item.tmdbId))),
+    [watchedIds]
+  );
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
   const lastSyncProgressRef = useRef<number>(-1);
   const { notifications, addNotification, removeNotification } = useNotifications();
@@ -203,11 +212,13 @@ export default function FilmsDashboard() {
     }
   }, [heroDownloading, addNotification, t]);
 
-  // Grouper les films par genre principal uniquement (chaque film dans une seule ligne)
+  // Grouper les films par genre principal (exclure les déjà vus des lignes genre)
   const filmsByGenre = useMemo(() => {
     const grouped: Record<string, FilmData[]> = {};
-    
+    const watched = new Set(watchedIds);
+
     films.forEach(film => {
+      if (watched.has(film.id) || (film.tmdbId != null && watched.has(String(film.tmdbId)))) return;
       if (film.genres && film.genres.length > 0) {
         // Utiliser uniquement le genre principal (premier du tableau)
         const primaryGenre = film.genres[0];
@@ -235,7 +246,7 @@ export default function FilmsDashboard() {
     });
 
     return grouped;
-  }, [films]);
+  }, [films, watchedIds]);
 
   // Préparer les données pour le hero (les 3 films les plus récents par date de sortie, avec poster)
   const heroFilms = useMemo(() => {
@@ -380,10 +391,30 @@ export default function FilmsDashboard() {
       )}
 
       <div className="pb-8 tv:pb-12 flex-1">
-        {/* Section Ajouts récents (tri par date de sortie du film) - première ligne */}
-        {recentFilms.length > 0 && (
+        {/* Section Reprendre la lecture — en tête de page */}
+        {resumeFilms.length > 0 && (
+          <CarouselRow title={t('dashboard.resumeWatching')} autoScroll={false}>
+            {resumeFilms.map((item) => (
+              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px] relative">
+                <LazyResumePoster item={item} />
+              </div>
+            ))}
+          </CarouselRow>
+        )}
+        {/* Section Revoir (films déjà terminés) */}
+        {rewatchFilms.length > 0 && (
+          <CarouselRow title={t('dashboard.rewatch')} autoScroll={false}>
+            {rewatchFilms.map((item) => (
+              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px] relative">
+                <LazyResumePoster item={item} />
+              </div>
+            ))}
+          </CarouselRow>
+        )}
+        {/* Section Ajouts récents (tri par date de sortie, cachés : déjà vus) */}
+        {recentFilms.filter((f) => !isWatched(f)).length > 0 && (
           <CarouselRow title={t('dashboard.recentAdditions')} autoScroll={false}>
-            {recentFilms.map((film) => (
+            {recentFilms.filter((f) => !isWatched(f)).map((film) => (
               <div key={film.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                 <LazyTorrentPoster item={{ ...film, type: 'movie' }} />
               </div>

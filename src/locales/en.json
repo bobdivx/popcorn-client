@@ -547,6 +547,7 @@
   },
   "dashboard": {
     "resumeWatching": "Continue watching",
+    "rewatch": "Rewatch",
     "popularMovies": "Popular movies",
     "popularSeries": "Popular series",
     "recentAdditions": "Recent additions",
@@ -1026,6 +1027,9 @@
     "savedMixedContent": "URL saved. Test skipped because the page is HTTPS and the backend is HTTP (Mixed Content).",
     "resetSuccess": "Configuration reset to default value.",
     "mixedContentError": "The page is HTTPS and the backend is HTTP. The browser blocks this test (Mixed Content). Use an HTTPS backend or a reverse proxy.",
+    "clientUrlLabel": "Client URL (webOS / quick connect)",
+    "clientUrlPlaceholder": "e.g. http://192.168.1.100:4321",
+    "clientUrlHelp": "Optional. URL where this client is reachable (for webOS TV and quick-connect QR). If empty, the current address is used when saving.",
     "info": {
       "title": "Information",
       "point1": "The Rust backend URL is stored in localStorage (client-side)",

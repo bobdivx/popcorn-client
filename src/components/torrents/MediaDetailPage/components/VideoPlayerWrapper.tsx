@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { serverApi } from '../../../../lib/client/server-api';
+import { updateResumeWatching } from '../../../../lib/resumeWatchingStorage';
+import type { ContentItem } from '../../../../lib/client/types';
 import type { TorrentFile } from '../hooks/useVideoFiles';
 import { useFullscreen } from '../../../streaming/player-shared/hooks/useFullscreen';
 import { QualityBadges } from './QualityBadges';
@@ -151,7 +153,23 @@ export function VideoPlayerWrapper({
   const loadingStepFromStatus = getLoadingStep(playStatus ?? '', progressMessage ?? '', torrentStats ?? null);
   // Quand on attend le flux (isLoading sans étape précise), afficher l’étape 1 (en file d’attente), pas la 4
   const loadingStep = loadingStepFromStatus > 0 ? loadingStepFromStatus : isLoading ? 1 : 0;
-  
+
+  const handlePlaybackProgress = useCallback(
+    (currentTime: number, duration: number) => {
+      if (tmdbId == null || !tmdbType || duration <= 0) return;
+      const progressPercent = (currentTime / duration) * 100;
+      const item: ContentItem = {
+        id: String(tmdbId),
+        title: torrentName || '',
+        type: tmdbType,
+        poster: posterUrl ?? undefined,
+        tmdbId,
+      };
+      updateResumeWatching(item, progressPercent);
+    },
+    [tmdbId, tmdbType, torrentName, posterUrl]
+  );
+
   const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';
   const STORAGE_INTRO_ALWAYS_SHOW = 'popcorn_intro_always_show';
   const STORAGE_ADS_SESSION = 'popcorn_ads_preroll_session';
@@ -547,6 +565,7 @@ export function VideoPlayerWrapper({
               }
               setIsLoading(false);
             }}
+            onProgress={handlePlaybackProgress}
           />
         </div>
       </div>

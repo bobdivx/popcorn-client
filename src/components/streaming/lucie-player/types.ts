@@ -26,6 +26,8 @@ export interface LuciePlayerProps {
   baseUrl?: string;
   /** Ref pour exposer stopBuffer (arrêt du buffer à la fermeture) */
   stopBufferRef?: import('preact').RefObject<(() => void) | null>;
+  /** Appelé périodiquement et à la fermeture avec la progression (pour Reprendre / Revoir). */
+  onProgress?: (currentTime: number, duration: number) => void;
 }
 
 /**

@@ -35,6 +35,7 @@ export default function LuciePlayer({
   onClose,
   baseUrl: baseUrlProp,
   stopBufferRef,
+  onProgress,
 }: LuciePlayerProps) {
   const playerConfig = usePlayerConfig();
   const { t } = useI18n();
@@ -71,6 +72,16 @@ export default function LuciePlayer({
       };
     }
   }, [stopBuffer, stopBufferRef]);
+
+  const effectiveDuration = duration > 0 ? duration : (lucieDuration ?? 0);
+  useEffect(() => {
+    if (!onProgress || effectiveDuration <= 0) return;
+    const id = setInterval(() => onProgress(currentTime, effectiveDuration), 15000);
+    return () => {
+      clearInterval(id);
+      onProgress(currentTime, effectiveDuration);
+    };
+  }, [onProgress, currentTime, effectiveDuration]);
 
   const isFullscreen = useFullscreen();
   

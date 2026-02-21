@@ -48,6 +48,7 @@ function toContentItem(raw: any): ContentItem {
   const genres = Array.isArray(raw?.genres) ? raw.genres : undefined;
   const seeds = raw?.seedCount ?? raw?.seed_count;
   const peers = raw?.leechCount ?? raw?.leech_count;
+  const indexerName = raw?.indexerName ?? raw?.indexer_name ?? raw?.uploader;
 
   const codecRaw = (raw?.codec || raw?.quality?.codec || '').toString().toLowerCase();
   const codec: ContentItem['codec'] =
@@ -84,6 +85,7 @@ function toContentItem(raw: any): ContentItem {
     tmdbId: typeof raw?.tmdbId === 'number' ? raw.tmdbId : (typeof raw?.tmdb_id === 'number' ? raw.tmdb_id : null),
     seeds: typeof seeds === 'number' ? seeds : undefined,
     peers: typeof peers === 'number' ? peers : undefined,
+    indexerName: typeof indexerName === 'string' && indexerName.trim() ? indexerName.trim() : undefined,
     codec,
     quality,
     fileSize: typeof fileSize === 'number' ? fileSize : undefined,

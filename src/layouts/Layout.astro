@@ -210,8 +210,12 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         window.addEventListener('error', function(e) {
           if (e.target && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK')) {
             var ref = e.target.src || e.target.href || '?';
-            console.error('[Popcorn] Resource load failed:', ref);
-            showError('Chargement bloque: ' + ref);
+            // Ne pas afficher ni logger les prefetch (ex. /player/xxx en 404 au focus clavier) : non bloquant
+            var isPrefetch = e.target.tagName === 'LINK' && (e.target.rel || '').toLowerCase().includes('prefetch');
+            if (!isPrefetch) {
+              console.error('[Popcorn] Resource load failed:', ref);
+              showError('Chargement bloque: ' + ref);
+            }
           }
         }, true);
         function hide() {

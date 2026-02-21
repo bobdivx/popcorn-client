@@ -11,6 +11,7 @@ export default function ServerSettings() {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [backendUrl, setBackendUrl] = useState('');
   const [savedBackendUrl, setSavedBackendUrl] = useState<string | null>(null);
+  const [clientUrl, setClientUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -55,6 +56,9 @@ export default function ServerSettings() {
       } else {
         setSavedBackendUrl(null);
       }
+      // URL du client (webOS / connexion rapide), même clé que le lanceur webOS
+      const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('webos_local_client_url') : null;
+      setClientUrl(stored ? stored : '');
     } catch (err) {
       console.error('Erreur lors du chargement de l\'URL du backend:', err);
       const defaultUrl = 'http://127.0.0.1:3000';
@@ -164,14 +168,23 @@ export default function ServerSettings() {
       // Sauvegarder la configuration dans localStorage
       saveBackendUrl(backendUrl.trim());
 
-      // Synchroniser l'URL du backend (et du client si local) dans le cloud (quick-connect, webOS)
+      // Synchroniser l'URL du backend (et du client si renseignée) dans le cloud (quick-connect, webOS)
       const cloudToken = TokenManager.getCloudAccessToken();
+      const clientUrlToSave = clientUrl.trim();
+      if (typeof localStorage !== 'undefined') {
+        if (clientUrlToSave) {
+          localStorage.setItem('webos_local_client_url', clientUrlToSave.replace(/\/$/, ''));
+        } else {
+          localStorage.removeItem('webos_local_client_url');
+        }
+      }
       if (cloudToken) {
         try {
           const { isCloudClient, getClientOrigin } = await import('../../lib/client-origin.js');
           const payload: { backendUrl: string; clientUrl?: string } = { backendUrl: backendUrl.trim() };
-          if (!isCloudClient() && getClientOrigin()) {
-            payload.clientUrl = getClientOrigin();
+          const effectiveClientUrl = clientUrlToSave || (!isCloudClient() ? getClientOrigin() : '');
+          if (effectiveClientUrl) {
+            payload.clientUrl = effectiveClientUrl.replace(/\/$/, '');
           }
           const res = await saveUserConfigMerge(payload, cloudToken);
           if (!res?.success) {
@@ -271,6 +284,24 @@ export default function ServerSettings() {
                 disabled={saving || testing || loading}
               />
               <p className="mt-2 ds-text-tertiary text-sm">{t('serverSettings.examples')}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--ds-text-secondary)] mb-2">
+                {t('serverSettings.clientUrlLabel')} <span className="ds-text-tertiary font-normal">({t('common.optional')})</span>
+              </label>
+              <input
+                type="text"
+                value={clientUrl}
+                onInput={(e) => {
+                  setClientUrl((e.target as HTMLInputElement).value);
+                  setError('');
+                  setSuccess('');
+                }}
+                placeholder={t('serverSettings.clientUrlPlaceholder')}
+                className="w-full px-4 py-3 bg-[var(--ds-surface)] border border-[var(--ds-border)] rounded-[var(--ds-radius-sm)] text-[var(--ds-text-primary)] placeholder-[var(--ds-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:border-transparent transition-all"
+                disabled={saving || testing || loading}
+              />
+              <p className="mt-2 ds-text-tertiary text-sm">{t('serverSettings.clientUrlHelp')}</p>
             </div>
             <div className="flex flex-col sm:flex-row gap-4">
               <button
