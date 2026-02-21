@@ -20,6 +20,14 @@ const isWebOS = import.meta.env.WEBOS === 'true';
   <head>
     <meta charset="UTF-8" />
     <script is:inline>
+      // Origine client (cloud vs local) pour CSS / JS
+      (function() {
+        var host = (window.location.hostname || '').toLowerCase();
+        var isCloud = host === 'client.popcornn.app' || host.endsWith('.client.popcornn.app');
+        document.documentElement.setAttribute('data-client-origin', isCloud ? 'cloud' : 'local');
+      })();
+    </script>
+    <script is:inline>
       // En tête de console : URL et temps de chargement (après load)
       (function() {
         function logPageInfo() {

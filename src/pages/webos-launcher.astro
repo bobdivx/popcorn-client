@@ -1,0 +1,155 @@
+---
+/**
+ * Lanceur webOS : choix entre client cloud et client local.
+ * Servi depuis le client (client.popcornn.app ou client local) pour accéder au même
+ * localStorage que le reste de l'app — après connexion QR, l'URL du client local
+ * est disponible ici (clé webos_local_client_url).
+ */
+const cloudClientBase = typeof import.meta.env.PUBLIC_CLIENT_URL !== 'undefined' && import.meta.env.PUBLIC_CLIENT_URL
+  ? String(import.meta.env.PUBLIC_CLIENT_URL).replace(/\/$/, '')
+  : 'https://client.popcornn.app';
+---
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Popcornn</title>
+  <style is:inline>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+    }
+    h1 { font-size: 1.75rem; margin-bottom: 2rem; color: #fff; }
+    .choices { display: flex; flex-direction: column; gap: 1rem; width: 100%; max-width: 28rem; }
+    .btn {
+      display: block; width: 100%; padding: 1rem 1.5rem; font-size: 1.1rem;
+      background: #1a1a1a; color: #e0e0e0; border: 2px solid #333; border-radius: 8px;
+      cursor: pointer; text-align: center; transition: background 0.15s, border-color 0.15s;
+    }
+    .btn:hover, .btn:focus { background: #252525; border-color: #666; outline: none; }
+    .btn:focus-visible { border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.3); }
+    .btn-primary { background: #0ea5e9; color: #fff; border-color: #0ea5e9; }
+    .btn-primary:hover, .btn-primary:focus { background: #0284c7; border-color: #0284c7; }
+    .local-form {
+      margin-top: 1rem; padding: 1rem; background: #1a1a1a; border-radius: 8px; border: 1px solid #333;
+    }
+    .local-form label { display: block; margin-bottom: 0.5rem; font-size: 0.95rem; }
+    .local-form input {
+      width: 100%; padding: 0.75rem; font-size: 1rem; background: #0f0f0f;
+      border: 2px solid #333; border-radius: 6px; color: #e0e0e0;
+    }
+    .local-form input:focus { border-color: #0ea5e9; outline: none; }
+    .local-form .hint { font-size: 0.85rem; color: #888; margin-top: 0.5rem; }
+    .local-form .actions { margin-top: 1rem; display: flex; gap: 0.75rem; }
+    .local-form .actions .btn { flex: 1; }
+    .saved-url { font-size: 0.9rem; color: #94a3b8; word-break: break-all; margin-bottom: 0.75rem; }
+  </style>
+</head>
+<body>
+  <h1>Popcornn</h1>
+  <div class="choices">
+    <button type="button" class="btn btn-primary" id="btn-cloud" data-focusable>Client cloud (popcornn.app)</button>
+    <div id="local-section">
+      <button type="button" class="btn" id="btn-local" data-focusable>Client local</button>
+      <button type="button" class="btn" id="btn-edit-local" data-focusable style="display: none;">Modifier l'URL du client local</button>
+      <div class="local-form" id="local-form" hidden>
+        <div class="saved-url" id="saved-url-label" hidden></div>
+        <label for="local-url">URL du client (ex. http://192.168.1.100:4321)</label>
+        <input type="url" id="local-url" placeholder="http://192.168.1.100:4321" autocomplete="off" />
+        <p class="hint">Même réseau Wi‑Fi que la TV. Après connexion QR depuis le client cloud, l'URL peut être enregistrée automatiquement.</p>
+        <div class="actions">
+          <button type="button" class="btn" id="btn-cancel-local">Annuler</button>
+          <button type="button" class="btn btn-primary" id="btn-save-local">Enregistrer et ouvrir</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script define:vars={{ cloudClientBase }}>
+    const WEBOS_LOCAL_CLIENT_KEY = 'webos_local_client_url';
+    document.addEventListener('webOSRelaunch', () => window.location.reload());
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && (!document.body.innerHTML.trim() || document.body.children.length === 0)) {
+        window.location.reload();
+      }
+    });
+    function getLocalClientUrl() {
+      try { return (localStorage.getItem(WEBOS_LOCAL_CLIENT_KEY) || '').trim().replace(/\/$/, ''); } catch (e) { return ''; }
+    }
+    function setLocalClientUrl(url) {
+      try {
+        const u = (url || '').trim().replace(/\/$/, '');
+        if (u) localStorage.setItem(WEBOS_LOCAL_CLIENT_KEY, u);
+        else localStorage.removeItem(WEBOS_LOCAL_CLIENT_KEY);
+      } catch (e) {}
+    }
+    function go(url) { if (url) window.location.href = url; }
+    const isCloudOrigin = window.location.hostname.includes('popcornn.app');
+    const cloudUrl = isCloudOrigin ? '/' : (cloudClientBase + '/');
+    const btnCloud = document.getElementById('btn-cloud');
+    const btnLocal = document.getElementById('btn-local');
+    const btnEditLocal = document.getElementById('btn-edit-local');
+    const localForm = document.getElementById('local-form');
+    const localInput = document.getElementById('local-url');
+    const savedUrlLabel = document.getElementById('saved-url-label');
+    const btnCancel = document.getElementById('btn-cancel-local');
+    const btnSave = document.getElementById('btn-save-local');
+    function updateEditButtonVisibility() {
+      btnEditLocal.style.display = getLocalClientUrl() ? 'block' : 'none';
+    }
+    updateEditButtonVisibility();
+    btnCloud.addEventListener('click', () => go(cloudUrl));
+    function showLocalForm(show) {
+      localForm.hidden = !show;
+      if (show) {
+        const saved = getLocalClientUrl();
+        if (saved) {
+          savedUrlLabel.textContent = 'URL enregistrée : ' + saved;
+          savedUrlLabel.hidden = false;
+          localInput.value = saved;
+        } else {
+          savedUrlLabel.hidden = true;
+          localInput.value = '';
+        }
+        localInput.focus();
+      } else {
+        updateEditButtonVisibility();
+      }
+    }
+    btnLocal.addEventListener('click', () => {
+      const saved = getLocalClientUrl();
+      if (saved) go(saved);
+      else showLocalForm(true);
+    });
+    btnEditLocal.addEventListener('click', () => showLocalForm(true));
+    btnCancel.addEventListener('click', () => showLocalForm(false));
+    function isValidUrl(s) {
+      s = (s || '').trim();
+      return s && (s.startsWith('http://') || s.startsWith('https://'));
+    }
+    btnSave.addEventListener('click', () => {
+      const url = (localInput.value || '').trim().replace(/\/$/, '');
+      if (!isValidUrl(url)) {
+        alert('Indiquez une URL commençant par http:// ou https://');
+        return;
+      }
+      setLocalClientUrl(url);
+      go(url);
+    });
+    localInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') btnSave.click();
+      if (e.key === 'Escape') btnCancel.click();
+    });
+  </script>
+</body>
+</html>

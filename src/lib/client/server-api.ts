@@ -436,6 +436,12 @@ class ServerApiClient {
       'Content-Type': 'application/json',
       ...(options.headers || {}),
     };
+    // Indiquer au backend si la requête vient du client cloud ou d'un client local
+    if (typeof window !== 'undefined' && window.location?.hostname) {
+      const h = (window.location.hostname || '').toLowerCase();
+      const isCloud = h === 'client.popcornn.app' || h.endsWith('.client.popcornn.app');
+      (headers as Record<string, string>)['X-Popcorn-Client-Origin'] = isCloud ? 'cloud' : 'local';
+    }
 
     try {
       const timeoutMs = this.getTimeoutMs(endpoint);

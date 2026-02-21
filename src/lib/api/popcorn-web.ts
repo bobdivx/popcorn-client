@@ -824,6 +824,8 @@ export async function deleteIndexerDefinition(id: string): Promise<{ success: bo
 export interface UserConfig {
   /** URL du backend Rust (pour configuration automatique sur nouveaux appareils) */
   backendUrl?: string | null;
+  /** URL du client (interface) pour webOS / connexion rapide */
+  clientUrl?: string | null;
   indexers?: Array<{
     id?: string;
     name: string;

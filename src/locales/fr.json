@@ -177,6 +177,7 @@
       "step1ReconfigureTitle": "Modifier la configuration",
       "step1ReconfigureSubtitle": "Changez l’URL du serveur ou ajoutez cet appareil via le QR code.",
       "connectClientTitle": "Connecter ce client",
+      "webosLocalHint": "Sur TV (webOS), connectez-vous à votre serveur Popcorn sur le réseau local : choisissez « Compte local » puis entrez l’adresse de l’ordinateur où tourne le serveur (ex. http://192.168.1.100:3000). TV et serveur doivent être sur le même Wi‑Fi.",
       "choiceQuestion": "Comment souhaitez-vous procéder ?",
       "choiceFirstTime": "C'est ma première installation",
       "choiceFirstTimeDesc": "Je n'ai jamais configuré Popcornn. Je veux entrer l'URL du serveur ici ou faire la configuration depuis mon téléphone.",

@@ -164,11 +164,16 @@ export default function ServerSettings() {
       // Sauvegarder la configuration dans localStorage
       saveBackendUrl(backendUrl.trim());
 
-      // Synchroniser l'URL du backend dans le cloud (pour quick-connect et autres appareils)
+      // Synchroniser l'URL du backend (et du client si local) dans le cloud (quick-connect, webOS)
       const cloudToken = TokenManager.getCloudAccessToken();
       if (cloudToken) {
         try {
-          const res = await saveUserConfigMerge({ backendUrl: backendUrl.trim() }, cloudToken);
+          const { isCloudClient, getClientOrigin } = await import('../../lib/client-origin.js');
+          const payload: { backendUrl: string; clientUrl?: string } = { backendUrl: backendUrl.trim() };
+          if (!isCloudClient() && getClientOrigin()) {
+            payload.clientUrl = getClientOrigin();
+          }
+          const res = await saveUserConfigMerge(payload, cloudToken);
           if (!res?.success) {
             console.warn('[ServerSettings] Sauvegarde cloud du backendUrl non effectuée:', res?.message);
           }

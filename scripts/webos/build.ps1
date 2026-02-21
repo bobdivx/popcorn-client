@@ -1,6 +1,6 @@
 # Script de build WebOS
 # Usage: .\scripts\webos\build.ps1 [-Demo] [-Simple] [-Package]
-# -Simple : app minimaliste qui affiche uniquement https://client.popcornn.app (pas de build Astro)
+# -Simple : app minimaliste avec lanceur (client cloud ou client local), pas de build Astro
 # -Demo   : utilise le backend de validation (popcorn-vercel) pour les builds stores (build complet)
 # -Package: crée l'IPK avec ares-package
 
@@ -60,8 +60,8 @@ Write-Success "Version détectée: $version"
 Set-Location $ProjectRoot
 
 if ($Simple) {
-    # Mode simple : pas de build Astro, l'app affiche juste client.popcornn.app
-    Write-Info "Mode simple : app = redirection vers https://client.popcornn.app"
+    # Mode simple : pas de build Astro, l'app affiche le lanceur (cloud / client local)
+    Write-Info "Mode simple : app = lanceur (client cloud / client local)"
     if (Test-Path $FrontendDir) {
         Remove-Item $FrontendDir -Recurse -Force
         Write-Info "Suppression de webos/frontend/ (inutile en mode simple)"
@@ -143,7 +143,7 @@ if ($Simple) {
         Write-Info "Mode démo : main = frontend/index.html"
     } else {
         $appInfo.main = "index.html"
-        Write-Info "Main = index.html (redirection client.popcornn.app)"
+        Write-Info "Main = index.html (lanceur cloud / client local)"
     }
     $appInfo | ConvertTo-Json -Depth 10 | Set-Content $AppInfoFile -Encoding UTF8
     Write-Success "appinfo.json mis à jour"
@@ -221,7 +221,7 @@ if ($Package) {
 Write-Section "Build WebOS terminé avec succès"
 Write-Success "L'application WebOS est prête dans le dossier webos/"
 if ($Simple) {
-    Write-Info "L'app lance index.html → https://client.popcornn.app"
+    Write-Info "L'app lance index.html (choix client cloud ou client local)"
 }
 if (-not $Package) {
     Write-Info "Pour créer l'IPK, exécutez: .\scripts\webos\build.ps1 -Package"

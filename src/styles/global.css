@@ -1446,14 +1446,15 @@ textarea:focus-visible {
   outline-offset: 2px !important;
 }
 
-/* Cartes torrent / poster : pas d'outline violet, uniquement le halo blanc (design-system) */
+/* Cartes torrent / poster : halo blanc visible au focus (cohérent avec design-system et .tv-card-focused) */
 [data-torrent-card]:focus-visible,
 [data-torrent-card]:focus-within,
 .torrent-poster:focus-visible,
 .torrent-poster:focus-within {
-  outline: none !important;
-  --tw-ring-width: 0px;
-  --tw-ring-offset-width: 0px;
+  outline: 2px solid rgba(255, 255, 255, 0.4) !important;
+  outline-offset: 2px !important;
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4);
+  animation: tv-halo-pulse 2s ease-in-out infinite;
 }
 
 /* Masquer l'outline sur les éléments dans les cartes focusées (l'effet est sur la carte) */

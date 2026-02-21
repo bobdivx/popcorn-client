@@ -128,6 +128,7 @@ export const quickConnectMethods = {
     refreshToken: string;
     jwtSecret?: string;
     backendUrl?: string;
+    clientUrl?: string;
   }>> {
     const result = await requestPopcornWeb<{
       user: { id: string; email: string };
@@ -135,6 +136,7 @@ export const quickConnectMethods = {
       refreshToken: string;
       jwtSecret?: string;
       backendUrl?: string;
+      clientUrl?: string;
     }>('/auth/quick-connect/connect', {
       method: 'POST',
       body: JSON.stringify({ secret }),
@@ -148,6 +150,14 @@ export const quickConnectMethods = {
       }
       this.saveTokens(result.data.accessToken, result.data.refreshToken);
       this.saveUser(result.data.user);
+      // URL du client local (pour webOS / lanceur) : permet d'ouvrir le client local après QR
+      if (result.data.clientUrl && typeof localStorage !== 'undefined') {
+        try {
+          localStorage.setItem('webos_local_client_url', result.data.clientUrl.trim().replace(/\/$/, ''));
+        } catch {
+          // ignore
+        }
+      }
     }
     
     return result;
