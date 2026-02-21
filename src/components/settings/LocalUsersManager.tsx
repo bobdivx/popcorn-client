@@ -2,7 +2,8 @@ import { useState, useEffect } from 'preact/hooks';
 import { inviteLocalUser, getLocalUsers, deleteLocalUser, resendLocalUserInvitation, type LocalUser } from '../../lib/api/popcorn-web';
 import { TokenManager } from '../../lib/client/storage';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { Users, Mail, Trash2, RefreshCw, UserPlus } from 'lucide-preact';
+import { Mail, Trash2, RefreshCw, UserPlus } from 'lucide-preact';
+import { DsCard, DsCardSection } from '../ui/design-system';
 
 export default function LocalUsersManager() {
   const { t } = useI18n();
@@ -14,7 +15,6 @@ export default function LocalUsersManager() {
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
 
-  // Vérifier si l'utilisateur a un token cloud (compte principal)
   const hasCloudToken = TokenManager.getCloudAccessToken() !== null;
 
   useEffect(() => {
@@ -22,9 +22,9 @@ export default function LocalUsersManager() {
       loadUsers();
     } else {
       setLoading(false);
-      setError('Accès réservé au compte principal');
+      setError(t('settingsMenu.localUsers.noToken'));
     }
-  }, [hasCloudToken]);
+  }, [hasCloudToken, t]);
 
   const loadUsers = async () => {
     try {
@@ -34,19 +34,18 @@ export default function LocalUsersManager() {
       if (localUsers) {
         setUsers(localUsers);
       } else {
-        // Vérifier si c'est un problème de token
         const token = TokenManager.getCloudAccessToken();
         const refreshToken = TokenManager.getCloudRefreshToken();
         if (!token) {
-          setError('Aucun token cloud disponible. Veuillez vous reconnecter avec votre compte principal depuis la page de connexion.');
+          setError(t('settingsMenu.localUsers.noToken'));
         } else if (!refreshToken) {
-          setError('Token cloud expiré et aucun refresh token disponible. Veuillez vous reconnecter avec votre compte principal.');
+          setError(t('settingsMenu.localUsers.tokenExpired'));
         } else {
-          setError('Impossible de charger les utilisateurs locaux. Le token cloud est peut-être expiré. Veuillez vous reconnecter avec votre compte principal.');
+          setError(t('settingsMenu.localUsers.loadError'));
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du chargement');
+      setError(err instanceof Error ? err.message : t('settingsMenu.localUsers.loadError'));
     } finally {
       setLoading(false);
     }
@@ -55,7 +54,7 @@ export default function LocalUsersManager() {
   const handleInvite = async (e: Event) => {
     e.preventDefault();
     if (!email.trim()) {
-      setError('Veuillez entrer un email');
+      setError(t('common.required'));
       return;
     }
 
@@ -65,24 +64,24 @@ export default function LocalUsersManager() {
       setSuccess(null);
 
       const result = await inviteLocalUser(email.trim(), displayName.trim() || undefined);
-      
+
       if (result.success) {
-        setSuccess(result.message || 'Invitation envoyée avec succès');
+        setSuccess(t('settingsMenu.localUsers.inviteSuccess'));
         setEmail('');
         setDisplayName('');
         await loadUsers();
       } else {
-        setError(result.message || 'Erreur lors de l\'envoi de l\'invitation');
+        setError(result.message || t('settingsMenu.localUsers.inviteError'));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de l\'envoi de l\'invitation');
+      setError(err instanceof Error ? err.message : t('settingsMenu.localUsers.inviteError'));
     } finally {
       setInviting(false);
     }
   };
 
   const handleDelete = async (userId: string, userEmail: string) => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur ${userEmail} ?`)) {
+    if (!confirm(t('settingsMenu.localUsers.deleteConfirm', { email: userEmail }))) {
       return;
     }
 
@@ -91,15 +90,15 @@ export default function LocalUsersManager() {
       setSuccess(null);
 
       const result = await deleteLocalUser(userId);
-      
+
       if (result.success) {
-        setSuccess(result.message || 'Utilisateur supprimé avec succès');
+        setSuccess(t('settingsMenu.localUsers.deleteSuccess'));
         await loadUsers();
       } else {
-        setError(result.message || 'Erreur lors de la suppression');
+        setError(result.message || t('settingsMenu.localUsers.deleteError'));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de la suppression');
+      setError(err instanceof Error ? err.message : t('settingsMenu.localUsers.deleteError'));
     }
   };
 
@@ -109,172 +108,165 @@ export default function LocalUsersManager() {
       setSuccess(null);
 
       const result = await resendLocalUserInvitation(userId);
-      
+
       if (result.success) {
-        setSuccess(result.message || 'Invitation renvoyée avec succès');
+        setSuccess(t('settingsMenu.localUsers.resendSuccess'));
       } else {
-        setError(result.message || 'Erreur lors du réenvoi de l\'invitation');
+        setError(result.message || t('settingsMenu.localUsers.resendError'));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors du réenvoi de l\'invitation');
+      setError(err instanceof Error ? err.message : t('settingsMenu.localUsers.resendError'));
     }
   };
 
   if (!hasCloudToken) {
     return (
-      <div class="bg-red-900/30 border border-red-700 rounded-lg p-6">
-        <p class="text-red-300">
-          Cette page est réservée au compte principal. Veuillez vous connecter avec votre compte cloud.
-        </p>
+      <div className="rounded-[var(--ds-radius-lg)] border border-[var(--ds-border-error)] bg-[var(--ds-surface-error-muted)] p-4">
+        <p className="ds-text-secondary text-sm">{t('settingsMenu.localUsers.mainAccountOnly')}</p>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div class="flex justify-center items-center py-12">
-        <div class="loading loading-spinner loading-lg text-primary-600"></div>
+      <div className="flex justify-center items-center py-12">
+        <span className="loading loading-spinner loading-lg text-[var(--ds-accent-violet)]" aria-hidden />
       </div>
     );
   }
 
   return (
-    <div class="space-y-6">
-      <div>
-        <h2 class="text-2xl font-bold text-white mb-2 flex items-center gap-2">
-          <Users class="w-6 h-6" />
-          Gestion des utilisateurs locaux
-        </h2>
-        <p class="text-gray-400">
-          Invitez des utilisateurs à créer un compte local avec des permissions limitées.
-        </p>
-      </div>
-
+    <div className="space-y-6">
       {error && (
-        <div class="bg-red-900/30 border border-red-700 rounded-lg p-4">
-          <p class="text-red-300">{error}</p>
+        <div className="ds-status-badge ds-status-badge--error w-full" role="alert">
+          {error}
         </div>
       )}
 
       {success && (
-        <div class="bg-green-900/30 border border-green-700 rounded-lg p-4">
-          <p class="text-green-300">{success}</p>
+        <div className="ds-status-badge ds-status-badge--success w-full" role="status">
+          {success}
         </div>
       )}
 
-      {/* Formulaire d'invitation */}
-      <div class="bg-gray-900 rounded-lg p-6 border border-gray-800">
-        <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <UserPlus class="w-5 h-5" />
-          Inviter un utilisateur local
-        </h3>
-        <form onSubmit={handleInvite} class="space-y-4">
-          <div>
-            <label class="block text-sm font-semibold text-white mb-2">
-              Email *
-            </label>
-            <input
-              type="email"
-              class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-              placeholder="utilisateur@example.com"
-              value={email}
-              onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
-              required
-              disabled={inviting}
-            />
-          </div>
-          <div>
-            <label class="block text-sm font-semibold text-white mb-2">
-              Nom d'affichage (optionnel)
-            </label>
-            <input
-              type="text"
-              class="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-              placeholder="Jean Dupont"
-              value={displayName}
-              onInput={(e) => setDisplayName((e.target as HTMLInputElement).value)}
-              disabled={inviting}
-            />
-          </div>
-          <button
-            type="submit"
-            class="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            disabled={inviting || !email.trim()}
-          >
-            {inviting ? (
-              <>
-                <span class="loading loading-spinner loading-sm"></span>
-                Envoi en cours...
-              </>
-            ) : (
-              <>
-                <Mail class="w-4 h-4" />
-                Envoyer l'invitation
-              </>
-            )}
-          </button>
-        </form>
-      </div>
+      <DsCard variant="elevated">
+        <DsCardSection>
+          <h3 className="ds-title-section text-[var(--ds-text-primary)] mb-2 flex items-center gap-2">
+            <UserPlus className="w-5 h-5 text-[var(--ds-accent-violet)]" strokeWidth={1.8} />
+            {t('settingsMenu.localUsers.inviteTitle')}
+          </h3>
+          <p className="ds-text-secondary text-sm mb-4">{t('settingsMenu.localUsers.inviteDescription')}</p>
+          <form onSubmit={handleInvite} className="space-y-4">
+            <div>
+              <label className="block text-sm font-semibold text-[var(--ds-text-secondary)] mb-2">
+                {t('settingsMenu.localUsers.emailRequired')}
+              </label>
+              <input
+                type="email"
+                className="w-full px-4 py-3 bg-[var(--ds-surface)] border border-[var(--ds-border)] rounded-[var(--ds-radius-sm)] text-[var(--ds-text-primary)] placeholder-[var(--ds-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]"
+                placeholder={t('settingsMenu.localUsers.emailPlaceholder')}
+                value={email}
+                onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
+                required
+                disabled={inviting}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-[var(--ds-text-secondary)] mb-2">
+                {t('settingsMenu.localUsers.displayNameOptional')}
+              </label>
+              <input
+                type="text"
+                className="w-full px-4 py-3 bg-[var(--ds-surface)] border border-[var(--ds-border)] rounded-[var(--ds-radius-sm)] text-[var(--ds-text-primary)] placeholder-[var(--ds-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]"
+                placeholder={t('settingsMenu.localUsers.displayNamePlaceholder')}
+                value={displayName}
+                onInput={(e) => setDisplayName((e.target as HTMLInputElement).value)}
+                disabled={inviting}
+              />
+            </div>
+            <button
+              type="submit"
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] px-6 py-3 rounded-[var(--ds-radius-sm)] font-semibold bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={inviting || !email.trim()}
+            >
+              {inviting ? (
+                <>
+                  <span className="loading loading-spinner loading-sm" aria-hidden />
+                  {t('settingsMenu.localUsers.inviting')}
+                </>
+              ) : (
+                <>
+                  <Mail className="w-4 h-4" strokeWidth={1.8} />
+                  {t('settingsMenu.localUsers.sendInvitation')}
+                </>
+              )}
+            </button>
+          </form>
+        </DsCardSection>
+      </DsCard>
 
-      {/* Liste des utilisateurs */}
-      <div class="bg-gray-900 rounded-lg p-6 border border-gray-800">
-        <h3 class="text-lg font-semibold text-white mb-4">
-          Utilisateurs locaux ({users.length})
-        </h3>
-        
-        {users.length === 0 ? (
-          <p class="text-gray-400 text-center py-8">
-            Aucun utilisateur local pour le moment
-          </p>
-        ) : (
-          <div class="space-y-3">
-            {users.map((user) => (
-              <div
-                key={user.id}
-                class="bg-gray-800 rounded-lg p-4 border border-gray-700 flex items-center justify-between"
-              >
-                <div class="flex-1">
-                  <div class="flex items-center gap-3 mb-1">
-                    <p class="text-white font-semibold">{user.email}</p>
-                    {user.isActive ? (
-                      <span class="badge badge-success badge-sm">Actif</span>
-                    ) : (
-                      <span class="badge badge-warning badge-sm">En attente</span>
+      <DsCard variant="elevated">
+        <DsCardSection>
+          <h3 className="ds-title-section text-[var(--ds-text-primary)] mb-4">
+            {t('settingsMenu.localUsers.listTitle', { count: users.length })}
+          </h3>
+
+          {users.length === 0 ? (
+            <p className="ds-text-tertiary text-sm text-center py-8">{t('settingsMenu.localUsers.noLocalUsers')}</p>
+          ) : (
+            <div className="space-y-3">
+              {users.map((user) => (
+                <div
+                  key={user.id}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-[var(--ds-radius-sm)] bg-[var(--ds-surface)] border border-[var(--ds-border)]"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <span className="font-semibold text-[var(--ds-text-primary)] truncate">{user.email}</span>
+                      {user.isActive ? (
+                        <span className="ds-status-badge ds-status-badge--success">{t('settingsMenu.localUsers.active')}</span>
+                      ) : (
+                        <span className="ds-status-badge ds-status-badge--warning">{t('settingsMenu.localUsers.pending')}</span>
+                      )}
+                      {!user.emailVerified && (
+                        <span className="ds-status-badge ds-status-badge--error">{t('settingsMenu.localUsers.emailNotVerified')}</span>
+                      )}
+                    </div>
+                    {user.displayName && (
+                      <p className="ds-text-secondary text-sm">{user.displayName}</p>
                     )}
-                    {!user.emailVerified && (
-                      <span class="badge badge-error badge-sm">Email non vérifié</span>
-                    )}
+                    <p className="ds-text-tertiary text-xs mt-1">
+                      {t('settingsMenu.localUsers.createdOn', { date: new Date(user.createdAt).toLocaleDateString() })}
+                    </p>
                   </div>
-                  {user.displayName && (
-                    <p class="text-gray-400 text-sm">{user.displayName}</p>
-                  )}
-                  <p class="text-gray-500 text-xs mt-1">
-                    Créé le {new Date(user.createdAt).toLocaleDateString('fr-FR')}
-                  </p>
-                </div>
-                <div class="flex items-center gap-2">
-                  {!user.isActive && (
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {!user.isActive && (
+                      <button
+                        type="button"
+                        onClick={() => handleResendInvitation(user.id)}
+                        className="inline-flex items-center justify-center w-9 h-9 rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] hover:bg-[var(--ds-surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]"
+                        title={t('settingsMenu.localUsers.resendInvitation')}
+                        aria-label={t('settingsMenu.localUsers.resendInvitation')}
+                      >
+                        <RefreshCw className="w-4 h-4" strokeWidth={1.8} />
+                      </button>
+                    )}
                     <button
-                      onClick={() => handleResendInvitation(user.id)}
-                      class="btn btn-sm btn-outline"
-                      title="Renvoyer l'invitation"
+                      type="button"
+                      onClick={() => handleDelete(user.id, user.email)}
+                      className="inline-flex items-center justify-center w-9 h-9 rounded-[var(--ds-radius-sm)] border border-[var(--ds-accent-red-muted)] bg-[var(--ds-surface-elevated)] text-[var(--ds-accent-red)] hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-red)]"
+                      title={t('settingsMenu.localUsers.delete')}
+                      aria-label={t('settingsMenu.localUsers.delete')}
                     >
-                      <RefreshCw class="w-4 h-4" />
+                      <Trash2 className="w-4 h-4" strokeWidth={1.8} />
                     </button>
-                  )}
-                  <button
-                    onClick={() => handleDelete(user.id, user.email)}
-                    class="btn btn-sm btn-error"
-                    title="Supprimer"
-                  >
-                    <Trash2 class="w-4 h-4" />
-                  </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          )}
+        </DsCardSection>
+      </DsCard>
     </div>
   );
 }

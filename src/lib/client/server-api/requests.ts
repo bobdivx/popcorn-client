@@ -48,7 +48,70 @@ export interface DiscoverSlider {
   updated_at: number;
 }
 
+/** Favori / à regarder plus tard (sync cloud) */
+export interface MediaFavorite {
+  id: string;
+  user_id: string;
+  tmdb_id: number;
+  tmdb_type: string;
+  category: string;
+  created_at: number;
+}
+
 export const requestsMethods = {
+  // Favoris (à regarder plus tard) — header X-User-ID
+  async listMediaFavorites(
+    this: ServerApiClientAccess,
+    params?: { limit?: number; offset?: number }
+  ): Promise<ApiResponse<MediaFavorite[]>> {
+    const userId = this.getCurrentUserId?.() ?? null;
+    const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
+    const q = new URLSearchParams();
+    if (params?.limit != null) q.set('limit', String(params.limit));
+    if (params?.offset != null) q.set('offset', String(params.offset));
+    const query = q.toString();
+    return this.backendRequest<MediaFavorite[]>(`/api/favorites${query ? '?' + query : ''}`, { method: 'GET', headers });
+  },
+
+  async addMediaFavorite(
+    this: ServerApiClientAccess,
+    data: { tmdb_id: number; tmdb_type: string; category: string }
+  ): Promise<ApiResponse<MediaFavorite>> {
+    const userId = this.getCurrentUserId?.() ?? null;
+    const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
+    return this.backendRequest<MediaFavorite>('/api/favorites', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(data),
+    });
+  },
+
+  async removeMediaFavorite(
+    this: ServerApiClientAccess,
+    tmdbId: number,
+    tmdbType: string
+  ): Promise<ApiResponse<boolean>> {
+    const userId = this.getCurrentUserId?.() ?? null;
+    const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
+    return this.backendRequest<boolean>(
+      `/api/favorites/${tmdbId}/${encodeURIComponent(tmdbType)}`,
+      { method: 'DELETE', headers }
+    );
+  },
+
+  async checkMediaFavorite(
+    this: ServerApiClientAccess,
+    tmdbId: number,
+    tmdbType: string
+  ): Promise<ApiResponse<{ is_favorite: boolean }>> {
+    const userId = this.getCurrentUserId?.() ?? null;
+    const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
+    return this.backendRequest<{ is_favorite: boolean }>(
+      `/api/favorites/check/${tmdbId}/${encodeURIComponent(tmdbType)}`,
+      { method: 'GET', headers }
+    );
+  },
+
   async listMediaRequests(
     this: ServerApiClientAccess,
     params?: { user_id?: string; status?: string; limit?: number; offset?: number }

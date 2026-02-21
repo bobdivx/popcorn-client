@@ -1,4 +1,4 @@
-import { Film, FolderOpen, FolderPlus, LayoutGrid, Users, ChevronRight } from 'lucide-preact';
+import { Film, FolderOpen, FolderPlus, LayoutGrid, Users, ChevronRight, Bookmark } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { canAccess } from '../../lib/permissions';
 import { DsCard, DsCardSection } from '../ui/design-system';
@@ -46,6 +46,14 @@ const LIBRARY_LINK_ITEMS: LibraryLinkItem[] = [
     descriptionKey: 'interfaceSettings.librarySectionDescription',
     icon: LayoutGrid,
     href: '/settings/library-display',
+    permission: undefined,
+  },
+  {
+    id: 'favorites',
+    titleKey: 'settingsMenu.favorites',
+    descriptionKey: 'settingsPages.favorites.subtitle',
+    icon: Bookmark,
+    href: '/settings/favorites',
     permission: undefined,
   },
   {

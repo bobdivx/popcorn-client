@@ -1229,6 +1229,63 @@ export async function saveCloudMediaRequests(
   }
 }
 
+/** Format d'un favori (à regarder plus tard) sauvegardé dans le cloud */
+export interface CloudMediaFavorite {
+  id: string;
+  tmdb_id: number;
+  tmdb_type: string;
+  category: string;
+  created_at: number;
+}
+
+/**
+ * Récupère les favoris (à regarder plus tard) sauvegardés dans le cloud.
+ */
+export async function getCloudMediaFavorites(accessToken?: string): Promise<CloudMediaFavorite[] | null> {
+  try {
+    const token = accessToken ?? TokenManager.getCloudAccessToken() ?? undefined;
+    if (!token) return null;
+    const apiUrl = `${getPopcornWebApiUrl()}/favorites`;
+    const res = await requestWithTokenRefresh(
+      apiUrl,
+      { method: 'GET', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } },
+      10000
+    );
+    if (!res.ok || !res.data?.success) return null;
+    const list = res.data?.data?.favorites;
+    return Array.isArray(list) ? (list as CloudMediaFavorite[]) : [];
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sauvegarde les favoris (à regarder plus tard) dans le cloud (remplace la liste).
+ */
+export async function saveCloudMediaFavorites(
+  favorites: CloudMediaFavorite[],
+  accessToken?: string
+): Promise<{ success: boolean; message?: string }> {
+  try {
+    const token = accessToken ?? TokenManager.getCloudAccessToken() ?? undefined;
+    if (!token) return { success: false, message: 'Token cloud manquant' };
+    const apiUrl = `${getPopcornWebApiUrl()}/favorites`;
+    const res = await requestWithTokenRefresh(
+      apiUrl,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ favorites }),
+      },
+      10000
+    );
+    if (!res.ok) return { success: false, message: res.data?.message ?? 'Erreur sauvegarde favoris' };
+    return res.data?.success ? { success: true } : { success: false, message: res.data?.message };
+  } catch (e) {
+    return { success: false, message: e instanceof Error ? e.message : 'Erreur inconnue' };
+  }
+}
+
 /**
  * Interface pour un utilisateur local
  */

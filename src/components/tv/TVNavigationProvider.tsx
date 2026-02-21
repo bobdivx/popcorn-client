@@ -181,19 +181,21 @@ export default function TVNavigationProvider() {
       return bestElement;
     };
 
+    // Sur webOS, scroll instantané pour une navigation plus fluide (smooth = lag sur TV)
+    const isWebOS = typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
+    const scrollBehavior: ScrollBehavior = isWebOS ? 'auto' : 'smooth';
+
     // Focus un élément
     const focusElement = (element: HTMLElement) => {
+      const scrollOpts = { behavior: scrollBehavior, block: 'center' as ScrollLogicalPosition, inline: 'center' as ScrollLogicalPosition };
+
       // Si c'est une carte, privilégier un élément réellement focusable
       if (isCard(element)) {
         const card = element.closest(CARD_SELECTOR) as HTMLElement || element;
 
         if (element.matches(FOCUSABLE_SELECTOR)) {
           element.focus();
-          element.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center',   // Ligne/row au centre de l'écran
-            inline: 'center'   // Carte au centre horizontalement
-          });
+          element.scrollIntoView(scrollOpts);
           lastFocusedRef.current = element;
           return;
         }
@@ -201,11 +203,7 @@ export default function TVNavigationProvider() {
         const focusable = card.querySelector(FOCUSABLE_SELECTOR) as HTMLElement;
         if (focusable) {
           focusable.focus();
-          focusable.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'center', 
-            inline: 'center' 
-          });
+          focusable.scrollIntoView(scrollOpts);
           lastFocusedRef.current = focusable;
           return;
         }
@@ -214,22 +212,14 @@ export default function TVNavigationProvider() {
           card.setAttribute('tabindex', '0');
         }
         card.focus();
-        card.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'center', 
-          inline: 'center' 
-        });
+        card.scrollIntoView(scrollOpts);
         lastFocusedRef.current = card;
         return;
       }
 
       element.focus();
-      element.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center', 
-        inline: 'center' 
-      });
-      
+      element.scrollIntoView(scrollOpts);
+
       lastFocusedRef.current = element;
     };
 
@@ -522,7 +512,7 @@ export default function TVNavigationProvider() {
 
     const handleFocusOut = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
-      // Délai pour vérifier si le focus reste dans le même élément
+      const delay = isWebOS ? 0 : 10;
       setTimeout(() => {
         const card = target.closest(CARD_SELECTOR) as HTMLElement;
         if (card && !card.contains(document.activeElement)) {
@@ -530,7 +520,7 @@ export default function TVNavigationProvider() {
         } else if (!card && target !== document.activeElement) {
           removeFocusEffect(target);
         }
-      }, 10);
+      }, delay);
     };
 
     // Styles CSS pour la navigation TV
@@ -556,6 +546,18 @@ export default function TVNavigationProvider() {
         transform: scale(1.08) !important;
         z-index: 50 !important;
         box-shadow: var(--tv-focus-shadow) !important;
+      }
+      
+      /* Cartes torrent / poster : pas de box-shadow violet, le design-system gère le halo blanc (ds-halo-pulse) */
+      [data-torrent-card].tv-card-focused,
+      .torrent-poster.tv-card-focused {
+        box-shadow: unset !important;
+      }
+      [data-torrent-card]:focus-visible,
+      [data-torrent-card]:focus-within,
+      .torrent-poster:focus-visible,
+      .torrent-poster:focus-within {
+        outline: none !important;
       }
       
       /* Cartes adjacentes assombries */
@@ -612,6 +614,11 @@ export default function TVNavigationProvider() {
           transform: scale(1.08) !important;
           z-index: 50 !important;
           box-shadow: var(--tv-focus-shadow) !important;
+        }
+        
+        [data-torrent-card].tv-card-focused,
+        .torrent-poster.tv-card-focused {
+          box-shadow: unset !important;
         }
         
         .tv-element-focused,

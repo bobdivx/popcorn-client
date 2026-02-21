@@ -80,7 +80,6 @@ const NAV_ITEMS: NavItem[] = [
     labelKey: 'settingsMenu.category.library',
     href: '/settings?category=library',
     icon: Library,
-    permissions: ['settings.server', 'settings.friends'],
     categoryParam: 'library',
   },
   {
@@ -202,6 +201,12 @@ export default function SettingsSidebar() {
                   data-settings-category
                   data-focusable
                   onClick={() => setSidebarOpen(false)}
+                  onFocus={(e) => {
+                    // Télécommande : afficher la page dès que le focus arrive sur l'item, sans appuyer sur OK
+                    if (!isActive) {
+                      e.currentTarget.click();
+                    }
+                  }}
                   className={`
                     settings-nav-item w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-left transition-all duration-200
                     focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)]

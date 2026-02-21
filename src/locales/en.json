@@ -359,7 +359,10 @@
     "profile": "Profile",
     "displayName": "Display name",
     "displayNamePlaceholder": "Your display name",
+    "displayNameOptionalHint": "Optional. Otherwise your email is used.",
     "avatar": "Avatar",
+    "avatarTvHint": "TV: use a square image (≥ 256×256) for best results.",
+    "invalidImage": "Please select an image (PNG, JPG or WebP).",
     "avatarUrl": "Avatar URL",
     "avatarUrlPlaceholder": "https://example.com/avatar.jpg",
     "uploadAvatar": "Upload image",
@@ -376,6 +379,8 @@
     "logoutConfirm": "Are you sure you want to sign out?",
     "twoFactor": {
       "title": "Two-Factor Authentication",
+      "descriptionShort": "Add an extra layer of security with a code sent by email at each sign-in.",
+      "configure": "Configure 2FA",
       "enabled": "Enabled",
       "disabled": "Disabled",
       "enable": "Enable 2FA",
@@ -406,7 +411,9 @@
       "accountInfo": "Account information",
       "accountInfoDesc": "Email, user ID",
       "logoutDesc": "Sign out from this account"
-    }
+    },
+    "quickLinks": "Quick links",
+    "profileCardDescription": "Avatar, account information and sign out"
   },
   "interfaceSettings": {
     "theme": "Theme",
@@ -481,7 +488,9 @@
     "quality1080": "1080p",
     "quality720": "720p",
     "quality480": "480p",
-    "quality360": "360p"
+    "quality360": "360p",
+    "watchLaterAdd": "Watch later",
+    "watchLaterRemove": "Remove from favorites"
   },
   "nav": {
     "menu": "Menu",
@@ -541,6 +550,7 @@
     "popularMovies": "Popular movies",
     "popularSeries": "Popular series",
     "recentAdditions": "Recent additions",
+    "watchLater": "Watch later",
     "fastTorrents": "⚡ Fast Downloads",
     "noContent": "No content is available at the moment.",
     "moviesGenre": "Movies - {genre}",
@@ -697,6 +707,7 @@
       "accountNotLoggedIn": "Not logged in",
       "indexersCount": "{count} indexer(s) configured"
     },
+    "favorites": "Watch later",
     "category": {
       "system": "System",
       "interface": "Interface",
@@ -941,7 +952,34 @@
     },
     "localUsers": {
       "title": "Local users",
-      "description": "Manage local accounts with limited permissions"
+      "description": "Manage local accounts with limited permissions",
+      "inviteTitle": "Invite a local user",
+      "inviteDescription": "Invite users to create a local account with limited permissions.",
+      "sendInvitation": "Send invitation",
+      "inviting": "Sending…",
+      "listTitle": "Local users ({count})",
+      "noLocalUsers": "No local users yet",
+      "emailRequired": "Email *",
+      "displayNameOptional": "Display name (optional)",
+      "emailPlaceholder": "user@example.com",
+      "displayNamePlaceholder": "John Doe",
+      "active": "Active",
+      "pending": "Pending",
+      "emailNotVerified": "Email not verified",
+      "createdOn": "Created on {date}",
+      "resendInvitation": "Resend invitation",
+      "delete": "Delete",
+      "deleteConfirm": "Are you sure you want to remove user {email}?",
+      "mainAccountOnly": "This page is for the main account only. Please sign in with your cloud account.",
+      "inviteSuccess": "Invitation sent successfully",
+      "inviteError": "Failed to send invitation",
+      "resendSuccess": "Invitation resent successfully",
+      "resendError": "Failed to resend invitation",
+      "deleteSuccess": "User removed successfully",
+      "deleteError": "Failed to remove user",
+      "loadError": "Failed to load local users. Please sign in again with your main account.",
+      "noToken": "No cloud token. Please sign in with your main account.",
+      "tokenExpired": "Session expired. Please sign in again with your main account."
     },
     "documentation": {
       "title": "Documentation",
@@ -1440,6 +1478,12 @@
       "title": "Synchronization",
       "subtitle": "Manage automatic torrent synchronization",
       "configureIndexers": "Configure indexers"
+    },
+    "favorites": {
+      "title": "Watch later",
+      "subtitle": "Media you added to favorites. Synced with your cloud account.",
+      "empty": "No media in the list. Add films or series from their detail page.",
+      "open": "View"
     },
     "debugSync": {
       "pageTitle": "Debug Sync (provisional)",

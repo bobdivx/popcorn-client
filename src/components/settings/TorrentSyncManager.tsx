@@ -273,8 +273,6 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
   const [selectedIndexerIdsForSync, setSelectedIndexerIdsForSync] = useState<string[] | null>(null);
   /** Indexer dont on affiche la modale de détails */
   const [selectedIndexerForModal, setSelectedIndexerForModal] = useState<Indexer | null>(null);
-  /** Panneau Paramètres ouvert/replié */
-  const [settingsOpen, setSettingsOpen] = useState(false);
   /** Onglet actif : Vue d'ensemble | Paramètres */
   const [syncView, setSyncView] = useState<'overview' | 'settings'>('overview');
 
@@ -1451,26 +1449,16 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
             </button>
           </div>
         )}
-        {/* Sous-carte : Paramètres (repliables, style EduFlow) */}
+        {/* Sous-carte : Paramètres (affichés directement) */}
         {status.settings && (
           <div class="p-4 sm:p-6">
-            <button
-              type="button"
-              class="flex items-center justify-between w-full text-left mb-4 rounded-xl py-2 px-3 -mx-3 hover:bg-white/5 transition-colors"
-              onClick={() => setSettingsOpen((o) => !o)}
-            >
-              <h3 class="text-base font-semibold text-white flex items-center gap-2">
-                <span class="flex items-center justify-center w-8 h-8 rounded-full text-[var(--ds-text-on-accent)] shrink-0 bg-[var(--ds-accent-violet)]">
-                  <Settings {...iconPropsSm} />
-                </span>
-                {t('torrentSyncManager.settings')}
-              </h3>
-              <svg xmlns="http://www.w3.org/2000/svg" class={`w-5 h-5 text-white/70 transition-transform ${settingsOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            {settingsOpen && (
-              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2">
+            <h3 class="text-base font-semibold text-white flex items-center gap-2 mb-4">
+              <span class="flex items-center justify-center w-8 h-8 rounded-full text-[var(--ds-text-on-accent)] shrink-0 bg-[var(--ds-accent-violet)]">
+                <Settings {...iconPropsSm} />
+              </span>
+              {t('torrentSyncManager.settings')}
+            </h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <label class="label py-0"><span class="label-text font-medium text-white/90">{t('torrentSyncManager.syncFrequency')}</span></label>
                   <select
@@ -1512,7 +1500,6 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                   </label>
                 </div>
               </div>
-            )}
           </div>
         )}
       </DsCard>

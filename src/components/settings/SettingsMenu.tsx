@@ -17,9 +17,12 @@ import DiscoverySubMenuPanel from './DiscoverySubMenuPanel';
 import AccountSubMenuPanel from './AccountSubMenuPanel';
 import PlaybackSettingsPanel from './PlaybackSettingsPanel';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { useState, useMemo, useEffect } from 'preact/hooks';
+import { useState, useMemo, useEffect, useRef } from 'preact/hooks';
 import type { ComponentType } from 'preact';
 import { canAccess } from '../../lib/permissions';
+
+const FOCUSABLE_IN_CONTENT =
+  'a[href]:not([disabled]), button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [data-focusable]';
 
 type CategoryId = 'system' | 'interface' | 'content' | 'library' | 'discovery' | 'account' | 'playback' | 'maintenance';
 
@@ -183,8 +186,45 @@ export default function SettingsMenu() {
     }
   }, [visibleCategories, selectedCategory]);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Télécommande : Droite depuis le menu → panneau de droite ; Gauche depuis le panneau → menu
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      const nav = el.querySelector<HTMLElement>('[data-tv-settings-nav]');
+      const content = el.querySelector<HTMLElement>('[data-tv-settings-content]');
+      if (!nav || !content) return;
+      const active = document.activeElement as HTMLElement;
+      if (e.key === 'ArrowRight' && nav.contains(active)) {
+        const first = content.querySelector<HTMLElement>(FOCUSABLE_IN_CONTENT);
+        if (first) {
+          first.focus();
+          first.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }
+      if (e.key === 'ArrowLeft' && content.contains(active)) {
+        const currentBtn =
+          nav.querySelector<HTMLElement>('[data-settings-category][aria-current="true"]') ||
+          nav.querySelector<HTMLElement>('[data-settings-category]');
+        if (currentBtn) {
+          currentBtn.focus();
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }
+    };
+    el.addEventListener('keydown', onKey, true);
+    return () => el.removeEventListener('keydown', onKey, true);
+  }, []);
+
   return (
     <div
+      ref={containerRef}
       className="settings-android-tv flex flex-col lg:flex-row min-h-[70vh] ds-card overflow-hidden"
       data-tv-settings-container
     >
@@ -211,6 +251,10 @@ export default function SettingsMenu() {
                 <button
                   type="button"
                   onClick={() => setSelectedCategory(cat.id)}
+                  onFocus={(e) => {
+                    setSelectedCategory(cat.id);
+                    (e.currentTarget as HTMLElement).scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                  }}
                   data-settings-category
                   data-focusable
                   className={`settings-nav-item w-full flex items-center gap-3 px-3 sm:px-4 py-3 rounded-2xl text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] min-h-[48px] tv:min-h-[56px] min-w-0 ${
@@ -237,7 +281,10 @@ export default function SettingsMenu() {
       </nav>
 
       {/* Panneau droit : contenu (cartes 32px, titres design system) */}
-      <div className="settings-content flex-1 flex flex-col min-w-0 bg-[var(--ds-surface-elevated)]">
+      <div
+        className="settings-content flex-1 flex flex-col min-w-0 bg-[var(--ds-surface-elevated)]"
+        data-tv-settings-content
+      >
         {currentCategory && (
           <>
             <div className="flex-shrink-0 px-4 sm:px-6 pt-4 sm:pt-6 pb-2 border-b border-[var(--ds-border)] min-w-0">

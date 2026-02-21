@@ -7,6 +7,7 @@ import { LazyTorrentPoster } from './components/LazyTorrentPoster';
 import type { ContentItem } from '../../lib/client/types';
 import { useInfiniteFilms } from './hooks/useInfiniteFilms';
 import { useRecentFilms } from './hooks/useRecentFilms';
+import { useFavoritesItems } from './hooks/useFavoritesItems';
 import { useSyncStatus } from './hooks/useSyncStatus';
 import { SyncProgress } from '../setup/components/SyncProgress';
 import { SyncCard } from './components/SyncCard';
@@ -25,6 +26,7 @@ export default function FilmsDashboard() {
   const { t, language } = useI18n();
   const { films, loading, error, hasMore, loadMore, refetchSilent } = useInfiniteFilms();
   const { films: recentFilms } = useRecentFilms();
+  const { items: favoritesItems } = useFavoritesItems();
   const { syncStatus, isSyncing, loading: syncLoading } = useSyncStatus();
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
   const lastSyncProgressRef = useRef<number>(-1);
@@ -384,6 +386,16 @@ export default function FilmsDashboard() {
             {recentFilms.map((film) => (
               <div key={film.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                 <LazyTorrentPoster item={{ ...film, type: 'movie' }} />
+              </div>
+            ))}
+          </CarouselRow>
+        )}
+        {/* Section À regarder plus tard (favoris) */}
+        {favoritesItems.length > 0 && (
+          <CarouselRow title={t('dashboard.watchLater')} autoScroll={false}>
+            {favoritesItems.map((item) => (
+              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+                <LazyTorrentPoster item={item} />
               </div>
             ))}
           </CarouselRow>

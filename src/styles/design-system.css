@@ -437,14 +437,18 @@
   animation: ds-halo-pulse 2s ease-in-out infinite;
 }
 
-/* Focus : même animation halo blanc scintillant que le bouton Paramètres */
+/* Focus : halo blanc scintillant (norme design). Une seule classe à ajouter. */
 .ds-focus-glow {
   transition: box-shadow 0.2s ease, outline 0.2s ease;
+  outline: none;
 }
 .ds-focus-glow:focus-visible {
-  outline: 2px solid rgba(255, 255, 255, 0.4);
-  outline-offset: 2px;
-  animation: ds-halo-pulse 2s ease-in-out infinite;
+  outline: 2px solid rgba(255, 255, 255, 0.4) !important;
+  outline-offset: 2px !important;
+  animation: ds-halo-pulse 2s ease-in-out infinite !important;
+  /* Annuler tout ring Tailwind/DaisyUI pour garder uniquement le halo */
+  --tw-ring-width: 0px;
+  --tw-ring-offset-width: 0px;
 }
 
 /* Clic : même halo blanc (pic de l’animation) + léger scale */
@@ -458,13 +462,15 @@
   transform: scale(0.98);
 }
 
-/* Cartes torrent / poster : halo blanc au focus et au clic (même norme) */
+/* Cartes torrent / poster : halo blanc scintillant au focus (même norme que .ds-focus-glow) */
 [data-torrent-card]:focus-within,
 [data-torrent-card]:focus-visible,
 .torrent-poster:focus-within,
 .torrent-poster:focus-visible {
-  animation: ds-halo-pulse 2s ease-in-out infinite;
-  transition: box-shadow 0.2s ease;
+  outline: 2px solid rgba(255, 255, 255, 0.4) !important;
+  outline-offset: 2px !important;
+  animation: ds-halo-pulse 2s ease-in-out infinite !important;
+  transition: box-shadow 0.2s ease, outline 0.2s ease;
 }
 [data-torrent-card]:active,
 .torrent-poster:active {

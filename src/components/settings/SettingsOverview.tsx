@@ -2,7 +2,7 @@ import { Monitor, UserCircle, RefreshCw, Search, Smartphone, ChevronRight } from
 import { useI18n } from '../../lib/i18n/useI18n';
 import { useMemo, useState, useEffect } from 'preact/hooks';
 import { canAccess } from '../../lib/permissions';
-import { DsCard, DsCardSection } from '../ui/design-system';
+import { DsCard, DsCardSection, focusGlowClass } from '../ui/design-system';
 import { serverApi } from '../../lib/client/server-api';
 import { TokenManager } from '../../lib/client/storage';
 import { getSyncStatusStore, subscribeSyncStatusStore, refreshSyncStatusStore } from '../../lib/sync-status-store';
@@ -173,7 +173,7 @@ export default function SettingsOverview() {
               key={item.id}
               href={item.href}
               data-astro-prefetch
-              className={`block min-w-0 rounded-[var(--ds-radius-lg)] overflow-hidden transition-all hover:scale-[1.01] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] ${isSyncCardInProgress ? 'overview-card--sync-in-progress' : ''}`}
+              className={`block min-w-0 rounded-[var(--ds-radius-lg)] overflow-hidden transition-all hover:scale-[1.01] hover:shadow-lg ${focusGlowClass} ${isSyncCardInProgress ? 'overview-card--sync-in-progress' : ''}`}
             >
               <DsCard variant="elevated" className="h-full">
                 <DsCardSection className="flex flex-col h-full min-h-[120px]">

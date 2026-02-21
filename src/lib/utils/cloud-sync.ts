@@ -3,7 +3,7 @@
  */
 
 import { serverApi } from '../client/server-api';
-import { saveUserConfigMerge, saveCloudMediaRequests, type CloudMediaRequest } from '../api/popcorn-web';
+import { saveUserConfigMerge, saveCloudMediaRequests, saveCloudMediaFavorites, type CloudMediaRequest, type CloudMediaFavorite } from '../api/popcorn-web';
 import { TokenManager } from '../client/storage';
 import { isTmdbKeyMaskedOrInvalid } from './tmdb-key';
 import { getLibraryDisplayConfig } from './library-display-config';
@@ -93,6 +93,7 @@ export async function syncIndexersToCloud(): Promise<void> {
     }
 
     await syncMediaRequestsToCloud();
+    await syncFavoritesToCloud();
   } catch (error) {
     // Ne pas bloquer l'application si la synchronisation échoue
     console.warn('[CLOUD SYNC] ⚠️ Erreur lors de la synchronisation vers le cloud:', error);
@@ -130,6 +131,34 @@ export async function syncMediaRequestsToCloud(): Promise<void> {
     }
   } catch (error) {
     console.warn('[CLOUD SYNC] ⚠️ Erreur sauvegarde cloud des demandes:', error);
+  }
+}
+
+/**
+ * Pousse les favoris (à regarder plus tard) du backend vers le cloud.
+ */
+export async function syncFavoritesToCloud(): Promise<void> {
+  try {
+    const cloudToken = TokenManager.getCloudAccessToken();
+    if (!cloudToken) return;
+
+    const res = await serverApi.listMediaFavorites({ limit: 500 });
+    if (!res.success || !res.data) return;
+
+    const list: CloudMediaFavorite[] = res.data.map((f) => ({
+      id: f.id,
+      tmdb_id: f.tmdb_id,
+      tmdb_type: f.tmdb_type,
+      category: f.category,
+      created_at: f.created_at,
+    }));
+
+    const saveResult = await saveCloudMediaFavorites(list, cloudToken);
+    if (saveResult.success) {
+      console.log('[CLOUD SYNC] ✅ Favoris (à regarder plus tard) sauvegardés dans le cloud');
+    }
+  } catch (error) {
+    console.warn('[CLOUD SYNC] ⚠️ Erreur sync favoris:', error);
   }
 }
 

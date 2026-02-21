@@ -13,7 +13,7 @@ export function useInfiniteFilms() {
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
 
-  const loadFilms = useCallback(async (pageNum: number, isInitial = false, silent = false) => {
+  const loadFilms = useCallback(async (pageNum: number, isInitial = false, silent = false, silentRefetchMerge = false) => {
     try {
       if (!silent) {
         if (isInitial) {
@@ -25,7 +25,7 @@ export function useInfiniteFilms() {
       setError(null);
 
       const prefs = getLibraryDisplayConfig();
-      const limit = isInitial ? prefs.torrentsInitialLimit : prefs.torrentsLoadMoreLimit;
+      const limit = (isInitial || silentRefetchMerge) ? prefs.torrentsInitialLimit : prefs.torrentsLoadMoreLimit;
       const minSeeds = prefs.showZeroSeedTorrents ? 0 : 1;
       const response = await serverApi.getFilmsDataPaginated(
         pageNum,
@@ -46,27 +46,39 @@ export function useInfiniteFilms() {
         // Déjà triés par date de sortie (release_date) côté API
         const sortedFilms = response.data;
 
-        if (isInitial) {
+        if (silentRefetchMerge) {
+          // Refetch silencieux pendant la sync : garder toute la liste déjà chargée, mettre à jour la page 1
+          setFilms(prev => {
+            const page1Ids = new Set(sortedFilms.map(f => f.id));
+            const rest = prev.filter(f => !page1Ids.has(f.id));
+            const merged = [...sortedFilms, ...rest];
+            merged.sort((a, b) => {
+              const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+              const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+              return dateB - dateA;
+            });
+            return merged;
+          });
+          setHasMore(true);
+        } else if (isInitial) {
           setFilms(sortedFilms);
+          setHasMore(response.data.length === limit);
         } else {
           setFilms(prev => {
-            // Éviter les doublons
             const existingIds = new Set(prev.map(f => f.id));
             const newFilms = sortedFilms.filter(f => !existingIds.has(f.id));
             return [...prev, ...newFilms];
           });
+          setHasMore(response.data.length === limit);
         }
-
-        // Si on reçoit moins d'éléments que demandé, il n'y a plus de données
-        setHasMore(response.data.length === limit);
       } else {
         setError(response.message || 'Erreur lors du chargement des films');
-        setHasMore(false);
+        if (!silentRefetchMerge) setHasMore(false);
       }
     } catch (err) {
       console.error('[INFINITE FILMS] Exception:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
-      setHasMore(false);
+      if (!silentRefetchMerge) setHasMore(false);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -91,11 +103,10 @@ export function useInfiniteFilms() {
     loadFilms(1, true);
   }, [loadFilms]);
 
-  /** Recharge en arrière-plan sans spinner : les nouveaux torrents apparaissent au fur et à mesure. */
+  /** Recharge en arrière-plan sans spinner : merge la page 1 avec la liste existante pour ne pas perdre les torrents déjà chargés. */
   const refetchSilent = useCallback(() => {
     setPage(1);
-    setHasMore(true);
-    loadFilms(1, true, true);
+    loadFilms(1, false, true, true);
   }, [loadFilms]);
 
   return {

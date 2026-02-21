@@ -4,7 +4,7 @@ import { serverApi } from '../../lib/client/server-api';
 import { getLocalProfile, onProfileChanged } from '../../lib/client/profile';
 import Avatar from '../ui/Avatar';
 import BackendStatusBadge from './BackendStatusBadge';
-import { DsProgressRing } from '../ui/design-system';
+import { DsProgressRing, focusGlowClass, focusAndActiveGlowClass } from '../ui/design-system';
 import { isMobileDevice, isTVPlatform } from '../../lib/utils/device-detection';
 import { calculateSyncProgress } from '../../lib/utils/sync-progress';
 import {
@@ -260,7 +260,7 @@ export default function Navbar() {
             {user ? (
                 <a
                   href="/search"
-                  className={`gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative inline-flex items-center justify-center transition-all duration-200 hover:scale-110 ${isActive('/search') ? 'bg-glass-active scale-110' : ''}`}
+                  className={`gtv-icon-btn ${focusAndActiveGlowClass} flex-shrink-0 relative inline-flex items-center justify-center transition-all duration-200 hover:scale-110 ${isActive('/search') ? 'bg-glass-active scale-110' : ''}`}
                   aria-label={t('nav.search')}
                   tabIndex={0}
                   data-focusable
@@ -290,7 +290,7 @@ export default function Navbar() {
                           <a
                             key={t.href}
                             href={t.href}
-                            className={`nav-tab whitespace-nowrap flex-shrink-0 transition-all duration-200 ${isMobile ? 'nav-tab-mobile' : ''} ${active ? 'nav-tab-active' : ''} ${
+                            className={`nav-tab ${focusGlowClass} whitespace-nowrap flex-shrink-0 transition-all duration-200 ${isMobile ? 'nav-tab-mobile' : ''} ${active ? 'nav-tab-active' : ''} ${
                               active ? 'transform scale-105' : 'hover:scale-105'
                             }`}
                             tabIndex={0}
@@ -421,7 +421,7 @@ export default function Navbar() {
               <>
                 <a
                   href="/downloads"
-                  className="gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative inline-flex items-center justify-center transition-all duration-200 hover:scale-110"
+                  className={`gtv-icon-btn ${focusAndActiveGlowClass} flex-shrink-0 relative inline-flex items-center justify-center transition-all duration-200 hover:scale-110`}
                   aria-label={t('nav.downloads')}
                   tabIndex={0}
                   data-focusable
@@ -433,7 +433,7 @@ export default function Navbar() {
                   <button
                     type="button"
                     onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                    className={`gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative inline-flex items-center justify-center transition-all duration-300 ${mobileMenuOpen ? 'bg-primary-600 rotate-90' : ''}`}
+                    className={`gtv-icon-btn ${focusAndActiveGlowClass} flex-shrink-0 relative inline-flex items-center justify-center transition-all duration-300 ${mobileMenuOpen ? 'bg-primary-600 rotate-90' : ''}`}
                     aria-label={t('nav.menu') || 'Menu'}
                     aria-expanded={mobileMenuOpen}
                     tabIndex={0}
@@ -448,7 +448,7 @@ export default function Navbar() {
                 ) : (
                   <a
                     href="/settings"
-                    className={`gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative inline-flex items-center justify-center ${isTV ? 'inline-flex' : 'hidden sm:inline-flex'} transition-all duration-200 hover:scale-110 ${isActivePrefix('/settings') ? 'bg-glass-active scale-110' : ''} ${syncProgress.inProgress ? 'ds-sync-active-pulse' : ''}`}
+                    className={`gtv-icon-btn ${focusAndActiveGlowClass} flex-shrink-0 relative inline-flex items-center justify-center ${isTV ? 'inline-flex' : 'hidden sm:inline-flex'} transition-all duration-200 hover:scale-110 ${isActivePrefix('/settings') ? 'bg-glass-active scale-110' : ''} ${syncProgress.inProgress ? 'ds-sync-active-pulse' : ''}`}
                     aria-label={t('nav.settings')}
                     tabIndex={0}
                     data-focusable
@@ -471,7 +471,7 @@ export default function Navbar() {
 
                 <a
                   href="/settings/account"
-                  className={`gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative inline-flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110 ${user ? 'hidden sm:inline-flex' : ''}`}
+                  className={`gtv-icon-btn ${focusAndActiveGlowClass} flex-shrink-0 relative inline-flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110 ${user ? 'hidden sm:inline-flex' : ''}`}
                   tabIndex={0}
                   data-focusable
                   aria-label={t('nav.account')}

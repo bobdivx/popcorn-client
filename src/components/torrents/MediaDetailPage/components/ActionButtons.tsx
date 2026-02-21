@@ -1,4 +1,4 @@
-import { Play, RotateCw, Download, Link2, Check, Trash2, Loader2, Zap, Upload, XCircle, Radio } from 'lucide-preact';
+import { Play, RotateCw, Download, Link2, Check, Trash2, Loader2, Zap, Upload, XCircle, Radio, Bookmark, BookmarkCheck } from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
 import { TorrentProgressBar, TorrentSpeedDisplay, PeersIndicator } from '../../ui';
@@ -35,6 +35,12 @@ interface ActionButtonsProps {
   onCancelDownload?: () => void;
   onCopyMagnet: () => void;
   onDeleteMedia: () => void;
+  /** À regarder plus tard (favoris) — affiché si tmdbId présent */
+  watchLater?: {
+    isFavorite: boolean;
+    loading: boolean;
+    onToggle: () => void | Promise<void>;
+  };
 }
 
 /**
@@ -119,6 +125,7 @@ export function ActionButtons({
   onCancelDownload,
   onCopyMagnet,
   onDeleteMedia,
+  watchLater,
 }: ActionButtonsProps) {
   const { t } = useI18n();
   const hasSavedPosition = savedPlaybackPosition !== null && savedPlaybackPosition !== undefined && savedPlaybackPosition > 0;
@@ -347,6 +354,29 @@ export function ActionButtons({
               {isAvailableLocally ? 'Lire' : 'Streaming'}
             </button>
         )
+      )}
+
+      {/* À regarder plus tard (favoris) — visible si tmdbId + tmdbType */}
+      {watchLater && (torrent.tmdbId && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) && (
+        <button
+          type="button"
+          onClick={() => void watchLater.onToggle()}
+          disabled={watchLater.loading}
+          data-focusable
+          tabIndex={0}
+          title={watchLater.isFavorite ? t('playback.watchLaterRemove') : t('playback.watchLaterAdd')}
+          className="inline-flex items-center gap-2 bg-glass hover:bg-glass-hover text-white px-6 py-3 rounded font-semibold text-lg transition-colors border border-white/30 glass-panel disabled:opacity-50"
+          aria-pressed={watchLater.isFavorite}
+        >
+          {watchLater.loading ? (
+            <span className="loading loading-spinner loading-sm" />
+          ) : watchLater.isFavorite ? (
+            <BookmarkCheck className="h-5 w-5 text-primary-400" size={20} />
+          ) : (
+            <Bookmark className="h-5 w-5" size={20} />
+          )}
+          {watchLater.isFavorite ? t('playback.watchLaterRemove') : t('playback.watchLaterAdd')}
+        </button>
       )}
 
       {/* Bouton Demander (request) - masqué si déjà dispo localement ou si un téléchargement est en cours (bouton principal = "Annuler le téléchargement") */}

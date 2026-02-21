@@ -14,7 +14,7 @@ export function useInfiniteSeries() {
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
 
-  const loadSeries = useCallback(async (pageNum: number, isInitial = false, silent = false) => {
+  const loadSeries = useCallback(async (pageNum: number, isInitial = false, silent = false, silentRefetchMerge = false) => {
     try {
       if (!silent) {
         if (isInitial) {
@@ -26,7 +26,7 @@ export function useInfiniteSeries() {
       setError(null);
 
       const prefs = getLibraryDisplayConfig();
-      const limit = isInitial ? prefs.torrentsInitialLimit : prefs.torrentsLoadMoreLimit;
+      const limit = (isInitial || silentRefetchMerge) ? prefs.torrentsInitialLimit : prefs.torrentsLoadMoreLimit;
       const minSeeds = prefs.showZeroSeedTorrents ? 0 : 1;
       const response = await serverApi.getSeriesDataPaginated(
         pageNum,
@@ -50,27 +50,39 @@ export function useInfiniteSeries() {
           return dateB - dateA;
         });
 
-        if (isInitial) {
+        if (silentRefetchMerge) {
+          // Refetch silencieux pendant la sync : garder toute la liste déjà chargée, mettre à jour la page 1
+          setSeries(prev => {
+            const page1Ids = new Set(sortedSeries.map(s => s.id));
+            const rest = prev.filter(s => !page1Ids.has(s.id));
+            const merged = [...sortedSeries, ...rest];
+            merged.sort((a, b) => {
+              const dateA = a.firstAirDate ? new Date(a.firstAirDate).getTime() : 0;
+              const dateB = b.firstAirDate ? new Date(b.firstAirDate).getTime() : 0;
+              return dateB - dateA;
+            });
+            return merged;
+          });
+          setHasMore(true);
+        } else if (isInitial) {
           setSeries(sortedSeries);
+          setHasMore(response.data.length === limit);
         } else {
           setSeries(prev => {
-            // Éviter les doublons
             const existingIds = new Set(prev.map(s => s.id));
             const newSeries = sortedSeries.filter(s => !existingIds.has(s.id));
             return [...prev, ...newSeries];
           });
+          setHasMore(response.data.length === limit);
         }
-
-        // Si on reçoit moins d'éléments que demandé, il n'y a plus de données
-        setHasMore(response.data.length === limit);
       } else {
         setError(response.message || 'Erreur lors du chargement des séries');
-        setHasMore(false);
+        if (!silentRefetchMerge) setHasMore(false);
       }
     } catch (err) {
       console.error('[INFINITE SERIES] Exception:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
-      setHasMore(false);
+      if (!silentRefetchMerge) setHasMore(false);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -95,11 +107,10 @@ export function useInfiniteSeries() {
     loadSeries(1, true);
   }, [loadSeries]);
 
-  /** Recharge en arrière-plan sans spinner : les nouveaux torrents apparaissent au fur et à mesure. */
+  /** Recharge en arrière-plan sans spinner : merge la page 1 avec la liste existante pour ne pas perdre les torrents déjà chargés. */
   const refetchSilent = useCallback(() => {
     setPage(1);
-    setHasMore(true);
-    loadSeries(1, true, true);
+    loadSeries(1, false, true, true);
   }, [loadSeries]);
 
   return {

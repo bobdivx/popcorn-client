@@ -21,7 +21,7 @@ type CategoryId = 'system' | 'interface' | 'content' | 'library' | 'discovery' |
 type SettingsRoute =
   | { type: 'overview' }
   | { type: 'category'; id: CategoryId }
-  | { type: 'page'; page: 'server' | 'account' };
+  | { type: 'page'; page: 'server' | 'account' | 'favorites' };
 
 function getRouteFromUrl(): SettingsRoute {
   if (typeof window === 'undefined') return { type: 'overview' };
@@ -34,6 +34,7 @@ function getRouteFromUrl(): SettingsRoute {
   }
   if (pathname === '/settings/server') return { type: 'page', page: 'server' };
   if (pathname.startsWith('/settings/account')) return { type: 'page', page: 'account' };
+  if (pathname.startsWith('/settings/favorites')) return { type: 'page', page: 'favorites' };
   if (pathname === '/settings/ui-preferences') return { type: 'category', id: 'interface' };
   return { type: 'overview' };
 }
@@ -69,7 +70,7 @@ const CATEGORY_PERMISSIONS: Record<CategoryId, string | string[] | undefined> = 
   interface: 'settings.ui_preferences',
   playback: 'settings.ui_preferences',
   content: ['settings.indexers', 'settings.sync', 'settings.server'],
-  library: ['settings.server', 'settings.friends'],
+  library: undefined, // visible à tous (chaque carte filtre sa propre permission : favoris, affichage biblio, etc.)
   discovery: 'settings.server',
   account: 'settings.account',
 };
@@ -115,6 +116,7 @@ export default function SettingsContent() {
         <div className="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
           {route.page === 'server' && <LazyPageServer />}
           {route.page === 'account' && <LazyPageAccount />}
+          {route.page === 'favorites' && <LazyPageFavorites />}
         </div>
       </div>
     );
@@ -152,38 +154,32 @@ function LazyPageServer() {
   );
 }
 
-function LazyPageAccount() {
-  const [Compos, setCompos] = useState<{
-    AccountSettings: ComponentType<any>;
-    TwoFactorSettings: ComponentType<any>;
-    QuickConnectAuthorize: ComponentType<any>;
-    LocalUsersLink: ComponentType<any>;
-  } | null>(null);
+function LazyPageFavorites() {
+  const [FavoritesSettings, setFavoritesSettings] = useState<ComponentType<any> | null>(null);
   useEffect(() => {
-    Promise.all([
-      import('./AccountSettings'),
-      import('./TwoFactorSettings'),
-      import('./QuickConnectAuthorize'),
-      import('./LocalUsersLink'),
-    ]).then(([a, b, c, d]) =>
-      setCompos({
-        AccountSettings: a.default,
-        TwoFactorSettings: b.default,
-        QuickConnectAuthorize: c.default,
-        LocalUsersLink: d.default,
-      })
-    );
+    import('./FavoritesSettings').then((m) => setFavoritesSettings(() => m.default));
   }, []);
-  if (!Compos) return <SettingsRouteSkeleton />;
+  if (!FavoritesSettings) return <SettingsRouteSkeleton />;
+  return (
+    <>
+      <DsPageHeader titleKey="settingsPages.favorites.title" subtitleKey="settingsPages.favorites.subtitle" />
+      <div className="space-y-6 sm:space-y-8">
+        <FavoritesSettings />
+      </div>
+    </>
+  );
+}
+
+function LazyPageAccount() {
+  const [AccountSubMenuPanel, setAccountSubMenuPanel] = useState<ComponentType<any> | null>(null);
+  useEffect(() => {
+    import('./AccountSubMenuPanel').then((m) => setAccountSubMenuPanel(() => m.default));
+  }, []);
+  if (!AccountSubMenuPanel) return <SettingsRouteSkeleton />;
   return (
     <PermissionGuard permission="settings.account">
       <DsPageHeader titleKey="settingsPages.account.title" subtitleKey="settingsPages.account.subtitle" />
-      <div className="space-y-6 sm:space-y-8">
-        <Compos.AccountSettings />
-        <Compos.TwoFactorSettings />
-        <Compos.QuickConnectAuthorize />
-        <Compos.LocalUsersLink />
-      </div>
+      <AccountSubMenuPanel />
     </PermissionGuard>
   );
 }

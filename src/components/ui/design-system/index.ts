@@ -3,6 +3,8 @@
  * Utiliser les tokens CSS (design-system.css) et ces composants partout.
  */
 
+export { focusGlowClass, activeGlowClass, focusAndActiveGlowClass } from './focus';
+
 export { DsCard, DsCardSection } from '../DsCard';
 export { DsSettingsSectionCard } from '../DsSettingsSectionCard';
 export type { DsSettingsSectionCardProps, SettingsSectionCardAccent, StatusBadgeVariant } from '../DsSettingsSectionCard';

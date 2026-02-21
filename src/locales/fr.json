@@ -359,7 +359,10 @@
     "profile": "Profil",
     "displayName": "Nom d'affichage",
     "displayNamePlaceholder": "Votre nom d'affichage",
+    "displayNameOptionalHint": "Optionnel. Sinon, l'email est utilisé.",
     "avatar": "Avatar",
+    "avatarTvHint": "TV : privilégiez une image carrée (≥ 256×256).",
+    "invalidImage": "Veuillez sélectionner une image (PNG, JPG ou WebP).",
     "avatarUrl": "URL de l'avatar",
     "avatarUrlPlaceholder": "https://exemple.com/avatar.jpg",
     "uploadAvatar": "Importer une image",
@@ -376,6 +379,8 @@
     "logoutConfirm": "Êtes-vous sûr de vouloir vous déconnecter ?",
     "twoFactor": {
       "title": "Authentification à deux facteurs",
+      "descriptionShort": "Ajoutez une couche de sécurité en recevant un code par email à chaque connexion.",
+      "configure": "Configurer la 2FA",
       "enabled": "Activée",
       "disabled": "Désactivée",
       "enable": "Activer la 2FA",
@@ -406,7 +411,9 @@
       "accountInfo": "Informations du compte",
       "accountInfoDesc": "Email, ID utilisateur",
       "logoutDesc": "Se déconnecter de ce compte"
-    }
+    },
+    "quickLinks": "Liens rapides",
+    "profileCardDescription": "Avatar, informations du compte et déconnexion"
   },
   "interfaceSettings": {
     "theme": "Thème",
@@ -481,7 +488,9 @@
     "quality1080": "1080p",
     "quality720": "720p",
     "quality480": "480p",
-    "quality360": "360p"
+    "quality360": "360p",
+    "watchLaterAdd": "À regarder plus tard",
+    "watchLaterRemove": "Retirer des favoris"
   },
   "nav": {
     "menu": "Menu",
@@ -541,6 +550,7 @@
     "popularMovies": "Films populaires",
     "popularSeries": "Séries populaires",
     "recentAdditions": "Ajouts récents",
+    "watchLater": "À regarder plus tard",
     "fastTorrents": "⚡ Téléchargements rapides",
     "noContent": "Aucun contenu n'est disponible pour le moment.",
     "moviesGenre": "Films - {genre}",
@@ -697,6 +707,7 @@
       "accountNotLoggedIn": "Non connecté",
       "indexersCount": "{count} indexeur(s) configuré(s)"
     },
+    "favorites": "À regarder plus tard",
     "category": {
       "system": "Système",
       "interface": "Interface",
@@ -941,7 +952,34 @@
     },
     "localUsers": {
       "title": "Utilisateurs locaux",
-      "description": "Gérer les comptes locaux avec permissions limitées"
+      "description": "Gérer les comptes locaux avec permissions limitées",
+      "inviteTitle": "Inviter un utilisateur local",
+      "inviteDescription": "Invitez des utilisateurs à créer un compte local avec des permissions limitées.",
+      "sendInvitation": "Envoyer l'invitation",
+      "inviting": "Envoi en cours…",
+      "listTitle": "Utilisateurs locaux ({count})",
+      "noLocalUsers": "Aucun utilisateur local pour le moment",
+      "emailRequired": "Email *",
+      "displayNameOptional": "Nom d'affichage (optionnel)",
+      "emailPlaceholder": "utilisateur@exemple.com",
+      "displayNamePlaceholder": "Jean Dupont",
+      "active": "Actif",
+      "pending": "En attente",
+      "emailNotVerified": "Email non vérifié",
+      "createdOn": "Créé le {date}",
+      "resendInvitation": "Renvoyer l'invitation",
+      "delete": "Supprimer",
+      "deleteConfirm": "Êtes-vous sûr de vouloir supprimer l'utilisateur {email} ?",
+      "mainAccountOnly": "Cette page est réservée au compte principal. Veuillez vous connecter avec votre compte cloud.",
+      "inviteSuccess": "Invitation envoyée avec succès",
+      "inviteError": "Erreur lors de l'envoi de l'invitation",
+      "resendSuccess": "Invitation renvoyée avec succès",
+      "resendError": "Erreur lors du renvoi de l'invitation",
+      "deleteSuccess": "Utilisateur supprimé avec succès",
+      "deleteError": "Erreur lors de la suppression",
+      "loadError": "Impossible de charger les utilisateurs locaux. Veuillez vous reconnecter avec votre compte principal.",
+      "noToken": "Aucun token cloud. Veuillez vous connecter avec votre compte principal.",
+      "tokenExpired": "Session expirée. Veuillez vous reconnecter avec votre compte principal."
     },
     "documentation": {
       "title": "Documentation",
@@ -1440,6 +1478,12 @@
       "title": "Synchronisation",
       "subtitle": "Gérez la synchronisation automatique des torrents",
       "configureIndexers": "Configurer les indexers"
+    },
+    "favorites": {
+      "title": "À regarder plus tard",
+      "subtitle": "Médias que vous avez ajoutés aux favoris. Ils sont synchronisés avec votre compte cloud.",
+      "empty": "Aucun média dans la liste. Ajoutez des films ou séries depuis leur page détail.",
+      "open": "Voir"
     },
     "debugSync": {
       "pageTitle": "Debug Sync (provisoire)",

@@ -1143,14 +1143,17 @@
 
 .nav-tab:focus {
   @apply bg-glass-hover text-white;
-  box-shadow:
-    0 0 0 2px transparent,
-    0 0 0 6px rgba(255, 255, 255, 0.35);
   /* S'assurer que le ring est visible même avec overflow */
   position: relative;
   z-index: 10;
   /* Marge pour éviter le clipping aux bords */
   margin: 4px;
+}
+/* Nav-tab sans ds-focus-glow : ring blanc statique (fallback) */
+.nav-tab:focus:not(.ds-focus-glow) {
+  box-shadow:
+    0 0 0 2px transparent,
+    0 0 0 6px rgba(255, 255, 255, 0.35);
 }
 
 .nav-tab:hover {
@@ -1432,15 +1435,25 @@ html {
   outline-offset: 2px !important;
 }
 
-/* Focus visible amélioré pour les éléments interactifs */
+/* Focus visible amélioré pour les éléments interactifs (sauf .ds-focus-glow et cartes torrent = halo blanc) */
 [data-focusable]:focus-visible,
 button:focus-visible,
-a:focus-visible,
+a:not(.ds-focus-glow):focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: 3px solid var(--tv-focus-color) !important;
   outline-offset: 2px !important;
+}
+
+/* Cartes torrent / poster : pas d'outline violet, uniquement le halo blanc (design-system) */
+[data-torrent-card]:focus-visible,
+[data-torrent-card]:focus-within,
+.torrent-poster:focus-visible,
+.torrent-poster:focus-within {
+  outline: none !important;
+  --tw-ring-width: 0px;
+  --tw-ring-offset-width: 0px;
 }
 
 /* Masquer l'outline sur les éléments dans les cartes focusées (l'effet est sur la carte) */
@@ -1502,4 +1515,25 @@ form button[type="submit"]:focus-visible,
   outline: 3px solid var(--tv-focus-color) !important;
   outline-offset: 2px !important;
   box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2) !important;
+}
+
+/* ==========================================================================
+   webOS : navigation plus fluide (transitions courtes, scroll instantané côté JS)
+   ========================================================================== */
+[data-webos="true"] [data-focusable],
+[data-webos="true"] [data-settings-card],
+[data-webos="true"] [data-settings-item],
+[data-webos="true"] [data-settings-category],
+[data-webos="true"] [data-torrent-card],
+[data-webos="true"] [data-focusable-card],
+[data-webos="true"] .torrent-poster {
+  transition-duration: 0.1s !important;
+}
+
+/* Halo statique sur webOS (pas d’animation infinie = moins de repaint, plus fluide) */
+[data-webos="true"] .tv-card-focused {
+  animation: none !important;
+  box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4) !important;
+  outline: 4px solid rgba(255, 255, 255, 0.5) !important;
+  outline-offset: 4px !important;
 }

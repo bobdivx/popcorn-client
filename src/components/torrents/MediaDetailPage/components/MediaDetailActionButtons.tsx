@@ -1,6 +1,7 @@
 import { useEffect } from 'preact/hooks';
 import { useMediaDetailActions } from '../hooks/useMediaDetailActions';
 import { useSubscriptionMe } from '../hooks/useSubscriptionMe';
+import { useMediaFavorite } from '../hooks/useMediaFavorite';
 import type { MediaDetailPageProps } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
 import { getStreamingInfoHash } from '../../../../lib/streamingInfoHashStorage';
@@ -100,6 +101,12 @@ export function MediaDetailActionButtons({
     isPlaying ||
     (streamingTorrentActive && !!activeTorrent?.infoHash && streamingInfoHash === activeTorrent.infoHash);
 
+  const watchLater = useMediaFavorite({
+    tmdbId: torrent.tmdbId ?? activeTorrent?.tmdbId,
+    tmdbType: (torrent.tmdbType ?? activeTorrent?.tmdbType) || undefined,
+    category: torrent.category === 'series' ? 'series' : 'films',
+  });
+
   const actions = useMediaDetailActions({
     activeTorrent,
     allVariants,
@@ -161,6 +168,11 @@ export function MediaDetailActionButtons({
         }
         onCopyMagnet={actions.handleCopyMagnet}
         onDeleteMedia={actions.handleRequestDelete}
+        watchLater={{
+          isFavorite: watchLater.isFavorite,
+          loading: watchLater.loading,
+          onToggle: watchLater.toggle,
+        }}
       />
 
       {/* Modal de confirmation : supprimer le torrent du client et les fichiers du disque */}

@@ -5,12 +5,21 @@ import { getLocalProfile, updateLocalProfile, type LocalProfile } from '../../li
 import { redirectTo } from '../../lib/utils/navigation.js';
 import { useI18n } from '../../lib/i18n';
 import { DsCard, DsCardSection } from '../ui/design-system';
+import { Modal } from '../ui/Modal';
+import TwoFactorSettings from './TwoFactorSettings';
+import { Shield } from 'lucide-preact';
 
-export type AccountSection = 'profile' | 'info' | 'interface' | 'logout' | 'all';
+export type AccountSection = 'profile' | 'info' | 'logout' | 'all';
 
 interface AccountSettingsProps {
   section?: AccountSection;
 }
+
+const inputClass =
+  'w-full px-4 py-3 bg-[var(--ds-surface)] border border-[var(--ds-border)] rounded-[var(--ds-radius-sm)] text-[var(--ds-text-primary)] placeholder-[var(--ds-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] form-tv-input tv:text-lg tv:min-h-[56px]';
+const labelClass = 'block text-sm font-semibold text-[var(--ds-text-secondary)] mb-2';
+const btnSecondaryClass =
+  'min-h-[44px] px-4 py-2 rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] text-sm font-medium hover:bg-[var(--ds-surface-hover)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] form-tv-button tv:min-h-[56px] tv:px-6 tv:py-3';
 
 export default function AccountSettings({ section = 'all' }: AccountSettingsProps) {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
@@ -20,6 +29,7 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
   const [displayName, setDisplayName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [saved, setSaved] = useState(false);
+  const [show2FAModal, setShow2FAModal] = useState(false);
   const { t } = useI18n();
 
   useEffect(() => {
@@ -40,10 +50,10 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
       if (response.success && response.data) {
         setUser(response.data);
       } else {
-        setError(response.message || 'Erreur lors du chargement des informations');
+        setError(response.message || t('common.error'));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setError(err instanceof Error ? err.message : t('common.unknownError'));
     } finally {
       setLoading(false);
     }
@@ -51,15 +61,15 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
 
   if (loading) {
     return (
-      <div class="flex justify-center items-center min-h-[200px]">
-        <span class="loading loading-spinner loading-lg text-[var(--ds-accent-violet)]" />
+      <div className="flex justify-center items-center min-h-[200px]">
+        <span className="loading loading-spinner loading-lg text-[var(--ds-accent-violet)]" aria-hidden />
       </div>
     );
   }
 
-  if (error) {
+  if (error && !user) {
     return (
-      <div class="ds-status-badge ds-status-badge--error w-full max-w-xl" role="alert">
+      <div className="ds-status-badge ds-status-badge--error w-full max-w-xl" role="alert">
         {error}
       </div>
     );
@@ -67,8 +77,8 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
 
   if (!user) {
     return (
-      <div class="ds-card rounded-[var(--ds-radius-lg)] px-4 py-6 text-center">
-        <p class="ds-text-secondary">{t('account.noUserInfo')}</p>
+      <div className="ds-card rounded-[var(--ds-radius-lg)] px-4 py-6 text-center">
+        <p className="ds-text-secondary">{t('account.noUserInfo')}</p>
       </div>
     );
   }
@@ -84,7 +94,7 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
   const handlePickFile = (file: File | null) => {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      setError('Veuillez sélectionner une image (PNG/JPG/WebP)');
+      setError(t('account.invalidImage'));
       return;
     }
     const reader = new FileReader();
@@ -100,87 +110,238 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
 
   const showProfile = section === 'all' || section === 'profile';
   const showInfo = section === 'all' || section === 'info';
-  const showInterface = section === 'all' || section === 'interface';
   const showLogout = section === 'all' || section === 'logout';
 
-  return (
-    <div class="space-y-6 sm:space-y-8">
-      {showProfile && (
-        <DsCard variant="elevated">
-          <DsCardSection title={t('account.profile')}>
+  const isUnified = section === 'all';
 
-        {saved && (
-          <div class="ds-status-badge ds-status-badge--success mb-6 w-fit" role="status">
-            {t('common.success')}
-          </div>
-        )}
+  if (isUnified) {
+    return (
+      <>
+      <DsCard variant="elevated">
+        <DsCardSection className="space-y-6">
+          {saved && (
+            <div className="ds-status-badge ds-status-badge--success w-fit" role="status">
+              {t('common.success')}
+            </div>
+          )}
+          {error && (
+            <div className="ds-status-badge ds-status-badge--error w-full max-w-xl" role="alert">
+              {error}
+            </div>
+          )}
 
-        {error && (
-          <div class="ds-status-badge ds-status-badge--error mb-6 w-fit max-w-xl" role="alert">
-            {error}
-          </div>
-        )}
-
-            <div class="flex flex-col sm:flex-row gap-6 sm:gap-8 items-start">
-              <div class="flex items-center gap-4">
-                <Avatar
-                  email={user.email}
-                  displayName={displayName}
-                  profile={profile}
-                  sizeClassName="w-20 h-20 sm:w-24 sm:h-24 tv:w-28 tv:h-28"
-                  className="rounded-[var(--ds-radius-lg)]"
-                />
-                <div class="text-sm ds-text-secondary">
-                  <div class="font-semibold text-[var(--ds-text-primary)]">{t('account.avatar')}</div>
-                </div>
-              </div>
-              <div class="flex-1 w-full space-y-4">
-                <div>
-                  <label class="block text-sm font-semibold text-[var(--ds-text-secondary)] mb-2">Nom affiché</label>
-                  <input
-                    type="text"
-                    class="w-full px-4 py-3 bg-[var(--ds-surface)] border border-[var(--ds-border)] rounded-[var(--ds-radius-sm)] text-[var(--ds-text-primary)] form-tv-input tv:text-lg tv:min-h-[56px] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]"
-                placeholder="Ex: Alex"
+          {/* Identité : avatar + nom affiché */}
+          <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-start">
+            <div className="flex flex-col items-center gap-2 flex-shrink-0">
+              <Avatar
+                email={user.email}
+                displayName={displayName}
+                profile={profile}
+                sizeClassName="w-20 h-20 sm:w-24 sm:h-24 tv:w-28 tv:h-28"
+                className="rounded-[var(--ds-radius-lg)]"
+              />
+              <span className="text-xs ds-text-tertiary">{t('account.avatar')}</span>
+            </div>
+            <div className="flex-1 w-full min-w-0">
+              <label className={labelClass}>{t('account.displayName')}</label>
+              <input
+                type="text"
+                className={inputClass}
+                placeholder={t('account.displayNamePlaceholder')}
                 value={displayName}
                 onInput={(e) => setDisplayName((e.target as HTMLInputElement).value)}
                 onBlur={() => persist({ displayName: displayName.trim() || undefined })}
                 tabIndex={0}
                 data-focusable
               />
-              <label class="label">
-                <span class="label-text-alt text-gray-400">Optionnel. Sinon, l’email est utilisé.</span>
-              </label>
+              <p className="ds-text-tertiary text-xs mt-1">{t('account.displayNameOptionalHint')}</p>
             </div>
+          </div>
 
-            <div class="form-control">
-              <label class="label">
-                <span class="label-text text-white font-semibold">Image d’avatar</span>
-              </label>
-
-              <div class="flex flex-col sm:flex-row gap-3">
+          {/* Image d'avatar : URL + import / supprimer */}
+          <div>
+            <label className={labelClass}>{t('account.avatarUrl')}</label>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                className={inputClass}
+                placeholder={t('account.avatarUrlPlaceholder')}
+                value={avatarUrl}
+                onInput={(e) => setAvatarUrl((e.target as HTMLInputElement).value)}
+                onBlur={() => persist({ avatarDataUrl: avatarUrl.trim() || undefined })}
+                data-focusable
+              />
+              <label className={`inline-flex items-center justify-center cursor-pointer ${btnSecondaryClass}`}>
+                {t('account.uploadAvatar')}
                 <input
-                  type="text"
-                  class="input input-bordered bg-black/30 border-white/10 text-white flex-1"
-                  placeholder="Collez une URL d’image (https://...)"
-                  value={avatarUrl}
-                  onInput={(e) => setAvatarUrl((e.target as HTMLInputElement).value)}
-                  onBlur={() => persist({ avatarDataUrl: avatarUrl.trim() || undefined })}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handlePickFile((e.target as HTMLInputElement).files?.[0] || null)}
                 />
-                    <label class="inline-flex items-center justify-center min-h-[44px] px-4 py-2 rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] text-sm font-medium hover:bg-white/10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]">
-                      Importer…
-                      <input type="file" accept="image/*" class="hidden" onChange={(e) => handlePickFile((e.target as HTMLInputElement).files?.[0] || null)} />
+              </label>
+              <button
+                type="button"
+                className={btnSecondaryClass}
+                onClick={() => {
+                  setAvatarUrl('');
+                  persist({ avatarDataUrl: undefined });
+                }}
+                tabIndex={0}
+                data-focusable
+              >
+                {t('account.removeAvatar')}
+              </button>
+            </div>
+            <p className="ds-text-tertiary text-xs mt-1">{t('account.avatarTvHint')}</p>
+          </div>
+
+          {/* Informations du compte (lecture seule) */}
+          <div className="pt-4 border-t border-[var(--ds-border)]">
+            <h3 className="ds-title-section text-[var(--ds-text-primary)] mb-3">
+              {t('account.subMenu.accountInfo')}
+            </h3>
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <dt className="text-xs font-medium text-[var(--ds-text-tertiary)] uppercase tracking-wider mb-1">
+                  {t('account.email')}
+                </dt>
+                <dd className="text-[var(--ds-text-primary)] font-medium break-all">{user.email}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium text-[var(--ds-text-tertiary)] uppercase tracking-wider mb-1">
+                  {t('account.userId')}
+                </dt>
+                <dd className="ds-text-secondary font-mono text-sm break-all">{user.id}</dd>
+              </div>
+            </dl>
+          </div>
+
+          {/* Authentification à deux facteurs + Déconnexion (même ligne) */}
+          <div className="pt-4 border-t border-[var(--ds-border)]">
+            <h3 className="ds-title-section text-[var(--ds-text-primary)] mb-2">
+              {t('account.twoFactor.title')}
+            </h3>
+            <p className="ds-text-secondary text-sm mb-4">
+              {t('account.twoFactor.descriptionShort')}
+            </p>
+            <p className="ds-text-secondary text-sm mb-3">{t('account.subMenu.logoutDesc')}</p>
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setShow2FAModal(true)}
+                className={`inline-flex items-center justify-center gap-2 ${btnSecondaryClass}`}
+                data-focusable
+              >
+                <Shield className="w-4 h-4" strokeWidth={1.8} />
+                {t('account.twoFactor.configure')}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await serverApi.logout();
+                  } catch (err) {
+                    console.error('Logout error:', err);
+                  }
+                  redirectTo('/login');
+                }}
+                className="min-h-[48px] px-6 py-3 rounded-[var(--ds-radius-sm)] font-semibold bg-[var(--ds-accent-red)] text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-red)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] tv:min-h-[56px] tv:px-8 tv:py-4"
+                tabIndex={0}
+                data-focusable
+              >
+                {t('account.logout')}
+              </button>
+            </div>
+          </div>
+        </DsCardSection>
+      </DsCard>
+
+      <Modal
+        isOpen={show2FAModal}
+        onClose={() => setShow2FAModal(false)}
+        title={t('account.twoFactor.title')}
+        size="md"
+      >
+        <TwoFactorSettings />
+      </Modal>
+    </>
+    );
+  }
+
+  return (
+    <div className="space-y-6 sm:space-y-8">
+      {showProfile && (
+        <DsCard variant="elevated">
+          <DsCardSection title={t('account.profile')}>
+            {saved && (
+              <div className="ds-status-badge ds-status-badge--success mb-4 w-fit" role="status">
+                {t('common.success')}
+              </div>
+            )}
+            {error && (
+              <div className="ds-status-badge ds-status-badge--error mb-4 w-fit max-w-xl" role="alert">
+                {error}
+              </div>
+            )}
+            <div className="flex flex-col sm:flex-row gap-6 sm:gap-8 items-start">
+              <div className="flex flex-col items-center gap-2 flex-shrink-0">
+                <Avatar
+                  email={user.email}
+                  displayName={displayName}
+                  profile={profile}
+                  sizeClassName="w-20 h-20 sm:w-24 sm:h-24"
+                  className="rounded-[var(--ds-radius-lg)]"
+                />
+                <span className="text-xs ds-text-tertiary">{t('account.avatar')}</span>
+              </div>
+              <div className="flex-1 w-full space-y-4">
+                <div>
+                  <label className={labelClass}>{t('account.displayName')}</label>
+                  <input
+                    type="text"
+                    className={inputClass}
+                    placeholder={t('account.displayNamePlaceholder')}
+                    value={displayName}
+                    onInput={(e) => setDisplayName((e.target as HTMLInputElement).value)}
+                    onBlur={() => persist({ displayName: displayName.trim() || undefined })}
+                    data-focusable
+                  />
+                  <p className="ds-text-tertiary text-xs mt-1">{t('account.displayNameOptionalHint')}</p>
+                </div>
+                <div>
+                  <label className={labelClass}>{t('account.avatarUrl')}</label>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <input
+                      type="text"
+                      className={inputClass}
+                      placeholder={t('account.avatarUrlPlaceholder')}
+                      value={avatarUrl}
+                      onInput={(e) => setAvatarUrl((e.target as HTMLInputElement).value)}
+                      onBlur={() => persist({ avatarDataUrl: avatarUrl.trim() || undefined })}
+                    />
+                    <label className={`inline-flex items-center justify-center cursor-pointer ${btnSecondaryClass}`}>
+                      {t('account.uploadAvatar')}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handlePickFile((e.target as HTMLInputElement).files?.[0] || null)}
+                      />
                     </label>
                     <button
                       type="button"
-                      class="min-h-[44px] px-4 py-2 rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] text-sm font-medium hover:bg-white/10 form-tv-button tv:min-h-[56px] tv:px-6 tv:py-3 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]"
-                      onClick={() => { setAvatarUrl(''); persist({ avatarDataUrl: undefined }); }}
-                      tabIndex={0}
+                      className={btnSecondaryClass}
+                      onClick={() => {
+                        setAvatarUrl('');
+                        persist({ avatarDataUrl: undefined });
+                      }}
                       data-focusable
                     >
-                      Supprimer
+                      {t('account.removeAvatar')}
                     </button>
                   </div>
-                  <p class="ds-text-tertiary text-xs mt-1">Conseil TV: privilégiez une image carrée (≥ 256×256).</p>
+                  <p className="ds-text-tertiary text-xs mt-1">{t('account.avatarTvHint')}</p>
                 </div>
               </div>
             </div>
@@ -190,33 +351,21 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
 
       {showInfo && (
         <DsCard variant="elevated">
-          <DsCardSection title="Informations du compte">
-            <div class="space-y-6">
+          <DsCardSection title={t('account.subMenu.accountInfo')}>
+            <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label class="block text-sm font-semibold ds-text-secondary mb-2">Email</label>
-                <p class="text-[var(--ds-text-primary)] text-lg">{user.email}</p>
+                <dt className="text-xs font-medium text-[var(--ds-text-tertiary)] uppercase tracking-wider mb-1">
+                  {t('account.email')}
+                </dt>
+                <dd className="text-[var(--ds-text-primary)] font-medium break-all">{user.email}</dd>
               </div>
               <div>
-                <label class="block text-sm font-semibold ds-text-secondary mb-2">ID</label>
-                <p class="ds-text-secondary font-mono text-sm break-all">{user.id}</p>
+                <dt className="text-xs font-medium text-[var(--ds-text-tertiary)] uppercase tracking-wider mb-1">
+                  {t('account.userId')}
+                </dt>
+                <dd className="ds-text-secondary font-mono text-sm break-all">{user.id}</dd>
               </div>
-            </div>
-          </DsCardSection>
-        </DsCard>
-      )}
-
-      {showInterface && (
-        <DsCard variant="elevated">
-          <DsCardSection title={t('account.interfaceSettings')}>
-            <p class="ds-text-secondary mb-6">{t('account.interfaceSettingsDescription')}</p>
-            <a
-              href="/settings?category=interface"
-              class="inline-flex items-center justify-center min-h-[48px] px-6 py-3 rounded-[var(--ds-radius-sm)] font-semibold bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] hover:opacity-95 tv:min-h-[64px] tv:px-8 tv:py-4 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)]"
-              tabIndex={0}
-              data-focusable
-            >
-              {t('account.openInterfaceSettings')}
-            </a>
+            </dl>
           </DsCardSection>
         </DsCard>
       )}
@@ -224,17 +373,19 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
       {showLogout && (
         <DsCard variant="elevated" className="border border-[var(--ds-accent-red-muted)]">
           <DsCardSection>
-            <h3 class="ds-title-section text-[var(--ds-text-primary)] mb-4">{t('common.logout')}</h3>
-            <p class="ds-text-secondary mb-6">Se déconnecter de ce compte sur cet appareil.</p>
+            <p className="ds-text-secondary text-sm mb-4">{t('account.subMenu.logoutDesc')}</p>
             <button
               type="button"
-              data-focusable
-              tabIndex={0}
               onClick={async () => {
-                try { await serverApi.logout(); } catch (err) { console.error('Erreur lors de la déconnexion:', err); }
-                finally { redirectTo('/login'); }
+                try {
+                  await serverApi.logout();
+                } catch (err) {
+                  console.error('Logout error:', err);
+                }
+                redirectTo('/login');
               }}
-              class="min-h-[48px] px-8 py-4 tv:px-12 tv:py-6 text-lg tv:text-xl font-semibold rounded-[var(--ds-radius-sm)] bg-[var(--ds-accent-red)] text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-red)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] tv:min-h-[64px]"
+              className="min-h-[48px] px-6 py-3 rounded-[var(--ds-radius-sm)] font-semibold bg-[var(--ds-accent-red)] text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-red)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)]"
+              data-focusable
             >
               {t('account.logout')}
             </button>

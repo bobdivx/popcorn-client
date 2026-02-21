@@ -1053,6 +1053,12 @@ interface IServerApiClientPublic {
 
   // Friends methods (backend)
   syncFriendShares(payload: { replace_all: boolean; friends: Array<{ local_user_id: string; share_type: 'none' | 'all' | 'selected'; media_ids?: string[] }> }): Promise<ApiResponse<string>>;
+
+  // Favoris / à regarder plus tard (sync cloud)
+  listMediaFavorites(params?: { limit?: number; offset?: number }): Promise<ApiResponse<import('./server-api/requests.js').MediaFavorite[]>>;
+  addMediaFavorite(data: { tmdb_id: number; tmdb_type: string; category: string }): Promise<ApiResponse<import('./server-api/requests.js').MediaFavorite>>;
+  removeMediaFavorite(tmdbId: number, tmdbType: string): Promise<ApiResponse<boolean>>;
+  checkMediaFavorite(tmdbId: number, tmdbType: string): Promise<ApiResponse<{ is_favorite: boolean }>>;
 }
 
 // Fusionner les types pour que ServerApiClient ait toutes les méthodes publiques
