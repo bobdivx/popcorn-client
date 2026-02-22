@@ -139,8 +139,6 @@ export default function CarouselRow({
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
           scrollBehavior: 'smooth',
-          // Réduit les violations "non-passive touchstart" en déclarant le défilement horizontal
-          touchAction: 'pan-x',
         }}
       >
         {childrenArray.map((child, index) => (
