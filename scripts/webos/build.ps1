@@ -1,12 +1,14 @@
 # Script de build WebOS
-# Usage: .\scripts\webos\build.ps1 [-Demo] [-Simple] [-Package]
+# Usage: .\scripts\webos\build.ps1 [-Demo] [-Simple] [-Native] [-Package]
 # -Simple : app minimaliste avec lanceur (client cloud ou client local), pas de build Astro
+# -Native : app complète embarquée (build Astro), pas de page de choix client = expérience fluide
 # -Demo   : utilise le backend de validation (popcorn-vercel) pour les builds stores (build complet)
 # -Package: crée l'IPK avec ares-package
 
 param(
     [switch]$Demo = $false,
     [switch]$Simple = $false,
+    [switch]$Native = $false,
     [switch]$Package = $false
 )
 
@@ -141,6 +143,9 @@ if ($Simple) {
     if ($Demo) {
         $appInfo.main = "frontend/index.html"
         Write-Info "Mode démo : main = frontend/index.html"
+    } elseif ($Native) {
+        $appInfo.main = "frontend/index.html"
+        Write-Info "Mode natif : main = frontend/index.html (app complète, pas de lanceur)"
     } else {
         $appInfo.main = "index.html"
         Write-Info "Main = index.html (lanceur cloud / client local)"
@@ -222,8 +227,11 @@ Write-Section "Build WebOS terminé avec succès"
 Write-Success "L'application WebOS est prête dans le dossier webos/"
 if ($Simple) {
     Write-Info "L'app lance index.html (choix client cloud ou client local)"
+} elseif ($Native) {
+    Write-Info "L'app lance frontend/index.html (app complète embarquée, pas de page de choix)"
 }
 if (-not $Package) {
     Write-Info "Pour créer l'IPK, exécutez: .\scripts\webos\build.ps1 -Package"
     if ($Simple) { Write-Info "  ou: .\scripts\webos\build.ps1 -Simple -Package (IPK minimal)" }
+    if ($Native) { Write-Info "  ou: .\scripts\webos\build.ps1 -Native -Package (IPK natif, app fluide)" }
 }
