@@ -9,8 +9,8 @@ Ce document résume les corrections apportées suite au rejet QA LG (round 1, 20
 **Problème :** *App Icon Background is not a solid color: App Icon Background must be a solid color (0% transparency) which complies with the tile color.*
 
 **Corrections :**
-- **CI (GitHub Actions)** : Le workflow `webos-build.yml` génère désormais les icônes avec ImageMagick en plaçant le logo sur un fond plein **#E50914** (couleur tuile Popcorn), sans transparence.
-- **Build local** : Le script `scripts/webos/create-icons-solid-bg.mjs` (Node + sharp) génère `webos/icon.png` (80×80) et `webos/icon-large.png` (130×130) avec le même fond plein. Le script `scripts/webos/build.ps1` appelle ce script lors du build.
+- **CI (GitHub Actions)** : Le workflow génère les icônes avec un fond plein **#D1C4E9** (accent violet du design system), sans transparence.
+- **Build local** : Le script `scripts/webos/create-icons-solid-bg.mjs` (Node + sharp) génère `webos/icon.png` (80×80) et `webos/icon-large.png` (130×130) avec fond **#D1C4E9** (--ds-accent-violet). Le script `scripts/webos/build.ps1` appelle ce script lors du build.
 - **Exécution manuelle** : `node scripts/webos/create-icons-solid-bg.mjs` pour régénérer les icônes à tout moment.
 
 ### 2. QA2026012917970 – Document UX Scenario insuffisant

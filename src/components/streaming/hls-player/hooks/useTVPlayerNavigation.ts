@@ -225,7 +225,6 @@ export function useTVPlayerNavigation({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('webosback', handleWebOSBack);
-      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     };
   }, [
     showControls,
@@ -251,20 +250,33 @@ export function useTVPlayerNavigation({
     if (isTV) setShowControls(true);
   }, [isTV, setShowControls]);
 
-  // Auto-masquer les contrôles après 5 secondes sur TV
+  // Sur TV : masquer les contrôles après 5 s d'inactivité. Ne pas réinitialiser le timer à chaque
+  // re-render (ex. currentTime) sinon les contrôles ne se masquent jamais sur webOS.
   useEffect(() => {
-    if (!isTV || !showControls) return;
-
-    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    if (!isTV || !showControls) {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = null;
+      }
+      return;
+    }
+    if (controlsTimeoutRef.current !== null) return; // déjà un masquage programmé
     controlsTimeoutRef.current = window.setTimeout(() => {
+      controlsTimeoutRef.current = null;
       setShowControls(false);
       setFocusedOnProgress(false);
     }, 5000);
-
-    return () => {
-      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-    };
+    return () => {};
   }, [isTV, showControls, setShowControls]);
+
+  useEffect(() => {
+    return () => {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   return {
     isTV,

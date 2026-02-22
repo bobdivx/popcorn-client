@@ -155,7 +155,7 @@ $iconLargePath = Join-Path $WebOSDir "icon-large.png"
 $sourceIcon = Join-Path $ProjectRoot "src-tauri\icons\icon.png"
 $iconScript = Join-Path $ProjectRoot "scripts\webos\create-icons-solid-bg.mjs"
 if (Test-Path $iconScript) {
-    Write-Info "Génération des icônes (fond plein, couleur tuile)..."
+    Write-Info "Génération des icônes (fond plein, couleur design violet)..."
     & node $iconScript
     if ($LASTEXITCODE -eq 0) {
         Write-Success "Icônes webOS générées (0% transparence)"

@@ -15,8 +15,8 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(__dirname, '..', '..');
 const webosDir = join(projectRoot, 'webos');
 
-// Couleur tuile Popcorn (rouge) - conforme aux guidelines LG
-const TILE_COLOR = { r: 229, g: 9, b: 20 }; // #E50914
+// Couleur design system (accent violet) - alignée avec l'app
+const TILE_COLOR = { r: 209, g: 196, b: 233 }; // #D1C4E9 (--ds-accent-violet)
 
 const SOURCE_ICONS = [
   join(projectRoot, 'src-tauri', 'icons', 'icon.png'),
@@ -67,7 +67,7 @@ async function main() {
     mkdirSync(webosDir, { recursive: true });
   }
 
-  console.log('🎨 Génération des icônes webOS (fond plein #E50914)...');
+  console.log('🎨 Génération des icônes webOS (fond plein #D1C4E9, design system)...');
   await createIcon(80, 70, join(webosDir, 'icon.png'));
   await createIcon(130, 120, join(webosDir, 'icon-large.png'));
   console.log('✅ icon.png (80x80) et icon-large.png (130x130) créés.');

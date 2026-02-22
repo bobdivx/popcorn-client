@@ -168,7 +168,6 @@ export function useTVPlayerNavigation({
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('webosback', handleWebOSBack);
-      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     };
   }, [showControls, focusedControlIndex, focusedOnProgress, onPlayPause, onSeek, onVolumeChange, onToggleMute, onToggleFullscreen, onClose, controls, setShowControls, getSeekStep, recordKeyDown, recordKeyUp]);
 
@@ -187,17 +186,36 @@ export function useTVPlayerNavigation({
     return () => clearTimeout(id);
   }, [isTV, showControls]);
 
+  // Sur TV : masquer les contrôles après 5 s d'inactivité. Ne pas réinitialiser le timer à chaque
+  // re-render (ex. currentTime) sinon les contrôles ne se masquent jamais sur webOS.
   useEffect(() => {
-    if (!isTV || !showControls) return;
-    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    if (!isTV || !showControls) {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = null;
+      }
+      return;
+    }
+    if (controlsTimeoutRef.current !== null) return; // déjà un masquage programmé
     controlsTimeoutRef.current = window.setTimeout(() => {
+      controlsTimeoutRef.current = null;
       setShowControls(false);
       setFocusedOnProgress(false);
     }, 5000);
     return () => {
-      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+      // Ne pas clear ici à chaque re-run : on clear seulement au démontage (effet ci-dessous).
     };
   }, [isTV, showControls, setShowControls]);
+
+  // Cleanup du timer au démontage du lecteur.
+  useEffect(() => {
+    return () => {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   return {
     isTV,
