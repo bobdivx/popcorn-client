@@ -190,8 +190,8 @@ export default function TVNavigationProvider() {
     const isWebOS = typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
     const scrollBehavior: ScrollBehavior = isWebOS ? 'auto' : 'smooth';
 
-    // Sur webOS, scrollIntoView ne fait pas défiler le carousel (overflow-x) : on scroll le conteneur à la main.
-    // La carte focusée ne doit jamais être coupée : on adapte le scroll pour qu'elle soit entièrement visible.
+    // Carousel (web + webOS) : on scroll le conteneur à la main pour que la carte ne soit jamais coupée.
+    // scrollIntoView centre la carte et peut la couper ; ici on assure qu'elle reste entièrement visible.
     const scrollCarouselToElement = (carousel: HTMLElement, el: HTMLElement) => {
       const elRect = el.getBoundingClientRect();
       const carouselRect = carousel.getBoundingClientRect();
@@ -206,10 +206,8 @@ export default function TVNavigationProvider() {
 
       let newScrollLeft = carousel.scrollLeft;
       if (elRect.width >= carousel.clientWidth) {
-        // Carte plus large que la vue : centrer
         newScrollLeft = cardLeftInScroll - (carousel.clientWidth / 2) + (elRect.width / 2);
       } else {
-        // Carte entièrement visible : corriger si elle est coupée à gauche ou à droite
         if (cardLeftInScroll < visibleLeft + padding) {
           newScrollLeft = cardLeftInScroll - padding;
         }
@@ -218,7 +216,11 @@ export default function TVNavigationProvider() {
         }
       }
       newScrollLeft = Math.max(0, Math.min(maxScroll, newScrollLeft));
-      carousel.scrollLeft = newScrollLeft;
+      if (isWebOS) {
+        carousel.scrollLeft = newScrollLeft;
+      } else {
+        carousel.scrollTo({ left: newScrollLeft, behavior: 'smooth' });
+      }
     };
 
     // Focus un élément
@@ -233,7 +235,7 @@ export default function TVNavigationProvider() {
 
         if (element.matches(FOCUSABLE_SELECTOR)) {
           element.focus();
-          if (isWebOS && carousel) scrollCarouselToElement(carousel, card);
+          if (carousel) scrollCarouselToElement(carousel, card);
           else element.scrollIntoView(scrollOpts);
           lastFocusedRef.current = element;
           return;
@@ -242,7 +244,7 @@ export default function TVNavigationProvider() {
         const focusable = card.querySelector(FOCUSABLE_SELECTOR) as HTMLElement;
         if (focusable) {
           focusable.focus();
-          if (isWebOS && carousel) scrollCarouselToElement(carousel, card);
+          if (carousel) scrollCarouselToElement(carousel, card);
           else focusable.scrollIntoView(scrollOpts);
           lastFocusedRef.current = focusable;
           return;
@@ -252,14 +254,14 @@ export default function TVNavigationProvider() {
           card.setAttribute('tabindex', '0');
         }
         card.focus();
-        if (isWebOS && carousel) scrollCarouselToElement(carousel, card);
+        if (carousel) scrollCarouselToElement(carousel, card);
         else card.scrollIntoView(scrollOpts);
         lastFocusedRef.current = card;
         return;
       }
 
       element.focus();
-      if (isWebOS && carousel) scrollCarouselToElement(carousel, targetToScroll);
+      if (carousel) scrollCarouselToElement(carousel, targetToScroll);
       else element.scrollIntoView(scrollOpts);
 
       lastFocusedRef.current = element;
