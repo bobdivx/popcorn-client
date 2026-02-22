@@ -75,18 +75,23 @@ export default function TVNavigationProvider() {
       return element.matches(CARD_SELECTOR) || !!element.closest(CARD_SELECTOR);
     };
 
-    // Sur la page Settings : restreindre gauche/droite au conteneur (éviter que "droite" aille au header)
+    // Restreindre les candidats selon le contexte (éviter changement de ligne en carousel, etc.)
     const getCandidatesForDirection = (
       current: HTMLElement,
       elements: HTMLElement[],
       direction: 'up' | 'down' | 'left' | 'right'
     ): HTMLElement[] => {
-      const settingsContainer = current.closest(SETTINGS_CONTAINER_SELECTOR);
-      if (!settingsContainer || (direction !== 'left' && direction !== 'right')) {
-        return elements;
+      // Dans un carousel : gauche/droite uniquement dans le MÊME carousel (éviter de sauter à la ligne du dessous)
+      const currentCarousel = current.closest(CAROUSEL_SELECTOR);
+      if (currentCarousel && (direction === 'left' || direction === 'right')) {
+        return elements.filter((el) => currentCarousel.contains(el));
       }
       // À l'intérieur du menu settings : gauche/droite uniquement dans le même conteneur
-      return elements.filter((el) => settingsContainer.contains(el));
+      const settingsContainer = current.closest(SETTINGS_CONTAINER_SELECTOR);
+      if (settingsContainer && (direction === 'left' || direction === 'right')) {
+        return elements.filter((el) => settingsContainer.contains(el));
+      }
+      return elements;
     };
 
     // Trouver l'élément le plus proche dans une direction
@@ -185,14 +190,33 @@ export default function TVNavigationProvider() {
     const isWebOS = typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
     const scrollBehavior: ScrollBehavior = isWebOS ? 'auto' : 'smooth';
 
-    // Sur webOS, scrollIntoView ne fait pas défiler le carousel (overflow-x) : on scroll le conteneur à la main
+    // Sur webOS, scrollIntoView ne fait pas défiler le carousel (overflow-x) : on scroll le conteneur à la main.
+    // La carte focusée ne doit jamais être coupée : on adapte le scroll pour qu'elle soit entièrement visible.
     const scrollCarouselToElement = (carousel: HTMLElement, el: HTMLElement) => {
       const elRect = el.getBoundingClientRect();
       const carouselRect = carousel.getBoundingClientRect();
-      const elementLeftInScroll = elRect.left - carouselRect.left + carousel.scrollLeft;
-      const centerOffset = (carousel.clientWidth / 2) - (elRect.width / 2);
-      let newScrollLeft = elementLeftInScroll - centerOffset;
+      const padding = 12;
       const maxScroll = carousel.scrollWidth - carousel.clientWidth;
+      if (maxScroll <= 0) return;
+
+      const cardLeftInScroll = elRect.left - carouselRect.left + carousel.scrollLeft;
+      const cardRightInScroll = cardLeftInScroll + elRect.width;
+      const visibleLeft = carousel.scrollLeft;
+      const visibleRight = carousel.scrollLeft + carousel.clientWidth;
+
+      let newScrollLeft = carousel.scrollLeft;
+      if (elRect.width >= carousel.clientWidth) {
+        // Carte plus large que la vue : centrer
+        newScrollLeft = cardLeftInScroll - (carousel.clientWidth / 2) + (elRect.width / 2);
+      } else {
+        // Carte entièrement visible : corriger si elle est coupée à gauche ou à droite
+        if (cardLeftInScroll < visibleLeft + padding) {
+          newScrollLeft = cardLeftInScroll - padding;
+        }
+        if (cardRightInScroll > visibleRight - padding) {
+          newScrollLeft = cardRightInScroll - carousel.clientWidth + padding;
+        }
+      }
       newScrollLeft = Math.max(0, Math.min(maxScroll, newScrollLeft));
       carousel.scrollLeft = newScrollLeft;
     };
