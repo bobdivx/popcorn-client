@@ -18,6 +18,7 @@ import { LANGUAGE_NAMES, type SupportedLanguage } from '../../lib/i18n';
 import { isDemoMode, setDemoMode } from '../../lib/backend-config';
 import { TokenManager } from '../../lib/client/storage';
 import { loadSubscription } from '../../lib/subscription-store';
+import { getPathHref, redirectTo } from '../../lib/utils/navigation';
 
 type NavTab = { label: string; href: string; match?: 'exact' | 'prefix' };
 
@@ -243,7 +244,7 @@ export default function Navbar() {
           {/* Gauche: avatar (ou logo) + recherche */}
           <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0 min-w-0">
             <a
-              href={user ? '/dashboard' : '/'}
+              href={getPathHref(user ? '/dashboard' : '/')}
               className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-primary-600/50 focus:ring-offset-2 focus:ring-offset-black rounded-full py-1 pr-2"
               tabIndex={0}
               data-focusable
@@ -259,7 +260,7 @@ export default function Navbar() {
 
             {user ? (
                 <a
-                  href="/search"
+                  href={getPathHref('/search')}
                   className={`gtv-icon-btn ${focusAndActiveGlowClass} flex-shrink-0 relative inline-flex items-center justify-center transition-all duration-200 hover:scale-110 ${isActive('/search') ? 'bg-glass-active scale-110' : ''}`}
                   aria-label={t('nav.search')}
                   tabIndex={0}
@@ -289,7 +290,7 @@ export default function Navbar() {
                         return (
                           <a
                             key={t.href}
-                            href={t.href}
+                            href={getPathHref(t.href)}
                             className={`nav-tab ${focusGlowClass} whitespace-nowrap flex-shrink-0 transition-all duration-200 ${isMobile ? 'nav-tab-mobile' : ''} ${active ? 'nav-tab-active' : ''} ${
                               active ? 'transform scale-105' : 'hover:scale-105'
                             }`}
@@ -317,7 +318,7 @@ export default function Navbar() {
                       <div className="px-2 py-3 space-y-1">
                         {/* Carte avatar en tête du menu */}
                         <a
-                          href="/settings/account"
+                          href={getPathHref('/settings/account')}
                           onClick={() => setMobileMenuOpen(false)}
                           className="flex items-center gap-3 px-4 py-3 rounded-lg text-white hover:bg-white/10 transition-all duration-200"
                           tabIndex={0}
@@ -349,7 +350,7 @@ export default function Navbar() {
                           return (
                             <a
                               key={t.href}
-                              href={t.href}
+                              href={getPathHref(t.href)}
                               onClick={() => setMobileMenuOpen(false)}
                               className={`block px-4 py-3.5 rounded-lg text-white transition-all duration-200 transform hover:scale-[1.02] hover:shadow-lg ${
                                 active 
@@ -372,7 +373,7 @@ export default function Navbar() {
                         })}
                         <div className="border-t border-white/10 my-2" aria-hidden />
                         <a
-                          href="/settings"
+                          href={getPathHref('/settings')}
                           onClick={() => setMobileMenuOpen(false)}
                           className={`block px-4 py-3.5 rounded-lg text-white transition-all duration-200 hover:scale-[1.02] hover:shadow-lg hover:bg-white/10 ${
                             isActivePrefix('/settings') ? 'bg-primary-600 font-bold' : 'text-white/90 hover:text-white'
@@ -405,7 +406,7 @@ export default function Navbar() {
                 type="button"
                 onClick={() => {
                   setDemoMode(false);
-                  window.location.href = '/';
+                  redirectTo('/');
                 }}
                 className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-600/90 text-white hover:bg-amber-500 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-gray-900"
                 title={t('demo.exitDemo')}
@@ -420,7 +421,7 @@ export default function Navbar() {
             {user ? (
               <>
                 <a
-                  href="/downloads"
+                  href={getPathHref('/downloads')}
                   className={`gtv-icon-btn ${focusAndActiveGlowClass} flex-shrink-0 relative inline-flex items-center justify-center transition-all duration-200 hover:scale-110`}
                   aria-label={t('nav.downloads')}
                   tabIndex={0}
@@ -447,7 +448,7 @@ export default function Navbar() {
                   </button>
                 ) : (
                   <a
-                    href="/settings"
+                    href={getPathHref('/settings')}
                     className={`gtv-icon-btn ${focusAndActiveGlowClass} flex-shrink-0 relative inline-flex items-center justify-center ${isTV ? 'inline-flex' : 'hidden sm:inline-flex'} transition-all duration-200 hover:scale-110 ${isActivePrefix('/settings') ? 'bg-glass-active scale-110' : ''} ${syncProgress.inProgress ? 'ds-sync-active-pulse' : ''}`}
                     aria-label={t('nav.settings')}
                     tabIndex={0}
@@ -470,7 +471,7 @@ export default function Navbar() {
                 )}
 
                 <a
-                  href="/settings/account"
+                  href={getPathHref('/settings/account')}
                   className={`gtv-icon-btn ${focusAndActiveGlowClass} flex-shrink-0 relative inline-flex items-center justify-center rounded-full transition-all duration-200 hover:scale-110 ${user ? 'hidden sm:inline-flex' : ''}`}
                   tabIndex={0}
                   data-focusable
@@ -511,7 +512,7 @@ export default function Navbar() {
                   </select>
                 </label>
                 <a
-                  href="/login"
+                  href={getPathHref('/login')}
                   className="gtv-pill-btn transition-all duration-200 hover:scale-105"
                   tabIndex={0}
                   data-focusable
@@ -519,7 +520,7 @@ export default function Navbar() {
                   {t('common.login')}
                 </a>
                 <a
-                  href="/register"
+                  href={getPathHref('/register')}
                   className="gtv-pill-btn gtv-pill-btn-primary transition-all duration-200 hover:scale-105 hover:shadow-primary-lg"
                   tabIndex={0}
                   data-focusable

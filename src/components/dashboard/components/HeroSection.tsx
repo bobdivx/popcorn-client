@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import type { ContentItem } from '../../../lib/client/types';
 import { useI18n } from '../../../lib/i18n/useI18n';
 import { getHighQualityTmdbImageUrl } from '../../../lib/utils/tmdb-images';
+import { getDisplayTitle } from '../../../lib/utils/title-display';
 import { YouTubeVideoPlayer } from '../../ui/YouTubeVideoPlayer';
 
 interface HeroSectionProps {
@@ -165,7 +166,7 @@ export function HeroSection({
 
   return (
     <div
-      className={`relative w-full h-[70vh] min-h-[380px] sm:min-h-[500px] tv:min-h-[600px] max-h-[800px] mb-8 overflow-hidden touch-pan-y ${noOverlap ? '' : '-mt-8 sm:-mt-20 md:-mt-32'}`}
+      className={`relative z-0 w-full h-[70vh] min-h-[380px] sm:min-h-[500px] tv:min-h-[600px] max-h-[800px] mb-8 overflow-hidden touch-pan-y ${noOverlap ? '' : '-mt-8 sm:-mt-20 md:-mt-32'}`}
       style={{ touchAction: 'pan-y' }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -256,13 +257,13 @@ export function HeroSection({
             </span>
           </div>
 
-          {/* Titre — plus discret quand le logo est affiché */}
+          {/* Titre (TMDB ou nettoyé, sans qualité/langue à côté) */}
           <h1 className={`font-bold mb-4 tv:mb-6 drop-shadow-2xl ${
             currentItem.logo
               ? 'text-xl sm:text-2xl md:text-3xl lg:text-4xl tv:text-5xl text-white/90'
               : 'text-4xl sm:text-5xl md:text-6xl lg:text-7xl tv:text-8xl text-white'
           }`}>
-            {currentItem.title}
+            {getDisplayTitle(currentItem) || currentItem.title}
           </h1>
 
           {/* Description */}

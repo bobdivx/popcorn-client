@@ -16,7 +16,6 @@ interface LazyTorrentPosterProps {
  * Utilise IntersectionObserver pour optimiser les performances
  */
 export function LazyTorrentPoster({ item, rootMargin = '200px' }: LazyTorrentPosterProps) {
-  const [isVisible, setIsVisible] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -26,7 +25,6 @@ export function LazyTorrentPoster({ item, rootMargin = '200px' }: LazyTorrentPos
 
     // Si IntersectionObserver n'est pas disponible, charger immédiatement
     if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
-      setIsVisible(true);
       setShouldRender(true);
       return;
     }
@@ -35,11 +33,7 @@ export function LazyTorrentPoster({ item, rootMargin = '200px' }: LazyTorrentPos
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            setIsVisible(true);
-            // Délai minimal avant de rendre pour éviter les flashs
-            setTimeout(() => {
-              setShouldRender(true);
-            }, 50);
+            setShouldRender(true);
             observer.unobserve(entry.target);
           }
         });

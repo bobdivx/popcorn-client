@@ -8,7 +8,7 @@ Ce dossier regroupe toute la documentation du projet.
 |-----------|----------|
 | **Build & déploiement** | BUILD_INSTRUCTIONS.md, BUILD_ANDROID.md, BUILD_TAURI_*, QUICK_START_DESKTOP.md, README-DESKTOP.md |
 | **Android** | ANDROID_SIGNING.md, CONFIGURATION_ANDROID_BACKEND.md, INSTALLATION_ANDROID.md, PLAY_STORE_PUBLICATION.md, TROUBLESHOOTING_APK*.md |
-| **WebOS** | WEBOS_QA_LG_CORRECTIONS.md (voir aussi dossier `webos/`) |
+| **WebOS** | WEBOS_QA_LG_CORRECTIONS.md (voir aussi dossier `popcorn-tauri/webos/`) |
 | **Lucie (player)** | LUCIE_*.md |
 | **Environnement** | README-ENV.md |
 | **Scripts** | scripts/README-TEST-PLAY-CONSOLE.md (test Play Console) |

@@ -5,7 +5,7 @@ import { useI18n } from '../../../lib/i18n/useI18n';
 import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-config';
 
 /**
- * Charge les séries triées par date d'ajout sur l'indexeur (ajouts récents)
+ * Charge les séries triées par date de sortie TMDB (firstAirDate), plus récentes en premier
  */
 export function useRecentSeries() {
   const { language } = useI18n();
@@ -22,7 +22,7 @@ export function useRecentSeries() {
           1,
           prefs.torrentsRecentLimit,
           language,
-          'recent',
+          'release_date',
           prefs.showZeroSeedTorrents ? 0 : 1,
           prefs.mediaLanguages,
           prefs.minQuality

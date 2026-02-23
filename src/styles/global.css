@@ -1329,6 +1329,12 @@ html {
   font-weight: 500; /* Poids moyen pour lisibilité TV */
 }
 
+/* webOS (TV + simulateur) : polices système uniquement pour éviter ERR_UNKNOWN_URL_SCHEME
+   (le simulateur tente de charger des polices en file:// depuis son répertoire d'installation) */
+html[data-webos="true"] {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
 /* Classes typographie TV */
 .text-tv-title {
   font-size: 3rem; /* 48px */

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
-import { redirectTo } from '../lib/utils/navigation.js';
+import { redirectTo, getPathHref } from '../lib/utils/navigation.js';
 import { QuickConnectDisplay } from './ui/QuickConnectDisplay';
 import { useI18n } from '../lib/i18n/useI18n';
 
@@ -200,7 +200,7 @@ export default function LoginForm() {
       <div className="text-center mt-6">
         <p className="text-gray-400 text-sm">
           {t('loginForm.noAccount')}{' '}
-          <a href="/register" className="text-white hover:text-primary-400 transition-colors font-medium">
+          <a href={getPathHref('/register')} className="text-white hover:text-primary-400 transition-colors font-medium">
             {t('loginForm.register')}
           </a>
         </p>

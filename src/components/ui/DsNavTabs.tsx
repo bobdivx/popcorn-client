@@ -21,7 +21,7 @@ export function DsNavTabs({ tabs, activeId, onChange, className = '', rightConte
   const activeTab = tabs.find((t) => t.id === activeId) ?? tabs[0];
   return (
     <div class="min-w-0 flex-1 flex flex-col">
-      <div class="flex flex-nowrap items-center gap-2 min-w-0">
+      <div class="ds-nav-tabs__row flex flex-nowrap items-center gap-2 min-w-0">
         <div role="tablist" class={`ds-nav-tabs ds-nav-tabs--inline ${className}`.trim()} aria-label="Navigation par onglets">
           {tabs.map((tab) => (
             <button
@@ -39,7 +39,7 @@ export function DsNavTabs({ tabs, activeId, onChange, className = '', rightConte
           ))}
         </div>
         {rightContent != null && (
-          <div class="flex flex-nowrap items-center gap-2 flex-shrink-0 overflow-x-auto scrollbar-hide ml-auto">
+          <div class="ds-nav-tabs__right flex flex-wrap items-center gap-2 flex-shrink-0 ml-auto min-w-0">
             {rightContent}
           </div>
         )}

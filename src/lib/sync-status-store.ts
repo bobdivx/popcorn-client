@@ -50,6 +50,8 @@ let pollIntervalId: ReturnType<typeof setInterval> | null = null;
 
 const POLL_ACTIVE_MS = 1500;
 const POLL_IDLE_MS = 30000;
+/** Quand le statut n'est pas encore chargé (ou erreur), retry souvent pour afficher la sync dès que possible (ex. page /settings/sync ouverte depuis une autre machine). */
+const POLL_WHEN_NULL_MS = 2000;
 
 function notify() {
   const s = { ...state };
@@ -108,7 +110,8 @@ function schedulePolling() {
     pollIntervalId = null;
   }
   const inProgress = Boolean(state.status?.sync_in_progress);
-  const ms = inProgress ? POLL_ACTIVE_MS : POLL_IDLE_MS;
+  const noStatusYet = state.status === null;
+  const ms = noStatusYet ? POLL_WHEN_NULL_MS : inProgress ? POLL_ACTIVE_MS : POLL_IDLE_MS;
   pollIntervalId = setInterval(() => {
     refreshSyncStatusStore();
   }, ms);

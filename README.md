@@ -123,7 +123,7 @@ popcorn-client/
 │   └── Dockerfile      # Build : docker build -f docker/Dockerfile .
 ├── scripts/            # Scripts (Android, WebOS, keystore, etc.)
 ├── src-tauri/          # Configuration Tauri (desktop/mobile)
-├── webos/              # Application WebOS
+├── (webOS : dans popcorn-tauri/webos/ — scripts, app, simulateur)
 ├── src/
 │   ├── lib/
 │   ├── components/

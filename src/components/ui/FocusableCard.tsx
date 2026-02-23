@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'preact/hooks';
 import { focusAndActiveGlowClass } from './design-system/focus';
+import { getPathHref } from '../../lib/utils/navigation';
 
 interface FocusableCardProps {
   children: preact.ComponentChildren;
@@ -40,7 +41,7 @@ export function FocusableCard({
         if (onClick) {
           onClick(e);
         } else if (href) {
-          window.location.href = href;
+          window.location.href = getPathHref(href);
         }
       }
     };

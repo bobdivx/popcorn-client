@@ -91,6 +91,8 @@ export interface HeroContent {
 export interface ContentItem {
   id: string;
   title: string;
+  /** Titre officiel TMDB (affichage hero/cartes, sans qualité/langue) — prioritaire sur title quand présent */
+  tmdbTitle?: string;
   type: 'movie' | 'tv';
   poster?: string;
   backdrop?: string;

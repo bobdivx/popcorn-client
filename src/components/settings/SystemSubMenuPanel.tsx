@@ -8,14 +8,14 @@ import VersionInfo from './VersionInfo';
 import DiagnosticsPanel from './DiagnosticsPanel';
 import StoragePanel from './StoragePanel';
 import { serverApi } from '../../lib/client/server-api';
-import { redirectTo } from '../../lib/utils/navigation.js';
+import { redirectTo, getPathHref } from '../../lib/utils/navigation.js';
 
 function SetupSection({ embedded = false }: { embedded?: boolean }) {
   const { t } = useI18n();
   const content = (
     <>
       <p className="text-sm ds-text-secondary mb-4">{t('settingsMenu.setup.description')}</p>
-      <a href="/setup?force=1" className="btn btn-primary" data-focusable tabIndex={0}>
+      <a href={getPathHref('/setup') + '?force=1'} className="btn btn-primary" data-focusable tabIndex={0}>
         {t('common.configure')}
       </a>
     </>

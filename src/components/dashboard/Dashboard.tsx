@@ -21,7 +21,7 @@ export default function Dashboard() {
   const isWatched = (item: ContentItem) =>
     watchedIds.has(item.id) || (item.tmdbId != null && watchedIds.has(String(item.tmdbId)));
   const { syncStatus, isSyncing, loading: syncLoading } = useSyncStatus();
-  const lastSyncProgressRef = useRef<number>(-1);
+  const wasSyncingRef = useRef(false);
   const clearedBySyncRef = useRef(false);
 
   // Quand l’onglet redevient visible : recharger les données depuis le backend (source de vérité). Pas de spinner.
@@ -66,23 +66,16 @@ export default function Dashboard() {
     reload();
   }, [syncLoading, totalTorrentsFromSync, hasDataToClear, reload]);
 
-  // Rafraîchir les données au fur et à mesure de la synchronisation torrent
+  // Ne rafraîchir les données qu'à la fin de la sync (pas pendant) pour éviter que les cartes bougent sur le dashboard
   useEffect(() => {
     if (!isSyncing) {
+      if (wasSyncingRef.current) reloadSilent();
+      wasSyncingRef.current = false;
       lastSyncProgressRef.current = -1;
       return;
     }
-    if (!syncStatus) return;
-    const totalProcessed = syncStatus.progress?.total_processed ?? 0;
-    const statsSum = syncStatus.stats
-      ? Object.values(syncStatus.stats).reduce((a, b) => a + b, 0)
-      : 0;
-    const key = totalProcessed + statsSum;
-    if (key > lastSyncProgressRef.current) {
-      lastSyncProgressRef.current = key;
-      if (key > 0) reloadSilent();
-    }
-  }, [isSyncing, syncStatus?.progress?.total_processed, syncStatus?.stats, reloadSilent]);
+    wasSyncingRef.current = true;
+  }, [isSyncing, reloadSilent]);
 
   const handlePlay = (item: ContentItem) => {
     window.location.href = `/player/${item.id}`;
@@ -121,8 +114,8 @@ export default function Dashboard() {
     resumeWatching.length > 0
   );
 
-  // Barre compacte en haut quand une sync est en cours (affiche le contenu en dessous)
-  const showSyncBar = !syncLoading && isSyncing;
+  // Barre compacte en haut quand une sync est en cours (on ne dépend pas de syncLoading pour éviter qu'elle disparaisse à chaque poll)
+  const showSyncBar = isSyncing;
 
   // Afficher la carte de synchronisation si:
   // - Pas de données ET pas de synchronisation en cours ET pas de torrents synchronisés
@@ -266,7 +259,7 @@ export default function Dashboard() {
 
       {/* Section Hero avec carousel */}
       {heroItems.length > 0 && (
-        <HeroSection items={heroItems} onPlay={handlePlay} />
+        <HeroSection items={heroItems} onPlay={handlePlay} onPrimaryAction={handlePlay} />
       )}
 
       <div className="pb-8 tv:pb-12">
@@ -292,16 +285,24 @@ export default function Dashboard() {
           </CarouselRow>
         )}
 
-        {/* Section Ajouts récents (cachés : déjà vus) */}
-        {data.recentAdditions && data.recentAdditions.filter((item) => !isWatched(item)).length > 0 && (
-          <CarouselRow title={t('dashboard.recentAdditions')} autoScroll={false}>
-            {data.recentAdditions.filter((item) => !isWatched(item)).map((item) => (
+        {/* Section Ajouts récents (toujours affichée pour éviter apparition/disparition). Tri par date de sortie TMDB. */}
+        <CarouselRow title={t('dashboard.recentAdditions')} autoScroll={false}>
+          {isSyncing ? (
+            <div className="flex-shrink-0 px-4 py-3 text-gray-400 text-sm sm:text-base">
+              {t('dashboard.recentAdditionsSyncing')}
+            </div>
+          ) : data.recentAdditions && data.recentAdditions.filter((item) => !isWatched(item)).length > 0 ? (
+            data.recentAdditions.filter((item) => !isWatched(item)).map((item) => (
               <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                 <LazyTorrentPoster item={item} />
               </div>
-            ))}
-          </CarouselRow>
-        )}
+            ))
+          ) : (
+            <div className="flex-shrink-0 px-4 py-3 text-gray-500 text-sm sm:text-base">
+              {t('dashboard.recentAdditionsEmpty')}
+            </div>
+          )}
+        </CarouselRow>
 
         {/* Section Torrents rapides (beaucoup de seeders) — cachés : déjà vus */}
         {data.fastTorrents && data.fastTorrents.filter((item) => !isWatched(item)).length > 0 && (

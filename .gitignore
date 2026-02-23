@@ -44,6 +44,4 @@ src-tauri/gen/
 *.apk
 *.aab
 
-# WebOS build artifacts
-webos/frontend/
-webos/*.ipk
+# WebOS : tout est dans popcorn-tauri/webos/

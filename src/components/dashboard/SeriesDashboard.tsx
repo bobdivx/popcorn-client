@@ -11,6 +11,7 @@ import { useRecentSeries } from './hooks/useRecentSeries';
 import { useFavoritesItems } from './hooks/useFavoritesItems';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useSyncStatus } from './hooks/useSyncStatus';
+import { refreshSyncStatusStore } from '../../lib/sync-status-store';
 import { SyncProgress } from '../setup/components/SyncProgress';
 import { SyncCard } from './components/SyncCard';
 import { useI18n } from '../../lib/i18n/useI18n';
@@ -26,7 +27,7 @@ import Library from '../Library';
 
 export default function SeriesDashboard() {
   const { t, language } = useI18n();
-  const { series, loading, error, hasMore, loadMore, refetchSilent } = useInfiniteSeries();
+  const { series, loading, error, hasMore, loadMore, clearAndRefetch, refetchSilent, refetchReplaceSilent } = useInfiniteSeries();
   const { series: recentSeries } = useRecentSeries();
   const { items: favoritesItems } = useFavoritesItems();
   const { resumeWatching, rewatchWatching, watchedIds } = useResumeWatching();
@@ -40,6 +41,9 @@ export default function SeriesDashboard() {
   );
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
   const lastSyncProgressRef = useRef<number>(-1);
+  const lastRefetchSilentAtRef = useRef<number>(0);
+  const SYNC_REFETCH_THROTTLE_MS = 2500;
+  const clearedBySyncRef = useRef(false);
   const { notifications, addNotification, removeNotification } = useNotifications();
   const { streamingTorrentActive } = useSubscriptionMe();
   const [heroDownloading, setHeroDownloading] = useState(false);
@@ -74,12 +78,44 @@ export default function SeriesDashboard() {
     }
   }, [loading, viewMode]);
 
-  // Rafraîchir la liste des séries au fur et à mesure de la synchronisation torrent
+  // Au montage : mise à jour du statut sync pour l’affichage (Films 0 / Séries 0).
+  useEffect(() => {
+    refreshSyncStatusStore();
+  }, []);
+
+  // Quand l’onglet redevient visible : recharger la liste depuis le backend (source de vérité). Pas de spinner.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && viewMode === 'torrents') refetchReplaceSilent();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [viewMode, refetchReplaceSilent]);
+
+  // Réinitialiser la garde quand il y a à nouveau des torrents (pour un prochain "vider").
+  const totalTorrentsFromSync = syncStatus?.stats
+    ? Object.values(syncStatus.stats).reduce((a: number, b: unknown) => a + Number(b), 0)
+    : -1;
+  if (totalTorrentsFromSync > 0) clearedBySyncRef.current = false;
+
+  // Source de vérité : si la sync dit 0 torrents, vider et recharger une seule fois (après "vider les torrents" ou ouverture de la page).
+  useEffect(() => {
+    if (syncLoading || totalTorrentsFromSync !== 0 || viewMode !== 'torrents') return;
+    if (clearedBySyncRef.current) return;
+    clearedBySyncRef.current = true;
+    clearAndRefetch();
+  }, [syncLoading, totalTorrentsFromSync, viewMode, clearAndRefetch]);
+
+  // Rafraîchir la liste des séries au fur et à mesure de la synchronisation torrent (throttlé pour éviter que les cartes bougent en continu)
+  const wasSyncingRef = useRef(false);
   useEffect(() => {
     if (!isSyncing) {
+      if (wasSyncingRef.current) refetchSilent(); // Rafraîchir une dernière fois à la fin de la sync
+      wasSyncingRef.current = false;
       lastSyncProgressRef.current = -1;
       return;
     }
+    wasSyncingRef.current = true;
     if (!syncStatus) return;
     const totalProcessed = syncStatus.progress?.total_processed ?? 0;
     const statsSum = syncStatus.stats
@@ -88,7 +124,13 @@ export default function SeriesDashboard() {
     const key = totalProcessed + statsSum;
     if (key > lastSyncProgressRef.current) {
       lastSyncProgressRef.current = key;
-      if (key > 0) refetchSilent();
+      if (key > 0) {
+        const now = Date.now();
+        if (now - lastRefetchSilentAtRef.current >= SYNC_REFETCH_THROTTLE_MS) {
+          lastRefetchSilentAtRef.current = now;
+          refetchSilent();
+        }
+      }
     }
   }, [isSyncing, syncStatus?.progress?.total_processed, syncStatus?.stats, refetchSilent]);
 
@@ -213,7 +255,16 @@ export default function SeriesDashboard() {
     }
   }, [heroDownloading, addNotification, t]);
 
-  // Grouper les séries par genre principal (exclure les déjà vus des lignes genre)
+  // Normaliser un élément genre (string ou objet TMDB { id, name }) en clé string
+  const genreToKey = (g: string | { id?: number; name?: string }): string => {
+    if (typeof g === 'string') return g.trim();
+    if (g && typeof g === 'object' && typeof (g as { name?: string }).name === 'string') {
+      return (g as { name: string }).name.trim();
+    }
+    return '';
+  };
+
+  // Grouper les séries par genre : chaque série apparaît dans TOUS ses genres (pas seulement le premier)
   const seriesByGenre = useMemo(() => {
     const grouped: Record<string, SeriesData[]> = {};
     const watched = new Set(watchedIds);
@@ -221,18 +272,17 @@ export default function SeriesDashboard() {
     series.forEach(serie => {
       if (watched.has(serie.id) || (serie.tmdbId != null && watched.has(String(serie.tmdbId)))) return;
       if (serie.genres && serie.genres.length > 0) {
-        // Utiliser uniquement le genre principal (premier du tableau)
-        const primaryGenre = serie.genres[0];
-        if (!grouped[primaryGenre]) {
-          grouped[primaryGenre] = [];
+        const seenGenres = new Set<string>();
+        for (const g of serie.genres) {
+          const key = genreToKey(g);
+          if (!key || seenGenres.has(key)) continue;
+          seenGenres.add(key);
+          if (!grouped[key]) grouped[key] = [];
+          grouped[key].push(serie);
         }
-        grouped[primaryGenre].push(serie);
       } else {
-        // Séries sans genre dans une catégorie "Autres" (clé interne pour i18n)
         const otherKey = '__other__';
-        if (!grouped[otherKey]) {
-          grouped[otherKey] = [];
-        }
+        if (!grouped[otherKey]) grouped[otherKey] = [];
         grouped[otherKey].push(serie);
       }
     });
@@ -324,9 +374,16 @@ export default function SeriesDashboard() {
     : 0;
   const hasTorrents = totalTorrents > 0;
 
-  // Contenu principal quand series.length === 0
+  // Contenu principal quand series.length === 0 — un seul état affiché selon sync pour éviter le scintillement
   const renderEmptyContent = () => {
-    if (!syncLoading && !isSyncing && !hasTorrents) {
+    if (syncLoading) {
+      return (
+        <div className="flex-1 flex items-center justify-center min-h-[50vh]">
+          <p className="text-gray-400 text-center">{t('common.loading')}</p>
+        </div>
+      );
+    }
+    if (!isSyncing && !hasTorrents) {
       return (
         <div className="flex-1 flex items-center justify-center min-h-[50vh]">
           <SyncCard type="series" />
@@ -422,16 +479,24 @@ export default function SeriesDashboard() {
             ))}
           </CarouselRow>
         )}
-        {/* Section Ajouts récents (tri par date indexeur, cachés : déjà vus) */}
-        {recentSeries.filter((s) => !isWatched(s)).length > 0 && (
-          <CarouselRow title={t('dashboard.recentAdditions')} autoScroll={false}>
-            {recentSeries.filter((s) => !isWatched(s)).map((serie) => (
+        {/* Section Ajouts récents (toujours affichée pour éviter apparition/disparition). Tri par date de sortie TMDB. */}
+        <CarouselRow title={t('dashboard.recentAdditions')} autoScroll={false}>
+          {isSyncing ? (
+            <div className="flex-shrink-0 px-4 py-3 text-gray-400 text-sm sm:text-base">
+              {t('dashboard.recentAdditionsSyncing')}
+            </div>
+          ) : recentSeries.filter((s) => !isWatched(s)).length > 0 ? (
+            recentSeries.filter((s) => !isWatched(s)).map((serie) => (
               <div key={serie.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                 <LazyTorrentPoster item={{ ...serie, type: 'tv' }} />
               </div>
-            ))}
-          </CarouselRow>
-        )}
+            ))
+          ) : (
+            <div className="flex-shrink-0 px-4 py-3 text-gray-500 text-sm sm:text-base">
+              {t('dashboard.recentAdditionsEmpty')}
+            </div>
+          )}
+        </CarouselRow>
         {/* Contenu vide : SyncCard ou message */}
         {series.length === 0 ? (
           renderEmptyContent()

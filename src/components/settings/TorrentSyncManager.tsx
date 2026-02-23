@@ -287,11 +287,7 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
   const loadIndexersInFlight = useRef(false);
   const prevSyncInProgressRef = useRef<boolean>(false);
 
-  useEffect(() => {
-    refreshSyncStatusStore();
-    loadIndexers();
-  }, []);
-
+  // S'abonner au store en premier pour que le polling soit bien programmé au premier refresh (surtout quand on ouvre /settings/sync depuis une autre machine).
   useEffect(() => {
     const defaultStatus: SyncStatus = {
       sync_in_progress: false,
@@ -337,6 +333,11 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
       }
     });
     return unsub;
+  }, []);
+
+  useEffect(() => {
+    refreshSyncStatusStore();
+    loadIndexers();
   }, []);
 
   useEffect(() => {
@@ -751,10 +752,12 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
       if (response.success) {
         const count = typeof response.data === 'number' ? response.data : 0;
         setSuccess(t('torrentSyncManager.torrentsCleared', { count }));
-        setTimeout(() => {
-          refreshSyncStatusStore();
-          loadIndexers();
-        }, 1000);
+        // Mise à jour immédiate du statut sync (0 torrents) pour que les dashboards Films/Series se vident
+        refreshSyncStatusStore();
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('popcorn:torrents-cleared'));
+        }
+        setTimeout(() => loadIndexers(), 500);
       } else {
         setError(response.message || t('torrentSyncManager.errorClearing'));
       }
@@ -1180,6 +1183,9 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
               : totalSynced > 0
                 ? t('torrentSyncManager.filmsSeriesSynced', { films, series })
                 : t('torrentSyncManager.noContentInDatabase');
+            const subtitleTitle = status.sync_in_progress && isCurrent
+              ? t('torrentSyncManager.newContentsFoundTooltip')
+              : undefined;
             const isSyncingThisCard = status.sync_in_progress && isCurrent;
             return (
               <button
@@ -1187,7 +1193,7 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                 type="button"
                 onClick={() => setSelectedIndexerForModal(indexer)}
                 class={`sync-indexer-card w-full text-left rounded-xl p-5 sm:p-6 transition-all duration-300 hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] ${isSyncingThisCard ? 'sync-indexer-card--syncing' : ''} ${hasError ? 'sync-card-error' : 'ds-box-accent'}`}
-                title={t('torrentSyncManager.clickForDetails')}
+                title={subtitleTitle ?? t('torrentSyncManager.clickForDetails')}
               >
                 <div class="relative min-w-0">
                   <span class="absolute top-0 right-0 flex items-center gap-2">
@@ -1202,7 +1208,7 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                     </span>
                   </span>
                   <h3 class={`text-base sm:text-lg md:text-xl font-bold text-[var(--ds-text-on-accent)] truncate ${isSyncingThisCard ? 'pr-28 sm:pr-32' : 'pr-12 sm:pr-14'}`}>{indexer.name}</h3>
-                  <p class="text-[var(--ds-text-on-accent)]/60 text-xs sm:text-sm mt-0.5 truncate">{subtitle}</p>
+                  <p class="text-[var(--ds-text-on-accent)]/60 text-xs sm:text-sm mt-0.5 truncate" title={subtitleTitle}>{subtitle}</p>
                   <div class="mt-4">
                     <div class="flex justify-between text-xs font-semibold text-[#1C1C1E] mb-1.5">
                       <span>{t('torrentSyncManager.progressLabel')}</span>
