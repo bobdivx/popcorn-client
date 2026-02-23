@@ -13,7 +13,8 @@ export const syncMethods = {
   async getSyncStatus(this: ServerApiClientSyncAccess): Promise<ApiResponse<any>> {
     const userId = this.getCurrentUserId();
     if (!userId) return { success: false, error: 'Unauthorized', message: 'Connecte-toi avant la sync.' };
-    return this.backendRequest(`/api/sync/status?user_id=${encodeURIComponent(userId)}`, { method: 'GET' });
+    // Sync torrent = globale (pas de user_id côté backend)
+    return this.backendRequest('/api/sync/status', { method: 'GET' });
   },
   async startSync(
     this: ServerApiClientSyncAccess,
@@ -60,9 +61,10 @@ export const syncMethods = {
   async clearSyncTorrents(this: ServerApiClientSyncAccess): Promise<ApiResponse<number>> {
     const userId = this.getCurrentUserId();
     if (!userId) return { success: false, error: 'Unauthorized', message: 'Connecte-toi avant la sync.' };
+    // Sync torrent = globale (vider toute la base sync, pas de user_id côté backend)
     return this.backendRequest<number>('/api/sync/clear-torrents', {
       method: 'POST',
-      body: JSON.stringify({ user_id: userId }),
+      body: JSON.stringify({}),
     });
   },
   /** Debug : vérifie si un torrent est réellement téléchargeable (GET + Range, premier octet bencode). */
