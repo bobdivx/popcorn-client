@@ -6,6 +6,8 @@ import ServerConnectionCheck from '../components/ServerConnectionCheck';
 import Navbar from '../components/layout/Navbar';
 import FeedbackFAB from '../components/layout/FeedbackFAB';
 import TVNavigationProvider from '../components/tv/TVNavigationProvider';
+import WebOSHead from '../components/webos/WebOSHead.astro';
+import WebOSBoot from '../components/webos/WebOSBoot.astro';
 
 interface Props {
   title?: string;
@@ -48,7 +50,7 @@ const isWebOS = import.meta.env.WEBOS === 'true';
     <meta name="generator" content={Astro.generator} />
     <meta name="theme-color" content="#a855f7" />
     <title>{title}</title>
-    <ClientRouter />
+    {!isWebOS && <ClientRouter />}
     <script is:inline>
       /* Masquer le bandeau "Chargement" après chaque navigation (View Transitions remplace le body, donc ce script doit être dans le head pour survivre). */
       document.addEventListener('astro:after-swap', function() {
@@ -58,18 +60,11 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         });
       });
     </script>
-    <!-- Google Fonts : désactivés sur webOS (file://) pour éviter blocage réseau et écran noir -->
-    {!isWebOS && (
-      <>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet" />
-      </>
-    )}
+    <WebOSHead />
   </head>
   <body class="min-h-screen bg-page text-white flex flex-col overflow-x-hidden">
     <script is:inline>
-      // Placeholder: les handlers seront enregistres apres que le DOM du fallback existe
+      // Afficher un message d'erreur dans le bandeau de chargement (utilisé par le Layout et WebOSBoot)
       window._popcornShowError = function(msg) {
         var fallback = document.getElementById('popcorn-loading-fallback');
         var errEl = document.getElementById('popcorn-loading-error');
@@ -78,23 +73,8 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         errEl.textContent = s;
         errEl.style.display = 'block';
       };
-      // webOS : relaunch depuis le menu TV
-      (function() {
-        document.addEventListener('webOSRelaunch', function() {
-          var sys = window.webOSSystem || window.PalmSystem;
-          if (sys && typeof sys.activate === 'function') sys.activate();
-          window.location.reload();
-        });
-        document.addEventListener('visibilitychange', function() {
-          if (document.visibilityState === 'visible') {
-            var body = document.body;
-            if (!body || !body.innerHTML.trim() || body.children.length === 0) {
-              window.location.reload();
-            }
-          }
-        });
-      })();
     </script>
+    <WebOSBoot />
     <!-- Indicateur de chargement immédiat (même style que HLSLoadingSpinner / chargement des pages) -->
     <div id="popcorn-loading-fallback" class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-page" aria-hidden="true">
       <div class="relative w-32 h-32 mb-6">
@@ -194,23 +174,26 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         var fallback = document.getElementById('popcorn-loading-fallback');
         var errEl = document.getElementById('popcorn-loading-error');
         var hint = document.getElementById('popcorn-loading-hint');
+        var isWebOSEnv = document.documentElement.getAttribute('data-webos') === 'true';
         function showError(msg) {
           console.error('[Popcorn] showError:', msg);
           if (window._popcornShowError) window._popcornShowError(msg);
         }
-        window.onerror = function(m, src, line, col, err) {
-          var msg = (err && err.message) || m || 'script';
-          if (src) msg += ' | ' + src + (line ? ':' + line : '');
-          showError('Erreur: ' + msg);
-          return false;
-        };
+        // Sur webOS, window.onerror est géré par WebOSBoot (composant dédié)
+        if (!isWebOSEnv) {
+          window.onerror = function(m, src, line, col, err) {
+            var msg = (err && err.message) || m || 'script';
+            if (src) msg += ' | ' + src + (line ? ':' + line : '');
+            showError('Erreur: ' + msg);
+            return false;
+          };
+        }
         window.onunhandledrejection = function(e) {
           showError('Erreur: ' + ((e.reason && (e.reason.message || String(e.reason))) || 'promise'));
         };
         window.addEventListener('error', function(e) {
           if (e.target && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK')) {
             var ref = e.target.src || e.target.href || '?';
-            // Ne pas afficher ni logger les prefetch (ex. /player/xxx en 404 au focus clavier) : non bloquant
             var isPrefetch = e.target.tagName === 'LINK' && (e.target.rel || '').toLowerCase().includes('prefetch');
             if (!isPrefetch) {
               console.error('[Popcorn] Resource load failed:', ref);
@@ -247,19 +230,6 @@ const isWebOS = import.meta.env.WEBOS === 'true';
               : 'Chargement lent. Si la page ne s\'affiche pas, rechargez.');
           }
         }, slowMsgDelay);
-        // Sur webOS uniquement : charger le bundle principal en différé (file:// peut bloquer les modules)
-        // Sur le build normal, Astro injecte déjà le script avec nom hashé (_assets/client-XXX.js)
-        if (document.documentElement.getAttribute('data-webos') === 'true') {
-          setTimeout(function() {
-            var script = document.createElement('script');
-            var isHttp = (typeof window !== 'undefined' && (window.location.protocol === 'http:' || window.location.protocol === 'https:'));
-            script.src = isHttp ? (window.location.origin + '/_assets/client.js') : './_assets/client.js';
-            script.type = 'module';
-            script.onload = function() { console.log('[Popcorn] Module _assets/client.js load OK'); };
-            script.onerror = function(e) { console.error('[Popcorn] Module _assets/client.js load FAIL', e); };
-            document.head.appendChild(script);
-          }, 500);
-        }
       })();
     </script>
   </body>

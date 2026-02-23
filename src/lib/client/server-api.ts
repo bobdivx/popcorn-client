@@ -420,7 +420,15 @@ class ServerApiClient {
 
   private async backendRequest<T>(endpoint: string, options: RequestInit = {}, retryCount = 0, baseUrlOverride?: string): Promise<ApiResponse<T>> {
     const base = baseUrlOverride ?? this.getBackendBaseUrl();
-    const url = `${base}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+    // Après "vider les torrents", les listes doivent être vides pour l'utilisateur courant : envoyer user_id sur list et fast
+    let finalEndpoint = endpoint;
+    if (endpoint.includes('/api/torrents/list') || endpoint.includes('/api/torrents/fast')) {
+      const uid = this.getCurrentUserId();
+      if (uid) {
+        finalEndpoint += (endpoint.includes('?') ? '&' : '?') + 'user_id=' + encodeURIComponent(uid);
+      }
+    }
+    const url = `${base}${finalEndpoint.startsWith('/') ? '' : '/'}${finalEndpoint}`;
     const maxRetries = 2; // Maximum 2 retries (3 tentatives au total)
     
     const mixedContentError = this.getMixedContentError(url);
@@ -452,9 +460,16 @@ class ServerApiClient {
       }
     }
 
+    // Ne jamais utiliser le cache navigateur pour les listes torrents et le statut sync
+    // (après "vider les torrents", les prochains chargements doivent voir la liste vide)
+    const noCache =
+      (options.method === 'GET' || !options.method) &&
+      (endpoint.includes('/api/torrents/list') || endpoint.includes('/api/torrents/fast') || endpoint.includes('/api/sync/status'));
+    const fetchOptions = noCache ? { ...options, headers, cache: 'no-store' as RequestCache } : { ...options, headers };
+
     try {
       const timeoutMs = this.getTimeoutMs(endpoint);
-      const response = await this.nativeFetch(url, { ...options, headers }, timeoutMs);
+      const response = await this.nativeFetch(url, fetchOptions, timeoutMs);
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {

@@ -21,8 +21,8 @@ export interface LibraryDisplayConfig {
 
 const DEFAULTS: LibraryDisplayConfig = {
   showZeroSeedTorrents: true,
-  torrentsInitialLimit: 100,
-  torrentsLoadMoreLimit: 50,
+  torrentsInitialLimit: 250,
+  torrentsLoadMoreLimit: 100,
   torrentsRecentLimit: 50,
   mediaLanguages: [],
   minQuality: '',

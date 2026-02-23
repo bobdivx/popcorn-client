@@ -249,10 +249,11 @@ docker-compose up -d</code></pre>
   </div>
 
   <script>
-    // Vérifier l'authentification
+    // Vérifier l'authentification (sous file:// utiliser login.html pour webOS)
     const token = localStorage.getItem('accessToken') || localStorage.getItem('access_token');
     if (!token) {
-      window.location.href = window.location.origin + '/login';
+      var loginUrl = (window.location.protocol === 'file:') ? './login.html' : (window.location.origin + '/login');
+      window.location.href = loginUrl;
     }
 
     // Copier le docker-compose complet

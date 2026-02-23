@@ -89,6 +89,18 @@ export function useInfiniteFilms() {
     loadFilms(1, true);
   }, [language]); // Recharger quand la langue change
 
+  // Après "vider les torrents" : vider l'affichage et recharger (cache navigateur désactivé pour /api/torrents/list)
+  useEffect(() => {
+    const handler = () => {
+      setFilms([]);
+      setPage(1);
+      setHasMore(true);
+      loadFilms(1, true);
+    };
+    window.addEventListener('popcorn:torrents-cleared', handler);
+    return () => window.removeEventListener('popcorn:torrents-cleared', handler);
+  }, [loadFilms]);
+
   const loadMore = useCallback(() => {
     if (!loadingMore && hasMore && !loading) {
       const nextPage = page + 1;
@@ -103,10 +115,25 @@ export function useInfiniteFilms() {
     loadFilms(1, true);
   }, [loadFilms]);
 
+  /** Vide la liste immédiatement puis recharge (pour "vider les torrents" : affichage à jour tout de suite). */
+  const clearAndRefetch = useCallback(() => {
+    setFilms([]);
+    setPage(1);
+    setHasMore(true);
+    loadFilms(1, true);
+  }, [loadFilms]);
+
   /** Recharge en arrière-plan sans spinner : merge la page 1 avec la liste existante pour ne pas perdre les torrents déjà chargés. */
   const refetchSilent = useCallback(() => {
     setPage(1);
     loadFilms(1, false, true, true);
+  }, [loadFilms]);
+
+  /** Recharge depuis le backend et remplace la liste (sans spinner). À appeler à chaque affichage de la page pour rester aligné avec le backend. */
+  const refetchReplaceSilent = useCallback(() => {
+    setPage(1);
+    setHasMore(true);
+    loadFilms(1, true, true);
   }, [loadFilms]);
 
   return {
@@ -117,6 +144,8 @@ export function useInfiniteFilms() {
     hasMore,
     loadMore,
     refetch,
+    clearAndRefetch,
     refetchSilent,
+    refetchReplaceSilent,
   };
 }

@@ -10,15 +10,15 @@ Ce document résume les corrections apportées suite au rejet QA LG (round 1, 20
 
 **Corrections :**
 - **CI (GitHub Actions)** : Le workflow génère les icônes avec un fond plein **#D1C4E9** (accent violet du design system), sans transparence.
-- **Build local** : Le script `scripts/webos/create-icons-solid-bg.mjs` (Node + sharp) génère `webos/icon.png` (80×80) et `webos/icon-large.png` (130×130) avec fond **#D1C4E9** (--ds-accent-violet). Le script `scripts/webos/build.ps1` appelle ce script lors du build.
-- **Exécution manuelle** : `node scripts/webos/create-icons-solid-bg.mjs` pour régénérer les icônes à tout moment.
+- **Build local** : Le script `popcorn-tauri/popcorn-tauri/webos/scripts/create-icons-solid-bg.mjs` (Node + sharp) génère `popcorn-tauri/webos/icon.png` (80×80) et `popcorn-tauri/webos/icon-large.png` (130×130) avec fond **#D1C4E9** (--ds-accent-violet). Le script `popcorn-tauri/popcorn-tauri/webos/scripts/build.ps1` appelle ce script lors du build.
+- **Exécution manuelle** : `node popcorn-tauri/popcorn-tauri/webos/scripts/create-icons-solid-bg.mjs` pour régénérer les icônes à tout moment.
 
 ### 2. QA2026012917970 – Document UX Scenario insuffisant
 
 **Problème :** *The description provided for the UX scenario file is insufficient.*
 
 **Corrections :**
-- **Fichier** : `webos/UX_Scenario_Popcorn_WebOS.html`
+- **Fichier** : `popcorn-tauri/webos/UX_Scenario_Popcorn_WebOS.html`
 - Ajout d’une section **Document Purpose and Scope**.
 - Ajout d’un **tableau récapitulatif des scénarios** (1.1 Summary of Test Scenarios).
 - Ajout de la section **8. Detailed Screen Descriptions** (écran par écran : splash, setup, login, home, search, detail, playback).
@@ -32,7 +32,7 @@ Soumettez le fichier HTML (ou le PDF/PPT exporté) mis à jour dans Seller Loung
 **Problème :** *Due to the enforcement of the Russian language enhancement law starting in March 2026 we kindly request our sellers to have their app descriptions translated into Russian if their apps are displayed in Russia.*
 
 **Corrections :**
-- **Fichier** : `webos/LG_SELLER_LOUNGE_RU_DESCRIPTIONS.md`
+- **Fichier** : `popcorn-tauri/webos/LG_SELLER_LOUNGE_RU_DESCRIPTIONS.md`
 - Contient les textes en **russe** à coller dans Seller Lounge (titre, description courte, description longue).
 - À renseigner dans **Seller Lounge > Application > Edit > Descriptions / Localisation** pour la langue **Russe (ru)**.
 
@@ -40,7 +40,7 @@ Aucune modification de code : action manuelle dans le Seller Lounge.
 
 ## Prochaines étapes
 
-1. **Rebuild IPK** avec le workflow GitHub (ou `scripts/webos/build.ps1` local) pour obtenir des icônes à fond plein.
+1. **Rebuild IPK** avec le workflow GitHub (ou `popcorn-tauri/popcorn-tauri/webos/scripts/build.ps1` local) pour obtenir des icônes à fond plein.
 2. **Soumettre** le document UX Scenario enrichi (HTML ou export PDF/PPT) dans Seller Lounge avec la prochaine version.
-3. **Ajouter** les descriptions en russe dans Seller Lounge (voir `webos/LG_SELLER_LOUNGE_RU_DESCRIPTIONS.md`).
+3. **Ajouter** les descriptions en russe dans Seller Lounge (voir `popcorn-tauri/webos/LG_SELLER_LOUNGE_RU_DESCRIPTIONS.md`).
 4. **Resoumettre** l’application pour un nouveau round QA.

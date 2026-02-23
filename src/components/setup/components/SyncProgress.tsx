@@ -146,7 +146,7 @@ export function SyncProgress({ compact = false, externalStatus }: SyncProgressPr
   if (!effectiveStatus) {
     if (compact) {
       return (
-        <div className="px-4 py-3 bg-blue-900/30 border-b border-blue-500/30 flex items-center gap-2">
+        <div className="sticky top-0 z-[100] px-4 py-3 bg-black/50 backdrop-blur-md border-b border-blue-500/40 flex items-center gap-2">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-400 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
           </svg>
@@ -198,10 +198,10 @@ export function SyncProgress({ compact = false, externalStatus }: SyncProgressPr
     }
   }
 
-  // Mode compact : barre en haut avec juste le pourcentage
+  // Mode compact : barre en haut avec juste le pourcentage (z-index au-dessus de la hero sur mobile)
   if (compact) {
     return (
-      <div className="px-4 py-3 bg-blue-900/30 border-b border-blue-500/30 flex items-center gap-3">
+      <div className="sticky top-0 z-[100] px-4 py-3 bg-black/50 backdrop-blur-md border-b border-blue-500/40 flex items-center gap-3">
         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-400 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
         </svg>

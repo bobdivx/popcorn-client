@@ -1,7 +1,7 @@
 {
-  "productName": "Popcorn",
+  "productName": "Popcorn TV",
   "version": "1.2.52",
-  "identifier": "com.popcorn.client.mobile",
+  "identifier": "com.popcorn.client.tv",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build:tauri",

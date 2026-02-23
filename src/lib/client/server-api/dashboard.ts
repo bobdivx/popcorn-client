@@ -39,6 +39,7 @@ function toContentItem(raw: any): ContentItem {
   const type: 'movie' | 'tv' =
     raw?.tmdbType === 'tv' || raw?.tmdb_type === 'tv' || raw?.category === 'SERIES' ? 'tv' : 'movie';
   const title = raw?.cleanTitle || raw?.clean_title || raw?.name || '';
+  const tmdbTitle = typeof raw?.tmdbTitle === 'string' && raw.tmdbTitle.trim() ? raw.tmdbTitle.trim() : undefined;
   const poster = raw?.imageUrl || raw?.image_url || raw?.poster_url || undefined;
   const backdrop = raw?.heroImageUrl || raw?.hero_image_url || undefined;
   const logo = raw?.logoUrl || raw?.logo_url || undefined;
@@ -74,6 +75,7 @@ function toContentItem(raw: any): ContentItem {
   const item: ContentItem = {
     id,
     title,
+    ...(tmdbTitle ? { tmdbTitle } : {}),
     type,
     poster,
     backdrop,
@@ -109,7 +111,7 @@ export const dashboardMethods = {
     options?: DashboardOptions
   ): Promise<ApiResponse<DashboardData>> {
     const minSeeds = options?.minSeeds ?? 0;
-    const popularLimit = options?.popularLimit ?? 20;
+    const popularLimit = options?.popularLimit ?? 50;
     const mediaLanguages = options?.mediaLanguages ?? [];
     const minQuality = options?.minQuality ?? '';
     const lang = toTmdbLanguage(language);
@@ -148,8 +150,8 @@ export const dashboardMethods = {
             }
           : undefined,
         continueWatching: [],
-        popularMovies: movies.slice(0, 20),
-        popularSeries: series.slice(0, 20),
+        popularMovies: movies.slice(0, 50),
+        popularSeries: series.slice(0, 50),
         recentAdditions: [],
         fastTorrents: [],
       };
@@ -174,7 +176,7 @@ export const dashboardMethods = {
     options?: DashboardOptions & { popularMovieIds?: string[]; popularSeriesIds?: string[] }
   ): Promise<ApiResponse<{ recentAdditions: ContentItem[]; fastTorrents: ContentItem[] }>> {
     const minSeeds = options?.minSeeds ?? 0;
-    const recentLimit = options?.recentLimit ?? 50;
+    const recentLimit = options?.recentLimit ?? 80;
     const mediaLanguages = options?.mediaLanguages ?? [];
     const minQuality = options?.minQuality ?? '';
     const popularMovieIds = new Set(options?.popularMovieIds ?? []);
@@ -184,9 +186,10 @@ export const dashboardMethods = {
     const qualParam = minQuality ? `&min_quality=${encodeURIComponent(minQuality)}` : '';
     const filterSuffix = `${langParam}${qualParam}`;
     try {
+      // Tri par date de sortie TMDB (release_date), pas par date de sync — « récents » = sortis récemment
       const [recentMoviesRes, recentSeriesRes, fastTorrentsRes] = await Promise.all([
-        this.backendRequest<any[]>(`/api/torrents/list?category=films&sort=recent&limit=${recentLimit}&page=1&skip_indexer=true&lang=${lang}&min_seeds=${minSeeds}${filterSuffix}`, { method: 'GET' }),
-        this.backendRequest<any[]>(`/api/torrents/list?category=series&sort=recent&limit=${recentLimit}&page=1&skip_indexer=true&lang=${lang}&min_seeds=${minSeeds}${filterSuffix}`, { method: 'GET' }),
+        this.backendRequest<any[]>(`/api/torrents/list?category=films&sort=release_date&limit=${recentLimit}&page=1&skip_indexer=true&lang=${lang}&min_seeds=${minSeeds}${filterSuffix}`, { method: 'GET' }),
+        this.backendRequest<any[]>(`/api/torrents/list?category=series&sort=release_date&limit=${recentLimit}&page=1&skip_indexer=true&lang=${lang}&min_seeds=${minSeeds}${filterSuffix}`, { method: 'GET' }),
         this.backendRequest<any[]>(`/api/torrents/fast?limit=20&min_seeds=50&lang=${lang}`, { method: 'GET' }),
       ]);
 
@@ -194,13 +197,13 @@ export const dashboardMethods = {
       const recentSeries = Array.isArray(recentSeriesRes.data) ? recentSeriesRes.data.map(toContentItem).filter((i) => i.id) : [];
       const fastTorrents = Array.isArray(fastTorrentsRes.data) ? fastTorrentsRes.data.map(toContentItem).filter((i) => i.id) : [];
 
-      const recentMoviesFiltered = recentMovies.filter((m) => !popularMovieIds.has(m.id)).slice(0, 10);
-      const recentSeriesFiltered = recentSeries.filter((s) => !popularSeriesIds.has(s.id)).slice(0, 10);
+      const recentMoviesFiltered = recentMovies.filter((m) => !popularMovieIds.has(m.id)).slice(0, 25);
+      const recentSeriesFiltered = recentSeries.filter((s) => !popularSeriesIds.has(s.id)).slice(0, 25);
       const recentAdditions = [...recentMoviesFiltered, ...recentSeriesFiltered];
 
       return {
         success: true,
-        data: { recentAdditions, fastTorrents: fastTorrents.slice(0, 20) },
+        data: { recentAdditions, fastTorrents: fastTorrents.slice(0, 40) },
       };
     } catch (e) {
       return {
@@ -223,8 +226,8 @@ export const dashboardMethods = {
     options?: DashboardOptions
   ): Promise<ApiResponse<DashboardData>> {
     const minSeeds = options?.minSeeds ?? 0;
-    const popularLimit = options?.popularLimit ?? 20;
-    const recentLimit = options?.recentLimit ?? 50;
+    const popularLimit = options?.popularLimit ?? 50;
+    const recentLimit = options?.recentLimit ?? 80;
     const mediaLanguages = options?.mediaLanguages ?? [];
     const minQuality = options?.minQuality ?? '';
     const lang = toTmdbLanguage(language);
@@ -242,11 +245,11 @@ export const dashboardMethods = {
           return res;
         })(),
         (async () => {
-          const res = await this.backendRequest<any[]>(`/api/torrents/list?category=films&sort=recent&limit=${recentLimit}&page=1&skip_indexer=true&lang=${lang}&min_seeds=${minSeeds}${filterSuffix}`, { method: 'GET' });
+          const res = await this.backendRequest<any[]>(`/api/torrents/list?category=films&sort=release_date&limit=${recentLimit}&page=1&skip_indexer=true&lang=${lang}&min_seeds=${minSeeds}${filterSuffix}`, { method: 'GET' });
           return res;
         })(),
         (async () => {
-          const res = await this.backendRequest<any[]>(`/api/torrents/list?category=series&sort=recent&limit=${recentLimit}&page=1&skip_indexer=true&lang=${lang}&min_seeds=${minSeeds}${filterSuffix}`, { method: 'GET' });
+          const res = await this.backendRequest<any[]>(`/api/torrents/list?category=series&sort=release_date&limit=${recentLimit}&page=1&skip_indexer=true&lang=${lang}&min_seeds=${minSeeds}${filterSuffix}`, { method: 'GET' });
           return res;
         })(),
         (async () => {
@@ -277,10 +280,10 @@ export const dashboardMethods = {
       // Filtrer les ajouts récents pour exclure ceux déjà dans les listes populaires
       const recentMoviesFiltered = recentMovies
         .filter(m => !popularMovieIds.has(m.id))
-        .slice(0, 10);
+        .slice(0, 25);
       const recentSeriesFiltered = recentSeries
         .filter(s => !popularSeriesIds.has(s.id))
-        .slice(0, 10);
+        .slice(0, 25);
 
       const heroCandidate = [...movies, ...series].find((i) => i.backdrop || i.poster) || movies[0] || series[0];
 
@@ -298,10 +301,10 @@ export const dashboardMethods = {
             }
           : undefined,
         continueWatching: [],
-        popularMovies: movies.slice(0, 20),
-        popularSeries: series.slice(0, 20),
+        popularMovies: movies.slice(0, 50),
+        popularSeries: series.slice(0, 50),
         recentAdditions: [...recentMoviesFiltered, ...recentSeriesFiltered],
-        fastTorrents: fastTorrents.slice(0, 20),
+        fastTorrents: fastTorrents.slice(0, 40),
       };
 
       return { success: true, data: dashboard };
@@ -540,7 +543,7 @@ export const dashboardMethods = {
     page: number = 1,
     limit: number = 30,
     language?: string,
-    sort: 'popular' | 'recent' = 'popular',
+    sort: 'popular' | 'recent' | 'release_date' = 'popular',
     minSeeds: number = 0,
     mediaLanguages: string[] = [],
     minQuality: string = ''

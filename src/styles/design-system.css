@@ -233,6 +233,27 @@
   margin: 0 var(--ds-space-1);
 }
 
+/* Responsive sync toolbar : sur mobile, la ligne des onglets peut wrap et le bouton CTA passe en dessous avec toute la largeur */
+@media (max-width: 640px) {
+  .sync-toolbar .ds-nav-tabs__row {
+    flex-wrap: wrap;
+  }
+  .sync-toolbar .ds-nav-tabs__right {
+    width: 100%;
+    flex-basis: 100%;
+    margin-left: 0;
+    margin-top: var(--ds-space-2);
+    padding-top: var(--ds-space-2);
+    border-top: 1px solid var(--ds-border);
+  }
+  .sync-toolbar .ds-nav-tabs__right .sync-toolbar__btn--primary,
+  .sync-toolbar .ds-nav-tabs__right .sync-toolbar__btn--danger {
+    flex: 1 1 100%;
+    min-width: 0;
+    width: 100%;
+  }
+}
+
 .ds-nav-tab:hover {
   color: var(--ds-text-primary);
   background-color: rgba(255, 255, 255, 0.06);

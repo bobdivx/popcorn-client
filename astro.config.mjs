@@ -35,10 +35,12 @@ export default defineConfig({
         'html5-qrcode',
         'hls.js',
       ],
+      // Faire crawler les pages et le wizard setup pour découvrir qrcode au démarrage (évite 504 au premier chargement depuis une autre machine)
+      entries: ['src/pages/**/*.astro', 'src/components/setup/**/*.tsx'],
     },
     server: {
       host: true, // Écouter sur 0.0.0.0 pour accès via IP (ex. 10.1.0.86:4326), évite "Failed to fetch dynamically imported module"
-      allowedHosts: ['astro.briseteia.me'],
+      allowedHosts: true, // Autoriser tout host (localhost, IP locale, etc.) pour éviter 504 sur les deps quand on accède via IP
       fs: {
         strict: false,
       },

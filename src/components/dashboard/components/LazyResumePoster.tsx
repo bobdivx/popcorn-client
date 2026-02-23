@@ -33,10 +33,7 @@ export function LazyResumePoster({ item, rootMargin = '200px' }: LazyResumePoste
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            // Délai minimal avant de rendre pour éviter les flashs
-            setTimeout(() => {
-              setShouldRender(true);
-            }, 50);
+            setShouldRender(true);
             observer.unobserve(entry.target);
           }
         });

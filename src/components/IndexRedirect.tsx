@@ -83,6 +83,16 @@ export default function IndexRedirect() {
         
         // Logger immédiatement pour diagnostiquer les crashes silencieux
         console.log('[IndexRedirect] Starting checkAndRedirect');
+
+        // Ne faire la redirection que sur la page d'accueil ("/").
+        // En déploiement SPA (fallback index.html pour toutes les routes), ce composant
+        // peut être monté sur /dashboard, /torrents/xxx, etc. : ne pas rediriger dans ce cas.
+        const pathname = typeof window !== 'undefined' ? (window.location.pathname || '/').replace(/\/$/, '') || '/' : '/';
+        if (pathname !== '/' && pathname !== '/demo' && !pathname.startsWith('/demo/')) {
+          setLoading(false);
+          return;
+        }
+
         try {
           if (isTauri()) {
             const { invoke } = await import('@tauri-apps/api/core');
