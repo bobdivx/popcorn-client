@@ -6,6 +6,8 @@ import { DsCard, DsCardSection, focusGlowClass } from '../ui/design-system';
 import { serverApi } from '../../lib/client/server-api';
 import { TokenManager } from '../../lib/client/storage';
 import { getSyncStatusStore, subscribeSyncStatusStore, refreshSyncStatusStore } from '../../lib/sync-status-store';
+import { getBackendConnectionStore } from '../../lib/backend-connection-store';
+import { getBackendUrl, getMyBackendUrl } from '../../lib/backend-config';
 
 type StatusVariant = 'success' | 'warning' | 'error' | 'neutral';
 
@@ -106,16 +108,21 @@ export default function SettingsOverview() {
       }
 
       if (canAccess('settings.server' as any)) {
-        try {
-          const res = await serverApi.checkServerHealth();
-          if (res.success && res.data) {
-            const reachable = (res.data as { reachable?: boolean }).reachable;
-            next.server = reachable
-              ? { text: t('settingsMenu.overviewCard.serverConnected'), variant: 'success' }
-              : { text: t('settingsMenu.overviewCard.serverOffline'), variant: 'error' };
-          }
-        } catch {
+        const backendStatus = getBackendConnectionStore().status;
+        if (backendStatus === 'offline') {
           next.server = { text: t('settingsMenu.overviewCard.serverOffline'), variant: 'error' };
+        } else {
+          try {
+            const res = await serverApi.checkServerHealth();
+            if (res.success && res.data) {
+              const reachable = (res.data as { reachable?: boolean }).reachable;
+              next.server = reachable
+                ? { text: t('settingsMenu.overviewCard.serverConnected'), variant: 'success' }
+                : { text: t('settingsMenu.overviewCard.serverOffline'), variant: 'error' };
+            }
+          } catch {
+            next.server = { text: t('settingsMenu.overviewCard.serverOffline'), variant: 'error' };
+          }
         }
       }
 
@@ -131,13 +138,21 @@ export default function SettingsOverview() {
       }
 
       if (canAccess('settings.indexers' as any)) {
-        try {
-          const res = await serverApi.getIndexers();
-          if (res.success && Array.isArray(res.data)) {
-            next.indexers = { text: t('settingsMenu.overviewCard.indexersCount', { count: res.data.length }), variant: 'neutral' };
+        const backendStatus = getBackendConnectionStore().status;
+        const myUrl = getMyBackendUrl();
+        const currentUrl = getBackendUrl();
+        const isFriendBackend = myUrl != null && currentUrl !== myUrl;
+        if (backendStatus === 'offline' || isFriendBackend) {
+          // Pas d'appel API quand le backend est offline ou quand c'est le serveur d'un ami (évite spam console).
+        } else {
+          try {
+            const res = await serverApi.getIndexers();
+            if (res.success && Array.isArray(res.data)) {
+              next.indexers = { text: t('settingsMenu.overviewCard.indexersCount', { count: res.data.length }), variant: 'neutral' };
+            }
+          } catch {
+            // ignore
           }
-        } catch {
-          // ignore
         }
       }
 

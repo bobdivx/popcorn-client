@@ -43,16 +43,22 @@ export default function TVNavigationProvider() {
     const SETTINGS_CONTAINER_SELECTOR = '[data-tv-settings-container]';
 
     // Obtenir tous les éléments focusables visibles (optionnellement limités à un conteneur, ex. modal)
+    // Exclut les éléments hors viewport (ex. menu settings masqué -translate-x-full) pour éviter boucle de focus
     const getFocusableElements = (scope?: HTMLElement | null): HTMLElement[] => {
       const root = scope || document;
+      const pad = 1;
       return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
         .filter(el => {
           if (scope && !scope.contains(el)) return false;
           const rect = el.getBoundingClientRect();
           const style = window.getComputedStyle(el);
+          const inViewportX = rect.right >= -pad && rect.left <= window.innerWidth + pad;
+          const inViewportY = rect.bottom >= -pad && rect.top <= window.innerHeight + pad;
           return (
             rect.width > 0 &&
             rect.height > 0 &&
+            inViewportX &&
+            inViewportY &&
             style.display !== 'none' &&
             style.visibility !== 'hidden' &&
             style.opacity !== '0' &&
@@ -295,17 +301,26 @@ export default function TVNavigationProvider() {
 
       if (scope) return focusableElements[0];
 
-      // Page Settings : priorité au premier élément du menu (nav) des paramètres
+      // Page Media Detail : priorité au bouton Retour pour que la télécommande y accède (flèches ou premier focus)
+      const mediaDetailBack = document.querySelector<HTMLElement>('[data-media-detail-back]');
+      if (mediaDetailBack && focusableElements.includes(mediaDetailBack)) return mediaDetailBack;
+
+      // Page Settings : sur la vue d'ensemble (/settings sans category), priorité au contenu (première carte)
       const settingsContainer = document.querySelector(SETTINGS_CONTAINER_SELECTOR);
       if (settingsContainer) {
-        const nav = settingsContainer.querySelector('[data-tv-settings-nav]');
+        const contentArea = document.querySelector('[data-tv-settings-content]');
         const inContainer = focusableElements.filter((el) => settingsContainer.contains(el));
-        if (nav && inContainer.length > 0) {
-          const firstInNav = inContainer.find((el) => nav.contains(el));
+        const isOverview = typeof window !== 'undefined' && window.location.pathname === '/settings' && !new URLSearchParams(window.location.search).get('category');
+        if (isOverview && contentArea && inContainer.length > 0) {
+          const firstInContent = inContainer.find((el) => contentArea.contains(el));
+          if (firstInContent) return firstInContent;
+        }
+        if (inContainer.length > 0) {
+          const nav = settingsContainer.querySelector('[data-tv-settings-nav]');
+          const firstInNav = nav ? inContainer.find((el) => nav.contains(el)) : null;
           if (firstInNav) return firstInNav;
           return inContainer[0];
         }
-        if (inContainer.length > 0) return inContainer[0];
       }
 
       // Priorité aux cartes sur les autres pages
@@ -439,9 +454,32 @@ export default function TVNavigationProvider() {
       let handled = false;
 
       switch (e.key) {
-        case 'ArrowLeft':
-          handled = navigate('left');
+        case 'ArrowLeft': {
+          // Settings : depuis le contenu, la flèche gauche ramène toujours au menu latéral
+          const settingsContainer = document.querySelector(SETTINGS_CONTAINER_SELECTOR);
+          const contentArea = document.querySelector('[data-tv-settings-content]');
+          const nav = document.querySelector<HTMLElement>('[data-tv-settings-nav]');
+          const active = document.activeElement as HTMLElement;
+          if (settingsContainer && contentArea && nav && active && contentArea.contains(active)) {
+            const navRect = nav.getBoundingClientRect();
+            const navOffScreen = navRect.right < 0 || navRect.left > window.innerWidth;
+            const focusNav = () => {
+              const currentItem = nav.querySelector<HTMLElement>('[aria-current="page"]');
+              const firstInNav = nav.querySelector<HTMLElement>('a[href], button, [data-focusable], [tabindex]:not([tabindex="-1"])');
+              const toFocus = currentItem || firstInNav;
+              if (toFocus) toFocus.focus();
+            };
+            if (navOffScreen) {
+              document.dispatchEvent(new CustomEvent('open-settings-drawer'));
+              requestAnimationFrame(() => requestAnimationFrame(focusNav));
+            } else {
+              focusNav();
+            }
+            handled = true;
+          }
+          if (!handled) handled = navigate('left');
           break;
+        }
         case 'ArrowRight':
           handled = navigate('right');
           break;
@@ -764,11 +802,42 @@ export default function TVNavigationProvider() {
     document.addEventListener('focusin', handleFocusIn, true);
     document.addEventListener('focusout', handleFocusOut, true);
 
-    // Pas de focus initial au chargement : l'indicateur de position (focus) n'apparaît
-    // qu'au premier mouvement sur la télécommande (flèches). navigate() focusera
-    // le premier élément adapté dès la première touche directionnelle.
+    // Page Settings vue d'ensemble : focus initial sur le contenu (première carte) à l'arrivée
+    const maybeFocusSettingsOverview = () => {
+      if (typeof window === 'undefined') return;
+      if (window.location.pathname !== '/settings' || new URLSearchParams(window.location.search).get('category')) return;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const first = getInitialFocusElement();
+          if (first) focusElement(first);
+        });
+      });
+    };
+    maybeFocusSettingsOverview();
+    window.addEventListener('popstate', maybeFocusSettingsOverview);
+    document.addEventListener('astro:page-load', maybeFocusSettingsOverview);
+
+    // Page Media Detail : focus initial sur le bouton Retour à l'arrivée (télécommande)
+    const maybeFocusMediaDetailBack = () => {
+      if (typeof window === 'undefined') return;
+      if (window.location.pathname !== '/torrents' || !new URLSearchParams(window.location.search).get('slug')) return;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const back = document.querySelector<HTMLElement>('[data-media-detail-back]');
+          if (back) focusElement(back);
+        });
+      });
+    };
+    const tMediaDetail = setTimeout(maybeFocusMediaDetailBack, 200);
+    window.addEventListener('popstate', maybeFocusMediaDetailBack);
+    document.addEventListener('astro:page-load', maybeFocusMediaDetailBack);
 
     return () => {
+      clearTimeout(tMediaDetail);
+      window.removeEventListener('popstate', maybeFocusMediaDetailBack);
+      document.removeEventListener('astro:page-load', maybeFocusMediaDetailBack);
+      window.removeEventListener('popstate', maybeFocusSettingsOverview);
+      document.removeEventListener('astro:page-load', maybeFocusSettingsOverview);
       document.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('keydown', handleWebOSBack, true);
       if (typeof window !== 'undefined' && (window as any).webOS) {

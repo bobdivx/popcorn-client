@@ -2,9 +2,12 @@
  * Store unifié du statut de synchronisation torrent.
  * Une seule source de vérité : polling centralisé, consommée par Navbar, TorrentSyncManager,
  * SettingsOverview, useSyncStatus (Dashboard).
+ * Quand le backend est connu offline (backend-connection-store), on ne lance pas de requête
+ * et on réessaie moins souvent pour éviter le spam console (GET ... net::ERR_*).
  */
 
 import { serverApi } from './client/server-api';
+import { getBackendConnectionStore } from './backend-connection-store';
 
 export interface SyncProgressStore {
   current_indexer?: string | null;
@@ -55,6 +58,8 @@ const POLL_ACTIVE_MS = 1500;
 const POLL_IDLE_MS = 30000;
 /** Quand le statut n'est pas encore chargé (ou erreur), retry souvent pour afficher la sync dès que possible (ex. page /settings/sync ouverte depuis une autre machine). */
 const POLL_WHEN_NULL_MS = 2000;
+/** Quand le backend est connu offline : ne pas bombarder l'API, réessayer moins souvent (évite le spam console). */
+const POLL_WHEN_OFFLINE_MS = 30000;
 
 function notify() {
   const s = { ...state };
@@ -78,6 +83,15 @@ export function subscribeSyncStatusStore(listener: Listener): () => void {
 }
 
 export async function refreshSyncStatusStore(): Promise<void> {
+  const backendStatus = getBackendConnectionStore().status;
+  if (backendStatus === 'offline') {
+    // Ne pas appeler l'API quand le backend est connu offline : évite le spam console (GET ... net::ERR_*).
+    state.loading = false;
+    notify();
+    if (listeners.size > 0) schedulePolling();
+    return;
+  }
+
   // Ne passer en loading que s'il n'y a pas encore de statut (premier chargement).
   // En polling (déjà un status), ne pas toucher à loading pour éviter que la barre de sync s'affiche/disparaisse en continu.
   const isPollingRefresh = state.status !== null;
@@ -111,6 +125,11 @@ function schedulePolling() {
   if (pollIntervalId !== null) {
     clearInterval(pollIntervalId);
     pollIntervalId = null;
+  }
+  const backendStatus = getBackendConnectionStore().status;
+  if (backendStatus === 'offline') {
+    pollIntervalId = setInterval(() => refreshSyncStatusStore(), POLL_WHEN_OFFLINE_MS);
+    return;
   }
   const inProgress = Boolean(state.status?.sync_in_progress);
   const noStatusYet = state.status === null;

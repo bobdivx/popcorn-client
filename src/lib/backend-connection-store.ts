@@ -5,7 +5,7 @@
  */
 
 import { serverApi } from './client/server-api';
-import { getBackendUrl } from './backend-config';
+import { getBackendUrl, getMyBackendUrl } from './backend-config';
 
 export type BackendConnectionStatus = 'online' | 'offline' | 'checking';
 
@@ -48,6 +48,10 @@ function registerConnectionFailureListener() {
   registeredWithServerApi = true;
   try {
     serverApi.addConnectionFailureListener(() => {
+      // Ne pas marquer « offline » quand c’est le serveur d’un ami qui échoue (pas « mon serveur »)
+      const myUrl = getMyBackendUrl();
+      const current = getBackendUrlSafe();
+      if (myUrl != null && current !== null && current !== myUrl) return;
       state.status = 'offline';
       state.lastError = null;
       state.backendUrl = getBackendUrlSafe();

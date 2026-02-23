@@ -686,20 +686,11 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   useEffect(() => {
     if (!isTVPlatform()) return;
     const t = setTimeout(() => {
-      const backLink = backLinkRef.current;
+      const backLink = document.querySelector<HTMLElement>('[data-media-detail-back]');
       if (backLink) {
         backLink.focus();
-      } else {
-        const playEl = document.querySelector('[data-media-detail-action="play"]') as HTMLButtonElement | null;
-        const downloadEl = document.querySelector('[data-media-detail-action="download"]') as HTMLButtonElement | null;
-        const el =
-          playEl && !playEl.disabled
-            ? playEl
-            : downloadEl && !downloadEl.disabled
-              ? downloadEl
-              : null;
-        if (el) el.focus();
       }
+      // Ne jamais mettre le focus par défaut sur Lire : priorité au Retour pour la télécommande
     }, 150);
     return () => clearTimeout(t);
   }, [activeTorrent?.id, torrentStats, isAvailableLocally, isPlaying]);

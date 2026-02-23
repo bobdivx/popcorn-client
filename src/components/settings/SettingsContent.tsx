@@ -86,13 +86,29 @@ export default function SettingsContent() {
   const { t } = useI18n();
   const [route, setRoute] = useState<SettingsRoute>(getRouteFromUrl);
 
+  // Synchroniser la route avec l’URL (category, pathname) : popstate, astro:page-load, Navigation API, focus
   useEffect(() => {
     const sync = () => setRoute(getRouteFromUrl());
+    sync();
     window.addEventListener('popstate', sync);
     document.addEventListener('astro:page-load', sync);
+    window.addEventListener('focus', sync);
+    const nav = typeof window !== 'undefined' && (window as any).navigation;
+    if (nav?.addEventListener) {
+      nav.addEventListener('navigate', sync);
+    }
+    // Rattraper un changement d’URL (ex. ?category=) sans full reload
+    const t1 = setTimeout(sync, 100);
+    const t2 = setTimeout(sync, 400);
     return () => {
       window.removeEventListener('popstate', sync);
       document.removeEventListener('astro:page-load', sync);
+      window.removeEventListener('focus', sync);
+      if (nav?.removeEventListener) {
+        nav.removeEventListener('navigate', sync);
+      }
+      clearTimeout(t1);
+      clearTimeout(t2);
     };
   }, []);
 

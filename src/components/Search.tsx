@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
 import { Search as SearchIcon, X } from 'lucide-preact';
 import { serverApi, type SearchResult } from '../lib/client/server-api';
 import { CacheManager } from '../lib/client/storage';
@@ -11,9 +11,49 @@ interface SearchProps {
   onResultClick?: (result: SearchResult) => void;
 }
 
+type SearchResultSource = 'local' | 'indexer' | 'tmdb';
+
+/** Un média avec une ou plusieurs sources (une carte peut être trouvée en base locale + indexeurs + TMDB) */
+interface SearchResultWithSources {
+  result: SearchResult;
+  sources: SearchResultSource[];
+}
+
 interface SearchResultPosterProps {
   result: SearchResult;
+  sources?: SearchResultSource[];
   onClick?: (result: SearchResult) => void;
+}
+
+/** Clé unique pour dédupliquer par média (tmdbId+type ou id) */
+function mediaKey(r: SearchResult): string {
+  if (r.tmdbId != null) return `tmdb-${r.tmdbId}-${r.type}`;
+  return `id-${r.id}`;
+}
+
+/** Fusionne résultats et fallback TMDB : une entrée par média, avec toutes les sources où il a été trouvé. */
+function mergeResultsByMedia(
+  results: SearchResult[],
+  resultsSource: SearchResultSource | null,
+  tmdbFallback: SearchResult[]
+): SearchResultWithSources[] {
+  const map = new Map<string, SearchResultWithSources>();
+  const add = (result: SearchResult, source: SearchResultSource) => {
+    const key = mediaKey(result);
+    const existing = map.get(key);
+    if (existing) {
+      if (!existing.sources.includes(source)) existing.sources.push(source);
+      if (!existing.result.poster && result.poster) existing.result = { ...existing.result, poster: result.poster };
+      if (!existing.result.overview && result.overview) existing.result = { ...existing.result, overview: result.overview };
+    } else {
+      map.set(key, { result: { ...result }, sources: [source] });
+    }
+  };
+  if (resultsSource && results.length > 0) {
+    results.forEach((r) => add(r, resultsSource));
+  }
+  tmdbFallback.forEach((r) => add(r, 'tmdb'));
+  return Array.from(map.values());
 }
 
 /** URL de détail : priorité TMDB (tmdbId + type), fallback slug. Discover si pas de torrent (id tmdb-xxx). */
@@ -37,7 +77,11 @@ function getRequestUrl(result: SearchResult): string | null {
 /**
  * Composant pour afficher un résultat de recherche dans un style moderne
  */
-function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
+function getSourceLabel(t: (k: string) => string, source: SearchResultSource): string {
+  return source === 'local' ? t('search.stepLocal') : source === 'indexer' ? t('search.stepIndexers') : t('search.stepTmdb');
+}
+
+function SearchResultPoster({ result, sources = [], onClick }: SearchResultPosterProps) {
   const { t } = useI18n();
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -104,7 +148,7 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
             </div>
           )}
 
-          {/* Badge type */}
+          {/* Badge type (F/S) */}
           <div className="absolute top-2 left-2 lg:top-3 lg:left-3 tv:top-4 tv:left-4 z-10">
             <div className={`w-6 h-6 lg:w-8 lg:h-8 tv:w-12 tv:h-12 rounded flex items-center justify-center shadow-primary transition-all duration-200 ${
               result.type === 'movie' ? 'bg-primary-600' : 'bg-primary-500'
@@ -114,6 +158,25 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
               </span>
             </div>
           </div>
+          {/* Bloc "Trouvé dans" : une ligne par source (Base locale, Indexeurs, TMDB) */}
+          {sources.length > 0 && (
+            <div className="absolute top-2 right-2 lg:top-3 lg:right-3 tv:top-4 tv:right-4 z-10 flex flex-col items-end gap-1 min-w-0 max-w-[60%]">
+              <span className="text-[10px] lg:text-xs tv:text-sm text-gray-400 font-medium uppercase tracking-wide whitespace-nowrap">
+                {t('search.foundIn')}
+              </span>
+              <div className="flex flex-col gap-0.5 items-end">
+                {sources.map((src) => (
+                  <span
+                    key={src}
+                    className="inline-flex items-center px-2 py-0.5 rounded text-xs lg:text-sm tv:text-base font-medium bg-gray-800/95 text-gray-200 border border-gray-600/80 backdrop-blur-sm whitespace-nowrap"
+                    title={getSourceLabel(t, src)}
+                  >
+                    {getSourceLabel(t, src)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Overlay au survol */}
           {showOverlay && (
@@ -155,19 +218,23 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
   );
 }
 
-type SearchPhase = 'idle' | 'local' | 'indexer';
+type SearchPhase = 'idle' | 'local' | 'indexer' | 'tmdb';
 
 export default function Search({ onResultClick }: SearchProps) {
   const { t, language } = useI18n();
   const [query, setQuery] = useState('');
   const [type, setType] = useState<'movie' | 'tv' | 'all'>('all');
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [resultsSource, setResultsSource] = useState<SearchResultSource | null>(null);
   const [tmdbFallbackResults, setTmdbFallbackResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchPhase, setSearchPhase] = useState<SearchPhase>('idle');
+  const [indexerNames, setIndexerNames] = useState<string[]>([]);
+  const [currentIndexerIndex, setCurrentIndexerIndex] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const prevLoadingRef = useRef(false);
+  const indexerCycleRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (inputRef.current && typeof window !== 'undefined') {
@@ -175,18 +242,22 @@ export default function Search({ onResultClick }: SearchProps) {
     }
   }, []);
 
-  // Organiser les résultats par type (déclaré avant le useEffect qui en dépend)
-  const movies = results.filter(r => r.type === 'movie');
-  const series = results.filter(r => r.type === 'tv');
-  const allResults = type === 'all' ? results : (type === 'movie' ? movies : series);
+  // Une carte par média (tmdbId+type), avec toutes les sources où il a été trouvé
+  const mergedResults = useMemo(
+    () => mergeResultsByMedia(results, resultsSource, tmdbFallbackResults),
+    [results, resultsSource, tmdbFallbackResults]
+  );
+  const mergedMovies = useMemo(() => mergedResults.filter((m) => m.result.type === 'movie'), [mergedResults]);
+  const mergedSeries = useMemo(() => mergedResults.filter((m) => m.result.type === 'tv'), [mergedResults]);
+  const mergedByType = type === 'all' ? mergedResults : type === 'movie' ? mergedMovies : mergedSeries;
+  const hasAnyResults = mergedResults.length > 0;
 
   // Après validation de la recherche (OK / Enter) : déplacer le focus sur le premier résultat (TV / télécommande)
   useEffect(() => {
     const hadLoading = prevLoadingRef.current;
     prevLoadingRef.current = loading;
     if (!isTVPlatform()) return;
-    const hasResults = allResults.length > 0 || tmdbFallbackResults.length > 0;
-    if (!hasResults || loading) return;
+    if (!hasAnyResults || loading) return;
     const focusOnInput = document.activeElement === inputRef.current;
     const justFinishedLoading = hadLoading;
     if (!justFinishedLoading && !focusOnInput) return;
@@ -199,13 +270,28 @@ export default function Search({ onResultClick }: SearchProps) {
       }
     }, 200);
     return () => clearTimeout(t);
-  }, [loading, allResults.length, tmdbFallbackResults.length]);
+  }, [loading, hasAnyResults]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const q = new URLSearchParams(window.location.search).get('q');
     if (q && q.trim()) setQuery(q.trim());
   }, []);
+
+  // Cyclage des noms d'indexeurs pendant la phase "indexer" pour l'animation
+  useEffect(() => {
+    if (searchPhase !== 'indexer') return;
+    const names = indexerNames.length > 0 ? indexerNames : [t('search.stepIndexers')];
+    indexerCycleRef.current = setInterval(() => {
+      setCurrentIndexerIndex((i) => (i + 1) % names.length);
+    }, 1400);
+    return () => {
+      if (indexerCycleRef.current) {
+        clearInterval(indexerCycleRef.current);
+        indexerCycleRef.current = null;
+      }
+    };
+  }, [searchPhase, indexerNames]);
 
   const handleSearch = async () => {
     if (!query.trim()) {
@@ -214,9 +300,13 @@ export default function Search({ onResultClick }: SearchProps) {
     }
 
     const cacheKey = `search_${query}_${type}_${language}`;
-    const cached = CacheManager.get<SearchResult[]>(cacheKey);
+    const cached = CacheManager.get<SearchResult[] | { data: SearchResult[]; source: SearchResultSource }>(cacheKey);
     if (cached) {
-      setResults(cached);
+      const data = Array.isArray(cached) ? cached : cached.data;
+      const source = Array.isArray(cached) ? null : (cached.source ?? null);
+      setResults(data);
+      setResultsSource(source);
+      setTmdbFallbackResults([]);
       return;
     }
 
@@ -224,6 +314,18 @@ export default function Search({ onResultClick }: SearchProps) {
       setLoading(true);
       setError(null);
       setSearchPhase('local');
+      setCurrentIndexerIndex(0);
+      // Charger les noms des indexeurs activés pour l'animation (en parallèle, sans attendre)
+      if (serverApi.isAuthenticated()) {
+        serverApi.getIndexers().then((res) => {
+          if (res.success && res.data) {
+            const names = (res.data as { name?: string; isEnabled?: boolean }[])
+              .filter((i) => i.isEnabled === true && i.name)
+              .map((i) => i.name!);
+            setIndexerNames(names.length > 0 ? names : []);
+          }
+        });
+      }
 
       if (!serverApi.isAuthenticated()) {
         setError(t('search.mustBeLoggedIn'));
@@ -251,8 +353,9 @@ export default function Search({ onResultClick }: SearchProps) {
       const localData = localRes.data ?? [];
       if (localData.length > 0) {
         setResults(localData);
+        setResultsSource('local');
         setTmdbFallbackResults([]);
-        CacheManager.set(cacheKey, localData, 60 * 60 * 1000);
+        CacheManager.set(cacheKey, { data: localData, source: 'local' as SearchResultSource }, 60 * 60 * 1000);
         setLoading(false);
         setSearchPhase('idle');
         return;
@@ -275,10 +378,12 @@ export default function Search({ onResultClick }: SearchProps) {
 
       const indexerData = indexerRes.data ?? [];
       setResults(indexerData);
-      CacheManager.set(cacheKey, indexerData, 60 * 60 * 1000);
+      setResultsSource('indexer');
+      CacheManager.set(cacheKey, { data: indexerData, source: 'indexer' as SearchResultSource }, 60 * 60 * 1000);
 
       // Si toujours aucun torrent trouvé : recherche TMDB pour permettre "Demander"
       if (indexerData.length === 0 && query.trim()) {
+        setSearchPhase('tmdb');
         const tmdbLang = language === 'fr' ? 'fr-FR' : 'en-US';
         const tmdbRes = await serverApi.searchTmdb({
           q: query.trim(),
@@ -315,6 +420,7 @@ export default function Search({ onResultClick }: SearchProps) {
   const handleClear = () => {
     setQuery('');
     setResults([]);
+    setResultsSource(null);
     setTmdbFallbackResults([]);
     setSearchPhase('idle');
     inputRef.current?.focus();
@@ -462,25 +568,30 @@ export default function Search({ onResultClick }: SearchProps) {
         </div>
       )}
 
-      {/* Résultats organisés en carrousels */}
-      {!loading && query && allResults.length > 0 && (
-        <div className="pb-8 tv:pb-12" data-search-results>
+      {/* Résultats : une carte par média (TMDB), avec "Trouvé dans : Base locale / Indexeurs / TMDB" */}
+      {!loading && query && hasAnyResults && (
+        <div className="pb-8 tv:pb-12 container mx-auto px-4 sm:px-6 lg:px-8 tv:px-16" data-search-results>
+          {mergedByType.some((m) => m.sources.includes('tmdb')) && !mergedByType.some((m) => m.sources.some((s) => s === 'local' || s === 'indexer')) && (
+            <p className="text-gray-400 text-base tv:text-lg mb-4">
+              {t('search.noTorrentsUseRequest')}
+            </p>
+          )}
           {type === 'all' ? (
             <>
-              {movies.length > 0 && (
+              {mergedMovies.length > 0 && (
                 <CarouselRow title={t('search.moviesFound')}>
-                  {movies.map((result) => (
-                    <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                      <SearchResultPoster result={result} onClick={onResultClick} />
+                  {mergedMovies.map(({ result, sources }) => (
+                    <div key={mediaKey(result)} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+                      <SearchResultPoster result={result} sources={sources} onClick={onResultClick} />
                     </div>
                   ))}
                 </CarouselRow>
               )}
-              {series.length > 0 && (
+              {mergedSeries.length > 0 && (
                 <CarouselRow title={t('search.seriesFound')}>
-                  {series.map((result) => (
-                    <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                      <SearchResultPoster result={result} onClick={onResultClick} />
+                  {mergedSeries.map(({ result, sources }) => (
+                    <div key={mediaKey(result)} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+                      <SearchResultPoster result={result} sources={sources} onClick={onResultClick} />
                     </div>
                   ))}
                 </CarouselRow>
@@ -488,82 +599,9 @@ export default function Search({ onResultClick }: SearchProps) {
             </>
           ) : (
             <CarouselRow title={type === 'movie' ? t('search.moviesFound') : t('search.seriesFound')}>
-              {allResults.map((result) => (
-                <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                  <SearchResultPoster result={result} onClick={onResultClick} />
-                </div>
-              ))}
-            </CarouselRow>
-          )}
-        </div>
-      )}
-
-      {/* État de chargement : mascotte Popcorn + étape affichée */}
-      {loading && (
-        <div className="flex flex-col items-center justify-center py-20 tv:py-32 px-4">
-          <div className="relative mb-6 tv:mb-8">
-            <div className="w-24 h-24 tv:w-32 tv:h-32 relative">
-              <div className="absolute inset-0 border-2 border-primary-500/30 rounded-full animate-spin" style={{ animationDuration: '3s' }} />
-              <div className="absolute inset-2 border-2 border-primary-400/20 rounded-full animate-spin" style={{ animationDuration: '2s', animationDirection: 'reverse' }} />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <img
-                  src="/popcorn_logo.png"
-                  alt="Popcorn"
-                  className="w-14 h-14 tv:w-20 tv:h-20 object-contain animate-pulse"
-                  style={{ animationDuration: '1.5s' }}
-                />
-              </div>
-            </div>
-          </div>
-          <p className="text-gray-300 text-lg tv:text-xl font-medium text-center max-w-md">
-            {searchPhase === 'local'
-              ? t('search.searchingLocal')
-              : t('search.searchingIndexers')}
-          </p>
-          <p className="text-gray-500 text-sm tv:text-base mt-2 text-center">
-            {searchPhase === 'local'
-              ? t('search.localSearchNote')
-              : t('search.indexerSearchNote')}
-          </p>
-        </div>
-      )}
-
-      {/* Aucun torrent trouvé mais résultats TMDB : proposer "Demander" */}
-      {!loading && query && allResults.length === 0 && !error && tmdbFallbackResults.length > 0 && (
-        <div className="pb-8 tv:pb-12 container mx-auto px-4 sm:px-6 lg:px-8 tv:px-16" data-search-results>
-          <p className="text-gray-400 text-base tv:text-lg mb-4">
-            {t('search.noTorrentsUseRequest')}
-          </p>
-          {type === 'all' ? (
-            <>
-              {tmdbFallbackResults.filter((r) => r.type === 'movie').length > 0 && (
-                <CarouselRow title={t('search.tmdbMoviesRequest')}>
-                  {tmdbFallbackResults
-                    .filter((r) => r.type === 'movie')
-                    .map((result) => (
-                      <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                        <SearchResultPoster result={result} onClick={onResultClick} />
-                      </div>
-                    ))}
-                </CarouselRow>
-              )}
-              {tmdbFallbackResults.filter((r) => r.type === 'tv').length > 0 && (
-                <CarouselRow title={t('search.tmdbSeriesRequest')}>
-                  {tmdbFallbackResults
-                    .filter((r) => r.type === 'tv')
-                    .map((result) => (
-                      <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                        <SearchResultPoster result={result} onClick={onResultClick} />
-                      </div>
-                    ))}
-                </CarouselRow>
-              )}
-            </>
-          ) : (
-            <CarouselRow title={t('search.tmdbRequestTitle')}>
-              {tmdbFallbackResults.map((result) => (
-                <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                  <SearchResultPoster result={result} onClick={onResultClick} />
+              {mergedByType.map(({ result, sources }) => (
+                <div key={mediaKey(result)} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+                  <SearchResultPoster result={result} sources={sources} onClick={onResultClick} />
                 </div>
               ))}
             </CarouselRow>
@@ -580,8 +618,86 @@ export default function Search({ onResultClick }: SearchProps) {
         </div>
       )}
 
+      {/* État de chargement : animation des étapes (base locale → indexeurs → TMDB) */}
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-20 tv:py-32 px-4">
+          {/* Stepper visuel : 3 étapes */}
+          <div className="flex items-center gap-2 tv:gap-4 mb-8 tv:mb-10">
+            <div
+              className={`flex items-center gap-2 rounded-full px-4 py-2 tv:px-5 tv:py-2.5 transition-all duration-300 ${
+                searchPhase === 'local'
+                  ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/40 scale-105'
+                  : searchPhase === 'indexer' || searchPhase === 'tmdb'
+                    ? 'bg-gray-700/80 text-gray-400'
+                    : 'bg-gray-800/60 text-gray-500'
+              }`}
+            >
+              <span className={`w-2 h-2 tv:w-2.5 tv:h-2.5 rounded-full ${searchPhase === 'local' ? 'bg-white animate-pulse' : 'bg-gray-500'}`} />
+              <span className="text-sm tv:text-base font-medium">{t('search.stepLocal')}</span>
+            </div>
+            <div className="w-6 tv:w-8 h-0.5 bg-gray-700 rounded" aria-hidden="true" />
+            <div
+              className={`flex items-center gap-2 rounded-full px-4 py-2 tv:px-5 tv:py-2.5 transition-all duration-300 ${
+                searchPhase === 'indexer'
+                  ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/40 scale-105'
+                  : searchPhase === 'tmdb'
+                    ? 'bg-gray-700/80 text-gray-400'
+                    : searchPhase === 'local'
+                      ? 'bg-gray-800/60 text-gray-500'
+                      : 'bg-gray-800/60 text-gray-500'
+              }`}
+            >
+              <span className={`w-2 h-2 tv:w-2.5 tv:h-2.5 rounded-full ${searchPhase === 'indexer' ? 'bg-white animate-pulse' : 'bg-gray-500'}`} />
+              <span className="text-sm tv:text-base font-medium">{t('search.stepIndexers')}</span>
+            </div>
+            <div className="w-6 tv:w-8 h-0.5 bg-gray-700 rounded" aria-hidden="true" />
+            <div
+              className={`flex items-center gap-2 rounded-full px-4 py-2 tv:px-5 tv:py-2.5 transition-all duration-300 ${
+                searchPhase === 'tmdb'
+                  ? 'bg-primary-600 text-white shadow-lg shadow-primary-500/40 scale-105'
+                  : searchPhase === 'indexer' || searchPhase === 'local'
+                    ? 'bg-gray-800/60 text-gray-500'
+                    : 'bg-gray-800/60 text-gray-500'
+              }`}
+            >
+              <span className={`w-2 h-2 tv:w-2.5 tv:h-2.5 rounded-full ${searchPhase === 'tmdb' ? 'bg-white animate-pulse' : 'bg-gray-500'}`} />
+              <span className="text-sm tv:text-base font-medium">{t('search.stepTmdb')}</span>
+            </div>
+          </div>
+
+          <div className="relative mb-6 tv:mb-8">
+            <div className="w-24 h-24 tv:w-32 tv:h-32 relative">
+              <div className="absolute inset-0 border-2 border-primary-500/30 rounded-full animate-spin" style={{ animationDuration: '3s' }} />
+              <div className="absolute inset-2 border-2 border-primary-400/20 rounded-full animate-spin" style={{ animationDuration: '2s', animationDirection: 'reverse' }} />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <img
+                  src="/popcorn_logo.png"
+                  alt="Popcorn"
+                  className="w-14 h-14 tv:w-20 tv:h-20 object-contain animate-pulse"
+                  style={{ animationDuration: '1.5s' }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <p className="text-gray-300 text-lg tv:text-xl font-medium text-center max-w-md min-h-[2rem]">
+            {searchPhase === 'local' && t('search.searchingLocal')}
+            {searchPhase === 'indexer' &&
+              (indexerNames.length > 0
+                ? t('search.searchingOnIndexer', { name: indexerNames[currentIndexerIndex % indexerNames.length] })
+                : t('search.searchingIndexers'))}
+            {searchPhase === 'tmdb' && t('search.searchingTmdb')}
+          </p>
+          <p className="text-gray-500 text-sm tv:text-base mt-2 text-center max-w-md">
+            {searchPhase === 'local' && t('search.localSearchNote')}
+            {searchPhase === 'indexer' && t('search.indexerSearchNote')}
+            {searchPhase === 'tmdb' && t('search.tmdbSearchNote')}
+          </p>
+        </div>
+      )}
+
       {/* État vide - aucun résultat (ni torrent ni TMDB) */}
-      {!loading && query && allResults.length === 0 && !error && tmdbFallbackResults.length === 0 && (
+      {!loading && query && !hasAnyResults && !error && (
         <div className="flex flex-col items-center justify-center py-20 tv:py-32 px-4">
           <div className="text-center max-w-2xl tv:max-w-3xl">
             <div className="text-6xl tv:text-8xl mb-4 tv:mb-6">🔍</div>

@@ -11,11 +11,11 @@ const { title = 'Paramètres - Popcorn Client' } = Astro.props;
 ---
 
 <Layout title={title}>
-  <div class="ds-page settings-page flex min-h-full w-full min-h-0">
+  <div class="ds-page settings-page flex min-h-full w-full min-h-0" data-tv-settings-container>
     <aside transition:persist="settings-sidebar" class="settings-sidebar-wrapper w-0 flex-shrink-0 lg:w-72 xl:w-80 h-full">
       <SettingsSidebar client:load />
     </aside>
-    <div class="settings-content-area flex-1 min-w-0 min-h-0 overflow-x-hidden overflow-y-auto pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-3 sm:px-6 lg:px-6 pb-[env(safe-area-inset-bottom,0px)]">
+    <div class="settings-content-area flex-1 min-w-0 min-h-0 overflow-x-hidden overflow-y-auto pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-3 sm:px-6 lg:px-6 pb-[env(safe-area-inset-bottom,0px)]" data-tv-settings-content>
       <SettingsMobileMenuTrigger client:load />
       <slot />
     </div>

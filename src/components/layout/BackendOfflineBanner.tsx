@@ -6,11 +6,13 @@ import {
   checkBackendConnection,
   type BackendConnectionState,
 } from '../../lib/backend-connection-store';
+import { getBackendUrl, getMyBackendUrl } from '../../lib/backend-config';
 import { useI18n } from '../../lib/i18n/useI18n';
 
 /**
  * Bannière affichée sous la navbar quand le backend est détecté hors ligne
  * (échecs API ConnectionError/Timeout ou health check). Bouton « Réessayer » pour relancer un check.
+ * Masquée quand le backend actuel est un serveur d’ami (pas « mon serveur ») pour ne pas inquiéter l’utilisateur.
  */
 export default function BackendOfflineBanner() {
   const { t } = useI18n();
@@ -23,7 +25,10 @@ export default function BackendOfflineBanner() {
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
-    if (state.status === 'offline') {
+    const myUrl = getMyBackendUrl();
+    const currentUrl = getBackendUrl();
+    const isFriendBackend = myUrl != null && currentUrl !== myUrl;
+    if (!isFriendBackend && state.status === 'offline') {
       document.body.dataset.backendOffline = 'true';
     } else {
       delete document.body.dataset.backendOffline;
@@ -38,6 +43,11 @@ export default function BackendOfflineBanner() {
     await checkBackendConnection();
     setRetrying(false);
   };
+
+  // Ne pas afficher quand c’est le serveur d’un ami qui est offline (pas le mien)
+  const myUrl = typeof window !== 'undefined' ? getMyBackendUrl() : null;
+  const currentUrl = typeof window !== 'undefined' ? getBackendUrl() : '';
+  if (myUrl != null && currentUrl !== myUrl) return null;
 
   if (state.status !== 'offline') return null;
 

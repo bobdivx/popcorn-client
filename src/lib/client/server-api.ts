@@ -578,6 +578,8 @@ class ServerApiClient {
     if (endpoint.startsWith('/api/v1/sync/')) return 60000;
     // Test d'indexer : peut prendre du temps (plusieurs requêtes + tests téléchargement + RSS)
     if (endpoint.includes('/api/indexers/test')) return 60000; // 60 secondes pour les tests d'indexers (test et test-stream)
+    // Recherche indexers : tous les indexeurs sont interrogés (login form, etc.) → peut être très lent (ex. HD-F)
+    if (endpoint.includes('/api/indexers/search')) return 90000; // 90 secondes
     // Health checks : timeout plus long sur Android pour gérer les réseaux lents
     if (endpoint.includes('/health') || endpoint.includes('/api/client/health')) {
       const isAndroid = typeof window !== 'undefined' && /Android/i.test(navigator.userAgent || '');

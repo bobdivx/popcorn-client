@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { isTauri } from '../../lib/utils/tauri';
 import { getBackendUrl, hasBackendUrl } from '../../lib/backend-config';
+import { getBackendConnectionStore } from '../../lib/backend-connection-store';
 import { serverApi } from '../../lib/client/server-api';
 
 type BackendStatus = 'ok' | 'error' | 'checking' | 'unknown';
@@ -77,9 +78,11 @@ export default function BackendStatusBadge({
   };
 
   // Ne pas mettre [status] en dépendance : checkHealth() fait setStatus(), ce qui relancerait l'effet en boucle.
+  // Quand le backend est connu offline, ne pas appeler l'API à chaque tick (évite spam console).
   useEffect(() => {
     checkHealth();
     const interval = setInterval(() => {
+      if (getBackendConnectionStore().status === 'offline') return;
       setTimeout(checkHealth, 0);
     }, 20_000);
     return () => clearInterval(interval);
