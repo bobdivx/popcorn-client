@@ -497,7 +497,9 @@
     "quality480": "480p",
     "quality360": "360p",
     "watchLaterAdd": "À regarder plus tard",
-    "watchLaterRemove": "Retirer des favoris"
+    "watchLaterRemove": "Retirer des favoris",
+    "castToDevice": "Lancer sur Chromecast",
+    "casting": "Lecture sur Chromecast"
   },
   "nav": {
     "menu": "Menu",

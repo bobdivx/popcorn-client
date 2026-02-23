@@ -280,7 +280,12 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
 
   // En mode streaming : garder l'URL stream-torrent pendant la lecture même si isAvailableLocally
   // passe à true (fichier en stream_cache), pour éviter de basculer sur HLS local (transcodage, timeout).
-  const useStreamTorrentMode = (streamingTorrentActive ?? false) && (!isAvailableLocally || isPlaying);
+  // Jamais pour les médias bibliothèque (local_xxx) : le backend ne gère pas stream-torrent pour eux.
+  const isLibraryMedia = activeTorrent?.infoHash?.startsWith('local_') ?? false;
+  const useStreamTorrentMode =
+    !isLibraryMedia &&
+    (streamingTorrentActive ?? false) &&
+    (!isAvailableLocally || isPlaying);
 
   // Log des paramètres streaming en console (visible dans l’onglet Console pour debug)
   useEffect(() => {

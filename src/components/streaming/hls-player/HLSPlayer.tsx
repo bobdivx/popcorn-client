@@ -12,6 +12,7 @@ import { shouldAutoFullscreen } from '../../../lib/utils/device-detection';
 import { SkipIntroOverlay } from '../player-shared/components/SkipIntroOverlay';
 import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
 import { useI18n } from '../../../lib/i18n';
+import { useChromecast } from '../../../lib/chromecast/useChromecast';
 
 export default function HLSPlayer({ 
   src, 
@@ -48,6 +49,7 @@ export default function HLSPlayer({
 }: HLSPlayerProps) {
   const playerConfig = usePlayerConfig();
   const { t } = useI18n();
+  const chromecast = useChromecast();
   const canAutoPlayRef = useRef<(() => boolean) | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -505,6 +507,9 @@ export default function HLSPlayer({
               ? onPlayNextEpisode
               : undefined
           }
+          showCastButton={chromecast.isAvailable}
+          isCasting={chromecast.isCasting}
+          onCastClick={() => chromecast.castMedia(src, torrentName || '', currentTime)}
         />
         {/* Overlays skip intro / épisode suivant au-dessus des contrôles (z-30) pour rester cliquables */}
         {showSkipIntro && (

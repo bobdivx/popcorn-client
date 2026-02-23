@@ -17,6 +17,11 @@ async function waitForStreamReady(
   addDebugLog: (level: string, msg: string, data?: any) => void
 ): Promise<boolean> {
   if (!streamingTorrentActive) return true;
+  // Médias de la bibliothèque (local_xxx) : pas d'API stream-torrent, lecture via HLS/local.
+  if (infoHash.startsWith('local_')) {
+    addDebugLog('info', 'Média bibliothèque (local_), pas d’appel stream-torrent/ready');
+    return true;
+  }
   const token = TokenManager.getCloudAccessToken();
   if (!token) {
     addDebugLog('warning', 'Stream torrent actif mais pas de token cloud');
