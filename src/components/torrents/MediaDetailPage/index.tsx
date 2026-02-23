@@ -687,15 +687,20 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     return () => window.removeEventListener('torrentAdded', onTorrentAdded);
   }, []);
 
-  // Focus par défaut sur le bouton Retour en TV pour y accéder à la télécommande (Back ou Enter = retour)
+  // Focus par défaut en TV : priorité au bouton Lire si présent, sinon au bouton Télécharger (toutes les pages MediaDetail)
   useEffect(() => {
     if (!isTVPlatform()) return;
     const t = setTimeout(() => {
-      const backLink = document.querySelector<HTMLElement>('[data-media-detail-back]');
-      if (backLink) {
-        backLink.focus();
+      const playBtn = document.querySelector<HTMLElement>('[data-media-detail-action="play"]');
+      const downloadBtn = document.querySelector<HTMLElement>('[data-media-detail-action="download"]');
+      if (playBtn) {
+        playBtn.focus();
+      } else if (downloadBtn) {
+        downloadBtn.focus();
+      } else {
+        const backLink = document.querySelector<HTMLElement>('[data-media-detail-back]');
+        if (backLink) backLink.focus();
       }
-      // Ne jamais mettre le focus par défaut sur Lire : priorité au Retour pour la télécommande
     }, 150);
     return () => clearTimeout(t);
   }, [activeTorrent?.id, torrentStats, isAvailableLocally, isPlaying]);
