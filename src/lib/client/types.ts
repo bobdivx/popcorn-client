@@ -73,7 +73,12 @@ export interface DashboardData {
   continueWatching?: ContentItem[];
   popularMovies?: ContentItem[];
   popularSeries?: ContentItem[];
+  /** Nouveautés films (tri par date de sortie) */
+  recentMovies?: ContentItem[];
+  /** Nouveautés séries (tri par date de sortie) */
+  recentSeries?: ContentItem[];
   recentAdditions?: ContentItem[];
+  /** Torrents les plus partagés (beaucoup de seeders) */
   fastTorrents?: ContentItem[];
 }
 

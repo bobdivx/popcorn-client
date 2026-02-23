@@ -7,7 +7,6 @@ import { LazyTorrentPoster } from './components/LazyTorrentPoster';
 import { LazyResumePoster } from './components/LazyResumePoster';
 import type { ContentItem } from '../../lib/client/types';
 import { useInfiniteSeries } from './hooks/useInfiniteSeries';
-import { useRecentSeries } from './hooks/useRecentSeries';
 import { useFavoritesItems } from './hooks/useFavoritesItems';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useSyncStatus } from './hooks/useSyncStatus';
@@ -28,7 +27,6 @@ import Library from '../Library';
 export default function SeriesDashboard() {
   const { t, language } = useI18n();
   const { series, loading, error, hasMore, loadMore, clearAndRefetch, refetchSilent, refetchReplaceSilent } = useInfiniteSeries();
-  const { series: recentSeries } = useRecentSeries();
   const { items: favoritesItems } = useFavoritesItems();
   const { resumeWatching, rewatchWatching, watchedIds } = useResumeWatching();
   const { syncStatus, isSyncing, loading: syncLoading } = useSyncStatus();
@@ -264,7 +262,7 @@ export default function SeriesDashboard() {
     return '';
   };
 
-  // Grouper les séries par genre : chaque série apparaît dans TOUS ses genres (pas seulement le premier)
+  // Grouper les séries par genre ; chaque ligne est triée avec les plus récentes au début.
   const seriesByGenre = useMemo(() => {
     const grouped: Record<string, SeriesData[]> = {};
     const watched = new Set(watchedIds);
@@ -479,24 +477,6 @@ export default function SeriesDashboard() {
             ))}
           </CarouselRow>
         )}
-        {/* Section Ajouts récents (toujours affichée pour éviter apparition/disparition). Tri par date de sortie TMDB. */}
-        <CarouselRow title={t('dashboard.recentAdditions')} autoScroll={false}>
-          {isSyncing ? (
-            <div className="flex-shrink-0 px-4 py-3 text-gray-400 text-sm sm:text-base">
-              {t('dashboard.recentAdditionsSyncing')}
-            </div>
-          ) : recentSeries.filter((s) => !isWatched(s)).length > 0 ? (
-            recentSeries.filter((s) => !isWatched(s)).map((serie) => (
-              <div key={serie.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                <LazyTorrentPoster item={{ ...serie, type: 'tv' }} />
-              </div>
-            ))
-          ) : (
-            <div className="flex-shrink-0 px-4 py-3 text-gray-500 text-sm sm:text-base">
-              {t('dashboard.recentAdditionsEmpty')}
-            </div>
-          )}
-        </CarouselRow>
         {/* Contenu vide : SyncCard ou message */}
         {series.length === 0 ? (
           renderEmptyContent()
@@ -507,9 +487,12 @@ export default function SeriesDashboard() {
 
             const genreTitle =
               genre === '__other__' ? t('common.others') : translateGenre(genre, language);
+            const inDb = genre !== '__other__' ? syncStatus?.genre_counts_series?.[genre] : undefined;
+            const titleBadge =
+              typeof inDb === 'number' ? `${genreSeries.length} / ${inDb}` : undefined;
 
             return (
-              <CarouselRow key={genre} title={genreTitle} autoScroll={false}>
+              <CarouselRow key={genre} title={genreTitle} titleBadge={titleBadge} autoScroll={false}>
                 {genreSeries.map((serie) => (
                   <div key={serie.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                     <LazyTorrentPoster item={{ ...serie, type: 'tv' }} />

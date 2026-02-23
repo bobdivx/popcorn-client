@@ -5,6 +5,8 @@ interface CarouselRowProps {
   title: string;
   children: preact.ComponentChildren;
   className?: string;
+  /** Badge ou icône affiché à côté du titre (ex. nombre d'éléments) */
+  titleBadge?: preact.ComponentChildren;
   /** Défilement automatique activé (défaut: true) */
   autoScroll?: boolean;
   /** Intervalle en ms entre chaque scroll (défaut: 5000) */
@@ -13,6 +15,7 @@ interface CarouselRowProps {
 
 export default function CarouselRow({
   title,
+  titleBadge,
   children,
   className = '',
   autoScroll = true,
@@ -105,7 +108,14 @@ export default function CarouselRow({
       onMouseLeave={() => setIsHovered(false)}
     >
       <div className="flex items-center mb-2 sm:mb-3 tv:mb-4 px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16">
-        <h2 className="text-lg sm:text-xl md:text-2xl tv:text-3xl font-bold text-white">{title}</h2>
+        <h2 className="text-lg sm:text-xl md:text-2xl tv:text-3xl font-bold text-white flex items-center gap-2">
+          {title}
+          {titleBadge != null && titleBadge !== '' && (
+            <span className="inline-flex items-center justify-center min-w-[1.5rem] h-5 sm:h-6 px-1.5 sm:px-2 rounded-full text-xs sm:text-sm font-medium bg-white/20 text-white/90 border border-white/30">
+              {titleBadge}
+            </span>
+          )}
+        </h2>
         {(isHovered || (scrollContainerRef.current?.scrollLeft || 0) > 0) && (
           <div className="hidden xs:flex gap-1.5 sm:gap-2 tv:gap-4 ml-auto">
             <button

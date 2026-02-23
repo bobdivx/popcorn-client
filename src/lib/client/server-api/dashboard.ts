@@ -150,8 +150,8 @@ export const dashboardMethods = {
             }
           : undefined,
         continueWatching: [],
-        popularMovies: movies.slice(0, 50),
-        popularSeries: series.slice(0, 50),
+        popularMovies: movies,
+        popularSeries: series,
         recentAdditions: [],
         fastTorrents: [],
       };
@@ -174,7 +174,7 @@ export const dashboardMethods = {
     this: ServerApiClientDashboardAccess,
     language?: string,
     options?: DashboardOptions & { popularMovieIds?: string[]; popularSeriesIds?: string[] }
-  ): Promise<ApiResponse<{ recentAdditions: ContentItem[]; fastTorrents: ContentItem[] }>> {
+  ): Promise<ApiResponse<{ recentAdditions: ContentItem[]; recentMovies: ContentItem[]; recentSeries: ContentItem[]; fastTorrents: ContentItem[] }>> {
     const minSeeds = options?.minSeeds ?? 0;
     const recentLimit = options?.recentLimit ?? 80;
     const mediaLanguages = options?.mediaLanguages ?? [];
@@ -186,31 +186,36 @@ export const dashboardMethods = {
     const qualParam = minQuality ? `&min_quality=${encodeURIComponent(minQuality)}` : '';
     const filterSuffix = `${langParam}${qualParam}`;
     try {
-      // Tri par date de sortie TMDB (release_date), pas par date de sync — « récents » = sortis récemment
+      // Tri par date de sortie TMDB (release_date) = nouveautés
       const [recentMoviesRes, recentSeriesRes, fastTorrentsRes] = await Promise.all([
         this.backendRequest<any[]>(`/api/torrents/list?category=films&sort=release_date&limit=${recentLimit}&page=1&skip_indexer=true&lang=${lang}&min_seeds=${minSeeds}${filterSuffix}`, { method: 'GET' }),
         this.backendRequest<any[]>(`/api/torrents/list?category=series&sort=release_date&limit=${recentLimit}&page=1&skip_indexer=true&lang=${lang}&min_seeds=${minSeeds}${filterSuffix}`, { method: 'GET' }),
-        this.backendRequest<any[]>(`/api/torrents/fast?limit=20&min_seeds=50&lang=${lang}`, { method: 'GET' }),
+        this.backendRequest<any[]>(`/api/torrents/fast?limit=40&min_seeds=1&lang=${lang}`, { method: 'GET' }),
       ]);
 
       const recentMovies = Array.isArray(recentMoviesRes.data) ? recentMoviesRes.data.map(toContentItem).filter((i) => i.id) : [];
       const recentSeries = Array.isArray(recentSeriesRes.data) ? recentSeriesRes.data.map(toContentItem).filter((i) => i.id) : [];
       const fastTorrents = Array.isArray(fastTorrentsRes.data) ? fastTorrentsRes.data.map(toContentItem).filter((i) => i.id) : [];
 
-      const recentMoviesFiltered = recentMovies.filter((m) => !popularMovieIds.has(m.id)).slice(0, 25);
-      const recentSeriesFiltered = recentSeries.filter((s) => !popularSeriesIds.has(s.id)).slice(0, 25);
+      const recentMoviesFiltered = recentMovies.filter((m) => !popularMovieIds.has(m.id)).slice(0, 40);
+      const recentSeriesFiltered = recentSeries.filter((s) => !popularSeriesIds.has(s.id)).slice(0, 40);
       const recentAdditions = [...recentMoviesFiltered, ...recentSeriesFiltered];
 
       return {
         success: true,
-        data: { recentAdditions, fastTorrents: fastTorrents.slice(0, 40) },
+        data: {
+          recentAdditions,
+          recentMovies: recentMovies.slice(0, 40),
+          recentSeries: recentSeries.slice(0, 40),
+          fastTorrents: fastTorrents.slice(0, 40),
+        },
       };
     } catch (e) {
       return {
         success: false,
         error: 'DashboardError',
         message: e instanceof Error ? e.message : 'Erreur lors du chargement des données secondaires',
-      } as ApiResponse<{ recentAdditions: ContentItem[]; fastTorrents: ContentItem[] }>;
+      } as ApiResponse<{ recentAdditions: ContentItem[]; recentMovies: ContentItem[]; recentSeries: ContentItem[]; fastTorrents: ContentItem[] }>;
     }
   },
 
@@ -253,8 +258,8 @@ export const dashboardMethods = {
           return res;
         })(),
         (async () => {
-          // Récupérer les torrents rapides (beaucoup de seeders)
-          const res = await this.backendRequest<any[]>(`/api/torrents/fast?limit=20&min_seeds=50&lang=${lang}`, { method: 'GET' });
+          // Récupérer les torrents rapides (beaucoup de seeders) — min_seeds=1 pour avoir assez de résultats (tri par seed_count)
+          const res = await this.backendRequest<any[]>(`/api/torrents/fast?limit=40&min_seeds=1&lang=${lang}`, { method: 'GET' });
           return res;
         })(),
       ]);
@@ -301,8 +306,8 @@ export const dashboardMethods = {
             }
           : undefined,
         continueWatching: [],
-        popularMovies: movies.slice(0, 50),
-        popularSeries: series.slice(0, 50),
+        popularMovies: movies,
+        popularSeries: series,
         recentAdditions: [...recentMoviesFiltered, ...recentSeriesFiltered],
         fastTorrents: fastTorrents.slice(0, 40),
       };
