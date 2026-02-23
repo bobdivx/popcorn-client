@@ -138,10 +138,20 @@ export default function SettingsContent() {
   );
 }
 
+// Cache des pages settings déjà chargées pour éviter le scintillement à la navigation télécommande
+const pageComponentCache: Record<string, ComponentType<any>> = {};
+
 function LazyPageServer() {
-  const [ServerSettings, setServerSettings] = useState<ComponentType<any> | null>(null);
+  const [ServerSettings, setServerSettings] = useState<ComponentType<any> | null>(() => pageComponentCache['server'] ?? null);
   useEffect(() => {
-    import('./ServerSettings').then((m) => setServerSettings(() => m.default));
+    if (pageComponentCache['server']) {
+      setServerSettings(() => pageComponentCache['server']);
+      return;
+    }
+    import('./ServerSettings').then((m) => {
+      pageComponentCache['server'] = m.default;
+      setServerSettings(() => m.default);
+    });
   }, []);
   if (!ServerSettings) return <SettingsRouteSkeleton />;
   return (
@@ -155,9 +165,16 @@ function LazyPageServer() {
 }
 
 function LazyPageFavorites() {
-  const [FavoritesSettings, setFavoritesSettings] = useState<ComponentType<any> | null>(null);
+  const [FavoritesSettings, setFavoritesSettings] = useState<ComponentType<any> | null>(() => pageComponentCache['favorites'] ?? null);
   useEffect(() => {
-    import('./FavoritesSettings').then((m) => setFavoritesSettings(() => m.default));
+    if (pageComponentCache['favorites']) {
+      setFavoritesSettings(() => pageComponentCache['favorites']);
+      return;
+    }
+    import('./FavoritesSettings').then((m) => {
+      pageComponentCache['favorites'] = m.default;
+      setFavoritesSettings(() => m.default);
+    });
   }, []);
   if (!FavoritesSettings) return <SettingsRouteSkeleton />;
   return (
@@ -171,9 +188,16 @@ function LazyPageFavorites() {
 }
 
 function LazyPageAccount() {
-  const [AccountSubMenuPanel, setAccountSubMenuPanel] = useState<ComponentType<any> | null>(null);
+  const [AccountSubMenuPanel, setAccountSubMenuPanel] = useState<ComponentType<any> | null>(() => pageComponentCache['account'] ?? null);
   useEffect(() => {
-    import('./AccountSubMenuPanel').then((m) => setAccountSubMenuPanel(() => m.default));
+    if (pageComponentCache['account']) {
+      setAccountSubMenuPanel(() => pageComponentCache['account']);
+      return;
+    }
+    import('./AccountSubMenuPanel').then((m) => {
+      pageComponentCache['account'] = m.default;
+      setAccountSubMenuPanel(() => m.default);
+    });
   }, []);
   if (!AccountSubMenuPanel) return <SettingsRouteSkeleton />;
   return (
@@ -192,16 +216,26 @@ function SettingsRouteSkeleton() {
   );
 }
 
+// Cache des panneaux déjà chargés pour éviter le scintillement du spinner à chaque changement de focus (télécommande)
+const categoryPanelCache: Record<CategoryId, ComponentType<any>> = {};
+
 function LazyCategoryPanel({ category }: { category: CategoryId }) {
-  const [Component, setComponent] = useState<ComponentType<any> | null>(null);
+  const [Component, setComponent] = useState<ComponentType<any> | null>(() => categoryPanelCache[category] ?? null);
 
   useEffect(() => {
+    const cached = categoryPanelCache[category];
+    if (cached) {
+      setComponent(() => cached);
+      return;
+    }
     let cancelled = false;
-    setComponent(null);
     const loader = CATEGORY_LOADERS[category];
     if (!loader) return;
     loader().then((m) => {
-      if (!cancelled) setComponent(() => m.default);
+      if (!cancelled) {
+        categoryPanelCache[category] = m.default;
+        setComponent(() => m.default);
+      }
     });
     return () => { cancelled = true; };
   }, [category]);

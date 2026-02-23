@@ -14,6 +14,8 @@ interface UseTVPlayerNavigationProps {
   onToggleMute: () => void;
   onToggleFullscreen: () => void;
   onClose?: () => void;
+  /** Si fourni, ajoute un contrôle « Paramètres / Qualité » accessible à la télécommande (avant plein écran). */
+  onOpenQualityMenu?: () => void;
   duration: number;
   currentTime: number;
   progressBarRef?: { current: HTMLElement | null };
@@ -28,6 +30,7 @@ export function useTVPlayerNavigation({
   onToggleMute,
   onToggleFullscreen,
   onClose,
+  onOpenQualityMenu,
   progressBarRef,
 }: UseTVPlayerNavigationProps) {
   const [focusedControlIndex, setFocusedControlIndex] = useState(0);
@@ -40,11 +43,12 @@ export function useTVPlayerNavigation({
     const c = [
       { id: 'playpause', action: onPlayPause },
       { id: 'mute', action: onToggleMute },
-      { id: 'fullscreen', action: onToggleFullscreen },
     ];
+    if (onOpenQualityMenu) c.push({ id: 'quality', action: onOpenQualityMenu });
+    c.push({ id: 'fullscreen', action: onToggleFullscreen });
     if (hasBack) c.unshift({ id: 'back', action: onClose! });
     return c;
-  }, [hasBack, onClose, onPlayPause, onToggleMute, onToggleFullscreen]);
+  }, [hasBack, onClose, onPlayPause, onToggleMute, onToggleFullscreen, onOpenQualityMenu]);
 
   const isBackKey = (e: KeyboardEvent) =>
     BACK_KEYS.includes(e.key) || BACK_KEY_CODES.includes(e.keyCode ?? e.which);
@@ -169,7 +173,7 @@ export function useTVPlayerNavigation({
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('webosback', handleWebOSBack);
     };
-  }, [showControls, focusedControlIndex, focusedOnProgress, onPlayPause, onSeek, onVolumeChange, onToggleMute, onToggleFullscreen, onClose, controls, setShowControls, getSeekStep, recordKeyDown, recordKeyUp]);
+  }, [showControls, focusedControlIndex, focusedOnProgress, onPlayPause, onSeek, onVolumeChange, onToggleMute, onToggleFullscreen, onClose, onOpenQualityMenu, controls, setShowControls, getSeekStep, recordKeyDown, recordKeyUp]);
 
   // Sur TV : afficher les contrôles au montage uniquement. Ne pas forcer la réaffichage
   // quand ils se cachent (sinon ils ne se cachent jamais). Le keydown handler affiche

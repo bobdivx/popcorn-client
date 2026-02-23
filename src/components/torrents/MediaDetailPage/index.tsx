@@ -682,19 +682,24 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     return () => window.removeEventListener('torrentAdded', onTorrentAdded);
   }, []);
 
-  // Focus par défaut sur Lire si affiché, sinon sur Télécharger (télécommande TV : webOS, Android TV, etc.)
+  // Focus par défaut sur le bouton Retour en TV pour y accéder à la télécommande (Back ou Enter = retour)
   useEffect(() => {
     if (!isTVPlatform()) return;
     const t = setTimeout(() => {
-      const playEl = document.querySelector('[data-media-detail-action="play"]') as HTMLButtonElement | null;
-      const downloadEl = document.querySelector('[data-media-detail-action="download"]') as HTMLButtonElement | null;
-      const el =
-        playEl && !playEl.disabled
-          ? playEl
-          : downloadEl && !downloadEl.disabled
-            ? downloadEl
-            : null;
-      if (el) el.focus();
+      const backLink = backLinkRef.current;
+      if (backLink) {
+        backLink.focus();
+      } else {
+        const playEl = document.querySelector('[data-media-detail-action="play"]') as HTMLButtonElement | null;
+        const downloadEl = document.querySelector('[data-media-detail-action="download"]') as HTMLButtonElement | null;
+        const el =
+          playEl && !playEl.disabled
+            ? playEl
+            : downloadEl && !downloadEl.disabled
+              ? downloadEl
+              : null;
+        if (el) el.focus();
+      }
     }, 150);
     return () => clearTimeout(t);
   }, [activeTorrent?.id, torrentStats, isAvailableLocally, isPlaying]);

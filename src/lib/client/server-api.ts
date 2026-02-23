@@ -64,11 +64,15 @@ export type {
   AuthResponse,
 } from './server-api/types.js';
 
+/** Callbacks appelés quand une requête échoue avec ConnectionError/Timeout (serveur hors ligne). Utilisé par le store pour remonter l'état dans l'UI. */
+export type ConnectionFailureListener = () => void;
+
 class ServerApiClient {
   private baseUrl: string;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
   private static readonly STORAGE_USER_KEY = 'popcorn_user';
+  private connectionFailureListeners: ConnectionFailureListener[] = [];
 
   private getBackendBaseUrl(): string {
     const raw = getBackendUrl();
@@ -531,19 +535,30 @@ class ServerApiClient {
       // Vérifier si l'erreur est récupérable et retenter si nécessaire
       if (retryCount < maxRetries && this.isRetryableError(error)) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Exponential backoff, max 3s
-        console.warn(`[server-api] Erreur réseau récupérable, retry dans ${delay}ms (tentative ${retryCount + 1}/${maxRetries})`);
+        // Ne pas logger les retries quand le serveur est hors ligne (évite le spam en console)
+        const errorInfoForRetry = this.getErrorMessage(error, undefined, endpoint, url);
+        if (errorInfoForRetry.code !== 'ConnectionError' && errorInfoForRetry.code !== 'Timeout') {
+          console.warn(`[server-api] Erreur réseau récupérable, retry dans ${delay}ms (tentative ${retryCount + 1}/${maxRetries})`);
+        }
         await new Promise(resolve => setTimeout(resolve, delay));
         return this.backendRequest<T>(endpoint, options, retryCount + 1, baseUrlOverride);
       }
       
       // Obtenir un message d'erreur clair pour l'utilisateur
       const errorInfo = this.getErrorMessage(error, undefined, endpoint, url);
-      console.error('[server-api] Erreur de connexion:', {
-        url,
-        endpoint,
-        error: error instanceof Error ? error.message : String(error),
-        errorCode: errorInfo.code,
-      });
+      // Ne pas polluer la console quand le serveur est simplement hors ligne (comportement attendu)
+      const isOffline = errorInfo.code === 'ConnectionError' || errorInfo.code === 'Timeout';
+      if (!isOffline) {
+        console.error('[server-api] Erreur de connexion:', {
+          url,
+          endpoint,
+          error: error instanceof Error ? error.message : String(error),
+          errorCode: errorInfo.code,
+        });
+      }
+      if (isOffline) {
+        this.connectionFailureListeners.forEach((cb) => { try { cb(); } catch (_) { /* ignore */ } });
+      }
       return {
         success: false,
         error: errorInfo.code,
@@ -569,6 +584,14 @@ class ServerApiClient {
       return isAndroid ? 10000 : 5000; // 10 secondes sur Android, 5 secondes ailleurs
     }
     return 15000;
+  }
+
+  /**
+   * Enregistre un callback appelé à chaque échec de requête pour cause de serveur hors ligne (ConnectionError/Timeout).
+   * Permet au store UI de remonter l'état "serveur hors ligne" sans dépendance circulaire.
+   */
+  addConnectionFailureListener(cb: ConnectionFailureListener): void {
+    this.connectionFailureListeners.push(cb);
   }
 
   /**
@@ -1000,6 +1023,9 @@ interface IServerApiClientPublic {
   addFavorite(contentId: string, encryptedData?: string): Promise<ApiResponse<LibraryItem>>;
   removeFavorite(favoriteId: string): Promise<ApiResponse<void>>;
   scanLocalMedia(): Promise<ApiResponse<string>>;
+
+  // Connection status (pour remonter "serveur hors ligne" dans l'UI)
+  addConnectionFailureListener(cb: ConnectionFailureListener): void;
 
   // Health methods
   checkServerHealth(): Promise<ApiResponse<{ status: string }>>;

@@ -51,6 +51,7 @@ export default function HLSPlayer({
   const canAutoPlayRef = useRef<(() => boolean) | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
+  const openQualityMenuRef = useRef<(() => void) | null>(null);
   const hasAutoFullscreenedRef = useRef(false);
   const [hlsDuration, setHlsDuration] = useState<number | undefined>(undefined);
   const hlsDurationRef = useRef<number>(0);
@@ -290,6 +291,7 @@ export default function HLSPlayer({
     onToggleMute: toggleMute,
     onToggleFullscreen: handleToggleFullscreen,
     onClose,
+    onOpenQualityMenu: onQualityChange != null ? () => openQualityMenuRef.current?.() : undefined,
     duration,
     currentTime,
     progressBarRef,
@@ -442,7 +444,7 @@ export default function HLSPlayer({
             backfaceVisibility: playerConfig.hardwareAcceleration ? 'hidden' : 'visible',
             width: '100%',
             height: '100%',
-            objectFit: 'contain',
+            objectFit: playerConfig.videoFillMode ?? 'contain',
             display: 'block',
             backgroundColor: '#000',
           }}
@@ -497,6 +499,7 @@ export default function HLSPlayer({
           showQualitySelector={onQualityChange != null}
           streamQuality={streamQuality ?? null}
           onQualityChange={onQualityChange}
+          onOpenQualityMenuRef={openQualityMenuRef}
           onPlayNextEpisode={
             nextEpisodeInfo && onPlayNextEpisode && (playerConfig.nextEpisodeButtonEnabled ?? true)
               ? onPlayNextEpisode

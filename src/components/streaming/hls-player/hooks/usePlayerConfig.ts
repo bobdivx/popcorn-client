@@ -31,6 +31,8 @@ export interface PlayerConfig {
   streamingMode: 'hls' | 'direct' | 'lucie';
   /** En mode streaming torrent : télécharger le média en entier (sinon uniquement la partie lue). Réservé aux abonnés. */
   streamingDownloadFull?: boolean;
+  /** 'contain' = bandes noires pour voir toute l'image, 'cover' = plein écran sans bandes (recadrage possible). */
+  videoFillMode?: 'contain' | 'cover';
 }
 
 export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
@@ -58,6 +60,7 @@ export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
   nextEpisodeCountdownSeconds: 90,
   streamingMode: 'hls',
   streamingDownloadFull: false,
+  videoFillMode: 'contain',
 };
 
 export function usePlayerConfig(): PlayerConfig {
@@ -72,6 +75,7 @@ export function usePlayerConfig(): PlayerConfig {
           ...DEFAULT_PLAYER_CONFIG,
           ...parsed,
           streamingDownloadFull: parsed.streamingDownloadFull === true,
+          videoFillMode: parsed.videoFillMode === 'cover' ? 'cover' : 'contain',
         });
       } catch (err) {
         console.warn('[usePlayerConfig] Erreur lors du chargement de la configuration:', err);

@@ -4,6 +4,7 @@ import '../styles/design-system.css';
 import { ClientRouter } from 'astro:transitions';
 import ServerConnectionCheck from '../components/ServerConnectionCheck';
 import Navbar from '../components/layout/Navbar';
+import BackendOfflineBanner from '../components/layout/BackendOfflineBanner';
 import FeedbackFAB from '../components/layout/FeedbackFAB';
 import TVNavigationProvider from '../components/tv/TVNavigationProvider';
 import WebOSHead from '../components/webos/WebOSHead.astro';
@@ -96,36 +97,56 @@ const isWebOS = import.meta.env.WEBOS === 'true';
     <TVNavigationProvider client:only="preact" />
     <ServerConnectionCheck client:only="preact" />
     <Navbar client:only="preact" />
+    <BackendOfflineBanner client:only="preact" />
     <FeedbackFAB client:only="preact" />
     <!-- Header (barre en haut) -->
     <main class="app-main flex-1 w-full overflow-x-hidden safe-area-top" style="padding-top: calc(5rem + var(--safe-area-inset-top));">
       <slot />
     </main>
     <style>
+      /* Bannière « Serveur hors ligne » : réserver l’espace sous la navbar */
+      body[data-backend-offline] .app-main {
+        padding-top: calc(5rem + var(--safe-area-inset-top) + 2.5rem) !important;
+      }
       /* Mobile : header plus compact (h-14) */
       @media (max-width: 639px) {
         .app-main {
           padding-top: calc(3.75rem + var(--safe-area-inset-top)) !important;
+        }
+        body[data-backend-offline] .app-main {
+          padding-top: calc(3.75rem + var(--safe-area-inset-top) + 2.5rem) !important;
         }
       }
       @media (min-width: 640px) {
         .app-main {
           padding-top: calc(5rem + var(--safe-area-inset-top)) !important;
         }
+        body[data-backend-offline] .app-main {
+          padding-top: calc(5rem + var(--safe-area-inset-top) + 2.5rem) !important;
+        }
       }
       @media (min-width: 768px) {
         .app-main {
           padding-top: calc(5.5rem + var(--safe-area-inset-top)) !important;
+        }
+        body[data-backend-offline] .app-main {
+          padding-top: calc(5.5rem + var(--safe-area-inset-top) + 2.5rem) !important;
         }
       }
       @media (min-width: 1024px) {
         .app-main {
           padding-top: calc(6rem + var(--safe-area-inset-top)) !important;
         }
+        body[data-backend-offline] .app-main {
+          padding-top: calc(6rem + var(--safe-area-inset-top) + 2.5rem) !important;
+        }
       }
       @media (min-width: 1920px) {
         .app-main {
           padding-top: calc(7rem + var(--safe-area-inset-top)) !important;
+        }
+        body[data-backend-offline] .app-main {
+          padding-top: calc(7rem + var(--safe-area-inset-top) + 2.5rem) !important;
         }
       }
     </style>

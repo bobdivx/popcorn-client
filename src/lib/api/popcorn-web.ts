@@ -1087,7 +1087,7 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
     return null;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      console.warn('[POPCORN-WEB] Timeout lors de la récupération de la configuration');
+      // Timeout / serveur hors ligne : comportement attendu, pas d'erreur en console
       return null;
     }
 
@@ -1105,7 +1105,13 @@ export async function getUserConfig(accessToken?: string): Promise<UserConfig | 
       return null;
     }
 
-    console.warn('[POPCORN-WEB] Impossible de récupérer la configuration:', error);
+    // Erreur réseau / connexion : serveur hors ligne, pas d'erreur en console
+    const isNetworkError = error instanceof Error && (
+      /fetch|network|connection|timeout/i.test(error.message)
+    );
+    if (!isNetworkError) {
+      console.warn('[POPCORN-WEB] Impossible de récupérer la configuration:', error);
+    }
     return null;
   }
 }
@@ -1172,7 +1178,6 @@ export async function getSubscriptionMe(accessToken?: string): Promise<Subscript
   try {
     const token = accessToken ?? TokenManager.getCloudAccessToken() ?? undefined;
     if (!token) {
-      console.warn('[Popcorn] Statut abonnement: aucun token cloud (connexion cloud requise pour récupérer l\'abonnement).');
       return null;
     }
     const apiUrl = `${getPopcornWebApiUrl()}/subscription/me`;
@@ -1182,11 +1187,9 @@ export async function getSubscriptionMe(accessToken?: string): Promise<Subscript
       10000
     );
     if (!res.ok) {
-      console.warn('[Popcorn] Statut abonnement: erreur API', res.status, res.data?.message ?? res.data?.error ?? res.data);
       return null;
     }
     if (!res.data?.success) {
-      console.warn('[Popcorn] Statut abonnement: réponse invalide (success=false)', res.data);
       return null;
     }
     const d = res.data?.data;
@@ -1195,9 +1198,8 @@ export async function getSubscriptionMe(accessToken?: string): Promise<Subscript
       backendUrl: d?.backendUrl ?? null,
       streamingTorrent: d?.streamingTorrent === true,
     };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn('[Popcorn] Statut abonnement: échec (réseau ou CORS)', msg);
+  } catch {
+    // Réseau / CORS / timeout : serveur cloud ou backend hors ligne, pas d'erreur en console
     return null;
   }
 }
@@ -1828,8 +1830,8 @@ export async function getSharedWithMe(): Promise<Array<{ friendId: string; email
     );
     if (!res.ok) return null;
     return res.data?.data?.shared || [];
-  } catch (error) {
-    console.warn('[POPCORN-WEB] Erreur getSharedWithMe:', error);
+  } catch {
+    // Timeout / réseau : normal si le cloud ou un serveur est hors ligne
     return null;
   }
 }

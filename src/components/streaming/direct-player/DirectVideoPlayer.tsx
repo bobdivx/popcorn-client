@@ -279,7 +279,7 @@ export default function DirectVideoPlayer({
             backfaceVisibility: playerConfig.hardwareAcceleration ? 'hidden' : 'visible',
             width: '100%',
             height: '100%',
-            objectFit: 'contain',
+            objectFit: playerConfig.videoFillMode ?? 'contain',
             display: 'block',
             backgroundColor: '#000',
           }}

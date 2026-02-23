@@ -217,45 +217,45 @@ async function downloadFromExternalIndexerOnce(options: {
     setTorrentStats,
   } = options;
 
-  // Pour les torrents externes, utiliser l'infoHash depuis la DB locale (pas d'API Torznab)
-  // Télécharger le fichier .torrent directement depuis la DB locale
+  // Si on a une URL externe (ex. C411, YGG), utiliser directement l'endpoint external/download :
+  // évite un 404 inutile sur /api/torrents/{infoHash}/download (torrent pas en DB locale).
+  const hasExternalHttpLink =
+    torrent._externalLink &&
+    (torrent._externalLink.startsWith('http://') || torrent._externalLink.startsWith('https://'));
+  if (hasExternalHttpLink) {
+    return await downloadFromExternalIndexer({
+      torrent,
+      baseUrl,
+      headers,
+      addNotification,
+      setPlayStatus,
+      pollTorrentProgress,
+      progressPollIntervalRef,
+      PROGRESS_POLL_INTERVAL_MS,
+      setTorrentStats,
+    });
+  }
+
+  // Torrent externe sans URL HTTP : tenter la DB locale par infoHash (ex. torrents synchronisés)
   if (torrent.infoHash) {
-    // Télécharger le fichier .torrent depuis la DB locale avec l'infoHash
     const downloadUrl = `${baseUrl}/api/torrents/${torrent.infoHash}/download`;
-    
     if (setPlayStatus) {
       setPlayStatus('adding');
     }
-    
     const response = await fetch(downloadUrl, { headers });
-    
+
     if (!response.ok) {
       if (response.status === 404) {
-        // Le fichier .torrent n'est pas dans la DB locale, essayer de le télécharger depuis l'indexer externe
-        if (torrent._externalLink) {
-          return await downloadFromExternalIndexer({
-            torrent,
-            baseUrl,
-            headers,
-            addNotification,
-            setPlayStatus,
-            pollTorrentProgress,
-            progressPollIntervalRef,
-            PROGRESS_POLL_INTERVAL_MS,
-            setTorrentStats,
-          });
-        }
         throw new Error('Le fichier .torrent n\'est pas disponible dans la DB locale et aucune URL externe n\'est disponible.');
       }
       throw new Error(`Impossible de télécharger le fichier torrent depuis la DB locale (${response.status})`);
     }
-    
-    // Le fichier .torrent est disponible dans la DB locale, l'ajouter au client
+
     const blob = await response.blob();
     const file = new File([blob], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
     const forStreaming = false;
     const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
-    
+
     const result = await clientApi.addTorrentFile(file, forStreaming, downloadType);
     addNotification('success', 'Torrent ajouté au client avec succès depuis la DB locale !');
     const infoHash = result?.info_hash ?? torrent.infoHash ?? '';

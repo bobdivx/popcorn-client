@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Minimize, Subtitles, ArrowLeft, RotateCcw, SkipForward, Settings } from 'lucide-preact';
 import { useI18n } from '../../../../lib/i18n';
 import { formatTime } from '../utils/formatTime';
@@ -76,6 +76,8 @@ interface VideoControlsProps {
   onQualityChange?: (height: number | null) => void;
   /** Progression du téléchargement torrent (0–1) pour afficher les parties déjà téléchargées sur la barre. */
   torrentProgress?: number | null;
+  /** Ref pour ouvrir le menu qualité depuis la télécommande (Enter sur le bouton Paramètres). */
+  onOpenQualityMenuRef?: { current: (() => void) | null };
 }
 
 export function VideoControls({
@@ -119,9 +121,18 @@ export function VideoControls({
   streamQuality = null,
   onQualityChange,
   torrentProgress,
+  onOpenQualityMenuRef,
 }: VideoControlsProps) {
   const { t } = useI18n();
   const [showQualityMenu, setShowQualityMenu] = useState(false);
+
+  useEffect(() => {
+    if (!onOpenQualityMenuRef) return;
+    onOpenQualityMenuRef.current = () => setShowQualityMenu(true);
+    return () => {
+      onOpenQualityMenuRef.current = null;
+    };
+  }, [onOpenQualityMenuRef]);
 
   const qualityLabel =
     streamQuality == null || streamQuality === 0
@@ -154,7 +165,9 @@ export function VideoControls({
   const padding = isTV ? 'px-10 pt-10 pb-10' : isFullscreen ? 'px-8 pt-8 pb-8 md:px-12 md:pt-10 md:pb-10' : 'px-3 pt-3 pb-3 sm:px-6 sm:pt-6 sm:pb-6 md:px-8 md:pt-8 md:pb-8';
   const gap = isTV ? 'gap-8' : isFullscreen ? 'gap-6' : 'gap-2 sm:gap-4 md:gap-5';
 
-  // Indices de focus : back(0 si hasBack), play, mute, fullscreen
+  // Indices de focus : back(0 si hasBack), play, mute, [quality si showQualitySelector], fullscreen
+  const qualityIndex = hasBackButton ? 3 : 2;
+  const fullscreenIndex = showQualitySelector && onQualityChange ? (hasBackButton ? 4 : 3) : (hasBackButton ? 3 : 2);
   const getFocusClass = (index: number) => {
     if (!isTV || focusedOnProgress) return '';
     if (focusedControlIndex !== index) return '';
@@ -379,7 +392,7 @@ export function VideoControls({
                     e.stopPropagation();
                     setShowQualityMenu((v) => !v);
                   }} 
-                  class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none min-w-[3rem] touch-manipulation`}
+                  class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none min-w-[3rem] touch-manipulation ${getFocusClass(qualityIndex)}`}
                   title={t('playback.quality')}
                   aria-label={t('playback.quality')}
                   aria-expanded={showQualityMenu}
@@ -431,7 +444,7 @@ export function VideoControls({
                 e.stopPropagation();
                 onToggleFullscreen();
               }} 
-              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${getFocusClass(hasBackButton ? 3 : 2)}`}
+              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${getFocusClass(fullscreenIndex)}`}
             >
               {isFullscreen ? <Minimize class={`${iconSize} text-white`} /> : <Maximize class={`${iconSize} text-white`} />}
             </button>

@@ -3,7 +3,7 @@ import { useI18n } from '../../lib/i18n';
 import { PreferencesManager, TokenManager } from '../../lib/client/storage';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
 import { serverApi } from '../../lib/client/server-api';
-import { SkipForward, ListVideo, Play, Download, HardDrive } from 'lucide-preact';
+import { SkipForward, ListVideo, Play, Download, HardDrive, Maximize2 } from 'lucide-preact';
 import { DsSettingsSectionCard } from '../ui/design-system';
 import { DEFAULT_PLAYER_CONFIG, type PlayerConfig } from '../streaming/hls-player/hooks/usePlayerConfig';
 import { useSubscriptionMe } from '../torrents/MediaDetailPage/hooks/useSubscriptionMe';
@@ -18,6 +18,7 @@ type PlaybackConfigStored = Pick<
   | 'nextEpisodeCountdownSeconds'
   | 'streamingMode'
   | 'streamingDownloadFull'
+  | 'videoFillMode'
 >;
 
 function getPlaybackConfig(): PlaybackConfigStored {
@@ -29,6 +30,7 @@ function getPlaybackConfig(): PlaybackConfigStored {
       nextEpisodeCountdownSeconds: DEFAULT_PLAYER_CONFIG.nextEpisodeCountdownSeconds,
       streamingMode: DEFAULT_PLAYER_CONFIG.streamingMode,
       streamingDownloadFull: DEFAULT_PLAYER_CONFIG.streamingDownloadFull ?? false,
+      videoFillMode: DEFAULT_PLAYER_CONFIG.videoFillMode ?? 'contain',
     };
   }
   try {
@@ -47,6 +49,7 @@ function getPlaybackConfig(): PlaybackConfigStored {
             ? parsed.streamingMode
             : DEFAULT_PLAYER_CONFIG.streamingMode,
         streamingDownloadFull: parsed.streamingDownloadFull === true,
+        videoFillMode: parsed.videoFillMode === 'cover' ? 'cover' : 'contain',
       };
     }
   } catch {
@@ -59,6 +62,7 @@ function getPlaybackConfig(): PlaybackConfigStored {
     nextEpisodeCountdownSeconds: DEFAULT_PLAYER_CONFIG.nextEpisodeCountdownSeconds,
     streamingMode: DEFAULT_PLAYER_CONFIG.streamingMode,
     streamingDownloadFull: DEFAULT_PLAYER_CONFIG.streamingDownloadFull ?? false,
+    videoFillMode: DEFAULT_PLAYER_CONFIG.videoFillMode ?? 'contain',
   };
 }
 
@@ -113,6 +117,7 @@ export default function PlaybackSettingsPanel() {
           nextEpisodeCountdownSeconds: next.nextEpisodeCountdownSeconds,
           streamingMode: next.streamingMode,
           streamingDownloadFull: next.streamingDownloadFull,
+          videoFillMode: next.videoFillMode,
         },
       },
       cloudToken
@@ -169,6 +174,14 @@ export default function PlaybackSettingsPanel() {
 
   const handleStreamingDownloadFull = (value: boolean) => {
     const next = { ...config, streamingDownloadFull: value };
+    setConfig(next);
+    savePlaybackToLocalStorage(next);
+    savePlaybackSettingsToCloud(next);
+    showSaved();
+  };
+
+  const handleVideoFillMode = (value: 'contain' | 'cover') => {
+    const next = { ...config, videoFillMode: value };
     setConfig(next);
     savePlaybackToLocalStorage(next);
     savePlaybackSettingsToCloud(next);
@@ -321,6 +334,40 @@ export default function PlaybackSettingsPanel() {
                 </div>
               </label>
             ))}
+          </div>
+        </div>
+      </DsSettingsSectionCard>
+
+      <DsSettingsSectionCard icon={Maximize2} title={t('interfaceSettings.videoFillMode')} accent="violet">
+        <div className="min-w-0">
+          <p className="text-sm ds-text-secondary mb-4">{t('interfaceSettings.videoFillModeDescription')}</p>
+          <div className="flex flex-col gap-3">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="video-fill-mode"
+                className="radio radio-primary"
+                checked={(config.videoFillMode ?? 'contain') === 'contain'}
+                onChange={() => handleVideoFillMode('contain')}
+              />
+              <div className="flex flex-col">
+                <span className="font-medium text-[var(--ds-text-primary)]">{t('interfaceSettings.videoFillModeContain')}</span>
+                <span className="text-xs ds-text-tertiary">{t('interfaceSettings.videoFillModeContainDescription')}</span>
+              </div>
+            </label>
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="radio"
+                name="video-fill-mode"
+                className="radio radio-primary"
+                checked={(config.videoFillMode ?? 'contain') === 'cover'}
+                onChange={() => handleVideoFillMode('cover')}
+              />
+              <div className="flex flex-col">
+                <span className="font-medium text-[var(--ds-text-primary)]">{t('interfaceSettings.videoFillModeCover')}</span>
+                <span className="text-xs ds-text-tertiary">{t('interfaceSettings.videoFillModeCoverDescription')}</span>
+              </div>
+            </label>
           </div>
         </div>
       </DsSettingsSectionCard>

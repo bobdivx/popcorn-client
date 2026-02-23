@@ -24,6 +24,8 @@ export interface PlayerConfig {
   introSkipSeconds: number;
   nextEpisodeCountdownSeconds: number;
   streamingMode: 'hls' | 'direct' | 'lucie';
+  /** 'contain' = bandes noires pour voir toute l'image, 'cover' = plein écran (recadrage possible). */
+  videoFillMode: 'contain' | 'cover';
 }
 
 export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
@@ -50,6 +52,7 @@ export const DEFAULT_PLAYER_CONFIG: PlayerConfig = {
   introSkipSeconds: 90,
   nextEpisodeCountdownSeconds: 90,
   streamingMode: 'hls',
+  videoFillMode: 'contain',
 };
 
 export function usePlayerConfig(): PlayerConfig {
