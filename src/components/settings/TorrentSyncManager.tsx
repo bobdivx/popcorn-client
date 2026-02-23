@@ -16,6 +16,7 @@ import type { Indexer } from '../../lib/client/types';
 import { useNativeNotifications } from '../../hooks/useNativeNotifications';
 import { calculateSyncProgress } from '../../lib/utils/sync-progress';
 import { useI18n } from '../../lib/i18n/useI18n';
+import { translateGenre } from '../../lib/utils/genre-translation';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
 import { Modal } from '../ui/Modal';
 import { DsNavTabs, DsIconButton, DsMetricCard, DsCard, DsCardSection, DsBarChart } from '../ui/design-system';
@@ -64,6 +65,8 @@ interface SyncStatus {
   tmdb_stats?: TmdbStats;
   /** Stats TMDB par indexer (pour la modale détail : enrichissement de cet indexer uniquement) */
   tmdb_stats_by_indexer?: Record<string, TmdbStats>;
+  /** Médias par genre TMDB par indexer : indexer_key -> genre_name -> titres */
+  media_by_genre_by_indexer?: Record<string, Record<string, string[]>>;
 }
 
 interface TorrentSyncManagerProps {
@@ -107,6 +110,16 @@ function IndexerDetailsModalContent({
   // Enrichissement TMDB pour cet indexer uniquement (pas les stats globales)
   const tmdb = status?.tmdb_stats_by_indexer?.[idx.name] ?? status?.tmdb_stats_by_indexer?.[idx.id];
   const tmdbTotal = tmdb ? tmdb.with_tmdb + tmdb.without_tmdb : 0;
+  // Médias par genre TMDB pour cet indexer
+  const mediaByGenre = status?.media_by_genre_by_indexer?.[idx.name] ?? status?.media_by_genre_by_indexer?.[idx.id];
+  const lang = (language === 'fr' ? 'fr' : 'en') as 'fr' | 'en';
+
+  /** Nom du type de média par catégorie (genre) pour l'affichage dans la modale */
+  const categoryToMediaName = (category: string): string => {
+    if (category === 'films') return t('torrentSyncManager.filmsCount');
+    if (category === 'series') return t('torrentSyncManager.seriesCount');
+    return t('torrentSyncManager.othersCount');
+  };
 
   return (
     <div class="space-y-5 text-sm min-w-0 max-w-full overflow-hidden">
@@ -151,6 +164,43 @@ function IndexerDetailsModalContent({
         )}
       </div>
 
+      {/* Médias par genre TMDB (Action, Aventure, etc.) */}
+      {mediaByGenre && Object.keys(mediaByGenre).length > 0 && (
+        <div class="pt-4 border-t border-[var(--ds-border)]">
+          <h4 class="text-[var(--ds-text-primary)] font-semibold mb-3 flex items-center gap-2">
+            <span class="flex items-center justify-center w-7 h-7 rounded-full text-[var(--ds-text-on-accent)] bg-[var(--ds-accent-violet)]">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+            </span>
+            {t('torrentSyncManager.mediaByGenre')}
+          </h4>
+          <div class="ds-box-surface p-3 max-h-64 overflow-y-auto space-y-4">
+            {Object.keys(mediaByGenre)
+              .sort((a, b) => translateGenre(a, lang).localeCompare(translateGenre(b, lang)))
+              .map((genre) => {
+                const titles = mediaByGenre[genre] ?? [];
+                if (titles.length === 0) return null;
+                return (
+                  <div key={genre}>
+                    <p class="text-[var(--ds-text-primary)] font-semibold text-xs uppercase tracking-wide mb-1.5">
+                      {translateGenre(genre, lang)}
+                    </p>
+                    <ul class="space-y-1 text-xs text-[var(--ds-text-secondary)]">
+                      {titles.slice(0, 15).map((title, i) => (
+                        <li key={i} class="truncate pl-2 border-l-2 border-[var(--ds-border)]" title={title}>{title}</li>
+                      ))}
+                      {titles.length > 15 && (
+                        <li class="text-[var(--ds-text-tertiary)] pl-2">+ {titles.length - 15} {t('torrentSyncManager.moreMedia')}</li>
+                      )}
+                    </ul>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
       {/* Section Enrichissement TMDB : uniquement pour cet indexer */}
       {tmdb && tmdbTotal > 0 && (
         <div class="pt-4 border-t border-[var(--ds-border)]">
@@ -188,7 +238,7 @@ function IndexerDetailsModalContent({
                   {tmdb.missing_tmdb.length > 0 ? (
                     tmdb.missing_tmdb.map(([name, category], i) => (
                       <div key={i} class="flex items-center gap-2 text-xs">
-                        <span class="text-[var(--ds-text-tertiary)] w-14 truncate">{category === 'films' ? '🎬' : category === 'series' ? '📺' : '📦'} {category}</span>
+                        <span class="text-[var(--ds-text-tertiary)] shrink-0 w-24 truncate" title={categoryToMediaName(category)}>{category === 'films' ? '🎬' : category === 'series' ? '📺' : '📦'} {categoryToMediaName(category)}</span>
                         <span class="text-[var(--ds-text-secondary)] flex-1 truncate" title={name}>{name}</span>
                       </div>
                     ))
@@ -1075,13 +1125,8 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
         </div>
       )}
 
-      {/* Barre Sync : indexer en cours (si sync) | onglets | outils | CTA — statut détaillé dans le panneau "Ce qui se passe" */}
+      {/* Barre Sync : onglets | outils | CTA — indexer en cours visible sur la carte concernée */}
       <div class="sync-toolbar mb-6">
-        {syncInProgress && (status.progress?.current_indexer ?? '').trim() && (
-          <span class="flex-shrink-0 text-xs font-semibold text-white/80 px-2 py-0.5 rounded-full bg-white/10 truncate max-w-[120px]" title={status.progress?.current_indexer ?? ''}>
-            {status.progress?.current_indexer?.trim()}
-          </span>
-        )}
       <DsNavTabs
         activeId={syncView}
         onChange={(id) => setSyncView(id as 'overview' | 'settings')}
@@ -1195,20 +1240,20 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                 class={`sync-indexer-card w-full text-left rounded-xl p-5 sm:p-6 transition-all duration-300 hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] ${isSyncingThisCard ? 'sync-indexer-card--syncing' : ''} ${hasError ? 'sync-card-error' : 'ds-box-accent'}`}
                 title={subtitleTitle ?? t('torrentSyncManager.clickForDetails')}
               >
-                <div class="relative min-w-0">
-                  <span class="absolute top-0 right-0 flex items-center gap-2">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-2 min-w-0 mb-0.5">
+                    <h3 class="flex-1 min-w-0 text-base sm:text-lg md:text-xl font-bold text-[var(--ds-text-on-accent)] truncate">{indexer.name}</h3>
                     {isSyncingThisCard && (
-                      <span class="sync-indexer-card__badge flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[var(--ds-text-on-accent)] text-xs font-bold whitespace-nowrap bg-white/90 shadow-sm">
+                      <span class="sync-indexer-card__badge flex items-center gap-1.5 shrink-0 rounded-full px-2.5 py-1 text-[var(--ds-text-on-accent)] text-xs font-bold whitespace-nowrap bg-white/90 shadow-sm">
                         <span class="sync-indexer-card__badge-dot" aria-hidden="true" />
                         {t('torrentSyncManager.inProgress')}
                       </span>
                     )}
-                    <span class="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center shrink-0 bg-[var(--ds-surface-elevated)]">
+                    <span class="w-10 h-10 sm:w-11 sm:h-11 shrink-0 rounded-full flex items-center justify-center bg-[var(--ds-surface-elevated)]">
                       <ChevronRight {...iconProps} class="text-[var(--ds-text-primary)]" />
                     </span>
-                  </span>
-                  <h3 class={`text-base sm:text-lg md:text-xl font-bold text-[var(--ds-text-on-accent)] truncate ${isSyncingThisCard ? 'pr-28 sm:pr-32' : 'pr-12 sm:pr-14'}`}>{indexer.name}</h3>
-                  <p class="text-[var(--ds-text-on-accent)]/60 text-xs sm:text-sm mt-0.5 truncate" title={subtitleTitle}>{subtitle}</p>
+                  </div>
+                  <p class="text-[var(--ds-text-on-accent)]/60 text-xs sm:text-sm truncate" title={subtitleTitle}>{subtitle}</p>
                   <div class="mt-4">
                     <div class="flex justify-between text-xs font-semibold text-[#1C1C1E] mb-1.5">
                       <span>{t('torrentSyncManager.progressLabel')}</span>

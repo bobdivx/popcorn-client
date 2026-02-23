@@ -1670,6 +1670,8 @@
     "distributionChart": "Distribution",
     "tmdb": "TMDB",
     "tmdbEnrichmentThisIndexer": "TMDB Enrichment (this indexer)",
+    "mediaByGenre": "Media by genre (TMDB)",
+    "moreMedia": "more media",
     "withTmdb": "With TMDB ID",
     "withoutTmdb": "Without TMDB ID",
     "ofTorrents": "of torrents",
