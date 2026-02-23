@@ -40,6 +40,7 @@ export default function FloatingActionButton({
 
   return (
     <div
+      data-tv-nav-skip
       className={`fixed z-40 ${positionClasses[position]} flex flex-col items-center gap-2`}
       style={{
         paddingBottom: 'var(--safe-area-inset-bottom)',

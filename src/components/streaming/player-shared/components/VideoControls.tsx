@@ -271,6 +271,8 @@ export function VideoControls({
           <div
             ref={progressBarRef}
             tabIndex={0}
+            data-tv-video-progress
+            role="slider"
             class={`relative ${progressHeight} bg-white/30 rounded-full cursor-pointer group/progress transition-all mb-4 sm:mb-6 md:mb-8 outline-none focus:outline-none ${getProgressFocusClass()}`}
             onClick={(e) => {
               e.preventDefault();
@@ -298,7 +300,6 @@ export function VideoControls({
             }}
             onFocus={() => setFocusedOnProgress?.(true)}
             onBlur={() => setFocusedOnProgress?.(false)}
-            role="slider"
             aria-label="Position dans la vidéo"
             aria-valuenow={Math.round(progressPercent)}
             aria-valuemin={0}
@@ -317,7 +318,7 @@ export function VideoControls({
             <div class="absolute left-0 top-0 h-full bg-purple-600 rounded-full" style={{ width: `${progressPercent}%` }} />
             <div class={`absolute top-1/2 -translate-y-1/2 ${isTV ? 'w-6 h-6' : 'w-4 h-4'} bg-purple-600 rounded-full opacity-0 group-hover/progress:opacity-100 transition-all border-2 border-white`} style={{ left: `calc(${progressPercent}% - ${progressPercent > 0 && progressPercent < 100 ? (isTV ? '12px' : '8px') : progressPercent === 100 ? (isTV ? '24px' : '16px') : '0px'})` }} />
           </div>
-          <div class={`flex items-center ${gap} relative z-30 overflow-x-auto min-w-0 scrollbar-visible`}>
+          <div class={`flex items-center ${gap} relative z-30 overflow-x-auto min-w-0 scrollbar-visible`} data-tv-video-controls-row>
             <button 
               onClick={(e) => { 
                 e.preventDefault();

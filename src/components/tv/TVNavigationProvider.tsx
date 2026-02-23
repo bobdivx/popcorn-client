@@ -24,6 +24,8 @@ import { useEffect, useRef } from 'preact/hooks';
  */
 export default function TVNavigationProvider() {
   const lastFocusedRef = useRef<HTMLElement | null>(null);
+  /** Dernier élément auquel on a appliqué l’effet visuel (pour retrait ciblé, évite querySelectorAll). */
+  const lastEffectTargetRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     // Sélecteur universel pour tous les éléments interactifs
@@ -43,28 +45,26 @@ export default function TVNavigationProvider() {
     const SETTINGS_CONTAINER_SELECTOR = '[data-tv-settings-container]';
 
     // Obtenir tous les éléments focusables visibles (optionnellement limités à un conteneur, ex. modal)
-    // Exclut les éléments hors viewport (ex. menu settings masqué -translate-x-full) pour éviter boucle de focus
+    // Exclut les éléments hors viewport. Sur webOS on évite getComputedStyle pour réduire la latence.
     const getFocusableElements = (scope?: HTMLElement | null): HTMLElement[] => {
       const root = scope || document;
       const pad = 1;
+      // Zone sous l’écran pour inclure la ligne suivante (dashboard Films/Séries) et permettre flèche bas
+      const belowViewport = typeof window !== 'undefined' ? Math.min(500, window.innerHeight * 0.6) : 0;
+      const isWebOSCheck = typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
       return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
         .filter(el => {
           if (scope && !scope.contains(el)) return false;
           const rect = el.getBoundingClientRect();
-          const style = window.getComputedStyle(el);
           const inViewportX = rect.right >= -pad && rect.left <= window.innerWidth + pad;
-          const inViewportY = rect.bottom >= -pad && rect.top <= window.innerHeight + pad;
-          return (
-            rect.width > 0 &&
-            rect.height > 0 &&
-            inViewportX &&
-            inViewportY &&
-            style.display !== 'none' &&
-            style.visibility !== 'hidden' &&
-            style.opacity !== '0' &&
-            !el.closest('[aria-hidden="true"]') &&
-            !el.closest('.hidden')
-          );
+          const inViewportY = rect.bottom >= -pad && rect.top <= window.innerHeight + pad + belowViewport;
+          if (rect.width <= 0 || rect.height <= 0 || !inViewportX || !inViewportY) return false;
+          if (el.closest('[aria-hidden="true"]') || el.closest('.hidden')) return false;
+          if (!isWebOSCheck) {
+            const style = window.getComputedStyle(el);
+            if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+          }
+          return true;
         });
     };
 
@@ -81,16 +81,36 @@ export default function TVNavigationProvider() {
       return element.matches(CARD_SELECTOR) || !!element.closest(CARD_SELECTOR);
     };
 
+    // Éléments à ignorer en navigation verticale depuis les carrousels (ex. bouton flottant Feedback)
+    const FAB_SKIP_SELECTOR = '[data-tv-nav-skip]';
+    const VIDEO_CONTROLS_ROW = '[data-tv-video-controls-row]';
+    const VIDEO_PROGRESS = '[data-tv-video-progress]';
+
     // Restreindre les candidats selon le contexte (éviter changement de ligne en carousel, etc.)
     const getCandidatesForDirection = (
       current: HTMLElement,
       elements: HTMLElement[],
       direction: 'up' | 'down' | 'left' | 'right'
     ): HTMLElement[] => {
+      // Dans le lecteur vidéo : gauche/droite uniquement dans la même ligne de boutons (pas la barre de progression)
+      const videoWrapper = current.closest('#video-player-wrapper');
+      const controlsRow = current.closest(VIDEO_CONTROLS_ROW);
+      if (videoWrapper && (direction === 'left' || direction === 'right')) {
+        const inRow = elements.filter((el) => {
+          if (el.closest(VIDEO_PROGRESS)) return false;
+          const elRow = el.closest(VIDEO_CONTROLS_ROW);
+          return elRow && controlsRow && elRow === controlsRow;
+        });
+        if (inRow.length > 0) return inRow;
+      }
       // Dans un carousel : gauche/droite uniquement dans le MÊME carousel (éviter de sauter à la ligne du dessous)
       const currentCarousel = current.closest(CAROUSEL_SELECTOR);
       if (currentCarousel && (direction === 'left' || direction === 'right')) {
         return elements.filter((el) => currentCarousel.contains(el));
+      }
+      // Depuis un carousel, haut/bas : exclure le FAB et autres [data-tv-nav-skip] pour garder le focus dans les lignes
+      if (currentCarousel && (direction === 'up' || direction === 'down')) {
+        return elements.filter((el) => !el.closest(FAB_SKIP_SELECTOR));
       }
       // À l'intérieur du menu settings : gauche/droite uniquement dans le même conteneur
       const settingsContainer = current.closest(SETTINGS_CONTAINER_SELECTOR);
@@ -196,6 +216,15 @@ export default function TVNavigationProvider() {
     const isWebOS = typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
     const scrollBehavior: ScrollBehavior = isWebOS ? 'auto' : 'smooth';
 
+    // Sur webOS : exécuter la navigation en rAF pour réduire la latence perçue (touche renvoyée tout de suite)
+    const scheduleOrRunNavigate = (direction: 'up' | 'down' | 'left' | 'right', scope?: HTMLElement | null): boolean => {
+      if (isWebOS) {
+        requestAnimationFrame(() => navigate(direction, scope));
+        return true;
+      }
+      return navigate(direction, scope);
+    };
+
     // Position d'ancrage du focus : la carte focusée reste à cet X en pixels (depuis le bord gauche du viewport).
     // Le carousel défile pour amener chaque carte à cette position → navigation fluide type Netflix.
     const FOCUS_ANCHOR_RATIO = 0.18;
@@ -266,32 +295,31 @@ export default function TVNavigationProvider() {
       lastFocusedRef.current = element;
     };
 
-    // Appliquer l'effet visuel
+    // Appliquer l'effet visuel (retrait ciblé pour limiter la latence sur webOS)
     const applyFocusEffect = (element: HTMLElement) => {
-      // Retirer l'effet des autres éléments
-      document.querySelectorAll('.tv-card-focused').forEach(el => {
-        el.classList.remove('tv-card-focused');
-      });
-      document.querySelectorAll('.tv-element-focused').forEach(el => {
-        el.classList.remove('tv-element-focused');
-      });
-      
-      // Appliquer l'effet approprié
+      const prev = lastEffectTargetRef.current;
+      if (prev) {
+        prev.classList.remove('tv-card-focused', 'tv-element-focused');
+        lastEffectTargetRef.current = null;
+      }
       const card = element.closest(CARD_SELECTOR) as HTMLElement;
       if (card) {
         card.classList.add('tv-card-focused');
+        lastEffectTargetRef.current = card;
       } else {
         element.classList.add('tv-element-focused');
+        lastEffectTargetRef.current = element;
       }
     };
 
     // Retirer l'effet visuel
     const removeFocusEffect = (element: HTMLElement) => {
       const card = element.closest(CARD_SELECTOR) as HTMLElement;
-      if (card) {
-        card.classList.remove('tv-card-focused');
-      }
+      if (card) card.classList.remove('tv-card-focused');
       element.classList.remove('tv-element-focused');
+      if (lastEffectTargetRef.current === card || lastEffectTargetRef.current === element) {
+        lastEffectTargetRef.current = null;
+      }
     };
 
     // Premier élément à focuser (selon la page ou la modal)
@@ -331,10 +359,15 @@ export default function TVNavigationProvider() {
 
     // Navigation dans une direction (scope optionnel = modal ou conteneur pour piège à focus, fromEl = élément de référence pour la recherche spatiale, ex. input qu'on quitte)
     const navigate = (direction: 'up' | 'down' | 'left' | 'right', scope?: HTMLElement | null, fromEl?: HTMLElement | null): boolean => {
-      const focusableElements = getFocusableElements(scope);
-      if (focusableElements.length === 0) return false;
-
       const activeElement = (fromEl ?? document.activeElement) as HTMLElement;
+      // Sur webOS / TV : en carousel, gauche/droite uniquement dans le carousel courant → moins d’éléments à traiter, moins de latence
+      let effectiveScope = scope;
+      if (!effectiveScope && activeElement && (direction === 'left' || direction === 'right')) {
+        const carousel = activeElement.closest(CAROUSEL_SELECTOR) as HTMLElement | null;
+        if (carousel) effectiveScope = carousel;
+      }
+      const focusableElements = getFocusableElements(effectiveScope);
+      if (focusableElements.length === 0) return false;
       
       // Si scope défini et focus hors scope, focuser le premier élément du scope
       if (scope && (!activeElement || activeElement === document.body || !scope.contains(activeElement))) {
@@ -477,17 +510,17 @@ export default function TVNavigationProvider() {
             }
             handled = true;
           }
-          if (!handled) handled = navigate('left');
+          if (!handled) handled = scheduleOrRunNavigate('left');
           break;
         }
         case 'ArrowRight':
-          handled = navigate('right');
+          handled = scheduleOrRunNavigate('right');
           break;
         case 'ArrowUp':
-          handled = navigate('up');
+          handled = scheduleOrRunNavigate('up');
           break;
         case 'ArrowDown':
-          handled = navigate('down');
+          handled = scheduleOrRunNavigate('down');
           break;
         case 'Enter':
         case 'NumpadEnter':
