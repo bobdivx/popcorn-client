@@ -2,6 +2,7 @@ import { useMemo, useEffect, useRef } from 'preact/hooks';
 import { useDashboardData } from './hooks/useDashboardData';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useSyncStatus } from './hooks/useSyncStatus';
+import { refreshSyncStatusStore } from '../../lib/sync-status-store';
 import type { ContentItem } from '../../lib/client/types';
 import CarouselRow from '../torrents/CarouselRow';
 import { HeroSection } from './components/HeroSection';
@@ -15,12 +16,55 @@ import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
 
 export default function Dashboard() {
   const { t, language } = useI18n();
-  const { data, loading, error, reloadSilent } = useDashboardData();
+  const { data, loading, error, reload, reloadSilent } = useDashboardData();
   const { resumeWatching, rewatchWatching, watchedIds } = useResumeWatching();
   const isWatched = (item: ContentItem) =>
     watchedIds.has(item.id) || (item.tmdbId != null && watchedIds.has(String(item.tmdbId)));
   const { syncStatus, isSyncing, loading: syncLoading } = useSyncStatus();
   const lastSyncProgressRef = useRef<number>(-1);
+  const clearedBySyncRef = useRef(false);
+
+  // Quand l’onglet redevient visible : recharger les données depuis le backend (source de vérité). Pas de spinner.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') reloadSilent();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [reloadSilent]);
+
+  // Au montage : mettre à jour le statut sync pour que totalTorrentsFromSync soit à jour (0 après "vider") et déclencher le rechargement si besoin.
+  useEffect(() => {
+    refreshSyncStatusStore();
+  }, []);
+
+  // Après "vider les torrents" (Settings) : recharger pour vider le dashboard même si on est sur une autre page / que le statut sync n'a pas encore été rafraîchi (ex. accès via IP).
+  useEffect(() => {
+    const handler = () => {
+      clearedBySyncRef.current = true;
+      reload();
+    };
+    window.addEventListener('popcorn:torrents-cleared', handler);
+    return () => window.removeEventListener('popcorn:torrents-cleared', handler);
+  }, [reload]);
+
+  // Source de vérité : si la sync dit 0 torrents en base mais le dashboard affiche encore du contenu,
+  // recharger une seule fois pour vider (évite une boucle).
+  const totalTorrentsFromSync = syncStatus?.stats
+    ? Object.values(syncStatus.stats).reduce((a: number, b: unknown) => a + Number(b), 0)
+    : -1;
+  const hasDataToClear = data && (
+    (data.popularMovies?.length ?? 0) > 0 ||
+    (data.popularSeries?.length ?? 0) > 0 ||
+    (data.recentAdditions?.length ?? 0) > 0 ||
+    (data.fastTorrents?.length ?? 0) > 0
+  );
+  useEffect(() => {
+    if (syncLoading || totalTorrentsFromSync !== 0 || !hasDataToClear) return;
+    if (clearedBySyncRef.current) return;
+    clearedBySyncRef.current = true;
+    reload();
+  }, [syncLoading, totalTorrentsFromSync, hasDataToClear, reload]);
 
   // Rafraîchir les données au fur et à mesure de la synchronisation torrent
   useEffect(() => {
