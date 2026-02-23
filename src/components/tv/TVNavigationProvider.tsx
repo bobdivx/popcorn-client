@@ -166,11 +166,11 @@ export default function TVNavigationProvider() {
         const targetCarousel = bestElement.closest(CAROUSEL_SELECTOR);
         
         if (targetCarousel && (!currentCarousel || !currentCarousel.isSameNode(targetCarousel))) {
-          // Entrer dans un nouveau carousel, trouver la première carte visible
+          // Entrer dans un nouveau carousel : première carte (au moins partiellement) visible pour navigation fluide
           const cardsInCarousel = Array.from(targetCarousel.querySelectorAll<HTMLElement>(CARD_SELECTOR))
             .filter(el => {
               const rect = el.getBoundingClientRect();
-              return rect.width > 0 && rect.height > 0 && rect.left >= 0 && rect.right <= window.innerWidth;
+              return rect.width > 0 && rect.height > 0 && rect.left < window.innerWidth && rect.right > 0;
             })
             .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
           
@@ -190,32 +190,25 @@ export default function TVNavigationProvider() {
     const isWebOS = typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
     const scrollBehavior: ScrollBehavior = isWebOS ? 'auto' : 'smooth';
 
-    // Carousel (web + webOS) : on scroll le conteneur à la main pour que la carte ne soit jamais coupée.
-    // scrollIntoView centre la carte et peut la couper ; ici on assure qu'elle reste entièrement visible.
+    // Position d'ancrage du focus : la carte focusée reste à cet X en pixels (depuis le bord gauche du viewport).
+    // Le carousel défile pour amener chaque carte à cette position → navigation fluide type Netflix.
+    const FOCUS_ANCHOR_RATIO = 0.18;
+    const getFocusAnchorX = () => typeof window !== 'undefined' ? window.innerWidth * FOCUS_ANCHOR_RATIO : 120;
+
+    // Carousel : on scroll pour que la carte focusée soit à la position d'ancrage (focus fixe, carousel qui bouge).
     const scrollCarouselToElement = (carousel: HTMLElement, el: HTMLElement) => {
       const elRect = el.getBoundingClientRect();
       const carouselRect = carousel.getBoundingClientRect();
-      const padding = 12;
       const maxScroll = carousel.scrollWidth - carousel.clientWidth;
       if (maxScroll <= 0) return;
 
+      const anchorX = getFocusAnchorX();
       const cardLeftInScroll = elRect.left - carouselRect.left + carousel.scrollLeft;
-      const cardRightInScroll = cardLeftInScroll + elRect.width;
-      const visibleLeft = carousel.scrollLeft;
-      const visibleRight = carousel.scrollLeft + carousel.clientWidth;
-
-      let newScrollLeft = carousel.scrollLeft;
-      if (elRect.width >= carousel.clientWidth) {
-        newScrollLeft = cardLeftInScroll - (carousel.clientWidth / 2) + (elRect.width / 2);
-      } else {
-        if (cardLeftInScroll < visibleLeft + padding) {
-          newScrollLeft = cardLeftInScroll - padding;
-        }
-        if (cardRightInScroll > visibleRight - padding) {
-          newScrollLeft = cardRightInScroll - carousel.clientWidth + padding;
-        }
-      }
+      // On veut : après scroll, le bord gauche de la carte soit à anchorX (dans le viewport).
+      // cardLeft (viewport) = carouselRect.left + (cardLeftInScroll - newScrollLeft) = anchorX
+      let newScrollLeft = cardLeftInScroll + carouselRect.left - anchorX;
       newScrollLeft = Math.max(0, Math.min(maxScroll, newScrollLeft));
+
       if (isWebOS) {
         carousel.scrollLeft = newScrollLeft;
       } else {
@@ -740,10 +733,23 @@ export default function TVNavigationProvider() {
           }
           e.preventDefault();
           e.stopPropagation();
-        } else if (window.history.length > 1) {
-          window.history.back();
-          e.preventDefault();
-          e.stopPropagation();
+        } else {
+          // Même logique que Escape/Backspace : priorité aux handlers data-tv-back-handler (ex. MediaDetail)
+          const handlers = Array.from(document.querySelectorAll('[data-tv-back-handler]')) as (HTMLElement & { _tvBack?: () => void })[];
+          const active = document.activeElement;
+          const containing = handlers.filter((el) => active && el.contains(active));
+          const deepest = containing.length
+            ? containing.reduce((a, b) => (a.contains(b) ? b : a))
+            : null;
+          if (deepest?._tvBack) {
+            deepest._tvBack();
+            e.preventDefault();
+            e.stopPropagation();
+          } else if (window.history.length > 1) {
+            window.history.back();
+            e.preventDefault();
+            e.stopPropagation();
+          }
         }
       }
     };
