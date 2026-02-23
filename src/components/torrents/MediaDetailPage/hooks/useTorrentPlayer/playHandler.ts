@@ -74,10 +74,10 @@ function getStreamingDownloadFull(): boolean {
   return false;
 }
 
-/** Appelle updateOnlyFiles dès que le torrent peut l'accepter, avec réessais en cas de 502/503 (initializing). */
+/** Appelle updateOnlyFiles dès que le torrent peut l'accepter, avec réessais en cas de 502/503 (torrent en "initializing"). */
 function scheduleUpdateOnlyFilesWithRetry(infoHash: string, fileIndex: number) {
-  // Premier essai après 1,5 s (laisse le temps au torrent de sortir d'initializing), puis 3s, 6s, 10s, 15s
-  const delays = [1500, 3000, 6000, 10000, 15000];
+  // 503 = "Le torrent n'est pas encore prêt" (backend). Délais progressifs pour laisser le temps au .torrent d'être récupéré.
+  const delays = [2000, 4000, 8000, 12000, 20000, 30000, 45000];
   let attempt = 0;
   const run = () => {
     clientApi.updateOnlyFiles(infoHash, [fileIndex]).catch(() => {
@@ -352,8 +352,94 @@ export function createHandlePlay(context: PlayHandlerContext) {
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
             const errorMsg = typeof errorData?.error === 'string' ? errorData.error : '';
-            // 404 ou message indexeur : torrent indisponible, ne pas fallback magnet (créerait un torrent "initializing" sans métadonnées)
-            if (response.status === 404 || (response.status === 502 && (errorMsg.includes('indexer') || errorMsg.includes('404') || errorMsg.includes('indisponible')))) {
+            const isTorrentUnavailable = response.status === 404 || (response.status === 502 && (errorMsg.includes('indexer') || errorMsg.includes('404') || errorMsg.includes('indisponible')));
+            // Si on a un magnet issu de la recherche (sync), l'utiliser en secours quand le .torrent est indisponible sur l'indexeur
+            if (isTorrentUnavailable && (torrent._externalMagnetUri?.trim())) {
+              addDebugLog('info', '📥 Fichier .torrent indisponible sur l\'indexeur, ajout via magnet (données de la recherche)', { hasMagnet: true });
+              const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
+              const downloadType = forStreaming ? undefined : (torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film'));
+              const addResult = await clientApi.addMagnetLink(torrent._externalMagnetUri!, torrent.name, forStreaming, downloadType);
+              if (addResult.info_hash) {
+                if (forStreaming) setStreamingInfoHash(addResult.info_hash);
+                if (typeof torrent.tmdbId === 'number' && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) {
+                  clientApi.bindDownloadToMedia(addResult.info_hash, torrent.tmdbId, torrent.tmdbType).catch(() => {});
+                }
+                setPlayStatus('adding');
+                setProgressMessage('Récupération des métadonnées...');
+                addDebugLog('info', '✅ Torrent ajouté via magnet (fallback), attente des métadonnées...', { infoHash: addResult.info_hash });
+
+                let retryCount = 0;
+                const maxRetries = 30;
+                const checkMetadata = async () => {
+                  try {
+                    const stats = await clientApi.getTorrent(addResult.info_hash);
+                    const hasMetadata = stats && stats.total_bytes > 0;
+                    const files = await clientApi.getTorrentFiles(addResult.info_hash);
+                    const hasFiles = files.length > 0;
+                    if (hasMetadata || hasFiles) {
+                      addDebugLog('success', '✅ Métadonnées disponibles', { total_bytes: stats?.total_bytes || 0, files_count: files.length });
+                      setPlayStatus('downloading');
+                      setProgressMessage('Recherche de peers...');
+                      const videos = await loadVideoFiles(addResult.info_hash);
+                      if (videos.length > 0) {
+                        addDebugLog('success', '✅ Fichiers vidéo trouvés', { files_count: videos.length });
+                        if (forStreaming && !getStreamingDownloadFull()) {
+                          scheduleUpdateOnlyFilesWithRetry(addResult.info_hash, videos[0].index ?? 0);
+                        }
+                        setVideoFiles(videos);
+                        setSelectedFile(videos[0]);
+                        if (forStreaming) {
+                          await markStreamingIfActive();
+                          const okM = await waitForStreamReady(
+                            streamingTorrentActive, addResult.info_hash, videos[0],
+                            setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
+                          );
+                          if (!okM) return;
+                          setPlayStatus('ready');
+                          setProgressMessage('Lancement de la lecture...');
+                          setIsPlaying(true);
+                          setShowInfo(false);
+                          stopProgressPolling();
+                          return;
+                        }
+                        progressPollIntervalRef.current = window.setInterval(() => pollTorrentProgress(addResult.info_hash), PROGRESS_POLL_INTERVAL_MS);
+                        pollTorrentProgress(addResult.info_hash);
+                      } else if (retryCount < maxRetries) {
+                        retryCount++;
+                        setProgressMessage(`Récupération des métadonnées... (${retryCount}/${maxRetries})`);
+                        setTimeout(checkMetadata, 1000);
+                      } else {
+                        setPlayStatus('downloading');
+                        setProgressMessage('Recherche de peers...');
+                        progressPollIntervalRef.current = window.setInterval(() => pollTorrentProgress(addResult.info_hash), PROGRESS_POLL_INTERVAL_MS);
+                        pollTorrentProgress(addResult.info_hash);
+                      }
+                    } else if (retryCount < maxRetries) {
+                      retryCount++;
+                      setProgressMessage(`Récupération des métadonnées... (${retryCount}/${maxRetries})`);
+                      setTimeout(checkMetadata, 1000);
+                    } else {
+                      setPlayStatus('downloading');
+                      setProgressMessage('Recherche de peers...');
+                      progressPollIntervalRef.current = window.setInterval(() => pollTorrentProgress(addResult.info_hash), PROGRESS_POLL_INTERVAL_MS);
+                      pollTorrentProgress(addResult.info_hash);
+                    }
+                  } catch {
+                    if (retryCount < maxRetries) {
+                      retryCount++;
+                      setTimeout(checkMetadata, 1000);
+                    } else {
+                      setPlayStatus('downloading');
+                      progressPollIntervalRef.current = window.setInterval(() => pollTorrentProgress(addResult.info_hash), PROGRESS_POLL_INTERVAL_MS);
+                      pollTorrentProgress(addResult.info_hash);
+                    }
+                  }
+                };
+                setTimeout(checkMetadata, 1000);
+                return;
+              }
+            }
+            if (isTorrentUnavailable) {
               setErrorMessage(errorMsg || 'Ce torrent n\'est plus disponible sur l\'indexeur. Choisissez une autre source.');
               setPlayStatus('idle');
               setProgressMessage(null);
