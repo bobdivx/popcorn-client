@@ -33,6 +33,9 @@ export interface SyncStatusStore {
   tmdb_stats?: { with_tmdb: number; without_tmdb: number; missing_tmdb: Array<[string, string]> };
   /** Stats TMDB par indexer (pour la modale détail d’un indexer) */
   tmdb_stats_by_indexer?: Record<string, { with_tmdb: number; without_tmdb: number; missing_tmdb: Array<[string, string]> }>;
+  media_by_genre_by_indexer?: Record<string, Record<string, string[]>>;
+  genre_counts_films?: Record<string, number>;
+  genre_counts_series?: Record<string, number>;
 }
 
 type Listener = (state: StoreState) => void;

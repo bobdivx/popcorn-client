@@ -56,6 +56,8 @@ export default function Dashboard() {
   const hasDataToClear = data && (
     (data.popularMovies?.length ?? 0) > 0 ||
     (data.popularSeries?.length ?? 0) > 0 ||
+    (data.recentMovies?.length ?? 0) > 0 ||
+    (data.recentSeries?.length ?? 0) > 0 ||
     (data.recentAdditions?.length ?? 0) > 0 ||
     (data.fastTorrents?.length ?? 0) > 0
   );
@@ -71,7 +73,6 @@ export default function Dashboard() {
     if (!isSyncing) {
       if (wasSyncingRef.current) reloadSilent();
       wasSyncingRef.current = false;
-      lastSyncProgressRef.current = -1;
       return;
     }
     wasSyncingRef.current = true;
@@ -110,6 +111,8 @@ export default function Dashboard() {
     (data.popularMovies && data.popularMovies.length > 0) ||
     (data.popularSeries && data.popularSeries.length > 0) ||
     (data.continueWatching && data.continueWatching.length > 0) ||
+    (data.recentMovies && data.recentMovies.length > 0) ||
+    (data.recentSeries && data.recentSeries.length > 0) ||
     (data.recentAdditions && data.recentAdditions.length > 0) ||
     resumeWatching.length > 0
   );
@@ -285,14 +288,14 @@ export default function Dashboard() {
           </CarouselRow>
         )}
 
-        {/* Section Ajouts récents (toujours affichée pour éviter apparition/disparition). Tri par date de sortie TMDB. */}
-        <CarouselRow title={t('dashboard.recentAdditions')} autoScroll={false}>
+        {/* Ligne Nouveautés films (tri par date de sortie) */}
+        <CarouselRow title={t('dashboard.newReleasesMovies')} autoScroll={false}>
           {isSyncing ? (
             <div className="flex-shrink-0 px-4 py-3 text-gray-400 text-sm sm:text-base">
               {t('dashboard.recentAdditionsSyncing')}
             </div>
-          ) : data.recentAdditions && data.recentAdditions.filter((item) => !isWatched(item)).length > 0 ? (
-            data.recentAdditions.filter((item) => !isWatched(item)).map((item) => (
+          ) : data.recentMovies && data.recentMovies.filter((item) => !isWatched(item)).length > 0 ? (
+            data.recentMovies.filter((item) => !isWatched(item)).map((item) => (
               <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                 <LazyTorrentPoster item={item} />
               </div>
@@ -304,9 +307,28 @@ export default function Dashboard() {
           )}
         </CarouselRow>
 
-        {/* Section Torrents rapides (beaucoup de seeders) — cachés : déjà vus */}
+        {/* Ligne Nouveautés séries (tri par date de sortie) */}
+        <CarouselRow title={t('dashboard.newReleasesSeries')} autoScroll={false}>
+          {isSyncing ? (
+            <div className="flex-shrink-0 px-4 py-3 text-gray-400 text-sm sm:text-base">
+              {t('dashboard.recentAdditionsSyncing')}
+            </div>
+          ) : data.recentSeries && data.recentSeries.filter((item) => !isWatched(item)).length > 0 ? (
+            data.recentSeries.filter((item) => !isWatched(item)).map((item) => (
+              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+                <LazyTorrentPoster item={item} />
+              </div>
+            ))
+          ) : (
+            <div className="flex-shrink-0 px-4 py-3 text-gray-500 text-sm sm:text-base">
+              {t('dashboard.recentAdditionsEmpty')}
+            </div>
+          )}
+        </CarouselRow>
+
+        {/* Ligne Torrents les plus partagés (beaucoup de seeders) */}
         {data.fastTorrents && data.fastTorrents.filter((item) => !isWatched(item)).length > 0 && (
-          <CarouselRow title={t('dashboard.fastTorrents')} autoScroll={false}>
+          <CarouselRow title={t('dashboard.mostShared')} autoScroll={false}>
             {data.fastTorrents.filter((item) => !isWatched(item)).map((item) => (
               <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                 <LazyTorrentPoster item={item} />
@@ -315,7 +337,7 @@ export default function Dashboard() {
           </CarouselRow>
         )}
 
-        {/* Section Films populaires - par catégories */}
+        {/* Section Films les plus populaires (par genre) */}
         {sortedMovieGenres.length > 0 ? (
           sortedMovieGenres.map(genre => {
             const genreMovies = moviesByGenre[genre];
@@ -327,7 +349,7 @@ export default function Dashboard() {
             const filteredMovies = genreMovies.filter((item) => !isWatched(item));
             if (filteredMovies.length === 0) return null;
             return (
-              <CarouselRow key={`movies-${genre}`} title={t('dashboard.moviesGenre', { genre: genreTitle })} autoScroll={false}>
+              <CarouselRow key={`movies-${genre}`} title={genreTitle} autoScroll={false}>
                 {filteredMovies.map((item) => (
                   <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                     <LazyTorrentPoster item={item} />
@@ -349,7 +371,7 @@ export default function Dashboard() {
           )
         )}
 
-        {/* Section Séries populaires - par catégories */}
+        {/* Section Séries les plus populaires (par genre) */}
         {sortedSeriesGenres.length > 0 ? (
           sortedSeriesGenres.map(genre => {
             const genreSeries = seriesByGenre[genre];
@@ -361,7 +383,7 @@ export default function Dashboard() {
             const filteredSeries = genreSeries.filter((item) => !isWatched(item));
             if (filteredSeries.length === 0) return null;
             return (
-              <CarouselRow key={`series-${genre}`} title={t('dashboard.seriesGenre', { genre: genreTitle })} autoScroll={false}>
+              <CarouselRow key={`series-${genre}`} title={genreTitle} autoScroll={false}>
                 {filteredSeries.map((item) => (
                   <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                     <LazyTorrentPoster item={item} />

@@ -67,6 +67,10 @@ interface SyncStatus {
   tmdb_stats_by_indexer?: Record<string, TmdbStats>;
   /** Médias par genre TMDB par indexer : indexer_key -> genre_name -> titres */
   media_by_genre_by_indexer?: Record<string, Record<string, string[]>>;
+  /** Nombre de films en base par genre (pour comparaison page Films) */
+  genre_counts_films?: Record<string, number>;
+  /** Nombre de séries en base par genre (pour comparaison page Séries) */
+  genre_counts_series?: Record<string, number>;
 }
 
 interface TorrentSyncManagerProps {

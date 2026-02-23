@@ -17,7 +17,7 @@ export function useDashboardData() {
       const prefs = getLibraryDisplayConfig();
       const opts = {
         minSeeds: prefs.showZeroSeedTorrents ? 0 : 1,
-        popularLimit: 20,
+        popularLimit: Math.min(prefs.torrentsInitialLimit || 250, 500),
         recentLimit: prefs.torrentsRecentLimit,
         mediaLanguages: prefs.mediaLanguages,
         minQuality: prefs.minQuality,
@@ -39,10 +39,11 @@ export function useDashboardData() {
         popularSeriesIds,
       });
 
-      // Un seul setData avec toutes les données → affichage en une fois, sans scintillement
       const merged: DashboardData = {
         ...phase1.data,
         recentAdditions: phase2.success && phase2.data ? phase2.data.recentAdditions : phase1.data.recentAdditions,
+        recentMovies: phase2.success && phase2.data ? phase2.data.recentMovies : [],
+        recentSeries: phase2.success && phase2.data ? phase2.data.recentSeries : [],
         fastTorrents: phase2.success && phase2.data ? phase2.data.fastTorrents : phase1.data.fastTorrents,
       };
       setData(merged);

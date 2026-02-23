@@ -7,7 +7,6 @@ import { LazyTorrentPoster } from './components/LazyTorrentPoster';
 import { LazyResumePoster } from './components/LazyResumePoster';
 import type { ContentItem } from '../../lib/client/types';
 import { useInfiniteFilms } from './hooks/useInfiniteFilms';
-import { useRecentFilms } from './hooks/useRecentFilms';
 import { useFavoritesItems } from './hooks/useFavoritesItems';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useSyncStatus } from './hooks/useSyncStatus';
@@ -28,7 +27,6 @@ import Library from '../Library';
 export default function FilmsDashboard() {
   const { t, language } = useI18n();
   const { films, loading, error, hasMore, loadMore, clearAndRefetch, refetchSilent, refetchReplaceSilent } = useInfiniteFilms();
-  const { films: recentFilms } = useRecentFilms();
   const { items: favoritesItems } = useFavoritesItems();
   const { resumeWatching, rewatchWatching, watchedIds } = useResumeWatching();
   const { syncStatus, isSyncing, loading: syncLoading } = useSyncStatus();
@@ -263,8 +261,7 @@ export default function FilmsDashboard() {
     return '';
   };
 
-  // Grouper les films par genre : chaque film apparaît dans TOUS ses genres (pas seulement le premier)
-  // pour que les lignes Animation, Aventure, etc. affichent tous les films concernés.
+  // Grouper les films par genre ; chaque ligne est triée avec les plus récents au début.
   const filmsByGenre = useMemo(() => {
     const grouped: Record<string, FilmData[]> = {};
     const watched = new Set(watchedIds);
@@ -469,24 +466,6 @@ export default function FilmsDashboard() {
             ))}
           </CarouselRow>
         )}
-        {/* Section Ajouts récents (toujours affichée pour éviter apparition/disparition). Tri par date de sortie TMDB. */}
-        <CarouselRow title={t('dashboard.recentAdditions')} autoScroll={false}>
-          {isSyncing ? (
-            <div className="flex-shrink-0 px-4 py-3 text-gray-400 text-sm sm:text-base">
-              {t('dashboard.recentAdditionsSyncing')}
-            </div>
-          ) : recentFilms.filter((f) => !isWatched(f)).length > 0 ? (
-            recentFilms.filter((f) => !isWatched(f)).map((film) => (
-              <div key={film.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                <LazyTorrentPoster item={{ ...film, type: 'movie' }} />
-              </div>
-            ))
-          ) : (
-            <div className="flex-shrink-0 px-4 py-3 text-gray-500 text-sm sm:text-base">
-              {t('dashboard.recentAdditionsEmpty')}
-            </div>
-          )}
-        </CarouselRow>
         {/* Section À regarder plus tard (favoris) */}
         {favoritesItems.length > 0 && (
           <CarouselRow title={t('dashboard.watchLater')} autoScroll={false}>
@@ -507,9 +486,12 @@ export default function FilmsDashboard() {
 
             const genreTitle =
               genre === '__other__' ? t('common.others') : translateGenre(genre, language);
+            const inDb = genre !== '__other__' ? syncStatus?.genre_counts_films?.[genre] : undefined;
+            const titleBadge =
+              typeof inDb === 'number' ? `${genreFilms.length} / ${inDb}` : undefined;
 
             return (
-              <CarouselRow key={genre} title={genreTitle} autoScroll={false}>
+              <CarouselRow key={genre} title={genreTitle} titleBadge={titleBadge} autoScroll={false}>
                 {genreFilms.map((film) => (
                   <div key={film.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                     <LazyTorrentPoster item={{ ...film, type: 'movie' }} />
