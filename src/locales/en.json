@@ -496,7 +496,9 @@
     "quality480": "480p",
     "quality360": "360p",
     "watchLaterAdd": "Watch later",
-    "watchLaterRemove": "Remove from favorites"
+    "watchLaterRemove": "Remove from favorites",
+    "castToDevice": "Cast to Chromecast",
+    "casting": "Playing on Chromecast"
   },
   "nav": {
     "menu": "Menu",

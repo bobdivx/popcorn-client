@@ -78,6 +78,12 @@ interface VideoControlsProps {
   torrentProgress?: number | null;
   /** Ref pour ouvrir le menu qualité depuis la télécommande (Enter sur le bouton Paramètres). */
   onOpenQualityMenuRef?: { current: (() => void) | null };
+  /** Afficher le bouton « Lancer sur Chromecast ». */
+  showCastButton?: boolean;
+  /** En cours de lecture sur un Chromecast. */
+  isCasting?: boolean;
+  /** Clic sur le bouton Cast (lancer la lecture sur le Chromecast). */
+  onCastClick?: () => void;
 }
 
 export function VideoControls({
@@ -122,6 +128,9 @@ export function VideoControls({
   onQualityChange,
   torrentProgress,
   onOpenQualityMenuRef,
+  showCastButton = false,
+  isCasting = false,
+  onCastClick,
 }: VideoControlsProps) {
   const { t } = useI18n();
   const [showQualityMenu, setShowQualityMenu] = useState(false);
@@ -165,9 +174,10 @@ export function VideoControls({
   const padding = isTV ? 'px-10 pt-10 pb-10' : isFullscreen ? 'px-8 pt-8 pb-8 md:px-12 md:pt-10 md:pb-10' : 'px-3 pt-3 pb-3 sm:px-6 sm:pt-6 sm:pb-6 md:px-8 md:pt-8 md:pb-8';
   const gap = isTV ? 'gap-8' : isFullscreen ? 'gap-6' : 'gap-2 sm:gap-4 md:gap-5';
 
-  // Indices de focus : back(0 si hasBack), play, mute, [quality si showQualitySelector], fullscreen
+  // Indices de focus : back(0 si hasBack), play, mute, [quality], [cast], fullscreen
   const qualityIndex = hasBackButton ? 3 : 2;
-  const fullscreenIndex = showQualitySelector && onQualityChange ? (hasBackButton ? 4 : 3) : (hasBackButton ? 3 : 2);
+  const castIndex = (showQualitySelector && onQualityChange ? (hasBackButton ? 4 : 3) : (hasBackButton ? 3 : 2));
+  const fullscreenIndex = (showCastButton && onCastClick ? castIndex + 1 : castIndex);
   const getFocusClass = (index: number) => {
     if (!isTV || focusedOnProgress) return '';
     if (focusedControlIndex !== index) return '';
@@ -383,6 +393,23 @@ export function VideoControls({
                 title="Langues et sous-titres"
               >
                 <Subtitles class={`${iconSize} text-white`} />
+              </button>
+            )}
+            {showCastButton && onCastClick && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCastClick();
+                }}
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${getFocusClass(castIndex)} ${isCasting ? 'bg-purple-600/40 border-purple-400/50' : ''}`}
+                title={isCasting ? t('playback.casting') : t('playback.castToDevice')}
+                aria-label={isCasting ? t('playback.casting') : t('playback.castToDevice')}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden>
+                  <path d="M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9 9 0 0 1 9.95 20M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6" />
+                  <line x1="2" y1="20" x2="2.01" y2="20" />
+                </svg>
               </button>
             )}
             {showQualitySelector && onQualityChange && (

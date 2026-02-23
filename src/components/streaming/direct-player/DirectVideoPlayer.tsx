@@ -5,6 +5,7 @@ import { useTVPlayerNavigation } from '../player-shared/hooks/useTVPlayerNavigat
 import { usePlayerConfig } from '../player-shared/hooks/usePlayerConfig';
 import { VideoControls } from '../player-shared/components/VideoControls';
 import { useI18n } from '../../../lib/i18n';
+import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import type { PlayerLoadingTorrentStats } from '../player-shared/components/PlayerLoadingOverlay';
 
 interface DirectVideoPlayerProps {
@@ -46,6 +47,7 @@ export default function DirectVideoPlayer({
 }: DirectVideoPlayerProps) {
   const { t } = useI18n();
   const playerConfig = usePlayerConfig();
+  const chromecast = useChromecast();
 
   /** Progression téléchargement (0–1) pour la barre verte. Utilise downloaded_bytes/total_bytes ou state completed/seeding pour éviter les incohérences (ex. fichier 100% téléchargé mais progress incorrect). */
   const torrentProgress = useMemo(() => {
@@ -356,6 +358,9 @@ export default function DirectVideoPlayer({
           showLogo={playerConfig.showLogo}
           onClose={onClose}
           onRestart={handleRestart}
+          showCastButton={chromecast.isAvailable}
+          isCasting={chromecast.isCasting}
+          onCastClick={() => chromecast.castMedia(src, torrentName || '', currentTime)}
         />
       </div>
     </div>
