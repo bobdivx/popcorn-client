@@ -1,0 +1,191 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import DocNav from '../../../components/DocNav';
+---
+
+<Layout title="Configuration Avancée Docker - Popcorn Torrent">
+  <div class="min-h-screen bg-black text-white">
+    <DocNav client:load currentPath="/docs/docker/advanced" />
+    
+    <div class="container mx-auto px-4 py-16 max-w-4xl">
+      <h1 class="text-4xl md:text-5xl font-bold mb-6">
+        Configuration Avancée
+      </h1>
+      
+      <div class="prose prose-invert max-w-none">
+        <p class="text-xl text-gray-300 mb-8">
+          Personnalisez votre déploiement Docker avec ces configurations avancées.
+        </p>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Variables d'environnement</h2>
+        <p class="text-gray-300 mb-4">
+          Toutes les variables sont optionnelles et ont des valeurs par défaut. Modifiez-les dans <code class="bg-black/50 px-2 py-1 rounded">docker-compose.yml</code> :
+        </p>
+
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code># Frontend
+environment:
+  - NODE_ENV=production
+  - HOST=0.0.0.0
+  - PORT=4321
+  - BACKEND_URL=http://backend:3000
+  - PUBLIC_BACKEND_URL=http://backend:3000
+  - TZ=Europe/Paris
+
+# Backend
+environment:
+  - SERVER_HOST=0.0.0.0
+  - SERVER_PORT=3000
+  - DOWNLOAD_DIR=/app/downloads
+  - API_BASE_URL=http://frontend:4321
+  - API_USERNAME=admin
+  - API_PASSWORD=admin123
+  - MAX_DOWNLOADS=5
+  - MAX_UPLOAD_SLOTS=4
+  - LOG_LEVEL=info
+  - RUST_LOG=info
+  - ANNOUNCE_INTERVAL=1800
+  - TZ=Europe/Paris</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Configuration réseau</h2>
+        <p class="text-gray-300 mb-4">
+          Par défaut, les ports exposés sont :
+        </p>
+        <ul class="list-disc list-inside text-gray-300 space-y-2 mb-8">
+          <li><strong>4325</strong> : Frontend (interface web) - mappe vers le port 4321 du conteneur</li>
+          <li><strong>3000</strong> : Backend (API)</li>
+        </ul>
+        <p class="text-gray-300 mb-4">
+          Vous pouvez modifier ces ports dans <code class="bg-black/50 px-2 py-1 rounded">docker-compose.yml</code> :
+        </p>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>ports:
+  - "8080:4321"  # Changer le port externe du frontend
+  - "3001:3000"  # Changer le port externe du backend</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Volumes et persistance</h2>
+        <p class="text-gray-300 mb-4">
+          Les données sont stockées dans les volumes suivants :
+        </p>
+        <ul class="list-disc list-inside text-gray-300 space-y-2 mb-8">
+          <li><code class="bg-black/50 px-2 py-1 rounded">./data/.data</code> : Base de données SQLite</li>
+          <li><code class="bg-black/50 px-2 py-1 rounded">./data/downloads</code> : Fichiers téléchargés</li>
+          <li><code class="bg-black/50 px-2 py-1 rounded">./data/transcode_cache</code> : Cache de transcodage</li>
+        </ul>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Mise à jour des images</h2>
+        <p class="text-gray-300 mb-4">
+          Pour mettre à jour vers la dernière version :
+        </p>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-green-400 overflow-x-auto"><code># Télécharger les dernières images
+docker-compose pull
+
+# Redémarrer avec les nouvelles images
+docker-compose up -d</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Reverse Proxy</h2>
+        <p class="text-gray-300 mb-4">
+          Pour exposer Popcorn Torrent sur Internet, utilisez un reverse proxy comme Nginx ou Traefik.
+        </p>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Exemple Nginx</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>server {'{'{'}'}
+    listen 80;
+    server_name popcorn.example.com;
+
+    location / {
+        proxy_pass http://localhost:4325;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Sauvegarde</h2>
+        <p class="text-gray-300 mb-4">
+          Pour sauvegarder vos données :
+        </p>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-green-400 overflow-x-auto"><code># Sauvegarder la base de données
+tar -czf backup-$(date +%Y%m%d).tar.gz data/.data/
+
+# Restaurer
+tar -xzf backup-YYYYMMDD.tar.gz</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Ressources système</h2>
+        <p class="text-gray-300 mb-4">
+          Vous pouvez limiter les ressources utilisées par les conteneurs :
+        </p>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>deploy:
+  resources:
+    limits:
+      memory: "2G"
+      cpus: "1.0"
+    reservations:
+      memory: "512M"
+      cpus: "0.5"</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Dépannage</h2>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Le conteneur ne démarre pas</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-green-400 overflow-x-auto"><code># Voir les logs
+docker-compose logs backend
+docker-compose logs frontend
+
+# Voir les logs en temps réel
+docker-compose logs -f</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Problèmes de permissions</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-green-400 overflow-x-auto"><code>sudo chown -R 1000:1000 data/
+chmod -R 755 data/</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Port déjà utilisé</h3>
+        <p class="text-gray-300 mb-4">
+          Si le port 4325 ou 3000 est déjà utilisé, modifiez les ports dans docker-compose.yml :
+        </p>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>ports:
+  - "4326:4321"  # Utiliser le port 4326 au lieu de 4325
+  - "3001:3000"  # Utiliser le port 3001 au lieu de 3000</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réinitialiser complètement</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-green-400 overflow-x-auto"><code># Arrêter et supprimer les conteneurs
+docker-compose down
+
+# Supprimer les volumes (ATTENTION: supprime toutes les données!)
+docker-compose down -v
+
+# Redémarrer
+docker-compose up -d</code></pre>
+        </div>
+
+        <div class="bg-blue-900/20 border border-blue-600/50 rounded-lg p-6 mt-8 mb-8">
+          <h3 class="text-xl font-bold mb-2 text-blue-300">💡 Images Docker Hub</h3>
+          <p class="text-gray-300 mb-2">
+            Les images sont disponibles sur Docker Hub :
+          </p>
+          <ul class="list-disc list-inside text-gray-300 space-y-1">
+            <li><a href="https://hub.docker.com/r/bobdivx/popcorn-frontend" target="_blank" class="text-red-400 hover:text-red-300">bobdivx/popcorn-frontend</a></li>
+            <li><a href="https://hub.docker.com/r/bobdivx/popcorn-backend" target="_blank" class="text-red-400 hover:text-red-300">bobdivx/popcorn-backend</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>

@@ -1,0 +1,371 @@
+---
+/**
+ * Lanceur webOS : choix entre client cloud et client local.
+ * Même design que l'app (design-system) et navigation télécommande (Haut/Bas, Entrée).
+ */
+const cloudClientBase = typeof import.meta.env.PUBLIC_CLIENT_URL !== 'undefined' && import.meta.env.PUBLIC_CLIENT_URL
+  ? String(import.meta.env.PUBLIC_CLIENT_URL).replace(/\/$/, '')
+  : 'https://client.popcornn.app';
+---
+
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark" data-webos-launcher="true">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Popcornn</title>
+  <style is:inline>
+    /* Design system (aligné avec design-system.css + global.css) */
+    :root {
+      --ds-surface: #1C1C1E;
+      --ds-surface-elevated: #2C2C2E;
+      --ds-accent-violet: #D1C4E9;
+      --ds-text-primary: #ffffff;
+      --ds-text-secondary: rgba(255, 255, 255, 0.65);
+      --ds-text-tertiary: rgba(255, 255, 255, 0.45);
+      --ds-text-on-accent: #1C1C1E;
+      --ds-border: rgba(255, 255, 255, 0.1);
+      --ds-radius-sm: 12px;
+      --ds-radius-md: 20px;
+      --ds-radius-lg: 32px;
+      --ds-space-4: 16px;
+      --ds-space-6: 24px;
+      --ds-space-8: 32px;
+      --page-bg: #12141a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #12141a;
+      background: var(--page-bg);
+      color: #ffffff;
+      color: var(--ds-text-primary);
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--ds-space-8);
+    }
+    .webos-launcher-container {
+      width: 100%;
+      max-width: 32rem;
+    }
+    .webos-launcher-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      margin-bottom: var(--ds-space-6);
+      color: var(--ds-text-primary);
+      text-align: center;
+    }
+    .webos-launcher-choices {
+      display: flex;
+      flex-direction: column;
+      gap: var(--ds-space-4);
+    }
+    .webos-launcher-btn {
+      display: block;
+      width: 100%;
+      min-height: 52px;
+      padding: var(--ds-space-4) var(--ds-space-6);
+      font-size: 1.05rem;
+      font-weight: 500;
+      background: #2C2C2E;
+      background: var(--ds-surface-elevated);
+      color: #ffffff;
+      color: var(--ds-text-primary);
+      border: 1px solid rgba(255,255,255,0.1);
+      border: 1px solid var(--ds-border);
+      border-radius: var(--ds-radius-sm);
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.15s, border-color 0.15s, transform 0.15s;
+    }
+    .webos-launcher-btn:hover,
+    .webos-launcher-btn:focus {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.2);
+      outline: none;
+    }
+    .webos-launcher-btn.btn-primary {
+      background: #D1C4E9;
+      background: var(--ds-accent-violet);
+      color: #1C1C1E;
+      color: var(--ds-text-on-accent);
+      border-color: #D1C4E9;
+      border-color: var(--ds-accent-violet);
+    }
+    .webos-launcher-btn.btn-primary:hover,
+    .webos-launcher-btn.btn-primary:focus {
+      background: rgba(209, 196, 233, 0.9);
+      border-color: var(--ds-accent-violet);
+    }
+    /* Focus télécommande : contour blanc bien visible (webOS) */
+    .webos-launcher-btn:focus-visible,
+    .webos-launcher-btn.webos-launcher-focused,
+    .webos-launcher-form input:focus-visible,
+    .webos-launcher-form input.webos-launcher-focused {
+      outline: 4px solid rgba(255, 255, 255, 0.9);
+      outline-offset: 2px;
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.5);
+      border-radius: var(--ds-radius-sm);
+    }
+    .webos-launcher-form {
+      margin-top: var(--ds-space-4);
+      padding: var(--ds-space-6);
+      background: var(--ds-surface-elevated);
+      border-radius: var(--ds-radius-md);
+      border: 1px solid var(--ds-border);
+    }
+    .webos-launcher-form label {
+      display: block;
+      margin-bottom: var(--ds-space-4);
+      font-size: 0.95rem;
+      color: var(--ds-text-secondary);
+    }
+    .webos-launcher-form input {
+      width: 100%;
+      padding: var(--ds-space-4);
+      font-size: 1rem;
+      background: var(--ds-surface);
+      border: 1px solid var(--ds-border);
+      border-radius: var(--ds-radius-sm);
+      color: var(--ds-text-primary);
+    }
+    .webos-launcher-form input::placeholder {
+      color: var(--ds-text-tertiary);
+    }
+    .webos-launcher-form .hint {
+      font-size: 0.85rem;
+      color: var(--ds-text-tertiary);
+      margin-top: var(--ds-space-4);
+    }
+    .webos-launcher-form .actions {
+      margin-top: var(--ds-space-6);
+      display: flex;
+      gap: var(--ds-space-4);
+    }
+    .webos-launcher-form .actions .webos-launcher-btn { flex: 1; }
+    .webos-launcher-saved-url {
+      font-size: 0.9rem;
+      color: var(--ds-text-secondary);
+      word-break: break-all;
+      margin-bottom: var(--ds-space-4);
+    }
+    .webos-launcher-reset { margin-top: var(--ds-space-6); text-align: center; }
+    .webos-launcher-reset-btn {
+      background: none;
+      border: none;
+      color: var(--ds-text-tertiary);
+      color: rgba(255,255,255,0.45);
+      font-size: 0.9rem;
+      cursor: pointer;
+      text-decoration: underline;
+      padding: 0.5rem;
+    }
+    .webos-launcher-reset-btn:hover, .webos-launcher-reset-btn:focus, .webos-launcher-reset-btn.webos-launcher-focused {
+      color: var(--ds-text-secondary);
+      outline: 4px solid rgba(255, 255, 255, 0.5);
+      outline-offset: 2px;
+    }
+  </style>
+</head>
+<body class="webos-launcher-page">
+  <div class="webos-launcher-container">
+    <h1 class="webos-launcher-title">Popcornn</h1>
+    <div class="webos-launcher-choices">
+      <button type="button" class="webos-launcher-btn btn-primary" id="btn-cloud" data-focusable tabindex="0">
+        Client cloud (popcornn.app)
+      </button>
+      <div id="local-section">
+        <button type="button" class="webos-launcher-btn" id="btn-local" data-focusable tabindex="0">
+          Client local
+        </button>
+        <button type="button" class="webos-launcher-btn" id="btn-edit-local" data-focusable tabindex="0" style="display: none;">
+          Modifier l'URL du client local
+        </button>
+        <div class="webos-launcher-form" id="local-form" hidden>
+          <div class="webos-launcher-saved-url" id="saved-url-label" hidden></div>
+          <label for="local-url">URL du client (ex. http://192.168.1.100:4321)</label>
+          <input type="url" id="local-url" placeholder="http://192.168.1.100:4321" autocomplete="off" data-focusable tabindex="0" />
+          <p class="hint">Même réseau Wi‑Fi que la TV. Après connexion QR depuis le client cloud, l'URL peut être enregistrée automatiquement.</p>
+          <div class="actions">
+            <button type="button" class="webos-launcher-btn" id="btn-cancel-local" data-focusable tabindex="0">Annuler</button>
+            <button type="button" class="webos-launcher-btn btn-primary" id="btn-save-local" data-focusable tabindex="0">Enregistrer et ouvrir</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="webos-launcher-reset">
+      <button type="button" class="webos-launcher-reset-btn" id="btn-reset-choice" data-focusable tabindex="0">Réinitialiser : afficher ce choix à chaque ouverture</button>
+    </p>
+  </div>
+  <script define:vars={{ cloudClientBase }} is:inline>
+    (function() {
+      var WEBOS_LOCAL_CLIENT_KEY = 'webos_local_client_url';
+      var WEBOS_LAST_CHOICE_KEY = 'webos_launcher_last_choice';
+      var FOCUS_CLASS = 'webos-launcher-focused';
+
+      document.addEventListener('webOSRelaunch', function() { window.location.reload(); });
+      document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible' && (!document.body.innerHTML.trim() || document.body.children.length === 0)) {
+          window.location.reload();
+        }
+      });
+
+      function getLocalClientUrl() {
+        try { return (localStorage.getItem(WEBOS_LOCAL_CLIENT_KEY) || '').trim().replace(/\/$/, ''); } catch (e) { return ''; }
+      }
+      function setLocalClientUrl(url) {
+        try {
+          var u = (url || '').trim().replace(/\/$/, '');
+          if (u) localStorage.setItem(WEBOS_LOCAL_CLIENT_KEY, u);
+          else localStorage.removeItem(WEBOS_LOCAL_CLIENT_KEY);
+        } catch (e) {}
+      }
+      function getLastChoice() {
+        try { return (localStorage.getItem(WEBOS_LAST_CHOICE_KEY) || '').trim(); } catch (e) { return ''; }
+      }
+      function setLastChoice(choice) {
+        try { if (choice) localStorage.setItem(WEBOS_LAST_CHOICE_KEY, choice); else localStorage.removeItem(WEBOS_LAST_CHOICE_KEY); } catch (e) {}
+      }
+      function go(url) { if (url) window.location.href = url; }
+
+      var isCloudOrigin = window.location.hostname.indexOf('popcornn.app') !== -1;
+      var cloudUrl = isCloudOrigin ? '/' : (cloudClientBase + '/');
+      var showChooser = false;
+      try { showChooser = (window.location.search || '').indexOf('choose=1') !== -1; } catch (e) {}
+      var lastChoice = getLastChoice();
+      var localUrl = getLocalClientUrl();
+      if (!showChooser && lastChoice === 'cloud') { setLastChoice('cloud'); go(cloudUrl); return; }
+      if (!showChooser && lastChoice === 'local' && localUrl) { go(localUrl); return; }
+
+      var btnCloud = document.getElementById('btn-cloud');
+      var btnLocal = document.getElementById('btn-local');
+      var btnEditLocal = document.getElementById('btn-edit-local');
+      var localForm = document.getElementById('local-form');
+      var localInput = document.getElementById('local-url');
+      var savedUrlLabel = document.getElementById('saved-url-label');
+      var btnCancel = document.getElementById('btn-cancel-local');
+      var btnSave = document.getElementById('btn-save-local');
+      var btnResetChoice = document.getElementById('btn-reset-choice');
+
+      function updateEditButtonVisibility() {
+        btnEditLocal.style.display = getLocalClientUrl() ? 'block' : 'none';
+      }
+      updateEditButtonVisibility();
+
+      function getFocusables() {
+        var list = [];
+        var main = [btnCloud, btnLocal];
+        if (btnEditLocal.style.display !== 'none') main.push(btnEditLocal);
+        list = main.slice();
+        if (localForm && !localForm.hidden) {
+          list.push(localInput, btnCancel, btnSave);
+        }
+        if (btnResetChoice) list.push(btnResetChoice);
+        return list.filter(Boolean);
+      }
+
+      function moveFocus(direction) {
+        var focusables = getFocusables();
+        if (focusables.length === 0) return;
+        var current = document.activeElement;
+        var idx = focusables.indexOf(current);
+        if (idx === -1) { focusables[0].focus(); applyFocusClass(focusables[0]); return; }
+        if (direction === 'next') idx = (idx + 1) % focusables.length;
+        else idx = idx - 1;
+        if (idx < 0) idx = focusables.length - 1;
+        focusables[idx].focus();
+        applyFocusClass(focusables[idx]);
+      }
+
+      function applyFocusClass(el) {
+        document.querySelectorAll('.' + FOCUS_CLASS).forEach(function(e) { e.classList.remove(FOCUS_CLASS); });
+        if (el) el.classList.add(FOCUS_CLASS);
+      }
+
+      function handleKey(e) {
+        var key = e.key;
+        var code = e.keyCode || e.which;
+        var isDown = (key === 'ArrowDown' || key === 'ArrowRight' || code === 40 || code === 39);
+        var isUp = (key === 'ArrowUp' || key === 'ArrowLeft' || code === 38 || code === 37);
+        var isEnter = (key === 'Enter' || code === 13);
+        var isBack = (key === 'Escape' || key === 'Backspace' || code === 27 || code === 8 || code === 461 || code === 10009);
+        if (isDown) { e.preventDefault(); e.stopPropagation(); moveFocus('next'); return; }
+        if (isUp) { e.preventDefault(); e.stopPropagation(); moveFocus('prev'); return; }
+        if (isEnter && document.activeElement && document.activeElement !== localInput) {
+          e.preventDefault(); e.stopPropagation(); document.activeElement.click(); return;
+        }
+        if (isBack && localForm && !localForm.hidden) { e.preventDefault(); showLocalForm(false); }
+      }
+      document.addEventListener('keydown', handleKey, true);
+
+      [btnCloud, btnLocal, btnEditLocal, localInput, btnCancel, btnSave, btnResetChoice].forEach(function(el) {
+        if (!el) return;
+        el.addEventListener('focus', function() { applyFocusClass(el); });
+        el.addEventListener('blur', function() { el.classList.remove(FOCUS_CLASS); });
+      });
+      if (btnResetChoice) {
+        btnResetChoice.addEventListener('click', function() {
+          setLastChoice('');
+          window.location.reload();
+        });
+      }
+
+      btnCloud.addEventListener('click', function() { setLastChoice('cloud'); go(cloudUrl); });
+      function showLocalForm(show) {
+        localForm.hidden = !show;
+        if (show) {
+          var saved = getLocalClientUrl();
+          if (saved) {
+            savedUrlLabel.textContent = 'URL enregistrée : ' + saved;
+            savedUrlLabel.hidden = false;
+            localInput.value = saved;
+          } else {
+            savedUrlLabel.hidden = true;
+            localInput.value = '';
+          }
+          localInput.focus();
+          applyFocusClass(localInput);
+        } else {
+          updateEditButtonVisibility();
+          btnLocal.focus();
+          applyFocusClass(btnLocal);
+        }
+      }
+      btnLocal.addEventListener('click', function() {
+        var saved = getLocalClientUrl();
+        if (saved) { setLastChoice('local'); go(saved); }
+        else showLocalForm(true);
+      });
+      btnEditLocal.addEventListener('click', function() { showLocalForm(true); });
+      btnCancel.addEventListener('click', function() { showLocalForm(false); });
+      function isValidUrl(s) {
+        s = (s || '').trim();
+        return s && (s.indexOf('http://') === 0 || s.indexOf('https://') === 0);
+      }
+      btnSave.addEventListener('click', function() {
+        var url = (localInput.value || '').trim().replace(/\/$/, '');
+        if (!isValidUrl(url)) {
+          alert('Indiquez une URL commençant par http:// ou https://');
+          return;
+        }
+        setLocalClientUrl(url);
+        setLastChoice('local');
+        go(url);
+      });
+      localInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); btnSave.click(); }
+        if (e.key === 'Escape') { e.preventDefault(); btnCancel.click(); }
+      });
+
+      setTimeout(function() {
+        var first = getFocusables()[0];
+        if (first) { first.focus(); applyFocusClass(first); }
+      }, 100);
+    })();
+  </script>
+</body>
+</html>

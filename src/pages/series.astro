@@ -1,0 +1,8 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SeriesDashboard from '../components/dashboard/SeriesDashboard';
+---
+
+<Layout title="Séries - Popcorn Client">
+  <SeriesDashboard client:only="preact" />
+</Layout>

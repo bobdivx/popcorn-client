@@ -1,0 +1,21 @@
+---
+import SettingsLayout from '../../layouts/SettingsLayout.astro';
+import LibRbitSettings from '../../components/settings/LibRbitSettings';
+import PermissionGuard from '../../components/ui/PermissionGuard';
+import DsPageHeader from '../../components/ui/DsPageHeader';
+---
+
+<SettingsLayout title="Client torrent - Popcorn Client">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="settingsPages.librqbit.title"
+      subtitleKey="settingsPages.librqbit.subtitle"
+    />
+    <PermissionGuard client:only="preact" permission="settings.server">
+      <div class="space-y-6 sm:space-y-8">
+        <LibRbitSettings client:only="preact" />
+      </div>
+    </PermissionGuard>
+  </div>
+</SettingsLayout>

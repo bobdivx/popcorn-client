@@ -1,0 +1,281 @@
+---
+import '../styles/global.css';
+import '../styles/design-system.css';
+import { ClientRouter } from 'astro:transitions';
+import ServerConnectionCheck from '../components/ServerConnectionCheck';
+import Navbar from '../components/layout/Navbar';
+import FeedbackFAB from '../components/layout/FeedbackFAB';
+import TVNavigationProvider from '../components/tv/TVNavigationProvider';
+
+interface Props {
+  title?: string;
+}
+
+const { title = 'Popcornn' } = Astro.props;
+const isWebOS = import.meta.env.WEBOS === 'true';
+---
+
+<!doctype html>
+<html lang="fr" id="html-root" data-theme="dark" class="overflow-x-hidden" data-webos={isWebOS ? 'true' : undefined} data-dev={import.meta.env.DEV ? 'true' : undefined}>
+  <head>
+    <meta charset="UTF-8" />
+    <script is:inline>
+      // En tête de console : URL et temps de chargement (après load)
+      (function() {
+        function logPageInfo() {
+          var nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+          var loadMs = nav && nav.loadEventEnd ? Math.round(nav.loadEventEnd - nav.fetchStart) : 0;
+          console.clear();
+          console.log('%c[Page] ' + location.href, 'font-weight: bold');
+          console.log('%c[Temps de chargement] ' + loadMs + ' ms', 'font-weight: bold');
+        }
+        if (document.readyState === 'complete') logPageInfo();
+        else window.addEventListener('load', logPageInfo);
+      })();
+    </script>
+    <meta name="description" content="Popcornn - Client léger pour serveur Popcornn" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <link rel="icon" type="image/png" href="/popcorn_logo.png" />
+    <link rel="apple-touch-icon" href="/popcorn_logo.png" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="theme-color" content="#a855f7" />
+    <title>{title}</title>
+    <ClientRouter />
+    <script is:inline>
+      /* Masquer le bandeau "Chargement" après chaque navigation (View Transitions remplace le body, donc ce script doit être dans le head pour survivre). */
+      document.addEventListener('astro:after-swap', function() {
+        requestAnimationFrame(function() {
+          var el = document.getElementById('popcorn-loading-fallback');
+          if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 0.15s'; setTimeout(function() { el.style.display = 'none'; }, 150); }
+        });
+      });
+    </script>
+    <!-- Google Fonts : désactivés sur webOS (file://) pour éviter blocage réseau et écran noir -->
+    {!isWebOS && (
+      <>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet" />
+      </>
+    )}
+  </head>
+  <body class="min-h-screen bg-page text-white flex flex-col overflow-x-hidden">
+    <script is:inline>
+      // Placeholder: les handlers seront enregistres apres que le DOM du fallback existe
+      window._popcornShowError = function(msg) {
+        var fallback = document.getElementById('popcorn-loading-fallback');
+        var errEl = document.getElementById('popcorn-loading-error');
+        if (!fallback || !errEl || fallback.style.display === 'none') return;
+        var s = String(msg).substring(0, 300);
+        errEl.textContent = s;
+        errEl.style.display = 'block';
+      };
+      // webOS : relaunch depuis le menu TV
+      (function() {
+        document.addEventListener('webOSRelaunch', function() {
+          var sys = window.webOSSystem || window.PalmSystem;
+          if (sys && typeof sys.activate === 'function') sys.activate();
+          window.location.reload();
+        });
+        document.addEventListener('visibilitychange', function() {
+          if (document.visibilityState === 'visible') {
+            var body = document.body;
+            if (!body || !body.innerHTML.trim() || body.children.length === 0) {
+              window.location.reload();
+            }
+          }
+        });
+      })();
+    </script>
+    <!-- Indicateur de chargement immédiat (style C411 : fond enrichi + carte glass + icon-container) -->
+    <div id="popcorn-loading-fallback" class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-page overflow-hidden" aria-hidden="true">
+      <div class="bg-page-gradient"></div>
+      <div class="bg-page-grid"></div>
+      <div class="bg-page-orbs">
+        <div class="loading-orb loading-orb-1"></div>
+        <div class="loading-orb loading-orb-2"></div>
+        <div class="loading-orb loading-orb-3"></div>
+      </div>
+      <div class="relative z-10 w-full max-w-[42rem] px-4 text-center">
+        <div class="animate-fade-in-down mb-8">
+          <img src="/popcorn_logo.png" alt="Popcorn" class="h-20 w-auto mx-auto opacity-90" />
+        </div>
+        <div class="ds-card-loading-wrapper">
+          <div class="ds-card-loading-glow"></div>
+          <div class="ds-card-loading">
+            <div class="ds-card-loading-bar"></div>
+            <div class="ds-card-loading-content">
+              <div class="loading-icon-container">
+                <div class="loading-icon-ring-outer"></div>
+                <div class="loading-icon-ring-middle"></div>
+                <div class="loading-icon-glow"></div>
+                <div class="loading-icon-circle">
+                  <img src="/popcorn_logo.png" alt="" class="w-full h-full object-contain" style="filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.5))" />
+                </div>
+              </div>
+              <h1 class="ds-loading-title">Chargement...</h1>
+              <p class="ds-loading-description ds-loading-description-subtle">Préparation de l'application</p>
+              <div class="ds-progress-container mb-8">
+                <div class="ds-progress-bar"></div>
+                <div class="ds-progress-wave"></div>
+              </div>
+              <p id="popcorn-loading-hint" class="text-white/60 text-sm mt-2 max-w-xs text-center hidden" style="display: none;">Si rien ne s&#39;affiche, quittez et rouvrez l&#39;app.</p>
+              <p id="popcorn-loading-error" class="mt-3 max-w-lg text-center px-3 py-2 rounded text-sm font-medium hidden" style="display: none; background: rgba(220,38,38,0.3); color: #fcd34d;"></p>
+              <div class="flex gap-1 mt-2 justify-center">
+                <span class="w-2 h-2 bg-primary rounded-full" style="animation: hls-bounce 1.4s infinite ease-in-out both; animation-delay: 0s"></span>
+                <span class="w-2 h-2 bg-primary rounded-full" style="animation: hls-bounce 1.4s infinite ease-in-out both; animation-delay: 0.2s"></span>
+                <span class="w-2 h-2 bg-primary rounded-full" style="animation: hls-bounce 1.4s infinite ease-in-out both; animation-delay: 0.4s"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <TVNavigationProvider client:only="preact" />
+    <ServerConnectionCheck client:only="preact" />
+    <Navbar client:only="preact" />
+    <FeedbackFAB client:only="preact" />
+    <!-- Header (barre en haut) -->
+    <main class="app-main flex-1 w-full overflow-x-hidden safe-area-top" style="padding-top: calc(5rem + var(--safe-area-inset-top));">
+      <slot />
+    </main>
+    <style>
+      /* Mobile : header plus compact (h-14) */
+      @media (max-width: 639px) {
+        .app-main {
+          padding-top: calc(3.75rem + var(--safe-area-inset-top)) !important;
+        }
+      }
+      @media (min-width: 640px) {
+        .app-main {
+          padding-top: calc(5rem + var(--safe-area-inset-top)) !important;
+        }
+      }
+      @media (min-width: 768px) {
+        .app-main {
+          padding-top: calc(5.5rem + var(--safe-area-inset-top)) !important;
+        }
+      }
+      @media (min-width: 1024px) {
+        .app-main {
+          padding-top: calc(6rem + var(--safe-area-inset-top)) !important;
+        }
+      }
+      @media (min-width: 1920px) {
+        .app-main {
+          padding-top: calc(7rem + var(--safe-area-inset-top)) !important;
+        }
+      }
+    </style>
+    <script is:inline>
+      // Initialisation de la langue et du thème depuis les préférences stockées
+      (function() {
+        if (typeof window !== 'undefined') {
+          try {
+            var stored = localStorage.getItem('popcorn_client_user_preferences');
+            if (stored) {
+              var prefs = JSON.parse(stored);
+              if (prefs.language && ['fr', 'en'].includes(prefs.language)) {
+                document.documentElement.lang = prefs.language;
+              }
+              var theme = prefs.theme || 'auto';
+              if (theme === 'auto') {
+                var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.documentElement.dataset.theme = prefersDark ? 'dark' : 'light';
+              } else if (theme === 'dark' || theme === 'light') {
+                document.documentElement.dataset.theme = theme;
+              }
+            }
+          } catch (e) {
+            // Ignore les erreurs
+          }
+        }
+      })();
+
+      // Intercepter les routes /player/* et rediriger vers /player avec l'ID en query param
+      // Cela permet de gérer les routes dynamiques en mode static
+      (function() {
+        if (typeof window === 'undefined') return;
+        const pathname = window.location.pathname;
+        const playerMatch = pathname.match(/\/player\/(.+)$/);
+        if (!playerMatch || !playerMatch[1]) return;
+        const id = playerMatch[1];
+        if (window.location.search.includes('id=') || window.location.search.includes('contentId=')) return;
+        const isFile = window.location.protocol === 'file:';
+        const target = isFile ? 'player.html?id=' + encodeURIComponent(id) : '/player?id=' + encodeURIComponent(id);
+        window.location.replace(target);
+      })();
+
+      // Enregistrer les pieges a erreurs (DOM dispo ici) + masquer le fallback quand l'app a rendu
+      (function() {
+        console.log('[Popcorn] Script bas de page execute');
+        var fallback = document.getElementById('popcorn-loading-fallback');
+        var errEl = document.getElementById('popcorn-loading-error');
+        var hint = document.getElementById('popcorn-loading-hint');
+        function showError(msg) {
+          console.error('[Popcorn] showError:', msg);
+          if (window._popcornShowError) window._popcornShowError(msg);
+        }
+        window.onerror = function(m, src, line, col, err) {
+          var msg = (err && err.message) || m || 'script';
+          if (src) msg += ' | ' + src + (line ? ':' + line : '');
+          showError('Erreur: ' + msg);
+          return false;
+        };
+        window.onunhandledrejection = function(e) {
+          showError('Erreur: ' + ((e.reason && (e.reason.message || String(e.reason))) || 'promise'));
+        };
+        window.addEventListener('error', function(e) {
+          if (e.target && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK')) {
+            var ref = e.target.src || e.target.href || '?';
+            console.error('[Popcorn] Resource load failed:', ref);
+            showError('Chargement bloque: ' + ref);
+          }
+        }, true);
+        function hide() {
+          if (!fallback) return;
+          fallback.style.opacity = '0';
+          fallback.style.transition = 'opacity 0.15s ease';
+          setTimeout(function() { fallback.style.display = 'none'; }, 150);
+        }
+        window.addEventListener('popcorn-app-ready', hide, { once: true });
+        window.addEventListener('astro:page-load', function onLoad() {
+          hide();
+          try { sessionStorage.setItem('popcorn-has-loaded', '1'); } catch (e) {}
+        }, { once: true });
+        try {
+          if (sessionStorage.getItem('popcorn-has-loaded')) hide();
+        } catch (e) {}
+        var isDev = document.documentElement.getAttribute('data-dev') === 'true';
+        var hintDelay = isDev ? 15000 : 8000;
+        var slowMsgDelay = isDev ? 20000 : 5000;
+        setTimeout(function() {
+          if (fallback && fallback.style.display !== 'none' && hint) hint.style.display = 'block';
+        }, hintDelay);
+        setTimeout(function() {
+          if (!fallback || fallback.style.display === 'none') return;
+          if (!errEl || !errEl.textContent) {
+            var isWebOSEnv = document.documentElement.getAttribute('data-webos') === 'true';
+            showError(isWebOSEnv
+              ? 'Aucune erreur capturee. Sur webOS (file://) les modules JS peuvent etre bloques. Quittez et rouvrez l app.'
+              : 'Chargement lent. Si la page ne s\'affiche pas, rechargez.');
+          }
+        }, slowMsgDelay);
+        // Sur webOS uniquement : charger le bundle principal en différé (file:// peut bloquer les modules)
+        // Sur le build normal, Astro injecte déjà le script avec nom hashé (_assets/client-XXX.js)
+        if (document.documentElement.getAttribute('data-webos') === 'true') {
+          setTimeout(function() {
+            var script = document.createElement('script');
+            var isHttp = (typeof window !== 'undefined' && (window.location.protocol === 'http:' || window.location.protocol === 'https:'));
+            script.src = isHttp ? (window.location.origin + '/_assets/client.js') : './_assets/client.js';
+            script.type = 'module';
+            script.onload = function() { console.log('[Popcorn] Module _assets/client.js load OK'); };
+            script.onerror = function(e) { console.error('[Popcorn] Module _assets/client.js load FAIL', e); };
+            document.head.appendChild(script);
+          }, 500);
+        }
+      })();
+    </script>
+  </body>
+</html>
+
