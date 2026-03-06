@@ -1,0 +1,19 @@
+---
+import SettingsLayout from '../../../layouts/SettingsLayout.astro';
+import ClientTorrentsUploadPageContent from '../../../components/settings/ClientTorrentsUploadPageContent';
+import PermissionGuard from '../../../components/ui/PermissionGuard';
+import DsPageHeader from '../../../components/ui/DsPageHeader';
+---
+
+<SettingsLayout title="Torrents du client - Popcorn Client">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="settings.clientTorrentsList.title"
+      subtitleKey="settings.clientTorrentsList.description"
+    />
+    <PermissionGuard client:only="preact" permission="settings.indexers">
+      <ClientTorrentsUploadPageContent client:only="preact" />
+    </PermissionGuard>
+  </div>
+</SettingsLayout>

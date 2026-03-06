@@ -1,0 +1,16 @@
+---
+import SettingsLayout from '../../layouts/SettingsLayout.astro';
+import DiscoverSlidersManager from '../../components/settings/DiscoverSlidersManager';
+import DsPageHeader from '../../components/ui/DsPageHeader';
+---
+
+<SettingsLayout title="Sliders de découverte - Popcorn">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="discover.sliders"
+      subtitleKey="discover.description"
+    />
+    <DiscoverSlidersManager client:only="preact" />
+  </div>
+</SettingsLayout>

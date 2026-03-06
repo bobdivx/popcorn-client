@@ -1,0 +1,150 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import DocNav from '../../../components/DocNav';
+---
+
+<Layout title="Documentation API - Popcorn Torrent">
+  <div class="min-h-screen bg-black text-white">
+    <DocNav client:load currentPath="/docs/api" />
+    
+    <div class="container mx-auto px-4 py-16 max-w-4xl">
+      <h1 class="text-4xl md:text-5xl font-bold mb-6">
+        Documentation API
+      </h1>
+      
+      <div class="prose prose-invert max-w-none">
+        <p class="text-xl text-gray-300 mb-8">
+          API REST complète pour intégrer Popcorn Torrent dans vos applications et automatiser vos workflows.
+        </p>
+
+        <div class="bg-blue-900/20 border border-blue-600/50 rounded-lg p-6 mb-8">
+          <h3 class="text-xl font-bold mb-2 text-blue-300">🌐 URL de base</h3>
+          <code class="text-green-400">https://popcorn-vercel.vercel.app/api/v1</code>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Authentification</h2>
+        <p class="text-gray-300 mb-4">
+          L'API utilise l'authentification JWT. Tous les endpoints protégés nécessitent un token d'accès dans l'en-tête <code class="bg-black/50 px-2 py-1 rounded">Authorization</code> :
+        </p>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-green-400 overflow-x-auto"><code>Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
+        </div>
+        <p class="mb-6">
+          <a href="/docs/api/authentication" class="text-red-400 hover:text-red-300 font-semibold">
+            En savoir plus sur l'authentification →
+          </a>
+        </p>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Endpoints disponibles</h2>
+        
+        <div class="space-y-6">
+          <div class="bg-white/5 border border-white/10 rounded-lg p-6">
+            <h3 class="text-2xl font-bold mb-3">🔐 Authentification</h3>
+            <ul class="list-disc list-inside text-gray-300 space-y-2 mb-4">
+              <li><code class="bg-black/50 px-2 py-1 rounded">POST /api/v1/auth/login</code> - Connexion</li>
+              <li><code class="bg-black/50 px-2 py-1 rounded">POST /api/v1/auth/register</code> - Inscription</li>
+              <li><code class="bg-black/50 px-2 py-1 rounded">POST /api/v1/auth/refresh</code> - Rafraîchir le token</li>
+              <li><code class="bg-black/50 px-2 py-1 rounded">GET /api/v1/auth/me</code> - Profil utilisateur</li>
+            </ul>
+            <a href="/docs/api/authentication" class="text-red-400 hover:text-red-300 font-semibold">
+              Documentation complète →
+            </a>
+          </div>
+
+          <div class="bg-white/5 border border-white/10 rounded-lg p-6">
+            <h3 class="text-2xl font-bold mb-3">📱 QR Code Login</h3>
+            <ul class="list-disc list-inside text-gray-300 space-y-2 mb-4">
+              <li><code class="bg-black/50 px-2 py-1 rounded">POST /api/v1/qr/generate</code> - Générer un QR code</li>
+              <li><code class="bg-black/50 px-2 py-1 rounded">POST /api/v1/qr/verify</code> - Vérifier un QR code</li>
+              <li><code class="bg-black/50 px-2 py-1 rounded">POST /api/v1/qr/submit</code> - Soumettre les credentials</li>
+            </ul>
+            <a href="/docs/api/qr-login" class="text-red-400 hover:text-red-300 font-semibold">
+              Documentation complète →
+            </a>
+          </div>
+
+          <div class="bg-white/5 border border-white/10 rounded-lg p-6">
+            <h3 class="text-2xl font-bold mb-3">🔄 Synchronisation</h3>
+            <ul class="list-disc list-inside text-gray-300 space-y-2 mb-4">
+              <li><code class="bg-black/50 px-2 py-1 rounded">GET /api/v1/sync/pull</code> - Récupérer la configuration</li>
+              <li><code class="bg-black/50 px-2 py-1 rounded">POST /api/v1/sync/push</code> - Envoyer la configuration</li>
+              <li><code class="bg-black/50 px-2 py-1 rounded">GET /api/v1/sync/status</code> - Statut de synchronisation</li>
+            </ul>
+            <a href="/docs/api/sync" class="text-red-400 hover:text-red-300 font-semibold">
+              Documentation complète →
+            </a>
+          </div>
+
+          <div class="bg-white/5 border border-white/10 rounded-lg p-6">
+            <h3 class="text-2xl font-bold mb-3">🔍 Indexers</h3>
+            <ul class="list-disc list-inside text-gray-300 space-y-2 mb-4">
+              <li><code class="bg-black/50 px-2 py-1 rounded">GET /api/v1/indexers</code> - Liste des indexers</li>
+              <li><code class="bg-black/50 px-2 py-1 rounded">POST /api/v1/indexers</code> - Créer un indexer</li>
+              <li><code class="bg-black/50 px-2 py-1 rounded">PUT /api/v1/indexers/:id</code> - Mettre à jour</li>
+              <li><code class="bg-black/50 px-2 py-1 rounded">DELETE /api/v1/indexers/:id</code> - Supprimer</li>
+            </ul>
+            <a href="/docs/api/indexers" class="text-red-400 hover:text-red-300 font-semibold">
+              Documentation complète →
+            </a>
+          </div>
+
+          <div class="bg-white/5 border border-white/10 rounded-lg p-6">
+            <h3 class="text-2xl font-bold mb-3">⚙️ Settings</h3>
+            <ul class="list-disc list-inside text-gray-300 space-y-2 mb-4">
+              <li><code class="bg-black/50 px-2 py-1 rounded">GET /api/v1/settings</code> - Récupérer les paramètres</li>
+              <li><code class="bg-black/50 px-2 py-1 rounded">PUT /api/v1/settings</code> - Mettre à jour</li>
+              <li><code class="bg-black/50 px-2 py-1 rounded">GET /api/v1/settings/tmdb</code> - Clé API TMDB</li>
+              <li><code class="bg-black/50 px-2 py-1 rounded">PUT /api/v1/settings/tmdb</code> - Mettre à jour TMDB</li>
+            </ul>
+            <a href="/docs/api/settings" class="text-red-400 hover:text-red-300 font-semibold">
+              Documentation complète →
+            </a>
+          </div>
+
+          <div class="bg-white/5 border border-white/10 rounded-lg p-6">
+            <h3 class="text-2xl font-bold mb-3">🔧 Backend Config</h3>
+            <ul class="list-disc list-inside text-gray-300 space-y-2 mb-4">
+              <li><code class="bg-black/50 px-2 py-1 rounded">GET /api/v1/backend/config</code> - Configuration backend</li>
+              <li><code class="bg-black/50 px-2 py-1 rounded">PUT /api/v1/backend/config</code> - Mettre à jour</li>
+            </ul>
+          </div>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Codes de réponse</h2>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <ul class="list-none text-gray-300 space-y-2">
+            <li><code class="bg-green-900/50 px-2 py-1 rounded">200</code> - Succès</li>
+            <li><code class="bg-green-900/50 px-2 py-1 rounded">201</code> - Créé</li>
+            <li><code class="bg-yellow-900/50 px-2 py-1 rounded">400</code> - Erreur de validation</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">401</code> - Non authentifié</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">403</code> - Interdit</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">404</code> - Non trouvé</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">500</code> - Erreur serveur</li>
+          </ul>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Format des réponses</h2>
+        <p class="text-gray-300 mb-4">
+          Toutes les réponses suivent ce format :
+        </p>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{'{'{'}'}
+  "success": true,
+  "data": { ... },
+  "error": null
+}</code></pre>
+        </div>
+        <p class="text-gray-300 mb-4">
+          En cas d'erreur :
+        </p>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{'{'{'}'}
+  "success": false,
+  "error": "ErrorCode",
+  "message": "Message d'erreur"
+}</code></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>

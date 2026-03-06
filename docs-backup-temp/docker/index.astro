@@ -1,0 +1,96 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import DocNav from '../../../components/DocNav';
+---
+
+<Layout title="Documentation Docker - Popcorn Torrent">
+  <div class="min-h-screen bg-black text-white">
+    <DocNav client:load currentPath="/docs/docker" />
+    
+    <div class="container mx-auto px-4 py-16 max-w-4xl">
+      <h1 class="text-4xl md:text-5xl font-bold mb-6">
+        Documentation Docker
+      </h1>
+      
+      <div class="prose prose-invert max-w-none mb-12">
+        <p class="text-xl text-gray-300 mb-8">
+          Guides complets pour déployer Popcorn Torrent avec Docker et Docker Compose en utilisant les images Docker Hub.
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-12">
+          <a 
+            href="/docs/docker/quick-start" 
+            class="bg-white/5 border border-white/10 rounded-lg p-6 hover:bg-white/10 transition-colors"
+          >
+            <h2 class="text-2xl font-bold mb-3">🚀 Démarrage rapide</h2>
+            <p class="text-gray-300 mb-4">
+              Déployez Popcorn Torrent en 5 minutes avec les images Docker Hub.
+            </p>
+            <span class="text-red-400 hover:text-red-300 font-semibold">
+              Lire le guide →
+            </span>
+          </a>
+
+          <a 
+            href="/docs/docker/advanced" 
+            class="bg-white/5 border border-white/10 rounded-lg p-6 hover:bg-white/10 transition-colors"
+          >
+            <h2 class="text-2xl font-bold mb-3">⚙️ Configuration avancée</h2>
+            <p class="text-gray-300 mb-4">
+              Personnalisez votre déploiement avec des configurations avancées.
+            </p>
+            <span class="text-red-400 hover:text-red-300 font-semibold">
+              Voir les options →
+            </span>
+          </a>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Vue d'ensemble</h2>
+        
+        <p class="text-gray-300 mb-6">
+          Popcorn Torrent peut être déployé facilement avec Docker Compose en utilisant les images pré-construites disponibles sur Docker Hub. L'application se compose de deux services principaux :
+        </p>
+
+        <ul class="list-disc list-inside text-gray-300 space-y-2 mb-8">
+          <li><strong>Frontend</strong> : Interface web Astro (port 4325 accessible depuis l'hôte)</li>
+          <li><strong>Backend</strong> : API Rust (port 3000)</li>
+        </ul>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Images Docker Hub</h3>
+        <ul class="list-disc list-inside text-gray-300 space-y-2 mb-8">
+          <li><a href="https://hub.docker.com/r/bobdivx/popcorn-frontend" target="_blank" class="text-red-400 hover:text-red-300">docker.io/bobdivx/popcorn-frontend:latest</a></li>
+          <li><a href="https://hub.docker.com/r/bobdivx/popcorn-backend" target="_blank" class="text-red-400 hover:text-red-300">docker.io/bobdivx/popcorn-backend:latest</a></li>
+        </ul>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Prérequis</h3>
+        <ul class="list-disc list-inside text-gray-300 space-y-2 mb-8">
+          <li>Docker et Docker Compose installés</li>
+          <li>Au moins 2GB de RAM disponibles</li>
+          <li>Espace disque pour les téléchargements</li>
+          <li>Connexion Internet pour télécharger les images depuis Docker Hub</li>
+        </ul>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Démarrage rapide</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-green-400 overflow-x-auto"><code>mkdir -p popcorn/data/.data popcorn/data/downloads popcorn/data/transcode_cache
+cd popcorn
+# Créer docker-compose.yml (voir le guide)
+docker-compose up -d</code></pre>
+        </div>
+
+        <p class="text-gray-300 mb-8">
+          Une fois démarré, accédez à l'interface web sur <code class="bg-black/50 px-2 py-1 rounded">http://localhost:4325</code>
+        </p>
+      </div>
+
+      <div class="mt-12">
+        <a 
+          href="/docs/docker/quick-start" 
+          class="inline-block bg-red-600 hover:bg-red-700 text-white font-semibold px-8 py-4 rounded-lg transition-colors"
+        >
+          Commencer avec le guide rapide →
+        </a>
+      </div>
+    </div>
+  </div>
+</Layout>

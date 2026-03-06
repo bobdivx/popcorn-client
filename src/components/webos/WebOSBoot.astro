@@ -1,0 +1,115 @@
+---
+/**
+ * Scripts de démarrage spécifiques à webOS (TV LG).
+ * - Relaunch / visibility : rechargement quand l'app revient au premier plan
+ * - window.onerror + chargement de app-webos.js (bundle IIFE, pas type=module)
+ * - Si PUBLIC_DEBUG_LOG_URL est défini au build, les logs sont envoyés vers le PC (serveur logs-receiver).
+ * Ce composant ne rend rien si le build n'est pas pour webOS (import.meta.env.WEBOS !== 'true').
+ */
+const isWebOS = import.meta.env.WEBOS === 'true';
+const debugLogUrl = typeof import.meta.env.PUBLIC_DEBUG_LOG_URL === 'string' ? import.meta.env.PUBLIC_DEBUG_LOG_URL : '';
+---
+
+{isWebOS && (
+  <>
+    {debugLogUrl && <script is:inline set:html={`window.__DEBUG_LOG_URL=${JSON.stringify(debugLogUrl)};`} />}
+    <script is:inline>
+      // webOS : envoi des logs vers le PC (GET + POST pour max compatibilite)
+      (function() {
+        var url = typeof window.__DEBUG_LOG_URL === 'string' ? window.__DEBUG_LOG_URL : '';
+        if (!url || url.indexOf('http') !== 0) return;
+        var base = url.replace(/\/$/, '') + '/log';
+        function send(level, args) {
+          try {
+            var msg = Array.prototype.slice.call(args).map(function(a) { return a != null ? String(a) : ''; }).join(' ').substring(0, 2000);
+            var getUrl = base + '?level=' + encodeURIComponent(level) + '&msg=' + encodeURIComponent(msg);
+            var img = new Image();
+            img.src = getUrl;
+          } catch (e) {}
+          try {
+            if (navigator.sendBeacon) navigator.sendBeacon(base, JSON.stringify({ level: level, msg: msg }));
+            else {
+              var x = new XMLHttpRequest();
+              x.open('POST', base, true);
+              x.setRequestHeader('Content-Type', 'application/json');
+              x.send(JSON.stringify({ level: level, msg: msg }));
+            }
+          } catch (e2) {}
+        }
+        var _log = console.log, _err = console.error;
+        console.log = function() { _log.apply(console, arguments); send('log', arguments); };
+        console.error = function() { _err.apply(console, arguments); send('error', arguments); };
+        send('log', ['[Popcorn] logs->PC actif']);
+      })();
+    </script>
+    <script is:inline>
+      // webOS : relaunch depuis le menu TV et rechargement si body vide au focus
+      (function() {
+        console.log('[Popcorn] boot script started');
+        document.addEventListener('webOSRelaunch', function() {
+          var sys = window.webOSSystem || window.PalmSystem;
+          if (sys && typeof sys.activate === 'function') sys.activate();
+          window.location.reload();
+        });
+        document.addEventListener('visibilitychange', function() {
+          if (document.visibilityState === 'visible') {
+            var body = document.body;
+            if (!body || !body.innerHTML.trim() || body.children.length === 0) {
+              window.location.reload();
+            }
+          }
+        });
+      })();
+    </script>
+    <script is:inline>
+      // webOS : erreurs JS + chargement du bundle UNIQUEMENT après action utilisateur (évite -20 : thread libre au lancement)
+      (function() {
+        console.log('[Popcorn] tap-overlay script started');
+        if (document.documentElement.getAttribute('data-webos') !== 'true') return;
+        window.onerror = function(msg, url, line, col, err) {
+          var s = (msg || '') + (url ? ' @ ' + url : '') + (line ? ' L' + line : '');
+          console.error('[Popcorn] onerror', s, err);
+          if (window._popcornShowError) window._popcornShowError(s.substring(0, 200));
+          return false;
+        };
+        function loadApp() {
+          if (window._popcornWebOSLoaded) return;
+          window._popcornWebOSLoaded = true;
+          var overlay = document.getElementById('popcorn-webos-tap-overlay');
+          if (overlay) overlay.style.display = 'none';
+          // Céder le thread une frame avant de charger le bundle (réduit risque -20 : WAM timeout)
+          function doLoad() {
+            var script = document.createElement('script');
+            var isHttp = (window.location.protocol === 'http:' || window.location.protocol === 'https:');
+            script.src = isHttp ? (window.location.origin + '/_assets/app-webos.js') : './_assets/app-webos.js';
+            script.onload = function() { console.log('[Popcorn] app-webos.js load OK'); };
+            script.onerror = function(e) {
+              console.error('[Popcorn] app-webos.js load FAIL', e);
+              if (window._popcornShowError) window._popcornShowError('Chargement app-webos.js a echoue: ' + (e && e.message ? e.message : 'erreur reseau ou fichier'));
+            };
+            document.head.appendChild(script);
+          }
+          if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(doLoad);
+          else setTimeout(doLoad, 0);
+        }
+        window._popcornStartWebOS = loadApp;
+        // Afficher overlay "Appuyez pour démarrer" puis charger au clic/entrée
+        function showTapOverlay() {
+          var overlay = document.createElement('div');
+          overlay.id = 'popcorn-webos-tap-overlay';
+          overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;';
+          overlay.innerHTML = '<p style="color:#fff;font-size:1.5rem;text-align:center;max-width:90%;">Appuyez sur OK ou Entrée pour démarrer Popcorn</p><button type="button" id="popcorn-webos-tap-btn" style="padding:1rem 2rem;font-size:1.25rem;background:#a855f7;color:#fff;border:none;border-radius:0.5rem;cursor:pointer;">Démarrer</button>';
+          overlay.onclick = loadApp;
+          document.body.appendChild(overlay);
+          var btn = document.getElementById('popcorn-webos-tap-btn');
+          if (btn) btn.onclick = function(e) { e.stopPropagation(); loadApp(); };
+          document.addEventListener('keydown', function onKey(e) {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.removeEventListener('keydown', onKey); loadApp(); }
+          }, { once: true });
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showTapOverlay);
+        else showTapOverlay();
+      })();
+    </script>
+  </>
+)}

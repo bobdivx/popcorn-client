@@ -1,0 +1,12 @@
+{
+  "identifier": "mobile",
+  "description": "Permissions pour les fonctionnalités mobiles (notifications, etc.)",
+  "windows": ["main"],
+  "permissions": [
+    "notification:default",
+    "notification:allow-notify",
+    "notification:allow-create-channel",
+    "notification:allow-request-permission",
+    "notification:allow-is-permission-granted"
+  ]
+}

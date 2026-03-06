@@ -1,0 +1,170 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import DocNav from '../../../components/DocNav';
+---
+
+<Layout title="Démarrage Rapide Docker - Popcorn Torrent">
+  <div class="min-h-screen bg-black text-white">
+    <DocNav client:load currentPath="/docs/docker/quick-start" />
+    
+    <div class="container mx-auto px-4 py-16 max-w-4xl">
+      <h1 class="text-4xl md:text-5xl font-bold mb-6">
+        Démarrage Rapide avec Docker
+      </h1>
+      
+      <div class="prose prose-invert max-w-none">
+        <p class="text-xl text-gray-300 mb-8">
+          Ce guide vous permettra de déployer Popcorn Torrent en quelques minutes avec Docker Hub.
+        </p>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Étape 1: Créer un répertoire pour l'application</h2>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-green-400 overflow-x-auto"><code>mkdir -p popcorn/data/.data popcorn/data/downloads popcorn/data/transcode_cache
+cd popcorn</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Étape 2: Créer le fichier docker-compose.yml</h2>
+        <p class="text-gray-300 mb-4">
+          Créez un fichier <code class="bg-black/50 px-2 py-1 rounded">docker-compose.yml</code> :
+        </p>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>name: popcorn
+services:
+  frontend:
+    image: docker.io/bobdivx/popcorn-frontend:latest
+    container_name: popcorn-frontend
+    depends_on:
+      backend:
+        condition: service_started
+    environment:
+      - NODE_ENV=production
+      - HOST=0.0.0.0
+      - PORT=4321
+      - BACKEND_URL=http://backend:3000
+      - PUBLIC_BACKEND_URL=http://backend:3000
+      - TZ=Europe/Paris
+    ports:
+      - "4325:4321"
+    restart: unless-stopped
+    networks:
+      - popcorn-network
+
+  backend:
+    image: docker.io/bobdivx/popcorn-backend:latest
+    container_name: popcorn-backend
+    environment:
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=3000
+      - DOWNLOAD_DIR=/app/downloads
+      - API_BASE_URL=http://frontend:4321
+      - API_USERNAME=admin
+      - API_PASSWORD=admin123
+      - MAX_DOWNLOADS=5
+      - LOG_LEVEL=info
+      - TZ=Europe/Paris
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data/.data:/app/.data
+      - ./data/downloads:/app/downloads
+      - ./data/transcode_cache:/app/downloads/transcode_cache
+    restart: unless-stopped
+    networks:
+      - popcorn-network
+
+networks:
+  popcorn-network:
+    driver: bridge</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Étape 3: Démarrer les services</h2>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-green-400 overflow-x-auto"><code>docker-compose up -d</code></pre>
+        </div>
+
+        <p class="text-gray-300 mb-8">
+          Cette commande va télécharger les images depuis Docker Hub et démarrer les conteneurs en arrière-plan.
+        </p>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Étape 4: Accéder à l'application</h2>
+        <p class="text-gray-300 mb-4">
+          Une fois les conteneurs démarrés, vous pouvez accéder à :
+        </p>
+        <ul class="list-disc list-inside text-gray-300 space-y-2 mb-8">
+          <li><strong>Interface web</strong> : <code class="bg-black/50 px-2 py-1 rounded">http://localhost:4325</code></li>
+          <li><strong>API Backend</strong> : <code class="bg-black/50 px-2 py-1 rounded">http://localhost:3000</code></li>
+        </ul>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Configuration optionnelle</h2>
+        <p class="text-gray-300 mb-4">
+          Par défaut, Popcorn Torrent fonctionne avec des valeurs par défaut. Vous pouvez personnaliser la configuration en modifiant les variables d'environnement dans <code class="bg-black/50 px-2 py-1 rounded">docker-compose.yml</code> :
+        </p>
+        
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code># Variables principales à modifier
+API_USERNAME=admin          # Nom d'utilisateur API
+API_PASSWORD=admin123       # Mot de passe API (CHANGEZ-LE en production!)
+TZ=Europe/Paris             # Fuseau horaire
+MAX_DOWNLOADS=5             # Nombre max de téléchargements simultanés
+LOG_LEVEL=info              # Niveau de logs</code></pre>
+        </div>
+
+        <div class="bg-yellow-900/20 border border-yellow-600/50 rounded-lg p-6 mt-8 mb-8">
+          <h3 class="text-xl font-bold mb-2 text-yellow-300">⚠️ Important - Sécurité</h3>
+          <p class="text-gray-300">
+            <strong>Changez les identifiants par défaut (API_USERNAME et API_PASSWORD) en production !</strong>
+          </p>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Commandes utiles</h2>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-green-400 overflow-x-auto"><code># Voir les logs
+docker-compose logs -f
+
+# Voir les logs d'un service spécifique
+docker-compose logs -f frontend
+docker-compose logs -f backend
+
+# Arrêter les services
+docker-compose down
+
+# Redémarrer
+docker-compose restart
+
+# Voir le statut
+docker-compose ps
+
+# Mettre à jour les images
+docker-compose pull
+docker-compose up -d</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Images Docker Hub</h2>
+        <p class="text-gray-300 mb-4">
+          Les images sont disponibles sur Docker Hub :
+        </p>
+        <ul class="list-disc list-inside text-gray-300 space-y-2 mb-8">
+          <li><strong>Frontend</strong> : <a href="https://hub.docker.com/r/bobdivx/popcorn-frontend" target="_blank" class="text-red-400 hover:text-red-300">docker.io/bobdivx/popcorn-frontend:latest</a></li>
+          <li><strong>Backend</strong> : <a href="https://hub.docker.com/r/bobdivx/popcorn-backend" target="_blank" class="text-red-400 hover:text-red-300">docker.io/bobdivx/popcorn-backend:latest</a></li>
+        </ul>
+
+        <div class="bg-blue-900/20 border border-blue-600/50 rounded-lg p-6 mt-8 mb-8">
+          <h3 class="text-xl font-bold mb-2 text-blue-300">💡 Note importante</h3>
+          <p class="text-gray-300">
+            Les configurations suivantes se font via l'interface web (pas de variables d'environnement) :
+            - Clé API TMDb
+            - Indexers (Jackett, YGG, etc.)
+            - Paramètres de synchronisation
+          </p>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Prochaines étapes</h2>
+        <ul class="list-disc list-inside text-gray-300 space-y-2 mb-8">
+          <li>Consultez la <a href="/docs/docker/advanced" class="text-red-400 hover:text-red-300">configuration avancée</a> pour plus d'options</li>
+          <li>Explorez les <a href="/features" class="text-red-400 hover:text-red-300">fonctionnalités</a> de Popcorn Torrent</li>
+          <li>Découvrez l'<a href="/docs/api" class="text-red-400 hover:text-red-300">API REST</a> pour l'intégration</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</Layout>

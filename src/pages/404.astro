@@ -1,0 +1,52 @@
+---
+import ErrorPage from '../components/errors/ErrorPage';
+import '../styles/global.css';
+
+// IMPORTANT (site statique):
+// Aucune logique serveur au runtime. On gère donc les "routes dynamiques"
+// via une redirection côté navigateur (JS) depuis la 404.
+---
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark" class="overflow-hidden">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Page non trouvée - Popcorn Torrent" />
+    <link rel="icon" type="image/png" href="/popcorn_logo.png" />
+    <title>404 - Page non trouvée - Popcornn</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+  </head>
+  <body class="min-h-screen bg-black text-white overflow-hidden">
+    <script is:inline>
+      (function () {
+        try {
+          var pathname = window.location.pathname || '';
+
+          // /player/<id>  -> /torrents?slug=<id>
+          var mPlayer = pathname.match(/^\/player\/(.+)$/);
+          if (mPlayer && mPlayer[1]) {
+            window.location.replace('/torrents?slug=' + encodeURIComponent(mPlayer[1]));
+            return;
+          }
+
+          // /torrents/<slug> -> /torrents?slug=<slug>
+          var mTorrents = pathname.match(/^\/torrents\/(.+)$/);
+          if (mTorrents && mTorrents[1]) {
+            window.location.replace('/torrents?slug=' + encodeURIComponent(mTorrents[1]));
+            return;
+          }
+        } catch (e) {
+          // noop
+        }
+      })();
+    </script>
+    <ErrorPage 
+      client:load
+      code={404}
+      title="Page non trouvée"
+      message="Désolé, la page que vous recherchez n'existe pas ou a été déplacée."
+      showHomeButton={true}
+      showBackButton={true}
+    />
+  </body>
+</html>

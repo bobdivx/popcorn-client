@@ -1,0 +1,165 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import DocNav from '../../../components/DocNav';
+---
+
+<Layout title="Documentation API - Settings">
+  <div class="min-h-screen bg-black text-white">
+    <DocNav client:load currentPath="/docs/api/settings" />
+    
+    <div class="container mx-auto px-4 py-16 max-w-4xl">
+      <h1 class="text-4xl md:text-5xl font-bold mb-6">
+        Paramètres Utilisateur
+      </h1>
+      
+      <div class="prose prose-invert max-w-none">
+        <p class="text-xl text-gray-300 mb-8">
+          Gérer les paramètres utilisateur (clés API, etc.) via l'API.
+        </p>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">GET /api/v1/settings</h2>
+        <p class="text-gray-300 mb-4">Récupérer tous les paramètres utilisateur.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>GET /api/v1/settings
+Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{'{'{'}'}
+  "success": true,
+  "data": {
+    "settings": [
+      {
+        "user_id": "user-id",
+        "tmdb_api_key": "your-tmdb-key",
+        "updated_at": 1234567890
+      }
+    ]
+  }
+}</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">PUT /api/v1/settings</h2>
+        <p class="text-gray-300 mb-4">Mettre à jour les paramètres d'un utilisateur.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`PUT /api/v1/settings
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+  "user_id": "user-id",
+  "tmdb_api_key": "your-new-tmdb-key"
+{'}'}`}></code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{'{'{'}'}'{'}
+  "success": true,
+  "data": {'{'}
+    "user_id": "user-id",
+    "tmdb_api_key": "your-new-tmdb-key",
+    "updated_at": 1234567890
+  {'}'}
+{'}'}</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">GET /api/v1/settings/tmdb</h2>
+        <p class="text-gray-300 mb-4">Récupérer la clé API TMDb d'un utilisateur spécifique.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>GET /api/v1/settings/tmdb?user_id=user-id
+Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`{
+  "success": true,
+  "data": {
+    "tmdb_api_key": "your-tmdb-key",
+    "updated_at": 1234567890
+  {'}'}
+}`}></code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">PUT /api/v1/settings/tmdb</h2>
+        <p class="text-gray-300 mb-4">Mettre à jour la clé API TMDb d'un utilisateur.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`PUT /api/v1/settings/tmdb
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+  "user_id": "user-id",
+  "tmdb_api_key": "your-new-tmdb-key"
+{'}'}`}></code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{'{'{'}'}'{'}
+  "success": true,
+  "data": {'{'}
+    "user_id": "user-id",
+    "tmdb_api_key": "your-new-tmdb-key",
+    "updated_at": 1234567890
+  {'}'}
+{'}'}</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">GET /api/v1/backend/config</h2>
+        <p class="text-gray-300 mb-4">Récupérer la configuration backend.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>GET /api/v1/backend/config
+Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code set:html={`{
+  "success": true,
+  "data": {
+    "backend_url": "http://localhost:3000",
+    "updated_at": 1234567890
+  {'}'}
+}`}></code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">PUT /api/v1/backend/config</h2>
+        <p class="text-gray-300 mb-4">Mettre à jour la configuration backend.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>PUT /api/v1/backend/config
+Authorization: Bearer YOUR_ACCESS_TOKEN
+Content-Type: application/json
+
+{'{'{'}'}
+  "backend_url": "http://localhost:3000"
+}</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Codes d'erreur</h2>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <ul class="list-none text-gray-300 space-y-2">
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">400</code> - ValidationError : Données invalides</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">401</code> - Unauthorized : Token invalide</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">404</code> - NotFound : Configuration non trouvée</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">500</code> - InternalServerError : Erreur serveur</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
