@@ -1,0 +1,8 @@
+---
+import Layout from '../layouts/Layout.astro';
+import IndexRedirect from '../components/IndexRedirect';
+---
+
+<Layout title="Popcorn Client">
+  <IndexRedirect client:only="preact" />
+</Layout>

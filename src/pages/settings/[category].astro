@@ -1,0 +1,15 @@
+---
+import SettingsLayout from '../../layouts/SettingsLayout.astro';
+import SettingsContent from '../../components/settings/SettingsContent';
+
+export function getStaticPaths() {
+  const validCategories = ['maintenance', 'playback', 'content', 'downloads', 'library', 'discovery'];
+  return validCategories.map((category) => ({ params: { category } }));
+}
+
+const { category } = Astro.params;
+---
+
+<SettingsLayout title="Paramètres - Popcorn Client">
+  <SettingsContent client:only="preact" />
+</SettingsLayout>

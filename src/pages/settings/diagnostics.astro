@@ -1,0 +1,19 @@
+---
+import SettingsLayout from '../../layouts/SettingsLayout.astro';
+import BackendDiagnostics from '../../components/settings/BackendDiagnostics';
+import PermissionGuard from '../../components/ui/PermissionGuard';
+import DsPageHeader from '../../components/ui/DsPageHeader';
+---
+
+<SettingsLayout title="Diagnostics - Popcorn Client">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="settingsPages.diagnostics.title"
+      subtitleKey="settingsPages.diagnostics.healthSubtitle"
+    />
+    <PermissionGuard client:only="preact" permission="settings.server">
+      <BackendDiagnostics client:only="preact" />
+    </PermissionGuard>
+  </div>
+</SettingsLayout>

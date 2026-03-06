@@ -1,0 +1,157 @@
+---
+import Layout from '../../../layouts/Layout.astro';
+import DocNav from '../../../components/DocNav';
+---
+
+<Layout title="Documentation API - Authentification">
+  <div class="min-h-screen bg-black text-white">
+    <DocNav client:load currentPath="/docs/api/authentication" />
+    
+    <div class="container mx-auto px-4 py-16 max-w-4xl">
+      <h1 class="text-4xl md:text-5xl font-bold mb-6">
+        Authentification API
+      </h1>
+      
+      <div class="prose prose-invert max-w-none">
+        <p class="text-xl text-gray-300 mb-8">
+          L'API utilise l'authentification JWT avec des tokens d'accès et de rafraîchissement.
+        </p>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">POST /api/v1/auth/login</h2>
+        <p class="text-gray-300 mb-4">Connexion avec email et mot de passe.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>POST /api/v1/auth/login
+Content-Type: application/json
+
+{'{'{'}'}
+  "email": "user@example.com",
+  "password": "password123"
+}</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{'{'{'}'}'{'}
+  "success": true,
+  "data": {'{'}
+    "user": {'{'}
+      "id": "user-id",
+      "email": "user@example.com"
+    {'}'},
+    "accessToken": "eyJhbGci...",
+    "refreshToken": "eyJhbGci..."
+  {'}'}
+{'}'}</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Exemple cURL</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-green-400 overflow-x-auto"><code>curl -X POST https://popcorn-vercel.vercel.app/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{'{'{'}'}"email":"user@example.com","password":"password123"}'</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">POST /api/v1/auth/register</h2>
+        <p class="text-gray-300 mb-4">Inscription d'un nouveau compte (nécessite un code d'invitation).</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>POST /api/v1/auth/register
+Content-Type: application/json
+
+{'{'{'}'}
+  "email": "user@example.com",
+  "password": "password123",
+  "inviteCode": "INVITE_CODE"
+}</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (201 Created)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{'{'{'}'}
+  "success": true,
+  "data": {
+    "message": "Inscription réussie",
+    "userId": "user-id"
+  }
+}</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">POST /api/v1/auth/refresh</h2>
+        <p class="text-gray-300 mb-4">Rafraîchir le token d'accès avec un refresh token.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>POST /api/v1/auth/refresh
+Content-Type: application/json
+
+{'{'{'}'}
+  "refreshToken": "eyJhbGci..."
+}</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{'{'{'}'}'{'}
+  "success": true,
+  "data": {'{'}
+    "accessToken": "eyJhbGci...",
+    "refreshToken": "eyJhbGci..."
+  {'}'}
+{'}'}</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">GET /api/v1/auth/me</h2>
+        <p class="text-gray-300 mb-4">Récupérer les informations du compte connecté.</p>
+        
+        <h3 class="text-2xl font-bold mt-8 mb-4">Requête</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>GET /api/v1/auth/me
+Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Réponse (200 OK)</h3>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-gray-300 overflow-x-auto"><code>{'{'{'}'}'{'}
+  "success": true,
+  "data": {'{'}
+    "user": {'{'}
+      "id": "user-id",
+      "email": "user@example.com",
+      "created_at": 1234567890,
+      "updated_at": 1234567890
+    {'}'}
+  {'}'}
+{'}'}</code></pre>
+        </div>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Utilisation des tokens</h2>
+        <p class="text-gray-300 mb-4">
+          Pour utiliser les endpoints protégés, incluez le token d'accès dans l'en-tête Authorization :
+        </p>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <pre class="text-green-400 overflow-x-auto"><code>Authorization: Bearer YOUR_ACCESS_TOKEN</code></pre>
+        </div>
+
+        <h3 class="text-2xl font-bold mt-8 mb-4">Durée de vie</h3>
+        <ul class="list-disc list-inside text-gray-300 space-y-2 mb-8">
+          <li><strong>Access Token</strong> : 7 jours (configurable via JWT_EXPIRES_IN)</li>
+          <li><strong>Refresh Token</strong> : 30 jours (configurable via JWT_REFRESH_EXPIRES_IN)</li>
+        </ul>
+
+        <h2 class="text-3xl font-bold mt-12 mb-6">Codes d'erreur</h2>
+        <div class="bg-black/50 border border-white/10 rounded-lg p-4 mb-6">
+          <ul class="list-none text-gray-300 space-y-2">
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">400</code> - ValidationError : Données invalides</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">401</code> - InvalidCredentials : Identifiants incorrects</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">401</code> - InvalidToken : Token invalide ou expiré</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">400</code> - EmailAlreadyExists : Email déjà utilisé</li>
+            <li><code class="bg-red-900/50 px-2 py-1 rounded">400</code> - InvalidInviteCode : Code d'invitation invalide</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>

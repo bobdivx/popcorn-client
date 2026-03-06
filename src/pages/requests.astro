@@ -1,0 +1,8 @@
+---
+import Layout from '../layouts/Layout.astro';
+import MyRequests from '../components/requests/MyRequests';
+---
+
+<Layout title="Mes demandes - Popcorn">
+  <MyRequests client:only="preact" />
+</Layout>

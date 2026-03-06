@@ -1,0 +1,13 @@
+---
+import SettingsLayout from '../../layouts/SettingsLayout.astro';
+import IndexersPageContent from '../../components/settings/IndexersPageContent';
+import PermissionGuard from '../../components/ui/PermissionGuard';
+---
+
+<SettingsLayout title="Gestion des Indexers - Popcorn Client">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <PermissionGuard client:only="preact" permission="settings.indexers">
+      <IndexersPageContent client:only="preact" />
+    </PermissionGuard>
+  </div>
+</SettingsLayout>

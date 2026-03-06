@@ -1,0 +1,27 @@
+---
+import SettingsLayout from '../../layouts/SettingsLayout.astro';
+import PermissionGuard from '../../components/ui/PermissionGuard';
+import DsPageHeader from '../../components/ui/DsPageHeader';
+import TranslatedButton from '../../components/ui/TranslatedButton';
+import SyncSettingsCards from '../../components/settings/SyncSettingsCards';
+---
+
+<SettingsLayout title="Synchronisation des Torrents - Popcorn Client">
+  <div class="ds-container max-w-5xl py-6 px-4 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="settingsPages.sync.title"
+      subtitleKey="settingsPages.sync.subtitle"
+    >
+      <TranslatedButton
+        client:only="preact"
+        href="/settings/indexers"
+        translationKey="settingsPages.sync.configureIndexers"
+        className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-[var(--ds-radius-full)] bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] border border-[var(--ds-border)] hover:bg-white/10 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)]"
+      />
+    </DsPageHeader>
+    <PermissionGuard client:only="preact" permission="settings.sync">
+      <SyncSettingsCards client:only="preact" />
+    </PermissionGuard>
+  </div>
+</SettingsLayout>

@@ -1,0 +1,8 @@
+---
+import Layout from '../layouts/Layout.astro';
+import SearchComponent from '../components/Search';
+---
+
+<Layout title="Recherche - Popcorn Client">
+  <SearchComponent client:only="preact" />
+</Layout>

@@ -1,0 +1,19 @@
+---
+import SettingsLayout from '../../../layouts/SettingsLayout.astro';
+import PermissionGuard from '../../../components/ui/PermissionGuard';
+import DsPageHeader from '../../../components/ui/DsPageHeader';
+import UploadTrackersManagerPanel from '../../../components/settings/UploadTrackersManagerPanel';
+---
+
+<SettingsLayout title="Trackers Upload - Popcorn Client">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="settings.uploadTrackerPanel.manageTrackersTitle"
+      subtitleKey="settings.uploadTrackerPanel.manageTrackersDescription"
+    />
+    <PermissionGuard client:only="preact" permission="settings.indexers">
+      <UploadTrackersManagerPanel client:only="preact" />
+    </PermissionGuard>
+  </div>
+</SettingsLayout>
