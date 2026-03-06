@@ -1,0 +1,24 @@
+---
+import ErrorPage from '../components/errors/ErrorPage';
+---
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark" class="overflow-hidden">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Erreur serveur - Popcorn Torrent" />
+    <link rel="icon" type="image/png" href="/popcorn_logo.png" />
+    <title>500 - Erreur serveur - Popcornn</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+  </head>
+  <body class="min-h-screen bg-black text-white overflow-hidden">
+    <ErrorPage 
+      client:load
+      code={500}
+      title="Erreur serveur"
+      message="Une erreur interne s'est produite. Notre équipe a été notifiée et travaille à résoudre le problème."
+      showHomeButton={true}
+      showBackButton={true}
+    />
+  </body>
+</html>

@@ -1,0 +1,19 @@
+---
+import SettingsLayout from '../../../layouts/SettingsLayout.astro';
+import ReseedTorrentsPanel from '../../../components/settings/ReseedTorrentsPanel';
+import PermissionGuard from '../../../components/ui/PermissionGuard';
+import DsPageHeader from '../../../components/ui/DsPageHeader';
+---
+
+<SettingsLayout title="Re-seed — Exporter les .torrent - Popcorn Client">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="settings.reseedPanel.title"
+      subtitleKey="settings.reseedPanel.subtitle"
+    />
+    <PermissionGuard client:only="preact" permission="settings.indexers">
+      <ReseedTorrentsPanel client:only="preact" />
+    </PermissionGuard>
+  </div>
+</SettingsLayout>

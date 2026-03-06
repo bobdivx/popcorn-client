@@ -1,0 +1,8 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Dashboard from '../components/dashboard/Dashboard';
+---
+
+<Layout title="Tableau de bord - Popcorn Client">
+  <Dashboard client:only="preact" />
+</Layout>

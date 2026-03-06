@@ -1,0 +1,18 @@
+---
+import Layout from '../layouts/Layout.astro';
+import RegisterForm from '../components/RegisterForm';
+---
+
+<Layout title="Inscription - Popcorn Vercel">
+  <div class="flex flex-col justify-center items-center min-h-screen bg-black px-4 py-16">
+    <div class="mb-8 animate-fade-in">
+      <img 
+        src="/popcorn_logo.png" 
+        alt="Popcorn Vercel" 
+        class="w-20 h-20 sm:w-24 sm:h-24 object-contain mx-auto"
+        loading="eager"
+      />
+    </div>
+    <RegisterForm client:load />
+  </div>
+</Layout>

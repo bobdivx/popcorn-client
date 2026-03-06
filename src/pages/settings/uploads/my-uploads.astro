@@ -1,0 +1,19 @@
+---
+import SettingsLayout from '../../../layouts/SettingsLayout.astro';
+import MyUploadsPanel from '../../../components/settings/MyUploadsPanel';
+import PermissionGuard from '../../../components/ui/PermissionGuard';
+import DsPageHeader from '../../../components/ui/DsPageHeader';
+---
+
+<SettingsLayout title="Mes uploads - Popcorn Client">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="settings.myUploadsPanel.title"
+      subtitleKey="settings.myUploadsPanel.description"
+    />
+    <PermissionGuard client:only="preact" permission="settings.indexers">
+      <MyUploadsPanel client:only="preact" />
+    </PermissionGuard>
+  </div>
+</SettingsLayout>

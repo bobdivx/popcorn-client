@@ -1,0 +1,9 @@
+---
+import Layout from '../layouts/Layout.astro';
+import MediaDetailRoute from '../components/torrents/MediaDetailPage/MediaDetailRoute';
+---
+
+<Layout title="Torrent - Popcorn">
+  <MediaDetailRoute client:only="preact" />
+</Layout>
+

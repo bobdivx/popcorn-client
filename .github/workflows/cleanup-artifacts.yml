@@ -1,0 +1,72 @@
+# Nettoie automatiquement les anciens artifacts pour éviter de saturer le quota de stockage.
+# Les APK/AAB sont déjà attachés aux GitHub Releases, donc les artifacts peuvent être supprimés tôt.
+# Après cleanup : le quota est recalculé toutes les 6–12 h. Attendre avant de relancer un build Android.
+# Voir https://docs.github.com/en/billing/managing-billing-for-github-actions#calculating-minute-and-storage-spending
+name: Clean old artifacts
+
+on:
+  schedule:
+    # Tous les lundis à 03:00 UTC
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      retention_days:
+        description: 'Supprimer les artifacts plus vieux que (jours)'
+        required: false
+        default: '7'
+        type: string
+
+env:
+  RETENTION_DAYS: ${{ github.event.inputs.retention_days || '7' }}
+
+jobs:
+  cleanup:
+    name: Delete old artifacts
+    runs-on: self-hosted
+    permissions:
+      actions: write
+    steps:
+      - name: Delete artifacts older than ${{ env.RETENTION_DAYS }} days
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const retentionDays = parseInt(process.env.RETENTION_DAYS || '7', 10);
+            const cutoff = new Date();
+            cutoff.setDate(cutoff.getDate() - retentionDays);
+            cutoff.setHours(0, 0, 0, 0);
+
+            let page = 1;
+            let totalDeleted = 0;
+            const perPage = 100;
+
+            while (true) {
+              const { data } = await github.rest.actions.listArtifactsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: perPage,
+                page
+              });
+
+              const artifacts = data.artifacts || [];
+              if (artifacts.length === 0) break;
+
+              for (const artifact of artifacts) {
+                const createdAt = new Date(artifact.created_at);
+                if (createdAt < cutoff) {
+                  await github.rest.actions.deleteArtifact({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    artifact_id: artifact.id
+                  });
+                  totalDeleted++;
+                  console.log(`Supprimé: ${artifact.name} (créé le ${artifact.created_at})`);
+                }
+              }
+
+              if (artifacts.length < perPage) break;
+              page++;
+            }
+
+            console.log(`\n✅ Nettoyage terminé: ${totalDeleted} artifact(s) supprimé(s) (plus vieux que ${retentionDays} jours).`);
+        env:
+          RETENTION_DAYS: ${{ env.RETENTION_DAYS }}

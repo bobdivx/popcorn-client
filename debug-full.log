@@ -1,0 +1,26 @@
+﻿--------- beginning of main
+01-18 19:27:08.717   844  2104 W libbinder.Binder: Binder transaction to android.content.pm.IPackageManager code 1598311760 took 5535ms. Data bytes: 80 Reply bytes: 4 Flags: 16
+01-18 19:27:08.821 31422 31422 D ApplicationLoaders: Returning zygote-cached class loader: /system_ext/framework/androidx.window.extensions.jar
+01-18 19:27:08.834 31422 31422 D CompatChangeReporter: Compat change id reported: 202956589; UID 99054; state: ENABLED
+01-18 19:27:08.858 31354 31435 W chromium: [WARNING:dns_config_service_android.cc(81)] Failed to read DnsConfig.
+01-18 19:27:08.859 31354 31390 I RustStdoutStderr: [WARNING:dns_config_service_android.cc(81)] Failed to read DnsConfig.
+01-18 19:27:08.892  2160  2160 W Finsky  : [2] STU: Failed to get storage stats for package 'com.google.android.tzdata6' (1601: Error getting stats: android.content.pm.PackageManager.NameNotFoundException)
+01-18 19:27:09.010 31422 31422 I LoadedApk: No resource references to update in package com.google.android.trichromelibrary
+01-18 19:27:09.035 31422 31422 I cr_WebViewApkApp: version=134.0.6998.135 (699813538) minSdkVersion=29 isBundle=false processName=com.google.android.webview:sandboxed_process0:org.chromium.content.app.SandboxedProcessService0:0
+--------- beginning of system
+01-18 19:27:09.123   844  1109 D BackgroundInstallControlService: Package event received: 0
+01-18 19:27:09.156   844  2044 W ActivityManager: Slow operation: 71ms so far, now at finishAttachApplicationInner: after mServices.attachApplicationLocked
+01-18 19:27:09.266   844  2044 W ActivityManager: Slow operation: 183ms so far, now at finishAttachApplicationInner: after dispatching broadcasts
+01-18 19:27:09.310   844   880 W Looper  : Slow dispatch took 185ms android.ui app=system_server main=false group=TOP_APP h=com.android.server.am.ActivityManagerService$UiHandler c=com.android.server.am.UidObserverController$$ExternalSyntheticLambda0@987ca5 m=0
+01-18 19:27:09.845 31422 31422 I cr_ChildProcessService: Creating new ChildProcessService pid=31422
+01-18 19:27:10.186   844  1109 D BackgroundInstallControlService: Package event received: 0
+01-18 19:27:10.217  2160  2160 W Finsky  : [2] STU: Failed to get storage stats for package 'com.google.android.permission' (1601: Error getting stats: android.content.pm.PackageManager.NameNotFoundException)
+01-18 19:27:10.319   844   880 W Looper  : Slow dispatch took 403ms android.ui app=system_server main=false group=TOP_APP h=com.android.server.am.ActivityManagerService$UiHandler c=com.android.server.am.UidObserverController$$ExternalSyntheticLambda0@987ca5 m=0
+01-18 19:27:10.400   844  1109 D BackgroundInstallControlService: Package event received: 0
+01-18 19:27:10.605   844   880 W Looper  : Slow delivery took 352ms android.ui app=system_server main=false group=TOP_APP h=com.android.server.am.ActivityManagerService$UiHandler c=com.android.server.am.UidObserverController$$ExternalSyntheticLambda0@987ca5 m=0
+01-18 19:27:10.605   844   880 W Looper  : Slow dispatch took 187ms android.ui app=system_server main=false group=TOP_APP h=com.android.server.am.ActivityManagerService$UiHandler c=com.android.server.am.UidObserverController$$ExternalSyntheticLambda0@987ca5 m=0
+01-18 19:27:10.611   844  1109 D BackgroundInstallControlService: Package event received: 0
+01-18 19:27:10.763   844   880 W Looper  : Drained
+01-18 19:27:10.766   844   880 W Looper  : Slow dispatch took 123ms android.ui app=system_server main=false group=TOP_APP h=com.android.server.am.ActivityManagerService$UiHandler c=com.android.server.am.UidObserverController$$ExternalSyntheticLambda0@987ca5 m=0
+01-18 19:27:10.956 25030 25030 D BoundBrokerSvc: onBind: Intent { act=com.google.android.gms.safetynet.service.START xflg=0x4 pkg=com.google.android.gms }
+01-18 19:27:10.956 25030 25030 D BoundBrokerSvc: Loading bound service for intent: Intent { act=com.google.android.gms.safetynet.service.START xflg=0x4 pkg=com.google.android.gms }
