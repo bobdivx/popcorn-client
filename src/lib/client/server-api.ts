@@ -729,6 +729,9 @@ class ServerApiClient {
     if (endpoint.includes('/api/library/uploader/validate-media')) {
       return 120000; // 2 minutes
     }
+    if (endpoint.includes('/api/library/uploader/generate-screenshots')) {
+      return 120000; // 2 minutes (FFmpeg sur NAS/volume réseau peut être lent)
+    }
     // Health checks : timeout plus long sur Android pour gérer les réseaux lents
     if (endpoint.includes('/health') || endpoint.includes('/api/client/health')) {
       const isAndroid = typeof window !== 'undefined' && /Android/i.test(navigator.userAgent || '');
@@ -1220,8 +1223,10 @@ interface IServerApiClientPublic {
   deleteTmdbKey(): Promise<ApiResponse<void>>;
   testTmdbKey(): Promise<ApiResponse<{ valid: boolean; message?: string }>>;
   getClientTorrentConfig(): Promise<ApiResponse<any>>;
-  getRatioConfig(): Promise<ApiResponse<{ tx_alt: boolean; source: string }>>;
-  updateRatioConfig(tx_alt: boolean): Promise<ApiResponse<{ tx_alt: boolean; source: string }>>;
+  updateClientTorrentListenPort(port: number): Promise<ApiResponse<{ listen_port: number }>>;
+  getRatioConfig(): Promise<ApiResponse<{ mode_enabled: boolean; source: string }>>;
+  getSeedingDiagnostic(): Promise<ApiResponse<{ upnp_enabled: boolean; ratio_mode_enabled: boolean; librqbit_ok: boolean; listen_port: number | null }>>;
+  updateRatioConfig(mode_enabled: boolean): Promise<ApiResponse<{ mode_enabled: boolean; source: string }>>;
   getRatioStats(): Promise<ApiResponse<{
     total_uploaded_bytes: number;
     total_downloaded_bytes: number;
@@ -1231,7 +1236,7 @@ interface IServerApiClientPublic {
     torrents: Array<{ info_hash: string; name: string; state: string; progress: number; uploaded_bytes: number; downloaded_bytes: number; ratio: number }>;
   }>>;
   getRatioTorrentTrackers(infoHash: string): Promise<ApiResponse<{ tracker_urls: string[] }>>;
-  postRatioTest(): Promise<ApiResponse<{ tx_alt: boolean; librqbit_ok: boolean; torrent_count: number; message: string }>>;
+  postRatioTest(): Promise<ApiResponse<{ mode_enabled: boolean; librqbit_ok: boolean; torrent_count: number; message: string }>>;
   postRatioTestSeed(options?: { tracker_url?: string; uploaded_mb?: number; info_hash?: string }): Promise<ApiResponse<{ success: boolean; tracker_url: string; uploaded_bytes: number; response_status: number; message: string }>>;
   getMediaPaths(): Promise<ApiResponse<{ download_dir_root: string; films_path: string | null; series_path: string | null; default_path: string | null; films_root: string; series_root: string }>>;
   putMediaPaths(body: { films_path?: string | null; series_path?: string | null; default_path?: string | null }): Promise<ApiResponse<{ download_dir_root: string; films_path: string | null; series_path: string | null; default_path: string | null; films_root: string; series_root: string }>>;
@@ -1258,6 +1263,7 @@ interface IServerApiClientPublic {
   cancelTorrentCreation(localMediaId: string): Promise<ApiResponse<CancelTorrentCreationResponse>>;
   validateUploadMedia(localMediaId: string): Promise<ApiResponse<UploadMediaValidationResponse>>;
   getPublishedUploads(): Promise<ApiResponse<PublishedUploadMediaEntry[]>>;
+  clearFailedUploads(): Promise<ApiResponse<{ deleted: number }>>;
   getUploadPreview(localMediaId: string, includeTechnical?: boolean, tracker?: string): Promise<ApiResponse<UploaderPreviewResponse>>;
   getTorrentFilesForReseed(): Promise<ApiResponse<import('./server-api/upload-tracker.js').ReseedTorrentInfo[]>>;
   downloadTorrentFileForReseed(infoHash: string): Promise<ApiResponse<Blob> & { filename?: string }>;

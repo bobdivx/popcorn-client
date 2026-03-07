@@ -20,7 +20,7 @@ function formatRatio(r: number): string {
 
 export default function RatioAdminPanel() {
   const { t } = useI18n();
-  const [config, setConfig] = useState<{ tx_alt: boolean; source: string } | null>(null);
+  const [config, setConfig] = useState<{ mode_enabled: boolean; source: string } | null>(null);
   const [stats, setStats] = useState<{
     total_uploaded_bytes: number;
     total_downloaded_bytes: number;
@@ -38,7 +38,7 @@ export default function RatioAdminPanel() {
     }>;
   } | null>(null);
   const [testResult, setTestResult] = useState<{
-    tx_alt: boolean;
+    mode_enabled: boolean;
     librqbit_ok: boolean;
     torrent_count: number;
     message: string;
@@ -166,7 +166,7 @@ export default function RatioAdminPanel() {
     setSavingTxAlt(true);
     setError(null);
     try {
-      const res = await serverApi.updateRatioConfig(!config.tx_alt);
+      const res = await serverApi.updateRatioConfig(!config.mode_enabled);
       if (res.success && res.data) {
         setConfig(res.data);
       } else {
@@ -250,13 +250,13 @@ export default function RatioAdminPanel() {
           </div>
         )}
 
-        {/* TX_ALT */}
+        {/* Mode tracker */}
         <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
           <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-2">
             <Shield className="w-5 h-5 text-primary-400" />
-            {t('ratioAdmin.txAltTitle')}
+            {t('ratioAdmin.modeTitle')}
           </h3>
-          <p className="text-sm text-gray-400 mb-4">{t('ratioAdmin.txAltDescription')}</p>
+          <p className="text-sm text-gray-400 mb-4">{t('ratioAdmin.modeDescription')}</p>
           {loadingConfig ? (
             <span className="loading loading-spinner loading-sm text-primary-400" />
           ) : config ? (
@@ -265,12 +265,12 @@ export default function RatioAdminPanel() {
                 <input
                   type="checkbox"
                   className="toggle toggle-primary"
-                  checked={config.tx_alt}
+                  checked={config.mode_enabled}
                   disabled={savingTxAlt}
                   onChange={handleToggleTxAlt}
                 />
                 <span className="label-text text-white">
-                  {config.tx_alt ? t('ratioAdmin.txAltOn') : t('ratioAdmin.txAltOff')}
+                  {config.mode_enabled ? t('ratioAdmin.modeOn') : t('ratioAdmin.modeOff')}
                 </span>
               </label>
               <span className="text-xs text-gray-500">
@@ -339,7 +339,7 @@ export default function RatioAdminPanel() {
           </button>
           {testResult && (
             <div className="mt-4 rounded-lg bg-white/5 p-4 space-y-2 text-sm">
-              <p><span className="text-gray-500">{t('ratioAdmin.testTxAlt')}:</span> {testResult.tx_alt ? t('ratioAdmin.txAltOn') : t('ratioAdmin.txAltOff')}</p>
+              <p><span className="text-gray-500">{t('ratioAdmin.testMode')}:</span> {testResult.mode_enabled ? t('ratioAdmin.modeOn') : t('ratioAdmin.modeOff')}</p>
               <p><span className="text-gray-500">{t('ratioAdmin.testLibrqbit')}:</span> {testResult.librqbit_ok ? t('ratioAdmin.ok') : t('ratioAdmin.failed')}</p>
               <p><span className="text-gray-500">{t('ratioAdmin.testTorrents')}:</span> {testResult.torrent_count}</p>
               <p><span className="text-gray-500">{t('ratioAdmin.testMessage')}:</span> {testResult.message}</p>

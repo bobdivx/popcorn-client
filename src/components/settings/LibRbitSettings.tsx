@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import { clientApi } from '../../lib/client/api';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { ExternalLink, Download, Upload, FileText, Settings, Database, X } from 'lucide-preact';
+import { ExternalLink, Download, Upload, FileText, Settings, Database, X, Network } from 'lucide-preact';
 
 const REFRESH_STATS_MS = 5000;
 
@@ -44,6 +44,10 @@ export default function LibRbitSettings() {
   const [logsError, setLogsError] = useState<string | null>(null);
   const logsAbortRef = useRef<AbortController | null>(null);
   const [webUiUrl, setWebUiUrl] = useState<string | null>(null);
+  const [listenPortCurrent, setListenPortCurrent] = useState<number | null>(null);
+  const [listenPortDesired, setListenPortDesired] = useState<string>('');
+  const [listenPortSaving, setListenPortSaving] = useState(false);
+  const [listenPortMessage, setListenPortMessage] = useState<'saved' | 'error' | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -57,6 +61,23 @@ export default function LibRbitSettings() {
       if (!base) base = (serverApi.getServerUrl() ?? '').trim();
       base = base.replace(/\/$/, '');
       if (base) setWebUiUrl(`${base}/librqbit/web/`);
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      const res = await serverApi.getSeedingDiagnostic();
+      if (res.success && res.data?.listen_port != null) setListenPortCurrent(res.data.listen_port);
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      const res = await serverApi.getClientTorrentConfig();
+      if (res.success && res.data?.config?.listen_port != null)
+        setListenPortDesired(String(res.data.config.listen_port));
+      else
+        setListenPortDesired('');
     })();
   }, []);
 
@@ -155,6 +176,25 @@ export default function LibRbitSettings() {
     }
   };
 
+  const handleSaveListenPort = async () => {
+    const port = parseInt(listenPortDesired.trim(), 10);
+    if (isNaN(port) || port < 1 || port > 65535) {
+      setListenPortMessage('error');
+      return;
+    }
+    setListenPortMessage(null);
+    setListenPortSaving(true);
+    try {
+      const res = await serverApi.updateClientTorrentListenPort(port);
+      if (res.success) setListenPortMessage('saved');
+      else setListenPortMessage('error');
+    } catch {
+      setListenPortMessage('error');
+    } finally {
+      setListenPortSaving(false);
+    }
+  };
+
   const loadDhtStats = async () => {
     const v = await clientApi.getLibrqbitDhtStats();
     setDhtStats(v ?? null);
@@ -209,6 +249,53 @@ export default function LibRbitSettings() {
           </div>
         </section>
       )}
+
+      {/* Port d'écoute BitTorrent */}
+      <section className={sectionCard}>
+        <h3 className={sectionTitle}>
+          <Network className="h-5 w-5 text-emerald-400 flex-shrink-0" size={20} />
+          {t('settingsPages.librqbit.listenPortTitle')}
+        </h3>
+        <p className="text-xs text-gray-500 mb-3">{t('settingsPages.librqbit.listenPortHint')}</p>
+        <div className="flex flex-wrap items-end gap-4">
+          {listenPortCurrent != null && (
+            <div className="min-w-[120px]">
+              <label className="block text-xs text-gray-400 mb-1">{t('settingsPages.librqbit.listenPortCurrent')}</label>
+              <div className="rounded-lg border border-white/20 bg-black/30 px-3 py-2 text-sm text-white font-mono">
+                {listenPortCurrent}
+              </div>
+            </div>
+          )}
+          <div className="flex-1 min-w-[140px]">
+            <label className="block text-xs text-gray-400 mb-1">{t('settingsPages.librqbit.listenPortDesired')}</label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                min={1}
+                max={65535}
+                value={listenPortDesired}
+                onInput={e => setListenPortDesired((e.target as HTMLInputElement).value)}
+                className={`${inputBase} flex-1 max-w-[120px]`}
+                placeholder="62288"
+                aria-label={t('settingsPages.librqbit.listenPortDesired')}
+              />
+              <button
+                onClick={handleSaveListenPort}
+                disabled={listenPortSaving}
+                className={`${btnPrimary} flex-shrink-0`}
+              >
+                {listenPortSaving ? '…' : t('settingsPages.librqbit.listenPortSave')}
+              </button>
+            </div>
+          </div>
+        </div>
+        {listenPortMessage === 'saved' && (
+          <p className="mt-2 text-sm text-emerald-400" role="status">{t('settingsPages.librqbit.listenPortSaved')}</p>
+        )}
+        {listenPortMessage === 'error' && (
+          <p className="mt-2 text-sm text-red-400" role="alert">{t('settingsPages.librqbit.listenPortError')}</p>
+        )}
+      </section>
 
       {/* Stats session */}
       <section className={sectionCard}>
