@@ -615,8 +615,11 @@
       "wizardReviewDescription": "Check the summary below, then launch the upload. Each tracker will be processed in sequence.",
       "wizardLaunchUpload": "Launch upload",
       "wizardCancelUpload": "Cancel upload",
+      "publishCountdown": "Publishing in {seconds} second(s)…",
+      "publishCountdownCancel": "Cancel",
       "cancelingUploadProgress": "Cancelling upload…",
       "cancelExternalCreation": "Cancel running creation",
+      "cancelRequestedSuccess": "Cancel requested. The creation will stop shortly.",
       "resumeExternalCreationNotice": "A .torrent creation is already running ({progress}%).",
       "resumeExternalCreationAction": "Return to running creation",
       "uploadCanceled": "Upload canceled.",
@@ -772,7 +775,10 @@
       "inRqbit": "Present",
       "notInRqbit": "Missing",
       "downloadTorrent": "Download .torrent",
-      "openOnTracker": "Open on tracker"
+      "openOnTracker": "Open on tracker",
+      "clearFailed": "Clear failed uploads",
+      "clearFailedSuccess": "{count} failed attempt(s) removed.",
+      "clearFailedError": "Failed to clear failed uploads."
     }
   },
   "errors": {

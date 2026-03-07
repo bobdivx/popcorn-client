@@ -631,8 +631,11 @@
       "wizardReviewDescription": "Vérifiez le récapitulatif puis lancez l'upload. Chaque tracker sera traité à la suite.",
       "wizardLaunchUpload": "Lancer l'upload",
       "wizardCancelUpload": "Annuler l'upload",
+      "publishCountdown": "Publication dans {seconds} seconde(s)…",
+      "publishCountdownCancel": "Annuler",
       "cancelingUploadProgress": "Annulation de l'upload en cours…",
       "cancelExternalCreation": "Annuler la création en cours",
+      "cancelRequestedSuccess": "Annulation demandée. La création va s'arrêter sous peu.",
       "resumeExternalCreationNotice": "Une création .torrent est déjà en cours ({progress}%).",
       "resumeExternalCreationAction": "Revenir à la création en cours",
       "uploadCanceled": "Upload annulé.",
@@ -772,7 +775,10 @@
       "inRqbit": "Présent",
       "notInRqbit": "Absent",
       "downloadTorrent": "Télécharger .torrent",
-      "openOnTracker": "Ouvrir sur le tracker"
+      "openOnTracker": "Ouvrir sur le tracker",
+      "clearFailed": "Vider les torrents en échec",
+      "clearFailedSuccess": "{count} tentative(s) en échec supprimée(s).",
+      "clearFailedError": "Impossible de supprimer les uploads en échec."
     }
   },
   "errors": {

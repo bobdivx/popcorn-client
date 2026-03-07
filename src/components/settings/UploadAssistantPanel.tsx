@@ -170,6 +170,8 @@ export default function UploadAssistantPanel() {
   const activeCreationIntervalRef = useRef<number | null>(null);
   const uploadAbortControllerRef = useRef<AbortController | null>(null);
   const uploadWasCancelledRef = useRef(false);
+  /** Media id pour lequel une création externe est en cours (pour le bouton Annuler). */
+  const runningCreationMediaIdRef = useRef<string>('');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const messageRef = useRef<HTMLDivElement>(null);
 
@@ -192,6 +194,10 @@ export default function UploadAssistantPanel() {
     duplicate: 0,
     error: 0,
   });
+  const [publishCountdown, setPublishCountdown] = useState<number | null>(null);
+  const publishCountdownCanceledRef = useRef(false);
+  const publishCountdownIntervalRef = useRef<number | null>(null);
+  const handleLaunchUploadRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const autoSkipStep1Ref = useRef(false);
   const availableMediaList = mediaList.filter((m) => !excludedMediaIds.includes(m.id));
 
@@ -454,6 +460,52 @@ export default function UploadAssistantPanel() {
       selectedTrackers.filter((tracker) => configuredTrackers.includes(tracker))
     );
   }, [selectedTrackers, configuredTrackers]);
+
+  // Auto-lancer la publication après 5 s quand tout est prêt ; l'utilisateur peut annuler avant.
+  useEffect(() => {
+    if (step !== 3) {
+      publishCountdownCanceledRef.current = false;
+    }
+    if (
+      step !== 3 ||
+      !canLaunchUpload ||
+      uploading ||
+      publishCountdownCanceledRef.current ||
+      externalCreationInProgress
+    ) {
+      if (publishCountdownIntervalRef.current != null) {
+        window.clearInterval(publishCountdownIntervalRef.current);
+        publishCountdownIntervalRef.current = null;
+      }
+      if (step !== 3 || !canLaunchUpload) {
+        setPublishCountdown(null);
+      }
+      return;
+    }
+    setPublishCountdown(5);
+    const id = window.setInterval(() => {
+      setPublishCountdown((prev) => {
+        if (prev == null || prev <= 1) {
+          if (publishCountdownIntervalRef.current != null) {
+            window.clearInterval(publishCountdownIntervalRef.current);
+            publishCountdownIntervalRef.current = null;
+          }
+          if (prev === 1 && !publishCountdownCanceledRef.current) {
+            handleLaunchUploadRef.current();
+          }
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    publishCountdownIntervalRef.current = id;
+    return () => {
+      if (publishCountdownIntervalRef.current != null) {
+        window.clearInterval(publishCountdownIntervalRef.current);
+        publishCountdownIntervalRef.current = null;
+      }
+    };
+  }, [step, canLaunchUpload, uploading, externalCreationInProgress]);
 
   useEffect(() => {
     if (step !== 1 || !shouldSkipTrackersStep || autoSkipStep1Ref.current) return;
@@ -771,6 +823,10 @@ export default function UploadAssistantPanel() {
     }
   };
 
+  useEffect(() => {
+    handleLaunchUploadRef.current = handleLaunchUpload;
+  });
+
   const handleCancelUpload = () => {
     if (!uploading) return;
     uploadWasCancelledRef.current = true;
@@ -778,17 +834,38 @@ export default function UploadAssistantPanel() {
     uploadAbortControllerRef.current?.abort();
   };
 
+  const handleCancelPublishCountdown = () => {
+    publishCountdownCanceledRef.current = true;
+    if (publishCountdownIntervalRef.current != null) {
+      window.clearInterval(publishCountdownIntervalRef.current);
+      publishCountdownIntervalRef.current = null;
+    }
+    setPublishCountdown(null);
+  };
+
   const handleCancelExternalCreation = async () => {
-    if (!selectedMediaId.trim() || cancelingExternalCreation) return;
+    const mediaIdToCancel = runningCreationMediaIdRef.current?.trim() || selectedMediaId?.trim();
+    if (!mediaIdToCancel || cancelingExternalCreation) return;
     setCancelingExternalCreation(true);
-    const res = await serverApi.cancelTorrentCreation(selectedMediaId);
+    const res = await serverApi.cancelTorrentCreation(mediaIdToCancel);
     setCancelingExternalCreation(false);
-    if (res.success && res.data?.cancel_requested) {
+    const cancelRequested = res.success && (res.data?.cancel_requested === true);
+    if (cancelRequested) {
       setProgressMessage(t('settings.uploadTrackerPanel.cancelingUploadProgress'));
+      setExternalCreationInProgress(false);
+      setTorrentProgress(null);
+      runningCreationMediaIdRef.current = '';
+      setMessage({
+        type: 'success',
+        text: t('settings.uploadTrackerPanel.cancelRequestedSuccess'),
+      });
       return;
     }
     if (!res.success) {
-      setMessage({ type: 'error', text: res.message ?? t('common.error') });
+      setMessage({
+        type: 'error',
+        text: res.message || res.error || t('common.error'),
+      });
     }
   };
 
@@ -822,9 +899,13 @@ export default function UploadAssistantPanel() {
       const runningElsewhere = typeof pct === 'number' && pct < 100;
       setExternalCreationInProgress(runningElsewhere);
       if (runningElsewhere) {
+        runningCreationMediaIdRef.current = selectedMediaId;
         setTorrentProgress(pct);
-      } else if (!uploading && !progressMessage) {
-        setTorrentProgress(null);
+      } else {
+        runningCreationMediaIdRef.current = '';
+        if (!uploading && !progressMessage) {
+          setTorrentProgress(null);
+        }
       }
     };
 
@@ -1313,32 +1394,49 @@ export default function UploadAssistantPanel() {
             )}
 
             <div className="mt-6 flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="btn btn-primary gap-2"
-                disabled={uploading || !canLaunchUpload || externalCreationInProgress}
-                onClick={() => void handleLaunchUpload()}
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {t('common.loading')}
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-4 h-4" />
-                    {t('settings.uploadTrackerPanel.wizardLaunchUpload')}
-                  </>
-                )}
-              </button>
-              {uploading && (
-                <button
-                  type="button"
-                  className="btn btn-error btn-sm"
-                  onClick={handleCancelUpload}
-                >
-                  {t('settings.uploadTrackerPanel.wizardCancelUpload')}
-                </button>
+              {publishCountdown != null && publishCountdown > 0 ? (
+                <>
+                  <span className="flex items-center gap-2 text-sm text-base-content/80">
+                    {t('settings.uploadTrackerPanel.publishCountdown', { seconds: publishCountdown })}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn btn-ghost btn-sm"
+                    onClick={handleCancelPublishCountdown}
+                  >
+                    {t('settings.uploadTrackerPanel.publishCountdownCancel')}
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-primary gap-2"
+                    disabled={uploading || !canLaunchUpload || externalCreationInProgress}
+                    onClick={() => void handleLaunchUpload()}
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        {t('common.loading')}
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        {t('settings.uploadTrackerPanel.wizardLaunchUpload')}
+                      </>
+                    )}
+                  </button>
+                  {uploading && (
+                    <button
+                      type="button"
+                      className="btn btn-error btn-sm"
+                      onClick={handleCancelUpload}
+                    >
+                      {t('settings.uploadTrackerPanel.wizardCancelUpload')}
+                    </button>
+                  )}
+                </>
               )}
               <button
                 type="button"

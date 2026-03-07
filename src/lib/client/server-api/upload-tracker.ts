@@ -329,6 +329,18 @@ export const uploadTrackerMethods = {
   },
 
   /**
+   * Supprime de l'historique toutes les entrées d'upload en échec (tentatives tracker non réussies).
+   * Retourne le nombre d'entrées supprimées.
+   */
+  async clearFailedUploads(
+    this: UploadTrackerClientAccess
+  ): Promise<ApiResponse<{ deleted: number }>> {
+    return this.backendRequest<{ deleted: number }>('/api/library/uploader/clear-failed', {
+      method: 'POST',
+    });
+  },
+
+  /**
    * Génère les captures d'écran pour un média (FFmpeg) ; elles seront réutilisées à l'upload.
    */
   async generateScreenshots(
