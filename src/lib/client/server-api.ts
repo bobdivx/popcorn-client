@@ -729,6 +729,9 @@ class ServerApiClient {
     if (endpoint.includes('/api/library/uploader/validate-media')) {
       return 120000; // 2 minutes
     }
+    if (endpoint.includes('/api/library/uploader/generate-screenshots')) {
+      return 120000; // 2 minutes (FFmpeg sur NAS/volume réseau peut être lent)
+    }
     // Health checks : timeout plus long sur Android pour gérer les réseaux lents
     if (endpoint.includes('/health') || endpoint.includes('/api/client/health')) {
       const isAndroid = typeof window !== 'undefined' && /Android/i.test(navigator.userAgent || '');
@@ -1220,7 +1223,9 @@ interface IServerApiClientPublic {
   deleteTmdbKey(): Promise<ApiResponse<void>>;
   testTmdbKey(): Promise<ApiResponse<{ valid: boolean; message?: string }>>;
   getClientTorrentConfig(): Promise<ApiResponse<any>>;
+  updateClientTorrentListenPort(port: number): Promise<ApiResponse<{ listen_port: number }>>;
   getRatioConfig(): Promise<ApiResponse<{ mode_enabled: boolean; source: string }>>;
+  getSeedingDiagnostic(): Promise<ApiResponse<{ upnp_enabled: boolean; ratio_mode_enabled: boolean; librqbit_ok: boolean; listen_port: number | null }>>;
   updateRatioConfig(mode_enabled: boolean): Promise<ApiResponse<{ mode_enabled: boolean; source: string }>>;
   getRatioStats(): Promise<ApiResponse<{
     total_uploaded_bytes: number;

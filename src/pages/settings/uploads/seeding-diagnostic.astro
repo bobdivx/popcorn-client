@@ -1,0 +1,19 @@
+---
+import SettingsLayout from '../../../layouts/SettingsLayout.astro';
+import SeedingDiagnosticPanel from '../../../components/settings/SeedingDiagnosticPanel';
+import PermissionGuard from '../../../components/ui/PermissionGuard';
+import DsPageHeader from '../../../components/ui/DsPageHeader';
+---
+
+<SettingsLayout title="Diagnostic partage - Popcorn Client">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="settings.seedingDiagnostic.title"
+      subtitleKey="settings.seedingDiagnostic.subtitle"
+    />
+    <PermissionGuard client:only="preact" permission="settings.indexers">
+      <SeedingDiagnosticPanel client:only="preact" />
+    </PermissionGuard>
+  </div>
+</SettingsLayout>
