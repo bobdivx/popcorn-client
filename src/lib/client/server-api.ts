@@ -1258,6 +1258,7 @@ interface IServerApiClientPublic {
   cancelTorrentCreation(localMediaId: string): Promise<ApiResponse<CancelTorrentCreationResponse>>;
   validateUploadMedia(localMediaId: string): Promise<ApiResponse<UploadMediaValidationResponse>>;
   getPublishedUploads(): Promise<ApiResponse<PublishedUploadMediaEntry[]>>;
+  clearFailedUploads(): Promise<ApiResponse<{ deleted: number }>>;
   getUploadPreview(localMediaId: string, includeTechnical?: boolean, tracker?: string): Promise<ApiResponse<UploaderPreviewResponse>>;
   getTorrentFilesForReseed(): Promise<ApiResponse<import('./server-api/upload-tracker.js').ReseedTorrentInfo[]>>;
   downloadTorrentFileForReseed(infoHash: string): Promise<ApiResponse<Blob> & { filename?: string }>;
