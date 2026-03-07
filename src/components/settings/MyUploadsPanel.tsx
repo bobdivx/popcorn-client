@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
-import { ArrowLeft, CheckCircle2, Download, ExternalLink, Loader2, RefreshCw, XCircle } from 'lucide-preact';
+import { ArrowLeft, CheckCircle2, Download, ExternalLink, Loader2, RefreshCw, Trash2, XCircle } from 'lucide-preact';
 import { serverApi } from '../../lib/client/server-api';
 import type { PublishedUploadMediaEntry } from '../../lib/client/server-api/upload-tracker';
 import { useI18n } from '../../lib/i18n/useI18n';
+import { notificationService } from '../../lib/services/notification-service';
 import { DsCard, DsCardSection } from '../ui/design-system';
 
 const BASE_URL = '/settings/uploads/';
@@ -25,6 +26,7 @@ export default function MyUploadsPanel() {
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<PublishedUploadMediaEntry[]>([]);
   const [downloadingHash, setDownloadingHash] = useState<string | null>(null);
+  const [clearingFailed, setClearingFailed] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -66,6 +68,30 @@ export default function MyUploadsPanel() {
     }
   };
 
+  const hasFailedTrackers = useMemo(
+    () => items.some((item) => item.trackers.some((tr) => !tr.success)),
+    [items]
+  );
+
+  const handleClearFailed = async () => {
+    setClearingFailed(true);
+    const res = await serverApi.clearFailedUploads();
+    setClearingFailed(false);
+    if (res.success && res.data) {
+      const count = res.data.deleted ?? 0;
+      await notificationService.notifySuccess(
+        t('settings.myUploadsPanel.clearFailed'),
+        t('settings.myUploadsPanel.clearFailedSuccess', { count })
+      );
+      load();
+    } else {
+      await notificationService.notifyError(
+        t('settings.myUploadsPanel.clearFailed'),
+        res.message || res.error || t('settings.myUploadsPanel.clearFailedError')
+      );
+    }
+  };
+
   return (
     <div className="space-y-6">
       <a
@@ -89,10 +115,28 @@ export default function MyUploadsPanel() {
                 {t('settings.myUploadsPanel.description')}
               </p>
             </div>
-            <button type="button" className="btn btn-ghost btn-sm gap-2" onClick={load} disabled={loading}>
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-              {t('common.refresh')}
-            </button>
+            <div className="flex items-center gap-2">
+              {hasFailedTrackers ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm gap-2 text-amber-600 hover:text-amber-500 dark:text-amber-400 dark:hover:text-amber-300"
+                  onClick={handleClearFailed}
+                  disabled={loading || clearingFailed}
+                  title={t('settings.myUploadsPanel.clearFailed')}
+                >
+                  {clearingFailed ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4" />
+                  )}
+                  {t('settings.myUploadsPanel.clearFailed')}
+                </button>
+              ) : null}
+              <button type="button" className="btn btn-ghost btn-sm gap-2" onClick={load} disabled={loading}>
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                {t('common.refresh')}
+              </button>
+            </div>
           </div>
 
           {loading ? (

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'preact/hooks';
-import { ArrowLeft, Download, Upload, Sprout, Users, Play, Pause, Trash2, Info, LogsIcon, Film, Clock, HardDrive, Copy, X, Pencil, PlusCircle } from 'lucide-preact';
+import { ArrowLeft, Download, Upload, Sprout, Users, Play, Pause, Trash2, Info, LogsIcon, Film, Clock, HardDrive, Copy, X, Pencil, PlusCircle, ExternalLink } from 'lucide-preact';
 import type { ClientTorrentStats } from '../../lib/client/types';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { clientApi } from '../../lib/client/api';
@@ -510,57 +510,63 @@ export function DownloadDetailModal({
                 </div>
               )}
 
-              {/* Actions : boutons pleine largeur sur mobile, focus ring violet */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-2 sm:gap-3 tv:gap-4 pt-3 sm:pt-4 border-t border-[var(--ds-border)]">
+              {/* Actions : icônes explicites, title/aria-label pour accessibilité */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap gap-2 sm:gap-3 tv:gap-4 pt-3 sm:pt-4 border-t border-[var(--ds-border)]">
                 {torrent.state === 'paused' ? (
                   <button
                     onClick={() => onResume(torrent.info_hash)}
-                    className="w-full sm:flex-1 min-h-[48px] px-4 py-3 tv:px-8 tv:py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg tv:rounded-xl text-sm sm:text-base tv:text-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex items-center justify-center gap-2"
+                    className="min-h-[48px] min-w-[48px] px-4 py-3 tv:px-6 tv:py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg tv:rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex items-center justify-center"
                     tabIndex={0}
                     data-focusable
+                    title={t('common.resume')}
+                    aria-label={t('common.resume')}
                   >
-                    <Play className="w-5 h-5 tv:w-6 tv:h-6 shrink-0" size={24} />
-                    <span>{t('common.resume')}</span>
+                    <Play className="w-6 h-6 tv:w-7 tv:h-7 shrink-0" size={28} />
                   </button>
                 ) : torrent.state !== 'completed' && torrent.state !== 'seeding' && torrent.state !== 'paused' ? (
                   <button
                     onClick={() => onPause(torrent.info_hash)}
-                    className="w-full sm:flex-1 min-h-[48px] px-4 py-3 tv:px-8 tv:py-4 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg tv:rounded-xl text-sm sm:text-base tv:text-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex items-center justify-center gap-2"
+                    className="min-h-[48px] min-w-[48px] px-4 py-3 tv:px-6 tv:py-4 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg tv:rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex items-center justify-center"
                     tabIndex={0}
                     data-focusable
+                    title={t('common.pause')}
+                    aria-label={t('common.pause')}
                   >
-                    <Pause className="w-5 h-5 tv:w-6 tv:h-6 shrink-0" size={24} />
-                    <span>{t('common.pause')}</span>
+                    <Pause className="w-6 h-6 tv:w-7 tv:h-7 shrink-0" size={28} />
                   </button>
                 ) : null}
 
                 <button
                   onClick={() => void handleRemoveAndClose(false)}
-                  className="w-full sm:flex-1 min-h-[48px] min-w-0 px-4 py-3 tv:px-8 tv:py-4 bg-primary hover:bg-primary-700 text-white rounded-lg tv:rounded-xl text-sm sm:text-base tv:text-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex items-center justify-center gap-2"
+                  className="min-h-[48px] min-w-[48px] px-4 py-3 tv:px-6 tv:py-4 bg-primary hover:bg-primary-700 text-white rounded-lg tv:rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex items-center justify-center"
                   tabIndex={0}
                   data-focusable
+                  title={t('common.delete')}
+                  aria-label={t('common.delete')}
                 >
-                  <Trash2 className="w-5 h-5 tv:w-6 tv:h-6 shrink-0" size={24} />
-                  <span>{t('common.delete')}</span>
+                  <Trash2 className="w-6 h-6 tv:w-7 tv:h-7 shrink-0" size={28} />
                 </button>
 
                 {(torrent.state === 'completed' || torrent.state === 'seeding') && (
                   <button
                     onClick={() => void handleRemoveAndClose(true)}
-                    className="w-full sm:flex-1 min-h-[48px] min-w-0 px-4 py-3 tv:px-8 tv:py-4 bg-primary-800 hover:bg-primary-900 text-white rounded-lg tv:rounded-xl text-sm sm:text-base tv:text-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] border border-primary-700 flex items-center justify-center gap-2"
+                    className="min-h-[48px] min-w-[48px] px-4 py-3 tv:px-6 tv:py-4 bg-primary-800 hover:bg-primary-900 text-white rounded-lg tv:rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] border border-primary-700 flex items-center justify-center"
                     tabIndex={0}
                     data-focusable
+                    title={t('downloads.removeWithFiles')}
+                    aria-label={t('downloads.removeWithFiles')}
                   >
-                    <Trash2 className="w-5 h-5 tv:w-6 tv:h-6 shrink-0" size={24} />
-                    <span>{t('downloads.removeWithFiles')}</span>
+                    <Trash2 className="w-6 h-6 tv:w-7 tv:h-7 shrink-0" size={28} />
                   </button>
                 )}
 
                 <a
                   href={`/torrents?slug=${encodeURIComponent(torrent.slug && torrent.slug.trim() ? torrent.slug : torrent.info_hash)}&from=downloads${torrent.slug && torrent.slug.trim() ? `&infoHash=${encodeURIComponent(torrent.info_hash)}` : ''}`}
-                  className="w-full sm:flex-1 min-h-[48px] min-w-0 px-4 py-3 tv:px-8 tv:py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg tv:rounded-xl text-sm sm:text-base tv:text-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex items-center justify-center gap-2"
+                  className="min-h-[48px] min-w-[48px] px-4 py-3 tv:px-6 tv:py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg tv:rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex items-center justify-center"
                   tabIndex={0}
                   data-focusable
+                  title={t('common.open')}
+                  aria-label={t('common.open')}
                   onClick={() => {
                     saveDownloadClientStats(torrent.info_hash, {
                       info_hash: torrent.info_hash,
@@ -575,18 +581,30 @@ export function DownloadDetailModal({
                     });
                   }}
                 >
-                  <Info className="w-5 h-5 tv:w-6 tv:h-6 shrink-0" size={24} />
-                  <span>{t('common.open')}</span>
+                  <ExternalLink className="w-6 h-6 tv:w-7 tv:h-7 shrink-0" size={28} />
                 </a>
 
                 <button
-                  onClick={() => onShowLogs(torrent.info_hash)}
-                  className="w-full sm:flex-1 min-h-[48px] min-w-0 px-4 py-3 tv:px-8 tv:py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg tv:rounded-xl text-sm sm:text-base tv:text-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex items-center justify-center gap-2"
+                  type="button"
+                  onClick={() => clientApi.torrents.downloadTorrentFile(torrent.info_hash, torrent.name)}
+                  className="min-h-[48px] min-w-[48px] px-4 py-3 tv:px-6 tv:py-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg tv:rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex items-center justify-center"
                   tabIndex={0}
                   data-focusable
+                  title={t('downloads.downloadTorrentFile')}
+                  aria-label={t('downloads.downloadTorrentFile')}
                 >
-                  <LogsIcon className="w-5 h-5 tv:w-6 tv:h-6 shrink-0" size={24} />
-                  <span>{t('downloads.logs')}</span>
+                  <Download className="w-6 h-6 tv:w-7 tv:h-7 shrink-0" size={28} />
+                </button>
+
+                <button
+                  onClick={() => onShowLogs(torrent.info_hash)}
+                  className="min-h-[48px] min-w-[48px] px-4 py-3 tv:px-6 tv:py-4 bg-gray-700 hover:bg-gray-600 text-white rounded-lg tv:rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex items-center justify-center"
+                  tabIndex={0}
+                  data-focusable
+                  title={t('downloads.logs')}
+                  aria-label={t('downloads.logs')}
+                >
+                  <LogsIcon className="w-6 h-6 tv:w-7 tv:h-7 shrink-0" size={28} />
                 </button>
 
                 <button
@@ -596,14 +614,14 @@ export function DownloadDetailModal({
                     setTrackerMessage(null);
                     if (!editPanelOpen) void loadTrackers();
                   }}
-                  className="w-full sm:flex-1 min-h-[48px] min-w-0 px-4 py-3 tv:px-8 tv:py-4 rounded-lg tv:rounded-xl text-sm sm:text-base tv:text-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex items-center justify-center gap-2 border border-[var(--ds-border)] bg-[var(--ds-surface-overlay)] text-[var(--ds-text-primary)] hover:bg-[var(--ds-surface-elevated)]"
+                  className="min-h-[48px] min-w-[48px] px-4 py-3 tv:px-6 tv:py-4 rounded-lg tv:rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex items-center justify-center border border-[var(--ds-border)] bg-[var(--ds-surface-overlay)] text-[var(--ds-text-primary)] hover:bg-[var(--ds-surface-elevated)]"
                   tabIndex={0}
                   data-focusable
+                  title={t('common.edit')}
                   aria-label={t('common.edit')}
                   aria-expanded={editPanelOpen}
                 >
-                  <Pencil className="w-5 h-5 tv:w-6 tv:h-6 shrink-0" size={24} />
-                  <span>{t('common.edit')}</span>
+                  <Pencil className="w-6 h-6 tv:w-7 tv:h-7 shrink-0" size={28} />
                 </button>
               </div>
             </div>

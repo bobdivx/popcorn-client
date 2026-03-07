@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
-import { ListPlus, Upload, ChevronRight, Download, ListChecks, SlidersHorizontal } from 'lucide-preact';
+import { ListPlus, Upload, ChevronRight, Download, ListChecks, SlidersHorizontal, Activity } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
 import { DsCard, DsCardSection } from '../ui/design-system';
@@ -49,6 +49,13 @@ export default function UploadsSubMenuPanel() {
       descriptionKey: 'settings.clientTorrentsList.description',
       icon: ListPlus,
       href: `${BASE_URL}client-torrents/`,
+    },
+    {
+      id: 'seeding-diagnostic',
+      titleKey: 'settings.seedingDiagnostic.title',
+      descriptionKey: 'settings.seedingDiagnostic.description',
+      icon: Activity,
+      href: `${BASE_URL}seeding-diagnostic/`,
     },
     {
       id: 'reseed',

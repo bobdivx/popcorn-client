@@ -319,11 +319,17 @@ export function createDemoServerApi(): Record<string, unknown> {
     async getClientTorrentConfig(): Promise<ApiResponse<unknown>> {
       return success({});
     },
-    async getRatioConfig(): Promise<ApiResponse<{ tx_alt: boolean; source: string }>> {
-      return success({ tx_alt: false, source: 'config' });
+    async updateClientTorrentListenPort(port: number): Promise<ApiResponse<{ listen_port: number }>> {
+      return success({ listen_port: port });
     },
-    async updateRatioConfig(_tx_alt: boolean): Promise<ApiResponse<{ tx_alt: boolean; source: string }>> {
-      return success({ tx_alt: false, source: 'env' });
+    async getRatioConfig(): Promise<ApiResponse<{ mode_enabled: boolean; source: string }>> {
+      return success({ mode_enabled: false, source: 'config' });
+    },
+    async getSeedingDiagnostic(): Promise<ApiResponse<{ upnp_enabled: boolean; ratio_mode_enabled: boolean; librqbit_ok: boolean; listen_port: number | null }>> {
+      return success({ upnp_enabled: true, ratio_mode_enabled: false, librqbit_ok: true, listen_port: 51413 });
+    },
+    async updateRatioConfig(_mode_enabled: boolean): Promise<ApiResponse<{ mode_enabled: boolean; source: string }>> {
+      return success({ mode_enabled: false, source: 'env' });
     },
     async getRatioStats(): Promise<ApiResponse<{
       total_uploaded_bytes: number;
@@ -345,8 +351,8 @@ export function createDemoServerApi(): Record<string, unknown> {
     async getRatioTorrentTrackers(_infoHash: string): Promise<ApiResponse<{ tracker_urls: string[] }>> {
       return success({ tracker_urls: [] });
     },
-    async postRatioTest(): Promise<ApiResponse<{ tx_alt: boolean; librqbit_ok: boolean; torrent_count: number; message: string }>> {
-      return success({ tx_alt: false, librqbit_ok: true, torrent_count: 0, message: 'Connexion librqbit OK' });
+    async postRatioTest(): Promise<ApiResponse<{ mode_enabled: boolean; librqbit_ok: boolean; torrent_count: number; message: string }>> {
+      return success({ mode_enabled: false, librqbit_ok: true, torrent_count: 0, message: 'Connexion librqbit OK' });
     },
     async postRatioTestSeed(_options?: { tracker_url?: string; uploaded_mb?: number; info_hash?: string }): Promise<ApiResponse<{ success: boolean; tracker_url: string; uploaded_bytes: number; response_status: number; message: string }>> {
       return success({

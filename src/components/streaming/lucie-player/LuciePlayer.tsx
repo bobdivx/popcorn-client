@@ -3,7 +3,6 @@ import { useVideoControls } from '../player-shared/hooks/useVideoControls';
 import { useFullscreen, toggleFullscreen } from '../player-shared/hooks/useFullscreen';
 import { ErrorDisplay } from '../player-shared/components/ErrorDisplay';
 import { VideoControls } from '../player-shared/components/VideoControls';
-import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import type { LuciePlayerProps } from './types';
 import { useLuciePlayer } from './hooks/useLuciePlayer';
 import { useTVPlayerNavigation } from '../player-shared/hooks/useTVPlayerNavigation';
@@ -40,7 +39,6 @@ export default function LuciePlayer({
 }: LuciePlayerProps) {
   const playerConfig = usePlayerConfig();
   const { t } = useI18n();
-  const chromecast = useChromecast();
   const canAutoPlayRef = useRef<(() => boolean) | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -380,9 +378,6 @@ export default function LuciePlayer({
               ? onPlayNextEpisode
               : undefined
           }
-          showCastButton={chromecast.isAvailable}
-          isCasting={chromecast.isCasting}
-          onCastClick={() => chromecast.castMedia(src, torrentName || '', currentTime)}
         />
         {/* Overlays skip intro / épisode suivant */}
         {showSkipIntro && (

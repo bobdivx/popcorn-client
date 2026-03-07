@@ -2093,6 +2093,9 @@ export async function sendFeedbackMessage(params: {
 
 export async function getFeedbackUnreadCount(): Promise<number | null> {
   try {
+    if (!TokenManager.getCloudAccessToken()) {
+      return null;
+    }
     const apiUrl = `${getPopcornWebApiUrl()}/feedback/count/unread`;
     const res = await requestWithTokenRefresh(
       apiUrl,

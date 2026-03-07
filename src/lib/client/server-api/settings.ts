@@ -99,22 +99,34 @@ export const settingsMethods = {
     const hasKey = (hasKeyRes.data as any)?.has_key === true || (hasKeyRes.data as any)?.has_key === 1;
     return { success: true, data: { valid: !!hasKey, message: hasKey ? undefined : 'ClÃ© TMDB non configurÃ©e' } };
   },
-  async getClientTorrentConfig(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{ config: { download_dir: string; max_downloads: number; max_upload_slots: number; librqbit_api_url: string; }; download_paths: { films_path: string; films_exists: boolean; films_subdirs_count: number; series_path: string; series_exists: boolean; series_subdirs_count: number; stream_temp_path: string; stream_temp_exists: boolean; }; subdirectory_creation: { enabled: boolean; description: string; example: string; }; }>> {
+  async getClientTorrentConfig(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{ config: { download_dir: string; max_downloads: number; max_upload_slots: number; librqbit_api_url: string; listen_port: number | null }; download_paths: { films_path: string; films_exists: boolean; films_subdirs_count: number; series_path: string; series_exists: boolean; series_subdirs_count: number; stream_temp_path: string; stream_temp_exists: boolean; }; subdirectory_creation: { enabled: boolean; description: string; example: string; }; }>> {
     return this.backendRequest('/api/admin/client-torrent/config', { method: 'GET' });
   },
-
-  /** GET /api/admin/ratio/config — état TX_ALT (protection ratio streaming) */
-  async getRatioConfig(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{ tx_alt: boolean; source: string }>> {
-    return this.backendRequest('/api/admin/ratio/config', { method: 'GET' });
-  },
-  /** PUT /api/admin/ratio/config — active/désactive TX_ALT (session en cours) */
-  async updateRatioConfig(this: ServerApiClientSettingsAccess, tx_alt: boolean): Promise<ApiResponse<{ tx_alt: boolean; source: string }>> {
-    return this.backendRequest('/api/admin/ratio/config', {
-      method: 'PUT',
-      body: JSON.stringify({ tx_alt }),
+  /** PATCH /api/admin/client-torrent/listen-port — enregistre le port d'écoute BitTorrent pour le prochain redémarrage. */
+  async updateClientTorrentListenPort(this: ServerApiClientSettingsAccess, listen_port: number): Promise<ApiResponse<{ listen_port: number }>> {
+    return this.backendRequest('/api/admin/client-torrent/listen-port', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ listen_port }),
     });
   },
-  /** GET /api/admin/ratio/stats — stats agrégées (upload, download, ratio) et liste torrents */
+
+  /** GET /api/admin/tracker-mode/config — état du mode compatibilité tracker */
+  async getRatioConfig(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{ mode_enabled: boolean; source: string }>> {
+    return this.backendRequest('/api/admin/tracker-mode/config', { method: 'GET' });
+  },
+  /** GET /api/admin/seeding-diagnostic — infos pour diagnostiquer le partage (UPnP, ratio, librqbit) */
+  async getSeedingDiagnostic(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{ upnp_enabled: boolean; ratio_mode_enabled: boolean; librqbit_ok: boolean; listen_port: number | null }>> {
+    return this.backendRequest('/api/admin/seeding-diagnostic', { method: 'GET' });
+  },
+  /** PUT /api/admin/tracker-mode/config — active/désactive le mode (session en cours) */
+  async updateRatioConfig(this: ServerApiClientSettingsAccess, mode_enabled: boolean): Promise<ApiResponse<{ mode_enabled: boolean; source: string }>> {
+    return this.backendRequest('/api/admin/tracker-mode/config', {
+      method: 'PUT',
+      body: JSON.stringify({ mode_enabled }),
+    });
+  },
+  /** GET /api/admin/tracker-mode/stats — stats agrégées (upload, download, ratio) et liste torrents */
   async getRatioStats(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{
     total_uploaded_bytes: number;
     total_downloaded_bytes: number;
@@ -131,13 +143,13 @@ export const settingsMethods = {
       ratio: number;
     }>;
   }>> {
-    return this.backendRequest('/api/admin/ratio/stats', { method: 'GET' });
+    return this.backendRequest('/api/admin/tracker-mode/stats', { method: 'GET' });
   },
-  /** GET /api/admin/ratio/torrents/:info_hash/trackers — URLs des trackers pour un torrent (indexer) */
+  /** GET /api/admin/tracker-mode/torrents/:info_hash/trackers — URLs des trackers pour un torrent (indexer) */
   async getRatioTorrentTrackers(this: ServerApiClientSettingsAccess, infoHash: string): Promise<ApiResponse<{ tracker_urls: string[]; debug_librqbit_keys?: string[] }>> {
     const hash = infoHash.trim().toLowerCase();
     if (hash.length !== 40) return { success: false, error: 'ValidationError', message: 'info_hash doit faire 40 caractères' };
-    const url = `/api/admin/ratio/torrents/${encodeURIComponent(hash)}/trackers`;
+    const url = `/api/admin/tracker-mode/torrents/${encodeURIComponent(hash)}/trackers`;
     console.log('[Ratio] getRatioTorrentTrackers request:', { infoHash: hash, url });
     const res = await this.backendRequest(url, { method: 'GET' });
     console.log('[Ratio] getRatioTorrentTrackers response:', { success: res.success, data: res.data, error: res.error, message: res.message });
@@ -168,16 +180,16 @@ export const settingsMethods = {
   async getClientTorrents(this: ServerApiClientSettingsAccess): Promise<ApiResponse<Array<{ info_hash: string; name: string; state: string; progress?: number; trackers?: string[] }>>> {
     return this.backendRequest('/api/client/torrents', { method: 'GET' });
   },
-  /** POST /api/admin/ratio/test — test connexion librqbit et état TX_ALT */
+  /** POST /api/admin/tracker-mode/check — test connexion librqbit et état du mode */
   async postRatioTest(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{
-    tx_alt: boolean;
+    mode_enabled: boolean;
     librqbit_ok: boolean;
     torrent_count: number;
     message: string;
   }>> {
-    return this.backendRequest('/api/admin/ratio/test', { method: 'POST' });
+    return this.backendRequest('/api/admin/tracker-mode/check', { method: 'POST' });
   },
-  /** POST /api/admin/ratio/test-seed — envoie une annonce de test (même format que le client), quantité en Mo configurable, info_hash optionnel */
+  /** POST /api/admin/tracker-mode/probe-seed — envoie une annonce de test (même format que le client), quantité en Mo configurable, info_hash optionnel */
   async postRatioTestSeed(this: ServerApiClientSettingsAccess, options?: { tracker_url?: string; uploaded_mb?: number; info_hash?: string }): Promise<ApiResponse<{
     success: boolean;
     tracker_url: string;
@@ -197,7 +209,7 @@ export const settingsMethods = {
           ...(options!.info_hash != null && options!.info_hash.trim() !== '' ? { info_hash: options!.info_hash.trim() } : {}),
         })
       : undefined;
-    return this.backendRequest('/api/admin/ratio/test-seed', {
+    return this.backendRequest('/api/admin/tracker-mode/probe-seed', {
       method: 'POST',
       body,
     });
