@@ -13,7 +13,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { DsBarChart, DsCard, DsCardSection, DsMetricCard, LoadingIcon } from '../ui/design-system';
 import { Modal } from '../ui/Modal';
 import { DescriptionPreview } from '../upload/DescriptionPreview';
-import { ArrowLeft, ArrowRight, Check, Loader2, Upload } from 'lucide-preact';
+import { ArrowLeft, ArrowRight, Check, Loader2, Search, Upload } from 'lucide-preact';
 
 const SAVED_MASK = '********';
 const WIZARD_STEPS = 3;
@@ -146,6 +146,10 @@ export default function UploadAssistantPanel() {
   const [selectedMediaId, setSelectedMediaId] = useState('');
   const [selectedMediaIds, setSelectedMediaIds] = useState<string[]>([]);
   const [excludedMediaIds, setExcludedMediaIds] = useState<string[]>([]);
+  const [mediaSearchQuery, setMediaSearchQuery] = useState('');
+  const [showExcludedMedia, setShowExcludedMedia] = useState(false);
+  const [filterTorrentCreated, setFilterTorrentCreated] = useState<'all' | 'with_torrent' | 'without_torrent'>('all');
+  const [publishedMediaIdsWithTorrent, setPublishedMediaIdsWithTorrent] = useState<Set<string>>(new Set());
 
   const [selectedTrackers, setSelectedTrackers] = useState<string[]>([]);
   const [configuredTrackers, setConfiguredTrackers] = useState<string[]>([]);
@@ -200,6 +204,21 @@ export default function UploadAssistantPanel() {
   const handleLaunchUploadRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const autoSkipStep1Ref = useRef(false);
   const availableMediaList = mediaList.filter((m) => !excludedMediaIds.includes(m.id));
+  const searchLower = mediaSearchQuery.trim().toLowerCase();
+  const baseListForDisplay =
+    showExcludedMedia ? mediaList : mediaList.filter((m) => !excludedMediaIds.includes(m.id));
+  const displayedMediaList = baseListForDisplay.filter((m) => {
+    if (searchLower) {
+      const title = (m.tmdb_title || m.file_name || '').toLowerCase();
+      const fileName = (m.file_name || '').toLowerCase();
+      if (!title.includes(searchLower) && !fileName.includes(searchLower)) return false;
+    }
+    const hasTorrent = publishedMediaIdsWithTorrent.has(m.id);
+    if (filterTorrentCreated === 'with_torrent' && !hasTorrent) return false;
+    if (filterTorrentCreated === 'without_torrent' && hasTorrent) return false;
+    return true;
+  });
+  const selectableInDisplayed = displayedMediaList.filter((m) => !excludedMediaIds.includes(m.id));
 
   const loadConfig = useCallback(async () => {
     setLoadingConfig(true);
@@ -346,6 +365,24 @@ export default function UploadAssistantPanel() {
   }, [selectedMediaIds]);
 
   useEffect(() => {
+    if (step !== 2 || mediaList.length === 0) return;
+    let cancelled = false;
+    serverApi.getPublishedUploads().then((res) => {
+      if (cancelled) return;
+      if (res.success && Array.isArray(res.data)) {
+        const ids = new Set<string>();
+        for (const entry of res.data) {
+          if (entry.has_torrent_file && entry.local_media_id) ids.add(entry.local_media_id);
+        }
+        setPublishedMediaIdsWithTorrent(ids);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [step, mediaList.length]);
+
+  useEffect(() => {
     if (selectedMediaIds.length === 0) {
       setSelectedMediaId('');
       return;
@@ -411,8 +448,8 @@ export default function UploadAssistantPanel() {
   const canGoStep2 = selectedTrackers.length > 0 && c411ConfigOk;
   const canGoStep3 = selectedMediaIds.length > 0;
   const allVisibleMediaSelected =
-    availableMediaList.length > 0 &&
-    availableMediaList.every((m) => selectedMediaIds.includes(m.id));
+    selectableInDisplayed.length > 0 &&
+    selectableInDisplayed.every((m) => selectedMediaIds.includes(m.id));
   const validationCompleted =
     selectedMediaIds.length > 0 &&
     selectedMediaIds.every((id) => validatedMediaIds.includes(id));
@@ -525,7 +562,7 @@ export default function UploadAssistantPanel() {
       setSelectedMediaIds([]);
       return;
     }
-    setSelectedMediaIds(availableMediaList.map((m) => m.id));
+    setSelectedMediaIds(selectableInDisplayed.map((m) => m.id));
   };
 
   const excludeMediaWithReason = useCallback((mediaId: string, reason: string) => {
@@ -1170,44 +1207,103 @@ export default function UploadAssistantPanel() {
             <p className="text-sm text-base-content/70 mb-4">
               {t('settings.uploadTrackerPanel.wizardChooseMediaListDescription')}
             </p>
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                disabled={availableMediaList.length === 0}
-                onClick={toggleSelectAllMedia}
-              >
-                {allVisibleMediaSelected
-                  ? t('settings.uploadTrackerPanel.wizardUnselectAllMedia')
-                  : t('settings.uploadTrackerPanel.wizardSelectAllMedia')}
-              </button>
-              <span className="text-xs text-base-content/60">
-                {t('settings.uploadTrackerPanel.selectedMediaCount', { count: selectedMediaIds.length })}
-              </span>
+            <div className="mb-3 flex flex-col gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative flex-1 min-w-[12rem] max-w-xs">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/50" aria-hidden />
+                  <input
+                    type="search"
+                    className="input input-bordered input-sm w-full pl-8"
+                    placeholder={t('settings.uploadTrackerPanel.mediaSearchPlaceholder')}
+                    value={mediaSearchQuery}
+                    onInput={(e) => setMediaSearchQuery((e.target as HTMLInputElement).value)}
+                  />
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="checkbox checkbox-sm"
+                    checked={showExcludedMedia}
+                    onChange={(e) => setShowExcludedMedia((e.target as HTMLInputElement).checked)}
+                  />
+                  <span className="text-sm">{t('settings.uploadTrackerPanel.showExcludedMedia')}</span>
+                </label>
+                <select
+                  className="select select-bordered select-sm w-auto max-w-[14rem]"
+                  value={filterTorrentCreated}
+                  onChange={(e) =>
+                    setFilterTorrentCreated((e.target as HTMLSelectElement).value as 'all' | 'with_torrent' | 'without_torrent')
+                  }
+                >
+                  <option value="all">{t('settings.uploadTrackerPanel.filterTorrentAll')}</option>
+                  <option value="with_torrent">{t('settings.uploadTrackerPanel.filterTorrentWith')}</option>
+                  <option value="without_torrent">{t('settings.uploadTrackerPanel.filterTorrentWithout')}</option>
+                </select>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={selectableInDisplayed.length === 0}
+                  onClick={toggleSelectAllMedia}
+                >
+                  {allVisibleMediaSelected
+                    ? t('settings.uploadTrackerPanel.wizardUnselectAllMedia')
+                    : t('settings.uploadTrackerPanel.wizardSelectAllMedia')}
+                </button>
+                <span className="text-xs text-base-content/60">
+                  {t('settings.uploadTrackerPanel.selectedMediaCount', { count: selectedMediaIds.length })}
+                </span>
+                {displayedMediaList.length > 0 && (
+                  <span className="text-xs text-base-content/50">
+                    {t('settings.uploadTrackerPanel.mediaFilteredCount', { count: displayedMediaList.length })}
+                  </span>
+                )}
+              </div>
             </div>
-            {availableMediaList.length === 0 ? (
+            {displayedMediaList.length === 0 ? (
               <p className="text-sm text-base-content/70">{t('settings.uploadTrackerPanel.noMedia')}</p>
             ) : (
               <div className="max-h-72 overflow-auto rounded-lg border border-base-300 divide-y divide-base-300">
-                {availableMediaList.map((m) => (
-                  <label
-                    key={m.id}
-                    className="flex items-start gap-3 p-3 cursor-pointer hover:bg-base-200/50"
-                  >
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-sm mt-0.5"
-                      checked={selectedMediaIds.includes(m.id)}
-                      onChange={() => toggleMediaSelection(m.id)}
-                    />
-                    <span className="min-w-0 flex-1 text-sm">
-                      <span className="block font-medium text-base-content truncate">
-                        {m.tmdb_title || m.file_name}
+                {displayedMediaList.map((m) => {
+                  const isExcluded = excludedMediaIds.includes(m.id);
+                  const hasTorrent = publishedMediaIdsWithTorrent.has(m.id);
+                  return (
+                    <label
+                      key={m.id}
+                      className={`flex items-start gap-3 p-3 ${isExcluded ? 'opacity-75 bg-base-200/50' : 'cursor-pointer hover:bg-base-200/50'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm mt-0.5"
+                        checked={selectedMediaIds.includes(m.id)}
+                        disabled={isExcluded}
+                        onChange={() => !isExcluded && toggleMediaSelection(m.id)}
+                      />
+                      <span className="min-w-0 flex-1 text-sm">
+                        <span className="block font-medium text-base-content truncate">
+                          {m.tmdb_title || m.file_name}
+                        </span>
+                        <span className="block text-xs text-base-content/70 truncate">{m.file_name}</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {isExcluded && (
+                            <span
+                              className="badge badge-warning badge-sm"
+                              title={excludedMediaReasons[m.id] || t('settings.uploadTrackerPanel.badgeExcluded')}
+                            >
+                              {t('settings.uploadTrackerPanel.badgeExcluded')}
+                            </span>
+                          )}
+                          {hasTorrent && (
+                            <span className="badge badge-info badge-sm">
+                              {t('settings.uploadTrackerPanel.badgeTorrentCreated')}
+                            </span>
+                          )}
+                        </div>
                       </span>
-                      <span className="block text-xs text-base-content/70 truncate">{m.file_name}</span>
-                    </span>
-                  </label>
-                ))}
+                    </label>
+                  );
+                })}
               </div>
             )}
             <p className="mt-3 text-xs text-base-content/60">

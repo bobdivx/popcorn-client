@@ -99,13 +99,25 @@ export const settingsMethods = {
     const hasKey = (hasKeyRes.data as any)?.has_key === true || (hasKeyRes.data as any)?.has_key === 1;
     return { success: true, data: { valid: !!hasKey, message: hasKey ? undefined : 'ClÃ© TMDB non configurÃ©e' } };
   },
-  async getClientTorrentConfig(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{ config: { download_dir: string; max_downloads: number; max_upload_slots: number; librqbit_api_url: string; }; download_paths: { films_path: string; films_exists: boolean; films_subdirs_count: number; series_path: string; series_exists: boolean; series_subdirs_count: number; stream_temp_path: string; stream_temp_exists: boolean; }; subdirectory_creation: { enabled: boolean; description: string; example: string; }; }>> {
+  async getClientTorrentConfig(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{ config: { download_dir: string; max_downloads: number; max_upload_slots: number; librqbit_api_url: string; listen_port: number | null }; download_paths: { films_path: string; films_exists: boolean; films_subdirs_count: number; series_path: string; series_exists: boolean; series_subdirs_count: number; stream_temp_path: string; stream_temp_exists: boolean; }; subdirectory_creation: { enabled: boolean; description: string; example: string; }; }>> {
     return this.backendRequest('/api/admin/client-torrent/config', { method: 'GET' });
+  },
+  /** PATCH /api/admin/client-torrent/listen-port — enregistre le port d'écoute BitTorrent pour le prochain redémarrage. */
+  async updateClientTorrentListenPort(this: ServerApiClientSettingsAccess, listen_port: number): Promise<ApiResponse<{ listen_port: number }>> {
+    return this.backendRequest('/api/admin/client-torrent/listen-port', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ listen_port }),
+    });
   },
 
   /** GET /api/admin/tracker-mode/config — état du mode compatibilité tracker */
   async getRatioConfig(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{ mode_enabled: boolean; source: string }>> {
     return this.backendRequest('/api/admin/tracker-mode/config', { method: 'GET' });
+  },
+  /** GET /api/admin/seeding-diagnostic — infos pour diagnostiquer le partage (UPnP, ratio, librqbit) */
+  async getSeedingDiagnostic(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{ upnp_enabled: boolean; ratio_mode_enabled: boolean; librqbit_ok: boolean; listen_port: number | null }>> {
+    return this.backendRequest('/api/admin/seeding-diagnostic', { method: 'GET' });
   },
   /** PUT /api/admin/tracker-mode/config — active/désactive le mode (session en cours) */
   async updateRatioConfig(this: ServerApiClientSettingsAccess, mode_enabled: boolean): Promise<ApiResponse<{ mode_enabled: boolean; source: string }>> {

@@ -319,8 +319,14 @@ export function createDemoServerApi(): Record<string, unknown> {
     async getClientTorrentConfig(): Promise<ApiResponse<unknown>> {
       return success({});
     },
+    async updateClientTorrentListenPort(port: number): Promise<ApiResponse<{ listen_port: number }>> {
+      return success({ listen_port: port });
+    },
     async getRatioConfig(): Promise<ApiResponse<{ mode_enabled: boolean; source: string }>> {
       return success({ mode_enabled: false, source: 'config' });
+    },
+    async getSeedingDiagnostic(): Promise<ApiResponse<{ upnp_enabled: boolean; ratio_mode_enabled: boolean; librqbit_ok: boolean; listen_port: number | null }>> {
+      return success({ upnp_enabled: true, ratio_mode_enabled: false, librqbit_ok: true, listen_port: 51413 });
     },
     async updateRatioConfig(_mode_enabled: boolean): Promise<ApiResponse<{ mode_enabled: boolean; source: string }>> {
       return success({ mode_enabled: false, source: 'env' });
