@@ -1,12 +1,17 @@
 import type { JSX } from 'preact';
+import DOMPurify from 'dompurify';
 import { bbcodeToHtml, looksLikeBbcode } from '../../lib/bbcode-to-html';
 
 const PREVIEW_CLASS =
   'w-full max-h-[35vh] overflow-auto rounded-lg border border-base-300 bg-base-300/80 p-4 text-sm text-base-content/90 prose prose-sm max-w-none dark:prose-invert prose-headings:my-2 prose-headings:font-semibold prose-h1:text-2xl prose-h1:sm:text-3xl prose-h1:font-bold prose-h1:tracking-tight prose-h1:mb-3 prose-h1:text-base-content prose-h2:mt-4 prose-h2:mb-2 prose-h2:pb-1 prose-h2:border-b prose-h2:border-base-content/20 prose-p:my-1 prose-pre:my-2 prose-pre:text-xs prose-pre:bg-base-200 prose-pre:rounded prose-img:max-h-48 prose-img:rounded prose-strong:text-base-content [&_.bbcode-center]:flex [&_.bbcode-center]:flex-col [&_.bbcode-center]:items-center [&_.bbcode-center_img]:block [&_.bbcode-center_img]:mx-auto [&_.popcorn-footer-logo]:max-h-6 [&_.popcorn-footer-logo]:w-auto [&_.popcorn-footer-logo]:align-middle';
 
-/** Enlève les séquences {} résiduelles (placeholders mal rendus par le backend). */
+/** Enlève les séquences {} résiduelles (placeholders mal rendus par le backend) et sanitise le HTML. */
 function sanitizePreviewHtml(html: string): string {
-  return html.replace(/\{\}/g, '');
+  const cleaned = html.replace(/\{\}/g, '');
+  if (typeof window !== 'undefined') {
+    return DOMPurify.sanitize(cleaned);
+  }
+  return cleaned;
 }
 
 export interface DescriptionPreviewProps {
