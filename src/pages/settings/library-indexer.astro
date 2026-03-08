@@ -1,0 +1,19 @@
+---
+import SettingsLayout from '../../layouts/SettingsLayout.astro';
+import LibraryIndexerPanel from '../../components/settings/LibraryIndexerPanel';
+import PermissionGuard from '../../components/ui/PermissionGuard';
+import DsPageHeader from '../../components/ui/DsPageHeader';
+---
+
+<SettingsLayout title="Indexers - Bibliothèque - Popcorn">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="settingsMenu.libraryIndexer.title"
+      subtitleKey="settingsMenu.libraryIndexer.description"
+    />
+    <PermissionGuard client:only="preact" permission="settings.server">
+      <LibraryIndexerPanel client:only="preact" />
+    </PermissionGuard>
+  </div>
+</SettingsLayout>

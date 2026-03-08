@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
-import { ListPlus, Upload, ChevronRight, Download, ListChecks, SlidersHorizontal, Activity } from 'lucide-preact';
+import { Upload, ChevronRight, Download, ListChecks, SlidersHorizontal, Activity } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
 import { DsCard, DsCardSection } from '../ui/design-system';
@@ -12,7 +12,7 @@ type UploadItem = {
   id: string;
   titleKey: string;
   descriptionKey: string;
-  icon: typeof ListPlus;
+  icon: typeof Upload;
   href: string;
   /** Si true, la carte est grisée (indexeur non configuré) */
   muted?: boolean;
@@ -43,13 +43,6 @@ export default function UploadsSubMenuPanel() {
   }, []);
 
   const items: UploadItem[] = [
-    {
-      id: 'client-torrents',
-      titleKey: 'settings.clientTorrentsList.title',
-      descriptionKey: 'settings.clientTorrentsList.description',
-      icon: ListPlus,
-      href: `${BASE_URL}client-torrents/`,
-    },
     {
       id: 'seeding-diagnostic',
       titleKey: 'settings.seedingDiagnostic.title',

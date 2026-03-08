@@ -1195,6 +1195,21 @@
       "title": "Library media",
       "description": "View media count, edit paths or remove an entry from the database"
     },
+    "libraryIndexer": {
+      "title": "Sync indexer visibility",
+      "description": "Enable or disable visibility of synced torrents per indexer in the library"
+    },
+    "libraryIndexerPanel": {
+      "intro": "Choose which indexers' synced torrents appear in the library (movies and series). Disabling an indexer hides its torrents in the library without deleting them.",
+      "loading": "Loading…",
+      "cardTitle": "Indexers visible in library",
+      "noIndexers": "No indexers configured. Add some in Settings → Indexers.",
+      "showInLibrary": "Show in library",
+      "hideInLibrary": "Hide from library",
+      "saved": "Preference saved.",
+      "saveError": "Error saving.",
+      "hint": "By default all indexers are visible. Torrents from disabled indexers will not appear in the Library tab."
+    },
     "libraryMediaPanel": {
       "intro": "List of files indexed in the library (movies and episodes). You can fix a path if the file was moved or remove an entry from the index (the file on disk is not deleted).",
       "loading": "Loading…",
