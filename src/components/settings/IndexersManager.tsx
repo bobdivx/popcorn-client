@@ -8,7 +8,7 @@ import IndexerDetailPanel from './IndexerDetailPanel';
 import { Modal } from '../ui/Modal';
 import { DsCard, DsCardSection } from '../ui/design-system';
 import { Plus, ChevronRight, Search } from 'lucide-preact';
-import { getIndexerDefinitionsWithBackendFallback, type IndexerDefinition } from '../../lib/api/popcorn-web';
+import { getIndexerDefinitionsWithBackendFallback, getUserConfig, type IndexerDefinition } from '../../lib/api/popcorn-web';
 import {
   filterAndSortIndexerDefinitions,
   getUniqueLanguagesAndCountries,
@@ -46,6 +46,8 @@ interface IndexersManagerProps {
 export default function IndexersManager({ editIndexer, onEditClose, initialModeAdd, onAddSuccess }: IndexersManagerProps = {}) {
   const { t, language: userLocale } = useI18n();
   const [indexers, setIndexers] = useState<Indexer[]>([]);
+  /** IDs des indexers visibles dans la bibliothèque (Films/Séries). null = tous visibles. */
+  const [visibleInLibraryIds, setVisibleInLibraryIds] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -136,12 +138,30 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
   const loadIndexers = async () => {
     try {
       setLoading(true);
-      const response = await serverApi.getIndexers();
-      if (response.success && response.data) {
-        setIndexers(response.data);
+      const [indexersRes, config, backendSyncRes] = await Promise.all([
+        serverApi.getIndexers(),
+        getUserConfig(),
+        serverApi.getSyncSettings(),
+      ]);
+      if (indexersRes.success && indexersRes.data) {
+        setIndexers(indexersRes.data);
       } else {
-        setError(response.message || t('indexersManager.errorLoading'));
+        setError(indexersRes.message || t('indexersManager.errorLoading'));
       }
+      // Statut "visible dans la bibliothèque" pour les cartes (cloud puis backend)
+      const cloudIds = config?.syncSettings?.visibleIndexerIds;
+      const backendIds = backendSyncRes.success ? backendSyncRes.data?.visible_indexer_ids : undefined;
+      const ids =
+        cloudIds !== undefined
+          ? Array.isArray(cloudIds) && cloudIds.length > 0
+            ? cloudIds
+            : null
+          : Array.isArray(backendIds) && backendIds.length > 0
+            ? backendIds
+            : backendIds === null
+              ? null
+              : null;
+      setVisibleInLibraryIds(ids);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('common.unknownError'));
     } finally {
@@ -553,6 +573,8 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
             {indexers.map((indexer) => {
               const ratio = undefined;
               const truncatedUrl = indexer.baseUrl.length > 45 ? indexer.baseUrl.slice(0, 42) + '…' : indexer.baseUrl;
+              const isVisibleInLibrary =
+                visibleInLibraryIds === null || (Array.isArray(visibleInLibraryIds) && visibleInLibraryIds.includes(indexer.id));
               return (
                 <button
                   key={indexer.id}
@@ -600,6 +622,15 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
                         <span class="px-2 py-0.5 rounded text-xs ds-text-tertiary">
                           {t('indexerCard.ratio')}: {ratio != null && Number.isFinite(ratio) ? ratio.toFixed(2) : t('indexerCard.ratioNotAvailable')}
                         </span>
+                        {isVisibleInLibrary ? (
+                          <span class="px-2 py-0.5 rounded text-xs font-medium bg-emerald-900/30 border border-emerald-600 text-emerald-300" title={t('settingsMenu.libraryIndexerPanel.hint')}>
+                            {t('indexerCard.libraryVisible')}
+                          </span>
+                        ) : (
+                          <span class="px-2 py-0.5 rounded text-xs font-medium bg-amber-900/30 border border-amber-600 text-amber-300" title={t('settingsMenu.libraryIndexerPanel.hint')}>
+                            {t('indexerCard.libraryHidden')}
+                          </span>
+                        )}
                       </div>
                       <span class="mt-auto pt-4 text-xs font-medium text-[var(--ds-accent-violet)] flex items-center gap-1" aria-hidden>
                         {t('common.open')}

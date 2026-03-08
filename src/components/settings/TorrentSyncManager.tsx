@@ -6,7 +6,7 @@ import {
   subscribeSyncStatusStore,
   refreshSyncStatusStore,
 } from '../../lib/sync-status-store';
-import { RefreshCw, Sparkles, ChevronRight, FileDown, Code2, List, Settings, RotateCw, Square, LayoutGrid } from 'lucide-preact';
+import { Sparkles, ChevronRight, FileDown, List, Settings, Play, Square, LayoutGrid } from 'lucide-preact';
 
 const iconProps = { size: 20, strokeWidth: 1.5 };
 const iconPropsSm = { size: 18, strokeWidth: 1.5 };
@@ -873,15 +873,26 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
         <header class="flex flex-wrap items-center justify-between gap-3 mb-5">
           <p class="text-white font-semibold text-lg">{t('torrentSyncManager.noSyncInProgress')}</p>
         </header>
-        {/* Même UX que la toolbar principale : une seule icône qui bascule */}        
+        {/* Même UX que la toolbar principale : deux icônes Vue d'ensemble / Paramètres */}
         <div class="sync-toolbar mb-6">
           <div class="flex flex-nowrap items-center gap-2 min-w-0">
             <DsIconButton
-              icon={syncView === 'overview' ? LayoutGrid : Settings}
-              onClick={() => setSyncView(syncView === 'overview' ? 'settings' : 'overview')}
-              title={syncView === 'overview' ? t('torrentSyncManager.tabOverview') : t('torrentSyncManager.tabSettings')}
-              ariaLabel={syncView === 'overview' ? t('torrentSyncManager.tabOverview') : t('torrentSyncManager.tabSettings')}
+              icon={LayoutGrid}
+              onClick={() => setSyncView('overview')}
+              title={t('torrentSyncManager.tabOverview')}
+              ariaLabel={t('torrentSyncManager.tabOverview')}
+              aria-pressed={syncView === 'overview'}
               size="sm"
+              className={'sync-toolbar__icon sync-toolbar__tab' + (syncView === 'overview' ? ' sync-toolbar__tab--active' : '')}
+            />
+            <DsIconButton
+              icon={Settings}
+              onClick={() => setSyncView('settings')}
+              title={t('torrentSyncManager.tabSettings')}
+              ariaLabel={t('torrentSyncManager.tabSettings')}
+              aria-pressed={syncView === 'settings'}
+              size="sm"
+              className={'sync-toolbar__icon sync-toolbar__tab' + (syncView === 'settings' ? ' sync-toolbar__tab--active' : '')}
             />
           </div>
         </div>
@@ -1108,20 +1119,29 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
         </div>
       )}
 
-      {/* Barre Sync : une icône (vue d'ensemble / paramètres) + outils + start/stop sur une seule ligne */}
+      {/* Barre Sync : deux icônes (Vue d'ensemble / Paramètres) + outils + start/stop sur une seule ligne */}
       <div class="sync-toolbar mb-6">
         <div class="flex flex-nowrap items-center gap-2 min-w-0">
           <DsIconButton
-            icon={syncView === 'overview' ? LayoutGrid : Settings}
-            onClick={() => setSyncView(syncView === 'overview' ? 'settings' : 'overview')}
-            title={syncView === 'overview' ? t('torrentSyncManager.tabOverview') : t('torrentSyncManager.tabSettings')}
-            ariaLabel={syncView === 'overview' ? t('torrentSyncManager.tabOverview') : t('torrentSyncManager.tabSettings')}
+            icon={LayoutGrid}
+            onClick={() => setSyncView('overview')}
+            title={t('torrentSyncManager.tabOverview')}
+            ariaLabel={t('torrentSyncManager.tabOverview')}
+            aria-pressed={syncView === 'overview'}
             size="sm"
+            className={'sync-toolbar__icon sync-toolbar__tab' + (syncView === 'overview' ? ' sync-toolbar__tab--active' : '')}
+          />
+          <DsIconButton
+            icon={Settings}
+            onClick={() => setSyncView('settings')}
+            title={t('torrentSyncManager.tabSettings')}
+            ariaLabel={t('torrentSyncManager.tabSettings')}
+            aria-pressed={syncView === 'settings'}
+            size="sm"
+            className={'sync-toolbar__icon sync-toolbar__tab' + (syncView === 'settings' ? ' sync-toolbar__tab--active' : '')}
           />
           <div class="sync-toolbar__tools" role="group" aria-label={t('torrentSyncManager.toolsAriaLabel')}>
-            <DsIconButton icon={RefreshCw} onClick={() => refreshSyncStatusStore()} disabled={loading} title={t('torrentSyncManager.refresh')} ariaLabel={t('torrentSyncManager.refresh')} iconClass={loading ? 'animate-spin' : ''} size="sm" />
-            <DsIconButton icon={FileDown} onClick={async () => { const res = await serverApi.downloadSyncLog(); if (!res.success) setError(res.message || t('torrentSyncManager.downloadLogError')); }} title={t('torrentSyncManager.downloadLog')} ariaLabel={t('torrentSyncManager.downloadLog')} size="sm" />
-            <DsIconButton icon={Code2} href="/settings/debug-sync" title={t('settingsPages.debugSync.debugLink')} ariaLabel={t('settingsPages.debugSync.debugLink')} size="sm" />
+            <DsIconButton icon={FileDown} onClick={async () => { const res = await serverApi.downloadSyncLog(); if (!res.success) setError(res.message || t('torrentSyncManager.downloadLogError')); }} title={t('torrentSyncManager.downloadLog')} ariaLabel={t('torrentSyncManager.downloadLog')} size="sm" className="sync-toolbar__icon" />
           </div>
           <span class="sync-toolbar__separator" aria-hidden="true" />
           {syncInProgress ? (
@@ -1132,20 +1152,20 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
               aria-busy={syncing}
               title={t('torrentSyncManager.stopSync')}
               ariaLabel={t('torrentSyncManager.stopSync')}
-              size="sm"
-              className="sync-toolbar__btn sync-toolbar__btn--danger"
+              size="md"
+              className="sync-toolbar__btn sync-toolbar__btn--main sync-toolbar__btn--danger"
               iconClass={syncing ? 'animate-spin' : ''}
             />
           ) : (
             <DsIconButton
-              icon={RotateCw}
+              icon={Play}
               onClick={startSync}
               disabled={syncing || (selectedIndexerIdsForSync !== null && selectedIndexerIdsForSync.length === 0)}
               aria-busy={syncing}
               title={t('torrentSyncManager.fullScan')}
               ariaLabel={t('torrentSyncManager.fullScan')}
-              size="sm"
-              className="sync-toolbar__btn sync-toolbar__btn--primary"
+              size="md"
+              className="sync-toolbar__btn sync-toolbar__btn--main sync-toolbar__btn--primary"
               iconClass={syncing ? 'animate-spin' : ''}
             />
           )}
