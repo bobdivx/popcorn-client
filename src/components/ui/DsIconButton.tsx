@@ -11,6 +11,8 @@ interface DsIconButtonProps {
   disabled?: boolean;
   /** Classes CSS additionnelles (ex. sync-toolbar__btn--danger pour couleur) */
   className?: string;
+  /** Pour les boutons type onglet (ex. Vue d’ensemble / Paramètres) */
+  'aria-pressed'?: boolean;
 }
 
 const iconSize = { sm: 18, md: 20 };
@@ -33,6 +35,7 @@ export function DsIconButton(props: DsIconButtonProps) {
     class: 'ds-icon-btn' + (className ? ' ' + className : '') + (disabled ? ' opacity-50 pointer-events-none' : ''),
     title,
     'aria-label': ariaLabel ?? title,
+    ...(typeof props['aria-pressed'] === 'boolean' && { 'aria-pressed': props['aria-pressed'] }),
   };
   const iconEl = <Icon size={s} strokeWidth={strokeWidth} class={iconClass} />;
   if (href) {

@@ -1543,7 +1543,9 @@
     "edit": "Modifier",
     "delete": "Supprimer",
     "seeders": "seeders",
-    "peers": "peers"
+    "peers": "peers",
+    "libraryVisible": "Bibliothèque : visible",
+    "libraryHidden": "Bibliothèque : masqué"
   },
   "indexerTestModal": {
     "title": "Test de l'indexer {name}",
