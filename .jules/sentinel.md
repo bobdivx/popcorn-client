@@ -1,0 +1,4 @@
+## 2024-05-18 - [CRITICAL] Fix XSS vulnerability in DescriptionPreview.tsx
+**Vulnerability:** XSS vulnerability identified in `src/components/upload/DescriptionPreview.tsx` via `dangerouslySetInnerHTML`.
+**Learning:** The codebase uses `dangerouslySetInnerHTML` to render a preview of a torrent description, but it was not sanitizing the HTML output. This could allow an attacker to inject malicious scripts into the application if they can control the description content. Furthermore, since Astro uses SSR, it is important to ensure that the sanitization occurs on the server side as well as the client side.
+**Prevention:** Added a sanitizer library (`isomorphic-dompurify`) to clean the HTML before injecting it into the DOM, providing XSS protection during both Server-Side Rendering (SSR) and Client-Side rendering.
