@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Design System — Tokens et utilitaires réutilisables
  * Appliquer partout (Sync, Settings, etc.) pour une UX cohérente type dashboard pro.
  * Référence : expérience type Education / Learning Dashboard (navigation claire, cartes, switches).
@@ -440,6 +440,31 @@
 .sync-toolbar .ds-icon-btn.sync-toolbar__btn {
   padding: 0;
 }
+/* Bouton principal Play/Stop : plus grand et mis en avant */
+.sync-toolbar .ds-icon-btn.sync-toolbar__btn--main {
+  width: 48px;
+  height: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: var(--ds-radius-full);
+  margin-left: var(--ds-space-1);
+}
+.sync-toolbar .ds-icon-btn.sync-toolbar__btn--main svg {
+  width: 24px;
+  height: 24px;
+}
+.sync-toolbar .ds-icon-btn.sync-toolbar__btn--main.sync-toolbar__btn--primary {
+  box-shadow: 0 2px 16px rgba(138, 43, 226, 0.5), 0 0 0 2px var(--ds-accent-violet);
+}
+.sync-toolbar .ds-icon-btn.sync-toolbar__btn--main.sync-toolbar__btn--primary:hover:not(:disabled) {
+  box-shadow: 0 4px 20px rgba(138, 43, 226, 0.55), 0 0 0 2px var(--ds-accent-violet);
+}
+.sync-toolbar .ds-icon-btn.sync-toolbar__btn--main.sync-toolbar__btn--danger {
+  box-shadow: 0 2px 16px rgba(220, 53, 69, 0.5), 0 0 0 2px var(--ds-accent-red);
+}
+.sync-toolbar .ds-icon-btn.sync-toolbar__btn--main.sync-toolbar__btn--danger:hover:not(:disabled) {
+  box-shadow: 0 4px 20px rgba(220, 53, 69, 0.55), 0 0 0 2px var(--ds-accent-red);
+}
 .sync-toolbar__status {
   flex-shrink: 0;
   max-width: 180px;
@@ -451,14 +476,28 @@
   text-overflow: ellipsis;
   padding: 0 var(--ds-space-2);
 }
+/* Icônes secondaires (onglets + télécharger log) : style unifié, sans bordure ni fond par défaut */
+.sync-toolbar .ds-icon-btn.sync-toolbar__icon {
+  border-radius: var(--ds-radius-full);
+  background-color: transparent;
+  color: var(--ds-text-secondary);
+  transition: background-color 0.15s, color 0.15s;
+}
+.sync-toolbar .ds-icon-btn.sync-toolbar__icon:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: var(--ds-text-primary);
+}
+.sync-toolbar .ds-icon-btn.sync-toolbar__icon.sync-toolbar__tab--active {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--ds-text-primary);
+}
+.sync-toolbar .ds-icon-btn.sync-toolbar__icon.sync-toolbar__tab--active:hover {
+  background-color: rgba(255, 255, 255, 0.14);
+}
 .sync-toolbar__tools {
   display: inline-flex;
   align-items: center;
   gap: var(--ds-space-1);
-  padding: var(--ds-space-1);
-  background-color: rgba(255, 255, 255, 0.06);
-  border-radius: var(--ds-radius-full);
-  border: 1px solid var(--ds-border);
   flex-shrink: 0;
 }
 .sync-toolbar__btn {
@@ -513,7 +552,6 @@
   margin: 0 var(--ds-space-1);
 }
 
-/* Mobile : tous les boutons de la ligne en forme ronde (pilule) comme les icônes */
 @media (max-width: 640px) {
   .sync-toolbar__btn,
   .sync-toolbar .ds-nav-tabs--inline .ds-nav-tab {

@@ -53,6 +53,8 @@ export const syncMethods = {
     else if (settings?.syncQueriesFilms !== undefined) payload.sync_queries_films = settings.syncQueriesFilms;
     if (settings?.sync_queries_series !== undefined) payload.sync_queries_series = settings.sync_queries_series;
     else if (settings?.syncQueriesSeries !== undefined) payload.sync_queries_series = settings.syncQueriesSeries;
+    if (settings?.visible_indexer_ids !== undefined) payload.visible_indexer_ids = settings.visible_indexer_ids;
+    else if (settings?.visibleIndexerIds !== undefined) payload.visible_indexer_ids = settings.visibleIndexerIds;
     return this.backendRequest<void>('/api/sync/settings', {
       method: 'PUT',
       body: JSON.stringify(payload),

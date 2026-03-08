@@ -17,17 +17,30 @@ export default function LibraryIndexerPanel() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const load = useCallback(async () => {
-    const [indexersRes, config] = await Promise.all([
+    const [indexersRes, config, backendSyncRes] = await Promise.all([
       serverApi.getIndexers(),
       getUserConfig(),
+      serverApi.getSyncSettings(),
     ]);
     if (indexersRes.success && Array.isArray(indexersRes.data)) {
       setIndexers(indexersRes.data);
     } else {
       setIndexers([]);
     }
-    const ids = config?.syncSettings?.visibleIndexerIds ?? null;
-    setVisibleIds(Array.isArray(ids) && ids.length > 0 ? ids : null);
+    // Priorité : cloud puis fallback backend local (pour persistance sans cloud / rechargement)
+    const cloudIds = config?.syncSettings?.visibleIndexerIds;
+    const backendIds = backendSyncRes.success ? backendSyncRes.data?.visible_indexer_ids : undefined;
+    const ids =
+      cloudIds !== undefined
+        ? Array.isArray(cloudIds) && cloudIds.length > 0
+          ? cloudIds
+          : null
+        : Array.isArray(backendIds) && backendIds.length > 0
+          ? backendIds
+          : backendIds === null
+            ? null
+            : null;
+    setVisibleIds(ids);
     setLoading(false);
   }, []);
 
@@ -68,6 +81,10 @@ export default function LibraryIndexerPanel() {
           ...currentSync,
           visibleIndexerIds: next === null || next.length === 0 ? null : next,
         },
+      });
+      // Persister aussi en base locale du backend pour que le rechargement reflète l’état sans cloud
+      await serverApi.updateSyncSettings({
+        visible_indexer_ids: next === null || next.length === 0 ? null : next,
       });
       setMessage({ type: 'success', text: t('settingsMenu.libraryIndexerPanel.saved') });
       setTimeout(() => setMessage(null), 2500);
