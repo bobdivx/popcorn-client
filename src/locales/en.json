@@ -786,7 +786,9 @@
       "prepareReseed": "Prepare for re-seed",
       "prepareReseedTitle": "Rename file on disk to match the .torrent so the client can find the data",
       "expectedName": "Expected by .torrent",
-      "noIndexers": "No indexers configured"
+      "noIndexers": "No indexers configured",
+      "dismissMessage": "Dismiss message",
+      "dbChangedHint": "After changing the torrent client database, use Refresh to see the updated list. The restore message below can be cleared with the button below."
     },
     "myUploadsPanel": {
       "title": "My uploads",
