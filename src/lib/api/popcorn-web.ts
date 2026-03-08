@@ -1010,6 +1010,8 @@ export interface UserConfig {
       /** Qualité minimale ("480p"|"720p"|"1080p"|"2160p"|"4K"). Vide = toutes */
       minQuality?: string;
     } | null;
+    /** IDs des indexers dont les torrents synchronisés sont visibles dans la bibliothèque. null = tous visibles. */
+    visibleIndexerIds?: string[] | null;
   } | null;
   indexerCategories?: Record<string, {
     enabled: boolean;
