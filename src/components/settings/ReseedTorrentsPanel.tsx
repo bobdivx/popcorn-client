@@ -7,7 +7,7 @@ import { serverApi } from '../../lib/client/server-api';
 import type { ReseedTorrentInfo, ReseedFromLibraryItem, RestoreFromIndexerResult } from '../../lib/client/server-api/upload-tracker';
 import type { Indexer } from '../../lib/client/server-api/types';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { RefreshCw, Download, Loader2, Library } from 'lucide-preact';
+import { RefreshCw, Download, Loader2, Library, X } from 'lucide-preact';
 
 export default function ReseedTorrentsPanel() {
   const { t, language } = useI18n();
@@ -350,10 +350,28 @@ export default function ReseedTorrentsPanel() {
           </div>
 
           {restoreMessage && (
-            <p className="mt-2 text-xs text-[var(--ds-text-tertiary)]">
-              {restoreMessage}
+            <p className="mt-2 text-xs text-[var(--ds-text-tertiary)] flex items-center gap-2 flex-wrap">
+              <span>{restoreMessage}</span>
+              <button
+                type="button"
+                className="btn btn-ghost btn-xs gap-1"
+                onClick={() => {
+                  setRestoreMessage(null);
+                  setLibraryError(null);
+                  setError(null);
+                }}
+                title={t('settings.reseedPanel.dismissMessage')}
+                aria-label={t('settings.reseedPanel.dismissMessage')}
+              >
+                <X className="w-3.5 h-3.5" />
+                {t('settings.reseedPanel.dismissMessage')}
+              </button>
             </p>
           )}
+
+          <p className="text-xs text-[var(--ds-text-tertiary)] mt-1">
+            {t('settings.reseedPanel.dbChangedHint')}
+          </p>
 
           {libraryLoading ? (
             <div className="flex items-center gap-2 text-[var(--ds-text-tertiary)]">

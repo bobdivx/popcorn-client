@@ -786,7 +786,9 @@
       "prepareReseed": "Préparer pour re-seed",
       "prepareReseedTitle": "Renommer le fichier sur disque pour qu'il corresponde au .torrent",
       "expectedName": "Attendu par le .torrent",
-      "noIndexers": "Aucun indexer configuré"
+      "noIndexers": "Aucun indexer configuré",
+      "dismissMessage": "Réinitialiser le message",
+      "dbChangedHint": "Après avoir changé la base de données du client torrent, utilisez Rafraîchir pour voir la liste à jour. Le message de restauration peut être effacé avec le bouton ci‑dessous."
     },
     "myUploadsPanel": {
       "title": "Mes uploads",
