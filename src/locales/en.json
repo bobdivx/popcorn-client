@@ -1543,7 +1543,9 @@
     "edit": "Edit",
     "delete": "Delete",
     "seeders": "seeders",
-    "peers": "peers"
+    "peers": "peers",
+    "libraryVisible": "Library: visible",
+    "libraryHidden": "Library: hidden"
   },
   "indexerTestModal": {
     "title": "Test indexer {name}",
@@ -1810,23 +1812,6 @@
       "title": "Synchronization",
       "subtitle": "Manage automatic torrent synchronization",
       "configureIndexers": "Configure indexers"
-    },
-    "debugSync": {
-      "pageTitle": "Debug Sync (provisional)",
-      "pageSubtitle": "Test whether a torrent is actually downloadable (GET + Range, bencode).",
-      "title": "Downloadability check",
-      "subtitle": "Indexer + torrent ID: backend tests the download URL (GET Range 0-63, first byte 'd').",
-      "indexerId": "Indexer",
-      "torrentId": "Torrent ID",
-      "torrentIdPlaceholder": "e.g. info_hash or id depending on indexer",
-      "loadingIndexers": "Loading…",
-      "check": "Check",
-      "checking": "Checking…",
-      "fillBoth": "Enter indexer and torrent ID.",
-      "errorGeneric": "Error during check.",
-      "downloadable": "Downloadable",
-      "notDownloadable": "Not downloadable",
-      "debugLink": "Debug (provisional)"
     },
     "diagnostics": {
       "title": "Diagnostics",
