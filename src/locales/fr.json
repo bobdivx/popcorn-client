@@ -1195,6 +1195,21 @@
       "title": "Médias de la bibliothèque",
       "description": "Voir le nombre de médias, modifier les chemins ou supprimer une entrée de la base"
     },
+    "libraryIndexer": {
+      "title": "Visibilité sync indexers",
+      "description": "Activer ou désactiver l'affichage des torrents synchronisés par indexer dans la bibliothèque"
+    },
+    "libraryIndexerPanel": {
+      "intro": "Choisissez quels indexers contribuent à l'affichage des torrents synchronisés dans la bibliothèque (films et séries). Désactiver un indexer masque ses torrents dans la bibliothèque sans les supprimer.",
+      "loading": "Chargement…",
+      "cardTitle": "Indexers visibles dans la bibliothèque",
+      "noIndexers": "Aucun indexer configuré. Ajoutez-en depuis Paramètres → Indexers.",
+      "showInLibrary": "Afficher dans la bibliothèque",
+      "hideInLibrary": "Masquer de la bibliothèque",
+      "saved": "Préférence enregistrée.",
+      "saveError": "Erreur lors de l'enregistrement.",
+      "hint": "Par défaut tous les indexers sont visibles. Les torrents des indexers désactivés ne s'afficheront pas dans l'onglet Bibliothèque."
+    },
     "libraryMediaPanel": {
       "intro": "Liste des fichiers indexés dans la bibliothèque (films et épisodes). Vous pouvez corriger un chemin si le fichier a été déplacé ou retirer une entrée de l'index (le fichier sur disque n'est pas supprimé).",
       "loading": "Chargement…",

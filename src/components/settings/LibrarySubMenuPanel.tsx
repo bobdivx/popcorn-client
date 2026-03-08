@@ -1,4 +1,4 @@
-import { Film, FolderOpen, FolderPlus, LayoutGrid, Users, ChevronRight } from 'lucide-preact';
+import { Film, FolderOpen, FolderPlus, LayoutGrid, List, Users, ChevronRight } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { canAccess } from '../../lib/permissions';
 import { DsCard, DsCardSection } from '../ui/design-system';
@@ -47,6 +47,14 @@ const LIBRARY_LINK_ITEMS: LibraryLinkItem[] = [
     icon: LayoutGrid,
     href: '/settings/library-display',
     permission: undefined,
+  },
+  {
+    id: 'library-indexer',
+    titleKey: 'settingsMenu.libraryIndexer.title',
+    descriptionKey: 'settingsMenu.libraryIndexer.description',
+    icon: List,
+    href: '/settings/library-indexer',
+    permission: 'settings.server',
   },
   {
     id: 'friends',
