@@ -122,24 +122,32 @@ export default function BackendStatusBadge({
     }
   };
 
-  // Ne pas mettre [status] en dépendance : checkHealth() fait setStatus(), ce qui relancerait l'effet en boucle.
-  // Quand c'est le backend d'un ami : ne pas health-check (évite erreurs et requêtes inutiles).
-  // Quand le backend est déjà offline au montage : ne pas appeler l'API tout de suite (évite spam à chaque remontage Navbar).
   useEffect(() => {
+    // Ne pas mettre [status] en dépendance : checkHealth() fait setStatus(), ce qui relancerait l'effet en boucle.
+    // Quand c'est le backend d'un ami : ne pas health-check (évite erreurs et requêtes inutiles).
+    const initialStore = getBackendConnectionStore();
+
     if (isFriendBackend()) {
       setStatus('unknown');
       const interval = setInterval(() => {
         if (isFriendBackend()) return;
-        if (getBackendConnectionStore().status !== 'offline') checkHealth();
+        // Backend d'un ami : on ne force pas le store global, mais on peut vérifier périodiquement
+        // pour mettre à jour l'UI si le serveur redevient joignable.
+        checkHealth();
       }, 20_000);
       return () => clearInterval(interval);
     }
-    if (getBackendConnectionStore().status !== 'offline') {
+
+    // Si le store indique déjà offline au montage, refléter l'état dans le badge,
+    // mais lancer quand même un poll régulier pour détecter un retour en ligne.
+    if (initialStore.status !== 'offline') {
       checkHealth();
+    } else {
+      setStatus('error');
     }
+
     const interval = setInterval(() => {
       if (isFriendBackend()) return;
-      if (getBackendConnectionStore().status === 'offline') return;
       setTimeout(checkHealth, 0);
     }, 20_000);
     return () => clearInterval(interval);

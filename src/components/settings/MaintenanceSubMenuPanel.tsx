@@ -1,4 +1,4 @@
-import { Wrench, Sliders, Activity, ChevronRight, ArrowLeft, FileText } from 'lucide-preact';
+import { Wrench, Sliders, Activity, ChevronRight, ArrowLeft, FileText, Power } from 'lucide-preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { useI18n } from '../../lib/i18n/useI18n';
@@ -14,7 +14,7 @@ const ACCENT_ICON_COLOR = 'var(--ds-accent-violet)';
 const MIN_MAX_TRANSCODINGS = 1;
 const MAX_MAX_TRANSCODINGS = 16;
 
-const MAINTENANCE_SUBS = ['forceCleanup', 'transcodingConfig', 'resources', 'logs'] as const;
+const MAINTENANCE_SUBS = ['forceCleanup', 'transcodingConfig', 'restartBackend', 'resources', 'logs'] as const;
 type MaintenanceSub = (typeof MAINTENANCE_SUBS)[number];
 
 function getSubFromUrl(): MaintenanceSub | null {
@@ -288,6 +288,69 @@ function TranscodingConfigSection({ embedded = false }: { embedded?: boolean }) 
   );
 }
 
+function RestartBackendSection({ embedded = false }: { embedded?: boolean }) {
+  const { t } = useI18n();
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleRestart = async () => {
+    if (loading) return;
+    setMessage(null);
+    const ok =
+      typeof window !== 'undefined' ? window.confirm(t('settingsMenu.maintenance.restartBackend.confirm')) : true;
+    if (!ok) return;
+    setLoading(true);
+    try {
+      const res = await serverApi.restartBackend();
+      if (!res.success) {
+        setMessage({ type: 'error', text: res.message || t('errors.generic') });
+        return;
+      }
+      setMessage({ type: 'success', text: t('settingsMenu.maintenance.restartBackend.success') });
+    } catch (err) {
+      setMessage({ type: 'error', text: err instanceof Error ? err.message : t('errors.generic') });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const content = (
+    <>
+      {!embedded && (
+        <p className="text-sm ds-text-secondary mb-4">{t('settingsMenu.maintenance.restartBackend.description')}</p>
+      )}
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={handleRestart}
+          disabled={loading}
+          className="btn btn-primary self-start disabled:opacity-60 disabled:cursor-not-allowed"
+          data-focusable
+          tabIndex={0}
+        >
+          {loading ? t('common.loading') : t('settingsMenu.maintenance.restartBackend.action')}
+        </button>
+        {message && (
+          <p className={`text-sm ${message.type === 'success' ? 'text-green-400' : 'text-red-400'}`} role="status">
+            {message.text}
+          </p>
+        )}
+      </div>
+    </>
+  );
+
+  if (embedded) return <div className="min-w-0">{content}</div>;
+  return (
+    <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
+      <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
+        <Power className="w-5 h-5 text-primary-400" />
+        {t('settingsMenu.maintenance.restartBackend.title')}
+      </h3>
+      {content}
+    </section>
+  );
+}
+
 type MaintenanceItem = {
   id: MaintenanceSub;
   titleKey: string;
@@ -298,6 +361,7 @@ type MaintenanceItem = {
 const MAINTENANCE_ITEMS: MaintenanceItem[] = [
   { id: 'forceCleanup', titleKey: 'settingsMenu.maintenance.forceCleanup.title', descriptionKey: 'settingsMenu.maintenance.forceCleanup.description', icon: Wrench },
   { id: 'transcodingConfig', titleKey: 'settingsMenu.maintenance.transcodingConfig.title', descriptionKey: 'settingsMenu.maintenance.transcodingConfig.description', icon: Sliders },
+  { id: 'restartBackend', titleKey: 'settingsMenu.maintenance.restartBackend.title', descriptionKey: 'settingsMenu.maintenance.restartBackend.description', icon: Power },
   { id: 'resources', titleKey: 'settingsMenu.maintenance.resources.title', descriptionKey: 'settingsMenu.maintenance.resources.description', icon: Activity },
   { id: 'logs', titleKey: 'settingsMenu.maintenance.serverLogs.title', descriptionKey: 'settingsMenu.maintenance.serverLogs.description', icon: FileText },
 ];
@@ -366,6 +430,7 @@ export default function MaintenanceSubMenuPanel() {
     const item = MAINTENANCE_ITEMS.find((i) => i.id === sub)!;
     if (sub === 'forceCleanup') return <SubPageFrame item={item}><ForceCleanupSection embedded /></SubPageFrame>;
     if (sub === 'transcodingConfig') return <SubPageFrame item={item}><TranscodingConfigSection embedded /></SubPageFrame>;
+    if (sub === 'restartBackend') return <SubPageFrame item={item}><RestartBackendSection embedded /></SubPageFrame>;
     if (sub === 'resources') return <SubPageFrame item={item}><ResourceMonitorDev embedded /></SubPageFrame>;
     if (sub === 'logs') return <SubPageFrame item={item}><ServerLogsSection embedded /></SubPageFrame>;
   }

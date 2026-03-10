@@ -63,6 +63,8 @@ export interface TorrentProgressResponse {
 export interface ActiveTorrentCreationEntry {
   local_media_id: string;
   progress: number;
+  started_at_ms?: number | null;
+  updated_at_ms?: number | null;
 }
 
 export interface CancelTorrentCreationResponse {
@@ -98,6 +100,17 @@ export interface PublishedUploadMediaEntry {
   rqbit_present: boolean;
   has_torrent_file: boolean;
   last_uploaded_at: number;
+}
+
+export interface CheckDuplicateEntry {
+  local_media_id: string;
+  exists_on_tracker: boolean;
+  matched_name?: string | null;
+  message?: string | null;
+}
+
+export interface CheckDuplicateResponse {
+  results: CheckDuplicateEntry[];
 }
 
 /** Réponse de prévisualisation NFO / description pour l'upload. */
@@ -253,6 +266,19 @@ export const uploadTrackerMethods = {
       signal?: AbortSignal;
     }
   ): Promise<ApiResponse<MultiTrackerUploadResult>> {
+    // Si une création .torrent est déjà en cours pour ce média, éviter de lancer un upload
+    // qui échouera immédiatement côté backend avec « Génération du .torrent: ... en cours ».
+    const progressResp = await this.getTorrentProgress(params.local_media_id);
+    const pct = progressResp.success ? progressResp.data?.progress ?? null : null;
+    if (typeof pct === 'number' && pct > 0 && pct < 100) {
+      return {
+        success: false,
+        error: 'TorrentCreationInProgress',
+        message:
+          'Création du .torrent déjà en cours pour ce média. Attends la fin ou annule avant de lancer l’upload.',
+      };
+    }
+
     return this.backendRequest<MultiTrackerUploadResult>('/api/library/uploader/upload-one', {
       method: 'POST',
       signal: params.signal,
@@ -354,6 +380,23 @@ export const uploadTrackerMethods = {
         body: JSON.stringify({ local_media_id: localMediaId }),
       }
     );
+  },
+
+  /**
+   * Vérifie si un média semble déjà exister sur un tracker (via recherche indexer).
+   * Actuellement supporte seulement "c411".
+   */
+  async checkDuplicateOnIndexer(
+    this: UploadTrackerClientAccess,
+    params: { indexer_id: string; local_media_ids: string[] }
+  ): Promise<ApiResponse<CheckDuplicateResponse>> {
+    return this.backendRequest<CheckDuplicateResponse>('/api/library/uploader/check-duplicate', {
+      method: 'POST',
+      body: JSON.stringify({
+        indexer_id: params.indexer_id,
+        local_media_ids: params.local_media_ids,
+      }),
+    });
   },
 
   /**
