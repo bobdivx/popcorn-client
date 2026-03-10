@@ -44,6 +44,7 @@ import type {
   UploaderPreviewResponse,
   UploadMediaValidationResponse,
   PublishedUploadMediaEntry,
+  CheckDuplicateResponse,
   CancelTorrentCreationResponse,
   ActiveTorrentCreationEntry,
 } from './server-api/upload-tracker.js';
@@ -538,9 +539,17 @@ class ServerApiClient {
         // Ne pas retenter le 502 pour l'ajout de tracker : le message du backend (librqbit injoignable, route absente) doit s'afficher tout de suite.
         const isAddTracker502 =
           response.status === 502 && endpoint.includes('/trackers') && (options.method === 'POST' || (options as any).method === 'POST');
+        // Ne pas retenter les endpoints non-idempotents : un retry relance des jobs coûteux (captures, hash, upload).
+        const isNonIdempotentPost =
+          (options.method === 'POST' || (options as any).method === 'POST') &&
+          (endpoint.includes('/api/library/uploader/upload-one') ||
+            endpoint.includes('/api/library/uploader/generate-screenshots') ||
+            endpoint.includes('/api/library/upload-tracker/create-torrent') ||
+            endpoint.includes('/api/admin/system/restart'));
         if (
           retryCount < maxRetries &&
           !isAddTracker502 &&
+          !isNonIdempotentPost &&
           this.isRetryableError(null, response)
         ) {
           const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Exponential backoff, max 3s
@@ -601,7 +610,13 @@ class ServerApiClient {
         };
       }
       // Vérifier si l'erreur est récupérable et retenter si nécessaire
-      if (retryCount < maxRetries && this.isRetryableError(error)) {
+      const isNonIdempotentPost =
+        (options.method === 'POST' || (options as any).method === 'POST') &&
+        (endpoint.includes('/api/library/uploader/upload-one') ||
+          endpoint.includes('/api/library/uploader/generate-screenshots') ||
+          endpoint.includes('/api/library/upload-tracker/create-torrent') ||
+          endpoint.includes('/api/admin/system/restart'));
+      if (retryCount < maxRetries && !isNonIdempotentPost && this.isRetryableError(error)) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Exponential backoff, max 3s
         // Ne pas logger les retries quand le serveur est hors ligne (évite le spam en console)
         const errorInfoForRetry = this.getErrorMessage(error, undefined, endpoint, url);
@@ -720,7 +735,7 @@ class ServerApiClient {
     }
     // Upload one (P-upload) : création .torrent + envoi trackers, peut être très long (hash de gros fichiers)
     if (endpoint.includes('/api/library/uploader/upload-one')) {
-      return 300000; // 5 minutes
+      return 1800000; // 30 minutes (hash sur gros fichiers / NAS peut dépasser 5 min)
     }
     // Prévisualisation NFO/description (peut inclure ffprobe → lent)
     if (endpoint.includes('/api/library/uploader/preview')) {
@@ -1259,12 +1274,15 @@ interface IServerApiClientPublic {
     screenshot_base_url?: string;
     signal?: AbortSignal;
   }): Promise<ApiResponse<MultiTrackerUploadResult>>;
+  getTorrentProgress(localMediaId: string): Promise<ApiResponse<{ progress?: number | null }>>;
   getActiveTorrentCreations(): Promise<ApiResponse<ActiveTorrentCreationEntry[]>>;
   cancelTorrentCreation(localMediaId: string): Promise<ApiResponse<CancelTorrentCreationResponse>>;
   validateUploadMedia(localMediaId: string): Promise<ApiResponse<UploadMediaValidationResponse>>;
   getPublishedUploads(): Promise<ApiResponse<PublishedUploadMediaEntry[]>>;
   clearFailedUploads(): Promise<ApiResponse<{ deleted: number }>>;
-  getUploadPreview(localMediaId: string, includeTechnical?: boolean, tracker?: string): Promise<ApiResponse<UploaderPreviewResponse>>;
+  generateScreenshots(localMediaId: string): Promise<ApiResponse<{ count: number; screenshot_base_url: string }>>;
+  checkDuplicateOnIndexer(params: { indexer_id: string; local_media_ids: string[] }): Promise<ApiResponse<CheckDuplicateResponse>>;
+  getUploadPreview(localMediaId: string, tracker?: string, screenshotBaseUrl?: string): Promise<ApiResponse<UploaderPreviewResponse>>;
   getTorrentFilesForReseed(): Promise<ApiResponse<import('./server-api/upload-tracker.js').ReseedTorrentInfo[]>>;
   downloadTorrentFileForReseed(infoHash: string): Promise<ApiResponse<Blob> & { filename?: string }>;
 
@@ -1295,6 +1313,7 @@ interface IServerApiClientPublic {
     }>
   >;
   getServerLogs(params?: { limit?: number }): Promise<ApiResponse<{ lines: string[] }>>;
+  restartBackend(): Promise<ApiResponse<{ will_exit: boolean }>>;
 
   // Dashboard methods
   getDashboardData(): Promise<ApiResponse<DashboardData>>;

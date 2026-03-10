@@ -11,6 +11,8 @@ import { updateChecker } from '../lib/services/update-checker.js';
 import { redirectTo, normalizePath } from '../lib/utils/navigation.js';
 import { loadRuntimeConfig, setBackendUrl, hasDeploymentBackend } from '../lib/backend-config.js';
 import { getUserConfig } from '../lib/api/popcorn-web.js';
+import { FullScreenLoadingOverlay } from './ui/design-system';
+import { useI18n } from '../lib/i18n/useI18n';
 
 type ConnectionStatus = 'checking' | 'connecting' | 'connected' | 'error';
 
@@ -24,6 +26,7 @@ const HEALTH_CHECK_CACHE_DURATION = 10000; // Cache de 10 secondes pour éviter 
 let lastHealthCheck: { timestamp: number; success: boolean } | null = null;
 
 export default function ServerConnectionCheck() {
+  const { t } = useI18n();
   const [status, setStatus] = useState<ConnectionStatus>('checking');
   const [message, setMessage] = useState('Vérification de la connexion au serveur...');
   const [progress, setProgress] = useState(0);
@@ -409,131 +412,46 @@ export default function ServerConnectionCheck() {
   };
 
   return (
-    <div 
-      className="fixed inset-0 z-[9999] bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center"
-      style={{ 
-        paddingTop: 'var(--safe-area-inset-top)',
-        paddingBottom: 'var(--safe-area-inset-bottom)',
-        paddingLeft: 'var(--safe-area-inset-left)',
-        paddingRight: 'var(--safe-area-inset-right)'
-      }}
+    <FullScreenLoadingOverlay
+      title={status === 'error' ? 'En attente du serveur...' : 'Connexion au serveur...'}
+      descriptionSubtle={message}
+      infoMessage={
+        retryCount > 0 ? `Tentative ${retryCount}... Réessai automatique dans quelques secondes` : undefined
+      }
+      onClose={() => setIsVisible(false)}
     >
-      {/* Animation de fond */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,119,198,0.1),transparent_50%)] animate-pulse"></div>
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '0s', animationDuration: '3s' }}></div>
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s', animationDuration: '3s' }}></div>
+      {error && (
+        <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-red-400 text-center max-w-md mx-auto mb-3">
+          {error}
+        </div>
+      )}
+
+      <p className="text-center text-sm text-gray-400 mt-4">
+        {progress > 0 ? `${Math.round(progress)}%` : 'Connexion en cours...'}
+      </p>
+
+      {/* Actions utiles (pour tous les utilisateurs) */}
+      <div className="flex flex-wrap items-center justify-center gap-3 max-w-lg mx-auto mt-4">
+        <button className="btn btn-sm btn-outline" onClick={openDiagnostics}>
+          Ouvrir diagnostics
+        </button>
+        <button className="btn btn-sm btn-outline" onClick={openServerSettings}>
+          Configurer le serveur
+        </button>
       </div>
 
-      {/* Contenu principal */}
-      <div className="relative z-10 flex flex-col items-center justify-center space-y-6 sm:space-y-8 px-4 py-4 sm:py-8 min-h-0 max-h-full overflow-y-auto">
-        {/* Logo/Icone animé */}
-        <div className="relative">
-          <div className="w-24 h-24 md:w-32 md:h-32 relative">
-            {/* Cercle externe animé */}
-            <div className="absolute inset-0 border-4 border-blue-500/30 rounded-full animate-spin" style={{ animationDuration: '3s' }}></div>
-            <div className="absolute inset-2 border-4 border-purple-500/30 rounded-full animate-spin" style={{ animationDuration: '2s', animationDirection: 'reverse' }}></div>
-            
-            {/* Logo Popcorn (même que les autres animations de chargement) */}
-            <div className="absolute inset-2 flex items-center justify-center">
-              <img
-                src="/popcorn_logo.png"
-                alt="Popcornn"
-                className="w-full h-full object-contain drop-shadow-lg animate-pulse"
-                style={{
-                  animationDuration: '2s',
-                  filter: 'drop-shadow(0 0 10px rgba(220, 38, 38, 0.5))',
-                }}
-              />
-            </div>
-          </div>
+      {backendUrl && (
+        <div className="text-center text-xs sm:text-sm text-gray-500 max-w-lg break-all px-2 mt-3" title={backendUrl}>
+          Backend: <span className="text-gray-300">{backendUrl}</span>
         </div>
+      )}
 
-          {/* Titre */}
-          <div className="text-center space-y-3 sm:space-y-4 tv:space-y-6">
-            <h1 className="text-2xl sm:text-3xl md:text-5xl tv:text-6xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent animate-pulse">
-              Popcornn
-            </h1>
-            
-            {/* Message de statut */}
-            <p className={`text-base sm:text-lg md:text-xl tv:text-2xl font-medium px-2 ${
-              status === 'connecting' && retryCount > 0
-                ? 'text-yellow-300' 
-                : status === 'connecting'
-                  ? 'text-yellow-300' 
-                  : 'text-gray-300'
-            }`}>
-              {message}
-            </p>
-          </div>
-
-        {/* Barre de progression */}
-        <div className="w-full max-w-md space-y-2">
-          <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-            <div 
-              className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all duration-500 ease-out relative"
-              style={{ width: `${progress > 0 ? progress : 30}%` }}
-            >
-              <div className="absolute inset-0 bg-white/30 animate-shimmer"></div>
-            </div>
-          </div>
-          <div className="text-center text-sm text-gray-400">
-            {progress > 0 ? `${Math.round(progress)}%` : 'Connexion en cours...'}
-          </div>
-        </div>
-
-        {/* Message d'erreur si disponible */}
-        {error && (
-          <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-red-400 text-center max-w-md">
-            {error}
-          </div>
-        )}
-
-        {/* Indicateur de réessai */}
-        {retryCount > 0 && (
-          <div className="text-center text-sm text-gray-500">
-            Tentative {retryCount}... Réessai automatique dans quelques secondes
-          </div>
-        )}
-
-        {/* Actions utiles (pour tous les utilisateurs) */}
-        <div className="flex flex-wrap items-center justify-center gap-3 max-w-lg">
-          <button className="btn btn-sm btn-outline" onClick={openDiagnostics}>
-            Ouvrir diagnostics
-          </button>
-          <button className="btn btn-sm btn-outline" onClick={openServerSettings}>
-            Configurer le serveur
-          </button>
-        </div>
-
-        {backendUrl && (
-          <div className="text-center text-xs sm:text-sm text-gray-500 max-w-lg break-all px-2" title={backendUrl}>
-            Backend: <span className="text-gray-300">{backendUrl}</span>
-          </div>
-        )}
-
-        {/* Points de chargement */}
-        <div className="flex space-x-2">
-          <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
-          <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-          <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-        </div>
+      {/* Points de chargement */}
+      <div className="flex space-x-2 justify-center mt-4">
+        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
+        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+        <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
       </div>
-
-      {/* Styles CSS pour l'animation shimmer */}
-      <style>{`
-        @keyframes shimmer {
-          0% {
-            transform: translateX(-100%);
-          }
-          100% {
-            transform: translateX(100%);
-          }
-        }
-        .animate-shimmer {
-          animation: shimmer 2s infinite;
-        }
-      `}</style>
-    </div>
+    </FullScreenLoadingOverlay>
   );
 }
