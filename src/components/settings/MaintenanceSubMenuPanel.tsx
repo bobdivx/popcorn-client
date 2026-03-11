@@ -1,4 +1,4 @@
-import { Wrench, Sliders, Activity, ChevronRight, ArrowLeft, FileText, Power } from 'lucide-preact';
+import { Wrench, Sliders, Activity, ChevronRight, ArrowLeft, FileText, Power, Server } from 'lucide-preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { useI18n } from '../../lib/i18n/useI18n';
@@ -14,7 +14,7 @@ const ACCENT_ICON_COLOR = 'var(--ds-accent-violet)';
 const MIN_MAX_TRANSCODINGS = 1;
 const MAX_MAX_TRANSCODINGS = 16;
 
-const MAINTENANCE_SUBS = ['forceCleanup', 'transcodingConfig', 'restartBackend', 'resources', 'logs'] as const;
+const MAINTENANCE_SUBS = ['forceCleanup', 'transcodingConfig', 'restartBackend', 'hardReset', 'resources', 'logs'] as const;
 type MaintenanceSub = (typeof MAINTENANCE_SUBS)[number];
 
 function getSubFromUrl(): MaintenanceSub | null {
@@ -351,6 +351,74 @@ function RestartBackendSection({ embedded = false }: { embedded?: boolean }) {
   );
 }
 
+function HardResetSection({ embedded = false }: { embedded?: boolean }) {
+  const { t } = useI18n();
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const handleHardReset = async () => {
+    if (loading) return;
+    const ok =
+      typeof window !== 'undefined' ? window.confirm(t('versionInfo.hardResetConfirm')) : true;
+    if (!ok) return;
+
+    setLoading(true);
+    setMessage(null);
+    try {
+      const resetRes = await serverApi.resetBackendDatabase();
+      if (!resetRes.success) {
+        throw new Error(resetRes.message || t('errors.generic'));
+      }
+      setMessage({ type: 'success', text: t('versionInfo.hardResetInProgress') });
+    } catch (err) {
+      setMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : t('errors.generic'),
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const content = (
+    <>
+      {!embedded && (
+        <p className="text-sm ds-text-secondary mb-4">{t('versionInfo.hardResetDescription')}</p>
+      )}
+      <div className="flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={handleHardReset}
+          disabled={loading}
+          className="btn btn-primary self-start disabled:opacity-60 disabled:cursor-not-allowed"
+          data-focusable
+          tabIndex={0}
+        >
+          {loading ? t('versionInfo.hardResetInProgress') : t('versionInfo.hardResetAction')}
+        </button>
+        {message && (
+          <p
+            className={`text-sm ${message.type === 'success' ? 'text-green-400' : 'text-red-400'}`}
+            role="status"
+          >
+            {message.text}
+          </p>
+        )}
+      </div>
+    </>
+  );
+
+  if (embedded) return <div className="min-w-0">{content}</div>;
+  return (
+    <section className="rounded-xl border border-red-900/30 bg-white/5 overflow-hidden">
+      <div className="p-4 sm:p-6">
+        <p className="text-sm font-semibold text-red-300 mb-2">{t('versionInfo.hardResetTitle')}</p>
+        {content}
+      </div>
+    </section>
+  );
+}
+
 type MaintenanceItem = {
   id: MaintenanceSub;
   titleKey: string;
@@ -362,6 +430,7 @@ const MAINTENANCE_ITEMS: MaintenanceItem[] = [
   { id: 'forceCleanup', titleKey: 'settingsMenu.maintenance.forceCleanup.title', descriptionKey: 'settingsMenu.maintenance.forceCleanup.description', icon: Wrench },
   { id: 'transcodingConfig', titleKey: 'settingsMenu.maintenance.transcodingConfig.title', descriptionKey: 'settingsMenu.maintenance.transcodingConfig.description', icon: Sliders },
   { id: 'restartBackend', titleKey: 'settingsMenu.maintenance.restartBackend.title', descriptionKey: 'settingsMenu.maintenance.restartBackend.description', icon: Power },
+  { id: 'hardReset', titleKey: 'versionInfo.hardResetTitle', descriptionKey: 'versionInfo.hardResetDescription', icon: Power },
   { id: 'resources', titleKey: 'settingsMenu.maintenance.resources.title', descriptionKey: 'settingsMenu.maintenance.resources.description', icon: Activity },
   { id: 'logs', titleKey: 'settingsMenu.maintenance.serverLogs.title', descriptionKey: 'settingsMenu.maintenance.serverLogs.description', icon: FileText },
 ];
@@ -431,6 +500,7 @@ export default function MaintenanceSubMenuPanel() {
     if (sub === 'forceCleanup') return <SubPageFrame item={item}><ForceCleanupSection embedded /></SubPageFrame>;
     if (sub === 'transcodingConfig') return <SubPageFrame item={item}><TranscodingConfigSection embedded /></SubPageFrame>;
     if (sub === 'restartBackend') return <SubPageFrame item={item}><RestartBackendSection embedded /></SubPageFrame>;
+    if (sub === 'hardReset') return <SubPageFrame item={item}><HardResetSection embedded /></SubPageFrame>;
     if (sub === 'resources') return <SubPageFrame item={item}><ResourceMonitorDev embedded /></SubPageFrame>;
     if (sub === 'logs') return <SubPageFrame item={item}><ServerLogsSection embedded /></SubPageFrame>;
   }
@@ -471,6 +541,36 @@ export default function MaintenanceSubMenuPanel() {
           </a>
         );
       })}
+      <a
+        href="/settings/server"
+        data-astro-prefetch="hover"
+        data-settings-card
+        className="block min-w-0 rounded-[var(--ds-radius-lg)] overflow-hidden transition-all hover:scale-[1.01] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] focus-visible:overflow-visible"
+      >
+        <DsCard variant="elevated" className="h-full">
+          <DsCardSection className="flex flex-col h-full min-h-[120px]">
+            <div className="flex items-start justify-between gap-3">
+              <span
+                className="inline-flex w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex-shrink-0 items-center justify-center"
+                style={{ backgroundColor: ACCENT_ICON_BG, color: ACCENT_ICON_COLOR }}
+                aria-hidden
+              >
+                <Server className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.8} />
+              </span>
+              <ChevronRight className="w-5 h-5 text-[var(--ds-text-tertiary)] flex-shrink-0 mt-0.5" aria-hidden />
+            </div>
+            <h2 className="ds-title-card text-[var(--ds-text-primary)] text-base sm:text-lg mt-3 truncate">
+              {t('serverSettings.title')}
+            </h2>
+            <span className="ds-text-tertiary text-sm mt-3 line-clamp-2">
+              {t('serverSettings.storageInfo')}
+            </span>
+            <span className="mt-auto pt-4 text-xs font-medium text-[var(--ds-accent-violet)] flex items-center gap-1" aria-hidden>
+              {t('common.open')}
+            </span>
+          </DsCardSection>
+        </DsCard>
+      </a>
     </div>
   );
 }

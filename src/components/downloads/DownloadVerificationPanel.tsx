@@ -1,12 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
-import { CheckCircle, AlertTriangle, XCircle, Loader2, Trash2 } from 'lucide-preact';
 import { clientApi } from '../../lib/client/api';
-import { useI18n } from '../../lib/i18n/useI18n';
 import type {
   ClientTorrentStats,
   TorrentVerificationResponse,
-  VerificationCheck,
-  VerificationCheckStatus,
 } from '../../lib/client/types';
 
 const POLL_INTERVAL_MS = 1500;
@@ -27,33 +23,6 @@ export interface DownloadVerificationPanelProps {
   onCancelAndRemove?: (infoHash: string) => void;
 }
 
-function StatusIcon({ status }: { status: VerificationCheckStatus }) {
-  const className = 'size-5 shrink-0';
-  switch (status) {
-    case 'ok':
-      return <CheckCircle class={`${className} text-emerald-500`} aria-hidden />;
-    case 'warning':
-      return <AlertTriangle class={`${className} text-amber-500`} aria-hidden />;
-    case 'error':
-      return <XCircle class={`${className} text-red-500`} aria-hidden />;
-    case 'pending':
-    default:
-      return <Loader2 class={`${className} animate-spin text-slate-400`} aria-hidden />;
-  }
-}
-
-function CheckRow({ check }: { check: VerificationCheck }) {
-  return (
-    <div class="flex items-start gap-3 rounded-lg bg-slate-800/60 px-3 py-2 transition-all duration-300 overflow-hidden">
-      <StatusIcon status={check.status} />
-      <div class="min-w-0 flex-1 overflow-hidden">
-        <div class="font-medium text-slate-200 truncate">{check.label}</div>
-        <div class="text-sm text-slate-400 truncate" title={check.message}>{check.message}</div>
-      </div>
-    </div>
-  );
-}
-
 export function DownloadVerificationPanel({
   infoHash,
   torrentName,
@@ -63,7 +32,6 @@ export function DownloadVerificationPanel({
   onDismiss,
   onCancelAndRemove,
 }: DownloadVerificationPanelProps) {
-  const { t } = useI18n();
   const [verification, setVerification] = useState<TorrentVerificationResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [timedOut, setTimedOut] = useState(false);
@@ -172,93 +140,6 @@ export function DownloadVerificationPanel({
     };
   }, [infoHash, finish, stopPolling]);
 
-  const isDone = !loading || timedOut;
-  const title = isDone ? t('downloads.verificationDone') : t('downloads.verificationTitle');
-  const subtitle = isDone && timedOut ? t('downloads.verificationTimeout') : t('downloads.verificationSubtitle');
-  // Nom affiché : priorité au nom retourné par l'API (nom réel côté client), sinon le nom passé en props (torrent ajouté)
-  const displayName = (verification?.stats?.name?.trim() || torrentName?.trim() || '').slice(0, 200) || null;
-
-  return (
-    <div
-      class="rounded-xl border border-slate-700/80 bg-slate-900/95 p-4 shadow-lg animate-in fade-in duration-300 overflow-hidden"
-      role="status"
-      aria-live="polite"
-      aria-label={title}
-    >
-      <div class="mb-3 flex items-start justify-between gap-3">
-        <div class="min-w-0 flex-1 overflow-hidden">
-          <h3 class="font-semibold text-white truncate">{title}</h3>
-          <p class="text-sm text-slate-400 truncate">{subtitle}</p>
-          {displayName && (
-            <p
-              class="mt-1 text-xs text-slate-500 line-clamp-2 break-words"
-              title={displayName}
-            >
-              {displayName}
-            </p>
-          )}
-        </div>
-        <div class="flex shrink-0 items-center gap-1">
-          {loading && !timedOut && (
-            <Loader2 class="size-6 animate-spin text-slate-400" aria-hidden />
-          )}
-          {dismissible && onDismiss && (
-            <button
-              type="button"
-              onClick={onDismiss}
-              class="rounded-md px-2 py-1 text-sm text-slate-400 hover:bg-slate-700/60 hover:text-white focus:outline-none focus:ring-2 focus:ring-slate-500"
-              title={t('common.close')}
-            >
-              {t('common.close')}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {verification?.checks && verification.checks.length > 0 ? (
-        <ul class="flex flex-col gap-2" aria-label="Verification checks">
-          {verification.checks.map((check) => (
-            <li key={check.id}>
-              <CheckRow check={check} />
-            </li>
-          ))}
-        </ul>
-      ) : loading && !verification ? (
-        <div class="flex items-center gap-2 rounded-lg bg-slate-800/60 px-3 py-4 text-slate-400">
-          <Loader2 class="size-5 animate-spin shrink-0" aria-hidden />
-          <span>{t('common.loading')}</span>
-        </div>
-      ) : null}
-
-      {/* Bouton d'annulation si le torrent semble bloqué (pas de peers après 10s) */}
-      {showCancelButton && !completedRef.current && onCancelAndRemove && (
-        <div class="mt-3 pt-3 border-t border-slate-700/50">
-          <div class="flex items-start gap-3 rounded-lg bg-amber-900/30 border border-amber-500/30 px-3 py-2 mb-3">
-            <AlertTriangle class="size-5 shrink-0 text-amber-500 mt-0.5" aria-hidden />
-            <div class="text-sm text-amber-200">
-              {t('downloads.nopeersWarning') || 'Aucun pair trouvé. Ce torrent pourrait ne pas être disponible actuellement.'}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleCancelAndRemove}
-            disabled={cancelling}
-            class="w-full flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
-          >
-            {cancelling ? (
-              <>
-                <Loader2 class="size-4 animate-spin" aria-hidden />
-                {t('common.loading')}
-              </>
-            ) : (
-              <>
-                <Trash2 class="size-4" aria-hidden />
-                {t('downloads.cancelAndRemove') || 'Annuler et supprimer'}
-              </>
-            )}
-          </button>
-        </div>
-      )}
-    </div>
-  );
+  // Panneau masqué : la vérification continue en arrière-plan (onComplete, onStatsUpdate)
+  return null;
 }

@@ -11,6 +11,7 @@ import { updateChecker } from '../lib/services/update-checker.js';
 import { redirectTo, normalizePath } from '../lib/utils/navigation.js';
 import { loadRuntimeConfig, setBackendUrl, hasDeploymentBackend } from '../lib/backend-config.js';
 import { getUserConfig } from '../lib/api/popcorn-web.js';
+import { TokenManager } from '../lib/client/storage.js';
 import { FullScreenLoadingOverlay } from './ui/design-system';
 import { useI18n } from '../lib/i18n/useI18n';
 
@@ -103,19 +104,29 @@ export default function ServerConnectionCheck() {
 
       // Premier lancement / aucune URL configurée: forcer l'assistant de configuration
       // (sinon l'app reste bloquée sur "En attente du serveur..." avec l'URL par défaut)
-      // IMPORTANT: Vérifier hasBackendUrl() APRÈS avoir vérifié les chemins autorisés
+      // Ne pas renvoyer vers /setup si l'utilisateur est déjà authentifié (cloud ou session) —
+      // il vient peut‑être de terminer le wizard avec l'URL par défaut sans qu'elle soit en localStorage.
       try {
         if (!hasBackendUrl()) {
+          const hasCloudAuth = typeof TokenManager?.getCloudAccessToken === 'function' && !!TokenManager.getCloudAccessToken();
+          const hasSession = serverApi.isAuthenticated();
+          if (!hasCloudAuth && !hasSession) {
+            setIsVisible(false);
+            redirectTo('/setup');
+            return;
+          }
+          // Utilisateur authentifié : continuer sans rediriger (getBackendUrl() utilisera l’URL par défaut)
+        }
+      } catch (error) {
+        // Si hasBackendUrl() plante (localStorage inaccessible), rediriger vers setup
+        // sauf si l'utilisateur a déjà une session (éviter de casser une session valide)
+        const hasAuth = typeof TokenManager?.getCloudAccessToken === 'function' && !!TokenManager.getCloudAccessToken() || serverApi.isAuthenticated();
+        if (!hasAuth) {
+          console.error('[ServerConnectionCheck] hasBackendUrl() failed:', error);
           setIsVisible(false);
           redirectTo('/setup');
           return;
         }
-      } catch (error) {
-        // Si hasBackendUrl() plante (localStorage inaccessible), rediriger vers setup
-        console.error('[ServerConnectionCheck] hasBackendUrl() failed:', error);
-        setIsVisible(false);
-        redirectTo('/setup');
-        return;
       }
 
       // Vérifier rapidement si le serveur est accessible avant d'afficher l'animation
@@ -266,8 +277,13 @@ export default function ServerConnectionCheck() {
         if (setupResponse.success && setupResponse.data) {
           // Ne pas forcer /setup si le backend est momentanément indisponible (reboot)
           if (setupResponse.data.backendReachable !== false && setupResponse.data.needsSetup) {
-            redirectTo('/setup');
-            return;
+            // Utilisateur authentifié cloud qui vient de terminer le wizard : le backend peut
+            // encore avoir 0 users locaux → ne pas le renvoyer sur /setup.
+            const hasCloudAuth = typeof TokenManager?.getCloudAccessToken === 'function' && !!TokenManager.getCloudAccessToken();
+            if (!hasCloudAuth) {
+              redirectTo('/setup');
+              return;
+            }
           }
         }
       }

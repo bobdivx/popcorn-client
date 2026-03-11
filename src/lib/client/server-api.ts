@@ -81,12 +81,16 @@ export type {
 /** Callbacks appelés quand une requête échoue avec ConnectionError/Timeout (serveur hors ligne). Utilisé par le store pour remonter l'état dans l'UI. */
 export type ConnectionFailureListener = () => void;
 
+/** Callbacks appelés quand une requête backend réussit (2xx). Permet au store de repasser en "online" après un offline. */
+export type ConnectionSuccessListener = () => void;
+
 class ServerApiClient {
   private baseUrl: string;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
   private static readonly STORAGE_USER_KEY = 'popcorn_user';
   private connectionFailureListeners: ConnectionFailureListener[] = [];
+  private connectionSuccessListeners: ConnectionSuccessListener[] = [];
 
   private getBackendBaseUrl(): string {
     const raw = getBackendUrl();
@@ -523,8 +527,9 @@ class ServerApiClient {
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        // Log pour debug : voir la réponse exacte du backend
-        if (typeof window !== 'undefined' && (endpoint.includes('/auth/login') || endpoint.includes('/sync/start'))) {
+        // 401 sur login = pas de compte local, le client tente le cloud ensuite → ne pas polluer la console
+        const isLogin401 = response.status === 401 && endpoint.includes('/auth/login');
+        if (typeof window !== 'undefined' && !isLogin401 && (endpoint.includes('/auth/login') || endpoint.includes('/sync/start'))) {
           const dataStr = JSON.stringify(data, null, 2);
           console.error(`[server-api] Erreur backend (${endpoint}):`, {
             status: response.status,
@@ -533,6 +538,9 @@ class ServerApiClient {
           });
           console.error('[server-api] Données complètes du backend:', dataStr);
           console.error('[server-api] Structure data:', data && typeof data === 'object' ? Object.keys(data) : []);
+        }
+        if (typeof window !== 'undefined' && isLogin401) {
+          console.log('[server-api] Pas de compte local sur le backend, tentative de connexion cloud...');
         }
         
         // Vérifier si l'erreur est récupérable et retenter si nécessaire
@@ -594,6 +602,8 @@ class ServerApiClient {
         };
       }
 
+      // Succès : notifier les listeners pour remettre le store en "online" si besoin
+      this.connectionSuccessListeners.forEach((cb) => { try { cb(); } catch (_) { /* ignore */ } });
       // Backend renvoie souvent { success, data }, on normalise.
       return {
         success: true,
@@ -698,6 +708,7 @@ class ServerApiClient {
         if (m) filename = m[1].trim();
       }
       const blob = await response.blob();
+      this.connectionSuccessListeners.forEach((cb) => { try { cb(); } catch (_) { /* ignore */ } });
       const out: ApiResponse<Blob> & { filename?: string; c411Result?: { success: boolean; message: string; torrentUrl?: string } } = {
         success: true,
         data: blob,
@@ -761,6 +772,14 @@ class ServerApiClient {
    */
   addConnectionFailureListener(cb: ConnectionFailureListener): void {
     this.connectionFailureListeners.push(cb);
+  }
+
+  /**
+   * Enregistre un callback appelé à chaque requête backend réussie (réponse 2xx).
+   * Permet au store de repasser en "online" après avoir été marqué "offline".
+   */
+  addConnectionSuccessListener(cb: ConnectionSuccessListener): void {
+    this.connectionSuccessListeners.push(cb);
   }
 
   /**
@@ -1211,6 +1230,7 @@ interface IServerApiClientPublic {
 
   // Connection status (pour remonter "serveur hors ligne" dans l'UI)
   addConnectionFailureListener(cb: ConnectionFailureListener): void;
+  addConnectionSuccessListener(cb: ConnectionSuccessListener): void;
 
   // Health methods
   checkServerHealth(): Promise<ApiResponse<{ status: string }>>;
