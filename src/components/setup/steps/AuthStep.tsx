@@ -17,29 +17,58 @@ interface AuthStepProps {
   onStatusChange?: () => void | Promise<void>;
 }
 
+type AuthView = 'login' | 'register' | '2fa';
+
 export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChange }: AuthStepProps) {
   const { t } = useI18n();
-  const [activeTab, setActiveTab] = useState<'login' | 'register' | 'quick-connect'>('login');
+  const [view, setView] = useState<AuthView>('login');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSavedConfig, setHasSavedConfig] = useState(false);
   const [restoringConfig, setRestoringConfig] = useState(false);
 
-  // Login form state
+  // Login form
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [requires2FA, setRequires2FA] = useState(false);
   const [tempToken, setTempToken] = useState<string | null>(null);
   const [twoFactorCode, setTwoFactorCode] = useState('');
 
-  // Register form state
+  // Register form
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
   const [registerInviteCode, setRegisterInviteCode] = useState('');
 
-  // NOTE: l'import cloud est maintenant géré par CloudImportManager
-  // et visualisé à l'étape 4 (WelcomeStep).
+  const afterCloudLogin = async (cloudToken: string) => {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      const savedConfig = await getUserConfig();
+      const hasSomething =
+        !!(savedConfig?.indexers?.length) ||
+        !!savedConfig?.tmdbApiKey ||
+        !!savedConfig?.downloadLocation ||
+        !!savedConfig?.syncSettings ||
+        !!savedConfig?.language ||
+        !!(savedConfig?.indexerCategories && Object.keys(savedConfig.indexerCategories).length > 0);
+      if (savedConfig && hasSomething) {
+        const missingCategories = !savedConfig.indexerCategories || Object.keys(savedConfig.indexerCategories).length === 0;
+        if (missingCategories) {
+          syncIndexersToCloud().catch((err) => console.warn('[AUTH] Sync catégories ignorée:', err));
+        }
+        CloudImportManager.startImport(savedConfig).finally(() => {
+          Promise.resolve(onStatusChange?.()).catch(() => {});
+        });
+        onNext();
+        return;
+      }
+    } catch (err) {
+      if (!(err instanceof Error && err.message.includes('401'))) {
+        console.warn('[AUTH] Impossible de vérifier config sauvegardée:', err);
+      }
+    }
+    onNext();
+  };
 
   const handleLogin = async (e: Event) => {
     e.preventDefault();
@@ -47,202 +76,67 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
     setLoading(true);
 
     try {
-      console.log('[AUTH] Tentative de connexion cloud pour:', loginEmail);
-      
-      // Si on est en mode 2FA, vérifier le code
       if (requires2FA && tempToken) {
         if (!twoFactorCode || twoFactorCode.length !== 6) {
           setError('Veuillez entrer le code à 6 chiffres reçu par email');
           setLoading(false);
           return;
         }
-        
         const verifyResponse = await serverApi.verifyTwoFactorCode(tempToken, twoFactorCode);
-        
         if (!verifyResponse.success) {
           setError(verifyResponse.message || 'Code de vérification incorrect');
           setLoading(false);
           return;
         }
-        
-        // Connexion réussie avec 2FA, continuer le flow normal
         setRequires2FA(false);
         setTempToken(null);
         setTwoFactorCode('');
-        
-        // Continuer avec le flow normal (récupération config, etc.)
         const cloudToken = verifyResponse.data?.accessToken || TokenManager.getCloudAccessToken();
-        if (cloudToken) {
-          try {
-            await new Promise(resolve => setTimeout(resolve, 200));
-            const savedConfig = await getUserConfig();
-            const hasSomething =
-              !!(savedConfig?.indexers?.length) ||
-              !!savedConfig?.tmdbApiKey ||
-              !!savedConfig?.downloadLocation ||
-              !!savedConfig?.syncSettings ||
-              !!savedConfig?.language ||
-              !!(savedConfig?.indexerCategories && Object.keys(savedConfig.indexerCategories).length > 0);
-          if (savedConfig && hasSomething) {
-              console.log('[AUTH] Configuration sauvegardée trouvée:', savedConfig);
-            // Si les catégories ne sont pas présentes dans le cloud, pousser un sync indexers/catégories
-            // (best-effort, non bloquant)
-            const missingCategories = !savedConfig.indexerCategories || Object.keys(savedConfig.indexerCategories).length === 0;
-            if (missingCategories) {
-              syncIndexersToCloud().catch((syncErr) => {
-                console.warn('[AUTH] Sync catégories vers le cloud ignorée:', syncErr);
-              });
-            }
-              CloudImportManager.startImport(savedConfig).finally(() => {
-                Promise.resolve(onStatusChange?.()).catch(() => {});
-              });
-              onNext();
-              return;
-            }
-          } catch (configError) {
-            console.warn('[AUTH] Impossible de vérifier la configuration sauvegardée:', configError);
-          }
-        }
-        
-        onNext();
+        if (cloudToken) await afterCloudLogin(cloudToken);
+        else onNext();
         return;
       }
-      
-      // Utiliser login() pour gérer à la fois comptes locaux (backend) et cloud
+
       const response = await serverApi.login(loginEmail, loginPassword);
 
-      // Vérifier si la 2FA est requise
       if (response.success && (response.data as any)?.requires2FA) {
         const data = response.data as any;
         setRequires2FA(true);
         setTempToken(data.tempToken || null);
-        setError(null);
+        setView('2fa');
         setLoading(false);
         return;
       }
 
       if (!response.success) {
-        // Messages d'erreur plus détaillés selon le type d'erreur
         let errorMessage = response.message || 'Erreur de connexion cloud';
-        
         if (response.error === 'CloudUnavailable') {
-          errorMessage = 'Le service cloud est actuellement indisponible. Vérifiez votre connexion internet et réessayez.';
+          errorMessage = 'Le service cloud est indisponible. Vérifiez votre connexion internet.';
         } else if (response.error === 'CloudLoginError') {
-          // Analyser le message pour donner plus de détails
           const msg = response.message || '';
-          if (msg.includes('401') || msg.includes('Unauthorized') || msg.includes('incorrect')) {
-            errorMessage = 'Email ou mot de passe incorrect';
-          } else if (msg.includes('timeout') || msg.includes('Timeout')) {
-            errorMessage = 'Le service cloud ne répond pas. Vérifiez votre connexion internet.';
-          } else if (msg.includes('network') || msg.includes('fetch') || msg.includes('Failed to fetch')) {
-            errorMessage = 'Impossible de contacter le service cloud. Vérifiez votre connexion internet.';
-          } else if (msg.includes('Web Crypto API')) {
-            // Si c'est une erreur Web Crypto API, on peut quand même continuer
-            // car les tokens cloud sont stockés (fallback dans loginCloud)
-            // Mais on affiche un avertissement
-            console.warn('[AUTH] Web Crypto API bloquée, mais connexion cloud réussie. Continuation du wizard...');
-            // Ne pas afficher d'erreur, continuer normalement
-            // Le fallback dans loginCloud a déjà géré le cas
-          } else {
-            errorMessage = `Erreur de connexion: ${msg}`;
-          }
+          if (msg.includes('401') || msg.includes('incorrect')) errorMessage = 'Email ou mot de passe incorrect';
+          else if (msg.includes('timeout') || msg.includes('fetch')) errorMessage = 'Service cloud inaccessible.';
+          else errorMessage = `Erreur de connexion: ${msg}`;
         }
-        
-      console.error('[AUTH] Erreur de connexion cloud:', {
-        error: response.error,
-        message: response.message,
-        fullResponse: response,
-        fullResponseString: JSON.stringify(response, null, 2),
-      });
-        
         setError(errorMessage);
         setLoading(false);
         return;
       }
 
-      // Utiliser le token cloud pour récupérer la configuration depuis popcorn-web
-      // Le token cloud est maintenant sauvegardé automatiquement par serverApi.loginCloud
       const cloudToken = response.data?.cloudAccessToken || TokenManager.getCloudAccessToken();
-      
-      if (cloudToken) {
-        // Maintenant que CORS est configuré partout dans popcorn-web, on peut récupérer la config
-        // en mode navigateur web aussi (plus besoin de workaround)
-        try {
-          console.log('[AUTH] Token cloud récupéré, vérification de la configuration sauvegardée...');
-          console.log('[AUTH] Token cloud (premiers caractères):', cloudToken.substring(0, 20) + '...');
-          console.log('[AUTH] Token cloud (longueur):', cloudToken.length);
-          
-          // Attendre un peu pour s'assurer que le token est bien sauvegardé
-          await new Promise(resolve => setTimeout(resolve, 200));
-          
-          // getUserConfig utilise maintenant automatiquement le token cloud si aucun token n'est fourni
-          const savedConfig = await getUserConfig();
-          const hasSomething =
-            !!(savedConfig?.indexers?.length) ||
-            !!savedConfig?.tmdbApiKey ||
-            !!savedConfig?.downloadLocation ||
-            !!savedConfig?.syncSettings ||
-            !!savedConfig?.language ||
-            !!(savedConfig?.indexerCategories && Object.keys(savedConfig.indexerCategories).length > 0);
-          if (savedConfig && hasSomething) {
-            console.log('[AUTH] Configuration sauvegardée trouvée:', savedConfig);
-            // Démarrer l'import cloud et avancer vers l'étape suivante
-            const missingCategories = !savedConfig.indexerCategories || Object.keys(savedConfig.indexerCategories).length === 0;
-            if (missingCategories) {
-              syncIndexersToCloud().catch((syncErr) => {
-                console.warn('[AUTH] Sync catégories vers le cloud ignorée:', syncErr);
-              });
-            }
-            CloudImportManager.startImport(savedConfig).finally(() => {
-              // Rafraîchir le statut du wizard une fois l'import terminé
-              Promise.resolve(onStatusChange?.()).catch(() => {});
-            });
-            onNext();
-            return;
-          } else {
-            console.log('[AUTH] Aucune configuration sauvegardée trouvée');
-          }
-        } catch (configError) {
-          // L'erreur 401 est normale si le token n'est pas valide (problème de secret JWT en production)
-          // ou si l'utilisateur n'a pas de configuration sauvegardée
-          if (configError instanceof Error && configError.message.includes('401')) {
-            console.log('[AUTH] Token non valide ou aucune configuration sauvegardée (normal si première connexion)');
-          } else {
-            console.warn('[AUTH] Impossible de vérifier la configuration sauvegardée:', configError);
-          }
-          // Continuer même si on ne peut pas vérifier la config (pas bloquant)
-        }
-      } else {
-        console.warn('[AUTH] Aucun token d\'accès trouvé après la connexion');
-      }
-
-      // Toujours continuer le wizard après connexion pour que l'utilisateur puisse
-      // faire les étapes Indexers, TMDB, etc. La redirection vers le dashboard
-      // est gérée par le Wizard quand l'utilisateur quitte /setup.
-      onNext();
+      if (cloudToken) await afterCloudLogin(cloudToken);
+      else onNext();
     } catch (err) {
-      // Gestion d'erreur plus détaillée
       let errorMessage = 'Erreur de connexion cloud';
-      
       if (err instanceof Error) {
-        if (err.message.includes('timeout') || err.message.includes('Timeout')) {
-          errorMessage = 'Le service cloud ne répond pas dans le délai imparti. Vérifiez votre connexion internet.';
-        } else if (err.message.includes('network') || err.message.includes('fetch') || err.message.includes('Failed to fetch')) {
-          errorMessage = 'Impossible de contacter le service cloud. Vérifiez votre connexion internet et que le service est accessible.';
-        } else if (err.message.includes('401') || err.message.includes('Unauthorized')) {
+        if (err.message.includes('timeout') || err.message.includes('fetch')) {
+          errorMessage = 'Impossible de contacter le service cloud.';
+        } else if (err.message.includes('401')) {
           errorMessage = 'Email ou mot de passe incorrect';
         } else {
           errorMessage = `Erreur: ${err.message}`;
         }
       }
-      
-      console.error('[AUTH] Erreur lors de la connexion cloud:', {
-        error: err,
-        message: err instanceof Error ? err.message : String(err),
-        stack: err instanceof Error ? err.stack : undefined,
-        errorString: JSON.stringify(err, Object.getOwnPropertyNames(err), 2),
-      });
-      
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -252,244 +146,196 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
   const handleRestoreConfig = async () => {
     setRestoringConfig(true);
     setError(null);
-
     try {
-      // Avant de restaurer: vérifier que le backend local est joignable.
-      // Sinon, les appels createIndexer/saveTmdbKey peuvent rester bloqués et donner un "spinner infini".
       const health = await serverApi.checkServerHealth();
       if (!health.success) {
-        setError(
-          `Impossible de restaurer: backend non accessible. ` +
-          `Vérifie que le backend Rust est démarré et que l'URL backend est correcte. ` +
-          `(${health.message || health.error || 'Erreur inconnue'})`
-        );
+        setError(`Backend non accessible: ${health.message || 'Erreur inconnue'}`);
         return;
       }
-
-      // Utiliser le token cloud pour récupérer la configuration depuis popcorn-web
       const cloudToken = TokenManager.getCloudAccessToken();
-      if (!cloudToken) {
-        setError('Token d\'authentification cloud manquant');
-        return;
-      }
-
-      // getUserConfig utilise maintenant automatiquement le token cloud si aucun token n'est fourni
+      if (!cloudToken) { setError("Token d'authentification cloud manquant"); return; }
       const savedConfig = await getUserConfig();
-      if (!savedConfig) {
-        setError('Aucune configuration sauvegardée trouvée');
-        return;
-      }
-
-      // Restaurer les indexers
+      if (!savedConfig) { setError('Aucune configuration sauvegardée trouvée'); return; }
       if (savedConfig.indexers && savedConfig.indexers.length > 0) {
         let restoredCount = 0;
         for (const indexer of savedConfig.indexers) {
           try {
             const res = await serverApi.createIndexer({
-              name: indexer.name,
-              baseUrl: indexer.baseUrl,
-              apiKey: indexer.apiKey ?? '',
-              jackettIndexerName: indexer.jackettIndexerName ?? '',
-              isEnabled: indexer.isEnabled !== false,
-              isDefault: indexer.isDefault || false,
-              priority: indexer.priority || 0,
-              indexerTypeId: indexer.indexerTypeId || undefined,
-              configJson: indexer.configJson || undefined,
+              name: indexer.name, baseUrl: indexer.baseUrl, apiKey: indexer.apiKey ?? '',
+              jackettIndexerName: indexer.jackettIndexerName ?? '', isEnabled: indexer.isEnabled !== false,
+              isDefault: indexer.isDefault || false, priority: indexer.priority || 0,
+              indexerTypeId: indexer.indexerTypeId || undefined, configJson: indexer.configJson || undefined,
             });
             if (res?.success) {
               restoredCount += 1;
-              
-              // Restaurer les catégories pour cet indexer si disponibles
               if (savedConfig.indexerCategories && res.data?.id) {
-                const indexerId = res.data.id;
-                // Chercher les catégories pour cet indexer (par nom ou ID)
-                const indexerCategories = savedConfig.indexerCategories[indexerId] || 
-                                         savedConfig.indexerCategories[indexer.name];
-                
+                const indexerCategories = savedConfig.indexerCategories[res.data.id] || savedConfig.indexerCategories[indexer.name];
                 if (indexerCategories) {
-                  try {
-                    await serverApi.updateIndexerCategories(indexerId, indexerCategories);
-                    console.log(`[AUTH] ✅ Catégories restaurées pour l'indexer ${indexer.name}`);
-                  } catch (catError) {
-                    console.warn(`[AUTH] ⚠️ Erreur lors de la restauration des catégories pour ${indexer.name}:`, catError);
-                  }
+                  try { await serverApi.updateIndexerCategories(res.data.id, indexerCategories); } catch { /* ignore */ }
                 }
               }
             }
-          } catch (idxError) {
-            console.warn('[AUTH] Erreur lors de la restauration d\'un indexer:', idxError);
-          }
+          } catch { /* ignore */ }
         }
-
-        // Si aucun indexer n'a pu être restauré, ne pas "continuer" silencieusement.
         if (savedConfig.indexers.length > 0 && restoredCount === 0) {
-          setError(
-            'Impossible de restaurer les indexers (aucune restauration réussie). ' +
-            'Le backend est peut-être mal configuré ou injoignable.'
-          );
+          setError('Impossible de restaurer les indexers. Le backend est peut-être mal configuré.');
           return;
         }
       }
-
-      // Restaurer la clé TMDB (ne jamais envoyer une clé masquée **** au backend)
       if (savedConfig.tmdbApiKey && !isTmdbKeyMaskedOrInvalid(savedConfig.tmdbApiKey)) {
-        try {
-          await serverApi.saveTmdbKey(savedConfig.tmdbApiKey.trim().replace(/\s+/g, ''));
-        } catch (tmdbError) {
-          console.warn('[AUTH] Erreur lors de la restauration de la clé TMDB:', tmdbError);
-        }
+        try { await serverApi.saveTmdbKey(savedConfig.tmdbApiKey.trim().replace(/\s+/g, '')); } catch { /* ignore */ }
       }
-
-      // Restaurer le download location
-      if (savedConfig.downloadLocation) {
-        PreferencesManager.setDownloadLocation(savedConfig.downloadLocation);
-      }
-
-      // Restaurer les dossiers par type (films, séries) sur le backend
-      if (savedConfig.mediaPaths && (savedConfig.mediaPaths.filmsPath != null || savedConfig.mediaPaths.seriesPath != null || savedConfig.mediaPaths.defaultPath != null)) {
-        try {
-          await serverApi.putMediaPaths({
-            films_path: savedConfig.mediaPaths.filmsPath ?? undefined,
-            series_path: savedConfig.mediaPaths.seriesPath ?? undefined,
-            default_path: savedConfig.mediaPaths.defaultPath ?? undefined,
-          });
-        } catch (mediaPathsErr) {
-          console.warn('[AUTH] Erreur lors de la restauration des dossiers médias:', mediaPathsErr);
-        }
-      }
-
-      // Restaurer les sources de bibliothèque (dossiers externes) sur le backend
-      if (savedConfig.librarySources && savedConfig.librarySources.length > 0) {
-        try {
-          const existing = await serverApi.getLibrarySources();
-          const existingPaths = new Set((existing.success && existing.data ? existing.data : []).map((s) => s.path));
-          for (const cloud of savedConfig.librarySources) {
-            if (!cloud.path?.trim() || existingPaths.has(cloud.path)) continue;
-            const createRes = await serverApi.createLibrarySource({
-              path: cloud.path,
-              category: cloud.category === 'SERIES' ? 'SERIES' : 'FILM',
-              label: cloud.label ?? undefined,
-              share_with_friends: !!cloud.share_with_friends,
-            });
-            if (createRes.success && createRes.data) existingPaths.add(cloud.path);
-          }
-        } catch (librarySourcesErr) {
-          console.warn('[AUTH] Erreur lors de la restauration des sources bibliothèque:', librarySourcesErr);
-        }
-      }
-
-      // Restaurer les paramètres de synchronisation (backend Rust)
-      if (savedConfig.syncSettings) {
-        try {
-          const s = savedConfig.syncSettings;
-          const payload: any = {};
-          if (typeof s.syncEnabled === 'boolean') payload.is_enabled = s.syncEnabled ? 1 : 0;
-          if (typeof s.syncFrequencyMinutes === 'number') payload.sync_frequency_minutes = s.syncFrequencyMinutes;
-          if (typeof s.maxTorrentsPerCategory === 'number') payload.max_torrents_per_category = s.maxTorrentsPerCategory;
-          if (typeof s.rssIncrementalEnabled === 'boolean') payload.rss_incremental_enabled = s.rssIncrementalEnabled ? 1 : 0;
-          if (Array.isArray(s.syncQueriesFilms)) payload.sync_queries_films = s.syncQueriesFilms;
-          if (Array.isArray(s.syncQueriesSeries)) payload.sync_queries_series = s.syncQueriesSeries;
-          if (Object.keys(payload).length > 0) {
-            await serverApi.updateSyncSettings(payload);
-          }
-        } catch (syncSettingsErr) {
-          console.warn('[AUTH] Erreur lors de la restauration des paramètres de sync:', syncSettingsErr);
-        }
-      }
-
-      // Configuration restaurée, continuer
+      if (savedConfig.downloadLocation) PreferencesManager.setDownloadLocation(savedConfig.downloadLocation);
       onNext();
     } catch (err) {
-      setError('Erreur lors de la restauration de la configuration: ' + (err instanceof Error ? err.message : 'Erreur inconnue'));
-      console.error('Erreur:', err);
+      setError('Erreur lors de la restauration: ' + (err instanceof Error ? err.message : 'Erreur inconnue'));
     } finally {
       setRestoringConfig(false);
     }
   };
 
-  const handleSkipRestore = () => {
-    setHasSavedConfig(false);
-    onNext();
-  };
-
   const handleRegister = async (e: Event) => {
     e.preventDefault();
     setError(null);
-
-    // Validation côté client
-    if (registerPassword !== registerConfirmPassword) {
-      setError('Les mots de passe ne correspondent pas');
-      return;
-    }
-
-    if (registerPassword.length < 8) {
-      setError('Le mot de passe doit contenir au moins 8 caractères');
-      return;
-    }
-
+    if (registerPassword !== registerConfirmPassword) { setError('Les mots de passe ne correspondent pas'); return; }
+    if (registerPassword.length < 8) { setError('Le mot de passe doit contenir au moins 8 caractères'); return; }
     setLoading(true);
-
     try {
       const response = await serverApi.registerCloud(registerEmail, registerPassword, registerInviteCode);
-
-      if (!response.success) {
-        setError(response.message || 'Erreur lors de l\'inscription');
-        setLoading(false);
-        return;
-      }
-
-      // Inscription réussie, continuer au prochain step
+      if (!response.success) { setError(response.message || "Erreur lors de l'inscription"); setLoading(false); return; }
       onNext();
     } catch (err) {
-      setError('Erreur d\'inscription. Vérifiez votre connexion réseau et que l\'API popcorn-web est accessible.');
-      console.error('Erreur:', err);
+      setError("Erreur d'inscription. Vérifiez votre connexion réseau.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-6">
-      <h3 className="text-2xl font-bold text-white">{t('wizard.auth.title')}</h3>
-      
-      <p className="text-gray-400">
-        {t('wizard.auth.description')}
-      </p>
+    <div>
+      <style>{`
+        .auth-two-col {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 24px;
+          align-items: start;
+        }
+        @media (max-width: 640px) {
+          .auth-two-col { grid-template-columns: 1fr; }
+        }
+        .auth-tab-bar {
+          display: flex;
+          gap: 4px;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.07);
+          border-radius: 10px;
+          padding: 4px;
+          margin-bottom: 24px;
+        }
+        .auth-tab {
+          flex: 1; padding: 8px 12px;
+          font-size: 13px; font-weight: 600;
+          border-radius: 7px; border: none; cursor: pointer;
+          transition: all 0.15s;
+          color: rgba(255,255,255,0.45);
+          background: transparent;
+          text-align: center;
+        }
+        .auth-tab.active {
+          background: rgba(124,58,237,0.2);
+          color: #c4b5fd;
+          box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+        }
+        .auth-tab:hover:not(.active) { color: rgba(255,255,255,0.7); }
+        .auth-section-label {
+          font-size: 11px; font-weight: 700; letter-spacing: 0.8px;
+          color: rgba(255,255,255,0.3); text-transform: uppercase;
+          margin-bottom: 12px;
+        }
+        .auth-qr-side {
+          background: rgba(124,58,237,0.06);
+          border: 1px solid rgba(124,58,237,0.15);
+          border-radius: 12px;
+          padding: 20px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          text-align: center;
+        }
+        .auth-qr-icon {
+          width: 40px; height: 40px;
+          background: rgba(124,58,237,0.15);
+          border-radius: 10px;
+          display: flex; align-items: center; justify-content: center;
+          margin-bottom: 10px;
+        }
+        .auth-2fa-box {
+          background: rgba(124,58,237,0.06);
+          border: 1px solid rgba(124,58,237,0.2);
+          border-radius: 12px;
+          padding: 20px;
+          margin-bottom: 20px;
+        }
+        .auth-code-input {
+          width: 100%;
+          background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.1);
+          border-radius: 10px;
+          padding: 14px;
+          color: #fff;
+          font-size: 24px; font-weight: 700;
+          text-align: center; letter-spacing: 8px;
+          outline: none;
+          transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .auth-code-input:focus {
+          border-color: rgba(124,58,237,0.6);
+          box-shadow: 0 0 0 3px rgba(124,58,237,0.12);
+        }
+        .auth-restore-banner {
+          background: rgba(59,130,246,0.07);
+          border: 1px solid rgba(59,130,246,0.2);
+          border-radius: 12px;
+          padding: 16px;
+          margin-bottom: 20px;
+        }
+      `}</style>
 
-      {error && (
-        <div className="bg-primary-900/30 border border-primary-700 rounded-lg p-4 text-primary-300">
-          <span>{error}</span>
-        </div>
-      )}
+      {/* En-tête */}
+      <div style="margin-bottom:28px;">
+        <h2 style="font-size:24px;font-weight:700;color:#fff;margin:0 0 8px;">
+          {t('wizard.auth.title')}
+        </h2>
+        <p style="font-size:14px;color:rgba(255,255,255,0.45);margin:0;line-height:1.5;">
+          {t('wizard.auth.description')}
+        </p>
+      </div>
 
-      {/* Proposition de restauration de configuration */}
+      {/* Bannière config sauvegardée */}
       {hasSavedConfig && (
-        <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4">
-          <h4 className="text-white font-semibold mb-2">Configuration sauvegardée détectée</h4>
-          <p className="text-gray-300 text-sm mb-4">
-            Une configuration précédente a été trouvée dans votre compte. Souhaitez-vous la restaurer ?
+        <div class="auth-restore-banner">
+          <div style="font-weight:600;color:#93c5fd;margin-bottom:6px;font-size:13.5px;">
+            Configuration sauvegardée détectée
+          </div>
+          <p style="color:rgba(255,255,255,0.55);font-size:13px;margin:0 0 12px;">
+            Une configuration précédente a été trouvée dans votre compte.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
             <button
               type="button"
+              class="wizard-btn-primary"
               onClick={handleRestoreConfig}
               disabled={restoringConfig}
-              className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style="font-size:13px;padding:9px 18px;"
             >
-              {restoringConfig ? (
-                <>
-                  <span className="loading loading-spinner loading-sm"></span>
-                  Restauration...
-                </>
-              ) : (
-                'Restaurer la configuration'
-              )}
+              {restoringConfig ? 'Restauration...' : 'Restaurer la configuration'}
             </button>
             <button
               type="button"
-              onClick={handleSkipRestore}
+              class="wizard-btn-secondary"
+              onClick={() => { setHasSavedConfig(false); onNext(); }}
               disabled={restoringConfig}
-              className="w-full sm:w-auto px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style="font-size:13px;padding:9px 18px;"
             >
               Passer
             </button>
@@ -497,262 +343,257 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex border-b border-gray-700">
-        <button
-          type="button"
-          className={`flex-1 py-3 px-4 text-center font-semibold transition-colors ${
-            activeTab === 'login'
-              ? 'text-primary-600 border-b-2 border-primary-600'
-              : 'text-gray-400 hover:text-white'
-          }`}
-          onClick={() => {
-            setActiveTab('login');
-            setError(null);
-          }}
-        >
-          {t('wizard.auth.loginTab')}
-        </button>
-        <button
-          type="button"
-          className={`flex-1 py-3 px-4 text-center font-semibold transition-colors ${
-            activeTab === 'register'
-              ? 'text-primary-600 border-b-2 border-primary-600'
-              : 'text-gray-400 hover:text-white'
-          }`}
-          onClick={() => {
-            setActiveTab('register');
-            setError(null);
-          }}
-        >
-          {t('wizard.auth.registerTab')}
-        </button>
-        <button
-          type="button"
-          className={`flex-1 py-3 px-4 text-center font-semibold transition-colors ${
-            activeTab === 'quick-connect'
-              ? 'text-primary-600 border-b-2 border-primary-600'
-              : 'text-gray-400 hover:text-white'
-          }`}
-          onClick={() => {
-            setActiveTab('quick-connect');
-            setError(null);
-          }}
-        >
-          {t('wizard.auth.quickConnect')}
-        </button>
-      </div>
-
-      {/* Login Form */}
-      {activeTab === 'login' && !requires2FA && (
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-white mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-              placeholder="votre@email.com"
-              value={loginEmail}
-              onInput={(e) => setLoginEmail((e.target as HTMLInputElement).value)}
-              required
-              disabled={loading}
-              autocomplete="email"
-            />
+      {/* Erreur */}
+      {error && (
+        <div class="wizard-error" style="margin-bottom:20px;">
+          <div style="display:flex;align-items:flex-start;gap:8px;">
+            <svg style="width:15px;height:15px;flex-shrink:0;margin-top:1px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            {error}
           </div>
-          <div>
-            <label className="block text-sm font-semibold text-white mb-2">
-              Mot de passe
-            </label>
-            <input
-              type="password"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-              placeholder="Votre mot de passe"
-              value={loginPassword}
-              onInput={(e) => setLoginPassword((e.target as HTMLInputElement).value)}
-              required
-              disabled={loading}
-              autocomplete="current-password"
-            />
-          </div>
-          <div className="flex flex-col sm:flex-row sm:justify-end pt-4">
-            <button
-              ref={(el) => { buttonRefs.current[0] = el; }}
-              type="submit"
-              className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading || !loginEmail || !loginPassword}
-            >
-              {loading ? (
-                <>
-                  <span className="loading loading-spinner loading-sm"></span>
-                  Connexion...
-                </>
-              ) : (
-                'Se connecter'
-              )}
-            </button>
-          </div>
-        </form>
+        </div>
       )}
 
-      {/* 2FA Code Form */}
-      {activeTab === 'login' && requires2FA && (
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-4">
-            <h4 className="text-white font-semibold mb-2">Code de vérification requis</h4>
-            <p className="text-gray-300 text-sm">
-              Un code de vérification à 6 chiffres a été envoyé à votre adresse email ({loginEmail}). 
-              Veuillez entrer ce code pour compléter la connexion.
+      {/* Vue 2FA */}
+      {view === '2fa' && (
+        <div>
+          <div class="auth-2fa-box">
+            <div style="font-weight:600;color:#c4b5fd;margin-bottom:6px;font-size:13.5px;">Code de vérification requis</div>
+            <p style="color:rgba(255,255,255,0.5);font-size:13px;margin:0;">
+              Un code à 6 chiffres a été envoyé à <strong style="color:rgba(255,255,255,0.75);">{loginEmail}</strong>.
             </p>
           </div>
-          <div>
-            <label className="block text-sm font-semibold text-white mb-2">
-              Code de vérification
-            </label>
-            <input
-              type="text"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent text-center text-2xl tracking-widest"
-              placeholder="000000"
-              value={twoFactorCode}
-              onInput={(e) => {
-                const value = (e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6);
-                setTwoFactorCode(value);
-              }}
-              required
-              disabled={loading}
-              autocomplete="one-time-code"
-              maxLength={6}
-              autoFocus
-            />
-            <p className="text-gray-400 text-xs mt-2">
-              Entrez le code à 6 chiffres reçu par email
-            </p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 pt-4">
+          <form onSubmit={handleLogin}>
+            <div style="margin-bottom:20px;">
+              <label class="wizard-label">Code de vérification</label>
+              <input
+                class="auth-code-input"
+                type="text"
+                placeholder="000000"
+                value={twoFactorCode}
+                onInput={(e) => setTwoFactorCode((e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6))}
+                required
+                disabled={loading}
+                autocomplete="one-time-code"
+                maxLength={6}
+                autoFocus
+              />
+              <p style="font-size:12px;color:rgba(255,255,255,0.3);margin-top:6px;">
+                Entrez le code à 6 chiffres reçu par email
+              </p>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button
+                ref={(el) => { buttonRefs.current[0] = el; }}
+                type="submit"
+                class="wizard-btn-primary"
+                disabled={loading || twoFactorCode.length !== 6}
+              >
+                {loading ? 'Vérification...' : 'Vérifier'}
+              </button>
+              <button
+                type="button"
+                class="wizard-btn-secondary"
+                onClick={() => { setView('login'); setRequires2FA(false); setTempToken(null); setTwoFactorCode(''); setError(null); }}
+                disabled={loading}
+              >
+                Retour
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Vues Login / Register */}
+      {view !== '2fa' && (
+        <>
+          {/* Tabs */}
+          <div class="auth-tab-bar">
             <button
-              ref={(el) => { buttonRefs.current[0] = el; }}
-              type="submit"
-              className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading || twoFactorCode.length !== 6}
+              type="button"
+              class={`auth-tab ${view === 'login' ? 'active' : ''}`}
+              onClick={() => { setView('login'); setError(null); }}
             >
-              {loading ? (
-                <>
-                  <span className="loading loading-spinner loading-sm"></span>
-                  Vérification...
-                </>
-              ) : (
-                'Vérifier le code'
-              )}
+              {t('wizard.auth.loginTab')}
             </button>
             <button
               type="button"
-              onClick={() => {
-                setRequires2FA(false);
-                setTempToken(null);
-                setTwoFactorCode('');
-                setError(null);
-              }}
-              disabled={loading}
-              className="w-full sm:w-auto px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              class={`auth-tab ${view === 'register' ? 'active' : ''}`}
+              onClick={() => { setView('register'); setError(null); }}
             >
-              Retour
+              {t('wizard.auth.registerTab')}
             </button>
           </div>
-        </form>
-      )}
 
-      {/* Register Form */}
-      {activeTab === 'register' && (
-        <form onSubmit={handleRegister} className="space-y-4">
-          <div>
-            <label className="block text-sm font-semibold text-white mb-2">
-              Code d'invitation
-            </label>
-            <input
-              type="text"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-              placeholder="Entrez votre code d'invitation"
-              value={registerInviteCode}
-              onInput={(e) => setRegisterInviteCode((e.target as HTMLInputElement).value)}
-              required
-              disabled={loading}
-              autoFocus
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-white mb-2">
-              Email
-            </label>
-            <input
-              type="email"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-              placeholder="votre@email.com"
-              value={registerEmail}
-              onInput={(e) => setRegisterEmail((e.target as HTMLInputElement).value)}
-              required
-              disabled={loading}
-              autocomplete="email"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-white mb-2">
-              Mot de passe
-            </label>
-            <input
-              type="password"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-              placeholder="Au moins 8 caractères"
-              value={registerPassword}
-              onInput={(e) => setRegisterPassword((e.target as HTMLInputElement).value)}
-              required
-              disabled={loading}
-              autocomplete="new-password"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-semibold text-white mb-2">
-              Confirmer le mot de passe
-            </label>
-            <input
-              type="password"
-              className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
-              placeholder="Confirmez votre mot de passe"
-              value={registerConfirmPassword}
-              onInput={(e) => setRegisterConfirmPassword((e.target as HTMLInputElement).value)}
-              required
-              disabled={loading}
-              autocomplete="new-password"
-            />
-          </div>
-          <div className="flex flex-col sm:flex-row sm:justify-end pt-4">
-            <button
-              ref={(el) => { buttonRefs.current[0] = el; }}
-              type="submit"
-              className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading || !registerEmail || !registerPassword || !registerInviteCode}
-            >
-              {loading ? (
-                <>
-                  <span className="loading loading-spinner loading-sm"></span>
-                  Inscription...
-                </>
-              ) : (
-                "S'inscrire"
-              )}
-            </button>
-          </div>
-        </form>
-      )}
+          {/* Login */}
+          {view === 'login' && (
+            <div class="auth-two-col">
+              {/* Colonne gauche : formulaire */}
+              <div>
+                <div class="auth-section-label">Connexion avec email</div>
+                <form onSubmit={handleLogin}>
+                  <div style="margin-bottom:14px;">
+                    <label class="wizard-label">Email</label>
+                    <input
+                      class="wizard-input"
+                      type="email"
+                      placeholder="votre@email.com"
+                      value={loginEmail}
+                      onInput={(e) => setLoginEmail((e.target as HTMLInputElement).value)}
+                      required
+                      disabled={loading}
+                      autocomplete="email"
+                    />
+                  </div>
+                  <div style="margin-bottom:20px;">
+                    <label class="wizard-label">Mot de passe</label>
+                    <input
+                      class="wizard-input"
+                      type="password"
+                      placeholder="Votre mot de passe"
+                      value={loginPassword}
+                      onInput={(e) => setLoginPassword((e.target as HTMLInputElement).value)}
+                      required
+                      disabled={loading}
+                      autocomplete="current-password"
+                    />
+                  </div>
+                  <button
+                    ref={(el) => { buttonRefs.current[0] = el; }}
+                    type="submit"
+                    class="wizard-btn-primary"
+                    style="width:100%;"
+                    disabled={loading || !loginEmail || !loginPassword}
+                  >
+                    {loading ? (
+                      <>
+                        <span style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;display:inline-block;animation:wizard-pulse 0.6s linear infinite;" />
+                        Connexion...
+                      </>
+                    ) : (
+                      <>
+                        Se connecter
+                        <svg style="width:14px;height:14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                        </svg>
+                      </>
+                    )}
+                  </button>
+                </form>
 
-      {/* Quick Connect */}
-      {activeTab === 'quick-connect' && (
-        <QuickConnectStep
-          focusedButtonIndex={focusedButtonIndex}
-          buttonRefs={buttonRefs}
-          onNext={onNext}
-          onStatusChange={onStatusChange}
-        />
+                <div style="margin-top:16px;text-align:center;">
+                  <button
+                    type="button"
+                    style="background:none;border:none;cursor:pointer;font-size:12.5px;color:rgba(167,139,250,0.7);text-decoration:underline;text-underline-offset:2px;"
+                    onClick={() => { setView('register'); setError(null); }}
+                  >
+                    Pas encore de compte ? S'inscrire
+                  </button>
+                </div>
+              </div>
+
+              {/* Colonne droite : QR code */}
+              <div class="auth-qr-side">
+                <div class="auth-qr-icon">
+                  <svg style="width:20px;height:20px;color:#a78bfa;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                  </svg>
+                </div>
+                <div style="font-size:12.5px;font-weight:600;color:rgba(255,255,255,0.75);margin-bottom:4px;">Connexion rapide</div>
+                <p style="font-size:12px;color:rgba(255,255,255,0.35);margin:0 0 14px;line-height:1.5;">
+                  Scannez le QR code depuis l'app Popcorn ou popcorn-web
+                </p>
+                <QuickConnectStep
+                  focusedButtonIndex={focusedButtonIndex}
+                  buttonRefs={buttonRefs}
+                  onNext={onNext}
+                  onStatusChange={onStatusChange}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Register */}
+          {view === 'register' && (
+            <div>
+              <div class="auth-section-label">Créer un compte</div>
+              <form onSubmit={handleRegister}>
+                <div style="margin-bottom:14px;">
+                  <label class="wizard-label">Code d'invitation</label>
+                  <input
+                    class="wizard-input"
+                    type="text"
+                    placeholder="Entrez votre code d'invitation"
+                    value={registerInviteCode}
+                    onInput={(e) => setRegisterInviteCode((e.target as HTMLInputElement).value)}
+                    required
+                    disabled={loading}
+                    autoFocus
+                  />
+                </div>
+                <div style="margin-bottom:14px;">
+                  <label class="wizard-label">Email</label>
+                  <input
+                    class="wizard-input"
+                    type="email"
+                    placeholder="votre@email.com"
+                    value={registerEmail}
+                    onInput={(e) => setRegisterEmail((e.target as HTMLInputElement).value)}
+                    required
+                    disabled={loading}
+                    autocomplete="email"
+                  />
+                </div>
+                <div style="margin-bottom:14px;">
+                  <label class="wizard-label">Mot de passe</label>
+                  <input
+                    class="wizard-input"
+                    type="password"
+                    placeholder="Au moins 8 caractères"
+                    value={registerPassword}
+                    onInput={(e) => setRegisterPassword((e.target as HTMLInputElement).value)}
+                    required
+                    disabled={loading}
+                    autocomplete="new-password"
+                  />
+                </div>
+                <div style="margin-bottom:20px;">
+                  <label class="wizard-label">Confirmer le mot de passe</label>
+                  <input
+                    class="wizard-input"
+                    type="password"
+                    placeholder="Confirmez votre mot de passe"
+                    value={registerConfirmPassword}
+                    onInput={(e) => setRegisterConfirmPassword((e.target as HTMLInputElement).value)}
+                    required
+                    disabled={loading}
+                    autocomplete="new-password"
+                  />
+                </div>
+                <div style="display:flex;gap:8px;justify-content:flex-end;">
+                  <button
+                    type="button"
+                    class="wizard-btn-secondary"
+                    onClick={() => { setView('login'); setError(null); }}
+                    disabled={loading}
+                    style="font-size:13px;padding:9px 16px;"
+                  >
+                    Retour
+                  </button>
+                  <button
+                    ref={(el) => { buttonRefs.current[0] = el; }}
+                    type="submit"
+                    class="wizard-btn-primary"
+                    disabled={loading || !registerEmail || !registerPassword || !registerInviteCode}
+                  >
+                    {loading ? "Inscription..." : "S'inscrire →"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

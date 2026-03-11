@@ -27,6 +27,29 @@ export function getPopcornWebApiUrl(): string {
   return getPopcornWebBaseUrl() + '/api/v1';
 }
 
+/**
+ * Supprime les clés dont la valeur est null ou undefined (récursif).
+ * Évite d'envoyer des null que l'API cloud peut rejeter (400 Invalid input).
+ */
+function sanitizeConfigForApi<T>(obj: T): T {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map((item) => sanitizeConfigForApi(item)) as T;
+  }
+  if (typeof obj === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (v !== null && v !== undefined) {
+        out[k] = sanitizeConfigForApi(v);
+      }
+    }
+    return out as T;
+  }
+  return obj;
+}
+
 async function fetchJsonWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -1088,7 +1111,7 @@ export async function saveUserConfig(config: UserConfig, accessToken?: string): 
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(configToSave),
+        body: JSON.stringify(sanitizeConfigForApi(configToSave)),
       },
       10000
     );
@@ -1101,7 +1124,7 @@ export async function saveUserConfig(config: UserConfig, accessToken?: string): 
       const errorData = res.data || {};
       return {
         success: false,
-        message: errorData.message || 'Erreur lors de la sauvegarde de la configuration',
+        message: errorData.message || errorData.error || 'Erreur lors de la sauvegarde de la configuration',
       };
     }
 

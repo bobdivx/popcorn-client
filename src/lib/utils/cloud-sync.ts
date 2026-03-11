@@ -3,10 +3,33 @@
  */
 
 import { serverApi } from '../client/server-api';
-import { saveUserConfigMerge, saveCloudMediaRequests, saveCloudMediaFavorites, type CloudMediaRequest, type CloudMediaFavorite } from '../api/popcorn-web';
+import { saveUserConfigMerge, saveCloudMediaRequests, saveCloudMediaFavorites, type CloudMediaRequest, type CloudMediaFavorite, type UserConfig } from '../api/popcorn-web';
 import { TokenManager } from '../client/storage';
 import { isTmdbKeyMaskedOrInvalid } from './tmdb-key';
 import { getLibraryDisplayConfig } from './library-display-config';
+
+/**
+ * Synchronise un ou plusieurs champs de configuration vers le cloud de manière incrémentale.
+ * Non-bloquant : les erreurs sont loguées mais n'interrompent pas le flux utilisateur.
+ */
+export async function syncFieldToCloud(partial: Partial<UserConfig>): Promise<void> {
+  try {
+    const cloudToken = TokenManager.getCloudAccessToken();
+    if (!cloudToken) {
+      console.log('[CLOUD SYNC] ℹ️ Aucun token cloud, sync incrémentale ignorée');
+      return;
+    }
+    const result = await saveUserConfigMerge(partial, cloudToken);
+    if (result?.success) {
+      console.log('[CLOUD SYNC] ✅ Champ(s) synchronisé(s):', Object.keys(partial).join(', '));
+    } else {
+      console.warn('[CLOUD SYNC] ⚠️ Échec sync incrémentale:', result?.message);
+    }
+  } catch (err) {
+    console.warn('[CLOUD SYNC] ⚠️ Erreur sync incrémentale:', err);
+    // Non-bloquant
+  }
+}
 
 /**
  * Synchronise automatiquement tous les indexers et leurs catégories vers le cloud

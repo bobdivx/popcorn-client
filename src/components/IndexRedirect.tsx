@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
+import { TokenManager } from '../lib/client/storage.js';
 import { getBackendUrl, isDemoMode, setDemoMode } from '../lib/backend-config';
 import { isTauri } from '../lib/utils/tauri';
 import { redirectTo } from '../lib/utils/navigation.js';
@@ -265,7 +266,9 @@ export default function IndexRedirect() {
           
           if (setupResponse2.success && setupResponse2.data) {
             if (setupResponse2.data.backendReachable !== false && setupResponse2.data.needsSetup) {
-              redirectTo('/setup');
+              const hasCloudAuth = typeof TokenManager?.getCloudAccessToken === 'function' && !!TokenManager.getCloudAccessToken();
+              if (!hasCloudAuth) redirectTo('/setup');
+              else redirectTo('/dashboard');
             } else {
               redirectTo('/dashboard');
             }

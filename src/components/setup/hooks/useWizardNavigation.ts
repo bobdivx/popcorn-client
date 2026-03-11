@@ -13,18 +13,17 @@ export function useWizardNavigation(
   const [focusedButtonIndex, setFocusedButtonIndex] = useState(0);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
-  // Réinitialiser à l'étape 1 si le setupStatus change (par exemple après configuration de l'URL)
+  // Au premier chargement uniquement : si le backend est accessible et qu'on est encore à l'étape 1,
+  // s'assurer d'afficher la première étape du wizard. Ne pas réinitialiser si l'utilisateur a déjà
+  // avancé (ex. connexion cloud puis passage à l'étape Serveur).
   useEffect(() => {
-    if (setupStatus && setupStatus.backendReachable) {
-      // Si le backend est accessible, on commence à l'étape 1 (serverUrl)
-      // mais le wizard déterminera automatiquement quelle est la première étape à afficher
-      const firstStepId = getStepId(1);
-      if (firstStepId) {
-        const firstStepNumber = getStepNumber(firstStepId);
-        if (firstStepNumber && firstStepNumber !== currentStep) {
-          setCurrentStep(firstStepNumber);
-        }
-      }
+    if (!setupStatus || !setupStatus.backendReachable) return;
+    if (currentStep !== 1) return;
+    const firstStepId = getStepId(1);
+    if (!firstStepId) return;
+    const firstStepNumber = getStepNumber(firstStepId);
+    if (firstStepNumber != null && firstStepNumber !== currentStep) {
+      setCurrentStep(firstStepNumber);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setupStatus?.backendReachable]);

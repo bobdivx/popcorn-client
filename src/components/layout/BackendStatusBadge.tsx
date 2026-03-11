@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { isTauri } from '../../lib/utils/tauri';
 import { getBackendUrl, getMyBackendUrl, hasBackendUrl } from '../../lib/backend-config';
-import { getBackendConnectionStore } from '../../lib/backend-connection-store';
+import { getBackendConnectionStore, subscribeBackendConnectionStore } from '../../lib/backend-connection-store';
 import { serverApi } from '../../lib/client/server-api';
 import { checkDockerUpdates, type DockerUpdateCheckResult } from '../../lib/services/docker-update-checker';
 
@@ -102,13 +102,14 @@ export default function BackendStatusBadge({
       setBackendVersion(null);
       return;
     }
-    setStatus('checking');
-    setLastError(null);
-    setBackendVersion(null);
-    if (!hasBackendUrl()) {
+    const url = getBackendUrl()?.trim().replace(/\/$/, '');
+    if (!url || !url.startsWith('http')) {
       setStatus('unknown');
       return;
     }
+    setStatus('checking');
+    setLastError(null);
+    setBackendVersion(null);
     try {
       const res = await serverApi.checkServerHealth();
       if (res.success && res.data) {
@@ -138,19 +139,31 @@ export default function BackendStatusBadge({
       return () => clearInterval(interval);
     }
 
-    // Si le store indique déjà offline au montage, refléter l'état dans le badge,
-    // mais lancer quand même un poll régulier pour détecter un retour en ligne.
+    // S'abonner au store : quand il repasse en "online" (après une requête réussie), rafraîchir le badge.
+    const unsub = subscribeBackendConnectionStore((storeState) => {
+      if (storeState.status === 'online') {
+        checkHealth();
+      } else if (storeState.status === 'offline') {
+        setStatus('error');
+      }
+    });
+
+    // Si le store indique déjà offline au montage, refléter l'état et lancer tout de suite un check.
     if (initialStore.status !== 'offline') {
       checkHealth();
     } else {
       setStatus('error');
+      checkHealth(); // Vérifier tout de suite au cas où le serveur est déjà revenu
     }
 
     const interval = setInterval(() => {
       if (isFriendBackend()) return;
       setTimeout(checkHealth, 0);
     }, 20_000);
-    return () => clearInterval(interval);
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
   }, []);
 
   // Fermer le menu au clic extérieur

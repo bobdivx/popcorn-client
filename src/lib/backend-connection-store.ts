@@ -63,6 +63,12 @@ function registerConnectionFailureListener() {
       state.lastChecked = Date.now();
       notify();
     });
+    serverApi.addConnectionSuccessListener(() => {
+      if (isFriendBackend()) return;
+      if (state.status === 'offline') {
+        setBackendConnectionOnline();
+      }
+    });
   } catch {
     registeredWithServerApi = false;
   }

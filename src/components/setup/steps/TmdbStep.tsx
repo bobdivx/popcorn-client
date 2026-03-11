@@ -241,12 +241,18 @@ export function TmdbStep({
       <h3 className="text-2xl font-bold text-white">Configuration de la clé API TMDB</h3>
       
       {hasExistingKey ? (
-        <div className="bg-green-900/30 border border-green-700 rounded-lg p-4 text-green-300">
+        <div className="bg-green-900/30 border border-green-700 rounded-lg p-4 text-green-300 flex items-center gap-2">
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
           <span>Clé API TMDB configurée</span>
         </div>
       ) : (
-        <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 text-yellow-300">
-          <span>Clé API TMDB non configurée. Il est recommandé d'en configurer une pour enrichir les métadonnées.</span>
+        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-red-300 flex items-center gap-2">
+          <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span>Clé API TMDB obligatoire — configurez-en une pour continuer.</span>
         </div>
       )}
 
@@ -354,8 +360,10 @@ export function TmdbStep({
         </button>
         <button
           ref={(el) => { buttonRefs.current[2] = el; }}
-          className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors"
+          className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           onClick={onNext}
+          disabled={!hasExistingKey}
+          title={!hasExistingKey ? 'Configurez une clé TMDB pour continuer' : undefined}
         >
           Suivant →
         </button>

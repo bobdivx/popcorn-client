@@ -1,4 +1,5 @@
 import { useI18n, LANGUAGE_NAMES, type SupportedLanguage } from '../../../lib/i18n';
+import { syncFieldToCloud } from '../../../lib/utils/cloud-sync';
 
 interface LanguageStepProps {
   focusedButtonIndex: number;
@@ -11,50 +12,100 @@ const LANGUAGE_FLAGS: Record<SupportedLanguage, string> = {
   en: '🇬🇧',
 };
 
+const LANGUAGE_DESCRIPTIONS: Record<SupportedLanguage, string> = {
+  fr: 'Interface en français',
+  en: 'English interface',
+};
+
 export function LanguageStep({ focusedButtonIndex, buttonRefs, onNext }: LanguageStepProps) {
   const { language, setLanguage, t, availableLanguages } = useI18n();
 
   const handleLanguageChange = (lang: SupportedLanguage) => {
     setLanguage(lang);
+    syncFieldToCloud({ language: lang }).catch(() => {});
   };
 
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h3 className="text-2xl font-bold text-white">{t('wizard.language.title')}</h3>
-        <p className="text-gray-400 mt-2">{t('wizard.language.description')}</p>
+    <div>
+      <style>{`
+        .lang-card {
+          display: flex; align-items: center; gap: 14px;
+          padding: 16px 18px;
+          border-radius: 12px;
+          border: 1.5px solid rgba(255,255,255,0.07);
+          background: rgba(255,255,255,0.03);
+          cursor: pointer;
+          transition: all 0.15s;
+          margin-bottom: 10px;
+          position: relative;
+        }
+        .lang-card:hover:not(.selected) {
+          border-color: rgba(255,255,255,0.12);
+          background: rgba(255,255,255,0.05);
+        }
+        .lang-card.selected {
+          border-color: rgba(124,58,237,0.5);
+          background: rgba(124,58,237,0.08);
+          box-shadow: 0 0 0 3px rgba(124,58,237,0.1);
+        }
+        .lang-flag {
+          font-size: 32px; line-height: 1; flex-shrink: 0;
+          filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
+        }
+        .lang-check {
+          width: 20px; height: 20px; border-radius: 50%;
+          background: #7c3aed;
+          display: flex; align-items: center; justify-content: center;
+          margin-left: auto; flex-shrink: 0;
+          box-shadow: 0 0 0 3px rgba(124,58,237,0.25);
+        }
+        .lang-check-empty {
+          width: 20px; height: 20px; border-radius: 50%;
+          border: 1.5px solid rgba(255,255,255,0.12);
+          margin-left: auto; flex-shrink: 0;
+        }
+      `}</style>
+
+      <div style="margin-bottom:28px;">
+        <h2 style="font-size:24px;font-weight:700;color:#fff;margin:0 0 8px;">{t('wizard.language.title')}</h2>
+        <p style="font-size:14px;color:rgba(255,255,255,0.4);margin:0;">{t('wizard.language.description')}</p>
       </div>
-      
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md mx-auto">
+
+      <div style="max-width:380px;">
         {availableLanguages.map((lang) => (
-          <button
+          <div
             key={lang}
-            type="button"
-            className={`flex items-center justify-center gap-3 p-4 rounded-xl border-2 transition-all duration-200 ${
-              language === lang
-                ? 'border-primary-500 bg-primary-500/10 text-white'
-                : 'border-gray-700 bg-gray-900 text-gray-300 hover:border-gray-600 hover:bg-gray-800'
-            }`}
+            class={`lang-card ${language === lang ? 'selected' : ''}`}
             onClick={() => handleLanguageChange(lang)}
           >
-            <span className="text-2xl">{LANGUAGE_FLAGS[lang]}</span>
-            <span className="font-medium text-lg">{LANGUAGE_NAMES[lang]}</span>
-            {language === lang && (
-              <svg className="w-5 h-5 text-primary-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
+            <span class="lang-flag">{LANGUAGE_FLAGS[lang]}</span>
+            <div>
+              <div style="font-size:15px;font-weight:600;color:#fff;">{LANGUAGE_NAMES[lang]}</div>
+              <div style="font-size:12.5px;color:rgba(255,255,255,0.4);margin-top:2px;">{LANGUAGE_DESCRIPTIONS[lang]}</div>
+            </div>
+            {language === lang ? (
+              <div class="lang-check">
+                <svg style="width:11px;height:11px;color:#fff;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width={3} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            ) : (
+              <div class="lang-check-empty" />
             )}
-          </button>
+          </div>
         ))}
       </div>
 
-      <div className="flex justify-end pt-4">
+      <div style="margin-top:24px;">
         <button
           ref={(el) => { buttonRefs.current[0] = el; }}
-          className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors"
+          class="wizard-btn-primary"
           onClick={onNext}
         >
-          {t('common.next')} →
+          Continuer
+          <svg style="width:14px;height:14px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+          </svg>
         </button>
       </div>
     </div>

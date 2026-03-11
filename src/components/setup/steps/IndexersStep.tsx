@@ -8,6 +8,7 @@ import {
   filterAndSortIndexerDefinitions,
   getUniqueLanguagesAndCountries,
 } from '../../../lib/utils/indexer-definitions-filter';
+import { syncIndexersToCloud } from '../../../lib/utils/cloud-sync';
 import { Info } from 'lucide-preact';
 
 const STORAGE_KEY_USE_JACKETT = 'popcorn-indexer-use-jackett';
@@ -299,6 +300,8 @@ export function IndexersStep({
       if (response.success) {
         await loadIndexers();
         onStatusChange();
+        // Sync incrémentale vers le cloud (non-bloquant)
+        syncIndexersToCloud().catch(() => {});
       } else {
         setError(response.message || 'Erreur lors de la suppression de l\'indexer');
       }
@@ -361,6 +364,8 @@ export function IndexersStep({
         });
         await loadIndexers();
         onStatusChange();
+        // Sync incrémentale vers le cloud (non-bloquant)
+        syncIndexersToCloud().catch(() => {});
       } else {
         setError(response.message || `Erreur lors de la ${editingIndexer ? 'mise à jour' : 'création'} de l'indexer`);
       }
