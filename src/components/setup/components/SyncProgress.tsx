@@ -17,6 +17,8 @@ interface SyncStatus {
     total_to_process: number;
   };
   sync_start_time?: number | null;
+  /** Stats TMDB (enrichis / sans TMDB) si renvoyées par l’API */
+  tmdb_stats?: { with_tmdb: number; without_tmdb: number };
 }
 
 interface SyncProgressProps {
@@ -327,37 +329,48 @@ export function SyncProgress({ compact = false, externalStatus }: SyncProgressPr
         </div>
       </div>
 
-      {/* Compteurs par catégorie avec animations */}
+      {/* Films, Séries, Autres : même design que Total synchronisé (une ligne par catégorie, pas de cartes séparées) */}
       {Object.keys(effectiveStatus.stats || {}).length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="space-y-3">
           {Object.entries(effectiveStatus.stats || {}).map(([category, count]) => {
             const animatedCount = Math.floor(animatedCounts[category] || 0);
             const icon = category === 'films' ? '🎬' : category === 'series' ? '📺' : '📦';
-            
+            const label = category === 'films' ? t('torrentSyncManager.films') : category === 'series' ? t('torrentSyncManager.series') : t('torrentSyncManager.others');
             return (
-              <div 
-                key={category} 
-                className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl p-6 border-2 border-gray-700"
+              <div
+                key={category}
+                className="bg-gradient-to-r from-primary-600/20 to-primary-600/10 rounded-xl p-4 sm:p-5 border border-primary-600/30 flex items-center justify-between"
               >
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-3xl">{icon}</span>
-                  <span className="text-white font-semibold text-sm capitalize">
-                    {category === 'films' ? t('torrentSyncManager.films') : category === 'series' ? t('torrentSyncManager.series') : t('torrentSyncManager.others')}
-                  </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl" aria-hidden="true">{icon}</span>
+                  <span className="text-white font-semibold">{label}</span>
                 </div>
-                <div className="text-4xl font-bold text-primary-600 mb-2">
+                <span className="text-primary-600 font-bold text-2xl tabular-nums">
                   {animatedCount.toLocaleString()}
-                </div>
-                <div className="text-xs text-gray-400">
-                  {t('syncProgress.torrentsSynced')}
-                </div>
+                </span>
               </div>
             );
           })}
         </div>
       )}
 
-      {/* Total */}
+      {/* TMDB : enrichis (même design que Total) si l’API renvoie tmdb_stats */}
+      {effectiveStatus.tmdb_stats && (effectiveStatus.tmdb_stats.with_tmdb > 0 || effectiveStatus.tmdb_stats.without_tmdb > 0) && (
+        <div className="bg-gradient-to-r from-primary-600/20 to-primary-600/10 rounded-xl p-4 sm:p-5 border border-primary-600/30 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
+            </svg>
+            <span className="text-white font-semibold">{t('torrentSyncManager.withTmdb')} / TMDB</span>
+          </div>
+          <span className="text-primary-600 font-bold text-2xl tabular-nums">
+            {effectiveStatus.tmdb_stats.with_tmdb.toLocaleString()}
+            <span className="text-white/70 font-normal text-lg ml-1">/ {(effectiveStatus.tmdb_stats.with_tmdb + effectiveStatus.tmdb_stats.without_tmdb).toLocaleString()}</span>
+          </span>
+        </div>
+      )}
+
+      {/* Total synchronisé (récap unique) */}
       {totalTorrents > 0 && (
         <div className="bg-gradient-to-r from-primary-600/20 to-primary-600/10 rounded-xl p-6 border border-primary-600/30">
           <div className="flex items-center justify-between">
@@ -367,20 +380,10 @@ export function SyncProgress({ compact = false, externalStatus }: SyncProgressPr
               </svg>
               <span className="text-white font-semibold">{t('syncProgress.totalSynced')}</span>
             </div>
-            <span className="text-primary-600 font-bold text-3xl">
+            <span className="text-primary-600 font-bold text-3xl tabular-nums">
               {totalTorrents.toLocaleString()}
             </span>
           </div>
-        </div>
-      )}
-
-      {/* Message si aucun résultat */}
-      {totalTorrents === 0 && elapsedTime > 10 && (
-        <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-6 text-center">
-          <p className="text-yellow-400 font-semibold mb-2">{t('syncProgress.inProgress')}</p>
-          <p className="text-gray-400 text-sm">
-            {t('syncProgress.noTorrentsFound')}
-          </p>
         </div>
       )}
     </div>

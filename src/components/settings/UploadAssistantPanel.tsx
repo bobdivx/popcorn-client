@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
-import { serverApi } from '../../lib/client/server-api';
+import { serverApi } from '../../lib/client/server-api.ts';
 import { getBackendUrl } from '../../lib/backend-config';
 import { getPopcornWebBaseUrl, uploadScreenshotsToCloud } from '../../lib/api/popcorn-web';
 import { TokenManager } from '../../lib/client/storage';
-import type { LibraryMediaEntry } from '../../lib.client/server-api/library';
+import type { LibraryMediaEntry } from '../../lib/client/server-api/library';
 import type {
   ActiveTorrentCreationEntry,
   MultiTrackerUploadResult,
+  PublishedUploadMediaEntry,
   UploaderPreviewResponse,
 } from '../../lib/client/server-api/upload-tracker';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { DsBarChart, DsCard, DsCardSection, DsMetricCard, LoadingIcon } from '../ui/design-system';
+import { DsBarChart, DsCard, DsCardSection, DsMetricCard, LoadingIcon, FullScreenLoadingOverlay } from '../ui/design-system';
 import { Modal } from '../ui/Modal';
 import { DescriptionPreview } from '../upload/DescriptionPreview';
 import { ArrowLeft, ArrowRight, Check, Loader2, Search, Upload } from 'lucide-preact';
@@ -78,22 +79,15 @@ function LoadingAssistantView({
   const libraryDone = !loadingLibrary;
 
   return (
-    <div
-      className="ds-card-loading-wrapper w-full max-w-[42rem] mx-auto"
-      role="status"
-      aria-live="polite"
-      aria-busy={!libraryDone}
+    <FullScreenLoadingOverlay
+      title={t('settings.uploadTrackerPanel.uploadAssistantTitle')}
+      description={t('settings.uploadTrackerPanel.uploadAssistantDescription')}
+      iconContent={
+        <LoadingIcon>
+          <Upload className="w-8 h-8 text-[var(--ds-accent-violet)]" strokeWidth={1.8} aria-hidden />
+        </LoadingIcon>
+      }
     >
-      <div className="ds-card-loading-glow" />
-      <div className="ds-card-loading">
-        <div className="ds-card-loading-bar" />
-        <div className="ds-card-loading-content !p-5 sm:!p-10 text-center">
-          <LoadingIcon>
-            <Upload className="w-8 h-8 text-[var(--ds-accent-violet)]" strokeWidth={1.8} aria-hidden />
-          </LoadingIcon>
-          <h2 className="ds-loading-title !text-[clamp(1.45rem,4.2vw,2.15rem)] leading-tight max-w-[24ch] mx-auto break-words">
-            {t('settings.uploadTrackerPanel.uploadAssistantDescription')}
-          </h2>
           <div className="w-full space-y-3 max-w-lg mx-auto mt-6">
             <div
               className={`flex items-center justify-center gap-3 rounded-lg px-4 py-3 transition-colors ${
@@ -126,13 +120,7 @@ function LoadingAssistantView({
               </div>
             )}
           </div>
-          <div className="ds-progress-container mt-6 mb-0">
-            <div className="ds-progress-bar" />
-            <div className="ds-progress-wave" />
-          </div>
-        </div>
-      </div>
-    </div>
+    </FullScreenLoadingOverlay>
   );
 }
 
@@ -150,6 +138,10 @@ export default function UploadAssistantPanel() {
   const [showExcludedMedia, setShowExcludedMedia] = useState(false);
   const [filterTorrentCreated, setFilterTorrentCreated] = useState<'all' | 'with_torrent' | 'without_torrent'>('all');
   const [publishedMediaIdsWithTorrent, setPublishedMediaIdsWithTorrent] = useState<Set<string>>(new Set());
+  const [publishedUploadsByMediaId, setPublishedUploadsByMediaId] = useState<Record<string, PublishedUploadMediaEntry>>({});
+  const [dupeOnTrackerByMediaId, setDupeOnTrackerByMediaId] = useState<Record<string, { exists: boolean; matchedName?: string }>>({});
+  const dupeCheckTimerRef = useRef<number | null>(null);
+  const [trackerToIndexerId, setTrackerToIndexerId] = useState<Record<string, string>>({});
 
   const [selectedTrackers, setSelectedTrackers] = useState<string[]>([]);
   const [configuredTrackers, setConfiguredTrackers] = useState<string[]>([]);
@@ -188,6 +180,9 @@ export default function UploadAssistantPanel() {
   const [screenshotsCount, setScreenshotsCount] = useState<number | null>(null);
   const [screenshotsLoading, setScreenshotsLoading] = useState(false);
   const [screenshotsBaseUrl, setScreenshotsBaseUrl] = useState<string | null>(null);
+  const [screenshotsSource, setScreenshotsSource] = useState<'backend' | 'cloud' | null>(null);
+  const [screenshotsReady, setScreenshotsReady] = useState(false);
+  const screenshotsInFlightRef = useRef<string>('');
   const [validationLoading, setValidationLoading] = useState(false);
   const [validatedMediaIds, setValidatedMediaIds] = useState<string[]>([]);
   const [excludedMediaReasons, setExcludedMediaReasons] = useState<Record<string, string>>({});
@@ -200,9 +195,12 @@ export default function UploadAssistantPanel() {
   });
   const [publishCountdown, setPublishCountdown] = useState<number | null>(null);
   const publishCountdownCanceledRef = useRef(false);
+  // Empêche le relancement automatique en boucle (ex. si l'upload échoue ou timeout) tant que l'utilisateur ne change pas d'étape.
+  const autoLaunchConsumedRef = useRef(false);
   const publishCountdownIntervalRef = useRef<number | null>(null);
   const handleLaunchUploadRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const autoSkipStep1Ref = useRef(false);
+  const [screenshotCarouselIndex, setScreenshotCarouselIndex] = useState(0);
   const availableMediaList = mediaList.filter((m) => !excludedMediaIds.includes(m.id));
   const searchLower = mediaSearchQuery.trim().toLowerCase();
   const baseListForDisplay =
@@ -219,6 +217,24 @@ export default function UploadAssistantPanel() {
     return true;
   });
   const selectableInDisplayed = displayedMediaList.filter((m) => !excludedMediaIds.includes(m.id));
+
+  // Carrousel simple pour les captures d'écran dans le résumé (étape 3).
+  useEffect(() => {
+    if (step !== 3 || !screenshotsBaseUrl || !screenshotsCount || screenshotsCount <= 1) {
+      return;
+    }
+    setScreenshotCarouselIndex(0);
+    const id = window.setInterval(() => {
+      setScreenshotCarouselIndex((prev) => {
+        const next = prev + 1;
+        if (!screenshotsCount || screenshotsCount <= 0) return 0;
+        return next % screenshotsCount;
+      });
+    }, 3000);
+    return () => {
+      window.clearInterval(id);
+    };
+  }, [step, screenshotsBaseUrl, screenshotsCount]);
 
   const loadConfig = useCallback(async () => {
     setLoadingConfig(true);
@@ -241,11 +257,15 @@ export default function UploadAssistantPanel() {
     ]);
 
     const configured = new Set<string>();
+    const trackerToIndexer: Record<string, string> = {};
     if (indexersRes.success && Array.isArray(indexersRes.data)) {
       for (const idx of indexersRes.data) {
         if (!idx?.isEnabled || !idx.name) continue;
         const mapped = mapIndexerNameToTracker(idx.name);
-        if (mapped) configured.add(mapped);
+        if (mapped) {
+          configured.add(mapped);
+          trackerToIndexer[mapped] = idx.id;
+        }
       }
     }
 
@@ -260,6 +280,7 @@ export default function UploadAssistantPanel() {
     const removedTrackers = new Set(readStoredTrackerList(TRACKER_REMOVED_STORAGE_KEY));
     const visibleConfigured = Array.from(configured).filter((tracker) => !removedTrackers.has(tracker));
     setConfiguredTrackers(visibleConfigured);
+    setTrackerToIndexerId(trackerToIndexer);
 
     setSelectedTrackers((prev) => {
       const current = prev.filter((tracker) => visibleConfigured.includes(tracker));
@@ -279,10 +300,10 @@ export default function UploadAssistantPanel() {
     const res = await serverApi.getLibraryMedia();
     if (res.success && res.data) {
       setMediaList(res.data);
-      setSelectedMediaId((prev) => (res.data!.length > 0 && !prev ? res.data![0].id : prev));
+      setSelectedMediaId((prev) => (prev && res.data!.some((m) => m.id === prev) ? prev : ''));
       setSelectedMediaIds((prev) => {
         if (prev.length > 0) return prev.filter((id) => res.data!.some((m) => m.id === id));
-        return res.data!.length > 0 ? [res.data![0].id] : [];
+        return [];
       });
     } else {
       setMediaList([]);
@@ -327,7 +348,7 @@ export default function UploadAssistantPanel() {
       stopTorrentProgressPolling();
       if (!localMediaId.trim()) return;
       torrentProgressIntervalRef.current = window.setInterval(async () => {
-        const res = await serverApi.getTorrentProgress(localMediaId);
+        const res = await (serverApi as any).getTorrentProgress(localMediaId);
         if (res.success && res.data) {
           const pct = res.data.progress;
           if (typeof pct === 'number') {
@@ -370,10 +391,13 @@ export default function UploadAssistantPanel() {
     serverApi.getPublishedUploads().then((res) => {
       if (cancelled) return;
       if (res.success && Array.isArray(res.data)) {
+        const byId: Record<string, PublishedUploadMediaEntry> = {};
         const ids = new Set<string>();
         for (const entry of res.data) {
+          if (entry?.local_media_id) byId[entry.local_media_id] = entry;
           if (entry.has_torrent_file && entry.local_media_id) ids.add(entry.local_media_id);
         }
+        setPublishedUploadsByMediaId(byId);
         setPublishedMediaIdsWithTorrent(ids);
       }
     });
@@ -381,6 +405,78 @@ export default function UploadAssistantPanel() {
       cancelled = true;
     };
   }, [step, mediaList.length]);
+
+  const excludeMediaWithReason = useCallback((mediaId: string, reason: string) => {
+    setExcludedMediaIds((prev) => (prev.includes(mediaId) ? prev : [...prev, mediaId]));
+    setExcludedMediaReasons((prev) => ({ ...prev, [mediaId]: reason }));
+  }, []);
+
+  // Vérifier la présence sur le tracker (via indexer) avant de hasher.
+  // Heuristique: on check le premier tracker sélectionné (template/preview idem),
+  // uniquement sur l'étape médias, et limité aux médias affichés (max 40) pour éviter le spam.
+  useEffect(() => {
+    if (step !== 2) return;
+    const primaryTracker = selectedTrackers[0];
+    if (!primaryTracker) return;
+    if (loadingMedia) return;
+    if (displayedMediaList.length === 0) return;
+    const indexerId = trackerToIndexerId[primaryTracker];
+    if (!indexerId) return;
+
+    if (dupeCheckTimerRef.current != null) {
+      window.clearTimeout(dupeCheckTimerRef.current);
+      dupeCheckTimerRef.current = null;
+    }
+    const id = window.setTimeout(async () => {
+      const ids = displayedMediaList
+        .slice(0, 40)
+        .map((m) => m.id)
+        .filter(Boolean);
+      const res = await serverApi.checkDuplicateOnIndexer({ indexer_id: indexerId, local_media_ids: ids });
+      if (!res.success || !res.data?.results) return;
+      const map: Record<string, { exists: boolean; matchedName?: string }> = {};
+      for (const r of res.data.results) {
+        if (!r?.local_media_id) continue;
+        if (r.exists_on_tracker) {
+          map[r.local_media_id] = { exists: true, matchedName: r.matched_name || undefined };
+        } else {
+          map[r.local_media_id] = { exists: false };
+        }
+      }
+      setDupeOnTrackerByMediaId((prev) => ({ ...prev, ...map }));
+    }, 600);
+    dupeCheckTimerRef.current = id;
+    return () => {
+      if (dupeCheckTimerRef.current != null) {
+        window.clearTimeout(dupeCheckTimerRef.current);
+        dupeCheckTimerRef.current = null;
+      }
+    };
+  }, [displayedMediaList, loadingMedia, selectedTrackers, step, trackerToIndexerId]);
+
+  const isAlreadyPublishedOnAllSelectedTrackers = useCallback(
+    (mediaId: string): boolean => {
+      if (!mediaId.trim()) return false;
+      if (selectedTrackers.length === 0) return false;
+      const entry = publishedUploadsByMediaId[mediaId];
+      if (!entry || !Array.isArray(entry.trackers)) return false;
+      const successTrackers = new Set(entry.trackers.filter((t) => t?.success).map((t) => t.tracker));
+      return selectedTrackers.every((t) => successTrackers.has(t));
+    },
+    [publishedUploadsByMediaId, selectedTrackers]
+  );
+
+  // Éviter de sélectionner des médias déjà publiés sur tous les trackers choisis :
+  // sinon on lance un hash + upload pour rien.
+  useEffect(() => {
+    if (selectedTrackers.length === 0) return;
+    const toExclude = selectedMediaIds.filter((id) => isAlreadyPublishedOnAllSelectedTrackers(id));
+    if (toExclude.length === 0) return;
+    for (const mediaId of toExclude) {
+      excludeMediaWithReason(mediaId, t('settings.uploadTrackerPanel.mediaAlreadyPublished'));
+    }
+    setSelectedMediaIds((prev) => prev.filter((id) => !toExclude.includes(id)));
+  }, [excludeMediaWithReason, isAlreadyPublishedOnAllSelectedTrackers, selectedMediaIds, selectedTrackers.length, t]);
 
   useEffect(() => {
     if (selectedMediaIds.length === 0) {
@@ -399,7 +495,16 @@ export default function UploadAssistantPanel() {
       const res = await serverApi.getActiveTorrentCreations();
       if (cancelled) return;
       if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-        const sorted = [...res.data].sort((a, b) => b.progress - a.progress);
+        const now = Date.now();
+        const ACTIVE_WINDOW_MS = 15_000;
+        const filtered = res.data.filter((e) => {
+          const updated = typeof e.updated_at_ms === 'number' ? e.updated_at_ms : null;
+          if (updated == null) return true; // rétrocompat: pas de timestamp → on garde
+          return now - updated <= ACTIVE_WINDOW_MS;
+        });
+        const sorted = [...(filtered.length > 0 ? filtered : res.data)].sort(
+          (a, b) => b.progress - a.progress
+        );
         const first = sorted[0];
         setActiveExternalCreation({
           ...first,
@@ -427,6 +532,57 @@ export default function UploadAssistantPanel() {
       messageRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }, [message]);
+
+  // Au chargement initial de l'assistant, si une création .torrent est déjà en cours côté backend,
+  // on "reprend" dessus : step 3, média sélectionné et polling de progression.
+  useEffect(() => {
+    if (loadingMedia) return;
+    // Ne pas écraser un upload déjà lancé depuis cette session.
+    if (uploading || externalCreationInProgress || runningCreationMediaIdRef.current) return;
+
+    const resumeIfNeeded = async () => {
+      const res = await serverApi.getActiveTorrentCreations();
+      if (!res.success || !Array.isArray(res.data) || res.data.length === 0) return;
+      const now = Date.now();
+      const ACTIVE_WINDOW_MS = 15_000;
+      const filtered = res.data.filter((e) => {
+        const updated = typeof e.updated_at_ms === 'number' ? e.updated_at_ms : null;
+        if (updated == null) return true; // rétrocompat: pas de timestamp → on garde
+        return now - updated <= ACTIVE_WINDOW_MS;
+      });
+      if (filtered.length === 0) return;
+      const sorted = [...filtered].sort((a, b) => b.progress - a.progress);
+      const first = sorted[0];
+      const mediaId = first.local_media_id;
+      if (!mediaId) return;
+
+      setActiveExternalCreation({
+        ...first,
+        progress: Math.max(0, Math.min(100, Math.round(first.progress))),
+      });
+      runningCreationMediaIdRef.current = mediaId;
+      setExternalCreationInProgress(true);
+      setTorrentProgress(Math.max(0, Math.min(100, Math.round(first.progress))));
+
+      // S'assurer que le média est sélectionné pour que l'UI de l'étape 3 ait du contexte.
+      setSelectedMediaIds((prev) => (prev.includes(mediaId) ? prev : [mediaId, ...prev]));
+      setSelectedMediaId(mediaId);
+      // Aller directement à l'étape récap / torrent factory.
+      setStep(3);
+      // Lancer le polling de progression pour refléter l'état actuel du hash.
+      startTorrentProgressPolling(mediaId);
+    };
+
+    void resumeIfNeeded();
+  }, [
+    loadingMedia,
+    uploading,
+    externalCreationInProgress,
+    setSelectedMediaIds,
+    setSelectedMediaId,
+    setStep,
+    startTorrentProgressPolling,
+  ]);
 
   const toggleTracker = (id: string) => {
     if (!configuredTrackers.includes(id)) return;
@@ -502,13 +658,15 @@ export default function UploadAssistantPanel() {
   useEffect(() => {
     if (step !== 3) {
       publishCountdownCanceledRef.current = false;
+      autoLaunchConsumedRef.current = false;
     }
     if (
       step !== 3 ||
       !canLaunchUpload ||
       uploading ||
       publishCountdownCanceledRef.current ||
-      externalCreationInProgress
+      externalCreationInProgress ||
+      autoLaunchConsumedRef.current
     ) {
       if (publishCountdownIntervalRef.current != null) {
         window.clearInterval(publishCountdownIntervalRef.current);
@@ -516,6 +674,7 @@ export default function UploadAssistantPanel() {
       }
       if (step !== 3 || !canLaunchUpload) {
         setPublishCountdown(null);
+        autoLaunchConsumedRef.current = false;
       }
       return;
     }
@@ -528,6 +687,7 @@ export default function UploadAssistantPanel() {
             publishCountdownIntervalRef.current = null;
           }
           if (prev === 1 && !publishCountdownCanceledRef.current) {
+            autoLaunchConsumedRef.current = true;
             handleLaunchUploadRef.current();
           }
           return null;
@@ -551,6 +711,10 @@ export default function UploadAssistantPanel() {
   }, [step, shouldSkipTrackersStep]);
 
   const toggleMediaSelection = (mediaId: string) => {
+    if (isAlreadyPublishedOnAllSelectedTrackers(mediaId)) {
+      excludeMediaWithReason(mediaId, t('settings.uploadTrackerPanel.mediaAlreadyPublished'));
+      return;
+    }
     setSelectedMediaIds((prev) => {
       if (prev.includes(mediaId)) return prev.filter((id) => id !== mediaId);
       return [...prev, mediaId];
@@ -564,11 +728,6 @@ export default function UploadAssistantPanel() {
     }
     setSelectedMediaIds(selectableInDisplayed.map((m) => m.id));
   };
-
-  const excludeMediaWithReason = useCallback((mediaId: string, reason: string) => {
-    setExcludedMediaIds((prev) => (prev.includes(mediaId) ? prev : [...prev, mediaId]));
-    setExcludedMediaReasons((prev) => ({ ...prev, [mediaId]: reason }));
-  }, []);
 
   const validateSelectedMedia = useCallback(async () => {
     if (selectedMediaIds.length === 0) return;
@@ -651,29 +810,72 @@ export default function UploadAssistantPanel() {
 
   const handleGenerateScreenshots = async (): Promise<boolean> => {
     if (!selectedMediaId.trim()) return false;
+    // Anti double-call (effets + renders rapides) : un seul call en vol par media_id.
+    if (screenshotsInFlightRef.current === selectedMediaId) return false;
+    screenshotsInFlightRef.current = selectedMediaId;
     setScreenshotsLoading(true);
     setMessage(null);
-    const res = await serverApi.generateScreenshots(selectedMediaId);
+    const res = await (serverApi as any).generateScreenshots(selectedMediaId);
     setScreenshotsLoading(false);
     if (res.success && res.data) {
       setScreenshotsCount(res.data.count);
-      setScreenshotsBaseUrl(res.data.screenshot_base_url?.trim() || null);
+      // Par défaut, utiliser le base URL renvoyé par le backend (chemin local derrière /api/library/uploader/...).
+      const backendBase = res.data.screenshot_base_url?.trim() || null;
+      setScreenshotsBaseUrl(backendBase);
+      setScreenshotsSource(backendBase ? 'backend' : null);
+      setScreenshotsReady(false);
       // Héberger les captures sur popcorn-web pour que la description C411 affiche les images (URLs publiques).
       if (res.data.count > 0 && TokenManager.getCloudAccessToken()) {
         const backendUrl = getBackendUrl() || serverApi.getServerUrl() || '';
         if (backendUrl) {
           const cloudRes = await uploadScreenshotsToCloud(selectedMediaId, backendUrl, res.data.count);
           if (cloudRes.success) {
-            setScreenshotsBaseUrl(getPopcornWebBaseUrl());
+            // Les captures sont maintenant stockées sur popcorn-web.
+            // Construire l'URL publique complète vers les captures pour ce média :
+            // {base}/api/library/uploader/screenshots/{media_id}/{index}.jpg
+            const cloudBase = getPopcornWebBaseUrl().replace(/\/$/, '');
+            const publicBase = `${cloudBase}/api/library/uploader/screenshots/${encodeURIComponent(selectedMediaId)}`;
+            setScreenshotsBaseUrl(publicBase);
+            setScreenshotsSource('cloud');
+            setScreenshotsReady(false);
           }
         }
       }
+      screenshotsInFlightRef.current = '';
       return true;
     } else {
       setMessage({ type: 'error', text: res.message ?? t('settings.uploadTrackerPanel.screenshotsError') });
+      screenshotsInFlightRef.current = '';
       return false;
     }
   };
+
+  // Précharger la première capture pour éviter d'afficher une image cassée le temps que
+  // le backend ou le cloud les rende réellement disponibles.
+  useEffect(() => {
+    if (!screenshotsBaseUrl || !screenshotsCount || screenshotsCount <= 0 || !screenshotsSource) {
+      setScreenshotsReady(false);
+      return;
+    }
+    const ext = screenshotsSource === 'cloud' ? 'jpg' : 'png';
+    const testSrc = `${screenshotsBaseUrl.replace(/\/$/, '')}/0.${ext}`;
+    let cancelled = false;
+    const img = new Image();
+    img.onload = () => {
+      if (!cancelled) {
+        setScreenshotsReady(true);
+      }
+    };
+    img.onerror = () => {
+      if (!cancelled) {
+        setScreenshotsReady(false);
+      }
+    };
+    img.src = testSrc;
+    return () => {
+      cancelled = true;
+    };
+  }, [screenshotsBaseUrl, screenshotsCount, screenshotsSource]);
 
   // Valider automatiquement les médias à l'arrivée sur l'étape 3.
   useEffect(() => {
@@ -855,7 +1057,8 @@ export default function UploadAssistantPanel() {
       }
     } finally {
       uploadAbortControllerRef.current = null;
-      stopTorrentProgressPolling();
+      // Ne pas arrêter le polling ici : si l'upload échoue (timeout/réseau),
+      // la création .torrent peut continuer côté backend et l'UI doit continuer à afficher la progression.
       setUploading(false);
     }
   };
@@ -873,6 +1076,7 @@ export default function UploadAssistantPanel() {
 
   const handleCancelPublishCountdown = () => {
     publishCountdownCanceledRef.current = true;
+    autoLaunchConsumedRef.current = true;
     if (publishCountdownIntervalRef.current != null) {
       window.clearInterval(publishCountdownIntervalRef.current);
       publishCountdownIntervalRef.current = null;
@@ -930,7 +1134,7 @@ export default function UploadAssistantPanel() {
 
     let cancelled = false;
     const checkProgress = async () => {
-      const res = await serverApi.getTorrentProgress(selectedMediaId);
+      const res = await (serverApi as any).getTorrentProgress(selectedMediaId);
       if (cancelled) return;
       const pct = res.success && res.data && typeof res.data.progress === 'number' ? res.data.progress : null;
       const runningElsewhere = typeof pct === 'number' && pct < 100;
@@ -1268,6 +1472,9 @@ export default function UploadAssistantPanel() {
                 {displayedMediaList.map((m) => {
                   const isExcluded = excludedMediaIds.includes(m.id);
                   const hasTorrent = publishedMediaIdsWithTorrent.has(m.id);
+                  const alreadyPublishedAll = isAlreadyPublishedOnAllSelectedTrackers(m.id);
+                  const dupeOnTracker = dupeOnTrackerByMediaId[m.id]?.exists === true;
+                  const dupeName = dupeOnTrackerByMediaId[m.id]?.matchedName;
                   return (
                     <label
                       key={m.id}
@@ -1277,8 +1484,8 @@ export default function UploadAssistantPanel() {
                         type="checkbox"
                         className="checkbox checkbox-sm mt-0.5"
                         checked={selectedMediaIds.includes(m.id)}
-                        disabled={isExcluded}
-                        onChange={() => !isExcluded && toggleMediaSelection(m.id)}
+                        disabled={isExcluded || alreadyPublishedAll || dupeOnTracker}
+                        onChange={() => !isExcluded && !alreadyPublishedAll && !dupeOnTracker && toggleMediaSelection(m.id)}
                       />
                       <span className="min-w-0 flex-1 text-sm">
                         <span className="block font-medium text-base-content truncate">
@@ -1297,6 +1504,19 @@ export default function UploadAssistantPanel() {
                           {hasTorrent && (
                             <span className="badge badge-info badge-sm">
                               {t('settings.uploadTrackerPanel.badgeTorrentCreated')}
+                            </span>
+                          )}
+                          {alreadyPublishedAll && (
+                            <span className="badge badge-success badge-sm" title={t('settings.uploadTrackerPanel.mediaAlreadyPublished')}>
+                              {t('settings.uploadTrackerPanel.badgeAlreadyPublished')}
+                            </span>
+                          )}
+                          {dupeOnTracker && (
+                            <span
+                              className="badge badge-success badge-sm"
+                              title={dupeName ? `${t('settings.uploadTrackerPanel.mediaExistsOnTracker')}\n${dupeName}` : t('settings.uploadTrackerPanel.mediaExistsOnTracker')}
+                            >
+                              {t('settings.uploadTrackerPanel.badgeExistsOnTracker')}
                             </span>
                           )}
                         </div>
@@ -1354,28 +1574,145 @@ export default function UploadAssistantPanel() {
                     value={selectedMediaIds.length}
                     accent="violet"
                     className="rounded-xl"
-                  />
+                    showHeader={false}
+                  >
+                    {selectedMediaIds.length > 0 && (
+                      <div className="flex items-center gap-3 mt-1">
+                        {(() => {
+                          const firstMediaId = selectedMediaIds[0];
+                          const media = mediaList.find((m) => m.id === firstMediaId);
+                          const posterUrl = media?.poster_url;
+                          const title = media?.tmdb_title || media?.file_name || firstMediaId;
+                          if (!posterUrl) {
+                            return (
+                              <span className="ds-metric-card__value font-bold text-lg sm:text-xl tabular-nums">
+                                {title}
+                              </span>
+                            );
+                          }
+                          return (
+                            <>
+                              <img
+                                src={posterUrl}
+                                alt={title}
+                                className="w-12 h-18 sm:w-14 sm:h-20 rounded-md object-cover shadow-md"
+                                loading="lazy"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold truncate">{title}</p>
+                                <p className="text-xs text-base-content/60 mt-0.5">
+                                  {selectedMediaIds.length === 1
+                                    ? t('settings.uploadTrackerPanel.wizardSummaryOneMedia')
+                                    : t('settings.uploadTrackerPanel.wizardSummaryManyMedia', {
+                                        count: selectedMediaIds.length,
+                                      })}
+                                </p>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </DsMetricCard>
                   <DsMetricCard
                     icon="🧭"
                     label={t('settings.uploadTrackerPanel.wizardSummaryTrackerSelected')}
                     value={selectedTrackers.length}
                     accent="yellow"
                     className="rounded-xl"
-                  />
+                    showHeader={false}
+                  >
+                    {selectedTrackers.length > 0 && (
+                      <div className="mt-1 space-y-1">
+                        <p className="text-sm font-semibold truncate">
+                          {selectedTrackers.join(', ')}
+                        </p>
+                        <p className="text-xs text-base-content/60">
+                          {t('settings.uploadTrackerPanel.wizardSummaryTrackerCount', {
+                            count: selectedTrackers.length,
+                          })}
+                        </p>
+                      </div>
+                    )}
+                  </DsMetricCard>
                   <DsMetricCard
                     icon="🖼️"
                     label={t('settings.uploadTrackerPanel.wizardSummaryScreenshots')}
                     value={screenshotsCount ?? 0}
                     accent="green"
                     className="rounded-xl"
-                  />
+                    showHeader={false}
+                  >
+                    {screenshotsCount && screenshotsCount > 0 && screenshotsBaseUrl && (
+                      <div className="mt-1">
+                        {!screenshotsReady && (
+                          <div className="w-full h-24 sm:h-28 rounded-lg bg-base-200/80 animate-pulse" />
+                        )}
+                        {screenshotsReady && (
+                          <>
+                            <div className="relative overflow-hidden rounded-lg bg-base-200">
+                              <div className="flex transition-transform duration-500 ease-out">
+                                {[...Array(screenshotsCount)].map((_, idx) => {
+                                  const ext = screenshotsSource === 'cloud' ? 'jpg' : 'png';
+                                  const src = `${screenshotsBaseUrl.replace(/\/$/, '')}/${idx}.${ext}`;
+                                  const isActive = idx === screenshotCarouselIndex;
+                                  return (
+                                    <img
+                                      key={idx}
+                                      src={src}
+                                      alt={t('settings.uploadTrackerPanel.screenshotAlt', {
+                                        index: idx + 1,
+                                      })}
+                                      className={`w-full h-24 sm:h-28 object-cover flex-shrink-0 ${
+                                        isActive ? 'opacity-100' : 'opacity-0 absolute inset-0'
+                                      }`}
+                                      loading="lazy"
+                                    />
+                                  );
+                                })}
+                              </div>
+                            </div>
+                            <div className="mt-1 flex justify-between items-center">
+                              <span className="text-xs text-base-content/70">
+                                {t('settings.uploadTrackerPanel.wizardSummaryScreenshotsCount', {
+                                  count: screenshotsCount,
+                                })}
+                              </span>
+                              {screenshotsCount > 1 && (
+                                <span className="text-[10px] uppercase tracking-wide text-base-content/50">
+                                  {t('settings.uploadTrackerPanel.wizardSummaryScreenshotsAuto')}
+                                </span>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </DsMetricCard>
                   <DsMetricCard
                     icon="⚙️"
                     label={t('settings.uploadTrackerPanel.wizardSummaryExecution')}
                     value={batchStats.total > 0 ? `${batchStats.processed}/${batchStats.total}` : '0/0'}
                     accent="yellow"
                     className="rounded-xl"
-                  />
+                    showHeader={false}
+                  >
+                    <div className="mt-1">
+                      <p className="ds-metric-card__value font-bold text-xl sm:text-2xl tabular-nums">
+                        {batchStats.total > 0
+                          ? `${Math.round((batchStats.processed / batchStats.total) * 100)}%`
+                          : '0%'}
+                      </p>
+                      {batchStats.total > 0 && (
+                        <p className="text-xs text-base-content/60 mt-0.5">
+                          {t('settings.uploadTrackerPanel.wizardSummaryExecutionDetail', {
+                            processed: batchStats.processed,
+                            total: batchStats.total,
+                          })}
+                        </p>
+                      )}
+                    </div>
+                  </DsMetricCard>
                 </div>
               </DsCardSection>
             </DsCard>

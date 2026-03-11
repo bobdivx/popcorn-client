@@ -13,15 +13,17 @@ interface ServerUrlStepProps {
   buttonRefs: { current: (HTMLButtonElement | null)[] };
   onNext: () => void;
   onStatusChange?: () => void | Promise<void>;
+  /** Quand true (ex: premier lancement sans URL), afficher directement le formulaire URL sans écran de choix */
+  skipInitialChoice?: boolean;
 }
 
 export type InstallationChoice = 'firstTime' | 'alreadyConfigured' | 'localAccount';
 
-export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChange }: ServerUrlStepProps) {
+export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChange, skipInitialChoice = false }: ServerUrlStepProps) {
   const { t } = useI18n();
-  /** Choix explicite de l'utilisateur : première installation ou déjà configuré ailleurs */
-  const [installationChoice, setInstallationChoice] = useState<InstallationChoice | null>(null);
-  const [showManualConfig, setShowManualConfig] = useState(false);
+  /** Choix explicite de l'utilisateur : première installation ou déjà configuré ailleurs (ignoré si skipInitialChoice) */
+  const [installationChoice, setInstallationChoice] = useState<InstallationChoice | null>(skipInitialChoice ? 'firstTime' : null);
+  const [showManualConfig, setShowManualConfig] = useState(skipInitialChoice);
   const [backendUrl, setBackendUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
@@ -128,15 +130,9 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
     try {
       setLoading(true);
       setError(null);
-      
-      if (!hasBackendUrl()) {
-        setBackendUrl('');
-        return;
-      }
 
-      // Utiliser l'URL réellement configurée (localStorage) pour l'affichage du formulaire,
-      // et non getBackendUrl() qui peut renvoyer window.location.origin quand le backend
-      // est sur un autre domaine (ex. backup.briseteia.me alors que la page est sur popcorn.briseteia.me)
+      // Même sans URL enregistrée, préremplir avec l'URL par défaut (ex. 127.0.0.1:3000)
+      // pour que l'utilisateur puisse valider d'un clic après une connexion cloud.
       const configured = getConfiguredBackendUrl()?.trim().replace(/\/$/, '');
       setBackendUrl(configured || getBackendUrl());
     } catch (err) {
@@ -583,7 +579,7 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
 
   // ===== Rendu =====
 
-  // Écran de choix : première installation ou déjà configuré
+  // Écran de choix : première installation ou déjà configuré (sauf si skipInitialChoice = affichage direct du formulaire URL)
   if (installationChoice === null) {
     return (
       <div className="space-y-6">
@@ -658,6 +654,7 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
   // Affichage principal (après choix)
   return (
     <div className="space-y-6">
+      {!skipInitialChoice && (
       <div className="flex items-center gap-3 mb-2">
         <button
           type="button"
@@ -675,6 +672,10 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
           {installationChoice === 'localAccount' && t('wizard.serverUrl.choiceLocalAccount')}
         </h3>
       </div>
+      )}
+      {skipInitialChoice && (
+        <h3 className="text-xl font-bold text-white mb-2">{t('wizard.serverUrl.connectClientTitle')}</h3>
+      )}
       
       {/* Mode mobile "première installation" uniquement (déjà configuré = même flux QR+code que TV) */}
       {isScannerMode && !showManualConfig && installationChoice === 'firstTime' && (
@@ -1087,6 +1088,7 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
       {/* Section Configuration manuelle */}
       {showManualConfig && (
         <>
+          {!skipInitialChoice && (
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
@@ -1108,6 +1110,12 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
               Entrez l'URL de votre serveur Popcorn
             </p>
           </div>
+          )}
+          {skipInitialChoice && (
+            <p className="text-gray-400 text-sm mb-2">
+              Entrez l'URL de votre serveur Popcorn (ex: http://localhost:3000)
+            </p>
+          )}
 
           {/* Statut backend : voir la pastille dans le header (démarrer/arrêter/redémarrer) */}
 
@@ -1155,32 +1163,28 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
             </p>
           </div>
 
-          {/* Boutons */}
+          {/* Bouton unique : teste la connexion et passe à l'étape suivante si OK */}
           <div className="flex flex-col sm:flex-row gap-3">
             <button
               ref={(el) => { buttonRefs.current[0] = el; }}
               data-focusable
-              className="w-full sm:w-auto px-5 py-2.5 bg-gray-800 hover:bg-gray-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              onClick={handleTest}
+              className="w-full sm:w-auto px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={handleNext}
               disabled={testing || loading || !backendUrl.trim()}
             >
               {testing ? (
-                <>
+                <span className="flex items-center justify-center gap-2">
                   <span className="loading loading-spinner loading-sm"></span>
-                  Test...
-                </>
+                  Connexion en cours...
+                </span>
               ) : (
-                'Tester'
+                <span className="flex items-center justify-center gap-2">
+                  {t('common.next')}
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </span>
               )}
-            </button>
-            <button
-              ref={(el) => { buttonRefs.current[1] = el; }}
-              data-focusable
-              className="w-full sm:flex-1 px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
-              onClick={handleNext}
-              disabled={testing || loading || !backendUrl.trim() || !success}
-            >
-              {t('common.next')} →
             </button>
           </div>
         </>

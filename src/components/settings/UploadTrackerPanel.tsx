@@ -341,7 +341,7 @@ export default function UploadTrackerPanel({ onC411Configured }: UploadTrackerPa
 
       <DsCardSection title={t('settings.uploadTrackerPanel.uploadAssistantTitle')}>
         <p className="text-sm text-base-content/70 mb-2">
-          {t('settings.uploadTrackerPanel.uploadAssistantDescription')}
+          {t('settings.uploadTrackerPanel.uploadAssistantTitle')}
         </p>
         <label className="flex items-center gap-2 mb-2 cursor-pointer">
           <input

@@ -11,116 +11,129 @@ interface CompleteStepProps {
   onComplete: () => void;
 }
 
+// Particules de confetti légères (CSS pur)
+function Confetti() {
+  const colors = ['#7c3aed', '#a78bfa', '#8b5cf6', '#c4b5fd', '#6d28d9', '#ddd6fe'];
+  const pieces = Array.from({ length: 18 }, (_, i) => ({
+    id: i,
+    color: colors[i % colors.length],
+    left: `${(i * 5.5 + 2) % 98}%`,
+    delay: `${(i * 0.12) % 2}s`,
+    duration: `${2.2 + (i % 3) * 0.4}s`,
+    size: i % 3 === 0 ? 8 : i % 3 === 1 ? 6 : 5,
+  }));
+
+  return (
+    <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none;border-radius:16px;">
+      <style>{`
+        @keyframes confetti-fall {
+          0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(200px) rotate(360deg); opacity: 0; }
+        }
+      `}</style>
+      {pieces.map((p) => (
+        <div
+          key={p.id}
+          style={{
+            position: 'absolute',
+            top: '-20px',
+            left: p.left,
+            width: `${p.size}px`,
+            height: `${p.size * 0.6}px`,
+            background: p.color,
+            borderRadius: '2px',
+            animation: `confetti-fall ${p.duration} ${p.delay} ease-in forwards`,
+            opacity: 0.8,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function CompleteStep({ focusedButtonIndex, buttonRefs, onComplete }: CompleteStepProps) {
   const { t } = useI18n();
   const [syncStatus, setSyncStatus] = useState<{ sync_in_progress: boolean; stats?: Record<string, number> } | null>(null);
   const [checkingSync, setCheckingSync] = useState(true);
   const [syncComplete, setSyncComplete] = useState(false);
   const [syncStarted, setSyncStarted] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(true);
 
-  // Synchroniser les utilisateurs locaux depuis popcorn-web vers le backend Rust
+  useEffect(() => {
+    const timer = setTimeout(() => setShowConfetti(false), 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Synchroniser les utilisateurs locaux
   useEffect(() => {
     const syncLocalUsers = async () => {
       try {
         const cloudToken = TokenManager.getCloudAccessToken();
-        if (!cloudToken) {
-          console.log('[COMPLETE STEP] Aucun token cloud, pas de synchronisation des utilisateurs locaux');
-          return;
-        }
-
-        console.log('[COMPLETE STEP] 🔄 Synchronisation des utilisateurs locaux depuis popcorn-web...');
+        if (!cloudToken) return;
         const localUsers = await getLocalUsers();
-        
-        if (!localUsers || localUsers.length === 0) {
-          console.log('[COMPLETE STEP] Aucun utilisateur local à synchroniser');
-          return;
-        }
-
+        if (!localUsers || localUsers.length === 0) return;
         const cloudUserId = TokenManager.getUser()?.id;
-        if (!cloudUserId) {
-          console.warn('[COMPLETE STEP] ⚠️ Impossible de récupérer l\'ID du compte cloud');
-          return;
-        }
-
-        // Synchroniser chaque utilisateur local actif vers le backend Rust
+        if (!cloudUserId) return;
         for (const localUser of localUsers) {
-          if (!localUser.isActive) {
-            console.log(`[COMPLETE STEP] Utilisateur local ${localUser.email} non actif, ignoré`);
-            continue;
-          }
-
+          if (!localUser.isActive) continue;
           try {
-            // Vérifier si l'utilisateur existe déjà dans le backend
             const existingUser = await serverApi.getLocalUser(localUser.id);
-            
-            if (existingUser.success && existingUser.data) {
-              console.log(`[COMPLETE STEP] Utilisateur local ${localUser.email} existe déjà dans le backend`);
-              continue;
-            }
-
-            // Récupérer le password_hash depuis popcorn-web pour la synchronisation
+            if (existingUser.success && existingUser.data) continue;
             const syncResponse = await getLocalUserForSync(localUser.id);
-
-            if (!syncResponse.success || !syncResponse.data) {
-              console.warn(`[COMPLETE STEP] ⚠️ Impossible de récupérer les informations de ${localUser.email} pour la synchronisation:`, syncResponse.message);
-              continue;
-            }
-
+            if (!syncResponse.success || !syncResponse.data) continue;
             const userData = syncResponse.data;
-            
-            // Créer l'utilisateur dans le backend Rust
-            const createResponse = await serverApi.createLocalUser({
-              cloud_account_id: cloudUserId,
-              email: userData.email,
-              password_hash: userData.password_hash,
-              display_name: userData.display_name || undefined,
+            await serverApi.createLocalUser({
+              cloud_account_id: cloudUserId, email: userData.email,
+              password_hash: userData.password_hash, display_name: userData.display_name || undefined,
             });
-
-            if (createResponse.success) {
-              console.log(`[COMPLETE STEP] ✅ Utilisateur local ${localUser.email} synchronisé avec succès`);
-            } else {
-              console.warn(`[COMPLETE STEP] ⚠️ Erreur lors de la synchronisation de ${localUser.email}:`, createResponse.message);
-            }
-          } catch (userError) {
-            console.error(`[COMPLETE STEP] ❌ Erreur lors de la synchronisation de ${localUser.email}:`, userError);
-          }
+          } catch { /* ignore par user */ }
         }
-
-        console.log('[COMPLETE STEP] ✅ Synchronisation des utilisateurs locaux terminée');
-      } catch (error) {
-        console.warn('[COMPLETE STEP] ⚠️ Erreur lors de la synchronisation des utilisateurs locaux:', error);
-        // Ne pas bloquer le wizard si la synchronisation échoue
-      }
+      } catch { /* ignore */ }
     };
-
     syncLocalUsers();
   }, []);
 
-  // Démarrer automatiquement la synchronisation au chargement de l'étape
   useEffect(() => {
     const startSync = async () => {
-      if (syncStarted) return; // Ne démarrer qu'une seule fois
-      
+      if (syncStarted) return;
       try {
-        console.log('[COMPLETE STEP] 🚀 Démarrage automatique de la synchronisation...');
+        // Éviter le 409 : ne pas lancer startSync si une sync est déjà en cours (ex. lancée à l'étape Sync)
+        const statusRes = await serverApi.getSyncStatus();
+        if (statusRes.success && statusRes.data) {
+          const syncInProgress = statusRes.data.sync_in_progress || false;
+          const progress = statusRes.data.progress;
+          const hasActiveProgress = progress && (
+            progress.current_indexer || progress.current_category ||
+            (progress.total_to_process > 0 && progress.total_processed < progress.total_to_process)
+          );
+          if (syncInProgress || hasActiveProgress) {
+            setSyncStarted(true);
+            return;
+          }
+        }
         const syncResponse = await serverApi.startSync();
         if (syncResponse.success) {
-          console.log('[COMPLETE STEP] ✅ Synchronisation démarrée avec succès');
           setSyncStarted(true);
         } else {
-          console.warn('[COMPLETE STEP] ⚠️ Impossible de démarrer la synchronisation:', syncResponse.message);
+          const msg = (syncResponse as any).error || (syncResponse as any).message || '';
+          if (typeof msg === 'string' && msg.includes('déjà en cours')) {
+            setSyncStarted(true);
+          } else {
+            setSyncStarted(false);
+          }
+        }
+      } catch (err: any) {
+        const msg = err?.message || err?.error || '';
+        if (typeof msg === 'string' && msg.includes('déjà en cours')) {
+          setSyncStarted(true);
+        } else {
           setSyncStarted(false);
         }
-      } catch (error) {
-        console.error('[COMPLETE STEP] ❌ Erreur lors du démarrage de la synchronisation:', error);
-        setSyncStarted(false);
       }
     };
-
     startSync();
   }, [syncStarted]);
 
-  // Vérifier le statut de la synchronisation au chargement et régulièrement
   useEffect(() => {
     const checkSync = async () => {
       try {
@@ -129,158 +142,191 @@ export function CompleteStep({ focusedButtonIndex, buttonRefs, onComplete }: Com
           const syncInProgress = response.data.sync_in_progress || false;
           const hasStats = response.data.stats && Object.keys(response.data.stats).length > 0;
           const progress = response.data.progress;
-          
-          // Vérifier si la sync est vraiment en cours
           const hasActiveProgress = progress && (
-            progress.current_indexer || 
-            progress.current_category || 
+            progress.current_indexer || progress.current_category ||
             (progress.total_to_process > 0 && progress.total_processed < progress.total_to_process)
           );
-          
           const isActuallySyncing = syncInProgress || hasActiveProgress || (hasStats && !syncComplete);
-          
-          setSyncStatus({
-            sync_in_progress: isActuallySyncing,
-            stats: response.data.stats,
-          });
-          
+          setSyncStatus({ sync_in_progress: isActuallySyncing, stats: response.data.stats });
           if (!isActuallySyncing && !syncComplete) {
-            // Vérifier plusieurs fois pour être sûr que la sync est vraiment terminée
-            setTimeout(() => {
-              setSyncComplete(true);
-            }, 3000);
+            setTimeout(() => setSyncComplete(true), 3000);
           }
         }
-      } catch (err) {
-        console.warn('[COMPLETE STEP] Erreur lors de la vérification du statut de synchronisation:', err);
-      } finally {
+      } catch { /* ignore */ } finally {
         setCheckingSync(false);
       }
     };
-
     checkSync();
-    
-    // Vérifier toutes les 2 secondes si une sync est en cours
     const interval = setInterval(() => {
-      if (!syncComplete || syncStarted) {
-        checkSync();
-      }
+      if (!syncComplete || syncStarted) checkSync();
     }, 2000);
-
     return () => clearInterval(interval);
   }, [syncComplete, syncStarted]);
 
   const isSyncing = syncStatus?.sync_in_progress || false;
 
   return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <div className="flex justify-center mb-4">
-          <div className="w-24 h-24 rounded-full bg-green-600 flex items-center justify-center">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-12 w-12 text-white"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
+    <div style={{ position: 'relative', minHeight: '420px', overflow: 'hidden', borderRadius: '16px' }}>
+      <style>{`
+        @keyframes complete-pop {
+          0% { transform: scale(0.5); opacity: 0; }
+          70% { transform: scale(1.1); }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes complete-ring {
+          0% { transform: scale(0.8); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes complete-fade-up {
+          from { opacity: 0; transform: translateY(16px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .complete-icon-wrap {
+          animation: complete-ring 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+        .complete-check {
+          animation: complete-pop 0.4s 0.15s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+        .complete-title {
+          animation: complete-fade-up 0.4s 0.25s ease both;
+        }
+        .complete-sub {
+          animation: complete-fade-up 0.4s 0.35s ease both;
+        }
+        .complete-body {
+          animation: complete-fade-up 0.4s 0.45s ease both;
+        }
+        .stat-pill {
+          display: flex; align-items: center; gap: 8px;
+          padding: 8px 14px;
+          background: rgba(124,58,237,0.08);
+          border: 1px solid rgba(124,58,237,0.15);
+          border-radius: 8px;
+          font-size: 12.5px;
+        }
+        .stat-pill-num { font-weight: 700; color: #c4b5fd; font-size: 15px; }
+        .stat-pill-label { color: rgba(255,255,255,0.45); }
+      `}</style>
+
+      {/* Vidéo en fond d'écran */}
+      <video
+        style={{
+          position: 'absolute',
+          inset: 0,
+          width: '100%',
+          height: '100%',
+          objectFit: 'cover',
+          zIndex: 0,
+        }}
+        autoPlay
+        muted
+        playsInline
+        onEnded={() => { if (!isSyncing) onComplete(); }}
+      >
+        <source src="/intro.mp4" type="video/mp4" />
+      </video>
+      {/* Overlay sombre pour garder le contenu lisible */}
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1 }} />
+
+      {/* Contenu par-dessus */}
+      <div style={{ position: 'relative', zIndex: 2, padding: '4px 0' }}>
+      <div style="text-align:center;margin-bottom:28px;position:relative;">
+        <div style="position:relative;display:inline-block;">
+          {showConfetti && <Confetti />}
+          <div class="complete-icon-wrap" style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,rgba(124,58,237,0.2),rgba(109,40,217,0.1));border:2px solid rgba(124,58,237,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+            <div class="complete-check" style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#6d28d9);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(124,58,237,0.5);">
+              <svg style="width:26px;height:26px;color:#fff;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
           </div>
         </div>
 
-        <h3 className="text-3xl font-bold text-white mb-2">{t('completeStep.configurationComplete')}</h3>
-        
-        <p className="text-lg text-gray-400 mb-6">
+        <h2 class="complete-title" style="font-size:24px;font-weight:700;color:#fff;margin:0 0 8px;">
+          {t('completeStep.configurationComplete')}
+        </h2>
+        <p class="complete-sub" style="font-size:14px;color:rgba(255,255,255,0.4);margin:0;">
           {t('completeStep.clientReady')}
         </p>
+      </div>
 
-        {/* Afficher la progression de la synchronisation si elle est en cours */}
+      {/* Statut de synchronisation */}
+      <div class="complete-body">
         {checkingSync ? (
-          <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4 mb-6">
-            <p className="text-blue-300 text-sm text-center">
+          <div style="padding:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;margin-bottom:20px;text-align:center;">
+            <div style="display:flex;align-items:center;justify-content:center;gap:8px;color:rgba(255,255,255,0.45);font-size:13.5px;">
+              <div style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.15);border-top-color:rgba(124,58,237,0.7);border-radius:50%;animation:wizard-pulse 0.6s linear infinite;" />
               {t('completeStep.checkingStatus')}
-            </p>
+            </div>
           </div>
         ) : isSyncing ? (
-          <div className="mb-6">
-            <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4 mb-4">
-              <p className="text-blue-300 text-sm text-center mb-4">
-                {t('completeStep.syncInProgress')}
-              </p>
+          <div style="margin-bottom:20px;">
+            <div style="padding:14px 16px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.15);border-radius:12px;margin-bottom:12px;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#60a5fa;animation:wizard-pulse 1.2s ease-in-out infinite;" />
+                <span style="font-size:13px;font-weight:600;color:#93c5fd;">{t('completeStep.syncInProgress')}</span>
+              </div>
+              <p style="font-size:12.5px;color:rgba(255,255,255,0.4);margin:0;">{t('completeStep.waitOrAccess')}</p>
             </div>
             <SyncProgress />
-            <div className="bg-gray-900/50 border border-gray-700 rounded-lg p-4 mt-4">
-              <p className="text-gray-400 text-sm text-center">
-                {t('completeStep.waitOrAccess')}
-              </p>
-            </div>
           </div>
         ) : syncComplete ? (
-          <div className="bg-green-900/20 border border-green-700/50 rounded-lg p-4 mb-6">
-            <p className="text-green-300 text-sm text-center">
-              {t('completeStep.syncComplete')}
-            </p>
+          <div style="padding:14px 16px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:12px;margin-bottom:20px;display:flex;align-items:center;gap:10px;">
+            <svg style="width:16px;height:16px;color:#4ade80;flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M5 13l4 4L19 7" />
+            </svg>
+            <span style="font-size:13px;color:#86efac;">{t('completeStep.syncComplete')}</span>
           </div>
         ) : null}
 
-        <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6">
-          <p className="text-white mb-4">
-            {t('completeStep.canStartUsing')}
-          </p>
-          
-          <div className="flex justify-center">
-            <video
-              className="max-w-full h-auto rounded-lg"
-              autoPlay
-              muted
-              playsInline
-              onEnded={() => {
-                // Ne pas rediriger automatiquement si la sync est en cours
-                if (!isSyncing) {
-                  onComplete();
-                }
-              }}
-            >
-              <source src="/intro.mp4" type="video/mp4" />
-              Votre navigateur ne supporte pas la lecture de vidéos.
-            </video>
+        {/* Stats si disponibles */}
+        {syncStatus?.stats && Object.keys(syncStatus.stats).length > 0 && (
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px;">
+            {Object.entries(syncStatus.stats).slice(0, 4).map(([key, count]) => (
+              <div key={key} class="stat-pill">
+                <span class="stat-pill-num">{count}</span>
+                <span class="stat-pill-label">{key}</span>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
 
-        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        {/* Boutons */}
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
           {isSyncing ? (
             <>
               <button
                 ref={(el) => { buttonRefs.current[0] = el; }}
-                className="w-full sm:w-auto px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg transition-colors"
+                class="wizard-btn-secondary"
                 onClick={onComplete}
+                style="font-size:13.5px;"
               >
                 {t('completeStep.accessDashboardNow')}
               </button>
               <button
-                ref={(el) => { buttonRefs.current[1] = el; }}
-                className="w-full sm:w-auto px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors text-lg opacity-50 cursor-not-allowed"
-                disabled={true}
+                class="wizard-btn-primary"
+                disabled
+                style="opacity:0.4;cursor:not-allowed;"
               >
-                {t('sync.syncInProgress')}
+                <div style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:wizard-pulse 0.6s linear infinite;" />
+                Synchronisation...
               </button>
             </>
           ) : (
             <button
               ref={(el) => { buttonRefs.current[0] = el; }}
-              className="w-full sm:w-auto px-8 py-4 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-lg transition-colors text-lg"
+              class="wizard-btn-primary"
               onClick={onComplete}
+              style="padding:12px 28px;font-size:14.5px;"
             >
               {t('wizard.complete.startUsing')}
+              <svg style="width:15px;height:15px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
             </button>
           )}
         </div>
+      </div>
       </div>
     </div>
   );

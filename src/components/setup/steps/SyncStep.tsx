@@ -3,6 +3,24 @@ import { serverApi } from '../../../lib/client/server-api';
 import { SyncProgress } from '../components/SyncProgress';
 import { useI18n } from '../../../lib/i18n';
 
+/** Même forme que la réponse /api/sync/status (pour SyncProgress externalStatus) */
+interface SyncStatusData {
+  sync_in_progress?: boolean;
+  stats?: Record<string, number>;
+  progress?: {
+    current_indexer?: string | null;
+    current_category?: string | null;
+    current_query?: string | null;
+    indexer_torrents: Record<string, number>;
+    category_torrents: Record<string, number>;
+    total_processed?: number;
+    total_to_process?: number;
+    fetched_pages?: number;
+    fetched_torrents?: number;
+  };
+  sync_start_time?: number | null;
+}
+
 interface SyncStepProps {
   focusedButtonIndex: number;
   buttonRefs: { current: (HTMLButtonElement | null)[] };
@@ -17,22 +35,26 @@ export function SyncStep({ focusedButtonIndex, buttonRefs, onPrevious, onNext }:
   const [syncStarted, setSyncStarted] = useState(false);
   const [error, setError] = useState('');
   const [consecutiveChecks, setConsecutiveChecks] = useState(0); // Compteur de vérifications consécutives
+  /** Statut de sync (même source que la page Sync torrent) pour afficher les mêmes stats dans le wizard */
+  const [syncStatus, setSyncStatus] = useState<SyncStatusData | null>(null);
 
-  // Vérifier si une synchronisation est en cours
+  // Vérifier si une synchronisation est en cours et récupérer le statut (même stats que la page Sync torrent)
   useEffect(() => {
     const checkSyncStatus = async () => {
       try {
         const response = await serverApi.getSyncStatus();
         if (response.success && response.data) {
-          const syncInProgress = response.data.sync_in_progress || false;
-          const hasStats = response.data.stats && Object.keys(response.data.stats).length > 0;
-          const progress = response.data.progress;
+          const data = response.data as SyncStatusData;
+          setSyncStatus(data);
+          const syncInProgress = data.sync_in_progress || false;
+          const hasStats = data.stats && Object.keys(data.stats).length > 0;
+          const progress = data.progress;
           
           // Vérifier si la sync est vraiment en cours en regardant plusieurs indicateurs
           const hasActiveProgress = progress && (
             progress.current_indexer || 
             progress.current_category || 
-            (progress.total_to_process > 0 && progress.total_processed < progress.total_to_process)
+            (progress.total_to_process !== undefined && progress.total_to_process > 0 && (progress.total_processed ?? 0) < progress.total_to_process)
           );
           
           // Si la sync est marquée comme en cours OU si on a des stats OU si on a une progression active
@@ -189,8 +211,8 @@ export function SyncStep({ focusedButtonIndex, buttonRefs, onPrevious, onNext }:
             </p>
           </div>
 
-          {/* Visuel de synchronisation */}
-          <SyncProgress />
+          {/* Mêmes stats que la page Sync torrent : progression, indexer/catégorie en cours, compteurs films/séries/autres, total */}
+          <SyncProgress compact={false} externalStatus={syncStatus} />
 
           <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4">
             <p className="text-blue-300 text-sm text-center">
@@ -225,6 +247,13 @@ export function SyncStep({ focusedButtonIndex, buttonRefs, onPrevious, onNext }:
             <p className="text-lg text-gray-400 mb-6">
               {t('syncStep.syncedSuccess')}
             </p>
+
+            {/* Afficher les mêmes stats que la page Sync torrent (films, séries, autres, total) */}
+            {syncStatus && (syncStatus.stats && Object.keys(syncStatus.stats).length > 0) && (
+              <div className="mb-6">
+                <SyncProgress compact={false} externalStatus={syncStatus} />
+              </div>
+            )}
 
             <div className="bg-gray-900 rounded-xl p-6 border border-gray-800 mb-6">
               <p className="text-white">

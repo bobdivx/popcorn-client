@@ -44,6 +44,7 @@ import type {
   UploaderPreviewResponse,
   UploadMediaValidationResponse,
   PublishedUploadMediaEntry,
+  CheckDuplicateResponse,
   CancelTorrentCreationResponse,
   ActiveTorrentCreationEntry,
 } from './server-api/upload-tracker.js';
@@ -80,12 +81,16 @@ export type {
 /** Callbacks appelés quand une requête échoue avec ConnectionError/Timeout (serveur hors ligne). Utilisé par le store pour remonter l'état dans l'UI. */
 export type ConnectionFailureListener = () => void;
 
+/** Callbacks appelés quand une requête backend réussit (2xx). Permet au store de repasser en "online" après un offline. */
+export type ConnectionSuccessListener = () => void;
+
 class ServerApiClient {
   private baseUrl: string;
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
   private static readonly STORAGE_USER_KEY = 'popcorn_user';
   private connectionFailureListeners: ConnectionFailureListener[] = [];
+  private connectionSuccessListeners: ConnectionSuccessListener[] = [];
 
   private getBackendBaseUrl(): string {
     const raw = getBackendUrl();
@@ -522,8 +527,9 @@ class ServerApiClient {
 
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        // Log pour debug : voir la réponse exacte du backend
-        if (typeof window !== 'undefined' && (endpoint.includes('/auth/login') || endpoint.includes('/sync/start'))) {
+        // 401 sur login = pas de compte local, le client tente le cloud ensuite → ne pas polluer la console
+        const isLogin401 = response.status === 401 && endpoint.includes('/auth/login');
+        if (typeof window !== 'undefined' && !isLogin401 && (endpoint.includes('/auth/login') || endpoint.includes('/sync/start'))) {
           const dataStr = JSON.stringify(data, null, 2);
           console.error(`[server-api] Erreur backend (${endpoint}):`, {
             status: response.status,
@@ -533,14 +539,25 @@ class ServerApiClient {
           console.error('[server-api] Données complètes du backend:', dataStr);
           console.error('[server-api] Structure data:', data && typeof data === 'object' ? Object.keys(data) : []);
         }
+        if (typeof window !== 'undefined' && isLogin401) {
+          console.log('[server-api] Pas de compte local sur le backend, tentative de connexion cloud...');
+        }
         
         // Vérifier si l'erreur est récupérable et retenter si nécessaire
         // Ne pas retenter le 502 pour l'ajout de tracker : le message du backend (librqbit injoignable, route absente) doit s'afficher tout de suite.
         const isAddTracker502 =
           response.status === 502 && endpoint.includes('/trackers') && (options.method === 'POST' || (options as any).method === 'POST');
+        // Ne pas retenter les endpoints non-idempotents : un retry relance des jobs coûteux (captures, hash, upload).
+        const isNonIdempotentPost =
+          (options.method === 'POST' || (options as any).method === 'POST') &&
+          (endpoint.includes('/api/library/uploader/upload-one') ||
+            endpoint.includes('/api/library/uploader/generate-screenshots') ||
+            endpoint.includes('/api/library/upload-tracker/create-torrent') ||
+            endpoint.includes('/api/admin/system/restart'));
         if (
           retryCount < maxRetries &&
           !isAddTracker502 &&
+          !isNonIdempotentPost &&
           this.isRetryableError(null, response)
         ) {
           const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Exponential backoff, max 3s
@@ -585,6 +602,8 @@ class ServerApiClient {
         };
       }
 
+      // Succès : notifier les listeners pour remettre le store en "online" si besoin
+      this.connectionSuccessListeners.forEach((cb) => { try { cb(); } catch (_) { /* ignore */ } });
       // Backend renvoie souvent { success, data }, on normalise.
       return {
         success: true,
@@ -601,7 +620,13 @@ class ServerApiClient {
         };
       }
       // Vérifier si l'erreur est récupérable et retenter si nécessaire
-      if (retryCount < maxRetries && this.isRetryableError(error)) {
+      const isNonIdempotentPost =
+        (options.method === 'POST' || (options as any).method === 'POST') &&
+        (endpoint.includes('/api/library/uploader/upload-one') ||
+          endpoint.includes('/api/library/uploader/generate-screenshots') ||
+          endpoint.includes('/api/library/upload-tracker/create-torrent') ||
+          endpoint.includes('/api/admin/system/restart'));
+      if (retryCount < maxRetries && !isNonIdempotentPost && this.isRetryableError(error)) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Exponential backoff, max 3s
         // Ne pas logger les retries quand le serveur est hors ligne (évite le spam en console)
         const errorInfoForRetry = this.getErrorMessage(error, undefined, endpoint, url);
@@ -683,6 +708,7 @@ class ServerApiClient {
         if (m) filename = m[1].trim();
       }
       const blob = await response.blob();
+      this.connectionSuccessListeners.forEach((cb) => { try { cb(); } catch (_) { /* ignore */ } });
       const out: ApiResponse<Blob> & { filename?: string; c411Result?: { success: boolean; message: string; torrentUrl?: string } } = {
         success: true,
         data: blob,
@@ -720,7 +746,7 @@ class ServerApiClient {
     }
     // Upload one (P-upload) : création .torrent + envoi trackers, peut être très long (hash de gros fichiers)
     if (endpoint.includes('/api/library/uploader/upload-one')) {
-      return 300000; // 5 minutes
+      return 1800000; // 30 minutes (hash sur gros fichiers / NAS peut dépasser 5 min)
     }
     // Prévisualisation NFO/description (peut inclure ffprobe → lent)
     if (endpoint.includes('/api/library/uploader/preview')) {
@@ -746,6 +772,14 @@ class ServerApiClient {
    */
   addConnectionFailureListener(cb: ConnectionFailureListener): void {
     this.connectionFailureListeners.push(cb);
+  }
+
+  /**
+   * Enregistre un callback appelé à chaque requête backend réussie (réponse 2xx).
+   * Permet au store de repasser en "online" après avoir été marqué "offline".
+   */
+  addConnectionSuccessListener(cb: ConnectionSuccessListener): void {
+    this.connectionSuccessListeners.push(cb);
   }
 
   /**
@@ -1196,6 +1230,7 @@ interface IServerApiClientPublic {
 
   // Connection status (pour remonter "serveur hors ligne" dans l'UI)
   addConnectionFailureListener(cb: ConnectionFailureListener): void;
+  addConnectionSuccessListener(cb: ConnectionSuccessListener): void;
 
   // Health methods
   checkServerHealth(): Promise<ApiResponse<{ status: string }>>;
@@ -1259,12 +1294,15 @@ interface IServerApiClientPublic {
     screenshot_base_url?: string;
     signal?: AbortSignal;
   }): Promise<ApiResponse<MultiTrackerUploadResult>>;
+  getTorrentProgress(localMediaId: string): Promise<ApiResponse<{ progress?: number | null }>>;
   getActiveTorrentCreations(): Promise<ApiResponse<ActiveTorrentCreationEntry[]>>;
   cancelTorrentCreation(localMediaId: string): Promise<ApiResponse<CancelTorrentCreationResponse>>;
   validateUploadMedia(localMediaId: string): Promise<ApiResponse<UploadMediaValidationResponse>>;
   getPublishedUploads(): Promise<ApiResponse<PublishedUploadMediaEntry[]>>;
   clearFailedUploads(): Promise<ApiResponse<{ deleted: number }>>;
-  getUploadPreview(localMediaId: string, includeTechnical?: boolean, tracker?: string): Promise<ApiResponse<UploaderPreviewResponse>>;
+  generateScreenshots(localMediaId: string): Promise<ApiResponse<{ count: number; screenshot_base_url: string }>>;
+  checkDuplicateOnIndexer(params: { indexer_id: string; local_media_ids: string[] }): Promise<ApiResponse<CheckDuplicateResponse>>;
+  getUploadPreview(localMediaId: string, tracker?: string, screenshotBaseUrl?: string): Promise<ApiResponse<UploaderPreviewResponse>>;
   getTorrentFilesForReseed(): Promise<ApiResponse<import('./server-api/upload-tracker.js').ReseedTorrentInfo[]>>;
   downloadTorrentFileForReseed(infoHash: string): Promise<ApiResponse<Blob> & { filename?: string }>;
 
@@ -1295,6 +1333,7 @@ interface IServerApiClientPublic {
     }>
   >;
   getServerLogs(params?: { limit?: number }): Promise<ApiResponse<{ lines: string[] }>>;
+  restartBackend(): Promise<ApiResponse<{ will_exit: boolean }>>;
 
   // Dashboard methods
   getDashboardData(): Promise<ApiResponse<DashboardData>>;
