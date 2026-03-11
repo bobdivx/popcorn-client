@@ -1,6 +1,6 @@
 {
   "productName": "Popcorn TV",
-  "version": "1.2.54",
+  "version": "1.2.55",
   "identifier": "com.popcorn.client.tv",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -45,7 +45,7 @@
     "shortDescription": "Client lÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ger Popcorn pour Android (Mobile et TV)",
     "longDescription": "Client lÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©ger pour Android - se connecte au serveur Popcorn distant. Fonctionne sur Android Mobile et Android TV avec dÃƒÆ’Ã†â€™Ãƒâ€ Ã¢â‚¬â„¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©tection automatique du type d'appareil.",
     "android": {
-      "versionCode": 155,
+      "versionCode": 156,
       "autoIncrementVersionCode": false
     }
   },
