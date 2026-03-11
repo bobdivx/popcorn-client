@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { isTauri } from '../../lib/utils/tauri';
 import { getBackendUrl, getMyBackendUrl, hasBackendUrl } from '../../lib/backend-config';
-import { getBackendConnectionStore } from '../../lib/backend-connection-store';
+import { getBackendConnectionStore, subscribeBackendConnectionStore } from '../../lib/backend-connection-store';
 import { serverApi } from '../../lib/client/server-api';
 import { checkDockerUpdates, type DockerUpdateCheckResult } from '../../lib/services/docker-update-checker';
 
@@ -102,13 +102,14 @@ export default function BackendStatusBadge({
       setBackendVersion(null);
       return;
     }
-    setStatus('checking');
-    setLastError(null);
-    setBackendVersion(null);
-    if (!hasBackendUrl()) {
+    const url = getBackendUrl()?.trim().replace(/\/$/, '');
+    if (!url || !url.startsWith('http')) {
       setStatus('unknown');
       return;
     }
+    setStatus('checking');
+    setLastError(null);
+    setBackendVersion(null);
     try {
       const res = await serverApi.checkServerHealth();
       if (res.success && res.data) {
@@ -122,27 +123,47 @@ export default function BackendStatusBadge({
     }
   };
 
-  // Ne pas mettre [status] en dépendance : checkHealth() fait setStatus(), ce qui relancerait l'effet en boucle.
-  // Quand c'est le backend d'un ami : ne pas health-check (évite erreurs et requêtes inutiles).
-  // Quand le backend est déjà offline au montage : ne pas appeler l'API tout de suite (évite spam à chaque remontage Navbar).
   useEffect(() => {
+    // Ne pas mettre [status] en dépendance : checkHealth() fait setStatus(), ce qui relancerait l'effet en boucle.
+    // Quand c'est le backend d'un ami : ne pas health-check (évite erreurs et requêtes inutiles).
+    const initialStore = getBackendConnectionStore();
+
     if (isFriendBackend()) {
       setStatus('unknown');
       const interval = setInterval(() => {
         if (isFriendBackend()) return;
-        if (getBackendConnectionStore().status !== 'offline') checkHealth();
+        // Backend d'un ami : on ne force pas le store global, mais on peut vérifier périodiquement
+        // pour mettre à jour l'UI si le serveur redevient joignable.
+        checkHealth();
       }, 20_000);
       return () => clearInterval(interval);
     }
-    if (getBackendConnectionStore().status !== 'offline') {
+
+    // S'abonner au store : quand il repasse en "online" (après une requête réussie), rafraîchir le badge.
+    const unsub = subscribeBackendConnectionStore((storeState) => {
+      if (storeState.status === 'online') {
+        checkHealth();
+      } else if (storeState.status === 'offline') {
+        setStatus('error');
+      }
+    });
+
+    // Si le store indique déjà offline au montage, refléter l'état et lancer tout de suite un check.
+    if (initialStore.status !== 'offline') {
       checkHealth();
+    } else {
+      setStatus('error');
+      checkHealth(); // Vérifier tout de suite au cas où le serveur est déjà revenu
     }
+
     const interval = setInterval(() => {
       if (isFriendBackend()) return;
-      if (getBackendConnectionStore().status === 'offline') return;
       setTimeout(checkHealth, 0);
     }, 20_000);
-    return () => clearInterval(interval);
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
   }, []);
 
   // Fermer le menu au clic extérieur

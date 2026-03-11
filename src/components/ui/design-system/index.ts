@@ -17,3 +17,4 @@ export { default as DsPageHeader } from '../DsPageHeader';
 export { LoadingIcon } from '../LoadingIcon';
 export { LoadingCard } from '../LoadingCard';
 export type { LoadingCardProps } from '../LoadingCard';
+export { FullScreenLoadingOverlay } from '../FullScreenLoadingOverlay';

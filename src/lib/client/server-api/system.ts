@@ -12,9 +12,17 @@ export interface TranscodingConfigResponse {
   max_concurrent_transcodings: number;
 }
 
+export interface RestartBackendResponse {
+  will_exit: boolean;
+}
+
 export const systemMethods = {
   async resetBackendDatabase(this: ServerApiClientSystemAccess): Promise<ApiResponse<void>> {
     return this.backendRequest<void>('/api/admin/database/reset', { method: 'POST' });
+  },
+
+  async restartBackend(this: ServerApiClientSystemAccess): Promise<ApiResponse<RestartBackendResponse>> {
+    return this.backendRequest<RestartBackendResponse>('/api/admin/system/restart', { method: 'POST' });
   },
 
   async forceCacheCleanup(this: ServerApiClientSystemAccess): Promise<ApiResponse<CleanupCacheResponse>> {

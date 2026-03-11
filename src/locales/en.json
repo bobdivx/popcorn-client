@@ -545,6 +545,10 @@
       "mediaFilteredCount": "{count} shown",
       "badgeExcluded": "Excluded",
       "badgeTorrentCreated": "Torrent created",
+      "badgeAlreadyPublished": "Already published",
+      "mediaAlreadyPublished": "Already published to all selected trackers (hash not needed).",
+      "badgeExistsOnTracker": "Already on tracker",
+      "mediaExistsOnTracker": "A similar version seems to already exist on the tracker (via indexer).",
       "announceUrl": "Announce URL",
       "c411PrereqsTitle": "C411 publication prerequisites",
       "c411PrereqsBody": "After creating the .torrent, add it to your BitTorrent client (qBittorrent, etc.) and make sure you are seeding: the Status column should show \"Seeding\" or \"Partage\", and the Seeds column at least 0 (1). C411 will reject the torrent if you are not seeding at submission time. For reuploads, keep the original file name and have the .nfo file.",
@@ -572,7 +576,7 @@
       "passkeyLabel": "Passkey C411 (optional, for announce URL)",
       "passkeyPlaceholder": "e.g. d9c28cf015c6f71601e3930388bedf3e",
       "passkeyHint": "Used to build https://c411.org/announce/YOUR_PASSKEY. Saved so you don't have to paste the full URL each time.",
-      "uploadAssistantTitle": "P-upload",
+      "uploadAssistantTitle": "Popcornn Uploader",
       "uploadAssistantDescription": "Native upload engine to publish torrents to configured trackers.",
       "uploadAssistantEnabledLabel": "P-upload is enabled for tracker uploads.",
       "uploadAssistantPathPlaceholder": "Internal path to Upload-Assistant",
@@ -666,7 +670,14 @@
       "wizardSummaryPlan": "Upload plan",
       "wizardSummaryExecution": "Execution",
       "wizardSummaryMediaSelected": "Selected media",
+      "wizardSummaryOneMedia": "1 media selected",
+      "wizardSummaryManyMedia": "{count} media selected",
       "wizardSummaryTrackerSelected": "Selected trackers",
+      "wizardSummaryTrackerCount": "{count} tracker(s) selected",
+      "wizardSummaryScreenshotsCount": "{count} screenshot(s) generated",
+      "wizardSummaryScreenshotsAuto": "auto slideshow",
+      "wizardSummaryExecutionDetail": "Processed {processed} / {total} media",
+      "screenshotAlt": "Screenshot {index}",
       "wizardTorrentFactoryTitle": "Torrent factory",
       "wizardTorrentFactoryHint": "Live progression for every pipeline step (configuration, preparation, preview and upload).",
       "factoryTrackers": "Trackers",
@@ -786,7 +797,9 @@
       "prepareReseed": "Prepare for re-seed",
       "prepareReseedTitle": "Rename file on disk to match the .torrent so the client can find the data",
       "expectedName": "Expected by .torrent",
-      "noIndexers": "No indexers configured"
+      "noIndexers": "No indexers configured",
+      "dismissMessage": "Dismiss message",
+      "dbChangedHint": "After changing the torrent client database, use Refresh to see the updated list. The restore message below can be cleared with the button below."
     },
     "myUploadsPanel": {
       "title": "My uploads",
@@ -1055,6 +1068,13 @@
         "maxLabel": "Max concurrent transcodings",
         "range": "Between {min} and {max}",
         "saveSuccess": "Setting saved."
+      },
+      "restartBackend": {
+        "title": "Restart backend",
+        "description": "Restarts the Popcornn server. In Docker, the container will restart automatically. In dev, your runner/watcher will relaunch the backend.",
+        "action": "Restart",
+        "confirm": "Restart the backend now? Requests will be interrupted for a few seconds.",
+        "success": "Restart requested. The backend should be back in a few seconds."
       },
       "resources": {
         "title": "Resources",

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
-import { Settings, Server, Package, Activity, HardDrive, ChevronRight, ArrowLeft } from 'lucide-preact';
+import { Settings, Package, Activity, HardDrive, ChevronRight, ArrowLeft } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { canAccess } from '../../lib/permissions';
 import { DsCard, DsCardSection } from '../ui/design-system';
@@ -15,7 +15,7 @@ const BASE_URL = '/settings?category=system';
 const ACCENT_ICON_BG = 'var(--ds-accent-violet-muted)';
 const ACCENT_ICON_COLOR = 'var(--ds-accent-violet)';
 
-const SYSTEM_SUBS = ['setup', 'server', 'hard-reset', 'versions', 'storage', 'diagnostics'] as const;
+const SYSTEM_SUBS = ['setup', 'hard-reset', 'versions', 'storage', 'diagnostics'] as const;
 type SystemSub = (typeof SYSTEM_SUBS)[number];
 
 function getSubFromUrl(): SystemSub | null {
@@ -110,8 +110,7 @@ type SystemItem = {
 
 const SYSTEM_ITEMS: SystemItem[] = [
   { id: 'setup', titleKey: 'settingsMenu.setup.title', descriptionKey: 'settingsMenu.setup.description', icon: Settings },
-  { id: 'server', titleKey: 'settingsMenu.server.title', descriptionKey: 'settingsMenu.server.description', icon: Server },
-  { id: 'hard-reset', titleKey: 'versionInfo.hardResetTitle', descriptionKey: 'versionInfo.hardResetDescription', icon: Server },
+  { id: 'hard-reset', titleKey: 'versionInfo.hardResetTitle', descriptionKey: 'versionInfo.hardResetDescription', icon: Settings },
   { id: 'versions', titleKey: 'settingsMenu.versions.title', descriptionKey: 'settingsMenu.versions.description', icon: Package },
   { id: 'storage', titleKey: 'settingsMenu.storage.title', descriptionKey: 'settingsMenu.storage.description', icon: HardDrive },
   { id: 'diagnostics', titleKey: 'settingsMenu.diagnostics.title', descriptionKey: 'settingsMenu.diagnostics.description', icon: Activity },
@@ -180,7 +179,6 @@ export default function SystemSubMenuPanel() {
   if (sub) {
     const item = SYSTEM_ITEMS.find((i) => i.id === sub)!;
     if (sub === 'setup') return <SubPageFrame item={item}><SetupSection embedded /></SubPageFrame>;
-    if (sub === 'server') return <SubPageFrame item={item}><ServerSettings /></SubPageFrame>;
     if (sub === 'hard-reset') return <SubPageFrame item={item}><HardResetSection embedded /></SubPageFrame>;
     if (sub === 'versions') return <SubPageFrame item={item}><VersionInfo /></SubPageFrame>;
     if (sub === 'storage') return <SubPageFrame item={item}><StoragePanel /></SubPageFrame>;

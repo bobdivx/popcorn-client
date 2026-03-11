@@ -2,7 +2,6 @@ import { useEffect, useState } from 'preact/hooks';
 import { Activity, CheckCircle, XCircle, Loader2, RefreshCcw } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
-import DebugSyncCheck from './DebugSyncCheck';
 
 interface HealthResult {
   reachable: boolean;
@@ -155,8 +154,6 @@ export default function DiagnosticsPanel() {
           </div>
         )}
       </section>
-
-      <DebugSyncCheck />
     </div>
   );
 }

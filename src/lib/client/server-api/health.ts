@@ -166,9 +166,10 @@ export const healthMethods = {
       hasTmdbKey = tmdbRes.success && (tmdbRes.data?.has_key === true || (tmdbRes.data as any)?.has_key === 1);
     }
 
-    // Critère simple et robuste:
-    // - si aucun user sur le backend => setup requis (première installation)
-    // - sinon, ne pas bloquer le démarrage (le reste se configure dans les settings si besoin)
+    // Critère principal pour dire "setup requis" au niveau global :
+    // - aucun user sur le backend => vraie première installation (bloquante)
+    // Le reste (indexers, TMDB, téléchargement) est géré par le wizard qui
+    // affiche ou masque dynamiquement les étapes en fonction de ce qui manque.
     const needsSetup = !hasUsers;
 
     return {
