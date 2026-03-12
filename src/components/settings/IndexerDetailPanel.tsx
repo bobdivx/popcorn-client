@@ -6,6 +6,7 @@ import IndexersManager from './IndexersManager';
 import { IndexerTestModal, formatProgressEvent } from './IndexerTestModal';
 import { syncIndexersToCloud } from '../../lib/utils/cloud-sync';
 import { useI18n } from '../../lib/i18n/useI18n';
+import IndexerCategoriesSelector from './IndexerCategoriesSelector';
 
 interface IndexerDetailPanelProps {
   indexer: Indexer;
@@ -152,7 +153,17 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
         isSyncing={syncing}
         testProgress={testProgress}
         testResult={testResult}
-      />
+      >
+        <div className="mt-4 border-t border-gray-700 pt-4">
+          <h3 className="text-base font-semibold text-white mb-2">
+            {t('settingsMenu.syncCategories.selectorTitle') ?? 'Catégories synchronisées'}
+          </h3>
+          <p className="text-xs text-gray-400 mb-3">
+            {t('settingsMenu.syncCategories.selectorDescription')}
+          </p>
+          <IndexerCategoriesSelector indexerId={indexer.id} />
+        </div>
+      </IndexerCard>
       <IndexerTestModal
         isOpen={testModalOpen}
         onClose={closeTestModal}

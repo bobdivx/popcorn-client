@@ -287,7 +287,7 @@ export function SyncCard({ type = 'all' }: SyncCardProps) {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] px-4 py-12">
+    <div className="flex flex-col items-center justify-center min-h-[400px] px-4 pb-12">
       <div className="max-w-2xl w-full">
         <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-xl p-8 border-2 border-gray-700 shadow-2xl">
           <div className="text-center mb-6">

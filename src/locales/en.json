@@ -162,8 +162,16 @@
     "pageSubtitle": "Discover films and series to request"
   },
   "languages": {
-    "fr": "Français",
-    "en": "English"
+  "fr": "Français",
+  "en": "English"
+  },
+  "settingsMenu": {
+    "syncCategories": {
+      "title": "Sync categories",
+      "description": "Choose which torrent categories (films, series, others) should be synchronized for each indexer.",
+      "selectorTitle": "Synchronized categories",
+      "selectorDescription": "Enable or disable torrent categories for this indexer. If you select nothing, all categories will be synchronized by default."
+    }
   },
   "wizard": {
     "language": {

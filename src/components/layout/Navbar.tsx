@@ -513,7 +513,7 @@ export default function Navbar() {
 
                 <div className="hidden lg:flex flex-col items-end leading-none pl-2">
                   <div className="text-white/90 font-semibold text-sm tv:text-base tabular-nums">{clock}</div>
-                  <div className="text-white/50 text-xs tv:text-sm">Popcorn TV</div>
+                  <div className="text-white/50 text-xs tv:text-sm">Popcornn</div>
                 </div>
               </>
             ) : (
