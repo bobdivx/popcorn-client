@@ -162,8 +162,16 @@
     "pageSubtitle": "Découvrez des films et séries à demander"
   },
   "languages": {
-    "fr": "Français",
-    "en": "English"
+  "fr": "Français",
+  "en": "English"
+  },
+  "settingsMenu": {
+    "syncCategories": {
+      "title": "Catégories de synchronisation",
+      "description": "Choisissez quelles catégories de torrents (films, séries, autres) doivent être synchronisées pour chaque indexer.",
+      "selectorTitle": "Catégories synchronisées",
+      "selectorDescription": "Activez ou désactivez les catégories de torrents pour cet indexer. Si vous ne sélectionnez rien, toutes les catégories seront synchronisées par défaut."
+    }
   },
   "wizard": {
     "language": {

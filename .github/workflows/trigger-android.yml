@@ -1,0 +1,25 @@
+name: Trigger Android builds in popcorn-tauri
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  trigger-android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send android-build event to popcorn-tauri (mobile)
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_ACCESS_TOKEN_TAURI }}
+          repository: bobdivx/popcorn-tauri
+          event-type: android-build
+
+      - name: Send android-tv-build event to popcorn-tauri (TV)
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.REPO_ACCESS_TOKEN_TAURI }}
+          repository: bobdivx/popcorn-tauri
+          event-type: android-tv-build
+

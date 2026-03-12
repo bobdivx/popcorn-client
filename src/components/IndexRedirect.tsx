@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
 import { TokenManager } from '../lib/client/storage.js';
 import { getBackendUrl, isDemoMode, setDemoMode } from '../lib/backend-config';
@@ -28,7 +28,7 @@ function saveBackendStartResult(result: BackendStartResult) {
 export default function IndexRedirect() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('Chargement...');
-  const [attempt, setAttempt] = useState(0);
+  const attemptRef = useRef(0);
   const [showIntro, setShowIntro] = useState(false);
 
   const handleIntroEnded = () => {
@@ -220,14 +220,13 @@ export default function IndexRedirect() {
           // Si le backend n'est pas joignable (ex: reboot), ne pas basculer vers /setup.
           // On réessaie quelques fois et on laisse le composant afficher un spinner.
           if (setupResponse.data.backendReachable === false) {
-            setMessage('Démarrage du serveur... (réessai)');
-            const next = attempt + 1;
-            setAttempt(next);
-            if (next < 10) {
+            attemptRef.current += 1;
+            setMessage(`Démarrage du serveur... (réessai ${attemptRef.current}/10)`);
+            if (attemptRef.current < 10) {
               setTimeout(checkAndRedirectInternal, 1000);
               return;
             }
-            // Après plusieurs tentatives, basculer vers le setup:
+            // Après 10 tentatives, basculer vers le setup:
             // c'est l'écran qui permet notamment de configurer l'URL du backend.
             redirectTo('/setup');
             setLoading(false);
@@ -348,11 +347,11 @@ export default function IndexRedirect() {
       <div className="flex justify-center items-center min-h-screen bg-base-100">
         <div className="text-center max-w-md mx-4">
           <HLSLoadingSpinner size="lg" text={message} />
-          {message.includes('tentative') && (
+          {message.includes('réessai') && (
             <div className="mt-4 w-full bg-gray-700 rounded-full h-2">
               <div 
                 className="bg-primary h-2 rounded-full transition-all duration-300"
-                style={{ width: `${Math.min(100, (parseInt(message.match(/tentative (\d+)/)?.[1] || '0')) * 10)}%` }}
+                style={{ width: `${Math.min(100, attemptRef.current * 10)}%` }}
               ></div>
             </div>
           )}
