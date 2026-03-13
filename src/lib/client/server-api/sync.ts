@@ -1,5 +1,5 @@
 /**
- * MÃ©thodes de synchronisation des torrents
+ * Méthodes de synchronisation des torrents
  */
 
 import type { ApiResponse } from './types.js';
@@ -7,6 +7,15 @@ import type { ApiResponse } from './types.js';
 interface ServerApiClientSyncAccess {
   backendRequest<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>>;
   getCurrentUserId(): string | null;
+}
+
+export interface SyncHistoryEntry {
+  id: number;
+  synced_at: number;
+  total_count: number;
+  duration_secs: number;
+  success: boolean;
+  error_count: number;
 }
 
 export const syncMethods = {
@@ -69,6 +78,25 @@ export const syncMethods = {
       body: JSON.stringify({}),
     });
   },
+  /** Retourne les dernières entrées de l'historique des synchronisations. */
+  async getSyncHistory(
+    this: ServerApiClientSyncAccess,
+    limit = 50,
+  ): Promise<ApiResponse<SyncHistoryEntry[]>> {
+    return this.backendRequest(`/api/sync/history?limit=${limit}`, { method: 'GET' });
+  },
+
+  /** Enregistre une entrée dans l'historique des synchronisations. */
+  async addSyncHistory(
+    this: ServerApiClientSyncAccess,
+    entry: Omit<SyncHistoryEntry, 'id'>,
+  ): Promise<ApiResponse<SyncHistoryEntry>> {
+    return this.backendRequest('/api/sync/history', {
+      method: 'POST',
+      body: JSON.stringify(entry),
+    });
+  },
+
   /** Debug : vérifie si un torrent est réellement téléchargeable (GET + Range, premier octet bencode). */
   async checkTorrentDownload(
     this: ServerApiClientSyncAccess,
