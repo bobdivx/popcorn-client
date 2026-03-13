@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import { getUserConfig } from '../../lib/api/popcorn-web';
 import { isTmdbKeyMaskedOrInvalid } from '../../lib/utils/tmdb-key';
-import { DsCard, DsCardSection } from '../ui/design-system';
 
 interface TmdbConfigProps {
   /** Si true, affiche uniquement le formulaire (sans image de fond ni en-tête), pour intégration dans DsSettingsSectionCard */
@@ -304,9 +303,9 @@ export default function TmdbConfig({ embedded = false }: TmdbConfigProps) {
           </div>
         </div>
         {messages}
-        <DsCard variant="elevated" className="shadow-xl mt-4">
-          <DsCardSection>{formFields}</DsCardSection>
-        </DsCard>
+        <div class="sc-frame" style="margin-top:1rem">
+          <div class="sc-frame-body">{formFields}</div>
+        </div>
       </div>
     </div>
   );

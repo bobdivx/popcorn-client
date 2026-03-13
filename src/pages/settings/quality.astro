@@ -1,0 +1,16 @@
+---
+import SettingsLayout from '../../layouts/SettingsLayout.astro';
+import QualitySettingsPanel from '../../components/settings/QualitySettingsPanel';
+import DsPageHeader from '../../components/ui/DsPageHeader';
+---
+
+<SettingsLayout title="Qualité des médias - Popcorn">
+  <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+    <DsPageHeader
+      client:only="preact"
+      titleKey="qualitySettings.title"
+      subtitleKey="qualitySettings.subtitle"
+    />
+    <QualitySettingsPanel client:only="preact" />
+  </div>
+</SettingsLayout>

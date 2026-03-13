@@ -5,7 +5,6 @@ import { HelpCircle, X } from 'lucide-preact';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web.js';
 import { TokenManager } from '../../lib/client/storage.js';
 import { serverApi } from '../../lib/client/server-api.js';
-import { DsCard, DsCardSection } from '../ui/design-system';
 
 export default function ServerSettings() {
   const { t } = useI18n();
@@ -263,13 +262,13 @@ export default function ServerSettings() {
         </div>
       )}
       {loading && (
-        <div className="ds-card rounded-[var(--ds-radius-lg)] px-4 py-3 flex items-center gap-2">
+        <div class="sc-frame" style="padding:12px 16px;display:flex;align-items:center;gap:10px;">
           <span className="loading loading-spinner loading-sm text-[var(--ds-accent-violet)]" />
           <span className="ds-text-secondary text-sm">{t('serverSettings.loadingConfig')}</span>
         </div>
       )}
       {!loading && savedBackendUrl && (
-        <div className="ds-card rounded-[var(--ds-radius-lg)] px-4 py-3 border border-[var(--ds-border)]">
+        <div class="sc-frame" style="padding:12px 16px;">
           <p className="text-sm text-[var(--ds-text-primary)]">
             <strong>{t('serverSettings.currentUrl')}</strong> {savedBackendUrl}
           </p>
@@ -277,9 +276,8 @@ export default function ServerSettings() {
         </div>
       )}
 
-      {/* Carte de configuration */}
-      <DsCard variant="elevated">
-        <DsCardSection>
+      <div class="sc-frame">
+        <div class="sc-frame-body">
           <div className="flex items-center justify-between mb-4">
             <h3 className="ds-title-section text-[var(--ds-text-primary)]">{t('serverSettings.title')}</h3>
             <button
@@ -354,14 +352,14 @@ export default function ServerSettings() {
               )}
             </div>
           </div>
-        </DsCardSection>
-      </DsCard>
+        </div>
+      </div>
 
       {/* Modal Informations */}
       {showInfoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--ds-surface-overlay)]" onClick={() => setShowInfoModal(false)}>
-          <DsCard variant="elevated" className="max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <DsCardSection>
+          <div class="sc-frame" style="max-width:28rem;width:100%;box-shadow:0 24px 60px rgba(0,0,0,0.5);" onClick={(e) => e.stopPropagation()}>
+            <div class="sc-frame-body">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="ds-title-section text-[var(--ds-text-primary)]">{t('serverSettings.info.title')}</h3>
                 <button
@@ -388,8 +386,8 @@ export default function ServerSettings() {
                   {t('common.close')}
                 </button>
               </div>
-            </DsCardSection>
-          </DsCard>
+            </div>
+          </div>
         </div>
       )}
     </div>

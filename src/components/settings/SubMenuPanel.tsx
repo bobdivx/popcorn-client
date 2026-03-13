@@ -100,8 +100,6 @@ export default function SubMenuPanel({ items, visibleItems, onParentBack }: SubM
           const externalProps = item.isExternal
             ? { target: '_blank' as const, rel: 'noopener noreferrer' }
             : {};
-          const itemClass = "settings-content-item group flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 rounded-[var(--ds-radius-lg)] text-[var(--ds-text-primary)] transition-all duration-200 hover:bg-[var(--ds-surface-elevated)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] min-h-[52px] sm:min-h-[56px] tv:min-h-[64px] min-w-0 border border-transparent";
-
           if (isLink) {
             return (
               <li key={item.id}>
@@ -109,19 +107,19 @@ export default function SubMenuPanel({ items, visibleItems, onParentBack }: SubM
                   href={href}
                   {...externalProps}
                   data-focusable
-                  className={itemClass}
+                  class="sc-list-item"
                   tabIndex={0}
                 >
-                  <div className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[var(--ds-accent-violet-muted)] flex items-center justify-center text-[var(--ds-accent-violet)] group-hover:opacity-90 transition-opacity">
-                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <div className="sc-list-icon">
+                    <Icon className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0 overflow-hidden">
-                    <span className="block font-medium text-[var(--ds-text-primary)] truncate text-sm sm:text-base">{item.title ?? t(item.titleKey)}</span>
-                    <span className="block text-xs sm:text-sm ds-text-secondary truncate mt-0.5">
+                    <span className="sc-list-text-title block truncate">{item.title ?? t(item.titleKey)}</span>
+                    <span className="sc-list-text-desc block truncate">
                       {item.description ?? t(item.descriptionKey)}
                     </span>
                   </div>
-                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--ds-text-tertiary)] flex-shrink-0 group-hover:translate-x-1 transition-transform" />
+                  <ArrowRight className="sc-list-arrow w-4 h-4" />
                 </a>
               </li>
             );
@@ -133,19 +131,19 @@ export default function SubMenuPanel({ items, visibleItems, onParentBack }: SubM
                 type="button"
                 onClick={() => setSelectedId(item.id)}
                 data-focusable
-                className={itemClass + " w-full text-left"}
+                class="sc-list-item"
                 tabIndex={0}
               >
-                <div className="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[var(--ds-accent-violet-muted)] flex items-center justify-center text-[var(--ds-accent-violet)] group-hover:opacity-90 transition-opacity">
-                  <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                <div className="sc-list-icon">
+                  <Icon className="w-4 h-4" />
                 </div>
                 <div className="flex-1 min-w-0 overflow-hidden">
-                  <span className="block font-medium text-[var(--ds-text-primary)] truncate text-sm sm:text-base">{item.title ?? t(item.titleKey)}</span>
-                  <span className="block text-xs sm:text-sm ds-text-secondary truncate mt-0.5">
+                  <span className="sc-list-text-title block truncate">{item.title ?? t(item.titleKey)}</span>
+                  <span className="sc-list-text-desc block truncate">
                     {item.description ?? t(item.descriptionKey)}
                   </span>
                 </div>
-                <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-[var(--ds-text-tertiary)] flex-shrink-0 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="sc-list-arrow w-4 h-4" />
               </button>
             </li>
           );

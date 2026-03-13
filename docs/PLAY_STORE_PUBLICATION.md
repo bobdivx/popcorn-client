@@ -1,3 +1,12 @@
+
+Description courte
+Popcorn vous permet de trouver, organiser et regarder vos contenus en quelques secondes grâce à des indexeurs configurables et une interface simple à prendre en main.
+
+Description détaillée
+Popcorn est une application de lecture et d’agrégation de contenus pensée pour les passionnés de séries, de films et d’anime. Configurez vos propres indexeurs, parcourez un catalogue unifié et lancez la lecture instantanément avec un lecteur moderne, fluide et sans publicité. Vos réglages (indexeurs, préférences de lecture, langue, thèmes, etc.) sont synchronisés dans le cloud pour retrouver la même expérience sur tous vos appareils, mobile comme TV. Popcorn met l’accent sur les performances, la confidentialité et la transparence : aucune donnée n’est partagée avec des tiers, tout le trafic est chiffré, et vous gardez le contrôle complet sur vos sources et votre bibliothèque.
+
+
+
 # Guide de Publication sur Google Play Store
 
 Ce guide explique comment préparer et publier les applications Android Popcorn (Mobile et TV) sur le Google Play Store.

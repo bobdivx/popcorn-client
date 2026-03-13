@@ -1,12 +1,10 @@
 import { useState, useEffect } from 'preact/hooks';
-import { Upload, ChevronRight, Download, ListChecks, SlidersHorizontal, Activity } from 'lucide-preact';
+import { Upload, Download, ListChecks, SlidersHorizontal, Activity } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
-import { DsCard, DsCardSection } from '../ui/design-system';
+import { SettingsNavCard } from './SettingsNavCard';
 
 const BASE_URL = '/settings/uploads/';
-const ACCENT_ICON_BG = 'var(--ds-accent-violet-muted)';
-const ACCENT_ICON_COLOR = 'var(--ds-accent-violet)';
 
 type UploadItem = {
   id: string;
@@ -83,41 +81,16 @@ export default function UploadsSubMenuPanel() {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
-      {items.map((item) => {
-        const Icon = item.icon;
-        const muted = item.muted ?? false;
-        return (
-          <a
-            key={item.id}
+      {items.map((item) => (
+        <div key={item.id} style={item.muted ? 'opacity:0.6;pointer-events:none;' : undefined}>
+          <SettingsNavCard
             href={item.href}
-            data-astro-prefetch="hover"
-            data-settings-card
-            className={`block min-w-0 rounded-[var(--ds-radius-lg)] overflow-hidden transition-all hover:scale-[1.01] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] focus-visible:overflow-visible ${muted ? 'opacity-70' : ''}`}
-          >
-            <DsCard variant="elevated" className="h-full">
-              <DsCardSection className="flex flex-col h-full min-h-[120px]">
-                <div className="flex items-start justify-between gap-3">
-                  <span
-                    className="inline-flex w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex-shrink-0 items-center justify-center"
-                    style={{ backgroundColor: ACCENT_ICON_BG, color: ACCENT_ICON_COLOR }}
-                    aria-hidden
-                  >
-                    <Icon className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.8} />
-                  </span>
-                  <ChevronRight className="w-5 h-5 text-[var(--ds-text-tertiary)] flex-shrink-0 mt-0.5" aria-hidden />
-                </div>
-                <h2 className="ds-title-card text-[var(--ds-text-primary)] text-base sm:text-lg mt-3 truncate">
-                  {t(item.titleKey)}
-                </h2>
-                <span className="ds-text-tertiary text-sm mt-3">{t(item.descriptionKey)}</span>
-                <span className="mt-auto pt-4 text-xs font-medium text-[var(--ds-accent-violet)] flex items-center gap-1" aria-hidden>
-                  {t('common.open')}
-                </span>
-              </DsCardSection>
-            </DsCard>
-          </a>
-        );
-      })}
+            icon={item.icon}
+            title={t(item.titleKey)}
+            description={t(item.descriptionKey)}
+          />
+        </div>
+      ))}
     </div>
   );
 }

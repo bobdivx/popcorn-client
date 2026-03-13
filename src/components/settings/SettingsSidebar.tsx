@@ -22,7 +22,6 @@ type NavItem = {
   icon: typeof Monitor;
   permission?: string;
   permissions?: string[];
-  /** Actif quand pathname commence par ce préfixe (ex. /settings/server, /settings/maintenance) */
   pathPrefix?: string;
 };
 
@@ -131,11 +130,162 @@ function isItemActive(item: NavItem, pathname: string, search: string): boolean 
     if (item.pathPrefix === '/settings/uploads') return path === '/settings/uploads' || path.startsWith('/settings/uploads/');
     if (item.pathPrefix === '/settings/ui-preferences') return path === '/settings/ui-preferences' || path.startsWith('/settings/ui-preferences/');
     if (item.pathPrefix === '/settings/account') return path.startsWith('/settings/account');
-    // Catégories path : /settings/maintenance, /settings/playback, etc.
     return path === item.pathPrefix || path.startsWith(item.pathPrefix + '/');
   }
   return false;
 }
+
+const SIDEBAR_CSS = `
+  .sn-sidebar {
+    background: linear-gradient(180deg, #0e0815 0%, #0a0812 100%);
+    border-right: 1px solid rgba(255,255,255,0.05);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .sn-sidebar::before {
+    content: '';
+    position: absolute;
+    top: -80px; left: -80px;
+    width: 320px; height: 320px;
+    background: radial-gradient(circle, rgba(124,58,237,0.14) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  .sn-sidebar::after {
+    content: '';
+    position: absolute;
+    bottom: -60px; right: -60px;
+    width: 220px; height: 220px;
+    background: radial-gradient(circle, rgba(139,92,246,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Logo */
+  .sn-logo {
+    display: flex; align-items: center; gap: 10px;
+    padding: 18px 14px 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    margin-bottom: 6px;
+    position: relative; z-index: 1;
+    flex-shrink: 0;
+  }
+  .sn-logo-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: rgba(124,58,237,0.15);
+    border: 1px solid rgba(124,58,237,0.3);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .sn-logo-title { color: #fff; font-weight: 700; font-size: 14px; line-height: 1.2; }
+  .sn-logo-sub { color: rgba(167,139,250,0.65); font-size: 11px; margin-top: 2px; }
+
+  /* Liste */
+  .sn-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 8px 16px;
+    position: relative; z-index: 1;
+    min-height: 0;
+    scrollbar-width: none;
+  }
+  .sn-list::-webkit-scrollbar { display: none; }
+
+  /* Item */
+  .sn-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 10px; border-radius: 10px;
+    margin-bottom: 2px;
+    transition: background 0.18s ease, border-color 0.18s ease;
+    border: 1px solid transparent;
+    cursor: pointer;
+    text-decoration: none;
+    min-height: 44px;
+    width: 100%;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .sn-item:hover:not(.sn-item--active) {
+    background: rgba(255,255,255,0.04);
+    border-color: rgba(255,255,255,0.06);
+  }
+  .sn-item--active {
+    background: rgba(124,58,237,0.12);
+    border-color: rgba(124,58,237,0.25);
+  }
+  .sn-item:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(124,58,237,0.55), inset 0 0 0 1px rgba(124,58,237,0.3);
+  }
+
+  /* Icône */
+  .sn-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.18s ease, color 0.18s ease;
+  }
+  .sn-icon--active {
+    background: rgba(124,58,237,0.22);
+    color: #a78bfa;
+  }
+  .sn-icon--inactive {
+    background: rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.4);
+  }
+  .sn-item:hover .sn-icon--inactive {
+    background: rgba(255,255,255,0.09);
+    color: rgba(255,255,255,0.7);
+  }
+
+  /* Label */
+  .sn-label {
+    flex: 1;
+    font-size: 13px; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    min-width: 0;
+    transition: color 0.18s ease;
+  }
+  .sn-label--active { color: rgba(255,255,255,0.92); }
+  .sn-label--inactive { color: rgba(255,255,255,0.48); }
+  .sn-item:hover .sn-label--inactive { color: rgba(255,255,255,0.75); }
+
+  /* Point animé (item actif) */
+  .sn-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #a78bfa; flex-shrink: 0;
+    animation: sn-pulse 2s ease-in-out infinite;
+  }
+  @keyframes sn-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.6); }
+  }
+
+  /* Overlay mobile */
+  .sn-overlay {
+    position: fixed; inset: 0; z-index: 25;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    transition: opacity 0.2s ease;
+  }
+
+  /* TV & grande cible tactile */
+  @media (hover: none) and (pointer: coarse) {
+    .sn-item { min-height: 52px; padding: 10px 12px; }
+    .sn-icon { width: 36px; height: 36px; }
+    .sn-label { font-size: 14px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sn-dot { animation: none; opacity: 0.7; }
+    .sn-item { transition: none; }
+    .sn-icon { transition: none; }
+    .sn-label { transition: none; }
+  }
+`;
 
 export default function SettingsSidebar() {
   const { t } = useI18n();
@@ -166,7 +316,6 @@ export default function SettingsSidebar() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  // Liste stable au premier rendu (SSR + hydratation) pour éviter le mismatch, puis filtrée par permissions après montage
   const visibleItems = useMemo(
     () => (mounted ? NAV_ITEMS.filter(isItemVisible) : NAV_ITEMS),
     [mounted]
@@ -174,36 +323,47 @@ export default function SettingsSidebar() {
 
   return (
     <>
-      {/* Overlay mobile : glass (blur) + transition opacité */}
+      <style>{SIDEBAR_CSS}</style>
+
+      {/* Overlay mobile */}
       <div
-        className={`lg:hidden fixed inset-0 z-[25] bg-black/60 backdrop-blur-sm transition-opacity duration-200 ${
-          sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
+        class="sn-overlay lg:hidden"
         aria-hidden
-        onClick={() => sidebarOpen && setSidebarOpen(false)}
+        style={{ opacity: sidebarOpen ? 1 : 0, pointerEvents: sidebarOpen ? 'auto' : 'none' }}
+        onClick={() => setSidebarOpen(false)}
       />
 
       <nav
-        className={`
-          settings-sidebar flex-shrink-0 w-[min(18rem,85vw)] sm:w-72 lg:w-72 xl:w-80
-          border-b lg:border-b-0 lg:border-r border-[var(--ds-border)]
-          bg-[var(--ds-surface-elevated)]/95 backdrop-blur-xl lg:bg-[var(--ds-surface-elevated)] lg:backdrop-blur-none
+        class={`
+          sn-sidebar flex-shrink-0
+          w-[min(18rem,85vw)] sm:w-72 lg:w-72 xl:w-80
           fixed left-0 z-[30] bottom-0
           top-[calc(3.75rem+var(--safe-area-inset-top,0px))] sm:top-[calc(5rem+var(--safe-area-inset-top,0px))] md:top-[calc(5.5rem+var(--safe-area-inset-top,0px))] lg:top-auto lg:bottom-auto lg:h-full
           transform transition-transform duration-200 ease-out
-          pt-4 lg:pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))]
-          overflow-hidden flex flex-col
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         `}
         aria-label={t('settingsMenu.title')}
         data-tv-settings-nav
       >
-        <div className="px-3 sm:px-4 pt-2 pb-2 min-w-0 flex-shrink-0">
-          <h2 className="ds-title-page truncate text-base sm:text-lg">
-            {t('settingsMenu.title')}
-          </h2>
+        {/* Logo */}
+        <div class="sn-logo">
+          <div class="sn-logo-icon">
+            <img
+              src="/popcorn_logo.png"
+              alt=""
+              style="width:20px;height:20px;object-fit:contain;"
+              loading="eager"
+              aria-hidden
+            />
+          </div>
+          <div>
+            <div class="sn-logo-title">Popcornn</div>
+            <div class="sn-logo-sub">{t('settingsMenu.title')}</div>
+          </div>
         </div>
-        <ul className="py-2 px-2 space-y-0.5 sm:space-y-1 scrollbar-hide overflow-y-auto overflow-x-hidden flex-1 min-h-0" role="list">
+
+        {/* Navigation */}
+        <ul class="sn-list" role="list">
           {visibleItems.map((item) => {
             const Icon = item.icon;
             const isActive = isItemActive(item, pathname, search);
@@ -215,24 +375,18 @@ export default function SettingsSidebar() {
                   data-settings-category
                   data-focusable
                   onClick={() => setSidebarOpen(false)}
-                  className={`
-                    settings-nav-item w-full flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl sm:rounded-2xl text-left transition-all duration-200
-                    focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)]
-                    min-h-[44px] sm:min-h-[48px] tv:min-h-[56px] min-w-0 touch-manipulation
-                    ${isActive
-                      ? 'bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)]'
-                      : 'text-[var(--ds-text-secondary)] hover:bg-white/10 hover:text-[var(--ds-text-primary)]'
-                    }
-                  `}
+                  class={`sn-item${isActive ? ' sn-item--active' : ''}`}
                   tabIndex={0}
                   aria-current={isActive ? 'page' : undefined}
                   aria-label={t(item.labelKey)}
                 >
-                  <Icon
-                    className={`w-5 h-5 sm:w-6 sm:h-6 tv:w-7 tv:h-7 flex-shrink-0 ${isActive ? 'opacity-100' : 'opacity-80'}`}
-                    aria-hidden
-                  />
-                  <span className="font-semibold truncate min-w-0 text-sm sm:text-base">{t(item.labelKey)}</span>
+                  <div class={`sn-icon${isActive ? ' sn-icon--active' : ' sn-icon--inactive'}`}>
+                    <Icon class="w-[18px] h-[18px]" strokeWidth={1.8} aria-hidden />
+                  </div>
+                  <span class={`sn-label${isActive ? ' sn-label--active' : ' sn-label--inactive'}`}>
+                    {t(item.labelKey)}
+                  </span>
+                  {isActive && <div class="sn-dot" aria-hidden />}
                 </a>
               </li>
             );

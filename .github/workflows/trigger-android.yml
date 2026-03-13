@@ -1,9 +1,8 @@
 name: Trigger Android builds in popcorn-tauri
 
 on:
-  push:
-    branches:
-      - main
+  # Plus de déclenchement automatique sur push : lancement manuel uniquement
+  workflow_dispatch:
 
 jobs:
   trigger-android:

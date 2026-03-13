@@ -2,7 +2,6 @@ import { Monitor, UserCircle, RefreshCw, Search, Smartphone, ChevronRight, Uploa
 import { useI18n } from '../../lib/i18n/useI18n';
 import { useMemo, useState, useEffect } from 'preact/hooks';
 import { canAccess } from '../../lib/permissions';
-import { DsCard, DsCardSection } from '../ui/design-system';
 import { serverApi } from '../../lib/client/server-api';
 import { TokenManager } from '../../lib/client/storage';
 import { getSyncStatusStore, subscribeSyncStatusStore, refreshSyncStatusStore } from '../../lib/sync-status-store';
@@ -148,17 +147,6 @@ export default function SettingsOverview() {
     load();
   }, [t]);
 
-  const accentIconBg: Record<string, string> = {
-    violet: 'var(--ds-accent-violet-muted)',
-    green: 'rgba(200, 230, 201, 0.35)',
-    yellow: 'rgba(255, 249, 196, 0.4)',
-  };
-  const accentIconColor: Record<string, string> = {
-    violet: 'var(--ds-accent-violet)',
-    green: 'var(--ds-accent-green)',
-    yellow: '#c9b800',
-  };
-
   const showSameOriginBackendCard = useMemo(() => {
     if (typeof window === 'undefined') return false;
     const url = getBackendUrl();
@@ -167,88 +155,70 @@ export default function SettingsOverview() {
 
   return (
     <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
-      <h1 className="ds-title-page">{t('settingsMenu.overview')}</h1>
-      <p className="ds-text-secondary mb-4 sm:mb-6 text-sm sm:text-base">{t('settingsMenu.subtitle')}</p>
+      <h1 style="font-size:1.5rem;font-weight:700;color:rgba(255,255,255,0.92);margin-bottom:6px;">{t('settingsMenu.overview')}</h1>
+      <p style="font-size:13px;color:rgba(255,255,255,0.42);margin-bottom:24px;">{t('settingsMenu.subtitle')}</p>
 
       {showSameOriginBackendCard && canAccess('settings.server' as any) && (
         <a
           href="/settings/server"
           data-astro-prefetch
           data-settings-card
-          className="block mb-4 sm:mb-5 rounded-[var(--ds-radius-lg)] overflow-hidden transition-all hover:scale-[1.01] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] focus-visible:overflow-visible"
+          class="sc-nav-link"
+          style="display:block;margin-bottom:20px;"
         >
-          <DsCard variant="glass" className="border-l-4 border-l-[var(--ds-accent-yellow)]">
-            <div className="ds-card-bar flex-shrink-0" aria-hidden />
-            <DsCardSection className="flex flex-row items-center gap-4">
-              <span
-                className="inline-flex w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex-shrink-0 items-center justify-center"
-                style={{ backgroundColor: 'rgba(255, 249, 196, 0.4)', color: '#c9b800' }}
-                aria-hidden
-              >
-                <Server className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.8} />
-              </span>
-              <div className="min-w-0 flex-1">
-                <h2 className="ds-title-card text-[var(--ds-text-primary)] text-base sm:text-lg">{t('settingsMenu.overviewCard.sameOriginBackendTitle')}</h2>
-                <p className="ds-text-secondary text-sm mt-1">{t('settingsMenu.overviewCard.sameOriginBackendDescription')}</p>
-                <span className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-[var(--ds-accent-violet)]">
-                  {t('settingsMenu.overviewCard.sameOriginBackendAction')}
-                  <ChevronRight className="w-4 h-4" />
-                </span>
-              </div>
-            </DsCardSection>
-          </DsCard>
+          <div class="sc-nav-card" style="flex-direction:row;align-items:center;gap:16px;border-left:3px solid rgba(234,179,8,0.5);min-height:auto;padding:16px 20px;">
+            <div class="sc-nav-icon sc-nav-icon--yellow" style="flex-shrink:0;">
+              <Server className="w-5 h-5" strokeWidth={1.8} aria-hidden />
+            </div>
+            <div style="flex:1;min-width:0;">
+              <div class="sc-nav-title" style="margin-top:0;">{t('settingsMenu.overviewCard.sameOriginBackendTitle')}</div>
+              <div class="sc-nav-desc" style="overflow:visible;-webkit-line-clamp:unset;">{t('settingsMenu.overviewCard.sameOriginBackendDescription')}</div>
+              <div class="sc-nav-open" style="margin-top:6px;padding-top:0;">{t('settingsMenu.overviewCard.sameOriginBackendAction')}</div>
+            </div>
+            <div class="sc-nav-chevron">
+              <ChevronRight className="w-5 h-5" aria-hidden />
+            </div>
+          </div>
         </a>
       )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
         {visibleItems.map((item) => {
           const Icon = item.icon;
           const summary = summaries[item.id];
-          const iconBg = (item.accent && accentIconBg[item.accent]) || accentIconBg.violet;
-          const iconColor = (item.accent && accentIconColor[item.accent]) || accentIconColor.violet;
           const isSyncCardInProgress = item.id === 'sync' && syncInProgress;
+          const accentKey = item.accent ?? 'violet';
           return (
             <a
               key={item.id}
               href={item.href}
               data-astro-prefetch
               data-settings-card
-              className={`block min-w-0 rounded-[var(--ds-radius-lg)] overflow-hidden transition-all hover:scale-[1.01] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] focus-visible:overflow-visible ${isSyncCardInProgress ? 'overview-card--sync-in-progress' : ''}`}
+              data-focusable
+              class="sc-nav-link"
             >
-              <DsCard variant="glass" className="h-full">
-                <div className="ds-card-bar flex-shrink-0" aria-hidden />
-                <DsCardSection className="flex flex-col h-full min-h-[120px]">
-                  <div className="flex items-start justify-between gap-3">
-                    <span
-                      className={`inline-flex w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex-shrink-0 items-center justify-center ${isSyncCardInProgress ? 'overview-card-icon--syncing' : ''}`}
-                      style={{ backgroundColor: iconBg, color: iconColor }}
-                      aria-hidden
-                    >
-                      <Icon className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.8} />
-                    </span>
-                    <ChevronRight className="w-5 h-5 text-[var(--ds-text-tertiary)] flex-shrink-0 mt-0.5" aria-hidden />
+              <div class="sc-nav-card">
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
+                  <div class={`sc-nav-icon sc-nav-icon--${accentKey}`}>
+                    <Icon className="w-5 h-5" strokeWidth={1.8} aria-hidden />
                   </div>
-                  <h2 className="ds-title-card text-[var(--ds-text-primary)] text-base sm:text-lg mt-3 truncate">{t(item.titleKey)}</h2>
-                  {summary ? (
-                    <span
-                      className={`ds-status-badge ds-status-badge--${summary.variant || 'neutral'} mt-3 w-fit inline-flex items-center gap-2`}
-                      aria-hidden
-                    >
-                      {isSyncCardInProgress && (
-                        <span className="overview-card-sync-spinner" aria-hidden>
-                          <span className="loading loading-spinner loading-sm" />
-                        </span>
-                      )}
-                      {summary.text}
-                    </span>
-                  ) : (
-                    <span className="ds-text-tertiary text-sm mt-3">{t('common.configure')}</span>
-                  )}
-                  <span className="mt-auto pt-4 text-xs font-medium text-[var(--ds-accent-violet)] flex items-center gap-1" aria-hidden>
-                    {t('common.open')}
-                  </span>
-                </DsCardSection>
-              </DsCard>
+                  <div class="sc-nav-chevron">
+                    <ChevronRight className="w-5 h-5 mt-0.5" aria-hidden />
+                  </div>
+                </div>
+                <div class="sc-nav-title">{t(item.titleKey)}</div>
+                {summary ? (
+                  <div class={`sc-status-badge sc-status-badge--${summary.variant ?? 'neutral'}`} aria-hidden>
+                    {isSyncCardInProgress && <span className="loading loading-spinner loading-xs mr-1" />}
+                    {summary.text}
+                  </div>
+                ) : (
+                  <div class="sc-nav-desc">{t('common.configure')}</div>
+                )}
+                <div class="sc-nav-footer" aria-hidden>
+                  <span class="sc-nav-open">{t('common.open')}</span>
+                </div>
+              </div>
             </a>
           );
         })}

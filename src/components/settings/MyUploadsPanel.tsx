@@ -4,7 +4,6 @@ import { serverApi } from '../../lib/client/server-api';
 import type { PublishedUploadMediaEntry } from '../../lib/client/server-api/upload-tracker';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { notificationService } from '../../lib/services/notification-service';
-import { DsCard, DsCardSection } from '../ui/design-system';
 
 const BASE_URL = '/settings/uploads/';
 
@@ -104,8 +103,8 @@ export default function MyUploadsPanel() {
         <span>{t('common.back')}</span>
       </a>
 
-      <DsCard variant="elevated" className="min-w-0 overflow-hidden">
-        <DsCardSection className="flex flex-col min-h-0 gap-3">
+      <div class="sc-frame">
+        <div class="sc-frame-body" style="display:flex;flex-direction:column;min-height:0;gap:0.75rem">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="ds-title-card text-[var(--ds-text-primary)] text-base sm:text-lg">
@@ -242,8 +241,8 @@ export default function MyUploadsPanel() {
               </div>
             </>
           )}
-        </DsCardSection>
-      </DsCard>
+        </div>
+      </div>
     </div>
   );
 }

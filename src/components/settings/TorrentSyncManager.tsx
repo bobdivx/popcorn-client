@@ -18,7 +18,7 @@ import { calculateSyncProgress } from '../../lib/utils/sync-progress';
 import { useI18n } from '../../lib/i18n/useI18n';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
 import { Modal } from '../ui/Modal';
-import { DsIconButton, DsMetricCard, DsCard, DsCardSection, DsBarChart } from '../ui/design-system';
+import { DsIconButton, DsMetricCard, DsBarChart } from '../ui/design-system';
 
 interface SyncSettings {
   sync_frequency_minutes: number;
@@ -897,19 +897,19 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
           </div>
         </div>
         {syncView === 'overview' ? (
-          <DsCard variant="elevated">
-            <DsCardSection className="text-center">
+          <div class="sc-frame">
+            <div class="sc-frame-body" style="text-align:center">
               <p class="ds-text-secondary mb-2">{t('errors.generic')}</p>
               {error && <p class="text-sm text-red-300">{error}</p>}
               <p class="text-sm mt-4 text-white/70">{t('torrentSyncManager.startBackendToSeeData')}</p>
-            </DsCardSection>
-          </DsCard>
+            </div>
+          </div>
         ) : (
-          <DsCard variant="elevated">
-            <DsCardSection className="text-center">
+          <div class="sc-frame">
+            <div class="sc-frame-body" style="text-align:center">
               <p class="ds-text-secondary">{t('torrentSyncManager.settingsAvailableWhenBackendConnected')}</p>
-            </DsCardSection>
-          </DsCard>
+            </div>
+          </div>
         )}
       </div>
     );
@@ -935,8 +935,11 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
           </div>
         )}
         {status.settings ? (
-          <DsCard variant="elevated" className="mb-0">
-            <DsCardSection title={t('torrentSyncManager.settings')}>
+          <div class="sc-frame">
+            <div class="sc-frame-header">
+              <div class="sc-frame-title">{t('torrentSyncManager.settings')}</div>
+            </div>
+            <div class="sc-frame-body">
               <div class="space-y-4">
                 <div>
                   <label class="label">
@@ -1042,16 +1045,16 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                   <p class="text-xs text-gray-400 mt-1">{t('torrentSyncManager.seriesKeywordsNote')}</p>
                 </div>
               </div>
-            </DsCardSection>
-          </DsCard>
+            </div>
+          </div>
         ) : (
-          <DsCard variant="elevated">
-            <DsCardSection>
+          <div class="sc-frame">
+            <div class="sc-frame-body">
               <div class="ds-status-badge ds-status-badge--warning w-fit" role="status">
                 {t('torrentSyncManager.settingsNotAvailable')}
               </div>
-            </DsCardSection>
-          </DsCard>
+            </div>
+          </div>
         )}
       </div>
     );
@@ -1344,8 +1347,11 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
 
       {/* Graphique répartition */}
       {(status.stats?.films ?? 0) + (status.stats?.series ?? 0) + (status.stats?.others ?? 0) > 0 && (
-        <DsCard variant="elevated" className="mb-6">
-          <DsCardSection title={t('torrentSyncManager.distributionChart')}>
+        <div class="sc-frame" style="margin-bottom:1.5rem">
+          <div class="sc-frame-header">
+            <div class="sc-frame-title">{t('torrentSyncManager.distributionChart')}</div>
+          </div>
+          <div class="sc-frame-body">
             <DsBarChart
               items={[
                 { label: t('torrentSyncManager.films'), value: status.stats?.films ?? 0, color: 'var(--ds-accent-yellow)' },
@@ -1353,8 +1359,8 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                 { label: t('torrentSyncManager.others'), value: status.stats?.others ?? 0, color: 'var(--ds-accent-green)' },
               ]}
             />
-          </DsCardSection>
-        </DsCard>
+          </div>
+        </div>
       )}
 
       {/* Pendant la sync : phase + carte "Récupérés → TMDB → base" + Total synchronisé */}
@@ -1396,8 +1402,11 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
               })()}
 
               {/* Carte unique : Récupérés → enrichissement TMDB → en base (graphique + TMDB) */}
-              <DsCard variant="elevated" className="rounded-xl overflow-hidden mb-4">
-                <DsCardSection title={t('torrentSyncManager.fetchThenEnrich')}>
+              <div class="sc-frame" style="margin-bottom:1rem">
+                <div class="sc-frame-header">
+                  <div class="sc-frame-title">{t('torrentSyncManager.fetchThenEnrich')}</div>
+                </div>
+                <div class="sc-frame-body">
                   {/* Graphique Films / Séries / Autres (en base) — même style que Répartition */}
                   <DsBarChart
                     items={[
@@ -1432,13 +1441,16 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                       </div>
                     );
                   })()}
-                </DsCardSection>
-              </DsCard>
+                </div>
+              </div>
 
               {/* Total synchronisé : carte avec graphique (comme Répartition) */}
               <div class="mt-4 pt-4 border-t border-white/10">
-                <DsCard variant="elevated" className="rounded-xl overflow-hidden">
-                  <DsCardSection title={t('torrentSyncManager.totalSynced')}>
+                <div class="sc-frame">
+                  <div class="sc-frame-header">
+                    <div class="sc-frame-title">{t('torrentSyncManager.totalSynced')}</div>
+                  </div>
+                  <div class="sc-frame-body">
                     <DsBarChart
                       items={[
                         { label: t('torrentSyncManager.films'), value: effectiveStats.films ?? 0, color: 'var(--ds-accent-yellow)' },
@@ -1449,8 +1461,8 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
                     <p class="text-sm text-[var(--ds-text-secondary)] mt-3 font-semibold tabular-nums">
                       {totalTorrents.toLocaleString()} {t('torrentSyncManager.synchronized')}
                     </p>
-                  </DsCardSection>
-                </DsCard>
+                  </div>
+                </div>
               </div>
 
               {(() => {
@@ -1504,7 +1516,7 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
 
       {syncView === 'settings' && (
               <>
-      <DsCard className="mb-6 sm:mb-8">
+      <div class="sc-frame" style="margin-bottom:1.5rem">
         {!status.sync_in_progress && indexers.length > 0 && (
           <div class="p-4 sm:p-6 border-b border-white/10">
             <h3 class="text-base font-semibold text-white mb-4 flex items-center gap-2">
@@ -1618,7 +1630,7 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
               </div>
           </div>
         )}
-      </DsCard>
+      </div>
               </>
             )}
 

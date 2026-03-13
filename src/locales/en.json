@@ -477,6 +477,33 @@
     "torrentsRecentLimit": "« Recent additions » section",
     "torrentsRecentLimitDescription": "Number of items in the recent additions section (20-200)"
   },
+  "qualitySettings": {
+    "title": "Media Quality",
+    "subtitle": "Manage the video player playback quality and the preferred quality for downloaded media",
+    "cardTitle": "Quality",
+    "cardDescription": "Playback quality and preferred quality for films and series",
+    "playerQuality": "Video player quality",
+    "playerQualityDescription": "Default resolution when starting a video",
+    "playerQualityAuto": "Auto (adaptive)",
+    "playerQualityAutoDesc": "The player automatically selects the best quality based on your connection",
+    "playerQualityHighest": "Best available quality",
+    "playerQualityHighestDesc": "Always forces the highest available resolution, regardless of connection",
+    "playerQualityLowest": "Minimum quality",
+    "playerQualityLowestDesc": "Forces the lowest resolution to save bandwidth",
+    "mediaQuality": "Preferred media quality",
+    "mediaQualityDescription": "Priority quality for films and series shown on the dashboard, Films and Series pages",
+    "mediaQualityNote": "The chosen quality is prioritized in results. Other qualities remain visible and accessible.",
+    "mediaQualityAll": "All qualities",
+    "mediaQualityAllDesc": "No preference, shows all media without distinction",
+    "mediaQuality480p": "480p (SD)",
+    "mediaQuality480pDesc": "Standard definition, lightweight files",
+    "mediaQuality720p": "720p (HD)",
+    "mediaQuality720pDesc": "High definition, good quality/size balance",
+    "mediaQuality1080p": "1080p (Full HD)",
+    "mediaQuality1080pDesc": "Full high definition, optimal quality for most screens",
+    "mediaQuality4k": "4K / 2160p (Ultra HD)",
+    "mediaQuality4kDesc": "Ultra high definition, large files, ideal for big screens"
+  },
   "playback": {
     "nextEpisode": "Next episode",
     "playLabel": "Play",
@@ -1830,7 +1857,7 @@
     },
     "uploads": {
       "title": "Uploads",
-      "subtitle": "Client torrents — add tracker and publication tracker (C411)"
+      "subtitle": "Manage torrent creation, seeding and publication to trackers"
     },
     "indexerDefinitions": {
       "title": "Indexer definitions",

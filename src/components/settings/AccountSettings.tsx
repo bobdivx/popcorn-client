@@ -3,7 +3,6 @@ import { serverApi } from '../../lib/client/server-api';
 import Avatar from '../ui/Avatar';
 import { getLocalProfile, updateLocalProfile, type LocalProfile } from '../../lib/client/profile';
 import { useI18n } from '../../lib/i18n';
-import { DsCard, DsCardSection } from '../ui/design-system';
 
 export type AccountSection = 'profile' | 'info' | 'interface' | 'logout' | 'all';
 
@@ -66,8 +65,10 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
 
   if (!user) {
     return (
-      <div class="ds-card rounded-[var(--ds-radius-lg)] px-4 py-6 text-center">
-        <p class="ds-text-secondary">{t('account.noUserInfo')}</p>
+      <div class="sc-frame">
+        <div class="sc-frame-body" style="text-align:center">
+          <p class="ds-text-secondary">{t('account.noUserInfo')}</p>
+        </div>
       </div>
     );
   }
@@ -104,8 +105,11 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
   return (
     <div class="space-y-6 sm:space-y-8">
       {showProfile && (
-        <DsCard variant="elevated">
-          <DsCardSection title={t('account.profile')}>
+        <div class="sc-frame">
+          <div class="sc-frame-header">
+            <div class="sc-frame-title">{t('account.profile')}</div>
+          </div>
+          <div class="sc-frame-body">
 
         {saved && (
           <div class="ds-status-badge ds-status-badge--success mb-6 w-fit" role="status">
@@ -182,13 +186,16 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
                 </div>
               </div>
             </div>
-          </DsCardSection>
-        </DsCard>
+          </div>
+        </div>
       )}
 
       {showInfo && (
-        <DsCard variant="elevated">
-          <DsCardSection title="Informations du compte">
+        <div class="sc-frame">
+          <div class="sc-frame-header">
+            <div class="sc-frame-title">Informations du compte</div>
+          </div>
+          <div class="sc-frame-body">
             <div class="space-y-6">
               <div>
                 <label class="block text-sm font-semibold ds-text-secondary mb-2">Email</label>
@@ -199,13 +206,16 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
                 <p class="ds-text-secondary font-mono text-sm break-all">{user.id}</p>
               </div>
             </div>
-          </DsCardSection>
-        </DsCard>
+          </div>
+        </div>
       )}
 
       {showInterface && (
-        <DsCard variant="elevated">
-          <DsCardSection title={t('account.interfaceSettings')}>
+        <div class="sc-frame">
+          <div class="sc-frame-header">
+            <div class="sc-frame-title">{t('account.interfaceSettings')}</div>
+          </div>
+          <div class="sc-frame-body">
             <p class="ds-text-secondary mb-6">{t('account.interfaceSettingsDescription')}</p>
             <a
               href="/settings?category=interface"
@@ -215,8 +225,8 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
             >
               {t('account.openInterfaceSettings')}
             </a>
-          </DsCardSection>
-        </DsCard>
+          </div>
+        </div>
       )}
 
     </div>

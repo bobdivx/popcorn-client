@@ -3,14 +3,13 @@ import { useI18n } from '../../lib/i18n';
 import { PreferencesManager, TokenManager } from '../../lib/client/storage';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
 import { serverApi } from '../../lib/client/server-api';
-import { SkipForward, ListVideo, Play, Download, HardDrive, ChevronRight, ArrowLeft } from 'lucide-preact';
-import { DsCard, DsCardSection } from '../ui/design-system';
+import { SkipForward, ListVideo, Play, Download, HardDrive, Gauge } from 'lucide-preact';
+import { SettingsNavCard } from './SettingsNavCard';
+import { SettingsSubPageFrame } from './SettingsSubPageFrame';
 import { DEFAULT_PLAYER_CONFIG, type PlayerConfig } from '../streaming/hls-player/hooks/usePlayerConfig';
 import { useSubscriptionMe } from '../torrents/MediaDetailPage/hooks/useSubscriptionMe';
 
 const BASE_URL = '/settings?category=playback';
-const ACCENT_ICON_BG = 'var(--ds-accent-violet-muted)';
-const ACCENT_ICON_COLOR = 'var(--ds-accent-violet)';
 
 const PLAYBACK_SUBS = ['autoplay', 'skipIntro', 'streamingDownloadFull', 'streamingRetention', 'streamingMode', 'nextEpisodeButton'] as const;
 type PlaybackSub = (typeof PLAYBACK_SUBS)[number];
@@ -237,26 +236,20 @@ export default function PlaybackSettingsPanel() {
     { id: 'nextEpisodeButton', titleKey: 'interfaceSettings.nextEpisodeButton', descriptionKey: 'interfaceSettings.nextEpisodeButtonDescription', icon: ListVideo },
   ];
 
+  const qualityCard = (
+    <SettingsNavCard
+      href="/settings/quality"
+      icon={Gauge}
+      title={t('qualitySettings.cardTitle')}
+      description={t('qualitySettings.cardDescription')}
+    />
+  );
+
   if (sub && playbackItems.some((i) => i.id === sub)) {
     const item = playbackItems.find((i) => i.id === sub)!;
-    const Icon = item.icon;
     const backAndFrame = (
-      <div className="space-y-6">
-        <a href={BASE_URL} data-astro-prefetch className="inline-flex items-center gap-2 text-sm font-medium text-[var(--ds-accent-violet)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 rounded" aria-label={t('common.back')}>
-          <ArrowLeft className="w-4 h-4" aria-hidden />
-          <span>{t('common.back')}</span>
-        </a>
-        <div className="rounded-[var(--ds-radius-lg)] overflow-hidden bg-[var(--ds-surface-elevated)] border border-[var(--ds-border)]">
-          <div className="px-4 py-3 sm:px-5 sm:py-4 border-b border-[var(--ds-border)] flex items-center gap-3">
-            <span className="inline-flex w-10 h-10 rounded-xl flex-shrink-0 items-center justify-center" style={{ backgroundColor: ACCENT_ICON_BG, color: ACCENT_ICON_COLOR }} aria-hidden>
-              <Icon className="w-5 h-5" strokeWidth={1.8} />
-            </span>
-            <div>
-              <h2 className="ds-title-card text-[var(--ds-text-primary)]">{t(item.titleKey)}</h2>
-              <span className="ds-text-tertiary text-sm line-clamp-2">{t(item.descriptionKey)}</span>
-            </div>
-          </div>
-          <div className="p-4 sm:p-5 min-w-0">
+      <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}>
+        <div>
             {saved && <div className="ds-status-badge ds-status-badge--success w-fit mb-4" role="status">{t('common.success')}</div>}
             {sub === 'autoplay' && (
               <>
@@ -337,8 +330,7 @@ export default function PlaybackSettingsPanel() {
               </>
             )}
           </div>
-        </div>
-      </div>
+      </SettingsSubPageFrame>
     );
     return <div className="flex-1 py-4 px-4 sm:px-6 overflow-y-auto scrollbar-visible">{backAndFrame}</div>;
   }
@@ -346,33 +338,17 @@ export default function PlaybackSettingsPanel() {
   return (
     <div className="flex-1 py-4 px-4 sm:px-6 overflow-y-auto scrollbar-visible">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
-        {playbackItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <a key={item.id} href={`${BASE_URL}&sub=${item.id}`} data-astro-prefetch="hover" data-settings-card className="block min-w-0 rounded-[var(--ds-radius-lg)] overflow-hidden transition-all hover:scale-[1.01] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] focus-visible:overflow-visible">
-              <DsCard variant="elevated" className="h-full">
-                <DsCardSection className="flex flex-col h-full min-h-[120px]">
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="inline-flex w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex-shrink-0 items-center justify-center" style={{ backgroundColor: ACCENT_ICON_BG, color: ACCENT_ICON_COLOR }} aria-hidden>
-                      <Icon className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.8} />
-                    </span>
-                    <ChevronRight className="w-5 h-5 text-[var(--ds-text-tertiary)] flex-shrink-0 mt-0.5" aria-hidden />
-                  </div>
-                  <h2 className="ds-title-card text-[var(--ds-text-primary)] text-base sm:text-lg mt-3 truncate">{t(item.titleKey)}</h2>
-                  <span className="ds-text-tertiary text-sm mt-3 line-clamp-2">{t(item.cardDescriptionKey ?? item.descriptionKey)}</span>
-                  <span className="mt-auto pt-4 flex items-center gap-2 flex-wrap">
-                    {item.subscriptionOnly && (
-                      <span className="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded bg-amber-500/20 text-amber-400/90" aria-hidden>
-                        {t('settingsMenu.subscriptionOnlyBadge')}
-                      </span>
-                    )}
-                    <span className="text-xs font-medium text-[var(--ds-accent-violet)] flex items-center gap-1" aria-hidden>{t('common.open')}</span>
-                  </span>
-                </DsCardSection>
-              </DsCard>
-            </a>
-          );
-        })}
+        {qualityCard}
+        {playbackItems.map((item) => (
+          <SettingsNavCard
+            key={item.id}
+            href={`${BASE_URL}&sub=${item.id}`}
+            icon={item.icon}
+            title={t(item.titleKey)}
+            description={t(item.cardDescriptionKey ?? item.descriptionKey)}
+            badge={item.subscriptionOnly ? { text: t('settingsMenu.subscriptionOnlyBadge'), variant: 'subscription' } : undefined}
+          />
+        ))}
       </div>
     </div>
   );

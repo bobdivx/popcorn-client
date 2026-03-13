@@ -477,6 +477,33 @@
     "torrentsRecentLimit": "Section « Ajouts récents »",
     "torrentsRecentLimitDescription": "Nombre d'éléments dans la section ajouts récents (20-200)"
   },
+  "qualitySettings": {
+    "title": "Qualité des médias",
+    "subtitle": "Gérez la qualité de lecture du lecteur vidéo et la qualité préférée des médias téléchargés",
+    "cardTitle": "Qualité",
+    "cardDescription": "Qualité de lecture et qualité préférée pour les films et séries",
+    "playerQuality": "Qualité du lecteur vidéo",
+    "playerQualityDescription": "Résolution de lecture par défaut au démarrage d'une vidéo",
+    "playerQualityAuto": "Auto (adaptatif)",
+    "playerQualityAutoDesc": "Le lecteur sélectionne automatiquement la meilleure qualité selon votre connexion",
+    "playerQualityHighest": "Meilleure qualité disponible",
+    "playerQualityHighestDesc": "Force toujours la résolution la plus haute disponible, quelle que soit la connexion",
+    "playerQualityLowest": "Qualité minimale",
+    "playerQualityLowestDesc": "Force la résolution la plus basse pour économiser la bande passante",
+    "mediaQuality": "Qualité préférée des médias",
+    "mediaQualityDescription": "Qualité prioritaire pour les films et séries affichés sur le tableau de bord, Films et Séries",
+    "mediaQualityNote": "La qualité choisie est mise en priorité dans les résultats. Les autres qualités restent visibles et accessibles.",
+    "mediaQualityAll": "Toutes les qualités",
+    "mediaQualityAllDesc": "Aucune préférence, affiche tous les médias sans distinction",
+    "mediaQuality480p": "480p (SD)",
+    "mediaQuality480pDesc": "Définition standard, fichiers légers",
+    "mediaQuality720p": "720p (HD)",
+    "mediaQuality720pDesc": "Haute définition, bon équilibre qualité / taille",
+    "mediaQuality1080p": "1080p (Full HD)",
+    "mediaQuality1080pDesc": "Pleine haute définition, qualité optimale pour la plupart des écrans",
+    "mediaQuality4k": "4K / 2160p (Ultra HD)",
+    "mediaQuality4kDesc": "Ultra haute définition, fichiers volumineux, idéal pour les grands écrans"
+  },
   "playback": {
     "nextEpisode": "Épisode suivant",
     "playLabel": "Lire",
@@ -1830,7 +1857,7 @@
     },
     "uploads": {
       "title": "Uploads",
-      "subtitle": "Torrents du client — ajouter un tracker et publication tracker (C411)"
+      "subtitle": "Gérez la création de torrents, le seeding et la publication vers les trackers"
     },
     "indexerDefinitions": {
       "title": "Définitions d'indexeurs",

@@ -3,7 +3,6 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
 import { getUserConfig, saveUserConfigMerge } from '../../lib/api/popcorn-web';
 import type { Indexer } from '../../lib/client/types';
-import { DsCard, DsCardSection } from '../ui/design-system';
 import { List, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-preact';
 
 const iconProps = { size: 20, strokeWidth: 1.5 };
@@ -122,8 +121,8 @@ export default function LibraryIndexerPanel() {
         </div>
       )}
 
-      <DsCard variant="elevated">
-        <DsCardSection>
+      <div class="sc-frame">
+        <div class="sc-frame-body">
           <h3 className="text-base font-semibold text-[var(--ds-text-primary)] flex items-center gap-2 mb-4">
             <span
               className="inline-flex w-8 h-8 rounded-full items-center justify-center shrink-0 bg-[var(--ds-accent-violet-muted)] text-[var(--ds-accent-violet)]"
@@ -171,8 +170,8 @@ export default function LibraryIndexerPanel() {
           <p className="text-xs text-[var(--ds-text-tertiary)] mt-4">
             {t('settingsMenu.libraryIndexerPanel.hint')}
           </p>
-        </DsCardSection>
-      </DsCard>
+        </div>
+      </div>
     </div>
   );
 }

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'preact/hooks';
 import { ArrowLeft, Check, CircleX, Settings2, Trash2 } from 'lucide-preact';
 import { serverApi } from '../../lib/client/server-api';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { DsCard, DsCardSection } from '../ui/design-system';
 
 const TRACKERS = ['C411', 'TORR9', 'GF', 'G3MINI', 'PTP', 'BLU'] as const;
 const SAVED_MASK = '********';
@@ -184,8 +183,11 @@ export default function UploadTrackersManagerPanel() {
         <span>{t('common.back')}</span>
       </a>
 
-      <DsCard variant="elevated">
-        <DsCardSection title={t('settings.uploadTrackerPanel.manageTrackersTitle')}>
+      <div class="sc-frame">
+        <div class="sc-frame-header">
+          <div class="sc-frame-title">{t('settings.uploadTrackerPanel.manageTrackersTitle')}</div>
+        </div>
+        <div class="sc-frame-body">
           <p className="text-sm text-base-content/70 mb-4">
             {t('settings.uploadTrackerPanel.manageTrackersDescription')}
           </p>
@@ -250,11 +252,14 @@ export default function UploadTrackersManagerPanel() {
               </div>
             ))}
           </div>
-        </DsCardSection>
-      </DsCard>
+        </div>
+      </div>
 
-      <DsCard variant="elevated">
-        <DsCardSection title="C411">
+      <div class="sc-frame">
+        <div class="sc-frame-header">
+          <div class="sc-frame-title">C411</div>
+        </div>
+        <div class="sc-frame-body">
           <p className="text-sm text-base-content/70 mb-3">
             {t('settings.uploadTrackerPanel.manageC411Hint')}
           </p>
@@ -302,8 +307,8 @@ export default function UploadTrackersManagerPanel() {
               {saving ? t('common.loading') : t('settings.uploadTrackerPanel.saveCookies')}
             </button>
           </div>
-        </DsCardSection>
-      </DsCard>
+        </div>
+      </div>
 
       {loading && <p className="text-sm text-base-content/70">{t('common.loading')}</p>}
       {message && (
