@@ -1314,6 +1314,8 @@ interface IServerApiClientPublic {
   updateSyncSettings(settings: any): Promise<ApiResponse<void>>;
   clearSyncTorrents(): Promise<ApiResponse<number>>;
   downloadSyncLog(): Promise<ApiResponse<void>>;
+  getSyncHistory(limit?: number): Promise<ApiResponse<import('./client/server-api/sync.js').SyncHistoryEntry[]>>;
+  addSyncHistory(entry: Omit<import('./client/server-api/sync.js').SyncHistoryEntry, 'id'>): Promise<ApiResponse<import('./client/server-api/sync.js').SyncHistoryEntry>>;
 
   // System methods
   resetBackendDatabase(): Promise<ApiResponse<void>>;

@@ -8,10 +8,18 @@ import {
   Chart,
   ArcElement,
   DoughnutController,
+  BarController,
+  LineController,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  PointElement,
+  LineElement,
+  Filler,
   Tooltip,
   Legend,
 } from 'chart.js';
-import { Play, Square, RotateCcw, Settings, ChevronDown, ChevronUp, FileDown, Trash2, RefreshCw, AlertTriangle, Check, Activity, Database, Film, Tv2, Package } from 'lucide-preact';
+import { Play, Square, Settings, ChevronDown, ChevronUp, FileDown, Trash2, RefreshCw, AlertTriangle, Check, Activity, Database } from 'lucide-preact';
 import { serverApi } from '../../lib/client/server-api';
 import {
   getSyncStatusStore,
@@ -23,18 +31,210 @@ import { calculateSyncProgress } from '../../lib/utils/sync-progress';
 import { useI18n } from '../../lib/i18n/useI18n';
 import type { Indexer } from '../../lib/client/types';
 import { useNativeNotifications } from '../../hooks/useNativeNotifications';
+import type { SyncHistoryEntry } from '../../lib/client/server-api/sync.js';
 
-Chart.register(ArcElement, DoughnutController, Tooltip, Legend);
+Chart.register(ArcElement, DoughnutController, BarController, LineController, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Filler, Tooltip, Legend);
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/*  Graphique donut animé                                                      */
+/*  Helpers Chart.js communs                                                   */
 /* ─────────────────────────────────────────────────────────────────────────── */
-function SyncDonutChart({ films, series, others }: { films: number; series: number; others: number }) {
+const TOOLTIP_BASE = {
+  backgroundColor: 'rgba(8,8,18,0.95)',
+  padding: 10,
+  cornerRadius: 10,
+  borderColor: 'rgba(255,255,255,0.08)',
+  borderWidth: 1,
+  titleColor: 'rgba(255,255,255,0.5)',
+  bodyColor: 'rgba(255,255,255,0.85)',
+};
+
+function reAnimate(chart: Chart) {
+  chart.reset();
+  chart.update();
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/*  Graphique historique des syncs (line + bar mixte)                          */
+/* ─────────────────────────────────────────────────────────────────────────── */
+function SyncHistoryChart({ history, animKey }: { history: SyncHistoryEntry[]; animKey: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
-  const total = films + series + others;
 
-  // Créer le chart une seule fois
+  const buildData = (h: SyncHistoryEntry[]) => ({
+    labels: h.map(e => {
+      const d = new Date(e.synced_at);
+      return [
+        d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }),
+        d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      ];
+    }),
+    datasets: [
+      {
+        type: 'bar' as const,
+        label: 'Torrents',
+        data: h.map(e => e.total_count),
+        backgroundColor: h.map(e => e.success ? 'rgba(139,92,246,0.65)' : 'rgba(239,68,68,0.55)'),
+        borderColor: h.map(e => e.success ? 'rgba(167,139,250,0.9)' : 'rgba(239,68,68,0.9)'),
+        borderWidth: 1,
+        borderRadius: 6,
+        borderSkipped: false,
+        yAxisID: 'y',
+        order: 2,
+      },
+      {
+        type: 'line' as const,
+        label: 'Tendance',
+        data: h.map(e => e.total_count),
+        borderColor: 'rgba(251,191,36,0.7)',
+        backgroundColor: 'rgba(251,191,36,0.05)',
+        borderWidth: 1.5,
+        pointRadius: h.map(e => e.success ? 3 : 4),
+        pointBackgroundColor: h.map(e => e.success ? 'rgba(167,139,250,0.9)' : 'rgba(239,68,68,0.9)'),
+        pointBorderWidth: 0,
+        tension: 0.35,
+        fill: false,
+        yAxisID: 'y',
+        order: 1,
+      },
+    ],
+  });
+
+  useEffect(() => {
+    if (!canvasRef.current || history.length === 0) return;
+    chartRef.current = new Chart(canvasRef.current, {
+      type: 'bar',
+      data: buildData(history),
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 800, easing: 'easeInOutQuart' },
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            ...TOOLTIP_BASE,
+            callbacks: {
+              title: (items) => {
+                const idx = items[0]?.dataIndex;
+                if (idx === undefined) return '';
+                const e = history[idx];
+                return new Date(e.synced_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+              },
+              label: (ctx) => {
+                const idx = ctx.dataIndex;
+                const e = history[idx];
+                if (ctx.datasetIndex === 1) return '';
+                return [
+                  `  ${e.total_count.toLocaleString()} torrents`,
+                  `  Durée : ${e.duration_secs < 60 ? e.duration_secs + 's' : Math.floor(e.duration_secs / 60) + 'min'}`,
+                  `  ${e.success ? '✓ Réussite' : `✗ ${e.error_count} erreur(s)`}`,
+                ];
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            grid: { display: false },
+            ticks: {
+              color: 'rgba(255,255,255,0.35)',
+              font: { size: 9.5 },
+              maxRotation: 0,
+              minRotation: 0,
+              autoSkip: true,
+              autoSkipPadding: 6,
+            },
+            border: { display: false },
+          },
+          y: {
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: { color: 'rgba(255,255,255,0.28)', font: { size: 10 }, callback: (v) => Number(v).toLocaleString() },
+            border: { color: 'rgba(255,255,255,0.05)' },
+          },
+        },
+      },
+    });
+    return () => { chartRef.current?.destroy(); chartRef.current = null; };
+  }, [history.length]);
+
+  useEffect(() => {
+    if (!chartRef.current || history.length === 0) return;
+    const d = buildData(history);
+    chartRef.current.data = d;
+    chartRef.current.update('active');
+  }, [JSON.stringify(history.map(e => e.total_count + e.synced_at))]);
+
+  useEffect(() => {
+    if (!chartRef.current || animKey === 0) return;
+    reAnimate(chartRef.current);
+  }, [animKey]);
+
+  return <div class="sync-chart-wrap" style="height:140px"><canvas ref={canvasRef} /></div>;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/*  Mini donut — tuile individuelle                                            */
+/* ─────────────────────────────────────────────────────────────────────────── */
+function SyncMiniDonut({ value, total, color, label, animKey }: {
+  value: number; total: number; color: string; label: string; animKey: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
+  const rest = Math.max(total - value, 0);
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    chartRef.current = new Chart(canvasRef.current, {
+      type: 'doughnut',
+      data: {
+        datasets: [{
+          data: [value || 0.001, rest || 0.001],
+          backgroundColor: [color, 'rgba(255,255,255,0.06)'],
+          borderWidth: 0,
+          hoverOffset: 0,
+        }],
+      },
+      options: {
+        cutout: '76%',
+        animation: { duration: 700, easing: 'easeInOutQuart' },
+        events: [],
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+      },
+    });
+    return () => { chartRef.current?.destroy(); chartRef.current = null; };
+  }, []);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    chartRef.current.data.datasets[0].data = [value || 0.001, Math.max(total - value, 0.001)];
+    chartRef.current.update('active');
+  }, [value, total]);
+
+  useEffect(() => {
+    if (!chartRef.current || animKey === 0) return;
+    reAnimate(chartRef.current);
+  }, [animKey]);
+
+  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+  return (
+    <div class="sync-mini-donut-wrap">
+      <canvas ref={canvasRef} style="width:64px;height:64px" />
+      <div class="sync-mini-donut-center">
+        <span class="sync-mini-pct">{pct}%</span>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/*  Donut de répartition (grand)                                               */
+/* ─────────────────────────────────────────────────────────────────────────── */
+function SyncDonutChart({ films, series, others, animKey }: {
+  films: number; series: number; others: number; animKey: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
+
   useEffect(() => {
     if (!canvasRef.current) return;
     chartRef.current = new Chart(canvasRef.current, {
@@ -43,93 +243,191 @@ function SyncDonutChart({ films, series, others }: { films: number; series: numb
         labels: ['Films', 'Séries', 'Autres'],
         datasets: [{
           data: [films || 0.001, series || 0.001, others || 0.001],
-          backgroundColor: [
-            'rgba(251,191,36,0.88)',
-            'rgba(139,92,246,0.88)',
-            'rgba(34,197,94,0.88)',
-          ],
-          borderColor: 'rgba(255,255,255,0.04)',
+          backgroundColor: ['rgba(251,191,36,0.88)', 'rgba(139,92,246,0.88)', 'rgba(34,197,94,0.88)'],
+          borderColor: 'rgba(255,255,255,0.03)',
           borderWidth: 2,
-          hoverOffset: 10,
+          hoverOffset: 8,
         }],
       },
       options: {
-        cutout: '74%',
-        animation: { duration: 800, easing: 'easeInOutQuart' },
+        cutout: '72%',
+        animation: { duration: 900, easing: 'easeInOutQuart' },
         plugins: {
           legend: { display: false },
-          tooltip: {
-            backgroundColor: 'rgba(10,10,20,0.92)',
-            padding: 10,
-            cornerRadius: 10,
-            callbacks: {
-              label: (ctx) => `  ${ctx.label}: ${ctx.parsed.toLocaleString()}`,
-            },
-          },
+          tooltip: { ...TOOLTIP_BASE, callbacks: { label: (ctx) => `  ${ctx.label}: ${ctx.parsed.toLocaleString()}` } },
         },
       },
     });
-    return () => {
-      chartRef.current?.destroy();
-      chartRef.current = null;
-    };
+    return () => { chartRef.current?.destroy(); chartRef.current = null; };
   }, []);
 
-  // Mettre à jour les données
   useEffect(() => {
     if (!chartRef.current) return;
-    const d = chartRef.current.data.datasets[0];
-    d.data = [films || 0.001, series || 0.001, others || 0.001];
+    chartRef.current.data.datasets[0].data = [films || 0.001, series || 0.001, others || 0.001];
     chartRef.current.update('active');
   }, [films, series, others]);
 
+  useEffect(() => {
+    if (!chartRef.current || animKey === 0) return;
+    reAnimate(chartRef.current);
+  }, [animKey]);
+
+  const total = films + series + others;
   return (
     <div class="sync-donut-wrap">
       <canvas ref={canvasRef} />
-      {total > 0 && (
-        <div class="sync-donut-center">
-          <span class="sync-donut-total">{total.toLocaleString()}</span>
-          <span class="sync-donut-label">total</span>
-        </div>
-      )}
-      {total === 0 && (
-        <div class="sync-donut-center">
-          <Database class="w-7 h-7" style="opacity:0.25" />
-        </div>
-      )}
+      <div class="sync-donut-center">
+        {total > 0 ? (
+          <>
+            <span class="sync-donut-total">{total.toLocaleString()}</span>
+            <span class="sync-donut-label">total</span>
+          </>
+        ) : (
+          <Database class="w-6 h-6" style="opacity:0.2" />
+        )}
+      </div>
     </div>
   );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */
-/*  Compteur animé                                                             */
+/*  Bar chart horizontal                                                       */
 /* ─────────────────────────────────────────────────────────────────────────── */
-function AnimatedNumber({ value }: { value: number }) {
-  const [display, setDisplay] = useState(value);
-  const prevRef = useRef(value);
+interface BarChartItem { label: string; value: number; color: string; }
+
+function SyncBarChart({ items, animKey }: { items: BarChartItem[]; animKey: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
 
   useEffect(() => {
-    const start = prevRef.current;
-    if (start === value) return;
-    const diff = value - start;
-    const steps = 24;
-    let step = 0;
-    const iv = setInterval(() => {
-      step++;
-      const t = step / steps;
-      const eased = 1 - Math.pow(1 - t, 3);
-      const next = Math.round(start + diff * eased);
-      setDisplay(next);
-      if (step >= steps) {
-        clearInterval(iv);
-        setDisplay(value);
-        prevRef.current = value;
-      }
-    }, 600 / steps);
-    return () => clearInterval(iv);
-  }, [value]);
+    if (!canvasRef.current) return;
+    const max = Math.max(...items.map(i => i.value), 1);
+    chartRef.current = new Chart(canvasRef.current, {
+      type: 'bar',
+      data: {
+        labels: items.map(i => i.label),
+        datasets: [{
+          data: items.map(i => i.value),
+          backgroundColor: items.map(i => i.color),
+          borderWidth: 0,
+          borderRadius: 8,
+          borderSkipped: false,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        animation: { duration: 900, easing: 'easeInOutQuart' },
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: { ...TOOLTIP_BASE, callbacks: { label: (ctx) => `  ${ctx.parsed.x.toLocaleString()}` } },
+        },
+        scales: {
+          x: {
+            max,
+            grid: { color: 'rgba(255,255,255,0.04)' },
+            ticks: { color: 'rgba(255,255,255,0.28)', font: { size: 10 }, callback: (v) => Number(v).toLocaleString() },
+            border: { color: 'rgba(255,255,255,0.05)' },
+          },
+          y: {
+            grid: { display: false },
+            ticks: { color: 'rgba(255,255,255,0.55)', font: { size: 11 } },
+            border: { display: false },
+          },
+        },
+      },
+    });
+    return () => { chartRef.current?.destroy(); chartRef.current = null; };
+  }, []);
 
-  return <>{display.toLocaleString()}</>;
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const max = Math.max(...items.map(i => i.value), 1);
+    chartRef.current.data.datasets[0].data = items.map(i => i.value);
+    (chartRef.current.options.scales!.x as Record<string, unknown>).max = max;
+    chartRef.current.update('active');
+  }, [items.map(i => i.value).join(',')]);
+
+  useEffect(() => {
+    if (!chartRef.current || animKey === 0) return;
+    reAnimate(chartRef.current);
+  }, [animKey]);
+
+  return (
+    <div class="sync-chart-wrap" style="height:88px">
+      <canvas ref={canvasRef} />
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────────────────────────────────── */
+/*  Bar chart groupé par indexer                                               */
+/* ─────────────────────────────────────────────────────────────────────────── */
+function SyncIndexerBarChart({ indexers, statsByIndexer, animKey }: {
+  indexers: Indexer[];
+  statsByIndexer?: Record<string, Record<string, number>>;
+  animKey: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<Chart | null>(null);
+
+  const getStats = (idx: Indexer) => {
+    const s = statsByIndexer?.[idx.name] ?? statsByIndexer?.[idx.id] ?? {};
+    return { films: Number(s.films ?? 0), series: Number(s.series ?? 0), others: Number(s.others ?? 0) };
+  };
+
+  const buildData = () => ({
+    labels: indexers.map(i => i.name),
+    datasets: [
+      { label: '🎬 Films',  data: indexers.map(i => getStats(i).films),  backgroundColor: 'rgba(251,191,36,0.8)',  borderRadius: 5, borderSkipped: false },
+      { label: '📺 Séries', data: indexers.map(i => getStats(i).series), backgroundColor: 'rgba(139,92,246,0.8)',  borderRadius: 5, borderSkipped: false },
+      { label: '📦 Autres', data: indexers.map(i => getStats(i).others), backgroundColor: 'rgba(34,197,94,0.75)',  borderRadius: 5, borderSkipped: false },
+    ],
+  });
+
+  useEffect(() => {
+    if (!canvasRef.current) return;
+    chartRef.current = new Chart(canvasRef.current, {
+      type: 'bar',
+      data: buildData(),
+      options: {
+        animation: { duration: 900, easing: 'easeInOutQuart' },
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true, position: 'bottom', labels: { color: 'rgba(255,255,255,0.45)', font: { size: 10 }, boxWidth: 8, padding: 10 } },
+          tooltip: { ...TOOLTIP_BASE, callbacks: { label: (ctx) => `  ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()}` } },
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.45)', font: { size: 10 } }, border: { display: false } },
+          y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 10 }, callback: (v) => Number(v).toLocaleString() }, border: { color: 'rgba(255,255,255,0.05)' } },
+        },
+      },
+    });
+    return () => { chartRef.current?.destroy(); chartRef.current = null; };
+  }, [indexers.map(i => i.id).join(',')]);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const d = buildData();
+    chartRef.current.data.datasets[0].data = d.datasets[0].data;
+    chartRef.current.data.datasets[1].data = d.datasets[1].data;
+    chartRef.current.data.datasets[2].data = d.datasets[2].data;
+    chartRef.current.update('active');
+  }, [JSON.stringify(statsByIndexer)]);
+
+  useEffect(() => {
+    if (!chartRef.current || animKey === 0) return;
+    reAnimate(chartRef.current);
+  }, [animKey]);
+
+  const height = Math.max(110, indexers.length * 32 + 55);
+  return (
+    <div class="sync-chart-wrap" style={`height:${height}px`}>
+      <canvas ref={canvasRef} />
+    </div>
+  );
 }
 
 /* ─────────────────────────────────────────────────────────────────────────── */
@@ -177,6 +475,16 @@ function formatFrequency(minutes: number): string {
   return `${minutes} min`;
 }
 
+function formatNextSync(lastSync: number | null, frequencyMin: number): string {
+  if (!lastSync) return 'bientôt';
+  const nextTs = lastSync * 1000 + frequencyMin * 60 * 1000;
+  const diff = Math.round((nextTs - Date.now()) / 1000);
+  if (diff <= 0) return 'imminent';
+  if (diff < 60) return `${diff}s`;
+  if (diff < 3600) return `${Math.floor(diff / 60)} min`;
+  return `${Math.floor(diff / 3600)} h`;
+}
+
 /* ─────────────────────────────────────────────────────────────────────────── */
 /*  Composant principal                                                        */
 /* ─────────────────────────────────────────────────────────────────────────── */
@@ -192,10 +500,20 @@ export default function SyncDashboard() {
   const [selectedIndexerIds, setSelectedIndexerIds] = useState<string[] | null>(null);
   const [filmsQueriesText, setFilmsQueriesText] = useState('');
   const [seriesQueriesText, setSeriesQueriesText] = useState('');
+  const [animKey, setAnimKey] = useState(0);
+  const [syncHistory, setSyncHistory] = useState<SyncHistoryEntry[]>([]);
   const prevSyncRef = useRef(false);
+  const syncStartRef = useRef<{ time: number } | null>(null);
   const loadIndexersRef = useRef(false);
 
   const { notifySyncStart, notifySyncError } = useNativeNotifications();
+
+  /* Charger l'historique depuis l'API backend */
+  useEffect(() => {
+    serverApi.getSyncHistory(50).then(r => {
+      if (r.success && r.data) setSyncHistory(r.data);
+    }).catch(() => { /* silencieux */ });
+  }, []);
 
   /* Abonnement au store */
   useEffect(() => {
@@ -223,13 +541,37 @@ export default function SyncDashboard() {
     return () => clearInterval(iv);
   }, [status?.sync_in_progress, status?.sync_start_time]);
 
-  /* Recharger les indexers quand la sync se termine */
+  /* Animer les charts + sauvegarder historique quand la sync change d'état */
   useEffect(() => {
-    const inProgress = Boolean(status?.sync_in_progress);
-    if (prevSyncRef.current && !inProgress) {
-      setTimeout(() => { refreshSyncStatusStore(); loadIndexers(); }, 1000);
+    const nowInProgress = Boolean(status?.sync_in_progress);
+    if (prevSyncRef.current !== nowInProgress) {
+      setAnimKey(k => k + 1);
+      if (nowInProgress) {
+        // Sync démarre — noter le timestamp de départ
+        syncStartRef.current = { time: Date.now() };
+      } else if (prevSyncRef.current && !nowInProgress) {
+        // Sync vient de se terminer — sauvegarder dans la DB
+        const duration = syncStartRef.current
+          ? Math.round((Date.now() - syncStartRef.current.time) / 1000)
+          : 0;
+        syncStartRef.current = null;
+        const errorsArr = status?.progress?.errors ?? [];
+        const entry = {
+          synced_at: Date.now(),
+          total_count: Number(status?.stats?.films ?? 0) + Number(status?.stats?.series ?? 0) + Number(status?.stats?.others ?? 0),
+          duration_secs: duration,
+          success: errorsArr.length === 0,
+          error_count: errorsArr.length,
+        };
+        serverApi.addSyncHistory(entry).then(r => {
+          if (r.success && r.data) {
+            setSyncHistory(prev => [...prev.slice(-49), r.data!]);
+          }
+        }).catch(() => { /* silencieux */ });
+        setTimeout(() => { refreshSyncStatusStore(); loadIndexers(); }, 1000);
+      }
     }
-    prevSyncRef.current = inProgress;
+    prevSyncRef.current = nowInProgress;
   }, [status?.sync_in_progress]);
 
   /* Chargement des indexers */
@@ -385,333 +727,210 @@ export default function SyncDashboard() {
   return (
     <div class="sync-dash">
 
-      {/* Bannière erreur/succès */}
-      {error && (
-        <div class="sync-banner sync-banner--error" role="alert">
-          <AlertTriangle class="w-4 h-4 flex-shrink-0" />
-          <span>{error}</span>
-          <button type="button" class="ml-auto" onClick={() => setError('')} aria-label="Fermer">✕</button>
-        </div>
-      )}
-      {success && (
-        <div class="sync-banner sync-banner--success" role="status">
-          <Check class="w-4 h-4 flex-shrink-0" />
-          <span>{success}</span>
-        </div>
-      )}
-
-      {/* ── HERO CARD ─────────────────────────────────────── */}
+      {/* ── HERO BAR ─────────────────────────────────────── */}
       <div class={`sync-hero sc-frame${inProgress ? ' sync-hero--active' : ''}`}>
-        <div class="sync-hero-content">
-          <div class="sync-hero-info">
-            {/* Status badge */}
+        <div class="sync-hero-row">
+          <div class="sync-hero-left">
             <div class={`sync-status-badge${inProgress ? ' sync-status-badge--live' : ''}`}>
-              {inProgress ? (
-                <>
-                  <span class="sync-pulse-dot" />
-                  {t('torrentSyncManager.inProgress')}
-                  {trigger === 'scheduled' && <span class="sync-trigger-tag">{t('torrentSyncManager.syncTriggerScheduled')}</span>}
-                  {trigger === 'manual' && <span class="sync-trigger-tag">{t('torrentSyncManager.syncTriggerManual')}</span>}
-                </>
-              ) : (
-                <>
-                  <span class="sync-idle-dot" />
-                  {t('torrentSyncManager.inactive')}
-                </>
-              )}
+              {inProgress
+                ? <><span class="sync-pulse-dot" />{t('torrentSyncManager.inProgress')}{trigger && <span class="sync-trigger-tag">{trigger}</span>}</>
+                : <><span class="sync-idle-dot" />{t('torrentSyncManager.inactive')}</>
+              }
             </div>
-
-            {/* Infos timing */}
             <div class="sync-hero-meta">
-              {inProgress && elapsedTime > 0 && (
-                <div class="sync-meta-item">
-                  <Activity class="w-3.5 h-3.5" />
-                  <span>{t('torrentSyncManager.elapsedSince')} {formatElapsed(elapsedTime)}</span>
-                </div>
-              )}
-              <div class="sync-meta-item">
-                <RefreshCw class="w-3.5 h-3.5" />
-                <span>{t('torrentSyncManager.lastSync')}: {formatLastSync(status.last_sync_date, language)}</span>
-              </div>
-              {isEnabled && !inProgress && (
-                <div class="sync-meta-item">
-                  <span>Auto: {formatFrequency(frequencyMin)}</span>
-                </div>
-              )}
+              {inProgress && elapsedTime > 0 && <span class="sync-meta-item"><Activity class="w-3 h-3" />{formatElapsed(elapsedTime)}</span>}
+              <span class="sync-meta-item"><RefreshCw class="w-3 h-3" />{formatLastSync(status.last_sync_date, language)}</span>
+              {isEnabled && !inProgress && <span class="sync-meta-item">Auto · {formatFrequency(frequencyMin)}</span>}
             </div>
           </div>
-
-          {/* Bouton principal PLAY/STOP */}
           <div class="sync-hero-actions">
+            {error && <span class="sync-inline-error"><AlertTriangle class="w-3.5 h-3.5" /><span>{error}</span><button type="button" onClick={() => setError('')}>✕</button></span>}
+            {success && <span class="sync-inline-success"><Check class="w-3.5 h-3.5" /></span>}
+            <button type="button" class="sync-btn-icon" onClick={() => serverApi.downloadSyncLog?.()} title={t('torrentSyncManager.downloadLog')}><FileDown class="w-4 h-4" /></button>
             {!inProgress ? (
-              <button
-                type="button"
-                class="sync-btn-play"
-                onClick={() => void handleStartSync()}
-                disabled={syncing}
-                aria-label={t('torrentSyncManager.launchSync')}
-              >
-                {syncing
-                  ? <span class="loading loading-spinner loading-sm" />
-                  : <Play class="w-7 h-7" fill="currentColor" />
-                }
+              <button type="button" class="sync-btn-play" onClick={() => void handleStartSync()} disabled={syncing}>
+                {syncing ? <span class="loading loading-spinner loading-xs" /> : <Play class="w-4 h-4" fill="currentColor" />}
                 <span>{t('torrentSyncManager.launchSync')}</span>
               </button>
             ) : (
-              <button
-                type="button"
-                class="sync-btn-stop"
-                onClick={() => void handleStopSync()}
-                disabled={syncing}
-                aria-label={t('torrentSyncManager.stopSync')}
-              >
-                {syncing
-                  ? <span class="loading loading-spinner loading-sm" />
-                  : <Square class="w-5 h-5" fill="currentColor" />
-                }
+              <button type="button" class="sync-btn-stop" onClick={() => void handleStopSync()} disabled={syncing}>
+                {syncing ? <span class="loading loading-spinner loading-xs" /> : <Square class="w-3.5 h-3.5" fill="currentColor" />}
                 <span>{t('torrentSyncManager.stopSync')}</span>
               </button>
             )}
-            <button
-              type="button"
-              class="sync-btn-icon"
-              onClick={() => serverApi.downloadSyncLog?.()}
-              title={t('torrentSyncManager.downloadLog')}
-              aria-label={t('torrentSyncManager.downloadLog')}
-            >
-              <FileDown class="w-4 h-4" />
-            </button>
           </div>
         </div>
 
-        {/* Barre de progression (pendant sync) */}
         {inProgress && (
           <div class="sync-hero-progress">
             <div class="sync-progress-header">
               <span class="sync-phase-tag">Phase {phase}/2</span>
               {currentIndexer && (
                 <span class="sync-current-info">
-                  <span class="font-medium text-[var(--ds-accent-violet)]">{currentIndexer}</span>
-                  {currentCategory && <span class="text-[var(--ds-text-tertiary)]"> · {currentCategory}</span>}
-                  {currentQuery && <span class="text-[var(--ds-text-tertiary)] truncate max-w-[160px]"> · {currentQuery}</span>}
+                  <span style="color:var(--ds-accent-violet);font-weight:600">{currentIndexer}</span>
+                  {currentCategory && <span> · {currentCategory}</span>}
+                  {currentQuery && <span class="truncate"> · {currentQuery}</span>}
                 </span>
               )}
-              <span class="ml-auto text-xs font-bold text-[var(--ds-accent-violet)]">{progressPercent}%</span>
+              <span style="margin-left:auto;font-weight:700;color:var(--ds-accent-violet);font-size:11px">{progressPercent}%</span>
             </div>
             <SyncProgressBar percent={progressPercent} animated={progressPercent < 5} />
-            {toProcess > 0 && (
-              <p class="text-xs text-[var(--ds-text-tertiary)] mt-1">
-                {t('torrentSyncManager.torrentProcessing')}: {processed.toLocaleString()} / {toProcess.toLocaleString()}
-              </p>
-            )}
+            {toProcess > 0 && <p class="sync-progress-count">{processed.toLocaleString()} / {toProcess.toLocaleString()}</p>}
           </div>
         )}
       </div>
 
-      {/* ── STATS ──────────────────────────────────────────── */}
-      <div class="sync-stats-grid">
-        <div class="sync-stat-card sync-stat-card--yellow">
-          <div class="sync-stat-icon">🎬</div>
-          <div class="sync-stat-value"><AnimatedNumber value={films} /></div>
-          <div class="sync-stat-label">{t('torrentSyncManager.films')}</div>
-        </div>
-        <div class="sync-stat-card sync-stat-card--violet">
-          <div class="sync-stat-icon">📺</div>
-          <div class="sync-stat-value"><AnimatedNumber value={series} /></div>
-          <div class="sync-stat-label">{t('torrentSyncManager.series')}</div>
-        </div>
-        <div class="sync-stat-card sync-stat-card--green">
-          <div class="sync-stat-icon">📦</div>
-          <div class="sync-stat-value"><AnimatedNumber value={others} /></div>
-          <div class="sync-stat-label">{t('torrentSyncManager.others')}</div>
-        </div>
-        <div class="sync-stat-card sync-stat-card--neutral">
-          <div class="sync-stat-icon">
-            <Database class="w-6 h-6" />
-          </div>
-          <div class="sync-stat-value"><AnimatedNumber value={total} /></div>
-          <div class="sync-stat-label">{t('torrentSyncManager.totalSynced')}</div>
-        </div>
-      </div>
+      {hasTorrents ? (<>
 
-      {/* ── GRAPHIQUES ─────────────────────────────────────── */}
-      {hasTorrents && (
-        <div class="sync-charts-row">
-          {/* Donut */}
-          <div class="sc-frame sync-donut-card">
-            <div class="sc-frame-header">
-              <div class="sc-frame-title">{t('torrentSyncManager.distributionChart')}</div>
-            </div>
-            <div class="sc-frame-body sync-charts-content">
-              <SyncDonutChart films={films} series={series} others={others} />
-              <div class="sync-legend">
-                <div class="sync-legend-item">
-                  <span class="sync-legend-dot" style="background:rgba(251,191,36,0.9)" />
-                  <span class="sync-legend-name">Films</span>
-                  <span class="sync-legend-val">{films.toLocaleString()}</span>
-                </div>
-                <div class="sync-legend-item">
-                  <span class="sync-legend-dot" style="background:rgba(139,92,246,0.9)" />
-                  <span class="sync-legend-name">Séries</span>
-                  <span class="sync-legend-val">{series.toLocaleString()}</span>
-                </div>
-                <div class="sync-legend-item">
-                  <span class="sync-legend-dot" style="background:rgba(34,197,94,0.9)" />
-                  <span class="sync-legend-name">Autres</span>
-                  <span class="sync-legend-val">{others.toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
+        {/* ── TUILES — 4 KPIs uniques ─────────────────────── */}
+        <div class="sync-tiles-grid">
+
+          {/* KPI 1 : Total synchronisé */}
+          <div class="sync-tile sync-tile--violet">
+            <span class="sync-tile-label">Total synchronisé</span>
+            <span class="sync-tile-value sync-tile-value--xl">{total.toLocaleString()}</span>
+            <span class="sync-tile-sub">torrents</span>
           </div>
 
-          {/* TMDB */}
-          {tmdb && tmdbTotal > 0 && (
-            <div class="sc-frame sync-tmdb-card">
-              <div class="sc-frame-header">
-                <div class="sc-frame-title">TMDB</div>
-                <div class="sc-frame-desc">{t('torrentSyncManager.tmdbEnrichmentThisIndexer')}</div>
-              </div>
-              <div class="sc-frame-body">
-                {/* Ring % */}
-                <div class="sync-tmdb-pct-ring">
-                  <svg viewBox="0 0 44 44" class="sync-tmdb-ring-svg">
-                    <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="5" />
-                    <circle
-                      cx="22" cy="22" r="18" fill="none"
-                      stroke="var(--ds-accent-green)"
-                      stroke-width="5"
-                      stroke-dasharray={`${(tmdbPercent / 100) * 113} 113`}
-                      stroke-linecap="round"
-                      transform="rotate(-90 22 22)"
-                      style="transition:stroke-dasharray 0.8s ease"
-                    />
-                  </svg>
-                  <div class="sync-tmdb-ring-center">
-                    <span class="sync-tmdb-pct">{tmdbPercent}%</span>
-                    <span class="sync-tmdb-pct-label">enrichi</span>
-                  </div>
-                </div>
-                <div class="sync-tmdb-stats">
-                  <div class="sync-tmdb-row sync-tmdb-row--green">
-                    <div class="sync-tmdb-row-label">✓ avec TMDB</div>
-                    <div class="sync-tmdb-row-val">{tmdb.with_tmdb.toLocaleString()}</div>
-                  </div>
-                  <div class="sync-tmdb-row sync-tmdb-row--amber">
-                    <div class="sync-tmdb-row-label">⚠ sans TMDB</div>
-                    <div class="sync-tmdb-row-val">{tmdb.without_tmdb.toLocaleString()}</div>
-                  </div>
-                </div>
-              </div>
+          {/* KPI 2 : Enrichissement TMDB */}
+          {tmdb && tmdbTotal > 0 ? (
+            <div class="sync-tile sync-tile--green">
+              <span class="sync-tile-label">Enrichissement TMDB</span>
+              <SyncMiniDonut value={tmdb.with_tmdb} total={tmdbTotal} color="rgba(34,197,94,0.85)" label="TMDB" animKey={animKey} />
+              <span class="sync-tile-value">{tmdbPercent}%</span>
+              <span class="sync-tile-sub">{tmdb.with_tmdb.toLocaleString()} / {tmdbTotal.toLocaleString()}</span>
+            </div>
+          ) : (
+            <div class="sync-tile sync-tile--neutral">
+              <span class="sync-tile-label">TMDB</span>
+              <span class="sync-tile-value" style="opacity:0.3">—</span>
+              <span class="sync-tile-sub">non disponible</span>
             </div>
           )}
-        </div>
-      )}
 
-      {/* ── PROGRESSION EN TEMPS RÉEL ────────────────────── */}
-      {inProgress && logLines.length > 0 && (
-        <div class="sc-frame sync-log-card">
-          <div class="sc-frame-header">
-            <div class="sc-frame-icon">
-              <Activity class="w-5 h-5" aria-hidden />
-            </div>
-            <div>
-              <div class="sc-frame-title">{t('torrentSyncManager.activityLogTitle')}</div>
-              <div class="sc-frame-desc">{t('torrentSyncManager.recentActivity')}</div>
-            </div>
-          </div>
-          <div class="sc-frame-body">
-            <div class="sync-log-lines">
-              {logLines.map((line, i) => (
-                <div key={i} class="sync-log-line">
-                  <span class="sync-log-dot" />
-                  <span class="sync-log-text">{line}</span>
-                </div>
+          {/* KPI 3 : Indexers actifs */}
+          <div class="sync-tile sync-tile--yellow">
+            <span class="sync-tile-label">Indexers actifs</span>
+            <span class="sync-tile-value sync-tile-value--xl">{indexers.length}</span>
+            <div class="sync-tile-chips">
+              {indexers.slice(0, 3).map(idx => (
+                <span key={idx.id} class="sync-tile-chip">{idx.name}</span>
               ))}
+              {indexers.length > 3 && <span class="sync-tile-chip">+{indexers.length - 3}</span>}
             </div>
+          </div>
+
+          {/* KPI 4 : Prochaine sync auto */}
+          <div class="sync-tile sync-tile--neutral">
+            <span class="sync-tile-label">Prochaine sync</span>
+            {isEnabled && !inProgress ? (
+              <>
+                <span class="sync-tile-value" style="font-size:1rem">{formatNextSync(status.last_sync_date, frequencyMin)}</span>
+                <span class="sync-tile-sub">Auto · {formatFrequency(frequencyMin)}</span>
+              </>
+            ) : inProgress ? (
+              <>
+                <span class="sync-tile-value" style="font-size:1rem;color:var(--ds-accent-violet)">En cours</span>
+                <span class="sync-tile-sub">{elapsedTime > 0 ? formatElapsed(elapsedTime) : '…'}</span>
+              </>
+            ) : (
+              <>
+                <span class="sync-tile-value" style="opacity:0.3">—</span>
+                <span class="sync-tile-sub">Auto désactivé</span>
+              </>
+            )}
           </div>
         </div>
-      )}
 
-      {/* ── ÉTAT VIDE ────────────────────────────────────── */}
-      {!hasTorrents && !inProgress && (
-        <div class="sc-frame sync-empty-card">
-          <div class="sc-frame-body" style="text-align:center;padding:2rem 1rem">
-            <div class="sync-empty-icon">
-              <Database class="w-10 h-10" style="opacity:0.3" />
-            </div>
-            <p class="text-[var(--ds-text-secondary)] font-medium mt-3">
-              {t('torrentSyncManager.noTorrentsSynced')}
-            </p>
-            <p class="text-[var(--ds-text-tertiary)] text-sm mt-1">
-              {indexers.length === 0
-                ? t('torrentSyncManager.mustConfigureIndexer')
-                : t('torrentSyncManager.noContentInDatabase')}
-            </p>
-          </div>
-        </div>
-      )}
+        {/* ── GRAPHIQUES — 3 vues différentes ─────────────── */}
+        <div class="sync-charts-grid">
 
-      {/* ── INDEXERS ─────────────────────────────────────── */}
-      {indexers.length > 0 && (
-        <div class="sc-frame">
-          <div class="sc-frame-header">
-            <div class="sc-frame-icon">
-              <Activity class="w-5 h-5" aria-hidden />
-            </div>
-            <div>
-              <div class="sc-frame-title">{t('torrentSyncManager.activeIndexers')}</div>
-              <div class="sc-frame-desc">{indexers.length} indexer{indexers.length > 1 ? 's' : ''} actif{indexers.length > 1 ? 's' : ''}</div>
+          {/* Chart 1 : Répartition par type (films/séries/autres) */}
+          <div class="sync-chart-card">
+            <div class="sync-chart-card-title">Répartition par type</div>
+            <div class="sync-chart-card-body sync-chart-card-body--donut">
+              <SyncDonutChart films={films} series={series} others={others} animKey={animKey} />
+              <div class="sync-legend">
+                <div class="sync-legend-item"><span class="sync-legend-dot" style="background:rgba(251,191,36,0.9)" /><span class="sync-legend-name">Films</span><span class="sync-legend-val">{films.toLocaleString()}</span></div>
+                <div class="sync-legend-item"><span class="sync-legend-dot" style="background:rgba(139,92,246,0.9)" /><span class="sync-legend-name">Séries</span><span class="sync-legend-val">{series.toLocaleString()}</span></div>
+                <div class="sync-legend-item"><span class="sync-legend-dot" style="background:rgba(34,197,94,0.9)" /><span class="sync-legend-name">Autres</span><span class="sync-legend-val">{others.toLocaleString()}</span></div>
+              </div>
             </div>
           </div>
-          <div class="sc-frame-body">
-            <div class="sync-indexers-grid">
-              {indexers.map((idx) => {
-                const byCat = status.stats_by_indexer?.[idx.name] ?? status.stats_by_indexer?.[idx.id] ?? {};
-                const iFilms = Number(byCat.films ?? 0);
-                const iSeries = Number(byCat.series ?? 0);
-                const iOthers = Number(byCat.others ?? 0);
-                const iTotal = iFilms + iSeries + iOthers;
-                const isCurrent = inProgress && (status.progress?.current_indexer === idx.name || status.progress?.current_indexer === idx.id);
+
+          {/* Chart 2 : Par indexer — vrai breakdown par source */}
+          <div class="sync-chart-card">
+            <div class="sync-chart-card-title">{t('torrentSyncManager.statsByIndexer')}</div>
+            <div class="sync-chart-card-body">
+              <SyncIndexerBarChart indexers={indexers} statsByIndexer={status.stats_by_indexer} animKey={animKey} />
+            </div>
+          </div>
+
+          {/* Chart 3 : Historique des syncs — pleine largeur */}
+          <div class="sync-chart-card sync-chart-card--wide">
+            <div class="sync-chart-card-title">
+              Historique des synchronisations
+              {syncHistory.length > 0 && (() => {
+                const ok = syncHistory.filter(e => e.success).length;
+                const pct = Math.round((ok / syncHistory.length) * 100);
                 return (
-                  <div key={idx.id} class={`sync-indexer-card${isCurrent ? ' sync-indexer-card--active' : ''}`}>
-                    <div class="sync-indexer-header">
-                      <div class="sync-indexer-icon">
-                        <Activity class="w-4 h-4" />
-                      </div>
-                      <div class="sync-indexer-name">{idx.name}</div>
-                      {isCurrent && (
-                        <div class="sync-indexer-live">
-                          <span class="sync-pulse-dot sync-pulse-dot--sm" />
-                          live
-                        </div>
-                      )}
-                    </div>
-                    <div class="sync-indexer-stats">
-                      <div class="sync-indexer-stat">
-                        <span class="sync-indexer-stat-icon">🎬</span>
-                        <span><AnimatedNumber value={iFilms} /></span>
-                      </div>
-                      <div class="sync-indexer-stat">
-                        <span class="sync-indexer-stat-icon">📺</span>
-                        <span><AnimatedNumber value={iSeries} /></span>
-                      </div>
-                      <div class="sync-indexer-stat">
-                        <span class="sync-indexer-stat-icon">📦</span>
-                        <span><AnimatedNumber value={iOthers} /></span>
-                      </div>
-                    </div>
-                    <div class="sync-indexer-total">
-                      Total : <strong>{iTotal.toLocaleString()}</strong>
-                    </div>
-                    {isCurrent && inProgress && (
-                      <div class="mt-2">
-                        <SyncProgressBar percent={progressPercent} animated />
-                      </div>
-                    )}
-                  </div>
+                  <span class={`sync-history-rate sync-history-rate--${pct >= 80 ? 'good' : pct >= 50 ? 'mid' : 'bad'}`}>
+                    {pct}% réussite
+                  </span>
                 );
-              })}
+              })()}
             </div>
+            <div class="sync-chart-card-body">
+              {syncHistory.length >= 2 ? (
+                <SyncHistoryChart history={syncHistory} animKey={animKey} />
+              ) : (
+                <div class="sync-history-empty">
+                  <span>Aucun historique — les données s'accumulent à chaque sync.</span>
+                  <div class="sync-history-legend">
+                    <span class="sync-history-dot sync-history-dot--ok" />Réussite
+                    <span class="sync-history-dot sync-history-dot--err" style="margin-left:0.75rem" />Erreur
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ── LOG + LIVE INFO pendant sync ─────────────────── */}
+        {inProgress && (logLines.length > 0 || currentIndexer) && (
+          <div class="sc-frame">
+            <div class="sync-log-panel">
+              {currentIndexer && (
+                <div class="sync-indexer-live-row">
+                  <span class="sync-pulse-dot" />
+                  <span style="color:var(--ds-accent-violet);font-weight:600">{currentIndexer}</span>
+                  {currentCategory && <span style="color:rgba(255,255,255,0.35)">· {currentCategory}</span>}
+                  {currentQuery && <span style="color:rgba(255,255,255,0.28);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">· {currentQuery}</span>}
+                </div>
+              )}
+              {logLines.length > 0 && (
+                <div class="sync-log-lines">
+                  {logLines.slice(-5).map((line, i) => (
+                    <div key={i} class="sync-log-line">
+                      <span class="sync-log-dot" />
+                      <span class="sync-log-text">{line}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+      </>) : !inProgress && (
+        /* ── ÉTAT VIDE ── */
+        <div class="sc-frame">
+          <div class="sync-empty-body">
+            <Database class="w-8 h-8" style="opacity:0.2" />
+            <p style="color:rgba(255,255,255,0.45);font-size:13px;font-weight:500">{t('torrentSyncManager.noTorrentsSynced')}</p>
+            <p style="color:rgba(255,255,255,0.22);font-size:11px">
+              {indexers.length === 0 ? t('torrentSyncManager.mustConfigureIndexer') : t('torrentSyncManager.noContentInDatabase')}
+            </p>
           </div>
         </div>
       )}
@@ -724,15 +943,11 @@ export default function SyncDashboard() {
           onClick={() => setShowSettings(!showSettings)}
           aria-expanded={showSettings}
         >
-          <div class="sc-frame-icon">
-            <Settings class="w-5 h-5" aria-hidden />
-          </div>
-          <div style="flex:1">
-            <div class="sc-frame-title">{t('torrentSyncManager.settings')}</div>
-          </div>
+          <Settings class="w-4 h-4" style="opacity:0.5;flex-shrink:0" aria-hidden />
+          <span class="sync-settings-toggle-label">{t('torrentSyncManager.settings')}</span>
           {showSettings
-            ? <ChevronUp class="w-5 h-5 text-[var(--ds-text-tertiary)]" />
-            : <ChevronDown class="w-5 h-5 text-[var(--ds-text-tertiary)]" />
+            ? <ChevronUp class="w-4 h-4" style="opacity:0.35;margin-left:auto" />
+            : <ChevronDown class="w-4 h-4" style="opacity:0.35;margin-left:auto" />
           }
         </button>
 
