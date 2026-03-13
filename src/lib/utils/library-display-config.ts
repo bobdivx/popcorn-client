@@ -15,8 +15,10 @@ export interface LibraryDisplayConfig {
   torrentsRecentLimit: number;
   /** Langues acceptées. Vide = toutes */
   mediaLanguages: string[];
-  /** Qualité minimale. Vide = toutes */
+  /** Qualité minimale (filtre strict). Vide = toutes */
   minQuality: string;
+  /** Qualité préférée (prioritaire sans masquer les autres). Vide = aucune préférence */
+  preferredQuality: string;
 }
 
 const DEFAULTS: LibraryDisplayConfig = {
@@ -26,6 +28,7 @@ const DEFAULTS: LibraryDisplayConfig = {
   torrentsRecentLimit: 50,
   mediaLanguages: [],
   minQuality: '',
+  preferredQuality: '',
 };
 
 /**
@@ -41,6 +44,7 @@ export function getLibraryDisplayConfig(): LibraryDisplayConfig {
     torrentsRecentLimit: local.torrentsRecentLimit ?? DEFAULTS.torrentsRecentLimit,
     mediaLanguages: Array.isArray(local.mediaLanguages) ? local.mediaLanguages : DEFAULTS.mediaLanguages,
     minQuality: local.minQuality ?? DEFAULTS.minQuality,
+    preferredQuality: local.preferredQuality ?? DEFAULTS.preferredQuality,
   };
 }
 
@@ -66,6 +70,7 @@ export async function loadLibraryDisplayFromCloud(): Promise<LibraryDisplayConfi
           ? lib.mediaLanguages
           : (local.mediaLanguages ?? DEFAULTS.mediaLanguages),
         minQuality: lib.minQuality ?? local.minQuality ?? DEFAULTS.minQuality,
+        preferredQuality: lib.preferredQuality ?? local.preferredQuality ?? DEFAULTS.preferredQuality,
       };
       PreferencesManager.updatePreferences(merged);
       return merged;
@@ -98,6 +103,7 @@ export async function saveLibraryDisplayConfig(config: Partial<LibraryDisplayCon
           torrentsRecentLimit: merged.torrentsRecentLimit,
           mediaLanguages: merged.mediaLanguages.length > 0 ? merged.mediaLanguages : undefined,
           minQuality: merged.minQuality || undefined,
+          preferredQuality: merged.preferredQuality || undefined,
         },
       };
       await saveUserConfigMerge({ syncSettings }, token);

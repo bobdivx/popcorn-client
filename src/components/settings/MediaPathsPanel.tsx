@@ -3,7 +3,6 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
 import { FolderOpen, Folder, Loader2 } from 'lucide-preact';
-import { DsCard, DsCardSection } from '../ui/design-system';
 
 type MediaPathType = 'films' | 'series';
 
@@ -144,8 +143,8 @@ export default function MediaPathsPanel({ onBack }: MediaPathsPanelProps) {
         </div>
       )}
 
-      <DsCard variant="elevated">
-        <DsCardSection>
+      <div class="sc-frame">
+        <div class="sc-frame-body">
           <div className="space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-4 rounded-[var(--ds-radius-sm)] border border-[var(--ds-border)] bg-[var(--ds-surface)]">
           <div className="flex-1 min-w-0">
@@ -187,8 +186,8 @@ export default function MediaPathsPanel({ onBack }: MediaPathsPanelProps) {
               </button>
             </div>
           </div>
-        </DsCardSection>
-      </DsCard>
+        </div>
+      </div>
 
       <p className="ds-text-tertiary text-xs">
         Racine serveur : <code className="bg-[var(--ds-surface-elevated)] px-1 rounded-[var(--ds-radius-sm)] text-[var(--ds-text-primary)]">{data.download_dir_root}</code>

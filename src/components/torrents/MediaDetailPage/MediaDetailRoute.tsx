@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { ClientTorrentStats } from '../../../lib/client/types';
 import { getDownloadClientStats } from '../../../lib/utils/download-meta-storage';
+import { normalizeTorrentStats } from '../../../lib/utils/torrentStatsUtils';
 import MediaDetailPage from './index';
 import type { MediaDetailPageProps } from './types';
 import { serverApi } from '../../../lib/client/server-api';
@@ -867,7 +868,9 @@ export default function MediaDetailRoute() {
       torrent={displayTorrent}
       initialVariants={initialVariants.length > 0 ? initialVariants : undefined}
       seriesEpisodes={seriesEpisodes ?? undefined}
-      initialTorrentStats={initialTorrentStats ?? undefined}
+      initialTorrentStats={
+        initialTorrentStats ? normalizeTorrentStats(initialTorrentStats as ClientTorrentStats) : undefined
+      }
       backHref={backHref ?? undefined}
       streamBackendUrl={streamBackendUrl ?? undefined}
     />

@@ -3,7 +3,6 @@ import { inviteLocalUser, getLocalUsers, deleteLocalUser, resendLocalUserInvitat
 import { TokenManager } from '../../lib/client/storage';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { Mail, Trash2, RefreshCw, UserPlus } from 'lucide-preact';
-import { DsCard, DsCardSection } from '../ui/design-system';
 
 export default function LocalUsersManager() {
   const { t } = useI18n();
@@ -149,8 +148,8 @@ export default function LocalUsersManager() {
         </div>
       )}
 
-      <DsCard variant="elevated">
-        <DsCardSection>
+      <div class="sc-frame">
+        <div class="sc-frame-body">
           <h3 className="ds-title-section text-[var(--ds-text-primary)] mb-2 flex items-center gap-2">
             <UserPlus className="w-5 h-5 text-[var(--ds-accent-violet)]" strokeWidth={1.8} />
             {t('settingsMenu.localUsers.inviteTitle')}
@@ -202,11 +201,11 @@ export default function LocalUsersManager() {
               )}
             </button>
           </form>
-        </DsCardSection>
-      </DsCard>
+        </div>
+      </div>
 
-      <DsCard variant="elevated">
-        <DsCardSection>
+      <div class="sc-frame">
+        <div class="sc-frame-body">
           <h3 className="ds-title-section text-[var(--ds-text-primary)] mb-4">
             {t('settingsMenu.localUsers.listTitle', { count: users.length })}
           </h3>
@@ -265,8 +264,8 @@ export default function LocalUsersManager() {
               ))}
             </div>
           )}
-        </DsCardSection>
-      </DsCard>
+        </div>
+      </div>
     </div>
   );
 }

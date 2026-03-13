@@ -11,7 +11,7 @@ import type {
   UploaderPreviewResponse,
 } from '../../lib/client/server-api/upload-tracker';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { DsBarChart, DsCard, DsCardSection, DsMetricCard, LoadingIcon, FullScreenLoadingOverlay } from '../ui/design-system';
+import { DsBarChart, DsMetricCard, LoadingIcon, FullScreenLoadingOverlay } from '../ui/design-system';
 import { Modal } from '../ui/Modal';
 import { DescriptionPreview } from '../upload/DescriptionPreview';
 import { ArrowLeft, ArrowRight, Check, Loader2, Search, Upload } from 'lucide-preact';
@@ -1297,7 +1297,9 @@ export default function UploadAssistantPanel() {
       {/* Étape 1 : Trackers + config par tracker */}
       {step === 1 && (
         <>
-          <DsCardSection title={t('settings.uploadTrackerPanel.wizardStepTrackers')}>
+          <div class="sc-frame">
+          <div class="sc-frame-header"><div class="sc-frame-title">{t('settings.uploadTrackerPanel.wizardStepTrackers')}</div></div>
+          <div class="sc-frame-body">
             <p className="text-sm text-base-content/70 mb-4">
               {t('settings.uploadTrackerPanel.wizardChooseTrackersDescription')}
             </p>
@@ -1389,7 +1391,8 @@ export default function UploadAssistantPanel() {
                 )}
               </div>
             )}
-          </DsCardSection>
+          </div>
+          </div>
           <div className="mt-4 flex justify-end">
             <button
               type="button"
@@ -1407,7 +1410,9 @@ export default function UploadAssistantPanel() {
       {/* Étape 2 : Liste des médias (multi-sélection) */}
       {step === 2 && (
         <>
-          <DsCardSection title={t('settings.uploadTrackerPanel.wizardStepMedia')}>
+          <div class="sc-frame">
+          <div class="sc-frame-header"><div class="sc-frame-title">{t('settings.uploadTrackerPanel.wizardStepMedia')}</div></div>
+          <div class="sc-frame-body">
             <p className="text-sm text-base-content/70 mb-4">
               {t('settings.uploadTrackerPanel.wizardChooseMediaListDescription')}
             </p>
@@ -1529,7 +1534,8 @@ export default function UploadAssistantPanel() {
             <p className="mt-3 text-xs text-base-content/60">
               {t('settings.uploadTrackerPanel.alreadyOnTrackerHint')}
             </p>
-          </DsCardSection>
+          </div>
+          </div>
           <div className="flex justify-between">
             <button
               type="button"
@@ -1562,8 +1568,9 @@ export default function UploadAssistantPanel() {
       {step === 3 && (
         <>
           <div className="space-y-4">
-            <DsCard variant="elevated">
-              <DsCardSection title={t('settings.uploadTrackerPanel.wizardSummaryTitle')}>
+            <div class="sc-frame">
+              <div class="sc-frame-header"><div class="sc-frame-title">{t('settings.uploadTrackerPanel.wizardSummaryTitle')}</div></div>
+              <div class="sc-frame-body">
                 <p className="text-sm text-base-content/70 mb-4">
                   {t('settings.uploadTrackerPanel.wizardReviewDescription')}
                 </p>
@@ -1714,17 +1721,18 @@ export default function UploadAssistantPanel() {
                     </div>
                   </DsMetricCard>
                 </div>
-              </DsCardSection>
-            </DsCard>
+              </div>
+            </div>
 
-            <DsCard variant="elevated">
-              <DsCardSection
-                title={
-                  previewData?.release_name?.trim()
+            <div class="sc-frame">
+              <div class="sc-frame-header">
+                <div class="sc-frame-title">
+                  {previewData?.release_name?.trim()
                     ? previewData.release_name
-                    : t('settings.uploadTrackerPanel.previewReleaseName')
-                }
-              >
+                    : t('settings.uploadTrackerPanel.previewReleaseName')}
+                </div>
+              </div>
+              <div class="sc-frame-body">
                 <DsBarChart
                   items={torrentFactoryItems}
                   max={100}
@@ -1759,11 +1767,12 @@ export default function UploadAssistantPanel() {
                     </button>
                   </div>
                 )}
-              </DsCardSection>
-            </DsCard>
+              </div>
+            </div>
 
-            <DsCard variant="elevated">
-              <DsCardSection title={t('settings.uploadTrackerPanel.wizardSummaryPlan')}>
+            <div class="sc-frame">
+              <div class="sc-frame-header"><div class="sc-frame-title">{t('settings.uploadTrackerPanel.wizardSummaryPlan')}</div></div>
+              <div class="sc-frame-body">
                 <div className="max-h-52 overflow-auto rounded-lg border border-base-300 divide-y divide-base-300">
                   {selectedMediaIds.map((id) => {
                     const media = mediaList.find((m) => m.id === id);
@@ -1784,8 +1793,8 @@ export default function UploadAssistantPanel() {
                     );
                   })}
                 </div>
-              </DsCardSection>
-            </DsCard>
+              </div>
+            </div>
           </div>
 
             {/* Rafraîchir l’aperçu */}

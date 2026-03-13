@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { Activity, CheckCircle, XCircle, ExternalLink, RefreshCw } from 'lucide-preact';
-import { DsCard, DsCardSection } from '../ui/design-system';
 
 type Diagnostic = {
   upnp_enabled: boolean;
@@ -43,8 +42,8 @@ export default function SeedingDiagnosticPanel() {
 
   return (
     <div className="space-y-4">
-      <DsCard variant="elevated" className="overflow-hidden">
-        <DsCardSection>
+      <div class="sc-frame">
+        <div class="sc-frame-body">
           <div className="flex items-center justify-between gap-3 mb-4">
             <span
               className="inline-flex w-11 h-11 rounded-xl flex-shrink-0 items-center justify-center"
@@ -157,8 +156,8 @@ export default function SeedingDiagnosticPanel() {
               </a>
             </div>
           </div>
-        </DsCardSection>
-      </DsCard>
+        </div>
+      </div>
     </div>
   );
 }

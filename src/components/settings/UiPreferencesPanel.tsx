@@ -4,7 +4,6 @@ import { PreferencesManager } from '../../lib/client/storage';
 import { TokenManager } from '../../lib/client/storage';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
 import { Globe, Moon, Sun, Monitor } from 'lucide-preact';
-import { DsCard, DsCardSection } from '../ui/design-system';
 
 type ThemeValue = 'light' | 'dark' | 'auto';
 
@@ -156,27 +155,31 @@ export default function UiPreferencesPanel({ section = 'all', embedded = false }
       )}
 
       {showLanguage && (
-        <DsCard variant="elevated">
-          <DsCardSection>
-            <h3 className="flex items-center gap-2 ds-title-section text-[var(--ds-text-primary)] mb-4">
-              <Globe className="w-5 h-5 text-[var(--ds-accent-violet)]" />
-              {t('account.language')}
-            </h3>
+        <div class="sc-frame">
+          <div class="sc-frame-header">
+            <div class="sc-frame-icon">
+              <Globe className="w-5 h-5" aria-hidden />
+            </div>
+            <div class="sc-frame-title">{t('account.language')}</div>
+          </div>
+          <div class="sc-frame-body">
             {languageBlock}
-          </DsCardSection>
-        </DsCard>
+          </div>
+        </div>
       )}
 
       {showTheme && (
-        <DsCard variant="elevated">
-          <DsCardSection>
-            <h3 className="flex items-center gap-2 ds-title-section text-[var(--ds-text-primary)] mb-4">
-              <Moon className="w-5 h-5 text-[var(--ds-accent-violet)]" />
-              {t('interfaceSettings.theme')}
-            </h3>
+        <div class="sc-frame">
+          <div class="sc-frame-header">
+            <div class="sc-frame-icon">
+              <Moon className="w-5 h-5" aria-hidden />
+            </div>
+            <div class="sc-frame-title">{t('interfaceSettings.theme')}</div>
+          </div>
+          <div class="sc-frame-body">
             {themeBlock}
-          </DsCardSection>
-        </DsCard>
+          </div>
+        </div>
       )}
 
       <p className="ds-text-tertiary text-sm mt-4">

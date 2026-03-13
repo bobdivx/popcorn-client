@@ -30,6 +30,7 @@ import { DownloadVerificationPanel } from '../../downloads/DownloadVerificationP
 import type { SeriesEpisodesResponse, TorrentListFileEntry } from '../../../lib/client/server-api/media';
 import { isTVPlatform } from '../../../lib/utils/device-detection';
 import { getHighQualityTmdbImageUrl } from '../../../lib/utils/tmdb-images';
+import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-config';
 
 /** Retourne l'épisode suivant (saison + id variante + titre) ou null. */
 function getNextEpisode(
@@ -280,6 +281,40 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   useEffect(() => {
     if (initialVariants && initialVariants.length > 0) {
       setAllVariants(initialVariants);
+
+      // Appliquer la qualité préférée des paramètres si plusieurs variantes disponibles
+      if (initialVariants.length > 1) {
+        const { preferredQuality } = getLibraryDisplayConfig();
+        if (preferredQuality) {
+          const QUALITY_ORDER: Record<string, number> = { Remux: 6, '4K': 5, '2160p': 5, UHD: 5, '1080p': 4, '720p': 3, '480p': 2 };
+          const normalizeRes = (raw?: string): string => {
+            if (!raw) return '';
+            const up = raw.toUpperCase();
+            if (up.includes('2160') || up === '4K' || up === 'UHD') return '4K';
+            if (up.includes('1080')) return '1080p';
+            if (up.includes('720')) return '720p';
+            if (up.includes('480')) return '480p';
+            if (up.includes('REMUX')) return 'Remux';
+            return raw;
+          };
+          const targetRes = normalizeRes(preferredQuality);
+          // Chercher les variantes de la qualité préférée
+          const preferred = initialVariants.filter((v: any) => normalizeRes(v.quality?.resolution) === targetRes);
+          if (preferred.length > 0) {
+            // Parmi les variantes préférées, prendre celle avec le plus de seeders
+            const best = [...preferred].sort((a: any, b: any) => (b.seedCount ?? 0) - (a.seedCount ?? 0))[0];
+            setSelectedTorrent(best);
+          } else {
+            // Qualité préférée non disponible : prendre la meilleure qualité disponible (ordre décroissant puis seeders)
+            const best = [...initialVariants].sort((a: any, b: any) => {
+              const aQ = QUALITY_ORDER[normalizeRes(a.quality?.resolution)] ?? 0;
+              const bQ = QUALITY_ORDER[normalizeRes(b.quality?.resolution)] ?? 0;
+              return bQ - aQ || (b.seedCount ?? 0) - (a.seedCount ?? 0);
+            })[0];
+            setSelectedTorrent(best);
+          }
+        }
+      }
     }
   }, [initialVariants]);
 
@@ -1738,6 +1773,11 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                   codec: variant.codec as 'x264' | 'x265' | 'AV1' | undefined,
                   fileSize: variant.fileSize,
                 })) : undefined}
+                allVariants={allVariants}
+                selectedVariantId={(selectedTorrent || torrent).id}
+                onSelectVariant={(variant) => {
+                  setSelectedTorrent(variant);
+                }}
               />
             )}
           </div>
@@ -1773,7 +1813,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                 }, 1200);
               }
             }}
-            onStatsUpdate={setTorrentStats}
+            onStatsUpdate={undefined}
             dismissible={true}
             onDismiss={() => {
               setShowVerificationPanel(false);

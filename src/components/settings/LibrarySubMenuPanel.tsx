@@ -1,10 +1,7 @@
-import { Film, FolderOpen, FolderPlus, LayoutGrid, List, Users, ChevronRight } from 'lucide-preact';
+import { Film, FolderOpen, FolderPlus, LayoutGrid, List, Users } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { canAccess } from '../../lib/permissions';
-import { DsCard, DsCardSection } from '../ui/design-system';
-
-const ACCENT_ICON_BG = 'var(--ds-accent-violet-muted)';
-const ACCENT_ICON_COLOR = 'var(--ds-accent-violet)';
+import { SettingsNavCard } from './SettingsNavCard';
 
 type LibraryLinkItem = {
   id: string;
@@ -77,42 +74,15 @@ export default function LibrarySubMenuPanel() {
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
-      {visible.map((item) => {
-        const Icon = item.icon;
-        return (
-          <a
-            key={item.id}
-            href={item.href}
-            data-astro-prefetch="hover"
-            data-settings-card
-            className="block min-w-0 rounded-[var(--ds-radius-lg)] overflow-hidden transition-all hover:scale-[1.01] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] focus-visible:overflow-visible"
-          >
-            <DsCard variant="elevated" className="h-full">
-              <DsCardSection className="flex flex-col h-full min-h-[120px]">
-                <div className="flex items-start justify-between gap-3">
-                  <span
-                    className="inline-flex w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex-shrink-0 items-center justify-center"
-                    style={{ backgroundColor: ACCENT_ICON_BG, color: ACCENT_ICON_COLOR }}
-                    aria-hidden
-                  >
-                    <Icon className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.8} />
-                  </span>
-                  <ChevronRight className="w-5 h-5 text-[var(--ds-text-tertiary)] flex-shrink-0 mt-0.5" aria-hidden />
-                </div>
-                <h2 className="ds-title-card text-[var(--ds-text-primary)] text-base sm:text-lg mt-3 truncate">
-                  {t(item.titleKey)}
-                </h2>
-                <span className="ds-text-tertiary text-sm mt-3 line-clamp-2">
-                  {t(item.descriptionKey)}
-                </span>
-                <span className="mt-auto pt-4 text-xs font-medium text-[var(--ds-accent-violet)] flex items-center gap-1" aria-hidden>
-                  {t('common.open')}
-                </span>
-              </DsCardSection>
-            </DsCard>
-          </a>
-        );
-      })}
+      {visible.map((item) => (
+        <SettingsNavCard
+          key={item.id}
+          href={item.href}
+          icon={item.icon}
+          title={t(item.titleKey)}
+          description={t(item.descriptionKey)}
+        />
+      ))}
     </div>
   );
 }

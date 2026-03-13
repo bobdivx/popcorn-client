@@ -200,8 +200,8 @@ export default function ReseedTorrentsPanel() {
       >
         ← {t('common.back')}
       </a>
-      <div className="ds-card elevated min-w-0 overflow-hidden">
-        <div className="p-4 sm:p-6 flex flex-col min-h-0">
+      <div class="sc-frame">
+        <div class="sc-frame-body" style="display:flex;flex-direction:column;min-height:0">
           <h2 className="ds-title-card text-[var(--ds-text-primary)] text-base sm:text-lg mb-2">
             {t('settings.reseedPanel.title')}
           </h2>
@@ -299,8 +299,8 @@ export default function ReseedTorrentsPanel() {
       </div>
 
       {/* Section Depuis la bibliothèque : médias déjà sur disque */}
-      <div className="ds-card elevated min-w-0 overflow-hidden">
-        <div className="p-4 sm:p-6 flex flex-col min-h-0">
+      <div class="sc-frame">
+        <div class="sc-frame-body" style="display:flex;flex-direction:column;min-height:0">
           <h2 className="ds-title-card text-[var(--ds-text-primary)] text-base sm:text-lg mb-2 flex items-center gap-2">
             <Library className="w-5 h-5 text-[var(--ds-accent-violet)]" />
             {t('settings.reseedPanel.libraryTitle')}
