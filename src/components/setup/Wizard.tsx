@@ -132,20 +132,28 @@ export default function Wizard() {
   }, [pendingNavStepId, getStepNumber, setCurrentStep]);
 
   useEffect(() => {
-    if (initialNeedsSetupRef.current !== null) return;
     if (loading) return;
-    // Pas d'URL backend au démarrage = première installation = traiter comme needsSetup=true
-    // Evite que computeSteps collapse les étapes après que l'utilisateur se connecte et entre son URL
+    // Pas d'URL backend au démarrage = supposer que le setup est nécessaire (valeur provisoire)
+    // Ne pas verrouiller : si le backend confirme plus tard needsSetup=false, on doit corriger
     if (!setupStatus) {
-      if (!hasBackendUrl()) {
+      if (initialNeedsSetupRef.current === null && !hasBackendUrl()) {
         initialNeedsSetupRef.current = true;
         setWizardStartedWithNeedsSetup(true);
       }
       return;
     }
+    // Le statut réel du backend est disponible — corriger le flag provisoire si nécessaire
     const needsSetup = setupStatus.needsSetup;
-    initialNeedsSetupRef.current = needsSetup;
-    setWizardStartedWithNeedsSetup(needsSetup);
+    if (needsSetup === false) {
+      // Setup déjà effectué : lever le flag provisoire pour permettre la redirection
+      initialNeedsSetupRef.current = false;
+      setWizardStartedWithNeedsSetup(false);
+    } else if (initialNeedsSetupRef.current === null) {
+      // Premier statut réel avec needsSetup=true
+      initialNeedsSetupRef.current = true;
+      setWizardStartedWithNeedsSetup(true);
+    }
+    // Si initialNeedsSetupRef.current === true et needsSetup === true : ne rien changer
   }, [loading, setupStatus]);
 
   useEffect(() => {
@@ -158,7 +166,9 @@ export default function Wizard() {
       if (setupStatus.backendReachable && setupStatus.needsSetup === false && setupStatus.hasUsers === true) {
         const currentStepId = getStepId(currentStep);
         const middleSteps: WizardStepId[] = ['serverUrl', 'language', 'auth', 'welcome', 'indexers', 'tmdb', 'downloadLocation', 'sync'];
-        if (currentStepId && middleSteps.includes(currentStepId)) return;
+        // Bloquer la redirection uniquement si le wizard a VRAIMENT démarré pour un setup nécessaire
+        // (pas juste parce qu'il n'y avait pas d'URL backend au départ)
+        if (currentStepId && middleSteps.includes(currentStepId) && initialNeedsSetupRef.current === true) return;
         if (initialNeedsSetupRef.current === true) return;
         if (serverApi.isAuthenticated()) {
           redirectTo('/dashboard');
