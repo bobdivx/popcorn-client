@@ -110,6 +110,26 @@ function patchManifest(manifestPath) {
     );
     modified = true;
   }
+
+  // 2b. Faketouch : requis par défaut dans beaucoup de builds, incompatible avec Android TV / Google TV
+  const faketouchPattern = /<uses-feature\s+android:name="android\.hardware\.faketouch"[^>]*android:required="true"[^>]*\/>/g;
+  if (content.match(faketouchPattern)) {
+    console.log('🔧 Modification: faketouch requis -> non requis (pour compatibilité TV)');
+    content = content.replace(
+      faketouchPattern,
+      '<uses-feature android:name="android.hardware.faketouch" android:required="false" />'
+    );
+    modified = true;
+  }
+  const faketouchPattern2 = /<uses-feature\s+android:name="android\.hardware\.faketouch"(?!\s+android:required)/g;
+  if (content.match(faketouchPattern2)) {
+    console.log('🔧 Ajout: faketouch non requis (pour compatibilité TV / Google TV)');
+    content = content.replace(
+      faketouchPattern2,
+      '<uses-feature android:name="android.hardware.faketouch" android:required="false"'
+    );
+    modified = true;
+  }
   
   // 3. S'assurer que leanback (TV) n'est pas requis (pour permettre mobile/tablette)
   const leanbackPattern = /<uses-feature\s+android:name="android\.software\.leanback"[^>]*android:required="true"[^>]*\/>/g;
@@ -173,7 +193,8 @@ function patchManifest(manifestPath) {
     'android.hardware.location',
     'android.hardware.location.gps',
     'android.hardware.wifi',
-    'android.hardware.bluetooth'
+    'android.hardware.bluetooth',
+    'android.hardware.faketouch'  // TV / Google TV n'ont pas faketouch
   ];
   
   optionalFeatures.forEach(feature => {
