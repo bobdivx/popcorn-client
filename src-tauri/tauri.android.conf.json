@@ -45,7 +45,7 @@
     "shortDescription": "Client leger Popcorn pour Android (Mobile et TV)",
     "longDescription": "Client leger pour Android - se connecte au serveur Popcorn distant. Fonctionne sur Android Mobile et Android TV avec detection automatique du type d appareil.",
     "android": {
-      "versionCode": 201,
+      "versionCode": 202,
       "autoIncrementVersionCode": false
     }
   },
