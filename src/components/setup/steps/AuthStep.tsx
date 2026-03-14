@@ -9,6 +9,7 @@ import { CloudImportManager } from '../../../lib/client/cloud-import';
 import { syncIndexersToCloud } from '../../../lib/utils/cloud-sync';
 import { isTmdbKeyMaskedOrInvalid } from '../../../lib/utils/tmdb-key';
 import { redirectTo } from '../../../lib/utils/navigation.js';
+import { setBackendUrl, hasDeploymentBackend } from '../../../lib/backend-config.js';
 import { QuickConnectStep } from './QuickConnectStep';
 import { useI18n } from '../../../lib/i18n';
 
@@ -52,8 +53,19 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         !!savedConfig?.downloadLocation ||
         !!savedConfig?.syncSettings ||
         !!savedConfig?.language ||
+        !!savedConfig?.backendUrl ||
         !!(savedConfig?.indexerCategories && Object.keys(savedConfig.indexerCategories).length > 0);
       if (savedConfig && hasSomething) {
+        // Restaurer l'URL backend EN PREMIER — obligatoire pour que les appels suivants
+        // (health check, getSetupStatus, etc.) atteignent le bon serveur
+        if (savedConfig.backendUrl && !hasDeploymentBackend()) {
+          try {
+            setBackendUrl(savedConfig.backendUrl);
+            console.log('[AUTH] URL backend restaurée depuis le cloud:', savedConfig.backendUrl);
+          } catch (e) {
+            console.warn('[AUTH] Impossible de restaurer l\'URL backend:', e);
+          }
+        }
         const missingCategories = !savedConfig.indexerCategories || Object.keys(savedConfig.indexerCategories).length === 0;
         if (missingCategories) {
           syncIndexersToCloud().catch((err) => console.warn('[AUTH] Sync catégories ignorée:', err));
