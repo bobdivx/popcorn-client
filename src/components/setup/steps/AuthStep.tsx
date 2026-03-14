@@ -4,9 +4,11 @@ import { TokenManager } from '../../../lib/client/storage';
 import { getUserConfig } from '../../../lib/api/popcorn-web';
 import { PreferencesManager } from '../../../lib/client/storage';
 import type { UserConfig } from '../../../lib/api/popcorn-web';
+import type { SetupStatus } from '../../../lib/client/types';
 import { CloudImportManager } from '../../../lib/client/cloud-import';
 import { syncIndexersToCloud } from '../../../lib/utils/cloud-sync';
 import { isTmdbKeyMaskedOrInvalid } from '../../../lib/utils/tmdb-key';
+import { redirectTo } from '../../../lib/utils/navigation.js';
 import { QuickConnectStep } from './QuickConnectStep';
 import { useI18n } from '../../../lib/i18n';
 
@@ -14,7 +16,7 @@ interface AuthStepProps {
   focusedButtonIndex: number;
   buttonRefs: { current: (HTMLButtonElement | null)[] };
   onNext: () => void;
-  onStatusChange?: () => void | Promise<void>;
+  onStatusChange?: () => Promise<SetupStatus | null> | void;
 }
 
 type AuthView = 'login' | 'register' | '2fa';
@@ -56,9 +58,17 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         if (missingCategories) {
           syncIndexersToCloud().catch((err) => console.warn('[AUTH] Sync catégories ignorée:', err));
         }
-        CloudImportManager.startImport(savedConfig).finally(() => {
-          Promise.resolve(onStatusChange?.()).catch(() => {});
+        // Attendre la fin de l'import cloud avant de vérifier le statut
+        await new Promise<void>((resolve) => {
+          CloudImportManager.startImport(savedConfig).finally(() => resolve());
         });
+        // Vérifier si le setup est déjà complet (config cloud restaurée dans le backend)
+        const freshStatus = await Promise.resolve(onStatusChange?.()).catch(() => null);
+        if (freshStatus && freshStatus.needsSetup === false && freshStatus.hasUsers === true) {
+          // Tout est configuré → aller directement au dashboard, sans passer par les étapes
+          redirectTo('/dashboard');
+          return;
+        }
         onNext();
         return;
       }
