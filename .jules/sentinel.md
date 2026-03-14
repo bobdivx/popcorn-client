@@ -1,0 +1,4 @@
+## 2025-05-24 - Prevent XSS in Preact Components
+**Vulnerability:** User input and BBCode-to-HTML converted data from trackers was being passed directly to `dangerouslySetInnerHTML` in `src/components/upload/DescriptionPreview.tsx` without sanitization, leading to an XSS vulnerability.
+**Learning:** In Astro/Preact applications, doing sanitization in both SSR and client-side correctly is crucial. The usage of a regular `dompurify` package would fail on SSR because it requires a `window` object. Using `isomorphic-dompurify` allows us to securely execute `DOMPurify.sanitize()` uniformly across SSR and client renders.
+**Prevention:** Avoid blindly using `dangerouslySetInnerHTML`. Always use `isomorphic-dompurify` to sanitize HTML output derived from user input or external APIs before injecting it into the DOM.
