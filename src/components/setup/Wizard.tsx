@@ -16,6 +16,7 @@ import { SyncStep } from './steps/SyncStep';
 import { CompleteStep } from './steps/CompleteStep';
 import { hasBackendUrl } from '../../lib/backend-config.js';
 import { isTVPlatform } from '../../lib/utils/device-detection';
+import { dbgLog } from '../../lib/debug/debug-store';
 import { serverApi } from '../../lib/client/server-api';
 import { PreferencesManager, TokenManager, clearStorageAndCookiesForSetup } from '../../lib/client/storage';
 import { redirectTo } from '../../lib/utils/navigation.js';
@@ -92,6 +93,7 @@ export default function Wizard() {
   // Direction de l'animation (-1 = vers l'arrière, 1 = vers l'avant)
   const [stepDirection, setStepDirection] = useState<1 | -1>(1);
   const prevStepRef = useRef<number>(1);
+  const wdbg = (msg: string) => dbgLog('[WIZ] ' + msg);
 
   const forceAllSteps = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('force') === '1';
   const isTV = typeof window !== 'undefined' && isTVPlatform();
@@ -135,52 +137,62 @@ export default function Wizard() {
 
   useEffect(() => {
     if (loading) return;
-    // Pas d'URL backend au démarrage = supposer que le setup est nécessaire (valeur provisoire)
-    // Ne pas verrouiller : si le backend confirme plus tard needsSetup=false, on doit corriger
+    wdbg(`E1 status=${setupStatus ? `ns=${setupStatus.needsSetup} hu=${setupStatus.hasUsers} br=${setupStatus.backendReachable}` : 'null'} ref=${initialNeedsSetupRef.current} hasUrl=${hasBackendUrl()}`);
     if (!setupStatus) {
       if (initialNeedsSetupRef.current === null && !hasBackendUrl()) {
         initialNeedsSetupRef.current = true;
         setWizardStartedWithNeedsSetup(true);
+        wdbg('E1 → ref=true (no backendUrl)');
       }
       return;
     }
-    // Le statut réel du backend est disponible — corriger le flag provisoire si nécessaire
     const needsSetup = setupStatus.needsSetup;
     if (needsSetup === false) {
-      // Setup déjà effectué : lever le flag provisoire pour permettre la redirection
-      initialNeedsSetupRef.current = false;
-      setWizardStartedWithNeedsSetup(false);
+      if (initialNeedsSetupRef.current !== true) {
+        wdbg('E1 → needsSetup=false & ref!=true → RESET ref=false wSNS=false');
+        initialNeedsSetupRef.current = false;
+        setWizardStartedWithNeedsSetup(false);
+      } else {
+        wdbg('E1 → needsSetup=false MAIS ref===true → GARDER (protection mobile)');
+      }
     } else if (initialNeedsSetupRef.current === null) {
-      // Premier statut réel avec needsSetup=true
       initialNeedsSetupRef.current = true;
       setWizardStartedWithNeedsSetup(true);
+      wdbg('E1 → needsSetup=true → ref=true');
     }
-    // Si initialNeedsSetupRef.current === true et needsSetup === true : ne rien changer
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, setupStatus]);
 
   useEffect(() => {
     const forceWizard = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('force') === '1';
 
     const checkAndRedirect = async () => {
-      if (!hasBackendUrl()) return;
-      if (loading || !setupStatus) return;
+      wdbg(`E2 hasUrl=${hasBackendUrl()} step=${currentStep} ref=${initialNeedsSetupRef.current} ns=${setupStatus?.needsSetup} hu=${setupStatus?.hasUsers} br=${setupStatus?.backendReachable}`);
+      if (!hasBackendUrl()) { wdbg('E2 → exit no backendUrl'); return; }
+      if (loading || !setupStatus) { wdbg('E2 → exit loading/noStatus'); return; }
       if (forceWizard) return;
       if (setupStatus.backendReachable && setupStatus.needsSetup === false && setupStatus.hasUsers === true) {
         const currentStepId = getStepId(currentStep);
         const middleSteps: WizardStepId[] = ['serverUrl', 'language', 'auth', 'welcome', 'indexers', 'tmdb', 'downloadLocation', 'sync'];
-        // Bloquer la redirection uniquement si le wizard a VRAIMENT démarré pour un setup nécessaire
-        // (pas juste parce qu'il n'y avait pas d'URL backend au départ)
-        if (currentStepId && middleSteps.includes(currentStepId) && initialNeedsSetupRef.current === true) return;
-        if (initialNeedsSetupRef.current === true) return;
-        if (serverApi.isAuthenticated()) {
-          redirectTo('/dashboard');
-        } else {
-          redirectTo('/login');
+        wdbg(`E2 cond OK | stepId=${currentStepId} auth=${serverApi.isAuthenticated()} ref=${initialNeedsSetupRef.current}`);
+        if (currentStepId && middleSteps.includes(currentStepId) && initialNeedsSetupRef.current === true) {
+          wdbg('E2 → BLOQUÉ (middleStep+ref=true)'); return;
         }
+        if (initialNeedsSetupRef.current === true) {
+          wdbg('E2 → BLOQUÉ (ref=true)'); return;
+        }
+        if (serverApi.isAuthenticated()) {
+          wdbg('E2 → redirectTo /dashboard'); redirectTo('/dashboard');
+        } else {
+          wdbg('E2 → redirectTo /login'); redirectTo('/login');
+        }
+      } else {
+        wdbg(`E2 → cond NON remplie br=${setupStatus?.backendReachable} ns=${setupStatus?.needsSetup} hu=${setupStatus?.hasUsers}`);
       }
     };
 
     checkAndRedirect();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, setupStatus, currentStep, getStepId]);
 
   const appVersion = (() => {
@@ -311,7 +323,12 @@ export default function Wizard() {
           <AuthStep
             focusedButtonIndex={focusedButtonIndex}
             buttonRefs={buttonRefs}
-            onNext={() => { const n = getNextStepNumber('auth'); if (n) setCurrentStep(n); }}
+            onNext={() => {
+              const n = getNextStepNumber('auth');
+              wdbg(`onNext auth → nextStep=${n} ref=${initialNeedsSetupRef.current}`);
+              if (n) setCurrentStep(n);
+              else wdbg('onNext auth → AUCUNE étape suivante (n=null) !');
+            }}
             onStatusChange={checkSetupStatus}
           />
         );
@@ -872,6 +889,7 @@ export default function Wizard() {
           <div class="wizard-footer-dot" />
           <span style="font-size:11.5px;color:rgba(255,255,255,0.18);">v{appVersion}</span>
         </footer>
+
       </main>
     </div>
   );

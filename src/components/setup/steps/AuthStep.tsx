@@ -13,6 +13,7 @@ import { setBackendUrl, hasDeploymentBackend } from '../../../lib/backend-config
 import { isTVPlatform, isTablet } from '../../../lib/utils/device-detection';
 import { QuickConnectStep } from './QuickConnectStep';
 import { useI18n } from '../../../lib/i18n';
+import { dbgLog } from '../../../lib/debug/debug-store';
 
 interface AuthStepProps {
   focusedButtonIndex: number;
@@ -26,6 +27,7 @@ type AuthView = 'login' | 'register' | '2fa';
 const LARGE_SCREEN_BREAKPOINT = 768;
 
 export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChange }: AuthStepProps) {
+  const dbg = (msg: string) => dbgLog('[AUTH] ' + msg);
   const { t } = useI18n();
   const isTV = typeof window !== 'undefined' && isTVPlatform();
   const [isLargeScreen, setIsLargeScreen] = useState(
@@ -63,9 +65,10 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
   const [registerInviteCode, setRegisterInviteCode] = useState('');
 
   const afterCloudLogin = async (cloudToken: string) => {
+    dbg('afterCloudLogin start');
     try {
-      await new Promise(resolve => setTimeout(resolve, 200));
       const savedConfig = await getUserConfig();
+      dbg(`getUserConfig: ${savedConfig ? `backendUrl=${savedConfig.backendUrl} idx=${savedConfig.indexers?.length ?? 0}` : 'null'}`);
       const hasSomething =
         !!(savedConfig?.indexers?.length) ||
         !!savedConfig?.tmdbApiKey ||
@@ -74,40 +77,42 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         !!savedConfig?.language ||
         !!savedConfig?.backendUrl ||
         !!(savedConfig?.indexerCategories && Object.keys(savedConfig.indexerCategories).length > 0);
+      dbg(`hasSomething:${hasSomething}`);
       if (savedConfig && hasSomething) {
-        // Restaurer l'URL backend EN PREMIER — obligatoire pour que les appels suivants
-        // (health check, getSetupStatus, etc.) atteignent le bon serveur
         if (savedConfig.backendUrl && !hasDeploymentBackend()) {
           try {
             setBackendUrl(savedConfig.backendUrl);
-            console.log('[AUTH] URL backend restaurée depuis le cloud:', savedConfig.backendUrl);
+            dbg(`backendUrl set: ${savedConfig.backendUrl}`);
           } catch (e) {
-            console.warn('[AUTH] Impossible de restaurer l\'URL backend:', e);
+            dbg(`backendUrl error: ${e}`);
           }
         }
         const missingCategories = !savedConfig.indexerCategories || Object.keys(savedConfig.indexerCategories).length === 0;
         if (missingCategories) {
           syncIndexersToCloud().catch((err) => console.warn('[AUTH] Sync catégories ignorée:', err));
         }
-        // Attendre la fin de l'import cloud avant de vérifier le statut
-        await new Promise<void>((resolve) => {
-          CloudImportManager.startImport(savedConfig).finally(() => resolve());
-        });
-        // Vérifier si le setup est déjà complet (config cloud restaurée dans le backend)
+        // Lancer l'import cloud en ARRIÈRE-PLAN sans bloquer la navigation
+        CloudImportManager.startImport(savedConfig).catch((e) => console.warn('[AUTH] Import cloud (bg):', e));
+        // Vérifier le statut immédiatement (sans attendre la fin de l'import)
+        dbg('calling onStatusChange...');
         const freshStatus = await Promise.resolve(onStatusChange?.()).catch(() => null);
+        dbg(`freshStatus: needsSetup=${freshStatus?.needsSetup} hasUsers=${freshStatus?.hasUsers} reachable=${freshStatus?.backendReachable}`);
+        dbg(`isAuthenticated:${serverApi.isAuthenticated()}`);
         if (freshStatus && freshStatus.needsSetup === false && freshStatus.hasUsers === true) {
-          // Tout est configuré → aller directement au dashboard, sans passer par les étapes
+          dbg('→ redirectTo /dashboard');
           redirectTo('/dashboard');
           return;
         }
+        dbg('→ onNext()');
         onNext();
         return;
       }
     } catch (err) {
       if (!(err instanceof Error && err.message.includes('401'))) {
-        console.warn('[AUTH] Impossible de vérifier config sauvegardée:', err);
+        dbg(`ERROR: ${err}`);
       }
     }
+    dbg('→ onNext() fallback (no config)');
     onNext();
   };
 

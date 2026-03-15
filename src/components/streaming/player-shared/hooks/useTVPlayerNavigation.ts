@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useMemo } from 'preact/hooks';
 import { isTVPlatform } from '../../../../lib/utils/device-detection';
 import { useSeekStepAcceleration } from './useSeekStepAcceleration';
 
-const BACK_KEY_CODES = [27, 8, 461];
+const BACK_KEY_CODES = [27, 8, 461, 4];
 const BACK_KEYS = ['Escape', 'Backspace', 'Back', 'BrowserBack', 'GoBack'];
 
 interface UseTVPlayerNavigationProps {
@@ -77,7 +77,11 @@ export function useTVPlayerNavigation({
         return;
       }
       const kc = e.keyCode ?? e.which;
-      const key = e.key || (kc === 13 ? 'Enter' : kc === 32 ? ' ' : kc === 37 ? 'ArrowLeft' : kc === 38 ? 'ArrowUp' : kc === 39 ? 'ArrowRight' : kc === 40 ? 'ArrowDown' : '');
+      const key = e.key || (kc === 13 || kc === 23 ? 'Enter' : kc === 32 ? ' ' : kc === 37 ? 'ArrowLeft' : kc === 38 ? 'ArrowUp' : kc === 39 ? 'ArrowRight' : kc === 40 ? 'ArrowDown' : '');
+      if (kc === 23) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
       if (kc === 415 || kc === 19) {
         e.preventDefault();
         onPlayPause();
@@ -97,6 +101,17 @@ export function useTVPlayerNavigation({
       }
       if (!showControls && [' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) {
         setShowControls(true);
+      }
+      if (isTV && showControls && key) {
+        if (controlsTimeoutRef.current) {
+          clearTimeout(controlsTimeoutRef.current);
+          controlsTimeoutRef.current = null;
+        }
+        controlsTimeoutRef.current = window.setTimeout(() => {
+          controlsTimeoutRef.current = null;
+          setShowControls(false);
+          setFocusedOnProgress(false);
+        }, 5000);
       }
       switch (key) {
         case ' ':

@@ -48,13 +48,11 @@ function normalizeResolution(raw?: string): string {
   return raw;
 }
 
-function qualityBadgeClass(resolution: string, isSelected: boolean): string {
+function qualityBadgeClass(_resolution: string, isSelected: boolean): string {
   if (isSelected) {
-    if (resolution === '4K' || resolution === 'Remux') return 'bg-violet-600 text-white border-violet-500';
-    if (resolution === '1080p') return 'bg-primary/80 text-white border-primary-500';
-    return 'bg-primary/60 text-white border-primary-400';
+    return 'glass-panel backdrop-blur-sm text-white border-violet-500/50 bg-violet-900/20';
   }
-  return 'bg-white/8 text-white/70 border-white/15 hover:bg-white/15 hover:text-white';
+  return 'glass-panel backdrop-blur-sm text-white/70 border-white/15 hover:text-white hover:border-white/30';
 }
 
 export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeederWarning = true, sources, allVariants, selectedVariantId, onSelectVariant }: TorrentInfoProps) {
@@ -310,7 +308,7 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
                     type="button"
                     onClick={() => canSwitch && onSelectVariant && onSelectVariant(bestVariant)}
                     title={`${variants.length} source${variants.length > 1 ? 's' : ''} · ${totalSeeds} seeder${totalSeeds !== 1 ? 's' : ''}${isPreferred ? (language === 'fr' ? ' · Qualité préférée' : ' · Preferred quality') : ''}`}
-                    className={`relative inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-1 focus:ring-offset-black/50 ${canSwitch ? 'cursor-pointer' : 'cursor-default'} ${qualityBadgeClass(resolution, isSelected)}`}
+                    className={`relative inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-1 focus:ring-offset-black/50 ${canSwitch ? 'cursor-pointer' : 'cursor-default'} ${qualityBadgeClass(resolution, isSelected)}`}
                     aria-pressed={isSelected}
                   >
                     {resolution}
@@ -328,7 +326,7 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
             </div>
           ) : currentQuality ? (
             /* Badge unique si qualité connue mais pas de groupe interactif */
-            <span className={`inline-flex items-center px-3 py-1.5 rounded-lg border text-xs font-bold ${qualityBadgeClass(currentQuality, true)}`}>
+            <span className={`inline-flex items-center px-3 py-1.5 rounded-full border text-xs font-bold ${qualityBadgeClass(currentQuality, true)}`}>
               {currentQuality}
             </span>
           ) : null}

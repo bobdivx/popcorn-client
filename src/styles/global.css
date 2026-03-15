@@ -38,6 +38,15 @@
   --safe-area-inset-left: env(safe-area-inset-left, 0px);
 }
 
+/* Android TV : réduire l’affichage pour que la résolution ne soit pas « tout trop grand » */
+html[data-tv-platform] body {
+  transform: scale(0.8);
+  transform-origin: 0 0;
+  width: 125vw;
+  height: 125vh;
+  overflow-x: hidden;
+}
+
 /* Masquer la scrollbar mais garder le scroll */
 .scrollbar-hide {
   -ms-overflow-style: none;  /* IE et Edge */
@@ -287,31 +296,31 @@
 }
 
 .nav-tab-active {
-  animation: tabActive 0.2s ease-out;
+  animation: tabActive 0.18s ease-out;
   position: relative;
 }
 
 .nav-tab-active::after {
   content: '';
   position: absolute;
-  bottom: -2px;
+  bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 60%;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 0.8), transparent);
+  width: 55%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 1), rgba(255, 255, 255, 0.6), rgba(168, 85, 247, 1), transparent);
   border-radius: 2px;
-  animation: tabActiveGlow 2s ease-in-out infinite;
+  animation: tabActiveGlow 2.5s ease-in-out infinite;
 }
 
 @keyframes tabActiveGlow {
   0%, 100% {
-    opacity: 0.6;
-    width: 60%;
+    opacity: 0.7;
+    width: 50%;
   }
   50% {
     opacity: 1;
-    width: 80%;
+    width: 70%;
   }
 }
 
@@ -900,6 +909,16 @@
     -webkit-backdrop-filter: var(--blur-glass);
     border: 1px solid rgba(255, 255, 255, 0.1);
   }
+
+  /* Navbar scrollée : fond plus opaque pour la lisibilité */
+  .navbar-scrolled {
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.92) 0%,
+      rgba(0, 0, 0, 0.75) 60%,
+      rgba(0, 0, 0, 0.4) 100%
+    ) !important;
+  }
   
   .glass-panel-lg {
     background-color: var(--bg-glass);
@@ -1038,11 +1057,23 @@
   .nav-tab {
     transition-duration: 0.3s;
   }
-  
+
+  /* Navigation tabs TV - espacés comme Google TV / Netflix */
+  .nav-tabs-wrapper {
+    gap: 0.5rem !important;
+  }
+
   /* Hover plus prononcé sur TV */
   .gtv-icon-btn:hover:not(:disabled),
   .gtv-pill-btn:hover:not(:disabled) {
     transform: translateY(-2px) scale(1.08);
+  }
+
+  /* Boutons icônes TV - plus grands et visibles */
+  .gtv-icon-btn {
+    width: 3.5rem !important;
+    height: 3.5rem !important;
+    border-radius: 1rem !important;
   }
   
   /* Menu dropdown plus grand sur TV */
@@ -1267,8 +1298,9 @@
 
 /* Styles pour navigation TV */
 .nav-tab {
-  @apply inline-flex items-center justify-center transition-all duration-300 focus:outline-none rounded-full px-5 lg:px-7 py-2 lg:py-3 text-white/80 bg-transparent;
+  @apply inline-flex items-center justify-center gap-2 transition-all duration-300 focus:outline-none rounded-full px-5 lg:px-7 py-2 lg:py-3 text-white/70 bg-transparent font-medium;
   min-height: 44px;
+  letter-spacing: 0.01em;
 }
 
 /* Styles pour navigation mobile - amélioration de l'affichage sur petits écrans */
@@ -1299,19 +1331,36 @@
   }
 }
 
+/* Navbar streaming TV — gradient Netflix-like */
+.navbar-tv {
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.95) 0%,
+    rgba(0, 0, 0, 0.82) 45%,
+    rgba(0, 0, 0, 0.5) 75%,
+    transparent 100%
+  );
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-bottom: none;
+}
+
 /* Padding TV pour nav-tab - doit être dans media query */
 @media (min-width: 1920px) {
   .nav-tab {
-    padding-left: 2.25rem !important; /* 36px */
-    padding-right: 2.25rem !important; /* 36px */
-    padding-top: 1rem !important; /* 16px */
-    padding-bottom: 1rem !important; /* 16px */
-    min-height: 52px;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+    padding-top: 0.875rem !important;
+    padding-bottom: 0.875rem !important;
+    min-height: 56px;
+    font-size: 1.125rem !important;
+    gap: 0.75rem !important;
   }
 }
 
 .nav-tab-active {
-  @apply text-white font-bold bg-glass-active;
+  @apply text-white font-bold;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .nav-tab:focus {
@@ -1327,7 +1376,22 @@
 }
 
 .nav-tab:hover {
-  @apply bg-glass-hover text-white;
+  @apply text-white;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Onglet actif TV - indicateur plus visible avec soulignement lumineux */
+@media (min-width: 1920px) {
+  .nav-tab-active {
+    background: rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset, 0 4px 20px rgba(168, 85, 247, 0.2) !important;
+  }
+
+  .nav-tab-active::after {
+    width: 70% !important;
+    height: 3px !important;
+    background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 1), rgba(255, 255, 255, 0.8), rgba(168, 85, 247, 1), transparent) !important;
+  }
 }
 
 /* Boutons compacts type Google TV — focus = halo blanc (norme design, voir .ds-focus-glow) */

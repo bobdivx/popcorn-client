@@ -1,8 +1,7 @@
-import { Play, RotateCw, Download, Link2, Check, Trash2, Loader2, Zap, Upload, XCircle, Radio, Bookmark, BookmarkCheck } from 'lucide-preact';
+import { Play, RotateCw, Download, Link2, Check, Trash2, Loader2, Upload, XCircle, Radio, Bookmark, BookmarkCheck } from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
 import { TorrentProgressBar, TorrentSpeedDisplay, PeersIndicator } from '../../ui';
-import RequestButton from '../../../requests/RequestButton';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { formatBytes, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
 
@@ -10,23 +9,18 @@ interface ActionButtonsProps {
   torrent: MediaDetailPageProps['torrent'];
   allVariants?: MediaDetailPageProps['torrent'][];
   isAvailableLocally: boolean;
-  /** En mode streaming (Lire) : masquer le panneau "En file d'attente" / progression téléchargement. */
   isStreamingThisTorrent?: boolean;
   canStream: boolean;
   isExternal: boolean;
   hasInfoHash: boolean;
-  /** Option streaming torrent active (abonnement) : afficher Lire en priorité avec icône streaming */
   streamingTorrentActive?: boolean;
   magnetCopied: boolean;
   downloadingToClient: boolean;
   deletingMedia: boolean;
   savedPlaybackPosition?: number | null;
   torrentStats?: ClientTorrentStats | null;
-  /** Compte à rebours (s) avant lancement auto à la fin du téléchargement (3, 2, 1). */
   countdownRemaining?: number | null;
-  /** Pack saison (plusieurs fichiers) : afficher "Télécharger toute la saison" + option épisode */
   isPackWithMultipleFiles?: boolean;
-  /** Index de l'épisode sélectionné dans la liste preview (pack) pour Télécharger/Lire cet épisode */
   selectedPackEpisodePreviewIndex?: number | null;
   onDownloadSingleEpisode?: (fileIndex: number) => void | Promise<void>;
   onPlaySingleEpisode?: (fileIndex: number) => void | Promise<void>;
@@ -35,11 +29,9 @@ interface ActionButtonsProps {
   onPlayFromBeginning?: () => void;
   onDownload: () => void;
   onDownloadTorrent: () => void;
-  /** Annuler le téléchargement en cours (retirer le torrent du client). Affiché à la place de Télécharger quand un téléchargement est en cours. */
   onCancelDownload?: () => void;
   onCopyMagnet: () => void;
   onDeleteMedia: () => void;
-  /** À regarder plus tard (favoris) — affiché si tmdbId présent */
   watchLater?: {
     isFavorite: boolean;
     loading: boolean;
@@ -47,64 +39,27 @@ interface ActionButtonsProps {
   };
 }
 
-/**
- * Fonction pour sélectionner le meilleur torrent selon la qualité
- * Priorité : Remux 4K > 4K > 1080p > 720p
- */
 function selectBestTorrent(variants: MediaDetailPageProps['torrent'][]): MediaDetailPageProps['torrent'] | null {
   if (!variants || variants.length === 0) return null;
-  
-  // Fonction de score pour chaque torrent
   const getQualityScore = (t: MediaDetailPageProps['torrent']): number => {
     let score = 0;
     const quality = t.quality;
     const full = quality?.full?.toUpperCase() || '';
     const resolution = quality?.resolution?.toUpperCase() || '';
     const source = quality?.source?.toUpperCase() || '';
-    
-    // Remux (priorité maximale)
-    if (full.includes('REMUX') || source.includes('REMUX') || full.includes('BLURAY')) {
-      score += 1000;
-    }
-    
-    // 4K / 2160P / UHD
-    if (resolution === '4K' || resolution === '2160P' || resolution === 'UHD' || resolution.includes('2160')) {
-      score += 500;
-    } else if (resolution === '1080P' || resolution.includes('1080')) {
-      score += 300;
-    } else if (resolution === '720P' || resolution.includes('720')) {
-      score += 100;
-    }
-    
-    // HDR
-    if (full.includes('HDR') || full.includes('DOLBY')) {
-      score += 50;
-    }
-    
-    // Codec préféré (x265/HEVC > AV1 > x264)
+    if (full.includes('REMUX') || source.includes('REMUX') || full.includes('BLURAY')) score += 1000;
+    if (resolution === '4K' || resolution === '2160P' || resolution === 'UHD' || resolution.includes('2160')) score += 500;
+    else if (resolution === '1080P' || resolution.includes('1080')) score += 300;
+    else if (resolution === '720P' || resolution.includes('720')) score += 100;
+    if (full.includes('HDR') || full.includes('DOLBY')) score += 50;
     const codec = quality?.codec?.toUpperCase() || '';
-    if (codec === 'X265' || codec === 'H265' || codec === 'HEVC') {
-      score += 30;
-    } else if (codec === 'AV1') {
-      score += 25;
-    } else if (codec === 'X264' || codec === 'H264') {
-      score += 10;
-    }
-    
-    // Plus de seeds = mieux
+    if (codec === 'X265' || codec === 'H265' || codec === 'HEVC') score += 30;
+    else if (codec === 'AV1') score += 25;
+    else if (codec === 'X264' || codec === 'H264') score += 10;
     score += (t.seedCount || 0) * 0.1;
-    
     return score;
   };
-  
-  // Trier par score décroissant
-  const sortedVariants = [...variants].sort((a, b) => {
-    const scoreA = getQualityScore(a);
-    const scoreB = getQualityScore(b);
-    return scoreB - scoreA;
-  });
-  
-  return sortedVariants[0] || null;
+  return [...variants].sort((a, b) => getQualityScore(b) - getQualityScore(a))[0] || null;
 }
 
 export function ActionButtons({
@@ -137,113 +92,90 @@ export function ActionButtons({
   const { t } = useI18n();
   const hasSavedPosition = savedPlaybackPosition !== null && savedPlaybackPosition !== undefined && savedPlaybackPosition > 0;
 
-  // Déterminer l'état du bouton de téléchargement (hydraté par les stats du client torrent)
   const stateLower = typeof torrentStats?.state === 'string' ? torrentStats.state.toLowerCase() : '';
   const isDownloading = !!torrentStats && (stateLower === 'downloading' || stateLower === 'queued');
   const isCompleted = !!torrentStats && (stateLower === 'completed' || stateLower === 'seeding');
   const progressValue = typeof torrentStats?.progress === 'number' ? torrentStats.progress : 0;
   const progressPercent = torrentStats ? Math.round(progressValue * 100) : 0;
   const progressComplete = !!(torrentStats && torrentStats.progress >= 0.99);
-  // Torrent téléchargé = état completed/seeding OU progression >= 99%
   const isDownloadComplete = isCompleted || progressComplete;
   const isSeeding = !!torrentStats && stateLower === 'seeding';
-  // Afficher l'état dès qu'on a des stats actives (même si download_started n'est pas exposé)
   const hasActiveDownloadStats = !!torrentStats && !isDownloadComplete && (
-    isDownloading ||
-    progressValue > 0 ||
+    isDownloading || progressValue > 0 ||
     (torrentStats.download_speed ?? 0) > 0 ||
     (torrentStats.peers_connected ?? 0) > 0 ||
     (torrentStats.downloaded_bytes ?? 0) > 0
   );
-  // Téléchargement en cours = stats actives OU phase "Ajout..." → on affiche "Annuler le téléchargement" si onCancelDownload est fourni
   const isDownloadInProgress = (!!torrentStats && !isDownloadComplete) || downloadingToClient;
   const showProgressInButton = hasActiveDownloadStats;
   const displayProgressPercent = hasActiveDownloadStats ? progressPercent : 0;
-  // En mode streaming (Lire), ne pas afficher le panneau de progression téléchargement (réservé au mode "Télécharger").
   const showProgressNextToCancel = !isStreamingThisTorrent && (isDownloadInProgress && !!onCancelDownload && !!torrentStats) && hasActiveDownloadStats;
 
-  // Détecter si c'est un média local (slug ou id commence par "local_") ou fichier de la bibliothèque (downloadPath)
   const isLocalTorrent =
     torrent.id?.startsWith('local_') ||
     torrent.slug?.startsWith('local_') ||
     torrent.infoHash?.startsWith('local_') ||
     !!(torrent as any).downloadPath;
-  
-  // Afficher le bouton si :
-  // - Le torrent n'est pas disponible localement (pas encore téléchargé) → bouton "Télécharger"
-  // - OU le torrent est complété (selon torrentStats) → bouton "Lire"
-  // - OU le torrent est disponible localement ET a un infoHash → bouton "Lire" (même sans stats)
-  // - OU c'est un média local → bouton "Lire"
-  // - OU option streaming torrent active ET (hasInfoHash ou magnet/lien pour stream) → bouton "Lire" (streaming)
-  const shouldShowButton = !isAvailableLocally || isDownloadComplete || (isAvailableLocally && hasInfoHash) || isLocalTorrent || (streamingTorrentActive && canStream);
 
-  // Afficher "Lire" quand le torrent est téléchargé, ou en streaming si abonnement actif.
+  const shouldShowButton = !isAvailableLocally || isDownloadComplete || (isAvailableLocally && hasInfoHash) || isLocalTorrent || (streamingTorrentActive && canStream);
   const shouldShowPlayButton =
     isLocalTorrent ||
     (isAvailableLocally && hasInfoHash) ||
     isDownloadComplete ||
     (streamingTorrentActive && canStream);
-  // Lire en mode streaming (sans fichier local) = on affiche l'icône Radio à côté du label
   const isPlayStreamingMode = shouldShowPlayButton && streamingTorrentActive && canStream && !isAvailableLocally && !isDownloadComplete;
-
-  // Quand abonnement streaming actif : afficher le bouton Télécharger à côté de Lire (sauf si déjà téléchargé)
   const showDownloadButtonAlongsidePlay =
-    streamingTorrentActive &&
-    canStream &&
-    shouldShowPlayButton &&
-    !isDownloadComplete &&
-    !showProgressNextToCancel &&
-    !downloadingToClient;
+    streamingTorrentActive && canStream && shouldShowPlayButton &&
+    !isDownloadComplete && !showProgressNextToCancel && !downloadingToClient;
 
   return (
-    <div className="mb-6">
-      <div className="flex flex-wrap gap-3 items-center">
-        {/* Bouton Télécharger / En cours / Lire (Annuler = icône dans la carte de progression) */}
+    <div className="mb-6 space-y-3">
+      {/* ── Rangée principale ── */}
+      <div className="flex flex-wrap gap-3 tv:gap-4 items-center">
+
+        {/* Bouton Lire / Télécharger — gradient animé, rounded-full */}
         {shouldShowButton && !(isDownloadInProgress && onCancelDownload && showProgressNextToCancel) && (
           <button
-            onClick={
-              shouldShowPlayButton
-                ? onPlay
-                : onDownload
-            }
+            onClick={shouldShowPlayButton ? onPlay : onDownload}
             disabled={countdownRemaining !== null && countdownRemaining > 0}
             title={isPlayStreamingMode ? t('playback.playStreamingLabel') : (shouldShowPlayButton && hasSavedPosition ? t('dashboard.resumeWatching') : undefined)}
             data-focusable
             data-media-detail-primary-action
             data-media-detail-action={shouldShowPlayButton ? 'play' : 'download'}
             tabIndex={0}
-            className="inline-flex items-center gap-2 bg-primary hover:bg-primary-700 text-white px-6 py-3 rounded-lg font-semibold text-lg transition-all duration-200 border border-primary-500/50 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px]"
+            className="gtv-pill-btn ds-focus-glow ds-active-glow ds-sync-active-pulse inline-flex items-center gap-2.5 font-bold text-base tv:text-2xl tv:px-10 tv:py-5 tv:min-h-[68px] disabled:opacity-50 disabled:cursor-not-allowed border border-violet-500/40 hover:border-violet-400/60 hover:bg-violet-900/20"
           >
             {downloadingToClient ? (
               <>
-                <span className="loading loading-spinner loading-sm"></span>
+                <Loader2 className="h-5 w-5 tv:h-7 tv:w-7 animate-spin shrink-0" size={20} />
                 Ajout...
               </>
             ) : (isDownloading || hasActiveDownloadStats) && !onCancelDownload ? (
               <>
-                <span className="loading loading-spinner loading-sm"></span>
-                {showProgressInButton ? `En cours... ${displayProgressPercent}%` : 'En cours... 0%'}
+                <Loader2 className="h-5 w-5 tv:h-7 tv:w-7 animate-spin shrink-0" size={20} />
+                {showProgressInButton ? `${displayProgressPercent}%` : '0%'}
               </>
             ) : countdownRemaining !== null && countdownRemaining > 0 ? (
               <>
-                <span className="loading loading-spinner loading-sm"></span>
-                Lancement dans {countdownRemaining} s…
+                <Loader2 className="h-5 w-5 tv:h-7 tv:w-7 animate-spin shrink-0" size={20} />
+                {countdownRemaining} s...
               </>
             ) : shouldShowPlayButton ? (
               <>
-                <Play className="h-5 w-5" size={20} />
-                {isPlayStreamingMode && <Radio className="h-4 w-4 text-primary-200" size={16} aria-hidden />}
+                <Play className="h-5 w-5 tv:h-7 tv:w-7 fill-current shrink-0" size={20} />
+                {isPlayStreamingMode && <Radio className="h-4 w-4 opacity-60 shrink-0" size={16} aria-hidden />}
                 {hasSavedPosition ? t('playback.resumeLabel') : t('playback.playLabel')}
               </>
             ) : (
               <>
-                <Download className="h-5 w-5" size={20} />
-                {isPackWithMultipleFiles ? 'Télécharger toute la saison' : 'Télécharger'}
+                <Download className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" size={20} />
+                {isPackWithMultipleFiles ? 'Télécharger la saison' : t('common.download')}
               </>
             )}
           </button>
         )}
-        {/* Bouton Télécharger à côté de Lire quand abonnement streaming actif (fichier pas encore téléchargé) */}
+
+        {/* Télécharger à côté de Lire (streaming) — style glass pill */}
         {showDownloadButtonAlongsidePlay && (
           <button
             type="button"
@@ -251,53 +183,49 @@ export function ActionButtons({
             data-focusable
             data-media-detail-action="download"
             tabIndex={0}
-            className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-lg font-semibold text-lg transition-all duration-200 border border-white/30 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px]"
+            className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 tv:text-xl tv:px-8 tv:py-4 tv:min-h-[68px]"
             title={isPackWithMultipleFiles ? t('playback.downloadFullSeason') : t('common.download')}
           >
-            <Download className="h-5 w-5" size={20} />
+            <Download className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" size={20} />
             {isPackWithMultipleFiles ? t('playback.downloadFullSeason') : t('common.download')}
           </button>
         )}
-        {/* Progression en cours : carte avec pourcentage + bouton Annuler (icône seule) */}
+
+        {/* Carte progression en cours */}
         {showProgressNextToCancel && torrentStats && onCancelDownload && (
           <div
-            className="flex items-start gap-3 min-w-[200px] max-w-[340px] flex-1 p-4 rounded-xl border border-primary-500/30 bg-gradient-to-br from-primary-900/40 to-primary-950/60 backdrop-blur-sm shadow-lg"
+            className="flex items-center gap-3 min-w-[200px] max-w-[340px] flex-1 px-4 py-3.5 rounded-xl border border-violet-500/20 bg-gradient-to-r from-violet-950/60 to-black/40 backdrop-blur-md"
             aria-label={t('downloads.progress')}
           >
-            <div className="flex flex-col gap-2 flex-1 min-w-0">
-              <div className="flex items-baseline justify-between gap-2">
-                <span className="text-white/80 text-sm font-medium truncate">
+            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-white/55 text-xs font-semibold uppercase tracking-wider truncate">
                   {torrentStats.state === 'queued' ? t('torrentStats.queued') : t('torrentStats.downloading')}
                 </span>
-                <span className="text-2xl font-bold tabular-nums text-primary-200 shrink-0">
-                  {displayProgressPercent}%
-                </span>
+                <span className="text-lg font-bold tabular-nums text-white shrink-0">{displayProgressPercent}%</span>
               </div>
-              <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+              <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
                 <div
-                  className="bg-primary-500 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(100, displayProgressPercent)}%` }}
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${Math.min(100, displayProgressPercent)}%`,
+                    background: 'linear-gradient(90deg, #7c3aed, #a78bfa)',
+                  }}
                   role="progressbar"
                   aria-valuenow={displayProgressPercent}
                   aria-valuemin={0}
                   aria-valuemax={100}
                 />
               </div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-white/60">
+              <div className="flex items-center gap-2 text-xs text-white/40">
                 {(torrentStats.download_speed ?? 0) > 0 && (
-                  <span>
-                    {((torrentStats.download_speed! / (1024 * 1024)).toFixed(1))} MB/s
-                  </span>
+                  <span>{((torrentStats.download_speed! / (1024 * 1024)).toFixed(1))} MB/s</span>
                 )}
                 {torrentStats.eta_seconds != null && torrentStats.eta_seconds > 0 && (
-                  <span>
-                    {t('torrentStats.eta')} {formatTimeRemaining(torrentStats.eta_seconds)}
-                  </span>
+                  <span>· {formatTimeRemaining(torrentStats.eta_seconds)}</span>
                 )}
                 {torrentStats.total_bytes > 0 && (
-                  <span>
-                    {formatBytes(torrentStats.downloaded_bytes ?? 0)} / {formatBytes(torrentStats.total_bytes)}
-                  </span>
+                  <span>· {formatBytes(torrentStats.downloaded_bytes ?? 0)} / {formatBytes(torrentStats.total_bytes)}</span>
                 )}
               </div>
             </div>
@@ -308,38 +236,16 @@ export function ActionButtons({
               aria-label={t('downloads.cancelDownload')}
               data-focusable
               data-media-detail-primary-action
-              className="shrink-0 p-2.5 rounded-lg text-white/80 hover:text-white hover:bg-white/15 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
+              className="gtv-icon-btn ds-focus-glow ds-active-glow shrink-0 w-9 h-9 min-w-9 min-h-9 text-white/60 hover:text-red-400"
             >
-              <XCircle className="h-6 w-6" size={24} />
+              <XCircle className="h-5 w-5" size={20} />
             </button>
           </div>
         )}
-        {/* Pack : téléchargement ou lecture d'un seul épisode (quand un épisode est sélectionné dans la liste preview) */}
+
+        {/* Pack : épisode sélectionné */}
         {isPackWithMultipleFiles && selectedPackEpisodePreviewIndex != null && (onDownloadSingleEpisode != null || (canStream && onPlaySingleEpisode != null)) && (
           <>
-            {onDownloadSingleEpisode != null && (
-              <button
-                type="button"
-                onClick={() => void onDownloadSingleEpisode(selectedPackEpisodePreviewIndex!)}
-                disabled={downloadingToClient}
-                title={t('mediaDetail.downloadThisEpisode')}
-                data-focusable
-                tabIndex={0}
-                className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white px-6 py-3 rounded-lg font-semibold text-lg border border-white/30 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 disabled:opacity-50 min-h-[48px]"
-              >
-                {downloadingToClient ? (
-                  <>
-                    <span className="loading loading-spinner loading-sm" />
-                    {t('common.loading')}
-                  </>
-                ) : (
-                  <>
-                    <Download className="h-5 w-5" size={20} />
-                    {t('mediaDetail.downloadThisEpisode')}
-                  </>
-                )}
-              </button>
-            )}
             {canStream && onPlaySingleEpisode != null && (
               <button
                 type="button"
@@ -348,144 +254,111 @@ export function ActionButtons({
                 title={t('mediaDetail.playThisEpisode')}
                 data-focusable
                 tabIndex={0}
-                className="inline-flex items-center gap-2 bg-primary hover:bg-primary-700 text-white px-6 py-3 rounded-lg font-semibold text-lg transition-all duration-200 border border-primary-500/50 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 disabled:opacity-50 min-h-[48px]"
+                className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 font-bold text-base disabled:opacity-50 border border-violet-500/40 hover:border-violet-400/60 hover:bg-violet-900/20"
               >
-                <Play className="h-5 w-5" size={20} />
+                <Play className="h-5 w-5 fill-current shrink-0" size={20} />
                 {t('mediaDetail.playThisEpisode')}
+              </button>
+            )}
+            {onDownloadSingleEpisode != null && (
+              <button
+                type="button"
+                onClick={() => void onDownloadSingleEpisode(selectedPackEpisodePreviewIndex!)}
+                disabled={downloadingToClient}
+                title={t('mediaDetail.downloadThisEpisode')}
+                data-focusable
+                tabIndex={0}
+                className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 disabled:opacity-50"
+              >
+                {downloadingToClient ? (
+                  <Loader2 className="h-5 w-5 animate-spin shrink-0" size={20} />
+                ) : (
+                  <Download className="h-5 w-5 shrink-0" size={20} />
+                )}
+                {t('mediaDetail.downloadThisEpisode')}
               </button>
             )}
           </>
         )}
-        {/* Ancien bouton désactivé "Télécharger l'épisode sélectionné" masqué quand on a les callbacks épisode */}
+
+        {/* Pack sans sélection */}
         {isPackWithMultipleFiles && !(selectedPackEpisodePreviewIndex != null && (onDownloadSingleEpisode != null || (canStream && onPlaySingleEpisode != null))) && !shouldShowPlayButton && (
-          <button
-            type="button"
-            disabled
-            title="Prochainement : téléchargement sélectif d’un épisode (priorité des fichiers)"
-            data-focusable
-            tabIndex={0}
-            className="inline-flex items-center gap-2 bg-white/10 text-white/60 px-6 py-3 rounded-lg font-semibold text-lg border border-white/20 cursor-not-allowed min-h-[48px]"
-          >
-            <Download className="h-5 w-5" size={20} />
-            Télécharger l&apos;épisode sélectionné
+          <button type="button" disabled tabIndex={0}
+            className="gtv-pill-btn inline-flex items-center gap-2.5 opacity-40 cursor-not-allowed">
+            <Download className="h-5 w-5 shrink-0" size={20} />
+            {t('mediaDetail.downloadThisEpisode')}
           </button>
         )}
 
-      {/* Boutons de lecture - Masqués pour l'instant (fonctionnalité à venir) */}
-      {/* Le bouton "Télécharger" lance automatiquement la lecture après téléchargement */}
-      {false && canStream && (
-        hasSavedPosition && onPlayFromBeginning ? (
-          <>
-            <button
-              onClick={onPlay}
-              className="inline-flex items-center gap-2 bg-primary hover:bg-primary-700 text-white px-8 py-3 rounded-lg font-semibold text-lg transition-all duration-200 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px]"
-              title="Reprendre la lecture à la position sauvegardée"
-            >
-              <Play className="h-6 w-6" size={24} />
-              Stream
-            </button>
-            <button
-              onClick={onPlayFromBeginning}
-              className="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded font-semibold text-lg transition-colors border border-white/30"
-              title="Reprendre depuis le début"
-            >
-              <RotateCw className="h-5 w-5" size={20} />
-              Depuis le début
-            </button>
-          </>
-        ) : (
-            <button
-              onClick={onPlay}
-              className="inline-flex items-center gap-2 bg-primary hover:bg-primary-700 text-white px-8 py-3 rounded-lg font-semibold text-lg transition-all duration-200 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px]"
-              title={isAvailableLocally ? "Lire depuis la bibliothèque locale" : "Lire en streaming"}
-            >
-              <Play className="h-6 w-6" size={24} />
-              {isAvailableLocally ? 'Lire' : 'Streaming'}
-            </button>
-        )
-      )}
+        {/* ── Séparateur ── */}
+        {(watchLater || (torrent._externalMagnetUri || (torrent._externalLink && torrent._externalLink.startsWith('magnet:'))) || ((isAvailableLocally || isDownloadComplete) && hasInfoHash && !isExternal)) && (
+          <div className="w-px h-7 bg-white/12 mx-0.5 self-center max-sm:hidden" aria-hidden />
+        )}
 
-      {/* À regarder plus tard (favoris) — visible si tmdbId + tmdbType */}
-      {watchLater && (torrent.tmdbId && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) && (
-        <button
-          type="button"
-          onClick={() => void watchLater.onToggle()}
-          disabled={watchLater.loading}
-          data-focusable
-          tabIndex={0}
-          title={watchLater.isFavorite ? t('playback.watchLaterRemove') : t('playback.watchLaterAdd')}
-          className="inline-flex items-center gap-2 bg-glass hover:bg-glass-hover text-white px-6 py-3 rounded font-semibold text-lg transition-colors border border-white/30 glass-panel disabled:opacity-50"
-          aria-pressed={watchLater.isFavorite}
-        >
-          {watchLater.loading ? (
-            <span className="loading loading-spinner loading-sm" />
-          ) : watchLater.isFavorite ? (
-            <BookmarkCheck className="h-5 w-5 text-primary-400" size={20} />
-          ) : (
-            <Bookmark className="h-5 w-5" size={20} />
-          )}
-          {watchLater.isFavorite ? t('playback.watchLaterRemove') : t('playback.watchLaterAdd')}
-        </button>
-      )}
+        {/* À regarder plus tard — icône ronde */}
+        {watchLater && (torrent.tmdbId && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) && (
+          <button
+            type="button"
+            onClick={() => void watchLater.onToggle()}
+            disabled={watchLater.loading}
+            data-focusable
+            tabIndex={0}
+            title={watchLater.isFavorite ? t('playback.watchLaterRemove') : t('playback.watchLaterAdd')}
+            aria-label={watchLater.isFavorite ? t('playback.watchLaterRemove') : t('playback.watchLaterAdd')}
+            aria-pressed={watchLater.isFavorite}
+            className={`gtv-icon-btn ds-focus-glow ds-active-glow tv:w-16 tv:h-16 disabled:opacity-50 ${watchLater.isFavorite ? 'text-violet-400 bg-violet-900/30' : ''}`}
+          >
+            {watchLater.loading ? (
+              <Loader2 className="h-5 w-5 tv:h-7 tv:w-7 animate-spin" size={20} />
+            ) : watchLater.isFavorite ? (
+              <BookmarkCheck className="h-5 w-5 tv:h-7 tv:w-7" size={20} />
+            ) : (
+              <Bookmark className="h-5 w-5 tv:h-7 tv:w-7" size={20} />
+            )}
+          </button>
+        )}
 
-      {/* Bouton Demander (request) - masqué si déjà dispo localement ou si un téléchargement est en cours (bouton principal = "Annuler le téléchargement") */}
-      {!isAvailableLocally && !isLocalTorrent && !isDownloadInProgress && torrent.tmdbId && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv') && (
-        <RequestButton
-          tmdbId={torrent.tmdbId}
-          mediaType={torrent.tmdbType as 'movie' | 'tv'}
-        />
-      )}
+        {/* Magnet — icône ronde */}
+        {(torrent._externalMagnetUri || (torrent._externalLink && torrent._externalLink.startsWith('magnet:'))) && (
+          <button
+            onClick={onCopyMagnet}
+            data-focusable
+            tabIndex={0}
+            title={magnetCopied ? 'Copié !' : 'Copier le lien magnet'}
+            aria-label={magnetCopied ? 'Copié !' : 'Copier le lien magnet'}
+            className={`gtv-icon-btn ds-focus-glow ds-active-glow tv:w-16 tv:h-16 ${magnetCopied ? 'text-green-400 bg-green-900/30' : ''}`}
+          >
+            {magnetCopied ? (
+              <Check className="h-5 w-5 tv:h-7 tv:w-7" size={20} />
+            ) : (
+              <Link2 className="h-5 w-5 tv:h-7 tv:w-7" size={20} />
+            )}
+          </button>
+        )}
 
-      {/* Bouton Magnet */}
-      {(torrent._externalMagnetUri || (torrent._externalLink && torrent._externalLink.startsWith('magnet:'))) && (
-        <button
-          onClick={onCopyMagnet}
-          data-focusable
-          tabIndex={0}
-          className="inline-flex items-center gap-2 bg-glass hover:bg-glass-hover text-white px-6 py-3 rounded font-semibold text-lg transition-colors border border-white/30 glass-panel"
-        >
-          {magnetCopied ? (
-            <>
-              <Check className="h-5 w-5" size={20} />
-              Copié !
-            </>
-          ) : (
-            <>
-              <Link2 className="h-5 w-5" size={20} />
-              Magnet
-            </>
-          )}
-        </button>
-      )}
-
-      {/* Bouton Supprimer (torrent complété = Lire affiché) : supprimer du client et du disque */}
-      {((isAvailableLocally || isDownloadComplete) && hasInfoHash && !isExternal) && (
-        <button
-          onClick={onDeleteMedia}
-          disabled={deletingMedia}
-          data-focusable
-          tabIndex={0}
-          className="inline-flex items-center gap-2 bg-primary-800 hover:bg-primary-900 text-white px-6 py-3 rounded-lg font-semibold text-lg transition-all duration-200 border border-primary-700/50 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px]"
-          title={isLocalTorrent ? "Supprimer le fichier local" : "Supprimer le torrent"}
-        >
-          {deletingMedia ? (
-            <>
-              <span className="loading loading-spinner loading-sm"></span>
-              Suppression...
-            </>
-          ) : (
-            <>
-              <Trash2 className="h-5 w-5" size={20} />
-              Supprimer
-            </>
-          )}
-        </button>
-      )}
+        {/* Supprimer — danger discret */}
+        {((isAvailableLocally || isDownloadComplete) && hasInfoHash && !isExternal) && (
+          <button
+            onClick={onDeleteMedia}
+            disabled={deletingMedia}
+            data-focusable
+            tabIndex={0}
+            className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2 text-white/45 hover:text-red-400 text-sm font-medium disabled:opacity-40"
+            title={isLocalTorrent ? 'Supprimer le fichier local' : 'Supprimer le torrent'}
+          >
+            {deletingMedia ? (
+              <Loader2 className="h-4 w-4 animate-spin shrink-0" size={16} />
+            ) : (
+              <Trash2 className="h-4 w-4 shrink-0" size={16} />
+            )}
+            Supprimer
+          </button>
+        )}
       </div>
 
-      {/* Affichage du statut de téléchargement (détail sous les boutons) — masqué en mode streaming. */}
+      {/* Barre de progression détaillée */}
       {!isStreamingThisTorrent && hasActiveDownloadStats && torrentStats && !showProgressNextToCancel && (
-        <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/10 backdrop-blur-sm">
+        <div className="px-4 py-3 rounded-xl border border-white/8 bg-white/3 backdrop-blur-sm">
           <TorrentProgressBar
             progress={torrentStats.progress}
             downloadedBytes={torrentStats.downloaded_bytes}
@@ -497,33 +370,23 @@ export function ActionButtons({
             progressColor="blue"
           />
           {torrentStats.status_reason && (
-            <div className="text-white/50 text-sm mt-1">
-              {torrentStats.status_reason}
-            </div>
+            <p className="text-white/35 text-xs mt-1">{torrentStats.status_reason}</p>
           )}
         </div>
       )}
 
-      {/* Affichage du statut de partage (seeding) */}
+      {/* Seeding */}
       {isSeeding && torrentStats && (
-        <div className="mt-4 p-4 bg-green-900/20 rounded-lg border border-green-500/50 backdrop-blur-sm">
-          <div className="flex items-center gap-2 mb-2">
-            <Upload className="h-5 w-5 text-green-400" size={20} />
-            <span className="text-green-400 font-medium">{t('torrentStats.seeding')}</span>
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-green-500/15 bg-green-950/25 backdrop-blur-sm">
+          <div className="flex items-center gap-2 text-green-400 shrink-0">
+            <Upload className="h-4 w-4 shrink-0" size={16} />
+            <span className="text-sm font-semibold">{t('torrentStats.seeding')}</span>
           </div>
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-green-300 text-sm">
-            <TorrentSpeedDisplay
-              uploadSpeed={torrentStats.upload_speed}
-              showEta={false}
-              className="!text-green-300"
-            />
+          <div className="w-px h-4 bg-white/12 shrink-0" aria-hidden />
+          <div className="flex items-center gap-3 text-green-300 text-sm min-w-0">
+            <TorrentSpeedDisplay uploadSpeed={torrentStats.upload_speed} showEta={false} className="!text-green-300" />
             <PeersIndicator peersConnected={torrentStats.peers_connected} className="text-green-300" />
           </div>
-          {(!torrentStats.upload_speed || torrentStats.upload_speed === 0) && !torrentStats.peers_connected && (
-            <div className="text-green-300 text-sm mt-1">
-              En attente de connexions peers pour partager
-            </div>
-          )}
         </div>
       )}
     </div>

@@ -913,6 +913,7 @@ class ServerApiClient {
     localStorage.setItem('refresh_token', refreshToken);
     this.accessToken = accessToken;
     this.refreshToken = refreshToken;
+    window.dispatchEvent(new Event('popcorn-auth-changed'));
   }
 
   /**

@@ -7,6 +7,7 @@ const BACK_KEY_CODES = [
   27,   // Escape (standard)
   8,    // Backspace
   461,  // VK_BACK - Android TV, LG WebOS Magic Remote
+  4,    // KEYCODE_BACK - Android TV / Fire TV
 ];
 const BACK_KEYS = ['Escape', 'Backspace', 'Back', 'BrowserBack', 'GoBack'];
 
@@ -82,11 +83,15 @@ export function useTVPlayerNavigation({
         return;
       }
 
-      // Gestion par key ET keyCode pour compatibilité WebOS / Apple TV / LG télécommande classique
+      // Gestion par key ET keyCode pour compatibilité WebOS / Apple TV / Android TV / LG télécommande classique
       const kc = e.keyCode ?? e.which;
-      const key = e.key || (kc === 13 ? 'Enter' : kc === 32 ? ' ' : kc === 37 ? 'ArrowLeft' : kc === 38 ? 'ArrowUp' : kc === 39 ? 'ArrowRight' : kc === 40 ? 'ArrowDown' : '');
+      const key = e.key || (kc === 13 || kc === 23 ? 'Enter' : kc === 32 ? ' ' : kc === 37 ? 'ArrowLeft' : kc === 38 ? 'ArrowUp' : kc === 39 ? 'ArrowRight' : kc === 40 ? 'ArrowDown' : '');
+      if (kc === 23) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
 
-      // Touches média LG WebOS télécommande classique (Play 415, Pause 19, Rembobiner 412, Avance 417)
+      // Touches média LG WebOS / Android TV (Play 415, Pause 19, Rembobiner 412, Avance 417, OK = 23)
       if (kc === 415 || kc === 19) {
         e.preventDefault();
         onPlayPause();
