@@ -15,16 +15,13 @@ function getRandomBytes(size: number): Uint8Array {
       const crypto = require('crypto');
       return crypto.randomBytes(size);
     } catch {
-      // Si crypto n'est pas disponible, utiliser Math.random
+      // Si crypto n'est pas disponible, lancer une erreur de sécurité
     }
   }
   
-  // Fallback ultime : générer des valeurs pseudo-aléatoires
-  const array = new Uint8Array(size);
-  for (let i = 0; i < size; i++) {
-    array[i] = Math.floor(Math.random() * 256);
-  }
-  return array;
+  // Si aucune source sécurisée n'est disponible, on refuse de générer
+  // une valeur aléatoire faible, afin d'éviter une faille de sécurité.
+  throw new Error("Aucune source sécurisée de génération de nombres aléatoires n'est disponible.");
 }
 
 function uint8ArrayToHex(array: Uint8Array): string {

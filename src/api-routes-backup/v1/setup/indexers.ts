@@ -202,11 +202,20 @@ export const POST: APIRoute = async ({ request }) => {
     // en utilisant le nom de l'indexer (ex: "c411" -> trouve "c411.json")
     
     // Générer un UUID v4
-    const id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+    let id: string;
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      id = crypto.randomUUID();
+    } else if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const array = new Uint8Array(1);
+        crypto.getRandomValues(array);
+        const r = array[0] % 16;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
+    } else {
+      throw new Error("Aucune source sécurisée de génération de nombres aléatoires n'est disponible.");
+    }
 
     const { getBackendUrlAsync } = await import('../../../../lib/backend-url.js');
     const backendUrl =

@@ -9,7 +9,16 @@ export function getOrCreateDeviceId(): string {
   
   if (!deviceId) {
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 15);
+    let random: string;
+    if (window.crypto && window.crypto.randomUUID) {
+      random = window.crypto.randomUUID().split('-')[0];
+    } else if (window.crypto && window.crypto.getRandomValues) {
+      const array = new Uint32Array(1);
+      window.crypto.getRandomValues(array);
+      random = array[0].toString(36);
+    } else {
+      throw new Error("No secure random number generator available");
+    }
     const userAgent = navigator.userAgent.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '');
     deviceId = `${timestamp}-${random}-${userAgent}`;
     localStorage.setItem(STORAGE_KEY, deviceId);
