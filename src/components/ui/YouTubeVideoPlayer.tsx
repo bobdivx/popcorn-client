@@ -8,7 +8,7 @@ interface YouTubeVideoPlayerProps {
   controls?: boolean;
   className?: string;
   onEnded?: () => void;
-  cover?: boolean; // Mode cover pour remplir l'écran comme une image de fond
+  cover?: boolean;
 }
 
 /** Lecteur YouTube identique sur toutes les plateformes. */
@@ -20,6 +20,7 @@ export function YouTubeVideoPlayer({
   controls = true,
   className = '',
   cover = false,
+  onEnded,
 }: YouTubeVideoPlayerProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -28,11 +29,44 @@ export function YouTubeVideoPlayer({
     setIsLoaded(true);
   }, [youtubeKey]);
 
-  if (!youtubeKey) {
-    return null;
-  }
+  // Détection de fin de vidéo via YouTube IFrame API (postMessage)
+  useEffect(() => {
+    if (!onEnded || loop) return;
 
-  // Construire l'URL YouTube embed
+    // Guard pour éviter les appels multiples si l'événement est déclenché plusieurs fois
+    let ended = false;
+
+    const handleMessage = (e: MessageEvent) => {
+      // Filtrer uniquement les messages venant de YouTube (origin-based, plus fiable que source)
+      if (!e.origin.includes('youtube.com')) return;
+
+      let data: any;
+      try {
+        data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+      } catch {
+        return;
+      }
+
+      if (ended) return;
+
+      // YouTube envoie playerState=0 quand la vidéo se termine
+      if (data?.event === 'infoDelivery' && data?.info?.playerState === 0) {
+        ended = true;
+        onEnded();
+      }
+      // Format alternatif YouTube IFrame API
+      if (data?.event === 'onStateChange' && data?.info === 0) {
+        ended = true;
+        onEnded();
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [onEnded, loop, youtubeKey]);
+
+  if (!youtubeKey) return null;
+
   const params = new URLSearchParams();
   if (autoplay) params.append('autoplay', '1');
   if (muted) params.append('mute', '1');
@@ -41,6 +75,8 @@ export function YouTubeVideoPlayer({
     params.append('playlist', youtubeKey);
   }
   if (!controls) params.append('controls', '0');
+  // Toujours activer l'API JS si onEnded est fourni (nécessaire pour les postMessage)
+  if (onEnded) params.append('enablejsapi', '1');
   params.append('rel', '0');
   params.append('modestbranding', '1');
   params.append('playsinline', '1');
@@ -50,10 +86,10 @@ export function YouTubeVideoPlayer({
   params.append('fs', '0');
   params.append('vq', 'hd1080');
   if (typeof window !== 'undefined') params.append('origin', window.location.origin);
+
   const youtubeUrl = `https://www.youtube.com/embed/${youtubeKey}?${params.toString()}`;
 
   if (cover) {
-    // Mode cover : la vidéo remplit le conteneur comme une image de fond
     return (
       <div className={`relative w-full h-full overflow-hidden ${className}`} style={{ position: 'relative', width: '100%', height: '100%' }}>
         <iframe

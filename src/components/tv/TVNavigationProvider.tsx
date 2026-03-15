@@ -59,7 +59,7 @@ export default function TVNavigationProvider() {
           const inViewportX = rect.right >= -pad && rect.left <= window.innerWidth + pad;
           const inViewportY = rect.bottom >= -pad && rect.top <= window.innerHeight + pad + belowViewport;
           if (rect.width <= 0 || rect.height <= 0 || !inViewportX || !inViewportY) return false;
-          if (el.closest('[aria-hidden="true"]') || el.closest('.hidden')) return false;
+          if (el.closest('[aria-hidden="true"]')) return false;
           if (!isWebOSCheck) {
             const style = window.getComputedStyle(el);
             if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;

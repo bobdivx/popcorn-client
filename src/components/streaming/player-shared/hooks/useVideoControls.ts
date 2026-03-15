@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
 import { usePlayerConfig } from './usePlayerConfig';
+import { isTVPlatform } from '../../../../lib/utils/device-detection';
 
 interface UseVideoControlsProps {
   videoRef: { current: HTMLVideoElement | null };
@@ -32,6 +33,8 @@ export function useVideoControls({
   const [volume, setVolume] = useState(playerConfig.volume);
   const controlsTimeoutRef = useRef<number | null>(null);
   const userPausedRef = useRef<boolean>(false);
+  /** Sur Android TV / TV : unmute une fois au premier "playing" (autoplay peut démarrer en muted). */
+  const hasTriedUnmuteOnTVRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (hlsDuration && hlsDuration > 0 && isFinite(hlsDuration)) {
@@ -155,6 +158,18 @@ export function useVideoControls({
     video.volume = playerConfig.volume;
     video.muted = playerConfig.muted;
 
+    /** Android TV : au premier "playing", forcer le son (certains WebView démarrent en muted pour l’autoplay). */
+    const handlePlayingUnmuteTV = () => {
+      if (!isTVPlatform() || hasTriedUnmuteOnTVRef.current) return;
+      hasTriedUnmuteOnTVRef.current = true;
+      const v = videoRef.current;
+      if (v) {
+        v.muted = false;
+        v.volume = Math.max(0.5, playerConfig.volume);
+      }
+    };
+    video.addEventListener('playing', handlePlayingUnmuteTV);
+
     return () => {
       if (container) {
         container.removeEventListener('mousemove', handleMouseMove);
@@ -170,6 +185,7 @@ export function useVideoControls({
       video.removeEventListener('volumechange', handleVolumeChange);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('durationchange', handleDurationChange);
+      video.removeEventListener('playing', handlePlayingUnmuteTV);
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     };
   }, [videoRef, hlsLoaded, playerConfig, hlsDuration]);
@@ -179,6 +195,10 @@ export function useVideoControls({
     if (!video) return;
     if (video.paused) {
       userPausedRef.current = false;
+      if (isTVPlatform()) {
+        video.muted = false;
+        video.volume = Math.max(0.5, playerConfig.volume);
+      }
       video.play().catch(() => setIsPlaying(false));
     } else {
       userPausedRef.current = true;

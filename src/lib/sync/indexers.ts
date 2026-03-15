@@ -24,17 +24,25 @@ export async function applyIndexersFromCloud(
     // ignore
   }
 
-  let created = 0;
-  for (const indexer of indexers) {
-    onProgress(`Import indexer: ${indexer.name}…`, 1);
+  const toCreate = indexers.filter(
+    (indexer) =>
+      !existing.some(
+        (e: any) =>
+          (e?.name || '').toLowerCase() === (indexer.name || '').toLowerCase() &&
+          (e?.baseUrl || '') === (indexer.baseUrl || '')
+      )
+  );
 
-    const alreadyExists = existing.some(
-      (e: any) =>
-        (e?.name || '').toLowerCase() === (indexer.name || '').toLowerCase() &&
-        (e?.baseUrl || '') === (indexer.baseUrl || '')
-    );
-    if (!alreadyExists) {
-      const res = await serverApi.createIndexer({
+  if (toCreate.length === 0) {
+    return { type: 'indexers', success: true, count: 0 };
+  }
+
+  onProgress(`Import ${toCreate.length} indexer(s)…`, 0);
+
+  // Créer tous les indexers manquants en parallèle
+  const results = await Promise.all(
+    toCreate.map((indexer) =>
+      serverApi.createIndexer({
         name: indexer.name,
         baseUrl: indexer.baseUrl ?? '',
         apiKey: indexer.apiKey ?? '',
@@ -44,18 +52,19 @@ export async function applyIndexersFromCloud(
         priority: indexer.priority || 0,
         indexerTypeId: indexer.indexerTypeId || undefined,
         configJson: indexer.configJson || undefined,
-      });
-      if (!res.success) {
-        return {
-          type: 'indexers',
-          success: false,
-          error: res.message || res.error || `Erreur import indexer: ${indexer.name}`,
-          count: created,
-        };
-      }
-      created++;
-    }
+      })
+    )
+  );
+
+  const firstError = results.find((r) => !r.success);
+  if (firstError) {
+    return {
+      type: 'indexers',
+      success: false,
+      error: firstError.message || firstError.error || 'Erreur import indexer',
+      count: results.filter((r) => r.success).length,
+    };
   }
 
-  return { type: 'indexers', success: true, count: indexers.length };
+  return { type: 'indexers', success: true, count: toCreate.length };
 }

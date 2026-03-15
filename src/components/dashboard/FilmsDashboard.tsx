@@ -459,7 +459,6 @@ export default function FilmsDashboard() {
             </div>
           </div>
           <HeroSection
-            noOverlap
             items={heroItemsWithOverview}
             onPlay={handlePlay}
             onPrimaryAction={streamingTorrentActive ? handlePlay : handleHeroDownload}

@@ -7,16 +7,19 @@ import { getFeedbackUnreadCount } from '../../lib/api/popcorn-web';
 import { Modal } from '../ui/Modal';
 import FloatingActionButton from '../ui/FloatingActionButton';
 import FeedbackChat from '../settings/FeedbackChat';
+import { isTVPlatform } from '../../lib/utils/device-detection';
 
 /**
  * Bouton flottant Feedback à intégrer dans le layout.
  * Visible uniquement si l'utilisateur est connecté avec un compte cloud.
+ * Masqué sur Android TV / TV (télécommande, pas d’usage du FAB).
  */
 export default function FeedbackFAB() {
   const { t } = useI18n();
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackUnreadCount, setFeedbackUnreadCount] = useState(0);
+  const isTV = typeof window !== 'undefined' && isTVPlatform();
 
   useEffect(() => {
     if (!serverApi.isAuthenticated()) {
@@ -35,7 +38,7 @@ export default function FeedbackFAB() {
   }, []);
 
   const hasCloud = user != null && !!TokenManager.getCloudAccessToken();
-  const visible = hasCloud;
+  const visible = hasCloud && !isTV;
 
   useEffect(() => {
     if (!hasCloud) {

@@ -460,7 +460,6 @@ export default function SeriesDashboard() {
             </div>
           </div>
           <HeroSection
-            noOverlap
             items={heroItemsWithOverview}
             onPlay={handlePlay}
             onPrimaryAction={streamingTorrentActive ? handlePlay : handleHeroDownload}

@@ -3,6 +3,7 @@ import SettingsLayout from '../../layouts/SettingsLayout.astro';
 import BackendDiagnostics from '../../components/settings/BackendDiagnostics';
 import PermissionGuard from '../../components/ui/PermissionGuard';
 import DsPageHeader from '../../components/ui/DsPageHeader';
+import DebugToggle from '../../components/debug/DebugToggle';
 ---
 
 <SettingsLayout title="Diagnostics - Popcorn Client">
@@ -15,5 +16,6 @@ import DsPageHeader from '../../components/ui/DsPageHeader';
     <PermissionGuard client:only="preact" permission="settings.server">
       <BackendDiagnostics client:only="preact" />
     </PermissionGuard>
+    <DebugToggle client:only="preact" />
   </div>
 </SettingsLayout>

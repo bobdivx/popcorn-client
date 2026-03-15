@@ -4,8 +4,8 @@ import '../styles/design-system.css';
 import { ClientRouter } from 'astro:transitions';
 import ServerConnectionCheck from '../components/ServerConnectionCheck';
 import Navbar from '../components/layout/Navbar';
-import FeedbackFAB from '../components/layout/FeedbackFAB';
 import TVNavigationProvider from '../components/tv/TVNavigationProvider';
+import DebugPanel from '../components/debug/DebugPanel';
 
 interface Props {
   title?: string;
@@ -60,6 +60,14 @@ const isWebOS = import.meta.env.WEBOS === 'true';
     )}
   </head>
   <body class="min-h-screen bg-page text-white flex flex-col overflow-x-hidden">
+    <script is:inline>
+      (function() {
+        var ua = navigator.userAgent || '';
+        var isTV = /Android.*TV|\bTV\b/i.test(ua) || /webOS|Web0S/i.test(ua) || /AppleTV|Apple TV/i.test(ua)
+          || (typeof window.__TAURI_INTERNALS__ !== 'undefined' && window.__TAURI_METADATA__ && window.__TAURI_METADATA__.platform === 'android' && window.innerWidth >= 1280 && window.innerHeight >= 720);
+        if (isTV) document.documentElement.setAttribute('data-tv-platform', 'true');
+      })();
+    </script>
     <script is:inline>
       // Placeholder: les handlers seront enregistres apres que le DOM du fallback existe
       window._popcornShowError = function(msg) {
@@ -134,7 +142,7 @@ const isWebOS = import.meta.env.WEBOS === 'true';
     <TVNavigationProvider client:only="preact" />
     <ServerConnectionCheck client:only="preact" />
     <Navbar client:only="preact" />
-    <FeedbackFAB client:only="preact" />
+    <DebugPanel client:only="preact" />
     <!-- Header (barre en haut) -->
     <main class="app-main flex-1 w-full overflow-x-hidden safe-area-top" style="padding-top: calc(5rem + var(--safe-area-inset-top));">
       <slot />

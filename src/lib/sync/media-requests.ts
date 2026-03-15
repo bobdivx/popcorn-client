@@ -20,30 +20,28 @@ export async function applyMediaRequestsFromCloud(onProgress?: (msg: string) => 
     const existingKeys = new Set(
       (existing.data ?? []).map((r) => `${r.tmdb_id}:${r.media_type}`)
     );
-    let created = 0;
 
-    for (const r of requests) {
-      const key = `${r.tmdb_id}:${r.media_type}`;
-      if (existingKeys.has(key)) continue;
-      let seasonNumbers: number[] | undefined;
-      if (r.season_numbers && r.season_numbers.trim()) {
-        try {
-          seasonNumbers = JSON.parse(r.season_numbers) as number[];
-        } catch {
-          // ignore
-        }
-      }
-      const res = await serverApi.createMediaRequest({
-        tmdb_id: r.tmdb_id,
-        media_type: r.media_type,
-        season_numbers: seasonNumbers,
-      });
-      if (res.success && res.data) {
-        existingKeys.add(key);
-        created++;
-      }
+    const toCreate = requests.filter((r) => !existingKeys.has(`${r.tmdb_id}:${r.media_type}`));
+    if (toCreate.length === 0) {
+      return { success: true, type: 'mediaRequests', message: 'Aucune nouvelle demande' };
     }
 
+    // Créer toutes les demandes manquantes en parallèle
+    const results = await Promise.all(
+      toCreate.map((r) => {
+        let seasonNumbers: number[] | undefined;
+        if (r.season_numbers && r.season_numbers.trim()) {
+          try { seasonNumbers = JSON.parse(r.season_numbers) as number[]; } catch { /* ignore */ }
+        }
+        return serverApi.createMediaRequest({
+          tmdb_id: r.tmdb_id,
+          media_type: r.media_type,
+          season_numbers: seasonNumbers,
+        });
+      })
+    );
+
+    const created = results.filter((r) => r.success && r.data).length;
     onProgress?.(`Demandes de média : ${created} créée(s)`);
     return {
       success: true,
