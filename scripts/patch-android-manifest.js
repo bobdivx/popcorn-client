@@ -111,6 +111,14 @@ function patchManifest(manifestPath) {
     modified = true;
   }
 
+  // Si touchscreen est ABSENT du manifest, Android l'implique comme requis → l'ajouter explicitement
+  if (!content.includes('android.hardware.touchscreen')) {
+    console.log('🔧 Ajout explicite: touchscreen non requis (absent du manifest, Android l\'implique sinon)');
+    const manifestClosePattern = /(\s*)(<\/manifest>)/;
+    content = content.replace(manifestClosePattern, '\n    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />$1$2');
+    modified = true;
+  }
+
   // 2b. Faketouch : requis par défaut dans beaucoup de builds, incompatible avec Android TV / Google TV
   const faketouchPattern = /<uses-feature\s+android:name="android\.hardware\.faketouch"[^>]*android:required="true"[^>]*\/>/g;
   if (content.match(faketouchPattern)) {
@@ -128,6 +136,15 @@ function patchManifest(manifestPath) {
       faketouchPattern2,
       '<uses-feature android:name="android.hardware.faketouch" android:required="false"'
     );
+    modified = true;
+  }
+
+  // Si faketouch est ABSENT du manifest, Android l'implique comme requis → l'ajouter explicitement
+  // C'est la cause principale des "0 appareils TV" sur Play Console
+  if (!content.includes('android.hardware.faketouch')) {
+    console.log('🔧 Ajout explicite: faketouch non requis (absent du manifest, Android l\'implique sinon → bloque les TVs)');
+    const manifestClosePattern = /(\s*)(<\/manifest>)/;
+    content = content.replace(manifestClosePattern, '\n    <uses-feature android:name="android.hardware.faketouch" android:required="false" />$1$2');
     modified = true;
   }
   
