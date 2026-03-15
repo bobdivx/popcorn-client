@@ -18,12 +18,9 @@ export function randomBytes(size: number): Uint8Array {
     return crypto.randomBytes(size);
   }
   
-  // Fallback ultime : générer des valeurs pseudo-aléatoires
-  const array = new Uint8Array(size);
-  for (let i = 0; i < size; i++) {
-    array[i] = Math.floor(Math.random() * 256);
-  }
-  return array;
+  // Si aucune source sécurisée n'est disponible, on refuse de générer
+  // une valeur aléatoire faible, afin d'éviter une faille de sécurité.
+  throw new Error("Aucune source sécurisée de génération de nombres aléatoires n'est disponible.");
 }
 
 export default {

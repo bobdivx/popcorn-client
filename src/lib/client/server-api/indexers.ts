@@ -32,11 +32,20 @@ export const indexersMethods = {
     return this.backendRequest<IndexerTypeInfo[]>('/api/admin/indexers/types', { method: 'GET' });
   },
   async createIndexer(this: ServerApiClientIndexersAccess, data: IndexerFormData): Promise<ApiResponse<Indexer>> {
-    const id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+    let id: string;
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      id = crypto.randomUUID();
+    } else if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+      id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const array = new Uint8Array(1);
+        crypto.getRandomValues(array);
+        const r = array[0] % 16;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
+    } else {
+      throw new Error("Aucune source sécurisée de génération de nombres aléatoires n'est disponible.");
+    }
     const payload: any = {
       id,
       name: data.name,
