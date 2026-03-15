@@ -15,6 +15,7 @@ import { DownloadLocationStep } from './steps/DownloadLocationStep';
 import { SyncStep } from './steps/SyncStep';
 import { CompleteStep } from './steps/CompleteStep';
 import { hasBackendUrl } from '../../lib/backend-config.js';
+import { isTVPlatform } from '../../lib/utils/device-detection';
 import { serverApi } from '../../lib/client/server-api';
 import { PreferencesManager, TokenManager, clearStorageAndCookiesForSetup } from '../../lib/client/storage';
 import { redirectTo } from '../../lib/utils/navigation.js';
@@ -93,6 +94,7 @@ export default function Wizard() {
   const prevStepRef = useRef<number>(1);
 
   const forceAllSteps = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('force') === '1';
+  const isTV = typeof window !== 'undefined' && isTVPlatform();
 
   const { steps, totalSteps, getStepNumber, getStepId, getNextStepNumber, getPreviousStepNumber } = useWizardSteps(
     setupStatus, forceShowStepIds, forceAllSteps, wizardStartedWithNeedsSetup, hasBackendUrl()
@@ -455,7 +457,7 @@ export default function Wizard() {
 
   // ─── Layout principal ─────────────────────────────────────────────────────
   return (
-    <div class="wizard-root">
+    <div class={`wizard-root${isTV ? ' tv-platform' : ''}`}>
       <style>{`
         .wizard-root {
           min-height: 100vh;
@@ -624,6 +626,17 @@ export default function Wizard() {
         .wizard-content-inner {
           width: 100%; max-width: 640px;
           position: relative;
+        }
+        /* TV : safe zone, lisibilité à distance */
+        .wizard-root.tv-platform .wizard-content {
+          padding: clamp(32px, 5vh, 56px) clamp(24px, 5vw, 64px);
+          align-items: center;
+        }
+        .wizard-root.tv-platform .wizard-content-inner {
+          max-width: 720px;
+        }
+        .wizard-root.tv-platform .wizard-card {
+          padding: clamp(20px, 3vw, 32px);
         }
         /* Mobile progress */
         .wizard-mobile-bar {

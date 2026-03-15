@@ -10,6 +10,7 @@ import { syncIndexersToCloud } from '../../../lib/utils/cloud-sync';
 import { isTmdbKeyMaskedOrInvalid } from '../../../lib/utils/tmdb-key';
 import { redirectTo } from '../../../lib/utils/navigation.js';
 import { setBackendUrl, hasDeploymentBackend } from '../../../lib/backend-config.js';
+import { isTVPlatform, isTablet } from '../../../lib/utils/device-detection';
 import { QuickConnectStep } from './QuickConnectStep';
 import { useI18n } from '../../../lib/i18n';
 
@@ -22,9 +23,27 @@ interface AuthStepProps {
 
 type AuthView = 'login' | 'register' | '2fa';
 
+const LARGE_SCREEN_BREAKPOINT = 768;
+
 export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChange }: AuthStepProps) {
   const { t } = useI18n();
+  const isTV = typeof window !== 'undefined' && isTVPlatform();
+  const [isLargeScreen, setIsLargeScreen] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth >= LARGE_SCREEN_BREAKPOINT
+  );
   const [view, setView] = useState<AuthView>('login');
+  const [showEmailFormExpanded, setShowEmailFormExpanded] = useState(false); // false = QR/code en premier, true = formulaire email
+
+  // Unifié (QR d'abord, puis email) sur TV, tablette et desktop
+  const useUnifiedAuthLayout = isTV || (typeof window !== 'undefined' && isTablet()) || isLargeScreen;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const check = () => setIsLargeScreen(window.innerWidth >= LARGE_SCREEN_BREAKPOINT);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSavedConfig, setHasSavedConfig] = useState(false);
@@ -233,8 +252,188 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
     }
   };
 
+  // Layout TV : Connexion rapide (QR + code) en premier, puis option "Connexion avec email"
+  const renderTVLayout = () => (
+    <div class="auth-step-tv">
+      <h2 class="auth-step-tv__title">{t('wizard.auth.title')}</h2>
+      <p class="auth-step-tv__subtitle">{t('wizard.auth.description')}</p>
+
+      {!showEmailFormExpanded ? (
+        <>
+          <div class="auth-step-tv__qr-block">
+            <QuickConnectStep
+              focusedButtonIndex={focusedButtonIndex}
+              buttonRefs={buttonRefs}
+              onNext={onNext}
+              onStatusChange={onStatusChange}
+              tvMode
+            />
+          </div>
+          <div class="auth-step-tv__divider">Ou</div>
+          <button
+            type="button"
+            class="auth-step-tv__email-cta"
+            data-focusable
+            onClick={() => setShowEmailFormExpanded(true)}
+          >
+            Connexion avec email
+          </button>
+        </>
+      ) : (
+        <div class="auth-step-tv__form-block">
+          <button
+            type="button"
+            class="auth-step-tv__back"
+            data-focusable
+            onClick={() => setShowEmailFormExpanded(false)}
+          >
+            ← Retour au QR code
+          </button>
+          {/* Réutiliser les vues login/register avec styles TV */}
+          <div class="auth-tab-bar auth-step-tv__tabs">
+            <button
+              type="button"
+              class={`auth-tab ${view === 'login' ? 'active' : ''} auth-step-tv__tab`}
+              onClick={() => { setView('login'); setError(null); }}
+            >
+              {t('wizard.auth.loginTab')}
+            </button>
+            <button
+              type="button"
+              class={`auth-tab ${view === 'register' ? 'active' : ''} auth-step-tv__tab`}
+              onClick={() => { setView('register'); setError(null); }}
+            >
+              {t('wizard.auth.registerTab')}
+            </button>
+          </div>
+          {view === 'login' && (
+            <div class="auth-step-tv__form">
+              <div class="auth-section-label">Connexion avec email</div>
+              <form onSubmit={handleLogin}>
+                <div class="auth-step-tv__field">
+                  <label class="wizard-label">Email</label>
+                  <input
+                    class="wizard-input auth-step-tv__input"
+                    type="email"
+                    placeholder="votre@email.com"
+                    value={loginEmail}
+                    onInput={(e) => setLoginEmail((e.target as HTMLInputElement).value)}
+                    required
+                    disabled={loading}
+                    autocomplete="email"
+                  />
+                </div>
+                <div class="auth-step-tv__field">
+                  <label class="wizard-label">Mot de passe</label>
+                  <input
+                    class="wizard-input auth-step-tv__input"
+                    type="password"
+                    placeholder="Votre mot de passe"
+                    value={loginPassword}
+                    onInput={(e) => setLoginPassword((e.target as HTMLInputElement).value)}
+                    required
+                    disabled={loading}
+                    autocomplete="current-password"
+                  />
+                </div>
+                <button
+                  ref={(el) => { buttonRefs.current[0] = el; }}
+                  type="submit"
+                  class="wizard-btn-primary auth-step-tv__submit"
+                  disabled={loading || !loginEmail || !loginPassword}
+                >
+                  {loading ? 'Connexion...' : 'Se connecter'}
+                </button>
+              </form>
+              <button
+                type="button"
+                class="auth-step-tv__link"
+                onClick={() => { setView('register'); setError(null); }}
+              >
+                Pas encore de compte ? S'inscrire
+              </button>
+            </div>
+          )}
+          {view === 'register' && (
+            <div class="auth-step-tv__form">
+              <div class="auth-section-label">Créer un compte</div>
+              <form onSubmit={handleRegister}>
+                <div class="auth-step-tv__field">
+                  <label class="wizard-label">Code d'invitation</label>
+                  <input
+                    class="wizard-input auth-step-tv__input"
+                    type="text"
+                    placeholder="Code d'invitation"
+                    value={registerInviteCode}
+                    onInput={(e) => setRegisterInviteCode((e.target as HTMLInputElement).value)}
+                    required
+                    disabled={loading}
+                  />
+                </div>
+                <div class="auth-step-tv__field">
+                  <label class="wizard-label">Email</label>
+                  <input
+                    class="wizard-input auth-step-tv__input"
+                    type="email"
+                    placeholder="votre@email.com"
+                    value={registerEmail}
+                    onInput={(e) => setRegisterEmail((e.target as HTMLInputElement).value)}
+                    required
+                    disabled={loading}
+                    autocomplete="email"
+                  />
+                </div>
+                <div class="auth-step-tv__field">
+                  <label class="wizard-label">Mot de passe</label>
+                  <input
+                    class="wizard-input auth-step-tv__input"
+                    type="password"
+                    placeholder="Au moins 8 caractères"
+                    value={registerPassword}
+                    onInput={(e) => setRegisterPassword((e.target as HTMLInputElement).value)}
+                    required
+                    disabled={loading}
+                    autocomplete="new-password"
+                  />
+                </div>
+                <div class="auth-step-tv__field">
+                  <label class="wizard-label">Confirmer le mot de passe</label>
+                  <input
+                    class="wizard-input auth-step-tv__input"
+                    type="password"
+                    placeholder="Confirmez"
+                    value={registerConfirmPassword}
+                    onInput={(e) => setRegisterConfirmPassword((e.target as HTMLInputElement).value)}
+                    required
+                    disabled={loading}
+                    autocomplete="new-password"
+                  />
+                </div>
+                <button
+                  ref={(el) => { buttonRefs.current[0] = el; }}
+                  type="submit"
+                  class="wizard-btn-primary auth-step-tv__submit"
+                  disabled={loading || !registerEmail || !registerPassword || !registerInviteCode}
+                >
+                  {loading ? "Inscription..." : "S'inscrire"}
+                </button>
+              </form>
+              <button
+                type="button"
+                class="auth-step-tv__link"
+                onClick={() => { setView('login'); setError(null); }}
+              >
+                Déjà un compte ? Se connecter
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
   return (
-    <div>
+    <div class={`auth-step-desktop-compact ${useUnifiedAuthLayout ? 'auth-step--unified' : ''}`}>
       <style>{`
         .auth-two-col {
           display: grid;
@@ -244,6 +443,14 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         }
         @media (max-width: 640px) {
           .auth-two-col { grid-template-columns: 1fr; }
+        }
+        /* Desktop : layout compact pour que le QR reste visible sans scroll (mobile/tablette inchangé) */
+        @media (min-width: 1024px) {
+          .auth-step-desktop-compact > div:first-of-type { margin-bottom: 16px !important; }
+          .auth-step-desktop-compact .auth-tab-bar { margin-bottom: 16px; }
+          .auth-step-desktop-compact .auth-two-col { gap: 16px; align-items: center; }
+          .auth-step-desktop-compact .auth-qr-side { padding: 14px; }
+          .auth-step-desktop-compact .auth-section-label { margin-bottom: 8px; }
         }
         .auth-tab-bar {
           display: flex;
@@ -321,17 +528,69 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
           padding: 16px;
           margin-bottom: 20px;
         }
+        /* ─── Layout TV : lisibilité à distance, zones de focus larges ─── */
+        .auth-step-tv { max-width: 720px; margin: 0 auto; text-align: center; }
+        .auth-step-tv__title { font-size: clamp(1.75rem, 4vw, 2.25rem); font-weight: 700; color: #fff; margin: 0 0 8px; }
+        .auth-step-tv__subtitle { font-size: clamp(0.9rem, 2vw, 1rem); color: rgba(255,255,255,0.5); margin: 0 0 24px; line-height: 1.5; }
+        .auth-step-tv__qr-block { margin-bottom: 24px; }
+        .auth-step-tv__divider {
+          display: flex; align-items: center; gap: 16px; margin: 28px 0;
+          color: rgba(255,255,255,0.35); font-size: 1rem; font-weight: 600;
+        }
+        .auth-step-tv__divider::before, .auth-step-tv__divider::after {
+          content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.12);
+        }
+        .auth-step-tv__email-cta {
+          display: inline-flex; align-items: center; justify-content: center;
+          min-height: 56px; padding: 14px 32px;
+          font-size: 1.125rem; font-weight: 600;
+          background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.15);
+          color: #fff; border-radius: 14px; cursor: pointer;
+          transition: background 0.2s, border-color 0.2s, transform 0.1s;
+        }
+        .auth-step-tv__email-cta:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.25); }
+        .auth-step-tv__email-cta:focus { outline: none; box-shadow: 0 0 0 4px rgba(124,58,237,0.4); }
+        .auth-step-tv__form-block { text-align: left; margin-top: 16px; }
+        .auth-step-tv__back {
+          margin-bottom: 20px; padding: 10px 0;
+          background: none; border: none; color: rgba(167,139,250,0.9);
+          font-size: 1rem; font-weight: 600; cursor: pointer;
+          min-height: 48px; border-radius: 10px;
+          transition: color 0.2s, background 0.2s;
+        }
+        .auth-step-tv__back:hover { color: #c4b5fd; background: rgba(124,58,237,0.1); }
+        .auth-step-tv__back:focus { outline: none; box-shadow: 0 0 0 3px rgba(124,58,237,0.3); }
+        .auth-step-tv__tabs { margin-bottom: 20px; }
+        .auth-step-tv__tab { font-size: 1rem !important; padding: 12px 16px !important; min-height: 48px; }
+        .auth-step-tv__form { max-width: 420px; }
+        .auth-step-tv__field { margin-bottom: 18px; }
+        .auth-step-tv__input {
+          font-size: 1.125rem !important; padding: 14px 18px !important;
+          min-height: 52px; border-radius: 12px;
+        }
+        .auth-step-tv__submit {
+          width: 100%; min-height: 52px; font-size: 1.125rem !important;
+          margin-top: 8px; margin-bottom: 16px;
+        }
+        .auth-step-tv__link {
+          background: none; border: none; color: rgba(167,139,250,0.85);
+          font-size: 1rem; text-decoration: underline; cursor: pointer;
+          padding: 8px 0; display: block; width: 100%;
+        }
+        .auth-step-tv__link:hover { color: #c4b5fd; }
       `}</style>
 
-      {/* En-tête */}
-      <div style="margin-bottom:28px;">
-        <h2 style="font-size:24px;font-weight:700;color:#fff;margin:0 0 8px;">
-          {t('wizard.auth.title')}
-        </h2>
-        <p style="font-size:14px;color:rgba(255,255,255,0.45);margin:0;line-height:1.5;">
-          {t('wizard.auth.description')}
-        </p>
-      </div>
+      {/* En-tête (sur TV, affiché seulement pour 2FA / config sauvegardée ; sinon le layout TV a le sien) */}
+      {(!useUnifiedAuthLayout || hasSavedConfig || view === '2fa') && (
+        <div style="margin-bottom:28px;">
+          <h2 style="font-size:24px;font-weight:700;color:#fff;margin:0 0 8px;">
+            {t('wizard.auth.title')}
+          </h2>
+          <p style="font-size:14px;color:rgba(255,255,255,0.45);margin:0;line-height:1.5;">
+            {t('wizard.auth.description')}
+          </p>
+        </div>
+      )}
 
       {/* Bannière config sauvegardée */}
       {hasSavedConfig && (
@@ -427,8 +686,11 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
         </div>
       )}
 
-      {/* Vues Login / Register */}
-      {view !== '2fa' && (
+      {/* Layout TV : Connexion rapide en premier, puis option email */}
+      {useUnifiedAuthLayout && view !== '2fa' && !hasSavedConfig && renderTVLayout()}
+
+      {/* Vues Login / Register (mobile uniquement : deux colonnes ou formulaire) */}
+      {!useUnifiedAuthLayout && view !== '2fa' && (
         <>
           {/* Tabs */}
           <div class="auth-tab-bar">
@@ -531,6 +793,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                   buttonRefs={buttonRefs}
                   onNext={onNext}
                   onStatusChange={onStatusChange}
+                  compact
                 />
               </div>
             </div>
@@ -620,3 +883,4 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
     </div>
   );
 }
+
