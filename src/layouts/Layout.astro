@@ -108,8 +108,17 @@ const isWebOS = import.meta.env.WEBOS === 'true';
     <script is:inline>
       (function() {
         var ua = navigator.userAgent || '';
-        var isTV = /Android.*TV|\bTV\b/i.test(ua) || /webOS|Web0S/i.test(ua) || /AppleTV|Apple TV/i.test(ua)
-          || (typeof window.__TAURI_INTERNALS__ !== 'undefined' && window.__TAURI_METADATA__ && window.__TAURI_METADATA__.platform === 'android' && window.innerWidth >= 1280 && window.innerHeight >= 720);
+        var w = window.innerWidth, h = window.innerHeight;
+        var isTauri = typeof window.__TAURI_INTERNALS__ !== 'undefined';
+        var tauriMeta = isTauri ? window.__TAURI_METADATA__ : null;
+        var tauriPlatform = tauriMeta ? (tauriMeta.platform || tauriMeta.os || '') : '';
+        var isTauriAndroidTV = isTauri && /android/i.test(tauriPlatform) && w >= 960 && h >= 540;
+        var isTauriFallback = isTauri && !tauriMeta && w >= 1280 && h >= 720;
+        var isAndroidTVUA = /Android.*TV|TV.*Android|GoogleTV|FireTV|AFT[A-Z]|Chromecast|SHIELD/i.test(ua);
+        var isTVGeneric = /\bTV\b/i.test(ua) && !/iPhone|iPad|Mobile/i.test(ua);
+        var isOtherTV = /webOS|Web0S/i.test(ua) || /AppleTV|Apple TV/i.test(ua);
+        var isAndroidBrowserTV = /Android/i.test(ua) && w >= 1280 && h >= 720 && w > h;
+        var isTV = isTauriAndroidTV || isTauriFallback || isAndroidTVUA || isTVGeneric || isOtherTV || isAndroidBrowserTV;
         if (isTV) document.documentElement.setAttribute('data-tv-platform', 'true');
       })();
     </script>

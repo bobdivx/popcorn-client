@@ -1,7 +1,7 @@
-import { Play, RotateCw, Download, Link2, Check, Trash2, Loader2, Upload, XCircle, Radio, Bookmark, BookmarkCheck } from 'lucide-preact';
+import { Play, RotateCw, Download, Link2, Check, Trash2, Loader2, XCircle, Radio, Bookmark, BookmarkCheck } from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
-import { TorrentProgressBar, TorrentSpeedDisplay, PeersIndicator } from '../../ui';
+import { TorrentProgressBar } from '../../ui';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { formatBytes, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
 
@@ -191,58 +191,6 @@ export function ActionButtons({
           </button>
         )}
 
-        {/* Carte progression en cours */}
-        {showProgressNextToCancel && torrentStats && onCancelDownload && (
-          <div
-            className="flex items-center gap-3 min-w-[200px] max-w-[340px] flex-1 px-4 py-3.5 rounded-xl border border-violet-500/20 bg-gradient-to-r from-violet-950/60 to-black/40 backdrop-blur-md"
-            aria-label={t('downloads.progress')}
-          >
-            <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-white/55 text-xs font-semibold uppercase tracking-wider truncate">
-                  {torrentStats.state === 'queued' ? t('torrentStats.queued') : t('torrentStats.downloading')}
-                </span>
-                <span className="text-lg font-bold tabular-nums text-white shrink-0">{displayProgressPercent}%</span>
-              </div>
-              <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${Math.min(100, displayProgressPercent)}%`,
-                    background: 'linear-gradient(90deg, #7c3aed, #a78bfa)',
-                  }}
-                  role="progressbar"
-                  aria-valuenow={displayProgressPercent}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                />
-              </div>
-              <div className="flex items-center gap-2 text-xs text-white/40">
-                {(torrentStats.download_speed ?? 0) > 0 && (
-                  <span>{((torrentStats.download_speed! / (1024 * 1024)).toFixed(1))} MB/s</span>
-                )}
-                {torrentStats.eta_seconds != null && torrentStats.eta_seconds > 0 && (
-                  <span>· {formatTimeRemaining(torrentStats.eta_seconds)}</span>
-                )}
-                {torrentStats.total_bytes > 0 && (
-                  <span>· {formatBytes(torrentStats.downloaded_bytes ?? 0)} / {formatBytes(torrentStats.total_bytes)}</span>
-                )}
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onCancelDownload}
-              title={t('downloads.cancelDownload')}
-              aria-label={t('downloads.cancelDownload')}
-              data-focusable
-              data-media-detail-primary-action
-              className="gtv-icon-btn ds-focus-glow ds-active-glow shrink-0 w-9 h-9 min-w-9 min-h-9 text-white/60 hover:text-red-400"
-            >
-              <XCircle className="h-5 w-5" size={20} />
-            </button>
-          </div>
-        )}
-
         {/* Pack : épisode sélectionné */}
         {isPackWithMultipleFiles && selectedPackEpisodePreviewIndex != null && (onDownloadSingleEpisode != null || (canStream && onPlaySingleEpisode != null)) && (
           <>
@@ -356,6 +304,58 @@ export function ActionButtons({
         )}
       </div>
 
+      {/* Carte progression en cours – sous la rangée de boutons pour ne pas déplacer les icônes */}
+      {showProgressNextToCancel && torrentStats && onCancelDownload && (
+        <div
+          className="flex items-center gap-3 min-w-[200px] max-w-[480px] w-full px-4 py-3.5 rounded-xl border border-violet-500/20 bg-gradient-to-r from-violet-950/60 to-black/40 backdrop-blur-md"
+          aria-label={t('downloads.progress')}
+        >
+          <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-white/55 text-xs font-semibold uppercase tracking-wider truncate">
+                {torrentStats.state === 'queued' ? t('torrentStats.queued') : t('torrentStats.downloading')}
+              </span>
+              <span className="text-lg font-bold tabular-nums text-white shrink-0">{displayProgressPercent}%</span>
+            </div>
+            <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.min(100, displayProgressPercent)}%`,
+                  background: 'linear-gradient(90deg, #7c3aed, #a78bfa)',
+                }}
+                role="progressbar"
+                aria-valuenow={displayProgressPercent}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              />
+            </div>
+            <div className="flex items-center gap-2 text-xs text-white/40">
+              {(torrentStats.download_speed ?? 0) > 0 && (
+                <span>{((torrentStats.download_speed! / (1024 * 1024)).toFixed(1))} MB/s</span>
+              )}
+              {torrentStats.eta_seconds != null && torrentStats.eta_seconds > 0 && (
+                <span>· {formatTimeRemaining(torrentStats.eta_seconds)}</span>
+              )}
+              {torrentStats.total_bytes > 0 && (
+                <span>· {formatBytes(torrentStats.downloaded_bytes ?? 0)} / {formatBytes(torrentStats.total_bytes)}</span>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onCancelDownload}
+            title={t('downloads.cancelDownload')}
+            aria-label={t('downloads.cancelDownload')}
+            data-focusable
+            data-media-detail-primary-action
+            className="gtv-icon-btn ds-focus-glow ds-active-glow shrink-0 w-9 h-9 min-w-9 min-h-9 text-white/60 hover:text-red-400"
+          >
+            <XCircle className="h-5 w-5" size={20} />
+          </button>
+        </div>
+      )}
+
       {/* Barre de progression détaillée */}
       {!isStreamingThisTorrent && hasActiveDownloadStats && torrentStats && !showProgressNextToCancel && (
         <div className="px-4 py-3 rounded-xl border border-white/8 bg-white/3 backdrop-blur-sm">
@@ -375,20 +375,6 @@ export function ActionButtons({
         </div>
       )}
 
-      {/* Seeding */}
-      {isSeeding && torrentStats && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-green-500/15 bg-green-950/25 backdrop-blur-sm">
-          <div className="flex items-center gap-2 text-green-400 shrink-0">
-            <Upload className="h-4 w-4 shrink-0" size={16} />
-            <span className="text-sm font-semibold">{t('torrentStats.seeding')}</span>
-          </div>
-          <div className="w-px h-4 bg-white/12 shrink-0" aria-hidden />
-          <div className="flex items-center gap-3 text-green-300 text-sm min-w-0">
-            <TorrentSpeedDisplay uploadSpeed={torrentStats.upload_speed} showEta={false} className="!text-green-300" />
-            <PeersIndicator peersConnected={torrentStats.peers_connected} className="text-green-300" />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
