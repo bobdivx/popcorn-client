@@ -1070,6 +1070,72 @@ export interface UserConfig {
   flaresolverrOpenUrl?: string | null;
 }
 
+export interface CloudDevice {
+  id: string;
+  deviceName: string;
+  deviceType: string | null;
+  platform: string | null;
+  clientVersion: string | null;
+  createdAt: number;
+  lastSeenAt: number | null;
+  revokedAt: number | null;
+  revocationReason: string | null;
+}
+
+export async function registerCloudDevice(params: {
+  id?: string;
+  deviceName: string;
+  deviceType?: string;
+  platform?: string;
+  clientVersion?: string;
+}): Promise<{ success: boolean; id?: string; message?: string }> {
+  try {
+    const token = TokenManager.getCloudAccessToken();
+    if (!token) {
+      return { success: false, message: 'Token cloud manquant' };
+    }
+    const apiUrl = `${getPopcornWebApiUrl()}/devices`;
+    const res = await requestWithTokenRefresh(
+      apiUrl,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      },
+      8000
+    );
+    if (!res.ok) {
+      return { success: false, message: res.data?.message || 'Erreur enregistrement appareil' };
+    }
+    const id = res.data?.data?.id as string | undefined;
+    return { success: true, id };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : 'Erreur réseau' };
+  }
+}
+
+export async function getCloudDevices(): Promise<CloudDevice[] | null> {
+  try {
+    const token = TokenManager.getCloudAccessToken();
+    if (!token) {
+      return null;
+    }
+    const apiUrl = `${getPopcornWebApiUrl()}/devices`;
+    const res = await requestWithTokenRefresh(
+      apiUrl,
+      { method: 'GET', headers: { 'Content-Type': 'application/json' } },
+      8000
+    );
+    if (!res.ok || !res.data?.success) {
+      return null;
+    }
+    const list = res.data?.data?.devices as CloudDevice[] | undefined;
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Sauvegarde la configuration utilisateur dans popcorn-web
  * @param config Configuration à sauvegarder

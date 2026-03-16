@@ -423,6 +423,15 @@
     "recoverConfigFromCloudSuccess": "Configuration récupérée avec succès.",
     "recoverConfigFromCloudNoConfig": "Aucune configuration sauvegardée dans le cloud.",
     "recoverConfigFromCloudError": "Erreur lors de la récupération de la configuration.",
+    "devices": {
+      "title": "Appareils connectés",
+      "description": "Liste des appareils qui se sont connectés à votre compte cloud Popcornn. Cette liste est partagée entre tous vos clients (desktop, web, TV, etc.).",
+      "empty": "Aucun appareil enregistré pour ce compte cloud.",
+      "unknownName": "Appareil Popcorn",
+      "lastSeen": "Dernière activité : {{date}}",
+      "neverSeen": "Aucune activité enregistrée",
+      "footerInfo": "Dans une prochaine version, vous pourrez révoquer ici les appareils que vous ne reconnaissez pas."
+    },
     "subMenu": {
       "accountInfo": "Informations du compte",
       "accountInfoDesc": "Email, ID utilisateur",
@@ -466,6 +475,9 @@
     "streamingRetentionKeep": "Garder indéfiniment",
     "streamingRetentionDontKeep": "Ne pas garder (supprimer après lecture)",
     "streamingRetentionDays": "{days} jours",
+    "videoFillMode": "Remplissage de l'image",
+    "videoFillModeContain": "Adapter à l'écran (bandes noires)",
+    "videoFillModeCover": "Plein écran (peut couper les bords)",
     "librarySection": "Affichage de la bibliothèque",
     "librarySectionDescription": "Personnaliser langue, qualité et pagination des listes de la bibliothèque",
     "showZeroSeedTorrents": "Afficher les torrents sans seeders",
@@ -1076,7 +1088,20 @@
       "indexersCount": "{count} indexeur(s) configuré(s)",
       "sameOriginBackendTitle": "Client et serveur API sur la même adresse",
       "sameOriginBackendDescription": "L'adresse de cette page (client) et l'adresse du serveur API (backend) sont identiques. Si vous souhaitez utiliser un autre serveur, modifiez l'URL du backend.",
-      "sameOriginBackendAction": "Modifier l'adresse du backend"
+      "sameOriginBackendAction": "Modifier l'adresse du backend",
+      "devicesSummary": "{count} appareil connecté au compte cloud",
+      "devicesSummary_plural": "{count} appareils connectés au compte cloud",
+      "devicesSummaryWithLast": "{count} appareil connecté · dernière activité {date}",
+      "devicesSummaryWithLast_plural": "{count} appareils connectés · dernière activité {date}",
+      "devicesNone": "Aucun appareil cloud connecté",
+      "ratioStatsTitle": "Statistiques de partage (client)",
+      "ratioStatsSubtitle": "Total téléchargé, total partagé (client) et ratios par tracker quand disponibles.",
+      "ratioTotalDownloaded": "Total téléchargé",
+      "ratioTotalUploaded": "Total partagé",
+      "ratioGlobalRatio": "Ratio global client",
+      "ratioSeedingCount": "{count} torrent en seed",
+      "ratioSeedingCount_plural": "{count} torrents en seed",
+      "ratioTrackerColumnLabel": "Ratio tracker"
     },
     "category": {
       "system": "Système",
@@ -1540,7 +1565,9 @@
       "useFlareSolverrHelp": "Recommandé si le site affiche une vérification Cloudflare. Le backend doit avoir FLARESOLVERR_URL configuré.",
       "enable": "Activer",
       "default": "Par défaut",
-      "priority": "Priorité"
+      "priority": "Priorité",
+      "manualTrackerRatio": "Ratio tracker (saisi manuellement)",
+      "manualTrackerRatioHelp": "Optionnel · utilisé si le ratio n'est pas récupérable automatiquement depuis le tracker."
     },
     "saving": "Sauvegarde..."
   },
@@ -2097,6 +2124,7 @@
     "inactive": "Inactif",
     "refresh": "Rafraîchir",
     "inProgress": "En cours...",
+    "syncNow": "Synchroniser maintenant",
     "elapsedSince": "En cours depuis {time}",
     "elapsedSinceLabel": "En cours depuis",
     "syncInProgressShort": "Sync…",

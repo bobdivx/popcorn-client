@@ -1,5 +1,5 @@
-import { useState } from 'preact/hooks';
-import AccountSettings from './AccountSettings';
+import { useState, useEffect } from 'preact/hooks';
+import AccountSettings, { type AccountSection } from './AccountSettings';
 import TwoFactorSettings from './TwoFactorSettings';
 import QuickConnectAuthorize from './QuickConnectAuthorize';
 import LocalUsersLink from './LocalUsersLink';
@@ -20,6 +20,20 @@ export default function AccountPanel() {
   const hasCloudToken = typeof window !== 'undefined' && !!TokenManager.getCloudAccessToken();
   const [recoverLoading, setRecoverLoading] = useState(false);
   const [recoverMessage, setRecoverMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [accountSection, setAccountSection] = useState<AccountSection | 'all'>('all');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const s = params.get('section');
+      if (s === 'profile' || s === 'info' || s === 'interface' || s === 'devices' || s === 'logout') {
+        setAccountSection(s);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const handleRecoverConfigFromCloud = async () => {
     setRecoverMessage(null);
@@ -96,7 +110,7 @@ export default function AccountPanel() {
           </button>
         </section>
       )}
-      <AccountSettings />
+      <AccountSettings section={accountSection} />
       <TwoFactorSettings />
       <QuickConnectAuthorize />
       {hasCloudToken && (

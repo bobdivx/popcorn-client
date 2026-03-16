@@ -173,14 +173,7 @@ export default function Wizard() {
       if (forceWizard) return;
       if (setupStatus.backendReachable && setupStatus.needsSetup === false && setupStatus.hasUsers === true) {
         const currentStepId = getStepId(currentStep);
-        const middleSteps: WizardStepId[] = ['serverUrl', 'language', 'auth', 'welcome', 'indexers', 'tmdb', 'downloadLocation', 'sync'];
         wdbg(`E2 cond OK | stepId=${currentStepId} auth=${serverApi.isAuthenticated()} ref=${initialNeedsSetupRef.current}`);
-        if (currentStepId && middleSteps.includes(currentStepId) && initialNeedsSetupRef.current === true) {
-          wdbg('E2 → BLOQUÉ (middleStep+ref=true)'); return;
-        }
-        if (initialNeedsSetupRef.current === true) {
-          wdbg('E2 → BLOQUÉ (ref=true)'); return;
-        }
         if (serverApi.isAuthenticated()) {
           wdbg('E2 → redirectTo /dashboard'); redirectTo('/dashboard');
         } else {

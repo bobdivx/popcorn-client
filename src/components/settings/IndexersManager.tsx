@@ -110,6 +110,21 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
   useEffect(() => {
     if (editIndexer) {
       setEditingIndexer(editIndexer);
+      // Reconstituer extraConfig à partir de configJson pour l'édition (champs avancés)
+      let extraConfig: Record<string, string> | undefined = undefined;
+      if (editIndexer.configJson) {
+        try {
+          const parsed = JSON.parse(editIndexer.configJson) as Record<string, unknown>;
+          if (parsed && typeof parsed === 'object') {
+            extraConfig = {};
+            for (const [k, v] of Object.entries(parsed)) {
+              if (v != null) extraConfig[k] = String(v);
+            }
+          }
+        } catch {
+          // ignore JSON invalide: on repart sur une config vide
+        }
+      }
       setFormData({
         name: editIndexer.name,
         baseUrl: editIndexer.baseUrl,
@@ -119,6 +134,9 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
         isDefault: editIndexer.isDefault,
         priority: editIndexer.priority,
         indexerTypeId: editIndexer.indexerTypeId ?? null,
+        extraConfig,
+        // Si l'ancienne config avait useFlareSolverr, on le retrouve dans extraConfig
+        useFlareSolverr: extraConfig?.useFlareSolverr === 'true',
       });
       setShowForm(true);
       setShowDefinitionSelector(false);
@@ -1010,6 +1028,36 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
               value={formData.priority}
               onInput={(e) => setFormData({ ...formData, priority: parseInt((e.target as HTMLInputElement).value) || 0 })}
               min="0"
+            />
+          </div>
+
+          {/* Ratio tracker manuel (stocké dans extraConfig, synchronisé via configJson + cloud) */}
+          <div class="form-control">
+            <label class="label">
+              <span class="label-text text-white">
+                {t('indexersManager.form.manualTrackerRatio')}{' '}
+                <span class="text-xs text-gray-400 ml-1">
+                  {t('indexersManager.form.manualTrackerRatioHelp')}
+                </span>
+              </span>
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              class="input input-bordered bg-gray-800 border-gray-700 text-white max-w-xs"
+              value={formData.extraConfig?.tracker_manual_ratio ?? ''}
+              onInput={(e) => {
+                const v = (e.target as HTMLInputElement).value;
+                setFormData({
+                  ...formData,
+                  extraConfig: {
+                    ...(formData.extraConfig || {}),
+                    tracker_manual_ratio: v,
+                  },
+                });
+              }}
+              placeholder="ex: 0.75"
             />
           </div>
 

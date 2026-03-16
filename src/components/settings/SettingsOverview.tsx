@@ -6,6 +6,8 @@ import { serverApi } from '../../lib/client/server-api';
 import { TokenManager } from '../../lib/client/storage';
 import { getSyncStatusStore, subscribeSyncStatusStore, refreshSyncStatusStore } from '../../lib/sync-status-store';
 import { getBackendUrl, isBackendUrlSameAsClientUrl } from '../../lib/backend-config';
+import { getCloudDevices } from '../../lib/api/popcorn-web';
+import { formatBytes } from '../../lib/utils/formatBytes';
 
 type StatusVariant = 'success' | 'warning' | 'error' | 'neutral';
 
@@ -19,13 +21,21 @@ type OverviewItem = {
   accent?: 'violet' | 'green' | 'yellow';
 };
 
-// Sync en premier, puis server, account, indexers, connexion rapide
+type RatioOverviewStats = {
+  total_uploaded_bytes: number;
+  total_downloaded_bytes: number;
+  ratio: number;
+  torrent_count: number;
+  seeding_count: number;
+};
+
+// Sync en premier, puis server, account, devices, indexers, connexion rapide
 const OVERVIEW_ITEMS: OverviewItem[] = [
   { id: 'sync', titleKey: 'settingsPages.sync.title', href: '/settings/sync', icon: RefreshCw, permission: 'settings.sync', accent: 'yellow' },
   { id: 'server', titleKey: 'settingsPages.server.title', href: '/settings/server', icon: Monitor, permission: 'settings.server', accent: 'violet' },
   { id: 'account', titleKey: 'settingsPages.account.title', href: '/settings/account', icon: UserCircle, permission: 'settings.account', accent: 'green' },
+  { id: 'devices', titleKey: 'account.devices.title', href: '/settings/account?sub=devices', icon: Smartphone, permission: 'settings.account', accent: 'green' },
   { id: 'indexers', titleKey: 'settingsPages.indexers.title', href: '/settings/indexers', icon: Search, permission: 'settings.indexers', accent: 'violet' },
-  { id: 'uploads', titleKey: 'settingsPages.uploads.title', href: '/settings/uploads', icon: Upload, permission: 'settings.indexers', accent: 'violet' },
   { id: 'quick-connect', titleKey: 'account.quickConnect.title', href: '/settings/account', icon: Smartphone, permission: 'settings.account', accent: 'violet' },
 ];
 
@@ -54,11 +64,41 @@ export default function SettingsOverview() {
   const visibleItems = useMemo(() => OVERVIEW_ITEMS.filter(isVisible), []);
   const [summaries, setSummaries] = useState<Record<string, { text: string; variant?: StatusVariant }>>({});
   const [syncInProgress, setSyncInProgress] = useState(false);
+  const [ratioStats, setRatioStats] = useState<RatioOverviewStats | null>(null);
+  const [ratioLoading, setRatioLoading] = useState(false);
+  const [c411Ratio, setC411Ratio] = useState<{ uploaded_bytes?: number | null; downloaded_bytes?: number | null; ratio?: number | null } | null>(null);
+  const [c411Loading, setC411Loading] = useState(false);
 
   useEffect(() => {
     if (canAccess('settings.sync' as any)) {
       refreshSyncStatusStore();
     }
+  }, []);
+
+  useEffect(() => {
+    if (!canAccess('settings.server' as any)) return;
+    let cancelled = false;
+    const loadC411Ratio = async () => {
+      setC411Loading(true);
+      try {
+        const res = await (serverApi as any).getTrackerRatio();
+        if (!cancelled && res?.success && res.data) {
+          setC411Ratio(res.data);
+        }
+      } catch {
+        if (!cancelled) {
+          setC411Ratio(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setC411Loading(false);
+        }
+      }
+    };
+    loadC411Ratio();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -83,6 +123,39 @@ export default function SettingsOverview() {
     });
     return unsub;
   }, [t]);
+
+  useEffect(() => {
+    if (!canAccess('settings.server' as any)) return;
+    let cancelled = false;
+    const loadRatioStats = async () => {
+      setRatioLoading(true);
+      try {
+        const res = await serverApi.getRatioStats();
+        if (!cancelled && res?.success && res.data) {
+          const { total_uploaded_bytes, total_downloaded_bytes, ratio, torrent_count, seeding_count } = res.data as any;
+          setRatioStats({
+            total_uploaded_bytes: total_uploaded_bytes ?? 0,
+            total_downloaded_bytes: total_downloaded_bytes ?? 0,
+            ratio: typeof ratio === 'number' ? ratio : 0,
+            torrent_count: torrent_count ?? 0,
+            seeding_count: seeding_count ?? 0,
+          });
+        }
+      } catch {
+        if (!cancelled) {
+          setRatioStats(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setRatioLoading(false);
+        }
+      }
+    };
+    loadRatioStats();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -126,6 +199,26 @@ export default function SettingsOverview() {
           next.account = loggedIn
             ? { text: t('settingsMenu.overviewCard.accountLoggedIn'), variant: 'success' }
             : { text: t('settingsMenu.overviewCard.accountNotLoggedIn'), variant: 'neutral' };
+
+          if (loggedIn) {
+            const devices = await getCloudDevices().catch(() => null);
+            if (devices && devices.length > 0) {
+              const activeDevices = devices.filter((d) => !d.revokedAt);
+              const count = activeDevices.length;
+              const lastSeenTs = Math.max(
+                0,
+                ...activeDevices
+                  .map((d) => d.lastSeenAt || d.createdAt || 0)
+              );
+              const lastSeenDate = lastSeenTs ? new Date(lastSeenTs).toLocaleString() : '';
+              const text = lastSeenTs
+                ? t('settingsMenu.overviewCard.devicesSummaryWithLast', { count, date: lastSeenDate })
+                : t('settingsMenu.overviewCard.devicesSummary', { count });
+              next.devices = { text, variant: 'success' };
+            } else {
+              next.devices = { text: t('settingsMenu.overviewCard.devicesNone'), variant: 'neutral' };
+            }
+          }
         } catch {
           // ignore
         }
@@ -157,6 +250,77 @@ export default function SettingsOverview() {
     <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
       <h1 style="font-size:1.5rem;font-weight:700;color:rgba(255,255,255,0.92);margin-bottom:6px;">{t('settingsMenu.overview')}</h1>
       <p style="font-size:13px;color:rgba(255,255,255,0.42);margin-bottom:24px;">{t('settingsMenu.subtitle')}</p>
+
+      {canAccess('settings.server' as any) && (
+        <div className="mb-4 sm:mb-5">
+          <div
+            className="sc-nav-card"
+            style="display:flex;flex-direction:column;gap:12px;padding:16px 20px;min-height:auto;"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="sc-nav-icon sc-nav-icon--yellow flex-shrink-0">
+                  <Upload className="w-5 h-5" strokeWidth={1.8} aria-hidden />
+                </div>
+                <div className="min-w-0">
+                  <div className="sc-nav-title" style="margin-top:0;">
+                    {t('settingsMenu.overviewCard.ratioStatsTitle')}
+                  </div>
+                  <div className="sc-nav-desc">
+                    {t('settingsMenu.overviewCard.ratioStatsSubtitle')}
+                  </div>
+                </div>
+              </div>
+              {ratioLoading && (
+                <div className="flex items-center justify-center h-6 flex-shrink-0" aria-hidden>
+                  <span className="loading loading-spinner loading-xs text-[var(--ds-accent-yellow)]" />
+                </div>
+              )}
+            </div>
+
+            {ratioStats ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-1 text-sm">
+                <div className="flex flex-col">
+                  <span className="ds-text-secondary mb-1">
+                    {t('settingsMenu.overviewCard.ratioTotalDownloaded')}
+                  </span>
+                  <span className="font-semibold text-white">
+                    {formatBytes(ratioStats.total_downloaded_bytes)}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="ds-text-secondary mb-1">
+                    {t('settingsMenu.overviewCard.ratioTotalUploaded')}
+                  </span>
+                  <span className="font-semibold text-white">
+                    {formatBytes(ratioStats.total_uploaded_bytes)}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="ds-text-secondary mb-1 flex items-center gap-2">
+                    {t('settingsMenu.overviewCard.ratioTrackerColumnLabel')}
+                    {c411Loading && (
+                      <span className="loading loading-spinner loading-xs text-[var(--ds-accent-yellow)]" aria-hidden />
+                    )}
+                  </span>
+                  <span className="font-semibold text-white">
+                    {c411Ratio?.ratio != null && Number.isFinite(c411Ratio.ratio)
+                      ? c411Ratio.ratio.toFixed(2)
+                      : '—'}
+                  </span>
+                  <span className="ds-text-secondary mt-1">
+                    {t('settingsMenu.overviewCard.ratioSeedingCount', { count: ratioStats.seeding_count })}
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-1 text-sm ds-text-secondary">
+                {ratioLoading ? t('common.loading') : t('common.noData')}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {showSameOriginBackendCard && canAccess('settings.server' as any) && (
         <a
