@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import { Download, Upload, Pause, Play, Trash2, Plus, FileText, Link2, X, FileText as LogsIcon, HardDrive } from 'lucide-preact';
 import { clientApi } from '../../lib/client/api';
 import type { ClientTorrentStats, TorrentLogEntry } from '../../lib/client/types';
@@ -1015,7 +1016,7 @@ export default function DownloadsList() {
       </div>
 
       {/* Modal pour ajouter un magnet link */}
-      {showAddMagnetModal && (
+      {showAddMagnetModal && createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -1110,7 +1111,8 @@ export default function DownloadsList() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       
       {/* Modal de détails du téléchargement */}
@@ -1128,7 +1130,7 @@ export default function DownloadsList() {
       )}
 
       {/* Modale pour afficher les logs filtrés */}
-      {showLogsModal && selectedTorrentHash && (
+      {showLogsModal && selectedTorrentHash && createPortal(
         <div
           className="fixed inset-0 bg-[var(--ds-surface-overlay)] backdrop-blur-sm z-50 flex items-center justify-center p-4 tv:p-8"
           onClick={(e) => {
@@ -1211,11 +1213,12 @@ export default function DownloadsList() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modale Logs session (client librqbit) */}
-      {showSessionLogsModal && (
+      {showSessionLogsModal && createPortal(
         <div
           className="fixed inset-0 bg-[var(--ds-surface-overlay)] backdrop-blur-sm z-50 flex items-center justify-center p-4 tv:p-8"
           onClick={(e) => {
@@ -1255,11 +1258,12 @@ export default function DownloadsList() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Panneau de vérification du téléchargement (après ajout d'un torrent) */}
-      {showVerificationPanel && verificationInfoHash && (
+      {showVerificationPanel && verificationInfoHash && createPortal(
         <div className="fixed bottom-4 left-4 right-4 z-40 max-w-md md:left-6 md:right-auto">
           <DownloadVerificationPanel
             infoHash={verificationInfoHash}
@@ -1272,7 +1276,8 @@ export default function DownloadsList() {
               setVerificationTorrentName('');
             }}
           />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
