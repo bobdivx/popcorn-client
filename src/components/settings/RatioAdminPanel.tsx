@@ -3,6 +3,7 @@ import { serverApi } from '../../lib/client/server-api';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { Shield, TrendingUp, RefreshCw, Zap, AlertCircle } from 'lucide-preact';
 import PermissionGuard from '../ui/PermissionGuard';
+import SubscriptionGuard from '../ui/SubscriptionGuard';
 import DsPageHeader from '../ui/DsPageHeader';
 
 function formatBytes(bytes: number): string {
@@ -204,8 +205,20 @@ export default function RatioAdminPanel() {
         ...(testSeedInfoHash.trim() !== '' ? { info_hash: testSeedInfoHash.trim() } : {}),
         ...(testSeedTrackerUrl.trim() !== '' ? { tracker_url: testSeedTrackerUrl.trim() } : {}),
       });
-      if (res.success && res.data) setTestSeedResult(res.data);
-      else setError(res.message || t('ratioAdmin.errorTestSeed'));
+      if (res.success && res.data) {
+        const data = { ...res.data };
+        if (
+          (data.ratio_from_tracker == null || Number.isNaN(data.ratio_from_tracker)) &&
+          typeof data.uploaded_from_tracker === 'number' &&
+          typeof data.downloaded_from_tracker === 'number' &&
+          data.downloaded_from_tracker > 0
+        ) {
+          data.ratio_from_tracker = data.uploaded_from_tracker / data.downloaded_from_tracker;
+        }
+        setTestSeedResult(data);
+      } else {
+        setError(res.message || t('ratioAdmin.errorTestSeed'));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -237,6 +250,7 @@ export default function RatioAdminPanel() {
 
   return (
     <PermissionGuard permission="settings.server">
+      <SubscriptionGuard>
       <div className="flex-1 py-4 px-4 sm:px-6 space-y-6 overflow-y-auto scrollbar-visible">
         <DsPageHeader
           titleKey="ratioAdmin.title"
@@ -522,6 +536,7 @@ export default function RatioAdminPanel() {
           </section>
         )}
       </div>
+      </SubscriptionGuard>
     </PermissionGuard>
   );
 }

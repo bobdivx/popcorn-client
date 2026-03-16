@@ -54,7 +54,20 @@ export function useFavoritesItems() {
             if (cancelled) break;
             if (groupRes.success && groupRes.data) {
               const item = groupToContentItem(groupRes.data as any, fav.tmdb_type);
-              if (item.id) results.push(item);
+              const normalizedTitle = (item.title ?? '').trim().toLowerCase();
+
+              // Si le média est "Inconnu" (plus de groupe torrent valide), on le supprime
+              // automatiquement de la liste "À regarder plus tard" pour éviter une carte fantôme.
+              if (!item.id || !normalizedTitle || normalizedTitle === 'inconnu' || normalizedTitle === 'unknown') {
+                try {
+                  await serverApi.removeMediaFavorite(fav.tmdb_id, fav.tmdb_type);
+                } catch {
+                  // ignorer les erreurs de cleanup : l'UX prime
+                }
+                continue;
+              }
+
+              results.push(item);
             }
           } catch {
             // ignorer les erreurs par favori (média pas encore sync, etc.)

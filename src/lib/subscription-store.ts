@@ -37,3 +37,9 @@ export function isStreamingTorrentActive(): boolean {
   const sub = getCachedSubscription();
   return sub?.streamingTorrent === true;
 }
+
+/** Indique si l'utilisateur a un abonnement payant actif (lecture depuis le cache). */
+export function isPayingSubscriber(): boolean {
+  const sub = getCachedSubscription();
+  return sub?.subscription?.status === 'active';
+}

@@ -124,13 +124,29 @@ export async function requestFullscreen(element: HTMLElement): Promise<void> {
   }
   const fullscreenOptions: FullscreenOptions = { navigationUI: 'hide' };
   try {
+    // Sur Android (app mobile), si un bridge natif est disponible, le prévenir avant de demander le plein écran web.
+    if (isAndroid()) {
+      try {
+        (window as any).Android?.enterFullscreen?.();
+      } catch (e) {
+        console.warn('[Fullscreen] Bridge Android.enterFullscreen indisponible:', e);
+      }
+    }
     if (element.requestFullscreen) await element.requestFullscreen(fullscreenOptions);
     else if ((element as any).webkitRequestFullscreen) await (element as any).webkitRequestFullscreen();
     else if ((element as any).mozRequestFullScreen) await (element as any).mozRequestFullScreen();
     else if ((element as any).msRequestFullscreen) await (element as any).msRequestFullscreen();
     else throw new Error('Fullscreen API not supported');
   } catch (e) {
-    if (isAndroid()) return Promise.resolve();
+    if (isAndroid()) {
+      // En WebView Android, l'API fullscreen peut être désactivée. On se repose alors uniquement sur le bridge natif.
+      try {
+        (window as any).Android?.enterFullscreen?.();
+      } catch (err) {
+        console.warn('[Fullscreen] Erreur fallback Android.enterFullscreen:', err);
+      }
+      return Promise.resolve();
+    }
     throw e;
   }
 }
@@ -143,6 +159,14 @@ export async function exitFullscreen(): Promise<void> {
     setAndroidImmersiveStyle(false);
   }
   try {
+    // Notifier le bridge Android si présent pour qu'il remette l'activité dans son orientation normale.
+    if (isAndroid()) {
+      try {
+        (window as any).Android?.exitFullscreen?.();
+      } catch (e) {
+        console.warn('[Fullscreen] Bridge Android.exitFullscreen indisponible:', e);
+      }
+    }
     if (document.exitFullscreen) await document.exitFullscreen();
     else if ((document as any).webkitExitFullscreen) await (document as any).webkitExitFullscreen();
     else if ((document as any).mozCancelFullScreen) await (document as any).mozCancelFullScreen();

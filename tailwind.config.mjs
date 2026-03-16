@@ -169,7 +169,7 @@ export default {
   },
   plugins: [require('daisyui')],
   daisyui: {
-    themes: ['dark'],
+    themes: ['dark', 'light'],
     darkTheme: 'dark',
   },
 };

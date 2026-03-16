@@ -145,6 +145,14 @@ export const settingsMethods = {
   }>> {
     return this.backendRequest('/api/admin/tracker-mode/stats', { method: 'GET' });
   },
+  /** GET /api/admin/trackers/ratio — ratio global exposé par le tracker principal */
+  async getTrackerRatio(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{
+    uploaded_bytes?: number | null;
+    downloaded_bytes?: number | null;
+    ratio?: number | null;
+  }>> {
+    return this.backendRequest('/api/admin/trackers/ratio', { method: 'GET' });
+  },
   /** GET /api/admin/tracker-mode/torrents/:info_hash/trackers — URLs des trackers pour un torrent (indexer) */
   async getRatioTorrentTrackers(this: ServerApiClientSettingsAccess, infoHash: string): Promise<ApiResponse<{ tracker_urls: string[]; debug_librqbit_keys?: string[] }>> {
     const hash = infoHash.trim().toLowerCase();
