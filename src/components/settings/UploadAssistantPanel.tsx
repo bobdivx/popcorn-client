@@ -11,10 +11,19 @@ import type {
   UploaderPreviewResponse,
 } from '../../lib/client/server-api/upload-tracker';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { DsBarChart, DsMetricCard, LoadingIcon, FullScreenLoadingOverlay } from '../ui/design-system';
+import {
+  DsBarChart,
+  DsMetricCard,
+  DsSettingsSectionCard,
+  DsCard,
+  DsCardSection,
+  LoadingIcon,
+  FullScreenLoadingOverlay,
+} from '../ui/design-system';
 import { Modal } from '../ui/Modal';
 import { DescriptionPreview } from '../upload/DescriptionPreview';
-import { ArrowLeft, ArrowRight, Check, Loader2, Search, Upload } from 'lucide-preact';
+import { ArrowLeft, ArrowRight, Check, Loader2, Search, Upload, Film, Radar, Images, Activity } from 'lucide-preact';
+import { Chart, ArcElement, DoughnutController, Tooltip, Legend } from 'chart.js';
 
 const SAVED_MASK = '********';
 const WIZARD_STEPS = 3;
@@ -65,6 +74,189 @@ type UploadBatchStats = {
   duplicate: number;
   error: number;
 };
+
+Chart.register(ArcElement, DoughnutController, Tooltip, Legend);
+
+function PipelineDonutChart({
+  steps,
+}: {
+  steps: Array<{ key: string; title: string; current: number; target: number; color: string }>;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const chartRef = useRef<Chart | null>(null);
+
+  const values = steps.map((s) => (s.target > 0 ? Math.min(s.current / s.target, 1) : 0));
+  const totalProgress = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+  const totalPct = Math.round(totalProgress * 100);
+  const activeStep =
+    steps.find((s, idx) => values[idx] < 1 && s.target > 0) ?? steps[steps.length - 1] ?? null;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    chartRef.current = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: steps.map((s) => s.title),
+        datasets: [
+          {
+            data: values.map((v) => (v <= 0 ? 0.001 : v)),
+            backgroundColor: steps.map((s) => s.color),
+            borderWidth: 0,
+          },
+        ],
+      },
+      options: {
+        cutout: '70%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const idx = ctx.dataIndex;
+                const step = steps[idx];
+                const pct = step.target > 0 ? Math.round((step.current / step.target) * 100) : 0;
+                return `${step.title}: ${step.current}/${step.target} (${pct}%)`;
+              },
+            },
+          },
+        },
+        responsive: true,
+        maintainAspectRatio: false,
+      },
+    });
+
+    return () => {
+      chartRef.current?.destroy();
+      chartRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    chartRef.current.data.labels = steps.map((s) => s.title);
+    chartRef.current.data.datasets[0].data = values.map((v) => (v <= 0 ? 0.001 : v));
+    chartRef.current.data.datasets[0].backgroundColor = steps.map((s) => s.color);
+    chartRef.current.update('active');
+  }, [JSON.stringify(steps.map((s) => `${s.key}:${s.current}/${s.target}`))]);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="relative w-32 h-32 sm:w-40 sm:h-40 mx-auto">
+        <canvas ref={canvasRef} />
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          {activeStep && (
+            <span className="text-[10px] uppercase tracking-wide text-[var(--ds-text-tertiary)] text-center px-3">
+              {activeStep.title}
+            </span>
+          )}
+          <span className="text-xl sm:text-2xl font-semibold tabular-nums text-[var(--ds-text-primary)]">
+            {totalPct}%
+          </span>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+        {steps.map((step) => {
+          return (
+            <div key={step.key} className="flex items-center justify-between gap-2 text-[11px]">
+              <span className="flex items-center gap-1 truncate text-[var(--ds-text-secondary)]">
+                <span
+                  className="inline-block w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: step.color }}
+                />
+                <span className="truncate">{step.title}</span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ExecutionChart({ stats }: { stats: UploadBatchStats }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const hasData = stats.total > 0 && (stats.success > 0 || stats.duplicate > 0 || stats.error > 0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !hasData) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const chart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        labels: ['Succès', 'Doublons', 'Erreurs'],
+        datasets: [
+          {
+            data: [stats.success, stats.duplicate, stats.error],
+            backgroundColor: [
+              'rgba(34, 197, 94, 0.9)',
+              'rgba(234, 179, 8, 0.9)',
+              'rgba(239, 68, 68, 0.9)',
+            ],
+            borderWidth: 0,
+          },
+        ],
+      },
+      options: {
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const label = ctx.label || '';
+                const value = ctx.parsed || 0;
+                return `${label}: ${value}`;
+              },
+            },
+          },
+        },
+        cutout: '70%',
+        responsive: true,
+        maintainAspectRatio: false,
+      },
+    });
+
+    return () => {
+      chart.destroy();
+    };
+  }, [stats.success, stats.duplicate, stats.error, hasData]);
+
+  if (!hasData) {
+    return (
+      <div className="flex items-center justify-center h-24 text-xs text-[var(--ds-text-tertiary)]">
+        Aucun envoi traité pour le moment
+      </div>
+    );
+  }
+
+  const percent =
+    stats.total > 0 ? Math.round((stats.processed / stats.total) * 100) : 0;
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="relative w-20 h-20">
+        <canvas ref={canvasRef} />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-sm font-semibold text-[var(--ds-text-primary)] tabular-nums">
+            {percent}%
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-col gap-1 text-xs text-[var(--ds-text-secondary)]">
+        <span>Succès : {stats.success}</span>
+        <span>Doublons : {stats.duplicate}</span>
+        <span>Erreurs : {stats.error}</span>
+      </div>
+    </div>
+  );
+}
 
 /** Écran de chargement initial avec animation des étapes (carte C411) */
 function LoadingAssistantView({
@@ -1208,6 +1400,65 @@ export default function UploadAssistantPanel() {
     },
   ];
 
+  const pipelineSteps = [
+    {
+      key: 'trackers',
+      title: t('settings.uploadTrackerPanel.wizardSummaryTrackers'),
+      current: selectedTrackers.length,
+      target: trackersTarget,
+      color: '#a855f7',
+      accent: 'violet' as const,
+    },
+    {
+      key: 'media',
+      title: t('settings.uploadTrackerPanel.wizardSummaryMedia'),
+      current: selectedMediaIds.length,
+      target: mediaTarget,
+      color: '#facc15',
+      accent: 'yellow' as const,
+    },
+    {
+      key: 'validation',
+      title: t('settings.uploadTrackerPanel.factoryValidation'),
+      current: validationCount,
+      target: validationTarget,
+      color: '#22c55e',
+      accent: 'green' as const,
+    },
+    {
+      key: 'screenshots',
+      title: t('settings.uploadTrackerPanel.wizardSummaryScreenshots'),
+      current: Math.min(screenshotsGeneratedCount, screenshotsTarget),
+      target: screenshotsTarget,
+      color: '#facc15',
+      accent: 'yellow' as const,
+    },
+    {
+      key: 'preview',
+      title: t('settings.uploadTrackerPanel.factoryPreview'),
+      current: previewCount,
+      target: previewTarget,
+      color: '#f97373',
+      accent: 'violet' as const,
+    },
+    {
+      key: 'hash',
+      title: t('settings.uploadTrackerPanel.factoryHash'),
+      current: hashProgressPct,
+      target: hashTarget,
+      color: '#6366f1',
+      accent: 'violet' as const,
+    },
+    {
+      key: 'upload',
+      title: t('settings.uploadTrackerPanel.factoryUpload'),
+      current: uploadProcessedCount,
+      target: uploadTarget,
+      color: '#9ca3af',
+      accent: 'violet' as const,
+    },
+  ];
+
   const loadPreview = useCallback(async () => {
     const mediaIdForPreview = selectedMediaIds[0] ?? '';
     if (!mediaIdForPreview.trim()) return;
@@ -1574,90 +1825,64 @@ export default function UploadAssistantPanel() {
                 <p className="text-sm text-base-content/70 mb-4">
                   {t('settings.uploadTrackerPanel.wizardReviewDescription')}
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                  <DsMetricCard
-                    icon="🎬"
-                    label={t('settings.uploadTrackerPanel.wizardSummaryMediaSelected')}
-                    value={selectedMediaIds.length}
-                    accent="violet"
-                    className="rounded-xl"
-                    showHeader={false}
-                  >
-                    {selectedMediaIds.length > 0 && (
-                      <div className="flex items-center gap-3 mt-1">
-                        {(() => {
-                          const firstMediaId = selectedMediaIds[0];
-                          const media = mediaList.find((m) => m.id === firstMediaId);
-                          const posterUrl = media?.poster_url;
-                          const title = media?.tmdb_title || media?.file_name || firstMediaId;
-                          if (!posterUrl) {
-                            return (
-                              <span className="ds-metric-card__value font-bold text-lg sm:text-xl tabular-nums">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                  <DsCard variant="glass" className="h-full min-w-0 overflow-hidden">
+                    <DsCardSection className="relative min-h-[160px] h-full min-w-0 overflow-hidden p-0">
+                      {selectedMediaIds.length > 0 && (() => {
+                        const firstMediaId = selectedMediaIds[0];
+                        const media = mediaList.find((m) => m.id === firstMediaId);
+                        const posterUrl = media?.poster_url;
+                        const title = media?.tmdb_title || media?.file_name || firstMediaId;
+                        const content = (
+                          <div className="relative z-10 h-full p-3 sm:p-4 flex flex-col justify-end">
+                            <div className="mt-1">
+                              <p className={`text-sm sm:text-base font-semibold truncate ${posterUrl ? 'text-white drop-shadow' : 'text-[var(--ds-text-primary)]'}`}>
                                 {title}
-                              </span>
-                            );
-                          }
-                          return (
-                            <>
-                              <img
-                                src={posterUrl}
-                                alt={title}
-                                className="w-12 h-18 sm:w-14 sm:h-20 rounded-md object-cover shadow-md"
-                                loading="lazy"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold truncate">{title}</p>
-                                <p className="text-xs text-base-content/60 mt-0.5">
-                                  {selectedMediaIds.length === 1
-                                    ? t('settings.uploadTrackerPanel.wizardSummaryOneMedia')
-                                    : t('settings.uploadTrackerPanel.wizardSummaryManyMedia', {
-                                        count: selectedMediaIds.length,
-                                      })}
-                                </p>
-                              </div>
-                            </>
-                          );
-                        })()}
-                      </div>
-                    )}
-                  </DsMetricCard>
-                  <DsMetricCard
-                    icon="🧭"
-                    label={t('settings.uploadTrackerPanel.wizardSummaryTrackerSelected')}
-                    value={selectedTrackers.length}
-                    accent="yellow"
-                    className="rounded-xl"
-                    showHeader={false}
-                  >
-                    {selectedTrackers.length > 0 && (
-                      <div className="mt-1 space-y-1">
-                        <p className="text-sm font-semibold truncate">
-                          {selectedTrackers.join(', ')}
-                        </p>
-                        <p className="text-xs text-base-content/60">
-                          {t('settings.uploadTrackerPanel.wizardSummaryTrackerCount', {
-                            count: selectedTrackers.length,
-                          })}
-                        </p>
-                      </div>
-                    )}
-                  </DsMetricCard>
-                  <DsMetricCard
-                    icon="🖼️"
-                    label={t('settings.uploadTrackerPanel.wizardSummaryScreenshots')}
-                    value={screenshotsCount ?? 0}
+                              </p>
+                              <p className={`text-xs mt-0.5 ${posterUrl ? 'text-white/80' : 'text-[var(--ds-text-tertiary)]'}`}>
+                                {selectedMediaIds.length === 1
+                                  ? t('settings.uploadTrackerPanel.wizardSummaryOneMedia')
+                                  : t('settings.uploadTrackerPanel.wizardSummaryManyMedia', {
+                                      count: selectedMediaIds.length,
+                                    })}
+                              </p>
+                            </div>
+                          </div>
+                        );
+
+                        if (!posterUrl) {
+                          return content;
+                        }
+
+                        return (
+                          <>
+                            <div
+                              className="absolute inset-0 bg-cover bg-center"
+                              style={{ backgroundImage: `url(${posterUrl})` }}
+                              aria-hidden
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" aria-hidden />
+                            {content}
+                          </>
+                        );
+                      })()}
+                    </DsCardSection>
+                  </DsCard>
+                  <DsSettingsSectionCard
+                    icon={Images}
+                    title=""
                     accent="green"
-                    className="rounded-xl"
-                    showHeader={false}
+                    cardVariant="glass"
+                    className="h-full"
                   >
                     {screenshotsCount && screenshotsCount > 0 && screenshotsBaseUrl && (
-                      <div className="mt-1">
+                      <div className="mt-3">
                         {!screenshotsReady && (
                           <div className="w-full h-24 sm:h-28 rounded-lg bg-base-200/80 animate-pulse" />
                         )}
                         {screenshotsReady && (
                           <>
-                            <div className="relative overflow-hidden rounded-lg bg-base-200">
+                            <div className="relative overflow-hidden rounded-lg bg-base-200 aspect-[16/9]">
                               <div className="flex transition-transform duration-500 ease-out">
                                 {[...Array(screenshotsCount)].map((_, idx) => {
                                   const ext = screenshotsSource === 'cloud' ? 'jpg' : 'png';
@@ -1670,8 +1895,8 @@ export default function UploadAssistantPanel() {
                                       alt={t('settings.uploadTrackerPanel.screenshotAlt', {
                                         index: idx + 1,
                                       })}
-                                      className={`w-full h-24 sm:h-28 object-cover flex-shrink-0 ${
-                                        isActive ? 'opacity-100' : 'opacity-0 absolute inset-0'
+                                      className={`absolute inset-0 w-full h-full object-cover ${
+                                        isActive ? 'opacity-100' : 'opacity-0'
                                       }`}
                                       loading="lazy"
                                     />
@@ -1679,39 +1904,24 @@ export default function UploadAssistantPanel() {
                                 })}
                               </div>
                             </div>
-                            <div className="mt-1 flex justify-between items-center">
-                              <span className="text-xs text-base-content/70">
-                                {t('settings.uploadTrackerPanel.wizardSummaryScreenshotsCount', {
-                                  count: screenshotsCount,
-                                })}
-                              </span>
-                              {screenshotsCount > 1 && (
-                                <span className="text-[10px] uppercase tracking-wide text-base-content/50">
-                                  {t('settings.uploadTrackerPanel.wizardSummaryScreenshotsAuto')}
-                                </span>
-                              )}
-                            </div>
+                            {/* Footer de texte retiré pour alléger la carte */}
                           </>
                         )}
                       </div>
                     )}
-                  </DsMetricCard>
-                  <DsMetricCard
-                    icon="⚙️"
-                    label={t('settings.uploadTrackerPanel.wizardSummaryExecution')}
-                    value={batchStats.total > 0 ? `${batchStats.processed}/${batchStats.total}` : '0/0'}
+                  </DsSettingsSectionCard>
+                  <DsSettingsSectionCard
+                    icon={Activity}
+                    title=""
                     accent="yellow"
-                    className="rounded-xl"
-                    showHeader={false}
+                    cardVariant="glass"
+                    className="h-full"
                   >
-                    <div className="mt-1">
-                      <p className="ds-metric-card__value font-bold text-xl sm:text-2xl tabular-nums">
-                        {batchStats.total > 0
-                          ? `${Math.round((batchStats.processed / batchStats.total) * 100)}%`
-                          : '0%'}
-                      </p>
+                    <div className="mt-3 space-y-3">
+                      <PipelineDonutChart steps={pipelineSteps} />
+                      <ExecutionChart stats={batchStats} />
                       {batchStats.total > 0 && (
-                        <p className="text-xs text-base-content/60 mt-0.5">
+                        <p className="text-xs text-[var(--ds-text-tertiary)]">
                           {t('settings.uploadTrackerPanel.wizardSummaryExecutionDetail', {
                             processed: batchStats.processed,
                             total: batchStats.total,
@@ -1719,7 +1929,7 @@ export default function UploadAssistantPanel() {
                         </p>
                       )}
                     </div>
-                  </DsMetricCard>
+                  </DsSettingsSectionCard>
                 </div>
               </div>
             </div>
@@ -1733,21 +1943,10 @@ export default function UploadAssistantPanel() {
                 </div>
               </div>
               <div class="sc-frame-body">
-                <DsBarChart
-                  items={torrentFactoryItems}
-                  max={100}
-                  showValues={false}
-                  horizontalLabelClassName="w-36 sm:w-44 whitespace-nowrap"
-                />
-                {batchStats.total > 0 && !uploading && batchStats.processed >= batchStats.total && (
-                  <p className="text-xs text-base-content/70 mt-1">
-                    {t('settings.uploadTrackerPanel.uploadBatchSummary', {
-                      success: batchStats.success,
-                      duplicate: batchStats.duplicate,
-                      error: batchStats.error,
-                    })}
-                  </p>
-                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  {/* Colonnes médias / trackers / captures conservées au-dessus */}
+                  {/** Le bloc d'exécution détaillé est géré par la carte suivante avec PipelineDonutChart */}
+                </div>
                 {externalCreationInProgress && !uploading && (
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <p className="text-xs text-warning">
