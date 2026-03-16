@@ -31,8 +31,7 @@ export default function UploadsSubMenuPanel() {
     serverApi.getC411UploadCookies().then((res) => {
       if (cancelled) return;
       if (res.success && res.data) {
-        const configured =
-          Boolean(res.data.upload_assistant_enabled) && Boolean(res.data.upload_assistant_path);
+        const configured = Boolean(res.data.upload_assistant_enabled);
         setUaConfigured(configured);
       }
       setLoadingUa(false);

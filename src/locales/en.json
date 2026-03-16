@@ -805,11 +805,11 @@
       "ratioMode": "Ratio mode (tracker compatibility)",
       "enabled": "Enabled",
       "disabled": "Disabled",
-      "portHint": "To find the TCP port to open on your router, check the torrent client web UI (Settings → Client torrent) or test the port with an external tool.",
+      "portHint": "The TCP and UDP port to open on your router is not yet available. Restart the server, then come back to this page.",
       "testTrackerAnnounce": "Test tracker announce",
       "testPortExternal": "Test port (canyouseeme.org)",
       "listenPort": "TCP port (rqbit)",
-      "portHintWithPort": "Open TCP port {port} on your router to allow incoming connections. You can test it with the tool below."
+      "portHintWithPort": "Open port {port} (TCP and UDP) on your router to allow incoming connections (seeding / ratio). If you have double NAT (modem + router), configure port forwarding on both devices. Test it with the tool below."
     },
     "reseedPanel": {
       "title": "Re-seed",

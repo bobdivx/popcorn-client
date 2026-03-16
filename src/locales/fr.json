@@ -805,11 +805,11 @@
       "ratioMode": "Mode ratio (compatibilité tracker)",
       "enabled": "Activé",
       "disabled": "Désactivé",
-      "portHint": "Pour connaître le port TCP à ouvrir sur votre box/routeur, consultez l'interface Web du client torrent (Paramètres → Client torrent) ou testez le port avec un outil externe.",
+      "portHint": "Le port TCP et UDP à ouvrir sur votre box/routeur n'est pas encore disponible. Redémarrez le serveur, puis revenez sur cette page.",
       "testTrackerAnnounce": "Tester l'annonce tracker",
       "testPortExternal": "Tester le port (canyouseeme.org)",
       "listenPort": "Port TCP (rqbit)",
-      "portHintWithPort": "Ouvrez le port TCP {port} sur votre box/routeur pour permettre les connexions entrantes. Vous pouvez le tester avec l'outil ci-dessous."
+      "portHintWithPort": "Ouvrez le port {port} en TCP et UDP sur votre box/routeur pour permettre les connexions entrantes (partage / ratio). En cas de double NAT (box + routeur), configurez la redirection sur les deux appareils. Testez avec l'outil ci-dessous."
     },
     "reseedPanel": {
       "title": "Re-seed",
