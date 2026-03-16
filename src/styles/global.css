@@ -91,10 +91,8 @@ body { color: #fff; }
 
 /* Android TV : réduire l’affichage pour que la résolution ne soit pas « tout trop grand » */
 html[data-tv-platform] body {
-  transform: scale(0.8);
-  transform-origin: 0 0;
-  width: 125vw;
-  height: 125vh;
+  width: 100%;
+  min-height: 100vh;
   overflow-x: hidden;
 }
 
@@ -507,7 +505,7 @@ html[data-tv-platform] body {
 }
 
 /* Focus TV encore plus visible sur grands écrans — halo blanc */
-@media (min-width: 1920px) {
+@media (min-width: 1280px) {
   [data-focusable]:focus-visible {
     outline-width: 4px;
     outline-offset: 4px;
@@ -635,7 +633,7 @@ html[data-tv-platform] body {
     top: calc(5rem + var(--safe-area-inset-top, 0px)); /* h-20 */
   }
 }
-@media (min-width: 1920px) {
+@media (min-width: 1280px) {
   .library-sync-bar-indeterminate {
     top: calc(6rem + var(--safe-area-inset-top, 0px)); /* h-24 */
   }
@@ -1050,9 +1048,9 @@ html[data-tv-platform] body {
       top: calc(6rem + var(--safe-area-inset-top));
     }
   }
-  @media (min-width: 1920px) {
+  @media (min-width: 1280px) {
     .hero-content-below-header {
-      top: calc(7rem + var(--safe-area-inset-top));
+      top: calc(5.5rem + var(--safe-area-inset-top));
     }
   }
   
@@ -1080,10 +1078,10 @@ html[data-tv-platform] body {
   }
 }
 
-/* Styles optimisés pour Android TV - Breakpoint 1920px+ */
+/* Styles optimisés pour Android TV - Breakpoint 1280px+ */
 /* Animations adaptées pour TV - Plus lentes et plus visibles */
-@media (min-width: 1920px) {
-  /* Hero dashboard : hauteur réduite pour que la première ligne de cartes soit visible sans être coupée (1080p) */
+@media (min-width: 1280px) {
+  /* Hero dashboard : hauteur réduite pour que la première ligne de cartes soit visible sans être coupée (720p/1080p) */
   .hero-dashboard {
     height: clamp(280px, 39vh, 420px) !important;
   }
@@ -1151,8 +1149,8 @@ html[data-tv-platform] body {
   }
 }
 
-/* Styles optimisés pour Android TV - Breakpoint 1920px+ */
-@media (min-width: 1920px) {
+/* Styles optimisés pour Android TV - Breakpoint 1280px+ */
+@media (min-width: 1280px) {
   /* Classes utilitaires TV pour espacements */
   .gap-tv-lg {
     gap: 2rem !important; /* 32px */
@@ -1396,16 +1394,16 @@ html[data-tv-platform] body {
   border-bottom: none;
 }
 
-/* Padding TV pour nav-tab - doit être dans media query */
-@media (min-width: 1920px) {
+/* Padding TV pour nav-tab */
+@media (min-width: 1280px) {
   .nav-tab {
-    padding-left: 2rem !important;
-    padding-right: 2rem !important;
-    padding-top: 0.875rem !important;
-    padding-bottom: 0.875rem !important;
-    min-height: 56px;
-    font-size: 1.125rem !important;
-    gap: 0.75rem !important;
+    padding-left: 1.25rem !important;
+    padding-right: 1.25rem !important;
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+    min-height: 52px;
+    font-size: 1.0625rem !important;
+    gap: 0.5rem !important;
   }
 }
 
@@ -1432,7 +1430,7 @@ html[data-tv-platform] body {
 }
 
 /* Onglet actif TV - indicateur plus visible avec soulignement lumineux */
-@media (min-width: 1920px) {
+@media (min-width: 1280px) {
   .nav-tab-active {
     background: rgba(255, 255, 255, 0.15) !important;
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset, 0 4px 20px rgba(168, 85, 247, 0.2) !important;
@@ -1639,7 +1637,7 @@ html {
   font-weight: 400; /* Normal pour TV */
 }
 
-@media (min-width: 1920px) {
+@media (min-width: 1280px) {
   .text-tv-title {
     font-size: 3.5rem !important; /* 56px sur TV */
   }
@@ -1718,7 +1716,7 @@ html {
 }
 
 /* Sur grand écran / TV : même halo blanc un peu plus marqué */
-@media (min-width: 1920px) {
+@media (min-width: 1280px) {
   .tv-card-focused {
     animation: tv-halo-pulse-lg 2s ease-in-out infinite !important;
   }
