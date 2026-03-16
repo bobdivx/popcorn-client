@@ -423,6 +423,15 @@
     "recoverConfigFromCloudSuccess": "Configuration récupérée avec succès.",
     "recoverConfigFromCloudNoConfig": "Aucune configuration sauvegardée dans le cloud.",
     "recoverConfigFromCloudError": "Erreur lors de la récupération de la configuration.",
+    "devices": {
+      "title": "Appareils connectés",
+      "description": "Liste des appareils qui se sont connectés à votre compte cloud Popcornn. Cette liste est partagée entre tous vos clients (desktop, web, TV, etc.).",
+      "empty": "Aucun appareil enregistré pour ce compte cloud.",
+      "unknownName": "Appareil Popcorn",
+      "lastSeen": "Dernière activité : {{date}}",
+      "neverSeen": "Aucune activité enregistrée",
+      "footerInfo": "Dans une prochaine version, vous pourrez révoquer ici les appareils que vous ne reconnaissez pas."
+    },
     "subMenu": {
       "accountInfo": "Informations du compte",
       "accountInfoDesc": "Email, ID utilisateur",
@@ -458,14 +467,17 @@
     "streamingModeDirect": "Direct (alternative sans HLS)",
     "streamingModeDirectDescription": "Lecture directe sans transcodage (limité aux formats supportés nativement)",
     "streamingDownloadFull": "Télécharger en entier (streaming)",
-    "streamingDownloadFullCardDescription": "Réservé abonnés. En streaming : tout le fichier ou seulement la partie lue.",
-    "streamingDownloadFullDescription": "Option réservée aux abonnés avec l’option streaming. Choisit, en lecture streaming : télécharger tout le fichier en arrière-plan ou seulement la partie lue.",
+    "streamingDownloadFullCardDescription": "Téléchargez et lisez le média immédiatement, sans attendre la fin du téléchargement. Réservé abonnés.",
+    "streamingDownloadFullDescription": "Permet de lancer la lecture dès le début du téléchargement, sans attendre que le fichier soit entièrement téléchargé. Choisissez entre télécharger tout le fichier en arrière-plan ou uniquement la partie en cours de lecture. Réservé aux abonnés avec l’option streaming.",
     "streamingDownloadFullRequiresSubscription": "Le mode streaming (et cette option) nécessitent un abonnement actif avec l’option streaming torrent.",
     "streamingRetention": "Rétention des torrents",
     "streamingRetentionDescription": "Durée de conservation des torrents téléchargés en streaming. Après ce délai, ils sont supprimés automatiquement pour libérer de l'espace.",
     "streamingRetentionKeep": "Garder indéfiniment",
     "streamingRetentionDontKeep": "Ne pas garder (supprimer après lecture)",
     "streamingRetentionDays": "{days} jours",
+    "videoFillMode": "Remplissage de l'image",
+    "videoFillModeContain": "Adapter à l'écran (bandes noires)",
+    "videoFillModeCover": "Plein écran (peut couper les bords)",
     "librarySection": "Affichage de la bibliothèque",
     "librarySectionDescription": "Personnaliser langue, qualité et pagination des listes de la bibliothèque",
     "showZeroSeedTorrents": "Afficher les torrents sans seeders",
@@ -793,11 +805,11 @@
       "ratioMode": "Mode ratio (compatibilité tracker)",
       "enabled": "Activé",
       "disabled": "Désactivé",
-      "portHint": "Pour connaître le port TCP à ouvrir sur votre box/routeur, consultez l'interface Web du client torrent (Paramètres → Client torrent) ou testez le port avec un outil externe.",
+      "portHint": "Le port TCP et UDP à ouvrir sur votre box/routeur n'est pas encore disponible. Redémarrez le serveur, puis revenez sur cette page.",
       "testTrackerAnnounce": "Tester l'annonce tracker",
       "testPortExternal": "Tester le port (canyouseeme.org)",
       "listenPort": "Port TCP (rqbit)",
-      "portHintWithPort": "Ouvrez le port TCP {port} sur votre box/routeur pour permettre les connexions entrantes. Vous pouvez le tester avec l'outil ci-dessous."
+      "portHintWithPort": "Ouvrez le port {port} en TCP et UDP sur votre box/routeur pour permettre les connexions entrantes (partage / ratio). En cas de double NAT (box + routeur), configurez la redirection sur les deux appareils. Testez avec l'outil ci-dessous."
     },
     "reseedPanel": {
       "title": "Re-seed",
@@ -874,6 +886,12 @@
   "permissions": {
     "accessDenied": "Accès refusé",
     "accessDeniedDescription": "Cette fonctionnalité est réservée au compte principal. Les utilisateurs locaux ont un accès limité aux paramètres.",
+    "backToSettings": "Retour aux paramètres"
+  },
+  "subscriptionGuard": {
+    "title": "Abonnement payant requis",
+    "description": "Cette fonctionnalité est réservée aux abonnés payants. Souscrivez à un abonnement actif pour y accéder.",
+    "cta": "Voir les abonnements",
     "backToSettings": "Retour aux paramètres"
   },
   "dashboard": {
@@ -1076,7 +1094,20 @@
       "indexersCount": "{count} indexeur(s) configuré(s)",
       "sameOriginBackendTitle": "Client et serveur API sur la même adresse",
       "sameOriginBackendDescription": "L'adresse de cette page (client) et l'adresse du serveur API (backend) sont identiques. Si vous souhaitez utiliser un autre serveur, modifiez l'URL du backend.",
-      "sameOriginBackendAction": "Modifier l'adresse du backend"
+      "sameOriginBackendAction": "Modifier l'adresse du backend",
+      "devicesSummary": "{count} appareil connecté au compte cloud",
+      "devicesSummary_plural": "{count} appareils connectés au compte cloud",
+      "devicesSummaryWithLast": "{count} appareil connecté · dernière activité {date}",
+      "devicesSummaryWithLast_plural": "{count} appareils connectés · dernière activité {date}",
+      "devicesNone": "Aucun appareil cloud connecté",
+      "ratioStatsTitle": "Statistiques de partage (client)",
+      "ratioStatsSubtitle": "Total téléchargé, total partagé (client) et ratios par tracker quand disponibles.",
+      "ratioTotalDownloaded": "Total téléchargé",
+      "ratioTotalUploaded": "Total partagé",
+      "ratioGlobalRatio": "Ratio global client",
+      "ratioSeedingCount": "{count} torrent en seed",
+      "ratioSeedingCount_plural": "{count} torrents en seed",
+      "ratioTrackerColumnLabel": "Ratio tracker"
     },
     "category": {
       "system": "Système",
@@ -1540,7 +1571,9 @@
       "useFlareSolverrHelp": "Recommandé si le site affiche une vérification Cloudflare. Le backend doit avoir FLARESOLVERR_URL configuré.",
       "enable": "Activer",
       "default": "Par défaut",
-      "priority": "Priorité"
+      "priority": "Priorité",
+      "manualTrackerRatio": "Ratio tracker (saisi manuellement)",
+      "manualTrackerRatioHelp": "Optionnel · utilisé si le ratio n'est pas récupérable automatiquement depuis le tracker."
     },
     "saving": "Sauvegarde..."
   },
@@ -2097,6 +2130,7 @@
     "inactive": "Inactif",
     "refresh": "Rafraîchir",
     "inProgress": "En cours...",
+    "syncNow": "Synchroniser maintenant",
     "elapsedSince": "En cours depuis {time}",
     "elapsedSinceLabel": "En cours depuis",
     "syncInProgressShort": "Sync…",

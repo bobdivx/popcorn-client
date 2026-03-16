@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
@@ -194,7 +195,7 @@ export default function MediaPathsPanel({ onBack }: MediaPathsPanelProps) {
       </p>
 
       {/* Modal Parcourir */}
-      {browseType !== null && (
+      {browseType !== null && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
           role="dialog"
@@ -280,7 +281,8 @@ export default function MediaPathsPanel({ onBack }: MediaPathsPanelProps) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

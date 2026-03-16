@@ -102,11 +102,13 @@ export default function Settings() {
               <input
                 type="checkbox"
                 className="toggle toggle-primary"
-                checked={preferences.theme === 'dark'}
+                checked={preferences.theme !== 'light'}
                 onChange={(e) => {
-                  PreferencesManager.updatePreferences({
-                    theme: (e.target as HTMLInputElement).checked ? 'dark' : 'light',
-                  });
+                  const theme = (e.target as HTMLInputElement).checked ? 'dark' : 'light';
+                  PreferencesManager.updatePreferences({ theme });
+                  if (typeof document !== 'undefined') {
+                    document.documentElement.dataset.theme = theme;
+                  }
                 }}
               />
             </label>

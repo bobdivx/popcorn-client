@@ -1,8 +1,8 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import SettingsLayout from '../layouts/SettingsLayout.astro';
 import DownloadsList from '../components/downloads/DownloadsList';
 ---
 
-<Layout title="Téléchargements - Popcorn Client">
+<SettingsLayout title="Téléchargements - Popcorn Client">
   <DownloadsList client:only="preact" />
-</Layout>
+</SettingsLayout>

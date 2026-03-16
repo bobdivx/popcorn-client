@@ -4,6 +4,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { getBackendUrl } from '../../lib/backend-config';
 import { serverApi } from '../../lib/client/server-api';
 import { canAccess } from '../../lib/permissions';
+import { getCachedSubscription, loadSubscription } from '../../lib/subscription-store';
 import LibRbitSettings from './LibRbitSettings';
 import { SettingsNavCard } from './SettingsNavCard';
 import { SettingsSubPageFrame } from './SettingsSubPageFrame';
@@ -17,6 +18,7 @@ type DownloadItem =
       descriptionKey: string;
       icon: typeof HardDrive;
       permission?: string;
+      requiresSubscription?: boolean;
       kind: 'link';
       href: string;
       isExternal?: boolean;
@@ -27,6 +29,7 @@ type DownloadItem =
       descriptionKey: string;
       icon: typeof HardDrive;
       permission?: string;
+      requiresSubscription?: boolean;
       kind: 'sub';
       sub: string;
     };
@@ -42,6 +45,10 @@ export default function DownloadsSubMenuPanel() {
   const { t } = useI18n();
   const [sub, setSub] = useState<string | null>(getSubFromUrl);
   const [librqbitWebHref, setLibrqbitWebHref] = useState('#');
+  const [isPayingSubscriber, setIsPayingSubscriber] = useState(() => {
+    const cached = getCachedSubscription();
+    return cached !== null ? cached.subscription?.status === 'active' : false;
+  });
 
   useEffect(() => {
     setSub(getSubFromUrl());
@@ -50,6 +57,17 @@ export default function DownloadsSubMenuPanel() {
   useEffect(() => {
     const base = (getBackendUrl() || serverApi.getServerUrl() || '').trim().replace(/\/$/, '');
     setLibrqbitWebHref(base ? `${base}/librqbit/web/` : '#');
+  }, []);
+
+  useEffect(() => {
+    const cached = getCachedSubscription();
+    if (cached !== null) {
+      setIsPayingSubscriber(cached.subscription?.status === 'active');
+      return;
+    }
+    loadSubscription()
+      .then((data) => setIsPayingSubscriber(data?.subscription?.status === 'active'))
+      .catch(() => setIsPayingSubscriber(false));
   }, []);
 
   useEffect(() => {
@@ -69,6 +87,7 @@ export default function DownloadsSubMenuPanel() {
       descriptionKey: 'ratioAdmin.subtitle',
       icon: Shield,
       permission: 'settings.server',
+      requiresSubscription: true,
       kind: 'link',
       href: '/settings/ratio/',
     },
@@ -93,9 +112,11 @@ export default function DownloadsSubMenuPanel() {
     },
   ];
 
-  const visible = items.filter(
-    (item) => !item.permission || canAccess(item.permission as any)
-  );
+  const visible = items.filter((item) => {
+    if (item.permission && !canAccess(item.permission as any)) return false;
+    if (item.requiresSubscription && !isPayingSubscriber) return false;
+    return true;
+  });
 
   if (sub === 'librqbit') {
     const item = items.find((i) => i.id === 'librqbit')!;

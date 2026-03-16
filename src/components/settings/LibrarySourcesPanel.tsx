@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi, type LibrarySource } from '../../lib/client/server-api';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
@@ -566,7 +567,7 @@ export default function LibrarySourcesPanel() {
         )}
       </div>
 
-      {browseOpen && (
+      {browseOpen && createPortal(
         <div
           class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
           role="dialog"
@@ -648,7 +649,8 @@ export default function LibrarySourcesPanel() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

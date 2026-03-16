@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import { Users, Mail, Trash2, RefreshCw, UserPlus, Activity as ActivityIcon } from 'lucide-preact';
 import { TokenManager } from '../../lib/client/storage';
 import { useI18n } from '../../lib/i18n/useI18n';
@@ -436,7 +437,7 @@ export default function FriendsManager() {
       </div>
 
       {/* Modal sélection médias */}
-      {selectingForFriendId && (
+      {selectingForFriendId && createPortal(
         <div class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
           <div class="w-full max-w-3xl bg-gray-900 border border-gray-700 rounded-lg p-6 max-h-[80vh] overflow-auto">
             <div class="flex items-center justify-between mb-4">
@@ -471,7 +472,8 @@ export default function FriendsManager() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

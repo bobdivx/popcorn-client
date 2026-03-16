@@ -139,7 +139,9 @@ export default function SeedingDiagnosticPanel() {
             )}
             <div className="flex flex-wrap gap-2">
               <a
-                href="/settings/ratio"
+                href="https://www.popcornn.app/subscription"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--ds-accent-violet-muted)] text-[var(--ds-accent-violet)] text-sm font-medium hover:opacity-90"
               >
                 {t('settings.seedingDiagnostic.testTrackerAnnounce')}

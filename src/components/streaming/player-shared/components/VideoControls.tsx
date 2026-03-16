@@ -435,14 +435,10 @@ export function VideoControls({
                 <button
                   ref={qualityButtonRef}
                   type="button"
-                  onPointerDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setShowQualityMenu((v) => !v);
-                  }}
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
+                    setShowQualityMenu((v) => !v);
                   }}
                   class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none min-w-[3rem] touch-manipulation ${getFocusClass(qualityIndex)}`}
                   title={t('playback.quality')}

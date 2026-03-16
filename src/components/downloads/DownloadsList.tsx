@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'preact/hooks';
-import { Download, Upload, Pause, Play, Trash2, Plus, FileText, Link2, X, FileText as LogsIcon } from 'lucide-preact';
+import { createPortal } from 'preact/compat';
+import { Download, Upload, Pause, Play, Trash2, Plus, FileText, Link2, X, FileText as LogsIcon, HardDrive } from 'lucide-preact';
 import { clientApi } from '../../lib/client/api';
 import type { ClientTorrentStats, TorrentLogEntry } from '../../lib/client/types';
 import { useI18n } from '../../lib/i18n/useI18n';
@@ -758,11 +759,9 @@ export default function DownloadsList() {
 
   if (loading && torrents.length === 0) {
     return (
-      <div className="min-h-screen bg-[var(--ds-surface)] text-[var(--ds-text-primary)]">
-        <div className="ds-container max-w-6xl py-4 sm:py-6 px-3 sm:px-6">
-          <div className="flex flex-col items-center justify-center py-20 tv:py-32">
-            <HLSLoadingSpinner size="lg" text={t('downloads.loadingDownloads')} />
-          </div>
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
+        <div className="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6 flex flex-col items-center justify-center min-h-[300px]">
+          <HLSLoadingSpinner size="lg" text={t('downloads.loadingDownloads')} />
         </div>
       </div>
     );
@@ -770,17 +769,29 @@ export default function DownloadsList() {
 
   if (error && torrents.length === 0) {
     return (
-      <div className="min-h-screen bg-[var(--ds-surface)] text-[var(--ds-text-primary)]">
-        <div className="ds-container max-w-6xl py-4 sm:py-6 px-3 sm:px-6">
-          <div className="rounded-[var(--ds-radius-lg)] overflow-hidden bg-[var(--ds-surface-elevated)] border border-[var(--ds-border)] p-6 tv:p-8 max-w-2xl mx-auto">
-            <p className="ds-text-secondary text-base tv:text-lg mb-4">{error}</p>
-            <button
-              onClick={loadTorrents}
-              className="btn btn-primary min-h-[48px] tv:min-h-[56px]"
-              tabIndex={0}
-            >
-              {t('common.retry')}
-            </button>
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
+        <div className="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+          <div className="sc-frame-wrap">
+            <div className="sc-frame">
+              <div className="sc-frame-header">
+                <div className="sc-frame-icon">
+                  <Download className="w-5 h-5" strokeWidth={1.8} aria-hidden />
+                </div>
+                <div>
+                  <div className="sc-frame-title">{t('downloads.title')}</div>
+                </div>
+              </div>
+              <div className="sc-frame-body">
+                <p className="ds-text-secondary text-sm mb-4">{error}</p>
+                <button
+                  onClick={loadTorrents}
+                  className="btn btn-primary min-h-[40px] tv:min-h-[48px]"
+                  tabIndex={0}
+                >
+                  {t('common.retry')}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -788,21 +799,30 @@ export default function DownloadsList() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--ds-surface)] text-[var(--ds-text-primary)] w-full">
-      {/* En-tête : titre + barre d'actions (style design system) */}
-      <div className="border-b border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]">
-        <div className="ds-container max-w-6xl py-4 sm:py-6 px-3 sm:px-6">
-          <h1 className="ds-title-page mb-4 tv:mb-5">
-            {t('downloads.title')}
-          </h1>
+    <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
+      <div className="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6 pb-8 tv:pb-10">
+        <h1 className="ds-title-page truncate mb-1">{t('downloads.title')}</h1>
+        <p className="ds-text-secondary mb-4 sm:mb-6 text-sm sm:text-base">{t('downloads.torrentsWillAppear')}</p>
 
-          {/* Barre d'actions */}
-          <div
-            ref={toolbarRef}
-            role="toolbar"
-            aria-label={t('downloads.actions') ?? 'Actions'}
-            className="flex flex-wrap items-stretch gap-2 tv:gap-2 tv:flex-nowrap rounded-[var(--ds-radius-md)] bg-[var(--ds-surface)] border border-[var(--ds-border)] p-2.5 tv:p-3"
-          >
+        {/* Toolbar dans un sc-frame */}
+        <div className="sc-frame-wrap mb-4 sm:mb-6">
+          <div className="sc-frame">
+            <div className="sc-frame-header">
+              <div className="sc-frame-icon">
+                <Download className="w-5 h-5" strokeWidth={1.8} aria-hidden />
+              </div>
+              <div>
+                <div className="sc-frame-title">{t('downloads.actions') ?? 'Actions'}</div>
+              </div>
+            </div>
+            <div className="sc-frame-body">
+              {/* Barre d'actions */}
+              <div
+                ref={toolbarRef}
+                role="toolbar"
+                aria-label={t('downloads.actions') ?? 'Actions'}
+                className="flex flex-wrap items-stretch gap-2 tv:gap-2 tv:flex-nowrap"
+              >
             {/* Groupe Ajouter */}
             <div className="flex flex-wrap tv:flex-nowrap gap-2 items-stretch">
               <label className="cursor-pointer flex">
@@ -896,38 +916,37 @@ export default function DownloadsList() {
             )}
           </div>
 
-          {/* Stats session librqbit */}
-          {sessionStats && (
-            <div className="mt-3 tv:mt-4 flex flex-wrap items-center gap-3 tv:gap-4 text-xs tv:text-sm ds-text-tertiary">
-              {(sessionStats.download_speed as { human_readable?: string } | undefined)?.human_readable != null && (
-                <span className="flex items-center gap-1.5">
-                  <Download className="w-4 h-4 text-[var(--ds-accent-violet)]" size={16} />
-                  <span>↓ {(sessionStats.download_speed as { human_readable: string }).human_readable}</span>
-                </span>
-              )}
-              {(sessionStats.upload_speed as { human_readable?: string } | undefined)?.human_readable != null && (
-                <span className="flex items-center gap-1.5">
-                  <Upload className="w-4 h-4 text-[var(--ds-accent-green)]" size={16} />
-                  <span>↑ {(sessionStats.upload_speed as { human_readable: string }).human_readable}</span>
-                </span>
-              )}
-              {typeof sessionStats.uptime_seconds === 'number' && (
-                <span>
-                  {t('downloads.sessionUptime') ?? 'Uptime'}: {Math.floor((sessionStats.uptime_seconds as number) / 60)} min
-                </span>
+              {/* Stats session librqbit */}
+              {sessionStats && (
+                <div className="mt-3 tv:mt-4 flex flex-wrap items-center gap-3 tv:gap-4 text-xs tv:text-sm ds-text-tertiary">
+                  {(sessionStats.download_speed as { human_readable?: string } | undefined)?.human_readable != null && (
+                    <span className="flex items-center gap-1.5">
+                      <Download className="w-4 h-4 text-[var(--ds-accent-violet)]" size={16} />
+                      <span>↓ {(sessionStats.download_speed as { human_readable: string }).human_readable}</span>
+                    </span>
+                  )}
+                  {(sessionStats.upload_speed as { human_readable?: string } | undefined)?.human_readable != null && (
+                    <span className="flex items-center gap-1.5">
+                      <Upload className="w-4 h-4 text-[var(--ds-accent-green)]" size={16} />
+                      <span>↑ {(sessionStats.upload_speed as { human_readable: string }).human_readable}</span>
+                    </span>
+                  )}
+                  {typeof sessionStats.uptime_seconds === 'number' && (
+                    <span>
+                      {t('downloads.sessionUptime') ?? 'Uptime'}: {Math.floor((sessionStats.uptime_seconds as number) / 60)} min
+                    </span>
+                  )}
+                </div>
               )}
             </div>
-          )}
+          </div>
         </div>
-      </div>
 
-      {/* Contenu principal */}
-      <div className="ds-container max-w-6xl py-4 sm:py-6 px-3 sm:px-6 pb-8 tv:pb-10">
         {/* Message d'erreur */}
         {error && !showAddMagnetModal && (
-          <div className="rounded-[var(--ds-radius-lg)] bg-[var(--ds-surface-elevated)] border border-[var(--ds-border)] p-4 tv:p-5 mb-4 tv:mb-6">
+          <div className="rounded-[var(--ds-radius-sm)] bg-[var(--ds-accent-red-muted)] border border-[var(--ds-accent-red)]/30 p-4 tv:p-5 mb-4 tv:mb-6">
             <div className="flex items-start justify-between">
-              <p className="ds-text-secondary text-sm tv:text-base flex-1">{error}</p>
+              <p className="text-[var(--ds-accent-red)] text-sm tv:text-base flex-1">{error}</p>
               <button
                 onClick={() => setError(null)}
                 className="ml-4 text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-primary)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] rounded p-1"
@@ -942,48 +961,62 @@ export default function DownloadsList() {
 
         {/* État vide */}
         {torrents.length === 0 && !loading && (
-          <div className="flex flex-col items-center justify-center py-16 tv:py-24 px-4">
-            <div className="text-center max-w-2xl">
-              <div className="text-5xl tv:text-6xl mb-3 tv:mb-4">📥</div>
-              <h2 className="ds-title-card text-[var(--ds-text-primary)] mb-3 tv:mb-4">
-                {t('downloads.noActiveDownloads')}
-              </h2>
-              <p className="ds-text-secondary text-sm tv:text-base mb-4 tv:mb-6">
-                {t('downloads.torrentsWillAppear')}
-              </p>
+          <div className="sc-frame-wrap">
+            <div className="sc-frame">
+              <div className="sc-frame-body flex flex-col items-center justify-center py-12 tv:py-16 text-center">
+                <div className="sc-frame-icon w-14 h-14 mb-4 tv:mb-5 mx-auto">
+                  <HardDrive className="w-6 h-6" strokeWidth={1.5} aria-hidden />
+                </div>
+                <h2 className="sc-frame-title text-base mb-2">
+                  {t('downloads.noActiveDownloads')}
+                </h2>
+                <p className="sc-frame-desc">
+                  {t('downloads.torrentsWillAppear')}
+                </p>
+              </div>
             </div>
           </div>
         )}
 
         {/* Liste des téléchargements */}
         {torrents.length > 0 && (
-          <>
-            <div className="ds-text-tertiary text-xs tv:text-sm mb-3 tv:mb-4">
-              {t('downloads.activeDownloads', { count: torrents.length, plural: torrents.length > 1 ? 's' : '' })}
+          <div className="sc-frame-wrap">
+            <div className="sc-frame">
+              <div className="sc-frame-header">
+                <div className="sc-frame-icon">
+                  <HardDrive className="w-5 h-5" strokeWidth={1.8} aria-hidden />
+                </div>
+                <div>
+                  <div className="sc-frame-title">
+                    {t('downloads.activeDownloads', { count: torrents.length, plural: torrents.length > 1 ? 's' : '' })}
+                  </div>
+                </div>
+              </div>
+              <div className="sc-frame-body">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 tv:grid-cols-6 gap-2 sm:gap-3 md:gap-4 tv:gap-4">
+                  {torrents.map((torrent) => {
+                    const key = torrent.info_hash.toLowerCase();
+                    const images = imageMap[key];
+                    return (
+                      <DownloadCard
+                        key={torrent.info_hash}
+                        torrent={torrent}
+                        posterUrl={images?.posterUrl ?? undefined}
+                        backdropUrl={images?.backdropUrl ?? undefined}
+                        displayTitle={displayTitleMap[key]}
+                        onOpenDetail={handleOpenDetail}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
             </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 tv:grid-cols-6 gap-2 sm:gap-3 md:gap-4 tv:gap-4">
-              {torrents.map((torrent) => {
-                const key = torrent.info_hash.toLowerCase();
-                const images = imageMap[key];
-                return (
-                  <DownloadCard
-                    key={torrent.info_hash}
-                    torrent={torrent}
-                    posterUrl={images?.posterUrl ?? undefined}
-                    backdropUrl={images?.backdropUrl ?? undefined}
-                    displayTitle={displayTitleMap[key]}
-                    onOpenDetail={handleOpenDetail}
-                  />
-                );
-              })}
-            </div>
-          </>
+          </div>
         )}
       </div>
 
       {/* Modal pour ajouter un magnet link */}
-      {showAddMagnetModal && (
+      {showAddMagnetModal && createPortal(
         <div
           role="dialog"
           aria-modal="true"
@@ -1078,7 +1111,8 @@ export default function DownloadsList() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
       
       {/* Modal de détails du téléchargement */}
@@ -1096,7 +1130,7 @@ export default function DownloadsList() {
       )}
 
       {/* Modale pour afficher les logs filtrés */}
-      {showLogsModal && selectedTorrentHash && (
+      {showLogsModal && selectedTorrentHash && createPortal(
         <div
           className="fixed inset-0 bg-[var(--ds-surface-overlay)] backdrop-blur-sm z-50 flex items-center justify-center p-4 tv:p-8"
           onClick={(e) => {
@@ -1179,11 +1213,12 @@ export default function DownloadsList() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modale Logs session (client librqbit) */}
-      {showSessionLogsModal && (
+      {showSessionLogsModal && createPortal(
         <div
           className="fixed inset-0 bg-[var(--ds-surface-overlay)] backdrop-blur-sm z-50 flex items-center justify-center p-4 tv:p-8"
           onClick={(e) => {
@@ -1223,11 +1258,12 @@ export default function DownloadsList() {
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Panneau de vérification du téléchargement (après ajout d'un torrent) */}
-      {showVerificationPanel && verificationInfoHash && (
+      {showVerificationPanel && verificationInfoHash && createPortal(
         <div className="fixed bottom-4 left-4 right-4 z-40 max-w-md md:left-6 md:right-auto">
           <DownloadVerificationPanel
             infoHash={verificationInfoHash}
@@ -1240,7 +1276,8 @@ export default function DownloadsList() {
               setVerificationTorrentName('');
             }}
           />
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

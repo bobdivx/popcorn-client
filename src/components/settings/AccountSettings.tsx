@@ -3,8 +3,9 @@ import { serverApi } from '../../lib/client/server-api';
 import Avatar from '../ui/Avatar';
 import { getLocalProfile, updateLocalProfile, type LocalProfile } from '../../lib/client/profile';
 import { useI18n } from '../../lib/i18n';
+import { getCloudDevices, type CloudDevice } from '../../lib/api/popcorn-web';
 
-export type AccountSection = 'profile' | 'info' | 'interface' | 'logout' | 'all';
+export type AccountSection = 'profile' | 'info' | 'interface' | 'devices' | 'logout' | 'all';
 
 interface AccountSettingsProps {
   section?: AccountSection;
@@ -19,6 +20,9 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
   const [avatarUrl, setAvatarUrl] = useState('');
   const [saved, setSaved] = useState(false);
   const { t } = useI18n();
+  const [devices, setDevices] = useState<CloudDevice[] | null>(null);
+  const [devicesLoading, setDevicesLoading] = useState(false);
+  const [devicesError, setDevicesError] = useState<string | null>(null);
 
   useEffect(() => {
     loadUser();
@@ -29,6 +33,22 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
     setProfile(p);
     setDisplayName(p.displayName || '');
     setAvatarUrl(p.avatarDataUrl || '');
+  }, []);
+
+  useEffect(() => {
+    const loadDevices = async () => {
+      try {
+        setDevicesLoading(true);
+        setDevicesError(null);
+        const list = await getCloudDevices();
+        setDevices(list);
+      } catch (e) {
+        setDevicesError(e instanceof Error ? e.message : 'Error loading devices');
+      } finally {
+        setDevicesLoading(false);
+      }
+    };
+    loadDevices();
   }, []);
 
   const loadUser = async () => {
@@ -101,6 +121,7 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
   const showProfile = section === 'all' || section === 'profile';
   const showInfo = section === 'all' || section === 'info';
   const showInterface = section === 'all' || section === 'interface';
+  const showDevices = section === 'all' || section === 'devices';
 
   return (
     <div class="space-y-6 sm:space-y-8">
@@ -206,6 +227,60 @@ export default function AccountSettings({ section = 'all' }: AccountSettingsProp
                 <p class="ds-text-secondary font-mono text-sm break-all">{user.id}</p>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showDevices && (
+        <div class="sc-frame">
+          <div class="sc-frame-header">
+            <div class="sc-frame-title">{t('account.devices.title')}</div>
+          </div>
+          <div class="sc-frame-body">
+            <p class="ds-text-secondary mb-4">{t('account.devices.description')}</p>
+            {devicesLoading && (
+              <div class="flex items-center gap-2 mb-4">
+                <span class="loading loading-spinner loading-sm text-[var(--ds-accent-violet)]" />
+                <span class="ds-text-secondary text-sm">{t('common.loading')}</span>
+              </div>
+            )}
+            {devicesError && (
+              <div class="ds-status-badge ds-status-badge--error mb-4" role="alert">
+                {devicesError}
+              </div>
+            )}
+            {!devicesLoading && !devicesError && (!devices || devices.length === 0) && (
+              <p class="ds-text-secondary text-sm">
+                {t('account.devices.empty')}
+              </p>
+            )}
+            {!devicesLoading && !devicesError && devices && devices.length > 0 && (
+              <ul class="space-y-3">
+                {devices.map((d) => (
+                  <li
+                    key={d.id}
+                    class="rounded-lg border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+                  >
+                    <div>
+                      <div class="text-sm font-semibold text-[var(--ds-text-primary)]">
+                        {d.deviceName || t('account.devices.unknownName')}
+                      </div>
+                      <div class="text-xs ds-text-tertiary mt-0.5">
+                        {d.deviceType || 'device'} · {d.platform || 'unknown'}
+                      </div>
+                    </div>
+                    <div class="text-xs ds-text-tertiary text-right">
+                      {d.lastSeenAt
+                        ? t('account.devices.lastSeen', { date: new Date(d.lastSeenAt).toLocaleString() })
+                        : t('account.devices.neverSeen')}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p class="ds-text-tertiary text-xs mt-4">
+              {t('account.devices.footerInfo')}
+            </p>
           </div>
         </div>
       )}

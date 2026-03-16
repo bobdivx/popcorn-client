@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import { ArrowLeft, Download, Upload, Sprout, Users, Play, Pause, Trash2, Info, LogsIcon, Film, Clock, HardDrive, Copy, X, Pencil, PlusCircle, ExternalLink } from 'lucide-preact';
 import type { ClientTorrentStats } from '../../lib/client/types';
 import { useI18n } from '../../lib/i18n/useI18n';
@@ -172,7 +173,7 @@ export function DownloadDetailModal({
     }
   };
 
-  return (
+  return createPortal(
     <div
       ref={modalRef}
       role="dialog"
@@ -628,6 +629,7 @@ export function DownloadDetailModal({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import { getBackendUrl, setBackendUrl as saveBackendUrl, clearBackendUrl, hasBackendUrl, isBackendUrlSameAsClientUrl } from '../../lib/backend-config.js';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { HelpCircle, X } from 'lucide-preact';
@@ -356,7 +357,7 @@ export default function ServerSettings() {
       </div>
 
       {/* Modal Informations */}
-      {showInfoModal && (
+      {showInfoModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--ds-surface-overlay)]" onClick={() => setShowInfoModal(false)}>
           <div class="sc-frame" style="max-width:28rem;width:100%;box-shadow:0 24px 60px rgba(0,0,0,0.5);" onClick={(e) => e.stopPropagation()}>
             <div class="sc-frame-body">
@@ -388,7 +389,8 @@ export default function ServerSettings() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

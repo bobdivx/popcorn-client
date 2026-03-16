@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import { serverApi } from '../../lib/client/server-api';
 import { clientApi } from '../../lib/client/api';
 import { useI18n } from '../../lib/i18n/useI18n';
@@ -276,7 +277,7 @@ export default function LibRbitSettings() {
                 value={listenPortDesired}
                 onInput={e => setListenPortDesired((e.target as HTMLInputElement).value)}
                 className={`${inputBase} flex-1 max-w-[120px]`}
-                placeholder="62288"
+                placeholder="4240"
                 aria-label={t('settingsPages.librqbit.listenPortDesired')}
               />
               <button
@@ -441,7 +442,7 @@ export default function LibRbitSettings() {
       </div>
 
       {/* Modal Logs */}
-      {showLogsModal && (
+      {showLogsModal && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
           onClick={e => e.target === e.currentTarget && setShowLogsModal(false)}
@@ -473,7 +474,8 @@ export default function LibRbitSettings() {
               </pre>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
