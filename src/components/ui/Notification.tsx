@@ -1,69 +1,114 @@
-import { useEffect, useState } from 'preact/hooks';
-import { Info, CheckCircle2, AlertTriangle, XCircle, X } from 'lucide-preact';
+import { useEffect, useRef, useState } from 'preact/hooks';
+import { Info, CheckCircle2, AlertTriangle, XCircle, X, Upload } from 'lucide-preact';
 
 export type NotificationType = 'info' | 'success' | 'warning' | 'error';
 
 export interface NotificationProps {
   type: NotificationType;
   message: string;
-  duration?: number; // Durée en millisecondes, 0 = permanent
+  duration?: number; // ms, 0 = permanent
   onClose?: () => void;
 }
 
+const typeConfig: Record<NotificationType, { bar: string; icon: string }> = {
+  info:    { bar: 'bg-blue-400',   icon: 'text-blue-400' },
+  success: { bar: 'bg-green-400',  icon: 'text-green-400' },
+  warning: { bar: 'bg-yellow-400', icon: 'text-yellow-400' },
+  error:   { bar: 'bg-red-400',    icon: 'text-red-400' },
+};
+
+const icons = {
+  info:    <Info class="shrink-0 w-4 h-4" size={16} />,
+  success: <CheckCircle2 class="shrink-0 w-4 h-4" size={16} />,
+  warning: <AlertTriangle class="shrink-0 w-4 h-4" size={16} />,
+  error:   <XCircle class="shrink-0 w-4 h-4" size={16} />,
+};
+
 export default function Notification({ type, message, duration = 5000, onClose }: NotificationProps) {
-  const [visible, setVisible] = useState(true);
+  const [show, setShow] = useState(false);
+  // Stocker onClose dans une ref pour ne pas redéclencher les effets à chaque rendu
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
 
+  // Animation d'entrée
   useEffect(() => {
-    if (duration > 0) {
-      const timer = setTimeout(() => {
-        setVisible(false);
-        setTimeout(() => onClose?.(), 300); // Attendre la fin de l'animation
-      }, duration);
+    const frame = requestAnimationFrame(() => setShow(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
-      return () => clearTimeout(timer);
-    }
-  }, [duration, onClose]);
+  // Auto-fermeture — ne dépend que de `duration`, pas de `onClose`
+  useEffect(() => {
+    if (duration <= 0) return;
+    const timer = setTimeout(handleClose, duration);
+    return () => clearTimeout(timer);
+  }, [duration]);
 
-  if (!visible) {
-    return null;
+  function handleClose() {
+    setShow(false);
+    setTimeout(() => onCloseRef.current?.(), 300);
   }
 
-  // Classes personnalisées pour s'intégrer au design Netflix (fond sombre avec transparence)
-  const typeClasses = {
-    info: 'bg-blue-500/80 backdrop-blur-md text-white border border-blue-400/30',
-    success: 'bg-green-500/80 backdrop-blur-md text-white border border-green-400/30',
-    warning: 'bg-yellow-500/80 backdrop-blur-md text-white border border-yellow-400/30',
-    error: 'bg-red-500/80 backdrop-blur-md text-white border border-red-400/30',
-  };
-
-  const icons = {
-    info: <Info class="stroke-current shrink-0 w-6 h-6" size={24} />,
-    success: <CheckCircle2 class="stroke-current shrink-0 h-6 w-6" size={24} />,
-    warning: <AlertTriangle class="stroke-current shrink-0 h-6 w-6" size={24} />,
-    error: <XCircle class="stroke-current shrink-0 h-6 w-6" size={24} />,
-  };
+  const config = typeConfig[type];
 
   return (
-    <div class={`flex items-start gap-2.5 px-3 py-2.5 rounded-lg border shadow-2xl transition-all duration-300 ${visible ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4'} ${typeClasses[type]}`}>
-      <div class="flex-shrink-0 w-4 h-4 mt-0.5">
+    <div
+      class={`relative flex items-center gap-3 pl-4 pr-3 py-3 rounded-xl overflow-hidden
+        bg-[rgba(28,28,30,0.96)] backdrop-blur-xl border border-white/10 shadow-xl
+        transition-all duration-300 ease-out
+        ${show ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-5'}`}
+    >
+      {/* Barre colorée à gauche */}
+      <div class={`absolute left-0 inset-y-0 w-[3px] ${config.bar}`} />
+
+      <span class={`flex-shrink-0 ${config.icon}`}>
         {icons[type]}
-      </div>
-      <span class="flex-1 text-xs font-normal leading-relaxed pr-1">{message}</span>
+      </span>
+
+      <span class="flex-1 text-xs font-medium text-white/85 leading-relaxed">{message}</span>
+
       {onClose && (
-        <button 
-          class="flex-shrink-0 text-white/50 hover:text-white transition-colors p-0.5 rounded hover:bg-white/10 -mt-0.5" 
-          onClick={() => { setVisible(false); setTimeout(() => onClose(), 300); }}
+        <button
+          class="flex-shrink-0 text-white/30 hover:text-white/70 transition-colors p-1 rounded-lg hover:bg-white/8"
+          onClick={handleClose}
           aria-label="Fermer"
         >
-          <X class="h-3.5 w-3.5" size={14} />
+          <X size={12} />
         </button>
       )}
     </div>
   );
 }
 
+export interface SeedingStatusInfo {
+  uploadSpeed: number;   // bytes/s
+  peersConnected: number;
+}
+
+function formatSpeed(bytesPerSec: number): string {
+  if (bytesPerSec <= 0) return '0 Ko/s';
+  if (bytesPerSec < 1024) return `${bytesPerSec} o/s`;
+  if (bytesPerSec < 1024 * 1024) return `${(bytesPerSec / 1024).toFixed(1)} Ko/s`;
+  return `${(bytesPerSec / (1024 * 1024)).toFixed(2)} Mo/s`;
+}
+
+function SeedingStatusItem({ info }: { info: SeedingStatusInfo }) {
+  return (
+    <div class="relative flex items-center gap-3 pl-4 pr-3.5 py-2.5 rounded-xl overflow-hidden bg-[rgba(28,28,30,0.96)] backdrop-blur-xl border border-white/10 shadow-xl">
+      <div class="absolute left-0 inset-y-0 w-[3px] bg-green-400" />
+      <span class="flex-shrink-0 text-green-400">
+        <Upload size={14} class="shrink-0 w-3.5 h-3.5" />
+      </span>
+      <span class="text-xs font-semibold text-green-400">Partage actif</span>
+      <div class="w-px h-3 bg-white/15 flex-shrink-0" />
+      <span class="text-xs text-white/60">{formatSpeed(info.uploadSpeed)}</span>
+      <div class="w-px h-3 bg-white/15 flex-shrink-0" />
+      <span class="text-xs text-white/60">{info.peersConnected} pair(s)</span>
+    </div>
+  );
+}
+
 /**
- * Composant conteneur pour afficher plusieurs notifications
+ * Conteneur unifié : statut de partage persistant + notifications éphémères
  */
 export interface NotificationContainerProps {
   notifications: Array<{
@@ -73,17 +118,21 @@ export interface NotificationContainerProps {
     duration?: number;
   }>;
   onRemove: (id: string) => void;
+  seedingStatus?: SeedingStatusInfo | null;
 }
 
-export function NotificationContainer({ notifications, onRemove }: NotificationContainerProps) {
-  if (notifications.length === 0) {
+export function NotificationContainer({ notifications, onRemove, seedingStatus }: NotificationContainerProps) {
+  if (notifications.length === 0 && !seedingStatus) {
     return null;
   }
 
-  // Positionner sous la navbar (h-16 = 64px + padding = ~80px)
-  // Utiliser un positionnement fixe mais mieux intégré au design Netflix
   return (
-    <div class="fixed top-20 right-4 z-[9999] max-w-xs w-full space-y-2 pointer-events-none">
+    <div class="fixed bottom-4 right-4 z-[9999] max-w-xs w-full space-y-2 pointer-events-none">
+      {seedingStatus && (
+        <div class="pointer-events-auto">
+          <SeedingStatusItem info={seedingStatus} />
+        </div>
+      )}
       {notifications.map((notification) => (
         <div key={notification.id} class="pointer-events-auto">
           <Notification

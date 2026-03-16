@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'preact/hooks';
 import { Film } from 'lucide-preact';
 import { useI18n } from '../../../lib/i18n/useI18n';
-import { NotificationContainer } from '../../ui/Notification';
+import { NotificationContainer, type SeedingStatusInfo } from '../../ui/Notification';
 import type { MediaDetailPageProps } from './types';
 import { useTorrentPlayer } from './hooks/useTorrentPlayer';
 import { scheduleUpdateOnlyFilesWithRetry } from './hooks/useTorrentPlayer/playHandler';
@@ -1870,8 +1870,16 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         </div>
       )}
 
-      {/* Notifications */}
-      <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+      {/* Notifications + statut de partage */}
+      <NotificationContainer
+        notifications={notifications}
+        onRemove={removeNotification}
+        seedingStatus={
+          torrentStats && (torrentStats.state === 'seeding' || torrentStats.state === 'completed' || torrentStats.files_available)
+            ? ({ uploadSpeed: torrentStats.upload_speed, peersConnected: torrentStats.peers_connected } satisfies SeedingStatusInfo)
+            : null
+        }
+      />
     </div>
     </>
   );

@@ -212,8 +212,8 @@ export default function Navbar() {
         paddingRight: 'var(--safe-area-inset-right)'
       }}
     >
-      <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 tv:px-24">
-        <div className="flex items-center h-14 sm:h-16 lg:h-18 tv:h-28 gap-3 sm:gap-4 lg:gap-6 tv:gap-10">
+        <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 tv:px-20">
+        <div className="flex items-center h-14 sm:h-16 lg:h-18 tv:h-20 gap-3 sm:gap-4 lg:gap-6 tv:gap-8">
 
           {/* ── GAUCHE : Marque ── */}
           <div className="flex-shrink-0">
@@ -227,10 +227,10 @@ export default function Navbar() {
               <img
                 src="/popcorn_logo.png"
                 alt="Popcornn"
-                className="w-8 h-8 sm:w-9 sm:h-9 lg:w-11 lg:h-11 tv:w-16 tv:h-16 object-contain transition-transform duration-300 group-hover:scale-110 group-hover:drop-shadow-[0_0_10px_rgba(168,85,247,0.8)]"
+                className="w-8 h-8 sm:w-9 sm:h-9 lg:w-11 lg:h-11 tv:w-12 tv:h-12 object-contain transition-transform duration-300 group-hover:scale-110 group-hover:drop-shadow-[0_0_10px_rgba(168,85,247,0.8)]"
                 loading="eager"
               />
-              <span className="hidden sm:block font-extrabold text-white text-xl lg:text-2xl tv:text-4xl leading-none tracking-tight select-none">
+              <span className="hidden sm:block font-extrabold text-white text-xl lg:text-2xl tv:text-3xl leading-none tracking-tight select-none">
                 Popcornn
               </span>
             </a>
@@ -253,7 +253,7 @@ export default function Navbar() {
                         data-focusable
                         aria-current={active ? 'page' : undefined}
                       >
-                        {TabIcon && <TabIcon className="w-4 h-4 tv:w-6 tv:h-6 flex-shrink-0" />}
+                        {TabIcon && <TabIcon className="w-4 h-4 tv:w-5 tv:h-5 flex-shrink-0" />}
                         <span>{tab.label}</span>
                       </a>
                     );
@@ -370,7 +370,7 @@ export default function Navbar() {
                   tabIndex={0}
                   data-focusable
                 >
-                  <SearchIcon className="w-4 h-4 sm:w-5 sm:h-5 tv:w-7 tv:h-7 relative z-10" />
+                  <SearchIcon className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 relative z-10" />
                 </a>
 
                 {/* Téléchargements — lg+ uniquement (dans hamburger sinon) */}
@@ -381,7 +381,7 @@ export default function Navbar() {
                   tabIndex={0}
                   data-focusable
                 >
-                  <Download className="w-4 h-4 sm:w-5 sm:h-5 tv:w-7 tv:h-7 relative z-10" />
+                  <Download className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 relative z-10" />
                 </a>
 
                 {/* Statut serveur — lg+ uniquement */}
@@ -425,14 +425,14 @@ export default function Navbar() {
                         />
                       </span>
                     )}
-                    <SettingsIcon className="w-4 h-4 sm:w-5 sm:h-5 tv:w-7 tv:h-7 relative z-10" />
+                    <SettingsIcon className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 relative z-10" />
                   </a>
                 )}
 
                 {/* Avatar — lg+ uniquement (dans hamburger sinon) */}
                 <a
                   href="/settings/account"
-                  className="hidden lg:block nav-avatar-btn flex-shrink-0 rounded-full overflow-hidden transition-all duration-200 hover:scale-105 hover:ring-2 hover:ring-primary-500/70 hover:ring-offset-1 hover:ring-offset-black focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-accent-violet)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-surface-elevated)] active:scale-95 w-10 h-10 lg:w-11 lg:h-11 tv:w-16 tv:h-16"
+                  className="hidden lg:block nav-avatar-btn flex-shrink-0 rounded-full overflow-hidden transition-all duration-200 hover:scale-105 hover:ring-2 hover:ring-primary-500/70 hover:ring-offset-1 hover:ring-offset-black focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-accent-violet)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-surface-elevated)] active:scale-95 w-10 h-10 lg:w-11 lg:h-11 tv:w-12 tv:h-12"
                   tabIndex={0}
                   data-focusable
                   aria-label={t('nav.account')}
@@ -448,7 +448,7 @@ export default function Navbar() {
 
                 {/* Horloge — lg+ */}
                 <div className="hidden lg:flex items-center pl-1 tv:pl-3">
-                  <span className="text-white/80 font-semibold text-sm tv:text-2xl tabular-nums tracking-tight">
+                  <span className="text-white/80 font-semibold text-sm tv:text-xl tabular-nums tracking-tight">
                     {clock}
                   </span>
                 </div>
