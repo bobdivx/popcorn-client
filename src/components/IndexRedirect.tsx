@@ -6,6 +6,7 @@ import { isTauri } from '../lib/utils/tauri';
 import { redirectTo } from '../lib/utils/navigation.js';
 import IntroVideoWithHlsPreload from './IntroVideoWithHlsPreload';
 import HLSLoadingSpinner from './ui/HLSLoadingSpinner';
+import { getCloudDevices } from '../lib/api/popcorn-web';
 
 const STORAGE_DIAG_ON_BOOT = 'popcorn_diagnostics_on_boot';
 const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';
@@ -238,10 +239,24 @@ export default function IndexRedirect() {
           // hasUsers est optionnel selon les plateformes; on ne redirige que si le backend indique explicitement "false".
           // IMPORTANT: Ne rediriger QUE si le backend est accessible (évite les boucles)
           if (setupResponse.data.backendReachable !== false && (setupResponse.data as any).hasUsers === false) {
-            console.log('[IndexRedirect] DB vide, redirection vers /setup');
-            redirectTo('/setup');
-            setLoading(false);
-            return;
+            try {
+              const devices = await getCloudDevices();
+              const activeDeviceCount =
+                devices?.filter((d) => !d.revokedAt && d.lastSeenAt && d.lastSeenAt > 0).length ?? 0;
+              if (activeDeviceCount === 0) {
+                console.log('[IndexRedirect] DB vide et aucun appareil cloud → redirection vers /setup');
+                redirectTo('/setup');
+                setLoading(false);
+                return;
+              }
+              console.log('[IndexRedirect] DB vide mais appareil cloud existant → ne pas forcer /setup');
+            } catch (e) {
+              console.warn('[IndexRedirect] Impossible de récupérer les appareils cloud, fallback /setup', e);
+              console.log('[IndexRedirect] DB vide, redirection vers /setup (fallback)');
+              redirectTo('/setup');
+              setLoading(false);
+              return;
+            }
           }
         }
 

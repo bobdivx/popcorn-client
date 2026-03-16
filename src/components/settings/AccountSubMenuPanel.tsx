@@ -26,7 +26,7 @@ import { SettingsSubPageFrame } from './SettingsSubPageFrame';
 
 const BASE_URL_DEFAULT = '/settings?category=account';
 
-const ACCOUNT_SUBS = ['subscription', 'profile', 'info', '2fa', 'quick-connect', 'local-users'] as const;
+const ACCOUNT_SUBS = ['subscription', 'profile', 'info', 'devices', '2fa', 'quick-connect', 'local-users'] as const;
 type AccountSub = (typeof ACCOUNT_SUBS)[number];
 
 function getSubFromUrl(): AccountSub | null {
@@ -60,6 +60,7 @@ const ACCOUNT_ITEMS: AccountItem[] = [
   { id: 'subscription', titleKey: 'settingsMenu.subscription.title', descriptionKey: 'settingsMenu.subscription.description', icon: CreditCard, permission: 'settings.account', kind: 'sub' },
   { id: 'profile', titleKey: 'account.profile', descriptionKey: 'account.avatar', icon: User, permission: 'settings.account', kind: 'sub' },
   { id: 'info', titleKey: 'account.subMenu.accountInfo', descriptionKey: 'account.subMenu.accountInfoDesc', icon: Info, permission: 'settings.account', kind: 'sub' },
+  { id: 'devices', titleKey: 'account.devices.title', descriptionKey: 'account.devices.description', icon: Smartphone, permission: 'settings.account', kind: 'sub' },
   { id: 'interface', titleKey: 'account.interfaceSettings', descriptionKey: 'account.interfaceSettingsDescription', icon: Palette, permission: 'settings.account', kind: 'link', href: '/settings/ui-preferences' },
   { id: '2fa', titleKey: 'account.twoFactor.title', descriptionKey: 'account.twoFactor.title', icon: Shield, permission: 'settings.account', kind: 'sub' },
   { id: 'quick-connect', titleKey: 'account.quickConnect.title', descriptionKey: 'account.quickConnect.description', icon: Smartphone, permission: 'settings.account', kind: 'sub' },
@@ -124,6 +125,7 @@ export default function AccountSubMenuPanel({ baseUrl = BASE_URL_DEFAULT }: { ba
       if (sub === 'subscription') return <SubPageFrame item={item} baseUrl={baseUrl}><SubscriptionStatusPanel /></SubPageFrame>;
       if (sub === 'profile') return <SubPageFrame item={item} baseUrl={baseUrl}><AccountSettings section="profile" /></SubPageFrame>;
       if (sub === 'info') return <SubPageFrame item={item} baseUrl={baseUrl}><AccountSettings section="info" /></SubPageFrame>;
+      if (sub === 'devices') return <SubPageFrame item={item} baseUrl={baseUrl}><AccountSettings section="devices" /></SubPageFrame>;
       if (sub === '2fa') return <SubPageFrame item={item} baseUrl={baseUrl}><TwoFactorSettings /></SubPageFrame>;
       if (sub === 'quick-connect') return <SubPageFrame item={item} baseUrl={baseUrl}><QuickConnectAuthorize /></SubPageFrame>;
       if (sub === 'local-users') return <SubPageFrame item={item} baseUrl={baseUrl}><LocalUsersManager /></SubPageFrame>;

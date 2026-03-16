@@ -3,6 +3,8 @@ import { serverApi } from '../lib/client/server-api';
 import { redirectTo, getPathHref } from '../lib/utils/navigation.js';
 import { QuickConnectDisplay } from './ui/QuickConnectDisplay';
 import { useI18n } from '../lib/i18n/useI18n';
+import { registerCloudDevice } from '../lib/api/popcorn-web';
+import { isTauri } from '../lib/utils/tauri';
 
 export default function LoginForm() {
   const { t } = useI18n();
@@ -60,6 +62,22 @@ export default function LoginForm() {
     checkUsers();
   }, []);
 
+  const registerDeviceIfPossible = async () => {
+    try {
+      const platform = typeof navigator !== 'undefined' ? navigator.platform || '' : '';
+      const deviceType = isTauri() ? 'desktop' : 'web';
+      const deviceName = 'Popcorn client';
+      await registerCloudDevice({
+        deviceName,
+        deviceType,
+        platform,
+        clientVersion: (import.meta as any).env?.PUBLIC_APP_VERSION || 'dev',
+      });
+    } catch {
+      // Best effort : ne pas bloquer la navigation
+    }
+  };
+
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     setError(null);
@@ -85,7 +103,8 @@ export default function LoginForm() {
         return;
       }
 
-      // Connexion réussie - rediriger vers le dashboard
+      // Connexion réussie - tenter d'enregistrer l'appareil dans le cloud (best effort), puis rediriger vers le dashboard
+      void registerDeviceIfPossible();
       redirectTo('/dashboard');
     } catch (err) {
       setError(t('loginForm.errors.networkError'));
@@ -107,8 +126,9 @@ export default function LoginForm() {
     );
   }
 
-  const handleQuickConnectSuccess = () => {
-    // Connexion réussie via QuickConnect - rediriger vers le dashboard
+  const handleQuickConnectSuccess = async () => {
+    // Connexion réussie via QuickConnect - tenter d'enregistrer l'appareil dans le cloud (non bloquant)
+    void registerDeviceIfPossible();
     redirectTo('/dashboard');
   };
 

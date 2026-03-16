@@ -289,16 +289,20 @@ const SIDEBAR_CSS = `
 
 export default function SettingsSidebar() {
   const { t } = useI18n();
-  const [pathname, setPathname] = useState(typeof window !== 'undefined' ? window.location.pathname : '/settings');
-  const [search, setSearch] = useState(typeof window !== 'undefined' ? window.location.search : '');
+  // Important: use a static default for SSR + first client render
+  // so that the initial markup matches and hydration can succeed.
+  const [pathname, setPathname] = useState('/settings');
+  const [search, setSearch] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     const update = () => {
+      if (typeof window === 'undefined') return;
       setPathname(window.location.pathname);
       setSearch(window.location.search);
     };
     update();
+    if (typeof window === 'undefined') return;
     window.addEventListener('popstate', update);
     document.addEventListener('astro:page-load', update);
     return () => {

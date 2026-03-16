@@ -121,6 +121,36 @@ export function SyncStep({ focusedButtonIndex, buttonRefs, onPrevious, onNext }:
     return () => clearInterval(interval);
   }, [syncStarted, syncComplete, consecutiveChecks]);
 
+  // Au montage, vérifier si une synchronisation a déjà été effectuée auparavant.
+  // Si des stats existent alors qu'aucune sync n'a été démarrée dans ce wizard,
+  // on considère l'étape comme déjà complétée pour ne pas bloquer l'utilisateur.
+  useEffect(() => {
+    const checkExistingSync = async () => {
+      try {
+        const response = await serverApi.getSyncStatus();
+        if (response.success && response.data) {
+          const data = response.data as SyncStatusData;
+          const hasStats = data.stats && Object.keys(data.stats).length > 0;
+          if (hasStats) {
+            setSyncStatus(data);
+            setSyncStarted(true);
+            setSyncing(false);
+            setSyncComplete(true);
+            console.log('[SYNC STEP] Étape Sync marquée comme complétée (stats déjà présentes)');
+          }
+        }
+      } catch (err) {
+        console.warn('[SYNC STEP] Impossible de vérifier une sync existante au montage:', err);
+      }
+    };
+
+    // Ne lancer cette vérification qu'une fois, et uniquement si le wizard
+    // n'a pas déjà démarré une sync dans cette session.
+    if (!syncStarted && !syncComplete) {
+      void checkExistingSync();
+    }
+  }, [syncStarted, syncComplete]);
+
   const handleStartSync = async () => {
     try {
       setError('');
