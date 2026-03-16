@@ -19,9 +19,12 @@ class UpdateChecker {
    * Initialise le vérificateur avec la version actuelle
    */
   async initialize(): Promise<void> {
-    // Essayer de charger depuis /VERSION.json (fichier copié dans public/ par le script copy-version.js)
+    // Essayer de charger depuis VERSION.json
+    // Sur webOS (file://), /VERSION.json pointe vers la racine du système → utiliser chemin relatif
+    const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:';
+    const versionUrl = isFileProtocol ? './VERSION.json' : '/VERSION.json';
     try {
-      const response = await fetch('/VERSION.json');
+      const response = await fetch(versionUrl);
       if (response.ok) {
         const data = await response.json();
         // Structure: { client: { version: "...", build: ... }, server: { ... } }

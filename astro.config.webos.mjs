@@ -62,7 +62,7 @@ export default defineConfig({
       },
     },
     define: {
-      'import.meta.env.WEBOS': 'true',
+      'import.meta.env.WEBOS': '"true"',
       'import.meta.env.PUBLIC_DEBUG_LOG_URL': JSON.stringify(process.env.PUBLIC_DEBUG_LOG_URL || ''),
     },
     server: {
