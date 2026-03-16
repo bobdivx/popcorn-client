@@ -436,13 +436,17 @@ export default function ServerConnectionCheck() {
       }
       onClose={() => setIsVisible(false)}
     >
-      {error && (
-        <div className="bg-red-500/20 border border-red-500/50 rounded-lg p-4 text-red-400 text-center max-w-md mx-auto mb-3">
-          {error}
-        </div>
-      )}
+      <div className="min-h-[4rem] flex items-center justify-center max-w-md mx-auto w-full mb-3">
+        {error ? (
+          <div className="bg-error/15 border border-error/40 rounded-lg p-4 text-error text-center w-full">
+            {error}
+          </div>
+        ) : (
+          <div className="h-full w-full" aria-hidden />
+        )}
+      </div>
 
-      <p className="text-center text-sm text-gray-400 mt-4">
+      <p className="text-center text-sm text-base-content/60 mt-2">
         {progress > 0 ? `${Math.round(progress)}%` : 'Connexion en cours...'}
       </p>
 
@@ -457,17 +461,10 @@ export default function ServerConnectionCheck() {
       </div>
 
       {backendUrl && (
-        <div className="text-center text-xs sm:text-sm text-gray-500 max-w-lg break-all px-2 mt-3" title={backendUrl}>
-          Backend: <span className="text-gray-300">{backendUrl}</span>
+        <div className="text-center text-xs sm:text-sm text-base-content/50 max-w-lg break-all px-2 mt-3" title={backendUrl}>
+          Backend: <span className="text-base-content/80">{backendUrl}</span>
         </div>
       )}
-
-      {/* Points de chargement */}
-      <div className="flex space-x-2 justify-center mt-4">
-        <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-        <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
-        <div className="w-2 h-2 bg-pink-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
-      </div>
     </FullScreenLoadingOverlay>
   );
 }

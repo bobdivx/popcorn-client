@@ -467,8 +467,8 @@
     "streamingModeDirect": "Direct (non-HLS alternative)",
     "streamingModeDirectDescription": "Direct playback without transcoding (limited to natively supported formats)",
     "streamingDownloadFull": "Download full (streaming)",
-    "streamingDownloadFullCardDescription": "Subscribers only. When streaming: download entire file or only the part played.",
-    "streamingDownloadFullDescription": "Option for subscribers with streaming. When streaming: download the entire file in the background or only the part being played.",
+    "streamingDownloadFullCardDescription": "Download and play media immediately, without waiting for the full download to complete. Subscribers only.",
+    "streamingDownloadFullDescription": "Allows you to start playing media as soon as the download begins, without waiting for it to fully download. Choose between downloading the entire file in the background or only the part being played. Subscribers only with the streaming option.",
     "streamingDownloadFullRequiresSubscription": "Streaming mode (and this option) require an active subscription with the streaming torrent option.",
     "streamingRetention": "Torrent retention",
     "streamingRetentionDescription": "How long to keep torrents downloaded while streaming. After this delay, they are automatically deleted to free up space.",
@@ -886,6 +886,12 @@
   "permissions": {
     "accessDenied": "Access denied",
     "accessDeniedDescription": "This feature is reserved for the main account. Local users have limited access to settings.",
+    "backToSettings": "Back to settings"
+  },
+  "subscriptionGuard": {
+    "title": "Paid subscription required",
+    "description": "This feature is reserved for paying subscribers. Subscribe to an active plan to access it.",
+    "cta": "View plans",
     "backToSettings": "Back to settings"
   },
   "dashboard": {
