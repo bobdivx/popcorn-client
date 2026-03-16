@@ -11,7 +11,7 @@ const { title = 'Paramètres - Popcorn Client' } = Astro.props;
 ---
 
 <Layout title={title}>
-  <div class="ds-page settings-page flex w-full" style="background:#07070e;" data-tv-settings-container>
+  <div class="ds-page settings-page flex w-full" data-tv-settings-container>
     <aside transition:persist="settings-sidebar" class="settings-sidebar-wrapper w-0 flex-shrink-0 lg:w-72 xl:w-80 self-stretch">
       <SettingsSidebar client:load />
     </aside>
@@ -35,6 +35,14 @@ const { title = 'Paramètres - Popcorn Client' } = Astro.props;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+  }
+
+  /* Fond de la page settings — adaptatif selon le thème */
+  .settings-page {
+    background: #07070e;
+  }
+  [data-theme="light"] .settings-page {
+    background: var(--ds-surface);
   }
 
   /* ── Animations de navigation settings ── */

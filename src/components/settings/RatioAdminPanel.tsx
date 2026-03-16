@@ -3,6 +3,7 @@ import { serverApi } from '../../lib/client/server-api';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { Shield, TrendingUp, RefreshCw, Zap, AlertCircle } from 'lucide-preact';
 import PermissionGuard from '../ui/PermissionGuard';
+import SubscriptionGuard from '../ui/SubscriptionGuard';
 import DsPageHeader from '../ui/DsPageHeader';
 
 function formatBytes(bytes: number): string {
@@ -249,6 +250,7 @@ export default function RatioAdminPanel() {
 
   return (
     <PermissionGuard permission="settings.server">
+      <SubscriptionGuard>
       <div className="flex-1 py-4 px-4 sm:px-6 space-y-6 overflow-y-auto scrollbar-visible">
         <DsPageHeader
           titleKey="ratioAdmin.title"
@@ -534,6 +536,7 @@ export default function RatioAdminPanel() {
           </section>
         )}
       </div>
+      </SubscriptionGuard>
     </PermissionGuard>
   );
 }

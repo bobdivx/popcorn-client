@@ -54,6 +54,174 @@
   --ds-touch-target-sm: 40px;
 }
 
+/* ── Thème clair ── */
+[data-theme="light"] {
+  /* Surfaces — ton lavande chaud, aucun blanc pur */
+  --ds-surface: #ede9f5;
+  --ds-surface-elevated: #f5f2fc;
+  --ds-surface-overlay: rgba(26, 21, 48, 0.12);
+
+  /* Accents — violet légèrement plus doux en light */
+  --ds-accent-violet: #6d28d9;
+  --ds-accent-violet-muted: rgba(109, 40, 217, 0.10);
+  --ds-accent-green: #15803d;
+  --ds-accent-yellow: #a16207;
+  --ds-accent-red: #dc2626;
+  --ds-accent-red-muted: rgba(220, 38, 38, 0.09);
+
+  /* Texte — violet-gris foncé, plus doux que le noir pur */
+  --ds-text-primary: #1a1530;
+  --ds-text-secondary: rgba(26, 21, 48, 0.60);
+  --ds-text-tertiary: rgba(26, 21, 48, 0.40);
+  --ds-text-on-accent: #ffffff;
+
+  /* Bordures — légère teinte violette */
+  --ds-border: rgba(109, 40, 217, 0.09);
+  --ds-border-strong: rgba(109, 40, 217, 0.17);
+}
+
+/* Cartes DS en mode clair */
+[data-theme="light"] .ds-card {
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.08);
+}
+
+/* Bouton icône en mode clair */
+[data-theme="light"] .ds-icon-btn:hover {
+  background-color: rgba(109, 40, 217, 0.09);
+  color: var(--ds-text-primary);
+}
+[data-theme="light"] .ds-icon-btn:active {
+  box-shadow: none;
+  background-color: rgba(109, 40, 217, 0.13);
+}
+
+/* Onglets nav en mode clair */
+[data-theme="light"] .ds-nav-tabs {
+  background-color: rgba(109, 40, 217, 0.06);
+}
+[data-theme="light"] .ds-nav-tab:hover {
+  background-color: rgba(109, 40, 217, 0.08);
+  color: var(--ds-text-primary);
+}
+[data-theme="light"] .ds-nav-tab[aria-selected="true"] {
+  background-color: var(--ds-accent-violet);
+  color: #ffffff;
+}
+
+/* sc-frame (cartes settings) en mode clair */
+[data-theme="light"] .sc-frame {
+  background: rgba(109, 40, 217, 0.03);
+  border-color: rgba(109, 40, 217, 0.10);
+}
+[data-theme="light"] .sc-frame-header {
+  border-bottom-color: rgba(109, 40, 217, 0.09);
+}
+[data-theme="light"] .sc-frame-title {
+  color: rgba(26, 21, 48, 0.88);
+}
+[data-theme="light"] .sc-frame-desc {
+  color: rgba(26, 21, 48, 0.42);
+}
+
+/* sc-nav-card en mode clair */
+[data-theme="light"] .sc-nav-card {
+  background: rgba(109, 40, 217, 0.03);
+  border-color: rgba(109, 40, 217, 0.09);
+  box-shadow: none;
+}
+[data-theme="light"] .sc-nav-link:hover .sc-nav-card,
+[data-theme="light"] .sc-nav-btn:hover .sc-nav-card {
+  background: rgba(109, 40, 217, 0.05);
+  border-color: rgba(109, 40, 217, 0.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] .sc-nav-title {
+  color: rgba(26, 21, 48, 0.88);
+}
+[data-theme="light"] .sc-nav-desc {
+  color: rgba(26, 21, 48, 0.42);
+}
+[data-theme="light"] .sc-nav-chevron {
+  color: rgba(26, 21, 48, 0.22);
+}
+[data-theme="light"] .sc-nav-link:hover .sc-nav-chevron,
+[data-theme="light"] .sc-nav-btn:hover .sc-nav-chevron {
+  color: rgba(109, 40, 217, 0.6);
+}
+[data-theme="light"] .sc-nav-open {
+  color: rgba(109, 40, 217, 0.5);
+}
+[data-theme="light"] .sc-nav-link:hover .sc-nav-open,
+[data-theme="light"] .sc-nav-btn:hover .sc-nav-open {
+  color: var(--ds-accent-violet);
+}
+
+/* Bouton retour (sc-back) en mode clair */
+[data-theme="light"] .sc-back {
+  color: rgba(109, 40, 217, 0.7);
+}
+[data-theme="light"] .sc-back:hover {
+  color: var(--ds-accent-violet);
+  background: rgba(109, 40, 217, 0.07);
+}
+
+/* sc-list-item en mode clair */
+[data-theme="light"] .sc-list-item:hover {
+  background: rgba(109, 40, 217, 0.05);
+  border-color: rgba(109, 40, 217, 0.09);
+}
+[data-theme="light"] .sc-list-text-title {
+  color: rgba(26, 21, 48, 0.85);
+}
+[data-theme="light"] .sc-list-text-desc {
+  color: rgba(26, 21, 48, 0.42);
+}
+[data-theme="light"] .sc-list-arrow {
+  color: rgba(26, 21, 48, 0.22);
+}
+[data-theme="light"] .sc-list-item:hover .sc-list-arrow {
+  color: rgba(109, 40, 217, 0.55);
+}
+
+/* Badges statut en mode clair */
+[data-theme="light"] .ds-status-badge--success {
+  background-color: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+}
+[data-theme="light"] .ds-status-badge--warning {
+  background-color: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+}
+[data-theme="light"] .ds-status-badge--error {
+  background-color: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+[data-theme="light"] .ds-status-badge--neutral {
+  background-color: rgba(109, 40, 217, 0.08);
+  color: var(--ds-text-secondary);
+}
+
+/* sc-status-badge en mode clair */
+[data-theme="light"] .sc-status-badge--success { background: rgba(22,163,74,0.1); color: rgba(21,128,61,0.9); }
+[data-theme="light"] .sc-status-badge--warning  { background: rgba(217,119,6,0.1); color: rgba(180,83,9,0.9); }
+[data-theme="light"] .sc-status-badge--error    { background: rgba(220,38,38,0.1); color: rgba(185,28,28,0.9); }
+[data-theme="light"] .sc-status-badge--neutral  { background: rgba(109, 40, 217, 0.06);   color: rgba(26, 21, 48, 0.55); }
+
+/* Boutons DS en mode clair */
+[data-theme="light"] .ds-btn-secondary {
+  background-color: rgba(109, 40, 217, 0.06);
+  border-color: rgba(109, 40, 217, 0.14);
+}
+[data-theme="light"] .ds-btn-secondary:hover:not(:disabled) {
+  background-color: rgba(109, 40, 217, 0.11);
+}
+
+/* Page header en mode clair */
+[data-theme="light"] .ds-page {
+  background-color: var(--ds-surface);
+  color: var(--ds-text-primary);
+}
+
 /* Cartes — fond élevé, 32px radius, légère élévation (style Learning Dashboard) */
 .ds-card {
   background-color: var(--ds-surface-elevated);
@@ -1634,4 +1802,188 @@
 }
 .settings-content-area {
   -webkit-overflow-scrolling: touch;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════
+   LIGHT MODE — Overrides pour les composants non-adaptatifs
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Protéger le contenu sur fond d'image (HeroSection, video overlays) ──
+   Les éléments portant data-dark-context gardent leurs couleurs sombres.    */
+[data-dark-context],
+[data-dark-context] * {
+  --ds-text-primary: #ffffff;
+  --ds-text-secondary: rgba(255,255,255,0.65);
+}
+
+/* ── Couleur de texte body par défaut ── */
+[data-theme="light"] body {
+  color: #1a1530;
+}
+
+/* ── Titres h1 / h2 / h3 non media (PageHeader, CarouselRow, etc.) ── */
+[data-theme="light"] h1,
+[data-theme="light"] h2,
+[data-theme="light"] h3,
+[data-theme="light"] h4 {
+  color: var(--ds-text-primary);
+}
+/* Mais pas dans les contextes toujours sombres */
+[data-dark-context] h1,
+[data-dark-context] h2,
+[data-dark-context] h3,
+[data-dark-context] h4 {
+  color: #fff;
+}
+
+/* ── Textes secondaires hardcodés ── */
+[data-theme="light"] .text-gray-400,
+[data-theme="light"] .text-gray-500 {
+  color: var(--ds-text-secondary) !important;
+}
+[data-theme="light"] .text-gray-300 {
+  color: var(--ds-text-secondary) !important;
+}
+[data-dark-context] .text-gray-400,
+[data-dark-context] .text-gray-500 {
+  color: rgba(255,255,255,0.55) !important;
+}
+
+/* ── Fond de page / états loading-error-empty ── */
+[data-theme="light"] .app-main .bg-black {
+  background-color: var(--ds-surface) !important;
+  color: var(--ds-text-primary) !important;
+}
+
+/* ── Fonds de cartes hardcodés gris foncé ── */
+[data-theme="light"] .bg-gray-900 {
+  background-color: #ede9f5 !important;
+}
+[data-theme="light"] .bg-gray-800 {
+  background-color: #deded9 !important;
+}
+[data-theme="light"] .border-gray-700 {
+  border-color: rgba(0,0,0,0.1) !important;
+}
+
+/* ── SyncCard : fond dégradé sombre ── */
+[data-theme="light"] .bg-gradient-to-br.from-gray-900 {
+  background-image: none !important;
+  background-color: var(--ds-surface-elevated) !important;
+  border-color: var(--ds-border) !important;
+}
+
+/* ── Hover fonds semi-transparents blancs → noirs ── */
+[data-theme="light"] .hover\:bg-white\/10:hover {
+  background-color: rgba(0,0,0,0.06) !important;
+}
+[data-theme="light"] .hover\:bg-white\/20:hover {
+  background-color: rgba(0,0,0,0.09) !important;
+}
+[data-theme="light"] .hover\:bg-white\/30:hover {
+  background-color: rgba(0,0,0,0.12) !important;
+}
+
+/* ── Fonds semi-transparents blancs ── */
+[data-theme="light"] .bg-white\/5 {
+  background-color: rgba(0,0,0,0.03) !important;
+}
+[data-theme="light"] .bg-white\/10 {
+  background-color: rgba(0,0,0,0.06) !important;
+}
+[data-theme="light"] .bg-white\/20 {
+  background-color: rgba(0,0,0,0.09) !important;
+}
+
+/* ── Bordures blanches semi-transparentes ── */
+[data-theme="light"] .border-white\/10 {
+  border-color: rgba(0,0,0,0.08) !important;
+}
+[data-theme="light"] .border-white\/20 {
+  border-color: rgba(0,0,0,0.12) !important;
+}
+[data-theme="light"] .border-white\/30 {
+  border-color: rgba(0,0,0,0.16) !important;
+}
+
+/* ── Focus ring offset sombre → clair ── */
+[data-theme="light"] .focus\:ring-offset-black:focus,
+[data-theme="light"] .focus\:ring-offset-gray-900:focus {
+  --tw-ring-offset-color: var(--ds-surface) !important;
+}
+
+/* ── Navbar ── */
+[data-theme="light"] .navbar-tv {
+  background: linear-gradient(
+    to bottom,
+    rgba(240,240,248,0.96) 0%,
+    rgba(240,240,248,0.82) 45%,
+    rgba(240,240,248,0.5) 75%,
+    transparent 100%
+  );
+}
+
+/* ── BackendStatusBadge dropdown fond gris ── */
+[data-theme="light"] .bg-gray-900\/50 {
+  background-color: rgba(235,235,240,0.95) !important;
+}
+
+/* ── Placeholders posters (bg-gradient de gray) ── */
+[data-theme="light"] .bg-gradient-to-br.from-gray-800.to-gray-900 {
+  background-image: none !important;
+  background-color: #d8d8e8 !important;
+}
+
+/* ── Toggle switch pill (FilmsDashboard / SeriesDashboard) ── */
+[data-theme="light"] .bg-black\/60 {
+  background-color: rgba(0,0,0,0.05) !important;
+}
+[data-theme="light"] .bg-black\/50 {
+  background-color: rgba(0,0,0,0.04) !important;
+}
+[data-theme="light"] .bg-black\/80 {
+  background-color: rgba(0,0,0,0.35) !important;
+}
+
+/* ── DiscoverSection : titres sous les cartes ── */
+[data-theme="light"] .app-main .truncate.text-white {
+  color: var(--ds-text-primary) !important;
+}
+
+/* ── DsMetricCard chevron ── */
+[data-theme="light"] .bg-white\/10.text-white\/90 {
+  background-color: rgba(0,0,0,0.06) !important;
+  color: var(--ds-text-primary) !important;
+}
+
+/* ── FloatingActionButton focus offset ── */
+[data-theme="light"] .focus\:ring-offset-\[\#121212\]:focus {
+  --tw-ring-offset-color: var(--ds-surface) !important;
+}
+
+/* ── Modal backdrop ── */
+[data-theme="light"] .bg-black\/80 {
+  background-color: rgba(0,0,0,0.35) !important;
+}
+
+/* ── Page error/login/register fond noir ── */
+[data-theme="light"] body.bg-black,
+[data-theme="light"] .bg-black {
+  background-color: var(--ds-surface) !important;
+}
+
+/* ── glass-panel en mode clair ── */
+[data-theme="light"] .glass-panel {
+  background-color: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.08);
+}
+[data-theme="light"] .glass-panel-lg {
+  background-color: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.08);
+}
+
+/* ── Sidebar mobile overlay ── */
+[data-theme="light"] .bg-black\/80 {
+  background-color: rgba(0,0,0,0.35) !important;
 }

@@ -167,6 +167,7 @@ export function HeroSection({
   return (
     <div
       className={`hero-dashboard relative z-0 w-full mb-8 overflow-hidden touch-pan-y ${noOverlap ? '' : '-mt-8 sm:-mt-20 md:-mt-32'}`}
+      data-dark-context
       style={{
         height: 'clamp(320px, 50vh, 560px)',
         touchAction: 'pan-y',

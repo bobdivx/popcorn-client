@@ -7,6 +7,7 @@ import { TokenManager } from '../../lib/client/storage';
 import { getSyncStatusStore, subscribeSyncStatusStore, refreshSyncStatusStore } from '../../lib/sync-status-store';
 import { getBackendUrl, isBackendUrlSameAsClientUrl } from '../../lib/backend-config';
 import { getCloudDevices } from '../../lib/api/popcorn-web';
+import { getCachedSubscription, loadSubscription } from '../../lib/subscription-store';
 import { formatBytes } from '../../lib/utils/formatBytes';
 
 type StatusVariant = 'success' | 'warning' | 'error' | 'neutral';
@@ -196,11 +197,20 @@ export default function SettingsOverview() {
       if (canAccess('settings.account' as any)) {
         try {
           const loggedIn = typeof TokenManager.getCloudAccessToken === 'function' && !!TokenManager.getCloudAccessToken();
-          next.account = loggedIn
-            ? { text: t('settingsMenu.overviewCard.accountLoggedIn'), variant: 'success' }
-            : { text: t('settingsMenu.overviewCard.accountNotLoggedIn'), variant: 'neutral' };
 
           if (loggedIn) {
+            const cached = getCachedSubscription();
+            const sub = cached !== null ? cached : await loadSubscription().catch(() => null);
+            if (sub?.subscription?.status === 'active') {
+              const planLabel = sub.subscription.planName || sub.subscription.planSlug || '';
+              next.account = {
+                text: t('settingsMenu.subscription.cardActivePlan', { plan: planLabel }),
+                variant: 'success',
+              };
+            } else {
+              next.account = { text: t('settingsMenu.subscription.cardNoPlan'), variant: 'warning' };
+            }
+
             const devices = await getCloudDevices().catch(() => null);
             if (devices && devices.length > 0) {
               const activeDevices = devices.filter((d) => !d.revokedAt);
@@ -218,6 +228,8 @@ export default function SettingsOverview() {
             } else {
               next.devices = { text: t('settingsMenu.overviewCard.devicesNone'), variant: 'neutral' };
             }
+          } else {
+            next.account = { text: t('settingsMenu.overviewCard.accountNotLoggedIn'), variant: 'neutral' };
           }
         } catch {
           // ignore

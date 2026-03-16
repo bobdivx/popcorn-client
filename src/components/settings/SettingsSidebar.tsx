@@ -285,6 +285,39 @@ const SIDEBAR_CSS = `
     .sn-icon { transition: none; }
     .sn-label { transition: none; }
   }
+
+  /* ── Thème clair ── */
+  [data-theme="light"] .sn-sidebar {
+    background: linear-gradient(180deg, #f0eef8 0%, #ece9f5 100%);
+    border-right-color: rgba(0,0,0,0.07);
+  }
+  [data-theme="light"] .sn-sidebar::before {
+    background: radial-gradient(circle, rgba(124,58,237,0.08) 0%, transparent 70%);
+  }
+  [data-theme="light"] .sn-sidebar::after {
+    background: radial-gradient(circle, rgba(139,92,246,0.05) 0%, transparent 70%);
+  }
+  [data-theme="light"] .sn-logo {
+    border-bottom-color: rgba(0,0,0,0.06);
+  }
+  [data-theme="light"] .sn-logo-title { color: #0f0f11; }
+  [data-theme="light"] .sn-logo-sub { color: rgba(109,40,217,0.65); }
+  [data-theme="light"] .sn-item:hover:not(.sn-item--active) {
+    background: rgba(0,0,0,0.04);
+    border-color: rgba(0,0,0,0.07);
+  }
+  [data-theme="light"] .sn-icon--inactive {
+    background: rgba(0,0,0,0.05);
+    color: rgba(15,15,17,0.45);
+  }
+  [data-theme="light"] .sn-item:hover .sn-icon--inactive {
+    background: rgba(109,40,217,0.1);
+    color: rgba(109,40,217,0.75);
+  }
+  [data-theme="light"] .sn-label--active { color: rgba(15,15,17,0.92); }
+  [data-theme="light"] .sn-label--inactive { color: rgba(15,15,17,0.48); }
+  [data-theme="light"] .sn-item:hover .sn-label--inactive { color: rgba(15,15,17,0.75); }
+  [data-theme="light"] .sn-overlay { background: rgba(0,0,0,0.45); }
 `;
 
 export default function SettingsSidebar() {

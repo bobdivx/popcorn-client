@@ -20,6 +20,22 @@ const isWebOS = import.meta.env.WEBOS === 'true';
   <head>
     <meta charset="UTF-8" />
     <script is:inline>
+      /* ── Anti-flash thème : doit s'exécuter AVANT toute CSS ── */
+      (function() {
+        try {
+          var s = localStorage.getItem('popcorn_client_user_preferences');
+          var t = 'dark';
+          if (s) {
+            var p = JSON.parse(s);
+            if (p.language) document.documentElement.lang = p.language;
+            t = p.theme || 'auto';
+          }
+          if (t === 'auto') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          document.documentElement.dataset.theme = t;
+        } catch(e) {}
+      })();
+    </script>
+    <script is:inline>
       // En tête de console : URL et temps de chargement (après load)
       (function() {
         function logPageInfo() {
@@ -50,6 +66,35 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         });
       });
     </script>
+    <script is:inline>
+      /* ── Listeners persistants : sync multi-onglets · mode auto OS · View Transitions ── */
+      (function() {
+        function applyStoredTheme() {
+          try {
+            var s = localStorage.getItem('popcorn_client_user_preferences');
+            var t = 'dark';
+            if (s) { var p = JSON.parse(s); t = p.theme || 'auto'; }
+            if (t === 'auto') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            document.documentElement.dataset.theme = t;
+          } catch(e) {}
+        }
+        /* Synchronisation entre onglets */
+        window.addEventListener('storage', function(e) {
+          if (e.key === 'popcorn_client_user_preferences') applyStoredTheme();
+        });
+        /* Changement du thème système (mode auto uniquement) */
+        try {
+          window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
+            try {
+              var s = localStorage.getItem('popcorn_client_user_preferences');
+              if (!s || (JSON.parse(s).theme || 'auto') === 'auto') applyStoredTheme();
+            } catch(e) {}
+          });
+        } catch(e) {}
+        /* Restaurer le thème après chaque View Transition Astro */
+        document.addEventListener('astro:after-swap', applyStoredTheme);
+      })();
+    </script>
     <!-- Google Fonts : désactivés sur webOS (file://) pour éviter blocage réseau et écran noir -->
     {!isWebOS && (
       <>
@@ -59,7 +104,7 @@ const isWebOS = import.meta.env.WEBOS === 'true';
       </>
     )}
   </head>
-  <body class="min-h-screen bg-page text-white flex flex-col overflow-x-hidden">
+  <body class="min-h-screen bg-page flex flex-col overflow-x-hidden">
     <script is:inline>
       (function() {
         var ua = navigator.userAgent || '';
@@ -176,30 +221,6 @@ const isWebOS = import.meta.env.WEBOS === 'true';
       }
     </style>
     <script is:inline>
-      // Initialisation de la langue et du thème depuis les préférences stockées
-      (function() {
-        if (typeof window !== 'undefined') {
-          try {
-            var stored = localStorage.getItem('popcorn_client_user_preferences');
-            if (stored) {
-              var prefs = JSON.parse(stored);
-              if (prefs.language && ['fr', 'en'].includes(prefs.language)) {
-                document.documentElement.lang = prefs.language;
-              }
-              var theme = prefs.theme || 'auto';
-              if (theme === 'auto') {
-                var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-                document.documentElement.dataset.theme = prefersDark ? 'dark' : 'light';
-              } else if (theme === 'dark' || theme === 'light') {
-                document.documentElement.dataset.theme = theme;
-              }
-            }
-          } catch (e) {
-            // Ignore les erreurs
-          }
-        }
-      })();
-
       // Intercepter les routes /player/* et rediriger vers /player avec l'ID en query param
       // Cela permet de gérer les routes dynamiques en mode static
       (function() {

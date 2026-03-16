@@ -38,6 +38,57 @@
   --safe-area-inset-left: env(safe-area-inset-left, 0px);
 }
 
+/* Couleur de corps par défaut (hors Tailwind @layer pour garantir la surcharge du thème clair) */
+body { color: #fff; }
+
+/* ── Thème clair : surcharger les variables dark du fond et du glassmorphism ── */
+[data-theme="light"] {
+  --bg-primary: #ede9f5;
+  --page-bg: #e8e5f0;
+  --bg-glass: rgba(109, 40, 217, 0.04);
+  --bg-glass-hover: rgba(109, 40, 217, 0.08);
+  --bg-glass-active: rgba(109, 40, 217, 0.13);
+}
+
+[data-theme="light"] body {
+  color: #1a1530;
+}
+
+[data-theme="light"] .scrollbar-visible {
+  scrollbar-color: rgba(0, 0, 0, 0.22) rgba(0, 0, 0, 0.06);
+}
+[data-theme="light"] .scrollbar-visible::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.06);
+}
+[data-theme="light"] .scrollbar-visible::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+[data-theme="light"] .scrollbar-visible::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.32);
+}
+
+[data-theme="light"] .dropdown-menu,
+[data-theme="light"] .dropdown-menu-mobile {
+  background: linear-gradient(135deg, rgba(245, 242, 252, 0.98) 0%, rgba(237, 233, 248, 0.99) 100%);
+  border-color: rgba(109, 40, 217, 0.12);
+  box-shadow: 0 8px 32px rgba(26, 21, 48, 0.12), 0 0 0 1px rgba(109, 40, 217, 0.06) inset;
+}
+
+[data-theme="light"] .navbar-scrolled {
+  background: linear-gradient(
+    to bottom,
+    rgba(237, 233, 245, 0.97) 0%,
+    rgba(232, 229, 240, 0.88) 60%,
+    rgba(232, 229, 240, 0.50) 100%
+  ) !important;
+}
+
+[data-theme="light"] :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  box-shadow: 0 0 0 3px rgba(109, 40, 217, 0.35);
+}
+
+
 /* Android TV : réduire l’affichage pour que la résolution ne soit pas « tout trop grand » */
 html[data-tv-platform] body {
   transform: scale(0.8);
@@ -1753,4 +1804,123 @@ form button[type="submit"]:focus-visible,
   outline: 3px solid var(--tv-focus-color) !important;
   outline-offset: 2px !important;
   box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2) !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════
+   LIGHT MODE — Navbar : fond clair, texte/icônes sombres
+   ══════════════════════════════════════════════════════════════ */
+
+/* Fond de la nav en mode clair (non scrollé) */
+[data-theme="light"] nav.navbar-tv {
+  background: linear-gradient(
+    to bottom,
+    rgba(232, 229, 240, 0.97) 0%,
+    rgba(232, 229, 240, 0.88) 60%,
+    rgba(232, 229, 240, 0.55) 85%,
+    transparent 100%
+  );
+}
+
+/* Fond de la nav scrollée en mode clair */
+[data-theme="light"] nav.navbar-scrolled,
+[data-theme="light"] nav.navbar-tv.navbar-scrolled {
+  background: linear-gradient(
+    to bottom,
+    rgba(237, 233, 245, 0.98) 0%,
+    rgba(232, 229, 240, 0.95) 60%,
+    rgba(232, 229, 240, 0.65) 100%
+  ) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(109, 40, 217, 0.10);
+}
+
+/* Textes blancs dans la nav → sombres */
+[data-theme="light"] nav .text-white,
+[data-theme="light"] nav .text-white\/80,
+[data-theme="light"] nav .text-white\/85,
+[data-theme="light"] nav .text-white\/90,
+[data-theme="light"] nav .text-white\/60 {
+  color: #1a1530 !important;
+}
+
+/* Nom de la marque */
+[data-theme="light"] nav span.font-extrabold {
+  color: #1a1530 !important;
+}
+
+/* Onglets de navigation */
+[data-theme="light"] nav .nav-tab {
+  color: rgba(26, 21, 48, 0.58) !important;
+}
+[data-theme="light"] nav .nav-tab:hover {
+  color: #1a1530 !important;
+  background: rgba(109, 40, 217, 0.08) !important;
+}
+[data-theme="light"] nav .nav-tab-active {
+  color: #1a1530 !important;
+  background: rgba(109, 40, 217, 0.10) !important;
+  font-weight: 700;
+}
+
+/* Boutons icône (search, downloads, settings, hamburger) */
+[data-theme="light"] nav .gtv-icon-btn {
+  color: rgba(26, 21, 48, 0.70) !important;
+  background-color: rgba(109, 40, 217, 0.06) !important;
+  border: 1px solid rgba(109, 40, 217, 0.10);
+}
+[data-theme="light"] nav .gtv-icon-btn:hover:not(:disabled) {
+  color: #1a1530 !important;
+  background-color: rgba(109, 40, 217, 0.12) !important;
+  transform: none;
+  box-shadow: none;
+}
+[data-theme="light"] nav .gtv-icon-btn.bg-primary-600 {
+  color: #fff !important;
+  background-color: #7c3aed !important;
+  border-color: transparent !important;
+}
+
+/* Boutons pill invité (Connexion / S'inscrire) */
+[data-theme="light"] nav .gtv-pill-btn {
+  color: rgba(26, 21, 48, 0.78) !important;
+  background-color: rgba(109, 40, 217, 0.06) !important;
+  border: 1px solid rgba(109, 40, 217, 0.12) !important;
+}
+[data-theme="light"] nav .gtv-pill-btn:hover:not(:disabled) {
+  color: #1a1530 !important;
+  background-color: rgba(109, 40, 217, 0.11) !important;
+}
+[data-theme="light"] nav .gtv-pill-btn-primary,
+[data-theme="light"] nav .gtv-pill-btn.gtv-pill-btn-primary {
+  background-color: #7c3aed !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+[data-theme="light"] nav .gtv-pill-btn-primary:hover {
+  background-color: #6d28d9 !important;
+}
+
+/* Horloge */
+[data-theme="light"] nav .tabular-nums {
+  color: rgba(26, 21, 48, 0.58) !important;
+}
+
+/* Dropdown hamburger mobile en mode clair */
+[data-theme="light"] nav .dropdown-menu-mobile a.text-white {
+  color: #1a1530 !important;
+}
+[data-theme="light"] nav .dropdown-menu-mobile a:hover {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+[data-theme="light"] nav .dropdown-menu-mobile .border-t {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Select langue dans la navbar */
+[data-theme="light"] nav select {
+  background-color: rgba(109, 40, 217, 0.06) !important;
+  border-color: rgba(109, 40, 217, 0.14) !important;
+  color: #1a1530 !important;
 }
