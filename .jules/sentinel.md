@@ -1,0 +1,4 @@
+## 2024-05-18 - XSS Vulnerability in DescriptionPreview
+**Vulnerability:** The `DescriptionPreview.tsx` component used `dangerouslySetInnerHTML` to render user-provided HTML and BBCode without proper sanitization, making the application vulnerable to Cross-Site Scripting (XSS).
+**Learning:** `dangerouslySetInnerHTML` should never be used with user-provided content without a robust sanitization process. Simple string replacement (like removing `{}`) is insufficient. Furthermore, in an Astro/Preact application that utilizes Server-Side Rendering (SSR), standard DOM sanitizers might cause hydration mismatches or SSR errors.
+**Prevention:** Always use a well-established sanitization library like `isomorphic-dompurify` when rendering untrusted HTML, especially in environments combining SSR and CSR, to prevent XSS and avoid hydration issues.
