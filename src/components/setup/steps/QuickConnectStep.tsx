@@ -198,9 +198,10 @@ export function QuickConnectStep({ focusedButtonIndex, buttonRefs, onNext, onSta
     await connectQuickConnect(secret);
   };
 
-  const spacing = tvMode ? 'space-y-6' : compact ? 'space-y-3' : 'space-y-6';
-  const qrSize = tvMode ? 280 : compact ? 136 : 224;
-  const qrPadding = tvMode ? 16 : compact ? 8 : 16;
+  const spacing = tvMode ? 'space-y-4' : compact ? 'space-y-3' : 'space-y-6';
+  // En TV mode, le QR doit tenir dans la hauteur disponible (viewport 720p - chrome)
+  const qrSize = tvMode ? 200 : compact ? 136 : 224;
+  const qrPadding = tvMode ? 12 : compact ? 8 : 16;
 
   return (
     <div className={`quick-connect-step ${tvMode ? 'quick-connect-step--tv' : ''} ${spacing}`}>
@@ -235,13 +236,16 @@ export function QuickConnectStep({ focusedButtonIndex, buttonRefs, onNext, onSta
         <div className={spacing}>
           {/* QR Code — TV: grand pour lecture à distance, compact: petit, défaut: moyen */}
           {qrCodeUrl && (
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center" style={{ maxWidth: '100%' }}>
               <div
-                className="bg-white rounded-xl overflow-visible flex items-center justify-center shadow-2xl"
+                className="bg-white rounded-xl flex items-center justify-center shadow-2xl flex-shrink-0"
                 style={{
                   padding: qrPadding,
-                  minWidth: qrSize + qrPadding * 2,
-                  minHeight: qrSize + qrPadding * 2,
+                  width: qrSize + qrPadding * 2,
+                  height: qrSize + qrPadding * 2,
+                  maxWidth: '90vw',
+                  maxHeight: tvMode ? '30vh' : undefined,
+                  boxSizing: 'border-box',
                 }}
               >
                 <img
@@ -249,10 +253,10 @@ export function QuickConnectStep({ focusedButtonIndex, buttonRefs, onNext, onSta
                   alt="QR Code de connexion rapide"
                   className="object-contain"
                   style={{
-                    width: qrSize,
-                    height: qrSize,
-                    maxWidth: '100%',
-                    maxHeight: '100%',
+                    width: '100%',
+                    height: '100%',
+                    maxWidth: qrSize,
+                    maxHeight: qrSize,
                   }}
                 />
               </div>

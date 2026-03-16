@@ -81,22 +81,39 @@ export function isAndroidTV(): boolean {
   }
 
   const userAgent = navigator.userAgent || '';
-  
-  if (/Android.*TV/i.test(userAgent) || /TV/i.test(userAgent)) {
+
+  // User-agent explicitement TV
+  if (/Android.*TV|TV.*Android/i.test(userAgent)) {
+    return true;
+  }
+  // Autres patterns TV connus (Google TV, Fire TV, boîtiers génériques)
+  if (/GoogleTV|FireTV|AFT[A-Z]|Chromecast|SHIELD|NVidia_SHIELD/i.test(userAgent)) {
+    return true;
+  }
+  // WebOS et autres smart TV
+  if (/\bTV\b/i.test(userAgent) && !/iPhone|iPad|Mobile/i.test(userAgent)) {
     return true;
   }
 
-  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
-    const platform = (window as any).__TAURI_METADATA__?.platform;
-    if (platform === 'android') {
-      if (window.innerWidth >= 1280 && window.innerHeight >= 720) {
+  // Tauri Android : tout appareil Android en Tauri avec résolution ≥ 720p est une TV
+  // (l'app Tauri n'est distribuée que sur Android TV, pas sur phones)
+  if ('__TAURI_INTERNALS__' in window) {
+    const meta = (window as any).__TAURI_METADATA__;
+    const platform = meta?.platform ?? meta?.os;
+    if (platform === 'android' || /android/i.test(String(platform ?? ''))) {
+      if (window.innerWidth >= 960 && window.innerHeight >= 540) {
         return true;
       }
     }
+    // Fallback Tauri sans metadata : si résolution TV-like (paysage large)
+    if (!meta && window.innerWidth >= 1280 && window.innerHeight >= 720) {
+      return true;
+    }
   }
 
-  if (window.innerWidth >= 1920 && window.innerHeight >= 1080) {
-    if (/Android/i.test(userAgent)) {
+  // Navigateur standard sur Android avec résolution TV (1280×720 minimum en paysage)
+  if (/Android/i.test(userAgent)) {
+    if (window.innerWidth >= 1280 && window.innerHeight >= 720 && window.innerWidth > window.innerHeight) {
       return true;
     }
   }
@@ -118,8 +135,9 @@ export function isTablet(): boolean {
     return true;
   }
 
-  if (/Android/i.test(userAgent) && window.innerWidth > 600 && window.innerWidth < 1920) {
-    return true;
+  // Une TV Android ne doit pas être classée comme tablette
+  if (/Android/i.test(userAgent) && window.innerWidth > 600 && window.innerWidth < 1280) {
+    if (!isAndroidTV()) return true;
   }
 
   return false;

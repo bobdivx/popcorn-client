@@ -5,7 +5,7 @@ export default {
     extend: {
       screens: {
         'xs': '475px',
-        'tv': '1920px',
+        'tv': '1280px',
       },
       colors: {
         primary: {
