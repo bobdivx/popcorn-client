@@ -276,7 +276,7 @@ export default function LibRbitSettings() {
                 value={listenPortDesired}
                 onInput={e => setListenPortDesired((e.target as HTMLInputElement).value)}
                 className={`${inputBase} flex-1 max-w-[120px]`}
-                placeholder="62288"
+                placeholder="4240"
                 aria-label={t('settingsPages.librqbit.listenPortDesired')}
               />
               <button
