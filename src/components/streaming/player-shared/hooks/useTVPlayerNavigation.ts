@@ -45,6 +45,8 @@ export function useTVPlayerNavigation({
   const [focusedOnProgress, setFocusedOnProgress] = useState(false);
   const [focusedOnScrub, setFocusedOnScrub] = useState(false);
   const isTV = isTVPlatform();
+  const focusedOnScrubRef = useRef(false);
+  focusedOnScrubRef.current = focusedOnScrub;
 
   // --- Scrub thumbnails (TV) ---
   const scrubThumbnailsActive = !!(scrubThumbnails && scrubThumbnails.count > 0);
@@ -140,6 +142,8 @@ export function useTVPlayerNavigation({
   /** Relance le compte à rebours de masquage des contrôles (5 s). */
   const resetControlsTimeout = () => {
     if (!isTV) return;
+    // En navigation vignettes : ne pas masquer l'UI, sinon la rangée disparaît avant qu'on puisse naviguer.
+    if (scrubThumbnailsActive && focusedOnScrubRef.current) return;
     if (controlsTimeoutRef.current) {
       clearTimeout(controlsTimeoutRef.current);
       controlsTimeoutRef.current = null;
@@ -419,6 +423,8 @@ export function useTVPlayerNavigation({
       }
       return;
     }
+    // En navigation vignettes : ne pas planifier l'auto-hide.
+    if (scrubThumbnailsActive && focusedOnScrubRef.current) return;
     if (controlsTimeoutRef.current !== null) return; // déjà un masquage programmé
     controlsTimeoutRef.current = window.setTimeout(() => {
       controlsTimeoutRef.current = null;
@@ -426,7 +432,7 @@ export function useTVPlayerNavigation({
       setFocusedOnProgress(false);
     }, 5000);
     return () => {};
-  }, [isTV, showControls, setShowControls]);
+  }, [isTV, showControls, setShowControls, scrubThumbnailsActive, focusedOnScrub]);
 
   // Cleanup du timer au démontage du lecteur.
   useEffect(() => {
