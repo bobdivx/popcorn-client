@@ -238,26 +238,37 @@ export default function DownloadsList() {
     const isInitial = !initialLoadDoneRef.current;
     try {
       if (isInitial) {
-        const list = await clientApi.listTorrentsEnriched();
+        // Au premier affichage, on veut que la page "arrive" vite même
+        // si l'enrichissement posters/titres est lent (dépend de librqbit).
+        const list = await clientApi.listTorrents();
         setTorrents(list);
         setError(null);
-        const images: Record<string, { posterUrl: string | null; backdropUrl: string | null }> = {};
-        const titles: Record<string, string> = {};
-        for (const t of list) {
-          const key = t.info_hash.toLowerCase();
-          if (t.poster_url || t.hero_image_url) {
-            images[key] = {
-              posterUrl: t.poster_url ?? null,
-              backdropUrl: t.hero_image_url ?? null,
-            };
-          }
-          if (t.tmdb_title && t.tmdb_title.trim()) {
-            titles[key] = t.tmdb_title.trim();
-          }
-        }
-        setImageMap((prev) => ({ ...prev, ...images }));
-        setDisplayTitleMap((prev) => ({ ...prev, ...titles }));
         initialLoadDoneRef.current = true;
+
+        // Enrichissement en arrière-plan : poster/titre.
+        void (async () => {
+          try {
+            const enrichedList = await clientApi.listTorrentsEnriched();
+            const images: Record<string, { posterUrl: string | null; backdropUrl: string | null }> = {};
+            const titles: Record<string, string> = {};
+            for (const t of enrichedList) {
+              const key = t.info_hash.toLowerCase();
+              if (t.poster_url || t.hero_image_url) {
+                images[key] = {
+                  posterUrl: t.poster_url ?? null,
+                  backdropUrl: t.hero_image_url ?? null,
+                };
+              }
+              if (t.tmdb_title && t.tmdb_title.trim()) {
+                titles[key] = t.tmdb_title.trim();
+              }
+            }
+            setImageMap((prev) => ({ ...prev, ...images }));
+            setDisplayTitleMap((prev) => ({ ...prev, ...titles }));
+          } catch {
+            // Echec silencieux : on garde la liste sans posters/titres enrichis.
+          }
+        })();
       } else {
         const list = await clientApi.listTorrents();
         setTorrents(list);

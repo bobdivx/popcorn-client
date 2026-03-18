@@ -6,6 +6,7 @@ import type {
 } from '../types.js';
 import type { ClientApi } from './index.js';
 import { handleResponse, handleError, extractInfoHashFromError } from './utils.js';
+import { getBackendUrl } from '../../backend-config.js';
 
 /**
  * Service pour la gestion des torrents
@@ -727,7 +728,10 @@ export class TorrentsService {
    */
   async downloadTorrentFile(infoHash: string, name: string): Promise<void> {
     try {
-      let response = await fetch(`/api/torrents/${encodeURIComponent(infoHash)}/download`);
+      const backendBaseUrl = (getBackendUrl() || 'http://127.0.0.1:3000').trim().replace(/\/$/, '');
+      let response = await fetch(
+        `${backendBaseUrl}/api/torrents/${encodeURIComponent(infoHash)}/download`
+      );
       
       if (response.ok) {
         const blob = await response.blob();
@@ -743,13 +747,9 @@ export class TorrentsService {
       }
       
       if (response.status === 404) {
-        const externalUrl = new URL('/api/torrents/external/download', window.location.origin);
-        externalUrl.searchParams.set('infoHash', infoHash);
-        if (name) {
-          externalUrl.searchParams.set('torrentName', name);
-        }
-        
-        response = await fetch(externalUrl.toString());
+        // Fallback: télécharger depuis la DB si le fichier `.torrent` a été stocké lors du sync.
+        const adminUrl = `${backendBaseUrl}/api/admin/torrent-files/by-info-hash/${encodeURIComponent(infoHash)}`;
+        response = await fetch(adminUrl);
         
         if (response.ok) {
           const contentType = response.headers.get('content-type') || '';
@@ -780,7 +780,7 @@ export class TorrentsService {
         }
         
         if (response.status === 404) {
-          alert('Le fichier .torrent n\'est pas disponible dans la base de données locale.');
+          alert('Le fichier .torrent n\'est pas disponible (il n\'est probablement pas stocké en base pour ce torrent).');
           return;
         }
       }
