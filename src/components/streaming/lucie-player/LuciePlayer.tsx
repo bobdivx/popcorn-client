@@ -36,6 +36,7 @@ export default function LuciePlayer({
   baseUrl: baseUrlProp,
   stopBufferRef,
   onProgress,
+  scrubThumbnails,
 }: LuciePlayerProps) {
   const playerConfig = usePlayerConfig();
   const { t } = useI18n();
@@ -217,7 +218,7 @@ export default function LuciePlayer({
     };
   }, [videoRef, lucieLoaded, isFullscreen, playerConfig.autoFullscreen]);
 
-  const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack } = useTVPlayerNavigation({
+  const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub } = useTVPlayerNavigation({
     showControls,
     setShowControls,
     onPlayPause: handlePlayPause,
@@ -229,6 +230,8 @@ export default function LuciePlayer({
     duration,
     currentTime,
     progressBarRef,
+    scrubThumbnails: scrubThumbnails?.mediaId && scrubThumbnails.count > 0 ? scrubThumbnails : null,
+    onScrubSeek: seekToTargetTime,
   });
 
   const displayError = error;
@@ -355,6 +358,7 @@ export default function LuciePlayer({
           hasBackButton={hasBack}
           onPlayPause={handlePlayPause}
           onSeek={baseHandleSeek}
+          onSeekToTime={seekToTargetTime}
           onVolumeChange={baseHandleVolumeChange}
           onToggleMute={toggleMute}
           onToggleFullscreen={handleToggleFullscreen}
@@ -373,6 +377,9 @@ export default function LuciePlayer({
           onClose={onClose}
           onRestart={handleRestart}
           videoFillMode={playerConfig.videoFillMode ?? 'contain'}
+          scrubThumbnails={scrubThumbnails ?? null}
+          tvScrubIndexExternal={isTV ? tvScrubIndex : undefined}
+          tvScrubFocused={isTV ? focusedOnScrub : undefined}
           onPlayNextEpisode={
             nextEpisodeInfo && onPlayNextEpisode && (playerConfig.nextEpisodeButtonEnabled ?? true)
               ? onPlayNextEpisode

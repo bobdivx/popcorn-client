@@ -44,6 +44,18 @@ export interface HLSPlayerProps {
   useStreamTorrentUrl?: boolean;
   /** Appelé périodiquement et à la fermeture avec la progression (pour Reprendre / Revoir). */
   onProgress?: (currentTime: number, duration: number) => void;
+
+  /** Miniatures scrub (type Netflix) — si défini, affiche une vignette au survol de la barre. */
+  scrubThumbnails?: {
+    /** media_id réel (clé dossier .popcorn_scrub_thumbnails/{media_id}) */
+    mediaId: string;
+    /** Nombre de vignettes disponibles */
+    count: number;
+    /** Durée du média (utile si duration player est temporairement 0) */
+    durationSeconds?: number;
+    /** Intervalle réel entre deux captures (ex. 10s) pour afficher des timecodes corrects. */
+    intervalSeconds?: number;
+  } | null;
 }
 
 declare global {

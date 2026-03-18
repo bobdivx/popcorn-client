@@ -207,6 +207,11 @@ export default function SettingsOverview() {
                 text: t('settingsMenu.subscription.cardActivePlan', { plan: planLabel }),
                 variant: 'success',
               };
+            } else if (sub?.streamingTorrent === true) {
+              next.account = {
+                text: t('settingsMenu.subscription.cardActivePlan', { plan: t('settingsMenu.subscription.streamingTorrentOption') }),
+                variant: 'success',
+              };
             } else {
               next.account = { text: t('settingsMenu.subscription.cardNoPlan'), variant: 'warning' };
             }

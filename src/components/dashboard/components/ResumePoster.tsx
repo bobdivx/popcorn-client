@@ -11,6 +11,10 @@ export function ResumePoster({ item }: ResumePosterProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(item.poster || null);
 
+  const playHref = item.infoHash
+    ? `/torrents?slug=${encodeURIComponent(item.id)}&infoHash=${encodeURIComponent(item.infoHash)}&from=dashboard`
+    : `/torrents?slug=${encodeURIComponent(item.id)}&from=dashboard`;
+
   useEffect(() => {
     if (item.poster && item.poster !== imageUrl) {
       setImageUrl(item.poster);
@@ -22,7 +26,7 @@ export function ResumePoster({ item }: ResumePosterProps) {
     if (e.stopPropagation) {
       e.stopPropagation();
     }
-    window.location.href = `/player/${item.id}`;
+    window.location.href = playHref;
   };
 
   const progress = item.progress || 0;
@@ -37,7 +41,7 @@ export function ResumePoster({ item }: ResumePosterProps) {
       <FocusableCard
         className="w-full"
         onClick={handleClick}
-        href={`/player/${item.id}`}
+        href={playHref}
         tabIndex={0}
         onFocus={() => {
           setIsFocused(true);

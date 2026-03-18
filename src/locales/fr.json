@@ -518,6 +518,9 @@
   },
   "playback": {
     "nextEpisode": "Épisode suivant",
+    "restartFromBeginning": "Redémarrer depuis le début",
+    "positionSlider": "Position dans la vidéo",
+    "seekToPosition": "Aller à {time}",
     "playLabel": "Lire",
     "playStreamingLabel": "Lire en streaming (téléchargement en cours)",
     "downloadFullSeason": "Télécharger toute la saison",
@@ -912,6 +915,7 @@
     "mostShared": "Les plus partagés",
     "otherGenres": "Autres genres",
     "watchLater": "À regarder plus tard",
+    "rewatch": "À revoir",
     "carouselIndicators": "Contenus du carousel",
     "goToContent": "Aller au contenu"
   },
@@ -937,7 +941,8 @@
     "tmdbSeriesRequest": "Séries (TMDB) — Demander",
     "tmdbRequestTitle": "Résultats TMDB — Demander le média",
     "forceIndexerLabel": "Rechercher directement sur les indexeurs",
-    "indexerSearchError": "Recherche sur les indexeurs impossible"
+    "indexerSearchError": "Recherche sur les indexeurs impossible",
+    "recentSearches": "Recherches récentes"
   },
   "library": {
     "title": "Bibliothèque",

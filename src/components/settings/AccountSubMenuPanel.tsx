@@ -138,20 +138,24 @@ export default function AccountSubMenuPanel({ baseUrl = BASE_URL_DEFAULT }: { ba
         const href = item.kind === 'link' ? item.href : `${baseUrl}${subParam}${item.id}`;
         const isExternal = item.kind === 'link' && !!item.isExternal;
         const isSubscriptionCard = item.id === 'subscription';
+        const hasPlanActive = subscriptionData?.subscription?.status === 'active';
+        const hasStreamingTorrent = subscriptionData?.streamingTorrent === true;
         const desc = isSubscriptionCard && subscriptionData !== undefined
           ? subscriptionData === null
             ? t('settingsMenu.subscription.notConnected')
-            : subscriptionData.subscription
+            : hasPlanActive
               ? t('settingsMenu.subscription.cardActivePlan', {
-                  plan: subscriptionData.subscription.planName || subscriptionData.subscription.planSlug || t('settingsMenu.subscription.plan'),
+                  plan: subscriptionData.subscription!.planName || subscriptionData.subscription!.planSlug || t('settingsMenu.subscription.plan'),
                 })
-              : t('settingsMenu.subscription.cardNoPlan')
+              : hasStreamingTorrent
+                ? t('settingsMenu.subscription.cardActivePlan', { plan: t('settingsMenu.subscription.streamingTorrentOption') })
+                : t('settingsMenu.subscription.cardNoPlan')
           : t(item.descriptionKey);
 
-        const rightSlot = isSubscriptionCard && subscriptionData?.subscription
+        const rightSlot = isSubscriptionCard && (hasPlanActive || hasStreamingTorrent)
           ? (
             <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:9999px;background:rgba(124,58,237,0.18);color:#a78bfa;flex-shrink:0;">
-              {subscriptionData.subscription.status === 'active' ? t('settingsMenu.overviewCard.accountLoggedIn') : subscriptionData.subscription.status}
+              {hasPlanActive ? t('settingsMenu.overviewCard.accountLoggedIn') : t('settingsMenu.subscription.streamingTorrentOption')}
             </span>
           )
           : undefined;

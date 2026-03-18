@@ -41,9 +41,6 @@ export default defineConfig({
     server: {
       host: true, // Écouter sur 0.0.0.0 pour accès via IP (ex. 10.1.0.86:4326), évite "Failed to fetch dynamically imported module"
       allowedHosts: true, // Autoriser tout host (localhost, IP locale, etc.) pour éviter 504 sur les deps quand on accède via IP
-      fs: {
-        strict: false,
-      },
       // Précharger les modules SSR (ex. @astrojs/preact) pour éviter
       // "transport invoke timed out after 60000ms" au premier chargement
       warmup: {

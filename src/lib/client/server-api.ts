@@ -34,6 +34,7 @@ import { generateAccessToken, generateRefreshToken } from '../auth/jwt-client.js
 import { authMethods } from './server-api/auth.js';
 import { mediaMethods } from './server-api/media.js';
 import { libraryMethods, type LibraryMediaEntry } from './server-api/library.js';
+import { localMediaMethods } from './server-api/local-media.js';
 import { uploadTrackerMethods } from './server-api/upload-tracker.js';
 import type {
   CreateTorrentParams,
@@ -893,6 +894,30 @@ class ServerApiClient {
     return 'http://127.0.0.1:3000';
   }
 
+  async getScrubThumbnailsMeta(localMediaId: string) {
+    const baseUrl = this.getServerUrl();
+    const url = `${baseUrl}/api/library/scrub-thumbnails/meta/${encodeURIComponent(localMediaId)}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch scrub thumbnails meta (${res.status})`);
+    }
+    return res.json();
+  }
+
+  async generateScrubThumbnails(localMediaId: string, opts?: { force?: boolean }) {
+    const baseUrl = this.getServerUrl();
+    const url = `${baseUrl}/api/library/scrub-thumbnails/generate`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ local_media_id: localMediaId, force: opts?.force === true }),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to trigger scrub thumbnails generation (${res.status})`);
+    }
+    return res.json();
+  }
+
   /**
    * Charge les tokens depuis le stockage local
    */
@@ -1228,6 +1253,7 @@ interface IServerApiClientPublic {
   addFavorite(contentId: string, encryptedData?: string): Promise<ApiResponse<LibraryItem>>;
   removeFavorite(favoriteId: string): Promise<ApiResponse<void>>;
   scanLocalMedia(): Promise<ApiResponse<string>>;
+  findLocalMediaByInfoHash(infoHash: string): Promise<ApiResponse<any>>;
 
   // Connection status (pour remonter "serveur hors ligne" dans l'UI)
   addConnectionFailureListener(cb: ConnectionFailureListener): void;
@@ -1373,6 +1399,7 @@ Object.assign(ServerApiClient.prototype,
   authMethods,
   mediaMethods,
   libraryMethods,
+  localMediaMethods,
   uploadTrackerMethods,
   healthMethods,
   indexersMethods,

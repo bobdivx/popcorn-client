@@ -35,6 +35,8 @@ export interface MediaDetailPageProps {
     _externalMagnetUri?: string | null;
     _guid?: string | null; // GUID Torznab pour téléchargement via API
     _externalGuid?: string | number; // Alias pour compatibilité
+    /** Identifiant torrent côté indexer (quand nécessaire pour télécharger le .torrent). */
+    _torrentId?: string | number | null;
     indexerId?: string | null;
     indexerName?: string | null;
     /** Ratio minimum requis par le tracker (fourni par l'indexeur Torznab), si disponible. */

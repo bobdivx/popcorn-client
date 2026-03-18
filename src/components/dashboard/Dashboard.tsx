@@ -81,7 +81,10 @@ export default function Dashboard() {
   }, [isSyncing, reloadSilent]);
 
   const handlePlay = (item: ContentItem) => {
-    window.location.href = `/player/${item.id}`;
+    const playHref = item.infoHash
+      ? `/torrents?slug=${encodeURIComponent(item.id)}&infoHash=${encodeURIComponent(item.infoHash)}&from=dashboard`
+      : `/torrents?slug=${encodeURIComponent(item.id)}&from=dashboard`;
+    window.location.href = playHref;
   };
 
   if (loading) {

@@ -150,6 +150,160 @@ export function VideoPlayerWrapper({
     streamingTorrentToken: streamingTorrentToken ?? undefined,
   });
 
+  const [scrubThumbnails, setScrubThumbnails] = useState<{ mediaId: string; count: number; durationSeconds?: number } | null>(null);
+  const scrubRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      scrubRetryTimeoutRef.current && clearTimeout(scrubRetryTimeoutRef.current);
+      scrubRetryTimeoutRef.current = null;
+    };
+  }, []);
+
+  // Charger (ou déclencher) les miniatures scrub pour ce média, si c'est un média local.
+  useEffect(() => {
+    // Pas de scrub thumbnails pour un flux distant (bibliothèque ami) ni en démo.
+    if (!visible) return;
+    if (streamBackendUrl?.trim()) {
+      setScrubThumbnails(null);
+      return;
+    }
+    // Médias bibliothèque : l'infoHash/id est au format local_{local_media_id}.
+    // Dans ce cas, on peut utiliser directement l'id sans heuristique sur le file_path.
+    const localIdFromInfoHash =
+      typeof infoHash === 'string' && infoHash.startsWith('local_')
+        ? infoHash.slice('local_'.length).trim()
+        : '';
+    if (!hlsFilePath || typeof hlsFilePath !== 'string') {
+      // Si on a déjà l'id via local_, on peut continuer même sans file_path.
+      if (!localIdFromInfoHash) {
+        setScrubThumbnails(null);
+        return;
+      }
+    }
+
+    let cancelled = false;
+    scrubRetryTimeoutRef.current && clearTimeout(scrubRetryTimeoutRef.current);
+    scrubRetryTimeoutRef.current = null;
+
+    const normalizePath = (p: string) => p.replace(/\\\\/g, '/').trim().toLowerCase();
+    const baseName = (p: string) => {
+      const n = normalizePath(p);
+      const parts = n.split('/');
+      return parts[parts.length - 1] || '';
+    };
+    const targetPath = hlsFilePath ? normalizePath(hlsFilePath) : '';
+    const targetBase = hlsFilePath ? baseName(hlsFilePath) : '';
+
+    const run = async () => {
+      try {
+        let localMediaId = localIdFromInfoHash;
+        // Torrents téléchargés : on peut récupérer le local_media_id via info_hash si l'entrée existe déjà.
+        if (!localMediaId && typeof infoHash === 'string' && infoHash.length >= 12 && !infoHash.startsWith('local_')) {
+          try {
+            const lm = await serverApi.findLocalMediaByInfoHash(infoHash);
+            if ((lm as any)?.success && (lm as any)?.data?.id) {
+              localMediaId = String((lm as any).data.id).trim();
+            }
+          } catch {
+            // ignore
+          }
+        }
+        if (!localMediaId) {
+          const libraryMedia = await serverApi.getLibraryMedia();
+          if ((libraryMedia as any)?.success) {
+            const items = Array.isArray((libraryMedia as any)?.data) ? (libraryMedia as any).data : [];
+            const match = items.find((m: any) => {
+              const fp = String(m?.file_path ?? '');
+              const fpNorm = normalizePath(fp);
+              if (targetPath && fpNorm === targetPath) return true;
+              if (targetBase && baseName(fp) === targetBase) return true;
+              const fn = String(m?.file_name ?? '');
+              if (targetBase && normalizePath(fn) === targetBase) return true;
+              return false;
+            });
+            localMediaId = (match?.id ?? '').trim();
+          }
+        }
+        // Fallback : le backend accepte aussi l'info_hash (40 hex) pour résoudre le média.
+        if (!localMediaId && typeof infoHash === 'string' && infoHash.length === 40 && /^[a-fA-F0-9]+$/.test(infoHash)) {
+          localMediaId = infoHash.trim().toLowerCase();
+        }
+        if (!localMediaId) return;
+
+        const fetchMeta = async () => {
+          const meta = await serverApi.getScrubThumbnailsMeta(localMediaId);
+          const ok = (meta as any)?.success === true;
+          const data = (meta as any)?.data;
+          if (!ok || !data) throw new Error('meta not ready');
+          const mediaId = (data.media_id ?? '').trim();
+          const count = Number(data.count ?? 0);
+          const durationSeconds = Number(data.duration_seconds ?? 0);
+          const intervalSeconds = Number(data.interval_seconds ?? 0);
+          if (!mediaId || !Number.isFinite(count) || count <= 0) throw new Error('meta invalid');
+          if (!cancelled) {
+            setScrubThumbnails({
+              mediaId,
+              count,
+              durationSeconds: Number.isFinite(durationSeconds) ? durationSeconds : undefined,
+              intervalSeconds: Number.isFinite(intervalSeconds) && intervalSeconds > 0 ? intervalSeconds : undefined,
+            });
+          }
+        };
+
+        try {
+          await fetchMeta();
+          // Si on détecte un ancien cache (ex: ~20 vignettes => intervalle très grand),
+          // forcer une régénération "1 vignette / 10s" pour correspondre au nouveau mode.
+          const meta = await serverApi.getScrubThumbnailsMeta(localMediaId).catch(() => null);
+          const data = (meta as any)?.data;
+          const count = Number(data?.count ?? 0);
+          const durationSeconds = Number(data?.duration_seconds ?? 0);
+          const intervalSeconds = Number(data?.interval_seconds ?? 0);
+          const expected = durationSeconds > 0 ? Math.min(300, Math.ceil(durationSeconds / 10)) : 0;
+          // Legacy si:
+          // - interval très grand (fallback duration/count, ex 44s)
+          // - OU interval absent/0 (meta.json manquant) ET count très faible par rapport au mode 10s
+          const looksLegacy =
+            expected > 0 &&
+            count > 0 &&
+            count < Math.min(expected, 60) &&
+            ((Number.isFinite(intervalSeconds) && intervalSeconds > 30) || !Number.isFinite(intervalSeconds) || intervalSeconds <= 0);
+          if (looksLegacy) {
+            await serverApi.generateScrubThumbnails(localMediaId, { force: true }).catch(() => {});
+            // Poll meta sans relancer une génération "non-force"
+            throw new Error('forced_regen');
+          }
+          return;
+        } catch (err) {
+          // Déclencher la génération, puis poll meta (génération peut prendre >2.5s selon le média/CPU)
+          const isForcedRegen = err instanceof Error && err.message === 'forced_regen';
+          if (!isForcedRegen) {
+            await serverApi.generateScrubThumbnails(localMediaId).catch(() => {});
+          }
+          let attempts = 0;
+          const poll = () => {
+            if (cancelled) return;
+            attempts += 1;
+            fetchMeta()
+              .catch(() => {
+                if (attempts >= 12) return; // ~24s
+                scrubRetryTimeoutRef.current = setTimeout(poll, 2000);
+              });
+          };
+          scrubRetryTimeoutRef.current = setTimeout(poll, 1500);
+        }
+      } catch {
+        // ignore — scrub thumbnails restent désactivées
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [infoHash, hlsFilePath, streamBackendUrl, visible]);
+
   const loadingStepFromStatus = getLoadingStep(playStatus ?? '', progressMessage ?? '', torrentStats ?? null);
   // Quand on attend le flux (isLoading sans étape précise), afficher l’étape 1 (en file d’attente), pas la 4
   const loadingStep = loadingStepFromStatus > 0 ? loadingStepFromStatus : isLoading ? 1 : 0;
@@ -529,6 +683,7 @@ export function VideoPlayerWrapper({
               streamQuality,
               onQualityChange: setStreamQuality,
               useStreamTorrentUrl: useStreamTorrentMode,
+              scrubThumbnails,
             }}
             lucieProps={{
               infoHash,
@@ -549,6 +704,7 @@ export function VideoPlayerWrapper({
               onClose,
               baseUrl,
               stopBufferRef,
+              scrubThumbnails,
             }}
             onHlsLoadingChange={(loading) => setIsLoading(loading)}
             onHlsError={(e) => {
