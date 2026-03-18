@@ -5,25 +5,32 @@
  */
 
 export function randomBytes(size: number): Uint8Array {
-  // Utiliser Web Crypto API à la place
-  if (typeof window !== 'undefined' && window.crypto) {
+  // Prioritize globalThis.crypto (Web Crypto API)
+  if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.getRandomValues) {
     const array = new Uint8Array(size);
-    window.crypto.getRandomValues(array);
+    globalThis.crypto.getRandomValues(array);
+    return array;
+  }
+
+  // Verify typeof crypto !== 'undefined' for SSR
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const array = new Uint8Array(size);
+    crypto.getRandomValues(array);
     return array;
   }
   
   // Fallback pour Node.js (ne devrait jamais arriver dans Tauri)
   if (typeof process !== 'undefined' && process.versions?.node) {
-    const crypto = require('crypto');
-    return crypto.randomBytes(size);
+    try {
+      const nodeCrypto = require('crypto');
+      return nodeCrypto.randomBytes(size);
+    } catch {
+      // ignore
+    }
   }
   
-  // Fallback ultime : générer des valeurs pseudo-aléatoires
-  const array = new Uint8Array(size);
-  for (let i = 0; i < size; i++) {
-    array[i] = Math.floor(Math.random() * 256);
-  }
-  return array;
+  // Throw an error instead of using insecure Math.random()
+  throw new Error('No secure random number generator available.');
 }
 
 export default {
