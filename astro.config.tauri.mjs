@@ -25,11 +25,6 @@ export default defineConfig({
       extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
     },
     // Exclure explicitement les routes API si elles existent encore
-    server: {
-      fs: {
-        strict: false,
-      },
-    },
     build: {
       rollupOptions: {
         external: [

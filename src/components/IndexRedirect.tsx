@@ -1,12 +1,19 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
 import { TokenManager } from '../lib/client/storage.js';
-import { getBackendUrl, isDemoMode, setDemoMode } from '../lib/backend-config';
+import {
+  getBackendUrl,
+  isDemoMode,
+  setDemoMode,
+  loadRuntimeConfig,
+  setBackendUrl,
+  hasDeploymentBackend,
+} from '../lib/backend-config';
 import { isTauri } from '../lib/utils/tauri';
 import { redirectTo } from '../lib/utils/navigation.js';
 import IntroVideoWithHlsPreload from './IntroVideoWithHlsPreload';
 import HLSLoadingSpinner from './ui/HLSLoadingSpinner';
-import { getCloudDevices } from '../lib/api/popcorn-web';
+import { getCloudDevices, getUserConfig } from '../lib/api/popcorn-web';
 
 const STORAGE_DIAG_ON_BOOT = 'popcorn_diagnostics_on_boot';
 const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';
@@ -179,7 +186,29 @@ export default function IndexRedirect() {
           // ignore
         }
 
-        setMessage(`Vérification du serveur... (tentative ${attempt + 1}/10)`);
+        // Restaurer l'URL backend depuis la config cloud avant toute vérification,
+        // pour que les appareils déjà enregistrés (sauvegarde devices popcorn-web) ne retombent pas sur /setup.
+        await loadRuntimeConfig();
+        if (!hasDeploymentBackend()) {
+          try {
+            const cloudConfig = await getUserConfig();
+            if (cloudConfig?.backendUrl?.trim()) {
+              const url = cloudConfig.backendUrl.trim().replace(/\/$/, '');
+              try {
+                const cloudHost = new URL(url).hostname;
+                if (cloudHost === window.location.hostname) {
+                  setBackendUrl(url);
+                }
+              } catch {
+                // URL cloud invalide, ignorer
+              }
+            }
+          } catch {
+            // ignore (utilisateur non connecté au cloud ou CORS)
+          }
+        }
+
+        setMessage(`Vérification du serveur... (tentative ${attemptRef.current + 1}/10)`);
         // Debug: log la config backend (sans faire de requête réseau pour éviter les blocages)
         // On évite checkServerHealth() ici car il peut bloquer et causer un ANR
         try {

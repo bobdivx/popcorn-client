@@ -703,14 +703,27 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                   if (item.download_path && !hasExistingPath && pathIsFile) {
                     setLibraryDownloadPath(item.download_path);
                   }
-                  setTorrentStats((prev) =>
-                    prev ?? {
+                  setTorrentStats((prev) => {
+                    const prevState = (prev?.state ?? '').toLowerCase();
+                    const prevProgress = typeof prev?.progress === 'number' ? prev.progress : 0;
+                    const looksStaleQueued =
+                      (prevState === 'queued' || prevState === 'downloading') &&
+                      prevProgress <= 0.001 &&
+                      (prev?.downloaded_bytes ?? 0) === 0 &&
+                      (prev?.download_speed ?? 0) === 0;
+                    const prevIsComplete =
+                      prevState === 'completed' || prevState === 'seeding' || prevProgress >= 0.99;
+
+                    // Si la bibliothèque confirme que le média existe déjà, on doit écraser
+                    // les stats "queued 0%" (souvent après reboot) pour éviter l'incohérence UI.
+                    if (prev && !looksStaleQueued && !prevIsComplete) return prev;
+                    return {
                       info_hash: activeTorrent.infoHash!,
                       name: item.name || activeTorrent.name || '',
                       state: 'completed',
-                      downloaded_bytes: item.file_size ?? 0,
-                      uploaded_bytes: 0,
-                      total_bytes: item.file_size ?? 0,
+                      downloaded_bytes: item.file_size ?? prev?.downloaded_bytes ?? 0,
+                      uploaded_bytes: prev?.uploaded_bytes ?? 0,
+                      total_bytes: item.file_size ?? prev?.total_bytes ?? 0,
                       progress: 1,
                       download_speed: 0,
                       upload_speed: 0,
@@ -720,8 +733,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                       leechers: 0,
                       eta_seconds: null,
                       download_started: true,
-                    }
-                  );
+                    };
+                  });
                   addDebugLog('success', 'ðŸ“š MÃ©dia trouvÃ© dans la bibliothÃ¨que (library)', {
                     info_hash: activeTorrent.infoHash,
                     download_path: item.download_path,
@@ -751,14 +764,24 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                 if (!hasExistingPathTmdb && firstPathIsFile) {
                   setLibraryDownloadPath(firstPath);
                 }
-                setTorrentStats((prev) =>
-                  prev ?? {
+                setTorrentStats((prev) => {
+                  const prevState = (prev?.state ?? '').toLowerCase();
+                  const prevProgress = typeof prev?.progress === 'number' ? prev.progress : 0;
+                  const looksStaleQueued =
+                    (prevState === 'queued' || prevState === 'downloading') &&
+                    prevProgress <= 0.001 &&
+                    (prev?.downloaded_bytes ?? 0) === 0 &&
+                    (prev?.download_speed ?? 0) === 0;
+                  const prevIsComplete =
+                    prevState === 'completed' || prevState === 'seeding' || prevProgress >= 0.99;
+                  if (prev && !looksStaleQueued && !prevIsComplete) return prev;
+                  return {
                     info_hash: activeTorrent.infoHash!,
                     name: activeTorrent.name || '',
                     state: 'completed',
-                    downloaded_bytes: 0,
-                    uploaded_bytes: 0,
-                    total_bytes: 0,
+                    downloaded_bytes: prev?.downloaded_bytes ?? 0,
+                    uploaded_bytes: prev?.uploaded_bytes ?? 0,
+                    total_bytes: prev?.total_bytes ?? 0,
                     progress: 1,
                     download_speed: 0,
                     upload_speed: 0,
@@ -768,8 +791,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                     leechers: 0,
                     eta_seconds: null,
                     download_started: true,
-                  }
-                );
+                  };
+                });
                 if (localMedia.length === 1) {
                   addDebugLog('success', `ðŸ“š MÃ©dia local trouvÃ© (TMDB ID: ${activeTorrent.tmdbId})`, {
                     file: localMedia[0].file_name,
@@ -825,6 +848,39 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
               if (!selectedFile) {
                 setSelectedFile(videos[0]);
               }
+              // Si on a des fichiers vidéo, le média est localement disponible.
+              // Après reboot, il arrive que les stats du client restent bloquées en "queued 0%":
+              // on force alors un état "completed" pour éviter d'afficher la carte de téléchargement.
+              if (!streamingTorrentActive) setIsAvailableLocally(true);
+              setTorrentStats((prev) => {
+                const prevState = (prev?.state ?? '').toLowerCase();
+                const prevProgress = typeof prev?.progress === 'number' ? prev.progress : 0;
+                const prevIsComplete = prevState === 'completed' || prevState === 'seeding' || prevProgress >= 0.99;
+                if (prevIsComplete) return prev;
+                const looksStaleQueued =
+                  (prevState === 'queued' || prevState === 'downloading') &&
+                  prevProgress <= 0.001 &&
+                  (prev?.downloaded_bytes ?? 0) === 0 &&
+                  (prev?.download_speed ?? 0) === 0;
+                if (prev && !looksStaleQueued) return prev;
+                return {
+                  info_hash: activeTorrent.infoHash!,
+                  name: activeTorrent.name || prev?.name || '',
+                  state: 'completed',
+                  downloaded_bytes: prev?.downloaded_bytes ?? 0,
+                  uploaded_bytes: prev?.uploaded_bytes ?? 0,
+                  total_bytes: prev?.total_bytes ?? 0,
+                  progress: 1,
+                  download_speed: 0,
+                  upload_speed: 0,
+                  peers_connected: 0,
+                  peers_total: 0,
+                  seeders: 0,
+                  leechers: 0,
+                  eta_seconds: null,
+                  download_started: true,
+                };
+              });
             }
           } catch (err) {
             // Ignorer les erreurs

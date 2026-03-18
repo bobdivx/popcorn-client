@@ -335,13 +335,27 @@ export function createHandlePlay(context: PlayHandlerContext) {
           // Passer indexerId, indexerName, torrentId, indexerTypeId pour le backend (template YGG etc.)
           const indexerId = (torrent as any).indexerId || (torrent as any).indexer_id;
           const indexerName = (torrent as any).indexerName || (torrent as any).indexer_name;
-          const guid = torrent._guid || (torrent as any)._externalGuid || null; // GUID Torznab stocké lors de la synchronisation
-          const torrentIdFromVariant = torrent.id?.includes('_') ? torrent.id.split('_').pop() : torrent.id;
-          const indexerTypeIdFromVariant = torrent.id?.match(/^external_(.+?)_\d+$/)?.[1];
+          const guid =
+            torrent._guid ||
+            (torrent as any).guid ||
+            (torrent as any).torrent_guid ||
+            (torrent as any)._externalGuid ||
+            null; // GUID Torznab stocké lors de la synchronisation
+
+          // IMPORTANT: l'id UI peut être "external_c411_<infoHash>" et n'est pas forcément le torrentId attendu par l'indexer.
+          // On privilégie les champs dédiés (torrent_id / torrentId) s'ils existent.
+          const torrentIdFromVariant =
+            (torrent as any).torrentId ||
+            (torrent as any).torrent_id ||
+            (torrent as any)._torrentId ||
+            null;
+
+          // indexerTypeId : toujours dérivable du préfixe "external_{type}_..."
+          const indexerTypeIdFromVariant = torrent.id?.match(/^external_([^_]+)_/)?.[1] ?? null;
           const indexerIdParam = indexerId ? `&indexerId=${encodeURIComponent(indexerId)}` : '';
           const indexerNameParam = indexerName ? `&indexerName=${encodeURIComponent(indexerName)}` : '';
           const guidParam = guid ? `&guid=${encodeURIComponent(guid)}` : '';
-          const torrentIdParam = torrentIdFromVariant ? `&torrentId=${encodeURIComponent(torrentIdFromVariant)}` : '';
+          const torrentIdParam = torrentIdFromVariant ? `&torrentId=${encodeURIComponent(String(torrentIdFromVariant))}` : '';
           const indexerTypeIdParam = indexerTypeIdFromVariant ? `&indexerTypeId=${encodeURIComponent(indexerTypeIdFromVariant)}` : '';
           const downloadUrl = `${baseUrl}/api/torrents/external/download?url=${encodeURIComponent(torrent._externalLink)}&torrentName=${encodeURIComponent(torrent.name)}${indexerIdParam}${indexerNameParam}${guidParam}${torrentIdParam}${indexerTypeIdParam}`;
           

@@ -67,9 +67,8 @@ export default defineConfig({
       'import.meta.env.PUBLIC_DEBUG_LOG_URL': JSON.stringify(process.env.PUBLIC_DEBUG_LOG_URL || ''),
     },
     server: {
-      fs: {
-        strict: false,
-      },
+      // Conserver le mode strict par défaut: évite que Vite tente de lire des chemins
+      // absolus hors projet (ex. /torrents → D:\torrents) et provoque EISDIR.
     },
   },
 });

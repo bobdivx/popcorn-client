@@ -182,7 +182,10 @@ export default function SeriesDashboard() {
   }, [hasMore, loadMore]);
 
   const handlePlay = (item: ContentItem) => {
-    window.location.href = `/player/${item.id}`;
+    const playHref = item.infoHash
+      ? `/torrents?slug=${encodeURIComponent(item.id)}&infoHash=${encodeURIComponent(item.infoHash)}&from=dashboard`
+      : `/torrents?slug=${encodeURIComponent(item.id)}&from=dashboard`;
+    window.location.href = playHref;
   };
 
   const switchBarClasses = 'relative z-30 shrink-0 w-full px-4 py-3 sm:px-6 sm:py-3 lg:px-8 bg-black flex items-center justify-center min-[640px]:justify-start';

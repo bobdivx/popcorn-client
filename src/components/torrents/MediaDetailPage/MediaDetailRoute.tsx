@@ -13,7 +13,9 @@ function getContentIdFromLocation(): string {
 
   const urlParams = new URLSearchParams(window.location.search);
   const fromQuery =
-    urlParams.get('slug') || urlParams.get('contentId') || urlParams.get('id') || urlParams.get('infoHash');
+    // Important: depuis /downloads on a souvent `slug` (groupe) + `infoHash` (torrent réel).
+    // `slug` peut ressembler à un info_hash (40 hex) → il ne faut pas le prioriser au-dessus de infoHash.
+    urlParams.get('infoHash') || urlParams.get('slug') || urlParams.get('contentId') || urlParams.get('id');
   if (fromQuery) return fromQuery;
 
   const pathname = window.location.pathname;
@@ -188,7 +190,10 @@ function convertVariantToTorrent(variant: any): Torrent {
     leechCount: variant.leech_count || variant.leechCount || 0,
     _externalLink: variant._externalLink || variant.external_link || null,
     _externalMagnetUri: variant._externalMagnetUri || variant.external_magnet_uri || null,
-    _guid: (variant as any)._guid || null, // GUID Torznab pour téléchargement via API
+    // GUID Torznab pour téléchargement via API (certains backends exposent `guid` directement)
+    _guid: (variant as any)._guid || (variant as any).guid || null,
+    // Identifiant torrent côté indexer (utile si guid absent et que l'API attend un id numérique)
+    _torrentId: (variant as any).torrent_id || (variant as any).torrentId || (variant as any)._torrentId || null,
     indexerId: (variant as any).indexer_id || (variant as any).indexerId || null,
     indexerName: (variant as any).indexer_name || (variant as any).indexerName || null,
     minimumRatio: (variant as any).minimum_ratio ?? (variant as any).minimumRatio ?? null,
@@ -357,6 +362,41 @@ export default function MediaDetailRoute() {
       const streamInfoHash = getStreamInfoHashFromLocation();
       const streamPath = getStreamPathFromLocation();
       const streamTitle = getTitleFromLocation();
+      const fromParam = getFromFromLocation();
+
+      const enrichFromLocalMediaByInfoHash = async (t: Torrent, infoHash: string): Promise<Torrent> => {
+        // Depuis /downloads, le backend peut renvoyer un torrent sans champs TMDB.
+        // On tente donc d'enrichir via l'entrée local_media (si bindée / détectée).
+        if (!infoHash || typeof infoHash !== 'string') return t;
+        if (t.tmdbId != null && (t.synopsis || t.imageUrl || t.heroImageUrl)) return t;
+        try {
+          const lm = await serverApi.findLocalMediaByInfoHash(infoHash);
+          const ok = (lm as any)?.success === true;
+          const data = (lm as any)?.data;
+          if (!ok || !data) return t;
+          const localTorrent = libraryItemToTorrent(data);
+          return {
+            ...t,
+            // Ne pas écraser les valeurs existantes (priorité à la réponse torrent), mais compléter si manquant
+            name: t.name || localTorrent.name,
+            cleanTitle: t.cleanTitle ?? localTorrent.cleanTitle,
+            mainTitle: (t as any).mainTitle ?? (localTorrent as any).mainTitle,
+            imageUrl: t.imageUrl ?? localTorrent.imageUrl,
+            heroImageUrl: t.heroImageUrl ?? localTorrent.heroImageUrl,
+            logoUrl: (t as any).logoUrl ?? (localTorrent as any).logoUrl,
+            synopsis: (t as any).synopsis ?? (localTorrent as any).synopsis,
+            releaseDate: t.releaseDate ?? localTorrent.releaseDate,
+            genres: t.genres ?? localTorrent.genres,
+            voteAverage: t.voteAverage ?? localTorrent.voteAverage,
+            runtime: t.runtime ?? localTorrent.runtime,
+            tmdbId: t.tmdbId ?? localTorrent.tmdbId,
+            tmdbType: t.tmdbType ?? localTorrent.tmdbType,
+            downloadPath: (t as any).downloadPath ?? (localTorrent as any).downloadPath,
+          } as Torrent;
+        } catch {
+          return t;
+        }
+      };
 
       // Média partagé par un ami : on a tout dans l'URL, pas besoin d'appeler notre backend
       if (streamBackendUrl && (streamInfoHash || streamPath)) {
@@ -508,8 +548,6 @@ export default function MediaDetailRoute() {
 
         // Cas tmdbId : recherche → détail (média peut ne pas être synchronisé)
         if (tmdbId) {
-          const fromParam = getFromFromLocation();
-
           // Depuis la bibliothèque avec un titre (nom de fichier) : privilégier l'entrée bibliothèque qui correspond
           if (fromParam === 'library' && titleFromQuery && titleFromQuery.trim().length > 0) {
             const libraryResponse = await serverApi.getLibrary();
@@ -649,7 +687,9 @@ export default function MediaDetailRoute() {
           const byIdData = byIdResponse?.data as any;
           const best = pickBestTorrentFromGroupPayload(byIdResponse);
           if (best && !cancelled) {
-            setTorrent({ ...best, mainTitle: byIdData?.main_title ?? undefined });
+            const t0 = { ...best, mainTitle: byIdData?.main_title ?? undefined } as Torrent;
+            const t = fromParam === 'downloads' ? await enrichFromLocalMediaByInfoHash(t0, contentId) : t0;
+            if (!cancelled) setTorrent(t);
             setLoading(false);
             return;
           }
@@ -672,7 +712,10 @@ export default function MediaDetailRoute() {
           const best = pickBestTorrentFromGroupPayload(groupResponse);
           const mainTitle = data?.main_title ?? undefined;
           if (best && !cancelled) {
-            setTorrent({ ...best, mainTitle });
+            const t0 = { ...best, mainTitle } as Torrent;
+            const infoHashForEnrich = (getStreamInfoHashFromLocation() || t0.infoHash || contentId || '').toString();
+            const t = fromParam === 'downloads' ? await enrichFromLocalMediaByInfoHash(t0, infoHashForEnrich) : t0;
+            if (!cancelled) setTorrent(t);
             console.log('[MediaDetailRoute] Torrent final sélectionné:', {
               id: best.id,
               name: best.name,

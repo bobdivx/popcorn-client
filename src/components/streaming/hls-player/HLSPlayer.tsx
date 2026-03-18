@@ -46,6 +46,7 @@ export default function HLSPlayer({
   onQualityChange,
   useStreamTorrentUrl: useStreamTorrentUrlProp,
   onProgress,
+  scrubThumbnails,
 }: HLSPlayerProps) {
   const playerConfig = usePlayerConfig();
   const { t } = useI18n();
@@ -287,7 +288,7 @@ export default function HLSPlayer({
     };
   }, [videoRef, hlsLoaded, isFullscreen, playerConfig.autoFullscreen]);
 
-  const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack } = useTVPlayerNavigation({
+  const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub } = useTVPlayerNavigation({
     showControls,
     setShowControls,
     onPlayPause: handlePlayPause,
@@ -300,6 +301,8 @@ export default function HLSPlayer({
     duration,
     currentTime,
     progressBarRef,
+    scrubThumbnails: scrubThumbnails?.mediaId && scrubThumbnails.count > 0 ? scrubThumbnails : null,
+    onScrubSeek: seekToTargetTime,
   });
 
   // Message informatif "autres transcodages arrêtés" : afficher 5 s puis masquer
@@ -458,6 +461,7 @@ export default function HLSPlayer({
           hasBackButton={hasBack}
           onPlayPause={handlePlayPause}
           onSeek={baseHandleSeek}
+          onSeekToTime={seekToTargetTime}
           onVolumeChange={baseHandleVolumeChange}
           onToggleMute={toggleMute}
           onToggleFullscreen={handleToggleFullscreen}
@@ -480,6 +484,9 @@ export default function HLSPlayer({
           onQualityChange={onQualityChange}
           onOpenQualityMenuRef={openQualityMenuRef}
           videoFillMode={playerConfig.videoFillMode ?? 'contain'}
+          scrubThumbnails={scrubThumbnails ?? null}
+          tvScrubIndexExternal={isTV ? tvScrubIndex : undefined}
+          tvScrubFocused={isTV ? focusedOnScrub : undefined}
           onPlayNextEpisode={
             nextEpisodeInfo && onPlayNextEpisode && (playerConfig.nextEpisodeButtonEnabled ?? true)
               ? onPlayNextEpisode

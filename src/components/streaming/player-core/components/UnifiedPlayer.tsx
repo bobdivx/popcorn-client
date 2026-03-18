@@ -86,6 +86,7 @@ export default function UnifiedPlayer({
           torrentName={hlsProps.torrentName ?? hlsProps.fileName}
           torrentStats={torrentStats}
           onProgress={onProgress}
+          scrubThumbnails={(hlsProps as any).scrubThumbnails ?? null}
         />
       ) : src && useLuciePlayer && lucieProps ? (
         <LuciePlayer

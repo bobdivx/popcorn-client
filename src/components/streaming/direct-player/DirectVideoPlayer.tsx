@@ -27,6 +27,8 @@ interface DirectVideoPlayerProps {
   torrentStats?: PlayerLoadingTorrentStats | null;
   /** Appelé périodiquement et à la fermeture avec la progression (pour Reprendre / Revoir). */
   onProgress?: (currentTime: number, duration: number) => void;
+  /** Miniatures scrub (type Netflix) — si défini, affiche une vignette au survol de la barre. */
+  scrubThumbnails?: { mediaId: string; count: number; durationSeconds?: number; intervalSeconds?: number } | null;
 }
 
 export default function DirectVideoPlayer({
@@ -44,6 +46,7 @@ export default function DirectVideoPlayer({
   torrentName = '',
   torrentStats,
   onProgress,
+  scrubThumbnails,
 }: DirectVideoPlayerProps) {
   const { t } = useI18n();
   const playerConfig = usePlayerConfig();
@@ -140,7 +143,7 @@ export default function DirectVideoPlayer({
     video.muted = newVolume === 0;
   };
 
-  const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack } = useTVPlayerNavigation({
+  const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub } = useTVPlayerNavigation({
     showControls,
     setShowControls,
     onPlayPause: handlePlayPause,
@@ -152,6 +155,8 @@ export default function DirectVideoPlayer({
     duration,
     currentTime,
     progressBarRef,
+    scrubThumbnails: scrubThumbnails?.mediaId && scrubThumbnails.count > 0 ? scrubThumbnails : null,
+    onScrubSeek: seekToTargetTime,
   });
 
   useEffect(() => {
@@ -348,6 +353,7 @@ export default function DirectVideoPlayer({
           hasBackButton={hasBack}
           onPlayPause={handlePlayPause}
           onSeek={handleSeek}
+          onSeekToTime={seekToTargetTime}
           onVolumeChange={handleVolumeChange}
           onToggleMute={toggleMute}
           onToggleFullscreen={handleToggleFullscreen}
@@ -362,6 +368,9 @@ export default function DirectVideoPlayer({
           showCastButton={chromecast.isAvailable}
           isCasting={chromecast.isCasting}
           onCastClick={() => chromecast.castMedia(src, torrentName || '', currentTime)}
+          scrubThumbnails={scrubThumbnails ?? null}
+          tvScrubIndexExternal={isTV ? tvScrubIndex : undefined}
+          tvScrubFocused={isTV ? focusedOnScrub : undefined}
         />
       </div>
     </div>

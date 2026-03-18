@@ -16,6 +16,10 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
   // Récupérer les stats de téléchargement si infoHash est disponible
   const { torrentStats } = useTorrentProgress(item.infoHash);
 
+  const playHref = item.infoHash
+    ? `/torrents?slug=${encodeURIComponent(item.id)}&infoHash=${encodeURIComponent(item.infoHash)}&from=dashboard`
+    : `/torrents?slug=${encodeURIComponent(item.id)}&from=dashboard`;
+
   useEffect(() => {
     if (item.poster && item.poster !== imageUrl) {
       setImageUrl(item.poster);
@@ -33,7 +37,7 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
     if (e.stopPropagation) {
       e.stopPropagation();
     }
-    window.location.href = `/player/${item.id}`;
+    window.location.href = playHref;
   };
 
   // Formatage de la vitesse pour barre de santé
@@ -56,7 +60,7 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
       <FocusableCard
         className="w-full"
         onClick={handleClick}
-        href={`/player/${item.id}`}
+        href={playHref}
         tabIndex={0}
         ariaLabel={item.title}
         onFocus={() => {

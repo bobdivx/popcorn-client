@@ -69,7 +69,9 @@ export function useStreamSource({
           filePath,
           fileName: selectedFile.name,
           fileIndex: selectedFile.index ?? 0,
-          isDirectMode: streamingTorrentMode ? true : isDirectMode,
+          // Le mode stream-torrent fournit sa propre route; on conserve le mode lecteur (HLS/direct)
+          // afin d'éviter de forcer le navigateur à lire un MKV en "direct".
+          isDirectMode,
           isLucieMode,
           streamBackendUrl,
           maxHeight: maxHeight ?? undefined,
@@ -97,9 +99,9 @@ export function useStreamSource({
         });
 
         setStreamUrl(streamUrl);
-        setHlsFilePath((isDirectMode || isLucieMode || streamingTorrentMode) ? 'direct' : normalizedPath);
-        // En mode direct / stream-torrent, garder loading true jusqu'à onLoadedData du lecteur (retour visuel chargement).
-        if (!isDirectMode && !isLucieMode && !streamingTorrentMode) setIsLoading(false);
+        setHlsFilePath((isDirectMode || isLucieMode) ? 'direct' : normalizedPath);
+        // En mode HLS, on peut couper le loading dès que la source est prête.
+        if (!isDirectMode && !isLucieMode) setIsLoading(false);
         const sourceType = infoHash?.startsWith('local_') ? 'local_' : (directStreamUrl ? 'direct_demo' : 'torrent');
         const playbackMode = isLucieMode ? 'lucie' : (isDirectMode ? 'direct' : 'hls');
         emitPlaybackStep('source_selected', { sourceType, mode: playbackMode });

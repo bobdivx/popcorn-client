@@ -541,19 +541,30 @@ export class TorrentsService {
     if (!accessToken) throw new Error('Token requis pour stream-torrent');
     const base = (await this.getRequestUrl('torrents')).replace(/\/api\/client\/torrents$/, '');
     const url = `${base}/api/stream-torrent/ready/${encodeURIComponent(infoHash)}/${fileId}/${encodeURIComponent(filename)}?access_token=${encodeURIComponent(accessToken)}`;
-    const maxAttempts = 4;
-    const retryDelayMs = 2000;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // Le backend peut avoir besoin de >10–20s (initialisation torrent + metadata + buffer).
+    // On suit Retry-After si présent, sinon on applique un backoff progressif.
+    const maxWaitMs = 60000;
+    const started = Date.now();
+    let attempt = 0;
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      attempt += 1;
       const response = await fetch(url);
       if (response.ok) return;
       const status = response.status;
-      const text = await response.text();
       const retryable = status === 502 || status === 503;
-      if (retryable && attempt < maxAttempts) {
-        await new Promise((r) => setTimeout(r, retryDelayMs));
-        continue;
+      const text = await response.text().catch(() => '');
+      const elapsed = Date.now() - started;
+      if (!retryable || elapsed >= maxWaitMs) {
+        throw new Error(text || `Flux non prêt (${status})`);
       }
-      throw new Error(text || `Flux non prêt (${status})`);
+      const retryAfterHeader = response.headers.get('retry-after');
+      const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : NaN;
+      const fallbackDelayMs = Math.min(15000, 800 + attempt * 700);
+      const delayMs = Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+        ? Math.min(15000, Math.max(500, retryAfterSeconds * 1000))
+        : fallbackDelayMs;
+      await new Promise((r) => setTimeout(r, delayMs));
     }
   }
 

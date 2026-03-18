@@ -100,13 +100,30 @@ export function ActionButtons({
   const progressComplete = !!(torrentStats && torrentStats.progress >= 0.99);
   const isDownloadComplete = isCompleted || progressComplete;
   const isSeeding = !!torrentStats && stateLower === 'seeding';
-  const hasActiveDownloadStats = !!torrentStats && !isDownloadComplete && (
-    isDownloading || progressValue > 0 ||
-    (torrentStats.download_speed ?? 0) > 0 ||
-    (torrentStats.peers_connected ?? 0) > 0 ||
-    (torrentStats.downloaded_bytes ?? 0) > 0
-  );
-  const isDownloadInProgress = (!!torrentStats && !isDownloadComplete) || downloadingToClient;
+  // Après reboot, il arrive que le client remonte un état "queued/downloading" avec 0% et 0 octet,
+  // alors que le média existe déjà sur disque. Dans ce cas, on ne veut pas afficher la carte de progression
+  // (ni masquer le bouton Lire).
+  const looksStaleQueuedZero =
+    !!torrentStats &&
+    (stateLower === 'queued' || stateLower === 'downloading') &&
+    progressValue <= 0.001 &&
+    (torrentStats.downloaded_bytes ?? 0) === 0 &&
+    (torrentStats.download_speed ?? 0) === 0 &&
+    (torrentStats.peers_connected ?? 0) === 0;
+
+  const hasActiveDownloadStats =
+    !!torrentStats &&
+    !isDownloadComplete &&
+    !isAvailableLocally &&
+    !looksStaleQueuedZero &&
+    (isDownloading ||
+      progressValue > 0 ||
+      (torrentStats.download_speed ?? 0) > 0 ||
+      (torrentStats.peers_connected ?? 0) > 0 ||
+      (torrentStats.downloaded_bytes ?? 0) > 0);
+
+  const isDownloadInProgress =
+    ((!!torrentStats && !isDownloadComplete && !isAvailableLocally && !looksStaleQueuedZero) || downloadingToClient);
   const showProgressInButton = hasActiveDownloadStats;
   const displayProgressPercent = hasActiveDownloadStats ? progressPercent : 0;
   const showProgressNextToCancel = !isStreamingThisTorrent && (isDownloadInProgress && !!onCancelDownload && !!torrentStats) && hasActiveDownloadStats;

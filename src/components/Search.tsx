@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { Search as SearchIcon, X } from 'lucide-preact';
 import { serverApi, type SearchResult } from '../lib/client/server-api';
 import { CacheManager } from '../lib/client/storage';
@@ -7,6 +7,34 @@ import { LoadingCard } from './ui/design-system';
 import CarouselRow from './torrents/CarouselRow';
 import { useI18n } from '../lib/i18n/useI18n';
 import { isTVPlatform } from '../lib/utils/device-detection';
+
+const SEARCH_HISTORY_KEY = 'popcorn_search_history';
+const SEARCH_HISTORY_MAX = 10;
+
+function getSearchHistory(): string[] {
+  try {
+    const raw = localStorage.getItem(SEARCH_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((x): x is string => typeof x === 'string' && x.trim() !== '').slice(0, SEARCH_HISTORY_MAX)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function addSearchToHistory(term: string): void {
+  const t = term.trim();
+  if (!t) return;
+  const prev = getSearchHistory();
+  const next = [t, ...prev.filter((x) => x !== t)].slice(0, SEARCH_HISTORY_MAX);
+  try {
+    localStorage.setItem(SEARCH_HISTORY_KEY, JSON.stringify(next));
+  } catch {
+    // ignore
+  }
+}
 
 interface SearchProps {
   onResultClick?: (result: SearchResult) => void;
@@ -168,6 +196,7 @@ export default function Search({ onResultClick }: SearchProps) {
   const [searchPhase, setSearchPhase] = useState<SearchPhase>('idle');
   const [error, setError] = useState<string | null>(null);
   const [forceIndexerSearch, setForceIndexerSearch] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>(() => getSearchHistory());
   const inputRef = useRef<HTMLInputElement>(null);
   const prevLoadingRef = useRef(false);
 
@@ -209,13 +238,17 @@ export default function Search({ onResultClick }: SearchProps) {
     if (q && q.trim()) setQuery(q.trim());
   }, []);
 
-  const handleSearch = async () => {
-    if (!query.trim()) {
+  const handleSearch = useCallback(async (termOverride?: string) => {
+    const searchTerm = (termOverride ?? query).trim();
+    if (!searchTerm) {
       setResults([]);
       return;
     }
+    setQuery(searchTerm);
+    addSearchToHistory(searchTerm);
+    setSearchHistory(getSearchHistory());
 
-    const cacheKey = `search_${query}_${type}_${language}${forceIndexerSearch ? '_indexer' : ''}`;
+    const cacheKey = `search_${searchTerm}_${type}_${language}${forceIndexerSearch ? '_indexer' : ''}`;
     const cached = CacheManager.get<SearchResult[]>(cacheKey);
     if (cached) {
       setResults(cached);
@@ -239,7 +272,7 @@ export default function Search({ onResultClick }: SearchProps) {
       if (forceIndexerSearch) {
         setSearchPhase('indexer');
         const indexerRes = await serverApi.search({
-          q: query,
+          q: searchTerm,
           type: typeParam,
           source: 'indexer',
           lang: language,
@@ -254,10 +287,10 @@ export default function Search({ onResultClick }: SearchProps) {
         setResults(indexerData);
         CacheManager.set(cacheKey, indexerData, 60 * 60 * 1000);
         setTmdbFallbackResults([]);
-        if (indexerData.length === 0 && query.trim()) {
+        if (indexerData.length === 0 && searchTerm) {
           const tmdbLang = language === 'fr' ? 'fr-FR' : 'en-US';
           const tmdbRes = await serverApi.searchTmdb({
-            q: query.trim(),
+            q: searchTerm,
             type: typeParam,
             language: tmdbLang,
             page: 1,
@@ -286,7 +319,7 @@ export default function Search({ onResultClick }: SearchProps) {
       }
 
       const localRes = await serverApi.search({
-        q: query,
+        q: searchTerm,
         type: typeParam,
         source: 'local',
         lang: language,
@@ -311,7 +344,7 @@ export default function Search({ onResultClick }: SearchProps) {
 
       setSearchPhase('indexer');
       const indexerRes = await serverApi.search({
-        q: query,
+        q: searchTerm,
         type: typeParam,
         source: 'indexer',
         lang: language,
@@ -329,10 +362,10 @@ export default function Search({ onResultClick }: SearchProps) {
       CacheManager.set(cacheKey, indexerData, 60 * 60 * 1000);
 
       // Si toujours aucun torrent trouvé : recherche TMDB pour permettre "Demander"
-      if (indexerData.length === 0 && query.trim()) {
+      if (indexerData.length === 0 && searchTerm) {
         const tmdbLang = language === 'fr' ? 'fr-FR' : 'en-US';
         const tmdbRes = await serverApi.searchTmdb({
-          q: query.trim(),
+          q: searchTerm,
           type: typeParam,
           language: tmdbLang,
           page: 1,
@@ -361,7 +394,7 @@ export default function Search({ onResultClick }: SearchProps) {
       setLoading(false);
       setSearchPhase('idle');
     }
-  };
+  }, [query, type, language, forceIndexerSearch, t]);
 
   const handleClear = () => {
     setQuery('');
@@ -650,17 +683,38 @@ export default function Search({ onResultClick }: SearchProps) {
         </div>
       )}
 
-      {/* État initial - pas encore de recherche */}
+      {/* État initial - pas encore de recherche + historique cliquable */}
       {!query && !loading && (
-        <div className="flex flex-col items-center justify-center py-20 tv:py-32 px-4">
-          <div className="text-center max-w-2xl tv:max-w-3xl">
+        <div className="flex flex-col items-center justify-center py-12 tv:py-20 px-4">
+          <div className="text-center max-w-2xl tv:max-w-3xl w-full">
             <div className="text-6xl tv:text-8xl mb-4 tv:mb-6">🎬</div>
             <h2 className="text-2xl tv:text-3xl font-bold text-white mb-4 tv:mb-6">
               {t('search.startSearch')}
             </h2>
-            <p className="text-gray-400 text-base tv:text-lg">
+            <p className="text-gray-400 text-base tv:text-lg mb-8 tv:mb-10">
               {t('search.startSearchDescription')}
             </p>
+            {searchHistory.length > 0 && (
+              <div className="text-left">
+                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 tv:mb-4">
+                  {t('search.recentSearches')}
+                </h3>
+                <div className="flex flex-wrap gap-2 tv:gap-3">
+                  {searchHistory.map((term) => (
+                    <button
+                      key={term}
+                      type="button"
+                      data-focusable
+                      onClick={() => handleSearch(term)}
+                      className="px-4 py-2 tv:px-5 tv:py-2.5 rounded-full bg-gray-800/90 hover:bg-gray-700 border border-gray-600 hover:border-primary-500 text-gray-200 hover:text-white text-sm tv:text-base transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black"
+                      tabIndex={0}
+                    >
+                      {term}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
