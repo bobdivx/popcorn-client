@@ -676,7 +676,8 @@ export function VideoControls({
               // pas par la position de lecture (currentTime).
               // `currentTime` ne sert qu'à initialiser l'index au moment où l'utilisateur entre dans le mode scrub.
               const selectedIndex = Math.min(count - 1, Math.max(0, tvScrubIndex));
-              const windowSize = 7;
+              // Afficher moins de vignettes pour qu'elles soient plus grandes.
+              const windowSize = 5;
               const half = Math.floor(windowSize / 2);
               const start = Math.max(0, Math.min(count - windowSize, selectedIndex - half));
               const end = Math.min(count - 1, start + windowSize - 1);
@@ -714,7 +715,8 @@ export function VideoControls({
                         ? (isTV && tvScrubFocused ? 'border-white ring-4 ring-white/95' : 'border-white ring-2 ring-white/90')
                         : 'border-white/20'
                     } shadow-2xl focus:outline-none focus:ring-2 focus:ring-white/80 transition-all ${isTV ? 'cursor-default pointer-events-none' : 'cursor-pointer hover:border-white/50'}`}
-                    style={{ width: '10.5rem' }}
+                    // Plus large (car on affiche moins de vignettes).
+                    style={{ width: '14rem' }}
                     onClick={(e: Event) => {
                       if (isTV) return;
                       e.preventDefault();
@@ -730,9 +732,6 @@ export function VideoControls({
                       loading="lazy"
                       decoding="async"
                     />
-                    <div class={`absolute bottom-0 left-0 right-0 px-3 py-2 ${selected ? 'bg-white/20' : 'bg-black/60'} text-white/95 text-lg font-semibold pointer-events-none`}>
-                      {formatTime(thumbTime)}
-                    </div>
                   </button>
                 );
               }
