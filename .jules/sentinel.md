@@ -1,0 +1,4 @@
+## 2024-05-18 - [CRITICAL] Insecure Math.random() Fallback for PRNG
+**Vulnerability:** Found insecure pseudo-random number generator fallback usage (`Math.random()`) when `crypto` functions were deemed unavailable in utility methods (`src/lib/utils/uuid.ts`, `src/lib/stubs/node-crypto.ts`).
+**Learning:** During cross-environment setups (like isomorphic frontends/Tauri and backends), attempting to conditionally support both `window.crypto` and Node.js `crypto` modules may incorrectly omit certain environment contexts and silently drop back to `Math.random()` as a faux-safety fallback for PRNG APIs.
+**Prevention:** Avoid defining a weak `Math.random()` pseudo-random generator fallback just to placate type definitions. Instead, always explicitly `throw new Error(...)` to fail-fast and securely if no cryptographically-secure source is accessible. Prioritize `globalThis.crypto.getRandomValues` to cover `window`, `self`, and modern Node/Bun edge contexts correctly.
