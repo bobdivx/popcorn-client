@@ -48,7 +48,8 @@ let state: StoreState = { ...initialState };
 const listeners = new Set<Listener>();
 let pollIntervalId: ReturnType<typeof setInterval> | null = null;
 
-const POLL_ACTIVE_MS = 1500;
+// Polling moins agressif pour réduire la charge CPU/réseau (notamment sur TV/webOS).
+const POLL_ACTIVE_MS = 4000;
 const POLL_IDLE_MS = 30000;
 
 function notify() {
