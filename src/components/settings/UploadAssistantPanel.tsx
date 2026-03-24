@@ -438,7 +438,6 @@ export default function UploadAssistantPanel() {
   const publishCountdownIntervalRef = useRef<number | null>(null);
   const handleLaunchUploadRef = useRef<() => Promise<void>>(() => Promise.resolve());
   const autoSkipStep1Ref = useRef(false);
-  const [screenshotCarouselIndex, setScreenshotCarouselIndex] = useState(0);
   const availableMediaList = mediaList.filter((m) => !excludedMediaIds.includes(m.id));
   const searchLower = mediaSearchQuery.trim().toLowerCase();
   const baseListForDisplay =
@@ -455,24 +454,6 @@ export default function UploadAssistantPanel() {
     return true;
   });
   const selectableInDisplayed = displayedMediaList.filter((m) => !excludedMediaIds.includes(m.id));
-
-  // Carrousel simple pour les captures d'écran dans le résumé (étape 3).
-  useEffect(() => {
-    if (step !== 3 || !screenshotsBaseUrl || !screenshotsCount || screenshotsCount <= 1) {
-      return;
-    }
-    setScreenshotCarouselIndex(0);
-    const id = window.setInterval(() => {
-      setScreenshotCarouselIndex((prev) => {
-        const next = prev + 1;
-        if (!screenshotsCount || screenshotsCount <= 0) return 0;
-        return next % screenshotsCount;
-      });
-    }, 3000);
-    return () => {
-      window.clearInterval(id);
-    };
-  }, [step, screenshotsBaseUrl, screenshotsCount]);
 
   const loadConfig = useCallback(async () => {
     setLoadingConfig(true);
@@ -1927,31 +1908,28 @@ export default function UploadAssistantPanel() {
                           <div className="w-full h-24 sm:h-28 rounded-lg bg-base-200/80 animate-pulse" />
                         )}
                         {screenshotsReady && (
-                          <>
-                            <div className="relative overflow-hidden rounded-lg bg-base-200 aspect-[16/9]">
-                              <div className="flex transition-transform duration-500 ease-out">
-                                {[...Array(screenshotsCount)].map((_, idx) => {
-                                  const ext = screenshotsSource === 'cloud' ? 'jpg' : 'png';
-                                  const src = `${screenshotsBaseUrl.replace(/\/$/, '')}/${idx}.${ext}`;
-                                  const isActive = idx === screenshotCarouselIndex;
-                                  return (
-                                    <img
-                                      key={idx}
-                                      src={src}
-                                      alt={t('settings.uploadTrackerPanel.screenshotAlt', {
-                                        index: idx + 1,
-                                      })}
-                                      className={`absolute inset-0 w-full h-full object-cover ${
-                                        isActive ? 'opacity-100' : 'opacity-0'
-                                      }`}
-                                      loading="lazy"
-                                    />
-                                  );
-                                })}
-                              </div>
+                          <div className="h-56 sm:h-64 overflow-hidden">
+                            <div className="grid h-full grid-rows-3 gap-2">
+                              {[0, 1, 2].map((idx) => {
+                                const ext = screenshotsSource === 'cloud' ? 'jpg' : 'png';
+                                const src = `${screenshotsBaseUrl.replace(/\/$/, '')}/${idx}.${ext}`;
+                                const hasScreenshot = idx < screenshotsCount;
+                                return hasScreenshot ? (
+                                  <img
+                                    key={idx}
+                                    src={src}
+                                    alt={t('settings.uploadTrackerPanel.screenshotAlt', {
+                                      index: idx + 1,
+                                    })}
+                                    className="w-full h-full rounded-lg bg-base-200 object-cover"
+                                    loading="lazy"
+                                  />
+                                ) : (
+                                  <div key={idx} className="w-full h-full rounded-lg bg-base-200/60" aria-hidden />
+                                );
+                              })}
                             </div>
-                            {/* Footer de texte retiré pour alléger la carte */}
-                          </>
+                          </div>
                         )}
                       </div>
                     )}
