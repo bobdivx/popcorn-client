@@ -45,6 +45,7 @@ export default function BackendStatusBadge({
   const [actionLoading, setActionLoading] = useState<'start' | 'stop' | 'restart' | null>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const offlineConfirmTimerRef = useRef<number | null>(null);
 
   // Charger la version client depuis VERSION.json (public/)
   useEffect(() => {
@@ -94,7 +95,8 @@ export default function BackendStatusBadge({
     return () => { cancelled = true; };
   }, []);
 
-  const checkHealth = async () => {
+  const checkHealth = async (options?: { silent?: boolean }) => {
+    const silent = options?.silent === true;
     if (isFriendBackend()) {
       // Backend d'un ami : ne jamais provoquer d'erreur ni de health check (séparation fiable).
       setStatus('unknown');
@@ -107,7 +109,9 @@ export default function BackendStatusBadge({
       setStatus('unknown');
       return;
     }
-    setStatus('checking');
+    if (!silent) {
+      setStatus('checking');
+    }
     setLastError(null);
     setBackendVersion(null);
     try {
@@ -142,25 +146,42 @@ export default function BackendStatusBadge({
     // S'abonner au store : quand il repasse en "online" (après une requête réussie), rafraîchir le badge.
     const unsub = subscribeBackendConnectionStore((storeState) => {
       if (storeState.status === 'online') {
-        checkHealth();
+        if (offlineConfirmTimerRef.current != null) {
+          window.clearTimeout(offlineConfirmTimerRef.current);
+          offlineConfirmTimerRef.current = null;
+        }
+        checkHealth({ silent: true });
       } else if (storeState.status === 'offline') {
-        setStatus('error');
+        // Evite le clignotement: confirmer "offline" via un health-check court.
+        if (offlineConfirmTimerRef.current != null) {
+          window.clearTimeout(offlineConfirmTimerRef.current);
+        }
+        offlineConfirmTimerRef.current = window.setTimeout(() => {
+          void checkHealth({ silent: true });
+          offlineConfirmTimerRef.current = null;
+        }, 700);
       }
     });
 
     // Si le store indique déjà offline au montage, refléter l'état et lancer tout de suite un check.
     if (initialStore.status !== 'offline') {
-      checkHealth();
+      checkHealth({ silent: true });
     } else {
       setStatus('error');
-      checkHealth(); // Vérifier tout de suite au cas où le serveur est déjà revenu
+      checkHealth({ silent: true }); // Vérifier tout de suite au cas où le serveur est déjà revenu
     }
 
     const interval = setInterval(() => {
       if (isFriendBackend()) return;
-      setTimeout(checkHealth, 0);
+      setTimeout(() => {
+        void checkHealth({ silent: true });
+      }, 0);
     }, 20_000);
     return () => {
+      if (offlineConfirmTimerRef.current != null) {
+        window.clearTimeout(offlineConfirmTimerRef.current);
+        offlineConfirmTimerRef.current = null;
+      }
       unsub();
       clearInterval(interval);
     };
