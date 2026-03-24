@@ -743,6 +743,7 @@
       "wizardSummaryScreenshotsCount": "{count} capture(s) générée(s)",
       "wizardSummaryScreenshotsAuto": "défilement automatique",
       "wizardSummaryExecutionDetail": "{processed} / {total} média(s) traités",
+      "syncTrackerRulesProgress": "Synchronisation des règles C411 depuis popcorn-web…",
       "screenshotAlt": "Capture d'écran {index}",
       "wizardTorrentFactoryTitle": "Torrent factory",
       "wizardTorrentFactoryHint": "Progression en direct de toutes les étapes du pipeline (configuration, préparation, preview et upload).",
