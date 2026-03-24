@@ -26,6 +26,27 @@ import Library from '../Library';
 
 const MIN_ITEMS_PER_GENRE_ROW = 10;
 
+function parseSortableTimestamp(value?: string): number {
+  if (!value) return 0;
+  const ts = Date.parse(value);
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function getSeriesSortTimestamp(serie: SeriesData): number {
+  const firstAirTs = parseSortableTimestamp(serie.firstAirDate);
+  if (firstAirTs > 0) return firstAirTs;
+  if (typeof serie.year === 'number' && Number.isFinite(serie.year)) {
+    return Date.UTC(serie.year, 0, 1);
+  }
+  return 0;
+}
+
+function compareSeriesByRecency(a: SeriesData, b: SeriesData): number {
+  const byDate = getSeriesSortTimestamp(b) - getSeriesSortTimestamp(a);
+  if (byDate !== 0) return byDate;
+  return a.title.localeCompare(b.title);
+}
+
 export default function SeriesDashboard() {
   const { t, language } = useI18n();
   const { series, loading, error, hasMore, loadMore, clearAndRefetch, refetchSilent, refetchReplaceSilent } = useInfiniteSeries();
@@ -294,11 +315,7 @@ export default function SeriesDashboard() {
 
     // Trier chaque groupe par date (plus récent en premier)
     Object.keys(grouped).forEach(genre => {
-      grouped[genre].sort((a, b) => {
-        const dateA = a.firstAirDate ? new Date(a.firstAirDate).getTime() : 0;
-        const dateB = b.firstAirDate ? new Date(b.firstAirDate).getTime() : 0;
-        return dateB - dateA;
-      });
+      grouped[genre].sort(compareSeriesByRecency);
     });
 
     return grouped;
@@ -308,11 +325,7 @@ export default function SeriesDashboard() {
   const recentSeriesRow = useMemo(() => {
     if (series.length === 0) return [];
     return [...series]
-      .sort((a, b) => {
-        const dateA = a.firstAirDate ? new Date(a.firstAirDate).getTime() : 0;
-        const dateB = b.firstAirDate ? new Date(b.firstAirDate).getTime() : 0;
-        return dateB - dateA;
-      })
+      .sort(compareSeriesByRecency)
       .slice(0, 40);
   }, [series]);
 
@@ -329,11 +342,7 @@ export default function SeriesDashboard() {
   const heroSeries = useMemo(() => {
     return [...series]
       .filter(s => s.poster || s.backdrop)
-      .sort((a, b) => {
-        const dateA = a.firstAirDate ? new Date(a.firstAirDate).getTime() : 0;
-        const dateB = b.firstAirDate ? new Date(b.firstAirDate).getTime() : 0;
-        return dateB - dateA;
-      })
+      .sort(compareSeriesByRecency)
       .slice(0, 3)
       .map(s => ({
         ...s,

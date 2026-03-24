@@ -8,9 +8,12 @@ const POLL_INTERVAL = 2000; // 2 secondes
  * Hook pour récupérer les stats de téléchargement d'un torrent par son infoHash
  * Arrête automatiquement le polling si le torrent est complété ou en erreur
  */
-export function useTorrentProgress(infoHash: string | undefined | null) {
+export function useTorrentProgress(
+  infoHash: string | undefined | null,
+  options?: { enabled?: boolean }
+) {
+  const enabled = options?.enabled ?? true;
   const [torrentStats, setTorrentStats] = useState<ClientTorrentStats | null>(null);
-  const [loading, setLoading] = useState(false);
   const intervalRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
 
@@ -22,7 +25,7 @@ export function useTorrentProgress(infoHash: string | undefined | null) {
   }, []);
 
   useEffect(() => {
-    if (!infoHash) {
+    if (!enabled || !infoHash) {
       setTorrentStats(null);
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -35,7 +38,6 @@ export function useTorrentProgress(infoHash: string | undefined | null) {
       if (!mountedRef.current) return;
       
       try {
-        setLoading(true);
         const stats = await clientApi.getTorrent(infoHash);
         
         if (!mountedRef.current) return;
@@ -53,10 +55,6 @@ export function useTorrentProgress(infoHash: string | undefined | null) {
         // Ignorer silencieusement les erreurs (torrent peut ne pas exister)
         if (mountedRef.current) {
           setTorrentStats(null);
-        }
-      } finally {
-        if (mountedRef.current) {
-          setLoading(false);
         }
       }
     };
@@ -81,7 +79,7 @@ export function useTorrentProgress(infoHash: string | undefined | null) {
         intervalRef.current = null;
       }
     };
-  }, [infoHash]);
+  }, [infoHash, enabled]);
 
-  return { torrentStats, loading };
+  return { torrentStats };
 }

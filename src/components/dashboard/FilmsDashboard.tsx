@@ -26,6 +26,27 @@ import Library from '../Library';
 
 const MIN_ITEMS_PER_GENRE_ROW = 10;
 
+function parseSortableTimestamp(value?: string): number {
+  if (!value) return 0;
+  const ts = Date.parse(value);
+  return Number.isFinite(ts) ? ts : 0;
+}
+
+function getFilmSortTimestamp(film: FilmData): number {
+  const releaseTs = parseSortableTimestamp(film.releaseDate);
+  if (releaseTs > 0) return releaseTs;
+  if (typeof film.year === 'number' && Number.isFinite(film.year)) {
+    return Date.UTC(film.year, 0, 1);
+  }
+  return 0;
+}
+
+function compareFilmsByRecency(a: FilmData, b: FilmData): number {
+  const byDate = getFilmSortTimestamp(b) - getFilmSortTimestamp(a);
+  if (byDate !== 0) return byDate;
+  return a.title.localeCompare(b.title);
+}
+
 export default function FilmsDashboard() {
   const { t, language } = useI18n();
   const { films, loading, error, hasMore, loadMore, clearAndRefetch, refetchSilent, refetchReplaceSilent } = useInfiniteFilms();
@@ -293,11 +314,7 @@ export default function FilmsDashboard() {
 
     // Trier chaque groupe par date (plus récent en premier)
     Object.keys(grouped).forEach(genre => {
-      grouped[genre].sort((a, b) => {
-        const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
-        const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-        return dateB - dateA;
-      });
+      grouped[genre].sort(compareFilmsByRecency);
     });
 
     return grouped;
@@ -307,11 +324,7 @@ export default function FilmsDashboard() {
   const recentFilmsRow = useMemo(() => {
     if (films.length === 0) return [];
     return [...films]
-      .sort((a, b) => {
-        const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
-        const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-        return dateB - dateA;
-      })
+      .sort(compareFilmsByRecency)
       .slice(0, 40);
   }, [films]);
 
@@ -328,11 +341,7 @@ export default function FilmsDashboard() {
   const heroFilms = useMemo(() => {
     return [...films]
       .filter(f => f.poster || f.backdrop)
-      .sort((a, b) => {
-        const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
-        const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-        return dateB - dateA;
-      })
+      .sort(compareFilmsByRecency)
       .slice(0, 3)
       .map(f => ({
         ...f,

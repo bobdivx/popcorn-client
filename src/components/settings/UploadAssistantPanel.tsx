@@ -23,7 +23,7 @@ import {
 import { Modal } from '../ui/Modal';
 import { DescriptionPreview } from '../upload/DescriptionPreview';
 import { ArrowLeft, ArrowRight, Check, Loader2, Search, Upload, Film, Radar, Images, Activity } from 'lucide-preact';
-import { Chart, ArcElement, DoughnutController, Tooltip, Legend } from 'chart.js';
+import { Chart, ArcElement, DoughnutController, PolarAreaController, RadialLinearScale, Tooltip, Legend } from 'chart.js';
 
 const SAVED_MASK = '********';
 const WIZARD_STEPS = 3;
@@ -75,13 +75,29 @@ type UploadBatchStats = {
   error: number;
 };
 
-Chart.register(ArcElement, DoughnutController, Tooltip, Legend);
+Chart.register(ArcElement, DoughnutController, PolarAreaController, RadialLinearScale, Tooltip, Legend);
 
 function PipelineDonutChart({
   steps,
 }: {
   steps: Array<{ key: string; title: string; current: number; target: number; color: string }>;
 }) {
+  const toRgba = (color: string, alpha: number): string => {
+    if (color.startsWith('#')) {
+      const hex = color.slice(1);
+      const normalized = hex.length === 3 ? hex.split('').map((c) => c + c).join('') : hex;
+      const int = Number.parseInt(normalized, 16);
+      const r = (int >> 16) & 255;
+      const g = (int >> 8) & 255;
+      const b = int & 255;
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+    if (color.startsWith('rgb(')) {
+      return color.replace('rgb(', 'rgba(').replace(')', `, ${alpha})`);
+    }
+    return color;
+  };
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const chartRef = useRef<Chart | null>(null);
 
@@ -90,6 +106,7 @@ function PipelineDonutChart({
   const totalPct = Math.round(totalProgress * 100);
   const activeStep =
     steps.find((s, idx) => values[idx] < 1 && s.target > 0) ?? steps[steps.length - 1] ?? null;
+  const activeStepKey = activeStep?.key ?? null;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -98,19 +115,19 @@ function PipelineDonutChart({
     if (!ctx) return;
 
     chartRef.current = new Chart(ctx, {
-      type: 'doughnut',
+      type: 'polarArea',
       data: {
         labels: steps.map((s) => s.title),
         datasets: [
           {
             data: values.map((v) => (v <= 0 ? 0.001 : v)),
-            backgroundColor: steps.map((s) => s.color),
-            borderWidth: 0,
+            backgroundColor: steps.map((s) => toRgba(s.color, 0.9)),
+            borderColor: 'rgba(15, 23, 42, 0.8)',
+            borderWidth: 1.5,
           },
         ],
       },
       options: {
-        cutout: '70%',
         plugins: {
           legend: { display: false },
           tooltip: {
@@ -122,6 +139,16 @@ function PipelineDonutChart({
                 return `${step.title}: ${step.current}/${step.target} (${pct}%)`;
               },
             },
+          },
+        },
+        scales: {
+          r: {
+            beginAtZero: true,
+            max: 1,
+            ticks: { display: false },
+            grid: { display: false },
+            angleLines: { display: false },
+            pointLabels: { display: false },
           },
         },
         responsive: true,
@@ -139,36 +166,55 @@ function PipelineDonutChart({
     if (!chartRef.current) return;
     chartRef.current.data.labels = steps.map((s) => s.title);
     chartRef.current.data.datasets[0].data = values.map((v) => (v <= 0 ? 0.001 : v));
-    chartRef.current.data.datasets[0].backgroundColor = steps.map((s) => s.color);
+    chartRef.current.data.datasets[0].backgroundColor = steps.map((s) => toRgba(s.color, 0.9));
+    chartRef.current.data.datasets[0].borderColor = 'rgba(15, 23, 42, 0.8)';
+    chartRef.current.data.datasets[0].borderWidth = 1.5;
     chartRef.current.update('active');
   }, [JSON.stringify(steps.map((s) => `${s.key}:${s.current}/${s.target}`))]);
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="relative w-32 h-32 sm:w-40 sm:h-40 mx-auto">
+      <div className="flex w-full flex-col gap-3">
+      <div className="relative mx-auto w-full max-w-[220px] aspect-square sm:max-w-[160px]">
         <canvas ref={canvasRef} />
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          {activeStep && (
-            <span className="text-[10px] uppercase tracking-wide text-[var(--ds-text-tertiary)] text-center px-3">
-              {activeStep.title}
-            </span>
-          )}
-          <span className="text-xl sm:text-2xl font-semibold tabular-nums text-[var(--ds-text-primary)]">
-            {totalPct}%
-          </span>
-        </div>
+      </div>
+      <div className="text-center">
+        <span className="text-xl sm:text-2xl font-semibold tabular-nums text-[var(--ds-text-primary)]">
+          {totalPct}%
+        </span>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
         {steps.map((step) => {
+          const isActive = step.key === activeStepKey;
+          const ratio = step.target > 0 ? Math.min(step.current / step.target, 1) : 0;
+          const isDone = ratio >= 1;
+          const rowStateClass = isDone
+            ? 'border-success/50 bg-success/10'
+            : isActive
+              ? 'border-warning/60 bg-warning/10'
+              : 'border-base-300/70 bg-base-200/30';
           return (
-            <div key={step.key} className="flex items-center justify-between gap-2 text-[11px]">
-              <span className="flex items-center gap-1 truncate text-[var(--ds-text-secondary)]">
+            <div
+              key={step.key}
+              className={`rounded-md border px-2 py-1.5 flex items-center justify-between gap-2 text-[11px] ${rowStateClass}`}
+            >
+              <div className="min-w-0 flex items-center gap-2">
                 <span
                   className="inline-block w-2 h-2 rounded-full flex-shrink-0"
                   style={{ backgroundColor: step.color }}
                 />
-                <span className="truncate">{step.title}</span>
-              </span>
+                <span
+                  className={`truncate ${
+                    isActive ? 'text-[var(--ds-text-primary)] font-medium' : 'text-[var(--ds-text-secondary)]'
+                  }`}
+                >
+                  {step.title}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span className="text-[10px] tabular-nums text-[var(--ds-text-tertiary)]">
+                  {step.current}/{step.target}
+                </span>
+              </div>
             </div>
           );
         })}
@@ -1915,7 +1961,7 @@ export default function UploadAssistantPanel() {
                     title=""
                     accent="yellow"
                     cardVariant="glass"
-                    className="h-full"
+                    className="h-full w-full"
                   >
                     <div className="mt-3 space-y-3">
                       <PipelineDonutChart steps={pipelineSteps} />

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
+import { memo } from 'preact/compat';
 import { Film, Users, Sprout, CheckCircle2 } from 'lucide-preact';
 import type { ContentItem } from '../../../lib/client/types';
 import { FocusableCard } from '../../ui/FocusableCard';
@@ -8,13 +9,16 @@ interface TorrentPosterProps {
   item: ContentItem;
 }
 
-export function TorrentPoster({ item }: TorrentPosterProps) {
+const IS_WEBOS = String((import.meta as any)?.env?.WEBOS ?? 'false') === 'true';
+
+function TorrentPosterComponent({ item }: TorrentPosterProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(item.poster || null);
   
-  // Récupérer les stats de téléchargement si infoHash est disponible
-  const { torrentStats } = useTorrentProgress(item.infoHash);
+  // Polling stats uniquement quand utile pour éviter de surcharger la navigation.
+  const shouldPollStats = isHovered || isFocused || Boolean(item.isDownloading);
+  const { torrentStats } = useTorrentProgress(item.infoHash, { enabled: shouldPollStats });
 
   const playHref = item.infoHash
     ? `/torrents?slug=${encodeURIComponent(item.id)}&infoHash=${encodeURIComponent(item.infoHash)}&from=dashboard`
@@ -31,6 +35,9 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
   const isCompleted = torrentStats && (torrentStats.state === 'completed' || torrentStats.state === 'seeding');
   const progressPercent = torrentStats ? Math.round(torrentStats.progress * 100) : 0;
   const showOverlay = isHovered || isFocused;
+  const cardAnimationClasses = IS_WEBOS
+    ? 'transform transition-opacity duration-150 ease-out'
+    : 'transform transition-all duration-200 ease-out hover:scale-[1.03] hover:shadow-primary will-change-transform';
 
   const handleClick = (e: MouseEvent | KeyboardEvent) => {
     e.preventDefault();
@@ -72,7 +79,7 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
           setIsHovered(false);
         }}
       >
-        <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-lg rounded-lg transform transition-all duration-200 ease-out hover:scale-[1.03] hover:shadow-primary focus-within:shadow-primary-lg will-change-transform">
+        <div className={`relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-lg rounded-lg focus-within:shadow-primary-lg ${cardAnimationClasses}`}>
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -195,7 +202,7 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
           <div className="absolute -bottom-1 left-0 right-0 h-1 tv:h-1.5 rounded-b-lg overflow-hidden z-10">
             <div 
               className={`h-full transition-all duration-300 ${getHealthBarColor(item.downloadSpeed)} ${
-                item.downloadSpeed > 0 ? 'animate-pulse' : ''
+                !IS_WEBOS && item.downloadSpeed > 0 ? 'animate-pulse' : ''
               }`}
               style={{ width: '100%' }}
             />
@@ -205,3 +212,5 @@ export function TorrentPoster({ item }: TorrentPosterProps) {
     </div>
   );
 }
+
+export const TorrentPoster = memo(TorrentPosterComponent);
