@@ -1173,6 +1173,18 @@ export default function UploadAssistantPanel() {
     let errorCount = 0;
     const failureDetails: string[] = [];
     const duplicateRegex = /(doublon|deja existant|already exists|already present|cross-slot)/i;
+
+    if (isC411Selected && !uploadWasCancelledRef.current) {
+      setProgressMessage(t('settings.uploadTrackerPanel.syncTrackerRulesProgress'));
+      await serverApi.syncTrackerCorrectionRules('C411');
+      if (uploadWasCancelledRef.current) {
+        setProgressMessage(null);
+        setUploading(false);
+        return;
+      }
+      setProgressMessage(null);
+    }
+
     try {
       for (let index = 0; index < selectedMediaIds.length; index += 1) {
         if (uploadWasCancelledRef.current) break;

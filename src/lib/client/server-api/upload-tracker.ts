@@ -367,6 +367,23 @@ export const uploadTrackerMethods = {
   },
 
   /**
+   * Recharge le cache local des règles de correction tracker (popcorn-web → SQLite serveur).
+   * Utile avant un upload C411 pour récupérer les dernières règles sans redémarrer le backend.
+   */
+  async syncTrackerCorrectionRules(
+    this: UploadTrackerClientAccess,
+    tracker?: string
+  ): Promise<ApiResponse<{ rules_synced: number; tracker: string }>> {
+    return this.backendRequest<{ rules_synced: number; tracker: string }>(
+      '/api/library/uploader/sync-tracker-correction-rules',
+      {
+        method: 'POST',
+        body: JSON.stringify({ tracker: tracker?.trim() || undefined }),
+      }
+    );
+  },
+
+  /**
    * Génère les captures d'écran pour un média (FFmpeg) ; elles seront réutilisées à l'upload.
    */
   async generateScreenshots(

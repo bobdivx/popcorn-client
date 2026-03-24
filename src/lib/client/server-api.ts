@@ -1327,6 +1327,7 @@ interface IServerApiClientPublic {
   validateUploadMedia(localMediaId: string): Promise<ApiResponse<UploadMediaValidationResponse>>;
   getPublishedUploads(): Promise<ApiResponse<PublishedUploadMediaEntry[]>>;
   clearFailedUploads(): Promise<ApiResponse<{ deleted: number }>>;
+  syncTrackerCorrectionRules(tracker?: string): Promise<ApiResponse<{ rules_synced: number; tracker: string }>>;
   generateScreenshots(localMediaId: string): Promise<ApiResponse<{ count: number; screenshot_base_url: string }>>;
   checkDuplicateOnIndexer(params: { indexer_id: string; local_media_ids: string[] }): Promise<ApiResponse<CheckDuplicateResponse>>;
   getUploadPreview(localMediaId: string, tracker?: string, screenshotBaseUrl?: string): Promise<ApiResponse<UploaderPreviewResponse>>;
