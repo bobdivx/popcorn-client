@@ -185,21 +185,36 @@ function PipelineDonutChart({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
         {steps.map((step) => {
           const isActive = step.key === activeStepKey;
+          const ratio = step.target > 0 ? Math.min(step.current / step.target, 1) : 0;
+          const isDone = ratio >= 1;
+          const rowStateClass = isDone
+            ? 'border-success/50 bg-success/10'
+            : isActive
+              ? 'border-warning/60 bg-warning/10'
+              : 'border-base-300/70 bg-base-200/30';
           return (
-            <div key={step.key} className="flex items-center justify-between gap-2 text-[11px]">
-              <span
-                className={`flex items-center gap-1 truncate ${
-                  isActive ? 'text-[var(--ds-text-primary)] font-medium' : 'text-[var(--ds-text-secondary)]'
-                }`}
-              >
+            <div
+              key={step.key}
+              className={`rounded-md border px-2 py-1.5 flex items-center justify-between gap-2 text-[11px] ${rowStateClass}`}
+            >
+              <div className="min-w-0 flex items-center gap-2">
                 <span
                   className="inline-block w-2 h-2 rounded-full flex-shrink-0"
                   style={{ backgroundColor: step.color }}
                 />
-                <span className={`truncate ${isActive ? 'badge badge-primary badge-xs py-1 px-2' : ''}`}>
+                <span
+                  className={`truncate ${
+                    isActive ? 'text-[var(--ds-text-primary)] font-medium' : 'text-[var(--ds-text-secondary)]'
+                  }`}
+                >
                   {step.title}
                 </span>
-              </span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <span className="text-[10px] tabular-nums text-[var(--ds-text-tertiary)]">
+                  {step.current}/{step.target}
+                </span>
+              </div>
             </div>
           );
         })}
