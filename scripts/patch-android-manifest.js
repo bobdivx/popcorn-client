@@ -23,13 +23,16 @@ const projectRoot = process.cwd();
 const possibleManifestPaths = [
   // Tauri v2 - chemin standard
   join(projectRoot, 'src-tauri', 'gen', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'),
-  // Tauri v2 - chemin alternatif
-  join(projectRoot, 'src-tauri', 'gen', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'),
   // Build output
   join(projectRoot, 'src-tauri', 'target', 'aarch64-linux-android', 'release', 'app', 'src', 'main', 'AndroidManifest.xml'),
   // Chemin de build alternatif
   join(projectRoot, 'src-tauri', 'android', 'app', 'src', 'main', 'AndroidManifest.xml'),
 ];
+
+function appendBeforeManifestClose(content, lineToAppend) {
+  const manifestClosePattern = /(\s*)(<\/manifest>)/;
+  return content.replace(manifestClosePattern, `\n    ${lineToAppend}$1$2`);
+}
 
 function findManifestPath() {
   for (const path of possibleManifestPaths) {
@@ -114,8 +117,10 @@ function patchManifest(manifestPath) {
   // Si touchscreen est ABSENT du manifest, Android l'implique comme requis → l'ajouter explicitement
   if (!content.includes('android.hardware.touchscreen')) {
     console.log('🔧 Ajout explicite: touchscreen non requis (absent du manifest, Android l\'implique sinon)');
-    const manifestClosePattern = /(\s*)(<\/manifest>)/;
-    content = content.replace(manifestClosePattern, '\n    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />$1$2');
+    content = appendBeforeManifestClose(
+      content,
+      '<uses-feature android:name="android.hardware.touchscreen" android:required="false" />'
+    );
     modified = true;
   }
 
@@ -143,8 +148,10 @@ function patchManifest(manifestPath) {
   // C'est la cause principale des "0 appareils TV" sur Play Console
   if (!content.includes('android.hardware.faketouch')) {
     console.log('🔧 Ajout explicite: faketouch non requis (absent du manifest, Android l\'implique sinon → bloque les TVs)');
-    const manifestClosePattern = /(\s*)(<\/manifest>)/;
-    content = content.replace(manifestClosePattern, '\n    <uses-feature android:name="android.hardware.faketouch" android:required="false" />$1$2');
+    content = appendBeforeManifestClose(
+      content,
+      '<uses-feature android:name="android.hardware.faketouch" android:required="false" />'
+    );
     modified = true;
   }
   
@@ -162,10 +169,11 @@ function patchManifest(manifestPath) {
   // 4. Ajouter la déclaration leanback si elle n'existe pas (pour support TV optionnel)
   if (!content.includes('android.software.leanback')) {
     console.log('🔧 Ajout: déclaration leanback (non requis) pour support TV optionnel');
-    // Trouver la balise </manifest> et insérer avant
-    const manifestClosePattern = /(\s*)(<\/manifest>)/;
-    const leanbackDeclaration = '\n    <!-- Support Android TV optionnel -->\n    <uses-feature android:name="android.software.leanback" android:required="false" />';
-    content = content.replace(manifestClosePattern, `${leanbackDeclaration}$1$2`);
+    content = appendBeforeManifestClose(content, '<!-- Support Android TV optionnel -->');
+    content = appendBeforeManifestClose(
+      content,
+      '<uses-feature android:name="android.software.leanback" android:required="false" />'
+    );
     modified = true;
   }
 
