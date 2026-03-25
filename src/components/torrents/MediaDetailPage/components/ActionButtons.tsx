@@ -145,20 +145,62 @@ export function ActionButtons({
     streamingTorrentActive && canStream && shouldShowPlayButton &&
     !isDownloadComplete && !showProgressNextToCancel && !downloadingToClient;
 
+  // Pack preview (torrent unique mais sélection possible via only_files) :
+  // le bouton principal doit agir sur l'épisode sélectionné, jamais sur tout le pack.
+  const isPackPreview = isPackWithMultipleFiles && !hasInfoHash;
+  /** Série TV : lecture / téléchargement par épisode dans le carrousel — pas de pill « Lire » global (sauf pack preview). */
+  const hidePrimaryPlayForTvSeries = torrent.tmdbType === 'tv' && !isPackPreview;
+  const isPackEpisodeSelected = isPackPreview && selectedPackEpisodePreviewIndex != null;
+  const canPlayPackPreviewEpisode = isPackEpisodeSelected && canStream && onPlaySingleEpisode != null;
+  const canDownloadPackPreviewEpisode = isPackEpisodeSelected && onDownloadSingleEpisode != null;
+  const primaryPackMode: 'play' | 'download' = canPlayPackPreviewEpisode ? 'play' : 'download';
+  const isPrimaryPackSelectionMissing = isPackPreview && !isPackEpisodeSelected;
+
   return (
     <div className="mb-6 space-y-3">
       {/* ── Rangée principale ── */}
-      <div className="flex flex-wrap gap-3 tv:gap-4 items-center">
+      <div className="flex flex-nowrap gap-3 tv:gap-4 items-center overflow-x-auto scrollbar-hide">
 
         {/* Bouton Lire / Télécharger — gradient animé, rounded-full */}
-        {shouldShowButton && !(isDownloadInProgress && onCancelDownload && showProgressNextToCancel) && (
+        {!hidePrimaryPlayForTvSeries &&
+          shouldShowButton &&
+          !(isDownloadInProgress && onCancelDownload && showProgressNextToCancel) && (
           <button
-            onClick={shouldShowPlayButton ? onPlay : onDownload}
-            disabled={countdownRemaining !== null && countdownRemaining > 0}
-            title={isPlayStreamingMode ? t('playback.playStreamingLabel') : (shouldShowPlayButton && hasSavedPosition ? t('dashboard.resumeWatching') : undefined)}
+            onClick={() => {
+              // Override pack preview : Play/Download portent sur l'épisode sélectionné.
+              if (isPackPreview && isPackEpisodeSelected) {
+                if (primaryPackMode === 'play' && canPlayPackPreviewEpisode) {
+                  void onPlaySingleEpisode!(selectedPackEpisodePreviewIndex!);
+                  return;
+                }
+                if (primaryPackMode === 'download' && canDownloadPackPreviewEpisode) {
+                  void onDownloadSingleEpisode!(selectedPackEpisodePreviewIndex!);
+                  return;
+                }
+              }
+              shouldShowPlayButton ? onPlay() : onDownload();
+            }}
+            disabled={
+              (countdownRemaining !== null && countdownRemaining > 0) ||
+              isPrimaryPackSelectionMissing ||
+              (isPackPreview && isPackEpisodeSelected && !canPlayPackPreviewEpisode && !canDownloadPackPreviewEpisode)
+            }
+            title={
+              isPackPreview && isPackEpisodeSelected
+                ? primaryPackMode === 'play'
+                  ? t('mediaDetail.playThisEpisode')
+                  : t('mediaDetail.downloadThisEpisode')
+                : isPlayStreamingMode
+                  ? t('playback.playStreamingLabel')
+                  : shouldShowPlayButton && hasSavedPosition
+                    ? t('dashboard.resumeWatching')
+                    : undefined
+            }
             data-focusable
             data-media-detail-primary-action
-            data-media-detail-action={shouldShowPlayButton ? 'play' : 'download'}
+            data-media-detail-action={
+              isPackPreview && isPackEpisodeSelected ? primaryPackMode : shouldShowPlayButton ? 'play' : 'download'
+            }
             tabIndex={0}
             className="gtv-pill-btn ds-focus-glow ds-active-glow ds-sync-active-pulse inline-flex items-center gap-2.5 font-bold text-base tv:text-2xl tv:px-10 tv:py-5 tv:min-h-[68px] disabled:opacity-50 disabled:cursor-not-allowed border border-violet-500/40 hover:border-violet-400/60 hover:bg-violet-900/20"
           >
@@ -177,6 +219,18 @@ export function ActionButtons({
                 <Loader2 className="h-5 w-5 tv:h-7 tv:w-7 animate-spin shrink-0" size={20} />
                 {countdownRemaining} s...
               </>
+            ) : isPackPreview && isPackEpisodeSelected ? (
+              primaryPackMode === 'play' ? (
+                <>
+                  <Play className="h-5 w-5 tv:h-7 tv:w-7 fill-current shrink-0" size={20} />
+                  {t('mediaDetail.playThisEpisode')}
+                </>
+              ) : (
+                <>
+                  <Download className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" size={20} />
+                  {t('mediaDetail.downloadThisEpisode')}
+                </>
+              )
             ) : shouldShowPlayButton ? (
               <>
                 <Play className="h-5 w-5 tv:h-7 tv:w-7 fill-current shrink-0" size={20} />
@@ -186,14 +240,14 @@ export function ActionButtons({
             ) : (
               <>
                 <Download className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" size={20} />
-                {isPackWithMultipleFiles ? 'Télécharger la saison' : t('common.download')}
+                {isPackPreview ? t('mediaDetail.downloadThisEpisode') : isPackWithMultipleFiles ? 'Télécharger la saison' : t('common.download')}
               </>
             )}
           </button>
         )}
 
         {/* Télécharger à côté de Lire (streaming) — style glass pill */}
-        {showDownloadButtonAlongsidePlay && (
+        {!hidePrimaryPlayForTvSeries && showDownloadButtonAlongsidePlay && (
           <button
             type="button"
             onClick={onDownload}
@@ -206,44 +260,6 @@ export function ActionButtons({
             <Download className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" size={20} />
             {isPackWithMultipleFiles ? t('playback.downloadFullSeason') : t('common.download')}
           </button>
-        )}
-
-        {/* Pack : épisode sélectionné */}
-        {isPackWithMultipleFiles && selectedPackEpisodePreviewIndex != null && (onDownloadSingleEpisode != null || (canStream && onPlaySingleEpisode != null)) && (
-          <>
-            {canStream && onPlaySingleEpisode != null && (
-              <button
-                type="button"
-                onClick={() => void onPlaySingleEpisode(selectedPackEpisodePreviewIndex!)}
-                disabled={downloadingToClient}
-                title={t('mediaDetail.playThisEpisode')}
-                data-focusable
-                tabIndex={0}
-                className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 font-bold text-base disabled:opacity-50 border border-violet-500/40 hover:border-violet-400/60 hover:bg-violet-900/20"
-              >
-                <Play className="h-5 w-5 fill-current shrink-0" size={20} />
-                {t('mediaDetail.playThisEpisode')}
-              </button>
-            )}
-            {onDownloadSingleEpisode != null && (
-              <button
-                type="button"
-                onClick={() => void onDownloadSingleEpisode(selectedPackEpisodePreviewIndex!)}
-                disabled={downloadingToClient}
-                title={t('mediaDetail.downloadThisEpisode')}
-                data-focusable
-                tabIndex={0}
-                className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 disabled:opacity-50"
-              >
-                {downloadingToClient ? (
-                  <Loader2 className="h-5 w-5 animate-spin shrink-0" size={20} />
-                ) : (
-                  <Download className="h-5 w-5 shrink-0" size={20} />
-                )}
-                {t('mediaDetail.downloadThisEpisode')}
-              </button>
-            )}
-          </>
         )}
 
         {/* Pack sans sélection */}

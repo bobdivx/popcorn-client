@@ -494,6 +494,21 @@ export function createDemoServerApi(): Record<string, unknown> {
     async testIndexerStream(): Promise<ApiResponse<unknown>> {
       return success({});
     },
+    async getBulkTorrentZipPreferences(): Promise<ApiResponse<{ sourceUrl?: string | null; selectedRelativePaths: string[] }>> {
+      return success({ sourceUrl: null, selectedRelativePaths: [] });
+    },
+    async putBulkTorrentZipPreferences(): Promise<ApiResponse<{ sourceUrl?: string | null; selectedRelativePaths: string[] }>> {
+      return success({ sourceUrl: null, selectedRelativePaths: [] });
+    },
+    async previewBulkTorrentZipFromFile(): Promise<ApiResponse<unknown>> {
+      return { success: false, error: 'DemoMode', message: 'Non disponible en démo.' };
+    },
+    async previewBulkTorrentZipFromUrl(): Promise<ApiResponse<unknown>> {
+      return { success: false, error: 'DemoMode', message: 'Non disponible en démo.' };
+    },
+    async importBulkTorrentZip(): Promise<ApiResponse<unknown>> {
+      return { success: false, error: 'DemoMode', message: 'Non disponible en démo.' };
+    },
 
     async resetBackendDatabase(): Promise<ApiResponse<void>> {
       return success(undefined);

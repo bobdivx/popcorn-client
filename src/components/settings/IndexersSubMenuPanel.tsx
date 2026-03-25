@@ -51,6 +51,7 @@ export default function IndexersSubMenuPanel({ onParentBack }: IndexersSubMenuPa
           onDeleted={loadIndexers}
           onEditClose={loadIndexers}
           onBack={props.onBack}
+          onIndexerUpdated={loadIndexers}
         />
       ),
     }));

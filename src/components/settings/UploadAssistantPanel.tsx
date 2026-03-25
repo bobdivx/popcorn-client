@@ -1173,6 +1173,18 @@ export default function UploadAssistantPanel() {
     let errorCount = 0;
     const failureDetails: string[] = [];
     const duplicateRegex = /(doublon|deja existant|already exists|already present|cross-slot)/i;
+
+    if (isC411Selected && !uploadWasCancelledRef.current) {
+      setProgressMessage(t('settings.uploadTrackerPanel.syncTrackerRulesProgress'));
+      await serverApi.syncTrackerCorrectionRules('C411');
+      if (uploadWasCancelledRef.current) {
+        setProgressMessage(null);
+        setUploading(false);
+        return;
+      }
+      setProgressMessage(null);
+    }
+
     try {
       for (let index = 0; index < selectedMediaIds.length; index += 1) {
         if (uploadWasCancelledRef.current) break;
@@ -1286,11 +1298,31 @@ export default function UploadAssistantPanel() {
     handleLaunchUploadRef.current = handleLaunchUpload;
   });
 
-  const handleCancelUpload = () => {
+  const handleCancelUpload = async () => {
     if (!uploading) return;
     uploadWasCancelledRef.current = true;
     setProgressMessage(t('settings.uploadTrackerPanel.cancelingUploadProgress'));
     uploadAbortControllerRef.current?.abort();
+    const mediaIdToCancel =
+      runningCreationMediaIdRef.current?.trim() ||
+      selectedMediaId?.trim() ||
+      selectedMediaIds[0]?.trim() ||
+      '';
+    if (mediaIdToCancel) {
+      try {
+        await serverApi.cancelTorrentCreation(mediaIdToCancel);
+      } catch {
+        // Ignorer ici: l'abort HTTP est déjà déclenché, on poursuit le reset UI.
+      }
+    }
+    stopTorrentProgressPolling();
+    stopExternalProgressPolling();
+    setExternalCreationInProgress(false);
+    setTorrentProgress(null);
+    runningCreationMediaIdRef.current = '';
+    setUploading(false);
+    setProgressMessage(null);
+    setStep(2);
   };
 
   const handleCancelPublishCountdown = () => {
@@ -1304,28 +1336,42 @@ export default function UploadAssistantPanel() {
   };
 
   const handleCancelExternalCreation = async () => {
-    const mediaIdToCancel = runningCreationMediaIdRef.current?.trim() || selectedMediaId?.trim();
+    const mediaIdToCancel =
+      runningCreationMediaIdRef.current?.trim() ||
+      activeExternalCreation?.local_media_id?.trim() ||
+      selectedMediaId?.trim();
     if (!mediaIdToCancel || cancelingExternalCreation) return;
     setCancelingExternalCreation(true);
-    const res = await serverApi.cancelTorrentCreation(mediaIdToCancel);
-    setCancelingExternalCreation(false);
-    const cancelRequested = res.success && (res.data?.cancel_requested === true);
-    if (cancelRequested) {
-      setProgressMessage(t('settings.uploadTrackerPanel.cancelingUploadProgress'));
-      setExternalCreationInProgress(false);
-      setTorrentProgress(null);
-      runningCreationMediaIdRef.current = '';
-      setMessage({
-        type: 'success',
-        text: t('settings.uploadTrackerPanel.cancelRequestedSuccess'),
-      });
-      return;
-    }
-    if (!res.success) {
+    try {
+      const res = await serverApi.cancelTorrentCreation(mediaIdToCancel);
+      const cancelRequested = res.success && (res.data?.cancel_requested === true);
+      if (cancelRequested) {
+        setProgressMessage(t('settings.uploadTrackerPanel.cancelingUploadProgress'));
+        setExternalCreationInProgress(false);
+        setTorrentProgress(null);
+        runningCreationMediaIdRef.current = '';
+        stopTorrentProgressPolling();
+        stopExternalProgressPolling();
+        setUploading(false);
+        setProgressMessage(null);
+        setStep(2);
+        setMessage({
+          type: 'success',
+          text: t('settings.uploadTrackerPanel.cancelRequestedSuccess'),
+        });
+        return;
+      }
       setMessage({
         type: 'error',
-        text: res.message || res.error || t('common.error'),
+        text: res.message || res.error || 'Aucune création .torrent active à annuler.',
       });
+    } catch (err) {
+      setMessage({
+        type: 'error',
+        text: err instanceof Error ? err.message : t('common.error'),
+      });
+    } finally {
+      setCancelingExternalCreation(false);
     }
   };
 

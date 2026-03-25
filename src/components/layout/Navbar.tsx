@@ -205,6 +205,7 @@ export default function Navbar() {
 
   return (
     <nav
+      data-tv-site-header
       className={`fixed top-0 left-0 right-0 w-full z-50 transition-all duration-500 navbar-tv ${isScrolled ? 'navbar-scrolled' : ''}`}
       style={{
         paddingTop: 'var(--safe-area-inset-top)',

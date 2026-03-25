@@ -6,6 +6,7 @@ import { IndexerTestModal, formatProgressEvent } from './IndexerTestModal';
 import { syncIndexersToCloud } from '../../lib/utils/cloud-sync';
 import { useI18n } from '../../lib/i18n/useI18n';
 import IndexerCategoriesSelector from './IndexerCategoriesSelector';
+import IndexerBulkZipPanel from './IndexerBulkZipPanel';
 import { Trash2, Pencil, RefreshCw, PlayCircle } from 'lucide-preact';
 
 interface IndexerDetailPanelProps {
@@ -13,9 +14,11 @@ interface IndexerDetailPanelProps {
   onDeleted?: () => void;
   onEditClose?: () => void;
   onBack?: () => void;
+  /** Après mise à jour de la config indexer (ex. préférences ZIP) */
+  onIndexerUpdated?: () => void;
 }
 
-export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, onBack }: IndexerDetailPanelProps) {
+export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, onBack, onIndexerUpdated }: IndexerDetailPanelProps) {
   const { t } = useI18n();
   const [showEdit, setShowEdit] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -158,7 +161,7 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
     );
   }
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'categories'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'categories' | 'bulkZip'>('overview');
 
   return (
     <div className="space-y-6">
@@ -247,6 +250,17 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
           >
             {t('settingsMenu.indexers.title')}
           </button>
+          <button
+            type="button"
+            className={`px-3 py-1.5 text-xs sm:text-sm rounded-t-md border-b-2 ${
+              activeTab === 'bulkZip'
+                ? 'border-[var(--ds-accent-violet)] text-white'
+                : 'border-transparent text-[var(--ds-text-secondary)] hover:text-white'
+            }`}
+            onClick={() => setActiveTab('bulkZip')}
+          >
+            {t('indexersManager.bulkZip.tabTitle')}
+          </button>
         </div>
 
         {/* Tab content */}
@@ -276,6 +290,10 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
             </p>
             <IndexerCategoriesSelector indexerId={indexer.id} />
           </div>
+        )}
+
+        {activeTab === 'bulkZip' && (
+          <IndexerBulkZipPanel indexerId={indexer.id} onConfigSaved={onIndexerUpdated} />
         )}
       </div>
 

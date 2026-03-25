@@ -167,6 +167,24 @@ export const mediaMethods = {
   },
 
   /**
+   * Récupère le détail d'une saison TMDB (inclut les épisodes et `still_path`)
+   * Utilisé pour afficher des vignettes officielles sur les cartes épisode.
+   */
+  async getTmdbTvSeasonDetail(
+    this: ServerApiClientMediaAccess,
+    tmdbId: number,
+    seasonNumber: number,
+    language?: string,
+  ): Promise<ApiResponse<any>> {
+    const q = new URLSearchParams();
+    q.set('language', toTmdbLanguage(language));
+    return this.backendRequest(
+      `/api/discover/tv/${tmdbId}/season/${seasonNumber}?${q.toString()}`,
+      { method: 'GET' },
+    );
+  },
+
+  /**
    * Récupère l'URL de stream pour un contenu
    * Le contentId peut être un slug (ex: "une-zone-a-defendre-2023") ou un infoHash
    * Note: Cette méthode est conservée pour compatibilité avec VideoPlayer.tsx

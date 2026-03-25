@@ -6,17 +6,23 @@ import type { MediaDetailPageProps } from './types';
 import { useTorrentPlayer } from './hooks/useTorrentPlayer';
 import { scheduleUpdateOnlyFilesWithRetry } from './hooks/useTorrentPlayer/playHandler';
 import { useVideoFiles } from './hooks/useVideoFiles';
+import { usePackEpisodes } from './hooks/usePackEpisodes';
 import { useDebug } from './hooks/useDebug';
 import { useNotifications } from './hooks/useNotifications';
 import { ProgressOverlay } from './components/ProgressOverlay';
 import { EnhancedProgressOverlay } from './components/EnhancedProgressOverlay';
 import { VideoPlayerWrapper } from './components/VideoPlayerWrapper';
 import { MediaDetailActionButtons } from './components/MediaDetailActionButtons';
-import { SeriesEpisodesSection } from './components/SeriesEpisodesSection';
 import { TorrentInfo } from './components/TorrentInfo';
-import { QualityBadges } from './components/QualityBadges';
+import { HeroHeader } from './components/HeroHeader';
+import { EpisodesArea } from './components/EpisodesArea';
+import { ActionsRow } from './components/ActionsRow';
 import { YouTubeVideoPlayer as VideoPlayer } from '../../ui/YouTubeVideoPlayer';
-import { getPlaybackPosition, getPlaybackPositionByMedia } from '../../../lib/streaming/torrent-storage';
+import {
+  getPlaybackPosition,
+  getPlaybackPositionByMedia,
+  getPlaybackPositionByMediaRecord,
+} from '../../../lib/streaming/torrent-storage';
 import { setStreamingInfoHash } from '../../../lib/streamingInfoHashStorage';
 import { getOrCreateDeviceId } from '../../../lib/utils/device-id';
 import { getDownloadClientStats, saveDownloadMeta } from '../../../lib/utils/download-meta-storage';
@@ -28,6 +34,7 @@ import { PROGRESS_POLL_INTERVAL_MS } from './utils/constants';
 import { startProgressPolling } from './actions/progressPolling';
 import { DownloadVerificationPanel } from '../../downloads/DownloadVerificationPanel';
 import type { SeriesEpisodesResponse, TorrentListFileEntry } from '../../../lib/client/server-api/media';
+import type { PackEpisodeKey } from './hooks/usePackEpisodes';
 import { isTVPlatform } from '../../../lib/utils/device-detection';
 import { getHighQualityTmdbImageUrl } from '../../../lib/utils/tmdb-images';
 import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-config';
@@ -249,6 +256,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
 
   // Ã‰tat pour la position de lecture sauvegardÃ©e
   const [savedPlaybackPosition, setSavedPlaybackPosition] = useState<number | null>(null);
+  /** Incrémenté à la fermeture du lecteur pour rafraîchir les pastilles « déjà vu » */
+  const [watchedEpisodesRefresh, setWatchedEpisodesRefresh] = useState(0);
   const [startFromBeginning, setStartFromBeginning] = useState(true);
 
   /** Chemin du fichier en bibliothÃ¨que (library ou findLocalMediaByTmdb), pour lecture sans torrent dans le client. */
@@ -279,6 +288,19 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     activeTorrent.slug?.startsWith('local_') ||
     activeTorrent.infoHash?.startsWith('local_') ||
     !!(activeTorrent as any).downloadPath;
+
+  // Pack complet (Ã©pisode 0) : l'utilisateur a sÃ©lectionnÃ© l'entrÃ©e "pack complet" dans la liste d'Ã©pisodes.
+  // Doit Ãªtre calculÃ© avant useVideoFiles (utilisÃ© pour garder tous les fichiers du torrent).
+  const isPackSelected = Boolean(
+    seriesEpisodes?.seasons?.length &&
+      selectedSeasonNum != null &&
+      selectedEpisodeVariantId != null &&
+      (() => {
+        const season = seriesEpisodes.seasons.find((s) => s.season === selectedSeasonNum);
+        const ep = season?.episodes?.find((e) => e.id === selectedEpisodeVariantId);
+        return ep?.episode === 0;
+      })()
+  );
 
   // Initialiser les variantes depuis le groupe (sÃ©ries)
   useEffect(() => {
@@ -325,6 +347,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   const { videoFiles, selectedFile, setVideoFiles, setSelectedFile, loadVideoFiles } = useVideoFiles({
     torrentName: activeTorrent.name,
     torrent: activeTorrentWithLibraryPath,
+    keepAllVideoFiles: isPackSelected,
     onError: (error) => {
       console.error('Erreur lors du chargement des fichiers vidÃ©o:', error);
     },
@@ -395,6 +418,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   const handleClosePlayerAndRefresh = useCallback(async () => {
     await handleClosePlayer();
     setRefreshAfterClose((r) => r + 1);
+    setWatchedEpisodesRefresh((n) => n + 1);
   }, [handleClosePlayer]);
 
   /** TÃ©lÃ©charger un seul Ã©pisode du pack (preview) : ajoute le torrent avec only_files [fileIndex]. */
@@ -964,23 +988,73 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     return () => window.removeEventListener('torrentAdded', onTorrentAdded);
   }, []);
 
-  // Focus par dÃ©faut en TV : prioritÃ© Lire (si disponible) > TÃ©lÃ©charger > Retour
+  // Focus par défaut en TV : si reprise série (position > 0) → carte épisode correspondante ; sinon Lire > Télécharger > Retour
   useEffect(() => {
     if (!isTVPlatform()) return;
+    if (isPlayingTrailer && !trailerUiVisible) return;
+    const seriesResume =
+      !!seriesEpisodes?.seasons?.length &&
+      savedPlaybackPosition != null &&
+      savedPlaybackPosition > 0 &&
+      selectedEpisodeVariantId != null;
+    const delayMs = seriesResume ? 550 : 200;
+    let cancelled = false;
     const t = setTimeout(() => {
-      const playEl = document.querySelector('[data-media-detail-action="play"]') as HTMLButtonElement | null;
-      const downloadEl = document.querySelector('[data-media-detail-action="download"]') as HTMLButtonElement | null;
-      const backLink = backLinkRef.current;
-      const el =
-        playEl && !playEl.disabled
-          ? playEl
-          : downloadEl && !downloadEl.disabled
-            ? downloadEl
-            : backLink;
-      if (el) el.focus();
-    }, 200);
-    return () => clearTimeout(t);
-  }, [activeTorrent?.id, torrentStats, isAvailableLocally, isPlaying]);
+      if (cancelled) return;
+      const focusPlayOrBack = () => {
+        if (cancelled) return;
+        const playEl = document.querySelector('[data-media-detail-action="play"]') as HTMLButtonElement | null;
+        const downloadEl = document.querySelector('[data-media-detail-action="download"]') as HTMLButtonElement | null;
+        const backLink = backLinkRef.current;
+        const el =
+          playEl && !playEl.disabled
+            ? playEl
+            : downloadEl && !downloadEl.disabled
+              ? downloadEl
+              : backLink;
+        const active = document.activeElement as HTMLElement | null;
+        const shouldAutoFocus = !active || active === document.body || (backLink && active === backLink);
+        if (el && shouldAutoFocus && el !== active) el.focus();
+      };
+
+      if (seriesResume && selectedEpisodeVariantId) {
+        const variantId = selectedEpisodeVariantId;
+        // Ne pas utiliser shouldAutoFocus ici : la première passe met souvent le focus sur « Lire » (200 ms)
+        // avant que la position / l’épisode repris soient chargés ; il faut voler le focus vers la carte.
+        const tryFocusEpisode = (remaining: number) => {
+          if (cancelled) return;
+          const epBtn = document.querySelector(
+            `[data-episode-card="${CSS.escape(variantId)}"]`,
+          ) as HTMLElement | null;
+          if (epBtn) {
+            epBtn.focus();
+            return;
+          }
+          if (remaining > 0) {
+            setTimeout(() => tryFocusEpisode(remaining - 1), 120);
+            return;
+          }
+          focusPlayOrBack();
+        };
+        tryFocusEpisode(6);
+        return;
+      }
+      focusPlayOrBack();
+    }, delayMs);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [
+    activeTorrent?.id,
+    isAvailableLocally,
+    isPlaying,
+    isPlayingTrailer,
+    trailerUiVisible,
+    seriesEpisodes,
+    savedPlaybackPosition,
+    selectedEpisodeVariantId,
+  ]);
 
   // TÃ©lÃ©commande : premiÃ¨re touche Retour met le focus sur le bouton Retour, deuxiÃ¨me touche navigue
   useEffect(() => {
@@ -1093,16 +1167,56 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     };
   }, [isPlayingTrailer, trailerUiVisible]);
 
-  // Initialiser la sÃ©lection saison/Ã©pisode au premier chargement (premiÃ¨re saison, premier Ã©pisode)
+  // Initialiser saison/épisode : reprise depuis le stockage TMDB (si série + position) sinon premier épisode
   useEffect(() => {
-    if (seriesEpisodes?.seasons?.length && selectedSeasonNum === null) {
+    if (!seriesEpisodes?.seasons?.length || selectedSeasonNum !== null) return;
+    let cancelled = false;
+    (async () => {
+      const deviceId = getOrCreateDeviceId();
+      const tid = activeTorrent.tmdbId;
+      const tty = activeTorrent.tmdbType;
+      let record: Awaited<ReturnType<typeof getPlaybackPositionByMediaRecord>> | null = null;
+      if (typeof tid === 'number' && tty === 'tv') {
+        record = await getPlaybackPositionByMediaRecord(tid, tty, deviceId);
+      }
+      if (cancelled) return;
+      if (record && record.position > 0) {
+        let epId: string | null = null;
+        let seasonNum: number | null = null;
+        if (record.variantId) {
+          for (const s of seriesEpisodes.seasons) {
+            const e = s.episodes.find((x) => x.id === record.variantId);
+            if (e) {
+              epId = e.id;
+              seasonNum = s.season;
+              break;
+            }
+          }
+        }
+        if (!epId && record.season != null && record.episode != null) {
+          const s = seriesEpisodes.seasons.find((x) => x.season === record.season);
+          const e = s?.episodes.find((x) => x.episode === record.episode);
+          if (e) {
+            epId = e.id;
+            seasonNum = record.season;
+          }
+        }
+        if (epId != null && seasonNum != null) {
+          setSelectedSeasonNum(seasonNum);
+          setSelectedEpisodeVariantId(epId);
+          return;
+        }
+      }
       const first = seriesEpisodes.seasons[0];
       if (first?.episodes?.length) {
         setSelectedSeasonNum(first.season);
         setSelectedEpisodeVariantId(first.episodes[0].id);
       }
-    }
-  }, [seriesEpisodes, selectedSeasonNum]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [seriesEpisodes, selectedSeasonNum, activeTorrent.tmdbId, activeTorrent.tmdbType]);
 
   // Torrent actif : infoHash et validitÃ© (dÃ©clarÃ©s tÃ´t pour les effets ci-dessous)
   const activeInfoHash = activeTorrent.infoHash;
@@ -1136,10 +1250,25 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
       );
       const ep = season?.episodes.find((e) => e.id === selectedEpisodeVariantId);
       if (ep != null) {
-        variant = allVariants.find((v: any) => {
-          const se = parseSeasonEpisodeFromVariant(v);
-          return se && se.season === ep.season && se.episode === ep.episode;
-        });
+        // 1) Si l'API fournit un info_hash, matcher directement (cas pack complet ou ids non-alignÃ©s).
+        if (ep.info_hash) {
+          variant = allVariants.find((v: any) => (v.infoHash || (v as any).info_hash) === ep.info_hash);
+        }
+        // 2) Fallback: matcher par SxxExx depuis les mÃ©tadonnÃ©es locales.
+        if (!variant) {
+          variant = allVariants.find((v: any) => {
+            const se = parseSeasonEpisodeFromVariant(v);
+            return se && se.season === ep.season && se.episode === ep.episode;
+          });
+        }
+        // 3) Pack complet (Ã©pisode 0) : prendre le meilleur candidat pour permettre list-files / stream.
+        if (!variant && ep.episode === 0) {
+          const candidates = allVariants.filter((v: any) => Boolean((v.infoHash || (v as any).info_hash) || v._externalMagnetUri || v._externalLink));
+          const best = (candidates.length ? candidates : allVariants)
+            .slice()
+            .sort((a: any, b: any) => (b.seedCount ?? 0) - (a.seedCount ?? 0) || (b.fileSize ?? 0) - (a.fileSize ?? 0))[0];
+          if (best) variant = best;
+        }
       }
     }
     if (variant) {
@@ -1154,24 +1283,17 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     }
   }, [seriesEpisodes, selectedEpisodeVariantId, allVariants, parseSeasonEpisodeFromVariant]);
 
-  // Pack complet (Ã©pisode 0) : charger la liste des fichiers du torrent pour lister les Ã©pisodes
-  const isPackSelected = Boolean(
-    seriesEpisodes?.seasons?.length &&
-    selectedSeasonNum != null &&
-    selectedEpisodeVariantId != null &&
-    (() => {
-      const season = seriesEpisodes.seasons.find((s) => s.season === selectedSeasonNum);
-      const ep = season?.episodes?.find((e) => e.id === selectedEpisodeVariantId);
-      return ep?.episode === 0;
-    })()
-  );
+  // Pack complet (Ã©pisode 0) : calculÃ© plus haut (avant useVideoFiles)
   /** Liste des fichiers du pack sans ajouter le torrent (API list-files : magnet ou URL externe) */
   const [packPreviewFiles, setPackPreviewFiles] = useState<TorrentListFileEntry[] | null>(null);
   const [loadingPackPreview, setLoadingPackPreview] = useState(false);
   /** Index du fichier (dans packPreviewFiles) sÃ©lectionnÃ© pour "TÃ©lÃ©charger cet Ã©pisode" / "Lire" (preview, torrent pas encore ajoutÃ©) */
   const [selectedPackEpisodePreviewIndex, setSelectedPackEpisodePreviewIndex] = useState<number | null>(null);
   useEffect(() => {
-    if (!isPackSelected || hasInfoHash) {
+    // Charger la preview (list-files) mÃªme si on a un infoHash :
+    // dans beaucoup de cas (indexers) on a un info_hash dÃ¨s la recherche mais le torrent n'est pas encore ajoutÃ© au client,
+    // et on veut quand mÃªme dÃ©composer le pack en Ã©pisodes pour l'affichage.
+    if (!isPackSelected) {
       setPackPreviewFiles(null);
       setSelectedPackEpisodePreviewIndex(null);
       setAddedTorrentInfoHash(null);
@@ -1218,65 +1340,53 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     };
     void load();
     return () => { cancelled = true; };
-  }, [isPackSelected, hasInfoHash, activeTorrent.id, (activeTorrent as { _externalLink?: string })._externalLink, (activeTorrent as { _externalMagnetUri?: string })._externalMagnetUri]);
-  /** DÃ©compose les fichiers du pack en saisons/Ã©pisodes via SxxExx ou 1x05 dans les noms */
-  const packEpisodesBySeason = useMemo(() => {
-    if (!isPackSelected || videoFiles.length < 2) return null;
-    const parsed: { season: number; episode: number; file: typeof videoFiles[0] }[] = [];
-    for (const file of videoFiles) {
-      const name = file.name || file.path || '';
-      const m = name.match(/[Ss](\d{1,2})[.\s-]*[Ee](\d{1,2})|(\d{1,2})[xX](\d{1,2})/);
-      if (m) {
-        const s = parseInt(m[1] ?? m[3] ?? '1', 10);
-        const e = parseInt(m[2] ?? m[4] ?? '1', 10);
-        if (!Number.isNaN(s) && !Number.isNaN(e)) parsed.push({ season: s, episode: e, file });
-      }
-    }
-    if (parsed.length === 0) return null;
-    const bySeason = new Map<number, { episode: number; file: typeof videoFiles[0] }[]>();
-    for (const p of parsed) {
-      const list = bySeason.get(p.season) ?? [];
-      list.push({ episode: p.episode, file: p.file });
-      bySeason.set(p.season, list);
-    }
-    for (const list of bySeason.values()) list.sort((a, b) => a.episode - b.episode);
-    const seasons = Array.from(bySeason.keys()).sort((a, b) => a - b);
-    return { bySeason, seasons };
-  }, [isPackSelected, videoFiles]);
-  /** MÃªme structure Ã  partir de la liste preview (sans torrent ajoutÃ©) : permet d'afficher les Ã©pisodes et "TÃ©lÃ©charger tout" */
-  const packEpisodesBySeasonFromPreview = useMemo(() => {
-    if (!isPackSelected || !packPreviewFiles || packPreviewFiles.length < 2) return null;
-    const parsed: { season: number; episode: number; index: number; name: string }[] = [];
-    for (let i = 0; i < packPreviewFiles.length; i++) {
-      const f = packPreviewFiles[i];
-      const name = f.name || '';
-      const m = name.match(/[Ss](\d{1,2})[.\s-]*[Ee](\d{1,2})|(\d{1,2})[xX](\d{1,2})/);
-      if (m) {
-        const s = parseInt(m[1] ?? m[3] ?? '1', 10);
-        const e = parseInt(m[2] ?? m[4] ?? '1', 10);
-        if (!Number.isNaN(s) && !Number.isNaN(e)) parsed.push({ season: s, episode: e, index: i, name });
-      }
-    }
-    if (parsed.length === 0) return null;
-    const bySeason = new Map<number, { episode: number; index: number; name: string }[]>();
-    for (const p of parsed) {
-      const list = bySeason.get(p.season) ?? [];
-      list.push({ episode: p.episode, index: p.index, name: p.name });
-      bySeason.set(p.season, list);
-    }
-    for (const list of bySeason.values()) list.sort((a, b) => a.episode - b.episode);
-    const seasons = Array.from(bySeason.keys()).sort((a, b) => a - b);
-    return { bySeason, seasons };
-  }, [isPackSelected, packPreviewFiles]);
-  /** Afficher la dÃ©composition par saison/Ã©pisode soit depuis les fichiers du torrent (aprÃ¨s ajout), soit depuis la preview (avant ajout) */
-  const displayedPackEpisodes = packEpisodesBySeason ?? packEpisodesBySeasonFromPreview;
+  }, [isPackSelected, activeTorrent.id, (activeTorrent as { _externalLink?: string })._externalLink, (activeTorrent as { _externalMagnetUri?: string })._externalMagnetUri]);
+
+  const packEpisodesModel = usePackEpisodes({ packPreviewFiles, videoFiles });
   const [selectedPackSeason, setSelectedPackSeason] = useState<number | null>(null);
   useEffect(() => {
-    if (displayedPackEpisodes?.seasons?.length && selectedPackSeason === null) {
-      setSelectedPackSeason(displayedPackEpisodes.seasons[0] ?? null);
+    if (packEpisodesModel?.seasons?.length && selectedPackSeason === null) {
+      setSelectedPackSeason(packEpisodesModel.seasons[0] ?? null);
     }
-    if (!displayedPackEpisodes) setSelectedPackSeason(null);
-  }, [displayedPackEpisodes, selectedPackSeason]);
+    if (!packEpisodesModel) setSelectedPackSeason(null);
+  }, [packEpisodesModel, selectedPackSeason]);
+
+  // Pack preview (avant ajout au client) : par défaut, sélectionner le 1er épisode de la saison affichée.
+  // Ça évite le comportement "télécharger tout" et colle au pattern streaming (Netflix/Prime).
+  useEffect(() => {
+    if (!isPackSelected) return;
+    // Uniquement en preview (avant que les fichiers du torrent soient dispo dans `videoFiles`)
+    if (videoFiles.length > 1) return;
+    if (!packEpisodesModel || selectedPackSeason == null) return;
+    const list = packEpisodesModel.episodesBySeason.get(selectedPackSeason);
+    if (!list || list.length === 0) return;
+    const firstPreviewIndex =
+      list.find((x) => x.key.kind === 'preview')?.key.kind === 'preview'
+        ? (list.find((x) => x.key.kind === 'preview')!.key as any).index
+        : null;
+    if (firstPreviewIndex == null) return;
+
+    setSelectedPackEpisodePreviewIndex((prev) => {
+      if (prev != null && list.some((x) => x.key.kind === 'preview' && (x.key as any).index === prev)) return prev;
+      return firstPreviewIndex;
+    });
+  }, [isPackSelected, packEpisodesModel, selectedPackSeason, videoFiles.length]);
+
+  const selectedPackEpisodeKey = useMemo(() => {
+    if (!isPackSelected) return null;
+    if (videoFiles.length > 1 && selectedFile?.path) return { kind: 'file' as const, path: selectedFile.path };
+    if (selectedPackEpisodePreviewIndex != null) return { kind: 'preview' as const, index: selectedPackEpisodePreviewIndex };
+    return null;
+  }, [isPackSelected, selectedFile?.path, selectedPackEpisodePreviewIndex, videoFiles.length]);
+
+  const onSelectPackEpisodeKey = (key: PackEpisodeKey) => {
+    if (key.kind === 'file') {
+      const f = videoFiles.find((vf) => vf.path === key.path);
+      if (f) setSelectedFile(f);
+    } else {
+      setSelectedPackEpisodePreviewIndex(key.index);
+    }
+  };
   useEffect(() => {
     if (isPackSelected && hasValidInfoHash && activeTorrent.infoHash) {
       void loadVideoFiles(activeTorrent.infoHash);
@@ -1324,6 +1434,15 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     () => getNextEpisode(seriesEpisodes ?? undefined, selectedSeasonNum, selectedEpisodeVariantId),
     [seriesEpisodes, selectedSeasonNum, selectedEpisodeVariantId]
   );
+
+  /** Saison / numéro d'épisode / id variante pour le lecteur (reprise TMDB + « vu »). */
+  const selectedEpisodeMeta = useMemo(() => {
+    if (!seriesEpisodes?.seasons?.length || selectedSeasonNum == null || selectedEpisodeVariantId == null) return null;
+    const season = seriesEpisodes.seasons.find((s) => s.season === selectedSeasonNum);
+    const ep = season?.episodes.find((e) => e.id === selectedEpisodeVariantId);
+    if (!ep) return null;
+    return { season: ep.season, episode: ep.episode, variantId: ep.id };
+  }, [seriesEpisodes, selectedSeasonNum, selectedEpisodeVariantId]);
 
   /** Pendant la transition, on affiche encore l'Ã©pisode prÃ©cÃ©dent pour garder le lecteur montÃ© (mÃªme Ã©lÃ©ment vidÃ©o) et permettre play() aprÃ¨s changement de source. */
   const displayTorrent = isTransitioningToNext && previousActiveTorrentRef.current ? previousActiveTorrentRef.current : activeTorrent;
@@ -1462,6 +1581,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         torrentId={displayTorrent.id}
         tmdbId={displayTorrent.tmdbId}
         tmdbType={displayTorrent.tmdbType}
+        seriesSeasonNum={selectedEpisodeMeta?.season ?? null}
+        seriesEpisodeNum={selectedEpisodeMeta?.episode ?? null}
         startFromBeginning={isTransitioningToNext ? false : startFromBeginning}
         isSeries={!!(seriesEpisodes?.seasons?.length)}
         nextEpisodeInfo={nextEpisodeInfo}
@@ -1499,6 +1620,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           torrentId={displayTorrent.id}
           tmdbId={displayTorrent.tmdbId}
           tmdbType={displayTorrent.tmdbType}
+          seriesSeasonNum={selectedEpisodeMeta?.season ?? null}
+          seriesEpisodeNum={selectedEpisodeMeta?.episode ?? null}
           startFromBeginning={isTransitioningToNext ? false : startFromBeginning}
           isSeries={!!(seriesEpisodes?.seasons?.length)}
           nextEpisodeInfo={nextEpisodeInfo}
@@ -1555,12 +1678,17 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
               />
             )}
           </>
-        ) : (heroImageUrl || imageUrl) ? (
+        ) : (heroImageUrl || imageUrl || trailerKey) ? (
           <>
             <div
               className="absolute inset-0 bg-cover bg-center bg-no-repeat pointer-events-none"
               style={{
-                backgroundImage: `url(${getHighQualityTmdbImageUrl(heroImageUrl || imageUrl) || heroImageUrl || imageUrl})`,
+                backgroundImage: `url(${
+                  getHighQualityTmdbImageUrl(heroImageUrl || imageUrl) ||
+                  heroImageUrl ||
+                  imageUrl ||
+                  (trailerKey ? `https://img.youtube.com/vi/${trailerKey}/hqdefault.jpg` : '')
+                })`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
               }}
@@ -1605,193 +1733,11 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
             </button>
           )}
 
-          <div className="max-w-4xl">
-            <div className="mb-4 sm:mb-6">
-              {torrent.logoUrl && (
-                <img
-                  src={torrent.logoUrl}
-                  alt=""
-                  className="max-h-14 sm:max-h-16 md:max-h-20 lg:max-h-24 xl:max-h-28 w-auto object-contain object-left mb-3 sm:mb-4 drop-shadow-2xl"
-                  style={{ maxWidth: 'min(24rem, 85vw)' }}
-                />
-              )}
-              <div className="flex items-baseline gap-4 flex-wrap">
-                <h1 className={`font-bold leading-tight ${
-                  torrent.logoUrl
-                    ? 'text-lg sm:text-xl md:text-2xl lg:text-3xl text-white/90'
-                    : 'text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl text-white'
-                }`}>
-                  {torrent.mainTitle || torrent.cleanTitle || torrent.name}
-                </h1>
-                {torrent.releaseDate && (
-                  <span className="text-white/50 font-normal text-xl sm:text-2xl md:text-3xl lg:text-4xl tabular-nums">
-                    {new Date(torrent.releaseDate).getFullYear()}
-                  </span>
-                )}
-              </div>
-              {/* Badges de qualitÃ© sous le titre avec logos officiels */}
-              {torrent.quality && (
-                <div className="mt-3 sm:mt-4">
-                  <QualityBadges quality={torrent.quality} />
-                </div>
-              )}
-            </div>
+          <div className="max-w-6xl w-full">
+            <HeroHeader torrent={torrent} />
 
-            {/* SÃ©ries : section Ã‰pisodes type streaming (saisons + liste dâ€™Ã©pisodes) */}
-            {seriesEpisodes?.seasons?.length ? (
-              <div className="mb-6 space-y-6">
-                <SeriesEpisodesSection
-                  seriesEpisodes={seriesEpisodes}
-                  selectedSeasonNum={selectedSeasonNum}
-                  selectedEpisodeVariantId={selectedEpisodeVariantId}
-                  onSelectSeason={(num) => {
-                    setSelectedSeasonNum(num);
-                    const s = seriesEpisodes.seasons.find((se) => se.season === num);
-                    if (s?.episodes?.[0]) setSelectedEpisodeVariantId(s.episodes[0].id);
-                  }}
-                  onSelectEpisode={setSelectedEpisodeVariantId}
-                  savedPlaybackPosition={savedPlaybackPosition}
-                  episodesInLibraryCount={isLocalTorrent && allVariants.length > 0 ? allVariants.length : undefined}
-                />
-                {/* Pack complet sÃ©lectionnÃ© : hint, chargement, puis liste des fichiers par SxxExx */}
-                {isPackSelected && videoFiles.length <= 1 && !hasInfoHash && !loadingPackPreview && !(packPreviewFiles && packPreviewFiles.length > 1) && (
-                  <p className="text-xs text-white/60">
-                    {t('mediaDetail.packAddTorrentHint')}
-                  </p>
-                )}
-                {isPackSelected && loadingPackPreview && (
-                  <p className="text-xs text-white/60">{t('common.loading') || 'Chargement...'}</p>
-                )}
-                {isPackSelected && (videoFiles.length > 1 || (packPreviewFiles && packPreviewFiles.length > 1)) && (
-                  <div>
-                    <span className="text-sm font-semibold text-white/80 block mb-2">
-                      {displayedPackEpisodes
-                        ? t('mediaDetail.packEpisodesByFile')
-                        : t('mediaDetail.packFilesList')}
-                    </span>
-                    {displayedPackEpisodes ? (
-                      <div className="space-y-3">
-                        <div>
-                          <span className="text-xs font-medium text-white/60 block mb-1">{t('mediaDetail.season')}</span>
-                          <div className="flex flex-wrap gap-2">
-                            {displayedPackEpisodes.seasons.map((s) => (
-                              <button
-                                key={s}
-                                type="button"
-                                onClick={() => setSelectedPackSeason(s)}
-                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black ${
-                                  selectedPackSeason === s
-                                    ? 'bg-primary-600 text-white'
-                                    : 'bg-white/10 text-white/90 hover:bg-white/20'
-                                }`}
-                              >
-                                {t('mediaDetail.seasonNumber', { number: s })}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                        {selectedPackSeason != null && displayedPackEpisodes.bySeason.get(selectedPackSeason) && (
-                          <div>
-                            <span className="text-xs font-medium text-white/60 block mb-1">{t('mediaDetail.episodes')}</span>
-                            <div className="flex flex-wrap gap-2">
-                              {packEpisodesBySeason
-                                ? packEpisodesBySeason.bySeason.get(selectedPackSeason)!.map(({ episode, file }) => {
-                                    const isSelected = selectedFile?.path === file.path;
-                                    return (
-                                      <button
-                                        key={file.path}
-                                        type="button"
-                                        onClick={() => setSelectedFile(file)}
-                                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black ${
-                                          isSelected ? 'bg-primary-600 text-white' : 'bg-white/10 text-white/90 hover:bg-white/20'
-                                        }`}
-                                        title={file.name || file.path}
-                                      >
-                                        {t('mediaDetail.episodeNumber', { number: episode })}
-                                      </button>
-                                    );
-                                  })
-                                : packEpisodesBySeasonFromPreview!.bySeason.get(selectedPackSeason)!.map(({ episode, index, name }) => {
-                                    const isSelected = selectedPackEpisodePreviewIndex === index;
-                                    return (
-                                      <button
-                                        key={`${selectedPackSeason}-${episode}-${index}`}
-                                        type="button"
-                                        onClick={() => setSelectedPackEpisodePreviewIndex(index)}
-                                        className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black ${
-                                          isSelected ? 'bg-primary-600 text-white' : 'bg-white/10 text-white/90 hover:bg-white/20'
-                                        }`}
-                                        title={name}
-                                      >
-                                        {t('mediaDetail.episodeNumber', { number: episode })}
-                                      </button>
-                                    );
-                                  })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex flex-wrap gap-2">
-                        {(packPreviewFiles || videoFiles).map((fileOrPreview, idx) => {
-                          const file = 'path' in fileOrPreview ? fileOrPreview : null;
-                          const preview = file ? null : fileOrPreview as TorrentListFileEntry;
-                          const name = file ? (file.name || file.path || '') : (preview?.name || '');
-                          const label = (() => {
-                            const s01e01 = /[Ss](\d{1,2})[Ee](\d{1,2})/.exec(name);
-                            if (s01e01) return t('mediaDetail.episodeNumber', { number: parseInt(s01e01[2], 10) });
-                            return `${idx + 1}`;
-                          })();
-                          const isSelected = file && selectedFile?.path === file.path;
-                          return file ? (
-                            <button
-                              key={file.path}
-                              type="button"
-                              onClick={() => setSelectedFile(file)}
-                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black ${
-                                isSelected ? 'bg-primary-600 text-white' : 'bg-white/10 text-white/90 hover:bg-white/20'
-                              }`}
-                              title={name}
-                            >
-                              {label}
-                            </button>
-                          ) : (
-                            <span key={idx} className="px-3 py-2 rounded-lg text-sm font-medium bg-white/10 text-white/90" title={name}>
-                              {label}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : null}
-
-            {/* Boutons d'action : icône Retour + actions principales */}
-            <div className="flex items-start gap-3 tv:gap-4">
-              {/* Bouton Retour — icône ronde alignée avec le premier bouton */}
-              <a
-                ref={backLinkRef}
-                href={backHref ?? '/dashboard'}
-                onClick={(e) => {
-                  if (typeof window !== 'undefined' && window.history.length > 1) {
-                    e.preventDefault();
-                    window.history.back();
-                  }
-                }}
-                className={`gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 ${isTV ? 'tv:w-16 tv:h-16' : ''}`}
-                data-focusable
-                data-media-detail-back
-                tabIndex={0}
-                aria-label="Retour"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className={isTV ? 'h-6 w-6 tv:h-8 tv:w-8' : 'h-5 w-5'} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                </svg>
-              </a>
-              <div className="flex-1 min-w-0">
-            <MediaDetailActionButtons
+            <ActionsRow backHref={backHref ?? '/dashboard'} isTV={isTV} backLinkRef={backLinkRef}>
+              <MediaDetailActionButtons
               torrent={selectedTorrent || torrent}
               activeTorrent={activeTorrent}
               allVariants={allVariants}
@@ -1856,8 +1802,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                 setTimeout(() => handlePlay(), 150);
               }}
             />
-              </div>
-            </div>
+            </ActionsRow>
 
             {/* Informations détaillées */}
             {showInfo && (
@@ -1883,6 +1828,35 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
               />
             )}
           </div>
+
+          {/* Carousel épisodes en bas (Apple TV+ style) */}
+          {seriesEpisodes?.seasons?.length ? (
+            <div className="mt-10 rounded-2xl overflow-hidden bg-black/30 border border-white/10">
+              <EpisodesArea
+                seriesEpisodes={seriesEpisodes}
+                tmdbId={activeTorrent?.tmdbType === 'tv' ? activeTorrent?.tmdbId ?? null : null}
+                watchedEpisodesRefresh={watchedEpisodesRefresh}
+                selectedSeasonNum={selectedSeasonNum}
+                selectedEpisodeVariantId={selectedEpisodeVariantId}
+                onSelectSeason={setSelectedSeasonNum}
+                onSelectEpisode={setSelectedEpisodeVariantId}
+                savedPlaybackPosition={savedPlaybackPosition}
+                episodesInLibraryCount={isLocalTorrent && allVariants.length > 0 ? allVariants.length : undefined}
+                isPackSelected={isPackSelected}
+                videoFilesCount={videoFiles.length}
+                hasInfoHash={hasInfoHash}
+                packInfoHash={activeTorrent?.infoHash ?? null}
+                loadingPackPreview={loadingPackPreview}
+                packPreviewFilesCount={packPreviewFiles?.length ?? 0}
+                packEpisodesModel={packEpisodesModel}
+                selectedPackSeason={selectedPackSeason}
+                onSelectPackSeason={setSelectedPackSeason}
+                selectedPackEpisodeKey={selectedPackEpisodeKey}
+                onSelectPackEpisodeKey={onSelectPackEpisodeKey}
+                isTV={isTV}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 

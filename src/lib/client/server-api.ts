@@ -495,8 +495,10 @@ class ServerApiClient {
       };
     }
 
+    const isFormData =
+      typeof FormData !== 'undefined' && options.body != null && options.body instanceof FormData;
     const headers: HeadersInit = {
-      'Content-Type': 'application/json',
+      ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
       ...(options.headers || {}),
     };
     // Indiquer au backend si la requête vient du client cloud ou d'un client local.
@@ -554,7 +556,8 @@ class ServerApiClient {
           (endpoint.includes('/api/library/uploader/upload-one') ||
             endpoint.includes('/api/library/uploader/generate-screenshots') ||
             endpoint.includes('/api/library/upload-tracker/create-torrent') ||
-            endpoint.includes('/api/admin/system/restart'));
+            endpoint.includes('/api/admin/system/restart') ||
+            endpoint.includes('/bulk-torrent-zip/import'));
         if (
           retryCount < maxRetries &&
           !isAddTracker502 &&
@@ -626,7 +629,8 @@ class ServerApiClient {
         (endpoint.includes('/api/library/uploader/upload-one') ||
           endpoint.includes('/api/library/uploader/generate-screenshots') ||
           endpoint.includes('/api/library/upload-tracker/create-torrent') ||
-          endpoint.includes('/api/admin/system/restart'));
+          endpoint.includes('/api/admin/system/restart') ||
+          endpoint.includes('/bulk-torrent-zip/import'));
       if (retryCount < maxRetries && !isNonIdempotentPost && this.isRetryableError(error)) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 3000); // Exponential backoff, max 3s
         // Ne pas logger les retries quand le serveur est hors ligne (évite le spam en console)
@@ -741,6 +745,10 @@ class ServerApiClient {
     if (endpoint.startsWith('/api/v1/sync/')) return 60000;
     // Test d'indexer : peut prendre du temps (plusieurs requêtes + tests téléchargement + RSS)
     if (endpoint.includes('/api/indexers/test')) return 60000; // 60 secondes pour les tests d'indexers (test et test-stream)
+    // Upload ZIP + extraction : le timeout du fetch couvre tout le corps (envoi réseau + serveur).
+    if (endpoint.includes('/bulk-torrent-zip/preview')) return 3_600_000; // 1 h (aligné TimeoutLayer backend)
+    if (endpoint.includes('/bulk-torrent-zip/preview-url')) return 3_600_000;
+    if (endpoint.includes('/bulk-torrent-zip/import')) return 3_600_000;
     // Création .torrent et publication C411 : lecture + hash du fichier peut être long (gros médias, chemins réseau / NAS)
     if (endpoint.includes('/api/library/upload-tracker/create-torrent') || endpoint.includes('/api/library/upload-tracker/publish-c411')) {
       return 300000; // 5 minutes (fichiers sur NAS/réseau = très lent)
@@ -1277,6 +1285,18 @@ interface IServerApiClientPublic {
   getTmdbGenres(): Promise<ApiResponse<{ movies: Array<{ id: number; name: string }>; tv: Array<{ id: number; name: string }> }>>;
   testIndexer(id: string): Promise<ApiResponse<any>>;
   testIndexerStream(id: string, onProgress?: (event: { type: string; query?: string; index?: number; total?: number; count?: number; success?: boolean; error?: string }) => void): Promise<ApiResponse<any>>;
+  getBulkTorrentZipPreferences(indexerId: string): Promise<ApiResponse<import('./server-api/indexers.js').BulkTorrentZipPreferences>>;
+  putBulkTorrentZipPreferences(
+    indexerId: string,
+    body: import('./server-api/indexers.js').BulkTorrentZipPreferences
+  ): Promise<ApiResponse<import('./server-api/indexers.js').BulkTorrentZipPreferences>>;
+  previewBulkTorrentZipFromFile(indexerId: string, file: File): Promise<ApiResponse<import('./server-api/indexers.js').BulkTorrentZipPreview>>;
+  previewBulkTorrentZipFromUrl(indexerId: string, url: string): Promise<ApiResponse<import('./server-api/indexers.js').BulkTorrentZipPreview>>;
+  importBulkTorrentZip(
+    indexerId: string,
+    previewId: string,
+    paths: string[]
+  ): Promise<ApiResponse<import('./server-api/indexers.js').BulkTorrentZipImportResult>>;
 
   // Settings methods
   getTmdbKey(): Promise<ApiResponse<{ apiKey: string | null; hasKey: boolean }>>;
@@ -1327,6 +1347,7 @@ interface IServerApiClientPublic {
   validateUploadMedia(localMediaId: string): Promise<ApiResponse<UploadMediaValidationResponse>>;
   getPublishedUploads(): Promise<ApiResponse<PublishedUploadMediaEntry[]>>;
   clearFailedUploads(): Promise<ApiResponse<{ deleted: number }>>;
+  syncTrackerCorrectionRules(tracker?: string): Promise<ApiResponse<{ rules_synced: number; tracker: string }>>;
   generateScreenshots(localMediaId: string): Promise<ApiResponse<{ count: number; screenshot_base_url: string }>>;
   checkDuplicateOnIndexer(params: { indexer_id: string; local_media_ids: string[] }): Promise<ApiResponse<CheckDuplicateResponse>>;
   getUploadPreview(localMediaId: string, tracker?: string, screenshotBaseUrl?: string): Promise<ApiResponse<UploaderPreviewResponse>>;
