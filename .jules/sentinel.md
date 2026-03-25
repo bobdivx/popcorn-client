@@ -1,0 +1,4 @@
+## 2024-05-24 - [Cross-Site Scripting (XSS) via dangerouslySetInnerHTML in DescriptionPreview]
+**Vulnerability:** User-provided `html` and `raw` input strings in `DescriptionPreview.tsx` were rendered directly using `dangerouslySetInnerHTML` without proper sanitization, allowing arbitrary JavaScript execution.
+**Learning:** `dangerouslySetInnerHTML` is extremely risky with unsanitized data. Using standard `dompurify` can cause hydration mismatch errors and vulnerabilities in Server-Side Rendering (SSR) environments. `isomorphic-dompurify` must be used instead for safe sanitization during both SSR and Client-Side rendering.
+**Prevention:** Always sanitize input from untrusted sources before using `dangerouslySetInnerHTML`. Specifically for SSR and Preact/Astro applications, utilize `isomorphic-dompurify` over `dompurify` to ensure safe, hydration-friendly rendering.
