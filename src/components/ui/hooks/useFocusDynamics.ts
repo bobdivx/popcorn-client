@@ -95,8 +95,10 @@ export function useFocusDynamics({
 
           // Scroll pour centrer la carte (ligne au milieu, carte au centre horizontal)
           if (containerRef.current) {
+            const isWebOS = typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
+            const behavior: ScrollBehavior = isWebOS ? 'auto' : 'smooth';
             element.scrollIntoView({ 
-              behavior: 'smooth', 
+              behavior,
               block: 'center',
               inline: 'center'
             });

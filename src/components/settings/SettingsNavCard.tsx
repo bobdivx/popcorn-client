@@ -26,6 +26,8 @@ export interface SettingsNavCardLinkProps extends BaseProps {
   href: string;
   onClick?: never;
   isExternal?: boolean;
+  /** Clic sur le lien (ex. navigation SPA query-only : appeler preventDefault) */
+  onLinkClick?: (e: JSX.TargetedMouseEvent<HTMLAnchorElement>) => void;
 }
 
 /** Carte navigable via `<button onClick>` (sous-panel inline) */
@@ -72,7 +74,7 @@ function CardInner({
 
 export function SettingsNavCard(props: SettingsNavCardProps) {
   if ('href' in props && props.href) {
-    const { href, isExternal, icon, title, description, accent, badge, rightSlot } = props;
+    const { href, isExternal, icon, title, description, accent, badge, rightSlot, onLinkClick } = props;
     const externalProps = isExternal ? { target: '_blank', rel: 'noopener noreferrer' } : {};
     return (
       <a
@@ -82,6 +84,7 @@ export function SettingsNavCard(props: SettingsNavCardProps) {
         data-focusable
         class="sc-nav-link"
         tabIndex={0}
+        onClick={onLinkClick}
         {...externalProps}
       >
         <CardInner

@@ -150,7 +150,13 @@ export function VideoPlayerWrapper({
     streamingTorrentToken: streamingTorrentToken ?? undefined,
   });
 
-  const [scrubThumbnails, setScrubThumbnails] = useState<{ mediaId: string; count: number; durationSeconds?: number } | null>(null);
+  const [scrubThumbnails, setScrubThumbnails] = useState<{
+    mediaId: string;
+    count: number;
+    durationSeconds?: number;
+    intervalSeconds?: number;
+  } | null>(null);
+  const [scrubThumbnailsLoading, setScrubThumbnailsLoading] = useState(false);
   const scrubRetryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -163,9 +169,14 @@ export function VideoPlayerWrapper({
   // Charger (ou déclencher) les miniatures scrub pour ce média, si c'est un média local.
   useEffect(() => {
     // Pas de scrub thumbnails pour un flux distant (bibliothèque ami) ni en démo.
-    if (!visible) return;
+    if (!visible) {
+      setScrubThumbnails(null);
+      setScrubThumbnailsLoading(false);
+      return;
+    }
     if (streamBackendUrl?.trim()) {
       setScrubThumbnails(null);
+      setScrubThumbnailsLoading(false);
       return;
     }
     // Médias bibliothèque : l'infoHash/id est au format local_{local_media_id}.
@@ -248,6 +259,7 @@ export function VideoPlayerWrapper({
               durationSeconds: Number.isFinite(durationSeconds) ? durationSeconds : undefined,
               intervalSeconds: Number.isFinite(intervalSeconds) && intervalSeconds > 0 ? intervalSeconds : undefined,
             });
+            setScrubThumbnailsLoading(false);
           }
         };
 
@@ -270,6 +282,10 @@ export function VideoPlayerWrapper({
             count < Math.min(expected, 60) &&
             ((Number.isFinite(intervalSeconds) && intervalSeconds > 30) || !Number.isFinite(intervalSeconds) || intervalSeconds <= 0);
           if (looksLegacy) {
+            if (!cancelled) {
+              setScrubThumbnails(null);
+              setScrubThumbnailsLoading(true);
+            }
             await serverApi.generateScrubThumbnails(localMediaId, { force: true }).catch(() => {});
             // Poll meta sans relancer une génération "non-force"
             throw new Error('forced_regen');
@@ -278,6 +294,7 @@ export function VideoPlayerWrapper({
         } catch (err) {
           // Déclencher la génération, puis poll meta (génération peut prendre >2.5s selon le média/CPU)
           const isForcedRegen = err instanceof Error && err.message === 'forced_regen';
+          if (!cancelled && !isForcedRegen) setScrubThumbnailsLoading(true);
           if (!isForcedRegen) {
             await serverApi.generateScrubThumbnails(localMediaId).catch(() => {});
           }
@@ -287,7 +304,10 @@ export function VideoPlayerWrapper({
             attempts += 1;
             fetchMeta()
               .catch(() => {
-                if (attempts >= 12) return; // ~24s
+                if (attempts >= 12) {
+                  setScrubThumbnailsLoading(false);
+                  return; // ~24s
+                }
                 scrubRetryTimeoutRef.current = setTimeout(poll, 2000);
               });
           };
@@ -295,6 +315,7 @@ export function VideoPlayerWrapper({
         }
       } catch {
         // ignore — scrub thumbnails restent désactivées
+        if (!cancelled) setScrubThumbnailsLoading(false);
       }
     };
 
@@ -684,6 +705,7 @@ export function VideoPlayerWrapper({
               onQualityChange: setStreamQuality,
               useStreamTorrentUrl: useStreamTorrentMode,
               scrubThumbnails,
+              scrubThumbnailsLoading,
             }}
             lucieProps={{
               infoHash,
@@ -705,6 +727,7 @@ export function VideoPlayerWrapper({
               baseUrl,
               stopBufferRef,
               scrubThumbnails,
+              scrubThumbnailsLoading,
             }}
             onHlsLoadingChange={(loading) => setIsLoading(loading)}
             onHlsError={(e) => {

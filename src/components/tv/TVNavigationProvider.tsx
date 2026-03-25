@@ -49,15 +49,17 @@ export default function TVNavigationProvider() {
     const getFocusableElements = (scope?: HTMLElement | null): HTMLElement[] => {
       const root = scope || document;
       const pad = 1;
-      // Zone sous l’écran pour inclure la ligne suivante (dashboard Films/Séries) et permettre flèche bas
+      // Zone sous/au-dessus l’écran pour inclure des lignes voisines lors des flèches
+      // (permet vers le bas OU vers le haut, même si les cartes deviennent partiellement hors viewport).
       const belowViewport = typeof window !== 'undefined' ? Math.min(500, window.innerHeight * 0.6) : 0;
+      const aboveViewport = typeof window !== 'undefined' ? Math.min(500, window.innerHeight * 0.35) : 0;
       const isWebOSCheck = typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
       return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
         .filter(el => {
           if (scope && !scope.contains(el)) return false;
           const rect = el.getBoundingClientRect();
           const inViewportX = rect.right >= -pad && rect.left <= window.innerWidth + pad;
-          const inViewportY = rect.bottom >= -pad && rect.top <= window.innerHeight + pad + belowViewport;
+          const inViewportY = rect.bottom >= -pad - aboveViewport && rect.top <= window.innerHeight + pad + belowViewport;
           if (rect.width <= 0 || rect.height <= 0 || !inViewportX || !inViewportY) return false;
           if (el.closest('[aria-hidden="true"]')) return false;
           if (!isWebOSCheck) {

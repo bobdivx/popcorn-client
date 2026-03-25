@@ -36,6 +36,9 @@ export interface LuciePlayerProps {
     durationSeconds?: number;
     intervalSeconds?: number;
   } | null;
+
+  /** Miniatures en cours de génération (placeholder animé). */
+  scrubThumbnailsLoading?: boolean;
 }
 
 /**

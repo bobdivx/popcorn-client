@@ -11,6 +11,7 @@ import { shouldAutoFullscreen } from '../../../lib/utils/device-detection';
 import { SkipIntroOverlay } from '../player-shared/components/SkipIntroOverlay';
 import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
 import { useI18n } from '../../../lib/i18n';
+import { useChromecast } from '../../../lib/chromecast/useChromecast';
 
 export default function LuciePlayer({ 
   src, 
@@ -37,9 +38,11 @@ export default function LuciePlayer({
   stopBufferRef,
   onProgress,
   scrubThumbnails,
+  scrubThumbnailsLoading,
 }: LuciePlayerProps) {
   const playerConfig = usePlayerConfig();
   const { t } = useI18n();
+  const chromecast = useChromecast();
   const canAutoPlayRef = useRef<(() => boolean) | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -376,8 +379,12 @@ export default function LuciePlayer({
           showLogo={playerConfig.showLogo}
           onClose={onClose}
           onRestart={handleRestart}
+          showCastButton={chromecast.isAvailable}
+          isCasting={chromecast.isCasting}
+          onCastClick={() => chromecast.castMedia(src, torrentName ?? fileName, currentTime)}
           videoFillMode={playerConfig.videoFillMode ?? 'contain'}
           scrubThumbnails={scrubThumbnails ?? null}
+          scrubThumbnailsLoading={scrubThumbnailsLoading}
           tvScrubIndexExternal={isTV ? tvScrubIndex : undefined}
           tvScrubFocused={isTV ? focusedOnScrub : undefined}
           onPlayNextEpisode={

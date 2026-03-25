@@ -1247,6 +1247,12 @@
       "title": "Torrent sync",
       "description": "Manage automatic torrent synchronization from indexers"
     },
+    "bulkTorrentZipNav": {
+      "title": "Torrent pack (ZIP)",
+      "description": "Download or upload a ZIP of .torrent files (e.g. indexer bulk pack) and choose what to add to the client",
+      "chooseIndexer": "Indexer",
+      "noIndexers": "Add at least one indexer in settings to use this feature."
+    },
     "diagnostics": {
       "title": "Diagnostics",
       "description": "Test backend connectivity, version and indexers"
@@ -1536,6 +1542,31 @@
     "errorDeleting": "Error deleting",
     "errorTesting": "Error testing connection",
     "syncStarted": "Synchronization started. Results will appear shortly.",
+    "bulkZip": {
+      "tabTitle": "Torrent pack (ZIP)",
+      "intro": "Some indexers ship a ZIP of all .torrent files. The server unpacks it; you choose what to add to the client and can save your selection for the next update (folder layout inside the ZIP usually stays the same).",
+      "sourceUrlLabel": "ZIP file URL (optional, for automatic download)",
+      "sourceUrlPlaceholder": "https://…",
+      "previewFromUrl": "Preview from URL",
+      "pickFile": "Choose a .zip file",
+      "previewFileHint": "Or upload an archive you already downloaded.",
+      "filterPlaceholder": "Filter by path…",
+      "selectAllVisible": "Select all (filtered list)",
+      "selectNone": "Clear selection",
+      "applySaved": "Apply saved selection",
+      "applySavedResult": "{count} path(s) checked from your saved selection.",
+      "applySavedNone": "No paths in common between the archive and the saved selection.",
+      "listTruncated": "Showing the first {shown} of {total} results (narrow the filter).",
+      "listSummary": "{total} file(s) listed. {selected} selected.",
+      "savePrefs": "Save URL + selection",
+      "importSelected": "Import selection to client",
+      "loadingPrefs": "Loading preferences…",
+      "previewOk": "{count} .torrent file(s) in the archive.",
+      "importResult": "{added} added, {failed} failed.",
+      "prefsSaved": "Preferences saved.",
+      "noPreview": "Run a preview (file or URL) to list .torrent files.",
+      "busy": "Working…"
+    },
     "cookieWizard": {
       "title": "Get session cookie",
       "tabSimple": "Simple method (extension)",

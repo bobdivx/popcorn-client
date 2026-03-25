@@ -967,6 +967,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   // Focus par dÃ©faut en TV : prioritÃ© Lire (si disponible) > TÃ©lÃ©charger > Retour
   useEffect(() => {
     if (!isTVPlatform()) return;
+    // En mode immersif (bande-annonce), ne pas refocaliser d'actions cachées
+    if (isPlayingTrailer && !trailerUiVisible) return;
     const t = setTimeout(() => {
       const playEl = document.querySelector('[data-media-detail-action="play"]') as HTMLButtonElement | null;
       const downloadEl = document.querySelector('[data-media-detail-action="download"]') as HTMLButtonElement | null;
@@ -977,10 +979,14 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           : downloadEl && !downloadEl.disabled
             ? downloadEl
             : backLink;
-      if (el) el.focus();
+      // Eviter de "casser" la navigation tÃ©lÃ©commande : ne refocaliser que si on est encore
+      // sur le body (chargement) ou sur le bouton Retour.
+      const active = document.activeElement as HTMLElement | null;
+      const shouldAutoFocus = !active || active === document.body || (backLink && active === backLink);
+      if (el && shouldAutoFocus && el !== active) el.focus();
     }, 200);
     return () => clearTimeout(t);
-  }, [activeTorrent?.id, torrentStats, isAvailableLocally, isPlaying]);
+  }, [activeTorrent?.id, isAvailableLocally, isPlaying, isPlayingTrailer, trailerUiVisible]);
 
   // TÃ©lÃ©commande : premiÃ¨re touche Retour met le focus sur le bouton Retour, deuxiÃ¨me touche navigue
   useEffect(() => {
@@ -1277,6 +1283,21 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     }
     if (!displayedPackEpisodes) setSelectedPackSeason(null);
   }, [displayedPackEpisodes, selectedPackSeason]);
+
+  // Pack preview (avant ajout au client) : par défaut, sélectionner le 1er épisode de la saison affichée.
+  // Ça évite le comportement "télécharger tout" et colle au pattern streaming (Netflix/Prime).
+  useEffect(() => {
+    if (!isPackSelected || hasInfoHash) return; // uniquement en preview (avant infoHash)
+    if (!packEpisodesBySeasonFromPreview || selectedPackSeason == null) return;
+
+    const list = packEpisodesBySeasonFromPreview.bySeason.get(selectedPackSeason);
+    if (!list || list.length === 0) return;
+
+    setSelectedPackEpisodePreviewIndex((prev) => {
+      if (prev != null && list.some((x) => x.index === prev)) return prev;
+      return list[0]?.index ?? null;
+    });
+  }, [isPackSelected, hasInfoHash, packEpisodesBySeasonFromPreview, selectedPackSeason]);
   useEffect(() => {
     if (isPackSelected && hasValidInfoHash && activeTorrent.infoHash) {
       void loadVideoFiles(activeTorrent.infoHash);
