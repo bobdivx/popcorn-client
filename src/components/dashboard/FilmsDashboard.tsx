@@ -25,6 +25,8 @@ import { useSubscriptionMe } from '../torrents/MediaDetailPage/hooks/useSubscrip
 import Library from '../Library';
 
 const MIN_ITEMS_PER_GENRE_ROW = 10;
+// Certains genres (ex: "Animation") doivent rester visibles même avec peu d'éléments.
+const ALWAYS_RENDER_GENRES = new Set<string>(['animation']);
 
 function parseSortableTimestamp(value?: string): number {
   if (!value) return 0;
@@ -545,7 +547,7 @@ export default function FilmsDashboard() {
           sortedGenres.map(genre => {
             const genreFilms = filmsByGenre[genre];
             // Éviter les lignes "vides" façon Netflix : masquer les genres avec trop peu de contenus.
-            if (!genreFilms || genreFilms.length < MIN_ITEMS_PER_GENRE_ROW) return null;
+            if (!genreFilms || (genreFilms.length < MIN_ITEMS_PER_GENRE_ROW && !ALWAYS_RENDER_GENRES.has(genre.trim().toLowerCase()))) return null;
 
             const genreTitle =
               genre === '__other__' ? t('common.others') : translateGenre(genre, language);

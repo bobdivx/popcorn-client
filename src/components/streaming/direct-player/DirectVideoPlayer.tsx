@@ -29,6 +29,9 @@ interface DirectVideoPlayerProps {
   onProgress?: (currentTime: number, duration: number) => void;
   /** Miniatures scrub (type Netflix) — si défini, affiche une vignette au survol de la barre. */
   scrubThumbnails?: { mediaId: string; count: number; durationSeconds?: number; intervalSeconds?: number } | null;
+
+  /** Miniatures en cours de génération (placeholder animé). */
+  scrubThumbnailsLoading?: boolean;
 }
 
 export default function DirectVideoPlayer({
@@ -47,6 +50,7 @@ export default function DirectVideoPlayer({
   torrentStats,
   onProgress,
   scrubThumbnails,
+  scrubThumbnailsLoading,
 }: DirectVideoPlayerProps) {
   const { t } = useI18n();
   const playerConfig = usePlayerConfig();
@@ -369,6 +373,7 @@ export default function DirectVideoPlayer({
           isCasting={chromecast.isCasting}
           onCastClick={() => chromecast.castMedia(src, torrentName || '', currentTime)}
           scrubThumbnails={scrubThumbnails ?? null}
+          scrubThumbnailsLoading={scrubThumbnailsLoading}
           tvScrubIndexExternal={isTV ? tvScrubIndex : undefined}
           tvScrubFocused={isTV ? focusedOnScrub : undefined}
         />

@@ -56,6 +56,9 @@ export interface HLSPlayerProps {
     /** Intervalle réel entre deux captures (ex. 10s) pour afficher des timecodes corrects. */
     intervalSeconds?: number;
   } | null;
+
+  /** Miniatures en cours de génération (placeholder animé). */
+  scrubThumbnailsLoading?: boolean;
 }
 
 declare global {

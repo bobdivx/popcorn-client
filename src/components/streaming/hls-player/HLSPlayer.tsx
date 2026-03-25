@@ -13,6 +13,7 @@ import { isTauri } from '../../../lib/utils/tauri';
 import { SkipIntroOverlay } from '../player-shared/components/SkipIntroOverlay';
 import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
 import { useI18n } from '../../../lib/i18n';
+import { useChromecast } from '../../../lib/chromecast/useChromecast';
 
 export default function HLSPlayer({ 
   src, 
@@ -47,9 +48,11 @@ export default function HLSPlayer({
   useStreamTorrentUrl: useStreamTorrentUrlProp,
   onProgress,
   scrubThumbnails,
+  scrubThumbnailsLoading,
 }: HLSPlayerProps) {
   const playerConfig = usePlayerConfig();
   const { t } = useI18n();
+  const chromecast = useChromecast();
   const canAutoPlayRef = useRef<(() => boolean) | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressBarRef = useRef<HTMLDivElement>(null);
@@ -483,8 +486,12 @@ export default function HLSPlayer({
           streamQuality={streamQuality ?? null}
           onQualityChange={onQualityChange}
           onOpenQualityMenuRef={openQualityMenuRef}
+          showCastButton={chromecast.isAvailable}
+          isCasting={chromecast.isCasting}
+          onCastClick={() => chromecast.castMedia(src, torrentName ?? fileName, currentTime)}
           videoFillMode={playerConfig.videoFillMode ?? 'contain'}
           scrubThumbnails={scrubThumbnails ?? null}
+          scrubThumbnailsLoading={scrubThumbnailsLoading}
           tvScrubIndexExternal={isTV ? tvScrubIndex : undefined}
           tvScrubFocused={isTV ? focusedOnScrub : undefined}
           onPlayNextEpisode={

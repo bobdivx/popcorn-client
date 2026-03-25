@@ -673,6 +673,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
                     setDetailModalIndexerId(null);
                     loadIndexers();
                   }}
+                  onIndexerUpdated={loadIndexers}
                 />
               </Modal>
             );
