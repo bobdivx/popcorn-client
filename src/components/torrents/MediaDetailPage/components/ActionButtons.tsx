@@ -148,6 +148,8 @@ export function ActionButtons({
   // Pack preview (torrent unique mais sélection possible via only_files) :
   // le bouton principal doit agir sur l'épisode sélectionné, jamais sur tout le pack.
   const isPackPreview = isPackWithMultipleFiles && !hasInfoHash;
+  /** Série TV : lecture / téléchargement par épisode dans le carrousel — pas de pill « Lire » global (sauf pack preview). */
+  const hidePrimaryPlayForTvSeries = torrent.tmdbType === 'tv' && !isPackPreview;
   const isPackEpisodeSelected = isPackPreview && selectedPackEpisodePreviewIndex != null;
   const canPlayPackPreviewEpisode = isPackEpisodeSelected && canStream && onPlaySingleEpisode != null;
   const canDownloadPackPreviewEpisode = isPackEpisodeSelected && onDownloadSingleEpisode != null;
@@ -157,10 +159,12 @@ export function ActionButtons({
   return (
     <div className="mb-6 space-y-3">
       {/* ── Rangée principale ── */}
-      <div className="flex flex-wrap gap-3 tv:gap-4 items-center">
+      <div className="flex flex-nowrap gap-3 tv:gap-4 items-center overflow-x-auto scrollbar-hide">
 
         {/* Bouton Lire / Télécharger — gradient animé, rounded-full */}
-        {shouldShowButton && !(isDownloadInProgress && onCancelDownload && showProgressNextToCancel) && (
+        {!hidePrimaryPlayForTvSeries &&
+          shouldShowButton &&
+          !(isDownloadInProgress && onCancelDownload && showProgressNextToCancel) && (
           <button
             onClick={() => {
               // Override pack preview : Play/Download portent sur l'épisode sélectionné.
@@ -243,7 +247,7 @@ export function ActionButtons({
         )}
 
         {/* Télécharger à côté de Lire (streaming) — style glass pill */}
-        {showDownloadButtonAlongsidePlay && (
+        {!hidePrimaryPlayForTvSeries && showDownloadButtonAlongsidePlay && (
           <button
             type="button"
             onClick={onDownload}
@@ -256,44 +260,6 @@ export function ActionButtons({
             <Download className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" size={20} />
             {isPackWithMultipleFiles ? t('playback.downloadFullSeason') : t('common.download')}
           </button>
-        )}
-
-        {/* Pack : épisode sélectionné */}
-        {isPackWithMultipleFiles && selectedPackEpisodePreviewIndex != null && (onDownloadSingleEpisode != null || (canStream && onPlaySingleEpisode != null)) && (
-          <>
-            {canStream && onPlaySingleEpisode != null && (
-              <button
-                type="button"
-                onClick={() => void onPlaySingleEpisode(selectedPackEpisodePreviewIndex!)}
-                disabled={downloadingToClient}
-                title={t('mediaDetail.playThisEpisode')}
-                data-focusable
-                tabIndex={0}
-                className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 font-bold text-base disabled:opacity-50 border border-violet-500/40 hover:border-violet-400/60 hover:bg-violet-900/20"
-              >
-                <Play className="h-5 w-5 fill-current shrink-0" size={20} />
-                {t('mediaDetail.playThisEpisode')}
-              </button>
-            )}
-            {onDownloadSingleEpisode != null && (
-              <button
-                type="button"
-                onClick={() => void onDownloadSingleEpisode(selectedPackEpisodePreviewIndex!)}
-                disabled={downloadingToClient}
-                title={t('mediaDetail.downloadThisEpisode')}
-                data-focusable
-                tabIndex={0}
-                className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 disabled:opacity-50"
-              >
-                {downloadingToClient ? (
-                  <Loader2 className="h-5 w-5 animate-spin shrink-0" size={20} />
-                ) : (
-                  <Download className="h-5 w-5 shrink-0" size={20} />
-                )}
-                {t('mediaDetail.downloadThisEpisode')}
-              </button>
-            )}
-          </>
         )}
 
         {/* Pack sans sélection */}

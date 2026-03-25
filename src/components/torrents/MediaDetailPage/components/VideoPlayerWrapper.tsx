@@ -35,6 +35,9 @@ interface VideoPlayerWrapperProps {
   /** Pour sauvegarder la position par média (tmdb) dans le player */
   tmdbId?: number;
   tmdbType?: 'movie' | 'tv';
+  /** Série : épisode en cours (sauvegarde reprise + « vu ») */
+  seriesSeasonNum?: number | null;
+  seriesEpisodeNum?: number | null;
   startFromBeginning?: boolean;
   /** Contexte série : afficher « Passer le générique » et appliquer auto-skip si activé */
   isSeries?: boolean;
@@ -83,6 +86,8 @@ export function VideoPlayerWrapper({
   torrentId, 
   tmdbId,
   tmdbType,
+  seriesSeasonNum,
+  seriesEpisodeNum,
   startFromBeginning = false, 
   isSeries = false,
   nextEpisodeInfo,
@@ -685,6 +690,9 @@ export function VideoPlayerWrapper({
               filePath: selectedFile?.path || selectedFile?.name || torrentName || 'video',
               tmdbId,
               tmdbType,
+              seriesSeason: seriesSeasonNum ?? undefined,
+              seriesEpisode: seriesEpisodeNum ?? undefined,
+              variantId: torrentId,
               startFromBeginning,
               isSeries,
               nextEpisodeInfo,
@@ -719,6 +727,9 @@ export function VideoPlayerWrapper({
               filePath: selectedFile?.path || selectedFile?.name || torrentName || 'video',
               tmdbId,
               tmdbType,
+              seriesSeason: seriesSeasonNum ?? undefined,
+              seriesEpisode: seriesEpisodeNum ?? undefined,
+              variantId: torrentId,
               startFromBeginning,
               isSeries,
               nextEpisodeInfo,

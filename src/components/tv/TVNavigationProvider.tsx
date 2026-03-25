@@ -43,6 +43,7 @@ export default function TVNavigationProvider() {
     const CARD_SELECTOR = '[data-torrent-card], .torrent-poster, [data-settings-card], [data-focusable-card]';
     const CAROUSEL_SELECTOR = '[data-carousel]';
     const SETTINGS_CONTAINER_SELECTOR = '[data-tv-settings-container]';
+    const SITE_HEADER_SELECTOR = '[data-tv-site-header]';
 
     // Obtenir tous les éléments focusables visibles (optionnellement limités à un conteneur, ex. modal)
     // Exclut les éléments hors viewport. Sur webOS on évite getComputedStyle pour réduire la latence.
@@ -94,6 +95,13 @@ export default function TVNavigationProvider() {
       elements: HTMLElement[],
       direction: 'up' | 'down' | 'left' | 'right'
     ): HTMLElement[] => {
+      // Header global (logo Popcorn, nav) : gauche/droite restent dans le header
+      const siteHeader = current.closest(SITE_HEADER_SELECTOR);
+      if (siteHeader && (direction === 'left' || direction === 'right')) {
+        const inHeader = elements.filter((el) => siteHeader.contains(el));
+        if (inHeader.length > 0) return inHeader;
+      }
+
       // Dans le lecteur vidéo : gauche/droite uniquement dans la même ligne de boutons (pas la barre de progression)
       const videoWrapper = current.closest('#video-player-wrapper');
       const controlsRow = current.closest(VIDEO_CONTROLS_ROW);

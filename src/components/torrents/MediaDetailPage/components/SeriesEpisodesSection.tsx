@@ -1,42 +1,100 @@
-import { Play, ChevronDown } from 'lucide-preact';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import type { SeriesEpisodesResponse } from '../../../../lib/client/server-api/media';
+import { serverApi } from '../../../../lib/client/server-api';
+import { watchedEpisodeKey } from '../../../../lib/streaming/torrent-storage';
+import { EpisodeCardsCarousel } from './EpisodeCardsCarousel';
 
 export interface SeriesEpisodesSectionProps {
   seriesEpisodes: SeriesEpisodesResponse;
-  selectedSeasonNum: number | null;
+  tmdbId?: number | null;
   selectedEpisodeVariantId: string | null;
-  onSelectSeason: (seasonNum: number) => void;
   onSelectEpisode: (episodeVariantId: string) => void;
   savedPlaybackPosition: number | null;
   /** Nombre d'épisodes en bibliothèque (série depuis library) */
   episodesInLibraryCount?: number;
+  watchedSet?: Set<string>;
+  isTV?: boolean;
 }
 
 /**
- * Section type expérience streaming : l'utilisateur choisit la saison (menu déroulant),
- * puis la liste des épisodes de cette saison s'affiche en dessous.
+ * Une ligne de cartes épisode par saison (sans menu déroulant) — type Netflix / grilles par saison.
  */
 export function SeriesEpisodesSection({
   seriesEpisodes,
-  selectedSeasonNum,
+  tmdbId,
   selectedEpisodeVariantId,
-  onSelectSeason,
   onSelectEpisode,
   savedPlaybackPosition,
   episodesInLibraryCount,
+  watchedSet,
+  isTV,
 }: SeriesEpisodesSectionProps) {
   const { t } = useI18n();
   const hasSavedPosition = savedPlaybackPosition != null && savedPlaybackPosition > 0;
-  const currentSeason = selectedSeasonNum != null
-    ? seriesEpisodes.seasons.find((s) => s.season === selectedSeasonNum)
-    : null;
-  const currentEpisode = currentSeason?.episodes.find((e) => e.id === selectedEpisodeVariantId);
-  const episodeCount = currentSeason?.episodes?.length ?? 0;
+  /** Clés : `${season}:${episodeNumber}` (TMDB par saison ; numéros d'épisode peuvent se répéter entre saisons). */
+  const [tmdbStillBySeasonEpisode, setTmdbStillBySeasonEpisode] = useState<Record<string, string>>({});
+
+  const seasonListKey = useMemo(
+    () => seriesEpisodes.seasons.map((s) => s.season).join(','),
+    [seriesEpisodes.seasons],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    if (typeof tmdbId !== 'number') {
+      setTmdbStillBySeasonEpisode({});
+      return;
+    }
+    const seasons = seriesEpisodes.seasons.map((s) => s.season);
+    if (seasons.length === 0) {
+      setTmdbStillBySeasonEpisode({});
+      return;
+    }
+    (async () => {
+      const merged: Record<string, string> = {};
+      await Promise.all(
+        seasons.map(async (seasonNum) => {
+          const res = await serverApi.getTmdbTvSeasonDetail(tmdbId, seasonNum, 'fr-FR');
+          if (cancelled) return;
+          if (!res?.success || !res.data) return;
+          const episodes = Array.isArray(res.data.episodes) ? res.data.episodes : [];
+          for (const ep of episodes) {
+            const num = typeof ep?.episode_number === 'number' ? ep.episode_number : null;
+            const stillPath = typeof ep?.still_path === 'string' ? ep.still_path : null;
+            if (num && stillPath) {
+              merged[`${seasonNum}:${num}`] = `https://image.tmdb.org/t/p/w780${stillPath}`;
+            }
+          }
+        }),
+      );
+      if (!cancelled) setTmdbStillBySeasonEpisode(merged);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tmdbId, seasonListKey]);
+
+  const getPreferredThumb = useMemo(() => {
+    return (seasonNum: number, episodeNumber: number | null, fallback: string | null) => {
+      if (episodeNumber != null && episodeNumber > 0) {
+        const k = `${seasonNum}:${episodeNumber}`;
+        if (tmdbStillBySeasonEpisode[k]) return tmdbStillBySeasonEpisode[k];
+      }
+      return fallback;
+    };
+  }, [tmdbStillBySeasonEpisode]);
+
+  const currentEpisode = useMemo(() => {
+    for (const s of seriesEpisodes.seasons) {
+      const e = s.episodes.find((x) => x.id === selectedEpisodeVariantId);
+      if (e) return e;
+    }
+    return null;
+  }, [seriesEpisodes.seasons, selectedEpisodeVariantId]);
 
   return (
-    <div className="space-y-5">
-      {/* Indication épisodes en bibliothèque (série depuis library) */}
+    <div className="space-y-8">
       {episodesInLibraryCount != null && episodesInLibraryCount > 0 && (
         <p className="text-sm text-white/70">
           {episodesInLibraryCount === 1
@@ -45,7 +103,6 @@ export function SeriesEpisodesSection({
         </p>
       )}
 
-      {/* Bannière « Reprendre la lecture » quand une position est sauvegardée */}
       {hasSavedPosition && currentEpisode && (
         <div
           className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl bg-white/10 border border-white/20 backdrop-blur-sm"
@@ -53,9 +110,7 @@ export function SeriesEpisodesSection({
           aria-label={t('dashboard.resumeWatching')}
         >
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white/80 mb-0.5">
-              {t('dashboard.resumeWatching')}
-            </p>
+            <p className="text-sm font-medium text-white/80 mb-0.5">{t('dashboard.resumeWatching')}</p>
             <p className="text-lg font-semibold text-white truncate">
               {currentEpisode.episode === 0
                 ? t('mediaDetail.fullPack')
@@ -68,87 +123,63 @@ export function SeriesEpisodesSection({
         </div>
       )}
 
-      {/* Sélecteur de saison : menu déroulant (comme sur les plateformes de streaming) */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <label htmlFor="series-season-select" className="text-sm font-semibold text-white/90 shrink-0">
-          {t('mediaDetail.season')}
-        </label>
-        <div className="relative min-w-[180px]">
-          <select
-            id="series-season-select"
-            value={selectedSeasonNum ?? ''}
-            onChange={(e) => {
-              const num = parseInt(e.currentTarget.value, 10);
-              if (!Number.isNaN(num)) onSelectSeason(num);
-            }}
-            className="w-full appearance-none bg-white/15 hover:bg-white/20 text-white font-medium py-3 pl-4 pr-10 rounded-lg border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent cursor-pointer"
-            aria-label={t('mediaDetail.season')}
-          >
-            {seriesEpisodes.seasons.map((s) => (
-              <option key={s.season} value={s.season} className="bg-gray-900 text-white">
-                {t('mediaDetail.seasonNumber', { number: s.season })}
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/70 pointer-events-none" aria-hidden />
-        </div>
-      </div>
+      {seriesEpisodes.seasons.map((seasonData) => {
+        const seasonNum = seasonData.season;
+        const episodes = seasonData.episodes ?? [];
+        if (!episodes.length) return null;
 
-      {/* Liste des épisodes de la saison sélectionnée — s'affiche dès qu'une saison est choisie */}
-      {currentSeason?.episodes?.length ? (
-        <section aria-label={t('mediaDetail.episodes')} className="rounded-xl overflow-hidden bg-black/40 border border-white/10">
-          <div className="px-4 py-3 border-b border-white/10 bg-white/5">
-            <h3 className="text-base font-semibold text-white">
-              {t('mediaDetail.episodes')} — {t('mediaDetail.seasonNumber', { number: currentSeason.season })}
-              <span className="ml-2 text-sm font-normal text-white/60">({episodeCount})</span>
-            </h3>
-          </div>
-          <ul className="divide-y divide-white/10" role="list">
-            {currentSeason.episodes.map((ep) => {
-              const isSelected = selectedEpisodeVariantId === ep.id;
-              const label =
-                ep.episode === 0
-                  ? t('mediaDetail.fullPack')
-                  : ep.name?.trim()
-                    ? t('mediaDetail.episodeWithTitle', {
-                        number: ep.episode,
-                        title: ep.name,
-                      })
-                    : t('mediaDetail.episodeNumber', { number: ep.episode });
-              return (
-                <li key={ep.id}>
-                  <button
-                    type="button"
-                    onClick={() => onSelectEpisode(ep.id)}
-                    className={`w-full flex items-center gap-4 px-4 py-4 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary-500 group ${
-                      isSelected
-                        ? 'bg-primary-600/40 text-white'
-                        : 'hover:bg-white/10 text-white/90'
-                    }`}
-                    aria-current={isSelected ? 'true' : undefined}
-                  >
-                    <span
-                      className="flex-shrink-0 w-11 h-11 rounded-lg flex items-center justify-center text-base font-bold bg-white/20"
-                      aria-hidden
-                    >
-                      {ep.episode === 0 ? '—' : ep.episode}
-                    </span>
-                    <span className="flex-1 min-w-0 truncate text-base font-medium">{label}</span>
-                    <span
-                      className={`flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center ${
-                        isSelected ? 'bg-primary-500 text-white' : 'bg-white/10 text-white/80 group-hover:bg-primary-500/80'
-                      }`}
-                      aria-hidden
-                    >
-                      <Play className="w-5 h-5 ml-0.5" fill="currentColor" />
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : null}
+        const episodeCount = episodes.length;
+        const headingId = `series-season-${seasonNum}-heading`;
+
+        return (
+          <section
+            key={seasonNum}
+            aria-labelledby={headingId}
+            className="rounded-xl overflow-hidden bg-black/40 border border-white/10"
+          >
+            <div className="px-4 py-3 border-b border-white/10 bg-white/5">
+              <h3 id={headingId} className="text-base font-semibold text-white">
+                {t('mediaDetail.seasonNumber', { number: seasonNum })}
+                <span className="ml-2 text-sm font-normal text-white/60">({episodeCount})</span>
+              </h3>
+            </div>
+            <EpisodeCardsCarousel
+              ariaLabel={`${t('mediaDetail.seasonNumber', { number: seasonNum })} — ${t('mediaDetail.episodes')}`}
+              items={episodes.map((ep) => {
+                const isSelected = selectedEpisodeVariantId === ep.id;
+                const title =
+                  ep.episode === 0
+                    ? t('mediaDetail.fullPack')
+                    : ep.name?.trim()
+                      ? t('mediaDetail.episodeWithTitle', { number: ep.episode, title: ep.name })
+                      : t('mediaDetail.episodeNumber', { number: ep.episode });
+
+                const watched =
+                  typeof tmdbId === 'number' && ep.episode > 0
+                    ? watchedSet?.has(watchedEpisodeKey(ep.season, ep.episode)) ?? false
+                    : false;
+                return {
+                  key: ep.id,
+                  episodeNumber: ep.episode === 0 ? '—' : ep.episode,
+                  title,
+                  subtitle: null,
+                  thumbnailUrl: getPreferredThumb(
+                    ep.season,
+                    typeof ep.episode === 'number' && ep.episode > 0 ? ep.episode : null,
+                    ep.info_hash && ep.file_path
+                      ? `/api/media/episode-thumbnail?info_hash=${encodeURIComponent(ep.info_hash)}&t=60&w=480`
+                      : null,
+                  ),
+                  watched,
+                  isSelected,
+                  onSelect: () => onSelectEpisode(ep.id),
+                  isTV,
+                };
+              })}
+            />
+          </section>
+        );
+      })}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import {
   getPlaybackPosition,
   savePlaybackPosition,
   savePlaybackPositionByMedia,
+  markEpisodeWatched,
 } from '../../../../lib/streaming/torrent-storage';
 import { getOrCreateDeviceId } from '../../../../lib/utils/device-id';
 import type { LucieManifest } from '../types';
@@ -16,6 +17,9 @@ interface UseLuciePlayerProps {
   filePath?: string;
   tmdbId?: number;
   tmdbType?: 'movie' | 'tv';
+  seriesSeason?: number;
+  seriesEpisode?: number;
+  variantId?: string;
   startFromBeginning: boolean;
   onError?: (error: Error) => void;
   onLoadingChange?: (loading: boolean) => void;
@@ -32,6 +36,9 @@ export function useLuciePlayer({
   filePath,
   tmdbId,
   tmdbType,
+  seriesSeason,
+  seriesEpisode,
+  variantId,
   startFromBeginning,
   onError,
   onLoadingChange,
@@ -60,6 +67,9 @@ export function useLuciePlayer({
   const torrentIdRef = useRef(torrentId);
   const tmdbIdRef = useRef(tmdbId);
   const tmdbTypeRef = useRef(tmdbType);
+  const seriesSeasonRef = useRef(seriesSeason);
+  const seriesEpisodeRef = useRef(seriesEpisode);
+  const variantIdRef = useRef(variantId);
   const onDurationChangeRef = useRef(onDurationChange);
 
   // Mettre à jour les refs quand les props changent
@@ -71,8 +81,11 @@ export function useLuciePlayer({
     torrentIdRef.current = torrentId;
     tmdbIdRef.current = tmdbId;
     tmdbTypeRef.current = tmdbType;
+    seriesSeasonRef.current = seriesSeason;
+    seriesEpisodeRef.current = seriesEpisode;
+    variantIdRef.current = variantId;
     onDurationChangeRef.current = onDurationChange;
-  }, [onError, onLoadingChange, canAutoPlay, startFromBeginning, torrentId, tmdbId, tmdbType, onDurationChange]);
+  }, [onError, onLoadingChange, canAutoPlay, startFromBeginning, torrentId, tmdbId, tmdbType, seriesSeason, seriesEpisode, variantId, onDurationChange]);
 
   const baseUrl = (baseUrlProp && baseUrlProp.trim()) || serverApi.getServerUrl();
 
@@ -356,6 +369,16 @@ export function useLuciePlayer({
           }
         }
 
+        const mediaExtrasForSave = () => {
+          const tty = tmdbTypeRef.current;
+          if (tty !== 'tv') return undefined;
+          const s = seriesSeasonRef.current;
+          const e = seriesEpisodeRef.current;
+          const v = variantIdRef.current;
+          if (s == null && e == null && v == null) return undefined;
+          return { season: s ?? undefined, episode: e ?? undefined, variantId: v ?? undefined };
+        };
+
         // Sauvegarder la position périodiquement
         const savePositionInterval = setInterval(async () => {
           const currentTorrentId = torrentIdRef.current;
@@ -367,10 +390,32 @@ export function useLuciePlayer({
             const tid = tmdbIdRef.current;
             const tty = tmdbTypeRef.current;
             if (typeof tid === 'number' && (tty === 'movie' || tty === 'tv')) {
-              savePlaybackPositionByMedia(tid, tty, deviceId, video.currentTime).catch(() => {});
+              savePlaybackPositionByMedia(tid, tty, deviceId, video.currentTime, mediaExtrasForSave()).catch(() => {});
             }
           }
         }, 10000);
+
+        const handleEndedWatched = () => {
+          const tid = tmdbIdRef.current;
+          const tty = tmdbTypeRef.current;
+          const s = seriesSeasonRef.current;
+          const e = seriesEpisodeRef.current;
+          if (typeof tid === 'number' && tty === 'tv' && s != null && e != null && e > 0) {
+            markEpisodeWatched(tid, s, e);
+          }
+        };
+        const handleTimeUpdateWatched = () => {
+          const tid = tmdbIdRef.current;
+          const tty = tmdbTypeRef.current;
+          const s = seriesSeasonRef.current;
+          const e = seriesEpisodeRef.current;
+          if (typeof tid !== 'number' || tty !== 'tv' || s == null || e == null || e <= 0) return;
+          const dur = video.duration;
+          if (!dur || !Number.isFinite(dur) || dur <= 0) return;
+          if (video.currentTime / dur >= 0.92) markEpisodeWatched(tid, s, e);
+        };
+        video.addEventListener('ended', handleEndedWatched);
+        video.addEventListener('timeupdate', handleTimeUpdateWatched);
 
         // Buffer automatique pendant la lecture
         const handleTimeUpdate = () => {
@@ -380,6 +425,8 @@ export function useLuciePlayer({
 
         cleanup = () => {
           clearInterval(savePositionInterval);
+          video.removeEventListener('ended', handleEndedWatched);
+          video.removeEventListener('timeupdate', handleTimeUpdateWatched);
           video.removeEventListener('timeupdate', handleTimeUpdate);
           shouldStopRef.current = true;
           
@@ -420,7 +467,7 @@ export function useLuciePlayer({
     return () => {
       cleanup?.();
     };
-  }, [infoHash, filePath, baseUrl, src]);
+  }, [infoHash, filePath, baseUrl, src, seriesSeason, seriesEpisode, variantId]);
 
   const stopBuffer = () => {
     shouldStopRef.current = true;
