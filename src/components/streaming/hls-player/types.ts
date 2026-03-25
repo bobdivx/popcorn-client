@@ -12,6 +12,10 @@ export interface HLSPlayerProps {
   /** Pour sauvegarder la position par média (tmdb), reprise même avec un autre info_hash */
   tmdbId?: number;
   tmdbType?: 'movie' | 'tv';
+  /** Série : contexte épisode pour reprise TMDB + marquage « vu » */
+  seriesSeason?: number;
+  seriesEpisode?: number;
+  variantId?: string;
   startFromBeginning?: boolean;
   /** Contexte série : afficher overlay « Passer le générique » pendant l'intro */
   isSeries?: boolean;

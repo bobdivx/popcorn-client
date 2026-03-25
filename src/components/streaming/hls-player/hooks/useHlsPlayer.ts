@@ -8,6 +8,7 @@ import {
   getPlaybackPosition,
   savePlaybackPosition,
   savePlaybackPositionByMedia,
+  markEpisodeWatched,
 } from '../../../../lib/streaming/torrent-storage';
 import { getOrCreateDeviceId } from '../../../../lib/utils/device-id';
 import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
@@ -22,6 +23,10 @@ interface UseHlsPlayerProps {
   /** Pour sauvegarder la position par média (tmdb), reprise même avec un autre info_hash */
   tmdbId?: number;
   tmdbType?: 'movie' | 'tv';
+  /** Série : saison / épisode / id variante — sauvegarde reprise + marquage « vu » */
+  seriesSeason?: number;
+  seriesEpisode?: number;
+  variantId?: string;
   startFromBeginning: boolean;
   onError?: (error: Error) => void;
   onLoadingChange?: (loading: boolean) => void;
@@ -49,6 +54,9 @@ export function useHlsPlayer({
   filePath,
   tmdbId,
   tmdbType,
+  seriesSeason,
+  seriesEpisode,
+  variantId,
   startFromBeginning,
   onError,
   onLoadingChange,
@@ -92,6 +100,9 @@ export function useHlsPlayer({
   const torrentIdRef = useRef(torrentId);
   const tmdbIdRef = useRef(tmdbId);
   const tmdbTypeRef = useRef(tmdbType);
+  const seriesSeasonRef = useRef(seriesSeason);
+  const seriesEpisodeRef = useRef(seriesEpisode);
+  const variantIdRef = useRef(variantId);
   const onDurationChangeRef = useRef(onDurationChange);
   const totalDurationRef = useRef<number>(0);
   const apiDurationRef = useRef<number>(0);
@@ -130,8 +141,11 @@ export function useHlsPlayer({
     torrentIdRef.current = torrentId;
     tmdbIdRef.current = tmdbId;
     tmdbTypeRef.current = tmdbType;
+    seriesSeasonRef.current = seriesSeason;
+    seriesEpisodeRef.current = seriesEpisode;
+    variantIdRef.current = variantId;
     onDurationChangeRef.current = onDurationChange;
-  }, [onError, onLoadingChange, canAutoPlay, startFromBeginning, torrentId, tmdbId, tmdbType, onDurationChange]);
+  }, [onError, onLoadingChange, canAutoPlay, startFromBeginning, torrentId, tmdbId, tmdbType, seriesSeason, seriesEpisode, variantId, onDurationChange]);
 
   const { hlsLoaded, error: loaderError } = useHlsLoader();
   const playerConfig = usePlayerConfig();
@@ -1258,6 +1272,16 @@ export function useHlsPlayer({
           }
         });
 
+        const mediaExtrasForSave = () => {
+          const tty = tmdbTypeRef.current;
+          if (tty !== 'tv') return undefined;
+          const s = seriesSeasonRef.current;
+          const e = seriesEpisodeRef.current;
+          const v = variantIdRef.current;
+          if (s == null && e == null && v == null) return undefined;
+          return { season: s ?? undefined, episode: e ?? undefined, variantId: v ?? undefined };
+        };
+
         // Sauvegarder la position périodiquement (maintenant directement en secondes)
         const savePositionInterval = setInterval(async () => {
           const currentTorrentId = torrentIdRef.current;
@@ -1269,7 +1293,7 @@ export function useHlsPlayer({
             const tid = tmdbIdRef.current;
             const tty = tmdbTypeRef.current;
             if (typeof tid === 'number' && (tty === 'movie' || tty === 'tv')) {
-              savePlaybackPositionByMedia(tid, tty, deviceId, video.currentTime).catch(() => {});
+              savePlaybackPositionByMedia(tid, tty, deviceId, video.currentTime, mediaExtrasForSave()).catch(() => {});
             }
           }
         }, 10000); // Sauvegarder toutes les 10 secondes
@@ -1290,13 +1314,39 @@ export function useHlsPlayer({
             const tty = tmdbTypeRef.current;
             if (typeof tid === 'number' && (tty === 'movie' || tty === 'tv')) {
               try {
-                await savePlaybackPositionByMedia(tid, tty, deviceId, video.currentTime);
+                await savePlaybackPositionByMedia(tid, tty, deviceId, video.currentTime, mediaExtrasForSave());
               } catch (e) {
                 console.warn('[useHlsPlayer] Erreur sauvegarde position (media):', e);
               }
             }
           }
         };
+
+        const handleEndedWatched = () => {
+          const tid = tmdbIdRef.current;
+          const tty = tmdbTypeRef.current;
+          const s = seriesSeasonRef.current;
+          const e = seriesEpisodeRef.current;
+          if (typeof tid === 'number' && tty === 'tv' && s != null && e != null && e > 0) {
+            markEpisodeWatched(tid, s, e);
+          }
+        };
+        const handleTimeUpdateWatched = () => {
+          const tid = tmdbIdRef.current;
+          const tty = tmdbTypeRef.current;
+          const s = seriesSeasonRef.current;
+          const e = seriesEpisodeRef.current;
+          if (typeof tid !== 'number' || tty !== 'tv' || s == null || e == null || e <= 0) return;
+          const dur = video.duration;
+          if (!dur || !Number.isFinite(dur) || dur <= 0) return;
+          if (video.currentTime / dur >= 0.92) markEpisodeWatched(tid, s, e);
+        };
+        video.addEventListener('ended', handleEndedWatched);
+        video.addEventListener('timeupdate', handleTimeUpdateWatched);
+        cleanupFunctions.push(() => {
+          video.removeEventListener('ended', handleEndedWatched);
+          video.removeEventListener('timeupdate', handleTimeUpdateWatched);
+        });
 
         // Sauvegarde + arrêt du buffer (uniquement à la sortie / démontage)
         const savePositionAndStopBuffer = async () => {
@@ -1422,7 +1472,7 @@ export function useHlsPlayer({
     };
     // IMPORTANT: Utiliser des dépendances stabilisées pour éviter les réinitialisations multiples
     // maxHeight : changement de qualité → nouvelle URL ; src / useStreamTorrentUrlProp : mode stream-torrent
-  }, [hlsLoaded, src, infoHash, filePath, baseUrlProp, streamBackendUrl, maxHeight, useStreamTorrentUrlProp]);
+  }, [hlsLoaded, src, infoHash, filePath, baseUrlProp, streamBackendUrl, maxHeight, useStreamTorrentUrlProp, seriesSeason, seriesEpisode, variantId]);
 
   // Fonction pour arrêter le buffer manuellement (utile lors de la fermeture).
   // Appelle le cleanup complet : pause vidéo + unregister backend (arrêt FFmpeg) + destroy HLS.

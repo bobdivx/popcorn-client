@@ -12,6 +12,9 @@ export interface LuciePlayerProps {
   /** Pour sauvegarder la position par média (tmdb), reprise même avec un autre info_hash */
   tmdbId?: number;
   tmdbType?: 'movie' | 'tv';
+  seriesSeason?: number;
+  seriesEpisode?: number;
+  variantId?: string;
   startFromBeginning?: boolean;
   /** Contexte série : afficher overlay « Passer le générique » pendant l'intro */
   isSeries?: boolean;

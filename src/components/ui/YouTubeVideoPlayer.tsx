@@ -29,16 +29,60 @@ export function YouTubeVideoPlayer({
     setIsLoaded(true);
   }, [youtubeKey]);
 
+  const postToPlayer = (message: unknown) => {
+    const iframe = iframeRef.current;
+    const win = iframe?.contentWindow;
+    if (!iframe || !win) return;
+    // YouTube IFrame API utilise postMessage stringifié (JSON).
+    try {
+      win.postMessage(typeof message === 'string' ? message : JSON.stringify(message), '*');
+    } catch {
+      // ignore
+    }
+  };
+
+  const ensureListening = () => {
+    // Active le flux d'événements postMessage (nécessaire sur certaines plateformes)
+    // et s'abonne à onStateChange pour recevoir la fin (0).
+    postToPlayer({ event: 'listening', id: youtubeKey });
+    postToPlayer({ event: 'command', func: 'addEventListener', args: ['onStateChange'] });
+  };
+
   // Détection de fin de vidéo via YouTube IFrame API (postMessage)
   useEffect(() => {
     if (!onEnded || loop) return;
 
     // Guard pour éviter les appels multiples si l'événement est déclenché plusieurs fois
     let ended = false;
+    const safeEnded = () => {
+      if (ended) return;
+      ended = true;
+      onEnded();
+    };
+
+    /** Détecte fin de lecture dans toutes les formes connues des messages YouTube embed. */
+    const looksLikeEnded = (data: any): boolean => {
+      if (!data || typeof data !== 'object') return false;
+      // onStateChange : info === 0 (ENDED)
+      if (data.event === 'onStateChange') {
+        const info = data.info;
+        if (info === 0 || info === '0') return true;
+      }
+      // infoDelivery : playerState 0 = ENDED (réponse à getPlayerState ou évènements internes)
+      if (data.event === 'infoDelivery' && data.info != null) {
+        const info = data.info;
+        if (info === 0 || info === '0') return true;
+        if (typeof info === 'number' && info === 0) return true;
+        if (typeof info === 'object' && (info.playerState === 0 || info.playerState === '0')) return true;
+      }
+      // Certaines builds envoient playerState à la racine
+      if (data.playerState === 0 || data.playerState === '0') return true;
+      return false;
+    };
 
     const handleMessage = (e: MessageEvent) => {
-      // Filtrer uniquement les messages venant de YouTube (origin-based, plus fiable que source)
-      if (!e.origin.includes('youtube.com')) return;
+      const origin = (e.origin || '').toLowerCase();
+      if (!origin.includes('youtube.com') && !origin.includes('youtube-nocookie.com')) return;
 
       let data: any;
       try {
@@ -48,22 +92,37 @@ export function YouTubeVideoPlayer({
       }
 
       if (ended) return;
-
-      // YouTube envoie playerState=0 quand la vidéo se termine
-      if (data?.event === 'infoDelivery' && data?.info?.playerState === 0) {
-        ended = true;
-        onEnded();
-      }
-      // Format alternatif YouTube IFrame API
-      if (data?.event === 'onStateChange' && data?.info === 0) {
-        ended = true;
-        onEnded();
+      if (looksLikeEnded(data)) {
+        safeEnded();
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [onEnded, loop, youtubeKey]);
+
+  /** Secours : certains navigateurs / TV ne reçoivent pas onStateChange — on interroge getPlayerState (réponses = infoDelivery). */
+  useEffect(() => {
+    if (!onEnded || loop) return;
+    let tick: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      tick = setInterval(() => {
+        postToPlayer({ event: 'command', func: 'getPlayerState', args: [] });
+      }, 1500);
+    };
+    const t = window.setTimeout(start, 800);
+    return () => {
+      clearTimeout(t);
+      if (tick) clearInterval(tick);
+    };
+  }, [onEnded, loop, youtubeKey, isLoaded]);
+
+  // S'assurer qu'on reçoit bien les événements (notamment WebOS)
+  useEffect(() => {
+    if (!onEnded || loop) return;
+    if (!isLoaded) return;
+    ensureListening();
+  }, [onEnded, loop, youtubeKey, isLoaded]);
 
   if (!youtubeKey) return null;
 
@@ -109,7 +168,10 @@ export function YouTubeVideoPlayer({
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen={false}
           loading="eager"
-          onLoad={() => setIsLoaded(true)}
+          onLoad={() => {
+            setIsLoaded(true);
+            ensureListening();
+          }}
         />
       </div>
     );
@@ -124,7 +186,10 @@ export function YouTubeVideoPlayer({
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
         allowFullScreen
         loading="lazy"
-        onLoad={() => setIsLoaded(true)}
+        onLoad={() => {
+          setIsLoaded(true);
+          ensureListening();
+        }}
       />
     </div>
   );
