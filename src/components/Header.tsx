@@ -30,7 +30,10 @@ export default function Header() {
   };
 
   return (
-    <header className="bg-black/80 border-b border-white/10 py-4 sticky top-0 z-50 backdrop-blur-sm">
+    <header
+      data-tv-site-header
+      className="bg-black/80 border-b border-white/10 py-4 sticky top-0 z-50 backdrop-blur-sm"
+    >
       <div className="container mx-auto px-4 flex justify-between items-center gap-3 min-h-[44px]">
         <a href={getPathHref('/')} className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0 flex-shrink">
           <img src={getPathHref('/popcorn_logo.png')} alt="Popcorn" className="w-8 h-8 flex-shrink-0" />

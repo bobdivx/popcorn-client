@@ -743,6 +743,7 @@
       "wizardSummaryScreenshotsCount": "{count} capture(s) générée(s)",
       "wizardSummaryScreenshotsAuto": "défilement automatique",
       "wizardSummaryExecutionDetail": "{processed} / {total} média(s) traités",
+      "syncTrackerRulesProgress": "Synchronisation des règles C411 depuis popcorn-web…",
       "screenshotAlt": "Capture d'écran {index}",
       "wizardTorrentFactoryTitle": "Torrent factory",
       "wizardTorrentFactoryHint": "Progression en direct de toutes les étapes du pipeline (configuration, préparation, preview et upload).",
@@ -1246,6 +1247,12 @@
       "title": "Sync torrents",
       "description": "Gérez la synchronisation automatique des torrents depuis les indexers"
     },
+    "bulkTorrentZipNav": {
+      "title": "Pack .torrent (ZIP)",
+      "description": "Télécharger ou importer une archive ZIP de .torrent (ex. pack indexer) et choisir quoi ajouter au client",
+      "chooseIndexer": "Indexer concerné",
+      "noIndexers": "Ajoutez au moins un indexer dans les paramètres pour utiliser cette fonction."
+    },
     "diagnostics": {
       "title": "Diagnostics",
       "description": "Tester la connexion backend, la version et les indexers"
@@ -1535,6 +1542,31 @@
     "errorDeleting": "Erreur lors de la suppression",
     "errorTesting": "Erreur lors du test de connexion",
     "syncStarted": "Synchronisation démarrée. Les résultats apparaîtront dans quelques instants.",
+    "bulkZip": {
+      "tabTitle": "Pack .torrent (ZIP)",
+      "intro": "Certains indexers proposent une archive ZIP de tous les fichiers .torrent. Décompressez-la côté serveur, choisissez ce que vous voulez ajouter au client, et enregistrez votre sélection pour les prochaines mises à jour (la structure des dossiers dans le ZIP reste en général identique).",
+      "sourceUrlLabel": "URL du fichier ZIP (optionnel, pour téléchargement automatique)",
+      "sourceUrlPlaceholder": "https://…",
+      "previewFromUrl": "Aperçu depuis l’URL",
+      "pickFile": "Choisir un fichier .zip",
+      "previewFileHint": "Ou importez une archive déjà téléchargée.",
+      "filterPlaceholder": "Filtrer par chemin…",
+      "selectAllVisible": "Tout sélectionner (liste filtrée)",
+      "selectNone": "Tout désélectionner",
+      "applySaved": "Appliquer la sélection enregistrée",
+      "applySavedResult": "{count} chemin(s) cochés selon la sélection enregistrée.",
+      "applySavedNone": "Aucun chemin en commun entre l’archive et la sélection enregistrée.",
+      "listTruncated": "Affichage des {shown} premiers résultats sur {total} (affinez le filtre).",
+      "listSummary": "{total} fichier(s) listé(s). {selected} sélectionné(s).",
+      "savePrefs": "Enregistrer URL + sélection",
+      "importSelected": "Importer la sélection dans le client",
+      "loadingPrefs": "Chargement des préférences…",
+      "previewOk": "{count} fichier(s) .torrent dans l’archive.",
+      "importResult": "{added} ajouté(s), {failed} en échec.",
+      "prefsSaved": "Préférences enregistrées.",
+      "noPreview": "Lancez un aperçu (fichier ou URL) pour lister les .torrent.",
+      "busy": "Traitement…"
+    },
     "cookieWizard": {
       "title": "Obtenir le cookie de session",
       "tabSimple": "Méthode simple (extension)",

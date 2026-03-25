@@ -4,6 +4,27 @@
 
 import type { ApiResponse, Indexer, IndexerFormData, IndexerTypeInfo } from './types.js';
 
+export interface BulkTorrentZipEntry {
+  path: string;
+  size: number;
+}
+
+export interface BulkTorrentZipPreview {
+  previewId: string;
+  torrentCount: number;
+  entries: BulkTorrentZipEntry[];
+}
+
+export interface BulkTorrentZipImportResult {
+  added: string[];
+  failed: Array<{ path: string; error: string }>;
+}
+
+export interface BulkTorrentZipPreferences {
+  sourceUrl?: string | null;
+  selectedRelativePaths: string[];
+}
+
 interface ServerApiClientIndexersAccess {
   backendRequest<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>>;
   getCurrentUserId(): string | null;
@@ -201,4 +222,100 @@ export const indexersMethods = {
     }
     return { success: false, error: 'BackendError', message: 'Test incomplet' };
   },
+
+  async getBulkTorrentZipPreferences(
+    this: ServerApiClientIndexersAccess,
+    indexerId: string
+  ): Promise<ApiResponse<BulkTorrentZipPreferences>> {
+    const res = await this.backendRequest<BulkTorrentZipPreferences>(
+      `/api/client/admin/indexers/${encodeURIComponent(indexerId)}/bulk-torrent-zip/preferences`,
+      { method: 'GET' }
+    );
+    if (!res.success) return res as ApiResponse<BulkTorrentZipPreferences>;
+    const d = res.data as BulkTorrentZipPreferences | undefined;
+    return {
+      success: true,
+      data: {
+        sourceUrl: d?.sourceUrl ?? null,
+        selectedRelativePaths: Array.isArray(d?.selectedRelativePaths) ? d.selectedRelativePaths : [],
+      },
+    };
+  },
+
+  async putBulkTorrentZipPreferences(
+    this: ServerApiClientIndexersAccess,
+    indexerId: string,
+    body: BulkTorrentZipPreferences
+  ): Promise<ApiResponse<BulkTorrentZipPreferences>> {
+    return this.backendRequest<BulkTorrentZipPreferences>(
+      `/api/client/admin/indexers/${encodeURIComponent(indexerId)}/bulk-torrent-zip/preferences`,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          sourceUrl: body.sourceUrl ?? null,
+          selectedRelativePaths: body.selectedRelativePaths,
+        }),
+      }
+    );
+  },
+
+  async previewBulkTorrentZipFromFile(
+    this: ServerApiClientIndexersAccess,
+    indexerId: string,
+    file: File
+  ): Promise<ApiResponse<BulkTorrentZipPreview>> {
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await this.backendRequest<BulkTorrentZipPreview>(
+      `/api/client/admin/indexers/${encodeURIComponent(indexerId)}/bulk-torrent-zip/preview`,
+      { method: 'POST', body: fd }
+    );
+    return normalizeBulkPreview(res);
+  },
+
+  async previewBulkTorrentZipFromUrl(
+    this: ServerApiClientIndexersAccess,
+    indexerId: string,
+    url: string
+  ): Promise<ApiResponse<BulkTorrentZipPreview>> {
+    const res = await this.backendRequest<BulkTorrentZipPreview>(
+      `/api/client/admin/indexers/${encodeURIComponent(indexerId)}/bulk-torrent-zip/preview-url`,
+      { method: 'POST', body: JSON.stringify({ url: url.trim() }) }
+    );
+    return normalizeBulkPreview(res);
+  },
+
+  async importBulkTorrentZip(
+    this: ServerApiClientIndexersAccess,
+    indexerId: string,
+    previewId: string,
+    paths: string[]
+  ): Promise<ApiResponse<BulkTorrentZipImportResult>> {
+    return this.backendRequest<BulkTorrentZipImportResult>(
+      `/api/client/admin/indexers/${encodeURIComponent(indexerId)}/bulk-torrent-zip/import`,
+      { method: 'POST', body: JSON.stringify({ previewId, paths }) }
+    );
+  },
 };
+
+function normalizeBulkPreview(res: ApiResponse<BulkTorrentZipPreview>): ApiResponse<BulkTorrentZipPreview> {
+  if (!res.success) return res as ApiResponse<BulkTorrentZipPreview>;
+  const raw = res.data as Record<string, unknown> | undefined;
+  if (!raw || typeof raw !== 'object') {
+    return { success: false, error: 'BackendError', message: 'Réponse aperçu invalide' };
+  }
+  const previewId = (raw.previewId ?? raw.preview_id) as string | undefined;
+  const torrentCount = (raw.torrentCount ?? raw.torrent_count) as number | undefined;
+  const entries = (raw.entries as BulkTorrentZipEntry[] | undefined) ?? [];
+  if (!previewId) {
+    return { success: false, error: 'BackendError', message: 'Réponse aperçu invalide' };
+  }
+  return {
+    success: true,
+    data: {
+      previewId,
+      torrentCount: typeof torrentCount === 'number' ? torrentCount : entries.length,
+      entries,
+    },
+  };
+}

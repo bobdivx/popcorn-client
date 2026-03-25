@@ -14,13 +14,15 @@ interface UseVideoFilesOptions {
   torrentName: string;
   onError?: (error: Error) => void;
   filePath?: string | null; // Chemin spécifique du fichier (pour torrents multi-épisodes)
+  /** Si true, ne pas réduire à un seul "fichier principal" (utile pour les packs de séries). */
+  keepAllVideoFiles?: boolean;
   torrent?: {
     infoHash?: string | null;
     downloadPath?: string | null;
   } | null; // Torrent complet pour accéder au downloadPath pour les médias locaux
 }
 
-export function useVideoFiles({ torrentName, onError, filePath, torrent }: UseVideoFilesOptions) {
+export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFiles, torrent }: UseVideoFilesOptions) {
   const [videoFiles, setVideoFiles] = useState<TorrentFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<TorrentFile | null>(null);
   const [loadingFiles, setLoadingFiles] = useState(false);
@@ -154,11 +156,7 @@ export function useVideoFiles({ torrentName, onError, filePath, torrent }: UseVi
         const torrentStats = await clientApi.getTorrent(infoHash);
         if (!torrentStats) {
           // Normal pour un variant externe pas encore ajouté : pas de warn pour éviter le bruit en console
-          console.log('[useVideoFiles] Torrent pas encore dans le client', retryCount > 0 ? `(réessai ${retryCount}/5)` : '');
-          if (retryCount < 5) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            return loadVideoFiles(infoHash, retryCount + 1);
-          }
+          console.log('[useVideoFiles] Torrent pas encore dans le client (pas de réessai automatique).');
           setLoadingFiles(false);
           return [];
         }
@@ -263,8 +261,8 @@ export function useVideoFiles({ torrentName, onError, filePath, torrent }: UseVi
           }
         }
 
-        // Détecter si c'est une série (plusieurs fichiers vidéo de taille similaire)
-        // ou un film (un seul gros fichier vidéo)
+        // Détecter si c'est une série (heuristique) :
+        // Attention: des épisodes 1080p/4K dépassent souvent 500MB → ne pas casser le cas "pack complet".
         const isLikelySeries =
           files.length > 1 && files.every((f) => f.size < 500_000_000); // Tous < 500MB = probablement des épisodes
 
@@ -274,8 +272,9 @@ export function useVideoFiles({ torrentName, onError, filePath, torrent }: UseVi
           return [];
         }
 
-        // Pour les films, ne garder que le fichier principal (le plus gros)
-        if (!isLikelySeries && files.length > 1) {
+        // Pour les films, ne garder que le fichier principal (le plus gros),
+        // sauf si on souhaite explicitement garder tous les fichiers (pack complet de série).
+        if (!keepAllVideoFiles && !isLikelySeries && files.length > 1) {
           const torrentNameLower = torrentName.toLowerCase();
           const torrentWords = torrentNameLower
             .split(/[\s\.\-_\(\)\[\]]+/)
@@ -308,6 +307,7 @@ export function useVideoFiles({ torrentName, onError, filePath, torrent }: UseVi
         console.log('[useVideoFiles] Fichiers vidéo filtrés:', {
           count: files.length,
           is_likely_series: isLikelySeries,
+          keep_all_video_files: Boolean(keepAllVideoFiles),
           files: files.map((f) => ({ path: f.path, size: f.size })),
         });
 

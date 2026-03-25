@@ -15,6 +15,9 @@ import { translateGenre } from '../../lib/utils/genre-translation';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
 
 const MIN_ITEMS_PER_GENRE_ROW = 10;
+// Certains genres (ex: "Animation") doivent rester visibles même avec peu d'éléments.
+// Cela évite la perception "catégorie manquante" sur le dashboard.
+const ALWAYS_RENDER_GENRES = new Set<string>(['animation']);
 
 export default function Dashboard() {
   const { t, language } = useI18n();
@@ -253,6 +256,7 @@ export default function Dashboard() {
     return sortedMovieGenres.filter(genre => {
       const list = moviesByGenre[genre] || [];
       const filtered = list.filter((item) => !isWatched(item));
+      if (ALWAYS_RENDER_GENRES.has(genre.trim().toLowerCase())) return filtered.length > 0;
       return filtered.length >= MIN_ITEMS_PER_GENRE_ROW;
     });
   }, [sortedMovieGenres, moviesByGenre, isWatched]);
@@ -261,7 +265,7 @@ export default function Dashboard() {
     sortedMovieGenres.forEach(genre => {
       const list = moviesByGenre[genre] || [];
       const filtered = list.filter((item) => !isWatched(item));
-      if (filtered.length > 0 && filtered.length < MIN_ITEMS_PER_GENRE_ROW) {
+      if (!ALWAYS_RENDER_GENRES.has(genre.trim().toLowerCase()) && filtered.length > 0 && filtered.length < MIN_ITEMS_PER_GENRE_ROW) {
         filtered.forEach(m => { if (m.id) seen.add(m.id); });
       }
     });
@@ -278,6 +282,7 @@ export default function Dashboard() {
     return sortedSeriesGenres.filter(genre => {
       const list = seriesByGenre[genre] || [];
       const filtered = list.filter((item) => !isWatched(item));
+      if (ALWAYS_RENDER_GENRES.has(genre.trim().toLowerCase())) return filtered.length > 0;
       return filtered.length >= MIN_ITEMS_PER_GENRE_ROW;
     });
   }, [sortedSeriesGenres, seriesByGenre, isWatched]);
@@ -286,7 +291,7 @@ export default function Dashboard() {
     sortedSeriesGenres.forEach(genre => {
       const list = seriesByGenre[genre] || [];
       const filtered = list.filter((item) => !isWatched(item));
-      if (filtered.length > 0 && filtered.length < MIN_ITEMS_PER_GENRE_ROW) {
+      if (!ALWAYS_RENDER_GENRES.has(genre.trim().toLowerCase()) && filtered.length > 0 && filtered.length < MIN_ITEMS_PER_GENRE_ROW) {
         filtered.forEach(s => { if (s.id) seen.add(s.id); });
       }
     });
@@ -388,7 +393,7 @@ export default function Dashboard() {
                 genre === '__other__' ? t('common.others') : translateGenre(genre, language);
 
               const filteredMovies = genreMovies.filter((item) => !isWatched(item));
-              if (filteredMovies.length < MIN_ITEMS_PER_GENRE_ROW) return null;
+              if (filteredMovies.length < MIN_ITEMS_PER_GENRE_ROW && !ALWAYS_RENDER_GENRES.has(genre.trim().toLowerCase())) return null;
               return (
                 <CarouselRow key={`movies-${genre}`} title={genreTitle} autoScroll={false}>
                   {filteredMovies.map((item) => (
@@ -433,7 +438,7 @@ export default function Dashboard() {
                 genre === '__other__' ? t('common.others') : translateGenre(genre, language);
 
               const filteredSeries = genreSeries.filter((item) => !isWatched(item));
-              if (filteredSeries.length < MIN_ITEMS_PER_GENRE_ROW) return null;
+              if (filteredSeries.length < MIN_ITEMS_PER_GENRE_ROW && !ALWAYS_RENDER_GENRES.has(genre.trim().toLowerCase())) return null;
               return (
                 <CarouselRow key={`series-${genre}`} title={genreTitle} autoScroll={false}>
                   {filteredSeries.map((item) => (

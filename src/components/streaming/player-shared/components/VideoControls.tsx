@@ -94,6 +94,8 @@ interface VideoControlsProps {
 
   /** Miniatures scrub (type Netflix) — si défini, affiche une vignette au survol de la barre. */
   scrubThumbnails?: { mediaId: string; count: number; durationSeconds?: number; intervalSeconds?: number } | null;
+  /** Miniatures en cours de génération (placeholder animé). */
+  scrubThumbnailsLoading?: boolean;
   /**
    * Index de la vignette sélectionnée sur TV (contrôlé par le parent via useTVPlayerNavigation).
    * Si fourni, prend le dessus sur l'état interne. Non défini = mode desktop (état interne).
@@ -151,6 +153,7 @@ export function VideoControls({
   onCastClick,
   videoFillMode,
   scrubThumbnails = null,
+  scrubThumbnailsLoading = false,
   tvScrubIndexExternal,
   tvScrubFocused = false,
 }: VideoControlsProps) {
@@ -669,7 +672,7 @@ export function VideoControls({
             )}
 
             {/* Bande de miniatures (TV + desktop) : navigation par les captures (clic = seek, flèches + Enter) */}
-            {scrubEnabled && showControls && (() => {
+            {showControls && (scrubEnabled || scrubThumbnailsLoading) && (scrubEnabled ? (() => {
               const count = scrubThumbnails!.count;
               const effectiveDuration = getEffectiveDuration();
               // La vignette sélectionnée est pilotée par la navigation (tvScrubIndex),
@@ -740,7 +743,19 @@ export function VideoControls({
                   {items}
                 </div>
               );
-            })()}
+            })() : (
+              // Placeholder animé pendant la génération des vignettes.
+              <div class="absolute -top-44 left-0 right-0 z-40 flex justify-center gap-5" aria-hidden>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div
+                    // eslint-disable-next-line react/no-array-index-key
+                    key={i}
+                    class="w-56 h-32 rounded-xl bg-white/10 animate-pulse shadow-2xl"
+                    style={{ width: '14rem' }}
+                  />
+                ))}
+              </div>
+            ))}
             <div class="absolute left-0 top-0 h-full bg-white/20 rounded-full" style={{ width: '100%' }} />
             {/* Partie déjà téléchargée par le client torrent : segment visible (couleur assortie au violet) */}
             {torrentProgress != null && torrentProgress > 0 && (
