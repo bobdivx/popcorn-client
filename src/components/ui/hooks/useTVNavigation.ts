@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'preact/hooks';
+import { isTVPlatform } from '../../../lib/utils/device-detection';
 
 interface UseTVNavigationOptions {
   /**
@@ -74,10 +75,10 @@ export function useTVNavigation({
       element.focus();
       
       // ScrollIntoView avec options optimisées pour TV
-      element.scrollIntoView({ 
-        behavior: 'smooth', 
+      element.scrollIntoView({
+        behavior: isTVPlatform() ? 'auto' : 'smooth',
         block: 'nearest',
-        inline: 'nearest'
+        inline: 'nearest',
       });
       
       onFocusChange?.(element);

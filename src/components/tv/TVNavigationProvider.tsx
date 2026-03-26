@@ -46,6 +46,7 @@ export default function TVNavigationProvider() {
     const SETTINGS_CONTAINER_SELECTOR = '[data-tv-settings-container]';
     const SITE_HEADER_SELECTOR = '[data-tv-site-header]';
     const APP_SIDEBAR_SELECTOR = '[data-tv-app-sidebar]';
+    const DATA_TV_DASHBOARD_PIN = 'data-tv-dashboard-pin';
 
     const isTvDoc = () =>
       typeof document !== 'undefined' && document.documentElement.getAttribute('data-tv-platform') === 'true';
@@ -183,6 +184,42 @@ export default function TVNavigationProvider() {
         });
       }
       return filtered;
+    };
+
+    /** TV : flèche gauche depuis l’élément le plus à gauche du main (hors carrousel, ex. hero) → ouvrir la sidebar. */
+    const tryFocusSidebarFromLeftmost = (activeElement: HTMLElement): boolean => {
+      if (!isTvDoc() || !activeElement) return false;
+      const mainEl = document.querySelector('main.app-main');
+      if (!mainEl || !mainEl.contains(activeElement)) return false;
+      if (activeElement.closest(CAROUSEL_SELECTOR)) return false;
+      const list = getFocusableElements(mainEl as HTMLElement);
+      if (list.length === 0) return false;
+      const sorted = [...list].sort((a, b) => {
+        const ra = a.getBoundingClientRect();
+        const rb = b.getBoundingClientRect();
+        return ra.left - rb.left || ra.top - rb.top;
+      });
+      if (sorted[0] === activeElement) {
+        return focusTVSidebarFirst();
+      }
+      return false;
+    };
+
+    /** TV : sur /dashboard la sidebar reste ouverte (même quand le focus est dans le contenu). */
+    const syncDashboardSidebarPin = () => {
+      if (!isTvDoc()) return;
+      const path = typeof window !== 'undefined' ? window.location.pathname.replace(/\/$/, '') || '/' : '/';
+      if (path === '/dashboard') {
+        document.documentElement.setAttribute(DATA_TV_DASHBOARD_PIN, 'true');
+        document.documentElement.setAttribute('data-tv-sidebar-open', 'true');
+      } else {
+        document.documentElement.removeAttribute(DATA_TV_DASHBOARD_PIN);
+        const sidebar = document.querySelector(APP_SIDEBAR_SELECTOR);
+        const ae = document.activeElement as HTMLElement | null;
+        if (ae && sidebar && !sidebar.contains(ae)) {
+          document.documentElement.removeAttribute('data-tv-sidebar-open');
+        }
+      }
     };
 
     // Détecter le contexte de navigation
@@ -367,9 +404,10 @@ export default function TVNavigationProvider() {
       return bestElement;
     };
 
-    // Sur webOS, scroll instantané pour une navigation plus fluide (smooth = lag sur TV)
+    // TV (toutes plateformes) : scroll instantané — smooth = lag sur télécommande
     const isWebOS = typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
-    const scrollBehavior: ScrollBehavior = isWebOS ? 'auto' : 'smooth';
+    const isInstantScroll = isWebOS || isTvDoc();
+    const scrollBehavior: ScrollBehavior = isInstantScroll ? 'auto' : 'smooth';
 
     /** webOS : limiter le débit des keydown en répétition (sinon la pile de travaux sature la télécommande). */
     let lastWebosArrowAt = 0;
@@ -399,12 +437,12 @@ export default function TVNavigationProvider() {
       let newScrollLeft = cardLeftInScroll + carouselRect.left - anchorX;
       newScrollLeft = Math.max(0, Math.min(maxScroll, newScrollLeft));
 
-      // webOS : éviter d’écrire scrollLeft si quasi inchangé (reflow coûteux)
-      if (isWebOS && Math.abs(carousel.scrollLeft - newScrollLeft) < 4) {
+      // TV / webOS : éviter d’écrire scrollLeft si quasi inchangé (reflow coûteux)
+      if (isInstantScroll && Math.abs(carousel.scrollLeft - newScrollLeft) < 4) {
         return;
       }
 
-      if (isWebOS) {
+      if (isInstantScroll) {
         carousel.scrollLeft = newScrollLeft;
       } else {
         carousel.scrollTo({ left: newScrollLeft, behavior: 'smooth' });
@@ -414,9 +452,9 @@ export default function TVNavigationProvider() {
     // Focus un élément
     const focusElement = (element: HTMLElement) => {
       const inHeroDashboard = element.closest('.hero-dashboard');
-      // webOS : éviter scrollIntoView(center) coûteux ; nearest limite les reflows.
+      // TV / webOS : éviter scrollIntoView(center) coûteux ; nearest limite les reflows.
       const scrollOpts =
-        isWebOS || inHeroDashboard
+        isInstantScroll || inHeroDashboard
           ? {
               behavior: scrollBehavior,
               block: 'nearest' as ScrollLogicalPosition,
@@ -615,6 +653,17 @@ export default function TVNavigationProvider() {
       const nextElement = findClosestElement(activeElement, candidates, direction, focusableElements);
       if (nextElement) {
         focusElement(nextElement);
+        return true;
+      }
+
+      if (
+        !scope &&
+        isTvDoc() &&
+        direction === 'left' &&
+        activeElement &&
+        activeElement !== document.body &&
+        tryFocusSidebarFromLeftmost(activeElement)
+      ) {
         return true;
       }
 
@@ -870,9 +919,10 @@ export default function TVNavigationProvider() {
       const target = e.target as HTMLElement;
       if (isTvDoc() && target) {
         const sidebar = document.querySelector(APP_SIDEBAR_SELECTOR);
+        const pinDashboard = document.documentElement.getAttribute(DATA_TV_DASHBOARD_PIN) === 'true';
         if (sidebar?.contains(target)) {
           document.documentElement.setAttribute('data-tv-sidebar-open', 'true');
-        } else {
+        } else if (!pinDashboard) {
           document.documentElement.removeAttribute('data-tv-sidebar-open');
         }
       }
@@ -1262,6 +1312,10 @@ export default function TVNavigationProvider() {
     window.addEventListener('popstate', maybeFocusSettingsContent);
     document.addEventListener('astro:page-load', maybeFocusSettingsContent);
 
+    syncDashboardSidebarPin();
+    window.addEventListener('popstate', syncDashboardSidebarPin);
+    document.addEventListener('astro:page-load', syncDashboardSidebarPin);
+
     // Page Media Detail : focus initial sur le bouton Retour à l'arrivée (télécommande)
     const maybeFocusMediaDetailBack = () => {
       if (typeof window === 'undefined') return;
@@ -1284,6 +1338,8 @@ export default function TVNavigationProvider() {
       document.removeEventListener('astro:page-load', maybeFocusMediaDetailBack);
       window.removeEventListener('popstate', maybeFocusSettingsContent);
       document.removeEventListener('astro:page-load', maybeFocusSettingsContent);
+      window.removeEventListener('popstate', syncDashboardSidebarPin);
+      document.removeEventListener('astro:page-load', syncDashboardSidebarPin);
       if (carouselDomObserver) carouselDomObserver.disconnect();
       document.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('keydown', handleWebOSBack, true);
