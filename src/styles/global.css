@@ -128,14 +128,49 @@ html[data-tv-platform="true"] .sidebar-tv-rail {
 
 html[data-tv-platform="true"] .sidebar-tv-rail:focus-within {
   width: 18rem !important; /* ~288px */
-  background: rgba(0, 0, 0, 0.85);
+  /* Même logique glass que fiche média : verre clair sur fond sombre, pas de teinte violette */
+  background: rgba(255, 255, 255, 0.07) !important;
   backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border-right-color: rgba(255, 255, 255, 0.18) !important;
 }
 
 /* Quand le rail TV est focus, on affiche le texte et on cache le mode compact */
 html[data-tv-platform="true"] .sidebar-tv-rail:focus-within .sidebar-label {
   display: block !important;
   animation: fadeIn 0.3s ease forwards;
+}
+
+/* Rail élargi : les liens ne sont plus des carrés icône — bordure / halo TV englobent icône + titre */
+html[data-tv-platform="true"] .sidebar-tv-rail:focus-within nav ul {
+  align-items: stretch;
+  width: 100%;
+}
+
+html[data-tv-platform="true"] .sidebar-tv-rail:focus-within nav ul > li {
+  width: 100%;
+}
+
+html[data-tv-platform="true"] .sidebar-tv-rail:focus-within nav a[href] {
+  width: 100% !important;
+  max-width: 100%;
+  min-height: 3.5rem;
+  height: auto !important;
+  justify-content: flex-start !important;
+  align-items: center;
+  padding-left: 0.75rem !important;
+  padding-right: 0.75rem !important;
+  padding-top: 0.625rem !important;
+  padding-bottom: 0.625rem !important;
+  box-sizing: border-box;
+}
+
+html[data-tv-platform="true"] .sidebar-tv-rail:focus-within .sidebar-tv-footer > div {
+  justify-content: flex-start !important;
+  gap: 0.75rem;
+  width: 100%;
+  padding-left: 0.25rem !important;
+  padding-right: 0.25rem !important;
 }
 
 /* Carousel horizontal : défilement tactile fluide (torrent cards, etc.) */
@@ -145,6 +180,11 @@ html[data-tv-platform="true"] .sidebar-tv-rail:focus-within .sidebar-label {
   touch-action: pan-x pan-y;         /* Autorise swipe horizontal ET vertical (page) */
   /* Garder overflow-y visible pour ne pas couper la bordure de focus en haut/bas */
   overflow-y: visible !important;
+}
+
+/* webOS : scroll horizontal piloté en JS (scrollLeft) — pas de scroll-behavior: smooth CSS qui double le coût */
+html[data-webos="true"] .carousel-container {
+  scroll-behavior: auto !important;
 }
 
 /* Page Demandes : éviter que la bordure de focus soit coupée (conteneur + cartes) */
