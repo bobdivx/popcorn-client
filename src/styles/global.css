@@ -113,7 +113,7 @@ html[data-tv-platform="true"] .app-main {
   padding-right: 0 !important;
   padding-bottom: max(4vh, 30px) !important;
   margin-left: 0 !important;
-  transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: none !important;
 }
 
 html[data-tv-platform="true"][data-tv-sidebar-open="true"] .app-main {
@@ -125,7 +125,7 @@ html[data-tv-platform="true"] .sidebar-tv-rail {
   width: 18rem !important;
   max-width: min(18rem, 85vw) !important;
   transform: translateX(-100%);
-  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: none !important;
   overflow: hidden;
   opacity: 1 !important;
   visibility: visible !important;
@@ -139,9 +139,16 @@ html[data-tv-platform="true"][data-tv-sidebar-open="true"] .sidebar-tv-rail {
   transform: translateX(0);
 }
 
+/* Labels : uniquement quand la barre est ouverte (évite rail large + texte forcé comme sur /dashboard) */
 html[data-tv-platform="true"] .sidebar-tv-rail .sidebar-label {
+  display: none !important;
+  animation: none !important;
+}
+
+html[data-tv-platform="true"][data-tv-sidebar-open="true"] .sidebar-tv-rail .sidebar-label,
+html[data-tv-platform="true"][data-tv-dashboard-pin="true"] .sidebar-tv-rail .sidebar-label {
   display: block !important;
-  animation: fadeIn 0.3s ease forwards;
+  animation: none !important;
 }
 
 html[data-tv-platform="true"] .sidebar-tv-rail nav ul {
@@ -199,6 +206,14 @@ html[data-tv-platform="true"] .animate-fade-in-up {
   animation: none !important;
   opacity: 1 !important;
   transform: none !important;
+}
+
+/* TV : désactiver animations et transitions sur toute l’app (perf, même logique que le mode dashboard) */
+html[data-tv-platform="true"] *,
+html[data-tv-platform="true"] *::before,
+html[data-tv-platform="true"] *::after {
+  animation: none !important;
+  transition: none !important;
 }
 
 /* Page Demandes : éviter que la bordure de focus soit coupée (conteneur + cartes) */

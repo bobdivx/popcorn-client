@@ -52,15 +52,16 @@ export default function Sidebar() {
     }
   }, []);
 
-  // Mode rail (icônes)
+  // Mode rail (icônes) : sur TV, « étendu » = barre ouverte ou page dashboard épinglée (labels visibles)
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const mq = window.matchMedia('(min-width: 1024px)');
     const apply = () => {
-      // Sur TV, toujours compact par défaut (le CSS TV gère l'expansion au focus)
       if (isTVPlatform()) {
-        setIsCompact(true);
+        const open = document.documentElement.getAttribute('data-tv-sidebar-open') === 'true';
+        const pin = document.documentElement.getAttribute('data-tv-dashboard-pin') === 'true';
+        setIsCompact(!(open || pin));
       } else {
         setIsCompact(mq.matches);
       }
@@ -68,6 +69,21 @@ export default function Sidebar() {
     apply();
 
     mq.addEventListener?.('change', apply as any);
+    if (isTVPlatform()) {
+      const obs = new MutationObserver(apply);
+      obs.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-tv-sidebar-open', 'data-tv-dashboard-pin'],
+      });
+      window.addEventListener('popstate', apply);
+      document.addEventListener('astro:page-load', apply);
+      return () => {
+        mq.removeEventListener?.('change', apply as any);
+        obs.disconnect();
+        window.removeEventListener('popstate', apply);
+        document.removeEventListener('astro:page-load', apply);
+      };
+    }
     return () => mq.removeEventListener?.('change', apply as any);
   }, []);
 
@@ -143,7 +159,9 @@ export default function Sidebar() {
       {/* Sidebar - Mode TV (Rail extensible au focus) */}
       <aside
         data-tv-app-sidebar
-        className={`fixed top-0 left-0 h-screen z-50 transform transition-all duration-300 ease-out glass-panel-lg backdrop-blur-md border-r border-white/15 shadow-2xl sidebar-tv-rail ${
+        className={`fixed top-0 left-0 h-screen z-50 transform glass-panel-lg backdrop-blur-md border-r border-white/15 shadow-2xl sidebar-tv-rail ${
+          isTV ? '' : 'transition-all duration-300 ease-out'
+        } ${
           isTV ? 'w-80 max-w-[85vw]' : isCompact ? 'w-20 lg:w-24' : 'w-80 max-w-[85vw]'
         } ${
           isTV

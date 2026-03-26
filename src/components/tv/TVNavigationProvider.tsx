@@ -216,7 +216,9 @@ export default function TVNavigationProvider() {
         document.documentElement.removeAttribute(DATA_TV_DASHBOARD_PIN);
         const sidebar = document.querySelector(APP_SIDEBAR_SELECTOR);
         const ae = document.activeElement as HTMLElement | null;
-        if (ae && sidebar && !sidebar.contains(ae)) {
+        // Toujours fermer la barre en quittant /dashboard sauf si le focus est encore dans la sidebar
+        // (activeElement peut être null pendant une transition Astro — avant : l’attribut restait bloqué « ouvert »)
+        if (!sidebar || !ae || ae === document.body || !sidebar.contains(ae)) {
           document.documentElement.removeAttribute('data-tv-sidebar-open');
         }
       }
