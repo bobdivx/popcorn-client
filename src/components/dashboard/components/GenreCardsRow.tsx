@@ -2,6 +2,7 @@ import { useRef } from 'preact/hooks';
 import { ChevronLeft, ChevronRight } from 'lucide-preact';
 import { translateGenre } from '../../../lib/utils/genre-translation';
 import { useI18n } from '../../../lib/i18n/useI18n';
+import { isTVPlatform } from '../../../lib/utils/device-detection';
 
 interface GenreCardsRowProps {
   genres: string[];
@@ -29,7 +30,10 @@ export function GenreCardsRow({
     if (!el) return;
     const card = el.querySelector<HTMLElement>('[data-genre-card]');
     const cardWidth = card ? card.getBoundingClientRect().width : 180;
-    el.scrollBy({ left: dir * (cardWidth + 16) * 3, behavior: 'smooth' });
+    el.scrollBy({
+      left: dir * (cardWidth + 16) * 3,
+      behavior: isTVPlatform() ? 'auto' : 'smooth',
+    });
   };
 
   return (
