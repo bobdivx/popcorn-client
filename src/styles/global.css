@@ -1070,22 +1070,33 @@ html[data-tv-platform] body {
   }
 
 /* Animation douce de glow pour les cartes dashboard au hover/focus */
+.card-glow-shell {
+  /* Outline (pas rogné par overflow-hidden), donc visible même sur les overlays */
+  outline: 2px solid rgba(168, 85, 247, 0);
+  outline-offset: -2px;
+  will-change: outline-color, box-shadow;
+}
+
 @keyframes card-glow-pulse {
   0% {
-    filter: drop-shadow(0 0 0 rgba(168, 85, 247, 0));
+    outline-color: rgba(168, 85, 247, 0);
+    box-shadow: 0 0 0 rgba(168, 85, 247, 0);
   }
   50% {
-    filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.35));
+    outline-color: rgba(168, 85, 247, 0.65);
+    box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.45), 0 0 18px rgba(168, 85, 247, 0.35), 0 0 36px rgba(168, 85, 247, 0.18);
   }
   100% {
-    filter: drop-shadow(0 0 0 rgba(168, 85, 247, 0));
+    outline-color: rgba(168, 85, 247, 0);
+    box-shadow: 0 0 0 rgba(168, 85, 247, 0);
   }
 }
 
-.group:hover .card-glow-animate,
-.group:focus-within .card-glow-animate {
+.group:hover .card-glow-shell,
+.group:focus-within .card-glow-shell,
+.torrent-poster:hover .card-glow-shell,
+.torrent-poster:focus-within .card-glow-shell {
   animation: card-glow-pulse 1.7s ease-in-out infinite;
-}
 }
 
 /* Détection TV et désactivation hover */
@@ -1934,4 +1945,7 @@ form button[type="submit"]:focus-visible,
   background-color: rgba(109, 40, 217, 0.06) !important;
   border-color: rgba(109, 40, 217, 0.14) !important;
   color: #1a1530 !important;
+}
+
+/* Fermeture de la layer utilities (@layer utilities) */
 }
