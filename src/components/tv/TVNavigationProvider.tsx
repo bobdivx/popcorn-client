@@ -53,16 +53,56 @@ export default function TVNavigationProvider() {
     const isWebOSCheck = () =>
       typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
 
-    /** webOS : union de quelques racines au lieu de document (moins de nœuds parcourus). */
+    /** Cache des nœuds focusables par carrousel (invalidé si le DOM du carrousel change). */
+    const carouselRawFocusablesCache = new WeakMap<HTMLElement, HTMLElement[]>();
+
+    const invalidateCarouselCachesForNode = (node: Node | null) => {
+      if (!node) return;
+      if (node instanceof HTMLElement && node.matches(CAROUSEL_SELECTOR)) {
+        carouselRawFocusablesCache.delete(node);
+        return;
+      }
+      let el: Element | null = node instanceof Element ? node : node.parentElement;
+      while (el) {
+        if (el.matches(CAROUSEL_SELECTOR)) {
+          carouselRawFocusablesCache.delete(el as HTMLElement);
+          return;
+        }
+        el = el.parentElement;
+      }
+    };
+
+    const getCarouselRawFocusables = (carousel: HTMLElement): HTMLElement[] => {
+      let list = carouselRawFocusablesCache.get(carousel);
+      if (list) return list;
+      list = Array.from(carousel.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      carouselRawFocusablesCache.set(carousel, list);
+      return list;
+    };
+
+    /** webOS : union de quelques racines — carrousels via cache (pas de querySelectorAll complet sur main à chaque touche). */
     const collectFocusablesFromWebOSRoots = (): HTMLElement[] => {
       const seen = new Set<HTMLElement>();
       const out: HTMLElement[] = [];
-      const roots: (HTMLElement | null)[] = [
-        document.querySelector('main.app-main'),
-        document.querySelector(APP_SIDEBAR_SELECTOR),
-        document.querySelector('[role="dialog"]:not([aria-hidden="true"])'),
-      ];
-      for (const r of roots) {
+      const main = document.querySelector('main.app-main');
+      if (main) {
+        for (const carousel of Array.from(main.querySelectorAll<HTMLElement>(CAROUSEL_SELECTOR))) {
+          for (const el of getCarouselRawFocusables(carousel)) {
+            if (seen.has(el)) continue;
+            seen.add(el);
+            out.push(el);
+          }
+        }
+        for (const el of Array.from(main.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))) {
+          if (el.closest(CAROUSEL_SELECTOR)) continue;
+          if (seen.has(el)) continue;
+          seen.add(el);
+          out.push(el);
+        }
+      }
+      const sidebar = document.querySelector(APP_SIDEBAR_SELECTOR);
+      const dialog = document.querySelector('[role="dialog"]:not([aria-hidden="true"])');
+      for (const r of [sidebar, dialog]) {
         if (!r) continue;
         for (const el of Array.from(r.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))) {
           if (seen.has(el)) continue;
@@ -97,16 +137,32 @@ export default function TVNavigationProvider() {
 
       let raw: HTMLElement[];
       if (scope) {
-        raw = Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+        raw = scope.matches(CAROUSEL_SELECTOR)
+          ? getCarouselRawFocusables(scope)
+          : Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
       } else if (webos) {
         raw = collectFocusablesFromWebOSRoots();
       } else {
         raw = Array.from(document.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
       }
 
-      return raw.filter((el) => {
+      const isCarouselScope = !!(scope && scope.matches(CAROUSEL_SELECTOR));
+      const rectForSort = isCarouselScope ? new Map<HTMLElement, { left: number; top: number }>() : null;
+
+      const filtered = raw.filter((el) => {
         if (scope && !scope.contains(el)) return false;
+        // TV : sidebar fermée = pas de focus dans la barre (évite un rail « toujours là » + focus fantôme)
+        if (
+          isTvDoc() &&
+          document.documentElement.getAttribute('data-tv-sidebar-open') !== 'true' &&
+          el.closest(APP_SIDEBAR_SELECTOR)
+        ) {
+          return false;
+        }
         const rect = el.getBoundingClientRect();
+        if (rectForSort) {
+          rectForSort.set(el, { left: rect.left, top: rect.top });
+        }
         const inViewportX = rect.right >= -pad && rect.left <= window.innerWidth + pad;
         const inViewportY = rect.bottom >= -pad - aboveViewport && rect.top <= window.innerHeight + pad + belowViewport;
         if (rect.width <= 0 || rect.height <= 0 || !inViewportX || !inViewportY) return false;
@@ -117,27 +173,16 @@ export default function TVNavigationProvider() {
         }
         return true;
       });
-    };
 
-    /** TV : depuis la carte gauche du carrousel — uniquement carrousel + barre d’app (évite un scan document entier). */
-    const getFocusableElementsCarouselPlusAppSidebar = (carouselEl: HTMLElement): HTMLElement[] => {
-      const sidebar = document.querySelector(APP_SIDEBAR_SELECTOR);
-      const a = getFocusableElements(carouselEl);
-      const b = sidebar ? getFocusableElements(sidebar as HTMLElement) : [];
-      if (b.length === 0) return a;
-      const seen = new Set<HTMLElement>();
-      const out: HTMLElement[] = [];
-      for (const el of a) {
-        if (seen.has(el)) continue;
-        seen.add(el);
-        out.push(el);
+      // Carrousel : ordre gauche → droite stable (réutilise les rects du filtre, pas de second getBoundingClientRect)
+      if (isCarouselScope && rectForSort && filtered.length > 1) {
+        filtered.sort((a, b) => {
+          const ra = rectForSort.get(a)!;
+          const rb = rectForSort.get(b)!;
+          return ra.left - rb.left || ra.top - rb.top;
+        });
       }
-      for (const el of b) {
-        if (seen.has(el)) continue;
-        seen.add(el);
-        out.push(el);
-      }
-      return out;
+      return filtered;
     };
 
     // Détecter le contexte de navigation
@@ -182,23 +227,9 @@ export default function TVNavigationProvider() {
         });
         if (inRow.length > 0) return inRow;
       }
-      // Dans un carousel : gauche/droite dans le même carrousel ; sur TV depuis la carte la plus à gauche, inclure la barre d’app
+      // Dans un carousel : gauche/droite dans le même carrousel (la barre d’app est gérée dans navigate → focusTVSidebarFirst)
       const currentCarousel = current.closest(CAROUSEL_SELECTOR);
       if (currentCarousel && (direction === 'left' || direction === 'right')) {
-        if (direction === 'left' && isTvDoc()) {
-          const inCarousel = elements.filter((el) => currentCarousel.contains(el));
-          const sorted = [...inCarousel].sort((a, b) => {
-            const ra = a.getBoundingClientRect();
-            const rb = b.getBoundingClientRect();
-            return ra.left - rb.left;
-          });
-          if (sorted.length > 0 && sorted[0] === current) {
-            const appSidebar = document.querySelector(APP_SIDEBAR_SELECTOR);
-            if (appSidebar) {
-              return elements.filter((el) => currentCarousel.contains(el) || appSidebar.contains(el));
-            }
-          }
-        }
         return elements.filter((el) => currentCarousel.contains(el));
       }
       // Depuis un carousel, haut/bas : exclure le FAB et autres [data-tv-nav-skip] pour garder le focus dans les lignes
@@ -223,12 +254,34 @@ export default function TVNavigationProvider() {
     };
 
     // Trouver l'élément le plus proche dans une direction
+    // `fullOrderedInScope` = liste complète du scope courant (inclut l’élément actif), requis pour le voisin L/R dans les carrousels.
     const findClosestElement = (
       current: HTMLElement,
       elements: HTMLElement[],
-      direction: 'up' | 'down' | 'left' | 'right'
+      direction: 'up' | 'down' | 'left' | 'right',
+      fullOrderedInScope?: HTMLElement[] | null
     ): HTMLElement | null => {
       const candidates = getCandidatesForDirection(current, elements, direction);
+
+      // TV + carrousel : gauche/droite = voisin sur la même ligne (liste déjà ordonnée dans getFocusableElements)
+      if (
+        isTvDoc() &&
+        (direction === 'left' || direction === 'right') &&
+        current.closest(CAROUSEL_SELECTOR)
+      ) {
+        const carousel = current.closest(CAROUSEL_SELECTOR) as HTMLElement;
+        const full =
+          fullOrderedInScope && fullOrderedInScope.length > 0 && fullOrderedInScope.every((el) => carousel.contains(el))
+            ? fullOrderedInScope
+            : getFocusableElements(carousel);
+        const idx = full.indexOf(current);
+        if (idx !== -1) {
+          const nextIdx = direction === 'left' ? idx - 1 : idx + 1;
+          if (nextIdx >= 0 && nextIdx < full.length) {
+            return full[nextIdx];
+          }
+        }
+      }
 
       const currentRect = current.getBoundingClientRect();
       const currentCenterX = currentRect.left + currentRect.width / 2;
@@ -320,7 +373,7 @@ export default function TVNavigationProvider() {
 
     /** webOS : limiter le débit des keydown en répétition (sinon la pile de travaux sature la télécommande). */
     let lastWebosArrowAt = 0;
-    const WEBOS_ARROW_REPEAT_MS = 42;
+    const WEBOS_ARROW_REPEAT_MS = 72;
 
     // webOS : navigation synchrone (rAF ajoutait une frame de délai + ne renvoyait pas le vrai résultat).
     const scheduleOrRunNavigate = (direction: 'up' | 'down' | 'left' | 'right', scope?: HTMLElement | null): boolean => {
@@ -484,15 +537,15 @@ export default function TVNavigationProvider() {
     // Navigation dans une direction (scope optionnel = modal ou conteneur pour piège à focus, fromEl = élément de référence pour la recherche spatiale, ex. input qu'on quitte)
     const navigate = (direction: 'up' | 'down' | 'left' | 'right', scope?: HTMLElement | null, fromEl?: HTMLElement | null): boolean => {
       const activeElement = (fromEl ?? document.activeElement) as HTMLElement;
-      // Sur webOS / TV : en carousel, gauche/droite uniquement dans le carousel courant → moins d’éléments à traiter, moins de latence
+
+      // Sur webOS / TV : en carousel, gauche/droite uniquement dans le carousel courant
       let effectiveScope = scope;
       if (!effectiveScope && activeElement && (direction === 'left' || direction === 'right')) {
         const carousel = activeElement.closest(CAROUSEL_SELECTOR) as HTMLElement | null;
         if (carousel) effectiveScope = carousel;
       }
 
-      // webOS : haut/bas depuis une carte torrent (dans [data-carousel]) — ne pas appeler collectFocusablesFromWebOSRoots()
-      // (scan main + sidebar + dialogues = très lent à chaque flèche). Le <main> suffit pour passer d’une ligne à l’autre.
+      // webOS : haut/bas depuis une carte torrent — le <main> suffit pour passer d’une ligne à l’autre
       if (
         !scope &&
         isWebOSCheck() &&
@@ -505,32 +558,33 @@ export default function TVNavigationProvider() {
         if (mainEl) effectiveScope = mainEl as HTMLElement;
       }
 
-      // TV : depuis la carte la plus à gauche d’un carrousel, flèche gauche → barre d’app (candidats = page entière)
-      let focusableElements: HTMLElement[];
+      const carouselEl = activeElement?.closest(CAROUSEL_SELECTOR) as HTMLElement | null;
+
+      let focusableElements: HTMLElement[] | undefined;
+
+      // TV : carte la plus à gauche + flèche gauche → barre latérale (un seul getFocusableElements quand scope === carrousel)
       if (
         !scope &&
         isTvDoc() &&
         direction === 'left' &&
         activeElement &&
-        activeElement !== document.body
+        activeElement !== document.body &&
+        carouselEl
       ) {
-        const carouselEl = activeElement.closest(CAROUSEL_SELECTOR) as HTMLElement | null;
-        if (carouselEl) {
-          const inCarousel = getFocusableElements(carouselEl);
-          const sorted = [...inCarousel].sort((a, b) => {
-            const ra = a.getBoundingClientRect();
-            const rb = b.getBoundingClientRect();
-            return ra.left - rb.left;
-          });
-          if (sorted.length > 0 && sorted[0] === activeElement) {
-            focusableElements = getFocusableElementsCarouselPlusAppSidebar(carouselEl);
-          } else {
-            focusableElements = getFocusableElements(effectiveScope);
+        if (effectiveScope === carouselEl) {
+          focusableElements = getFocusableElements(carouselEl);
+          if (focusableElements.length > 0 && focusableElements[0] === activeElement && focusTVSidebarFirst()) {
+            return true;
           }
         } else {
-          focusableElements = getFocusableElements(effectiveScope);
+          const inCarousel = getFocusableElements(carouselEl);
+          if (inCarousel.length > 0 && inCarousel[0] === activeElement && focusTVSidebarFirst()) {
+            return true;
+          }
         }
-      } else {
+      }
+
+      if (focusableElements === undefined) {
         focusableElements = getFocusableElements(effectiveScope);
       }
 
@@ -558,7 +612,7 @@ export default function TVNavigationProvider() {
 
       // Exclure l'élément actuel (ou fromEl) des candidats pour éviter de se re-focuser
       const candidates = focusableElements.filter((el) => el !== activeElement);
-      const nextElement = findClosestElement(activeElement, candidates, direction);
+      const nextElement = findClosestElement(activeElement, candidates, direction, focusableElements);
       if (nextElement) {
         focusElement(nextElement);
         return true;
@@ -811,9 +865,17 @@ export default function TVNavigationProvider() {
       }
     };
 
-    // Gestionnaire de focus pour effet visuel
+    // Gestionnaire de focus pour effet visuel + état barre latérale TV (masquée si le focus est dans le contenu)
     const handleFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLElement;
+      if (isTvDoc() && target) {
+        const sidebar = document.querySelector(APP_SIDEBAR_SELECTOR);
+        if (sidebar?.contains(target)) {
+          document.documentElement.setAttribute('data-tv-sidebar-open', 'true');
+        } else {
+          document.documentElement.removeAttribute('data-tv-sidebar-open');
+        }
+      }
       applyFocusEffect(target);
     };
 
@@ -1093,6 +1155,21 @@ export default function TVNavigationProvider() {
       }
     };
 
+    // Invalider le cache carrousel quand le DOM du dashboard change (sync, infinite scroll, etc.)
+    const mainForCarouselObserver = document.querySelector('main.app-main');
+    const carouselDomObserver =
+      mainForCarouselObserver &&
+      new MutationObserver((mutations) => {
+        for (const m of mutations) {
+          invalidateCarouselCachesForNode(m.target);
+          m.addedNodes.forEach((n) => invalidateCarouselCachesForNode(n));
+          m.removedNodes.forEach((n) => invalidateCarouselCachesForNode(n));
+        }
+      });
+    if (carouselDomObserver && mainForCarouselObserver) {
+      carouselDomObserver.observe(mainForCarouselObserver, { childList: true, subtree: true });
+    }
+
     // Ajouter les event listeners
     document.addEventListener('keydown', handleKeyDown, true);
     document.addEventListener('keydown', handleWebOSBack, true);
@@ -1155,6 +1232,7 @@ export default function TVNavigationProvider() {
       document.removeEventListener('astro:page-load', maybeFocusMediaDetailBack);
       window.removeEventListener('popstate', maybeFocusSettingsContent);
       document.removeEventListener('astro:page-load', maybeFocusSettingsContent);
+      if (carouselDomObserver) carouselDomObserver.disconnect();
       document.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('keydown', handleWebOSBack, true);
       if (typeof window !== 'undefined' && (window as any).webOS) {

@@ -144,9 +144,13 @@ export default function Sidebar() {
       <aside
         data-tv-app-sidebar
         className={`fixed top-0 left-0 h-screen z-50 transform transition-all duration-300 ease-out glass-panel-lg backdrop-blur-md border-r border-white/15 shadow-2xl sidebar-tv-rail ${
-          isCompact ? 'w-20 lg:w-24' : 'w-80 max-w-[85vw]'
+          isTV ? 'w-80 max-w-[85vw]' : isCompact ? 'w-20 lg:w-24' : 'w-80 max-w-[85vw]'
         } ${
-          isOpen ? 'translate-x-0 opacity-100' : '-translate-x-full lg:translate-x-0 opacity-0 lg:opacity-100'
+          isTV
+            ? 'opacity-100'
+            : isOpen
+              ? 'translate-x-0 opacity-100'
+              : '-translate-x-full lg:translate-x-0 opacity-0 lg:opacity-100'
         }`}
         role="navigation"
         aria-label={t('nav.sideNavigation')}
