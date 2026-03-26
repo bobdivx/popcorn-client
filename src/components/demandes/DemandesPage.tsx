@@ -5,6 +5,7 @@ import CarouselRow from '../torrents/CarouselRow';
 import { HeroSection } from '../dashboard/components/HeroSection';
 import type { ContentItem } from '../../lib/client/types';
 import TorrentCardsShadowLoader from '../ui/TorrentCardsShadowLoader';
+import { LazyTorrentPoster } from '../dashboard/components/LazyTorrentPoster';
 
 const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_IMG_BACKDROP = 'https://image.tmdb.org/t/p/original';
@@ -150,7 +151,7 @@ export default function DemandesPage() {
       .map((m) => toContentItem(m, 'movie'));
   }, [popularMovies]);
 
-  const handleItemClick = (item: ContentItem) => {
+  const handlePlay = (item: ContentItem) => {
     const tmdbId = item.tmdbId;
     const type = item.type || 'movie';
     if (tmdbId) {
@@ -158,56 +159,32 @@ export default function DemandesPage() {
     }
   };
 
-  const handlePlay = (item: ContentItem) => {
-    handleItemClick(item);
-  };
-
   const renderPosterCard = (item: ContentItem) => {
-    const imageUrl = item.poster || item.backdrop;
+    // Override the id to make TorrentPoster play the item click handler we want
+    const onClickOverride = () => {
+      const tmdbId = item.tmdbId;
+      const type = item.type || 'movie';
+      if (tmdbId) {
+        window.location.href = `/discover?tmdbId=${tmdbId}&type=${type}`;
+      }
+    };
+    
     return (
-    <div
-      key={item.id}
-      data-torrent-card
-      data-focusable
-      className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px] cursor-pointer group torrent-poster overflow-visible"
-      onClick={() => handleItemClick(item)}
-      role="button"
-      tabIndex={0}
-      aria-label={item.title}
-      onKeyDown={(e) => {
+      <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]" onClickCapture={(e) => {
+        // Intercept click to go to discover instead of player
+        e.preventDefault();
+        e.stopPropagation();
+        onClickOverride();
+      }} onKeyDownCapture={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          handleItemClick(item);
+          e.stopPropagation();
+          onClickOverride();
         }
-      }}
-    >
-      <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] rounded-lg overflow-hidden bg-gray-900/85 border border-white/15 ring-2 ring-transparent group-hover:ring-primary/50 transition-all duration-300">
-        <div className="card-glow-animate pointer-events-none absolute inset-0 z-30 rounded-lg border border-violet-400/0 opacity-0 transition-all duration-300 ease-out group-hover:opacity-100 group-focus-within:opacity-100 group-hover:border-violet-400/70 group-focus-within:border-violet-400/80 group-hover:shadow-[0_0_0_1px_rgba(168,85,247,0.45),0_0_26px_rgba(168,85,247,0.32)] group-focus-within:shadow-[0_0_0_1px_rgba(168,85,247,0.6),0_0_30px_rgba(168,85,247,0.4)]" />
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={item.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-500">
-            {item.title?.slice(0, 2) || '?'}
-          </div>
-        )}
-        {item.rating != null && (
-          <div className="absolute bottom-2 right-2 bg-black/70 px-2 py-0.5 rounded text-xs font-semibold">
-            ⭐ {item.rating.toFixed(1)}
-          </div>
-        )}
+      }}>
+        <LazyTorrentPoster item={{...item, infoHash: ''}} />
       </div>
-      <p className="mt-2 text-sm text-white truncate group-hover:text-primary transition-colors">
-        {item.title}
-      </p>
-      {item.releaseDate && (
-        <p className="text-xs text-gray-400">{item.releaseDate}</p>
-      )}
-    </div>
-  );
+    );
   };
 
   if (loading) {
@@ -271,7 +248,7 @@ export default function DemandesPage() {
         <p className="text-gray-400 text-sm sm:text-base">{t('discover.pageSubtitle')}</p>
       </div>
 
-      <div className="pb-8 tv:pb-12 pt-2 tv:pt-4 overflow-visible">
+      <div className="pb-8 tv:pb-12 pt-2 tv:pt-4 overflow-visible animate-[fade-in-up_0.6s_ease-out_forwards] opacity-0">
         {/* Films populaires */}
         {popularMovies.length > 0 && (
           <CarouselRow title={t('discover.popularMovies')} autoScroll={false}>

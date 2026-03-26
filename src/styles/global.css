@@ -106,6 +106,38 @@ html[data-tv-platform] body {
   display: none;  /* Chrome, Safari et Opera */
 }
 
+/* ── LAYOUT TV OVERSCAN & RAIL ── */
+/* Mettre de l'espace pour la Sidebar et enlever l'espace haut/côtés pour que le Hero soit full bleed */
+html[data-tv-platform="true"] .app-main {
+  /* On annule le padding-top de 5rem (desktop) car le hero touche le haut */
+  padding-top: 0 !important;
+  /* Le contenu gèrera son overscan (padding) par composant, afin que le hero n'ait pas de bandes noires latérales */
+  padding-left: 0 !important; 
+  padding-right: 0 !important;
+  padding-bottom: max(4vh, 30px) !important;
+  /* La sidebar rail est fixe à gauche, donc on décale le main */
+  margin-left: max(6rem, 96px) !important; 
+}
+
+/* Sidebar en mode TV : Compact par défaut mais s'ouvre au Focus-Within */
+html[data-tv-platform="true"] .sidebar-tv-rail {
+  width: 6rem !important; /* ~96px */
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+}
+
+html[data-tv-platform="true"] .sidebar-tv-rail:focus-within {
+  width: 18rem !important; /* ~288px */
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(40px);
+}
+
+/* Quand le rail TV est focus, on affiche le texte et on cache le mode compact */
+html[data-tv-platform="true"] .sidebar-tv-rail:focus-within .sidebar-label {
+  display: block !important;
+  animation: fadeIn 0.3s ease forwards;
+}
+
 /* Carousel horizontal : défilement tactile fluide (torrent cards, etc.) */
 .carousel-container {
   -webkit-overflow-scrolling: touch; /* Momentum scroll sur iOS */

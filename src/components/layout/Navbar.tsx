@@ -202,6 +202,7 @@ export default function Navbar() {
   ];
 
   if (loading) return null;
+  if (isTV) return null; // Ne pas afficher la top Navbar sur TV
 
   return (
     <nav
