@@ -121,8 +121,8 @@ export default function Sidebar() {
       {/* Bouton toggle pour mobile (fallback si besoin) */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed top-20 left-4 z-40 lg:hidden p-3 glass-panel rounded-lg text-white hover:bg-glass-hover transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] min-w-[48px] transform hover:scale-110 ${
-          isOpen ? 'rotate-90 bg-primary-600' : ''
+        className={`fixed top-20 left-4 z-40 lg:hidden p-3 glass-panel backdrop-blur-sm rounded-lg text-white border border-white/15 hover:bg-white/10 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 min-h-[48px] min-w-[48px] transform hover:scale-105 ${
+          isOpen ? 'rotate-90 bg-white/15 ring-1 ring-white/25' : ''
         }`}
         aria-label="Toggle sidebar"
         tabIndex={0}
@@ -142,7 +142,8 @@ export default function Sidebar() {
 
       {/* Sidebar - Mode TV (Rail extensible au focus) */}
       <aside
-        className={`fixed top-0 left-0 h-screen z-50 transform transition-all duration-300 ease-out glass-panel-lg border-r border-white/10 shadow-2xl sidebar-tv-rail ${
+        data-tv-app-sidebar
+        className={`fixed top-0 left-0 h-screen z-50 transform transition-all duration-300 ease-out glass-panel-lg backdrop-blur-md border-r border-white/15 shadow-2xl sidebar-tv-rail ${
           isCompact ? 'w-20 lg:w-24' : 'w-80 max-w-[85vw]'
         } ${
           isOpen ? 'translate-x-0 opacity-100' : '-translate-x-full lg:translate-x-0 opacity-0 lg:opacity-100'
@@ -151,13 +152,13 @@ export default function Sidebar() {
         aria-label={t('nav.sideNavigation')}
       >
         <div className="flex flex-col h-full relative">
-          {/* Spacer pour éviter le chevauchement avec la navbar */}
-          <div className="flex-shrink-0 pt-16 md:pt-20 lg:pt-24 tv:pt-28" />
+          {/* Spacer : sur TV la navbar est masquée — moins de marge pour libérer la zone de focus */}
+          <div className="flex-shrink-0 pt-16 md:pt-20 lg:pt-24 tv:pt-6" />
 
           {/* Bouton fermer (mobile drawer) */}
           <button
             onClick={() => setIsOpen(false)}
-            className="lg:hidden absolute top-4 right-4 p-2 text-white hover:bg-glass-hover rounded-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] min-w-[48px]"
+            className="lg:hidden absolute top-4 right-4 p-2 text-white glass-panel backdrop-blur-sm border border-white/15 hover:bg-white/10 rounded-lg transition-all duration-200 hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 min-h-[48px] min-w-[48px]"
             aria-label={t('common.close')}
             tabIndex={0}
             data-focusable
@@ -185,16 +186,16 @@ export default function Sidebar() {
                         isCompact ? 'tooltip tooltip-right' : ''
                       } flex items-center ${
                         isCompact ? 'justify-center w-14 h-14 tv:w-16 tv:h-16 px-0 py-0' : 'gap-4 px-4 py-3 min-h-[48px] tv:min-h-[56px]'
-                      } text-white transition-all duration-200 rounded-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 transform ${
+                      } transition-all duration-200 rounded-xl border focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40 focus-visible:ring-offset-0 focus-visible:ring-offset-transparent transform ${
                         active
-                          ? 'bg-primary shadow-primary-lg text-white font-semibold scale-105'
-                          : 'hover:bg-glass-hover text-gray-300 hover:text-white hover:scale-105'
+                          ? 'glass-panel backdrop-blur-sm border-white/25 bg-white/12 text-white font-semibold shadow-none'
+                          : 'border-transparent text-white/75 hover:text-white hover:bg-white/10 hover:border-white/15'
                       }`}
                       tabIndex={0}
                       data-focusable
                     >
                       <Icon className={`w-6 h-6 tv:w-7 tv:h-7 flex-shrink-0 transition-transform duration-200 ${
-                        active ? 'scale-110' : ''
+                        active ? 'text-white' : 'text-white/80'
                       }`} size={24} />
                       <span className={`sidebar-label text-base tv:text-lg font-medium transition-all duration-200 ${
                         active ? 'font-bold' : 'font-medium'
@@ -209,7 +210,7 @@ export default function Sidebar() {
           </nav>
 
           {/* Footer avec profil utilisateur */}
-          <div className="border-t border-white/10 p-4 flex-shrink-0 glass-panel">
+          <div className="sidebar-tv-footer border-t border-white/15 p-4 flex-shrink-0 bg-white/[0.06] backdrop-blur-md">
             <div className={`flex items-center ${isCompact ? 'justify-center px-0' : 'gap-3 px-4'} py-3`}>
               <Avatar
                 email={user.email}

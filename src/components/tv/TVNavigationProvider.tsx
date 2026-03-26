@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'preact/hooks';
+import { focusTVSidebarFirst } from '../../lib/tv/focus-tv-sidebar';
 
 /**
  * Fournisseur de navigation TV global - Style Netflix
@@ -44,31 +45,99 @@ export default function TVNavigationProvider() {
     const CAROUSEL_SELECTOR = '[data-carousel]';
     const SETTINGS_CONTAINER_SELECTOR = '[data-tv-settings-container]';
     const SITE_HEADER_SELECTOR = '[data-tv-site-header]';
+    const APP_SIDEBAR_SELECTOR = '[data-tv-app-sidebar]';
+
+    const isTvDoc = () =>
+      typeof document !== 'undefined' && document.documentElement.getAttribute('data-tv-platform') === 'true';
+
+    const isWebOSCheck = () =>
+      typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
+
+    /** webOS : union de quelques racines au lieu de document (moins de nœuds parcourus). */
+    const collectFocusablesFromWebOSRoots = (): HTMLElement[] => {
+      const seen = new Set<HTMLElement>();
+      const out: HTMLElement[] = [];
+      const roots: (HTMLElement | null)[] = [
+        document.querySelector('main.app-main'),
+        document.querySelector(APP_SIDEBAR_SELECTOR),
+        document.querySelector('[role="dialog"]:not([aria-hidden="true"])'),
+      ];
+      for (const r of roots) {
+        if (!r) continue;
+        for (const el of Array.from(r.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))) {
+          if (seen.has(el)) continue;
+          seen.add(el);
+          out.push(el);
+        }
+      }
+      if (out.length === 0 && document.body) {
+        return Array.from(document.body.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      }
+      return out;
+    };
 
     // Obtenir tous les éléments focusables visibles (optionnellement limités à un conteneur, ex. modal)
     // Exclut les éléments hors viewport. Sur webOS on évite getComputedStyle pour réduire la latence.
     const getFocusableElements = (scope?: HTMLElement | null): HTMLElement[] => {
-      const root = scope || document;
       const pad = 1;
       // Zone sous/au-dessus l’écran pour inclure des lignes voisines lors des flèches
-      // (permet vers le bas OU vers le haut, même si les cartes deviennent partiellement hors viewport).
       const belowViewport = typeof window !== 'undefined' ? Math.min(500, window.innerHeight * 0.6) : 0;
-      const aboveViewport = typeof window !== 'undefined' ? Math.min(500, window.innerHeight * 0.35) : 0;
-      const isWebOSCheck = typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
-      return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-        .filter(el => {
-          if (scope && !scope.contains(el)) return false;
-          const rect = el.getBoundingClientRect();
-          const inViewportX = rect.right >= -pad && rect.left <= window.innerWidth + pad;
-          const inViewportY = rect.bottom >= -pad - aboveViewport && rect.top <= window.innerHeight + pad + belowViewport;
-          if (rect.width <= 0 || rect.height <= 0 || !inViewportX || !inViewportY) return false;
-          if (el.closest('[aria-hidden="true"]')) return false;
-          if (!isWebOSCheck) {
-            const style = window.getComputedStyle(el);
-            if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
-          }
-          return true;
-        });
+      // TV : zone « au-dessus » large pour joindre le hero après scroll. webOS : plafonner (2400px = scan énorme à chaque touche).
+      const webos = isWebOSCheck();
+      const tv = isTvDoc();
+      // webOS + TV : assez large pour le hero, sans inclure toute la page comme avec 2400px
+      const aboveViewport =
+        typeof window !== 'undefined'
+          ? webos && tv
+            ? Math.min(1800, window.innerHeight * 1.5)
+            : tv
+              ? Math.min(2400, window.innerHeight * 2)
+              : Math.min(500, window.innerHeight * 0.35)
+          : 0;
+
+      let raw: HTMLElement[];
+      if (scope) {
+        raw = Array.from(scope.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      } else if (webos) {
+        raw = collectFocusablesFromWebOSRoots();
+      } else {
+        raw = Array.from(document.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      }
+
+      return raw.filter((el) => {
+        if (scope && !scope.contains(el)) return false;
+        const rect = el.getBoundingClientRect();
+        const inViewportX = rect.right >= -pad && rect.left <= window.innerWidth + pad;
+        const inViewportY = rect.bottom >= -pad - aboveViewport && rect.top <= window.innerHeight + pad + belowViewport;
+        if (rect.width <= 0 || rect.height <= 0 || !inViewportX || !inViewportY) return false;
+        if (el.closest('[aria-hidden="true"]')) return false;
+        if (!webos) {
+          const style = window.getComputedStyle(el);
+          if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+        }
+        return true;
+      });
+    };
+
+    /** TV : depuis la carte gauche du carrousel — uniquement carrousel + barre d’app (évite un scan document entier). */
+    const getFocusableElementsCarouselPlusAppSidebar = (carouselEl: HTMLElement): HTMLElement[] => {
+      const sidebar = document.querySelector(APP_SIDEBAR_SELECTOR);
+      const a = getFocusableElements(carouselEl);
+      const b = sidebar ? getFocusableElements(sidebar as HTMLElement) : [];
+      if (b.length === 0) return a;
+      const seen = new Set<HTMLElement>();
+      const out: HTMLElement[] = [];
+      for (const el of a) {
+        if (seen.has(el)) continue;
+        seen.add(el);
+        out.push(el);
+      }
+      for (const el of b) {
+        if (seen.has(el)) continue;
+        seen.add(el);
+        out.push(el);
+      }
+      return out;
     };
 
     // Détecter le contexte de navigation
@@ -113,14 +182,37 @@ export default function TVNavigationProvider() {
         });
         if (inRow.length > 0) return inRow;
       }
-      // Dans un carousel : gauche/droite uniquement dans le MÊME carousel (éviter de sauter à la ligne du dessous)
+      // Dans un carousel : gauche/droite dans le même carrousel ; sur TV depuis la carte la plus à gauche, inclure la barre d’app
       const currentCarousel = current.closest(CAROUSEL_SELECTOR);
       if (currentCarousel && (direction === 'left' || direction === 'right')) {
+        if (direction === 'left' && isTvDoc()) {
+          const inCarousel = elements.filter((el) => currentCarousel.contains(el));
+          const sorted = [...inCarousel].sort((a, b) => {
+            const ra = a.getBoundingClientRect();
+            const rb = b.getBoundingClientRect();
+            return ra.left - rb.left;
+          });
+          if (sorted.length > 0 && sorted[0] === current) {
+            const appSidebar = document.querySelector(APP_SIDEBAR_SELECTOR);
+            if (appSidebar) {
+              return elements.filter((el) => currentCarousel.contains(el) || appSidebar.contains(el));
+            }
+          }
+        }
         return elements.filter((el) => currentCarousel.contains(el));
       }
       // Depuis un carousel, haut/bas : exclure le FAB et autres [data-tv-nav-skip] pour garder le focus dans les lignes
       if (currentCarousel && (direction === 'up' || direction === 'down')) {
         return elements.filter((el) => !el.closest(FAB_SKIP_SELECTOR));
+      }
+      // Menu paramètres (nav) sur TV : flèche gauche → barre d’app (hors [data-tv-settings-container])
+      const settingsNav = current.closest('[data-tv-settings-nav]');
+      const settingsContainerForNav = current.closest(SETTINGS_CONTAINER_SELECTOR);
+      if (settingsNav && settingsContainerForNav && direction === 'left' && isTvDoc()) {
+        const appSidebar = document.querySelector(APP_SIDEBAR_SELECTOR);
+        if (appSidebar) {
+          return elements.filter((el) => settingsContainerForNav.contains(el) || appSidebar.contains(el));
+        }
       }
       // À l'intérieur du menu settings : gauche/droite uniquement dans le même conteneur
       const settingsContainer = current.closest(SETTINGS_CONTAINER_SELECTOR);
@@ -226,12 +318,12 @@ export default function TVNavigationProvider() {
     const isWebOS = typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
     const scrollBehavior: ScrollBehavior = isWebOS ? 'auto' : 'smooth';
 
-    // Sur webOS : exécuter la navigation en rAF pour réduire la latence perçue (touche renvoyée tout de suite)
+    /** webOS : limiter le débit des keydown en répétition (sinon la pile de travaux sature la télécommande). */
+    let lastWebosArrowAt = 0;
+    const WEBOS_ARROW_REPEAT_MS = 42;
+
+    // webOS : navigation synchrone (rAF ajoutait une frame de délai + ne renvoyait pas le vrai résultat).
     const scheduleOrRunNavigate = (direction: 'up' | 'down' | 'left' | 'right', scope?: HTMLElement | null): boolean => {
-      if (isWebOS) {
-        requestAnimationFrame(() => navigate(direction, scope));
-        return true;
-      }
       return navigate(direction, scope);
     };
 
@@ -254,6 +346,11 @@ export default function TVNavigationProvider() {
       let newScrollLeft = cardLeftInScroll + carouselRect.left - anchorX;
       newScrollLeft = Math.max(0, Math.min(maxScroll, newScrollLeft));
 
+      // webOS : éviter d’écrire scrollLeft si quasi inchangé (reflow coûteux)
+      if (isWebOS && Math.abs(carousel.scrollLeft - newScrollLeft) < 4) {
+        return;
+      }
+
       if (isWebOS) {
         carousel.scrollLeft = newScrollLeft;
       } else {
@@ -263,7 +360,16 @@ export default function TVNavigationProvider() {
 
     // Focus un élément
     const focusElement = (element: HTMLElement) => {
-      const scrollOpts = { behavior: scrollBehavior, block: 'center' as ScrollLogicalPosition, inline: 'center' as ScrollLogicalPosition };
+      const inHeroDashboard = element.closest('.hero-dashboard');
+      // webOS : éviter scrollIntoView(center) coûteux ; nearest limite les reflows.
+      const scrollOpts =
+        isWebOS || inHeroDashboard
+          ? {
+              behavior: scrollBehavior,
+              block: 'nearest' as ScrollLogicalPosition,
+              inline: 'nearest' as ScrollLogicalPosition,
+            }
+          : { behavior: scrollBehavior, block: 'center' as ScrollLogicalPosition, inline: 'center' as ScrollLogicalPosition };
       const targetToScroll = element.closest(CARD_SELECTOR) as HTMLElement || element;
       const carousel = targetToScroll.closest(CAROUSEL_SELECTOR) as HTMLElement | null;
 
@@ -339,6 +445,15 @@ export default function TVNavigationProvider() {
 
       if (scope) return focusableElements[0];
 
+      // TV + Dashboard : commencer sur le hero (évite de scroller vers les carrousels et de « perdre » le bandeau)
+      if (isTvDoc() && typeof window !== 'undefined') {
+        const path = window.location.pathname.replace(/\/$/, '') || '/';
+        if (path === '/dashboard') {
+          const heroBtn = document.querySelector<HTMLElement>('.hero-dashboard button[data-focusable]');
+          if (heroBtn && focusableElements.includes(heroBtn)) return heroBtn;
+        }
+      }
+
       // Page Media Detail : priorité au bouton Retour pour que la télécommande y accède (flèches ou premier focus)
       const mediaDetailBack = document.querySelector<HTMLElement>('[data-media-detail-back]');
       if (mediaDetailBack && focusableElements.includes(mediaDetailBack)) return mediaDetailBack;
@@ -375,7 +490,50 @@ export default function TVNavigationProvider() {
         const carousel = activeElement.closest(CAROUSEL_SELECTOR) as HTMLElement | null;
         if (carousel) effectiveScope = carousel;
       }
-      const focusableElements = getFocusableElements(effectiveScope);
+
+      // webOS : haut/bas depuis une carte torrent (dans [data-carousel]) — ne pas appeler collectFocusablesFromWebOSRoots()
+      // (scan main + sidebar + dialogues = très lent à chaque flèche). Le <main> suffit pour passer d’une ligne à l’autre.
+      if (
+        !scope &&
+        isWebOSCheck() &&
+        activeElement &&
+        activeElement !== document.body &&
+        (direction === 'up' || direction === 'down') &&
+        activeElement.closest(CAROUSEL_SELECTOR)
+      ) {
+        const mainEl = document.querySelector('main.app-main');
+        if (mainEl) effectiveScope = mainEl as HTMLElement;
+      }
+
+      // TV : depuis la carte la plus à gauche d’un carrousel, flèche gauche → barre d’app (candidats = page entière)
+      let focusableElements: HTMLElement[];
+      if (
+        !scope &&
+        isTvDoc() &&
+        direction === 'left' &&
+        activeElement &&
+        activeElement !== document.body
+      ) {
+        const carouselEl = activeElement.closest(CAROUSEL_SELECTOR) as HTMLElement | null;
+        if (carouselEl) {
+          const inCarousel = getFocusableElements(carouselEl);
+          const sorted = [...inCarousel].sort((a, b) => {
+            const ra = a.getBoundingClientRect();
+            const rb = b.getBoundingClientRect();
+            return ra.left - rb.left;
+          });
+          if (sorted.length > 0 && sorted[0] === activeElement) {
+            focusableElements = getFocusableElementsCarouselPlusAppSidebar(carouselEl);
+          } else {
+            focusableElements = getFocusableElements(effectiveScope);
+          }
+        } else {
+          focusableElements = getFocusableElements(effectiveScope);
+        }
+      } else {
+        focusableElements = getFocusableElements(effectiveScope);
+      }
+
       if (focusableElements.length === 0) return false;
       
       // Si scope défini et focus hors scope, focuser le premier élément du scope
@@ -488,9 +646,37 @@ export default function TVNavigationProvider() {
         }
       }
 
+      // TV : touche Menu / ContextMenu / Android KEYCODE_MENU (82) → focus navigation latérale
+      if (
+        document.documentElement.getAttribute('data-tv-platform') === 'true' &&
+        !modal &&
+        (e.key === 'ContextMenu' ||
+          e.key === 'Menu' ||
+          (e as KeyboardEvent & { keyCode?: number }).keyCode === 82)
+      ) {
+        if (focusTVSidebarFirst()) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        return;
+      }
+
       // Ignorer si player vidéo actif
       if (document.querySelector('.hls-player-container:focus-within')) {
         return;
+      }
+
+      if (
+        isWebOS &&
+        (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')
+      ) {
+        const now = performance.now();
+        if (e.repeat && now - lastWebosArrowAt < WEBOS_ARROW_REPEAT_MS) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        lastWebosArrowAt = now;
       }
 
       let handled = false;
@@ -519,7 +705,11 @@ export default function TVNavigationProvider() {
             }
             handled = true;
           }
-          if (!handled) handled = scheduleOrRunNavigate('left');
+          if (!handled) {
+            // Navigation synchrone pour savoir si un déplacement a eu lieu (fallback barre d’app géré dans getCandidatesForDirection)
+            const moved = navigate('left');
+            handled = moved;
+          }
           break;
         }
         case 'ArrowRight':
@@ -726,6 +916,37 @@ export default function TVNavigationProvider() {
       a, button, input, select, textarea, [tabindex], [data-focusable] {
         transition: outline 0.15s ease-out, outline-offset 0.15s ease-out;
       }
+
+      /* webOS : GPU / CPU limités — pas d’animation infinie, zoom léger, transitions désactivées */
+      html[data-webos="true"] [data-torrent-card],
+      html[data-webos="true"] .torrent-poster,
+      html[data-webos="true"] [data-settings-card],
+      html[data-webos="true"] [data-focusable-card] {
+        transition: none !important;
+      }
+      html[data-webos="true"] .tv-card-focused {
+        transform: scale(1.02) !important;
+      }
+      html[data-webos="true"] [data-torrent-card].tv-card-focused,
+      html[data-webos="true"] .torrent-poster.tv-card-focused,
+      html[data-webos="true"] [data-settings-card].tv-card-focused {
+        animation: none !important;
+      }
+      html[data-webos="true"] .tv-element-focused,
+      html[data-webos="true"] a:focus-visible,
+      html[data-webos="true"] button:focus-visible,
+      html[data-webos="true"] input:focus-visible,
+      html[data-webos="true"] select:focus-visible,
+      html[data-webos="true"] textarea:focus-visible,
+      html[data-webos="true"] [tabindex]:focus-visible {
+        animation: none !important;
+      }
+      html[data-webos="true"] a,
+      html[data-webos="true"] button,
+      html[data-webos="true"] input,
+      html[data-webos="true"] [data-focusable] {
+        transition: none !important;
+      }
     `;
 
     // Version sans :has() pour les navigateurs plus anciens
@@ -784,6 +1005,36 @@ export default function TVNavigationProvider() {
         
         a, button, input, select, textarea, [tabindex], [data-focusable] {
           transition: outline 0.15s ease-out, outline-offset 0.15s ease-out;
+        }
+
+        html[data-webos="true"] [data-torrent-card],
+        html[data-webos="true"] .torrent-poster,
+        html[data-webos="true"] [data-settings-card],
+        html[data-webos="true"] [data-focusable-card] {
+          transition: none !important;
+        }
+        html[data-webos="true"] .tv-card-focused {
+          transform: scale(1.02) !important;
+        }
+        html[data-webos="true"] [data-torrent-card].tv-card-focused,
+        html[data-webos="true"] .torrent-poster.tv-card-focused,
+        html[data-webos="true"] [data-settings-card].tv-card-focused {
+          animation: none !important;
+        }
+        html[data-webos="true"] .tv-element-focused,
+        html[data-webos="true"] a:focus-visible,
+        html[data-webos="true"] button:focus-visible,
+        html[data-webos="true"] input:focus-visible,
+        html[data-webos="true"] select:focus-visible,
+        html[data-webos="true"] textarea:focus-visible,
+        html[data-webos="true"] [tabindex]:focus-visible {
+          animation: none !important;
+        }
+        html[data-webos="true"] a,
+        html[data-webos="true"] button,
+        html[data-webos="true"] input,
+        html[data-webos="true"] [data-focusable] {
+          transition: none !important;
         }
       `;
     }
