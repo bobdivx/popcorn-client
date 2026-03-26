@@ -8,6 +8,8 @@ const BACKGROUND_PAGE_DELAY_MS = 80;
 
 function sortByDate(data: SeriesData[]) {
   return [...data].sort((a, b) => {
+    const completeDiff = Number(Boolean(b.isCompletePack)) - Number(Boolean(a.isCompletePack));
+    if (completeDiff !== 0) return completeDiff;
     const dateA = a.firstAirDate ? new Date(a.firstAirDate).getTime() : 0;
     const dateB = b.firstAirDate ? new Date(b.firstAirDate).getTime() : 0;
     return dateB - dateA;

@@ -41,30 +41,39 @@ export function PackEpisodesSection({
   const items = season != null ? model.episodesBySeason.get(season) ?? [] : [];
   const episodeCount = items.length;
   const [tmdbStillByEpisode, setTmdbStillByEpisode] = useState<Record<number, string>>({});
+  const [tmdbNameByEpisode, setTmdbNameByEpisode] = useState<Record<number, string>>({});
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
       if (typeof tmdbId !== 'number' || !season) {
         if (!cancelled) setTmdbStillByEpisode({});
+        if (!cancelled) setTmdbNameByEpisode({});
         return;
       }
       const res = await serverApi.getTmdbTvSeasonDetail(tmdbId, season, 'fr-FR');
       if (cancelled) return;
       if (!res?.success || !res.data) {
         setTmdbStillByEpisode({});
+        setTmdbNameByEpisode({});
         return;
       }
       const episodes = Array.isArray(res.data.episodes) ? res.data.episodes : [];
       const map: Record<number, string> = {};
+      const names: Record<number, string> = {};
       for (const ep of episodes) {
         const num = typeof ep?.episode_number === 'number' ? ep.episode_number : null;
         const stillPath = typeof ep?.still_path === 'string' ? ep.still_path : null;
         if (num && stillPath) {
           map[num] = `https://image.tmdb.org/t/p/w780${stillPath}`;
         }
+        if (num) {
+          const episodeName = typeof ep?.name === 'string' ? ep.name.trim() : '';
+          if (episodeName) names[num] = episodeName;
+        }
       }
       setTmdbStillByEpisode(map);
+      setTmdbNameByEpisode(names);
     }
     load();
     return () => {
@@ -133,10 +142,12 @@ export function PackEpisodesSection({
             typeof tmdbId === 'number' && season != null && ep.episode > 0
               ? watchedSet?.has(watchedEpisodeKey(season, ep.episode)) ?? false
               : false;
+          const tmdbEpisodeName =
+            typeof ep.episode === 'number' && ep.episode > 0 ? tmdbNameByEpisode[ep.episode] : undefined;
           return {
             key: `${ep.key.kind}:${ep.key.kind === 'file' ? ep.key.path : ep.key.index}`,
             episodeNumber: ep.episode,
-            title: ep.title,
+            title: tmdbEpisodeName || ep.title,
             subtitle: null,
             thumbnailUrl: getPreferredThumb(typeof ep.episode === 'number' && ep.episode > 0 ? ep.episode : null, fallback),
             watched,

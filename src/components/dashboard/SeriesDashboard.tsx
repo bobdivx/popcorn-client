@@ -15,7 +15,7 @@ import { SyncProgress } from '../setup/components/SyncProgress';
 import { SyncCard } from './components/SyncCard';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { translateGenre } from '../../lib/utils/genre-translation';
-import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
+import TorrentCardsShadowLoader from '../ui/TorrentCardsShadowLoader';
 import { serverApi } from '../../lib/client/server-api';
 import { NotificationContainer } from '../ui/Notification';
 import { useNotifications } from '../torrents/MediaDetailPage/hooks/useNotifications';
@@ -43,7 +43,13 @@ function getSeriesSortTimestamp(serie: SeriesData): number {
   return 0;
 }
 
+function isCompleteSeries(serie: SeriesData): boolean {
+  return Boolean(serie.isCompletePack);
+}
+
 function compareSeriesByRecency(a: SeriesData, b: SeriesData): number {
+  const completeDiff = Number(isCompleteSeries(b)) - Number(isCompleteSeries(a));
+  if (completeDiff !== 0) return completeDiff;
   const byDate = getSeriesSortTimestamp(b) - getSeriesSortTimestamp(a);
   if (byDate !== 0) return byDate;
   return a.title.localeCompare(b.title);
@@ -389,8 +395,8 @@ export default function SeriesDashboard() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-black">
-        <HLSLoadingSpinner size="lg" />
+      <div className="min-h-screen bg-black pt-4 sm:pt-6">
+        <TorrentCardsShadowLoader rows={3} showHero />
       </div>
     );
   }
@@ -480,11 +486,12 @@ export default function SeriesDashboard() {
             primaryActionDisabled={!streamingTorrentActive && heroDownloading}
             primaryButtonLabel={streamingTorrentActive ? t('common.watch') : t('common.download')}
             primaryButtonIcon={streamingTorrentActive ? <Play className="h-6 w-6 tv:h-8 tv:w-8" size={24} /> : <Download className="h-6 w-6 tv:h-8 tv:w-8" size={24} />}
+            size="large"
           />
         </div>
       )}
 
-      <div className="pb-8 tv:pb-12 flex-1 safe-area-bottom" style={{ paddingBottom: 'max(2rem, var(--safe-area-inset-bottom))' }}>
+      <div className="pt-2 sm:pt-3 pb-8 tv:pb-12 flex-1 safe-area-bottom" style={{ paddingBottom: 'max(2rem, var(--safe-area-inset-bottom))' }}>
         {/* Section Reprendre la lecture — en tête de page */}
         {resumeSeries.length > 0 && (
           <CarouselRow title={t('dashboard.resumeWatching')} autoScroll={false}>

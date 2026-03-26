@@ -58,7 +58,7 @@ export function LazyResumePoster({ item, rootMargin = '200px' }: LazyResumePoste
         ref={containerRef}
         className="relative min-w-[140px] sm:min-w-[160px] md:min-w-[180px] lg:min-w-[280px] xl:min-w-[320px] tv:min-w-[400px]"
       >
-        <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-lg rounded-lg animate-pulse">
+        <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900/85 border border-white/15 shadow-lg rounded-lg animate-pulse">
           <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900" />
         </div>
       </div>

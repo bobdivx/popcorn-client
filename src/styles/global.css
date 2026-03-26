@@ -22,7 +22,7 @@
 :root {
   --bg-primary: #121212; /* Anthracite */
   /* Fond unifié de toutes les pages (identique à /settings) */
-  --page-bg: #12141a;
+  --page-bg: #000000;
   --bg-glass: rgba(255, 255, 255, 0.05); /* Verre dépoli */
   --bg-glass-hover: rgba(255, 255, 255, 0.1);
   --bg-glass-active: rgba(255, 255, 255, 0.15);
@@ -1068,6 +1068,24 @@ html[data-tv-platform] body {
     @apply hover:scale-105 transition-all duration-200;
     box-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3);
   }
+
+/* Animation douce de glow pour les cartes dashboard au hover/focus */
+@keyframes card-glow-pulse {
+  0% {
+    filter: drop-shadow(0 0 0 rgba(168, 85, 247, 0));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.35));
+  }
+  100% {
+    filter: drop-shadow(0 0 0 rgba(168, 85, 247, 0));
+  }
+}
+
+.group:hover .card-glow-animate,
+.group:focus-within .card-glow-animate {
+  animation: card-glow-pulse 1.7s ease-in-out infinite;
+}
 }
 
 /* Détection TV et désactivation hover */
@@ -1081,11 +1099,6 @@ html[data-tv-platform] body {
 /* Styles optimisés pour Android TV - Breakpoint 1280px+ */
 /* Animations adaptées pour TV - Plus lentes et plus visibles */
 @media (min-width: 1280px) {
-  /* Hero dashboard : hauteur réduite pour que la première ligne de cartes soit visible sans être coupée (720p/1080p) */
-  .hero-dashboard {
-    height: clamp(280px, 39vh, 420px) !important;
-  }
-
   .animate-fade-in {
     animation-duration: 0.6s;
   }

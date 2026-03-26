@@ -20,6 +20,29 @@ function toTmdbLanguage(lang?: string): string {
   return lang === 'fr' ? 'fr-FR' : lang === 'en' ? 'en-US' : `${lang}-${lang.toUpperCase()}`;
 }
 
+function detectCompletePackFromRaw(raw: any): boolean {
+  const candidates = [
+    raw?.name,
+    raw?.title,
+    raw?.cleanTitle,
+    raw?.clean_title,
+    raw?.tmdbTitle,
+    raw?.tmdb_title,
+  ]
+    .filter((v) => typeof v === 'string')
+    .map((v) => String(v).toLowerCase());
+
+  if (candidates.length === 0) return false;
+  const text = candidates.join(' ');
+  return (
+    /\bintegrale?\b/.test(text) ||
+    /\bcompl[eè]te?s?\b/.test(text) ||
+    /\bfull\s*season\b/.test(text) ||
+    /\bsaison\s+\d+\s+compl[eè]te\b/.test(text) ||
+    /\bs\d{1,2}\s*complete\b/.test(text)
+  );
+}
+
 /**
  * Options communes pour les appels dashboard
  */
@@ -91,6 +114,7 @@ function toContentItem(raw: any): ContentItem {
     codec,
     quality,
     fileSize: typeof fileSize === 'number' ? fileSize : undefined,
+    isCompletePack: detectCompletePackFromRaw(raw),
   };
 
   if (type === 'tv') {
@@ -484,6 +508,7 @@ export const dashboardMethods = {
           seeds: typeof raw?.seedCount === 'number' ? raw.seedCount : raw?.seed_count,
           peers: typeof raw?.leechCount === 'number' ? raw.leechCount : raw?.leech_count,
           fileSize: typeof raw?.fileSize === 'number' ? raw.fileSize : raw?.file_size,
+          isCompletePack: detectCompletePackFromRaw(raw),
         } satisfies SeriesData;
       })
       .filter(Boolean) as SeriesData[];

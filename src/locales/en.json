@@ -918,7 +918,20 @@
     "watchLater": "Watch later",
     "rewatch": "Rewatch",
     "carouselIndicators": "Carousel content",
-    "goToContent": "Go to content"
+    "goToContent": "Go to content",
+    "genresTitle": "Genres",
+    "genreAll": "All",
+    "genreAllHint": "Show all",
+    "genreSelected": "Selected",
+    "genreFilter": "Filter",
+    "sectionMovies": "Movies",
+    "sectionSeries": "Series",
+    "newReleases": "New releases",
+    "newReleasesMoviesSubtitle": "Latest releases added",
+    "newReleasesSeriesSubtitle": "New episodes and seasons",
+    "mostSharedMoviesSubtitle": "Torrents with the most seeders",
+    "mostSharedSeriesSubtitle": "Most shared series",
+    "syncAppearing": "Content will appear progressively during synchronization."
   },
   "search": {
     "title": "Search",

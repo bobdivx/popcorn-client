@@ -79,7 +79,10 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
           setIsHovered(false);
         }}
       >
-        <div className={`relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-lg rounded-lg focus-within:shadow-primary-lg ${cardAnimationClasses}`}>
+        <div
+          className={`relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900/85 border border-white/15 shadow-lg rounded-lg focus-within:shadow-primary-lg ${cardAnimationClasses}`}
+        >
+          <div className="card-glow-animate pointer-events-none absolute inset-0 z-30 rounded-lg border border-violet-400/0 opacity-0 transition-all duration-300 ease-out group-hover:opacity-100 group-focus-within:opacity-100 group-hover:border-violet-400/70 group-focus-within:border-violet-400/80 group-hover:shadow-[0_0_0_1px_rgba(168,85,247,0.45),0_0_26px_rgba(168,85,247,0.32)] group-focus-within:shadow-[0_0_0_1px_rgba(168,85,247,0.6),0_0_30px_rgba(168,85,247,0.4)]" />
         {imageUrl ? (
           <img
             src={imageUrl}
