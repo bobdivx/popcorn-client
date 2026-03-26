@@ -491,7 +491,7 @@ export default function SeriesDashboard() {
         </div>
       )}
 
-      <div className="pt-2 sm:pt-3 pb-8 tv:pb-12 flex-1 safe-area-bottom" style={{ paddingBottom: 'max(2rem, var(--safe-area-inset-bottom))' }}>
+      <div className="pt-2 sm:pt-3 pb-8 tv:pb-12 flex-1 safe-area-bottom animate-[fade-in-up_0.5s_ease-out_forwards] opacity-0" style={{ paddingBottom: 'max(2rem, var(--safe-area-inset-bottom))' }}>
         {/* Section Reprendre la lecture — en tête de page */}
         {resumeSeries.length > 0 && (
           <CarouselRow title={t('dashboard.resumeWatching')} autoScroll={false}>

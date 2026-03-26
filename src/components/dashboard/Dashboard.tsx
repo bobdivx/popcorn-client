@@ -300,7 +300,7 @@ export default function Dashboard() {
         />
       )}
 
-      <div className="pt-2 sm:pt-3 pb-8 tv:pb-12">
+      <div className="pt-2 sm:pt-3 pb-8 tv:pb-12 animate-[fade-in-up_0.5s_ease-out_forwards] opacity-0">
         {/* Section Reprendre la lecture — en tête de page */}
         {(resumeWatching.length > 0 || (data.continueWatching && data.continueWatching.length > 0)) && (
           <CarouselRow title={t('dashboard.resumeWatching')} autoScroll={false}>

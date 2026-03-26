@@ -361,26 +361,26 @@ export function useHlsPlayer({
           throw new Error('HLS.js n\'est pas disponible ou n\'est pas supporté par ce navigateur');
         }
 
-        // Configuration HLS.js. Buffer plus grand et timeouts plus longs pour flux distant (bibliothèque partagée).
-        const maxBufferLength = isRemoteStream ? 300 : 120;
+        // Options HLS.js optimisées pour une mise en buffer agressive et un TTFF (Time-To-First-Frame) bas
+        const maxBufferLength = isRemoteStream ? 600 : 300; // Jusqu'à 10 mins de preload
         const hls = new window.Hls({
           enableWorker: true,
-          lowLatencyMode: false,
+          lowLatencyMode: true, // Autoriser le chargement anticipé
           // Jellyfin-style: backBufferLength défini globalement dans useHlsLoader
           maxBufferLength,
-          maxMaxBufferLength: maxBufferLength,
-          maxBufferSize: playerConfig.maxBufferSize * 1000 * 1000,
-          maxBufferHole: 0.5,
-          highBufferWatchdogPeriod: isRemoteStream ? 3 : 2,
+          maxMaxBufferLength: maxBufferLength * 2, // Permettre l'ingestion massive si connexion fibre
+          maxBufferSize: (playerConfig.maxBufferSize * 1000 * 1000) * 2, // 2x RAM allouée (par défaut 60M -> 120MB)
+          maxBufferHole: 0.3,
+          highBufferWatchdogPeriod: isRemoteStream ? 2 : 1, // Vérifier les soucis de buffer plus souvent
           nudgeOffset: 0.1,
-          nudgeMaxRetry: isRemoteStream ? 25 : 15,
+          nudgeMaxRetry: isRemoteStream ? 50 : 30, // Tenter plus de nudges pour combler les micro-coupures
           // Qualité adaptée au player et démarrage rapide
           capLevelToPlayerSize: true,
           startLevel: -1,
-          // Timeouts : plus longs pour flux distant (latence réseau)
-          fragLoadingTimeOut: isRemoteStream ? 60000 : 45000,
-          manifestLoadingTimeOut: isRemoteStream ? 45000 : 30000,
-          levelLoadingTimeOut: isRemoteStream ? 60000 : 45000,
+          // Timeouts : plus longs pour flux distant (latence réseau) et prévenir le drop massif
+          fragLoadingTimeOut: isRemoteStream ? 90000 : 60000,
+          manifestLoadingTimeOut: isRemoteStream ? 60000 : 45000,
+          levelLoadingTimeOut: isRemoteStream ? 90000 : 60000,
           // Détecter les en-têtes playlist : X-Transcodings-Evicted et X-Video-Duration (durée réelle pour médias local_)
           xhrSetup: (xhr: XMLHttpRequest, url: string) => {
             xhr.addEventListener('load', () => {

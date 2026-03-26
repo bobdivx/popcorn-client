@@ -4,6 +4,7 @@ import { useI18n } from '../../../lib/i18n/useI18n';
 import { getHighQualityTmdbImageUrl } from '../../../lib/utils/tmdb-images';
 import { getDisplayTitle } from '../../../lib/utils/title-display';
 import { YouTubeVideoPlayer } from '../../ui/YouTubeVideoPlayer';
+import { isTVPlatform } from '../../../lib/utils/device-detection';
 
 interface HeroSectionProps {
   items: ContentItem[];
@@ -166,14 +167,17 @@ export function HeroSection({
   const rawImageUrl = imageUrls[currentItem.id] || currentItem.poster || currentItem.backdrop;
   const currentImageUrl = getHighQualityTmdbImageUrl(rawImageUrl) ?? rawImageUrl;
   const currentTrailerKey = trailerKeys[currentItem.id];
+  const isTV = isTVPlatform();
   const isLargeHero = size === 'large';
-  // Hauteur explicite pour garantir le flux et éviter tout chevauchement des sections suivantes.
-  const heroHeight = isLargeHero ? 'clamp(340px, 52vh, 640px)' : 'clamp(320px, 50vh, 560px)';
+  
+  // Sur TV, le hero doit être plus imposant (billboard)
+  const tvHeroHeight = isLargeHero ? 'max(70vh, 500px)' : 'clamp(320px, 50vh, 560px)';
+  const heroHeight = isTV ? tvHeroHeight : (isLargeHero ? 'clamp(340px, 52vh, 640px)' : 'clamp(320px, 50vh, 560px)');
 
   return (
     <div
       className={`hero-dashboard relative z-0 w-full mb-8 touch-pan-y ${
-        isLargeHero ? 'px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16' : ''
+        (isLargeHero && !isTV) ? 'px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16' : ''
       }`}
       data-dark-context
       style={{
@@ -183,7 +187,7 @@ export function HeroSection({
       onTouchEnd={handleTouchEnd}
     >
       <div
-        className={`relative w-full overflow-hidden ${isLargeHero ? 'rounded-2xl border border-white/10' : ''}`}
+        className={`relative w-full overflow-hidden ${isLargeHero && !isTV ? 'rounded-2xl border border-white/10' : ''}`}
         style={{ height: heroHeight }}
       >
       {isLargeHero ? (
@@ -224,11 +228,11 @@ export function HeroSection({
           {/* ─── Contenu : deux zones (texte + barre d’actions) ─── */}
           <div
             key={`content-${currentIndex}`}
-            className="absolute inset-0 z-10 flex flex-col"
+            className="absolute inset-0 z-10 flex flex-col pt-8"
           >
-            <div className="flex-1 min-h-0 flex flex-col justify-end px-4 sm:px-6 lg:px-16 tv:px-24 pb-3 overflow-hidden hero-slide-enter">
-              <div className="max-w-2xl tv:max-w-3xl w-full flex flex-col gap-2 sm:gap-3">
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-white/95">
+            <div className={`flex-1 min-h-0 flex flex-col justify-end pb-3 overflow-hidden hero-slide-enter ${isTV ? 'px-12 tv:px-24' : 'px-4 sm:px-6 lg:px-16'}`}>
+              <div className="max-w-2xl tv:max-w-4xl w-full flex flex-col gap-2 sm:gap-4 tv:gap-6">
+                <div className={`flex flex-wrap items-center gap-2 sm:gap-3 text-white/95 ${isTV ? 'text-lg tv:text-xl' : ''}`}>
                   <span className="text-xs sm:text-sm font-semibold uppercase tracking-wide">
                     {currentItem.type === 'movie' ? t('common.film') : currentItem.type === 'tv' ? t('common.serie') : t('common.content')}
                   </span>
@@ -271,9 +275,9 @@ export function HeroSection({
               </div>
             </div>
 
-            <div className="flex-shrink-0 px-4 sm:px-6 lg:px-16 tv:px-24 py-3 sm:py-4 bg-gradient-to-t from-black/95 via-black/85 to-transparent backdrop-blur-[2px] hero-slide-enter">
-              <div className="max-w-2xl tv:max-w-3xl w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="flex flex-col xs:flex-row gap-2 sm:gap-3">
+            <div className={`flex-shrink-0 py-3 sm:py-4 bg-gradient-to-t from-black/95 via-black/85 to-transparent backdrop-blur-[2px] hero-slide-enter ${isTV ? 'px-12 tv:px-24' : 'px-4 sm:px-6 lg:px-16'}`}>
+              <div className="max-w-2xl tv:max-w-4xl w-full flex flex-col sm:flex-row sm:items-center sm:justify-start gap-3">
+                <div className="flex flex-col xs:flex-row gap-3 tv:gap-6">
                   <button
                     onClick={handlePrimaryAction}
                     data-focusable

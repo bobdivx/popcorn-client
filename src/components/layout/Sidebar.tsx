@@ -4,11 +4,13 @@ import { serverApi } from '../../lib/client/server-api';
 import { getLocalProfile, onProfileChanged } from '../../lib/client/profile';
 import Avatar from '../ui/Avatar';
 import { useI18n } from '../../lib/i18n/useI18n';
+import { isTVPlatform } from '../../lib/utils/device-detection';
 
 export default function Sidebar() {
   const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
+  const [isTV, setIsTV] = useState(false);
   const [currentPath, setCurrentPath] = useState('');
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -35,27 +37,36 @@ export default function Sidebar() {
     return onProfileChanged(() => setProfile(getLocalProfile()));
   }, []);
 
-  // Détecter si on est sur TV/Desktop pour afficher la sidebar par défaut
+  // Détecter si on est sur TV/Desktop pour afficher la sidebar
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const isTV = window.matchMedia('(min-width: 1920px)').matches;
+      const tvMode = isTVPlatform();
+      setIsTV(tvMode);
+      
       const isDesktop = window.matchMedia('(min-width: 1024px)').matches && !window.matchMedia('(pointer: coarse)').matches;
       
-      if (isTV || isDesktop) {
+      // Sur TV, la sidebar est TOUJOURS rendue, mais agit en mode Rail (compacte par défaut, s'ouvre au focus)
+      if (tvMode || isDesktop) {
         setIsOpen(true);
       }
     }
   }, []);
 
-  // Mode rail (icônes) sur desktop/TV, menu complet sur mobile
+  // Mode rail (icônes)
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
     const mq = window.matchMedia('(min-width: 1024px)');
-    const apply = () => setIsCompact(mq.matches);
+    const apply = () => {
+      // Sur TV, toujours compact par défaut (le CSS TV gère l'expansion au focus)
+      if (isTVPlatform()) {
+        setIsCompact(true);
+      } else {
+        setIsCompact(mq.matches);
+      }
+    };
     apply();
 
-    // compat vieux navigateurs
     mq.addEventListener?.('change', apply as any);
     return () => mq.removeEventListener?.('change', apply as any);
   }, []);
@@ -99,6 +110,12 @@ export default function Sidebar() {
     return null;
   }
 
+  // Ne pas afficher la sidebar sur mobile/desktop classique si on veut l'exclusivité TV (A ajuster selon vos besoins)
+  // Pour le moment, on force son affichage sur TV, et on la cache si ce n'est pas TV pour ne pas casser le site existant.
+  if (!isTV && typeof window !== 'undefined') {
+    return null;
+  }
+
   return (
     <>
       {/* Bouton toggle pour mobile (fallback si besoin) */}
@@ -123,10 +140,10 @@ export default function Sidebar() {
         aria-hidden="true"
       />
 
-      {/* Sidebar */}
+      {/* Sidebar - Mode TV (Rail extensible au focus) */}
       <aside
-        className={`fixed top-0 left-0 h-screen z-50 transform transition-all duration-300 ease-out glass-panel-lg border-r border-white/10 shadow-2xl ${
-          isCompact ? 'lg:w-24 lg:max-w-none' : 'w-80 max-w-[85vw]'
+        className={`fixed top-0 left-0 h-screen z-50 transform transition-all duration-300 ease-out glass-panel-lg border-r border-white/10 shadow-2xl sidebar-tv-rail ${
+          isCompact ? 'w-20 lg:w-24' : 'w-80 max-w-[85vw]'
         } ${
           isOpen ? 'translate-x-0 opacity-100' : '-translate-x-full lg:translate-x-0 opacity-0 lg:opacity-100'
         }`}
@@ -179,13 +196,11 @@ export default function Sidebar() {
                       <Icon className={`w-6 h-6 tv:w-7 tv:h-7 flex-shrink-0 transition-transform duration-200 ${
                         active ? 'scale-110' : ''
                       }`} size={24} />
-                      {!isCompact && (
-                        <span className={`text-base tv:text-lg font-medium transition-all duration-200 ${
-                          active ? 'font-bold' : 'font-medium'
-                        }`}>
-                          {item.label}
-                        </span>
-                      )}
+                      <span className={`sidebar-label text-base tv:text-lg font-medium transition-all duration-200 ${
+                        active ? 'font-bold' : 'font-medium'
+                      } ${isCompact ? 'hidden' : 'block'}`}>
+                        {item.label}
+                      </span>
                     </a>
                   </li>
                 );
@@ -203,13 +218,11 @@ export default function Sidebar() {
                 sizeClassName="w-10 h-10 tv:w-12 tv:h-12"
                 className="flex-shrink-0"
               />
-              {!isCompact && (
-                <div className="flex-1 min-w-0">
-                  <p className="text-white font-semibold text-sm tv:text-base truncate" title={profile.displayName || user.email || t('account.defaultName')}>
-                    {profile.displayName || user.email || t('account.defaultName')}
-                  </p>
-                </div>
-              )}
+              <div className={`flex-1 min-w-0 sidebar-label ${isCompact ? 'hidden' : 'block'}`}>
+                <p className="text-white font-semibold text-sm tv:text-base truncate" title={profile.displayName || user.email || t('account.defaultName')}>
+                  {profile.displayName || user.email || t('account.defaultName')}
+                </p>
+              </div>
             </div>
           </div>
         </div>
