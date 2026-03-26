@@ -892,6 +892,58 @@ export default function TVNavigationProvider() {
       }, delay);
     };
 
+    /** Toutes les plateformes TV : pas de pulse/scale/transitions lourdes (Android TV, Apple TV, webOS…). */
+    const TV_PLATFORM_PERF_CSS = `
+      html[data-tv-platform="true"] [data-torrent-card],
+      html[data-tv-platform="true"] .torrent-poster,
+      html[data-tv-platform="true"] [data-settings-card],
+      html[data-tv-platform="true"] [data-focusable-card] {
+        transition: none !important;
+      }
+      html[data-tv-platform="true"] .tv-card-focused {
+        transform: none !important;
+        box-shadow: none !important;
+      }
+      html[data-tv-platform="true"] [data-torrent-card].tv-card-focused,
+      html[data-tv-platform="true"] .torrent-poster.tv-card-focused,
+      html[data-tv-platform="true"] [data-settings-card].tv-card-focused {
+        animation: none !important;
+        outline: 3px solid rgba(255, 255, 255, 0.55) !important;
+        outline-offset: 2px !important;
+        box-shadow: none !important;
+      }
+      html[data-tv-platform="true"] [data-torrent-card]:focus-visible,
+      html[data-tv-platform="true"] [data-torrent-card]:focus-within,
+      html[data-tv-platform="true"] .torrent-poster:focus-visible,
+      html[data-tv-platform="true"] .torrent-poster:focus-within {
+        animation: none !important;
+        box-shadow: none !important;
+      }
+      html[data-tv-platform="true"] [data-carousel]:has(.tv-card-focused) [data-torrent-card]:not(.tv-card-focused),
+      html[data-tv-platform="true"] [data-carousel]:has(.tv-card-focused) .torrent-poster:not(.tv-card-focused) {
+        opacity: 1 !important;
+      }
+      html[data-tv-platform="true"] .grid:has(.tv-card-focused) [data-settings-card]:not(.tv-card-focused):not(:focus-within) {
+        opacity: 1 !important;
+      }
+      html[data-tv-platform="true"] .tv-element-focused,
+      html[data-tv-platform="true"] a:focus-visible,
+      html[data-tv-platform="true"] button:focus-visible,
+      html[data-tv-platform="true"] input:focus-visible,
+      html[data-tv-platform="true"] select:focus-visible,
+      html[data-tv-platform="true"] textarea:focus-visible,
+      html[data-tv-platform="true"] [tabindex]:focus-visible {
+        animation: none !important;
+        box-shadow: none !important;
+      }
+      html[data-tv-platform="true"] a,
+      html[data-tv-platform="true"] button,
+      html[data-tv-platform="true"] input,
+      html[data-tv-platform="true"] [data-focusable] {
+        transition: none !important;
+      }
+    `;
+
     // Styles CSS pour la navigation TV
     const style = document.createElement('style');
     style.id = 'tv-navigation-styles';
@@ -1009,7 +1061,7 @@ export default function TVNavigationProvider() {
       html[data-webos="true"] [data-focusable] {
         transition: none !important;
       }
-    `;
+    ` + TV_PLATFORM_PERF_CSS;
 
     // Version sans :has() pour les navigateurs plus anciens
     if (!CSS.supports('selector(:has(*))')) {
@@ -1098,7 +1150,7 @@ export default function TVNavigationProvider() {
         html[data-webos="true"] [data-focusable] {
           transition: none !important;
         }
-      `;
+      ` + TV_PLATFORM_PERF_CSS;
     }
 
     if (!document.getElementById('tv-navigation-styles')) {

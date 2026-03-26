@@ -189,6 +189,18 @@ html[data-webos="true"] .carousel-container {
   scroll-behavior: auto !important;
 }
 
+/* Toutes les TV : même principe (scroll instantané, moins de travail moteur à chaque flèche) */
+html[data-tv-platform="true"] .carousel-container {
+  scroll-behavior: auto !important;
+}
+
+/* TV : pas d’animation d’entrée sur les lignes de carrousel (classe ajoutée par IntersectionObserver hors TV) */
+html[data-tv-platform="true"] .animate-fade-in-up {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
 /* Page Demandes : éviter que la bordure de focus soit coupée (conteneur + cartes) */
 [data-page="demandes"] [data-carousel] {
   overflow-y: visible !important;
