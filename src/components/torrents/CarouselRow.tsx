@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'preact/hooks';
+import { isTVPlatform } from '../../lib/utils/device-detection';
 
 interface CarouselRowProps {
   title: string;
@@ -21,6 +22,7 @@ export default function CarouselRow({
 }: CarouselRowProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isTV] = useState(() => typeof window !== 'undefined' && isTVPlatform());
 
   const scroll = useCallback((direction: 'left' | 'right') => {
     if (!scrollContainerRef.current) return;
@@ -29,9 +31,9 @@ export default function CarouselRow({
     // Utiliser courbe de Bézier organique pour défilement fluide
     scrollContainerRef.current.scrollBy({
       left: direction === 'left' ? -scrollAmount : scrollAmount,
-      behavior: 'smooth',
+      behavior: isTV ? 'auto' : 'smooth',
     });
-  }, []);
+  }, [isTV]);
 
   // Navigation et focus gérés par TVNavigationProvider global
   // Ce carousel expose juste data-carousel pour que TVNavigationProvider puisse le détecter
@@ -40,9 +42,9 @@ export default function CarouselRow({
   const isHoveredRef = useRef(false);
   isHoveredRef.current = isHovered;
 
-  // Défilement automatique
+  // Défilement automatique — désactivé sur TV (évite scroll JS + reflows en arrière-plan)
   useEffect(() => {
-    if (!autoScroll) return;
+    if (!autoScroll || isTV) return;
     const el = scrollContainerRef.current;
     if (!el) return;
 
@@ -60,10 +62,16 @@ export default function CarouselRow({
 
     const id = setInterval(tick, autoScrollInterval);
     return () => clearInterval(id);
-  }, [autoScroll, autoScrollInterval]);
+  }, [autoScroll, autoScrollInterval, isTV]);
 
-  // Animation au scroll avec Intersection Observer
+  // Animation au scroll avec Intersection Observer — sur TV : affichage immédiat (pas d’IO + pas de keyframes)
   useEffect(() => {
+    if (isTV) {
+      if (containerRef.current) {
+        containerRef.current.classList.add('animate-fade-in-up');
+      }
+      return;
+    }
     if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
       if (containerRef.current) {
         containerRef.current.classList.add('animate-fade-in-up');
@@ -94,14 +102,14 @@ export default function CarouselRow({
     return () => {
       observer.disconnect();
     };
-  }, []);
+  }, [isTV]);
 
   const childrenArray = Array.isArray(children) ? children : [children];
 
   return (
     <div 
       ref={containerRef}
-      className={`mb-8 sm:mb-10 md:mb-12 tv:mb-16 ${className} opacity-0`}
+      className={`mb-8 sm:mb-10 md:mb-12 tv:mb-16 ${className} ${isTV ? 'opacity-100' : 'opacity-0'}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -142,11 +150,11 @@ export default function CarouselRow({
       <div
         ref={scrollContainerRef}
         data-carousel
-        className="flex gap-1 sm:gap-1.5 md:gap-2 lg:gap-4 xl:gap-6 tv:gap-8 overflow-x-auto overflow-y-visible scrollbar-hide px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 py-3 tv:py-4 scroll-smooth carousel-container"
+        className={`flex gap-1 sm:gap-1.5 md:gap-2 lg:gap-4 xl:gap-6 tv:gap-8 overflow-x-auto overflow-y-visible scrollbar-hide px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 py-3 tv:py-4 carousel-container ${isTV ? '' : 'scroll-smooth'}`}
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
-          scrollBehavior: 'smooth',
+          scrollBehavior: isTV ? 'auto' : 'smooth',
           // Autoriser aussi le scroll vertical de la page quand le geste commence sur une carte
           touchAction: 'auto',
         }}
