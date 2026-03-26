@@ -106,52 +106,54 @@ html[data-tv-platform] body {
   display: none;  /* Chrome, Safari et Opera */
 }
 
-/* ── LAYOUT TV OVERSCAN & RAIL ── */
-/* Mettre de l'espace pour la Sidebar et enlever l'espace haut/côtés pour que le Hero soit full bleed */
+/* ── LAYOUT TV OVERSCAN & SIDEBAR (masquée par défaut, ouverte via Menu ou flèche gauche) ── */
 html[data-tv-platform="true"] .app-main {
-  /* On annule le padding-top de 5rem (desktop) car le hero touche le haut */
   padding-top: 0 !important;
-  /* Le contenu gèrera son overscan (padding) par composant, afin que le hero n'ait pas de bandes noires latérales */
-  padding-left: 0 !important; 
+  padding-left: 0 !important;
   padding-right: 0 !important;
   padding-bottom: max(4vh, 30px) !important;
-  /* La sidebar rail est fixe à gauche, donc on décale le main */
-  margin-left: max(6rem, 96px) !important; 
+  margin-left: 0 !important;
+  transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Sidebar en mode TV : Compact par défaut mais s'ouvre au Focus-Within */
+html[data-tv-platform="true"][data-tv-sidebar-open="true"] .app-main {
+  margin-left: 18rem !important;
+}
+
+/* Sidebar TV : hors écran par défaut ; ouverte avec data-tv-sidebar-open (JS) */
 html[data-tv-platform="true"] .sidebar-tv-rail {
-  width: 6rem !important; /* ~96px */
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  width: 18rem !important;
+  max-width: min(18rem, 85vw) !important;
+  transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
-}
-
-html[data-tv-platform="true"] .sidebar-tv-rail:focus-within {
-  width: 18rem !important; /* ~288px */
-  /* Même logique glass que fiche média : verre clair sur fond sombre, pas de teinte violette */
+  opacity: 1 !important;
+  visibility: visible !important;
   background: rgba(255, 255, 255, 0.07) !important;
   backdrop-filter: blur(40px);
   -webkit-backdrop-filter: blur(40px);
   border-right-color: rgba(255, 255, 255, 0.18) !important;
 }
 
-/* Quand le rail TV est focus, on affiche le texte et on cache le mode compact */
-html[data-tv-platform="true"] .sidebar-tv-rail:focus-within .sidebar-label {
+html[data-tv-platform="true"][data-tv-sidebar-open="true"] .sidebar-tv-rail {
+  transform: translateX(0);
+}
+
+html[data-tv-platform="true"] .sidebar-tv-rail .sidebar-label {
   display: block !important;
   animation: fadeIn 0.3s ease forwards;
 }
 
-/* Rail élargi : les liens ne sont plus des carrés icône — bordure / halo TV englobent icône + titre */
-html[data-tv-platform="true"] .sidebar-tv-rail:focus-within nav ul {
+html[data-tv-platform="true"] .sidebar-tv-rail nav ul {
   align-items: stretch;
   width: 100%;
 }
 
-html[data-tv-platform="true"] .sidebar-tv-rail:focus-within nav ul > li {
+html[data-tv-platform="true"] .sidebar-tv-rail nav ul > li {
   width: 100%;
 }
 
-html[data-tv-platform="true"] .sidebar-tv-rail:focus-within nav a[href] {
+html[data-tv-platform="true"] .sidebar-tv-rail nav a[href] {
   width: 100% !important;
   max-width: 100%;
   min-height: 3.5rem;
@@ -165,7 +167,7 @@ html[data-tv-platform="true"] .sidebar-tv-rail:focus-within nav a[href] {
   box-sizing: border-box;
 }
 
-html[data-tv-platform="true"] .sidebar-tv-rail:focus-within .sidebar-tv-footer > div {
+html[data-tv-platform="true"] .sidebar-tv-rail .sidebar-tv-footer > div {
   justify-content: flex-start !important;
   gap: 0.75rem;
   width: 100%;
