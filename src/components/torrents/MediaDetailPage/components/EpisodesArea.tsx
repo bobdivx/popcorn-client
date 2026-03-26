@@ -6,6 +6,28 @@ import type { SeriesEpisodesResponse } from '../../../../lib/client/server-api/m
 import type { PackEpisodeKey, PackEpisodesModel } from '../hooks/usePackEpisodes';
 import { getWatchedEpisodesSet } from '../../../../lib/streaming/torrent-storage';
 
+function EpisodeCardsSkeleton({ count = 4 }: { count?: number }) {
+  return (
+    <div className="px-4 sm:px-5 py-4 sm:py-5">
+      <div className="flex gap-4 overflow-hidden">
+        {Array.from({ length: count }).map((_, idx) => (
+          <div
+            key={idx}
+            className="shrink-0 w-[280px] sm:w-[320px] rounded-2xl border border-white/10 bg-white/[0.04] overflow-hidden"
+            aria-hidden
+          >
+            <div className="aspect-video w-full bg-white/[0.06] animate-pulse" />
+            <div className="p-3 sm:p-4 space-y-2">
+              <div className="h-4 w-3/4 rounded bg-white/[0.08] animate-pulse" />
+              <div className="h-3 w-1/2 rounded bg-white/[0.06] animate-pulse" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function EpisodesArea(props: {
   seriesEpisodes?: SeriesEpisodesResponse;
   tmdbId?: number | null;
@@ -104,7 +126,9 @@ export function EpisodesArea(props: {
         <p className="text-xs text-white/60">{t('mediaDetail.packAddTorrentHint')}</p>
       )}
       {isPackSelected && loadingPackPreview && (
-        <p className="text-xs text-white/60">{t('common.loading') || 'Chargement...'}</p>
+        <div className="rounded-xl overflow-hidden bg-black/35 border border-white/10">
+          <EpisodeCardsSkeleton />
+        </div>
       )}
 
       {isPackSelected && (videoFilesCount > 1 || packPreviewFilesCount > 1) ? (
@@ -122,8 +146,8 @@ export function EpisodesArea(props: {
               isTV={isTV}
             />
           ) : (
-            <div className="p-4 text-xs text-white/60 rounded-xl bg-black/40 border border-white/10">
-              {t('common.loading') || 'Chargement...'}
+            <div className="rounded-xl overflow-hidden bg-black/35 border border-white/10">
+              <EpisodeCardsSkeleton />
             </div>
           )}
         </div>

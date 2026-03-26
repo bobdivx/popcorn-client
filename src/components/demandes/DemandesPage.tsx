@@ -4,7 +4,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import CarouselRow from '../torrents/CarouselRow';
 import { HeroSection } from '../dashboard/components/HeroSection';
 import type { ContentItem } from '../../lib/client/types';
-import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
+import TorrentCardsShadowLoader from '../ui/TorrentCardsShadowLoader';
 
 const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_IMG_BACKDROP = 'https://image.tmdb.org/t/p/original';
@@ -181,7 +181,8 @@ export default function DemandesPage() {
         }
       }}
     >
-      <div className="relative aspect-[2/3] rounded-lg overflow-hidden bg-white/5 ring-2 ring-transparent group-hover:ring-primary/50 transition-all duration-300">
+      <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] rounded-lg overflow-hidden bg-gray-900/85 border border-white/15 ring-2 ring-transparent group-hover:ring-primary/50 transition-all duration-300">
+        <div className="card-glow-animate pointer-events-none absolute inset-0 z-30 rounded-lg border border-violet-400/0 opacity-0 transition-all duration-300 ease-out group-hover:opacity-100 group-focus-within:opacity-100 group-hover:border-violet-400/70 group-focus-within:border-violet-400/80 group-hover:shadow-[0_0_0_1px_rgba(168,85,247,0.45),0_0_26px_rgba(168,85,247,0.32)] group-focus-within:shadow-[0_0_0_1px_rgba(168,85,247,0.6),0_0_30px_rgba(168,85,247,0.4)]" />
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -211,8 +212,8 @@ export default function DemandesPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[60vh] bg-black">
-        <HLSLoadingSpinner size="lg" />
+      <div className="min-h-[60vh] bg-black pt-4 sm:pt-6">
+        <TorrentCardsShadowLoader rows={2} showHero />
       </div>
     );
   }
@@ -258,6 +259,7 @@ export default function DemandesPage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
           }
+          size="large"
         />
       )}
 

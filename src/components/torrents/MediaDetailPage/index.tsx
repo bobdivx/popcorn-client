@@ -1311,6 +1311,12 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     let cancelled = false;
     setLoadingPackPreview(true);
     const load = async () => {
+      const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+      const isRecoverablePackError = (err: unknown) => {
+        if (!(err instanceof Error)) return false;
+        const msg = err.message || '';
+        return msg.includes('502') || msg.includes('503') || msg.includes('504') || msg.toLowerCase().includes('gateway');
+      };
       try {
         const params = magnet
           ? { magnet }
@@ -1325,9 +1331,22 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
               })(),
               ...(isRelativeLink && externalLink && { relativeUrl: externalLink }),
             };
-        const res = await serverApi.getTorrentFileList(params);
+        let res: Awaited<ReturnType<typeof serverApi.getTorrentFileList>> | null = null;
+        let lastErr: unknown = null;
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            res = await serverApi.getTorrentFileList(params);
+            if (res?.success) break;
+            lastErr = new Error(res?.message || 'Erreur list-files');
+          } catch (e) {
+            lastErr = e;
+            if (!isRecoverablePackError(e) || attempt === 2) break;
+            await sleep(700 * (attempt + 1));
+          }
+        }
+        if (!res && lastErr) throw lastErr;
         if (cancelled) return;
-        if (res.success && Array.isArray(res.data)) {
+        if (res?.success && Array.isArray(res.data)) {
           setPackPreviewFiles(res.data);
         } else {
           setPackPreviewFiles(null);

@@ -14,7 +14,7 @@ import { refreshSyncStatusStore } from '../../lib/sync-status-store';
 import { SyncProgress } from '../setup/components/SyncProgress';
 import { SyncCard } from './components/SyncCard';
 import { useI18n } from '../../lib/i18n/useI18n';
-import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
+import TorrentCardsShadowLoader from '../ui/TorrentCardsShadowLoader';
 import { translateGenre } from '../../lib/utils/genre-translation';
 import { serverApi } from '../../lib/client/server-api';
 import { NotificationContainer } from '../ui/Notification';
@@ -388,8 +388,8 @@ export default function FilmsDashboard() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-page">
-        <HLSLoadingSpinner size="lg" />
+      <div className="min-h-screen bg-page pt-4 sm:pt-6">
+        <TorrentCardsShadowLoader rows={3} showHero />
       </div>
     );
   }
@@ -479,11 +479,12 @@ export default function FilmsDashboard() {
             primaryActionDisabled={!streamingTorrentActive && heroDownloading}
             primaryButtonLabel={streamingTorrentActive ? t('common.watch') : t('common.download')}
             primaryButtonIcon={streamingTorrentActive ? <Play className="h-6 w-6 tv:h-8 tv:w-8" size={24} /> : <Download className="h-6 w-6 tv:h-8 tv:w-8" size={24} />}
+            size="large"
           />
         </div>
       )}
 
-      <div className="pb-8 tv:pb-12 flex-1 safe-area-bottom" style={{ paddingBottom: 'max(2rem, var(--safe-area-inset-bottom))' }}>
+      <div className="pt-2 sm:pt-3 pb-8 tv:pb-12 flex-1 safe-area-bottom" style={{ paddingBottom: 'max(2rem, var(--safe-area-inset-bottom))' }}>
         {/* Section Reprendre la lecture — en tête de page */}
         {resumeFilms.length > 0 && (
           <CarouselRow title={t('dashboard.resumeWatching')} autoScroll={false}>
