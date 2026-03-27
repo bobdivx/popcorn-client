@@ -251,7 +251,28 @@ export default function TVNavigationProvider() {
       direction: 'up' | 'down' | 'left' | 'right',
       fullOrderedInScope?: HTMLElement[] | null
     ): HTMLElement | null => {
-      const candidates = getCandidatesForDirection(current, elements, direction);
+      const DIRECTION_THRESHOLD = 5;
+      let candidates = getCandidatesForDirection(current, elements, direction);
+
+      // TV : en remontant depuis le contenu, ne pas sauter au header tant qu’un focus existe au-dessus dans <main>
+      // (sinon le score spatial privilégie souvent un onglet du header aligné en X avec la carte courante)
+      if (direction === 'up' && isTvDoc()) {
+        const main = document.querySelector('main.app-main');
+        const header = document.querySelector(SITE_HEADER_SELECTOR);
+        if (main?.contains(current) && !header?.contains(current)) {
+          const curRect = current.getBoundingClientRect();
+          const cy = curRect.top + curRect.height / 2;
+          const aboveInMain = candidates.filter((el) => {
+            if (header?.contains(el)) return false;
+            if (!main?.contains(el)) return false;
+            const r = el.getBoundingClientRect();
+            return r.top + r.height / 2 < cy - DIRECTION_THRESHOLD;
+          });
+          if (aboveInMain.length > 0) {
+            candidates = aboveInMain;
+          }
+        }
+      }
 
       // TV + carrousel : gauche/droite = voisin sur la même ligne (liste déjà ordonnée dans getFocusableElements)
       if (
@@ -278,8 +299,6 @@ export default function TVNavigationProvider() {
       const currentCenterY = currentRect.top + currentRect.height / 2;
       const context = getNavigationContext(current);
 
-      // Seuils pour déterminer si un élément est dans la bonne direction
-      const DIRECTION_THRESHOLD = 5;
       // Pénalité pour la distance sur l'axe secondaire
       const SECONDARY_PENALTY = context === 'carousel' ? 3 : 2;
 
