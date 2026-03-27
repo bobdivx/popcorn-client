@@ -106,80 +106,12 @@ html[data-tv-platform] body {
   display: none;  /* Chrome, Safari et Opera */
 }
 
-/* ── LAYOUT TV OVERSCAN & SIDEBAR (masquée par défaut, ouverte via Menu ou flèche gauche) ── */
+/* ── TV : contenu sous la navbar (plus de barre latérale dédiée) ── */
 html[data-tv-platform="true"] .app-main {
-  padding-top: 0 !important;
   padding-left: 0 !important;
   padding-right: 0 !important;
   padding-bottom: max(4vh, 30px) !important;
   margin-left: 0 !important;
-  transition: none !important;
-}
-
-html[data-tv-platform="true"][data-tv-sidebar-open="true"] .app-main {
-  margin-left: 18rem !important;
-}
-
-/* Sidebar TV : hors écran par défaut ; ouverte avec data-tv-sidebar-open (JS) */
-html[data-tv-platform="true"] .sidebar-tv-rail {
-  width: 18rem !important;
-  max-width: min(18rem, 85vw) !important;
-  transform: translateX(-100%);
-  transition: none !important;
-  overflow: hidden;
-  opacity: 1 !important;
-  visibility: visible !important;
-  background: rgba(255, 255, 255, 0.07) !important;
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
-  border-right-color: rgba(255, 255, 255, 0.18) !important;
-}
-
-html[data-tv-platform="true"][data-tv-sidebar-open="true"] .sidebar-tv-rail {
-  transform: translateX(0);
-}
-
-/* Labels : uniquement quand la barre est ouverte (évite rail large + texte forcé comme sur /dashboard) */
-html[data-tv-platform="true"] .sidebar-tv-rail .sidebar-label {
-  display: none !important;
-  animation: none !important;
-}
-
-html[data-tv-platform="true"][data-tv-sidebar-open="true"] .sidebar-tv-rail .sidebar-label,
-html[data-tv-platform="true"][data-tv-dashboard-pin="true"] .sidebar-tv-rail .sidebar-label {
-  display: block !important;
-  animation: none !important;
-}
-
-html[data-tv-platform="true"] .sidebar-tv-rail nav ul {
-  align-items: stretch;
-  width: 100%;
-}
-
-html[data-tv-platform="true"] .sidebar-tv-rail nav ul > li {
-  width: 100%;
-}
-
-html[data-tv-platform="true"] .sidebar-tv-rail nav a[href] {
-  width: 100% !important;
-  max-width: 100%;
-  min-height: 3.5rem;
-  height: auto !important;
-  justify-content: flex-start !important;
-  align-items: center;
-  padding-left: 0.75rem !important;
-  padding-right: 0.75rem !important;
-  padding-top: 0.625rem !important;
-  padding-bottom: 0.625rem !important;
-  box-sizing: border-box;
-}
-
-html[data-tv-platform="true"] .sidebar-tv-rail .sidebar-tv-footer > div {
-  justify-content: flex-start !important;
-  gap: 0.75rem;
-  width: 100%;
-  padding-left: 0.25rem !important;
-  padding-right: 0.25rem !important;
 }
 
 /* Carousel horizontal : défilement tactile fluide (torrent cards, etc.) */

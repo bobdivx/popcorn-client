@@ -6,7 +6,6 @@ import { getLocalProfile, onProfileChanged } from '../../lib/client/profile';
 import Avatar from '../ui/Avatar';
 import BackendStatusBadge from './BackendStatusBadge';
 import { DsProgressRing } from '../ui/design-system';
-import { isTVPlatform } from '../../lib/utils/device-detection';
 import { calculateSyncProgress } from '../../lib/utils/sync-progress';
 import {
   getSyncStatusStore,
@@ -28,7 +27,6 @@ export default function Navbar() {
   const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState(() => getLocalProfile());
-  const isTV = isTVPlatform();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [useHamburger, setUseHamburger] = useState(false);
   const [guestMenuOpen, setGuestMenuOpen] = useState(false);
@@ -132,7 +130,7 @@ export default function Navbar() {
   // Breakpoint CSS déterministe : hamburger sous lg (1024px), onglets inline au-dessus
   // Aucune mesure de débordement JS → pas de flash, pas de chevauchement possible
   useEffect(() => {
-    if (!user || isTV) {
+    if (!user) {
       setUseHamburger(false);
       return;
     }
@@ -141,7 +139,7 @@ export default function Navbar() {
     update();
     mq.addEventListener('change', update);
     return () => mq.removeEventListener('change', update);
-  }, [user, isTV]);
+  }, [user]);
 
   useEffect(() => {
     // Horloge (mise à jour au changement de minute)
@@ -202,7 +200,6 @@ export default function Navbar() {
   ];
 
   if (loading) return null;
-  if (isTV) return null; // Ne pas afficher la top Navbar sur TV
 
   return (
     <nav
