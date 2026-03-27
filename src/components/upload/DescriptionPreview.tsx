@@ -1,4 +1,5 @@
 import type { JSX } from 'preact';
+import DOMPurify from 'isomorphic-dompurify';
 import { bbcodeToHtml, looksLikeBbcode } from '../../lib/bbcode-to-html';
 
 const PREVIEW_CLASS =
@@ -36,24 +37,28 @@ export function DescriptionPreview({
   const hasRaw = raw != null && raw.trim() !== '';
 
   if (hasHtml) {
+    // 🛡️ Sentinel: Sanitize backend HTML to prevent XSS (High Priority)
+    const sanitizedHtml = DOMPurify.sanitize(sanitizePreviewHtml(html));
     return (
       <div
         className={`${PREVIEW_CLASS} ${className}`.trim()}
         role="document"
         aria-label={ariaLabel}
-        dangerouslySetInnerHTML={{ __html: sanitizePreviewHtml(html) }}
+        dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
       />
     );
   }
 
   if (hasRaw && looksLikeBbcode(raw)) {
     const converted = bbcodeToHtml(raw);
+    // 🛡️ Sentinel: Sanitize converted BBCode HTML to prevent XSS (High Priority)
+    const sanitizedConverted = DOMPurify.sanitize(sanitizePreviewHtml(converted));
     return (
       <div
         className={`${PREVIEW_CLASS} ${className}`.trim()}
         role="document"
         aria-label={ariaLabel}
-        dangerouslySetInnerHTML={{ __html: sanitizePreviewHtml(converted) }}
+        dangerouslySetInnerHTML={{ __html: sanitizedConverted }}
       />
     );
   }

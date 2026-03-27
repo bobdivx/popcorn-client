@@ -1,0 +1,38 @@
+
+> popcorn-vercel@1.1.0 predev
+> node scripts/copy-version.js
+
+✅ VERSION.json copié dans public/
+
+> popcorn-vercel@1.1.0 dev
+> astro dev --port 4326 --host
+
+07:31:31 [types] Generated 1ms
+07:31:31 [content] Syncing content
+07:31:31 [content] Synced content
+07:31:31 [vite] Re-optimizing dependencies because vite config has changed
+
+ astro  v5.17.2 ready in 1098 ms
+
+┃ Local    http://localhost:4326/
+┃ Network  http://192.168.0.2:4326/
+
+07:31:31 watching for file changes...
+07:32:17 [ERROR] Expected "}" but found "\":true},{\""
+  Stack trace:
+    at /app/src/pages/xss-test.astro:25:707
+    [...] See full stack trace in the browser, or rerun with --verbose.
+07:32:37 [200] /xss-test 54ms
+
+🌼   daisyUI 4.12.24
+├─ ✔︎ 2 themes added		https://daisyui.com/docs/themes
+╰─ ❤︎ Support daisyUI project:	https://opencollective.com/daisyui
+
+
+🌼   daisyUI 4.12.24
+├─ ✔︎ 2 themes added		https://daisyui.com/docs/themes
+╰─ ★ Star daisyUI on GitHub	https://github.com/saadeghi/daisyui
+
+07:32:44 [404] /x 2760ms
+07:33:09 [200] /xss-test 16ms
+07:33:09 [404] /x 7ms
