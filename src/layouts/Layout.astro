@@ -4,7 +4,6 @@ import '../styles/design-system.css';
 import { ClientRouter } from 'astro:transitions';
 import ServerConnectionCheck from '../components/ServerConnectionCheck';
 import Navbar from '../components/layout/Navbar';
-import Sidebar from '../components/layout/Sidebar';
 import TVNavigationProvider from '../components/tv/TVNavigationProvider';
 import DebugPanel from '../components/debug/DebugPanel';
 import WebOSBoot from '../components/webos/WebOSBoot.astro';
@@ -184,7 +183,6 @@ const isWebOS = import.meta.env.WEBOS === 'true';
     <TVNavigationProvider client:only="preact" />
     <ServerConnectionCheck client:only="preact" />
     <Navbar client:only="preact" />
-    <Sidebar client:only="preact" />
     <DebugPanel client:only="preact" />
     <!-- Main content -->
     <main class="app-main flex-1 w-full overflow-x-hidden safe-area-top" style="padding-top: calc(5rem + var(--safe-area-inset-top));">
