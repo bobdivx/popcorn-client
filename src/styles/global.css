@@ -140,6 +140,14 @@ html[data-tv-platform="true"] .animate-fade-in-up {
   transform: none !important;
 }
 
+/* TV : utilitaires Tailwind animate-* / fade-in (arbitrary) — surcharge si ordre de bundles change */
+html[data-tv-platform="true"] [class*="animate-"],
+html[data-tv-platform="true"] [class*="fade-in"] {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
 /* TV : désactiver animations et transitions sur toute l’app (perf, même logique que le mode dashboard) */
 html[data-tv-platform="true"] *,
 html[data-tv-platform="true"] *::before,

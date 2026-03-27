@@ -860,17 +860,31 @@ export default function TVNavigationProvider() {
       }, delay);
     };
 
-    /** Toutes les plateformes TV : pas de pulse/scale/transitions lourdes (Android TV, Apple TV, webOS…). */
+    /** TV : pas d’animations sur cartes / carrousels (surcharge des styles « Netflix » et des utilitaires Tailwind). */
     const TV_PLATFORM_PERF_CSS = `
+      html[data-tv-platform="true"] [data-carousel],
+      html[data-tv-platform="true"] [data-carousel] *,
+      html[data-tv-platform="true"] .carousel-container,
+      html[data-tv-platform="true"] .carousel-container * {
+        animation: none !important;
+        transition: none !important;
+      }
+      html[data-tv-platform="true"] [class*="animate-"] {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+      }
       html[data-tv-platform="true"] [data-torrent-card],
       html[data-tv-platform="true"] .torrent-poster,
       html[data-tv-platform="true"] [data-settings-card],
       html[data-tv-platform="true"] [data-focusable-card] {
         transition: none !important;
+        animation: none !important;
       }
       html[data-tv-platform="true"] .tv-card-focused {
         transform: none !important;
         box-shadow: none !important;
+        animation: none !important;
       }
       html[data-tv-platform="true"] [data-torrent-card].tv-card-focused,
       html[data-tv-platform="true"] .torrent-poster.tv-card-focused,
@@ -922,38 +936,36 @@ export default function TVNavigationProvider() {
         --tv-focus-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4);
       }
       
-      /* Style pour les cartes (torrent, settings) */
-      [data-torrent-card],
-      .torrent-poster,
-      [data-settings-card],
-      [data-focusable-card] {
+      /* Style « Netflix » (desktop / mobile) — pas sur html[data-tv-platform] (mode perf ci-dessous) */
+      html:not([data-tv-platform="true"]) [data-torrent-card],
+      html:not([data-tv-platform="true"]) .torrent-poster,
+      html:not([data-tv-platform="true"]) [data-settings-card],
+      html:not([data-tv-platform="true"]) [data-focusable-card] {
         transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out;
       }
       
-      /* Effet Netflix pour cartes focusées */
-      .tv-card-focused {
+      html:not([data-tv-platform="true"]) .tv-card-focused {
         transform: scale(1.08) !important;
         z-index: 50 !important;
         box-shadow: var(--tv-focus-shadow) !important;
       }
       
-      /* Cartes torrent / poster : halo blanc scintillant (pas de box-shadow violet) */
-      [data-torrent-card].tv-card-focused,
-      .torrent-poster.tv-card-focused,
-      [data-settings-card].tv-card-focused {
+      html:not([data-tv-platform="true"]) [data-torrent-card].tv-card-focused,
+      html:not([data-tv-platform="true"]) .torrent-poster.tv-card-focused,
+      html:not([data-tv-platform="true"]) [data-settings-card].tv-card-focused {
         box-shadow: unset !important;
         outline: 4px solid rgba(255, 255, 255, 0.4) !important;
         outline-offset: 4px !important;
         border-radius: 0.5rem !important;
         animation: tv-halo-pulse 2s ease-in-out infinite !important;
       }
-      [data-settings-card].tv-card-focused {
+      html:not([data-tv-platform="true"]) [data-settings-card].tv-card-focused {
         border-radius: var(--ds-radius-lg) !important;
       }
-      [data-torrent-card]:focus-visible,
-      [data-torrent-card]:focus-within,
-      .torrent-poster:focus-visible,
-      .torrent-poster:focus-within {
+      html:not([data-tv-platform="true"]) [data-torrent-card]:focus-visible,
+      html:not([data-tv-platform="true"]) [data-torrent-card]:focus-within,
+      html:not([data-tv-platform="true"]) .torrent-poster:focus-visible,
+      html:not([data-tv-platform="true"]) .torrent-poster:focus-within {
         outline: 2px solid rgba(255, 255, 255, 0.4) !important;
         outline-offset: 2px !important;
         border-radius: 0.5rem !important;
@@ -961,41 +973,43 @@ export default function TVNavigationProvider() {
         animation: tv-halo-pulse 2s ease-in-out infinite !important;
       }
       
-      /* Cartes adjacentes assombries */
-      [data-carousel]:has(.tv-card-focused) [data-torrent-card]:not(.tv-card-focused),
-      [data-carousel]:has(.tv-card-focused) .torrent-poster:not(.tv-card-focused),
-      .grid:has(.tv-card-focused) [data-settings-card]:not(.tv-card-focused):not(:focus-within) {
+      html:not([data-tv-platform="true"]) [data-carousel]:has(.tv-card-focused) [data-torrent-card]:not(.tv-card-focused),
+      html:not([data-tv-platform="true"]) [data-carousel]:has(.tv-card-focused) .torrent-poster:not(.tv-card-focused),
+      html:not([data-tv-platform="true"]) .grid:has(.tv-card-focused) [data-settings-card]:not(.tv-card-focused):not(:focus-within) {
         opacity: 0.7;
       }
       
-      /* Focus visible global : halo blanc scintillant (boutons, liens, inputs) */
-      .tv-element-focused,
-      a:focus-visible,
-      button:focus-visible,
-      input:focus-visible,
-      select:focus-visible,
-      textarea:focus-visible,
-      [tabindex]:focus-visible {
+      html:not([data-tv-platform="true"]) .tv-element-focused,
+      html:not([data-tv-platform="true"]) a:focus-visible,
+      html:not([data-tv-platform="true"]) button:focus-visible,
+      html:not([data-tv-platform="true"]) input:focus-visible,
+      html:not([data-tv-platform="true"]) select:focus-visible,
+      html:not([data-tv-platform="true"]) textarea:focus-visible,
+      html:not([data-tv-platform="true"]) [tabindex]:focus-visible {
         outline: 3px solid var(--tv-focus-color) !important;
         outline-offset: 2px !important;
         box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4) !important;
         animation: tv-halo-pulse 2s ease-in-out infinite !important;
       }
       
-      /* Masquer le halo sur les éléments à l’intérieur des cartes (le halo est sur la carte) */
-      .tv-card-focused a:focus-visible,
-      .tv-card-focused button:focus-visible,
-      [data-torrent-card] a:focus-visible,
-      [data-torrent-card] button:focus-visible,
-      .torrent-poster a:focus-visible,
-      .torrent-poster button:focus-visible {
+      html:not([data-tv-platform="true"]) .tv-card-focused a:focus-visible,
+      html:not([data-tv-platform="true"]) .tv-card-focused button:focus-visible,
+      html:not([data-tv-platform="true"]) [data-torrent-card] a:focus-visible,
+      html:not([data-tv-platform="true"]) [data-torrent-card] button:focus-visible,
+      html:not([data-tv-platform="true"]) .torrent-poster a:focus-visible,
+      html:not([data-tv-platform="true"]) .torrent-poster button:focus-visible {
         outline: none !important;
         box-shadow: none !important;
         animation: none !important;
       }
       
-      /* Animation de transition pour le focus */
-      a, button, input, select, textarea, [tabindex], [data-focusable] {
+      html:not([data-tv-platform="true"]) a,
+      html:not([data-tv-platform="true"]) button,
+      html:not([data-tv-platform="true"]) input,
+      html:not([data-tv-platform="true"]) select,
+      html:not([data-tv-platform="true"]) textarea,
+      html:not([data-tv-platform="true"]) [tabindex],
+      html:not([data-tv-platform="true"]) [data-focusable] {
         transition: outline 0.15s ease-out, outline-offset 0.15s ease-out;
       }
 
@@ -1039,53 +1053,59 @@ export default function TVNavigationProvider() {
           --tv-focus-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4);
         }
         
-        [data-torrent-card],
-        .torrent-poster,
-        [data-settings-card],
-        [data-focusable-card] {
+        html:not([data-tv-platform="true"]) [data-torrent-card],
+        html:not([data-tv-platform="true"]) .torrent-poster,
+        html:not([data-tv-platform="true"]) [data-settings-card],
+        html:not([data-tv-platform="true"]) [data-focusable-card] {
           transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.2s ease-out;
         }
         
-        .tv-card-focused {
+        html:not([data-tv-platform="true"]) .tv-card-focused {
           transform: scale(1.08) !important;
           z-index: 50 !important;
           box-shadow: var(--tv-focus-shadow) !important;
         }
         
-        [data-torrent-card].tv-card-focused,
-        .torrent-poster.tv-card-focused,
-        [data-settings-card].tv-card-focused {
+        html:not([data-tv-platform="true"]) [data-torrent-card].tv-card-focused,
+        html:not([data-tv-platform="true"]) .torrent-poster.tv-card-focused,
+        html:not([data-tv-platform="true"]) [data-settings-card].tv-card-focused {
           box-shadow: unset !important;
           outline: 4px solid rgba(255, 255, 255, 0.4) !important;
           outline-offset: 4px !important;
           border-radius: 0.5rem !important;
           animation: tv-halo-pulse 2s ease-in-out infinite !important;
         }
-        [data-settings-card].tv-card-focused {
+        html:not([data-tv-platform="true"]) [data-settings-card].tv-card-focused {
           border-radius: var(--ds-radius-lg) !important;
         }
         
-        .tv-element-focused,
-        a:focus-visible,
-        button:focus-visible,
-        input:focus-visible,
-        select:focus-visible,
-        textarea:focus-visible,
-        [tabindex]:focus-visible {
+        html:not([data-tv-platform="true"]) .tv-element-focused,
+        html:not([data-tv-platform="true"]) a:focus-visible,
+        html:not([data-tv-platform="true"]) button:focus-visible,
+        html:not([data-tv-platform="true"]) input:focus-visible,
+        html:not([data-tv-platform="true"]) select:focus-visible,
+        html:not([data-tv-platform="true"]) textarea:focus-visible,
+        html:not([data-tv-platform="true"]) [tabindex]:focus-visible {
           outline: 3px solid var(--tv-focus-color) !important;
           outline-offset: 2px !important;
           box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4) !important;
           animation: tv-halo-pulse 2s ease-in-out infinite !important;
         }
         
-        .tv-card-focused a:focus-visible,
-        .tv-card-focused button:focus-visible {
+        html:not([data-tv-platform="true"]) .tv-card-focused a:focus-visible,
+        html:not([data-tv-platform="true"]) .tv-card-focused button:focus-visible {
           outline: none !important;
           box-shadow: none !important;
           animation: none !important;
         }
         
-        a, button, input, select, textarea, [tabindex], [data-focusable] {
+        html:not([data-tv-platform="true"]) a,
+        html:not([data-tv-platform="true"]) button,
+        html:not([data-tv-platform="true"]) input,
+        html:not([data-tv-platform="true"]) select,
+        html:not([data-tv-platform="true"]) textarea,
+        html:not([data-tv-platform="true"]) [tabindex],
+        html:not([data-tv-platform="true"]) [data-focusable] {
           transition: outline 0.15s ease-out, outline-offset 0.15s ease-out;
         }
 
