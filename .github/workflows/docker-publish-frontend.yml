@@ -304,6 +304,18 @@ jobs:
           echo "reachable=false" >> $GITHUB_OUTPUT
           exit 1
 
+      - name: Compute build metadata
+        id: build_meta
+        run: |
+          SHORT_SHA="$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          VERSION="${{ steps.increment_version.outputs.version || steps.version.outputs.version }}"
+          if [ -z "${VERSION}" ] || [ "${VERSION}" = "null" ]; then
+            VERSION="$(jq -r '.client.version' VERSION.json 2>/dev/null || echo "1.0.0")"
+          fi
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "✅ Build metadata: short_sha=${SHORT_SHA}, version=${VERSION}"
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
@@ -314,6 +326,8 @@ jobs:
             type=raw,value=v${{ steps.increment_version.outputs.version || steps.version.outputs.version }},enable=${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
             type=raw,value=latest,enable=${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
             type=raw,value=dev,enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/dev' }}
+            type=raw,value=dev-${{ steps.build_meta.outputs.short_sha }},enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/dev' }}
+            type=raw,value=dev-v${{ steps.build_meta.outputs.version }},enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/dev' }}
             type=semver,pattern={{version}},enable=${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') }}
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') }}
             type=semver,pattern={{major}},enable=${{ github.event_name != 'pull_request' && startsWith(github.ref, 'refs/tags/v') }}
@@ -339,6 +353,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_GIT_SHA=${{ github.sha }}
+            APP_BUILD_REF=${{ github.ref_name }}
           cache-from: type=registry,ref=${{ steps.check_creds.outputs.username }}/popcorn-frontend:buildcache
           cache-to: type=registry,ref=${{ steps.check_creds.outputs.username }}/popcorn-frontend:buildcache,mode=max
           platforms: linux/amd64,linux/arm64
@@ -354,6 +371,9 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_GIT_SHA=${{ github.sha }}
+            APP_BUILD_REF=${{ github.ref_name }}
           cache-from: type=registry,ref=${{ steps.check_creds.outputs.username }}/popcorn-frontend:buildcache
           cache-to: type=registry,ref=${{ steps.check_creds.outputs.username }}/popcorn-frontend:buildcache,mode=max
           platforms: linux/amd64,linux/arm64
@@ -375,6 +395,9 @@ jobs:
           push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_GIT_SHA=${{ github.sha }}
+            APP_BUILD_REF=${{ github.ref_name }}
           platforms: linux/amd64,linux/arm64
 
       - name: Log success

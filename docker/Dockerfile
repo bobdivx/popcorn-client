@@ -29,6 +29,9 @@ RUN npm run build
 # Stage 2: Runtime avec nginx
 FROM nginx:alpine
 
+ARG APP_GIT_SHA=unknown
+ARG APP_BUILD_REF=unknown
+
 # Copier les fichiers statiques buildés depuis le stage builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
@@ -41,5 +44,8 @@ COPY docker/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 EXPOSE 80
+
+ENV APP_GIT_SHA=${APP_GIT_SHA}
+ENV APP_BUILD_REF=${APP_BUILD_REF}
 
 ENTRYPOINT ["/docker-entrypoint.sh"]

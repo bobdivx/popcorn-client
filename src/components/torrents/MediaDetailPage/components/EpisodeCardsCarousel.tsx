@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { ChevronLeft, ChevronRight, CircleCheck, Play } from 'lucide-preact';
+import { isTVPlatform } from '../../../../lib/utils/device-detection';
 
 export interface EpisodeCarouselItem {
   key: string;
@@ -28,7 +29,11 @@ export function EpisodeCardsCarousel({
   useEffect(() => {
     if (!selectedKey) return;
     const el = scrollerRef.current?.querySelector<HTMLElement>(`[data-episode-card="${CSS.escape(selectedKey)}"]`);
-    el?.scrollIntoView?.({ block: 'nearest', inline: 'center' });
+    el?.scrollIntoView?.({
+      block: 'nearest',
+      inline: 'center',
+      behavior: isTVPlatform() ? 'auto' : 'smooth',
+    });
   }, [selectedKey]);
 
   const scrollByCards = (dir: -1 | 1) => {
@@ -36,7 +41,10 @@ export function EpisodeCardsCarousel({
     if (!el) return;
     const card = el.querySelector<HTMLElement>('[data-episode-card]');
     const cardWidth = card ? card.getBoundingClientRect().width : 320;
-    el.scrollBy({ left: dir * (cardWidth + 16) * 2, behavior: 'smooth' });
+    el.scrollBy({
+      left: dir * (cardWidth + 16) * 2,
+      behavior: isTVPlatform() ? 'auto' : 'smooth',
+    });
   };
 
   return (

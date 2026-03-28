@@ -22,7 +22,7 @@
 :root {
   --bg-primary: #121212; /* Anthracite */
   /* Fond unifié de toutes les pages (identique à /settings) */
-  --page-bg: #12141a;
+  --page-bg: #000000;
   --bg-glass: rgba(255, 255, 255, 0.05); /* Verre dépoli */
   --bg-glass-hover: rgba(255, 255, 255, 0.1);
   --bg-glass-active: rgba(255, 255, 255, 0.15);
@@ -106,6 +106,14 @@ html[data-tv-platform] body {
   display: none;  /* Chrome, Safari et Opera */
 }
 
+/* ── TV : contenu sous la navbar (plus de barre latérale dédiée) ── */
+html[data-tv-platform="true"] .app-main {
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-bottom: max(4vh, 30px) !important;
+  margin-left: 0 !important;
+}
+
 /* Carousel horizontal : défilement tactile fluide (torrent cards, etc.) */
 .carousel-container {
   -webkit-overflow-scrolling: touch; /* Momentum scroll sur iOS */
@@ -113,6 +121,39 @@ html[data-tv-platform] body {
   touch-action: pan-x pan-y;         /* Autorise swipe horizontal ET vertical (page) */
   /* Garder overflow-y visible pour ne pas couper la bordure de focus en haut/bas */
   overflow-y: visible !important;
+}
+
+/* webOS : scroll horizontal piloté en JS (scrollLeft) — pas de scroll-behavior: smooth CSS qui double le coût */
+html[data-webos="true"] .carousel-container {
+  scroll-behavior: auto !important;
+}
+
+/* Toutes les TV : même principe (scroll instantané, moins de travail moteur à chaque flèche) */
+html[data-tv-platform="true"] .carousel-container {
+  scroll-behavior: auto !important;
+}
+
+/* TV : pas d’animation d’entrée sur les lignes de carrousel (classe ajoutée par IntersectionObserver hors TV) */
+html[data-tv-platform="true"] .animate-fade-in-up {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* TV : utilitaires Tailwind animate-* / fade-in (arbitrary) — surcharge si ordre de bundles change */
+html[data-tv-platform="true"] [class*="animate-"],
+html[data-tv-platform="true"] [class*="fade-in"] {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+
+/* TV : désactiver animations et transitions sur toute l’app (perf, même logique que le mode dashboard) */
+html[data-tv-platform="true"] *,
+html[data-tv-platform="true"] *::before,
+html[data-tv-platform="true"] *::after {
+  animation: none !important;
+  transition: none !important;
 }
 
 /* Page Demandes : éviter que la bordure de focus soit coupée (conteneur + cartes) */
@@ -1068,6 +1109,35 @@ html[data-tv-platform] body {
     @apply hover:scale-105 transition-all duration-200;
     box-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3);
   }
+
+/* Animation douce de glow pour les cartes dashboard au hover/focus */
+.card-glow-shell {
+  /* Outline (pas rogné par overflow-hidden), donc visible même sur les overlays */
+  outline: 2px solid rgba(168, 85, 247, 0);
+  outline-offset: -2px;
+  will-change: outline-color, box-shadow;
+}
+
+@keyframes card-glow-pulse {
+  0% {
+    outline-color: rgba(168, 85, 247, 0);
+    box-shadow: 0 0 0 rgba(168, 85, 247, 0);
+  }
+  50% {
+    outline-color: rgba(168, 85, 247, 0.65);
+    box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.45), 0 0 18px rgba(168, 85, 247, 0.35), 0 0 36px rgba(168, 85, 247, 0.18);
+  }
+  100% {
+    outline-color: rgba(168, 85, 247, 0);
+    box-shadow: 0 0 0 rgba(168, 85, 247, 0);
+  }
+}
+
+.group:hover .card-glow-shell,
+.group:focus-within .card-glow-shell,
+.torrent-poster:hover .card-glow-shell,
+.torrent-poster:focus-within .card-glow-shell {
+  animation: card-glow-pulse 1.7s ease-in-out infinite;
 }
 
 /* Détection TV et désactivation hover */
@@ -1081,11 +1151,6 @@ html[data-tv-platform] body {
 /* Styles optimisés pour Android TV - Breakpoint 1280px+ */
 /* Animations adaptées pour TV - Plus lentes et plus visibles */
 @media (min-width: 1280px) {
-  /* Hero dashboard : hauteur réduite pour que la première ligne de cartes soit visible sans être coupée (720p/1080p) */
-  .hero-dashboard {
-    height: clamp(280px, 39vh, 420px) !important;
-  }
-
   .animate-fade-in {
     animation-duration: 0.6s;
   }
@@ -1921,4 +1986,7 @@ form button[type="submit"]:focus-visible,
   background-color: rgba(109, 40, 217, 0.06) !important;
   border-color: rgba(109, 40, 217, 0.14) !important;
   color: #1a1530 !important;
+}
+
+/* Fermeture de la layer utilities (@layer utilities) */
 }

@@ -4,6 +4,7 @@ import { useI18n } from '../../../lib/i18n/useI18n';
 import { getHighQualityTmdbImageUrl } from '../../../lib/utils/tmdb-images';
 import { getDisplayTitle } from '../../../lib/utils/title-display';
 import { YouTubeVideoPlayer } from '../../ui/YouTubeVideoPlayer';
+import { isTVPlatform } from '../../../lib/utils/device-detection';
 
 interface HeroSectionProps {
   items: ContentItem[];
@@ -18,6 +19,8 @@ interface HeroSectionProps {
   primaryActionDisabled?: boolean;
   /** Ne pas remonter sous l'élément au-dessus (ex: barre switch) — désactive les marges négatives */
   noOverlap?: boolean;
+  /** Taille du hero (default ou large pour dashboard). */
+  size?: 'default' | 'large';
 }
 
 const MIN_SWIPE_DISTANCE = 50;
@@ -30,6 +33,7 @@ export function HeroSection({
   onPrimaryAction,
   primaryActionDisabled = false,
   noOverlap = false,
+  size = 'default',
 }: HeroSectionProps) {
   const { t } = useI18n();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -163,18 +167,150 @@ export function HeroSection({
   const rawImageUrl = imageUrls[currentItem.id] || currentItem.poster || currentItem.backdrop;
   const currentImageUrl = getHighQualityTmdbImageUrl(rawImageUrl) ?? rawImageUrl;
   const currentTrailerKey = trailerKeys[currentItem.id];
+  const isTV = isTVPlatform();
+  const isLargeHero = size === 'large';
+  
+  // Sur TV, le hero doit être plus imposant (billboard)
+  const tvHeroHeight = isLargeHero ? 'max(70vh, 500px)' : 'clamp(320px, 50vh, 560px)';
+  const heroHeight = isTV ? tvHeroHeight : (isLargeHero ? 'clamp(340px, 52vh, 640px)' : 'clamp(320px, 50vh, 560px)');
 
   return (
     <div
-      className={`hero-dashboard relative z-0 w-full mb-8 overflow-hidden touch-pan-y ${noOverlap ? '' : '-mt-8 sm:-mt-20 md:-mt-32'}`}
+      className={`hero-dashboard relative z-0 w-full mb-8 touch-pan-y ${
+        (isLargeHero && !isTV) ? 'px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16' : ''
+      }`}
       data-dark-context
       style={{
-        height: 'clamp(320px, 50vh, 560px)',
         touchAction: 'pan-y',
       }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
     >
+      <div
+        className={`relative w-full overflow-hidden ${isLargeHero && !isTV ? 'rounded-2xl border border-white/10' : ''}`}
+        style={{ height: heroHeight }}
+      >
+      {isLargeHero ? (
+        <div className="relative h-full">
+          {/* ─── Couche fond : vidéo ou image ─── */}
+          {isPlayingTrailer && currentTrailerKey ? (
+            <div key={`trailer-${currentIndex}`} className="absolute inset-0 hero-slide-enter">
+              <YouTubeVideoPlayer
+                youtubeKey={currentTrailerKey}
+                autoplay={true}
+                muted={true}
+                loop={false}
+                controls={false}
+                cover={true}
+                className="w-full h-full"
+                onEnded={() => setIsPlayingTrailer(false)}
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/65 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/70" />
+            </div>
+          ) : (
+            <div
+              key={`bg-${currentIndex}`}
+              className="absolute inset-0 bg-cover bg-center hero-slide-enter"
+              style={{
+                backgroundImage: currentImageUrl || currentItem.backdrop ? `url(${currentImageUrl || currentItem.backdrop})` : 'none',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/65 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/70" />
+            </div>
+          )}
+
+          {/* ─── Contenu : deux zones (texte + barre d’actions) ─── */}
+          <div
+            key={`content-${currentIndex}`}
+            className="absolute inset-0 z-10 flex flex-col pt-8"
+          >
+            <div className={`flex-1 min-h-0 flex flex-col justify-end pb-3 overflow-hidden hero-slide-enter ${isTV ? 'px-12 tv:px-24' : 'px-4 sm:px-6 lg:px-16'}`}>
+              <div className="max-w-2xl tv:max-w-4xl w-full flex flex-col gap-2 sm:gap-4 tv:gap-6">
+                <div className={`flex flex-wrap items-center gap-2 sm:gap-3 text-white/95 ${isTV ? 'text-lg tv:text-xl' : ''}`}>
+                  <span className="text-xs sm:text-sm font-semibold uppercase tracking-wide">
+                    {currentItem.type === 'movie' ? t('common.film') : currentItem.type === 'tv' ? t('common.serie') : t('common.content')}
+                  </span>
+                  {(currentItem.year ?? (currentItem.releaseDate ? String(currentItem.releaseDate).slice(0, 4) : null)) && (
+                    <>
+                      <span className="text-white/50">•</span>
+                      <span className="text-xs sm:text-sm">{currentItem.year ?? String(currentItem.releaseDate || '').slice(0, 4)}</span>
+                    </>
+                  )}
+                  {currentItem.rating != null && (
+                    <>
+                      <span className="text-white/50">•</span>
+                      <span className="text-xs sm:text-sm">⭐ {Number(currentItem.rating).toFixed(1)}</span>
+                    </>
+                  )}
+                </div>
+
+                {currentItem.logo && (
+                  <img
+                    src={currentItem.logo}
+                    alt=""
+                    className="max-h-7 sm:max-h-8 md:max-h-10 lg:max-h-12 w-auto object-contain object-left drop-shadow-2xl"
+                    style={{ maxWidth: 'min(14rem, 60vw)' }}
+                  />
+                )}
+
+                <h1 className={`font-bold drop-shadow-2xl line-clamp-2 ${
+                  currentItem.logo
+                    ? 'text-base sm:text-lg md:text-xl lg:text-2xl tv:text-3xl text-white/95'
+                    : 'text-xl sm:text-2xl md:text-3xl lg:text-4xl tv:text-5xl text-white'
+                }`}>
+                  {getDisplayTitle(currentItem) || currentItem.title || ''}
+                </h1>
+
+                {currentItem.overview && (
+                  <p className="text-xs sm:text-sm tv:text-base text-white/80 line-clamp-2 drop-shadow-lg max-w-xl">
+                    {currentItem.overview}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className={`flex-shrink-0 py-3 sm:py-4 bg-gradient-to-t from-black/95 via-black/85 to-transparent backdrop-blur-[2px] hero-slide-enter ${isTV ? 'px-12 tv:px-24' : 'px-4 sm:px-6 lg:px-16'}`}>
+              <div className="max-w-2xl tv:max-w-4xl w-full flex flex-col sm:flex-row sm:items-center sm:justify-start gap-3">
+                <div className="flex flex-col xs:flex-row gap-3 tv:gap-6">
+                  <button
+                    onClick={handlePrimaryAction}
+                    data-focusable
+                    tabIndex={0}
+                    disabled={primaryActionDisabled}
+                    aria-busy={primaryActionDisabled}
+                    className="w-full xs:w-auto gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center justify-center gap-2.5 px-5 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base tv:text-xl tv:px-10 tv:py-5 tv:min-h-[68px] font-bold border border-violet-500/40 hover:border-violet-400/60 hover:bg-violet-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {primaryButtonIcon ?? (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M8 5v14l11-7z"/>
+                      </svg>
+                    )}
+                    {resolvedPrimaryLabel}
+                  </button>
+                  <button
+                    onClick={() => handleMoreInfo(currentItem)}
+                    data-focusable
+                    tabIndex={0}
+                    className="w-full xs:w-auto gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center justify-center gap-2.5 px-5 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base tv:text-xl tv:px-8 tv:py-4 tv:min-h-[68px]"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    {t('common.details')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+      <>
       {/* Animation de fondu entre les slides */}
       <style>{`
         @keyframes hero-slide-fade {
@@ -199,8 +335,9 @@ export function HeroSection({
             className="w-full h-full"
             onEnded={() => setIsPlayingTrailer(false)}
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/50 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/30 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/65 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/70" />
         </div>
       ) : (
         <div
@@ -212,8 +349,9 @@ export function HeroSection({
             backgroundPosition: 'center',
           }}
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/65 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/45 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/70" />
         </div>
       )}
 
@@ -273,7 +411,7 @@ export function HeroSection({
         </div>
 
         {/* Zone 2 : barre d’actions — hauteur fixe, toujours visible en bas */}
-        <div className="flex-shrink-0 px-4 sm:px-6 lg:px-16 tv:px-24 py-3 sm:py-4 bg-gradient-to-t from-black/95 via-black/80 to-transparent hero-slide-enter">
+        <div className="flex-shrink-0 px-4 sm:px-6 lg:px-16 tv:px-24 py-3 sm:py-4 bg-gradient-to-t from-black/95 via-black/85 to-transparent backdrop-blur-[2px] hero-slide-enter">
           <div className="max-w-2xl tv:max-w-3xl w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="flex flex-col xs:flex-row gap-2 sm:gap-3">
               <button
@@ -282,7 +420,7 @@ export function HeroSection({
                 tabIndex={0}
                 disabled={primaryActionDisabled}
                 aria-busy={primaryActionDisabled}
-                className="w-full xs:w-auto bg-primary hover:bg-primary-700 text-white px-5 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold text-sm sm:text-base flex items-center justify-center gap-2 transition-all shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-transparent min-h-[42px] sm:min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full xs:w-auto gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center justify-center gap-2.5 px-5 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base tv:text-xl tv:px-10 tv:py-5 tv:min-h-[68px] font-bold border border-violet-500/40 hover:border-violet-400/60 hover:bg-violet-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {primaryButtonIcon ?? (
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
@@ -295,7 +433,7 @@ export function HeroSection({
                 onClick={() => handleMoreInfo(currentItem)}
                 data-focusable
                 tabIndex={0}
-                className="w-full xs:w-auto bg-white/20 hover:bg-white/30 text-white px-5 py-2.5 sm:px-6 sm:py-3 rounded-lg font-semibold text-sm sm:text-base flex items-center justify-center gap-2 transition-all border border-white/40 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-transparent min-h-[42px] sm:min-h-[44px]"
+                className="w-full xs:w-auto gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center justify-center gap-2.5 px-5 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base tv:text-xl tv:px-8 tv:py-4 tv:min-h-[68px]"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -303,25 +441,11 @@ export function HeroSection({
                 {t('common.details')}
               </button>
             </div>
-            {items.length > 1 && (
-              <div className="flex justify-center sm:justify-end gap-1.5" role="tablist" aria-label={t('dashboard.carouselIndicators')}>
-                {items.map((_, index) => (
-                  <button
-                    key={index}
-                    type="button"
-                    role="tab"
-                    aria-selected={index === currentIndex}
-                    aria-label={`${t('dashboard.goToContent')} ${index + 1}`}
-                    onClick={() => setCurrentIndex(index)}
-                    className={`h-1.5 sm:h-2 rounded-full transition-all ${
-                      index === currentIndex ? 'w-6 sm:w-7 bg-white' : 'w-1.5 sm:w-2 bg-white/50 hover:bg-white/70'
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
           </div>
         </div>
+      </div>
+      </>
+      )}
       </div>
     </div>
   );

@@ -45,3 +45,10 @@ src-tauri/gen/
 *.aab
 
 # WebOS : tout est dans popcorn-tauri/webos/
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/

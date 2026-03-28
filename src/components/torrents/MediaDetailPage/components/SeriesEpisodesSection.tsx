@@ -34,6 +34,7 @@ export function SeriesEpisodesSection({
   const hasSavedPosition = savedPlaybackPosition != null && savedPlaybackPosition > 0;
   /** Clés : `${season}:${episodeNumber}` (TMDB par saison ; numéros d'épisode peuvent se répéter entre saisons). */
   const [tmdbStillBySeasonEpisode, setTmdbStillBySeasonEpisode] = useState<Record<string, string>>({});
+  const [tmdbNameBySeasonEpisode, setTmdbNameBySeasonEpisode] = useState<Record<string, string>>({});
 
   const seasonListKey = useMemo(
     () => seriesEpisodes.seasons.map((s) => s.season).join(','),
@@ -44,15 +45,18 @@ export function SeriesEpisodesSection({
     let cancelled = false;
     if (typeof tmdbId !== 'number') {
       setTmdbStillBySeasonEpisode({});
+      setTmdbNameBySeasonEpisode({});
       return;
     }
     const seasons = seriesEpisodes.seasons.map((s) => s.season);
     if (seasons.length === 0) {
       setTmdbStillBySeasonEpisode({});
+      setTmdbNameBySeasonEpisode({});
       return;
     }
     (async () => {
       const merged: Record<string, string> = {};
+      const names: Record<string, string> = {};
       await Promise.all(
         seasons.map(async (seasonNum) => {
           const res = await serverApi.getTmdbTvSeasonDetail(tmdbId, seasonNum, 'fr-FR');
@@ -65,10 +69,17 @@ export function SeriesEpisodesSection({
             if (num && stillPath) {
               merged[`${seasonNum}:${num}`] = `https://image.tmdb.org/t/p/w780${stillPath}`;
             }
+            if (num) {
+              const episodeName = typeof ep?.name === 'string' ? ep.name.trim() : '';
+              if (episodeName) names[`${seasonNum}:${num}`] = episodeName;
+            }
           }
         }),
       );
-      if (!cancelled) setTmdbStillBySeasonEpisode(merged);
+      if (!cancelled) {
+        setTmdbStillBySeasonEpisode(merged);
+        setTmdbNameBySeasonEpisode(names);
+      }
     })();
     return () => {
       cancelled = true;
@@ -147,11 +158,15 @@ export function SeriesEpisodesSection({
               ariaLabel={`${t('mediaDetail.seasonNumber', { number: seasonNum })} — ${t('mediaDetail.episodes')}`}
               items={episodes.map((ep) => {
                 const isSelected = selectedEpisodeVariantId === ep.id;
+                const tmdbEpisodeName =
+                  ep.episode === 0 ? null : tmdbNameBySeasonEpisode[`${ep.season}:${ep.episode}`] ?? null;
                 const title =
                   ep.episode === 0
                     ? t('mediaDetail.fullPack')
-                    : ep.name?.trim()
-                      ? t('mediaDetail.episodeWithTitle', { number: ep.episode, title: ep.name })
+                    : tmdbEpisodeName
+                      ? t('mediaDetail.episodeWithTitle', { number: ep.episode, title: tmdbEpisodeName })
+                      : ep.name?.trim()
+                        ? t('mediaDetail.episodeWithTitle', { number: ep.episode, title: ep.name })
                       : t('mediaDetail.episodeNumber', { number: ep.episode });
 
                 const watched =

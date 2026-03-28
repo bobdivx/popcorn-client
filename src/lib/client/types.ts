@@ -135,6 +135,8 @@ export interface ContentItem {
     fileSize?: number;
   }>; // Multi-sources : agrégation de plusieurs trackers
   trailerUrl?: string; // URL du trailer pour animation immersive
+  /** True quand le torrent semble être une saison/série complète (INTÉGRALE, COMPLETE, etc.). */
+  isCompletePack?: boolean;
 }
 
 export interface FilmData extends ContentItem {

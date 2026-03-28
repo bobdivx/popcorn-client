@@ -14,7 +14,7 @@ import { refreshSyncStatusStore } from '../../lib/sync-status-store';
 import { SyncProgress } from '../setup/components/SyncProgress';
 import { SyncCard } from './components/SyncCard';
 import { useI18n } from '../../lib/i18n/useI18n';
-import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
+import TorrentCardsShadowLoader from '../ui/TorrentCardsShadowLoader';
 import { translateGenre } from '../../lib/utils/genre-translation';
 import { serverApi } from '../../lib/client/server-api';
 import { NotificationContainer } from '../ui/Notification';
@@ -23,6 +23,7 @@ import { resolveHeroTorrent } from './utils/heroDownload';
 import { handleDownload } from '../torrents/MediaDetailPage/actions/download';
 import { useSubscriptionMe } from '../torrents/MediaDetailPage/hooks/useSubscriptionMe';
 import Library from '../Library';
+import { isTVPlatform } from '../../lib/utils/device-detection';
 
 const MIN_ITEMS_PER_GENRE_ROW = 10;
 // Certains genres (ex: "Animation") doivent rester visibles même avec peu d'éléments.
@@ -76,6 +77,7 @@ export default function FilmsDashboard() {
   const [autoViewChecked, setAutoViewChecked] = useState(false);
   const switchTorrentRef = useRef<HTMLButtonElement>(null);
   const switchLibraryRef = useRef<HTMLButtonElement>(null);
+  const [isTV] = useState(() => typeof window !== 'undefined' && isTVPlatform());
 
   const setViewModeAndUrl = useCallback((mode: 'torrents' | 'library') => {
     setViewMode(mode);
@@ -90,15 +92,15 @@ export default function FilmsDashboard() {
     }
   }, []);
 
-  // À l'arrivée sur la page, focus sur le switch (accessible télécommande / clavier)
+  // À l'arrivée sur la page, focus sur le switch (accessible télécommande / clavier) — pas sur TV (switch masqué)
   useEffect(() => {
-    if (loading) return;
+    if (loading || isTV) return;
     const el = viewMode === 'torrents' ? switchTorrentRef.current : switchLibraryRef.current;
     if (el) {
       const t = setTimeout(() => el.focus(), 0);
       return () => clearTimeout(t);
     }
-  }, [loading, viewMode]);
+  }, [loading, viewMode, isTV]);
 
   // Au montage : mise à jour du statut sync pour l’affichage (Films 0 / Séries 0).
   useEffect(() => {
@@ -253,7 +255,7 @@ export default function FilmsDashboard() {
       <div className="min-h-screen bg-page text-white flex flex-col">
         <NotificationContainer notifications={notifications} onRemove={removeNotification} />
         {showSyncBar && <SyncProgress compact externalStatus={syncStatus} />}
-        <div className={switchBarClasses}>{renderViewToggle()}</div>
+        {!isTV && <div className={switchBarClasses}>{renderViewToggle()}</div>}
         <div className="pb-8 tv:pb-12 flex-1 safe-area-bottom" style={{ paddingBottom: 'max(2rem, var(--safe-area-inset-bottom))' }}>
           <Library initialContentFilter="movies" showHero={false} showFilters={false} showSync={false} />
         </div>
@@ -388,8 +390,8 @@ export default function FilmsDashboard() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-page">
-        <HLSLoadingSpinner size="lg" />
+      <div className="min-h-screen bg-page pt-4 sm:pt-6">
+        <TorrentCardsShadowLoader rows={3} showHero />
       </div>
     );
   }
@@ -460,18 +462,20 @@ export default function FilmsDashboard() {
       {/* Barre de progression compacte en haut quand sync en cours */}
       {showSyncBar && <SyncProgress compact externalStatus={syncStatus} />}
       {/* Switch : barre sous le header quand pas de hero */}
-      {heroItemsWithOverview.length === 0 && (
+      {heroItemsWithOverview.length === 0 && !isTV && (
         <div className={switchBarClasses}>{renderViewToggle()}</div>
       )}
 
-      {/* Section Hero : switch à droite de la carte (mobile, tablette, PC), aligné en haut à droite */}
+      {/* Section Hero : switch à droite de la carte (mobile, tablette, PC), aligné en haut à droite — masqué sur TV */}
       {heroItemsWithOverview.length > 0 && (
         <div className="relative">
-          <div className="absolute top-3 right-3 sm:top-4 sm:right-4 md:top-5 md:right-5 z-30 flex items-center justify-end w-auto max-w-[calc(100%-1.5rem)] sm:max-w-none">
-            <div className="bg-black/60 backdrop-blur-sm rounded-full border border-white/20 p-1 shadow-lg">
-              {renderViewToggle()}
+          {!isTV && (
+            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 md:top-5 md:right-5 z-30 flex items-center justify-end w-auto max-w-[calc(100%-1.5rem)] sm:max-w-none">
+              <div className="bg-black/60 backdrop-blur-sm rounded-full border border-white/20 p-1 shadow-lg">
+                {renderViewToggle()}
+              </div>
             </div>
-          </div>
+          )}
           <HeroSection
             items={heroItemsWithOverview}
             onPlay={handlePlay}
@@ -479,11 +483,12 @@ export default function FilmsDashboard() {
             primaryActionDisabled={!streamingTorrentActive && heroDownloading}
             primaryButtonLabel={streamingTorrentActive ? t('common.watch') : t('common.download')}
             primaryButtonIcon={streamingTorrentActive ? <Play className="h-6 w-6 tv:h-8 tv:w-8" size={24} /> : <Download className="h-6 w-6 tv:h-8 tv:w-8" size={24} />}
+            size="large"
           />
         </div>
       )}
 
-      <div className="pb-8 tv:pb-12 flex-1 safe-area-bottom" style={{ paddingBottom: 'max(2rem, var(--safe-area-inset-bottom))' }}>
+      <div className="pt-2 sm:pt-3 pb-8 tv:pb-12 flex-1 safe-area-bottom animate-[fade-in-up_0.5s_ease-out_forwards] opacity-0" style={{ paddingBottom: 'max(2rem, var(--safe-area-inset-bottom))' }}>
         {/* Section Reprendre la lecture — en tête de page */}
         {resumeFilms.length > 0 && (
           <CarouselRow title={t('dashboard.resumeWatching')} autoScroll={false}>

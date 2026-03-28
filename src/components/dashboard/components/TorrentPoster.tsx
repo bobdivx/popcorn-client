@@ -36,8 +36,8 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
   const progressPercent = torrentStats ? Math.round(torrentStats.progress * 100) : 0;
   const showOverlay = isHovered || isFocused;
   const cardAnimationClasses = IS_WEBOS
-    ? 'transform transition-opacity duration-150 ease-out'
-    : 'transform transition-all duration-200 ease-out hover:scale-[1.03] hover:shadow-primary will-change-transform';
+    ? 'transform-gpu transition-opacity duration-150 ease-out will-change-transform'
+    : 'transform-gpu transition-all duration-[200ms] ease-out hover:scale-[1.05] focus-within:scale-[1.05] hover:shadow-primary-lg focus-within:shadow-primary-lg hover:z-40 focus-within:z-40 will-change-transform';
 
   const handleClick = (e: MouseEvent | KeyboardEvent) => {
     e.preventDefault();
@@ -79,7 +79,12 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
           setIsHovered(false);
         }}
       >
-        <div className={`relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-lg rounded-lg focus-within:shadow-primary-lg ${cardAnimationClasses}`}>
+        <div
+          className={`relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900/85 border border-white/10 shadow-lg rounded-xl focus-within:ring-4 focus-within:ring-primary/80 focus-within:ring-offset-2 focus-within:ring-offset-black card-glow-shell ${cardAnimationClasses}`}
+        >
+          <div
+            className="pointer-events-none absolute inset-0 z-30 rounded-xl border border-violet-400/0 opacity-0 transition-opacity duration-[200ms] ease-out group-hover:opacity-100 group-focus-within:opacity-100 group-hover:border-violet-400/80 group-focus-within:border-violet-400/100 bg-white/[0.03] backdrop-blur-[1px] bg-gradient-to-b from-violet-500/10 to-transparent"
+          />
         {imageUrl ? (
           <img
             src={imageUrl}
@@ -164,7 +169,7 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
 
         {/* Overlay au survol */}
         {showOverlay && (
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent flex flex-col justify-end p-3 lg:p-4 tv:p-6 pb-10 lg:pb-12 tv:pb-16 transition-opacity pointer-events-none">
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent flex flex-col justify-end p-3 lg:p-4 tv:p-6 pb-10 lg:pb-12 tv:pb-16 transition-opacity duration-[200ms] animate-fade-in pointer-events-none">
             <div className="space-y-1.5 lg:space-y-2 tv:space-y-3">
               <h3 className="text-white font-semibold text-sm lg:text-base tv:text-lg line-clamp-1">
                 {item.title}

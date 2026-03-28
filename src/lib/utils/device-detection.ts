@@ -69,6 +69,12 @@ export function isAppleTV(): boolean {
  * Utilisé pour la navigation à la télécommande dans le lecteur vidéo
  */
 export function isTVPlatform(): boolean {
+  if (typeof window !== 'undefined') {
+    // Force via paramètre URL pour le test facile (?tv=1)
+    if (window.location.search.includes('tv=1')) return true;
+    // Force via attribut HTML (DevTools)
+    if (document.documentElement.getAttribute('data-tv-platform') === 'true') return true;
+  }
   return isAndroidTV() || isWebOSTV() || isAppleTV();
 }
 
