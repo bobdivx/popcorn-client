@@ -1,5 +1,10 @@
 # Gestion centralisée des versions pour client et serveur
 # Format: X.Y.Z (ex: 1.0.1)
+#
+# IMPORTANT — Ne pas modifier VERSION.json à la main. Toute mise à jour de version
+# doit passer par ce script (fonctions ci-dessous), sinon risque d'écarts avec
+# les builds / releases. En cas de conflit Git sur VERSION.json, résoudre puis
+# appeler Set-ClientVersion / Set-ServerVersion pour réécrire proprement le fichier.
 
 # Trouver la racine du projet (où se trouve VERSION.json)
 # Le script est dans scripts/, donc VERSION.json est à la racine (un niveau au-dessus)
@@ -193,5 +198,50 @@ function Update-VersionMinor {
     }
 }
 
+function Set-ClientVersion {
+    param(
+        [Parameter(Mandatory = $true)][string]$Version,
+        [Parameter(Mandatory = $true)][int]$Build
+    )
+    if (-not (Test-Path $VERSION_FILE)) {
+        Get-VersionInfo -Component client | Out-Null
+    }
+    try {
+        $content = Get-Content $VERSION_FILE -Raw | ConvertFrom-Json
+        $content.client.version = $Version
+        $content.client.build = $Build
+        $json = $content | ConvertTo-Json -Depth 3
+        Set-Content -Path $VERSION_FILE -Value $json -Encoding UTF8
+        Write-Host "  [OK] client -> $Version (build $Build)" -ForegroundColor Green
+        return @{ Version = $Version; Build = $Build; FullVersion = "$Version.$Build" }
+    } catch {
+        Write-Host "  [ERROR] Set-ClientVersion: $($_.Exception.Message)" -ForegroundColor Red
+        return $null
+    }
+}
+
+function Set-ServerVersion {
+    param(
+        [Parameter(Mandatory = $true)][string]$Version,
+        [Parameter(Mandatory = $true)][int]$Build
+    )
+    if (-not (Test-Path $VERSION_FILE)) {
+        Get-VersionInfo -Component server | Out-Null
+    }
+    try {
+        $content = Get-Content $VERSION_FILE -Raw | ConvertFrom-Json
+        $content.server.version = $Version
+        $content.server.build = $Build
+        $json = $content | ConvertTo-Json -Depth 3
+        Set-Content -Path $VERSION_FILE -Value $json -Encoding UTF8
+        Write-Host "  [OK] server -> $Version (build $Build)" -ForegroundColor Green
+        return @{ Version = $Version; Build = $Build; FullVersion = "$Version.$Build" }
+    } catch {
+        Write-Host "  [ERROR] Set-ServerVersion: $($_.Exception.Message)" -ForegroundColor Red
+        return $null
+    }
+}
+
 # Les fonctions sont disponibles après le chargement du script avec: . $versionScript
+# Exemple alignement explicite : . .\scripts\version-manager.ps1; Set-ClientVersion -Version "1.3.13" -Build 219
 # Pas besoin d'Export-ModuleMember car ce n'est pas un module PowerShell
