@@ -93,22 +93,10 @@ const debugLogUrl = typeof import.meta.env.PUBLIC_DEBUG_LOG_URL === 'string' ? i
           else setTimeout(doLoad, 0);
         }
         window._popcornStartWebOS = loadApp;
-        // Afficher overlay "Appuyez pour démarrer" puis charger au clic/entrée
-        function showTapOverlay() {
-          var overlay = document.createElement('div');
-          overlay.id = 'popcorn-webos-tap-overlay';
-          overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;';
-          overlay.innerHTML = '<p style="color:#fff;font-size:1.5rem;text-align:center;max-width:90%;">Appuyez sur OK ou Entrée pour démarrer Popcorn</p><button type="button" id="popcorn-webos-tap-btn" style="padding:1rem 2rem;font-size:1.25rem;background:#a855f7;color:#fff;border:none;border-radius:0.5rem;cursor:pointer;">Démarrer</button>';
-          overlay.onclick = loadApp;
-          document.body.appendChild(overlay);
-          var btn = document.getElementById('popcorn-webos-tap-btn');
-          if (btn) btn.onclick = function(e) { e.stopPropagation(); loadApp(); };
-          document.addEventListener('keydown', function onKey(e) {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); document.removeEventListener('keydown', onKey); loadApp(); }
-          }, { once: true });
-        }
-        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', showTapOverlay);
-        else showTapOverlay();
+
+        // Charger l'application immédiatement dès que le DOM est prêt (évite le bouton "Démarrer")
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', loadApp);
+        else loadApp();
       })();
     </script>
   </>

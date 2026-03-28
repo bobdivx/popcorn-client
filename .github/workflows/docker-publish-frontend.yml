@@ -94,6 +94,11 @@ jobs:
           docker push ${USER}/popcorn-frontend:${V}
           docker push ${USER}/popcorn-frontend:v${V}
 
+      - name: Trigger Watchtower Webhook
+        run: |
+          curl -H "Authorization: Bearer ${{ secrets.WATCHTOWER_TOKEN }}" \
+               http://${{ secrets.SERVER_IP }}:8080/v1/update
+
   build-and-push:
     runs-on: self-hosted
     # Ne construire que sur dev et tags ; sur main on fait seulement promote (job promote-on-main)
@@ -405,3 +410,9 @@ jobs:
         run: |
           echo "✅ Frontend Docker Image published successfully!"
           echo "You can find it at: https://hub.docker.com/r/${{ steps.check_creds.outputs.username }}/popcorn-frontend/tags"
+
+      - name: Trigger Watchtower Webhook
+        if: github.event_name != 'pull_request'
+        run: |
+          curl -H "Authorization: Bearer ${{ secrets.WATCHTOWER_TOKEN }}" \
+               http://${{ secrets.SERVER_IP }}:8080/v1/update
