@@ -120,7 +120,8 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         var isTVGeneric = /\bTV\b/i.test(ua) && !/iPhone|iPad|Mobile/i.test(ua);
         var isOtherTV = /webOS|Web0S/i.test(ua) || /AppleTV|Apple TV/i.test(ua);
         var isAndroidBrowserTV = /Android/i.test(ua) && w >= 1280 && h >= 720 && w > h;
-        var isTV = isTauriAndroidTV || isTauriFallback || isAndroidTVUA || isTVGeneric || isOtherTV || isAndroidBrowserTV;
+        var isForcedTV = window.location.search.indexOf('tv=1') !== -1;
+        var isTV = isTauriAndroidTV || isTauriFallback || isAndroidTVUA || isTVGeneric || isOtherTV || isAndroidBrowserTV || isForcedTV;
         if (isTV) document.documentElement.setAttribute('data-tv-platform', 'true');
       })();
     </script>
@@ -183,7 +184,7 @@ const isWebOS = import.meta.env.WEBOS === 'true';
     <ServerConnectionCheck client:only="preact" />
     <Navbar client:only="preact" />
     <DebugPanel client:only="preact" />
-    <!-- Header (barre en haut) -->
+    <!-- Main content -->
     <main class="app-main flex-1 w-full overflow-x-hidden safe-area-top" style="padding-top: calc(5rem + var(--safe-area-inset-top));">
       <slot />
     </main>

@@ -270,8 +270,14 @@ export function QuickConnectDisplay({
                 <img 
                   src={qrCodeUrl} 
                   alt={t('settingsPages.quickConnect.qrAlt')}
-                  style={{ width: qrSize, height: qrSize }}
-                  className="block"
+                  style={{ 
+                    width: '100%', 
+                    maxWidth: qrSize, 
+                    height: 'auto', 
+                    maxHeight: '35vh',
+                    objectFit: 'contain' 
+                  }}
+                  className="block mx-auto"
                 />
               </div>
               <p className="text-gray-400 text-xs text-center">

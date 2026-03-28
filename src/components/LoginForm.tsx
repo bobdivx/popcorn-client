@@ -5,6 +5,7 @@ import { QuickConnectDisplay } from './ui/QuickConnectDisplay';
 import { useI18n } from '../lib/i18n/useI18n';
 import { registerCloudDevice } from '../lib/api/popcorn-web';
 import { isTauri } from '../lib/utils/tauri';
+import { isTVPlatform } from '../lib/utils/device-detection';
 
 export default function LoginForm() {
   const { t } = useI18n();
@@ -15,6 +16,9 @@ export default function LoginForm() {
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [checkingUsers, setCheckingUsers] = useState(true);
+
+  // Détection TV pour adapter la taille de la carte de login
+  const isTV = typeof window !== 'undefined' ? isTVPlatform() : false;
 
   // Signaler que l'app a rendu (masquer l'écran de chargement initial, évite écran noir webOS)
   useEffect(() => {
@@ -114,10 +118,13 @@ export default function LoginForm() {
     }
   };
 
+  // Définir la largeur et le padding de la carte en fonction du type d'appareil
+  const cardClasses = `w-full ${isTV ? 'max-w-xl md:max-w-2xl p-8 lg:p-12' : 'max-w-md p-4 sm:p-6 md:p-8'} bg-black/80 backdrop-blur-sm border border-white/20 rounded-xl shadow-2xl mx-3 sm:mx-4`;
+
   // Afficher un loader pendant la vérification
   if (checkingUsers) {
     return (
-      <div className="w-full max-w-md bg-black/80 backdrop-blur-sm border border-white/20 rounded-lg p-4 sm:p-6 md:p-8 shadow-2xl mx-3 sm:mx-4">
+      <div className={cardClasses}>
         <div className="text-center">
           <span className="loading loading-spinner loading-lg text-primary-500"></span>
           <p className="mt-4 text-white">{t('common.verification')}</p>
@@ -133,8 +140,10 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="w-full max-w-md bg-black/80 backdrop-blur-sm border border-white/20 rounded-lg p-4 sm:p-6 md:p-8 shadow-2xl mx-3 sm:mx-4">
-      <h2 className="text-2xl sm:text-3xl font-bold text-white text-center mb-4 sm:mb-6">{t('loginForm.title')}</h2>
+    <div className={cardClasses}>
+      <h2 className={`${isTV ? 'text-3xl sm:text-4xl' : 'text-2xl sm:text-3xl'} font-bold text-white text-center mb-4 sm:mb-6`}>
+        {t('loginForm.title')}
+      </h2>
 
       {sessionExpiredMessage && (
         <div className="mb-4 bg-amber-500/20 border border-amber-500/50 text-amber-200 px-4 py-3 rounded text-sm" role="status">

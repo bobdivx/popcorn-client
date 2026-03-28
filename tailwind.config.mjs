@@ -113,6 +113,10 @@ export default {
             transform: 'scale(1.1)',
           },
         },
+        'shimmer': {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' },
+        },
         'bezier-scroll': {
           '0%': {
             transform: 'translateX(0)',
@@ -133,6 +137,7 @@ export default {
         'focus-pinned-left': 'focus-pinned-left 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards',
         'fade-other-cards': 'fade-other-cards 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards',
         'trailer-immersive': 'trailer-immersive 1s cubic-bezier(0.4, 0, 0.2, 1) forwards',
+        'shimmer': 'shimmer 2s infinite linear',
         'bezier-scroll': 'bezier-scroll 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards',
       },
       transitionProperty: {

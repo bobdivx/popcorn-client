@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from 'preact/hooks';
+import { useMemo, useEffect, useRef, useState } from 'preact/hooks';
 import { useDashboardData } from './hooks/useDashboardData';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useSyncStatus } from './hooks/useSyncStatus';
@@ -8,16 +8,34 @@ import CarouselRow from '../torrents/CarouselRow';
 import { HeroSection } from './components/HeroSection';
 import { LazyResumePoster } from './components/LazyResumePoster';
 import { LazyTorrentPoster } from './components/LazyTorrentPoster';
+import { GenreCardsRow } from './components/GenreCardsRow';
 import { SyncCard } from './components/SyncCard';
 import { SyncProgress } from '../setup/components/SyncProgress';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { translateGenre } from '../../lib/utils/genre-translation';
-import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
+import TorrentCardsShadowLoader from '../ui/TorrentCardsShadowLoader';
 
-const MIN_ITEMS_PER_GENRE_ROW = 10;
-// Certains genres (ex: "Animation") doivent rester visibles même avec peu d'éléments.
-// Cela évite la perception "catégorie manquante" sur le dashboard.
-const ALWAYS_RENDER_GENRES = new Set<string>(['animation']);
+function normalizeGenreKey(genre: string): string {
+  return genre.trim().toLowerCase();
+}
+
+function itemHasGenre(item: ContentItem, selectedGenre: string | null): boolean {
+  if (!selectedGenre) return true;
+  if (!item.genres || item.genres.length === 0) return false;
+  const wanted = normalizeGenreKey(selectedGenre);
+  return item.genres.some((g) => normalizeGenreKey(g) === wanted);
+}
+
+function isUsableImageUrl(url: unknown): url is string {
+  if (typeof url !== 'string') return false;
+  const value = url.trim();
+  if (!value) return false;
+  return (
+    value.startsWith('http://') ||
+    value.startsWith('https://') ||
+    value.startsWith('/') ||
+    value.startsWith('data:image/')
+  );
+}
 
 export default function Dashboard() {
   const { t, language } = useI18n();
@@ -28,6 +46,7 @@ export default function Dashboard() {
   const { syncStatus, isSyncing, loading: syncLoading } = useSyncStatus();
   const wasSyncingRef = useRef(false);
   const clearedBySyncRef = useRef(false);
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
 
   // Quand l’onglet redevient visible : recharger les données depuis le backend (source de vérité). Pas de spinner.
   useEffect(() => {
@@ -92,8 +111,8 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-black">
-        <HLSLoadingSpinner size="lg" />
+      <div className="min-h-screen bg-black pt-4 sm:pt-6">
+        <TorrentCardsShadowLoader rows={3} showHero />
       </div>
     );
   }
@@ -160,149 +179,99 @@ export default function Dashboard() {
         <div className="flex-1 flex flex-col items-center justify-center py-16 px-4">
           <p className="text-gray-400 text-center">{t('sync.syncDescription')}</p>
           <p className="text-gray-500 text-sm mt-2 text-center">
-            Les contenus apparaîtront au fur et à mesure de la synchronisation.
+            {t('dashboard.syncAppearing')}
           </p>
         </div>
       </div>
     );
   }
 
-  // Grouper les films par genre principal uniquement (chaque film dans une seule ligne)
-  const moviesByGenre = useMemo(() => {
-    const grouped: Record<string, ContentItem[]> = {};
-    
-    if (data.popularMovies) {
-      data.popularMovies.forEach(movie => {
-        if (movie.genres && movie.genres.length > 0) {
-          // Utiliser uniquement le genre principal (premier du tableau)
-          const primaryGenre = movie.genres[0];
-          if (!grouped[primaryGenre]) {
-            grouped[primaryGenre] = [];
-          }
-          grouped[primaryGenre].push(movie);
-        } else {
-          // Films sans genre dans une catégorie "Autres" (clé interne pour i18n)
-          const otherKey = '__other__';
-          if (!grouped[otherKey]) {
-            grouped[otherKey] = [];
-          }
-          grouped[otherKey].push(movie);
-        }
-      });
-    }
-
-    // Trier chaque groupe par date (plus récent en premier)
-    Object.keys(grouped).forEach(genre => {
-      grouped[genre].sort((a, b) => {
-        const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
-        const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-        return dateB - dateA;
-      });
-    });
-
-    return grouped;
-  }, [data.popularMovies]);
-
-  // Grouper les séries par genre principal uniquement (chaque série dans une seule ligne)
-  const seriesByGenre = useMemo(() => {
-    const grouped: Record<string, ContentItem[]> = {};
-    
-    if (data.popularSeries) {
-      data.popularSeries.forEach(serie => {
-        if (serie.genres && serie.genres.length > 0) {
-          // Utiliser uniquement le genre principal (premier du tableau)
-          const primaryGenre = serie.genres[0];
-          if (!grouped[primaryGenre]) {
-            grouped[primaryGenre] = [];
-          }
-          grouped[primaryGenre].push(serie);
-        } else {
-          // Séries sans genre dans une catégorie "Autres" (clé interne pour i18n)
-          const otherKey = '__other__';
-          if (!grouped[otherKey]) {
-            grouped[otherKey] = [];
-          }
-          grouped[otherKey].push(serie);
-        }
-      });
-    }
-
-    // Trier chaque groupe par date (plus récent en premier)
-    Object.keys(grouped).forEach(genre => {
-      grouped[genre].sort((a, b) => {
-        const dateA = a.firstAirDate || a.releaseDate ? new Date(a.firstAirDate || a.releaseDate || '').getTime() : 0;
-        const dateB = b.firstAirDate || b.releaseDate ? new Date(b.firstAirDate || b.releaseDate || '').getTime() : 0;
-        return dateB - dateA;
-      });
-    });
-
-    return grouped;
-  }, [data.popularSeries]);
-
-  // Trier les genres par ordre alphabétique
-  const sortedMovieGenres = Object.keys(moviesByGenre).sort((a, b) => {
-    if (a === '__other__') return 1;
-    if (b === '__other__') return -1;
-    return a.localeCompare(b);
-  });
-  const sortedSeriesGenres = Object.keys(seriesByGenre).sort((a, b) => {
-    if (a === '__other__') return 1;
-    if (b === '__other__') return -1;
-    return a.localeCompare(b);
-  });
-
-  // Genres "assez remplis" pour les films (>= 10 après filtre vu) ; le reste va dans "Autres genres"
-  const bigMovieGenres = useMemo(() => {
-    return sortedMovieGenres.filter(genre => {
-      const list = moviesByGenre[genre] || [];
-      const filtered = list.filter((item) => !isWatched(item));
-      if (ALWAYS_RENDER_GENRES.has(genre.trim().toLowerCase())) return filtered.length > 0;
-      return filtered.length >= MIN_ITEMS_PER_GENRE_ROW;
-    });
-  }, [sortedMovieGenres, moviesByGenre, isWatched]);
-  const otherMoviesRow = useMemo(() => {
-    const seen = new Set<string>();
-    sortedMovieGenres.forEach(genre => {
-      const list = moviesByGenre[genre] || [];
-      const filtered = list.filter((item) => !isWatched(item));
-      if (!ALWAYS_RENDER_GENRES.has(genre.trim().toLowerCase()) && filtered.length > 0 && filtered.length < MIN_ITEMS_PER_GENRE_ROW) {
-        filtered.forEach(m => { if (m.id) seen.add(m.id); });
+  const allGenres = useMemo(() => {
+    const set = new Map<string, string>();
+    const merged = [
+      ...(data.popularMovies ?? []),
+      ...(data.popularSeries ?? []),
+      ...(data.recentMovies ?? []),
+      ...(data.recentSeries ?? []),
+      ...(data.fastTorrents ?? []),
+    ];
+    for (const item of merged) {
+      if (!item.genres) continue;
+      for (const g of item.genres) {
+        const key = normalizeGenreKey(g);
+        if (!key || set.has(key)) continue;
+        set.set(key, g.trim());
       }
-    });
-    if (seen.size === 0) return [];
-    const all = (data.popularMovies || []).filter(m => m.id && seen.has(m.id) && !isWatched(m));
-    return all.sort((a, b) => {
-      const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
-      const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
-      return dateB - dateA;
-    });
-  }, [sortedMovieGenres, moviesByGenre, data.popularMovies, isWatched]);
+    }
+    return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
+  }, [data]);
 
-  const bigSeriesGenres = useMemo(() => {
-    return sortedSeriesGenres.filter(genre => {
-      const list = seriesByGenre[genre] || [];
-      const filtered = list.filter((item) => !isWatched(item));
-      if (ALWAYS_RENDER_GENRES.has(genre.trim().toLowerCase())) return filtered.length > 0;
-      return filtered.length >= MIN_ITEMS_PER_GENRE_ROW;
-    });
-  }, [sortedSeriesGenres, seriesByGenre, isWatched]);
-  const otherSeriesRow = useMemo(() => {
-    const seen = new Set<string>();
-    sortedSeriesGenres.forEach(genre => {
-      const list = seriesByGenre[genre] || [];
-      const filtered = list.filter((item) => !isWatched(item));
-      if (!ALWAYS_RENDER_GENRES.has(genre.trim().toLowerCase()) && filtered.length > 0 && filtered.length < MIN_ITEMS_PER_GENRE_ROW) {
-        filtered.forEach(s => { if (s.id) seen.add(s.id); });
+  const genreBackgrounds = useMemo(() => {
+    const map: Record<string, string> = {};
+    const candidates = [
+      ...(data.popularMovies ?? []),
+      ...(data.popularSeries ?? []),
+      ...(data.recentMovies ?? []),
+      ...(data.recentSeries ?? []),
+      ...(data.fastTorrents ?? []),
+    ];
+    const candidateUrls = candidates
+      .map((item) => item.backdrop || item.poster || null)
+      .filter(isUsableImageUrl);
+    const usedImageUrls = new Set<string>();
+    usedImageUrls.add('/media-generic.svg');
+    for (const genre of allGenres) {
+      const wanted = normalizeGenreKey(genre);
+      const match = candidates.find((item) => {
+        if (!item.genres || item.genres.length === 0) return false;
+        const hasGenre = item.genres.some((g) => normalizeGenreKey(g) === wanted);
+        if (!hasGenre) return false;
+        const rawUrl = item.backdrop || item.poster || null;
+        const url = isUsableImageUrl(rawUrl) ? rawUrl : null;
+        if (!url) return false;
+        return !usedImageUrls.has(url);
+      });
+      const rawBg = match?.backdrop || match?.poster || null;
+      const bg = isUsableImageUrl(rawBg) ? rawBg : null;
+      if (bg) {
+        map[genre] = bg;
+        usedImageUrls.add(bg);
+      } else {
+        // Fallback "photo réelle" : prendre une image non utilisée, même hors-genre.
+        const anyUnused = candidateUrls.find((url) => !usedImageUrls.has(url));
+        if (anyUnused) {
+          map[genre] = anyUnused;
+          usedImageUrls.add(anyUnused);
+        } else {
+          map[genre] = '/media-generic.svg';
+        }
       }
-    });
-    if (seen.size === 0) return [];
-    const all = (data.popularSeries || []).filter(s => s.id && seen.has(s.id) && !isWatched(s));
-    return all.sort((a, b) => {
-      const dateA = (a.firstAirDate || a.releaseDate) ? new Date((a.firstAirDate || a.releaseDate) || '').getTime() : 0;
-      const dateB = (b.firstAirDate || b.releaseDate) ? new Date((b.firstAirDate || b.releaseDate) || '').getTime() : 0;
-      return dateB - dateA;
-    });
-  }, [sortedSeriesGenres, seriesByGenre, data.popularSeries, isWatched]);
+    }
+    return map;
+  }, [allGenres, data]);
+
+  const recentMoviesRow = useMemo(
+    () => (data.recentMovies ?? []).filter((item) => !isWatched(item) && itemHasGenre(item, selectedGenre)),
+    [data.recentMovies, isWatched, selectedGenre]
+  );
+  const recentSeriesRow = useMemo(
+    () => (data.recentSeries ?? []).filter((item) => !isWatched(item) && itemHasGenre(item, selectedGenre)),
+    [data.recentSeries, isWatched, selectedGenre]
+  );
+  const sharedMoviesRow = useMemo(
+    () =>
+      (data.fastTorrents ?? []).filter(
+        (item) => item.type === 'movie' && !isWatched(item) && itemHasGenre(item, selectedGenre)
+      ),
+    [data.fastTorrents, isWatched, selectedGenre]
+  );
+  const sharedSeriesRow = useMemo(
+    () =>
+      (data.fastTorrents ?? []).filter(
+        (item) => item.type === 'tv' && !isWatched(item) && itemHasGenre(item, selectedGenre)
+      ),
+    [data.fastTorrents, isWatched, selectedGenre]
+  );
 
   // Préparer les données pour le hero (combiner films et séries populaires)
   const heroItems: ContentItem[] = [];
@@ -323,10 +292,15 @@ export default function Dashboard() {
 
       {/* Section Hero avec carousel */}
       {heroItems.length > 0 && (
-        <HeroSection items={heroItems} onPlay={handlePlay} onPrimaryAction={handlePlay} />
+        <HeroSection
+          items={heroItems}
+          onPlay={handlePlay}
+          onPrimaryAction={handlePlay}
+          size="large"
+        />
       )}
 
-      <div className="pb-8 tv:pb-12">
+      <div className="pt-2 sm:pt-3 pb-8 tv:pb-12 animate-[fade-in-up_0.5s_ease-out_forwards] opacity-0">
         {/* Section Reprendre la lecture — en tête de page */}
         {(resumeWatching.length > 0 || (data.continueWatching && data.continueWatching.length > 0)) && (
           <CarouselRow title={t('dashboard.resumeWatching')} autoScroll={false}>
@@ -349,10 +323,31 @@ export default function Dashboard() {
           </CarouselRow>
         )}
 
-        {/* Ligne Nouveautés films (tri par date de sortie) — masquée pendant la sync torrent ; masquée si vide */}
-        {!isSyncing && data.recentMovies && data.recentMovies.filter((item) => !isWatched(item)).length > 0 && (
-          <CarouselRow title={t('dashboard.newReleasesMovies')} autoScroll={false}>
-            {data.recentMovies.filter((item) => !isWatched(item)).map((item) => (
+        <GenreCardsRow
+          genres={allGenres}
+          genreBackgrounds={genreBackgrounds}
+          allBackground="/media-generic.svg"
+          selectedGenre={selectedGenre}
+          onSelectGenre={setSelectedGenre}
+          language={language}
+        />
+
+        <section className="mb-3 px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16">
+          <div className="flex items-center gap-3">
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-white/90 uppercase tracking-wide">
+              {t('dashboard.sectionMovies')}
+            </h3>
+            <div className="h-px flex-1 bg-white/10" />
+          </div>
+        </section>
+
+        {/* Ligne Nouveautés films (tri par date de sortie) */}
+        {!isSyncing && recentMoviesRow.length > 0 && (
+          <CarouselRow
+            title={t('dashboard.newReleases')}
+            autoScroll={false}
+          >
+            {recentMoviesRow.map((item) => (
               <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                 <LazyTorrentPoster item={item} />
               </div>
@@ -360,10 +355,13 @@ export default function Dashboard() {
           </CarouselRow>
         )}
 
-        {/* Ligne Nouveautés séries (tri par date de sortie) — masquée pendant la sync torrent ; masquée si vide */}
-        {!isSyncing && data.recentSeries && data.recentSeries.filter((item) => !isWatched(item)).length > 0 && (
-          <CarouselRow title={t('dashboard.newReleasesSeries')} autoScroll={false}>
-            {data.recentSeries.filter((item) => !isWatched(item)).map((item) => (
+        {/* Ligne les plus partagés films */}
+        {sharedMoviesRow.length > 0 && (
+          <CarouselRow
+            title={t('dashboard.mostShared')}
+            autoScroll={false}
+          >
+            {sharedMoviesRow.map((item) => (
               <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                 <LazyTorrentPoster item={item} />
               </div>
@@ -371,10 +369,22 @@ export default function Dashboard() {
           </CarouselRow>
         )}
 
-        {/* Ligne Torrents les plus partagés (beaucoup de seeders) */}
-        {data.fastTorrents && data.fastTorrents.filter((item) => !isWatched(item)).length > 0 && (
-          <CarouselRow title={t('dashboard.mostShared')} autoScroll={false}>
-            {data.fastTorrents.filter((item) => !isWatched(item)).map((item) => (
+        <section className="mb-3 mt-2 px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16">
+          <div className="flex items-center gap-3">
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-white/90 uppercase tracking-wide">
+              {t('dashboard.sectionSeries')}
+            </h3>
+            <div className="h-px flex-1 bg-white/10" />
+          </div>
+        </section>
+
+        {/* Ligne Nouveautés séries */}
+        {!isSyncing && recentSeriesRow.length > 0 && (
+          <CarouselRow
+            title={t('dashboard.newReleases')}
+            autoScroll={false}
+          >
+            {recentSeriesRow.map((item) => (
               <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                 <LazyTorrentPoster item={item} />
               </div>
@@ -382,94 +392,18 @@ export default function Dashboard() {
           </CarouselRow>
         )}
 
-        {/* Section Films les plus populaires (par genre) */}
-        {sortedMovieGenres.length > 0 ? (
-          <>
-            {bigMovieGenres.map(genre => {
-              const genreMovies = moviesByGenre[genre];
-              if (genreMovies.length === 0) return null;
-
-              const genreTitle =
-                genre === '__other__' ? t('common.others') : translateGenre(genre, language);
-
-              const filteredMovies = genreMovies.filter((item) => !isWatched(item));
-              if (filteredMovies.length < MIN_ITEMS_PER_GENRE_ROW && !ALWAYS_RENDER_GENRES.has(genre.trim().toLowerCase())) return null;
-              return (
-                <CarouselRow key={`movies-${genre}`} title={genreTitle} autoScroll={false}>
-                  {filteredMovies.map((item) => (
-                    <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                      <LazyTorrentPoster item={item} />
-                    </div>
-                  ))}
-                </CarouselRow>
-              );
-            })}
-            {otherMoviesRow.length >= MIN_ITEMS_PER_GENRE_ROW && (
-              <CarouselRow key="movies-other-genres" title={t('dashboard.otherGenres')} autoScroll={false}>
-                {otherMoviesRow.map((item) => (
-                  <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                    <LazyTorrentPoster item={item} />
-                  </div>
-                ))}
-              </CarouselRow>
-            )}
-          </>
-        ) : (
-          // Si aucun genre, afficher tous les films dans une seule ligne
-          data.popularMovies && data.popularMovies.filter((item) => !isWatched(item)).length > 0 && (
-            <CarouselRow title={t('dashboard.popularMovies')} autoScroll={false}>
-              {data.popularMovies.filter((item) => !isWatched(item)).map((item) => (
-                <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                  <LazyTorrentPoster item={item} />
-                </div>
-              ))}
-            </CarouselRow>
-          )
-        )}
-
-        {/* Section Séries les plus populaires (par genre) */}
-        {sortedSeriesGenres.length > 0 ? (
-          <>
-            {bigSeriesGenres.map(genre => {
-              const genreSeries = seriesByGenre[genre];
-              if (genreSeries.length === 0) return null;
-
-              const genreTitle =
-                genre === '__other__' ? t('common.others') : translateGenre(genre, language);
-
-              const filteredSeries = genreSeries.filter((item) => !isWatched(item));
-              if (filteredSeries.length < MIN_ITEMS_PER_GENRE_ROW && !ALWAYS_RENDER_GENRES.has(genre.trim().toLowerCase())) return null;
-              return (
-                <CarouselRow key={`series-${genre}`} title={genreTitle} autoScroll={false}>
-                  {filteredSeries.map((item) => (
-                    <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                      <LazyTorrentPoster item={item} />
-                    </div>
-                  ))}
-                </CarouselRow>
-              );
-            })}
-            {otherSeriesRow.length >= MIN_ITEMS_PER_GENRE_ROW && (
-              <CarouselRow key="series-other-genres" title={t('dashboard.otherGenres')} autoScroll={false}>
-                {otherSeriesRow.map((item) => (
-                  <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                    <LazyTorrentPoster item={item} />
-                  </div>
-                ))}
-              </CarouselRow>
-            )}
-          </>
-        ) : (
-          // Si aucun genre, afficher toutes les séries dans une seule ligne
-          data.popularSeries && data.popularSeries.filter((item) => !isWatched(item)).length > 0 && (
-            <CarouselRow title={t('dashboard.popularSeries')} autoScroll={false}>
-              {data.popularSeries.filter((item) => !isWatched(item)).map((item) => (
-                <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                  <LazyTorrentPoster item={item} />
-                </div>
-              ))}
-            </CarouselRow>
-          )
+        {/* Ligne les plus partagées séries */}
+        {sharedSeriesRow.length > 0 && (
+          <CarouselRow
+            title={t('dashboard.mostShared')}
+            autoScroll={false}
+          >
+            {sharedSeriesRow.map((item) => (
+              <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+                <LazyTorrentPoster item={item} />
+              </div>
+            ))}
+          </CarouselRow>
         )}
       </div>
     </div>
