@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { useHlsLoader } from './streaming/hls-player/hooks/useHlsLoader';
 import { serverApi } from '../lib/client/server-api';
 
@@ -31,13 +31,16 @@ export default function IntroVideoWithHlsPreload({
   const [hlsPreloadStatus, setHlsPreloadStatus] = useState<string>('');
   const { hlsLoaded } = useHlsLoader();
 
+  const introSrc =
+    typeof window !== 'undefined' && window.location.protocol === 'file:'
+      ? './intro.mp4'
+      : '/intro.mp4';
+
   useEffect(() => {
-    // Afficher le bouton skip après 2 secondes
     const skipTimer = setTimeout(() => {
       setShowSkip(true);
     }, 2000);
 
-    // Démarrer la lecture automatiquement
     const video = videoRef.current;
     if (video) {
       video.play().catch((error) => {
@@ -170,23 +173,13 @@ export default function IntroVideoWithHlsPreload({
     };
   }, [hlsLoaded, hlsInfoHash, hlsFilePath, onHlsReady]);
 
-  const handleEnded = () => {
-    // Arrêter le préchargement HLS si nécessaire
-    if (hlsRef.current) {
-      try {
-        hlsRef.current.stopLoad();
-      } catch (e) {
-        console.warn('[IntroVideoWithHlsPreload] Erreur lors de l\'arrêt du préchargement:', e);
-      }
-    }
-    onEnded();
-  };
-
-  const handleSkip = () => {
+  const introFinishedRef = useRef(false);
+  const completeIntro = useCallback(() => {
+    if (introFinishedRef.current) return;
+    introFinishedRef.current = true;
     if (videoRef.current) {
       videoRef.current.pause();
     }
-    // Arrêter le préchargement HLS si nécessaire
     if (hlsRef.current) {
       try {
         hlsRef.current.stopLoad();
@@ -195,7 +188,21 @@ export default function IntroVideoWithHlsPreload({
       }
     }
     onEnded();
-  };
+  }, [onEnded]);
+
+  // Vidéo absente, codec webOS, ou /intro.mp4 inaccessible : éviter écran infini
+  useEffect(() => {
+    const maxWaitMs = 18000;
+    const t = window.setTimeout(() => {
+      const v = videoRef.current;
+      if (introFinishedRef.current) return;
+      if (v && !v.ended && v.readyState < 2) {
+        console.warn('[IntroVideoWithHlsPreload] Timeout / pas de données vidéo, passage automatique');
+        completeIntro();
+      }
+    }, maxWaitMs);
+    return () => window.clearTimeout(t);
+  }, [completeIntro]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
@@ -217,11 +224,15 @@ export default function IntroVideoWithHlsPreload({
         autoPlay
         muted
         playsInline
-        onEnded={handleEnded}
+        onEnded={completeIntro}
+        onError={() => {
+          console.warn('[IntroVideoWithHlsPreload] Erreur vidéo intro (fichier ou codec), passage automatique');
+          completeIntro();
+        }}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
       >
-        <source src="/intro.mp4" type="video/mp4" />
+        <source src={introSrc} type="video/mp4" />
         Votre navigateur ne supporte pas la lecture de vidéos.
       </video>
       
@@ -229,7 +240,10 @@ export default function IntroVideoWithHlsPreload({
       <div className="absolute bottom-8 right-8 z-10 flex flex-col items-end gap-3">
         {showSkip && (
           <button
-            onClick={handleSkip}
+            type="button"
+            onClick={completeIntro}
+            data-focusable
+            tabindex={0}
             className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold transition-all duration-300 shadow-lg border-2 border-primary-500 flex items-center gap-2"
             aria-label="Passer l'intro"
           >

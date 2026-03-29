@@ -217,11 +217,55 @@ async function downloadFromExternalIndexerOnce(options: {
     setTorrentStats,
   } = options;
 
-  // Si on a une URL externe (ex. C411, YGG), utiliser directement l'endpoint external/download :
-  // évite un 404 inutile sur /api/torrents/{infoHash}/download (torrent pas en DB locale).
   const hasExternalHttpLink =
     torrent._externalLink &&
     (torrent._externalLink.startsWith('http://') || torrent._externalLink.startsWith('https://'));
+
+  // Si on a déjà l'info_hash ET un lien HTTP indexer : tenter d'abord la DB locale (torrents.file_data).
+  // Évite les 429 / rate limit sur l'indexer quand la sync ou un ajout antérieur a stocké le .torrent.
+  if (hasExternalHttpLink && torrent.infoHash?.trim()) {
+    const localUrl = `${baseUrl}/api/torrents/${encodeURIComponent(torrent.infoHash.trim())}/download`;
+    if (setPlayStatus) {
+      setPlayStatus('adding');
+    }
+    const localRes = await fetch(localUrl, { headers });
+    if (localRes.ok) {
+      const blob = await localRes.blob();
+      const file = new File([blob], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
+      const forStreaming = false;
+      const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+      const result = await clientApi.addTorrentFile(file, forStreaming, downloadType);
+      addNotification('success', 'Torrent ajouté depuis la copie locale du serveur (sans appel à l’indexer).');
+      const infoHash = result?.info_hash ?? torrent.infoHash ?? '';
+      if (infoHash) {
+        persistDownloadMeta(infoHash, torrent);
+        bindDownloadIfTmdb(infoHash, torrent);
+      }
+      window.dispatchEvent(new CustomEvent('torrentAdded', { detail: { infoHash, name: torrent.name } }));
+      if (result?.info_hash) {
+        setTorrentStats?.(createInitialTorrentStats(result.info_hash, torrent.name));
+        startProgressPolling(result.info_hash, {
+          torrent,
+          pollTorrentProgress,
+          progressPollIntervalRef,
+          PROGRESS_POLL_INTERVAL_MS,
+          setPlayStatus,
+        });
+      } else if (torrent.infoHash) {
+        setTorrentStats?.(createInitialTorrentStats(torrent.infoHash, torrent.name));
+        startProgressPolling(torrent.infoHash, {
+          torrent,
+          pollTorrentProgress,
+          progressPollIntervalRef,
+          PROGRESS_POLL_INTERVAL_MS,
+          setPlayStatus,
+        });
+      }
+      return;
+    }
+  }
+
+  // URL externe sans copie locale : proxy backend → indexer (peut être rate-limité, ex. C411 429).
   if (hasExternalHttpLink) {
     return await downloadFromExternalIndexer({
       torrent,
@@ -384,7 +428,11 @@ async function downloadFromExternalIndexer(options: {
     externalUrl.searchParams.set('url', torrent._externalLink);
   }
   externalUrl.searchParams.set('torrentName', torrent.name);
-  
+  const ihExt = torrent.infoHash?.trim() ?? '';
+  if (/^[a-f0-9]{40}$/i.test(ihExt)) {
+    externalUrl.searchParams.set('infoHash', ihExt.toLowerCase());
+  }
+
   // Ajouter les informations de l'indexer si disponibles (gérer les deux formats: camelCase et snake_case)
   const indexerId = (torrent as any).indexerId || (torrent as any).indexer_id;
   const indexerName = (torrent as any).indexerName || (torrent as any).indexer_name;

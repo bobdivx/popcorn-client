@@ -72,7 +72,7 @@ export function EpisodeCardsCarousel({
       <div
         ref={scrollerRef}
         role="list"
-        className="overflow-x-auto no-scrollbar px-4 sm:px-5 py-4 sm:py-5"
+        className="overflow-x-auto scrollbar-hide px-4 sm:px-5 py-4 sm:py-5"
         style={{ scrollSnapType: 'x mandatory' }}
       >
         <div className="flex gap-4">

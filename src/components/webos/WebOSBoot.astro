@@ -43,7 +43,7 @@ const debugLogUrl = typeof import.meta.env.PUBLIC_DEBUG_LOG_URL === 'string' ? i
       })();
     </script>
     <script is:inline>
-      // webOS : relaunch depuis le menu TV et rechargement si body vide au focus
+      // webOS : relaunch depuis le menu TV (LG). Reload body-vide + visibilitychange retire (faux positifs firmware).
       (function() {
         console.log('[Popcorn] boot script started');
         document.addEventListener('webOSRelaunch', function() {
@@ -51,18 +51,10 @@ const debugLogUrl = typeof import.meta.env.PUBLIC_DEBUG_LOG_URL === 'string' ? i
           if (sys && typeof sys.activate === 'function') sys.activate();
           window.location.reload();
         });
-        document.addEventListener('visibilitychange', function() {
-          if (document.visibilityState === 'visible') {
-            var body = document.body;
-            if (!body || !body.innerHTML.trim() || body.children.length === 0) {
-              window.location.reload();
-            }
-          }
-        });
       })();
     </script>
     <script is:inline>
-      // webOS : erreurs JS + chargement du bundle UNIQUEMENT après action utilisateur (évite -20 : thread libre au lancement)
+      // webOS : erreurs JS + chargement du bundle au DOMContentLoaded (évite -20 : thread libre au lancement)
       (function() {
         console.log('[Popcorn] tap-overlay script started');
         if (document.documentElement.getAttribute('data-webos') !== 'true') return;

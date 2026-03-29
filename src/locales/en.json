@@ -518,6 +518,7 @@
   },
   "playback": {
     "nextEpisode": "Next episode",
+    "chooseEpisode": "Episodes",
     "restartFromBeginning": "Restart from beginning",
     "positionSlider": "Video position",
     "seekToPosition": "Go to {time}",
@@ -547,7 +548,9 @@
     "quality480": "480p",
     "quality360": "360p",
     "watchLaterAdd": "Add to watch later",
-    "watchLaterRemove": "Remove from watch later"
+    "watchLaterRemove": "Remove from watch later",
+    "castToDevice": "Cast to device",
+    "casting": "Casting"
   },
   "nav": {
     "menu": "Menu",
@@ -999,6 +1002,8 @@
     "packEpisodesByFile": "Pack episodes (by file)",
     "packFilesList": "Pack files (for playback)",
     "packAddTorrentHint": "After adding the torrent, episodes will be listed here by file (S01E01, …).",
+    "packListFilesFailed": "Could not load the pack file list.",
+    "packListFilesFailedIndexerHint": "The indexer often returned a web page instead of a .torrent file (e.g. C411 without passkey / cookies). Check the indexer API key in settings, or add the full torrent to the client first.",
     "downloadThisEpisode": "Download this episode",
     "playThisEpisode": "Play this episode",
     "season": "Season",

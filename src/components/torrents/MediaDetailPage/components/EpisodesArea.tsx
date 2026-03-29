@@ -33,9 +33,8 @@ export function EpisodesArea(props: {
   tmdbId?: number | null;
   /** Incrémenté pour relire les épisodes « vus » depuis localStorage */
   watchedEpisodesRefresh?: number;
-  selectedSeasonNum: number | null;
   selectedEpisodeVariantId: string | null;
-  onSelectSeason: (seasonNum: number) => void;
+  /** Sélection d’un épisode (saison + id) — le parent gère saison et lecture au clic. */
   onSelectEpisode: (episodeVariantId: string) => void;
   savedPlaybackPosition: number | null;
   episodesInLibraryCount?: number;
@@ -45,6 +44,8 @@ export function EpisodesArea(props: {
   hasInfoHash: boolean;
   packInfoHash?: string | null;
   loadingPackPreview: boolean;
+  /** Erreur list-files / .torrent (affichée pour expliquer l’absence d’épisodes pack) */
+  packPreviewLoadError?: string | null;
   packPreviewFilesCount: number;
 
   packEpisodesModel: PackEpisodesModel | null;
@@ -61,7 +62,6 @@ export function EpisodesArea(props: {
     tmdbId,
     watchedEpisodesRefresh,
     selectedEpisodeVariantId,
-    onSelectSeason,
     onSelectEpisode,
     savedPlaybackPosition,
     episodesInLibraryCount,
@@ -70,6 +70,7 @@ export function EpisodesArea(props: {
     hasInfoHash,
     packInfoHash,
     loadingPackPreview,
+    packPreviewLoadError,
     packPreviewFilesCount,
     packEpisodesModel,
     selectedPackSeason,
@@ -105,16 +106,21 @@ export function EpisodesArea(props: {
 
   return (
     <div className="mb-6 space-y-6">
+      {isPackSelected && packPreviewLoadError ? (
+        <div
+          role="alert"
+          className="rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-50/95 space-y-2"
+        >
+          <p className="font-medium">{packPreviewLoadError}</p>
+          <p className="text-amber-100/80 text-xs leading-relaxed">{t('mediaDetail.packListFilesFailedIndexerHint')}</p>
+        </div>
+      ) : null}
       {!isOnlyFullPackPlaceholder ? (
         <SeriesEpisodesSection
           seriesEpisodes={seriesEpisodes}
           tmdbId={tmdbId}
           selectedEpisodeVariantId={selectedEpisodeVariantId}
-          onSelectEpisode={(id) => {
-            const se = seriesEpisodes.seasons.find((s) => s.episodes.some((e) => e.id === id));
-            if (se) onSelectSeason(se.season);
-            onSelectEpisode(id);
-          }}
+          onSelectEpisode={onSelectEpisode}
           savedPlaybackPosition={savedPlaybackPosition}
           episodesInLibraryCount={episodesInLibraryCount}
           watchedSet={watchedSet}

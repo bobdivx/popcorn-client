@@ -518,6 +518,7 @@
   },
   "playback": {
     "nextEpisode": "Épisode suivant",
+    "chooseEpisode": "Épisodes",
     "restartFromBeginning": "Redémarrer depuis le début",
     "positionSlider": "Position dans la vidéo",
     "seekToPosition": "Aller à {time}",
@@ -547,7 +548,9 @@
     "quality480": "480p",
     "quality360": "360p",
     "watchLaterAdd": "Ajouter à regarder plus tard",
-    "watchLaterRemove": "Retirer de regarder plus tard"
+    "watchLaterRemove": "Retirer de regarder plus tard",
+    "castToDevice": "Diffuser sur un appareil",
+    "casting": "Diffusion en cours"
   },
   "nav": {
     "menu": "Menu",
@@ -999,6 +1002,8 @@
     "packEpisodesByFile": "Épisodes du pack (par fichier)",
     "packFilesList": "Fichiers du pack (pour la lecture)",
     "packAddTorrentHint": "Après avoir ajouté le torrent, les épisodes seront listés ici par fichier (S01E01, …).",
+    "packListFilesFailed": "Impossible de charger la liste des fichiers du pack.",
+    "packListFilesFailedIndexerHint": "L’indexeur a souvent renvoyé une page web au lieu du fichier .torrent (ex. C411 sans passkey / cookies). Vérifiez la clé API de l’indexeur dans les réglages, ou ajoutez d’abord le torrent entier au client.",
     "downloadThisEpisode": "Télécharger cet épisode",
     "playThisEpisode": "Lire cet épisode",
     "season": "Saison",

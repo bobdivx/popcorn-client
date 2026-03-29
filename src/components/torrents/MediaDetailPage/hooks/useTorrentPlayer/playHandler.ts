@@ -357,16 +357,43 @@ export function createHandlePlay(context: PlayHandlerContext) {
           const guidParam = guid ? `&guid=${encodeURIComponent(guid)}` : '';
           const torrentIdParam = torrentIdFromVariant ? `&torrentId=${encodeURIComponent(String(torrentIdFromVariant))}` : '';
           const indexerTypeIdParam = indexerTypeIdFromVariant ? `&indexerTypeId=${encodeURIComponent(indexerTypeIdFromVariant)}` : '';
-          const downloadUrl = `${baseUrl}/api/torrents/external/download?url=${encodeURIComponent(torrent._externalLink)}&torrentName=${encodeURIComponent(torrent.name)}${indexerIdParam}${indexerNameParam}${guidParam}${torrentIdParam}${indexerTypeIdParam}`;
-          
-          addDebugLog('info', '📥 URL de téléchargement via proxy backend:', { 
-            downloadUrl, 
-            originalUrl: torrent._externalLink,
-            indexerId,
-            indexerName,
-            guid,
-          });
-          const response = await fetch(downloadUrl, { headers });
+          const ihForUrl = torrent.infoHash?.trim() ?? '';
+          const infoHashQueryParam =
+            /^[a-f0-9]{40}$/i.test(ihForUrl) ? `&infoHash=${encodeURIComponent(ihForUrl.toLowerCase())}` : '';
+          const downloadUrl = `${baseUrl}/api/torrents/external/download?url=${encodeURIComponent(torrent._externalLink)}&torrentName=${encodeURIComponent(torrent.name)}${indexerIdParam}${indexerNameParam}${guidParam}${torrentIdParam}${indexerTypeIdParam}${infoHashQueryParam}`;
+
+          let response: Response;
+          const ih = torrent.infoHash?.trim();
+          if (ih) {
+            const localTorrentUrl = `${baseUrl}/api/torrents/${encodeURIComponent(ih)}/download`;
+            addDebugLog('info', '🔍 Tentative .torrent depuis la DB locale (évite rate limit indexer)', {
+              localTorrentUrl,
+            });
+            const localRes = await fetch(localTorrentUrl, { headers });
+            if (localRes.ok) {
+              addDebugLog('success', '✅ .torrent servi depuis la DB locale, pas d’appel à l’indexer');
+              response = localRes;
+            } else {
+              addDebugLog('info', '📥 Pas de .torrent en DB locale, proxy indexer', { status: localRes.status });
+              addDebugLog('info', '📥 URL de téléchargement via proxy backend:', {
+                downloadUrl,
+                originalUrl: torrent._externalLink,
+                indexerId,
+                indexerName,
+                guid,
+              });
+              response = await fetch(downloadUrl, { headers });
+            }
+          } else {
+            addDebugLog('info', '📥 URL de téléchargement via proxy backend:', {
+              downloadUrl,
+              originalUrl: torrent._externalLink,
+              indexerId,
+              indexerName,
+              guid,
+            });
+            response = await fetch(downloadUrl, { headers });
+          }
 
           if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));

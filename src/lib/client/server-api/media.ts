@@ -85,28 +85,36 @@ export const mediaMethods = {
   },
 
   /**
-   * Liste les fichiers d'un torrent sans l'ajouter (magnet ou URL externe).
-   * Permet d'afficher les épisodes sur la page détail pour télécharger un épisode ou tout le pack.
+   * Liste les fichiers d'un torrent sans l'ajouter.
+   * - `infoHash` (40 hex) : lit `torrents.file_data` côté backend si la sync a stocké le .torrent (pas d'appel indexer).
+   * - `magnet` ou URL / indexer : comportement existant ; `infoHash` en plus permet un essai base avant Torznab sur list-files.
    */
   async getTorrentFileList(
     this: ServerApiClientMediaAccess,
-    params:
-      | { magnet?: string }
-      | {
-          url?: string;
-          indexerId?: string;
-          torrentId?: string;
-          guid?: string;
-          indexerTypeId?: string;
-          indexerName?: string;
-          /** URL relative (ex. torrents.php?action=download&id=70824&...) pour indexers type Gazelle/HD-F ; résolue côté backend avec base_url. */
-          relativeUrl?: string;
-        },
+    params: {
+      /** Si présent et 40 car. hex, le backend utilise le .torrent déjà synchronisé en base. */
+      infoHash?: string;
+      magnet?: string;
+      url?: string;
+      indexerId?: string;
+      torrentId?: string;
+      guid?: string;
+      indexerTypeId?: string;
+      indexerName?: string;
+      /** URL relative (ex. torrents.php?action=download&id=70824&...) pour indexers type Gazelle/HD-F ; résolue côté backend avec base_url. */
+      relativeUrl?: string;
+    },
   ): Promise<ApiResponse<TorrentListFileEntry[]>> {
     const q = new URLSearchParams();
-    if ('magnet' in params && params.magnet) {
-      q.set('magnet', params.magnet);
-    } else if ('url' in params && (params.url || params.indexerId)) {
+    const rawIh = params.infoHash?.trim() ?? '';
+    if (/^[a-f0-9]{40}$/i.test(rawIh)) {
+      q.set('infoHash', rawIh.toLowerCase());
+    }
+    const hasMagnet = Boolean(params.magnet);
+    const hasExternal = Boolean(params.url || params.indexerId || params.relativeUrl);
+    if (hasMagnet) {
+      q.set('magnet', params.magnet!);
+    } else if (hasExternal) {
       if (params.url) q.set('url', params.url);
       if (params.indexerId) q.set('indexerId', params.indexerId);
       if (params.torrentId) q.set('torrentId', params.torrentId);
@@ -114,8 +122,12 @@ export const mediaMethods = {
       if (params.indexerTypeId) q.set('indexerTypeId', params.indexerTypeId);
       if (params.indexerName) q.set('indexerName', params.indexerName);
       if (params.relativeUrl) q.set('relativeUrl', params.relativeUrl);
-    } else {
-      return { success: false, message: 'Paramètre magnet ou (url ou indexerId) requis.' };
+    }
+    if (!q.has('infoHash') && !hasMagnet && !hasExternal) {
+      return {
+        success: false,
+        message: 'Paramètre infoHash (40 hex), magnet, ou (url / indexerId / relativeUrl) requis.',
+      };
     }
     return this.backendRequest<TorrentListFileEntry[]>(`/api/torrents/list-files?${q.toString()}`, { method: 'GET' });
   },
