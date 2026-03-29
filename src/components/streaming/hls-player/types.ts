@@ -1,3 +1,7 @@
+import type { SeriesEpisodePickerItem } from '../player-shared/types/seriesEpisodePicker';
+
+export type { SeriesEpisodePickerItem };
+
 export interface HLSPlayerProps {
   src: string;
   infoHash?: string;
@@ -63,6 +67,11 @@ export interface HLSPlayerProps {
 
   /** Miniatures en cours de génération (placeholder animé). */
   scrubThumbnailsLoading?: boolean;
+
+  /** Série : rail d'épisodes sur l'overlay pause (plusieurs épisodes). */
+  seriesEpisodePickerItems?: SeriesEpisodePickerItem[] | null;
+  selectedSeriesEpisodeVariantId?: string | null;
+  onSelectSeriesEpisode?: (variantId: string) => void;
 }
 
 declare global {

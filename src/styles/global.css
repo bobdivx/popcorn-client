@@ -106,6 +106,15 @@ html[data-tv-platform] body {
   display: none;  /* Chrome, Safari et Opera */
 }
 
+/* Alias (certains composants utilisaient no-scrollbar sans règle Tailwind) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* ── TV : contenu sous la navbar (plus de barre latérale dédiée) ── */
 html[data-tv-platform="true"] .app-main {
   padding-left: 0 !important;

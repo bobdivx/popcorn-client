@@ -6,6 +6,7 @@
     "predev": "node scripts/copy-version.js",
     "dev": "astro dev --port 4326 --host",
     "dev:clean": "node -e \"const fs=require('fs'); try { fs.rmSync('node_modules/.vite', { recursive: true, force: true }); } catch(e) {}\" && npm run dev",
+    "dev:fresh": "cross-env VITE_OPTIMIZE_FORCE=1 astro dev --port 4326 --host",
     "start": "astro dev --port 4326 --host",
     "prebuild": "node scripts/copy-version.js",
     "build": "astro build",

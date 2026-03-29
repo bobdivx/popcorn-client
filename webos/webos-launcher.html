@@ -168,10 +168,12 @@ Modifier l'URL du client local
       var FOCUS_CLASS = 'webos-launcher-focused';
 
       document.addEventListener('webOSRelaunch', function() { window.location.reload(); });
+      var webosLauncherPageLoaded = false;
+      window.addEventListener('load', function() { webosLauncherPageLoaded = true; });
       document.addEventListener('visibilitychange', function() {
-        if (document.visibilityState === 'visible' && (!document.body.innerHTML.trim() || document.body.children.length === 0)) {
-          window.location.reload();
-        }
+        if (document.visibilityState !== 'visible' || !webosLauncherPageLoaded) return;
+        var b = document.body;
+        if (!b || !b.innerHTML.trim() || b.children.length === 0) window.location.reload();
       });
 
       function getLocalClientUrl() {

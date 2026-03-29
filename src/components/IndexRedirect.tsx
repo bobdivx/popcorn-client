@@ -14,6 +14,7 @@ import { redirectTo } from '../lib/utils/navigation.js';
 import IntroVideoWithHlsPreload from './IntroVideoWithHlsPreload';
 import HLSLoadingSpinner from './ui/HLSLoadingSpinner';
 import { getCloudDevices, getUserConfig } from '../lib/api/popcorn-web';
+import { isWebOSTV } from '../lib/utils/device-detection';
 
 const STORAGE_DIAG_ON_BOOT = 'popcorn_diagnostics_on_boot';
 const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';
@@ -56,16 +57,16 @@ export default function IndexRedirect() {
   }, []);
 
   useEffect(() => {
-    // Vérifier si l'intro a déjà été vue
     const introSkipped = localStorage.getItem(STORAGE_INTRO_SKIPPED) === '1';
-    
-    if (!introSkipped) {
-      // Afficher l'intro au premier démarrage
+    // webOS (IPK file://) : /intro.mp4 ne résout pas ; la vidéo ne se termine jamais → écran figé.
+    // Build WEBOS : data-webos sur <html>. On saute l'intro et on va direct au flux normal.
+    const webosEmbedded =
+      typeof document !== 'undefined' &&
+      document.documentElement.getAttribute('data-webos') === 'true';
+    if (!introSkipped && !webosEmbedded && !isWebOSTV()) {
       setShowIntro(true);
       return;
     }
-    
-    // Si l'intro a déjà été vue, continuer avec le chargement normal
     checkAndRedirect();
   }, []);
 

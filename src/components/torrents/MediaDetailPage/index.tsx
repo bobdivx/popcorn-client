@@ -12,6 +12,7 @@ import { useNotifications } from './hooks/useNotifications';
 import { ProgressOverlay } from './components/ProgressOverlay';
 import { EnhancedProgressOverlay } from './components/EnhancedProgressOverlay';
 import { VideoPlayerWrapper } from './components/VideoPlayerWrapper';
+import type { SeriesEpisodePickerItem } from '../../streaming/player-shared/types/seriesEpisodePicker';
 import { MediaDetailActionButtons } from './components/MediaDetailActionButtons';
 import { TorrentInfo } from './components/TorrentInfo';
 import { HeroHeader } from './components/HeroHeader';
@@ -225,6 +226,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   /** En mode immersif (false), les infos et overlays sont masquÃ©s, luminositÃ© vidÃ©o normale. Clic ou touche rÃ©affiche. */
   const [trailerUiVisible, setTrailerUiVisible] = useState(true);
   const trailerCloseButtonRef = useRef<HTMLButtonElement>(null);
+  /** Couche plein écran « Afficher les informations » (hors zone aria-hidden du contenu). */
+  const trailerImmersiveLayerRef = useRef<HTMLDivElement>(null);
   const hasAutoPlayedTrailerRef = useRef(false);
   const [verificationInfoHash, setVerificationInfoHash] = useState<string | null>(null);
   const [verificationTorrentName, setVerificationTorrentName] = useState<string | null>(null);
@@ -236,6 +239,10 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   const mediaDetailActionsRef = useRef<{ handleDownload: (variant?: MediaDetailPageProps['torrent']) => void } | null>(null);
   const backLinkRef = useRef<HTMLAnchorElement>(null);
   const tvBackHandlerRef = useRef<HTMLDivElement>(null);
+  /** Héros + actions masqués en BA immersive ; le carrousel épisodes reste hors de ce bloc (clics / focus TV). */
+  const trailerImmersiveHiddenChromeRef = useRef<HTMLDivElement>(null);
+  /** Clic sur une carte épisode (série) : lancer la lecture une fois le torrent résolu. */
+  const episodePlayIntentRef = useRef<string | null>(null);
   const isTV = isTVPlatform();
   /** Compteur d'Ã©checs consÃ©cutifs de getTorrent (hors 404) pour invalider torrentStats si backend injoignable. */
   const getTorrentFailCountRef = useRef<number>(0);
@@ -988,16 +995,25 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     return () => window.removeEventListener('torrentAdded', onTorrentAdded);
   }, []);
 
-  // Focus par défaut en TV : si reprise série (position > 0) → carte épisode correspondante ; sinon Lire > Télécharger > Retour
+  // Focus par défaut en TV : série → 1re carte du carrousel (ou carte reprise si position > 0) ; sinon Lire > Télécharger > Retour
   useEffect(() => {
     if (!isTVPlatform()) return;
     if (isPlayingTrailer && !trailerUiVisible) return;
+    const hasSeriesCarousel = !!seriesEpisodes?.seasons?.length;
     const seriesResume =
-      !!seriesEpisodes?.seasons?.length &&
+      hasSeriesCarousel &&
       savedPlaybackPosition != null &&
       savedPlaybackPosition > 0 &&
       selectedEpisodeVariantId != null;
-    const delayMs = seriesResume ? 550 : 200;
+    const firstSeasonWithEpisodes = seriesEpisodes?.seasons.find((s) => (s.episodes?.length ?? 0) > 0);
+    const firstCarouselEpisodeId = firstSeasonWithEpisodes?.episodes?.[0]?.id ?? null;
+    const focusEpisodeCardId =
+      hasSeriesCarousel && selectedEpisodeVariantId
+        ? seriesResume
+          ? selectedEpisodeVariantId
+          : (firstCarouselEpisodeId ?? selectedEpisodeVariantId)
+        : null;
+    const delayMs = seriesResume ? 550 : hasSeriesCarousel ? 400 : 200;
     let cancelled = false;
     const t = setTimeout(() => {
       if (cancelled) return;
@@ -1017,10 +1033,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         if (el && shouldAutoFocus && el !== active) el.focus();
       };
 
-      if (seriesResume && selectedEpisodeVariantId) {
-        const variantId = selectedEpisodeVariantId;
-        // Ne pas utiliser shouldAutoFocus ici : la première passe met souvent le focus sur « Lire » (200 ms)
-        // avant que la position / l’épisode repris soient chargés ; il faut voler le focus vers la carte.
+      if (focusEpisodeCardId) {
+        const variantId = focusEpisodeCardId;
         const tryFocusEpisode = (remaining: number) => {
           if (cancelled) return;
           const epBtn = document.querySelector(
@@ -1036,7 +1050,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           }
           focusPlayOrBack();
         };
-        tryFocusEpisode(6);
+        tryFocusEpisode(12);
         return;
       }
       focusPlayOrBack();
@@ -1090,7 +1104,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     }
   }, [torrent.trailerKey]);
 
-  // Lancer automatiquement la bande-annonce (sans clic) ; les infos se cachent aprÃ¨s 5 s (voir effet ci-dessous)
+  // Lancer automatiquement la bande-annonce (sans clic)
   useEffect(() => {
     if (!trailerKey || hasAutoPlayedTrailerRef.current) return;
     hasAutoPlayedTrailerRef.current = true;
@@ -1102,14 +1116,25 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     if (!isPlayingTrailer) setTrailerUiVisible(true);
   }, [isPlayingTrailer]);
 
-  // DÃ©lai 5 s aprÃ¨s le dÃ©but de la bande-annonce puis masquer les infos (mode immersif)
-  const TRAILER_HIDE_UI_DELAY_MS = 5000;
+  // Bande-annonce immersive : ne pas laisser le focus dans le héros aria-hidden (pas le carrousel épisodes).
   useEffect(() => {
-    if (!isPlayingTrailer) return;
-    setTrailerUiVisible(true);
-    const t = setTimeout(() => setTrailerUiVisible(false), TRAILER_HIDE_UI_DELAY_MS);
-    return () => clearTimeout(t);
-  }, [isPlayingTrailer]);
+    if (!isPlayingTrailer || trailerUiVisible) return;
+    const scope = trailerImmersiveHiddenChromeRef.current;
+    const active = document.activeElement;
+    if (scope && active instanceof HTMLElement && scope.contains(active)) {
+      active.blur();
+    }
+    const layer = trailerImmersiveLayerRef.current;
+    if (layer) {
+      requestAnimationFrame(() => {
+        try {
+          layer.focus({ preventScroll: true });
+        } catch {
+          layer.focus();
+        }
+      });
+    }
+  }, [isPlayingTrailer, trailerUiVisible]);
 
   // TV : quand l'UI redevient visible pendant la bande-annonce â†’ focus sur Lire ou TÃ©lÃ©charger
   useEffect(() => {
@@ -1239,54 +1264,117 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     return null;
   }, []);
 
+  const resolveVariantForSelectedEpisode = useCallback(
+    (episodeVariantId: string | null): MediaDetailPageProps['torrent'] | null => {
+      if (!seriesEpisodes?.seasons?.length || episodeVariantId == null) return null;
+      let variant: MediaDetailPageProps['torrent'] | null | undefined = allVariants.find((v: any) => v.id === episodeVariantId);
+      if (!variant) {
+        const season = seriesEpisodes.seasons.find((s) => s.episodes.some((e) => e.id === episodeVariantId));
+        const ep = season?.episodes.find((e) => e.id === episodeVariantId);
+        if (ep != null) {
+          if (ep.info_hash) {
+            variant = allVariants.find((v: any) => (v.infoHash || (v as any).info_hash) === ep.info_hash);
+          }
+          if (!variant) {
+            variant = allVariants.find((v: any) => {
+              const se = parseSeasonEpisodeFromVariant(v);
+              return se && se.season === ep.season && se.episode === ep.episode;
+            });
+          }
+          if (!variant && ep.episode === 0) {
+            const candidates = allVariants.filter((v: any) =>
+              Boolean((v.infoHash || (v as any).info_hash) || v._externalMagnetUri || v._externalLink),
+            );
+            const best = (candidates.length ? candidates : allVariants)
+              .slice()
+              .sort((a: any, b: any) => (b.seedCount ?? 0) - (a.seedCount ?? 0) || (b.fileSize ?? 0) - (a.fileSize ?? 0))[0];
+            if (best) variant = best;
+          }
+        }
+      }
+      return variant ?? null;
+    },
+    [seriesEpisodes, allVariants, parseSeasonEpisodeFromVariant],
+  );
+
+  const handleSeriesEpisodeSelect = useCallback(
+    (episodeVariantId: string) => {
+      if (!seriesEpisodes?.seasons?.length) return;
+      if (isPlayingTrailer && !trailerUiVisible) {
+        setTrailerUiVisible(true);
+      }
+      const se = seriesEpisodes.seasons.find((s) => s.episodes.some((e) => e.id === episodeVariantId));
+      if (se) setSelectedSeasonNum(se.season);
+      setSelectedEpisodeVariantId(episodeVariantId);
+      episodePlayIntentRef.current = episodeVariantId;
+    },
+    [seriesEpisodes, isPlayingTrailer, trailerUiVisible],
+  );
+
   // Synchroniser selectedTorrent (et libraryDownloadPath) quand l'utilisateur choisit un Ã©pisode (sÃ©ries)
   useEffect(() => {
     if (!seriesEpisodes?.seasons?.length || selectedEpisodeVariantId == null) return;
-    let variant = allVariants.find((v: any) => v.id === selectedEpisodeVariantId);
-    // Fallback pour la bibliothÃ¨que : les variants ont id "local_xxx", pas l'id TMDB â†’ matcher par SxxExx
-    if (!variant) {
-      const season = seriesEpisodes.seasons.find((s) =>
-        s.episodes.some((e) => e.id === selectedEpisodeVariantId)
-      );
-      const ep = season?.episodes.find((e) => e.id === selectedEpisodeVariantId);
-      if (ep != null) {
-        // 1) Si l'API fournit un info_hash, matcher directement (cas pack complet ou ids non-alignÃ©s).
-        if (ep.info_hash) {
-          variant = allVariants.find((v: any) => (v.infoHash || (v as any).info_hash) === ep.info_hash);
-        }
-        // 2) Fallback: matcher par SxxExx depuis les mÃ©tadonnÃ©es locales.
-        if (!variant) {
-          variant = allVariants.find((v: any) => {
-            const se = parseSeasonEpisodeFromVariant(v);
-            return se && se.season === ep.season && se.episode === ep.episode;
-          });
-        }
-        // 3) Pack complet (Ã©pisode 0) : prendre le meilleur candidat pour permettre list-files / stream.
-        if (!variant && ep.episode === 0) {
-          const candidates = allVariants.filter((v: any) => Boolean((v.infoHash || (v as any).info_hash) || v._externalMagnetUri || v._externalLink));
-          const best = (candidates.length ? candidates : allVariants)
-            .slice()
-            .sort((a: any, b: any) => (b.seedCount ?? 0) - (a.seedCount ?? 0) || (b.fileSize ?? 0) - (a.fileSize ?? 0))[0];
-          if (best) variant = best;
-        }
-      }
-    }
+    const variant = resolveVariantForSelectedEpisode(selectedEpisodeVariantId);
     if (variant) {
       setSelectedTorrent(variant);
       setCurrentSeedCount(variant.seedCount ?? 0);
       setCurrentLeechCount(variant.leechCount ?? 0);
       setCurrentFileSize(variant.fileSize ?? 0);
-      // Mettre Ã  jour le chemin bibliothÃ¨que pour la lecture (sÃ©ries depuis library)
       if (variant.downloadPath) {
         setLibraryDownloadPath(variant.downloadPath);
       }
     }
-  }, [seriesEpisodes, selectedEpisodeVariantId, allVariants, parseSeasonEpisodeFromVariant]);
+  }, [seriesEpisodes, selectedEpisodeVariantId, resolveVariantForSelectedEpisode]);
+
+  // Après clic sur une carte épisode : lancer Lire quand le torrent actif correspond à la variante résolue (handlePlay gère streaming vs téléchargement).
+  useEffect(() => {
+    const intent = episodePlayIntentRef.current;
+    if (intent == null || selectedEpisodeVariantId !== intent) return;
+    const expected = resolveVariantForSelectedEpisode(intent);
+    if (!expected) {
+      if (allVariants.length > 0) {
+        episodePlayIntentRef.current = null;
+        addNotification('error', 'Aucune source trouvée pour cet épisode.');
+      }
+      return;
+    }
+    const sameId = Boolean(activeTorrent.id && expected.id && activeTorrent.id === expected.id);
+    const sameHash =
+      Boolean(activeTorrent.infoHash && expected.infoHash) &&
+      String(activeTorrent.infoHash).toLowerCase() === String(expected.infoHash).toLowerCase();
+    if (!sameId && !sameHash) return;
+
+    episodePlayIntentRef.current = null;
+
+    void (async () => {
+      if (savedPlaybackPosition != null && savedPlaybackPosition > 0) setStartFromBeginning(false);
+      else setStartFromBeginning(true);
+      const el = videoWrapperRef.current || (document.getElementById('video-player-wrapper') as HTMLDivElement);
+      if (el && !document.fullscreenElement) {
+        try {
+          await el.requestFullscreen();
+        } catch (_) {}
+      }
+      continueInBackgroundRef.current = false;
+      handlePlay();
+    })();
+  }, [
+    selectedEpisodeVariantId,
+    activeTorrent.id,
+    activeTorrent.infoHash,
+    resolveVariantForSelectedEpisode,
+    handlePlay,
+    savedPlaybackPosition,
+    allVariants.length,
+    addNotification,
+  ]);
 
   // Pack complet (Ã©pisode 0) : calculÃ© plus haut (avant useVideoFiles)
   /** Liste des fichiers du pack sans ajouter le torrent (API list-files : magnet ou URL externe) */
   const [packPreviewFiles, setPackPreviewFiles] = useState<TorrentListFileEntry[] | null>(null);
   const [loadingPackPreview, setLoadingPackPreview] = useState(false);
+  /** Erreur API list-files / téléchargement .torrent (ex. C411 → HTML au lieu du binaire) */
+  const [packPreviewLoadError, setPackPreviewLoadError] = useState<string | null>(null);
   /** Index du fichier (dans packPreviewFiles) sÃ©lectionnÃ© pour "TÃ©lÃ©charger cet Ã©pisode" / "Lire" (preview, torrent pas encore ajoutÃ©) */
   const [selectedPackEpisodePreviewIndex, setSelectedPackEpisodePreviewIndex] = useState<number | null>(null);
   useEffect(() => {
@@ -1297,12 +1385,16 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
       setPackPreviewFiles(null);
       setSelectedPackEpisodePreviewIndex(null);
       setAddedTorrentInfoHash(null);
+      setPackPreviewLoadError(null);
       return;
     }
     const magnet = (activeTorrent as { _externalMagnetUri?: string })._externalMagnetUri ?? ((activeTorrent as { _externalLink?: string })._externalLink?.startsWith('magnet:') ? (activeTorrent as { _externalLink: string })._externalLink : null);
     const externalLink = (activeTorrent as { _externalLink?: string })._externalLink && !(activeTorrent as { _externalLink?: string })._externalLink?.startsWith('magnet:') ? (activeTorrent as { _externalLink: string })._externalLink : null;
-    if (!magnet && !externalLink) {
+    const rawPackInfoHash = activeTorrent.infoHash?.trim() ?? '';
+    const packInfoHash = /^[a-f0-9]{40}$/i.test(rawPackInfoHash) ? rawPackInfoHash.toLowerCase() : '';
+    if (!magnet && !externalLink && !packInfoHash) {
       setPackPreviewFiles(null);
+      setPackPreviewLoadError(null);
       return;
     }
     const isRelativeLink = externalLink != null && !externalLink.startsWith('http://') && !externalLink.startsWith('https://');
@@ -1311,6 +1403,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     let cancelled = false;
     setLoadingPackPreview(true);
     const load = async () => {
+      setPackPreviewLoadError(null);
       const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
       const isRecoverablePackError = (err: unknown) => {
         if (!(err instanceof Error)) return false;
@@ -1319,8 +1412,9 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
       };
       try {
         const params = magnet
-          ? { magnet }
+          ? { ...(packInfoHash ? { infoHash: packInfoHash } : {}), magnet }
           : {
+              ...(packInfoHash ? { infoHash: packInfoHash } : {}),
               url: isRelativeLink ? undefined : externalLink!,
               indexerId: (activeTorrent as { indexerId?: string }).indexerId,
               torrentId: numericTorrentId ?? (activeTorrent.id?.includes('_') ? activeTorrent.id.split('_').pop() : activeTorrent.id),
@@ -1348,18 +1442,38 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         if (cancelled) return;
         if (res?.success && Array.isArray(res.data)) {
           setPackPreviewFiles(res.data);
+          setPackPreviewLoadError(null);
         } else {
           setPackPreviewFiles(null);
+          const msg =
+            (res?.success === false && res.message ? res.message : '') ||
+            (lastErr instanceof Error ? lastErr.message : '') ||
+            t('mediaDetail.packListFilesFailed');
+          setPackPreviewLoadError(msg);
+          addNotification('error', msg);
         }
-      } catch {
-        if (!cancelled) setPackPreviewFiles(null);
+      } catch (e) {
+        if (!cancelled) {
+          setPackPreviewFiles(null);
+          const msg = e instanceof Error ? e.message : t('mediaDetail.packListFilesFailed');
+          setPackPreviewLoadError(msg);
+          addNotification('error', msg);
+        }
       } finally {
         if (!cancelled) setLoadingPackPreview(false);
       }
     };
     void load();
     return () => { cancelled = true; };
-  }, [isPackSelected, activeTorrent.id, (activeTorrent as { _externalLink?: string })._externalLink, (activeTorrent as { _externalMagnetUri?: string })._externalMagnetUri]);
+  }, [
+    isPackSelected,
+    activeTorrent.id,
+    activeTorrent.infoHash,
+    (activeTorrent as { _externalLink?: string })._externalLink,
+    (activeTorrent as { _externalMagnetUri?: string })._externalMagnetUri,
+    t,
+    addNotification,
+  ]);
 
   const packEpisodesModel = usePackEpisodes({ packPreviewFiles, videoFiles });
   const [selectedPackSeason, setSelectedPackSeason] = useState<number | null>(null);
@@ -1462,6 +1576,32 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     if (!ep) return null;
     return { season: ep.season, episode: ep.episode, variantId: ep.id };
   }, [seriesEpisodes, selectedSeasonNum, selectedEpisodeVariantId]);
+
+  /** Liste aplatie pour le rail d'épisodes sur l'overlay pause du lecteur (style Netflix). */
+  const playerSeriesEpisodePickerItems = useMemo((): SeriesEpisodePickerItem[] | null => {
+    if (!seriesEpisodes?.seasons?.length) return null;
+    const items: SeriesEpisodePickerItem[] = [];
+    for (const s of seriesEpisodes.seasons) {
+      for (const ep of s.episodes ?? []) {
+        if (ep.episode === 0) continue;
+        const thumb =
+          ep.info_hash && ep.file_path
+            ? `/api/media/episode-thumbnail?info_hash=${encodeURIComponent(ep.info_hash)}&t=60&w=320`
+            : null;
+        const label =
+          ep.name?.trim()
+            ? t('mediaDetail.episodeWithTitle', { number: ep.episode, title: ep.name })
+            : t('mediaDetail.episodeNumber', { number: ep.episode });
+        items.push({
+          variantId: ep.id,
+          label,
+          sublabel: t('mediaDetail.seasonNumber', { number: s.season }),
+          thumbnailUrl: thumb,
+        });
+      }
+    }
+    return items.length > 1 ? items : null;
+  }, [seriesEpisodes, t]);
 
   /** Pendant la transition, on affiche encore l'Ã©pisode prÃ©cÃ©dent pour garder le lecteur montÃ© (mÃªme Ã©lÃ©ment vidÃ©o) et permettre play() aprÃ¨s changement de source. */
   const displayTorrent = isTransitioningToNext && previousActiveTorrentRef.current ? previousActiveTorrentRef.current : activeTorrent;
@@ -1621,6 +1761,9 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         playStatus={playStatus}
         progressMessage={progressMessage}
         torrentStats={torrentStats}
+        seriesEpisodePickerItems={playerSeriesEpisodePickerItems}
+        selectedSeriesEpisodeVariantId={selectedEpisodeVariantId}
+        onSelectSeriesEpisode={handleSeriesEpisodeSelect}
       />
     );
   }
@@ -1660,6 +1803,9 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           releaseDate={displayTorrent.releaseDate ?? null}
           useStreamTorrentMode={useStreamTorrentMode}
           streamingTorrentToken={TokenManager.getCloudAccessToken()}
+          seriesEpisodePickerItems={playerSeriesEpisodePickerItems}
+          selectedSeriesEpisodeVariantId={selectedEpisodeVariantId}
+          onSelectSeriesEpisode={handleSeriesEpisodeSelect}
         />
       )}
     <div className="relative bg-page text-white">
@@ -1688,7 +1834,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
             )}
             {!trailerUiVisible && (
               <div
-                className="absolute inset-0 z-[5] cursor-pointer"
+                ref={trailerImmersiveLayerRef}
+                className="absolute inset-0 z-[5] cursor-pointer outline-none focus:ring-2 focus:ring-white/40 focus:ring-inset"
                 onClick={() => setTrailerUiVisible(true)}
                 onKeyDown={(e) => { e.key === 'Enter' && setTrailerUiVisible(true); }}
                 role="button"
@@ -1721,14 +1868,14 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         )}
       </div>
 
-      {/* Contenu principal (data-tv-back-handler : premiÃ¨re touche Retour = focus sur Retour, deuxiÃ¨me = navigation). MasquÃ© en mode immersif bande-annonce. */}
-      <div
-        className={`relative z-10 transition-opacity duration-300 ${isPlayingTrailer && !trailerUiVisible ? 'opacity-0 pointer-events-none' : ''}`}
-        ref={tvBackHandlerRef}
-        data-tv-back-handler
-        aria-hidden={isPlayingTrailer && !trailerUiVisible}
-      >
-        <div className="relative w-full min-h-[60vh] sm:min-h-[70vh] flex flex-col justify-end px-3 sm:px-4 md:px-6 lg:px-16 pb-8 sm:pb-12 md:pb-16 pt-20 sm:pt-24 md:pt-32">
+      {/* Contenu principal : en BA immersive, seul le héros est masqué — le carrousel épisodes reste utilisable (souris / TV). */}
+      <div className="relative z-10 transition-opacity duration-300" ref={tvBackHandlerRef} data-tv-back-handler>
+        <div
+          ref={trailerImmersiveHiddenChromeRef}
+          className={`${isPlayingTrailer && !trailerUiVisible ? 'opacity-0 pointer-events-none' : ''}`}
+          aria-hidden={isPlayingTrailer && !trailerUiVisible}
+        >
+        <div className="relative w-full min-h-[56vh] sm:min-h-[66vh] flex flex-col justify-end px-3 sm:px-4 md:px-6 lg:px-16 pb-8 sm:pb-12 md:pb-16 pt-16 sm:pt-20 md:pt-28">
           {/* Bouton Bande-annonce (haut droite) — visible uniquement quand la bande-annonce ne joue pas */}
           {trailerKey && !isPlayingTrailer && (
             <button
@@ -1752,7 +1899,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
             </button>
           )}
 
-          <div className="max-w-6xl w-full">
+          <div className="max-w-6xl w-full mb-6 sm:mb-8 md:mb-10">
             <HeroHeader torrent={torrent} />
 
             <ActionsRow backHref={backHref ?? '/dashboard'} isTV={isTV} backLinkRef={backLinkRef}>
@@ -1847,36 +1994,38 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
               />
             )}
           </div>
+        </div>
+        </div>
 
-          {/* Carousel épisodes en bas (Apple TV+ style) */}
+          {/* Carousel épisodes : hors du bloc immersif BA (visible, pointer-events OK, pas aria-hidden). */}
           {seriesEpisodes?.seasons?.length ? (
-            <div className="mt-10 rounded-2xl overflow-hidden bg-black/30 border border-white/10">
-              <EpisodesArea
-                seriesEpisodes={seriesEpisodes}
-                tmdbId={activeTorrent?.tmdbType === 'tv' ? activeTorrent?.tmdbId ?? null : null}
-                watchedEpisodesRefresh={watchedEpisodesRefresh}
-                selectedSeasonNum={selectedSeasonNum}
-                selectedEpisodeVariantId={selectedEpisodeVariantId}
-                onSelectSeason={setSelectedSeasonNum}
-                onSelectEpisode={setSelectedEpisodeVariantId}
-                savedPlaybackPosition={savedPlaybackPosition}
-                episodesInLibraryCount={isLocalTorrent && allVariants.length > 0 ? allVariants.length : undefined}
-                isPackSelected={isPackSelected}
-                videoFilesCount={videoFiles.length}
-                hasInfoHash={hasInfoHash}
-                packInfoHash={activeTorrent?.infoHash ?? null}
-                loadingPackPreview={loadingPackPreview}
-                packPreviewFilesCount={packPreviewFiles?.length ?? 0}
-                packEpisodesModel={packEpisodesModel}
-                selectedPackSeason={selectedPackSeason}
-                onSelectPackSeason={setSelectedPackSeason}
-                selectedPackEpisodeKey={selectedPackEpisodeKey}
-                onSelectPackEpisodeKey={onSelectPackEpisodeKey}
-                isTV={isTV}
-              />
+            <div className="px-3 sm:px-4 md:px-6 lg:px-16 relative z-20 mt-10 pb-[max(7rem,calc(2rem+env(safe-area-inset-bottom,0px)))] sm:pb-[max(9rem,calc(2.5rem+env(safe-area-inset-bottom,0px)))] md:pb-[max(10rem,calc(3rem+env(safe-area-inset-bottom,0px)))]">
+              <div className="rounded-2xl overflow-hidden bg-black/30 border border-white/10">
+                <EpisodesArea
+                  seriesEpisodes={seriesEpisodes}
+                  tmdbId={activeTorrent?.tmdbType === 'tv' ? activeTorrent?.tmdbId ?? null : null}
+                  watchedEpisodesRefresh={watchedEpisodesRefresh}
+                  selectedEpisodeVariantId={selectedEpisodeVariantId}
+                  onSelectEpisode={handleSeriesEpisodeSelect}
+                  savedPlaybackPosition={savedPlaybackPosition}
+                  episodesInLibraryCount={isLocalTorrent && allVariants.length > 0 ? allVariants.length : undefined}
+                  isPackSelected={isPackSelected}
+                  videoFilesCount={videoFiles.length}
+                  hasInfoHash={hasInfoHash}
+                  packInfoHash={activeTorrent?.infoHash ?? null}
+                  loadingPackPreview={loadingPackPreview}
+                  packPreviewLoadError={packPreviewLoadError}
+                  packPreviewFilesCount={packPreviewFiles?.length ?? 0}
+                  packEpisodesModel={packEpisodesModel}
+                  selectedPackSeason={selectedPackSeason}
+                  onSelectPackSeason={setSelectedPackSeason}
+                  selectedPackEpisodeKey={selectedPackEpisodeKey}
+                  onSelectPackEpisodeKey={onSelectPackEpisodeKey}
+                  isTV={isTV}
+                />
+              </div>
             </div>
           ) : null}
-        </div>
       </div>
 
       {/* Modal de sÃ©lection de source (plusieurs sources disponibles) â€” adaptÃ©e TV */}
