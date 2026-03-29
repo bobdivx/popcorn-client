@@ -2,6 +2,10 @@
 dist/
 .output/
 
+# Rust / Cargo (build local, ex. Tauri ou outils)
+target/
+**/target/
+
 # dependencies
 node_modules/
 
