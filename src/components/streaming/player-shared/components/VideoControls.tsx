@@ -6,6 +6,7 @@ import { serverApi } from '../../../../lib/client/server-api';
 import { formatTime } from '../utils/formatTime';
 import { SubtitleSelector } from './SubtitleSelector';
 import { persistVideoFillMode } from '../hooks/usePlayerConfig';
+import type { SeriesEpisodePickerItem } from '../types/seriesEpisodePicker';
 
 interface AudioTrack {
   id: number;
@@ -103,6 +104,11 @@ interface VideoControlsProps {
   tvScrubIndexExternal?: number;
   /** Sur TV : la rangée de vignettes est-elle la zone de focus active ? */
   tvScrubFocused?: boolean;
+
+  /** Série : rail d'épisodes cliquable sur l'overlay pause (affiche si infos pause + au moins 2 épisodes). */
+  seriesEpisodePickerItems?: SeriesEpisodePickerItem[] | null;
+  selectedSeriesEpisodeVariantId?: string | null;
+  onSelectSeriesEpisode?: (variantId: string) => void;
 }
 
 export function VideoControls({
@@ -156,6 +162,9 @@ export function VideoControls({
   scrubThumbnailsLoading = false,
   tvScrubIndexExternal,
   tvScrubFocused = false,
+  seriesEpisodePickerItems = null,
+  selectedSeriesEpisodeVariantId = null,
+  onSelectSeriesEpisode,
 }: VideoControlsProps) {
   const { t } = useI18n();
   const effectiveFillMode = videoFillMode ?? 'contain';
@@ -403,45 +412,113 @@ export function VideoControls({
     return 'ring-2 ring-purple-600 ring-opacity-90 ring-inset';
   };
 
-  const showPausedOverlay = !isPlaying && showControls && (posterUrl || synopsis);
+  const showPosterSynopsisPause = !isPlaying && showControls && (posterUrl || synopsis);
+  const showEpisodePickerInPause =
+    !isPlaying &&
+    showControls &&
+    seriesEpisodePickerItems &&
+    seriesEpisodePickerItems.length > 1 &&
+    onSelectSeriesEpisode;
+  const showPausedChrome = showPosterSynopsisPause || showEpisodePickerInPause;
 
   return (
     <>
       <div class={`absolute inset-0 pointer-events-none transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0'}`} style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0.3) 50%, transparent 100%)' }} />
       {/* Overlay pause : poster + synopsis à gauche (style Media Detail) */}
-      {showPausedOverlay && (
+      {showPausedChrome && (
         <div class="absolute inset-0 flex flex-col justify-end z-15 pointer-events-none">
           <div class="w-full h-full bg-gradient-to-r from-black via-black/90 to-transparent pointer-events-none" aria-hidden="true" />
-          {/* Padding bas important pour que synopsis + poster restent au-dessus de la barre de progression et des boutons (pas de chevauchement) */}
+          {/* Padding bas important pour que synopsis + poster + rail épisodes restent au-dessus de la barre et des boutons */}
           <div class="absolute inset-0 flex flex-col justify-end px-3 sm:px-6 md:px-10 lg:px-16 pb-40 sm:pb-28 md:pb-32 lg:pb-36 xl:pb-44">
-            <div class="max-w-5xl xl:max-w-6xl flex flex-col sm:flex-row items-start gap-3 sm:gap-6 md:gap-8 w-full">
-              {posterUrl && (
-                <div class="flex-shrink-0 w-20 h-28 sm:w-40 sm:h-56 md:w-48 md:h-72 lg:w-56 lg:h-80 xl:w-64 xl:h-96 rounded-lg sm:rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/20 max-h-[25vh] sm:max-h-none">
-                  <img src={posterUrl} alt="" class="w-full h-full object-cover" />
-                </div>
-              )}
-              <div class="flex-1 min-w-0 flex flex-col gap-2 sm:gap-4">
-                {(torrentName || releaseDate) && (
-                  <div class="flex items-baseline gap-2 sm:gap-4 flex-wrap">
-                    {torrentName && (
-                      <h2 class="text-lg sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight drop-shadow-2xl">
-                        {torrentName}
-                      </h2>
-                    )}
-                    {releaseDate && (
-                      <span class="inline-flex items-center justify-center px-2 py-1 sm:px-4 sm:py-2 bg-gray-800/90 backdrop-blur-md text-white/95 text-xs sm:text-lg font-semibold rounded-lg border border-white/30 shadow-lg">
-                        {new Date(releaseDate).getFullYear()}
-                      </span>
-                    )}
+            {showPosterSynopsisPause && (
+              <div class="max-w-5xl xl:max-w-6xl flex flex-col sm:flex-row items-start gap-3 sm:gap-6 md:gap-8 w-full">
+                {posterUrl && (
+                  <div class="flex-shrink-0 w-20 h-28 sm:w-40 sm:h-56 md:w-48 md:h-72 lg:w-56 lg:h-80 xl:w-64 xl:h-96 rounded-lg sm:rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/20 max-h-[25vh] sm:max-h-none">
+                    <img src={posterUrl} alt="" class="w-full h-full object-cover" />
                   </div>
                 )}
-                {synopsis && (
-                  <p class="text-white/95 text-xs sm:text-base md:text-xl lg:text-2xl leading-relaxed line-clamp-2 sm:line-clamp-4 md:line-clamp-6 drop-shadow-lg max-w-2xl">
-                    {synopsis}
-                  </p>
-                )}
+                <div class="flex-1 min-w-0 flex flex-col gap-2 sm:gap-4">
+                  {(torrentName || releaseDate) && (
+                    <div class="flex items-baseline gap-2 sm:gap-4 flex-wrap">
+                      {torrentName && (
+                        <h2 class="text-lg sm:text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight drop-shadow-2xl">
+                          {torrentName}
+                        </h2>
+                      )}
+                      {releaseDate && (
+                        <span class="inline-flex items-center justify-center px-2 py-1 sm:px-4 sm:py-2 bg-gray-800/90 backdrop-blur-md text-white/95 text-xs sm:text-lg font-semibold rounded-lg border border-white/30 shadow-lg">
+                          {new Date(releaseDate).getFullYear()}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {synopsis && (
+                    <p class="text-white/95 text-xs sm:text-base md:text-xl lg:text-2xl leading-relaxed line-clamp-2 sm:line-clamp-4 md:line-clamp-6 drop-shadow-lg max-w-2xl">
+                      {synopsis}
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+            {showEpisodePickerInPause && (
+              <div
+                class={`pointer-events-auto w-full max-w-6xl pb-2 ${showPosterSynopsisPause ? 'mt-4 sm:mt-6' : 'mt-0'}`}
+              >
+                <p class="text-white/80 text-xs sm:text-sm font-medium mb-2 sm:mb-3 drop-shadow-md">
+                  {t('playback.chooseEpisode')}
+                </p>
+                <div class="flex gap-2 sm:gap-3 overflow-x-auto pb-1 scrollbar-visible touch-pan-x">
+                  {seriesEpisodePickerItems!.map((item) => {
+                    const selected = item.variantId === selectedSeriesEpisodeVariantId;
+                    return (
+                      <button
+                        key={item.variantId}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onSelectSeriesEpisode!(item.variantId);
+                        }}
+                        class={`group flex-shrink-0 w-[7.5rem] sm:w-36 md:w-40 text-left rounded-lg overflow-hidden border-2 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
+                          selected
+                            ? 'border-purple-400 ring-2 ring-purple-500/60 shadow-lg scale-[1.02]'
+                            : 'border-white/20 hover:border-white/50 hover:scale-[1.02]'
+                        }`}
+                        aria-current={selected ? 'true' : undefined}
+                        aria-label={item.sublabel ? `${item.label} — ${item.sublabel}` : item.label}
+                      >
+                        <div class="relative aspect-video bg-black/80">
+                          {item.thumbnailUrl ? (
+                            <img
+                              src={item.thumbnailUrl}
+                              alt=""
+                              class="w-full h-full object-cover"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                          ) : (
+                            <div class="w-full h-full flex items-center justify-center bg-white/5">
+                              <Play class="w-8 h-8 text-white/40" />
+                            </div>
+                          )}
+                          {!selected && (
+                            <div class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Play class="w-10 h-10 text-white drop-shadow-lg" />
+                            </div>
+                          )}
+                        </div>
+                        <div class="px-1.5 py-1.5 sm:px-2 sm:py-2 bg-black/75">
+                          {item.sublabel && (
+                            <p class="text-[10px] sm:text-xs text-white/60 truncate">{item.sublabel}</p>
+                          )}
+                          <p class="text-[11px] sm:text-sm text-white font-medium line-clamp-2 leading-tight">{item.label}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -660,7 +737,7 @@ export function VideoControls({
                   <img
                     src={scrubHover.url}
                     alt=""
-                    class="block w-40 sm:w-48 md:w-56 h-auto object-cover"
+                    class="block w-52 sm:w-60 md:w-72 h-auto object-cover"
                     loading="lazy"
                     decoding="async"
                   />
@@ -679,8 +756,11 @@ export function VideoControls({
               // pas par la position de lecture (currentTime).
               // `currentTime` ne sert qu'à initialiser l'index au moment où l'utilisateur entre dans le mode scrub.
               const selectedIndex = Math.min(count - 1, Math.max(0, tvScrubIndex));
-              // Afficher moins de vignettes pour qu'elles soient plus grandes.
-              const windowSize = 5;
+              // Fenêtre glissante : montrer plus de vignettes si le média en a beaucoup (sans tout afficher d’un coup).
+              const windowSize = Math.min(
+                count,
+                isTV ? 9 : isFullscreen ? 11 : 9
+              );
               const half = Math.floor(windowSize / 2);
               const start = Math.max(0, Math.min(count - windowSize, selectedIndex - half));
               const end = Math.min(count - 1, start + windowSize - 1);
@@ -717,9 +797,9 @@ export function VideoControls({
                       selected
                         ? (isTV && tvScrubFocused ? 'border-white ring-4 ring-white/95' : 'border-white ring-2 ring-white/90')
                         : 'border-white/20'
-                    } shadow-2xl focus:outline-none focus:ring-2 focus:ring-white/80 transition-all ${isTV ? 'cursor-default pointer-events-none' : 'cursor-pointer hover:border-white/50'}`}
-                    // Plus large (car on affiche moins de vignettes).
-                    style={{ width: '14rem' }}
+                    } shadow-2xl focus:outline-none focus:ring-2 focus:ring-white/80 transition-all flex-1 basis-0 min-w-[10rem] sm:min-w-[12rem] md:min-w-[13rem] max-w-[30rem] aspect-video ${
+                      isTV ? 'cursor-default pointer-events-none' : 'cursor-pointer hover:border-white/50'
+                    }`}
                     onClick={(e: Event) => {
                       if (isTV) return;
                       e.preventDefault();
@@ -731,7 +811,7 @@ export function VideoControls({
                     <img
                       src={getScrubUrlForIndex(idx)}
                       alt=""
-                      class="block w-full h-auto object-cover pointer-events-none"
+                      class="absolute inset-0 w-full h-full object-cover pointer-events-none"
                       loading="lazy"
                       decoding="async"
                     />
@@ -739,19 +819,24 @@ export function VideoControls({
                 );
               }
               return (
-                <div class="absolute -top-44 left-0 right-0 z-40 flex justify-center gap-5" aria-hidden>
+                <div
+                  class="absolute -top-52 sm:-top-56 md:-top-60 z-40 flex w-screen max-w-[100vw] left-1/2 -translate-x-1/2 gap-2 sm:gap-3 md:gap-4 px-3 sm:px-5 md:px-8 box-border overflow-x-auto pb-1 scrollbar-visible"
+                  aria-hidden
+                >
                   {items}
                 </div>
               );
             })() : (
               // Placeholder animé pendant la génération des vignettes.
-              <div class="absolute -top-44 left-0 right-0 z-40 flex justify-center gap-5" aria-hidden>
+              <div
+                class="absolute -top-52 sm:-top-56 md:-top-60 z-40 flex w-screen max-w-[100vw] left-1/2 -translate-x-1/2 gap-2 sm:gap-3 md:gap-4 px-3 sm:px-5 md:px-8 box-border overflow-x-auto pb-1 scrollbar-visible"
+                aria-hidden
+              >
                 {Array.from({ length: 5 }).map((_, i) => (
                   <div
                     // eslint-disable-next-line react/no-array-index-key
                     key={i}
-                    class="w-56 h-32 rounded-xl bg-white/10 animate-pulse shadow-2xl"
-                    style={{ width: '14rem' }}
+                    class="flex-1 basis-0 min-w-[10rem] sm:min-w-[12rem] md:min-w-[13rem] max-w-[30rem] aspect-video rounded-xl bg-white/10 animate-pulse shadow-2xl"
                   />
                 ))}
               </div>

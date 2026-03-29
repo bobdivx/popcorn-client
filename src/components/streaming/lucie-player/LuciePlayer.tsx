@@ -42,6 +42,9 @@ export default function LuciePlayer({
   onProgress,
   scrubThumbnails,
   scrubThumbnailsLoading,
+  seriesEpisodePickerItems,
+  selectedSeriesEpisodeVariantId,
+  onSelectSeriesEpisode,
 }: LuciePlayerProps) {
   const playerConfig = usePlayerConfig();
   const { t } = useI18n();
@@ -86,6 +89,7 @@ export default function LuciePlayer({
   const effectiveDuration = duration > 0 ? duration : (lucieDuration ?? 0);
   useEffect(() => {
     if (!onProgress || effectiveDuration <= 0) return;
+    onProgress(currentTime, effectiveDuration);
     const id = setInterval(() => onProgress(currentTime, effectiveDuration), 15000);
     return () => {
       clearInterval(id);
@@ -398,6 +402,9 @@ export default function LuciePlayer({
               ? onPlayNextEpisode
               : undefined
           }
+          seriesEpisodePickerItems={seriesEpisodePickerItems ?? null}
+          selectedSeriesEpisodeVariantId={selectedSeriesEpisodeVariantId ?? null}
+          onSelectSeriesEpisode={onSelectSeriesEpisode}
         />
         {/* Overlays skip intro / épisode suivant */}
         {showSkipIntro && (

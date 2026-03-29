@@ -106,6 +106,7 @@ export default function DirectVideoPlayer({
   // Reprendre / Revoir : enregistrer la progression périodiquement et à la fermeture
   useEffect(() => {
     if (!onProgress || duration <= 0) return;
+    onProgress(currentTime, duration);
     const id = setInterval(() => onProgress(currentTime, duration), 15000);
     return () => {
       clearInterval(id);

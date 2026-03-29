@@ -52,6 +52,9 @@ export default function HLSPlayer({
   onProgress,
   scrubThumbnails,
   scrubThumbnailsLoading,
+  seriesEpisodePickerItems,
+  selectedSeriesEpisodeVariantId,
+  onSelectSeriesEpisode,
 }: HLSPlayerProps) {
   const playerConfig = usePlayerConfig();
   const { t } = useI18n();
@@ -162,6 +165,8 @@ export default function HLSPlayer({
   const effectiveDuration = duration > 0 ? duration : (hlsDuration ?? 0);
   useEffect(() => {
     if (!onProgress || effectiveDuration <= 0) return;
+    // Important : notifier tout de suite quand la durée HLS devient connue (reprise + miniatures scrub côté parent).
+    onProgress(currentTime, effectiveDuration);
     const id = setInterval(() => onProgress(currentTime, effectiveDuration), 15000);
     return () => {
       clearInterval(id);
@@ -505,6 +510,9 @@ export default function HLSPlayer({
               ? onPlayNextEpisode
               : undefined
           }
+          seriesEpisodePickerItems={seriesEpisodePickerItems ?? null}
+          selectedSeriesEpisodeVariantId={selectedSeriesEpisodeVariantId ?? null}
+          onSelectSeriesEpisode={onSelectSeriesEpisode}
         />
         {/* Overlays skip intro / épisode suivant au-dessus des contrôles (z-30) pour rester cliquables */}
         {showSkipIntro && (
