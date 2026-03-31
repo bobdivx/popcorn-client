@@ -3,9 +3,9 @@
 
 function getRandomBytes(size: number): Uint8Array {
   // Utiliser Web Crypto API (compatible Tauri)
-  if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.getRandomValues) {
     const array = new Uint8Array(size);
-    window.crypto.getRandomValues(array);
+    globalThis.crypto.getRandomValues(array);
     return array;
   }
   
@@ -15,16 +15,12 @@ function getRandomBytes(size: number): Uint8Array {
       const crypto = require('crypto');
       return crypto.randomBytes(size);
     } catch {
-      // Si crypto n'est pas disponible, utiliser Math.random
+      // Ignorer l'erreur pour fallback sur l'erreur ci-dessous
     }
   }
   
-  // Fallback ultime : générer des valeurs pseudo-aléatoires
-  const array = new Uint8Array(size);
-  for (let i = 0; i < size; i++) {
-    array[i] = Math.floor(Math.random() * 256);
-  }
-  return array;
+  // Refuser d'utiliser Math.random pour des raisons de sécurité
+  throw new Error('No cryptographically secure PRNG available. Refusing to fallback to Math.random() for security reasons.');
 }
 
 function uint8ArrayToHex(array: Uint8Array): string {
