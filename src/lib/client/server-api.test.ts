@@ -20,7 +20,7 @@ describe('server-api (mode Tauri)', () => {
     const fetchSpy = vi.fn(async (url: any) => {
       // endpoint attendu (pas /api/v1/* en Tauri)
       expect(String(url)).toContain('http://127.0.0.1:3000/api/torrents/list');
-      expect(String(url)).toContain('category=FILM');
+      expect(String(url).toLowerCase()).toContain('category=film');
       return {
         ok: true,
         json: async () => ({
@@ -57,7 +57,7 @@ describe('server-api (mode Tauri)', () => {
 
     const fetchSpy = vi.fn(async (url: any) => {
       expect(String(url)).toContain('http://127.0.0.1:3000/api/torrents/list');
-      expect(String(url)).toContain('category=SERIES');
+      expect(String(url).toLowerCase()).toContain('category=series');
       return {
         ok: true,
         json: async () => ({
@@ -90,8 +90,8 @@ describe('server-api (mode Tauri)', () => {
     }));
 
     const fetchSpy = vi.fn(async (url: any) => {
-      const u = String(url);
-      if (u.includes('category=FILM')) {
+      const u = String(url).toLowerCase();
+      if (u.includes('category=film')) {
         return {
           ok: true,
           json: async () => ({
@@ -100,12 +100,21 @@ describe('server-api (mode Tauri)', () => {
           }),
         } as any;
       }
-      if (u.includes('category=SERIES')) {
+      if (u.includes('category=series')) {
         return {
           ok: true,
           json: async () => ({
             success: true,
             data: [{ slug: 's1', cleanTitle: 'Series 1', category: 'SERIES', tmdbType: 'tv' }],
+          }),
+        } as any;
+      }
+      if (u.includes('api/torrents/fast')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: [],
           }),
         } as any;
       }
