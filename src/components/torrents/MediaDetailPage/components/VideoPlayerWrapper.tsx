@@ -18,6 +18,7 @@ import { useStreamSource } from '../../../streaming/player-core/hooks/useStreamS
 import { buildProxyUrl } from '../../../streaming/player-core/utils/buildStreamUrl';
 import { canUseSeekReload as computeCanUseSeekReload } from '../../../streaming/player-core/utils/streamSourceUtils';
 import { emitPlaybackStep } from '../../../streaming/player-core/observability/playbackEvents';
+import { logVideoPlaybackError } from '../../../streaming/direct-player/mediaErrorDiagnostics';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import type { SeriesEpisodePickerItem } from '../../../streaming/player-shared/types/seriesEpisodePicker';
 
@@ -772,6 +773,7 @@ export function VideoPlayerWrapper({
             }}
             onDirectLoadedData={() => setIsLoading(false)}
             onDirectError={(e) => {
+              const videoEl = e.target instanceof HTMLVideoElement ? e.target : null;
               if (useStreamTorrentMode) {
                 // Le flux peut mettre 30–60 s à être prêt (torrent initializing côté librqbit) : plus de tentatives et délai 5 s
                 const maxRetries = 12;
@@ -789,12 +791,26 @@ export function VideoPlayerWrapper({
                   }, retryDelayMs);
                   return;
                 }
-                console.error('[VideoPlayerWrapper] Direct video error après', maxRetries, 'tentatives:', e);
+                if (videoEl) {
+                  logVideoPlaybackError('VideoPlayerWrapper', videoEl, {
+                    note: 'stream-torrent gave up after retries',
+                    attempts: maxRetries,
+                  });
+                } else {
+                  console.error('[VideoPlayerWrapper] Direct video error après', maxRetries, 'tentatives:', e);
+                }
                 setHlsLoadingMessage(t('playback.torrentUnavailableOnIndexer') ?? 'Ce torrent n\'est plus disponible sur l\'indexeur. Choisissez une autre source.');
                 setIsLoading(false);
                 return;
               }
-              console.error('[VideoPlayerWrapper] Direct video error:', e);
+              if (videoEl) {
+                logVideoPlaybackError('VideoPlayerWrapper', videoEl, {
+                  note: 'direct playback',
+                  willTryHlsFallback: !directStreamUrl && isDirectMode && !forceHlsFallback,
+                });
+              } else {
+                console.error('[VideoPlayerWrapper] Direct video error:', e);
+              }
               if (!directStreamUrl && isDirectMode && !forceHlsFallback) {
                 console.warn('[VideoPlayerWrapper] Fallback automatique vers HLS après échec du mode direct.');
                 emitPlaybackStep('fallback_direct_to_hls', { message: 'Direct stream failed' });

@@ -562,7 +562,7 @@ export function DownloadDetailModal({
                 )}
 
                 <a
-                  href={`/torrents?slug=${encodeURIComponent(torrent.slug && torrent.slug.trim() ? torrent.slug : torrent.info_hash)}&from=downloads${torrent.slug && torrent.slug.trim() ? `&infoHash=${encodeURIComponent(torrent.info_hash)}` : ''}`}
+                  href={`/torrents?slug=${encodeURIComponent(torrent.slug && torrent.slug.trim() ? torrent.slug : torrent.info_hash)}&from=downloads&infoHash=${encodeURIComponent(torrent.info_hash)}`}
                   className="min-h-[48px] min-w-[48px] px-4 py-3 tv:px-6 tv:py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg tv:rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex items-center justify-center"
                   tabIndex={0}
                   data-focusable

@@ -7,6 +7,7 @@ import { VideoControls } from '../player-shared/components/VideoControls';
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import type { PlayerLoadingTorrentStats } from '../player-shared/components/PlayerLoadingOverlay';
+import { getMediaErrorDiagnostics, logVideoPlaybackError, type MediaErrorDiagnostics } from './mediaErrorDiagnostics';
 
 interface DirectVideoPlayerProps {
   src: string;
@@ -75,6 +76,13 @@ export default function DirectVideoPlayer({
   const [loaded, setLoaded] = useState(false);
   const [isWaiting, setIsWaiting] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [errorDiag, setErrorDiag] = useState<MediaErrorDiagnostics | null>(null);
+
+  useEffect(() => {
+    setHasError(false);
+    setErrorDiag(null);
+    setLoaded(false);
+  }, [src]);
 
   const isFullscreen = useFullscreen();
 
@@ -191,6 +199,20 @@ export default function DirectVideoPlayer({
     };
   }, [onLoadedData]);
 
+  const errorDetailMessage = (() => {
+    const c = errorDiag?.mediaErrorCode;
+    if (c === 1) return t('playback.errorStreamDetailAborted');
+    if (c === 2) return t('playback.errorStreamDetailNetwork');
+    if (c === 3) return t('playback.errorStreamDetailDecode');
+    if (c === 4) return t('playback.errorStreamDetailFormat');
+    if (errorDiag && c == null) return t('playback.errorStreamDetailUnknown');
+    return t('playback.errorStream');
+  })();
+
+  const technicalErrorLine =
+    errorDiag &&
+    `${errorDiag.codeLabel}${errorDiag.mediaErrorCode != null ? ` (${errorDiag.mediaErrorCode})` : ''} · networkState=${errorDiag.networkState} · readyState=${errorDiag.readyState}`;
+
   const shouldShowBuffering =
     loadingProp || isWaiting || (isSeeking && bufferedPercent < 100);
   const effectiveShowControls = showControls;
@@ -296,6 +318,9 @@ export default function DirectVideoPlayer({
             backgroundColor: '#000',
           }}
           onError={(e) => {
+            const video = e.currentTarget as HTMLVideoElement;
+            logVideoPlaybackError('DirectVideoPlayer', video);
+            setErrorDiag(getMediaErrorDiagnostics(video));
             setHasError(true);
             onError(e as Event);
           }}
@@ -317,7 +342,11 @@ export default function DirectVideoPlayer({
                 </svg>
               </div>
               <h3 class="text-white text-xl font-semibold mb-2">{t('common.error')}</h3>
-              <p class="text-white/80 text-sm mb-6">{t('playback.errorStream')}</p>
+              <p class="text-white/80 text-sm mb-3">{errorDetailMessage}</p>
+              {technicalErrorLine ? (
+                <p class="text-white/50 text-xs font-mono mb-3 break-all max-w-full">{technicalErrorLine}</p>
+              ) : null}
+              <p class="text-white/50 text-xs mb-6">{t('playback.errorStreamConsoleHint')}</p>
               <button
                 type="button"
                 onClick={(e) => {
