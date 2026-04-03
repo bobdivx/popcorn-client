@@ -1,4 +1,5 @@
 import type { JSX } from 'preact';
+import DOMPurify from 'isomorphic-dompurify';
 import { bbcodeToHtml, looksLikeBbcode } from '../../lib/bbcode-to-html';
 
 const PREVIEW_CLASS =
@@ -41,7 +42,7 @@ export function DescriptionPreview({
         className={`${PREVIEW_CLASS} ${className}`.trim()}
         role="document"
         aria-label={ariaLabel}
-        dangerouslySetInnerHTML={{ __html: sanitizePreviewHtml(html) }}
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(sanitizePreviewHtml(html)) }}
       />
     );
   }
@@ -53,7 +54,7 @@ export function DescriptionPreview({
         className={`${PREVIEW_CLASS} ${className}`.trim()}
         role="document"
         aria-label={ariaLabel}
-        dangerouslySetInnerHTML={{ __html: sanitizePreviewHtml(converted) }}
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(sanitizePreviewHtml(converted)) }}
       />
     );
   }
