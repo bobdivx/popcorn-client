@@ -5,16 +5,239 @@ import { normalizeTorrentStats } from '../../../lib/utils/torrentStatsUtils';
 import MediaDetailPage from './index';
 import type { MediaDetailPageProps } from './types';
 import { serverApi } from '../../../lib/client/server-api';
+import type {
+  SeriesEpisodesResponse,
+  SeriesEpisodeInfo,
+  SeriesSeasonInfo,
+} from '../../../lib/client/server-api/media';
 
 type Torrent = MediaDetailPageProps['torrent'];
+
+/** True si la chaîne ressemble à un info_hash (32/40 hex), pas à un slug TMDB lisible. */
+function isLikelyInfoHashString(s: string | null | undefined): boolean {
+  if (!s || typeof s !== 'string') return false;
+  const t = s.trim();
+  return (t.length === 40 || t.length === 32) && /^[a-fA-F0-9]+$/.test(t);
+}
+
+/** Nom de release type S01E04 / S1.E4 (série). */
+function torrentNameLooksLikeSeriesEpisode(name: string | null | undefined): boolean {
+  if (!name) return false;
+  return /\bS\d{1,2}[\s._-]?E\d{1,2}\b/i.test(name);
+}
+
+function parsePositiveTmdbId(v: unknown): number | null {
+  if (typeof v === 'number' && !Number.isNaN(v) && v > 0) return Math.floor(v);
+  if (typeof v === 'string' && /^\d+$/.test(v.trim())) return parseInt(v.trim(), 10);
+  return null;
+}
+
+function mostFrequentId(ids: number[]): number | null {
+  if (!ids.length) return null;
+  const m = new Map<number, number>();
+  for (const id of ids) m.set(id, (m.get(id) ?? 0) + 1);
+  let best: number | null = null;
+  let c = 0;
+  m.forEach((cnt, id) => {
+    if (cnt > c) {
+      c = cnt;
+      best = id;
+    }
+  });
+  return best;
+}
+
+function extractTmdbTvIdFromGroupData(data: any, best: any): number | null {
+  const variants = Array.isArray(data?.variants) ? data.variants : [];
+  const rows = [best, data, ...variants].filter(Boolean);
+  const tvIds: number[] = [];
+  for (const row of rows) {
+    const typ = String(row.tmdb_type ?? row.tmdbType ?? '').toLowerCase();
+    const n = parsePositiveTmdbId(row.tmdb_id ?? row.tmdbId);
+    if (n == null) continue;
+    if (typ === 'tv' || typ === 'series') tvIds.push(n);
+  }
+  if (tvIds.length) return mostFrequentId(tvIds);
+  const anyIds: number[] = [];
+  for (const row of rows) {
+    const n = parsePositiveTmdbId(row.tmdb_id ?? row.tmdbId);
+    if (n != null) anyIds.push(n);
+  }
+  return mostFrequentId(anyIds);
+}
+
+function extractTextSeriesSlugFromGroupData(data: any): string | null {
+  const tryOne = (s: unknown): string | null => {
+    if (typeof s !== 'string') return null;
+    const t = s.trim();
+    return t && !isLikelyInfoHashString(t) ? t : null;
+  };
+  const fromRoot = tryOne(data?.slug);
+  if (fromRoot) return fromRoot;
+  const variants = Array.isArray(data?.variants) ? data.variants : [];
+  for (const v of variants) {
+    const s = tryOne(v?.slug ?? v?.group_slug ?? v?.series_slug);
+    if (s) return s;
+  }
+  return null;
+}
+
+const TMDB_SYNTH_LANG = 'fr-FR';
+
+async function buildSeriesEpisodesFromTmdbDiscover(
+  cancelled: boolean,
+  tmdbTvId: number,
+  slugLabel: string,
+): Promise<SeriesEpisodesResponse | null> {
+  if (!tmdbTvId || Number.isNaN(tmdbTvId)) return null;
+  const detail = await serverApi.getTmdbTvDetail(tmdbTvId, TMDB_SYNTH_LANG);
+  if (cancelled || !detail.success || !detail.data) return null;
+  const d = detail.data as Record<string, unknown>;
+  const showName = String(d.name || d.original_name || '').trim() || 'Série';
+  const seasonsMeta = Array.isArray(d.seasons)
+    ? (d.seasons as { season_number?: number }[])
+    : [];
+  const seasonNums = [
+    ...new Set(
+      seasonsMeta
+        .map((s) => s.season_number)
+        .filter((n): n is number => typeof n === 'number' && n >= 0),
+    ),
+  ].sort((a, b) => a - b);
+
+  const seasonsOut: SeriesSeasonInfo[] = [];
+
+  for (const seasonNum of seasonNums) {
+    if (cancelled) return null;
+    const sRes = await serverApi.getTmdbTvSeasonDetail(tmdbTvId, seasonNum, TMDB_SYNTH_LANG);
+    if (!sRes.success || !sRes.data) continue;
+    const rawEps = Array.isArray((sRes.data as { episodes?: unknown }).episodes)
+      ? (sRes.data as { episodes: unknown[] }).episodes
+      : [];
+    const episodes: SeriesEpisodeInfo[] = [];
+    for (const ep of rawEps) {
+      const e = ep as { episode_number?: number; name?: string };
+      if (typeof e.episode_number !== 'number') continue;
+      if (e.episode_number < 0) continue;
+      if (seasonNum > 0 && e.episode_number === 0) continue;
+      const epNum = e.episode_number;
+      const epName = (typeof e.name === 'string' && e.name.trim()) || `Épisode ${epNum}`;
+      episodes.push({
+        season: seasonNum,
+        episode: epNum,
+        name: epName,
+        id: `popcorn_tmdb_${tmdbTvId}_s${seasonNum}_e${epNum}`,
+        info_hash: null,
+        file_size: 0,
+        seed_count: 0,
+        leech_count: 0,
+        is_from_multi_torrent: false,
+      });
+    }
+    if (episodes.length) seasonsOut.push({ season: seasonNum, episodes });
+  }
+
+  if (!seasonsOut.length) return null;
+  const slugSafe =
+    slugLabel && !isLikelyInfoHashString(slugLabel) ? slugLabel : `tmdb_${tmdbTvId}`;
+  return {
+    slug: slugSafe,
+    main_title: showName,
+    seasons: seasonsOut,
+  };
+}
+
+function extractShowTmdbIdFromSyntheticPayload(p: SeriesEpisodesResponse | null): number | null {
+  const first = p?.seasons?.[0]?.episodes?.[0]?.id;
+  const m = typeof first === 'string' ? first.match(/^popcorn_tmdb_(\d+)_s\d+_e\d+$/) : null;
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function applySyntheticTmdbToTorrent(t: Torrent, payload: SeriesEpisodesResponse | null): Torrent {
+  const sid = extractShowTmdbIdFromSyntheticPayload(payload);
+  if (sid == null) return t;
+  return {
+    ...t,
+    tmdbId: t.tmdbId ?? sid,
+    tmdbType: (t.tmdbType as string | undefined) ?? 'tv',
+  } as Torrent;
+}
+
+/**
+ * Charge saisons/épisodes : priorité TMDB id, puis slug groupe (jamais un info_hash seul pour /series/.../episodes).
+ * Dernier recours : recherche TMDB TV par titre, puis construction Discover si le backend est vide.
+ */
+async function resolveSeriesEpisodesPayload(
+  cancelled: boolean,
+  args: {
+    contentId: string;
+    groupSlug?: string | null;
+    tmdbId?: number | null;
+    tmdbTitleSearchHint?: string | null;
+  },
+): Promise<SeriesEpisodesResponse | null> {
+  const { contentId, groupSlug, tmdbId, tmdbTitleSearchHint } = args;
+  if (cancelled) return null;
+
+  const slugOk =
+    typeof groupSlug === 'string' && groupSlug.trim() && !isLikelyInfoHashString(groupSlug)
+      ? groupSlug.trim()
+      : null;
+
+  if (typeof tmdbId === 'number' && !Number.isNaN(tmdbId)) {
+    const r = await serverApi.getSeriesEpisodesByTmdbId(tmdbId);
+    if (cancelled) return null;
+    if (r.success && r.data?.seasons?.length) return r.data;
+    const synth = await buildSeriesEpisodesFromTmdbDiscover(cancelled, tmdbId, slugOk || contentId);
+    if (synth) return synth;
+  }
+
+  if (slugOk) {
+    const r = await serverApi.getSeriesEpisodes(slugOk);
+    if (cancelled) return null;
+    if (r.success && r.data?.seasons?.length) return r.data;
+  }
+
+  if (!isLikelyInfoHashString(contentId)) {
+    const r = await serverApi.getSeriesEpisodes(contentId);
+    if (cancelled) return null;
+    if (r.success && r.data?.seasons?.length) return r.data;
+  }
+
+  const hint = (tmdbTitleSearchHint ?? '').trim();
+  if (hint.length >= 2) {
+    try {
+      const sr = await serverApi.searchTmdb({ q: hint, type: 'tv', language: TMDB_SYNTH_LANG });
+      if (cancelled) return null;
+      const first = Array.isArray(sr.data) ? sr.data[0] : null;
+      const sid = first?.tmdbId;
+      if (typeof sid === 'number' && !Number.isNaN(sid)) {
+        const r2 = await serverApi.getSeriesEpisodesByTmdbId(sid);
+        if (cancelled) return null;
+        if (r2.success && r2.data?.seasons?.length) return r2.data;
+        const synth2 = await buildSeriesEpisodesFromTmdbDiscover(cancelled, sid, slugOk || contentId);
+        if (synth2) return synth2;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return null;
+}
 
 function getContentIdFromLocation(): string {
   if (typeof window === 'undefined') return '';
 
   const urlParams = new URLSearchParams(window.location.search);
+  const slug = urlParams.get('slug');
+  const infoHashParam = urlParams.get('infoHash');
+  // Depuis /downloads (ou dashboard) : `slug` = groupe série/film TMDB, `infoHash` = le torrent actif.
+  // Il faut charger par slug pour avoir variantes + épisodes TMDB ; l’infoHash reste lu à part pour le stream.
+  if (slug?.trim() && infoHashParam?.trim()) {
+    return slug.trim();
+  }
   const fromQuery =
-    // Important: depuis /downloads on a souvent `slug` (groupe) + `infoHash` (torrent réel).
-    // `slug` peut ressembler à un info_hash (40 hex) → il ne faut pas le prioriser au-dessus de infoHash.
     urlParams.get('infoHash') || urlParams.get('slug') || urlParams.get('contentId') || urlParams.get('id');
   if (fromQuery) return fromQuery;
 
@@ -614,7 +837,41 @@ export default function MediaDetailRoute() {
           const emptyGroupTitle = data?.main_title || titleFromQuery || '';
 
           if (best && !cancelled) {
-            setTorrent({ ...best, mainTitle: data?.main_title ?? undefined });
+            const mainTitle = data?.main_title ?? undefined;
+            const torrentPayload = { ...best, mainTitle } as Torrent;
+            const typeParam = new URLSearchParams(
+              typeof window !== 'undefined' ? window.location.search : '',
+            ).get('type');
+            const bestTmdbType = String(
+              best.tmdbType ?? (best as { tmdb_type?: string }).tmdb_type ?? '',
+            ).toLowerCase();
+            const isTvDetail =
+              typeParam === 'tv' || bestTmdbType === 'tv' || bestTmdbType === 'series';
+
+            if (isTvDetail) {
+              try {
+                const episodesRes = await serverApi.getSeriesEpisodesByTmdbId(tmdbId);
+                if (episodesRes.success && episodesRes.data && !cancelled) {
+                  setSeriesEpisodes(episodesRes.data);
+                } else {
+                  setSeriesEpisodes(null);
+                }
+              } catch {
+                setSeriesEpisodes(null);
+              }
+              const variants = (data?.variants ?? []) as any[];
+              if (variants.length > 0) {
+                setInitialVariants(
+                  variants.map((v: any) => ({ ...convertVariantToTorrent(v), mainTitle })),
+                );
+              } else {
+                setInitialVariants([torrentPayload]);
+              }
+            } else {
+              setSeriesEpisodes(null);
+            }
+
+            setTorrent(torrentPayload);
             setLoading(false);
             return;
           }
@@ -688,7 +945,118 @@ export default function MediaDetailRoute() {
           const best = pickBestTorrentFromGroupPayload(byIdResponse);
           if (best && !cancelled) {
             const t0 = { ...best, mainTitle: byIdData?.main_title ?? undefined } as Torrent;
-            const t = fromParam === 'downloads' ? await enrichFromLocalMediaByInfoHash(t0, contentId) : t0;
+            let t =
+              fromParam === 'downloads' ? await enrichFromLocalMediaByInfoHash(t0, contentId) : t0;
+            const tid = t.tmdbId ?? null;
+            const ttype = String(t.tmdbType ?? '').toLowerCase();
+            const explicitTv =
+              ttype === 'tv' ||
+              ttype === 'series' ||
+              String((t as any).category ?? '').toUpperCase() === 'SERIES';
+            const inferTvFromDownloads =
+              fromParam === 'downloads' &&
+              torrentNameLooksLikeSeriesEpisode(t.name) &&
+              ttype !== 'movie';
+            const shouldLoadEpisodesByTmdb =
+              tid != null && (explicitTv || inferTvFromDownloads);
+
+            /** Rempli seulement si l’API a renvoyé au moins une saison avec épisodes. */
+            let episodesPayloadOk: SeriesEpisodesResponse | null = null;
+
+            if (shouldLoadEpisodesByTmdb) {
+              try {
+                const titleHint =
+                  (typeof byIdData?.main_title === 'string' && byIdData.main_title.trim()) ||
+                  (typeof t.cleanTitle === 'string' && t.cleanTitle.trim()) ||
+                  (typeof (t as any).clean_title === 'string' && (t as any).clean_title.trim()) ||
+                  null;
+                const payload = await resolveSeriesEpisodesPayload(cancelled, {
+                  contentId,
+                  groupSlug: null,
+                  tmdbId: tid,
+                  tmdbTitleSearchHint: titleHint,
+                });
+                if (payload?.seasons?.length && !cancelled) {
+                  setSeriesEpisodes(payload);
+                  episodesPayloadOk = payload;
+                  t = applySyntheticTmdbToTorrent(t, payload);
+                } else if (!cancelled) {
+                  setSeriesEpisodes(null);
+                }
+              } catch {
+                if (!cancelled) setSeriesEpisodes(null);
+              }
+              try {
+                const libraryResponse = await serverApi.getLibrary();
+                if (libraryResponse.success && libraryResponse.data && !cancelled) {
+                  const libraryItems = Array.isArray(libraryResponse.data) ? libraryResponse.data : [];
+                  const seriesInLibrary = libraryItems.filter(
+                    (item: any) =>
+                      item.tmdb_id === tid &&
+                      (item.tmdb_type === 'tv' ||
+                        item.tmdb_type === 'series' ||
+                        item.category === 'SERIES') &&
+                      item.exists,
+                  );
+                  if (seriesInLibrary.length > 0) {
+                    setInitialVariants(seriesInLibrary.map((i: any) => libraryItemToTorrent(i)));
+                  }
+                }
+              } catch {
+                /* ignore */
+              }
+            }
+
+            // Si le 1er essai (tmdbId seul) échoue ou renvoie des saisons vides, on retente via le groupe
+            // (slug texte + tmdb agrégé + recherche TMDB). Avant c’était un « else if » : jamais exécuté
+            // quand shouldLoadEpisodesByTmdb était vrai — d’où l’absence de cartes depuis Téléchargements.
+            if (
+              !cancelled &&
+              fromParam === 'downloads' &&
+              torrentNameLooksLikeSeriesEpisode(t.name) &&
+              !episodesPayloadOk?.seasons?.length
+            ) {
+              try {
+                const grp = await serverApi.getTorrentGroup(contentId);
+                const gd = grp?.data as any;
+                if (grp.success && gd && !cancelled) {
+                  const gb = pickBestTorrentFromGroupPayload(grp);
+                  const mainTitle = gd?.main_title ?? undefined;
+                  const tmdbG = extractTmdbTvIdFromGroupData(gd, gb);
+                  if (typeof tmdbG === 'number' && (t.tmdbId == null || t.tmdbType == null)) {
+                    t = {
+                      ...t,
+                      tmdbId: t.tmdbId ?? tmdbG,
+                      tmdbType: (t.tmdbType as string | null | undefined) ?? 'tv',
+                    } as Torrent;
+                  }
+                  const variants = (gd?.variants ?? []) as any[];
+                  if (variants.length > 0) {
+                    setInitialVariants(
+                      variants.map((v: any) => ({ ...convertVariantToTorrent(v), mainTitle })),
+                    );
+                  } else if (gb) {
+                    setInitialVariants([{ ...convertVariantToTorrent(gb), mainTitle }]);
+                  }
+                  const titleHint =
+                    (typeof gd?.main_title === 'string' && gd.main_title.trim()) ||
+                    (gb && String((gb as any).cleanTitle ?? (gb as any).clean_title ?? '').trim()) ||
+                    null;
+                  const payload = await resolveSeriesEpisodesPayload(cancelled, {
+                    contentId,
+                    groupSlug: extractTextSeriesSlugFromGroupData(gd),
+                    tmdbId: tmdbG,
+                    tmdbTitleSearchHint: titleHint,
+                  });
+                  if (payload?.seasons?.length && !cancelled) {
+                    setSeriesEpisodes(payload);
+                    t = applySyntheticTmdbToTorrent(t, payload);
+                  }
+                }
+              } catch {
+                /* ignore */
+              }
+            }
             if (!cancelled) setTorrent(t);
             setLoading(false);
             return;
@@ -714,8 +1082,7 @@ export default function MediaDetailRoute() {
           if (best && !cancelled) {
             const t0 = { ...best, mainTitle } as Torrent;
             const infoHashForEnrich = (getStreamInfoHashFromLocation() || t0.infoHash || contentId || '').toString();
-            const t = fromParam === 'downloads' ? await enrichFromLocalMediaByInfoHash(t0, infoHashForEnrich) : t0;
-            if (!cancelled) setTorrent(t);
+            let t = fromParam === 'downloads' ? await enrichFromLocalMediaByInfoHash(t0, infoHashForEnrich) : t0;
             console.log('[MediaDetailRoute] Torrent final sélectionné:', {
               id: best.id,
               name: best.name,
@@ -734,21 +1101,40 @@ export default function MediaDetailRoute() {
             } else {
               setInitialVariants([{ ...best, mainTitle }]);
             }
-            // Épisodes par saison si c'est une série
-            if (best.tmdbType === 'tv' || (best as any).tmdb_type === 'tv') {
+            // Épisodes par saison (slug texte ou tmdb — pas un info_hash seul pour l’API /series/.../episodes)
+            const isSeriesGroup =
+              best.tmdbType === 'tv' ||
+              (best as any).tmdb_type === 'tv' ||
+              (best as any).tmdb_type === 'series' ||
+              torrentNameLooksLikeSeriesEpisode(best.name);
+            if (isSeriesGroup) {
               try {
-                const episodesRes = await serverApi.getSeriesEpisodes(contentId);
-                if (episodesRes.success && episodesRes.data && !cancelled) {
-                  setSeriesEpisodes(episodesRes.data);
-                } else {
+                const tmdbEp = extractTmdbTvIdFromGroupData(data, best);
+                const slugEp = extractTextSeriesSlugFromGroupData(data);
+                const titleHint =
+                  (typeof data?.main_title === 'string' && data.main_title.trim()) ||
+                  (typeof best.cleanTitle === 'string' && best.cleanTitle.trim()) ||
+                  (typeof (best as any).clean_title === 'string' && (best as any).clean_title.trim()) ||
+                  null;
+                const payload = await resolveSeriesEpisodesPayload(cancelled, {
+                  contentId,
+                  groupSlug: slugEp,
+                  tmdbId: tmdbEp,
+                  tmdbTitleSearchHint: titleHint,
+                });
+                if (payload?.seasons?.length && !cancelled) {
+                  setSeriesEpisodes(payload);
+                  t = applySyntheticTmdbToTorrent(t, payload);
+                } else if (!cancelled) {
                   setSeriesEpisodes(null);
                 }
               } catch (_e) {
-                setSeriesEpisodes(null);
+                if (!cancelled) setSeriesEpisodes(null);
               }
             } else {
               setSeriesEpisodes(null);
             }
+            if (!cancelled) setTorrent(t);
             setLoading(false);
             return;
           }
@@ -893,11 +1279,8 @@ export default function MediaDetailRoute() {
   // Depuis la page Téléchargements avec slug + infoHash : utiliser l'infoHash de l'URL pour le streaming
   // (le groupe chargé par slug peut avoir des variantes sans info_hash en DB).
   const urlInfoHash = getStreamInfoHashFromLocation();
-  const fromDownloads = getFromFromLocation() === 'downloads';
-  const displayTorrent =
-    fromDownloads && urlInfoHash
-      ? { ...torrent, infoHash: urlInfoHash }
-      : torrent;
+  // Si l’URL fixe un infoHash explicite (téléchargements, dashboard, …), c’est le fichier à lire même si le groupe expose une autre « meilleure » variante.
+  const displayTorrent = urlInfoHash ? { ...torrent, infoHash: urlInfoHash } : torrent;
   // Récupérer les stats client (progression, partage) dès qu'on a un info_hash, pour afficher
   // le statut de téléchargement et "en partage" que l'on ouvre la page depuis Téléchargements
   // (infoHash dans l'URL) ou depuis la Bibliothèque (slug dans l'URL, mais torrent.infoHash connu).

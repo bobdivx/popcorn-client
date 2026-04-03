@@ -284,6 +284,16 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     [activeTorrent, libraryDownloadPath]
   );
 
+  /** TMDB série pour vignettes épisodes : torrent ou ids synthétiques popcorn_tmdb_{id}_s_e */
+  const episodeCarouselTmdbId = useMemo(() => {
+    if (typeof activeTorrent?.tmdbId === 'number' && !Number.isNaN(activeTorrent.tmdbId)) {
+      return activeTorrent.tmdbId;
+    }
+    const first = seriesEpisodes?.seasons?.[0]?.episodes?.[0]?.id;
+    const m = typeof first === 'string' ? first.match(/^popcorn_tmdb_(\d+)_s\d+_e\d+$/) : null;
+    return m ? parseInt(m[1], 10) : null;
+  }, [activeTorrent?.tmdbId, seriesEpisodes]);
+
   // Constantes dÃ©rivÃ©es (basÃ©es sur le torrent actif pour lecture/tÃ©lÃ©chargement)
   const isExternal = activeTorrent.id.startsWith('external_');
   const hasInfoHash = typeof activeTorrent.infoHash === 'string' && activeTorrent.infoHash.trim().length > 0;
@@ -2003,7 +2013,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
               <div className="rounded-2xl overflow-hidden bg-black/30 border border-white/10">
                 <EpisodesArea
                   seriesEpisodes={seriesEpisodes}
-                  tmdbId={activeTorrent?.tmdbType === 'tv' ? activeTorrent?.tmdbId ?? null : null}
+                  tmdbId={episodeCarouselTmdbId}
                   watchedEpisodesRefresh={watchedEpisodesRefresh}
                   selectedEpisodeVariantId={selectedEpisodeVariantId}
                   onSelectEpisode={handleSeriesEpisodeSelect}
