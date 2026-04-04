@@ -1,0 +1,4 @@
+## 2024-05-24 - XSS Vulnerability in Description Preview
+**Vulnerability:** The description preview component (`DescriptionPreview.tsx`) rendered user-provided HTML descriptions (both direct HTML and converted BBCode) without sanitization via `dangerouslySetInnerHTML`, allowing potential Cross-Site Scripting (XSS).
+**Learning:** HTML data marked as "already rendered by the backend" cannot be implicitly trusted and must be sanitized on the frontend as well. In isomorphic/SSR environments like Astro+Preact, standard DOMPurify causes hydration errors or fails, necessitating `isomorphic-dompurify`.
+**Prevention:** Always wrap variables passed into `dangerouslySetInnerHTML` with `DOMPurify.sanitize()` using `isomorphic-dompurify` in isomorphic applications, regardless of the claimed safety of the backend source.
