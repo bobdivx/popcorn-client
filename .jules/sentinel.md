@@ -1,0 +1,4 @@
+## 2024-05-24 - [HIGH] XSS Vulnerability in dangerouslySetInnerHTML Usage
+**Vulnerability:** The `DescriptionPreview` component used `dangerouslySetInnerHTML` to render HTML provided directly from the backend or converted from BBCode without prior sanitization, allowing potential Cross-Site Scripting (XSS) if malicious payloads were injected.
+**Learning:** Even if data is marked as "already rendered by the backend", it should never be implicitly trusted in the frontend, particularly when injected using `dangerouslySetInnerHTML`.
+**Prevention:** Always use `isomorphic-dompurify` to sanitize HTML output before using `dangerouslySetInnerHTML` in Astro/Preact environments to ensure safe rendering across SSR and client-side without hydration mismatches.
