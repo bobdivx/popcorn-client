@@ -1,0 +1,35 @@
+
+> popcorn-vercel@1.1.0 predev
+> node scripts/copy-version.js
+
+✅ VERSION.json copié dans public/
+
+> popcorn-vercel@1.1.0 dev
+> astro dev --port 4326 --host
+
+06:17:12 [types] Generated 1ms
+06:17:12 [content] Syncing content
+06:17:12 [content] Synced content
+06:17:12 [vite] Re-optimizing dependencies because vite config has changed
+
+ astro  v5.17.2 ready in 1020 ms
+
+┃ Local    http://localhost:4326/
+┃ Network  http://192.168.0.2:4326/
+
+06:17:13 watching for file changes...
+06:18:00 [ERROR] require() cannot be used on an ESM graph with top-level await. Use import() instead. To see where the top-level await comes from, use --experimental-print-required-tla.
+  From /app/node_modules/isomorphic-dompurify/node_modules/jsdom/lib/jsdom/living/css/helpers/css-values.js
+  Requiring /app/node_modules/isomorphic-dompurify/node_modules/@asamuzakjp/css-color/dist/esm/index.js
+  Stack trace:
+    at ModuleJobSync.runSync (node:internal/modules/esm/module_job:450:13)
+    at loadESMFromCJS (node:internal/modules/cjs/loader:1536:24)
+    at Object..js (node:internal/modules/cjs/loader:1838:10)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at require (node:internal/modules/helpers:147:16)
+    at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at Module.require (node:internal/modules/cjs/loader:1463:12)
+    [...] See full stack trace in the browser, or rerun with --verbose.
