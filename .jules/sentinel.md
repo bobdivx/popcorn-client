@@ -1,0 +1,4 @@
+## 2024-05-24 - [Sanitize Rendered HTML using isomorphic-dompurify]
+**Vulnerability:** XSS vulnerability through explicitly trusted backend rendered HTML string injected into the DOM.
+**Learning:** In this codebase, HTML data explicitly marked as 'already rendered by the backend' (e.g., descriptions) must not be implicitly trusted. The frontend must independently sanitize it using `isomorphic-dompurify` before injecting it via `dangerouslySetInnerHTML` to prevent Cross-Site Scripting (XSS).
+**Prevention:** When sanitizing HTML in the Astro/Preact frontend to prevent XSS, use `isomorphic-dompurify` instead of standard `dompurify` to ensure sanitization occurs during both Server-Side Rendering (SSR) and Client-Side rendering, preventing hydration mismatches and SSR vulnerabilities.
