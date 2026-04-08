@@ -1,0 +1,4 @@
+## 2025-02-17 - [XSS vulnerability in DescriptionPreview]
+**Vulnerability:** The application was vulnerable to Cross-Site Scripting (XSS) in `src/components/upload/DescriptionPreview.tsx` because it passed raw HTML and BBCode directly to `dangerouslySetInnerHTML` without proper sanitization.
+**Learning:** Even if data is purportedly formatted or processed by a backend (like BBCode to HTML conversion), injecting it raw into the DOM via `dangerouslySetInnerHTML` in a frontend UI component introduces severe risks if the backend does not sanitize properly or if an attacker overrides the response.
+**Prevention:** Always sanitize any untrusted or semi-trusted markup (e.g., descriptions) on the client side before rendering it via `dangerouslySetInnerHTML`. Use `isomorphic-dompurify` to ensure isomorphic environments (SSR + CSR) safely sanitize without hydration mismatch issues.
