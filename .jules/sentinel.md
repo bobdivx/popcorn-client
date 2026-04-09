@@ -1,0 +1,5 @@
+
+## 2024-05-24 - [Critical XSS Vulnerability in Upload Description Preview]
+**Vulnerability:** The `DescriptionPreview` component used `dangerouslySetInnerHTML` to render HTML descriptions received from the backend (or parsed from BBCode) without sufficient sanitization. It only removed literal `{}` characters, making it trivial for an attacker to inject malicious scripts (e.g., `<script>alert(1)</script>`) via the description field, leading to Cross-Site Scripting (XSS).
+**Learning:** Even when HTML is expected to be safe or parsed by internal tools, passing it directly into `dangerouslySetInnerHTML` without explicit sanitization on the client-side creates a significant vulnerability. We cannot blindly trust backend or parsed output for rendering raw HTML.
+**Prevention:** Always sanitize any dynamic HTML content before injecting it into the DOM. In this specific Astro/Preact architecture, always use `isomorphic-dompurify` (instead of standard `dompurify`) with `DOMPurify.sanitize()` before passing content to `dangerouslySetInnerHTML` to prevent hydration mismatches and ensure secure Server-Side Rendering (SSR) and Client-Side rendering.
