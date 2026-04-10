@@ -1,4 +1,5 @@
 import type { JSX } from 'preact';
+import DOMPurify from 'isomorphic-dompurify';
 import { bbcodeToHtml, looksLikeBbcode } from '../../lib/bbcode-to-html';
 
 const PREVIEW_CLASS =
@@ -6,7 +7,8 @@ const PREVIEW_CLASS =
 
 /** Enlève les séquences {} résiduelles (placeholders mal rendus par le backend). */
 function sanitizePreviewHtml(html: string): string {
-  return html.replace(/\{\}/g, '');
+  const noPlaceholders = html.replace(/\{\}/g, '');
+  return DOMPurify.sanitize(noPlaceholders);
 }
 
 export interface DescriptionPreviewProps {
