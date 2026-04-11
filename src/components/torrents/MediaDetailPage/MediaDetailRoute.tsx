@@ -574,7 +574,7 @@ export default function MediaDetailRoute() {
   /** Toutes les variantes du groupe (pour séries) */
   const [initialVariants, setInitialVariants] = useState<Torrent[]>([]);
   /** Épisodes par saison (séries uniquement) */
-  const [seriesEpisodes, setSeriesEpisodes] = useState<import('../../../lib/client/server-api/media.js').SeriesEpisodesResponse | null>(null);
+  const [seriesEpisodes, setSeriesEpisodes] = useState<SeriesEpisodesResponse | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -800,8 +800,12 @@ export default function MediaDetailRoute() {
                   setTorrent(libraryItemToTorrent(toUse));
                   setInitialVariants(variants);
                   try {
-                    const episodesRes = await serverApi.getSeriesEpisodesByTmdbId(tmdbId);
-                    if (episodesRes.success && episodesRes.data && !cancelled) setSeriesEpisodes(episodesRes.data);
+                    const payload = await resolveSeriesEpisodesPayload(cancelled, {
+                      contentId,
+                      tmdbId,
+                      tmdbTitleSearchHint: titleFromQuery
+                    });
+                    if (payload?.seasons?.length && !cancelled) setSeriesEpisodes(payload);
                   } catch { setSeriesEpisodes(null); }
                   setLoading(false);
                   return;
@@ -850,9 +854,14 @@ export default function MediaDetailRoute() {
 
             if (isTvDetail) {
               try {
-                const episodesRes = await serverApi.getSeriesEpisodesByTmdbId(tmdbId);
-                if (episodesRes.success && episodesRes.data && !cancelled) {
-                  setSeriesEpisodes(episodesRes.data);
+                const payload = await resolveSeriesEpisodesPayload(cancelled, {
+                  contentId: best.id,
+                  groupSlug: data?.slug,
+                  tmdbId,
+                  tmdbTitleSearchHint: data?.main_title || titleFromQuery
+                });
+                if (payload?.seasons?.length && !cancelled) {
+                  setSeriesEpisodes(payload);
                 } else {
                   setSeriesEpisodes(null);
                 }
@@ -894,9 +903,15 @@ export default function MediaDetailRoute() {
               setInitialVariants(variants);
               // Charger les saisons/épisodes pour la page détail série (médias locaux)
               try {
-                const episodesRes = await serverApi.getSeriesEpisodesByTmdbId(tmdbId);
-                if (episodesRes.success && episodesRes.data && !cancelled) {
-                  setSeriesEpisodes(episodesRes.data);
+                const payload = await resolveSeriesEpisodesPayload(cancelled, {
+                  contentId: main.info_hash || main.slug || contentId,
+                  tmdbId,
+                  tmdbTitleSearchHint: main.name || titleFromQuery
+                });
+                if (payload?.seasons?.length && !cancelled) {
+                  setSeriesEpisodes(payload);
+                } else {
+                  setSeriesEpisodes(null);
                 }
               } catch (_e) {
                 setSeriesEpisodes(null);
