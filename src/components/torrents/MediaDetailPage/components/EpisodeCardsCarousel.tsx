@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'preact/hooks';
-import { ChevronLeft, ChevronRight, CircleCheck, Play } from 'lucide-preact';
+import { ChevronLeft, ChevronRight, CircleCheck, Play, CloudDownload, HardDrive } from 'lucide-preact';
 import { isTVPlatform } from '../../../../lib/utils/device-detection';
 
 export interface EpisodeCarouselItem {
@@ -10,6 +10,10 @@ export interface EpisodeCarouselItem {
   thumbnailUrl?: string | null;
   /** Épisode marqué comme vu (lecture quasi complète ou fin). */
   watched?: boolean;
+  /** Disponible dans un indexeur (torrent trouvé). */
+  isAvailable?: boolean;
+  /** Déjà téléchargé (fichier local présent). */
+  isDownloaded?: boolean;
   isSelected: boolean;
   onSelect: () => void;
   isTV?: boolean;
@@ -118,6 +122,25 @@ export function EpisodeCardsCarousel({
                       aria-label="Déjà vu"
                     >
                       <CircleCheck className="w-6 h-6 text-emerald-400 drop-shadow-md" strokeWidth={2.5} />
+                    </span>
+                  ) : null}
+
+                  {/* Icones de statut (Téléchargé > Disponible) */}
+                  {it.isDownloaded ? (
+                    <span
+                      className="inline-flex items-center justify-center p-1.5 rounded-full bg-blue-500/80 border border-blue-400/50 shadow-lg"
+                      title="Téléchargé"
+                      aria-label="Téléchargé"
+                    >
+                      <HardDrive className="w-4 h-4 text-white" strokeWidth={2.5} />
+                    </span>
+                  ) : it.isAvailable ? (
+                    <span
+                      className="inline-flex items-center justify-center p-1.5 rounded-full bg-amber-500/80 border border-amber-400/50 shadow-lg"
+                      title="Disponible (Indexer)"
+                      aria-label="Disponible"
+                    >
+                      <CloudDownload className="w-4 h-4 text-white" strokeWidth={2.5} />
                     </span>
                   ) : null}
                 </div>

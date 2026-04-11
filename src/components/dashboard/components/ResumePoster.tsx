@@ -46,17 +46,14 @@ export function ResumePoster({ item }: ResumePosterProps) {
         onFocus={(e) => {
           setIsFocused(true);
           setIsHovered(true);
-          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'center' });
         }}
         onBlur={() => {
           setIsFocused(false);
           setIsHovered(false);
         }}
       >
-        <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900/85 border border-white/15 shadow-lg rounded-lg transform transition-all duration-200 ease-out hover:scale-[1.03] hover:shadow-primary focus-within:shadow-primary-lg will-change-transform card-glow-shell">
-        <div
-          className="pointer-events-none absolute inset-0 z-30 rounded-lg border border-violet-400/0 opacity-0 transition-all duration-300 ease-out group-hover:opacity-100 group-focus-within:opacity-100 group-hover:border-violet-400/70 group-focus-within:border-violet-400/80 bg-white/[0.02] backdrop-blur-[2px] bg-gradient-to-b from-violet-500/5 to-transparent"
-        />
+        <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900/85 border border-white/15 shadow-lg rounded-lg transform transition-all duration-200 ease-out hover:scale-[1.02] focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-1 focus-within:ring-offset-black will-change-transform">
         {imageUrl ? (
           <img
             src={imageUrl}

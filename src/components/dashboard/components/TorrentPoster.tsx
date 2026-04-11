@@ -37,7 +37,7 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
   const showOverlay = isHovered || isFocused;
   const cardAnimationClasses = IS_WEBOS
     ? 'transform-gpu transition-opacity duration-150 ease-out will-change-transform'
-    : 'transform-gpu transition-all duration-[200ms] ease-out hover:scale-[1.05] focus-within:scale-[1.05] hover:shadow-primary-lg focus-within:shadow-primary-lg hover:z-40 focus-within:z-40 will-change-transform';
+    : 'transform-gpu transition-all duration-[200ms] ease-out hover:scale-[1.02] focus-within:scale-[1.02] hover:shadow-lg focus-within:shadow-lg hover:z-40 focus-within:z-40 will-change-transform';
 
   const handleClick = (e: MouseEvent | KeyboardEvent) => {
     e.preventDefault();
@@ -73,7 +73,7 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
         onFocus={(e) => {
           setIsFocused(true);
           setIsHovered(true);
-          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'center' });
         }}
         onBlur={() => {
           setIsFocused(false);
@@ -81,11 +81,8 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
         }}
       >
         <div
-          className={`relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900/85 border border-white/10 shadow-lg rounded-xl focus-within:ring-4 focus-within:ring-primary/80 focus-within:ring-offset-2 focus-within:ring-offset-black card-glow-shell ${cardAnimationClasses}`}
+          className={`relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900/85 border border-white/10 shadow-lg rounded-xl focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-1 focus-within:ring-offset-black ${cardAnimationClasses}`}
         >
-          <div
-            className="pointer-events-none absolute inset-0 z-30 rounded-xl border border-violet-400/0 opacity-0 transition-opacity duration-[200ms] ease-out group-hover:opacity-100 group-focus-within:opacity-100 group-hover:border-violet-400/80 group-focus-within:border-violet-400/100 bg-white/[0.03] backdrop-blur-[1px] bg-gradient-to-b from-violet-500/10 to-transparent"
-          />
         {imageUrl ? (
           <img
             src={imageUrl}
