@@ -43,9 +43,10 @@ export function ResumePoster({ item }: ResumePosterProps) {
         onClick={handleClick}
         href={playHref}
         tabIndex={0}
-        onFocus={() => {
+        onFocus={(e) => {
           setIsFocused(true);
           setIsHovered(true);
+          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
         }}
         onBlur={() => {
           setIsFocused(false);

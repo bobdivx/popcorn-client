@@ -162,7 +162,7 @@ export function ActionButtons({
       <div className="flex flex-nowrap gap-3 tv:gap-4 items-center overflow-x-auto scrollbar-hide">
 
         {/* Bouton Lire / Télécharger — gradient animé, rounded-full */}
-        {!hidePrimaryPlayForTvSeries &&
+        {(!hidePrimaryPlayForTvSeries || !shouldShowPlayButton) &&
           shouldShowButton &&
           !(isDownloadInProgress && onCancelDownload && showProgressNextToCancel) && (
           <button
@@ -247,7 +247,7 @@ export function ActionButtons({
         )}
 
         {/* Télécharger à côté de Lire (streaming) — style glass pill */}
-        {!hidePrimaryPlayForTvSeries && showDownloadButtonAlongsidePlay && (
+        {showDownloadButtonAlongsidePlay && (
           <button
             type="button"
             onClick={onDownload}
