@@ -103,16 +103,17 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
         onClick={handleClick}
         href={detailUrl}
         tabIndex={0}
-        onFocus={() => {
+        onFocus={(e) => {
           setIsFocused(true);
           setIsHovered(true);
+          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'center' });
         }}
         onBlur={() => {
           setIsFocused(false);
           setIsHovered(false);
         }}
       >
-          <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-lg rounded-lg transform transition-all duration-200 ease-out hover:scale-[1.03] hover:shadow-primary focus-within:shadow-primary-lg will-change-transform">
+          <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-md rounded-lg transform transition-all duration-200 ease-out hover:scale-[1.02] focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-1 focus-within:ring-offset-black will-change-transform">
           {imageUrl ? (
             <img
               src={imageUrl}
