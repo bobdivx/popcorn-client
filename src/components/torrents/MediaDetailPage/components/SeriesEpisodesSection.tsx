@@ -186,6 +186,8 @@ export function SeriesEpisodesSection({
                       : null,
                   ),
                   watched,
+                  isAvailable: !!ep.info_hash,
+                  isDownloaded: !!ep.file_path,
                   isSelected,
                   onSelect: () => onSelectEpisode(ep.id),
                   isTV,

@@ -151,6 +151,8 @@ export function PackEpisodesSection({
             subtitle: null,
             thumbnailUrl: getPreferredThumb(typeof ep.episode === 'number' && ep.episode > 0 ? ep.episode : null, fallback),
             watched,
+            isAvailable: true,
+            isDownloaded: ep.key.kind === 'file', // If we have the file object, consider it potentially downloaded
             isSelected: keyEquals(selectedEpisodeKey, ep.key),
             onSelect: () => onSelectEpisodeKey(ep.key),
             isTV,
