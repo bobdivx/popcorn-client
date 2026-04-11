@@ -83,6 +83,9 @@ export function GenreCardsRow({
                 data-genre-card
                 tabIndex={0}
                 onClick={() => onSelectGenre(null)}
+                onFocus={(e) => {
+                  (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'center' });
+                }}
                 className={`group shrink-0 w-[150px] sm:w-[170px] tv:w-[210px] aspect-[2/3] rounded-2xl border overflow-hidden text-left transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 ${
                   selectedGenre === null
                     ? 'border-primary-500/60 text-white shadow-[0_0_0_1px_rgba(124,58,237,0.25)]'
@@ -120,6 +123,9 @@ export function GenreCardsRow({
                     data-genre-card
                     tabIndex={0}
                     onClick={() => onSelectGenre(genre)}
+                    onFocus={(e) => {
+                      (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'center' });
+                    }}
                     className={`group shrink-0 w-[150px] sm:w-[170px] tv:w-[210px] aspect-[2/3] rounded-2xl border overflow-hidden text-left transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 ${
                       isActive
                         ? 'border-primary-500/60 text-white shadow-[0_0_0_1px_rgba(124,58,237,0.25)]'
