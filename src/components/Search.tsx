@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'preact/hooks';
 import { Search as SearchIcon, X } from 'lucide-preact';
 import { serverApi, type SearchResult } from '../lib/client/server-api';
 import { CacheManager } from '../lib/client/storage';
@@ -184,6 +184,32 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
   );
 }
 
+/**
+ * Regroupe les résultats de recherche par TMDB ID pour éviter les doublons (plusieurs torrents pour le même média).
+ */
+function groupSearchResults(results: SearchResult[]): SearchResult[] {
+  const groups = new Map<string, SearchResult>();
+
+  for (const r of results) {
+    // Clé de groupe : tmdbId si présent (>0), sinon titre + type (fallback)
+    const key = (r.tmdbId && r.tmdbId > 0)
+      ? `${r.tmdbId}-${r.type}`
+      : `${r.title.toLowerCase().trim()}-${r.type}`;
+
+    if (!groups.has(key)) {
+      groups.set(key, r);
+    } else {
+      // Si on a déjà un résultat pour ce média, on garde celui qui a un poster s'il existe
+      const existing = groups.get(key)!;
+      if (!existing.poster && r.poster) {
+        groups.set(key, r);
+      }
+    }
+  }
+
+  return Array.from(groups.values());
+}
+
 type SearchPhase = 'idle' | 'local' | 'indexer';
 
 export default function Search({ onResultClick }: SearchProps) {
@@ -207,9 +233,11 @@ export default function Search({ onResultClick }: SearchProps) {
   }, []);
 
   // Organiser les résultats par type (déclaré avant le useEffect qui en dépend)
-  const movies = results.filter(r => r.type === 'movie');
-  const series = results.filter(r => r.type === 'tv');
-  const allResults = type === 'all' ? results : (type === 'movie' ? movies : series);
+  // Regrouper par TMDB ID pour éviter les doublons
+  const groupedResults = useMemo(() => groupSearchResults(results), [results]);
+  const movies = groupedResults.filter(r => r.type === 'movie');
+  const series = groupedResults.filter(r => r.type === 'tv');
+  const allResults = type === 'all' ? groupedResults : (type === 'movie' ? movies : series);
 
   // Après validation de la recherche (OK / Enter) : déplacer le focus sur le premier résultat (TV / télécommande)
   useEffect(() => {
