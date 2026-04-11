@@ -131,33 +131,7 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
   const showPulse = isActive && (torrent.download_speed > 0 || torrent.upload_speed > 0);
   const showOverlay = isHovered || isFocused;
 
-  // Gérer le focus pour l'overlay (survol / focus TV)
-  useEffect(() => {
-    const container = cardContainerRef.current;
-    if (!container) return;
-
-    const handleFocusIn = (e: FocusEvent) => {
-      const target = e.target as HTMLElement;
-      if (container.contains(target) && (target.matches('.card-tv') || target.tabIndex >= 0)) {
-        setIsFocused(true);
-      }
-    };
-
-    const handleFocusOut = (e: FocusEvent) => {
-      const relatedTarget = e.relatedTarget as HTMLElement;
-      if (!container.contains(relatedTarget)) {
-        setIsFocused(false);
-      }
-    };
-
-    container.addEventListener('focusin', handleFocusIn);
-    container.addEventListener('focusout', handleFocusOut);
-
-    return () => {
-      container.removeEventListener('focusin', handleFocusIn);
-      container.removeEventListener('focusout', handleFocusOut);
-    };
-  }, []);
+  // Le focus est géré par `FocusableCard` (onFocus/onBlur) pour éviter des listeners DOM par carte.
 
   return (
     <div
@@ -171,6 +145,15 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
         className="w-full max-w-full"
         tabIndex={0}
         ariaLabel={displayTitle || torrent.name}
+        onFocus={(e) => {
+          setIsFocused(true);
+          setIsHovered(true);
+          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+        }}
+        onBlur={() => {
+          setIsFocused(false);
+          setIsHovered(false);
+        }}
         onClick={(e) => {
           if (onOpenDetail && !(e.target as HTMLElement).closest('button, a')) {
             onOpenDetail(torrent, posterUrl, backdropUrl);
