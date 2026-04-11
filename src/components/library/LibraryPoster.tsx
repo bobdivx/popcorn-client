@@ -47,9 +47,10 @@ export function LibraryPoster({ item, onPlay, className, priorityLoad }: Library
         onClick={handleClick}
         tabIndex={0}
         ariaLabel={displayTitle}
-        onFocus={() => {
+        onFocus={(e) => {
           setIsFocused(true);
           setIsHovered(true);
+          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
         }}
         onBlur={() => {
           setIsFocused(false);

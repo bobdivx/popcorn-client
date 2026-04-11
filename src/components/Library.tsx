@@ -534,7 +534,10 @@ export default function Library({
     return (
       <div key={gridKey} className="mb-8 tv:mb-10 px-4 tv:px-6">
         <h2 className="text-lg sm:text-xl tv:text-2xl font-semibold text-white mb-4">{title}</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 tv:grid-cols-6 gap-4 tv:gap-6">
+        <div
+          data-carousel
+          className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 tv:grid-cols-6 gap-4 tv:gap-6"
+        >
           {sectionItems.map((item, index) => (
             <div
               key={`${item.info_hash || item.slug || (item.tmdb_id != null ? `series-tmdb-${item.tmdb_id}` : item.name)}-${index}`}

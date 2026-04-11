@@ -1,11 +1,12 @@
-import { useEffect, useState, useCallback, useRef } from 'preact/hooks';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
 import { Download, Upload, Pause, Play, Trash2, Plus, FileText, Link2, X, FileText as LogsIcon, HardDrive } from 'lucide-preact';
 import { clientApi } from '../../lib/client/api';
-import type { ClientTorrentStats, TorrentLogEntry } from '../../lib/client/types';
+import type { ClientTorrentStats, ContentItem, TorrentLogEntry } from '../../lib/client/types';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { getDownloadMeta } from '../../lib/utils/download-meta-storage';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
+import { HeroSection } from '../dashboard/components/HeroSection';
 import { DownloadCard } from './DownloadCard';
 import { DownloadDetailModal } from './DownloadDetailModal';
 import { DownloadVerificationPanel } from './DownloadVerificationPanel';
@@ -212,6 +213,55 @@ export default function DownloadsList() {
   const [selectedTorrent, setSelectedTorrent] = useState<ClientTorrentStats | null>(null);
   const [selectedTorrentPoster, setSelectedTorrentPoster] = useState<string | null>(null);
   const [selectedTorrentBackdrop, setSelectedTorrentBackdrop] = useState<string | null>(null);
+
+  const heroItems = useMemo<ContentItem[]>(() => {
+    if (!torrents || torrents.length === 0) return [];
+    const sorted = [...torrents].sort((a, b) => {
+      const score = (x: ClientTorrentStats) => {
+        if (x.state === 'downloading') return 0;
+        if (x.state === 'seeding') return 1;
+        if (x.state === 'paused') return 2;
+        if (x.state === 'completed') return 3;
+        return 4;
+      };
+      return score(a) - score(b);
+    });
+
+    const items: ContentItem[] = [];
+    for (const tor of sorted) {
+      const key = String(tor.info_hash || '').toLowerCase();
+      const images = key ? imageMap[key] : undefined;
+      const title = (displayTitleMap[key] && displayTitleMap[key].trim()) || tor.name || t('downloads.title');
+      const backdrop = images?.backdropUrl ?? null;
+      const poster = images?.posterUrl ?? null;
+      if (!backdrop && !poster) continue;
+
+      items.push({
+        id: `download-${key || encodeURIComponent(title)}`,
+        title,
+        tmdbTitle: title,
+        type: 'movie',
+        poster: poster || undefined,
+        backdrop: backdrop || undefined,
+        progress: typeof tor.progress === 'number' ? tor.progress : undefined,
+      });
+
+      if (items.length >= 5) break;
+    }
+    return items;
+  }, [torrents, imageMap, displayTitleMap, t]);
+
+  const handleHeroOpen = useCallback((item: ContentItem) => {
+    const raw = String(item.id || '');
+    const key = raw.startsWith('download-') ? raw.slice('download-'.length) : null;
+    if (!key) return;
+    const tor = torrents.find((x) => String(x.info_hash || '').toLowerCase() === key);
+    if (!tor) return;
+    const images = imageMap[key];
+    setSelectedTorrent(tor);
+    setSelectedTorrentPoster(images?.posterUrl ?? null);
+    setSelectedTorrentBackdrop(images?.backdropUrl ?? null);
+  }, [torrents, imageMap]);
 
   // Panneau de vérification après ajout d'un torrent
   const [verificationInfoHash, setVerificationInfoHash] = useState<string | null>(null);
@@ -810,13 +860,30 @@ export default function DownloadsList() {
   }
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
-      <div className="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6 pb-8 tv:pb-10">
-        <h1 className="ds-title-page truncate mb-1">{t('downloads.title')}</h1>
-        <p className="ds-text-secondary mb-4 sm:mb-6 text-sm sm:text-base">{t('downloads.torrentsWillAppear')}</p>
+    <div className="min-h-screen bg-black text-white flex flex-col">
+      {heroItems.length > 0 && (
+        <HeroSection
+          items={heroItems}
+          onPlay={handleHeroOpen}
+          onPrimaryAction={handleHeroOpen}
+          primaryButtonLabel={t('common.details')}
+          size="large"
+        />
+      )}
+
+      <div
+        className="pt-2 sm:pt-3 pb-8 tv:pb-12 flex-1 safe-area-bottom animate-[fade-in-up_0.5s_ease-out_forwards] opacity-0"
+        style={{ paddingBottom: 'max(2rem, var(--safe-area-inset-bottom))' }}
+      >
+        <div className="px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 pt-4 sm:pt-6 pb-4">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl tv:text-5xl font-bold text-white mb-2">
+            {t('downloads.title')}
+          </h1>
+          <p className="text-gray-400 text-sm sm:text-base">{t('downloads.torrentsWillAppear')}</p>
+        </div>
 
         {/* Toolbar dans un sc-frame */}
-        <div className="sc-frame-wrap mb-4 sm:mb-6">
+        <div className="sc-frame-wrap mb-4 sm:mb-6 px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16">
           <div className="sc-frame">
             <div className="sc-frame-header">
               <div className="sc-frame-icon">
@@ -955,35 +1022,39 @@ export default function DownloadsList() {
 
         {/* Message d'erreur */}
         {error && !showAddMagnetModal && (
-          <div className="rounded-[var(--ds-radius-sm)] bg-[var(--ds-accent-red-muted)] border border-[var(--ds-accent-red)]/30 p-4 tv:p-5 mb-4 tv:mb-6">
-            <div className="flex items-start justify-between">
-              <p className="text-[var(--ds-accent-red)] text-sm tv:text-base flex-1">{error}</p>
-              <button
-                onClick={() => setError(null)}
-                className="ml-4 text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-primary)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] rounded p-1"
-                tabIndex={0}
-                aria-label="Masquer l'erreur"
-              >
-                <X className="w-5 h-5 tv:w-6 tv:h-6" size={24} />
-              </button>
+          <div className="px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16">
+            <div className="rounded-[var(--ds-radius-sm)] bg-[var(--ds-accent-red-muted)] border border-[var(--ds-accent-red)]/30 p-4 tv:p-5 mb-4 tv:mb-6">
+              <div className="flex items-start justify-between">
+                <p className="text-[var(--ds-accent-red)] text-sm tv:text-base flex-1">{error}</p>
+                <button
+                  onClick={() => setError(null)}
+                  className="ml-4 text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-primary)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] rounded p-1"
+                  tabIndex={0}
+                  aria-label="Masquer l'erreur"
+                >
+                  <X className="w-5 h-5 tv:w-6 tv:h-6" size={24} />
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {/* État vide */}
         {torrents.length === 0 && !loading && (
-          <div className="sc-frame-wrap">
-            <div className="sc-frame">
-              <div className="sc-frame-body flex flex-col items-center justify-center py-12 tv:py-16 text-center">
-                <div className="sc-frame-icon w-14 h-14 mb-4 tv:mb-5 mx-auto">
-                  <HardDrive className="w-6 h-6" strokeWidth={1.5} aria-hidden />
+          <div className="px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16">
+            <div className="sc-frame-wrap">
+              <div className="sc-frame">
+                <div className="sc-frame-body flex flex-col items-center justify-center py-12 tv:py-16 text-center">
+                  <div className="sc-frame-icon w-14 h-14 mb-4 tv:mb-5 mx-auto">
+                    <HardDrive className="w-6 h-6" strokeWidth={1.5} aria-hidden />
+                  </div>
+                  <h2 className="sc-frame-title text-base mb-2">
+                    {t('downloads.noActiveDownloads')}
+                  </h2>
+                  <p className="sc-frame-desc">
+                    {t('downloads.torrentsWillAppear')}
+                  </p>
                 </div>
-                <h2 className="sc-frame-title text-base mb-2">
-                  {t('downloads.noActiveDownloads')}
-                </h2>
-                <p className="sc-frame-desc">
-                  {t('downloads.torrentsWillAppear')}
-                </p>
               </div>
             </div>
           </div>
@@ -991,34 +1062,38 @@ export default function DownloadsList() {
 
         {/* Liste des téléchargements */}
         {torrents.length > 0 && (
-          <div className="sc-frame-wrap">
-            <div className="sc-frame">
-              <div className="sc-frame-header">
-                <div className="sc-frame-icon">
-                  <HardDrive className="w-5 h-5" strokeWidth={1.8} aria-hidden />
-                </div>
-                <div>
-                  <div className="sc-frame-title">
-                    {t('downloads.activeDownloads', { count: torrents.length, plural: torrents.length > 1 ? 's' : '' })}
-                  </div>
-                </div>
+          <div className="px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16">
+            <section className="mb-3">
+              <div className="flex items-center gap-3">
+                <h3 className="text-sm sm:text-base md:text-lg font-semibold text-white/90 uppercase tracking-wide">
+                  {t('downloads.activeDownloads', { count: torrents.length, plural: torrents.length > 1 ? 's' : '' })}
+                </h3>
+                <div className="h-px flex-1 bg-white/10" />
               </div>
-              <div className="sc-frame-body">
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 tv:grid-cols-6 gap-2 sm:gap-3 md:gap-4 tv:gap-4">
-                  {torrents.map((torrent) => {
-                    const key = torrent.info_hash.toLowerCase();
-                    const images = imageMap[key];
-                    return (
-                      <DownloadCard
-                        key={torrent.info_hash}
-                        torrent={torrent}
-                        posterUrl={images?.posterUrl ?? undefined}
-                        backdropUrl={images?.backdropUrl ?? undefined}
-                        displayTitle={displayTitleMap[key]}
-                        onOpenDetail={handleOpenDetail}
-                      />
-                    );
-                  })}
+            </section>
+
+            <div className="sc-frame-wrap">
+              <div className="sc-frame">
+                <div className="sc-frame-body">
+                  <div
+                    data-carousel
+                    className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 tv:grid-cols-6 gap-2 sm:gap-3 md:gap-4 tv:gap-4"
+                  >
+                    {torrents.map((torrent) => {
+                      const key = torrent.info_hash.toLowerCase();
+                      const images = imageMap[key];
+                      return (
+                        <DownloadCard
+                          key={torrent.info_hash}
+                          torrent={torrent}
+                          posterUrl={images?.posterUrl ?? undefined}
+                          backdropUrl={images?.backdropUrl ?? undefined}
+                          displayTitle={displayTitleMap[key]}
+                          onOpenDetail={handleOpenDetail}
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
