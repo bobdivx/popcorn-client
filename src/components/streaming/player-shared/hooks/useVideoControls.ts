@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
 import { usePlayerConfig } from './usePlayerConfig';
 import { isTVPlatform } from '../../../../lib/utils/device-detection';
@@ -206,35 +206,39 @@ export function useVideoControls({
     }
   };
 
-  const seekToTargetTime = (targetTime: number) => {
-    const video = videoRef.current;
-    if (!video) return;
-    const durationValue = duration > 0 && isFinite(duration) ? duration : (video.duration && isFinite(video.duration) ? video.duration : 0);
-    if (!durationValue) return;
-    const clamped = Math.max(0, Math.min(durationValue, targetTime));
-    let bufferedEnd = 0;
-    try {
-      if (video.buffered?.length > 0) bufferedEnd = video.buffered.end(video.buffered.length - 1);
-    } catch (_) {}
-    if (!canUseSeekReload) {
-      emitPlaybackStep('seek_native', { position: clamped });
-      video.currentTime = clamped;
-      return;
-    }
-    if (reloadWithSeek && clamped > 0 && !isLoading) {
-      const margin = 2;
-      const isBeyondBufferedWindow = clamped > bufferedEnd + margin;
-      const isLargeJump = Math.abs(clamped - video.currentTime) > 60;
-      if (isLargeJump || (bufferedEnd >= 20 && isBeyondBufferedWindow)) {
-        emitPlaybackStep('seek_reload', { position: clamped });
-        reloadWithSeek(clamped);
+  const seekToTargetTime = useCallback(
+    (targetTime: number) => {
+      const video = videoRef.current;
+      if (!video) return;
+      const durationValue =
+        duration > 0 && isFinite(duration) ? duration : video.duration && isFinite(video.duration) ? video.duration : 0;
+      if (!durationValue) return;
+      const clamped = Math.max(0, Math.min(durationValue, targetTime));
+      let bufferedEnd = 0;
+      try {
+        if (video.buffered?.length > 0) bufferedEnd = video.buffered.end(video.buffered.length - 1);
+      } catch (_) {}
+      if (!canUseSeekReload) {
+        emitPlaybackStep('seek_native', { position: clamped });
+        video.currentTime = clamped;
         return;
       }
-    }
-    if (isLoading) return;
-    emitPlaybackStep('seek_native', { position: clamped });
-    video.currentTime = clamped;
-  };
+      if (reloadWithSeek && clamped > 0 && !isLoading) {
+        const margin = 2;
+        const isBeyondBufferedWindow = clamped > bufferedEnd + margin;
+        const isLargeJump = Math.abs(clamped - video.currentTime) > 60;
+        if (isLargeJump || (bufferedEnd >= 20 && isBeyondBufferedWindow)) {
+          emitPlaybackStep('seek_reload', { position: clamped });
+          reloadWithSeek(clamped);
+          return;
+        }
+      }
+      if (isLoading) return;
+      emitPlaybackStep('seek_native', { position: clamped });
+      video.currentTime = clamped;
+    },
+    [videoRef, duration, canUseSeekReload, reloadWithSeek, isLoading]
+  );
 
   const handleSeek = (e: any) => {
     const video = videoRef.current;

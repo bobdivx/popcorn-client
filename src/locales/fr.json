@@ -592,6 +592,39 @@
     "diagnosticsDescription": "Outils de diagnostic et informations système",
     "audit": "Audit",
     "auditDescription": "Historique des actions et événements",
+    "notifications": "Notifications",
+    "notificationsDescription": "Gérez les notifications (Webhook, Slack, Telegram, Email)",
+    "notificationSettings": {
+      "title": "Notifications",
+      "description": "Configurez les alertes et notifications pour les nouveaux médias, les demandes et le système.",
+      "webhookTitle": "Webhook générique",
+      "webhookEnabled": "Webhook activé",
+      "webhookUrl": "URL du Webhook",
+      "webhookUrlHint": "Envoie un POST JSON avec {title, message, timestamp}",
+      "slackTitle": "Slack",
+      "slackEnabled": "Slack activé",
+      "slackWebhookUrl": "URL du Webhook Slack",
+      "slackWebhookUrlHint": "URL Incoming Webhook (ex: https://hooks.slack.com/services/...)",
+      "discordTitle": "Discord",
+      "discordEnabled": "Discord activé",
+      "discordWebhookUrl": "URL du Webhook Discord",
+      "discordWebhookUrlHint": "URL de webhook Discord standard",
+      "telegramTitle": "Telegram",
+      "telegramEnabled": "Telegram activé",
+      "telegramBotToken": "Token du Bot Telegram",
+      "telegramChatId": "ID du Chat (Chat ID)",
+      "telegramHint": "Créez un bot via @BotFather et obtenez l'ID via @userinfobot",
+      "emailTitle": "Email",
+      "emailEnabled": "Email activé",
+      "emailAddress": "Adresse email de réception",
+      "emailHint": "Nécessite une configuration SMTP sur le serveur",
+      "systemTitle": "Système",
+      "systemEnabled": "Logs système activés",
+      "testNotification": "Tester la notification",
+      "testSuccess": "Notification de test envoyée !",
+      "testError": "Échec de l'envoi du test",
+      "saveSuccess": "Paramètres de notification enregistrés"
+    },
     "uploadTrackerPanel": {
       "title": "Publication",
       "description": "Créez un .torrent pour un média de la bibliothèque et publiez-le via P-upload vers vos trackers.",
@@ -2029,6 +2062,10 @@
     "server": {
       "title": "Serveur",
       "subtitle": "Configurez l'URL du serveur Popcornn auquel se connecter"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "subtitle": "Gérez les alertes (Webhook, Slack, Telegram, Email, Logs)"
     },
     "quickConnect": {
       "title": "Connexion rapide",

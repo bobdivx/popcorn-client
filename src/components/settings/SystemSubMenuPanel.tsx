@@ -1,20 +1,21 @@
 import { useState, useEffect } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
-import { Settings, Package, Activity, HardDrive } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { canAccess } from '../../lib/permissions';
 import ServerSettings from './ServerSettings';
 import VersionInfo from './VersionInfo';
 import DiagnosticsPanel from './DiagnosticsPanel';
 import StoragePanel from './StoragePanel';
+import NotificationSettings from './NotificationSettings';
 import { serverApi } from '../../lib/client/server-api';
 import { redirectTo } from '../../lib/utils/navigation.js';
 import { SettingsNavCard } from './SettingsNavCard';
 import { SettingsSubPageFrame } from './SettingsSubPageFrame';
+import { Bell, Settings, Package, Activity, HardDrive } from 'lucide-preact';
 
 const BASE_URL = '/settings?category=system';
 
-const SYSTEM_SUBS = ['setup', 'hard-reset', 'versions', 'storage', 'diagnostics'] as const;
+const SYSTEM_SUBS = ['setup', 'hard-reset', 'versions', 'storage', 'diagnostics', 'notifications'] as const;
 type SystemSub = (typeof SYSTEM_SUBS)[number];
 
 function getSubFromUrl(): SystemSub | null {
@@ -109,6 +110,7 @@ type SystemItem = {
 
 const SYSTEM_ITEMS: SystemItem[] = [
   { id: 'setup', titleKey: 'settingsMenu.setup.title', descriptionKey: 'settingsMenu.setup.description', icon: Settings },
+  { id: 'notifications', titleKey: 'notificationSettings.title', descriptionKey: 'notificationSettings.description', icon: Bell },
   { id: 'hard-reset', titleKey: 'versionInfo.hardResetTitle', descriptionKey: 'versionInfo.hardResetDescription', icon: Settings },
   { id: 'versions', titleKey: 'settingsMenu.versions.title', descriptionKey: 'settingsMenu.versions.description', icon: Package },
   { id: 'storage', titleKey: 'settingsMenu.storage.title', descriptionKey: 'settingsMenu.storage.description', icon: HardDrive },
@@ -139,6 +141,7 @@ export default function SystemSubMenuPanel() {
   if (sub) {
     const item = SYSTEM_ITEMS.find((i) => i.id === sub)!;
     if (sub === 'setup') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><SetupSection embedded /></SettingsSubPageFrame>;
+    if (sub === 'notifications') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><NotificationSettings /></SettingsSubPageFrame>;
     if (sub === 'hard-reset') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><HardResetSection embedded /></SettingsSubPageFrame>;
     if (sub === 'versions') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><VersionInfo /></SettingsSubPageFrame>;
     if (sub === 'storage') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><StoragePanel /></SettingsSubPageFrame>;
