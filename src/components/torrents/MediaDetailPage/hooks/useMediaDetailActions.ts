@@ -145,9 +145,51 @@ export function useMediaDetailActions(input: UseMediaDetailActionsInput): UseMed
     addNotification,
   ]);
 
+  const handleDownloadAllEpisodes = useCallback(async (episodesPayload: any) => {
+    if (!episodesPayload?.seasons) return;
+    
+    // Collecter tous les info_hashes uniques disponibles
+    const uniqueInfoHashes = new Set<string>();
+    const variantsToDownload: MediaDetailPageProps['torrent'][] = [];
+    
+    for (const season of episodesPayload.seasons) {
+      for (const ep of season.episodes) {
+        if (ep.info_hash && !uniqueInfoHashes.has(ep.info_hash)) {
+          uniqueInfoHashes.add(ep.info_hash);
+          // Trouver le variant correspondant dans allVariants
+          const variant = allVariants.find(v => v.infoHash === ep.info_hash);
+          if (variant) variantsToDownload.push(variant);
+        }
+      }
+    }
+    
+    if (variantsToDownload.length === 0) {
+      addNotification('info', 'Aucun épisode disponible pour le téléchargement');
+      return;
+    }
+    
+    addNotification('info', `Démarrage du téléchargement de ${variantsToDownload.length} source(s)...`);
+    
+    let successCount = 0;
+    for (const v of variantsToDownload) {
+      try {
+        // On utilise directement doDownload avec l'override
+        await doDownload(v);
+        successCount++;
+      } catch (e) {
+        console.error(`Erreur téléchargement variant ${v.infoHash}:`, e);
+      }
+    }
+    
+    if (successCount > 0) {
+      addNotification('success', `${successCount} source(s) ajoutée(s) avec succès`);
+    }
+  }, [allVariants, doDownload, addNotification]);
+
   return {
     handleDownload: doDownload,
     handleDownloadTorrent: doDownloadTorrent,
+    handleDownloadAllEpisodes,
     handleCopyMagnet: doCopyMagnet,
     handleRequestDelete,
     handleConfirmDelete,

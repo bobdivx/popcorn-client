@@ -131,24 +131,24 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
   const showPulse = isActive && (torrent.download_speed > 0 || torrent.upload_speed > 0);
   const showOverlay = isHovered || isFocused;
 
-  // Le focus est géré par `FocusableCard` (onFocus/onBlur) pour éviter des listeners DOM par carte.
-
   return (
     <div
       ref={cardContainerRef}
       data-torrent-card
-      className="relative group cursor-pointer torrent-poster min-w-0 w-full max-w-full"
+      className="relative w-full max-w-full"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <FocusableCard
-        className="w-full max-w-full"
+        className={`group text-left rounded-2xl overflow-hidden border transition focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] w-full block ${
+           isFocused || isHovered ? 'border-[var(--ds-accent-violet)]/50 bg-[var(--ds-accent-violet)]/10' : 'border-white/10 bg-white/5 hover:bg-white/10'
+        }`}
         tabIndex={0}
         ariaLabel={displayTitle || torrent.name}
         onFocus={(e) => {
           setIsFocused(true);
           setIsHovered(true);
-          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'center' });
         }}
         onBlur={() => {
           setIsFocused(false);
@@ -160,127 +160,104 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
           }
         }}
       >
-        <div className="relative aspect-[2/3] overflow-hidden bg-[var(--ds-surface)] shadow-lg rounded-[var(--ds-radius-sm)] tv:rounded-xl w-full">
-          {/* Image backdrop en arrière-plan avec blur */}
-          {backdropUrl && (
-            <div
-              className="absolute inset-0 opacity-30 z-0 transition-opacity duration-300"
-              style={{
-                backgroundImage: `url(${backdropUrl})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                filter: 'blur(20px)',
-              }}
-            />
-          )}
-          
-          {/* Poster TMDB au premier plan */}
-          {posterUrl ? (
-            <img
-              src={posterUrl}
-              alt={torrent.name}
-              className="w-full h-full object-cover relative z-10"
-              loading="lazy"
-              decoding="async"
-              fetchpriority="low"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
+        <div className="relative aspect-video w-full overflow-hidden bg-black/30">
+          {/* Background image: priority to backdrop, otherwise fallback to blurred poster */}
+          {backdropUrl ? (
+            <img src={backdropUrl} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover z-0" />
+          ) : posterUrl ? (
+            <>
+              <div
+                className="absolute inset-0 opacity-50 z-0"
+                style={{
+                  backgroundImage: `url(${posterUrl})`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  filter: 'blur(20px)',
+                }}
+              />
+              <img src={posterUrl} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-contain z-0" />
+            </>
           ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-[var(--ds-surface)] to-[var(--ds-surface-elevated)] relative z-10 p-2 tv:p-3">
-              <Film className="w-8 h-8 tv:w-10 tv:h-10 mb-1 tv:mb-2 text-[var(--ds-text-tertiary)] shrink-0" size={40} />
-              <p className="text-[10px] tv:text-xs ds-text-secondary line-clamp-2 text-center w-full">{displayTitle || torrent.name}</p>
-              <p className="text-[9px] tv:text-[10px] ds-text-tertiary mt-1 text-center leading-tight" title={t('downloads.notLinkedToTmdb')}>
-                {t('downloads.notLinkedToTmdbShort')}
-              </p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-white/10 via-black/40 to-black/80 z-0 p-2 text-white/20">
+               <Film className="w-8 h-8 tv:w-10 tv:h-10 mb-2 shrink-0" size={40} />
             </div>
           )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
 
-          {/* Badge d'état en haut à gauche - compact sur TV */}
-          <div className="absolute top-1.5 left-1.5 lg:top-2 lg:left-2 tv:top-2 tv:left-2 z-20">
-            <TorrentStatusBadge state={torrent.state} className="px-1.5 py-0.5 tv:px-2 tv:py-1 text-[10px] tv:text-xs shadow-lg" />
+          {/* Badge d'état en haut à gauche */}
+          <div className="absolute left-3 top-3 z-20">
+            <TorrentStatusBadge state={torrent.state} className="px-2.5 py-1 rounded-full text-[10px] tv:text-xs font-bold tracking-wide bg-black/50 border border-white/15 text-white/90" />
           </div>
 
-          {/* Badges de stats */}
-          <div className="absolute top-1.5 right-1.5 lg:top-2 lg:right-2 tv:top-2 tv:right-2 z-20 flex flex-col gap-1 tv:gap-1.5 items-end">
+          {/* Badges de stats, top right */}
+          <div className="absolute top-3 right-3 z-20 flex flex-col gap-1.5 items-end">
             {torrent.download_speed > 0 && (
-              <div className="bg-[var(--ds-accent-violet)]/90 backdrop-blur-sm rounded-[var(--ds-radius-sm)] px-1.5 py-0.5 tv:px-2 tv:py-1 flex items-center gap-1 text-[10px] tv:text-xs text-[var(--ds-text-on-accent)] shadow-lg">
-                <Download className="w-2.5 h-2.5 tv:w-3 tv:h-3" size={14} />
-                <span className="font-semibold">{formatSpeed(torrent.download_speed)}</span>
+              <div className="bg-[var(--ds-accent-violet)]/90 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1.5 text-[10px] tv:text-xs text-[var(--ds-text-on-accent)] shadow-lg border border-white/15">
+                <Download className="w-3 h-3 tv:w-3.5 tv:h-3.5" strokeWidth={2.5} size={14} />
+                <span className="font-semibold tracking-wide">{formatSpeed(torrent.download_speed)}</span>
               </div>
             )}
             {torrent.upload_speed > 0 && (
-              <div className="bg-[var(--ds-accent-green)]/90 backdrop-blur-sm rounded-[var(--ds-radius-sm)] px-1.5 py-0.5 tv:px-2 tv:py-1 flex items-center gap-1 text-[10px] tv:text-xs text-[var(--ds-text-on-accent)] shadow-lg">
-                <Upload className="w-2.5 h-2.5 tv:w-3 tv:h-3" size={14} />
-                <span className="font-semibold">{formatSpeed(torrent.upload_speed)}</span>
+              <div className="bg-[var(--ds-accent-green)]/90 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1.5 text-[10px] tv:text-xs text-[var(--ds-text-on-accent)] shadow-lg border border-white/15">
+                <Upload className="w-3 h-3 tv:w-3.5 tv:h-3.5" strokeWidth={2.5} size={14} />
+                <span className="font-semibold tracking-wide">{formatSpeed(torrent.upload_speed)}</span>
               </div>
             )}
             {torrent.seeders > 0 && (
-              <div className="bg-[var(--ds-accent-green)]/90 backdrop-blur-sm rounded-[var(--ds-radius-sm)] px-1.5 py-0.5 tv:px-2 tv:py-1 flex items-center gap-1 text-[10px] tv:text-xs text-[var(--ds-text-on-accent)] shadow-lg">
-                <Sprout className="w-2.5 h-2.5 tv:w-3 tv:h-3" size={14} />
+              <div className="bg-[var(--ds-accent-green)]/90 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1.5 text-[10px] tv:text-xs text-[var(--ds-text-on-accent)] shadow-lg border border-white/15">
+                <Sprout className="w-3 h-3 tv:w-3.5 tv:h-3.5" strokeWidth={2.5} size={14} />
                 <span className="font-semibold">{torrent.seeders}</span>
               </div>
             )}
             {(torrent.peers_connected > 0 || torrent.peers_total > 0) && (
-              <div className="bg-[var(--ds-accent-violet-muted)] backdrop-blur-sm rounded-[var(--ds-radius-sm)] px-1.5 py-0.5 tv:px-2 tv:py-1 flex items-center gap-1 text-[10px] tv:text-xs text-[var(--ds-accent-violet)] shadow-lg border border-[var(--ds-border)]">
-                <Users className="w-2.5 h-2.5 tv:w-3 tv:h-3" size={14} />
+              <div className="bg-[var(--ds-accent-violet-muted)] backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1.5 text-[10px] tv:text-xs text-[var(--ds-accent-violet)] shadow-lg border border-[var(--ds-accent-violet)]/30">
+                <Users className="w-3 h-3 tv:w-3.5 tv:h-3.5" strokeWidth={2.5} size={14} />
                 <span className="font-semibold">{torrent.peers_connected || torrent.peers_total}</span>
+              </div>
+            )}
+            {torrent.is_private && (
+              <div className="bg-[var(--ds-accent-yellow)]/90 backdrop-blur-sm rounded-full px-2 py-1 flex items-center gap-1.5 text-[10px] tv:text-xs text-black shadow-lg border border-[var(--ds-accent-yellow)]/30">
+                <span className="font-medium text-[10px]">🔒 Privé</span>
               </div>
             )}
           </div>
 
+          <div className="absolute right-3 bottom-4 w-11 h-11 rounded-full flex items-center justify-center border border-white/15 bg-black/40 text-white/90 group-hover:bg-[var(--ds-accent-violet)] group-hover:text-white transition z-20 shadow-lg">
+             <Film className="w-5 h-5 ml-0.5" strokeWidth={2} />
+          </div>
+
           {/* Barre de progression */}
-          <div className="absolute bottom-0 left-0 right-0 h-1 tv:h-1.5 bg-[var(--ds-surface)]/80 z-20">
+          <div className="absolute bottom-0 left-0 right-0 h-1 tv:h-1.5 bg-black/40 z-20">
             <div
-              className={`${progressColor} h-full transition-all duration-500 ${showPulse ? 'animate-pulse' : ''}`}
+              className={`${progressColor} h-full transition-all duration-500 ${showPulse ? 'animate-[pulse_2s_ease-in-out_infinite]' : ''}`}
               style={{ width: `${torrent.progress * 100}%` }}
             />
           </div>
+        </div>
 
-          {/* Overlay au survol/focus */}
-          {showOverlay && (
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/80 to-transparent flex flex-col justify-end p-2 lg:p-3 tv:p-3 transition-opacity pointer-events-none z-30">
-              <div className="space-y-1 tv:space-y-2">
-                <h3 className="text-[var(--ds-text-primary)] font-semibold text-xs lg:text-sm tv:text-sm line-clamp-2">
-                  {displayTitle}
-                </h3>
-                <div className="flex flex-wrap items-center gap-1.5 tv:gap-2 text-[10px] tv:text-xs ds-text-secondary">
-                  <span>{formatBytes(torrent.downloaded_bytes)} / {formatBytes(torrent.total_bytes)}</span>
-                  <span>•</span>
-                  <span className="font-semibold">{(torrent.progress * 100).toFixed(1)}%</span>
-                  {torrent.eta_seconds && torrent.eta_seconds > 0 && (
-                    <>
-                      <span>•</span>
-                      <span>ETA: {formatETA(torrent.eta_seconds)}</span>
-                    </>
-                  )}
-                </div>
-                {torrent.status_reason && (
-                  <div className="text-[10px] tv:text-xs text-[var(--ds-accent-yellow)] mt-0.5 line-clamp-2">
-                    {torrent.status_reason}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Badge privé */}
-          {torrent.is_private && (
-            <div className="absolute bottom-1.5 left-1.5 lg:bottom-2 lg:left-2 tv:bottom-2 tv:left-2 z-20">
-              <div className="bg-[var(--ds-accent-yellow)]/90 backdrop-blur-sm rounded-[var(--ds-radius-sm)] px-1.5 py-0.5 tv:px-2 tv:py-1 text-[10px] tv:text-xs text-[var(--ds-text-on-accent)] shadow-lg flex items-center gap-1">
-                <span>🔒</span>
-                <span className="font-medium">{t('downloads.private')}</span>
-              </div>
-            </div>
+        <div className="p-3 sm:p-4 bg-transparent relative z-10 text-left">
+          <div className="text-base font-semibold text-white/90 truncate" title={displayTitle}>
+            {displayTitle || torrent.name}
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-[6px] text-xs text-white/50 mt-1.5">
+            <span>{formatBytes(torrent.downloaded_bytes)} / {formatBytes(torrent.total_bytes)}</span>
+            <span className="w-1 h-1 rounded-full bg-white/20" />
+            <span className="font-medium text-white/70">{(torrent.progress * 100).toFixed(1)}%</span>
+            {torrent.eta_seconds && torrent.eta_seconds > 0 ? (
+              <>
+                <span className="w-1 h-1 rounded-full bg-white/20" />
+                <span>ETA: {formatETA(torrent.eta_seconds)}</span>
+              </>
+            ) : null}
+          </div>
+          
+          {torrent.status_reason && (
+             <div className="text-xs text-[var(--ds-accent-yellow)] mt-1.5 line-clamp-1 opacity-80">
+                {torrent.status_reason}
+             </div>
           )}
         </div>
-        {/* Titre sous le poster */}
-        {displayTitle && (
-          <p className="mt-1.5 tv:mt-2 text-[10px] sm:text-xs tv:text-xs ds-text-secondary line-clamp-2 px-0.5" title={displayTitle}>
-            {displayTitle}
-          </p>
-        )}
       </FocusableCard>
     </div>
   );

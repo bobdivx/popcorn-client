@@ -4,6 +4,7 @@ import type { MediaRequest } from '../../lib/client/server-api/requests';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { Clock, CheckCircle, XCircle, Film, Tv, Trash2 } from 'lucide-preact';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
+import { FocusableCard } from '../ui/FocusableCard';
 
 const STATUS_PENDING = 1;
 const STATUS_APPROVED = 2;
@@ -45,6 +46,114 @@ function statusBadgeClass(status: number) {
     default:
       return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
   }
+}
+
+function RequestCard({ req, onDelete, deletingId, t }: { req: RequestWithTmdb, onDelete: (id: number) => void, deletingId: number | null, t: any }) {
+  const [isFocused, setIsFocused] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  
+  const posterUrl = req.tmdbInfo?.poster_path ? `https://image.tmdb.org/t/p/w185${req.tmdbInfo.poster_path}` : null;
+  const title = req.tmdbInfo?.title || `TMDB #${req.tmdb_id}`;
+  const year = req.tmdbInfo?.release_date?.slice(0, 4) || req.tmdbInfo?.first_air_date?.slice(0, 4);
+
+  return (
+    <FocusableCard
+      className="w-full h-full"
+      onClick={() => {}}
+      onFocus={(e) => {
+        setIsFocused(true);
+        setIsHovered(true);
+        (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'center' });
+      }}
+      onBlur={() => {
+        setIsFocused(false);
+        setIsHovered(false);
+      }}
+    >
+      <div
+        className={`glass-panel rounded-xl overflow-hidden flex flex-col h-full transform transition-all duration-200 ease-out will-change-transform ${
+          isFocused || isHovered ? 'scale-[1.02] ring-2 ring-primary-500 shadow-xl' : 'scale-100'
+        }`}
+      >
+        {/* Poster + Overlay */}
+        <div class="relative aspect-[2/3] bg-gray-800">
+          {posterUrl ? (
+            <img
+              src={posterUrl}
+              alt={title}
+              class="w-full h-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900">
+              {req.media_type === 'movie' ? (
+                <Film class="w-16 h-16 text-gray-600" />
+              ) : (
+                <Tv class="w-16 h-16 text-gray-600" />
+              )}
+            </div>
+          )}
+          
+          {/* Status badge overlay */}
+          <div class="absolute top-2 right-2">
+            <div class={`flex items-center gap-1.5 px-2 py-1 rounded-full border ${statusBadgeClass(req.status)}`}>
+              {statusIcon(req.status)}
+              <span class="text-xs font-medium">
+                {req.status === STATUS_PENDING ? t('requests.statusPending') : 
+                 req.status === STATUS_APPROVED ? t('requests.statusApproved') : 
+                 req.status === STATUS_DECLINED ? t('requests.statusDeclined') : t('requests.statusUnknown')}
+              </span>
+            </div>
+          </div>
+
+          {/* Media type badge */}
+          <div class="absolute top-2 left-2">
+            <div class="flex items-center gap-1 px-2 py-1 rounded-full bg-black/60 text-white/80 text-xs">
+              {req.media_type === 'movie' ? <Film class="w-4 h-4" /> : <Tv class="w-4 h-4" />}
+              <span>{req.media_type === 'movie' ? t('common.film') : t('common.serie')}</span>
+            </div>
+          </div>
+
+          {/* Delete button (pending only) */}
+          {req.status === STATUS_PENDING && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(req.id);
+              }}
+              disabled={deletingId === req.id}
+              class={`absolute bottom-2 right-2 p-2 rounded-full bg-red-500/80 hover:bg-red-500 text-white transition-opacity disabled:opacity-50 ${isHovered || isFocused ? 'opacity-100' : 'opacity-0'}`}
+              title={t('requests.cancelRequest')}
+            >
+              {deletingId === req.id ? (
+                <HLSLoadingSpinner size="sm" />
+              ) : (
+                <Trash2 class="w-4 h-4" />
+              )}
+            </button>
+          )}
+        </div>
+
+        {/* Info */}
+        <div class="p-4 flex-1 flex flex-col">
+          <h3 class="font-semibold text-white text-lg line-clamp-2 mb-1">
+            {title}
+          </h3>
+          {year && (
+            <p class="text-sm text-gray-400 mb-2">{year}</p>
+          )}
+          <p class="text-xs text-gray-500 mt-auto">
+            {t('requests.requestedOn')} {new Date(req.created_at * 1000).toLocaleDateString()}
+          </p>
+          {req.notes && (
+            <p class="text-xs text-gray-400 mt-2 italic line-clamp-2">
+              {req.notes}
+            </p>
+          )}
+        </div>
+      </div>
+    </FocusableCard>
+  );
 }
 
 export default function MyRequests() {
@@ -183,88 +292,15 @@ export default function MyRequests() {
 
         {!error && requests.length > 0 && (
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-            {requests.map((req) => {
-              const posterUrl = getPosterUrl(req.tmdbInfo?.poster_path);
-              const title = req.tmdbInfo?.title || `TMDB #${req.tmdb_id}`;
-              const year = getReleaseYear(req);
-              
-              return (
-                <div
-                  key={req.id}
-                  class="glass-panel rounded-xl overflow-hidden flex flex-col group hover:ring-2 hover:ring-primary-500/50 transition-all"
-                >
-                  {/* Poster + Overlay */}
-                  <div class="relative aspect-[2/3] bg-gray-800">
-                    {posterUrl ? (
-                      <img
-                        src={posterUrl}
-                        alt={title}
-                        class="w-full h-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900">
-                        {req.media_type === 'movie' ? (
-                          <Film class="w-16 h-16 text-gray-600" />
-                        ) : (
-                          <Tv class="w-16 h-16 text-gray-600" />
-                        )}
-                      </div>
-                    )}
-                    
-                    {/* Status badge overlay */}
-                    <div class="absolute top-2 right-2">
-                      <div class={`flex items-center gap-1.5 px-2 py-1 rounded-full border ${statusBadgeClass(req.status)}`}>
-                        {statusIcon(req.status)}
-                        <span class="text-xs font-medium">{getStatusLabel(req.status)}</span>
-                      </div>
-                    </div>
-
-                    {/* Media type badge */}
-                    <div class="absolute top-2 left-2">
-                      <div class="flex items-center gap-1 px-2 py-1 rounded-full bg-black/60 text-white/80 text-xs">
-                        {getMediaTypeIcon(req.media_type)}
-                        <span>{req.media_type === 'movie' ? t('common.film') : t('common.serie')}</span>
-                      </div>
-                    </div>
-
-                    {/* Delete button (pending only) */}
-                    {req.status === STATUS_PENDING && (
-                      <button
-                        onClick={() => handleDelete(req.id)}
-                        disabled={deletingId === req.id}
-                        class="absolute bottom-2 right-2 p-2 rounded-full bg-red-500/80 hover:bg-red-500 text-white opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
-                        title={t('requests.cancelRequest')}
-                      >
-                        {deletingId === req.id ? (
-                          <HLSLoadingSpinner size="sm" />
-                        ) : (
-                          <Trash2 class="w-4 h-4" />
-                        )}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div class="p-4 flex-1 flex flex-col">
-                    <h3 class="font-semibold text-white text-lg line-clamp-2 mb-1">
-                      {title}
-                    </h3>
-                    {year && (
-                      <p class="text-sm text-gray-400 mb-2">{year}</p>
-                    )}
-                    <p class="text-xs text-gray-500 mt-auto">
-                      {t('requests.requestedOn')} {new Date(req.created_at * 1000).toLocaleDateString()}
-                    </p>
-                    {req.notes && (
-                      <p class="text-xs text-gray-400 mt-2 italic line-clamp-2">
-                        {req.notes}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {requests.map((req) => (
+              <RequestCard 
+                key={req.id} 
+                req={req} 
+                onDelete={handleDelete} 
+                deletingId={deletingId}
+                t={t}
+              />
+            ))}
           </div>
         )}
       </div>

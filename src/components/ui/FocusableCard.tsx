@@ -69,7 +69,8 @@ export function FocusableCard({
     };
   }, [onClick, href]);
 
-  const baseClasses = `card-tv focus-tv-glow ds-focus-glow ds-active-glow transition-all duration-300 ${className}`;
+  const isTV = typeof document !== 'undefined' && (document.body?.dataset?.tv === 'true' || navigator.userAgent.toLowerCase().includes('tv') || document.body?.classList.contains('tv-platform'));
+  const baseClasses = `group transition cursor-pointer ${isTV ? 'tv-card gtv-focusable focus:scale-105 outline-none' : 'focus:outline-none focus:ring-2 focus:ring-primary-500'} ${className}`;
   const commonProps: any = {
     ref: cardRef as any,
     className: baseClasses,
