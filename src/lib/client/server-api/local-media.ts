@@ -12,7 +12,7 @@ export const localMediaMethods = {
   ): Promise<ApiResponse<any>> {
     const hash = (infoHash || '').trim().toLowerCase();
     if (!hash) return { success: false, message: 'info_hash requis' };
-    return this.backendRequest(`/api/local-media/by-info-hash/${encodeURIComponent(hash)}`, { method: 'GET' });
+    return this.backendRequest(`/api/client/local-media/by-info-hash/${encodeURIComponent(hash)}`, { method: 'GET' });
   },
 };
 

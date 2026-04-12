@@ -128,15 +128,23 @@ export class ClientApi {
   }
 
   /**
+   * Rechercher les médias locaux par TMDB ID
+   */
+  async findLocalMediaByTmdb(tmdbId: number, tmdbType?: string): Promise<any[]> {
+    return this._torrents.findLocalMediaByTmdb(tmdbId, tmdbType);
+  }
+
+  /**
    * Ajouter un torrent depuis un fichier .torrent
    */
   async addTorrentFile(
     file: File, 
     forStreaming: boolean = false,
     downloadType?: string,
-    customDownloadPath?: string
+    customDownloadPath?: string,
+    onlyFiles?: number[]
   ): Promise<AddTorrentResponse> {
-    return this._torrents.addTorrentFile(file, forStreaming, downloadType, customDownloadPath);
+    return this._torrents.addTorrentFile(file, forStreaming, downloadType, customDownloadPath, onlyFiles);
   }
 
   /**
@@ -147,9 +155,10 @@ export class ClientApi {
     name: string, 
     forStreaming: boolean = false,
     downloadType?: string,
-    customDownloadPath?: string
+    customDownloadPath?: string,
+    onlyFiles?: number[]
   ): Promise<AddTorrentResponse> {
-    return this._torrents.addMagnetLink(magnetUri, name, forStreaming, downloadType, customDownloadPath);
+    return this._torrents.addMagnetLink(magnetUri, name, forStreaming, downloadType, customDownloadPath, onlyFiles);
   }
 
   /**

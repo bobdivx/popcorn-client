@@ -14,6 +14,12 @@ export interface EpisodeCarouselItem {
   isAvailable?: boolean;
   /** Déjà téléchargé (fichier local présent). */
   isDownloaded?: boolean;
+  /** En cours de téléchargement (via le client). */
+  isDownloading?: boolean;
+  /** Progression du téléchargement (0 à 100). */
+  downloadProgress?: number;
+  /** Message de statut (ex: "Initialisation...") */
+  statusMessage?: string | null;
   isSelected: boolean;
   onSelect: () => void;
   isTV?: boolean;
@@ -110,6 +116,56 @@ export function EpisodeCardsCarousel({
                   <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-black/40 to-black/80" />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+
+                {/* Overlay Premium de Téléchargement */}
+                {it.isDownloading && (
+                  <div className="absolute inset-0 z-20 overflow-hidden pointer-events-none">
+                    {/* Gradient de fond demandé */}
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/90 to-black transition-opacity duration-500" />
+                    
+                    {/* Contenu de l'overlay */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+                      {/* Anneau de progression ou icône pulsante */}
+                      <div className="relative w-14 h-14 sm:w-16 sm:h-16 mb-3">
+                        <div className="absolute inset-0 rounded-full border-2 border-white/5" />
+                        <div 
+                          className="absolute inset-0 rounded-full border-2 border-primary-500 border-t-transparent animate-spin" 
+                          style={{ 
+                            animationDuration: '1s',
+                            maskImage: `conic-gradient(transparent 20%, black 100%)`
+                          }} 
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <CloudDownload className="w-6 h-6 sm:w-7 sm:h-7 text-primary-400 animate-pulse" />
+                        </div>
+                      </div>
+
+                      <div className="text-center">
+                        <div className="text-[10px] sm:text-xs font-bold text-white tracking-[0.2em] uppercase mb-1 drop-shadow-md opacity-80">
+                          En cours
+                        </div>
+                        {typeof it.downloadProgress === 'number' && (
+                          <div className="text-xl sm:text-2xl font-black text-white drop-shadow-lg tabular-nums">
+                            {Math.round(it.downloadProgress)}%
+                          </div>
+                        )}
+                        {it.statusMessage && (
+                          <div className="text-[9px] sm:text-[10px] text-white/50 uppercase tracking-tighter mt-1 truncate max-w-[180px]">
+                            {it.statusMessage}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Lueur d'activité en bas */}
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/5">
+                      <div 
+                        className="h-full bg-primary-500 transition-all duration-500 shadow-[0_0_12px_rgba(var(--color-primary-500,168,85,247),0.6)]"
+                        style={{ width: `${it.downloadProgress ?? 0}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 <div className="absolute left-3 top-3 flex items-center gap-2">
                   <span className="px-2.5 py-1 rounded-full text-xs font-bold tracking-wide bg-black/50 border border-white/15 text-white/90">

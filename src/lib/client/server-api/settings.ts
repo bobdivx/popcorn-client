@@ -159,7 +159,7 @@ export const settingsMethods = {
     if (hash.length !== 40) return { success: false, error: 'ValidationError', message: 'info_hash doit faire 40 caractères' };
     const url = `/api/admin/tracker-mode/torrents/${encodeURIComponent(hash)}/trackers`;
     console.log('[Ratio] getRatioTorrentTrackers request:', { infoHash: hash, url });
-    const res = await this.backendRequest(url, { method: 'GET' });
+    const res = await this.backendRequest<{ tracker_urls: string[]; debug_librqbit_keys?: string[] }>(url, { method: 'GET' });
     console.log('[Ratio] getRatioTorrentTrackers response:', { success: res.success, data: res.data, error: res.error, message: res.message });
     if (res.success && res.data?.debug_librqbit_keys) {
       console.warn('[Ratio] Aucun tracker renvoyé par l’API. Clés reçues de librqbit:', res.data.debug_librqbit_keys, res.data.debug_librqbit_keys?.includes('trackers') ? '(contient "trackers" mais liste vide)' : '(clé "trackers" absente → binaire librqbit peut-être pas à jour)');
