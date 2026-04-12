@@ -95,6 +95,13 @@ export default function DownloadsList() {
     try {
       const list = await clientApi.listTorrents();
       setTorrents(list);
+
+      // Mettre à jour le torrent sélectionné s'il existe pour refléter les nouveaux états (ex: reprise, progression)
+      setSelectedTorrent(prev => {
+        if (!prev) return null;
+        return list.find(t => t.info_hash === prev.info_hash) || prev;
+      });
+
       if (loading) {
         setLoading(false);
         const enriched = await clientApi.listTorrentsEnriched();
@@ -157,9 +164,9 @@ export default function DownloadsList() {
           <h2 className="text-2xl sm:text-3xl font-bold text-white">{title}</h2>
           <span className="px-3 py-1 bg-white/5 rounded-full text-xs font-bold text-white/40 border border-white/10">{items.length}</span>
         </div>
-        <div className="flex gap-4 sm:gap-6 overflow-x-auto scrollbar-hide px-4 sm:px-12 pb-8 pt-2" style={{ scrollSnapType: 'x mandatory' }}>
+        <div className="flex gap-4 overflow-x-auto scrollbar-hide px-4 sm:px-12 pb-8 pt-2" style={{ scrollSnapType: 'x mandatory' }}>
           {items.map((torrent) => (
-            <div key={torrent.info_hash} className="shrink-0 w-[85vw] sm:w-[420px]" style={{ scrollSnapAlign: 'start' }}>
+            <div key={torrent.info_hash} className="shrink-0 w-[280px] sm:w-[320px]" style={{ scrollSnapAlign: 'start' }}>
               <DownloadCard
                 torrent={torrent}
                 posterUrl={imageMap[torrent.info_hash.toLowerCase()]?.posterUrl}
@@ -187,7 +194,7 @@ export default function DownloadsList() {
             const h = it.id.replace('download-', '');
             const tor = torrents.find(t=>t.info_hash.toLowerCase()===h);
             if(tor) handleOpenDetail(tor, it.poster, it.backdrop);
-        }} primaryButtonLabel={t('common.details')} size="large" />
+        }} primaryButtonLabel="Lire" size="large" />
       )}
 
       <div className="pt-4 sm:pt-8 pb-12 flex-1 safe-area-bottom">
@@ -297,9 +304,9 @@ export default function DownloadsList() {
         <DownloadDetailModal 
           torrent={selectedTorrent} 
           onClose={handleCloseDetail} 
-          onPause={(h) => { clientApi.pauseTorrent(h); loadTorrents(); }} 
-          onResume={(h) => { clientApi.resumeTorrent(h); loadTorrents(); }} 
-          onRemove={async (h, d) => { if(confirm("Supprimer ?")) { await clientApi.removeTorrent(h, d); loadTorrents(); return true; } return false; }} 
+          onPause={async (h) => { await clientApi.pauseTorrent(h); await loadTorrents(); }} 
+          onResume={async (h) => { await clientApi.resumeTorrent(h); await loadTorrents(); }} 
+          onRemove={async (h, d) => { if(confirm("Supprimer ?")) { await clientApi.removeTorrent(h, d); await loadTorrents(); return true; } return false; }} 
           onShowLogs={handleShowLogs} 
           posterUrl={selectedTorrentPoster} 
           backdropUrl={selectedTorrentBackdrop} 

@@ -250,6 +250,9 @@ interface IServerApiClientPublic {
   listExplorerFiles(path?: string): Promise<ApiResponse<Array<{ name: string; path: string; is_directory: boolean; size?: number; modified?: number }>>>;
   listLibrarySourceExplorerFiles(path?: string): Promise<ApiResponse<Array<{ name: string; path: string; is_directory: boolean; size?: number; modified?: number }>>>;
   setLibrarySourceEnabled(id: string, is_enabled: boolean): Promise<ApiResponse<void>>;
+  getNotificationSettings(): Promise<ApiResponse<any>>;
+  updateNotificationSettings(settings: any): Promise<ApiResponse<any>>;
+  getSentNotificationsHistory(limit?: number): Promise<ApiResponse<any[]>>;
   getLibraryMedia(): Promise<ApiResponse<LibraryMediaEntry[]>>;
   updateLibraryMedia(id: string, file_path: string): Promise<ApiResponse<LibraryMediaEntry>>;
   deleteLibraryMedia(id: string): Promise<ApiResponse<void>>;
