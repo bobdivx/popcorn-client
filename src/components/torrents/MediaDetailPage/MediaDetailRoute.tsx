@@ -1302,13 +1302,74 @@ export default function MediaDetailRoute() {
   const initialTorrentStats: ClientTorrentStats | null = displayTorrent.infoHash
     ? (getDownloadClientStats(displayTorrent.infoHash) as ClientTorrentStats | null)
     : null;
+
+  // Enrichir les épisodes avec les variantes trouvées en recherche (id/info_hash/disponibilité)
+  const enrichedSeriesEpisodes = useMemo(() => {
+    if (!seriesEpisodes || !initialVariants?.length) return seriesEpisodes;
+
+    const newSeasons = seriesEpisodes.seasons.map((season) => {
+      const seasonNum = season.season;
+      const newEpisodes = season.episodes.map((ep) => {
+        // Ne pas écraser si l'épisode a déjà un info_hash valide (venant du backend)
+        if (ep.info_hash && ep.info_hash.length >= 32) return ep;
+
+        const epNum = ep.episode;
+        
+        // Trouver le meilleur variant pour cet épisode
+        // Priorité 1: Match exact SxxEyy
+        // Priorité 2: Season Pack (Sxx sans Eyy spécifique ou mention "Complete")
+        let bestVariant: Torrent | null = null;
+        
+        for (const variant of initialVariants) {
+          const name = (variant.name || variant.cleanTitle || '').toUpperCase();
+          
+          // Match SxxEyy
+          const epRegex = new RegExp(`S${seasonNum.toString().padStart(2, '0')}[\\s._-]?E${epNum.toString().padStart(2, '0')}\\b`, 'i');
+          if (epRegex.test(name)) {
+            if (!bestVariant || (variant.seedCount || 0) > (bestVariant.seedCount || 0)) {
+              bestVariant = variant;
+            }
+          }
+          
+          // Match Season Pack (si pas encore de variant précis trouvé)
+          if (!bestVariant) {
+            const seasonRegex = new RegExp(`S${seasonNum.toString().padStart(2, '0')}\\b`, 'i');
+            const isPack = seasonRegex.test(name) && 
+              (name.includes('COMPLETE') || name.includes('INTEGRALE') || !/\bE\d{1,2}\b/i.test(name));
+            
+            if (isPack) {
+              if (!bestVariant || (variant.seedCount || 0) > (bestVariant.seedCount || 0)) {
+                bestVariant = variant;
+              }
+            }
+          }
+        }
+
+        if (bestVariant) {
+          return {
+            ...ep,
+            info_hash: bestVariant.infoHash,
+            id: bestVariant.id, // Permet de sélectionner cette variante lors du clic
+            isAvailable: true,
+          };
+        }
+
+        return ep;
+      });
+
+      return { ...season, episodes: newEpisodes };
+    });
+
+    return { ...seriesEpisodes, seasons: newSeasons };
+  }, [seriesEpisodes, initialVariants]);
+
   const backHref = getBackHrefFromLocation();
   const streamBackendUrl = getStreamBackendUrlFromLocation();
   return (
     <MediaDetailPage
       torrent={displayTorrent}
       initialVariants={initialVariants.length > 0 ? initialVariants : undefined}
-      seriesEpisodes={seriesEpisodes ?? undefined}
+      seriesEpisodes={enrichedSeriesEpisodes ?? undefined}
       initialTorrentStats={
         initialTorrentStats ? normalizeTorrentStats(initialTorrentStats as ClientTorrentStats) : undefined
       }

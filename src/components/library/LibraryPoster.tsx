@@ -34,6 +34,9 @@ export function LibraryPoster({ item, onPlay, className, priorityLoad }: Library
     'min-w-[140px] sm:min-w-[160px] md:min-w-[180px] lg:min-w-[280px] xl:min-w-[320px] tv:min-w-[400px]';
 
   const showOverlay = isHovered || isFocused;
+  const cardAnimationClasses =
+    'transform-gpu transition-all duration-[200ms] ease-out hover:scale-[1.02] focus-within:scale-[1.02] hover:shadow-lg focus-within:shadow-lg hover:z-40 focus-within:z-40' +
+    (isFocused || isHovered ? ' ring-2 ring-primary-500 shadow-xl' : ' shadow-lg');
 
   return (
     <div
@@ -50,14 +53,14 @@ export function LibraryPoster({ item, onPlay, className, priorityLoad }: Library
         onFocus={(e) => {
           setIsFocused(true);
           setIsHovered(true);
-          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'center' });
         }}
         onBlur={() => {
           setIsFocused(false);
           setIsHovered(false);
         }}
       >
-        <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-lg rounded-lg transform transition-all duration-200 ease-out hover:scale-[1.03] hover:shadow-primary focus-within:shadow-primary-lg will-change-transform">
+        <div className={`relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 border border-white/10 rounded-xl transition-all duration-200 ease-out will-change-transform ${cardAnimationClasses}`}>
           {poster ? (
             <img
               src={poster}

@@ -29,6 +29,7 @@ interface ActionButtonsProps {
   onPlayFromBeginning?: () => void;
   onDownload: () => void;
   onDownloadTorrent: () => void;
+  onDownloadAllEpisodes?: () => void;
   onCancelDownload?: () => void;
   onCopyMagnet: () => void;
   onDeleteMedia: () => void;
@@ -84,6 +85,7 @@ export function ActionButtons({
   onPlayFromBeginning,
   onDownload,
   onDownloadTorrent,
+  onDownloadAllEpisodes,
   onCancelDownload,
   onCopyMagnet,
   onDeleteMedia,
@@ -240,9 +242,24 @@ export function ActionButtons({
             ) : (
               <>
                 <Download className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" size={20} />
-                {isPackPreview ? t('mediaDetail.downloadThisEpisode') : isPackWithMultipleFiles ? 'Télécharger la saison' : t('common.download')}
+                {isPackPreview ? t('mediaDetail.downloadThisEpisode') : isPackWithMultipleFiles ? 'Télécharger la saison' : torrent.tmdbType === 'tv' ? "Télécharger l'épisode" : t('common.download')}
               </>
             )}
+          </button>
+        )}
+
+        {/* Tout télécharger (Series) */}
+        {onDownloadAllEpisodes && (
+          <button
+            type="button"
+            onClick={onDownloadAllEpisodes}
+            data-focusable
+            tabIndex={0}
+            className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 tv:text-xl tv:px-8 tv:py-4 tv:min-h-[68px] border border-emerald-500/40 hover:border-emerald-400/60 hover:bg-emerald-900/20"
+            title="Télécharger tous les épisodes disponibles"
+          >
+            <Download className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" size={20} />
+            Tout télécharger
           </button>
         )}
 

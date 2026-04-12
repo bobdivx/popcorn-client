@@ -30,6 +30,7 @@ export interface MediaDetailActionButtonsProps {
   isPackWithMultipleFiles?: boolean;
   /** Index de l'épisode sélectionné dans la liste preview (pack pas encore ajouté) pour Télécharger/Lire cet épisode */
   selectedPackEpisodePreviewIndex?: number | null;
+  seriesEpisodes?: MediaDetailPageProps['seriesEpisodes'];
   onDownloadSingleEpisode?: (fileIndex: number) => void | Promise<void>;
   onPlaySingleEpisode?: (fileIndex: number) => void | Promise<void>;
   /** Refs / callbacks pour les actions */
@@ -80,6 +81,7 @@ export function MediaDetailActionButtons({
   countdownRemaining = null,
   isPackWithMultipleFiles = false,
   selectedPackEpisodePreviewIndex = null,
+  seriesEpisodes,
   onDownloadSingleEpisode,
   onPlaySingleEpisode,
   setTorrentStats,
@@ -171,6 +173,7 @@ export function MediaDetailActionButtons({
         onPlayAuto={onPlayAuto}
         onDownload={onDownloadClick}
         onDownloadTorrent={actions.handleDownloadTorrent}
+        onDownloadAllEpisodes={seriesEpisodes ? () => actions.handleDownloadAllEpisodes(seriesEpisodes) : undefined}
         onCancelDownload={
           (hasInfoHash || !!torrentStats?.info_hash)
             ? () => void actions.handleCancelDownload()

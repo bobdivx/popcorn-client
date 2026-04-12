@@ -696,21 +696,21 @@ export function createHandlePlay(context: PlayHandlerContext) {
         }
       }
       
-      // PRIORITÉ 2: Vérifier si on a un magnet link (direct ou dans _externalLink)
+      // PRIORITÉ 2: Vérifier si on a un magnet link (direct ou dans _externalLink), ou construire à partir de l'infoHash
       const magnetUri = torrent._externalMagnetUri || 
         (torrent._externalLink && torrent._externalLink.startsWith('magnet:') 
           ? torrent._externalLink 
           : null);
       
-      if (magnetUri) {
-        addDebugLog('info', '🔨 Construction du magnet link à partir de l\'infoHash (fallback)', {
+      if (magnetUri || torrent.infoHash) {
+        addDebugLog('info', '🔨 Utilisation ou construction du magnet link (fallback)', {
           infoHash: torrent.infoHash,
-          note: '⚠️ Les trackers peuvent ne pas être disponibles dans le magnet link construit',
+          hasMagnet: !!magnetUri,
         });
-        const constructedMagnet = `magnet:?xt=urn:btih:${torrent.infoHash}&dn=${encodeURIComponent(torrent.name)}`;
+        const constructedMagnet = magnetUri || `magnet:?xt=urn:btih:${torrent.infoHash}&dn=${encodeURIComponent(torrent.name || 'Unknown')}`;
         
         setPlayStatus('adding');
-        setProgressMessage('Ajout du torrent via infoHash...');
+        setProgressMessage('Ajout du torrent via magnet...');
 
         try {
           const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
