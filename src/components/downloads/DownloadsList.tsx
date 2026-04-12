@@ -95,6 +95,13 @@ export default function DownloadsList() {
     try {
       const list = await clientApi.listTorrents();
       setTorrents(list);
+
+      // Mettre à jour le torrent sélectionné s'il existe pour refléter les nouveaux états (ex: reprise, progression)
+      setSelectedTorrent(prev => {
+        if (!prev) return null;
+        return list.find(t => t.info_hash === prev.info_hash) || prev;
+      });
+
       if (loading) {
         setLoading(false);
         const enriched = await clientApi.listTorrentsEnriched();
@@ -153,13 +160,13 @@ export default function DownloadsList() {
     if (items.length === 0) return null;
     return (
       <div className="mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="px-12 mb-4 flex items-center gap-4">
-          <h2 className="text-3xl font-bold text-white">{title}</h2>
+        <div className="px-4 sm:px-12 mb-4 flex items-center gap-4">
+          <h2 className="text-2xl sm:text-3xl font-bold text-white">{title}</h2>
           <span className="px-3 py-1 bg-white/5 rounded-full text-xs font-bold text-white/40 border border-white/10">{items.length}</span>
         </div>
-        <div className="flex gap-6 overflow-x-auto scrollbar-hide px-12 pb-8 pt-2" style={{ scrollSnapType: 'x mandatory' }}>
+        <div className="flex gap-4 overflow-x-auto scrollbar-hide px-4 sm:px-12 pb-8 pt-2" style={{ scrollSnapType: 'x mandatory' }}>
           {items.map((torrent) => (
-            <div key={torrent.info_hash} className="shrink-0 w-[420px]" style={{ scrollSnapAlign: 'start' }}>
+            <div key={torrent.info_hash} className="shrink-0 w-[280px] sm:w-[320px]" style={{ scrollSnapAlign: 'start' }}>
               <DownloadCard
                 torrent={torrent}
                 posterUrl={imageMap[torrent.info_hash.toLowerCase()]?.posterUrl}
@@ -187,28 +194,29 @@ export default function DownloadsList() {
             const h = it.id.replace('download-', '');
             const tor = torrents.find(t=>t.info_hash.toLowerCase()===h);
             if(tor) handleOpenDetail(tor, it.poster, it.backdrop);
-        }} primaryButtonLabel={t('common.details')} size="large" />
+        }} primaryButtonLabel="Lire" size="large" />
       )}
 
-      <div className="pt-8 pb-12 flex-1 safe-area-bottom">
-        <div className="px-12 mb-10 flex items-center justify-between">
+      <div className="pt-4 sm:pt-8 pb-12 flex-1 safe-area-bottom">
+        <div className="px-4 sm:px-12 mb-6 sm:mb-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div>
-            <h1 className="text-5xl font-bold text-white mb-2 tracking-tight">{t('downloads.title')}</h1>
-            <p className="text-white/40 text-lg font-medium">{t('downloads.activeDownloads', { count: torrents.length, plural: torrents.length > 1 ? 's' : '' })}</p>
+            <h1 className="text-3xl sm:text-5xl font-bold text-white mb-1 sm:mb-2 tracking-tight">{t('downloads.title')}</h1>
+            <p className="text-white/40 text-base sm:text-lg font-medium">{t('downloads.activeDownloads', { count: torrents.length, plural: torrents.length > 1 ? 's' : '' })}</p>
           </div>
-          <div className="flex items-center gap-3 p-2 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-xl">
-             <button onClick={() => setShowAddMagnetModal(true)} className="w-12 h-12 rounded-2xl hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all"><Link2 size={24} /></button>
-             <button onClick={() => setShowSessionLogsModal(true)} className="w-12 h-12 rounded-2xl hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all"><LogsIcon size={24} /></button>
+          <div className="flex items-center gap-2 p-1.5 sm:p-2 bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl backdrop-blur-xl shrink-0">
+             <button onClick={() => setShowAddMagnetModal(true)} className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all"><Link2 size={24} /></button>
+             <button onClick={() => setShowSessionLogsModal(true)} className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all"><LogsIcon size={24} /></button>
           </div>
         </div>
 
         {torrents.length === 0 ? (
-          <div className="px-12 mt-12 flex flex-col items-center justify-center py-32 text-center bg-white/[0.02] border border-white/5 rounded-[3rem] mx-12 backdrop-blur-sm">
-            <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6 border border-white/10 shadow-inner">
-               <HardDrive size={40} className="text-white/20" />
+          <div className="px-6 sm:px-12 mt-8 sm:mt-12 flex flex-col items-center justify-center py-20 sm:py-32 text-center bg-white/[0.02] border border-white/5 rounded-3xl sm:rounded-[3rem] mx-4 sm:mx-12 backdrop-blur-sm">
+            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-white/5 rounded-full flex items-center justify-center mb-6 border border-white/10 shadow-inner">
+               <HardDrive size={32} className="text-white/20 sm:hidden" />
+               <HardDrive size={40} className="text-white/20 hidden sm:block" />
             </div>
-            <h2 className="text-3xl font-bold text-white mb-2">{t('downloads.noActiveDownloads')}</h2>
-            <p className="text-white/30 text-lg max-w-md">{t('downloads.torrentsWillAppear')}</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">{t('downloads.noActiveDownloads')}</h2>
+            <p className="text-white/30 text-base sm:text-lg max-w-md">{t('downloads.torrentsWillAppear')}</p>
           </div>
         ) : (
           <div>
@@ -296,9 +304,9 @@ export default function DownloadsList() {
         <DownloadDetailModal 
           torrent={selectedTorrent} 
           onClose={handleCloseDetail} 
-          onPause={(h) => { clientApi.pauseTorrent(h); loadTorrents(); }} 
-          onResume={(h) => { clientApi.resumeTorrent(h); loadTorrents(); }} 
-          onRemove={async (h, d) => { if(confirm("Supprimer ?")) { await clientApi.removeTorrent(h, d); loadTorrents(); return true; } return false; }} 
+          onPause={async (h) => { await clientApi.pauseTorrent(h); await loadTorrents(); }} 
+          onResume={async (h) => { await clientApi.resumeTorrent(h); await loadTorrents(); }} 
+          onRemove={async (h, d) => { if(confirm("Supprimer ?")) { await clientApi.removeTorrent(h, d); await loadTorrents(); return true; } return false; }} 
           onShowLogs={handleShowLogs} 
           posterUrl={selectedTorrentPoster} 
           backdropUrl={selectedTorrentBackdrop} 
