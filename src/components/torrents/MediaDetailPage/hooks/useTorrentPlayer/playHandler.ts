@@ -138,9 +138,20 @@ export function createHandlePlay(context: PlayHandlerContext) {
     // PRIORITÉ 0: Si on a déjà des fichiers vidéo chargés (ex. par useVideoFiles au montage), lancer la lecture directement.
     // Permet de lire même quand getTorrent renvoie 404 temporairement alors que les fichiers sont bien présents.
     if (hasInfoHash && torrent.infoHash && videoFiles.length > 0 && selectedFile) {
-      addDebugLog('info', '✅ Fichiers vidéo déjà chargés, démarrage direct de la lecture', {
-        files_count: videoFiles.length,
-      });
+      // Sécurité : vérifier que le fichier sélectionné semble appartenir au torrent actuel (infoHash ou name)
+      const fileNameLower = selectedFile.path.toLowerCase();
+      const torrentHashLower = torrent.infoHash.toLowerCase();
+      const isActuallyStale = !fileNameLower.includes(torrentHashLower) && 
+                              !fileNameLower.includes(torrent.name.toLowerCase().substring(0, 10));
+      
+      if (isActuallyStale) {
+        addDebugLog('warning', '⚠️ Détection de fichiers obsolètes (stale), passage aux priorités suivantes');
+        // On laisse useVideoFiles faire son reset via useEffect, mais on saute cette priorité
+      } else {
+        addDebugLog('info', '✅ Fichiers vidéo déjà chargés, démarrage direct de la lecture', {
+          files_count: videoFiles.length,
+          fileName: selectedFile.name
+        });
       await markStreamingIfActive();
       if (streamingTorrentActive && !getStreamingDownloadFull()) {
         const idx = selectedFile.index ?? 0;
@@ -157,6 +168,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
       setShowInfo(false);
       stopProgressPolling();
       return;
+      }
     }
 
     // PRIORITÉ 0.5: Média disponible en bibliothèque (fichier sur disque, torrent peut être absent du client) — charger depuis le chemin library puis lancer
@@ -488,7 +500,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
             if (isTorrentUnavailable) {
               setErrorMessage(errorMsg || 'Ce torrent n\'est plus disponible sur l\'indexeur. Choisissez une autre source.');
               setPlayStatus('idle');
-              setProgressMessage(null);
+              setProgressMessage('');
               return;
             }
             // Si l'API retourne un magnet link en cas d'erreur, l'utiliser

@@ -10,6 +10,7 @@ export interface UseTorrentPlayerOptions {
     _externalMagnetUri?: string | null;
     _guid?: string | null;
     tmdbType?: string | null;
+    tmdbId?: number | null;
     indexerId?: string | number | null;
     indexerName?: string | null;
   };
@@ -75,6 +76,7 @@ export interface PlayHandlerContext {
     _externalMagnetUri?: string | null;
     _guid?: string | null;
     tmdbType?: string | null;
+    tmdbId?: number | null;
     indexerId?: string | number | null;
     indexerName?: string | null;
   };

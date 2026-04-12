@@ -258,4 +258,53 @@ export const mediaMethods = {
       };
     }
   },
+
+  async getScrubThumbnailsMeta(
+    this: ServerApiClientMediaAccess,
+    localMediaId: string,
+    opts?: { torrentRelativePath?: string | null }
+  ) {
+    const baseUrl = this.getServerUrl();
+    const rel = opts?.torrentRelativePath?.trim();
+    const q = rel ? `?file=${encodeURIComponent(rel)}` : '';
+    const url = `${baseUrl}/api/library/scrub-thumbnails/meta/${encodeURIComponent(localMediaId)}${q}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch scrub thumbnails meta (${res.status})`);
+    }
+    return res.json();
+  },
+
+  async generateScrubThumbnails(
+    this: ServerApiClientMediaAccess,
+    localMediaId: string,
+    opts?: {
+      force?: boolean;
+      torrentRelativePath?: string | null;
+      /** Durée réelle du média (s), si le backend sous-estime (ffprobe / MKV). */
+      durationHintSeconds?: number | null;
+    }
+  ) {
+    const baseUrl = this.getServerUrl();
+    const url = `${baseUrl}/api/library/scrub-thumbnails/generate`;
+    const rel = opts?.torrentRelativePath?.trim();
+    const hint = opts?.durationHintSeconds;
+    const body: Record<string, unknown> = {
+      local_media_id: localMediaId,
+      force: opts?.force === true,
+    };
+    if (rel) body.torrent_relative_path = rel;
+    if (typeof hint === 'number' && Number.isFinite(hint) && hint >= 60) {
+      body.duration_hint_seconds = hint;
+    }
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      throw new Error(`Failed to trigger scrub thumbnails generation (${res.status})`);
+    }
+    return res.json();
+  },
 };
