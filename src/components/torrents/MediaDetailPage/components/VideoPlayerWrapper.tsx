@@ -317,7 +317,8 @@ export function VideoPlayerWrapper({
           const count = Number(data?.count ?? 0);
           const durationSeconds = Number(data?.duration_seconds ?? 0);
           const intervalSeconds = Number(data?.interval_seconds ?? 0);
-          const expected = durationSeconds > 0 ? Math.min(300, Math.ceil(durationSeconds / 10)) : 0;
+          // Aligné sur SCRUB_MAX_COUNT côté serveur (génération scrub).
+          const expected = durationSeconds > 0 ? Math.min(2000, Math.ceil(durationSeconds / 10)) : 0;
           // Legacy si:
           // - interval très grand (fallback duration/count, ex 44s)
           // - OU interval absent/0 (meta.json manquant) ET count très faible par rapport au mode 10s
@@ -339,7 +340,10 @@ export function VideoPlayerWrapper({
             Number.isFinite(durationSeconds) &&
             durationSeconds >= 120 &&
             count * intervalSeconds < durationSeconds * 0.82;
-          if (looksLegacy || wayTooFewThumbs || sparseVersusMetaDuration) {
+          // Ancien cache « plein » (assez de fichiers) mais sous le plafond actuel — pas les ~15 vignettes d’un échec partiel.
+          const belowExpectedCap =
+            expected > 200 && count >= 100 && count > 0 && count < expected - 30;
+          if (looksLegacy || wayTooFewThumbs || sparseVersusMetaDuration || belowExpectedCap) {
             if (!cancelled) {
               setScrubThumbnails(null);
               setScrubThumbnailsLoading(true);
@@ -401,7 +405,7 @@ export function VideoPlayerWrapper({
     const ctx = scrubMetaRef.current;
     if (!ctx?.localMediaId || scrubRegenInFlightRef.current || scrubAutoRegenDoneRef.current) return;
     const st = scrubThumbnailsRef.current;
-    const expected = Math.min(300, Math.ceil(d / 10));
+    const expected = Math.min(2000, Math.ceil(d / 10));
     if (!st || st.count <= 0) return;
     if (st.count >= expected - 2) return;
     if (st.count * 10 >= d * 0.88) return;
