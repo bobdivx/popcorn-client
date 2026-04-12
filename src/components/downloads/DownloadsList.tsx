@@ -9,6 +9,7 @@ import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
 import { HeroSection } from '../dashboard/components/HeroSection';
 import { DownloadCard } from './DownloadCard';
 import { DownloadDetailModal } from './DownloadDetailModal';
+import { Modal } from '../ui/Modal';
 
 const REFRESH_INTERVAL = 2000;
 
@@ -218,59 +219,78 @@ export default function DownloadsList() {
         )}
       </div>
 
-      {showAddMagnetModal && createPortal(
-          <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-50 flex items-center justify-center p-8 animate-in fade-in duration-300" onClick={(e)=>e.target===e.currentTarget&&setShowAddMagnetModal(false)}>
-            <div className="bg-neutral-900 border border-white/10 p-10 rounded-[2.5rem] max-w-2xl w-full shadow-2xl transition-transform">
-               <h2 className="text-4xl font-bold mb-8 text-white">{t('downloads.addMagnetLink')}</h2>
-               <textarea value={magnetLink} onChange={(e)=>setMagnetLink(e.target.value)} className="w-full h-48 bg-black/40 border border-white/10 rounded-2xl p-6 text-white placeholder-white/10 mb-8 focus:outline-none focus:border-[var(--ds-accent-violet)] transition-colors" placeholder="magnet:?xt=urn:btih:..." />
-               <div className="flex justify-end gap-4">
-                 <button onClick={()=>setShowAddMagnetModal(false)} className="px-10 py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold transition-colors">Annuler</button>
-                 <button onClick={async ()=>{
-                    setAddingTorrent(true);
-                    try {
-                        const name = magnetLink.match(/dn=([^&]+)/) ? decodeURIComponent(magnetLink.match(/dn=([^&]+)/)![1]) : 'Torrent';
-                        await clientApi.addMagnetLink(magnetLink, name, false);
-                        setShowAddMagnetModal(false); setMagnetLink(''); loadTorrents();
-                    } catch(e) { } finally { setAddingTorrent(false); }
-                 }} className="px-10 py-4 rounded-2xl bg-[var(--ds-accent-violet)] text-white font-bold shadow-lg shadow-purple-500/20">{addingTorrent ? 'Ajout...' : 'Ajouter'}</button>
-               </div>
-            </div>
-          </div>, document.body
-      )}
-
-      {showLogsModal && createPortal(
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-2xl z-50 flex items-center justify-center p-8 animate-in fade-in duration-300" onClick={()=>setShowLogsModal(false)}>
-          <div className="bg-neutral-900 border border-white/10 p-10 rounded-[2.5rem] max-w-5xl w-full h-[80vh] flex flex-col shadow-2xl" onClick={e=>e.stopPropagation()}>
-             <div className="flex justify-between items-center mb-8">
-               <h2 className="text-3xl font-bold text-white">Logs du Torrent</h2>
-               <button onClick={()=>setShowLogsModal(false)} className="p-3 bg-white/5 rounded-2xl hover:bg-white/10 text-white/50 hover:text-white transition-all"><X size={24}/></button>
-             </div>
-             <div className="flex-1 overflow-y-auto bg-black/40 rounded-3xl p-6 font-mono text-sm text-white/60 custom-scrollbar border border-white/5">
-                {logsLoading ? <div className="flex items-center justify-center h-full"><HLSLoadingSpinner size="md" /></div> : (
-                  logs.length > 0 ? logs.map((l, i) => (
-                    <div key={i} className={`py-1 border-b border-white/5 last:border-0 ${l.level === 'ERROR' ? 'text-red-400' : l.level === 'WARN' ? 'text-amber-400' : ''}`}>
-                      <span className="opacity-30">[{new Date(l.timestamp).toLocaleTimeString()}]</span> <span className="font-bold opacity-50">[{l.level}]</span> {l.message}
-                    </div>
-                  )) : "Aucun log disponible"
-                )}
-             </div>
+      <Modal
+        isOpen={showAddMagnetModal}
+        onClose={() => setShowAddMagnetModal(false)}
+        title={t('downloads.addMagnetLink')}
+        size="lg"
+      >
+        <div className="flex flex-col gap-6">
+          <textarea 
+            value={magnetLink} 
+            onChange={(e: any) => setMagnetLink(e.target.value)} 
+            className="w-full h-48 bg-black/40 border border-white/10 rounded-2xl p-6 text-white placeholder-white/10 focus:outline-none focus:border-[var(--ds-accent-violet)] transition-colors" 
+            placeholder="magnet:?xt=urn:btih:..." 
+            autoFocus
+          />
+          <div className="flex justify-end gap-4">
+            <button 
+              onClick={() => setShowAddMagnetModal(false)} 
+              className="px-10 py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold transition-colors"
+              data-focusable
+            >
+              Annuler
+            </button>
+            <button 
+              onClick={async () => {
+                setAddingTorrent(true);
+                try {
+                  const name = magnetLink.match(/dn=([^&]+)/) ? decodeURIComponent(magnetLink.match(/dn=([^&]+)/)![1]) : 'Torrent';
+                  await clientApi.addMagnetLink(magnetLink, name, false);
+                  setShowAddMagnetModal(false); setMagnetLink(''); loadTorrents();
+                } catch(e) { } finally { setAddingTorrent(false); }
+              }} 
+              className="px-10 py-4 rounded-2xl bg-[var(--ds-accent-violet)] text-white font-bold shadow-lg shadow-purple-500/20"
+              disabled={addingTorrent}
+              data-focusable
+            >
+              {addingTorrent ? 'Ajout...' : 'Ajouter'}
+            </button>
           </div>
-        </div>, document.body
-      )}
+        </div>
+      </Modal>
 
-      {showSessionLogsModal && createPortal(
-         <div className="fixed inset-0 bg-black/90 backdrop-blur-2xl z-50 flex items-center justify-center p-8 animate-in fade-in duration-300" onClick={()=>setShowSessionLogsModal(false)}>
-            <div className="bg-neutral-900 border border-white/10 p-10 rounded-[2.5rem] max-w-5xl w-full h-[80vh] flex flex-col shadow-2xl" onClick={e=>e.stopPropagation()}>
-               <div className="flex justify-between items-center mb-8">
-                  <h2 className="text-3xl font-bold text-white">Logs Session</h2>
-                  <button onClick={()=>setShowSessionLogsModal(false)} className="p-3 bg-white/5 rounded-2xl hover:bg-white/10 text-white/50 hover:text-white transition-all"><X size={24}/></button>
-               </div>
-               <div className="flex-1 overflow-y-auto bg-black/40 rounded-3xl p-6 font-mono text-sm text-white/40 custom-scrollbar border border-white/5 whitespace-pre-wrap">
-                  {sessionLogsLines.length > 0 ? sessionLogsLines.join('\n') : "En attente de logs..."}
-               </div>
-            </div>
-         </div>, document.body
-      )}
+      <Modal
+        isOpen={showLogsModal}
+        onClose={() => setShowLogsModal(false)}
+        title="Logs du Torrent"
+        size="xl"
+      >
+        <div className="flex flex-col h-[60vh]">
+          <div className="flex-1 overflow-y-auto bg-black/40 rounded-3xl p-6 font-mono text-sm text-white/60 custom-scrollbar border border-white/5">
+            {logsLoading ? <div className="flex items-center justify-center h-full"><HLSLoadingSpinner size="md" /></div> : (
+              logs.length > 0 ? logs.map((l, i) => (
+                <div key={i} className={`py-1 border-b border-white/5 last:border-0 ${l.level === 'ERROR' ? 'text-red-400' : l.level === 'WARN' ? 'text-amber-400' : ''}`}>
+                  <span className="opacity-30">[{new Date(l.timestamp).toLocaleTimeString()}]</span> <span className="font-bold opacity-50">[{l.level}]</span> {l.message}
+                </div>
+              )) : "Aucun log disponible"
+            )}
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showSessionLogsModal}
+        onClose={() => setShowSessionLogsModal(false)}
+        title="Logs Session"
+        size="xl"
+      >
+        <div className="flex flex-col h-[60vh]">
+          <div className="flex-1 overflow-y-auto bg-black/40 rounded-3xl p-6 font-mono text-sm text-white/40 custom-scrollbar border border-white/5 whitespace-pre-wrap">
+            {sessionLogsLines.length > 0 ? sessionLogsLines.join('\n') : "En attente de logs..."}
+          </div>
+        </div>
+      </Modal>
 
       {selectedTorrent && (
         <DownloadDetailModal 
