@@ -3,7 +3,8 @@ import { createPortal } from 'preact/compat';
 import { 
   ArrowLeft, Download, Upload, Sprout, Users, Play, Pause, 
   Trash2, Info, Film, Clock, HardDrive, Copy, X, Pencil, 
-  PlusCircle, ExternalLink, Settings2, ChevronDown, ChevronUp 
+  PlusCircle, ExternalLink, Settings2, ChevronDown, ChevronUp,
+  FileText as LogsIcon
 } from 'lucide-preact';
 import type { ClientTorrentStats } from '../../lib/client/types';
 import { useI18n } from '../../lib/i18n/useI18n';
