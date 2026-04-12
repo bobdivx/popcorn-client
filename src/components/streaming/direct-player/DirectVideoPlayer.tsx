@@ -28,7 +28,7 @@ interface DirectVideoPlayerProps {
   torrentStats?: PlayerLoadingTorrentStats | null;
   /** Appelé périodiquement et à la fermeture avec la progression (pour Reprendre / Revoir). */
   onProgress?: (currentTime: number, duration: number) => void;
-  /** Miniatures scrub (type Netflix) — si défini, affiche une vignette au survol de la barre. */
+  /** Miniatures scrub : carrousel sous la barre (pas d’aperçu flottant au survol). */
   scrubThumbnails?: { mediaId: string; count: number; durationSeconds?: number; intervalSeconds?: number } | null;
 
   /** Miniatures en cours de génération (placeholder animé). */

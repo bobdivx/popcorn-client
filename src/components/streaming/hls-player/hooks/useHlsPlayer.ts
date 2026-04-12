@@ -905,35 +905,16 @@ export function useHlsPlayer({
             // 503/202 = playlist seek en cours de génération côté backend (cf. Jellyfin: nouveau stream URL avec position)
             const seekUrl = seekLoadUrlRef.current;
             // 503/202 = playlist seek en cours de génération (backend peut prendre 2-5 min pour un long film avec seek lointain)
-            if ((statusCode === 503 || statusCode === 202) && pendingSeekRef.current > 0 && seekUrl && seekLoadRetryCountRef.current < 15) {
-              // Après 3 retries, essayer un seek natif au lieu de continuer (évite blocage si transcodage pas prêt)
-              if (
-                seekLoadRetryCountRef.current >= 3 &&
-                !seekFallbackTriedRef.current &&
-                hlsRef.current?.media
-              ) {
-                seekFallbackTriedRef.current = true;
-                const seekTarget = pendingSeekRef.current;
-                pendingSeekRef.current = 0;
-                seekLoadUrlRef.current = null;
-                setPendingSeekPosition(0);
-                setIsLoading(false);
-                emitPlaybackStep('seek_native_fallback', { position: seekTarget, reason: '503_after_retries' });
-                console.warn('[useHlsPlayer] 503 après 3 retries → fallback seek natif à', seekTarget, 's (transcodage peut ne pas être prêt)');
-                const video = hlsRef.current.media;
-                video.currentTime = seekTarget;
-                try {
-                  hlsRef.current.startLoad(seekTarget);
-                } catch (_) {}
-                return;
-              }
+            if ((statusCode === 503 || statusCode === 202) && pendingSeekRef.current > 0 && seekUrl && seekLoadRetryCountRef.current < 25) {
               seekLoadRetryCountRef.current += 1;
               const retryAfterHeader = data?.response?.headers?.['Retry-After'] ?? data?.response?.headers?.['retry-after'];
               const retryAfterSec = typeof retryAfterHeader === 'string' ? parseInt(retryAfterHeader, 10) : NaN;
-              const baseDelays = [4000, 8000, 12000, 20000, 35000, 55000]; // Jusqu'à 55s entre retries
+              // Délais progressifs : courts au début (on peut avoir des résultats rapides), longs ensuite
+              // car le backend peut prendre 30-60s pour un seek lointain (segment >800 sur un film de 83 min)
+              const baseDelays = [3000, 5000, 8000, 10000, 12000, 15000, 20000, 25000, 30000, 35000]; // 10 délais
               const delayMs = Number.isFinite(retryAfterSec) && retryAfterSec > 0
                 ? retryAfterSec * 1000
-                : baseDelays[Math.min(seekLoadRetryCountRef.current - 1, baseDelays.length - 1)];
+                : baseDelays[Math.min(seekLoadRetryCountRef.current - 1, baseDelays.length - 1)] ?? 35000;
               emitPlaybackStep('retry_503', { attempt: seekLoadRetryCountRef.current });
               console.debug('[useHlsPlayer] 503/202 sur reloadWithSeek, retry', seekLoadRetryCountRef.current, 'dans', delayMs / 1000, 's');
               window.setTimeout(() => {
@@ -955,10 +936,10 @@ export function useHlsPlayer({
               (statusCode === 503 || statusCode === 202) &&
               pendingSeekRef.current > 0 &&
               seekUrl &&
-              seekLoadRetryCountRef.current >= 15 &&
+              seekLoadRetryCountRef.current >= 25 &&
               hlsRef.current
             ) {
-              console.error('[useHlsPlayer] 503 après 15 retries (5+ min) → abandon du seek, le serveur n\'a pas terminé la génération');
+              console.error('[useHlsPlayer] 503 après 25 retries (8+ min) → abandon du seek, le serveur n\'a pas terminé la génération');
               pendingSeekRef.current = 0;
               seekLoadUrlRef.current = null;
               setPendingSeekPosition(0);
@@ -1147,6 +1128,33 @@ export function useHlsPlayer({
                 onErrorRef.current?.(new Error(msg));
                 return;
               }
+              // levelParsingError pendant un seek = réponse 503 vide que HLS.js n'a pas pu parser.
+              // Ne pas appeler startLoad() (boucle infinie). Traiter comme un 503 et retry via seekUrl.
+              const seekUrl = seekLoadUrlRef.current;
+              if (
+                data.details === 'levelParsingError' &&
+                pendingSeekRef.current > 0 &&
+                seekUrl &&
+                seekLoadRetryCountRef.current < 25
+              ) {
+                seekLoadRetryCountRef.current += 1;
+                const baseDelays = [3000, 5000, 8000, 10000, 12000, 15000, 20000, 25000, 30000, 35000];
+                const delayMs = baseDelays[Math.min(seekLoadRetryCountRef.current - 1, baseDelays.length - 1)] ?? 35000;
+                console.debug('[useHlsPlayer] levelParsingError pendant seek (503 vide), retry', seekLoadRetryCountRef.current, 'dans', delayMs / 1000, 's');
+                window.setTimeout(() => {
+                  if (hlsRef.current && seekLoadUrlRef.current === seekUrl) {
+                    try {
+                      hlsRef.current.loadSource(seekUrl);
+                    } catch (e) {
+                      pendingSeekRef.current = 0;
+                      seekLoadUrlRef.current = null;
+                      setPendingSeekPosition(0);
+                      setIsLoading(false);
+                    }
+                  }
+                }, delayMs);
+                return;
+              }
               // Tenter de récupérer
               console.debug('[useHlsPlayer] Erreur réseau fatale, tentative hls.startLoad()');
               try {
@@ -1154,6 +1162,7 @@ export function useHlsPlayer({
               } catch (_) {}
               return;
             }
+
 
             // Erreur fatale non-réseau, non-média: retry réseau ou destroy
             const isNetworkError = data.type === 'networkError' ||
