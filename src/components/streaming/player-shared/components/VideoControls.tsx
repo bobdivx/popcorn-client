@@ -93,7 +93,7 @@ interface VideoControlsProps {
   /** Format d'image actuel (contain = bandes noires, cover = plein écran). Affiche le choix dans le menu Paramètres. */
   videoFillMode?: 'contain' | 'cover';
 
-  /** Miniatures scrub (type Netflix) — si défini, affiche une vignette au survol de la barre. */
+  /** Miniatures scrub : carrousel sous la barre (pas d’aperçu flottant au survol). */
   scrubThumbnails?: { mediaId: string; count: number; durationSeconds?: number; intervalSeconds?: number } | null;
   /** Miniatures en cours de génération (placeholder animé). */
   scrubThumbnailsLoading?: boolean;
@@ -211,14 +211,6 @@ export function VideoControls({
   ];
   const volumePercent = volume * 100;
 
-  const [scrubHover, setScrubHover] = useState<{
-    percent: number;
-    time: number;
-    url: string;
-  } | null>(null);
-  const [scrubActive, setScrubActive] = useState(false);
-  const scrubHideTimeoutRef = useRef<number | null>(null);
-
   const scrubEnabled =
     !!scrubThumbnails &&
     !!scrubThumbnails.mediaId &&
@@ -253,12 +245,22 @@ export function VideoControls({
     return ((safe + 0.5) / count) * effectiveDuration;
   };
 
-  // Index interne (desktop) : navigation par survol/clic/clavier sur la barre.
+  // Index interne (desktop) : clic / drag sur la barre, clavier global, ou carrousel.
   const [tvScrubIndexInternal, setTvScrubIndexInternal] = useState<number>(0);
   // Sur TV, l'index est piloté par useTVPlayerNavigation (via tvScrubIndexExternal).
   // Sur desktop, on utilise l'état interne.
   const tvScrubIndex = isTV && tvScrubIndexExternal != null ? tvScrubIndexExternal : tvScrubIndexInternal;
   const setTvScrubIndex = setTvScrubIndexInternal;
+
+  // Refs pour éviter de recréer le listener window à chaque rendu (onSeekToTime / index changeaient souvent → touches perdues, plafond ~9).
+  const scrubThumbnailsRef = useRef(scrubThumbnails);
+  scrubThumbnailsRef.current = scrubThumbnails;
+  const timeForScrubIndexRef = useRef(timeForScrubIndex);
+  timeForScrubIndexRef.current = timeForScrubIndex;
+  const tvScrubInternalRef = useRef(tvScrubIndexInternal);
+  tvScrubInternalRef.current = tvScrubIndexInternal;
+  const onSeekToTimeRef = useRef(onSeekToTime);
+  onSeekToTimeRef.current = onSeekToTime;
 
   // Desktop (Chrome) : permettre la navigation clavier des vignettes sans dépendre du focus DOM sur la barre.
   // Sur TV, c'est géré par useTVPlayerNavigation.
@@ -300,15 +302,17 @@ export function VideoControls({
       if (keyNormalized === 'Enter' || keyNormalized === ' ') {
         e.preventDefault();
         e.stopPropagation();
-        const targetTime = timeForScrubIndex(tvScrubIndexInternal);
-        onSeekToTime?.(targetTime);
+        const targetTime = timeForScrubIndexRef.current(tvScrubInternalRef.current);
+        onSeekToTimeRef.current?.(targetTime);
         return;
       }
 
       if (!isNavKey) return;
       e.preventDefault();
       e.stopPropagation();
-      const count = scrubThumbnails!.count;
+      const st = scrubThumbnailsRef.current;
+      const count = st?.count ?? 0;
+      if (count <= 0) return;
       setTvScrubIndexInternal((prev) => {
         let nextIdx = prev;
         const step = keyNormalized === 'PageUp' || keyNormalized === 'PageDown' ? 5 : 1;
@@ -321,20 +325,19 @@ export function VideoControls({
     };
     window.addEventListener('keydown', onKeyDownCapture, true);
     return () => window.removeEventListener('keydown', onKeyDownCapture, true);
-  }, [isTV, showControls, scrubEnabled, scrubThumbnails?.count, onSeekToTime, tvScrubIndexInternal]);
+  }, [isTV, showControls, scrubEnabled, scrubThumbnails?.count]);
 
   // Desktop : valider automatiquement la position après 2s sur une vignette (debounce),
   // uniquement quand les contrôles sont visibles et que scrub est actif.
   useEffect(() => {
     if (isTV) return;
     if (!showControls || !scrubEnabled) return;
-    if (!onSeekToTime) return;
     const id = window.setTimeout(() => {
-      const targetTime = timeForScrubIndex(tvScrubIndexInternal);
-      onSeekToTime(targetTime);
+      const targetTime = timeForScrubIndexRef.current(tvScrubInternalRef.current);
+      onSeekToTimeRef.current?.(targetTime);
     }, 2000);
     return () => window.clearTimeout(id);
-  }, [isTV, showControls, scrubEnabled, onSeekToTime, tvScrubIndexInternal]);
+  }, [isTV, showControls, scrubEnabled, tvScrubIndexInternal]);
 
   // Sur TV en mode vignettes : la barre de progression reflète la vignette sélectionnée (pas currentTime).
   // Cela synchronise visuellement la barre et le carousel — le curseur indique où on se trouvera après Enter.
@@ -347,47 +350,30 @@ export function VideoControls({
     return duration > 0 ? (currentTime / duration) * 100 : 0;
   })();
 
-  const setScrubFromPercent = (percent: number, forceActive = false) => {
+  /** Aligne l’index du carrousel de vignettes sur une position % de la timeline (pas d’aperçu au survol). */
+  const setScrubFromPercent = (percent: number) => {
     const effectiveDuration = getEffectiveDuration();
-    if (!scrubEnabled || !scrubBaseUrl || effectiveDuration <= 0) return;
+    if (!scrubEnabled || effectiveDuration <= 0) return;
     const p = Math.min(100, Math.max(0, percent));
     const t = (p / 100) * effectiveDuration;
     const count = scrubThumbnails!.count;
-    const idx = Math.min(count - 1, Math.max(0, Math.floor((t / effectiveDuration) * count)));
-    const url = getScrubUrlForIndex(idx);
-    setScrubHover({ percent: p, time: t, url });
-    if (forceActive) setScrubActive(true);
+    const interval = scrubThumbnails?.intervalSeconds;
+    const idx =
+      interval != null && Number.isFinite(interval) && interval > 0
+        ? Math.min(count - 1, Math.max(0, Math.floor(t / interval)))
+        : Math.min(count - 1, Math.max(0, Math.floor((t / effectiveDuration) * count)));
+    setTvScrubIndex(idx);
   };
 
-  const setScrubFromPointer = (e: any, forceActive = false) => {
+  const setScrubFromPointer = (e: any) => {
     const effectiveDuration = getEffectiveDuration();
-    if (!scrubEnabled || !scrubBaseUrl || effectiveDuration <= 0) return;
+    if (!scrubEnabled || effectiveDuration <= 0) return;
     const el = e.currentTarget as HTMLDivElement;
     const rect = el.getBoundingClientRect();
     const x = Math.min(rect.width, Math.max(0, e.clientX - rect.left));
     const percent = rect.width > 0 ? (x / rect.width) * 100 : 0;
-    setScrubFromPercent(percent, forceActive);
+    setScrubFromPercent(percent);
   };
-
-  const scheduleScrubHide = (delayMs: number) => {
-    if (scrubHideTimeoutRef.current != null) {
-      window.clearTimeout(scrubHideTimeoutRef.current);
-      scrubHideTimeoutRef.current = null;
-    }
-    scrubHideTimeoutRef.current = window.setTimeout(() => {
-      setScrubActive(false);
-      setScrubHover(null);
-    }, delayMs) as unknown as number;
-  };
-
-  useEffect(() => {
-    return () => {
-      if (scrubHideTimeoutRef.current != null) {
-        window.clearTimeout(scrubHideTimeoutRef.current);
-        scrubHideTimeoutRef.current = null;
-      }
-    };
-  }, []);
 
   const buttonSize = isTV ? 'w-20 h-20' : isFullscreen ? 'w-[4.5rem] h-[4.5rem] min-w-[4.5rem] min-h-[4.5rem]' : 'w-11 h-11 min-w-11 min-h-11 sm:w-14 sm:h-14 sm:min-w-14 sm:min-h-14 md:w-16 md:h-16 md:min-w-16 md:min-h-16';
   const iconSize = isTV ? 'w-10 h-10' : isFullscreen ? 'w-9 h-9' : 'w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8';
@@ -560,16 +546,19 @@ export function VideoControls({
           )}
         </div>
         <div class={padding}>
+          {/* Colonne barre + carrousel de vignettes scrub (pas d’aperçu flottant au survol) */}
+          <div class="flex flex-col gap-2 mb-4 sm:mb-6 md:mb-8">
           <div
             ref={progressBarRef}
             // Sur TV en mode vignettes : la barre ne doit pas être focusable (sinon le focus « part » sur la barre).
             tabIndex={isTV && scrubEnabled ? -1 : 0}
             data-tv-video-progress
             role="slider"
-            class={`relative ${progressHeight} bg-white/30 rounded-full cursor-pointer group/progress transition-all mb-4 sm:mb-6 md:mb-8 outline-none focus:outline-none ${getProgressFocusClass()}`}
+            class={`relative ${progressHeight} bg-white/30 rounded-full cursor-pointer group/progress transition-all outline-none focus:outline-none ${getProgressFocusClass()}`}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
+              if (scrubEnabled && !isTV) setScrubFromPointer(e);
               onSeek(e);
             }}
             onPointerDown={(e) => {
@@ -578,32 +567,22 @@ export function VideoControls({
               try {
                 (e.currentTarget as HTMLDivElement).setPointerCapture?.(e.pointerId);
               } catch (err) {}
-              setScrubFromPointer(e, true);
+              setScrubFromPointer(e);
               onSeek(e);
             }}
             onPointerMove={(e) => {
               if (isTV) return;
-              // Seek quand drag (bouton appuyé)
               if (e.buttons === 1) {
                 e.preventDefault();
                 e.stopPropagation();
-                setScrubFromPointer(e, true);
+                setScrubFromPointer(e);
                 onSeek(e);
-                return;
               }
-              // Miniature scrub au survol (expérience Netflix)
-              setScrubFromPointer(e, false);
             }}
             onPointerUp={(e) => {
               try {
                 (e.currentTarget as HTMLDivElement).releasePointerCapture?.(e.pointerId);
               } catch (err) {}
-              // Garder un court instant l'aperçu après le drag (comme Netflix), puis cacher.
-              scheduleScrubHide(700);
-            }}
-            onPointerLeave={() => {
-              if (isTV) return;
-              if (!scrubActive) setScrubHover(null);
             }}
             onFocus={() => {
               // TV + scrub : ne jamais laisser le focus DOM sur la barre.
@@ -619,15 +598,10 @@ export function VideoControls({
                 // Desktop : initialiser l'index depuis la position courante à l'entrée dans le mode scrub.
                 const idx = Math.min(count - 1, Math.max(0, Math.floor((currentTime / effectiveDuration) * count)));
                 setTvScrubIndex(idx);
-              } else if (effectiveDuration > 0 && !scrubEnabled && !isTV) {
-                const percent = (currentTime / effectiveDuration) * 100;
-                setScrubFromPercent(percent, false);
               }
             }}
             onBlur={() => {
               setFocusedOnProgress?.(false);
-              setScrubActive(false);
-              setScrubHover(null);
             }}
             onKeyDown={(e: KeyboardEvent) => {
               // Sur TV avec miniatures scrub, la navigation est gérée au niveau window (useTVPlayerNavigation).
@@ -680,7 +654,6 @@ export function VideoControls({
                 if (keyNormalized === 'End') nextIdx = count - 1;
 
                 setTvScrubIndex(nextIdx);
-                scheduleScrubHide(2500);
                 return;
               }
 
@@ -698,7 +671,6 @@ export function VideoControls({
               if (keyNormalized === 'Home') nextTime = 0;
               if (keyNormalized === 'End') nextTime = effectiveDuration;
               const percent = (nextTime / effectiveDuration) * 100;
-              setScrubFromPercent(percent, true);
 
               // Déclencher le seek en simulant un clic sur la barre.
               const el = (progressBarRef as any)?.current as HTMLDivElement | null;
@@ -715,132 +687,12 @@ export function VideoControls({
                 // Fallback si jamais la ref n'est pas attachée.
                 onSeekTV(keyNormalized === 'ArrowLeft' || keyNormalized === 'PageDown' ? 'left' : 'right', step);
               }
-              // Laisser visible l'aperçu un peu après la dernière touche.
-              scheduleScrubHide(900);
             }}
             aria-label={t('playback.positionSlider')}
             aria-valuenow={Math.round(progressPercent)}
             aria-valuemin={0}
             aria-valuemax={100}
           >
-            {/* Web/desktop: tooltip vignette au survol/drag */}
-            {!isTV && scrubEnabled && scrubHover && (
-              <div
-                class="absolute -top-24 sm:-top-28 md:-top-32 z-40 pointer-events-none"
-                style={{
-                  left: `${scrubHover.percent}%`,
-                  transform: 'translateX(-50%)',
-                }}
-                aria-hidden
-              >
-                <div class="rounded-lg overflow-hidden bg-black/80 backdrop-blur-md border border-white/20 shadow-xl">
-                  <img
-                    src={scrubHover.url}
-                    alt=""
-                    class="block w-52 sm:w-60 md:w-72 h-auto object-cover"
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <div class="px-2 py-1 text-xs text-white/90 bg-black/60">
-                    {formatTime(scrubHover.time)}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Bande de miniatures (TV + desktop) : navigation par les captures (clic = seek, flèches + Enter) */}
-            {showControls && (scrubEnabled || scrubThumbnailsLoading) && (scrubEnabled ? (() => {
-              const count = scrubThumbnails!.count;
-              const effectiveDuration = getEffectiveDuration();
-              // La vignette sélectionnée est pilotée par la navigation (tvScrubIndex),
-              // pas par la position de lecture (currentTime).
-              // `currentTime` ne sert qu'à initialiser l'index au moment où l'utilisateur entre dans le mode scrub.
-              const selectedIndex = Math.min(count - 1, Math.max(0, tvScrubIndex));
-              // Fenêtre glissante : montrer plus de vignettes si le média en a beaucoup (sans tout afficher d’un coup).
-              const windowSize = Math.min(
-                count,
-                isTV ? 9 : isFullscreen ? 11 : 9
-              );
-              const half = Math.floor(windowSize / 2);
-              const start = Math.max(0, Math.min(count - windowSize, selectedIndex - half));
-              const end = Math.min(count - 1, start + windowSize - 1);
-              const seekToThumbnail = (idx: number) => {
-                const seekTime = timeForScrubIndex(idx);
-                setTvScrubIndex(idx);
-                setTvScrubVisible(true);
-                if (onSeekToTime) onSeekToTime(seekTime);
-                else {
-                  const percent = effectiveDuration > 0 ? (seekTime / effectiveDuration) * 100 : 0;
-                  const el = (progressBarRef as any)?.current as HTMLDivElement | null;
-                  if (el) {
-                    const rect = el.getBoundingClientRect();
-                    const clientX = rect.left + (rect.width * percent) / 100;
-                    onSeek({
-                      currentTarget: el,
-                      clientX,
-                      preventDefault: () => {},
-                      stopPropagation: () => {},
-                    });
-                  }
-                }
-              };
-              const items = [];
-              for (let idx = start; idx <= end; idx++) {
-                const selected = idx === selectedIndex;
-                const thumbTime = timeForScrubIndex(idx);
-                items.push(
-                  <button
-                    key={idx}
-                    type="button"
-                    tabIndex={isTV ? -1 : 0}
-                    class={`relative rounded-xl overflow-hidden bg-black/70 border ${
-                      selected
-                        ? (isTV && tvScrubFocused ? 'border-white ring-4 ring-white/95' : 'border-white ring-2 ring-white/90')
-                        : 'border-white/20'
-                    } shadow-2xl focus:outline-none focus:ring-2 focus:ring-white/80 transition-all flex-1 basis-0 min-w-[10rem] sm:min-w-[12rem] md:min-w-[13rem] max-w-[30rem] aspect-video ${
-                      isTV ? 'cursor-default pointer-events-none' : 'cursor-pointer hover:border-white/50'
-                    }`}
-                    onClick={(e: Event) => {
-                      if (isTV) return;
-                      e.preventDefault();
-                      e.stopPropagation();
-                      seekToThumbnail(idx);
-                    }}
-                    aria-label={t('playback.seekToPosition', { time: formatTime(thumbTime) })}
-                  >
-                    <img
-                      src={getScrubUrlForIndex(idx)}
-                      alt=""
-                      class="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  </button>
-                );
-              }
-              return (
-                <div
-                  class="absolute -top-52 sm:-top-56 md:-top-60 z-40 flex w-screen max-w-[100vw] left-1/2 -translate-x-1/2 gap-2 sm:gap-3 md:gap-4 px-3 sm:px-5 md:px-8 box-border overflow-x-auto pb-1 scrollbar-visible"
-                  aria-hidden
-                >
-                  {items}
-                </div>
-              );
-            })() : (
-              // Placeholder animé pendant la génération des vignettes.
-              <div
-                class="absolute -top-52 sm:-top-56 md:-top-60 z-40 flex w-screen max-w-[100vw] left-1/2 -translate-x-1/2 gap-2 sm:gap-3 md:gap-4 px-3 sm:px-5 md:px-8 box-border overflow-x-auto pb-1 scrollbar-visible"
-                aria-hidden
-              >
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div
-                    // eslint-disable-next-line react/no-array-index-key
-                    key={i}
-                    class="flex-1 basis-0 min-w-[10rem] sm:min-w-[12rem] md:min-w-[13rem] max-w-[30rem] aspect-video rounded-xl bg-white/10 animate-pulse shadow-2xl"
-                  />
-                ))}
-              </div>
-            ))}
             <div class="absolute left-0 top-0 h-full bg-white/20 rounded-full" style={{ width: '100%' }} />
             {/* Partie déjà téléchargée par le client torrent : segment visible (couleur assortie au violet) */}
             {torrentProgress != null && torrentProgress > 0 && (
@@ -869,6 +721,98 @@ export function VideoControls({
               class={`absolute top-1/2 -translate-y-1/2 ${isTV ? 'w-6 h-6' : 'w-4 h-4'} bg-purple-600 rounded-full transition-all border-2 border-white ${isTV ? 'opacity-100' : 'opacity-0 group-hover/progress:opacity-100'}`}
               style={{ left: `calc(${progressPercent}% - ${progressPercent > 0 && progressPercent < 100 ? (isTV ? '12px' : '8px') : progressPercent === 100 ? (isTV ? '24px' : '16px') : '0px'})` }}
             />
+          </div>
+          {/* Carrousel de miniatures (TV + desktop), sous la barre */}
+          {showControls && (scrubEnabled || scrubThumbnailsLoading) && (scrubEnabled ? (() => {
+            const count = scrubThumbnails!.count;
+            const effectiveDuration = getEffectiveDuration();
+            const selectedIndex = Math.min(count - 1, Math.max(0, tvScrubIndex));
+            const windowSize = Math.min(
+              count,
+              isTV ? 9 : isFullscreen ? 11 : 9
+            );
+            const half = Math.floor(windowSize / 2);
+            const start = Math.max(0, Math.min(count - windowSize, selectedIndex - half));
+            const end = Math.min(count - 1, start + windowSize - 1);
+            const seekToThumbnail = (idx: number) => {
+              const seekTime = timeForScrubIndex(idx);
+              setTvScrubIndex(idx);
+              setTvScrubVisible(true);
+              if (onSeekToTime) onSeekToTime(seekTime);
+              else {
+                const percent = effectiveDuration > 0 ? (seekTime / effectiveDuration) * 100 : 0;
+                const el = (progressBarRef as any)?.current as HTMLDivElement | null;
+                if (el) {
+                  const rect = el.getBoundingClientRect();
+                  const clientX = rect.left + (rect.width * percent) / 100;
+                  onSeek({
+                    currentTarget: el,
+                    clientX,
+                    preventDefault: () => {},
+                    stopPropagation: () => {},
+                  });
+                }
+              }
+            };
+            const items = [];
+            for (let idx = start; idx <= end; idx++) {
+              const selected = idx === selectedIndex;
+              const thumbTime = timeForScrubIndex(idx);
+              items.push(
+                <button
+                  key={idx}
+                  type="button"
+                  // Pas de tabulation sur les vignettes : la fenêtre glissante démontait le nœud focal → blocage.
+                  // Clavier : listener global (flèches) ; souris : clic inchangé.
+                  tabIndex={-1}
+                  class={`relative rounded-xl overflow-hidden bg-black/70 border ${
+                    selected
+                      ? (isTV && tvScrubFocused ? 'border-white ring-4 ring-white/95' : 'border-white ring-2 ring-white/90')
+                      : 'border-white/20'
+                  } shadow-2xl focus:outline-none focus:ring-2 focus:ring-white/80 transition-all flex-1 basis-0 min-w-0 max-w-[30rem] aspect-video ${
+                    isTV ? 'cursor-default pointer-events-none' : 'cursor-pointer hover:border-white/50'
+                  }`}
+                  onClick={(e: Event) => {
+                    if (isTV) return;
+                    e.preventDefault();
+                    e.stopPropagation();
+                    seekToThumbnail(idx);
+                  }}
+                  aria-label={t('playback.seekToPosition', { time: formatTime(thumbTime) })}
+                >
+                  <img
+                    src={getScrubUrlForIndex(idx)}
+                    alt=""
+                    class="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                    loading={selected ? 'eager' : 'lazy'}
+                    decoding="async"
+                    fetchPriority={selected ? 'high' : 'low'}
+                  />
+                </button>
+              );
+            }
+            return (
+              <div
+                class="relative z-10 flex w-full max-w-full gap-2 sm:gap-3 md:gap-4 box-border overflow-hidden pb-1 min-h-0"
+                aria-hidden
+              >
+                {items}
+              </div>
+            );
+          })() : (
+            <div
+              class="relative z-10 flex w-full max-w-full gap-2 sm:gap-3 md:gap-4 box-border overflow-hidden pb-1 min-h-0"
+              aria-hidden
+            >
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div
+                  // eslint-disable-next-line react/no-array-index-key
+                  key={i}
+                  class="flex-1 basis-0 min-w-0 max-w-[30rem] aspect-video rounded-xl bg-white/10 animate-pulse shadow-2xl"
+                />
+              ))}
+            </div>
+          ))}
           </div>
           <div class={`flex items-center ${gap} relative z-30 overflow-x-auto min-w-0 scrollbar-visible`} data-tv-video-controls-row>
             <button 

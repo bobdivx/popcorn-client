@@ -592,6 +592,39 @@
     "diagnosticsDescription": "Diagnostic tools and system information",
     "audit": "Audit",
     "auditDescription": "Action and event history",
+    "notifications": "Notifications",
+    "notificationsDescription": "Manage notifications (Webhook, Slack, Telegram, Email)",
+    "notificationSettings": {
+      "title": "Notifications",
+      "description": "Configure alerts and notifications for new media, requests and system events.",
+      "webhookTitle": "Generic Webhook",
+      "webhookEnabled": "Webhook enabled",
+      "webhookUrl": "Webhook URL",
+      "webhookUrlHint": "Sends a JSON POST with {title, message, timestamp}",
+      "slackTitle": "Slack",
+      "slackEnabled": "Slack enabled",
+      "slackWebhookUrl": "Slack Webhook URL",
+      "slackWebhookUrlHint": "Incoming Webhook URL (e.g. https://hooks.slack.com/services/...)",
+      "discordTitle": "Discord",
+      "discordEnabled": "Discord enabled",
+      "discordWebhookUrl": "Discord Webhook URL",
+      "discordWebhookUrlHint": "Standard Discord webhook URL",
+      "telegramTitle": "Telegram",
+      "telegramEnabled": "Telegram enabled",
+      "telegramBotToken": "Telegram Bot Token",
+      "telegramChatId": "Chat ID",
+      "telegramHint": "Create a bot via @BotFather and get your ID via @userinfobot",
+      "emailTitle": "Email",
+      "emailEnabled": "Email enabled",
+      "emailAddress": "Recipient email address",
+      "emailHint": "Requires SMTP configuration on the server",
+      "systemTitle": "System",
+      "systemEnabled": "System logs enabled",
+      "testNotification": "Test notification",
+      "testSuccess": "Test notification sent!",
+      "testError": "Failed to send test",
+      "saveSuccess": "Notification settings saved"
+    },
     "uploadTrackerPanel": {
       "title": "Publishing",
       "description": "Create a .torrent for a library media and publish it via P-upload to your trackers.",
@@ -2012,6 +2045,10 @@
     "server": {
       "title": "Server",
       "subtitle": "Configure the Popcornn server URL to connect to"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "subtitle": "Manage alerts (Webhook, Slack, Telegram, Email, Logs)"
     },
     "quickConnect": {
       "title": "Quick connect",

@@ -35,40 +35,65 @@ export function Modal({
     if (!isOpen || !modalRef.current) return;
 
     const modal = modalRef.current;
-    const focusableElements = modal.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"]), [data-focusable]'
-    );
 
-    const firstFocusable = focusableElements[0] as HTMLElement;
-    const lastFocusable = focusableElements[focusableElements.length - 1] as HTMLElement;
+    const getFocusableElements = () => {
+      return modal.querySelectorAll<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [data-focusable]:not([disabled])'
+      );
+    };
 
     const handleTabKey = (e: KeyboardEvent) => {
       if (e.key !== 'Tab') return;
+
+      const focusableElements = getFocusableElements();
+      if (focusableElements.length === 0) return;
+
+      const firstFocusable = focusableElements[0];
+      const lastFocusable = focusableElements[focusableElements.length - 1];
 
       if (e.shiftKey) {
         // Shift + Tab
         if (document.activeElement === firstFocusable) {
           e.preventDefault();
-          lastFocusable?.focus();
+          lastFocusable.focus();
         }
       } else {
         // Tab
         if (document.activeElement === lastFocusable) {
           e.preventDefault();
-          firstFocusable?.focus();
+          firstFocusable.focus();
         }
       }
     };
 
-    modal.addEventListener('keydown', handleTabKey);
+    // Gestion de la navigation fléchée pour la TV (facultatif si géré par ailleurs, mais aide le focus trap)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Tab') {
+        handleTabKey(e);
+      }
+    };
 
-    // Focus le premier élément focusable
-    setTimeout(() => {
-      firstFocusable?.focus();
-    }, 100);
+    modal.addEventListener('keydown', handleKeyDown);
+
+    // Focus le premier élément focusable au montage
+    const initialFocus = () => {
+      const focusable = getFocusableElements();
+      if (focusable.length > 0) {
+        // Chercher d'abord un élément privilégié (ex: bouton fermer ou premier bouton d'action)
+        const primary = Array.from(focusable).find(el => 
+          el.getAttribute('aria-label') === 'Fermer' || 
+          el.classList.contains('ds-btn-primary') ||
+          el.hasAttribute('data-autofocus')
+        );
+        (primary || focusable[0]).focus();
+      }
+    };
+
+    const timer = setTimeout(initialFocus, 150);
 
     return () => {
-      modal.removeEventListener('keydown', handleTabKey);
+      modal.removeEventListener('keydown', handleKeyDown);
+      clearTimeout(timer);
     };
   }, [isOpen]);
 

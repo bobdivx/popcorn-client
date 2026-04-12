@@ -23,6 +23,32 @@ interface DownloadDetailModalProps {
   backdropUrl?: string | null;
 }
 
+const StatCard = ({ icon: Icon, label, value, colorClass }: any) => (
+  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col gap-1 backdrop-blur-sm group hover:bg-white/10 transition-all">
+    <div className="flex items-center gap-2 text-[var(--ds-text-tertiary)] group-hover:text-white/80 transition-colors">
+      <Icon size={16} className={colorClass} />
+      <span className="text-xs font-semibold uppercase tracking-wider">{label}</span>
+    </div>
+    <div className="text-lg sm:text-2xl font-bold text-white tracking-tight">{value}</div>
+  </div>
+);
+
+const ActionTile = ({ icon: Icon, label, onClick, className = "", danger = false }: any) => (
+  <button
+    onClick={onClick}
+    className={`group flex flex-col items-center justify-center p-4 sm:p-6 rounded-2xl border transition-all duration-300 gap-3 
+      ${danger 
+        ? 'bg-red-500/10 border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40' 
+        : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+      } ${className}`}
+  >
+    <div className={`p-3 rounded-full transition-transform group-hover:scale-110 ${danger ? 'bg-red-500/20 text-red-500' : 'bg-white/10 text-white'}`}>
+      <Icon size={24} />
+    </div>
+    <span className={`text-sm font-bold tracking-wide ${danger ? 'text-red-400' : 'text-white/90'}`}>{label}</span>
+  </button>
+);
+
 export function DownloadDetailModal({ 
   torrent, 
   onClose, 
@@ -80,32 +106,6 @@ export function DownloadDetailModal({
     } catch (e) {} finally { setAddTrackerLoading(false); }
   };
 
-  const StatCard = ({ icon: Icon, label, value, colorClass }: any) => (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col gap-1 backdrop-blur-sm group hover:bg-white/10 transition-all">
-      <div className="flex items-center gap-2 text-[var(--ds-text-tertiary)] group-hover:text-white/80 transition-colors">
-        <Icon size={16} className={colorClass} />
-        <span className="text-xs font-semibold uppercase tracking-wider">{label}</span>
-      </div>
-      <div className="text-lg sm:text-2xl font-bold text-white tracking-tight">{value}</div>
-    </div>
-  );
-
-  const ActionTile = ({ icon: Icon, label, onClick, className = "", danger = false }: any) => (
-    <button
-      onClick={onClick}
-      className={`group flex flex-col items-center justify-center p-4 sm:p-6 rounded-2xl border transition-all duration-300 gap-3 
-        ${danger 
-          ? 'bg-red-500/10 border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40' 
-          : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
-        } ${className}`}
-    >
-      <div className={`p-3 rounded-full transition-transform group-hover:scale-110 ${danger ? 'bg-red-500/20 text-red-500' : 'bg-white/10 text-white'}`}>
-        <Icon size={24} />
-      </div>
-      <span className={`text-sm font-bold tracking-wide ${danger ? 'text-red-400' : 'text-white/90'}`}>{label}</span>
-    </button>
-  );
-
   return (
     <Modal 
       isOpen={true} 
@@ -128,6 +128,8 @@ export function DownloadDetailModal({
             onClick={onClose}
             className="flex items-center gap-2 text-white/60 hover:text-white transition-colors p-2 -ml-2 rounded-xl hover:bg-white/5"
             data-focusable
+            data-autofocus
+            aria-label="Fermer"
           >
             <ArrowLeft size={20} />
             <span className="font-semibold hidden sm:inline">{t('common.back')}</span>
