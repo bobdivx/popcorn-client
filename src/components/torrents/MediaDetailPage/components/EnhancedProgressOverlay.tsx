@@ -54,16 +54,20 @@ export function EnhancedProgressOverlay({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex items-center justify-center">
-      {/* Fond avec l'image */}
+      {/* Fond avec l''image et effet de profondeur */}
       {imageUrl && (
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-10 blur-2xl transition-opacity duration-500"
-          style={{ backgroundImage: `url(${imageUrl})` }}
-        />
+        <>
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-30 scale-105 transition-all duration-700 blur-xl"
+            style={{ backgroundImage: `url(${imageUrl})` }}
+          />
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+        </>
       )}
 
-      {/* Overlay sombre */}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/90 to-black" />
+      {/* Overlay dynamique : Gradient radial profond */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_transparent_0%,_rgba(0,0,0,0.8)_100%)]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black" />
 
       {/* Contenu */}
       <div className="relative z-10 max-w-lg w-full mx-4">
@@ -103,13 +107,13 @@ export function EnhancedProgressOverlay({
           </div>
         )}
 
-        {/* Spinner + indicateur d'étapes */}
+        {/* Spinner + indicateur d''étapes */}
         {playStatus !== 'error' && (
           <div className="flex flex-col items-center">
-            {/* Indicateur d'étapes (barre avec 4 phases) */}
+            {/* Indicateur d''étapes (barre avec 4 phases) */}
             {(playStatus === 'adding' || playStatus === 'downloading' || playStatus === 'buffering') && (
-              <div className="w-full max-w-sm mb-8">
-                <div className="flex justify-between gap-1">
+              <div className="w-full max-w-sm mb-12 relative">
+                <div className="flex justify-between gap-3">
                   {LOADING_STEPS.map((step, i) => {
                     const stepNum = i + 1;
                     const isActive = currentStep === stepNum;
@@ -118,20 +122,21 @@ export function EnhancedProgressOverlay({
                       <div key={step.label} className="flex flex-1 flex-col items-center">
                         <div
                           className={`
-                            w-full h-1.5 rounded-full transition-all duration-300
-                            ${isDone ? 'bg-primary-500' : isActive ? 'bg-primary-500 animate-pulse' : 'bg-white/20'}
+                            w-full h-1 rounded-full transition-all duration-500 relative
+                            ${isDone ? 'bg-primary-500 shadow-[0_0_10px_rgba(168,85,247,0.5)]' : isActive ? 'bg-white/30 overflow-hidden' : 'bg-white/10'}
                           `}
-                        />
-                        <div className="mt-2 flex flex-col items-center">
+                        >
+                          {isActive && (
+                            <div className="absolute inset-0 bg-primary-500 animate-shimmer shadow-[0_0_15px_rgba(168,85,247,0.8)]" />
+                          )}
+                        </div>
+                        <div className="mt-3 flex flex-col items-center">
                           <span
                             className={`
-                              text-xs font-medium transition-colors
-                              ${isActive ? 'text-primary-400' : isDone ? 'text-white/70' : 'text-white/40'}
+                              text-[10px] uppercase tracking-[0.2em] font-bold transition-all duration-300
+                              ${isActive ? 'text-primary-400 opacity-100 scale-110' : isDone ? 'text-white/80' : 'text-white/20'}
                             `}
                           >
-                            {isActive && (
-                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary-400 animate-ping mr-1 align-middle" />
-                            )}
                             {step.label}
                           </span>
                         </div>
@@ -142,49 +147,59 @@ export function EnhancedProgressOverlay({
               </div>
             )}
 
-            <div className="relative w-28 h-28 mb-6">
-              {/* Cercle de fond */}
-              <div className="absolute inset-0 border-4 border-primary-600/20 rounded-full" />
-              {/* Spinner principal */}
-              <div
-                className="absolute inset-0 border-4 border-transparent border-t-primary-600 border-r-primary-600 rounded-full animate-spin"
-                style={{ animationDuration: '1s' }}
-              />
-              {/* Contenu central : % seulement quand on a une vraie progression, sinon animation par phase */}
-              {(playStatus === 'downloading' || playStatus === 'buffering') && torrentStats && (progressPercentage > 0 || isDownloading) ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-primary-600 text-3xl font-bold drop-shadow-lg">
-                    {progressPercentage < 1 ? progressPercentage.toFixed(1) : progressPercentage.toFixed(0)}%
+            <div className="relative w-40 h-40 mb-10 flex items-center justify-center">
+               {/* Effet Orbe / Halo de fond */}
+               <div className="absolute inset-0 bg-primary-600/10 rounded-full blur-3xl animate-glow-pulse" />
+               
+               {/* Cercle SVG de progression Premium */}
+               <svg className="absolute inset-0 w-full h-full transform -rotate-90">
+                 {/* Fond de l''anneau */}
+                 <circle
+                   cx="80"
+                   cy="80"
+                   r="74"
+                   className="stroke-white/5 fill-none"
+                   strokeWidth="3"
+                 />
+                 {/* Anneau actif avec glow */}
+                 <circle
+                   cx="80"
+                   cy="80"
+                   r="74"
+                   className="stroke-primary-500 fill-none transition-all duration-1000 ease-out"
+                   strokeWidth="3"
+                   strokeLinecap="round"
+                   strokeDasharray={2 * Math.PI * 74}
+                   strokeDashoffset={2 * Math.PI * 74 * (1 - (progressPercentage / 100))}
+                   style={{ filter: 'drop-shadow(0 0 8px rgba(168, 85, 247, 0.6))' }}
+                 />
+               </svg>
+
+              {/* Contenu central */}
+              <div className="relative flex flex-col items-center justify-center animate-fade-in">
+                {(playStatus === 'downloading' || playStatus === 'buffering') && torrentStats && (progressPercentage > 0 || isDownloading) ? (
+                  <div className="flex flex-col items-center">
+                    <span className="text-white text-4xl font-black tracking-tighter">
+                      {progressPercentage.toFixed(0)}<span className="text-xl text-primary-400">%</span>
+                    </span>
+                  </div>
+                ) : playStatus === 'adding' ? (
+                   <div className="text-4xl animate-float">📥</div>
+                ) : isWaitingSeeders ? (
+                  <div className="text-4xl animate-orbit">🔗</div>
+                ) : (
+                  <span className="text-white text-4xl font-black tracking-tighter">
+                    {progressPercentage.toFixed(0)}<span className="text-xl text-primary-400">%</span>
                   </span>
-                </div>
-              ) : playStatus === 'adding' ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-4xl animate-pulse" title="Préparation">
-                    📥
-                  </span>
-                </div>
-              ) : isWaitingSeeders ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-4xl animate-pulse" title="En attente de seeders">
-                    🔗
-                  </span>
-                </div>
-              ) : (playStatus === 'downloading' || playStatus === 'buffering') ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-primary-600 text-3xl font-bold drop-shadow-lg">
-                    {progressPercentage < 1 ? progressPercentage.toFixed(1) : progressPercentage.toFixed(0)}%
-                  </span>
-                </div>
-              ) : null}
-              {/* Badge vitesse quand téléchargement actif */}
+                )}
+              </div>
+
+              {/* Badge vitesse flottant */}
               {isDownloading && (
-                <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2">
-                  <div className="flex items-center gap-2 bg-green-500/20 backdrop-blur-sm px-3 py-1 rounded-full border border-green-500/30">
-                    <div className="relative w-2 h-2">
-                      <div className="absolute inset-0 bg-green-500 rounded-full animate-ping" />
-                      <div className="absolute inset-0 bg-green-500 rounded-full" />
-                    </div>
-                    <span className="text-green-400 text-xs font-semibold">{downloadSpeed} MB/s</span>
+                <div className="absolute -right-4 top-0 animate-float">
+                  <div className="deep-glass px-3 py-1.5 rounded-2xl flex items-center gap-2 border border-green-500/30">
+                    <span className="flex h-2 w-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
+                    <span className="text-green-400 text-xs font-black tracking-widest">{downloadSpeed} MB/s</span>
                   </div>
                 </div>
               )}
@@ -211,52 +226,50 @@ export function EnhancedProgressOverlay({
               </p>
             )}
 
-            {/* Stats améliorées */}
+            {/* Card de détails Premium (Deep Glass) */}
             {playStatus === 'downloading' && torrentStats && (
-              <div className="mt-8 pt-6 border-t border-white/10 w-full">
-                <div className="mb-6 text-center">
-                  <div className="text-white/50 text-sm uppercase tracking-wider mb-2">Progression</div>
-                  <div className="text-white text-2xl font-bold mb-1">
-                    {downloadedFormatted} <span className="text-lg font-normal text-white/70">/ {totalFormatted}</span>
+              <div className="deep-glass p-8 rounded-[2.5rem] w-full max-w-md mx-auto group hover:bg-white/[0.05] transition-all duration-500">
+                <div className="flex justify-between items-end mb-6">
+                  <div className="text-left">
+                    <div className="text-white/30 text-[10px] uppercase tracking-[0.2em] font-black mb-1">Téléchargé</div>
+                    <div className="text-white text-2xl font-black">
+                      {downloadedFormatted} <span className="text-white/20 text-sm font-light">/ {totalFormatted}</span>
+                    </div>
                   </div>
-                  <div className="text-white/60 text-sm">
-                    {progressPercentage.toFixed(1)}% complété
+                  <div className="text-right">
+                    <div className="text-primary-400/50 text-[10px] uppercase tracking-[0.2em] font-black mb-1">Temps restant</div>
+                    <div className="text-primary-400 text-xl font-black tracking-tighter">{timeRemaining}</div>
                   </div>
                 </div>
                 
-                {/* Barre de progression */}
-                <div className="mb-6 w-full bg-white/10 rounded-full h-3 overflow-hidden shadow-inner">
+                {/* Barre de progression Shimmer */}
+                <div className="mb-10 w-full bg-white/5 rounded-full h-1.5 overflow-hidden relative">
                   <div
-                    className="bg-gradient-to-r from-primary-600 to-primary-500 h-full rounded-full transition-all duration-300 ease-out shadow-primary shadow-primary-600/50"
+                    className="bg-primary-500 h-full rounded-full transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(168,85,247,0.4)] relative"
                     style={{ width: `${progressPercentage}%` }}
-                  />
+                  >
+                    <div className="absolute inset-0 bg-white/20 animate-shimmer" />
+                  </div>
                 </div>
                 
-                {/* Stats détaillées */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                  <div>
-                    <div className="text-white/50 text-xs uppercase tracking-wider mb-2">Vitesse</div>
-                    <div className="text-white text-lg font-bold">
-                      {downloadSpeed} <span className="text-sm font-normal text-white/70">MB/s</span>
+                {/* Stats en grille */}
+                <div className="grid grid-cols-2 gap-y-6 gap-x-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center">
+                      <span className="text-xs">⚡</span>
+                    </div>
+                    <div className="text-left">
+                      <div className="text-white/30 text-[8px] uppercase tracking-widest font-bold">Vitesse</div>
+                      <div className="text-white text-sm font-black">{downloadSpeed} MB/s</div>
                     </div>
                   </div>
-                  <div>
-                    <div className="text-white/50 text-xs uppercase tracking-wider mb-2">Temps restant</div>
-                    <div className="text-white text-lg font-bold">
-                      {timeRemaining}
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center">
+                      <span className="text-xs">👥</span>
                     </div>
-                  </div>
-                  <div>
-                    <div className="text-white/50 text-xs uppercase tracking-wider mb-2">Peers</div>
-                    <div className="text-white text-lg font-bold">
-                      {torrentStats.peers_connected}
-                      <span className="text-sm font-normal text-white/70">/{torrentStats.peers_total}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-white/50 text-xs uppercase tracking-wider mb-2">Seeders</div>
-                    <div className="text-white text-lg font-bold">
-                      {torrentStats.seeders || 0}
+                    <div className="text-left">
+                      <div className="text-white/30 text-[8px] uppercase tracking-widest font-bold">Peers</div>
+                      <div className="text-white text-sm font-black">{torrentStats.peers_connected}<span className="text-white/20">/{torrentStats.peers_total}</span></div>
                     </div>
                   </div>
                 </div>

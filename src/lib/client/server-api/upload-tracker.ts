@@ -175,6 +175,7 @@ interface UploadTrackerClientAccess {
   backendRequest<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>>;
   requestBlob(endpoint: string, options?: RequestInit): Promise<ApiResponse<Blob> & { filename?: string }>;
   getServerUrl?(): string;
+  getTorrentProgress(localMediaId: string): Promise<ApiResponse<TorrentProgressResponse>>;
 }
 
 export const uploadTrackerMethods = {

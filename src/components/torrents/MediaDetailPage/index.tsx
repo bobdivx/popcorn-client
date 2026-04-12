@@ -289,6 +289,10 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   /** Incrémenté à la fermeture du lecteur pour rafraîchir les pastilles « déjà vu » */
   const [watchedEpisodesRefresh, setWatchedEpisodesRefresh] = useState(0);
   const [startFromBeginning, setStartFromBeginning] = useState(true);
+  /** Épisodes identifiés comme présents dans la bibliothèque (Set de "season:episode") */
+  const [downloadedEpisodesSet, setDownloadedEpisodesSet] = useState<Set<string>>(new Set());
+  /** Map "season:episode" -> "chemin du fichier" pour les épisodes téléchargés */
+  const [libraryEpisodesPathMap, setLibraryEpisodesPathMap] = useState<Record<string, string>>({});
 
   /** Chemin du fichier en bibliothÃ¨que (library ou findLocalMediaByTmdb), pour lecture sans torrent dans le client. */
   const [libraryDownloadPath, setLibraryDownloadPath] = useState<string | null>(null);
@@ -383,11 +387,37 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     }
   }, [initialVariants]);
 
+  // Métadonnées de l'épisode sélectionné (pour useVideoFiles et VideoPlayer)
+  const selectedEpisodeMeta = useMemo(() => {
+    if (!seriesEpisodes?.seasons?.length || selectedSeasonNum == null || selectedEpisodeVariantId == null) return null;
+    const season = seriesEpisodes.seasons.find((s) => s.season === selectedSeasonNum);
+    const ep = season?.episodes.find((e) => e.id === selectedEpisodeVariantId);
+    if (!ep) return null;
+    return { season: ep.season, episode: ep.episode, variantId: ep.id };
+  }, [seriesEpisodes, selectedSeasonNum, selectedEpisodeVariantId]);
+
+  // Met à jour libraryDownloadPath quand l'épisode sélectionné change (pour les séries)
+  useEffect(() => {
+    if (activeTorrent.tmdbType === 'tv' && selectedEpisodeMeta) {
+      const key = `${selectedEpisodeMeta.season}:${selectedEpisodeMeta.episode}`;
+      const path = libraryEpisodesPathMap[key];
+      if (path) {
+        if (libraryDownloadPath !== path) setLibraryDownloadPath(path);
+      } else {
+        if (libraryDownloadPath !== null) setLibraryDownloadPath(null);
+      }
+    }
+  }, [selectedEpisodeMeta, libraryEpisodesPathMap, activeTorrent.tmdbType, libraryDownloadPath]);
+
   // Hooks personnalisÃ©s
   const { videoFiles, selectedFile, setVideoFiles, setSelectedFile, loadVideoFiles } = useVideoFiles({
     torrentName: activeTorrent.name,
     torrent: activeTorrentWithLibraryPath,
     keepAllVideoFiles: isPackSelected,
+    season: selectedEpisodeMeta?.season ?? null,
+    episode: selectedEpisodeMeta?.episode ?? null,
+    // Passer le chemin spécifique de l'épisode s'il est connu dans la bibliothèque
+    filePath: selectedEpisodeMeta ? libraryEpisodesPathMap[`${selectedEpisodeMeta.season}:${selectedEpisodeMeta.episode}`] : null,
     onError: (error) => {
       console.error('Erreur lors du chargement des fichiers vidÃ©o:', error);
     },
@@ -1012,6 +1042,114 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     return () => clearInterval(iv);
   }, [hasInfoHash, activeTorrent.infoHash, activeTorrent.clientState, activeTorrent.clientProgress, isPlaying, playStatus, streamingTorrentActive]);
 
+  // Détection des épisodes téléchargés dans la bibliothèque pour les séries
+  useEffect(() => {
+    if (activeTorrent.tmdbType !== 'tv' || !activeTorrent.tmdbId || !seriesEpisodes?.seasons) return;
+
+    let cancelled = false;
+    const updateDownloadedEpisodes = async () => {
+      try {
+        // Source 1 : Médias locaux indexés par le serveur
+        const localMedias = await clientApi.findLocalMediaByTmdb(activeTorrent.tmdbId!, 'tv');
+        
+        // Source 2 : Liste des torrents en cours (pour détecter les épisodes complétés récemment)
+        const allTorrents = await clientApi.listTorrents();
+        
+        if (cancelled) return;
+
+        const episodesSet = new Set<string>();
+        const pathMap: Record<string, string> = {};
+
+        // Helper pour extraire SxxEyy d'un nom de fichier ou de torrent
+        const parseSE = (name: string) => {
+          if (!name) return null;
+          // Patterns: S01E01, 1x01, S01.E01, S01 - E01, Season 1 Episode 1
+          const m = name.match(/s([0-9]{1,2})[.\s-]*e([0-9]{1,3})/i) || 
+                    name.match(/([0-9]{1,2})x([0-9]{1,3})/i) ||
+                    name.match(/season[.\s-]*([0-9]{1,2})[.\s-]*episode[.\s-]*([0-9]{1,3})/i);
+          if (m) return { s: parseInt(m[1], 10), e: parseInt(m[2], 10) };
+          return null;
+        };
+
+        // 1. Analyser les médias locaux revenus de l'index
+        if (localMedias && Array.isArray(localMedias)) {
+          for (const media of localMedias) {
+             // Priorité aux champs explicites du backend s'ils existent (local_media peut avoir season/episode_number)
+             let s = media.season ?? media.season_number ?? media.seasonNumber;
+             let e = media.episode ?? media.episode_number ?? media.episodeNumber;
+             
+             if (typeof s !== 'number' || typeof e !== 'number') {
+               const se = parseSE(media.file_name || media.file_path || media.name || '');
+               if (se) {
+                 s = se.s;
+                 e = se.e;
+               }
+             }
+
+             if (typeof s === 'number' && typeof e === 'number') {
+               const key = `${s}:${e}`;
+               episodesSet.add(key);
+               pathMap[key] = media.file_path || media.downloadPath;
+             }
+          }
+        }
+
+        // 2. Analyser les torrents complétés
+        const currentSeriesTitle = (activeTorrent.mainTitle || activeTorrent.name || '').toLowerCase();
+        
+        // Liste de mots communs à ignorer pour la détection par nom
+        const commonWords = ['les', 'the', 'des', 'mes', 'tes', 'ses', 'nos', 'vos', 'une', 'des', 'mon', 'ton', 'son', 'ma', 'ta', 'sa', 'du', 'au', 'aux', 'le', 'la', 'un'];
+        const words = currentSeriesTitle.split(/[\s\.\-_]+/).filter(w => w.length > 1 && !commonWords.includes(w));
+        
+        // On prend les 2 premiers mots significatifs pour une détection plus précise
+        const searchWords = words.slice(0, 2);
+
+        for (const t of allTorrents) {
+          const isCompleted = t.state === 'completed' || t.state === 'seeding' || (t.progress ?? 0) >= 0.99;
+
+          if (isCompleted && t.name) {
+            const torrentNameLower = t.name.toLowerCase();
+            
+            // Priorité 1 : Matching par ID TMDB si disponible
+            let matched = false;
+            const tTmdbId = (t as any).tmdb_id || (t as any).tmdbId;
+            if (activeTorrent.tmdbId && tTmdbId && Number(tTmdbId) === Number(activeTorrent.tmdbId)) {
+              matched = true;
+            } 
+            // Priorité 2 : Matching par mots significatifs du titre
+            else if (searchWords.length > 0 && searchWords.every(w => torrentNameLower.includes(w))) {
+              matched = true;
+            }
+
+            if (matched) {
+               const se = parseSE(t.name);
+               if (se) {
+                 const key = `${se.s}:${se.e}`;
+                 if (!episodesSet.has(key)) {
+                    episodesSet.add(key);
+                 }
+               }
+            }
+          }
+        }
+
+        if (!cancelled) {
+          setDownloadedEpisodesSet(episodesSet);
+          setLibraryEpisodesPathMap(pathMap);
+        }
+      } catch (err) {
+        console.error('[MediaDetailPage] Erreur updateDownloadedEpisodes:', err);
+      }
+    };
+
+    updateDownloadedEpisodes();
+    const iv = setInterval(updateDownloadedEpisodes, 15_000);
+    return () => {
+      cancelled = true;
+      clearInterval(iv);
+    };
+  }, [activeTorrent.tmdbId, activeTorrent.tmdbType, seriesEpisodes, activeTorrent.name, activeTorrent.mainTitle]);
+
   // Afficher le panneau de vÃ©rification quand un tÃ©lÃ©chargement vient d'Ãªtre ajoutÃ© (Ã©vÃ©nement torrentAdded)
   useEffect(() => {
     const onTorrentAdded = (e: Event) => {
@@ -1602,13 +1740,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   );
 
   /** Saison / numéro d'épisode / id variante pour le lecteur (reprise TMDB + « vu »). */
-  const selectedEpisodeMeta = useMemo(() => {
-    if (!seriesEpisodes?.seasons?.length || selectedSeasonNum == null || selectedEpisodeVariantId == null) return null;
-    const season = seriesEpisodes.seasons.find((s) => s.season === selectedSeasonNum);
-    const ep = season?.episodes.find((e) => e.id === selectedEpisodeVariantId);
-    if (!ep) return null;
-    return { season: ep.season, episode: ep.episode, variantId: ep.id };
-  }, [seriesEpisodes, selectedSeasonNum, selectedEpisodeVariantId]);
+  // Déjà défini plus haut pour useVideoFiles
 
   /** Liste aplatie pour le rail d'épisodes sur l'overlay pause du lecteur (style Netflix). */
   const playerSeriesEpisodePickerItems = useMemo((): SeriesEpisodePickerItem[] | null => {
@@ -2042,6 +2174,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                   onSelectEpisode={handleSeriesEpisodeSelect}
                   savedPlaybackPosition={savedPlaybackPosition}
                   episodesInLibraryCount={isLocalTorrent && allVariants.length > 0 ? allVariants.length : undefined}
+                  downloadedEpisodesSet={downloadedEpisodesSet}
                   isPackSelected={isPackSelected}
                   videoFilesCount={videoFiles.length}
                   hasInfoHash={hasInfoHash}
@@ -2055,6 +2188,9 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                   selectedPackEpisodeKey={selectedPackEpisodeKey}
                   onSelectPackEpisodeKey={onSelectPackEpisodeKey}
                   isTV={isTV}
+                  isDownloading={playStatus === 'downloading' || playStatus === 'starting'}
+                  downloadProgress={torrentStats?.progress != null ? torrentStats.progress * 100 : undefined}
+                  statusMessage={progressMessage}
                 />
               </div>
             </div>

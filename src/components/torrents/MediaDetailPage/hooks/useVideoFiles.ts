@@ -1,4 +1,4 @@
-import { useState, useRef } from 'preact/hooks';
+import { useState, useRef, useEffect } from 'preact/hooks';
 import { clientApi } from '../../../../lib/client/api';
 
 export interface TorrentFile {
@@ -16,13 +16,15 @@ interface UseVideoFilesOptions {
   filePath?: string | null; // Chemin spécifique du fichier (pour torrents multi-épisodes)
   /** Si true, ne pas réduire à un seul "fichier principal" (utile pour les packs de séries). */
   keepAllVideoFiles?: boolean;
+  season?: number | null;
+  episode?: number | null;
   torrent?: {
     infoHash?: string | null;
     downloadPath?: string | null;
   } | null; // Torrent complet pour accéder au downloadPath pour les médias locaux
 }
 
-export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFiles, torrent }: UseVideoFilesOptions) {
+export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFiles, season, episode, torrent }: UseVideoFilesOptions) {
   const [videoFiles, setVideoFiles] = useState<TorrentFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<TorrentFile | null>(null);
   const [loadingFiles, setLoadingFiles] = useState(false);
@@ -31,6 +33,23 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
   const filesCacheRef = useRef<Map<string, TorrentFile[]>>(new Map());
   // Garder une trace du dernier infoHash utilisé pour invalider le cache si nécessaire
   const lastInfoHashRef = useRef<string | null>(null);
+
+  // Synchroniser le reset de l'état quand l'infoHash du torrent change
+  useEffect(() => {
+    const infoHash = torrent?.infoHash;
+    if (infoHash && lastInfoHashRef.current && lastInfoHashRef.current !== infoHash) {
+      console.warn('[useVideoFiles] ⚠️ useEffect: InfoHash changé, reset massif des états', {
+        old: lastInfoHashRef.current,
+        new: infoHash
+      });
+      // Invalidation immédiate pour éviter toute lecture de stale data par handlePlay
+      filesCacheRef.current.clear();
+      loadingCacheRef.current.clear();
+      setVideoFiles([]);
+      setSelectedFile(null);
+    }
+    lastInfoHashRef.current = infoHash || null;
+  }, [torrent?.infoHash]);
 
   const loadVideoFiles = async (infoHash: string, retryCount: number = 0): Promise<TorrentFile[]> => {
     if (!infoHash) return [];
@@ -314,7 +333,31 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
         setVideoFiles(files);
 
         if (files.length > 0) {
-          // Essayer de sélectionner le fichier qui correspond au nom du torrent
+          // 1. Si on a des infos de saison/épisode, chercher un matching SxxExx précis
+          if (season != null && episode != null && episode > 0) {
+            const sStr = season.toString().padStart(2, '0');
+            const eStr = episode.toString().padStart(2, '0');
+            // Formats: S01E05, S1E5, 01x05, 1x5, S01.E05, etc.
+            const patterns = [
+              new RegExp(`s0?${season}e0?${episode}\\b`, 'i'),
+              new RegExp(`${season}x0?${episode}\\b`, 'i'),
+              new RegExp(`s0?${season}[.\\s-]e0?${episode}\\b`, 'i'),
+              // Cas spécifique pour les fichiers nommés juste par le numéro d'épisode dans un dossier de saison
+              new RegExp(`\\D0?${episode}\\.\\b`, 'i') 
+            ];
+
+            const matchByPattern = files.find(f => patterns.some(p => p.test(f.path)));
+            if (matchByPattern) {
+              console.log('[useVideoFiles] ✅ Matching SxxExx trouvé:', matchByPattern.path);
+              setSelectedFile(matchByPattern);
+              setLoadingFiles(false);
+              filesCacheRef.current.set(infoHash, files);
+              loadingCacheRef.current.delete(infoHash);
+              return files;
+            }
+          }
+
+          // 2. Essayer de sélectionner le fichier qui correspond au nom du torrent
           const torrentNameLower = torrentName.toLowerCase();
           const torrentWords = torrentNameLower
             .split(/[\s\.\-_\(\)\[\]]+/)
