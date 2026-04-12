@@ -37,7 +37,7 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
   const showOverlay = isHovered || isFocused;
   const cardAnimationClasses = IS_WEBOS
     ? 'transform-gpu transition-opacity duration-150 ease-out will-change-transform'
-    : 'transform-gpu transition-all duration-[200ms] ease-out hover:scale-[1.02] focus-within:scale-[1.02] hover:shadow-lg focus-within:shadow-lg hover:z-40 focus-within:z-40 will-change-transform';
+    : 'transform-gpu transition-all duration-[200ms] ease-out hover:z-40 focus-within:z-40 will-change-transform';
 
   const handleClick = (e: MouseEvent | KeyboardEvent) => {
     e.preventDefault();
