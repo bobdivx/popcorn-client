@@ -1,8 +1,9 @@
 export const prerender = false;
 
 import type { APIRoute } from 'astro';
-import type { Indexer, IndexerFormData } from '../../../../lib/client/types.js';
+import type { Indexer, IndexerFormData } from '../../../lib/client/types.js';
 import { z } from 'zod';
+import { generateId } from '../../../lib/utils/uuid.js';
 
 function getBackendUrlOverrideFromRequest(request: Request): string | null {
   const raw = request.headers.get('x-popcorn-backend-url') || request.headers.get('X-Popcorn-Backend-Url');
@@ -39,7 +40,7 @@ const indexerSchema = z.object({
  */
 export const GET: APIRoute = async ({ request }) => {
   try {
-    const { getBackendUrlAsync } = await import('../../../../lib/backend-url.js');
+    const { getBackendUrlAsync } = await import('../../../lib/backend-url.js');
     const backendUrl =
       getBackendUrlOverrideFromRequest(request) ||
       (await getBackendUrlAsync());
@@ -201,14 +202,10 @@ export const POST: APIRoute = async ({ request }) => {
     // Si indexerTypeId n'est pas fourni, le backend cherchera dans les définitions JSON
     // en utilisant le nom de l'indexer (ex: "c411" -> trouve "c411.json")
     
-    // Générer un UUID v4
-    const id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+    // Générer un UUID cryptographiquement sécurisé
+    const id = generateId();
 
-    const { getBackendUrlAsync } = await import('../../../../lib/backend-url.js');
+    const { getBackendUrlAsync } = await import('../../../lib/backend-url.js');
     const backendUrl =
       getBackendUrlOverrideFromRequest(request) ||
       (await getBackendUrlAsync());
