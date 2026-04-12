@@ -57,27 +57,34 @@ export function EpisodeCardsCarousel({
     });
   };
 
+  const isTV = isTVPlatform();
+  const showArrows = !isTV;
+
   return (
     <div aria-label={ariaLabel} className="relative">
       <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-black/60 to-transparent" />
       <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-black/60 to-transparent" />
 
-      <button
-        type="button"
-        className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full border border-white/15 bg-black/40 hover:bg-black/60 text-white/90"
-        onClick={() => scrollByCards(-1)}
-        aria-label="Précédent"
-      >
-        <ChevronLeft className="w-5 h-5" />
-      </button>
-      <button
-        type="button"
-        className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full border border-white/15 bg-black/40 hover:bg-black/60 text-white/90"
-        onClick={() => scrollByCards(1)}
-        aria-label="Suivant"
-      >
-        <ChevronRight className="w-5 h-5" />
-      </button>
+      {showArrows && (
+        <>
+          <button
+            type="button"
+            className="hidden lg:flex absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full border border-white/15 bg-black/40 hover:bg-black/60 text-white/90"
+            onClick={() => scrollByCards(-1)}
+            aria-label="Précédent"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <button
+            type="button"
+            className="hidden lg:flex absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full border border-white/15 bg-black/40 hover:bg-black/60 text-white/90"
+            onClick={() => scrollByCards(1)}
+            aria-label="Suivant"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </>
+      )}
 
       <div
         ref={scrollerRef}

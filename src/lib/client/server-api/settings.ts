@@ -281,4 +281,24 @@ export const settingsMethods = {
       : '/api/library/sources/explorer';
     return this.backendRequest(url, { method: 'GET' });
   },
+
+  /** GET /api/admin/notification-settings — récupère les paramètres de notification */
+  async getNotificationSettings(this: ServerApiClientSettingsAccess): Promise<ApiResponse<any>> {
+    return this.backendRequest('/api/admin/notification-settings', { method: 'GET' });
+  },
+
+  /** PUT /api/admin/notification-settings — met à jour les paramètres de notification */
+  async updateNotificationSettings(this: ServerApiClientSettingsAccess, settings: any): Promise<ApiResponse<any>> {
+    return this.backendRequest('/api/admin/notification-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+  },
+
+  /** GET /api/admin/notifications/history — historique des notifications envoyées */
+  async getSentNotificationsHistory(this: ServerApiClientSettingsAccess, limit?: number): Promise<ApiResponse<any[]>> {
+    const url = limit ? `/api/admin/notifications/history?limit=${limit}` : '/api/admin/notifications/history';
+    return this.backendRequest(url, { method: 'GET' });
+  },
 };

@@ -113,7 +113,7 @@ export function DownloadDetailModal({
       size="full"
       className="p-0 sm:p-0" // Reset standard padding to keep custom layout
     >
-      <div className="relative flex flex-col h-full overflow-hidden">
+      <div className="relative flex flex-col lg:h-full lg:overflow-hidden">
         {/* Immersive backdrop background inside the modal */}
         {backdropUrl && (
           <div 
@@ -123,21 +123,23 @@ export function DownloadDetailModal({
         )}
 
         {/* Header bar */}
-        <div className="relative z-10 flex items-center justify-between px-8 py-4 border-b border-white/5">
+        <div className="relative z-10 flex items-center justify-between px-4 sm:px-8 py-4 border-b border-white/5 bg-black/20 backdrop-blur-xl">
           <button
             onClick={onClose}
-            className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+            className="flex items-center gap-2 text-white/60 hover:text-white transition-colors p-2 -ml-2 rounded-xl hover:bg-white/5"
             data-focusable
           >
             <ArrowLeft size={20} />
-            <span className="font-semibold">{t('common.back')}</span>
+            <span className="font-semibold hidden sm:inline">{t('common.back')}</span>
           </button>
-          <TorrentStatusBadge state={torrent.state} className="scale-110" />
+          <div className="flex items-center gap-3">
+             <TorrentStatusBadge state={torrent.state} className="scale-90 sm:scale-110" />
+          </div>
         </div>
 
-        <div className="relative z-10 flex-1 flex flex-col lg:flex-row overflow-hidden">
+        <div className="relative z-10 flex-1 flex flex-col lg:flex-row lg:overflow-hidden">
           {/* Left Sidebar - Poster & Basic Info */}
-          <div className="w-full lg:w-96 p-8 border-b lg:border-b-0 lg:border-r border-white/5 bg-white/[0.02]">
+          <div className="w-full lg:w-96 p-4 sm:p-8 border-b lg:border-b-0 lg:border-r border-white/5 bg-white/[0.02] flex-shrink-0">
             <div className="relative aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl mb-8 group">
               {posterUrl ? (
                 <img src={posterUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={torrent.name} />
@@ -170,7 +172,7 @@ export function DownloadDetailModal({
           </div>
 
           {/* Main Content - Stats & Actions */}
-          <div className="flex-1 p-8 overflow-y-auto custom-scrollbar">
+          <div className="flex-1 p-4 sm:p-8 lg:overflow-y-auto custom-scrollbar">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
               <StatCard icon={Download} label="Download" value={downSpeed} colorClass="text-blue-400" />
               <StatCard icon={Upload} label="Upload" value={upSpeed} colorClass="text-emerald-400" />
@@ -187,7 +189,7 @@ export function DownloadDetailModal({
                   <ActionTile icon={Pause} label="Pause" onClick={() => onPause(torrent.info_hash)} />
                 )}
                 <ActionTile icon={LogsIcon || Info} label="Logs" onClick={() => onShowLogs(torrent.info_hash)} />
-                <ActionTile icon={ExternalLink} label="Détail" onClick={() => (window.location.href = `/torrents?infoHash=${torrent.info_hash}`)} />
+                <ActionTile icon={Play} label="Lire" onClick={() => (window.location.href = `/torrents?infoHash=${torrent.info_hash}`)} />
                 <ActionTile icon={Trash2} label="Supprimer" onClick={() => onRemove(torrent.info_hash, false)} danger />
               </div>
             </div>
