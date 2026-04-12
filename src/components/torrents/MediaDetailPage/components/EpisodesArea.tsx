@@ -38,6 +38,7 @@ export function EpisodesArea(props: {
   onSelectEpisode: (episodeVariantId: string) => void;
   savedPlaybackPosition: number | null;
   episodesInLibraryCount?: number;
+  downloadedEpisodesSet?: Set<string>;
 
   isPackSelected: boolean;
   videoFilesCount: number;
@@ -55,6 +56,9 @@ export function EpisodesArea(props: {
   onSelectPackEpisodeKey: (key: PackEpisodeKey) => void;
 
   isTV?: boolean;
+  isDownloading?: boolean;
+  downloadProgress?: number;
+  statusMessage?: string | null;
 }) {
   const { t } = useI18n();
   const {
@@ -65,6 +69,7 @@ export function EpisodesArea(props: {
     onSelectEpisode,
     savedPlaybackPosition,
     episodesInLibraryCount,
+    downloadedEpisodesSet,
     isPackSelected,
     videoFilesCount,
     hasInfoHash,
@@ -78,6 +83,9 @@ export function EpisodesArea(props: {
     selectedPackEpisodeKey,
     onSelectPackEpisodeKey,
     isTV,
+    isDownloading,
+    downloadProgress,
+    statusMessage,
   } = props;
 
   const [watchedTick, setWatchedTick] = useState(0);
@@ -123,8 +131,12 @@ export function EpisodesArea(props: {
           onSelectEpisode={onSelectEpisode}
           savedPlaybackPosition={savedPlaybackPosition}
           episodesInLibraryCount={episodesInLibraryCount}
+          downloadedEpisodesSet={downloadedEpisodesSet}
           watchedSet={watchedSet}
           isTV={isTV}
+          isDownloading={isDownloading}
+          downloadProgress={downloadProgress}
+          statusMessage={statusMessage}
         />
       ) : null}
 

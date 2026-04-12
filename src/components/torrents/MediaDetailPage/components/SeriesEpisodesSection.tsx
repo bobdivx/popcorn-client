@@ -13,8 +13,13 @@ export interface SeriesEpisodesSectionProps {
   savedPlaybackPosition: number | null;
   /** Nombre d'épisodes en bibliothèque (série depuis library) */
   episodesInLibraryCount?: number;
+  downloadedEpisodesSet?: Set<string>;
   watchedSet?: Set<string>;
   isTV?: boolean;
+  /** Torrent info pour l'épisode sélectionné */
+  isDownloading?: boolean;
+  downloadProgress?: number;
+  statusMessage?: string | null;
 }
 
 /**
@@ -27,8 +32,12 @@ export function SeriesEpisodesSection({
   onSelectEpisode,
   savedPlaybackPosition,
   episodesInLibraryCount,
+  downloadedEpisodesSet,
   watchedSet,
   isTV,
+  isDownloading,
+  downloadProgress,
+  statusMessage,
 }: SeriesEpisodesSectionProps) {
   const { t } = useI18n();
   const hasSavedPosition = savedPlaybackPosition != null && savedPlaybackPosition > 0;
@@ -157,6 +166,8 @@ export function SeriesEpisodesSection({
             <EpisodeCardsCarousel
               ariaLabel={`${t('mediaDetail.seasonNumber', { number: seasonNum })} — ${t('mediaDetail.episodes')}`}
               items={episodes.map((ep) => {
+                const epKey = `${ep.season}:${ep.episode}`;
+                const downloaded = downloadedEpisodesSet?.has(epKey) ?? false;
                 const isSelected = selectedEpisodeVariantId === ep.id;
                 const tmdbEpisodeName =
                   ep.episode === 0 ? null : tmdbNameBySeasonEpisode[`${ep.season}:${ep.episode}`] ?? null;
@@ -187,7 +198,10 @@ export function SeriesEpisodesSection({
                   ),
                   watched,
                   isAvailable: !!ep.info_hash,
-                  isDownloaded: !!ep.file_path,
+                  isDownloaded: !!ep.file_path || downloaded,
+                  isDownloading: isSelected ? isDownloading : false,
+                  downloadProgress: isSelected ? downloadProgress : undefined,
+                  statusMessage: isSelected ? statusMessage : null,
                   isSelected,
                   onSelect: () => onSelectEpisode(ep.id),
                   isTV,

@@ -7,6 +7,10 @@ import type { ApiResponse } from './types.js';
 interface ServerApiClientSyncAccess {
   backendRequest<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>>;
   getCurrentUserId(): string | null;
+  getBackendBaseUrl(): string;
+  loadTokens(): void;
+  accessToken: string | null;
+  nativeFetch(url: string, init: RequestInit, timeoutMs: number): Promise<Response>;
 }
 
 export interface SyncHistoryEntry {
@@ -107,5 +111,48 @@ export const syncMethods = {
       `/api/debug/check-torrent-download?indexer_id=${encodeURIComponent(indexerId)}&torrent_id=${encodeURIComponent(torrentId)}`,
       { method: 'GET' },
     );
+  },
+
+  /** Télécharge le journal de la synchronisation (en cours ou dernière exécution) en fichier .txt. */
+  async downloadSyncLog(this: ServerApiClientSyncAccess): Promise<ApiResponse<void>> {
+    if (typeof window === 'undefined') {
+      return { success: false, error: 'Unavailable', message: 'Disponible uniquement côté client.' };
+    }
+    const base = this.getBackendBaseUrl();
+    const url = `${base}/api/sync/log`;
+    this.loadTokens();
+    const headers: Record<string, string> = {};
+    if (this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
+    try {
+      const response = await this.nativeFetch(url, { method: 'GET', headers }, 30000);
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        return {
+          success: false,
+          error: 'BackendError',
+          message: text || `Erreur ${response.status}`,
+        };
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition');
+      let filename = 'sync-log.txt';
+      if (disposition) {
+        const match = /filename="?([^";\n]+)"?/.exec(disposition);
+        if (match) filename = match[1].trim();
+      }
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+      return { success: true, data: undefined };
+    } catch (error) {
+      return {
+        success: false,
+        error: 'NetworkError',
+        message: error instanceof Error ? error.message : 'Erreur lors du téléchargement du journal.',
+      };
+    }
   },
 };

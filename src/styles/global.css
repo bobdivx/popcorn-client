@@ -1999,3 +1999,47 @@ form button[type="submit"]:focus-visible,
 
 /* Fermeture de la layer utilities (@layer utilities) */
 }
+/* --- Premium Animations for Overlays --- */
+@keyframes premium-shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes slow-orbit {
+  from { transform: rotate(0deg) translateX(12px) rotate(0deg); }
+  to { transform: rotate(360deg) translateX(12px) rotate(-360deg); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(1); filter: blur(8px); }
+  50% { opacity: 0.6; transform: scale(1.1); filter: blur(12px); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.animate-shimmer {
+  animation: premium-shimmer 2s infinite linear;
+}
+
+.animate-orbit {
+  animation: slow-orbit 4s infinite linear;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 3s infinite ease-in-out;
+}
+
+.animate-float {
+  animation: float 5s infinite ease-in-out;
+}
+
+.deep-glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.8);
+}
+

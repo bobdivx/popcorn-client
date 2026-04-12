@@ -51,13 +51,13 @@ async function requestPopcornWeb<T>(
           const body = typeof options.body === 'string' ? options.body : undefined;
           
           try {
-            const nativeRes = await invoke('native-fetch', {
+            const nativeRes = (await invoke('native-fetch', {
               url: fullUrl,
               method,
               headers: headerPairs,
               body,
               timeoutMs: 10000,
-            } as any);
+            } as any)) as { body?: string; status?: number; headers?: Array<[string, string]> };
             
             const response = new Response(nativeRes?.body ?? '', {
               status: nativeRes?.status ?? 0,
