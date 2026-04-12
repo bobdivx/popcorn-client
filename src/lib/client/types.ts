@@ -243,6 +243,8 @@ export interface ClientTorrentStats {
   tmdb_title?: string | null;
   /** Slug du média pour la navigation (endpoint enrichi). */
   slug?: string | null;
+  /** Type de média TMDB (endpoint enrichi). */
+  tmdb_type?: 'movie' | 'tv' | null;
 }
 
 export interface AddTorrentResponse {

@@ -173,6 +173,29 @@ function SourceSelectModal({
                   <span className="px-3 py-1 tv:px-4 tv:py-2 bg-primary/20 text-primary-200 rounded-lg text-sm tv:text-base font-semibold">
                     {tracker}
                   </span>
+                  {(() => {
+                    const name = variant.name || '';
+                    const mSxxExx = name.match(/S(\d{1,2})E(\d{1,3})/i);
+                    const isSxxExx = !!mSxxExx;
+                    const mSxx = name.match(/S([0-9]{1,2})/);
+                    const isComplete = name.toLowerCase().includes('integrale') || name.toLowerCase().includes('complete');
+                    let scope = null;
+                    if (isSxxExx) {
+                      scope = `S${mSxxExx[1].padStart(2, '0')}E${mSxxExx[2].padStart(2, '0')} (Épisode)`;
+                    } else if (mSxx || name.toLowerCase().includes('saison ') || name.toLowerCase().includes('season ')) {
+                      scope = mSxx ? `Saison ${parseInt(mSxx[1], 10)} (Pack)` : 'Saison Complète';
+                    } else if (isComplete) {
+                      scope = 'Série Complète';
+                    }
+                    if (scope) {
+                      return (
+                        <span className="px-3 py-1 tv:px-4 tv:py-2 bg-rose-500/80 text-white rounded-lg text-sm tv:text-base font-semibold shadow-sm border border-rose-400/50">
+                          {scope}
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                   {quality && (
                     <span className="px-3 py-1 tv:px-4 tv:py-2 bg-white/10 text-white rounded-lg text-sm tv:text-base font-semibold">
                       {quality}
