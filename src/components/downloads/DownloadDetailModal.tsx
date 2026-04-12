@@ -189,7 +189,7 @@ export function DownloadDetailModal({
                   <ActionTile icon={Pause} label="Pause" onClick={() => onPause(torrent.info_hash)} />
                 )}
                 <ActionTile icon={LogsIcon || Info} label="Logs" onClick={() => onShowLogs(torrent.info_hash)} />
-                <ActionTile icon={ExternalLink} label="Détail" onClick={() => (window.location.href = `/torrents?infoHash=${torrent.info_hash}`)} />
+                <ActionTile icon={Play} label="Lire" onClick={() => (window.location.href = `/torrents?infoHash=${torrent.info_hash}`)} />
                 <ActionTile icon={Trash2} label="Supprimer" onClick={() => onRemove(torrent.info_hash, false)} danger />
               </div>
             </div>
