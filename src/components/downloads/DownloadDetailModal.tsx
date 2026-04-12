@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState, useCallback } from 'preact/hooks';
-import { createPortal } from 'preact/compat';
+import { useEffect, useState } from 'preact/hooks';
 import { 
   ArrowLeft, Download, Upload, Sprout, Users, Play, Pause, 
-  Trash2, Info, Film, Clock, HardDrive, Copy, X, Pencil, 
+  Trash2, Info, Film, Clock, HardDrive, Copy, Pencil, 
   PlusCircle, ExternalLink, Settings2, ChevronDown, ChevronUp,
   FileText as LogsIcon
 } from 'lucide-preact';
@@ -11,7 +10,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { clientApi } from '../../lib/client/api';
 import { TorrentProgressBar, TorrentStatusBadge } from '../torrents/ui';
 import { formatBytes, formatSpeed, formatETA } from '../../lib/utils/formatBytes';
-import { saveDownloadClientStats } from '../../lib/utils/download-meta-storage';
+import { Modal } from '../ui/Modal';
 
 interface DownloadDetailModalProps {
   torrent: ClientTorrentStats;
@@ -35,9 +34,6 @@ export function DownloadDetailModal({
   backdropUrl 
 }: DownloadDetailModalProps) {
   const { t } = useI18n();
-  const modalRef = useRef<HTMLDivElement>(null);
-  const closeButtonRef = useRef<HTMLButtonElement>(null);
-  const isRemovingRef = useRef(false);
   
   const [statsV1, setStatsV1] = useState<Record<string, any> | null>(null);
   const [downloadPath, setDownloadPath] = useState<string | null>(null);
@@ -73,11 +69,6 @@ export function DownloadDetailModal({
   const upSpeed = live?.upload_speed?.human_readable || formatSpeed(torrent.upload_speed);
   const eta = live?.time_remaining?.human_readable || formatETA(torrent.eta_seconds);
   const peers = live?.snapshot?.peer_stats?.live ?? (torrent.peers_connected || 0);
-
-  // Focus management
-  useEffect(() => {
-    closeButtonRef.current?.focus();
-  }, []);
 
   const handleAddTracker = async () => {
     if (!newTrackerUrl.trim()) return;
@@ -115,27 +106,28 @@ export function DownloadDetailModal({
     </button>
   );
 
-  return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8 tv:p-12 animate-in fade-in duration-300"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
+  return (
+    <Modal 
+      isOpen={true} 
+      onClose={onClose} 
+      size="full"
+      className="p-0 sm:p-0" // Reset standard padding to keep custom layout
     >
-      {/* Immersive backdrop */}
-      <div className="absolute inset-0 bg-black/90 pointer-events-none" />
-      {backdropUrl && (
-        <div 
-          className="absolute inset-0 bg-cover bg-center opacity-30 blur-[60px] scale-110 pointer-events-none"
-          style={{ backgroundImage: `url(${backdropUrl})` }}
-        />
-      )}
+      <div className="relative flex flex-col h-full overflow-hidden">
+        {/* Immersive backdrop background inside the modal */}
+        {backdropUrl && (
+          <div 
+            className="absolute inset-0 bg-cover bg-center opacity-30 blur-[60px] scale-110 pointer-events-none"
+            style={{ backgroundImage: `url(${backdropUrl})` }}
+          />
+        )}
 
-      <div className="relative w-full max-w-7xl max-h-[90vh] bg-neutral-900/50 border border-white/10 rounded-3xl backdrop-blur-3xl shadow-2xl flex flex-col overflow-hidden">
         {/* Header bar */}
-        <div className="flex items-center justify-between px-8 py-4 border-b border-white/5">
+        <div className="relative z-10 flex items-center justify-between px-8 py-4 border-b border-white/5">
           <button
-            ref={closeButtonRef}
             onClick={onClose}
             className="flex items-center gap-2 text-white/60 hover:text-white transition-colors"
+            data-focusable
           >
             <ArrowLeft size={20} />
             <span className="font-semibold">{t('common.back')}</span>
@@ -143,7 +135,7 @@ export function DownloadDetailModal({
           <TorrentStatusBadge state={torrent.state} className="scale-110" />
         </div>
 
-        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+        <div className="relative z-10 flex-1 flex flex-col lg:flex-row overflow-hidden">
           {/* Left Sidebar - Poster & Basic Info */}
           <div className="w-full lg:w-96 p-8 border-b lg:border-b-0 lg:border-r border-white/5 bg-white/[0.02]">
             <div className="relative aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl mb-8 group">
@@ -205,6 +197,7 @@ export function DownloadDetailModal({
               <button 
                 onClick={() => setShowAdvanced(!showAdvanced)}
                 className="w-full flex items-center justify-between p-6 hover:bg-white/5 transition-colors"
+                data-focusable
               >
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-white/5 rounded-xl text-white/60">
@@ -222,7 +215,7 @@ export function DownloadDetailModal({
                        <label className="text-[10px] font-bold uppercase tracking-widest text-white/30">Lien du Torrent (Info Hash)</label>
                        <div className="flex items-center gap-3 bg-black/40 p-3 rounded-xl border border-white/5">
                          <span className="font-mono text-sm text-white/50 truncate flex-1">{torrent.info_hash}</span>
-                         <button onClick={() => navigator.clipboard.writeText(torrent.info_hash)} className="p-2 hover:bg-white/5 rounded-lg text-white/40 transition-colors"><Copy size={16}/></button>
+                         <button onClick={() => navigator.clipboard.writeText(torrent.info_hash)} className="p-2 hover:bg-white/5 rounded-lg text-white/40 transition-colors" data-focusable><Copy size={16}/></button>
                        </div>
                     </div>
 
@@ -252,6 +245,7 @@ export function DownloadDetailModal({
                         onClick={handleAddTracker}
                         disabled={addTrackerLoading}
                         className="p-2 bg-[var(--ds-accent-violet)] rounded-xl text-white hover:opacity-90 disabled:opacity-50"
+                        data-focusable
                       >
                         <PlusCircle size={20} />
                       </button>
@@ -268,7 +262,6 @@ export function DownloadDetailModal({
           </div>
         </div>
       </div>
-    </div>,
-    document.body
+    </Modal>
   );
 }
