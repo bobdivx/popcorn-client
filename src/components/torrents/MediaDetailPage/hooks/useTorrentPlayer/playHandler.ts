@@ -79,20 +79,23 @@ function getStreamingDownloadFull(): boolean {
   return false;
 }
 
-/** Appelle updateOnlyFiles dès que le torrent peut l'accepter, avec réessais en cas de 502/503 (torrent en "initializing"). */
+/** Appelle updateOnlyFiles dès que le torrent peut l'accepter, avec réessais en cas de 502/503/500 (librqbit « initializing »). */
 export function scheduleUpdateOnlyFilesWithRetry(infoHash: string, fileIndex: number) {
-  // 503 = "Le torrent n'est pas encore prêt" (backend). Premier délai plus long pour laisser librqbit sortir de "initializing".
-  const delays = [5000, 4000, 8000, 12000, 20000, 30000, 45000];
+  // 503/500 « can't update initializing torrent » : délais plus longs au début pour éviter le spam console.
+  const delaysMs = [12000, 15000, 20000, 25000, 35000, 45000, 60000, 90000];
   let attempt = 0;
   const run = () => {
-    clientApi.updateOnlyFiles(infoHash, [fileIndex]).catch(() => {
-      attempt++;
-      if (attempt < delays.length) {
-        window.setTimeout(run, delays[attempt]);
-      }
-    });
+    clientApi
+      .updateOnlyFiles(infoHash, [fileIndex])
+      .then(() => {})
+      .catch(() => {
+        attempt += 1;
+        if (attempt < delaysMs.length) {
+          window.setTimeout(run, delaysMs[attempt]);
+        }
+      });
   };
-  window.setTimeout(run, delays[0]);
+  window.setTimeout(run, delaysMs[0]);
 }
 
 export function createHandlePlay(context: PlayHandlerContext) {

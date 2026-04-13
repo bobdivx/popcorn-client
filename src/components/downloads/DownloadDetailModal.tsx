@@ -33,8 +33,9 @@ const StatCard = ({ icon: Icon, label, value, colorClass }: any) => (
   </div>
 );
 
-const ActionTile = ({ icon: Icon, label, onClick, className = "", danger = false }: any) => (
+const ActionTile = ({ icon: Icon, label, onClick, className = "", danger = false, ...rest }: any) => (
   <button
+    {...rest}
     onClick={onClick}
     className={`group flex flex-col items-center justify-center p-4 sm:p-6 rounded-2xl border transition-all duration-300 gap-3 
       ${danger 
@@ -113,7 +114,7 @@ export function DownloadDetailModal({
       size="full"
       className="p-0 sm:p-0" // Reset standard padding to keep custom layout
     >
-      <div className="relative flex flex-col lg:h-full lg:overflow-hidden">
+      <div className="relative flex min-h-0 max-h-full flex-col overflow-hidden lg:h-full">
         {/* Immersive backdrop background inside the modal */}
         {backdropUrl && (
           <div 
@@ -128,7 +129,6 @@ export function DownloadDetailModal({
             onClick={onClose}
             className="flex items-center gap-2 text-white/60 hover:text-white transition-colors p-2 -ml-2 rounded-xl hover:bg-white/5"
             data-focusable
-            data-autofocus
             aria-label="Fermer"
           >
             <ArrowLeft size={20} />
@@ -139,10 +139,10 @@ export function DownloadDetailModal({
           </div>
         </div>
 
-        <div className="relative z-10 flex-1 flex flex-col lg:flex-row lg:overflow-hidden">
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
           {/* Left Sidebar - Poster & Basic Info */}
-          <div className="w-full lg:w-96 p-4 sm:p-8 border-b lg:border-b-0 lg:border-r border-white/5 bg-white/[0.02] flex-shrink-0">
-            <div className="relative aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl mb-8 group">
+          <div className="w-full flex-shrink-0 border-b border-white/5 bg-white/[0.02] p-4 sm:p-8 lg:w-96 lg:min-h-0 lg:max-h-full lg:overflow-y-auto lg:border-b-0 lg:border-r tv:lg:w-[min(24rem,32vw)] custom-scrollbar">
+            <div className="relative mx-auto aspect-[2/3] w-full max-w-[min(100%,18rem)] overflow-hidden rounded-2xl shadow-2xl group tv:max-w-[min(100%,22rem)] lg:mx-0 lg:max-w-none">
               {posterUrl ? (
                 <img src={posterUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={torrent.name} />
               ) : (
@@ -174,7 +174,7 @@ export function DownloadDetailModal({
           </div>
 
           {/* Main Content - Stats & Actions */}
-          <div className="flex-1 p-4 sm:p-8 lg:overflow-y-auto custom-scrollbar">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-8 custom-scrollbar">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
               <StatCard icon={Download} label="Download" value={downSpeed} colorClass="text-blue-400" />
               <StatCard icon={Upload} label="Upload" value={upSpeed} colorClass="text-emerald-400" />
@@ -185,13 +185,19 @@ export function DownloadDetailModal({
             <div className="mb-10">
               <h2 className="text-xs font-bold uppercase tracking-widest text-white/40 mb-4">Commandes</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <ActionTile
+                  icon={Play}
+                  label="Lire"
+                  data-focusable
+                  data-autofocus
+                  onClick={() => (window.location.href = `/torrents?infoHash=${torrent.info_hash}`)}
+                />
                 {torrent.state === 'paused' ? (
                   <ActionTile icon={Play} label="Reprendre" onClick={() => onResume(torrent.info_hash)} className="bg-emerald-500/10 border-emerald-500/20" />
                 ) : (
                   <ActionTile icon={Pause} label="Pause" onClick={() => onPause(torrent.info_hash)} />
                 )}
                 <ActionTile icon={LogsIcon || Info} label="Logs" onClick={() => onShowLogs(torrent.info_hash)} />
-                <ActionTile icon={Play} label="Lire" onClick={() => (window.location.href = `/torrents?infoHash=${torrent.info_hash}`)} />
                 <ActionTile icon={Trash2} label="Supprimer" onClick={() => onRemove(torrent.info_hash, false)} danger />
               </div>
             </div>
