@@ -396,11 +396,15 @@ function convertVariantToTorrent(variant: any): Torrent {
   };
 
   const infoHash = variant.info_hash || variant.infoHash || null;
+  const tmdbTitleRaw = (variant as any).tmdb_title ?? (variant as any).tmdbTitle;
+  const tmdbTitle =
+    typeof tmdbTitleRaw === 'string' && tmdbTitleRaw.trim().length > 0 ? tmdbTitleRaw.trim() : null;
   return {
     id: variant.id || '',
     slug: variant.slug || variant.id || null,
     infoHash: infoHash,
     name: variant.name || '',
+    tmdbTitle,
     cleanTitle: variant.clean_title || variant.cleanTitle || null,
     description: variant.description || null,
     category: variant.category || null,
@@ -503,13 +507,17 @@ function pickBestTorrentFromGroupPayload(payload: any, titleHint?: string | null
 
 /** Convertit un item de la bibliothèque (getLibrary) en objet Torrent pour la page détail */
 function libraryItemToTorrent(localMedia: any): Torrent {
-  // name est déjà le titre TMDB (tmdb_title || file_name) côté backend
-  const displayTitle = localMedia.name || '';
+  const tmdbTitleRaw = localMedia.tmdb_title ?? localMedia.tmdbTitle;
+  const tmdbTitle =
+    typeof tmdbTitleRaw === 'string' && tmdbTitleRaw.trim().length > 0 ? tmdbTitleRaw.trim() : null;
+  // name côté backend = tmdb_title || file_name ; on garde aussi tmdb_title séparé pour le lecteur.
+  const displayTitle = (tmdbTitle || localMedia.name || '').trim();
   return {
     id: localMedia.info_hash || localMedia.slug || '',
     slug: localMedia.slug || null,
     infoHash: localMedia.info_hash || null,
     name: displayTitle,
+    tmdbTitle,
     mainTitle: displayTitle || null,
     cleanTitle: displayTitle || null,
     description: localMedia.synopsis || null,
@@ -603,6 +611,7 @@ export default function MediaDetailRoute() {
             // Ne pas écraser les valeurs existantes (priorité à la réponse torrent), mais compléter si manquant
             name: t.name || localTorrent.name,
             cleanTitle: t.cleanTitle ?? localTorrent.cleanTitle,
+            tmdbTitle: (t as any).tmdbTitle ?? (localTorrent as any).tmdbTitle,
             mainTitle: (t as any).mainTitle ?? (localTorrent as any).mainTitle,
             imageUrl: t.imageUrl ?? localTorrent.imageUrl,
             heroImageUrl: t.heroImageUrl ?? localTorrent.heroImageUrl,

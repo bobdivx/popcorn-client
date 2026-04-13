@@ -506,7 +506,12 @@ export default function TVNavigationProvider() {
       const focusableElements = getFocusableElements(scope);
       if (focusableElements.length === 0) return null;
 
-      if (scope) return focusableElements[0];
+      // Modale (scope = dialog) : ne pas utiliser le 1er nœud DOM (souvent « Retour ») — respecter data-autofocus (ex. « Lire » dans la modal Téléchargements)
+      if (scope) {
+        const autofocus = focusableElements.find((el) => el.hasAttribute('data-autofocus'));
+        if (autofocus) return autofocus;
+        return focusableElements[0];
+      }
 
       // TV + Dashboard : commencer sur le hero (évite de scroller vers les carrousels et de « perdre » le bandeau)
       if (isTvDoc() && typeof window !== 'undefined') {
