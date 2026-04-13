@@ -39,6 +39,8 @@ import type { PackEpisodeKey } from './hooks/usePackEpisodes';
 import { isTVPlatform } from '../../../lib/utils/device-detection';
 import { getHighQualityTmdbImageUrl } from '../../../lib/utils/tmdb-images';
 import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-config';
+import { getMediaDisplayTitle } from './utils/mediaDisplayTitle';
+import { useTmdbApiTitle } from './hooks/useTmdbApiTitle';
 
 /** Retourne l'Ã©pisode suivant (saison + id variante + titre) ou null. */
 function getNextEpisode(
@@ -228,7 +230,7 @@ function SourceSelectModal({
 }
 
 export default function MediaDetailPage({ torrent, initialVariants, seriesEpisodes, initialTorrentStats, backHref, streamBackendUrl }: MediaDetailPageProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   // Ã‰tats de base
   const [isPlaying, setIsPlaying] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
@@ -1773,6 +1775,11 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   const displayFile = isTransitioningToNext && previousSelectedFileRef.current ? previousSelectedFileRef.current : selectedFile;
   const displayInfoHash = displayTorrent?.infoHash;
 
+  const tmdbApiTitleActive = useTmdbApiTitle(activeTorrent?.tmdbId, activeTorrent?.tmdbType, language);
+  const tmdbApiTitleDisplay = useTmdbApiTitle(displayTorrent?.tmdbId, displayTorrent?.tmdbType, language);
+  const mediaTitleForHero = getMediaDisplayTitle(activeTorrent, tmdbApiTitleActive);
+  const mediaTitleForPlayer = getMediaDisplayTitle(displayTorrent, tmdbApiTitleDisplay);
+
   // VÃ©rifier si on peut afficher le lecteur vidÃ©o (ou pendant la transition pour ne pas dÃ©monter)
   const canShowVideoPlayer = isPlaying && hasValidInfoHash && (!!displayFile && (videoFiles.length > 0 || isTransitioningToNext));
   
@@ -1901,7 +1908,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         key={`player-${displayInfoHash}-${displayFile?.path ?? displayFile?.name ?? ''}`}
         infoHash={displayInfoHash}
         selectedFile={displayFile!}
-        torrentName={displayTorrent.mainTitle || displayTorrent.cleanTitle || displayTorrent.name}
+        torrentName={mediaTitleForPlayer}
         torrentId={displayTorrent.id}
         tmdbId={displayTorrent.tmdbId}
         tmdbType={displayTorrent.tmdbType}
@@ -1943,34 +1950,34 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           key={`player-${displayInfoHash}-${displayFile?.path ?? displayFile?.name ?? ''}`}
           infoHash={displayInfoHash}
           selectedFile={displayFile!}
-          torrentName={displayTorrent.mainTitle || displayTorrent.cleanTitle || displayTorrent.name}
-          torrentId={displayTorrent.id}
-          tmdbId={displayTorrent.tmdbId}
-          tmdbType={displayTorrent.tmdbType}
-          seriesSeasonNum={selectedEpisodeMeta?.season ?? null}
-          seriesEpisodeNum={selectedEpisodeMeta?.episode ?? null}
-          startFromBeginning={isTransitioningToNext ? false : startFromBeginning}
-          isSeries={!!(seriesEpisodes?.seasons?.length)}
-          nextEpisodeInfo={nextEpisodeInfo}
-          onPlayNextEpisode={onPlayNextEpisode}
-          onClose={handleClosePlayerAndRefresh}
-          visible={true}
-          wrapperRef={(el) => { videoWrapperRef.current = el; }}
-          quality={displayTorrent.quality}
-          directStreamUrl={(displayTorrent as any)._demoStreamUrl ?? undefined}
-          streamBackendUrl={streamBackendUrl ?? undefined}
-          playStatus={playStatus}
-          progressMessage={progressMessage}
-          torrentStats={torrentStats}
-          posterUrl={displayTorrent.imageUrl ?? null}
-          logoUrl={displayTorrent.logoUrl ?? null}
-          synopsis={displayTorrent.synopsis ?? displayTorrent.description ?? null}
-          releaseDate={displayTorrent.releaseDate ?? null}
-          useStreamTorrentMode={useStreamTorrentMode}
-          streamingTorrentToken={TokenManager.getCloudAccessToken()}
-          seriesEpisodePickerItems={playerSeriesEpisodePickerItems}
-          selectedSeriesEpisodeVariantId={selectedEpisodeVariantId}
-          onSelectSeriesEpisode={handleSeriesEpisodeSelect}
+        torrentName={mediaTitleForPlayer}
+        torrentId={displayTorrent.id}
+        tmdbId={displayTorrent.tmdbId}
+        tmdbType={displayTorrent.tmdbType}
+        seriesSeasonNum={selectedEpisodeMeta?.season ?? null}
+        seriesEpisodeNum={selectedEpisodeMeta?.episode ?? null}
+        startFromBeginning={isTransitioningToNext ? false : startFromBeginning}
+        isSeries={!!(seriesEpisodes?.seasons?.length)}
+        nextEpisodeInfo={nextEpisodeInfo}
+        onPlayNextEpisode={onPlayNextEpisode}
+        onClose={handleClosePlayerAndRefresh}
+        visible={true}
+        wrapperRef={(el) => { videoWrapperRef.current = el; }}
+        quality={displayTorrent.quality}
+        directStreamUrl={(displayTorrent as any)._demoStreamUrl ?? undefined}
+        streamBackendUrl={streamBackendUrl ?? undefined}
+        playStatus={playStatus}
+        progressMessage={progressMessage}
+        torrentStats={torrentStats}
+        posterUrl={displayTorrent.imageUrl ?? null}
+        logoUrl={displayTorrent.logoUrl ?? null}
+        synopsis={displayTorrent.synopsis ?? displayTorrent.description ?? null}
+        releaseDate={displayTorrent.releaseDate ?? null}
+        useStreamTorrentMode={useStreamTorrentMode}
+        streamingTorrentToken={TokenManager.getCloudAccessToken()}
+        seriesEpisodePickerItems={playerSeriesEpisodePickerItems}
+        selectedSeriesEpisodeVariantId={selectedEpisodeVariantId}
+        onSelectSeriesEpisode={handleSeriesEpisodeSelect}
         />
       )}
     <div className="relative bg-page text-white">
@@ -2065,7 +2072,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           )}
 
           <div className="max-w-6xl w-full mb-6 sm:mb-8 md:mb-10">
-            <HeroHeader torrent={torrent} />
+            <HeroHeader torrent={activeTorrent} displayTitle={mediaTitleForHero} />
 
             <ActionsRow backHref={backHref ?? '/dashboard'} isTV={isTV} backLinkRef={backLinkRef}>
               <MediaDetailActionButtons

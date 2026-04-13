@@ -266,9 +266,16 @@ export const mediaMethods = {
   ) {
     const baseUrl = this.getServerUrl();
     const rel = opts?.torrentRelativePath?.trim();
-    const q = rel ? `?file=${encodeURIComponent(rel)}` : '';
-    const url = `${baseUrl}/api/library/scrub-thumbnails/meta/${encodeURIComponent(localMediaId)}${q}`;
-    const res = await fetch(url);
+    const pathSeg = encodeURIComponent(localMediaId);
+    const withFile = (useFile: boolean) => {
+      const q = useFile && rel ? `?file=${encodeURIComponent(rel)}` : '';
+      return `${baseUrl}/api/library/scrub-thumbnails/meta/${pathSeg}${q}`;
+    };
+    let res = await fetch(withFile(!!rel));
+    // Torrent stream : librqbit peut ne pas résoudre le chemin exact ; sans ?file= le serveur choisit le plus gros .mkv/mp4.
+    if (!res.ok && rel && res.status === 404) {
+      res = await fetch(withFile(false));
+    }
     if (!res.ok) {
       throw new Error(`Failed to fetch scrub thumbnails meta (${res.status})`);
     }

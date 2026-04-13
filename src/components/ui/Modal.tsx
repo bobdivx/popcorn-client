@@ -79,11 +79,16 @@ export function Modal({
     const initialFocus = () => {
       const focusable = getFocusableElements();
       if (focusable.length > 0) {
-        // Chercher d'abord un élément privilégié (ex: bouton fermer ou premier bouton d'action)
-        const primary = Array.from(focusable).find(el => 
-          el.getAttribute('aria-label') === 'Fermer' || 
-          el.classList.contains('ds-btn-primary') ||
-          el.hasAttribute('data-autofocus')
+        // data-autofocus prime (ex. action principale dans une modale custom)
+        const autofocusEl = Array.from(focusable).find((el) => el.hasAttribute('data-autofocus'));
+        if (autofocusEl) {
+          autofocusEl.focus();
+          return;
+        }
+        const primary = Array.from(focusable).find(
+          (el) =>
+            el.getAttribute('aria-label') === 'Fermer' ||
+            el.classList.contains('ds-btn-primary')
         );
         (primary || focusable[0]).focus();
       }
@@ -154,7 +159,7 @@ export function Modal({
   const node = (
     <div
       ref={overlayRef}
-      className={`fixed inset-0 z-[9999] flex items-stretch sm:items-center justify-center p-0 sm:p-4 ${
+      className={`fixed inset-0 z-[9999] flex min-h-0 min-w-0 items-stretch sm:items-center justify-center overflow-hidden p-0 sm:p-4 tv:p-3 ${
         isAnimating ? 'animate-fade-in' : ''
       }`}
       style={{ zIndex: 2147483647 }}
@@ -173,7 +178,7 @@ export function Modal({
       {/* Modal : style glass (C411) avec bordure violette + barre gradient */}
       <div
         ref={modalRef}
-        className={`relative z-10 w-full ${sizeClasses[size]} ds-modal-glass flex flex-col h-full sm:h-auto max-h-[100vh] sm:max-h-[92vh] ${
+        className={`relative z-10 w-full min-h-0 min-w-0 ${sizeClasses[size]} ds-modal-glass flex flex-col h-full max-h-full sm:h-auto sm:max-h-[calc(100vh-2rem)] tv:max-h-[calc(100vh-1.5rem)] tv:max-w-[calc(100vw-1.5rem)] ${
           'scale-100 opacity-100'
         } ${className}`}
         onClick={(e) => e.stopPropagation()}

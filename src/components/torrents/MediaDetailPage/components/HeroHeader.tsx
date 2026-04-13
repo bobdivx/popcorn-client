@@ -1,8 +1,15 @@
 import type { MediaDetailPageProps } from '../types';
 import { QualityBadges } from './QualityBadges';
 
-export function HeroHeader({ torrent }: { torrent: MediaDetailPageProps['torrent'] }) {
-  const title = torrent.mainTitle || torrent.cleanTitle || torrent.name;
+export function HeroHeader({
+  torrent,
+  displayTitle,
+}: {
+  torrent: MediaDetailPageProps['torrent'];
+  /** Titre déjà résolu (TMDB API + champs torrent). */
+  displayTitle: string;
+}) {
+  const title = displayTitle.trim() || torrent.name;
   const year = torrent.releaseDate ? new Date(torrent.releaseDate).getFullYear() : null;
 
   return (

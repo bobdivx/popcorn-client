@@ -19,6 +19,8 @@ export interface MediaDetailPageProps {
     name: string;
     /** Titre TMDB (main_title du groupe) — prioritaire pour l'affichage. */
     mainTitle?: string | null;
+    /** Titre TMDB explicite (champ `tmdb_title` / enrichissement), à préférer au titre de release tronqué. */
+    tmdbTitle?: string | null;
     cleanTitle?: string; // Titre nettoyé parsé par le backend (peut contenir des restes type VFI, HDR10...)
     description?: string | null;
     category?: string;
