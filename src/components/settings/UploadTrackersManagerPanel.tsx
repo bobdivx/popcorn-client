@@ -269,7 +269,7 @@ export default function UploadTrackersManagerPanel() {
                 {t('settings.uploadTrackerPanel.wizardC411ApiKeyLabel')}
               </label>
               <input
-                type="text"
+                type="password"
                 className="input input-bordered input-sm w-full max-w-xl font-mono"
                 value={apiKey}
                 placeholder={t('settings.uploadTrackerPanel.wizardC411ApiKeyPlaceholder')}
@@ -282,7 +282,7 @@ export default function UploadTrackersManagerPanel() {
                 {t('settings.uploadTrackerPanel.wizardC411PasskeyLabel')}
               </label>
               <input
-                type="text"
+                type="password"
                 className="input input-bordered input-sm w-full max-w-xl font-mono"
                 value={passkey}
                 placeholder={t('settings.uploadTrackerPanel.passkeyPlaceholder')}
