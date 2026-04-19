@@ -296,7 +296,7 @@ export function TmdbStep({
         </label>
         <div className="flex flex-col sm:flex-row gap-4">
           <input
-            type="text"
+            type="password"
             className="w-full sm:flex-1 px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-600 focus:border-transparent"
             placeholder={hasExistingKey ? "Entrez une nouvelle clé pour remplacer" : "Entrez votre clé API TMDB"}
             value={tmdbKey}
