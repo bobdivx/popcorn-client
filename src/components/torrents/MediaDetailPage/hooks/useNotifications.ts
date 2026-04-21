@@ -5,7 +5,8 @@ export function useNotifications() {
   const [notifications, setNotifications] = useState<Array<{ id: string; type: NotificationType; message: string; duration?: number }>>([]);
 
   const addNotification = useCallback((type: NotificationType, message: string, duration?: number) => {
-    const id = `${Date.now()}-${Math.random()}`;
+    const randomVal = globalThis.crypto.getRandomValues(new Uint32Array(1))[0];
+    const id = `${Date.now()}-${randomVal}`;
     setNotifications((prev) => [...prev, { id, type, message, duration }]);
     return id;
   }, []);
