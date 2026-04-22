@@ -1,3 +1,5 @@
+import { generateId } from './uuid.js';
+
 export function getOrCreateDeviceId(): string {
   if (typeof window === 'undefined') {
     return 'server';
@@ -9,7 +11,8 @@ export function getOrCreateDeviceId(): string {
   
   if (!deviceId) {
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 15);
+    // Use cryptographically secure ID generation instead of Math.random()
+    const random = generateId();
     const userAgent = navigator.userAgent.substring(0, 20).replace(/[^a-zA-Z0-9]/g, '');
     deviceId = `${timestamp}-${random}-${userAgent}`;
     localStorage.setItem(STORAGE_KEY, deviceId);
