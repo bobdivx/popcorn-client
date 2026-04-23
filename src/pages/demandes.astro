@@ -1,10 +1,6 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import PreactPageTemplate from '../components/page-model/PreactPageTemplate.astro';
 import DemandesPage from '../components/demandes/DemandesPage';
 ---
 
-<Layout title="Demandes - Popcorn Client">
-  <div class="min-h-screen bg-black text-white">
-    <DemandesPage client:only="preact" />
-  </div>
-</Layout>
+<PreactPageTemplate title="Demandes - Popcorn Client" component={DemandesPage} pageClass="min-h-screen bg-black text-white" />
