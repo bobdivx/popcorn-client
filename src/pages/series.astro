@@ -1,6 +1,10 @@
 ---
-import PreactPageTemplate from '../components/page-model/PreactPageTemplate.astro';
+import Layout from '../layouts/Layout.astro';
 import SeriesDashboard from '../components/dashboard/SeriesDashboard';
 ---
 
-<PreactPageTemplate title="Séries - Popcorn Client" component={SeriesDashboard} />
+<Layout title="Séries - Popcorn Client">
+  <div>
+    <SeriesDashboard client:only="preact" />
+  </div>
+</Layout>

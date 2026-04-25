@@ -1,6 +1,10 @@
 ---
-import PreactPageTemplate from '../components/page-model/PreactPageTemplate.astro';
+import Layout from '../layouts/Layout.astro';
 import DashboardPage from '../components/dashboard/Dashboard';
 ---
 
-<PreactPageTemplate title="Tableau de bord - Popcorn Client" component={DashboardPage} />
+<Layout title="Tableau de bord - Popcorn Client">
+  <div>
+    <DashboardPage client:only="preact" />
+  </div>
+</Layout>
