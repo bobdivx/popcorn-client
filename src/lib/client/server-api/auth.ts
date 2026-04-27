@@ -27,8 +27,7 @@ export const authMethods = {
   async register(
     this: ServerApiClientAuthAccess,
     email: string,
-    password: string,
-    inviteCode: string
+    password: string
   ): Promise<ApiResponse<{ user: { id: string; email: string } }>> {
     // Le backend Rust attend aussi un username.
     const username = (email.split('@')[0] || email || 'user').trim();
@@ -38,7 +37,6 @@ export const authMethods = {
         email,
         username,
         password,
-        invite_code: inviteCode,
       }),
     });
     if (!res.success) return res as ApiResponse<{ user: { id: string; email: string } }>;
@@ -360,12 +358,11 @@ export const authMethods = {
   async registerCloud(
     this: ServerApiClientAuthAccess,
     email: string,
-    password: string,
-    inviteCode: string
+    password: string
   ): Promise<ApiResponse<AuthResponse>> {
     // Unifié : appel direct à popcorn-web pour tous les modes
     try {
-      const result = await popcornWebRegister(email, password, inviteCode);
+      const result = await popcornWebRegister(email, password);
       if (!result) {
         return {
           success: false,
