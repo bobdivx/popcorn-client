@@ -40,3 +40,26 @@ export function generateId(): string {
 export function generateInviteCode(): string {
   return uint8ArrayToHex(getRandomBytes(8)).toUpperCase();
 }
+
+export function randomUUID(): string {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  // Fallback if randomUUID is not natively supported
+  const id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    // We use a cryptographically secure random value if available
+    const randomArray = new Uint8Array(1);
+    let r = 0;
+    if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.getRandomValues) {
+      globalThis.crypto.getRandomValues(randomArray);
+      r = randomArray[0] % 16;
+    } else {
+      // Fallback only if no crypto is available
+      r = (Math.random() * 16) | 0;
+    }
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+  return id;
+}

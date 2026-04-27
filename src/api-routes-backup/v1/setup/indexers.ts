@@ -202,11 +202,8 @@ export const POST: APIRoute = async ({ request }) => {
     // en utilisant le nom de l'indexer (ex: "c411" -> trouve "c411.json")
     
     // Générer un UUID v4
-    const id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+    const { randomUUID } = await import('../../../lib/utils/uuid.js');
+    const id = randomUUID();
 
     const { getBackendUrlAsync } = await import('../../../../lib/backend-url.js');
     const backendUrl =

@@ -53,11 +53,8 @@ export const indexersMethods = {
     return this.backendRequest<IndexerTypeInfo[]>('/api/admin/indexers/types', { method: 'GET' });
   },
   async createIndexer(this: ServerApiClientIndexersAccess, data: IndexerFormData): Promise<ApiResponse<Indexer>> {
-    const id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+    const { randomUUID } = await import('../../utils/uuid.js');
+    const id = randomUUID();
     const payload: any = {
       id,
       name: data.name,
