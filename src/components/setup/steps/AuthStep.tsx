@@ -62,7 +62,6 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
-  const [registerInviteCode, setRegisterInviteCode] = useState('');
 
   const afterCloudLogin = async (cloudToken: string) => {
     dbg('afterCloudLogin start');
@@ -247,7 +246,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
     if (registerPassword.length < 8) { setError('Le mot de passe doit contenir au moins 8 caractères'); return; }
     setLoading(true);
     try {
-      const response = await serverApi.registerCloud(registerEmail, registerPassword, registerInviteCode);
+      const response = await serverApi.registerCloud(registerEmail, registerPassword);
       if (!response.success) { setError(response.message || "Erreur lors de l'inscription"); setLoading(false); return; }
       onNext();
     } catch (err) {
@@ -316,11 +315,11 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
               <div class="auth-section-label">Connexion avec email</div>
               <form onSubmit={handleLogin}>
                 <div class="auth-step-tv__field">
-                  <label class="wizard-label">Email</label>
+                  <label class="wizard-label">{t('wizard.auth.email')}</label>
                   <input
                     class="wizard-input auth-step-tv__input"
                     type="email"
-                    placeholder="votre@email.com"
+                    placeholder={t('wizard.auth.emailPlaceholder')}
                     value={loginEmail}
                     onInput={(e) => setLoginEmail((e.target as HTMLInputElement).value)}
                     required
@@ -329,11 +328,11 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                   />
                 </div>
                 <div class="auth-step-tv__field">
-                  <label class="wizard-label">Mot de passe</label>
+                  <label class="wizard-label">{t('wizard.auth.password')}</label>
                   <input
                     class="wizard-input auth-step-tv__input"
                     type="password"
-                    placeholder="Votre mot de passe"
+                    placeholder={t('wizard.auth.passwordPlaceholder')}
                     value={loginPassword}
                     onInput={(e) => setLoginPassword((e.target as HTMLInputElement).value)}
                     required
@@ -364,23 +363,11 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
               <div class="auth-section-label">Créer un compte</div>
               <form onSubmit={handleRegister}>
                 <div class="auth-step-tv__field">
-                  <label class="wizard-label">Code d'invitation</label>
-                  <input
-                    class="wizard-input auth-step-tv__input"
-                    type="text"
-                    placeholder="Code d'invitation"
-                    value={registerInviteCode}
-                    onInput={(e) => setRegisterInviteCode((e.target as HTMLInputElement).value)}
-                    required
-                    disabled={loading}
-                  />
-                </div>
-                <div class="auth-step-tv__field">
-                  <label class="wizard-label">Email</label>
+                  <label class="wizard-label">{t('wizard.auth.email')}</label>
                   <input
                     class="wizard-input auth-step-tv__input"
                     type="email"
-                    placeholder="votre@email.com"
+                    placeholder={t('wizard.auth.emailPlaceholder')}
                     value={registerEmail}
                     onInput={(e) => setRegisterEmail((e.target as HTMLInputElement).value)}
                     required
@@ -389,11 +376,11 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                   />
                 </div>
                 <div class="auth-step-tv__field">
-                  <label class="wizard-label">Mot de passe</label>
+                  <label class="wizard-label">{t('wizard.auth.password')}</label>
                   <input
                     class="wizard-input auth-step-tv__input"
                     type="password"
-                    placeholder="Au moins 8 caractères"
+                    placeholder={t('wizard.auth.passwordMinLengthHint')}
                     value={registerPassword}
                     onInput={(e) => setRegisterPassword((e.target as HTMLInputElement).value)}
                     required
@@ -402,11 +389,11 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                   />
                 </div>
                 <div class="auth-step-tv__field">
-                  <label class="wizard-label">Confirmer le mot de passe</label>
+                  <label class="wizard-label">{t('wizard.auth.confirmPassword')}</label>
                   <input
                     class="wizard-input auth-step-tv__input"
                     type="password"
-                    placeholder="Confirmez"
+                    placeholder={t('wizard.auth.confirmPasswordPlaceholder')}
                     value={registerConfirmPassword}
                     onInput={(e) => setRegisterConfirmPassword((e.target as HTMLInputElement).value)}
                     required
@@ -418,7 +405,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                   ref={(el) => { buttonRefs.current[0] = el; }}
                   type="submit"
                   class="wizard-btn-primary auth-step-tv__submit"
-                  disabled={loading || !registerEmail || !registerPassword || !registerInviteCode}
+                  disabled={loading || !registerEmail || !registerPassword}
                 >
                   {loading ? "Inscription..." : "S'inscrire"}
                 </button>
@@ -652,11 +639,11 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
           </div>
           <form onSubmit={handleLogin}>
             <div style="margin-bottom:20px;">
-              <label class="wizard-label">Code de vérification</label>
+              <label class="wizard-label">{t('wizard.auth.verificationCode')}</label>
               <input
                 class="auth-code-input"
                 type="text"
-                placeholder="000000"
+                placeholder={t('wizard.auth.verificationCodePlaceholder')}
                 value={twoFactorCode}
                 onInput={(e) => setTwoFactorCode((e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 6))}
                 required
@@ -723,11 +710,11 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                 <div class="auth-section-label">Connexion avec email</div>
                 <form onSubmit={handleLogin}>
                   <div style="margin-bottom:14px;">
-                    <label class="wizard-label">Email</label>
+                    <label class="wizard-label">{t('wizard.auth.email')}</label>
                     <input
                       class="wizard-input"
                       type="email"
-                      placeholder="votre@email.com"
+                      placeholder={t('wizard.auth.emailPlaceholder')}
                       value={loginEmail}
                       onInput={(e) => setLoginEmail((e.target as HTMLInputElement).value)}
                       required
@@ -736,11 +723,11 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                     />
                   </div>
                   <div style="margin-bottom:20px;">
-                    <label class="wizard-label">Mot de passe</label>
+                    <label class="wizard-label">{t('wizard.auth.password')}</label>
                     <input
                       class="wizard-input"
                       type="password"
-                      placeholder="Votre mot de passe"
+                      placeholder={t('wizard.auth.passwordPlaceholder')}
                       value={loginPassword}
                       onInput={(e) => setLoginPassword((e.target as HTMLInputElement).value)}
                       required
@@ -810,37 +797,25 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
               <div class="auth-section-label">Créer un compte</div>
               <form onSubmit={handleRegister}>
                 <div style="margin-bottom:14px;">
-                  <label class="wizard-label">Code d'invitation</label>
-                  <input
-                    class="wizard-input"
-                    type="text"
-                    placeholder="Entrez votre code d'invitation"
-                    value={registerInviteCode}
-                    onInput={(e) => setRegisterInviteCode((e.target as HTMLInputElement).value)}
-                    required
-                    disabled={loading}
-                    autoFocus
-                  />
-                </div>
-                <div style="margin-bottom:14px;">
-                  <label class="wizard-label">Email</label>
+                  <label class="wizard-label">{t('wizard.auth.email')}</label>
                   <input
                     class="wizard-input"
                     type="email"
-                    placeholder="votre@email.com"
+                    placeholder={t('wizard.auth.emailPlaceholder')}
                     value={registerEmail}
                     onInput={(e) => setRegisterEmail((e.target as HTMLInputElement).value)}
                     required
                     disabled={loading}
                     autocomplete="email"
+                    autoFocus
                   />
                 </div>
                 <div style="margin-bottom:14px;">
-                  <label class="wizard-label">Mot de passe</label>
+                  <label class="wizard-label">{t('wizard.auth.password')}</label>
                   <input
                     class="wizard-input"
                     type="password"
-                    placeholder="Au moins 8 caractères"
+                    placeholder={t('wizard.auth.passwordMinLengthHint')}
                     value={registerPassword}
                     onInput={(e) => setRegisterPassword((e.target as HTMLInputElement).value)}
                     required
@@ -849,11 +824,11 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                   />
                 </div>
                 <div style="margin-bottom:20px;">
-                  <label class="wizard-label">Confirmer le mot de passe</label>
+                  <label class="wizard-label">{t('wizard.auth.confirmPassword')}</label>
                   <input
                     class="wizard-input"
                     type="password"
-                    placeholder="Confirmez votre mot de passe"
+                    placeholder={t('wizard.auth.confirmPasswordPlaceholder')}
                     value={registerConfirmPassword}
                     onInput={(e) => setRegisterConfirmPassword((e.target as HTMLInputElement).value)}
                     required
@@ -875,7 +850,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                     ref={(el) => { buttonRefs.current[0] = el; }}
                     type="submit"
                     class="wizard-btn-primary"
-                    disabled={loading || !registerEmail || !registerPassword || !registerInviteCode}
+                    disabled={loading || !registerEmail || !registerPassword}
                   >
                     {loading ? "Inscription..." : "S'inscrire →"}
                   </button>

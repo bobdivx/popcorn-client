@@ -367,10 +367,9 @@ export async function loginCloud(email: string, password: string): Promise<{
  * Crée un compte cloud via l'API popcorn-web
  * @param email Email de l'utilisateur
  * @param password Mot de passe
- * @param inviteCode Code d'invitation
  * @returns Réponse avec user et tokens, ou null si l'API n'est pas disponible
  */
-export async function registerCloud(email: string, password: string, inviteCode: string): Promise<{
+export async function registerCloud(email: string, password: string): Promise<{
   user: {
     id: string;
     email: string;
@@ -388,7 +387,7 @@ export async function registerCloud(email: string, password: string, inviteCode:
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, inviteCode }),
+        body: JSON.stringify({ email, password }),
       },
       10000
     );
