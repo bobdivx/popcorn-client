@@ -10,6 +10,7 @@ import { isTVPlatform } from '../lib/utils/device-detection';
 
 const SEARCH_HISTORY_KEY = 'popcorn_search_history';
 const SEARCH_HISTORY_MAX = 10;
+const SEARCH_CACHE_VERSION = 'v3';
 
 function getSearchHistory(): string[] {
   try {
@@ -277,7 +278,7 @@ export default function Search({ onResultClick }: SearchProps) {
     addSearchToHistory(searchTerm);
     setSearchHistory(getSearchHistory());
 
-    const cacheKey = `search_${searchTerm}_${type}_${language}${forceIndexerSearch ? '_indexer' : ''}`;
+    const cacheKey = `search_${SEARCH_CACHE_VERSION}_${searchTerm}_${type}_${language}${forceIndexerSearch ? '_indexer' : ''}`;
     const cached = CacheManager.get<SearchResult[]>(cacheKey);
     if (cached) {
       setResults(cached);
@@ -365,10 +366,6 @@ export default function Search({ onResultClick }: SearchProps) {
       if (localData.length > 0) {
         setResults(localData);
         setTmdbFallbackResults([]);
-        CacheManager.set(cacheKey, localData, 60 * 60 * 1000);
-        setLoading(false);
-        setSearchPhase('idle');
-        return;
       }
 
       setSearchPhase('indexer');
@@ -380,18 +377,21 @@ export default function Search({ onResultClick }: SearchProps) {
       });
 
       if (!indexerRes.success) {
-        setError(indexerRes.message || 'Erreur lors de la recherche sur les indexeurs');
+        if (localData.length === 0) {
+          setError(indexerRes.message || 'Erreur lors de la recherche sur les indexeurs');
+        }
         setLoading(false);
         setSearchPhase('idle');
         return;
       }
 
       const indexerData = indexerRes.data ?? [];
-      setResults(indexerData);
-      CacheManager.set(cacheKey, indexerData, 60 * 60 * 1000);
+      const combinedData = [...localData, ...indexerData];
+      setResults(combinedData);
+      CacheManager.set(cacheKey, combinedData, 60 * 60 * 1000);
 
       // Si toujours aucun torrent trouvé : recherche TMDB pour permettre "Demander"
-      if (indexerData.length === 0 && searchTerm) {
+      if (combinedData.length === 0 && searchTerm) {
         const tmdbLang = language === 'fr' ? 'fr-FR' : 'en-US';
         const tmdbRes = await serverApi.searchTmdb({
           q: searchTerm,
@@ -625,7 +625,7 @@ export default function Search({ onResultClick }: SearchProps) {
 
       {/* État de chargement : carte C411 avec LoadingCard */}
       {loading && (
-        <div className="flex flex-col items-center justify-center py-20 tv:py-32 px-4 w-full max-w-[42rem] mx-auto">
+        <div className="flex flex-col items-center justify-start py-6 tv:py-8 px-4 w-full max-w-[42rem] mx-auto -mt-2 sm:-mt-4">
           <LoadingCard
             title={searchPhase === 'local' ? t('search.searchingLocal') : t('search.searchingIndexers')}
             description={searchPhase === 'local' ? t('search.localSearchNote') : t('search.indexerSearchNote')}
