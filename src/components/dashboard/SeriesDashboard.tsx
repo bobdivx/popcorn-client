@@ -1,42 +1,27 @@
 import { useMemo } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import type { ContentItem } from '../../lib/client/types';
-import { formatDateForApi, toContentItem } from '../page-model/tmdb-mapper';
 import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
-import { useSimpleTmdbDiscover } from '../page-model/useSimpleTmdbDiscover';
+import { useInfiniteSeries } from './hooks/useInfiniteSeries';
 
 export default function SeriesDashboard() {
-  const { t, language } = useI18n();
-  const today = useMemo(() => formatDateForApi(new Date()), []);
-  const sectionQueries = useMemo(
-    () => [
-      { id: 'popular', kind: 'tv' as const, params: { sort_by: 'popularity.desc' } },
-      { id: 'topRated', kind: 'tv' as const, params: { sort_by: 'vote_average.desc', vote_count_gte: 200 } },
-      { id: 'newReleases', kind: 'tv' as const, params: { sort_by: 'first_air_date.desc', first_air_date_lte: today } },
-    ],
-    [today]
-  );
-  const { itemsById, loading, error } = useSimpleTmdbDiscover(sectionQueries, language);
-  const popular = itemsById.popular ?? [];
-  const topRated = itemsById.topRated ?? [];
-  const newReleases = itemsById.newReleases ?? [];
+  const { t } = useI18n();
+  const { series, loading, error } = useInfiniteSeries();
 
   const heroItems = useMemo(
-    () => popular.slice(0, 5).map((item) => toContentItem(item, 'tv')).filter((item) => item.poster || item.backdrop),
-    [popular]
+    () => series.slice(0, 5).filter((item) => item.poster || item.backdrop),
+    [series]
   );
 
   const handleNavigate = (item: ContentItem) => {
-    if (item.tmdbId) window.location.href = `/discover?tmdbId=${item.tmdbId}&type=${item.type || 'tv'}`;
+    window.location.href = `/torrents?slug=${encodeURIComponent(item.id)}&from=dashboard`;
   };
 
   const sections = useMemo(
     () => [
-      { id: 'popular', title: t('discover.popularSeries'), items: popular.map((item) => toContentItem(item, 'tv')) },
-      { id: 'topRated', title: t('discover.topRatedSeries'), items: topRated.map((item) => toContentItem(item, 'tv')) },
-      { id: 'newReleases', title: t('discover.newReleases'), items: newReleases.map((item) => toContentItem(item, 'tv')) },
+      { id: 'synced-series', title: t('sync.allSeries'), items: series },
     ],
-    [newReleases, popular, t, topRated]
+    [series, t]
   );
 
   return (
@@ -49,6 +34,8 @@ export default function SeriesDashboard() {
       loading={loading}
       error={error}
       onNavigate={handleNavigate}
+      emptyTitle={t('sync.noSeriesSynced')}
+      emptyDescription={t('sync.startSyncSeriesDescription')}
     />
   );
 }
