@@ -425,6 +425,7 @@ export class ServerApiClientBase {
     if (endpoint.includes('/api/media/') || endpoint.includes('/api/torrents/')) return 30000;
     if (endpoint.startsWith('/api/v1/setup/')) return 60000;
     if (endpoint.startsWith('/api/v1/sync/')) return 60000;
+    if (endpoint.includes('/api/indexers/search')) return 90000;
     if (endpoint.includes('/api/indexers/test')) return 60000;
     if (endpoint.includes('/bulk-torrent-zip/preview')) return 3_600_000;
     if (endpoint.includes('/bulk-torrent-zip/preview-url')) return 3_600_000;

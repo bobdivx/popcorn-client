@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import { useI18n } from '../../lib/i18n/useI18n';
-import CarouselRow from '../torrents/CarouselRow';
-import { HeroSection } from '../dashboard/components/HeroSection';
 import type { ContentItem } from '../../lib/client/types';
 import TorrentCardsShadowLoader from '../ui/TorrentCardsShadowLoader';
-import { LazyTorrentPoster } from '../dashboard/components/LazyTorrentPoster';
+import { CarouselSection } from '../page-model/CarouselSection';
+import { PageContainer } from '../page-model/PageContainer';
+import { PageHeader } from '../page-model/PageHeader';
+import { PosterCard } from '../page-model/PosterCard';
 
 const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_IMG_BACKDROP = 'https://image.tmdb.org/t/p/original';
@@ -159,34 +160,6 @@ export default function DemandesPage() {
     }
   };
 
-  const renderPosterCard = (item: ContentItem) => {
-    // Override the id to make TorrentPoster play the item click handler we want
-    const onClickOverride = () => {
-      const tmdbId = item.tmdbId;
-      const type = item.type || 'movie';
-      if (tmdbId) {
-        window.location.href = `/discover?tmdbId=${tmdbId}&type=${type}`;
-      }
-    };
-    
-    return (
-      <div key={item.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]" onClickCapture={(e) => {
-        // Intercept click to go to discover instead of player
-        e.preventDefault();
-        e.stopPropagation();
-        onClickOverride();
-      }} onKeyDownCapture={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          e.stopPropagation();
-          onClickOverride();
-        }
-      }}>
-        <LazyTorrentPoster item={{...item, infoHash: ''}} />
-      </div>
-    );
-  };
-
   if (loading) {
     return (
       <div className="min-h-[60vh] bg-black pt-4 sm:pt-6">
@@ -224,80 +197,75 @@ export default function DemandesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-white" data-page="demandes">
-      {/* Hero avec films populaires */}
-      {heroItems.length > 0 && (
-        <HeroSection
-          items={heroItems}
-          onPlay={handlePlay}
-          primaryButtonLabel={t('requests.requestMedia')}
-          primaryButtonIcon={
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 tv:h-8 tv:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-          }
-          size="large"
-        />
-      )}
-
-      {/* En-tête sous le hero, comme sur le dashboard */}
-      <div className="px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 pt-4 sm:pt-6 pb-4">
-        <h1 className="text-2xl sm:text-3xl md:text-4xl tv:text-5xl font-bold text-white mb-2">
-          {t('nav.demandes')}
-        </h1>
-        <p className="text-gray-400 text-sm sm:text-base">{t('discover.pageSubtitle')}</p>
-      </div>
-
+    <PageContainer
+      pageId="demandes"
+      heroItems={heroItems}
+      onHeroPlay={handlePlay}
+      heroPrimaryButtonLabel={t('requests.requestMedia')}
+      heroPrimaryButtonIcon={
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 tv:h-8 tv:w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+      }
+    >
+      <PageHeader title={t('nav.demandes')} subtitle={t('discover.pageSubtitle')} />
       <div className="pb-8 tv:pb-12 pt-2 tv:pt-4 overflow-visible animate-[fade-in-up_0.6s_ease-out_forwards] opacity-0">
-        {/* Films populaires */}
         {popularMovies.length > 0 && (
-          <CarouselRow title={t('discover.popularMovies')} autoScroll={false}>
-            {popularMovies.map((m) => renderPosterCard(toContentItem(m, 'movie')))}
-          </CarouselRow>
+          <CarouselSection title={t('discover.popularMovies')}>
+            {popularMovies.map((m) => (
+              <PosterCard key={m.id} item={toContentItem(m, 'movie')} onNavigate={handlePlay} />
+            ))}
+          </CarouselSection>
         )}
 
-        {/* Films les mieux notés */}
         {topRatedMovies.length > 0 && (
-          <CarouselRow title={t('discover.topRatedMovies')} autoScroll={false}>
-            {topRatedMovies.map((m) => renderPosterCard(toContentItem(m, 'movie')))}
-          </CarouselRow>
+          <CarouselSection title={t('discover.topRatedMovies')}>
+            {topRatedMovies.map((m) => (
+              <PosterCard key={m.id} item={toContentItem(m, 'movie')} onNavigate={handlePlay} />
+            ))}
+          </CarouselSection>
         )}
 
-        {/* Sorties cinéma */}
         {cinemaReleases.length > 0 && (
-          <CarouselRow title={t('discover.cinemaReleases')} autoScroll={false}>
-            {cinemaReleases.map((m) => renderPosterCard(toContentItem(m, 'movie')))}
-          </CarouselRow>
+          <CarouselSection title={t('discover.cinemaReleases')}>
+            {cinemaReleases.map((m) => (
+              <PosterCard key={m.id} item={toContentItem(m, 'movie')} onNavigate={handlePlay} />
+            ))}
+          </CarouselSection>
         )}
 
-        {/* Sorties VOD / Nouveautés films */}
         {vodReleases.length > 0 && (
-          <CarouselRow title={t('discover.vodReleases')} autoScroll={false}>
-            {vodReleases.map((m) => renderPosterCard(toContentItem(m, 'movie')))}
-          </CarouselRow>
+          <CarouselSection title={t('discover.vodReleases')}>
+            {vodReleases.map((m) => (
+              <PosterCard key={m.id} item={toContentItem(m, 'movie')} onNavigate={handlePlay} />
+            ))}
+          </CarouselSection>
         )}
 
-        {/* Séries populaires */}
         {popularSeries.length > 0 && (
-          <CarouselRow title={t('discover.popularSeries')} autoScroll={false}>
-            {popularSeries.map((s) => renderPosterCard(toContentItem(s, 'tv')))}
-          </CarouselRow>
+          <CarouselSection title={t('discover.popularSeries')}>
+            {popularSeries.map((s) => (
+              <PosterCard key={s.id} item={toContentItem(s, 'tv')} onNavigate={handlePlay} />
+            ))}
+          </CarouselSection>
         )}
 
-        {/* Séries les mieux notées */}
         {topRatedSeries.length > 0 && (
-          <CarouselRow title={t('discover.topRatedSeries')} autoScroll={false}>
-            {topRatedSeries.map((s) => renderPosterCard(toContentItem(s, 'tv')))}
-          </CarouselRow>
+          <CarouselSection title={t('discover.topRatedSeries')}>
+            {topRatedSeries.map((s) => (
+              <PosterCard key={s.id} item={toContentItem(s, 'tv')} onNavigate={handlePlay} />
+            ))}
+          </CarouselSection>
         )}
 
-        {/* Nouveautés séries */}
         {newSeries.length > 0 && (
-          <CarouselRow title={t('discover.newReleases')} autoScroll={false}>
-            {newSeries.map((s) => renderPosterCard(toContentItem(s, 'tv')))}
-          </CarouselRow>
+          <CarouselSection title={t('discover.newReleases')}>
+            {newSeries.map((s) => (
+              <PosterCard key={s.id} item={toContentItem(s, 'tv')} onNavigate={handlePlay} />
+            ))}
+          </CarouselSection>
         )}
       </div>
-    </div>
+    </PageContainer>
   );
 }
