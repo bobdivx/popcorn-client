@@ -121,7 +121,9 @@ export function HeroSection({
       return `/discover?tmdbId=${item.tmdbId}&type=${item.type}`;
     }
     // Torrent (slug ou id) → page détail torrent
-    return `/torrents/${item.id}?from=dashboard`;
+    const slug = encodeURIComponent(item.id);
+    const infoHash = item.infoHash ? `&infoHash=${encodeURIComponent(item.infoHash)}` : '';
+    return `/torrents?slug=${slug}${infoHash}&from=dashboard`;
   };
 
   const handleMoreInfo = (item: ContentItem) => {
