@@ -36,6 +36,8 @@
   --safe-area-inset-right: env(safe-area-inset-right, 0px);
   --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
   --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  --app-visual-scale: 1;
+  --app-visual-scale-inverse: 1;
 }
 
 /* Couleur de corps par défaut (hors Tailwind @layer pour garantir la surcharge du thème clair) */
@@ -96,6 +98,40 @@ html[data-tv-platform] body {
   overflow-x: hidden;
 }
 
+/* PC / TV : densité visuelle équivalente à un zoom navigateur à 80%, sans action utilisateur. */
+@media (min-width: 1024px) and (min-height: 500px) {
+  :root {
+    --app-visual-scale: 0.8;
+    --app-visual-scale-inverse: 1.25;
+  }
+}
+
+@supports (zoom: 1) {
+  @media (min-width: 1024px) and (min-height: 500px) {
+    body:has(.app-main [data-page="dashboard"]),
+    body:has(.app-main [data-page="films"]),
+    body:has(.app-main [data-page="series"]),
+    body:has(.app-main [data-page="demandes"]) {
+      zoom: var(--app-visual-scale);
+      width: calc(100% * var(--app-visual-scale-inverse));
+      min-height: calc(100vh * var(--app-visual-scale-inverse));
+    }
+  }
+}
+
+/* Garde de scroll pour les cartes focusées : évite le rognage en haut/bas du viewport. */
+.app-main {
+  scroll-padding-top: clamp(5rem, 10vh, 8rem);
+  scroll-padding-bottom: max(6rem, calc(3rem + var(--safe-area-inset-bottom)));
+  padding-bottom: max(2rem, calc(1rem + var(--safe-area-inset-bottom)));
+}
+
+[data-torrent-card],
+.torrent-poster {
+  scroll-margin-top: clamp(5rem, 10vh, 8rem);
+  scroll-margin-bottom: max(6rem, calc(3rem + var(--safe-area-inset-bottom)));
+}
+
 /* Masquer la scrollbar mais garder le scroll */
 .scrollbar-hide {
   -ms-overflow-style: none;  /* IE et Edge */
@@ -119,7 +155,7 @@ html[data-tv-platform] body {
 html[data-tv-platform="true"] .app-main {
   padding-left: 0 !important;
   padding-right: 0 !important;
-  padding-bottom: max(4vh, 30px) !important;
+  padding-bottom: max(8vh, calc(4rem + var(--safe-area-inset-bottom))) !important;
   margin-left: 0 !important;
 }
 
