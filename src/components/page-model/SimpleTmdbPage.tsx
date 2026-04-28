@@ -20,6 +20,8 @@ interface SimpleTmdbPageProps {
   loading: boolean;
   error: string | null;
   onNavigate: (item: ContentItem) => void;
+  emptyTitle?: string;
+  emptyDescription?: string;
 }
 
 export function SimpleTmdbPage({
@@ -31,6 +33,8 @@ export function SimpleTmdbPage({
   loading,
   error,
   onNavigate,
+  emptyTitle,
+  emptyDescription,
 }: SimpleTmdbPageProps) {
   if (loading) {
     return (
@@ -44,18 +48,29 @@ export function SimpleTmdbPage({
     return <div className="flex min-h-[40vh] items-center justify-center px-4 text-red-400">{error}</div>;
   }
 
+  const hasContent = sections.some((section) => section.items.length > 0);
+
   return (
     <PageContainer pageId={pageId} heroItems={heroItems} onHeroPlay={onNavigate}>
       <PageHeader title={title} subtitle={subtitle} />
       <div className="pb-8 tv:pb-12 pt-2 tv:pt-4 overflow-visible animate-[fade-in-up_0.6s_ease-out_forwards] opacity-0">
-        {sections.map((section) =>
-          section.items.length > 0 ? (
-            <CarouselSection key={section.id} title={section.title}>
-              {section.items.map((item) => (
-                <PosterCard key={item.id} item={item} onNavigate={onNavigate} />
-              ))}
-            </CarouselSection>
-          ) : null
+        {hasContent ? (
+          sections.map((section) =>
+            section.items.length > 0 ? (
+              <CarouselSection key={section.id} title={section.title}>
+                {section.items.map((item) => (
+                  <PosterCard key={item.id} item={item} onNavigate={onNavigate} />
+                ))}
+              </CarouselSection>
+            ) : null
+          )
+        ) : (
+          <section className="mx-4 sm:mx-6 lg:mx-16 tv:mx-24 rounded-2xl border border-white/10 bg-white/[0.03] px-6 py-12 text-center">
+            <p className="text-lg font-semibold text-white">{emptyTitle}</p>
+            {emptyDescription ? (
+              <p className="mx-auto mt-2 max-w-2xl text-sm text-white/60">{emptyDescription}</p>
+            ) : null}
+          </section>
         )}
       </div>
     </PageContainer>

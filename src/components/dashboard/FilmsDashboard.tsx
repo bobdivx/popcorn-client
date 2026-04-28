@@ -1,42 +1,27 @@
 import { useMemo } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import type { ContentItem } from '../../lib/client/types';
-import { formatDateForApi, toContentItem } from '../page-model/tmdb-mapper';
 import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
-import { useSimpleTmdbDiscover } from '../page-model/useSimpleTmdbDiscover';
+import { useInfiniteFilms } from './hooks/useInfiniteFilms';
 
 export default function FilmsDashboard() {
-  const { t, language } = useI18n();
-  const today = useMemo(() => formatDateForApi(new Date()), []);
-  const sectionQueries = useMemo(
-    () => [
-      { id: 'popular', kind: 'movie' as const, params: { sort_by: 'popularity.desc' } },
-      { id: 'topRated', kind: 'movie' as const, params: { sort_by: 'vote_average.desc', vote_count_gte: 500 } },
-      { id: 'newReleases', kind: 'movie' as const, params: { sort_by: 'primary_release_date.desc', primary_release_date_lte: today } },
-    ],
-    [today]
-  );
-  const { itemsById, loading, error } = useSimpleTmdbDiscover(sectionQueries, language);
-  const popular = itemsById.popular ?? [];
-  const topRated = itemsById.topRated ?? [];
-  const newReleases = itemsById.newReleases ?? [];
+  const { t } = useI18n();
+  const { films, loading, error } = useInfiniteFilms();
 
   const heroItems = useMemo(
-    () => popular.slice(0, 5).map((item) => toContentItem(item, 'movie')).filter((item) => item.poster || item.backdrop),
-    [popular]
+    () => films.slice(0, 5).filter((item) => item.poster || item.backdrop),
+    [films]
   );
 
   const handleNavigate = (item: ContentItem) => {
-    if (item.tmdbId) window.location.href = `/discover?tmdbId=${item.tmdbId}&type=${item.type || 'movie'}`;
+    window.location.href = `/torrents?slug=${encodeURIComponent(item.id)}&from=dashboard`;
   };
 
   const sections = useMemo(
     () => [
-      { id: 'popular', title: t('discover.popularMovies'), items: popular.map((item) => toContentItem(item, 'movie')) },
-      { id: 'topRated', title: t('discover.topRatedMovies'), items: topRated.map((item) => toContentItem(item, 'movie')) },
-      { id: 'newReleases', title: t('discover.newReleases'), items: newReleases.map((item) => toContentItem(item, 'movie')) },
+      { id: 'synced-films', title: t('sync.allFilms'), items: films },
     ],
-    [newReleases, popular, t, topRated]
+    [films, t]
   );
 
   return (
@@ -49,6 +34,8 @@ export default function FilmsDashboard() {
       loading={loading}
       error={error}
       onNavigate={handleNavigate}
+      emptyTitle={t('sync.noFilmsSynced')}
+      emptyDescription={t('sync.startSyncDescription')}
     />
   );
 }
