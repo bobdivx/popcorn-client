@@ -188,9 +188,32 @@ export function VideoPlayerWrapper({
         poster: posterUrl ?? undefined,
         tmdbId,
       };
-      updateResumeWatching(item, progressPercent);
+      // Pour les séries, on attache la saison/épisode/variantId et la position
+      // exacte pour permettre une reprise précise depuis la rangée "Reprendre".
+      const episodeInfo =
+        tmdbType === 'tv'
+          ? {
+              ...(seriesSeasonNum != null ? { season: seriesSeasonNum } : {}),
+              ...(seriesEpisodeNum != null ? { episode: seriesEpisodeNum } : {}),
+              ...(selectedSeriesEpisodeVariantId
+                ? { variantId: selectedSeriesEpisodeVariantId }
+                : {}),
+              positionSeconds: currentTime,
+              durationSeconds: duration,
+            }
+          : undefined;
+      updateResumeWatching(item, progressPercent, episodeInfo);
     },
-    [tmdbId, tmdbType, torrentName, posterUrl, reportPlaybackDuration]
+    [
+      tmdbId,
+      tmdbType,
+      torrentName,
+      posterUrl,
+      reportPlaybackDuration,
+      seriesSeasonNum,
+      seriesEpisodeNum,
+      selectedSeriesEpisodeVariantId,
+    ]
   );
 
   const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';

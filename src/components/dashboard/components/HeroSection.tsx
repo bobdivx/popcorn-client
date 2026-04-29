@@ -171,6 +171,10 @@ export function HeroSection({
   const currentTrailerKey = trailerKeys[currentItem.id];
   const isTV = isTVPlatform();
   const isLargeHero = size === 'large';
+  const currentSignal = currentItem.heroSignal;
+  const heroNewEpisodeLabel = t('dashboard.heroNewEpisode');
+  const heroRequestDownloadedLabel = t('dashboard.heroRequestDownloaded');
+  const heroDownloadedUnseenLabel = t('dashboard.heroDownloadedUnseen');
   
   // Sur TV, le hero doit être plus imposant (billboard)
   const tvHeroHeight = isLargeHero ? 'max(70vh, 500px)' : 'clamp(320px, 50vh, 560px)';
@@ -238,6 +242,30 @@ export function HeroSection({
                   <span className="text-xs sm:text-sm font-semibold uppercase tracking-wide">
                     {currentItem.type === 'movie' ? t('common.film') : currentItem.type === 'tv' ? t('common.serie') : t('common.content')}
                   </span>
+                  {currentSignal?.downloadedUnseen && (
+                    <>
+                      <span className="text-white/50">•</span>
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500/25 border border-amber-300/40 text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
+                        {heroDownloadedUnseenLabel}
+                      </span>
+                    </>
+                  )}
+                  {currentSignal?.requestDownloaded && (
+                    <>
+                      <span className="text-white/50">•</span>
+                      <span className="px-2 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-300/40 text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
+                        {heroRequestDownloadedLabel}
+                      </span>
+                    </>
+                  )}
+                  {currentSignal?.newEpisode && (
+                    <>
+                      <span className="text-white/50">•</span>
+                      <span className="px-2 py-0.5 rounded-full bg-violet-500/30 border border-violet-300/50 text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
+                        {heroNewEpisodeLabel}
+                      </span>
+                    </>
+                  )}
                   {(currentItem.year ?? (currentItem.releaseDate ? String(currentItem.releaseDate).slice(0, 4) : null)) && (
                     <>
                       <span className="text-white/50">•</span>
@@ -370,6 +398,30 @@ export function HeroSection({
               <span className="text-xs sm:text-sm font-semibold uppercase tracking-wide">
                 {currentItem.type === 'movie' ? t('common.film') : currentItem.type === 'tv' ? t('common.serie') : t('common.content')}
               </span>
+              {currentSignal?.downloadedUnseen && (
+                <>
+                  <span className="text-white/50">•</span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/25 border border-amber-300/40 text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
+                    {heroDownloadedUnseenLabel}
+                  </span>
+                </>
+              )}
+              {currentSignal?.requestDownloaded && (
+                <>
+                  <span className="text-white/50">•</span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-300/40 text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
+                    {heroRequestDownloadedLabel}
+                  </span>
+                </>
+              )}
+              {currentSignal?.newEpisode && (
+                <>
+                  <span className="text-white/50">•</span>
+                  <span className="px-2 py-0.5 rounded-full bg-violet-500/30 border border-violet-300/50 text-[10px] sm:text-xs font-semibold uppercase tracking-wide">
+                    {heroNewEpisodeLabel}
+                  </span>
+                </>
+              )}
               {(currentItem.year ?? (currentItem.releaseDate ? String(currentItem.releaseDate).slice(0, 4) : null)) && (
                 <>
                   <span className="text-white/50">•</span>

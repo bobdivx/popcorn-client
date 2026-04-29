@@ -80,32 +80,83 @@ function getNextEpisode(
 function SourceSelectModal({
   variants,
   onSelect,
+  onDownloadAllSeries,
+  isSeries = false,
   onClose,
   firstButtonRef,
 }: {
   variants: MediaDetailPageProps['torrent'][];
   onSelect: (variant: MediaDetailPageProps['torrent']) => void;
+  onDownloadAllSeries?: (quality: string) => void;
+  isSeries?: boolean;
   onClose: () => void;
   firstButtonRef: { current: HTMLButtonElement | null };
 }) {
   const { t } = useI18n();
+  const normalizeResolution = useCallback((raw?: string | null): string => {
+    if (!raw) return '';
+    const up = raw.toUpperCase();
+    if (up.includes('2160') || up === '4K' || up === 'UHD') return '4K';
+    if (up.includes('1080')) return '1080p';
+    if (up.includes('720')) return '720p';
+    if (up.includes('480')) return '480p';
+    if (up.includes('REMUX')) return 'Remux';
+    return raw;
+  }, []);
+
+  const qualityOrder: Record<string, number> = { Remux: 1000, '4K': 500, '1080p': 300, '720p': 100, '480p': 50 };
   const sortedVariants = [...variants].sort((a, b) => {
-    const qualityOrder: Record<string, number> = { Remux: 1000, '4K': 500, '1080p': 300, '720p': 100, '480p': 50 };
-    const aRes = (a.quality as { resolution?: string })?.resolution ?? '';
-    const bRes = (b.quality as { resolution?: string })?.resolution ?? '';
+    const aRes = normalizeResolution((a.quality as { resolution?: string })?.resolution ?? '');
+    const bRes = normalizeResolution((b.quality as { resolution?: string })?.resolution ?? '');
     const aQuality = qualityOrder[aRes] ?? 0;
     const bQuality = qualityOrder[bRes] ?? 0;
     return bQuality - aQuality || (b.seedCount ?? 0) - (a.seedCount ?? 0);
   });
+  const availableQualities = useMemo(() => {
+    const set = new Set<string>();
+    for (const variant of variants) {
+      const q = normalizeResolution((variant.quality as { resolution?: string })?.resolution ?? '');
+      if (q) set.add(q);
+    }
+    return [...set].sort((a, b) => (qualityOrder[b] ?? 0) - (qualityOrder[a] ?? 0));
+  }, [normalizeResolution, qualityOrder, variants]);
+  const [selectedQuality, setSelectedQuality] = useState<string>(() => {
+    if (availableQualities.includes('1080p')) return '1080p';
+    return availableQualities[0] ?? '';
+  });
+  const primaryDownloadAllRef = useRef<HTMLButtonElement | null>(null);
+
+  useEffect(() => {
+    if (availableQualities.length === 0) {
+      setSelectedQuality('');
+      return;
+    }
+    // 1080p est seulement la valeur par défaut initiale, sans forcer la sélection ensuite.
+    if (!selectedQuality || !availableQualities.includes(selectedQuality)) {
+      if (availableQualities.includes('1080p')) {
+        setSelectedQuality('1080p');
+      } else {
+        setSelectedQuality(availableQualities[0]);
+      }
+    }
+  }, [availableQualities, selectedQuality]);
+  const displayedVariants = useMemo(() => {
+    if (!selectedQuality) return sortedVariants;
+    return sortedVariants.filter((variant) => normalizeResolution((variant.quality as { resolution?: string })?.resolution ?? '') === selectedQuality);
+  }, [normalizeResolution, selectedQuality, sortedVariants]);
 
   useEffect(() => {
     const t = setTimeout(() => {
+      if (isSeries && onDownloadAllSeries && primaryDownloadAllRef.current) {
+        primaryDownloadAllRef.current.focus();
+        return;
+      }
       if (firstButtonRef.current) {
         firstButtonRef.current.focus();
       }
     }, 50);
     return () => clearTimeout(t);
-  }, [firstButtonRef]);
+  }, [firstButtonRef, isSeries, onDownloadAllSeries]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -148,9 +199,43 @@ function SourceSelectModal({
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-4 tv:p-6 space-y-3 tv:space-y-4">
-          {sortedVariants.map((variant, index) => {
+          {isSeries && onDownloadAllSeries && (
+            <div className="p-4 tv:p-6 rounded-xl border border-white/12 bg-white/5 backdrop-blur-sm">
+              <div className="flex flex-col gap-3 tv:gap-4">
+                <div className="flex flex-wrap items-center gap-2 tv:gap-3">
+                  {availableQualities.map((quality) => (
+                    <button
+                      key={quality}
+                      type="button"
+                      onClick={() => setSelectedQuality(quality)}
+                      data-focusable
+                      className={`gtv-pill-btn ds-focus-glow ds-active-glow px-3 py-1.5 tv:px-4 tv:py-2 rounded-lg border text-sm tv:text-base font-semibold transition-colors ${
+                        selectedQuality === quality
+                          ? 'bg-violet-600/30 text-white border-violet-300 ring-2 ring-violet-300/80 shadow-[0_0_0_1px_rgba(196,181,253,0.45)]'
+                          : 'text-white/80 border-white/25 hover:bg-white/10'
+                      }`}
+                    >
+                      {quality}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  ref={primaryDownloadAllRef}
+                  type="button"
+                  onClick={() => selectedQuality && onDownloadAllSeries(selectedQuality)}
+                  disabled={!selectedQuality}
+                  data-focusable
+                  tabIndex={0}
+                  className="gtv-pill-btn ds-focus-glow ds-active-glow ds-sync-active-pulse w-full tv:w-auto inline-flex items-center justify-center gap-2.5 font-bold text-base tv:text-2xl tv:px-10 tv:py-5 tv:min-h-[68px] disabled:opacity-50 disabled:cursor-not-allowed border border-violet-500/40 hover:border-violet-400/60 hover:bg-violet-900/20 tv-element-focused"
+                >
+                  Tout télécharger
+                </button>
+              </div>
+            </div>
+          )}
+          {displayedVariants.map((variant, index) => {
             const tracker = (variant as any).indexerName ?? (variant as any).indexer_name ?? 'Tracker';
-            const quality = (variant.quality as { resolution?: string })?.resolution ?? '';
+            const quality = normalizeResolution((variant.quality as { resolution?: string })?.resolution ?? '');
             const codec = (variant.quality as { codec?: string })?.codec ?? (variant as any).codec ?? '';
             const seeds = variant.seedCount ?? 0;
             const peers = variant.leechCount ?? 0;
@@ -166,7 +251,7 @@ function SourceSelectModal({
               <button
                 key={variant.id ?? index}
                 type="button"
-                ref={index === 0 ? firstButtonRef : undefined}
+                ref={index === 0 && !(isSeries && onDownloadAllSeries) ? firstButtonRef : undefined}
                 onClick={() => onSelect(variant)}
                 data-focusable
                 className="w-full text-left p-4 tv:p-6 rounded-xl bg-white/5 hover:bg-primary/30 border border-white/10 hover:border-primary-500/50 transition-all flex flex-col gap-2 tv:gap-3 focus:outline-none focus:ring-4 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 tv-element-focused"
@@ -223,6 +308,11 @@ function SourceSelectModal({
               </button>
             );
           })}
+          {displayedVariants.length === 0 && (
+            <div className="p-4 tv:p-6 rounded-xl border border-white/10 bg-white/5 text-white/75">
+              Aucune source disponible pour cette qualité.
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -285,6 +375,16 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   /** Saison / Ã©pisode sÃ©lectionnÃ©s (pour sÃ©ries) */
   const [selectedSeasonNum, setSelectedSeasonNum] = useState<number | null>(null);
   const [selectedEpisodeVariantId, setSelectedEpisodeVariantId] = useState<string | null>(null);
+  const normalizeResolution = useCallback((raw?: string | null): string => {
+    if (!raw) return '';
+    const up = raw.toUpperCase();
+    if (up.includes('2160') || up === '4K' || up === 'UHD') return '4K';
+    if (up.includes('1080')) return '1080p';
+    if (up.includes('720')) return '720p';
+    if (up.includes('480')) return '480p';
+    if (up.includes('REMUX')) return 'Remux';
+    return raw;
+  }, []);
 
   // Ã‰tat pour la position de lecture sauvegardÃ©e
   const [savedPlaybackPosition, setSavedPlaybackPosition] = useState<number | null>(null);
@@ -485,6 +585,30 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     setShowInfo,
     addDebugLog,
   });
+
+  const handleDownloadWholeSeriesByQuality = useCallback((quality: string) => {
+    const target = normalizeResolution(quality);
+    const byInfoHash = new Map<string, MediaDetailPageProps['torrent']>();
+    for (const variant of allVariants) {
+      const infoHash = (variant.infoHash ?? '').trim();
+      if (!infoHash) continue;
+      if (normalizeResolution(variant.quality?.resolution) !== target) continue;
+      const prev = byInfoHash.get(infoHash);
+      if (!prev || (variant.seedCount ?? 0) > (prev.seedCount ?? 0)) {
+        byInfoHash.set(infoHash, variant);
+      }
+    }
+    const variantsToDownload = [...byInfoHash.values()].sort((a, b) => (b.seedCount ?? 0) - (a.seedCount ?? 0));
+    if (variantsToDownload.length === 0) {
+      addNotification('info', `Aucune source ${target} disponible pour cette série`);
+      return;
+    }
+    for (const variant of variantsToDownload) {
+      mediaDetailActionsRef.current?.handleDownload(variant);
+    }
+    addNotification('success', `${variantsToDownload.length} source(s) ${target} ajoutée(s)`);
+    setShowSourceModal(false);
+  }, [addNotification, allVariants, normalizeResolution]);
 
   /** Ferme le lecteur puis dÃ©clenche un rafraÃ®chissement des stats et de la disponibilitÃ© (carte Ã  jour aprÃ¨s stream). */
   const handleClosePlayerAndRefresh = useCallback(async () => {
@@ -711,12 +835,22 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     }
   }, [activeTorrent.infoHash, hasInfoHash]);
 
-  // VÃ©rifier la position de lecture sauvegardÃ©e (torrent actif) : prioritÃ© par mÃ©dia (tmdb) si dispo, sinon par torrent
+  // VÃ©rifier la position de lecture sauvegardÃ©e (torrent actif) : prioritÃ© au query param ?t=
+  // (deep-link "Reprendre la lecture"), sinon par mÃ©dia (tmdb), sinon par torrent.
   useEffect(() => {
     const checkSavedPosition = async () => {
       if (typeof window === 'undefined') return;
       const deviceId = getOrCreateDeviceId();
       try {
+        const params = new URLSearchParams(window.location.search);
+        const tParam = params.get('t');
+        if (tParam) {
+          const t = Number(tParam);
+          if (Number.isFinite(t) && t > 0) {
+            setSavedPlaybackPosition(t);
+            return;
+          }
+        }
         const tmdbId = activeTorrent.tmdbId;
         const tmdbType = activeTorrent.tmdbType;
         if (typeof tmdbId === 'number' && (tmdbType === 'movie' || tmdbType === 'tv')) {
@@ -1097,29 +1231,16 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
         }
 
         // 2. Analyser les torrents complétés
-        const currentSeriesTitle = (activeTorrent.mainTitle || activeTorrent.name || '').toLowerCase();
-        
-        // Liste de mots communs à ignorer pour la détection par nom
-        const commonWords = ['les', 'the', 'des', 'mes', 'tes', 'ses', 'nos', 'vos', 'une', 'des', 'mon', 'ton', 'son', 'ma', 'ta', 'sa', 'du', 'au', 'aux', 'le', 'la', 'un'];
-        const words = currentSeriesTitle.split(/[\s\.\-_]+/).filter(w => w.length > 1 && !commonWords.includes(w));
-        
-        // On prend les 2 premiers mots significatifs pour une détection plus précise
-        const searchWords = words.slice(0, 2);
-
         for (const t of allTorrents) {
           const isCompleted = t.state === 'completed' || t.state === 'seeding' || (t.progress ?? 0) >= 0.99;
 
           if (isCompleted && t.name) {
-            const torrentNameLower = t.name.toLowerCase();
-            
-            // Priorité 1 : Matching par ID TMDB si disponible
+            // Matching strict : ID TMDB uniquement.
+            // Le fallback par mots-clés causait des faux positifs/faux négatifs
+            // sur des séries aux titres proches (ex: Testament/Testaments).
             let matched = false;
             const tTmdbId = (t as any).tmdb_id || (t as any).tmdbId;
             if (activeTorrent.tmdbId && tTmdbId && Number(tTmdbId) === Number(activeTorrent.tmdbId)) {
-              matched = true;
-            } 
-            // Priorité 2 : Matching par mots significatifs du titre
-            else if (searchWords.length > 0 && searchWords.every(w => torrentNameLower.includes(w))) {
               matched = true;
             }
 
@@ -1151,6 +1272,106 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
       clearInterval(iv);
     };
   }, [activeTorrent.tmdbId, activeTorrent.tmdbType, seriesEpisodes, activeTorrent.name, activeTorrent.mainTitle]);
+
+  // Auto-téléchargement des nouveaux épisodes :
+  // si l'utilisateur a déjà commencé la série OU a déjà des épisodes téléchargés,
+  // ajouter automatiquement les nouveaux épisodes disponibles.
+  useEffect(() => {
+    if (activeTorrent.tmdbType !== 'tv' || !activeTorrent.tmdbId || !seriesEpisodes?.seasons?.length) return;
+
+    let cancelled = false;
+    (async () => {
+      const deviceId = getOrCreateDeviceId();
+      const record = await getPlaybackPositionByMediaRecord(activeTorrent.tmdbId!, 'tv', deviceId);
+      if (cancelled) return;
+
+      const hasPlaybackProgress = !!record && record.position > 0;
+      const downloadedAnchors = [...downloadedEpisodesSet]
+        .map((k) => {
+          const [s, e] = k.split(':');
+          const season = Number(s);
+          const episode = Number(e);
+          return Number.isFinite(season) && Number.isFinite(episode) ? { season, episode } : null;
+        })
+        .filter((x): x is { season: number; episode: number } => x != null)
+        .sort((a, b) => (a.season - b.season) || (a.episode - b.episode));
+      const lastDownloaded = downloadedAnchors.length > 0 ? downloadedAnchors[downloadedAnchors.length - 1] : null;
+      const hasDownloadedEpisodes = !!lastDownloaded;
+
+      if (!hasPlaybackProgress && !hasDownloadedEpisodes) return;
+
+      const watchedSeason = hasPlaybackProgress
+        ? (typeof record?.season === 'number' ? record.season : 1)
+        : (lastDownloaded?.season ?? 1);
+      const watchedEpisode = hasPlaybackProgress
+        ? (typeof record?.episode === 'number' ? record.episode : 0)
+        : (lastDownloaded?.episode ?? 0);
+
+      const isAfterWatched = (season: number, episode: number) =>
+        season > watchedSeason || (season === watchedSeason && episode > watchedEpisode);
+
+      const keyForEpisode = (season: number, episode: number) => `${season}:${episode}`;
+      const alreadyRequestedKey = `seriesAutoDownloadRequested:${activeTorrent.tmdbId}`;
+      const alreadyRequested = new Set<string>();
+      if (typeof localStorage !== 'undefined') {
+        try {
+          const raw = localStorage.getItem(alreadyRequestedKey);
+          const parsed = raw ? JSON.parse(raw) : [];
+          if (Array.isArray(parsed)) {
+            for (const infoHash of parsed) {
+              if (typeof infoHash === 'string' && infoHash.trim()) alreadyRequested.add(infoHash.trim());
+            }
+          }
+        } catch {
+          // Ignore JSON invalide
+        }
+      }
+
+      const candidatesByInfoHash = new Map<string, MediaDetailPageProps['torrent']>();
+      for (const seasonData of seriesEpisodes.seasons) {
+        for (const ep of seasonData.episodes ?? []) {
+          if (!ep?.info_hash || ep.episode <= 0) continue;
+          if (!isAfterWatched(ep.season, ep.episode)) continue;
+          const episodeKey = keyForEpisode(ep.season, ep.episode);
+          if (downloadedEpisodesSet.has(episodeKey)) continue;
+          if (alreadyRequested.has(ep.info_hash)) continue;
+
+          const variantMatch = allVariants.find((v) => (v.infoHash ?? '').toLowerCase() === ep.info_hash.toLowerCase());
+          if (!variantMatch) continue;
+          const prev = candidatesByInfoHash.get(ep.info_hash);
+          if (!prev || (variantMatch.seedCount ?? 0) > (prev.seedCount ?? 0)) {
+            candidatesByInfoHash.set(ep.info_hash, variantMatch);
+          }
+        }
+      }
+
+      const toDownload = [...candidatesByInfoHash.values()].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
+      if (toDownload.length === 0) return;
+
+      for (const variant of toDownload) {
+        mediaDetailActionsRef.current?.handleDownload(variant);
+        if (variant.infoHash) alreadyRequested.add(variant.infoHash);
+      }
+
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(alreadyRequestedKey, JSON.stringify([...alreadyRequested]));
+      }
+      addNotification('info', `${toDownload.length} nouvel(s) épisode(s) ajouté(s) automatiquement`);
+    })().catch(() => {
+      // Échec silencieux : ne pas casser la page détail.
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeTorrent.tmdbId,
+    activeTorrent.tmdbType,
+    addNotification,
+    allVariants,
+    downloadedEpisodesSet,
+    seriesEpisodes,
+  ]);
 
   // Afficher le panneau de vÃ©rification quand un tÃ©lÃ©chargement vient d'Ãªtre ajoutÃ© (Ã©vÃ©nement torrentAdded)
   useEffect(() => {
@@ -1365,11 +1586,50 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     };
   }, [isPlayingTrailer, trailerUiVisible]);
 
-  // Initialiser saison/épisode : reprise depuis le stockage TMDB (si série + position) sinon premier épisode
+  // Initialiser saison/épisode : priorité aux query params (?season&episode&variantId
+  // depuis "Reprendre la lecture"), sinon stockage TMDB (localStorage), sinon premier épisode.
   useEffect(() => {
     if (!seriesEpisodes?.seasons?.length || selectedSeasonNum !== null) return;
     let cancelled = false;
     (async () => {
+      // 1) Query params (deep-link de la rangée Reprendre)
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const variantParam = params.get('variantId');
+        const seasonParam = params.get('season');
+        const episodeParam = params.get('episode');
+        let urlEpId: string | null = null;
+        let urlSeasonNum: number | null = null;
+        if (variantParam) {
+          for (const s of seriesEpisodes.seasons) {
+            const e = s.episodes.find((x) => x.id === variantParam);
+            if (e) {
+              urlEpId = e.id;
+              urlSeasonNum = s.season;
+              break;
+            }
+          }
+        }
+        if (!urlEpId && seasonParam && episodeParam) {
+          const sNum = Number(seasonParam);
+          const eNum = Number(episodeParam);
+          if (Number.isFinite(sNum) && Number.isFinite(eNum)) {
+            const s = seriesEpisodes.seasons.find((x) => x.season === sNum);
+            const e = s?.episodes.find((x) => x.episode === eNum);
+            if (e) {
+              urlEpId = e.id;
+              urlSeasonNum = sNum;
+            }
+          }
+        }
+        if (!cancelled && urlEpId != null && urlSeasonNum != null) {
+          setSelectedSeasonNum(urlSeasonNum);
+          setSelectedEpisodeVariantId(urlEpId);
+          return;
+        }
+      }
+
+      // 2) localStorage (savePlaybackPositionByMedia)
       const deviceId = getOrCreateDeviceId();
       const tid = activeTorrent.tmdbId;
       const tty = activeTorrent.tmdbType;
@@ -1405,6 +1665,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           return;
         }
       }
+
+      // 3) Premier épisode disponible
       const first = seriesEpisodes.seasons[0];
       if (first?.episodes?.length) {
         setSelectedSeasonNum(first.season);
@@ -2208,6 +2470,8 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
       {showSourceModal && allVariants.length > 1 && (
         <SourceSelectModal
           variants={allVariants}
+          isSeries={activeTorrent.tmdbType === 'tv'}
+          onDownloadAllSeries={activeTorrent.tmdbType === 'tv' ? handleDownloadWholeSeriesByQuality : undefined}
           onSelect={(variant) => {
             setShowSourceModal(false);
             mediaDetailActionsRef.current?.handleDownload(variant);

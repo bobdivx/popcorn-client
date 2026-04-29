@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
-import type { ContentItem } from '../../../lib/client/types';
+import type { EnrichedResumeItem } from '../hooks/useResumeWatching';
 import { ResumePoster } from './ResumePoster';
 
 interface LazyResumePosterProps {
-  item: ContentItem;
+  item: EnrichedResumeItem;
+  /** Surcharge optionnelle de la navigation au clic (sinon URL générée par défaut). */
+  onNavigate?: (item: EnrichedResumeItem) => void;
   /**
    * Marge de chargement anticipé (en pixels) pour commencer à charger avant que l'élément soit visible
    * @default 200
@@ -15,7 +17,7 @@ interface LazyResumePosterProps {
  * Composant wrapper qui charge ResumePoster uniquement lorsque l'élément devient visible
  * Utilise IntersectionObserver pour optimiser les performances
  */
-export function LazyResumePoster({ item, rootMargin = '200px' }: LazyResumePosterProps) {
+export function LazyResumePoster({ item, onNavigate, rootMargin = '200px' }: LazyResumePosterProps) {
   const [shouldRender, setShouldRender] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -67,7 +69,7 @@ export function LazyResumePoster({ item, rootMargin = '200px' }: LazyResumePoste
 
   return (
     <div ref={containerRef}>
-      <ResumePoster item={item} />
+      <ResumePoster item={item} onNavigate={onNavigate} />
     </div>
   );
 }

@@ -137,6 +137,12 @@ export interface ContentItem {
   trailerUrl?: string; // URL du trailer pour animation immersive
   /** True quand le torrent semble être une saison/série complète (INTÉGRALE, COMPLETE, etc.). */
   isCompletePack?: boolean;
+  /** Signaux UI optionnels pour le hero/cartes dashboard. */
+  heroSignal?: {
+    newEpisode?: boolean;
+    requestDownloaded?: boolean;
+    downloadedUnseen?: boolean;
+  };
 }
 
 export interface FilmData extends ContentItem {

@@ -274,6 +274,58 @@ export default function TVNavigationProvider() {
         }
       }
 
+      // Préférence pour [data-tv-page-action] (toggle Bibliothèque, etc.) quand il se trouve
+      // entre la position courante et la cible naturelle dans la direction. Permet de
+      // l'atteindre même s'il est éloigné horizontalement (sinon le score spatial le rate
+      // car le voisin direct vertical aligné en X gagne presque toujours).
+      // Actif sur toutes les plateformes (TV + desktop avec flèches), pas seulement TV.
+      if (direction === 'up' || direction === 'down') {
+        const curRect = current.getBoundingClientRect();
+        const cy = curRect.top + curRect.height / 2;
+        const inAction = !!current.closest('[data-tv-page-action]');
+        if (!inAction) {
+          const pageActionCands = candidates.filter((el) => {
+            if (!el.closest('[data-tv-page-action]')) return false;
+            const r = el.getBoundingClientRect();
+            const ay = r.top + r.height / 2;
+            return direction === 'up' ? ay < cy - DIRECTION_THRESHOLD : ay > cy + DIRECTION_THRESHOLD;
+          });
+          if (pageActionCands.length > 0) {
+            // Prendre l'élément le plus proche en Y (entrée/sortie de la barre d'action).
+            const closest = pageActionCands.reduce((best, el) => {
+              const r = el.getBoundingClientRect();
+              const ay = r.top + r.height / 2;
+              const dist = Math.abs(ay - cy);
+              if (!best || dist < best.dist) return { el, dist };
+              return best;
+            }, null as null | { el: HTMLElement; dist: number });
+            if (closest) {
+              const paY = closest.el.getBoundingClientRect();
+              const paCy = paY.top + paY.height / 2;
+              // Vérifier qu'il n'y a aucune autre rangée focalisable strictement entre nous et la page-action.
+              // On considère qu'un élément est "sur la même ligne" qu'un autre s'il est à moins de 30px en Y.
+              const SAME_ROW_TOLERANCE = 30;
+              const blocking = candidates.some((el) => {
+                if (el === closest.el || el === current) return false;
+                if (el.closest('[data-tv-page-action]')) return false;
+                const r = el.getBoundingClientRect();
+                const ey = r.top + r.height / 2;
+                // Ignorer les éléments quasi sur la même ligne que current (ex : autres
+                // boutons du hero) — ils ne bloquent pas verticalement.
+                if (Math.abs(ey - cy) < SAME_ROW_TOLERANCE) return false;
+                if (direction === 'up') {
+                  return ey < cy - DIRECTION_THRESHOLD && ey > paCy + SAME_ROW_TOLERANCE;
+                }
+                return ey > cy + DIRECTION_THRESHOLD && ey < paCy - SAME_ROW_TOLERANCE;
+              });
+              if (!blocking) {
+                return closest.el;
+              }
+            }
+          }
+        }
+      }
+
       // TV + carrousel : gauche/droite = voisin sur la même ligne (liste déjà ordonnée dans getFocusableElements)
       if (
         isTvDoc() &&
@@ -396,6 +448,9 @@ export default function TVNavigationProvider() {
     const getFocusAnchorX = () => typeof window !== 'undefined' ? window.innerWidth * FOCUS_ANCHOR_RATIO : 120;
 
     // Carousel : on scroll pour que la carte focusée soit à la position d'ancrage (focus fixe, carousel qui bouge).
+    // Le scroll est instantané (behavior='auto') sur TOUTES les plateformes : le mode 'smooth'
+    // sur desktop produisait un effet de « glissé » de toutes les cartes à chaque
+    // changement de focus — perçu comme parasite par les utilisateurs (cf. UX roadmap Phase 3).
     const scrollCarouselToElement = (carousel: HTMLElement, el: HTMLElement) => {
       const elRect = el.getBoundingClientRect();
       const carouselRect = carousel.getBoundingClientRect();
@@ -409,16 +464,12 @@ export default function TVNavigationProvider() {
       let newScrollLeft = cardLeftInScroll + carouselRect.left - anchorX;
       newScrollLeft = Math.max(0, Math.min(maxScroll, newScrollLeft));
 
-      // TV / webOS : éviter d’écrire scrollLeft si quasi inchangé (reflow coûteux)
-      if (isInstantScroll && Math.abs(carousel.scrollLeft - newScrollLeft) < 4) {
+      // Évite un reflow inutile si la position est déjà quasi correcte.
+      if (Math.abs(carousel.scrollLeft - newScrollLeft) < 4) {
         return;
       }
 
-      if (isInstantScroll) {
-        carousel.scrollLeft = newScrollLeft;
-      } else {
-        carousel.scrollTo({ left: newScrollLeft, behavior: 'smooth' });
-      }
+      carousel.scrollLeft = newScrollLeft;
     };
 
     // Focus un élément
@@ -513,10 +564,11 @@ export default function TVNavigationProvider() {
         return focusableElements[0];
       }
 
-      // TV + Dashboard : commencer sur le hero (évite de scroller vers les carrousels et de « perdre » le bandeau)
+      // TV + Pages avec hero (Dashboard / Films / Séries) : commencer sur le hero
+      // (évite de scroller vers les carrousels et de « perdre » le bandeau).
       if (isTvDoc() && typeof window !== 'undefined') {
         const path = window.location.pathname.replace(/\/$/, '') || '/';
-        if (path === '/dashboard') {
+        if (path === '/dashboard' || path === '/films' || path === '/series') {
           const heroBtn = document.querySelector<HTMLElement>('.hero-dashboard button[data-focusable]');
           if (heroBtn && focusableElements.includes(heroBtn)) return heroBtn;
         }
@@ -621,6 +673,42 @@ export default function TVNavigationProvider() {
       return true;
     };
 
+    /** TV : premier focusable d'un bloc [data-tv-page-action] (toggle Bibliothèque, etc.). */
+    const focusPageAction = (): boolean => {
+      const action = document.querySelector<HTMLElement>('[data-tv-page-action]');
+      if (!action) return false;
+      const first =
+        action.querySelector<HTMLElement>(
+          'a[href]:not([disabled]), button:not([disabled]), [data-focusable], [tabindex]:not([tabindex="-1"])'
+        ) ?? (action.matches(FOCUSABLE_SELECTOR) ? action : null);
+      if (!first) return false;
+      first.focus();
+      return true;
+    };
+
+    /**
+     * Touche Menu : cycle Header → Page-action → Contenu (1ère carte).
+     * Permet d'atteindre le toggle Bibliothèque même quand il est hors du parcours
+     * spatial naturel (placé à droite du titre, sous le hero).
+     */
+    const cycleTopFocus = (): boolean => {
+      const active = document.activeElement as HTMLElement | null;
+      const inHeader = !!active && !!active.closest(SITE_HEADER_SELECTOR);
+      const inAction = !!active && !!active.closest('[data-tv-page-action]');
+      if (!inHeader && !inAction) {
+        // Depuis le contenu : aller au header.
+        if (focusTVHeaderFirst()) return true;
+        return focusPageAction();
+      }
+      if (inHeader) {
+        // Header → page-action si présente, sinon on reste.
+        if (focusPageAction()) return true;
+        return false;
+      }
+      // inAction → revenir au header.
+      return focusTVHeaderFirst();
+    };
+
     // Gestionnaire de touches
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -700,7 +788,7 @@ export default function TVNavigationProvider() {
         }
       }
 
-      // TV : touche Menu / ContextMenu / Android KEYCODE_MENU (82) → focus navigation latérale
+      // TV : touche Menu / ContextMenu / Android KEYCODE_MENU (82) → cycle Header → Page action → Contenu
       if (
         document.documentElement.getAttribute('data-tv-platform') === 'true' &&
         !modal &&
@@ -708,7 +796,26 @@ export default function TVNavigationProvider() {
           e.key === 'Menu' ||
           (e as KeyboardEvent & { keyCode?: number }).keyCode === 82)
       ) {
-        if (focusTVHeaderFirst()) {
+        if (cycleTopFocus()) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+        return;
+      }
+
+      // Raccourci direct toggle Bibliothèque / page-action :
+      // - Desktop : touche « b » (lettre, hors champ texte).
+      // - TV : touche couleur Verte (Tizen/webOS keyCode 404, key=ColorF1) — la plus accessible
+      //   sur la majorité des télécommandes.
+      const evKeyCode = (e as KeyboardEvent & { keyCode?: number }).keyCode;
+      const isPageActionShortcut =
+        !modal &&
+        !inEditable &&
+        ((e.key === 'b' || e.key === 'B') ||
+          e.key === 'ColorF1' ||
+          evKeyCode === 404);
+      if (isPageActionShortcut) {
+        if (focusPageAction()) {
           e.preventDefault();
           e.stopPropagation();
         }

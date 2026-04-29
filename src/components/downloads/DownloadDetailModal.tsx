@@ -14,6 +14,7 @@ import { Modal } from '../ui/Modal';
 
 interface DownloadDetailModalProps {
   torrent: ClientTorrentStats;
+  relatedTorrents?: ClientTorrentStats[];
   onClose: () => void;
   onPause: (infoHash: string) => void;
   onResume: (infoHash: string) => void;
@@ -52,6 +53,7 @@ const ActionTile = ({ icon: Icon, label, onClick, className = "", danger = false
 
 export function DownloadDetailModal({ 
   torrent, 
+  relatedTorrents,
   onClose, 
   onPause, 
   onResume, 
@@ -61,6 +63,7 @@ export function DownloadDetailModal({
   backdropUrl 
 }: DownloadDetailModalProps) {
   const { t } = useI18n();
+  const [activeInfoHash, setActiveInfoHash] = useState<string>(torrent.info_hash);
   
   const [statsV1, setStatsV1] = useState<Record<string, any> | null>(null);
   const [downloadPath, setDownloadPath] = useState<string | null>(null);
@@ -68,41 +71,47 @@ export function DownloadDetailModal({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [newTrackerUrl, setNewTrackerUrl] = useState('');
   const [addTrackerLoading, setAddTrackerLoading] = useState(false);
+  const modalTorrents = relatedTorrents && relatedTorrents.length > 0 ? relatedTorrents : [torrent];
+  const activeTorrent = modalTorrents.find(t => t.info_hash === activeInfoHash) || torrent;
+
+  useEffect(() => {
+    setActiveInfoHash(torrent.info_hash);
+  }, [torrent.info_hash]);
 
   // Background stats polling
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        setStatsV1(await clientApi.getTorrentStatsV1(torrent.info_hash));
+        setStatsV1(await clientApi.getTorrentStatsV1(activeTorrent.info_hash));
       } catch (e) {}
     };
     fetchStats();
     const interval = setInterval(fetchStats, 2000);
     return () => clearInterval(interval);
-  }, [torrent.info_hash]);
+  }, [activeTorrent.info_hash]);
 
   // Fetch path and trackers once
   useEffect(() => {
     (async () => {
       try {
-        setDownloadPath(await clientApi.getTorrentDownloadPath(torrent.info_hash));
-        setTrackers(await clientApi.getTorrentTrackers(torrent.info_hash));
+        setDownloadPath(await clientApi.getTorrentDownloadPath(activeTorrent.info_hash));
+        setTrackers(await clientApi.getTorrentTrackers(activeTorrent.info_hash));
       } catch (e) {}
     })();
-  }, [torrent.info_hash]);
+  }, [activeTorrent.info_hash]);
 
   const live = statsV1?.live;
-  const downSpeed = live?.download_speed?.human_readable || formatSpeed(torrent.download_speed);
-  const upSpeed = live?.upload_speed?.human_readable || formatSpeed(torrent.upload_speed);
-  const eta = live?.time_remaining?.human_readable || formatETA(torrent.eta_seconds);
-  const peers = live?.snapshot?.peer_stats?.live ?? (torrent.peers_connected || 0);
+  const downSpeed = live?.download_speed?.human_readable || formatSpeed(activeTorrent.download_speed);
+  const upSpeed = live?.upload_speed?.human_readable || formatSpeed(activeTorrent.upload_speed);
+  const eta = live?.time_remaining?.human_readable || formatETA(activeTorrent.eta_seconds);
+  const peers = live?.snapshot?.peer_stats?.live ?? (activeTorrent.peers_connected || 0);
 
   const handleAddTracker = async () => {
     if (!newTrackerUrl.trim()) return;
     setAddTrackerLoading(true);
     try {
-      await clientApi.addTracker(torrent.info_hash, newTrackerUrl.trim());
-      setTrackers(await clientApi.getTorrentTrackers(torrent.info_hash));
+      await clientApi.addTracker(activeTorrent.info_hash, newTrackerUrl.trim());
+      setTrackers(await clientApi.getTorrentTrackers(activeTorrent.info_hash));
       setNewTrackerUrl('');
     } catch (e) {} finally { setAddTrackerLoading(false); }
   };
@@ -135,7 +144,7 @@ export function DownloadDetailModal({
             <span className="font-semibold hidden sm:inline">{t('common.back')}</span>
           </button>
           <div className="flex items-center gap-3">
-             <TorrentStatusBadge state={torrent.state} className="scale-90 sm:scale-110" />
+             <TorrentStatusBadge state={activeTorrent.state} className="scale-90 sm:scale-110" />
           </div>
         </div>
 
@@ -144,7 +153,7 @@ export function DownloadDetailModal({
           <div className="w-full flex-shrink-0 border-b border-white/5 bg-white/[0.02] p-4 sm:p-8 lg:w-96 lg:min-h-0 lg:max-h-full lg:overflow-y-auto lg:border-b-0 lg:border-r tv:lg:w-[min(24rem,32vw)] custom-scrollbar">
             <div className="relative mx-auto aspect-[2/3] w-full max-w-[min(100%,18rem)] overflow-hidden rounded-2xl shadow-2xl group tv:max-w-[min(100%,22rem)] lg:mx-0 lg:max-w-none">
               {posterUrl ? (
-                <img src={posterUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={torrent.name} />
+                <img src={posterUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={activeTorrent.name} />
               ) : (
                 <div className="w-full h-full bg-neutral-800 flex items-center justify-center">
                   <Film size={80} className="text-white/10" />
@@ -154,21 +163,39 @@ export function DownloadDetailModal({
             </div>
 
             <h1 className="text-2xl font-bold text-white mb-4 line-clamp-2 leading-tight">
-              {torrent.name}
+              {activeTorrent.name}
             </h1>
+            {modalTorrents.length > 1 && (
+              <div className="mb-4">
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2">
+                  Épisode / Fichier ({modalTorrents.length})
+                </label>
+                <select
+                  value={activeInfoHash}
+                  onChange={(e) => setActiveInfoHash((e.target as HTMLSelectElement).value)}
+                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[var(--ds-accent-violet)]"
+                >
+                  {modalTorrents.map((item) => (
+                    <option key={item.info_hash} value={item.info_hash} className="bg-black">
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             <div className="space-y-6">
               <TorrentProgressBar 
-                progress={torrent.progress} 
-                downloadedBytes={torrent.downloaded_bytes} 
-                totalBytes={torrent.total_bytes} 
+                progress={activeTorrent.progress} 
+                downloadedBytes={activeTorrent.downloaded_bytes} 
+                totalBytes={activeTorrent.total_bytes} 
                 statusLabel="Progression"
-                progressColor={torrent.state === 'downloading' ? 'blue' : 'green'}
+                progressColor={activeTorrent.state === 'downloading' ? 'blue' : 'green'}
               />
               
               <div className="flex items-center justify-between text-sm">
                 <span className="text-white/40 uppercase tracking-widest font-bold">Taille Totale</span>
-                <span className="text-white font-mono">{formatBytes(torrent.total_bytes)}</span>
+                <span className="text-white font-mono">{formatBytes(activeTorrent.total_bytes)}</span>
               </div>
             </div>
           </div>
@@ -190,15 +217,15 @@ export function DownloadDetailModal({
                   label="Lire"
                   data-focusable
                   data-autofocus
-                  onClick={() => (window.location.href = `/torrents?infoHash=${torrent.info_hash}`)}
+                  onClick={() => (window.location.href = `/torrents?infoHash=${activeTorrent.info_hash}`)}
                 />
-                {torrent.state === 'paused' ? (
-                  <ActionTile icon={Play} label="Reprendre" onClick={() => onResume(torrent.info_hash)} className="bg-emerald-500/10 border-emerald-500/20" />
+                {activeTorrent.state === 'paused' ? (
+                  <ActionTile icon={Play} label="Reprendre" onClick={() => onResume(activeTorrent.info_hash)} className="bg-emerald-500/10 border-emerald-500/20" />
                 ) : (
-                  <ActionTile icon={Pause} label="Pause" onClick={() => onPause(torrent.info_hash)} />
+                  <ActionTile icon={Pause} label="Pause" onClick={() => onPause(activeTorrent.info_hash)} />
                 )}
-                <ActionTile icon={LogsIcon || Info} label="Logs" onClick={() => onShowLogs(torrent.info_hash)} />
-                <ActionTile icon={Trash2} label="Supprimer" onClick={() => onRemove(torrent.info_hash, false)} danger />
+                <ActionTile icon={LogsIcon || Info} label="Logs" onClick={() => onShowLogs(activeTorrent.info_hash)} />
+                <ActionTile icon={Trash2} label="Supprimer" onClick={() => onRemove(activeTorrent.info_hash, false)} danger />
               </div>
             </div>
 
@@ -224,8 +251,8 @@ export function DownloadDetailModal({
                     <div className="space-y-2">
                        <label className="text-[10px] font-bold uppercase tracking-widest text-white/30">Lien du Torrent (Info Hash)</label>
                        <div className="flex items-center gap-3 bg-black/40 p-3 rounded-xl border border-white/5">
-                         <span className="font-mono text-sm text-white/50 truncate flex-1">{torrent.info_hash}</span>
-                         <button onClick={() => navigator.clipboard.writeText(torrent.info_hash)} className="p-2 hover:bg-white/5 rounded-lg text-white/40 transition-colors" data-focusable><Copy size={16}/></button>
+                         <span className="font-mono text-sm text-white/50 truncate flex-1">{activeTorrent.info_hash}</span>
+                         <button onClick={() => navigator.clipboard.writeText(activeTorrent.info_hash)} className="p-2 hover:bg-white/5 rounded-lg text-white/40 transition-colors" data-focusable><Copy size={16}/></button>
                        </div>
                     </div>
 

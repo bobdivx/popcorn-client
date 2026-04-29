@@ -7,6 +7,7 @@ import { PageHeader } from '../page-model/PageHeader';
 import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
 import { useInfiniteFilms } from './hooks/useInfiniteFilms';
 import { useResumeWatching } from './hooks/useResumeWatching';
+import { useContentSignals } from './hooks/useContentSignals';
 
 const SECTION_LIMIT = 25;
 const MAX_GENRES = 12;
@@ -18,6 +19,7 @@ export default function FilmsDashboard() {
   const { films, loading, error } = useInfiniteFilms();
   const { resumeWatching } = useResumeWatching();
   const [view, setView] = useState<LibraryViewMode>('torrents');
+  const { withSignals: filmsWithSignals } = useContentSignals(films, resumeWatching);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -33,8 +35,8 @@ export default function FilmsDashboard() {
   };
 
   const heroItems = useMemo(
-    () => films.slice(0, 5).filter((item) => item.poster || item.backdrop),
-    [films]
+    () => filmsWithSignals.slice(0, 5).filter((item) => item.poster || item.backdrop),
+    [filmsWithSignals]
   );
 
   const handleNavigate = (item: ContentItem) => {
@@ -42,16 +44,16 @@ export default function FilmsDashboard() {
   };
 
   const sections = useMemo(() => {
-    const newest = films.slice(0, SECTION_LIMIT);
+    const newest = filmsWithSignals.slice(0, SECTION_LIMIT);
 
-    const popular = [...films]
+    const popular = [...filmsWithSignals]
       .sort((a, b) => (b.seeds ?? 0) - (a.seeds ?? 0))
       .slice(0, SECTION_LIMIT);
 
     const resumeMovies = resumeWatching.filter((item) => item.type === 'movie');
 
     const genreMap = new Map<string, ContentItem[]>();
-    for (const film of films) {
+    for (const film of filmsWithSignals) {
       if (!Array.isArray(film.genres)) continue;
       for (const genre of film.genres) {
         if (!genre) continue;
@@ -70,12 +72,13 @@ export default function FilmsDashboard() {
       }));
 
     return [
+      // Reprendre la lecture en tête : visibilité immédiate des films à terminer.
+      { id: 'resume-films', title: t('dashboard.resumeWatching'), items: resumeMovies, kind: 'resume' as const },
       { id: 'recent-films', title: t('dashboard.newReleasesMovies'), items: newest },
       { id: 'popular-films', title: t('dashboard.popularMovies'), items: popular },
-      { id: 'resume-films', title: t('dashboard.resumeWatching'), items: resumeMovies },
       ...genreSections,
     ];
-  }, [films, resumeWatching, t]);
+  }, [filmsWithSignals, resumeWatching, t]);
 
   const toggle = (
     <LibraryViewToggle mode={view} onChange={handleChangeView} contentType="movies" />

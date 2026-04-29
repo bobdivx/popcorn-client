@@ -949,6 +949,9 @@
   },
   "dashboard": {
     "resumeWatching": "Reprendre la lecture",
+    "waitingForNext": "En attente du prochain épisode",
+    "newEpisodeBadge": "Nouveau",
+    "nextEpisodeBadge": "Prochain : {date}",
     "popularMovies": "Films populaires",
     "popularSeries": "Séries populaires",
     "syncedSubtitle": "Les contenus affichés viennent uniquement de vos torrents synchronisés.",
@@ -983,7 +986,11 @@
     "newReleasesSeriesSubtitle": "Nouveaux épisodes et saisons",
     "mostSharedMoviesSubtitle": "Torrents avec le plus de seeders",
     "mostSharedSeriesSubtitle": "Séries les plus partagées",
-    "syncAppearing": "Les contenus apparaîtront au fur et à mesure de la synchronisation."
+    "syncAppearing": "Les contenus apparaîtront au fur et à mesure de la synchronisation.",
+    "heroNewEpisode": "Nouvel épisode",
+    "heroRequestDownloaded": "Demande téléchargée",
+    "heroDownloadedUnseen": "À regarder",
+    "watchNowHighlights": "Nouveautés à regarder"
   },
   "search": {
     "title": "Rechercher",

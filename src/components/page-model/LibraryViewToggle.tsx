@@ -20,6 +20,7 @@ export function LibraryViewToggle({ mode, onChange, contentType }: LibraryViewTo
     <div
       role="tablist"
       aria-label={libraryLabel}
+      data-tv-page-action
       className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/[0.04] p-1 backdrop-blur"
     >
       <button

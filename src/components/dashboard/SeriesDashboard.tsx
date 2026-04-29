@@ -7,6 +7,7 @@ import { PageHeader } from '../page-model/PageHeader';
 import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
 import { useInfiniteSeries } from './hooks/useInfiniteSeries';
 import { useResumeWatching } from './hooks/useResumeWatching';
+import { useContentSignals } from './hooks/useContentSignals';
 
 const SECTION_LIMIT = 25;
 const MAX_GENRES = 12;
@@ -16,8 +17,9 @@ const VIEW_STORAGE_KEY = 'popcorn:series-view';
 export default function SeriesDashboard() {
   const { t } = useI18n();
   const { series, loading, error } = useInfiniteSeries();
-  const { resumeWatching } = useResumeWatching();
+  const { resumeWatching, waitingForNext } = useResumeWatching();
   const [view, setView] = useState<LibraryViewMode>('torrents');
+  const { withSignals: seriesWithSignals } = useContentSignals(series, resumeWatching);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -33,8 +35,8 @@ export default function SeriesDashboard() {
   };
 
   const heroItems = useMemo(
-    () => series.slice(0, 5).filter((item) => item.poster || item.backdrop),
-    [series]
+    () => seriesWithSignals.slice(0, 5).filter((item) => item.poster || item.backdrop),
+    [seriesWithSignals]
   );
 
   const handleNavigate = (item: ContentItem) => {
@@ -42,16 +44,17 @@ export default function SeriesDashboard() {
   };
 
   const sections = useMemo(() => {
-    const newest = series.slice(0, SECTION_LIMIT);
+    const newest = seriesWithSignals.slice(0, SECTION_LIMIT);
 
-    const popular = [...series]
+    const popular = [...seriesWithSignals]
       .sort((a, b) => (b.seeds ?? 0) - (a.seeds ?? 0))
       .slice(0, SECTION_LIMIT);
 
     const resumeSeries = resumeWatching.filter((item) => item.type === 'tv');
+    const waitingSeries = waitingForNext.filter((item) => item.type === 'tv');
 
     const genreMap = new Map<string, ContentItem[]>();
-    for (const tv of series) {
+    for (const tv of seriesWithSignals) {
       if (!Array.isArray(tv.genres)) continue;
       for (const genre of tv.genres) {
         if (!genre) continue;
@@ -70,12 +73,26 @@ export default function SeriesDashboard() {
       }));
 
     return [
+      // Reprendre la lecture en tête : visibilité immédiate des séries à reprendre + badges
+      // « Nouveau » / « Prochain : <date> » TMDB pour le suivi multi-épisodes.
+      { id: 'resume-series', title: t('dashboard.resumeWatching'), items: resumeSeries, kind: 'resume' as const },
+      // « En attente » : séries à jour pour lesquelles un nouvel épisode est annoncé mais pas
+      // encore diffusé. Triées par date de diffusion (plus proche d'abord).
+      {
+        id: 'waiting-series',
+        title: t('dashboard.waitingForNext'),
+        items: [...waitingSeries].sort((a, b) => {
+          const da = a.nextEpisodeAirDate ?? '';
+          const db = b.nextEpisodeAirDate ?? '';
+          return da.localeCompare(db);
+        }),
+        kind: 'resume' as const,
+      },
       { id: 'recent-series', title: t('dashboard.newReleasesSeries'), items: newest },
       { id: 'popular-series', title: t('dashboard.popularSeries'), items: popular },
-      { id: 'resume-series', title: t('dashboard.resumeWatching'), items: resumeSeries },
       ...genreSections,
     ];
-  }, [series, resumeWatching, t]);
+  }, [seriesWithSignals, resumeWatching, waitingForNext, t]);
 
   const toggle = (
     <LibraryViewToggle mode={view} onChange={handleChangeView} contentType="series" />
