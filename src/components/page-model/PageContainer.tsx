@@ -20,7 +20,7 @@ export function PageContainer({
   children,
 }: PageContainerProps) {
   return (
-    <div className="min-h-screen bg-black text-white" data-page={pageId}>
+    <div className="min-h-screen bg-black text-white relative" data-page={pageId}>
       {heroItems.length > 0 && onHeroPlay ? (
         <HeroSection
           items={heroItems}
