@@ -1,0 +1,72 @@
+name: Auto-merge dev to main (after Docker success)
+
+on:
+  workflow_run:
+    workflows:
+      - Build and Publish Frontend Docker Image
+    types:
+      - completed
+    branches:
+      - dev
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: auto-merge-dev-to-main-client
+  cancel-in-progress: true
+
+jobs:
+  open-and-auto-merge-pr:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create or update PR dev -> main/master
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin
+
+          if git show-ref --verify --quiet refs/remotes/origin/main; then
+            TARGET_BRANCH="main"
+          elif git show-ref --verify --quiet refs/remotes/origin/master; then
+            TARGET_BRANCH="master"
+          else
+            echo "Neither main nor master exists on origin."
+            exit 1
+          fi
+
+          if [ "$(git rev-parse "origin/dev")" = "$(git rev-parse "origin/${TARGET_BRANCH}")" ]; then
+            echo "dev and ${TARGET_BRANCH} are already in sync."
+            exit 0
+          fi
+
+          PR_NUMBER="$(gh pr list --base "${TARGET_BRANCH}" --head "dev" --state open --json number --jq '.[0].number')"
+          if [ -z "${PR_NUMBER}" ]; then
+            gh pr create \
+              --base "${TARGET_BRANCH}" \
+              --head "dev" \
+              --title "chore: merge dev into ${TARGET_BRANCH}" \
+              --body "Auto-generated after successful Docker workflow on dev."
+            PR_NUMBER="$(gh pr list --base "${TARGET_BRANCH}" --head "dev" --state open --json number --jq '.[0].number')"
+          fi
+
+          if [ -z "${PR_NUMBER}" ]; then
+            echo "Unable to find or create pull request."
+            exit 1
+          fi
+
+          if gh pr merge "${PR_NUMBER}" --auto --merge; then
+            echo "Auto-merge enabled for PR #${PR_NUMBER}."
+          else
+            echo "Could not enable auto-merge for PR #${PR_NUMBER}."
+            exit 1
+          fi
