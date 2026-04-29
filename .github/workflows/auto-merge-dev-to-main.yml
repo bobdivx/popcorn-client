@@ -61,7 +61,7 @@ jobs:
             set -e
 
             if [ "${CREATE_EXIT_CODE}" -ne 0 ]; then
-              if echo "${CREATE_OUTPUT}" | rg -q "not permitted to create or approve pull requests|createPullRequest"; then
+              if echo "${CREATE_OUTPUT}" | grep -Eq "not permitted to create or approve pull requests|createPullRequest"; then
                 echo "::warning::GitHub Actions token is not allowed to create PRs. Skipping auto-merge workflow."
                 exit 0
               fi
