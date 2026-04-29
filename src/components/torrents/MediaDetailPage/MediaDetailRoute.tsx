@@ -209,8 +209,35 @@ async function resolveSeriesEpisodesPayload(
     try {
       const sr = await serverApi.searchTmdb({ q: hint, type: 'tv', language: TMDB_SYNTH_LANG });
       if (cancelled) return null;
-      const first = Array.isArray(sr.data) ? sr.data[0] : null;
-      const sid = first?.tmdbId;
+      const normalize = (v: string) =>
+        v
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/gi, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      const qn = normalize(hint);
+      const qWords = qn.split(' ').filter((w) => w.length >= 3);
+      const score = (title: string) => {
+        const tn = normalize(title);
+        if (!tn) return 0;
+        const tWords = new Set(tn.split(' ').filter((w) => w.length >= 3));
+        if (qWords.length === 0) return tn === qn ? 1 : 0;
+        let matched = 0;
+        for (const w of qWords) {
+          if (tWords.has(w)) matched += 1;
+        }
+        const base = matched / qWords.length;
+        // Bonus si la requête est incluse textuellement dans le titre.
+        return tn.includes(qn) ? Math.min(1, base + 0.25) : base;
+      };
+      const candidates = Array.isArray(sr.data) ? sr.data : [];
+      const best = candidates
+        .map((it) => ({
+          item: it,
+          s: score(String((it as any)?.title || (it as any)?.name || (it as any)?.tmdbTitle || '')),
+        }))
+        .sort((a, b) => b.s - a.s)[0];
+      const sid = best && best.s >= 0.55 ? best.item?.tmdbId : null;
       if (typeof sid === 'number' && !Number.isNaN(sid)) {
         const r2 = await serverApi.getSeriesEpisodesByTmdbId(sid);
         if (cancelled) return null;

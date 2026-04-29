@@ -4,6 +4,7 @@ import { Film, Users, Sprout, CheckCircle2 } from 'lucide-preact';
 import type { ContentItem } from '../../../lib/client/types';
 import { FocusableCard } from '../../ui/FocusableCard';
 import { useTorrentProgress } from '../hooks/useTorrentProgress';
+import { useI18n } from '../../../lib/i18n/useI18n';
 
 interface TorrentPosterProps {
   item: ContentItem;
@@ -12,6 +13,7 @@ interface TorrentPosterProps {
 const IS_WEBOS = String((import.meta as any)?.env?.WEBOS ?? 'false') === 'true';
 
 function TorrentPosterComponent({ item }: TorrentPosterProps) {
+  const { t } = useI18n();
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(item.poster || null);
@@ -57,6 +59,8 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
     return 'bg-red-500'; // Lent - Rouge
   };
 
+  const signal = item.heroSignal;
+
   return (
     <div
       data-torrent-card
@@ -70,10 +74,12 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
         href={playHref}
         tabIndex={0}
         ariaLabel={item.title}
-        onFocus={(e) => {
+        onFocus={() => {
           setIsFocused(true);
           setIsHovered(true);
-          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'center' });
+          // NB : on ne déclenche plus de scrollIntoView ici. Le TVNavigationProvider gère
+          // déjà le défilement via scrollCarouselToElement (ancrage 18%) ; combiner les deux
+          // produisait un effet de « glissé » de toutes les cartes sur la TV (double scroll).
         }}
         onBlur={() => {
           setIsFocused(false);
@@ -121,14 +127,29 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
           </div>
         ) : null}
 
-        {/* Icône de complétion en haut à droite */}
-        {isCompleted && (
-          <div className="absolute top-1 right-1 lg:top-2 lg:right-2 tv:top-3 tv:right-3 z-10">
+        {/* Badges signal + icône de complétion en haut à droite */}
+        <div className="absolute top-1 right-1 lg:top-2 lg:right-2 tv:top-3 tv:right-3 z-10 flex flex-col items-end gap-1.5">
+          {signal?.downloadedUnseen ? (
+            <span className="px-2 py-0.5 rounded-full bg-amber-500/25 border border-amber-300/40 text-[10px] lg:text-xs font-semibold uppercase tracking-wide text-white shadow-sm">
+              {t('dashboard.heroDownloadedUnseen')}
+            </span>
+          ) : null}
+          {signal?.requestDownloaded ? (
+            <span className="px-2 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-300/40 text-[10px] lg:text-xs font-semibold uppercase tracking-wide text-white shadow-sm">
+              {t('dashboard.heroRequestDownloaded')}
+            </span>
+          ) : null}
+          {signal?.newEpisode ? (
+            <span className="px-2 py-0.5 rounded-full bg-violet-500/30 border border-violet-300/50 text-[10px] lg:text-xs font-semibold uppercase tracking-wide text-white shadow-sm">
+              {t('dashboard.heroNewEpisode')}
+            </span>
+          ) : null}
+          {isCompleted && (
             <div className="w-6 h-6 lg:w-8 lg:h-8 tv:w-12 tv:h-12 bg-green-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white/30">
               <CheckCircle2 className="w-4 h-4 lg:w-5 lg:h-5 tv:w-8 tv:h-8 text-white" size={20} />
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Badge de disponibilité + Stats temps réel (Seeds/Peers) - discret en bas de la tuile */}
         {(item.seeds !== undefined || item.peers !== undefined) && (

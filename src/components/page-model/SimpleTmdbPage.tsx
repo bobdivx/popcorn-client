@@ -5,11 +5,15 @@ import { CarouselSection } from './CarouselSection';
 import { PageContainer } from './PageContainer';
 import { PageHeader } from './PageHeader';
 import { PosterCard } from './PosterCard';
+import { LazyResumePoster } from '../dashboard/components/LazyResumePoster';
+import type { EnrichedResumeItem } from '../dashboard/hooks/useResumeWatching';
 
 interface SimpleTmdbSection {
   id: string;
   title: string;
   items: ContentItem[];
+  /** Type d'affichage : 'resume' utilise ResumePoster (barre de progression + badges TMDB). */
+  kind?: 'standard' | 'resume';
 }
 
 interface SimpleTmdbPageProps {
@@ -74,9 +78,18 @@ export function SimpleTmdbPage({
           sections.map((section) =>
             section.items.length > 0 ? (
               <CarouselSection key={section.id} title={section.title}>
-                {section.items.map((item) => (
-                  <PosterCard key={item.id} item={item} onNavigate={onNavigate} />
-                ))}
+                {section.kind === 'resume'
+                  ? section.items.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]"
+                      >
+                        <LazyResumePoster item={item as EnrichedResumeItem} />
+                      </div>
+                    ))
+                  : section.items.map((item) => (
+                      <PosterCard key={item.id} item={item} onNavigate={onNavigate} />
+                    ))}
               </CarouselSection>
             ) : null
           )

@@ -48,6 +48,31 @@ function filterLogs(logs: TorrentLogEntry[]): TorrentLogEntry[] {
   return [...logs].sort((a, b) => b.timestamp - a.timestamp).slice(0, 500);
 }
 
+function normalizeSeriesTitle(title: string): string {
+  return title
+    .replace(/\./g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b\d{4}\b/g, '')
+    .replace(/\[.*?\]/g, '')
+    .replace(/\(.*?\)/g, '')
+    .replace(/\b(?:x264|x265|HEVC|HDR|DTS|AC3|BluRay|WEB-DL|REMUX|4K|1080p|720p|480p|BDRip|WEBRip|DVDRip|FRENCH|VOSTFR|VF)\b/gi, '')
+    .replace(/S\d{1,2}E\d{1,3}/gi, '')
+    .replace(/\bSaison\s+\d+\b/gi, '')
+    .replace(/\bSeason\s+\d+\b/gi, '')
+    .replace(/\bEpisode\s+\d+\b/gi, '')
+    .trim()
+    .toLowerCase();
+}
+
+function getTorrentPriority(torrent: ClientTorrentStats): number {
+  if (torrent.state === 'downloading') return 5;
+  if (torrent.state === 'seeding') return 4;
+  if (torrent.state === 'queued') return 3;
+  if (torrent.state === 'paused') return 2;
+  if (torrent.state === 'completed') return 1;
+  return 0;
+}
+
 export default function DownloadsList() {
   const { t } = useI18n();
   const [torrents, setTorrents] = useState<ClientTorrentStats[]>([]);
@@ -67,6 +92,7 @@ export default function DownloadsList() {
   const [tmdbTypeMap, setTmdbTypeMap] = useState<Record<string, any>>({});
 
   const [selectedTorrent, setSelectedTorrent] = useState<ClientTorrentStats | null>(null);
+  const [selectedRelatedTorrents, setSelectedRelatedTorrents] = useState<ClientTorrentStats[]>([]);
   const [selectedTorrentPoster, setSelectedTorrentPoster] = useState<string | null>(null);
   const [selectedTorrentBackdrop, setSelectedTorrentBackdrop] = useState<string | null>(null);
 
@@ -143,13 +169,58 @@ export default function DownloadsList() {
 
   const moviesTorrents = useMemo(() => torrents.filter(t => tmdbTypeMap[t.info_hash.toLowerCase()] === 'movie'), [torrents, tmdbTypeMap]);
   const seriesTorrents = useMemo(() => torrents.filter(t => tmdbTypeMap[t.info_hash.toLowerCase()] === 'tv'), [torrents, tmdbTypeMap]);
+  const groupedSeriesData = useMemo(() => {
+    const groups = new Map<string, { representative: ClientTorrentStats; index: number; torrents: ClientTorrentStats[] }>();
+    seriesTorrents.forEach((torrent, index) => {
+      const key = torrent.info_hash.toLowerCase();
+      const displayTitle = (displayTitleMap[key] || torrent.tmdb_title || torrent.name || '').trim();
+      const normalizedTitle = normalizeSeriesTitle(displayTitle);
+      const groupKey = normalizedTitle || key;
+      const current = groups.get(groupKey);
+      if (!current) {
+        groups.set(groupKey, { representative: torrent, index, torrents: [torrent] });
+        return;
+      }
+
+      current.torrents.push(torrent);
+
+      const currentPriority = getTorrentPriority(current.representative);
+      const candidatePriority = getTorrentPriority(torrent);
+      const shouldReplace =
+        candidatePriority > currentPriority ||
+        (candidatePriority === currentPriority && torrent.progress > current.representative.progress);
+
+      if (shouldReplace) {
+        current.representative = torrent;
+      }
+    });
+
+    const orderedGroups = Array.from(groups.values()).sort((a, b) => a.index - b.index);
+    const groupedSeriesTorrents = orderedGroups.map(group => group.representative);
+    const representativeToGroupMap: Record<string, ClientTorrentStats[]> = {};
+    orderedGroups.forEach((group) => {
+      representativeToGroupMap[group.representative.info_hash] = [...group.torrents];
+    });
+    return { groupedSeriesTorrents, representativeToGroupMap };
+  }, [seriesTorrents, displayTitleMap]);
+  const groupedSeriesTorrents = groupedSeriesData.groupedSeriesTorrents;
+  const representativeToGroupMap = groupedSeriesData.representativeToGroupMap;
   const otherTorrents = useMemo(() => torrents.filter(t => {
      const type = tmdbTypeMap[t.info_hash.toLowerCase()];
      return type !== 'movie' && type !== 'tv';
   }), [torrents, tmdbTypeMap]);
 
-  const handleOpenDetail = (tor, p, b) => { setSelectedTorrent(tor); setSelectedTorrentPoster(p); setSelectedTorrentBackdrop(b); };
-  const handleCloseDetail = () => { setSelectedTorrent(null); };
+  const handleOpenDetail = (tor, p, b) => {
+    const group = representativeToGroupMap[tor.info_hash];
+    setSelectedRelatedTorrents(group && group.length > 0 ? group : [tor]);
+    setSelectedTorrent(tor);
+    setSelectedTorrentPoster(p);
+    setSelectedTorrentBackdrop(b);
+  };
+  const handleCloseDetail = () => {
+    setSelectedTorrent(null);
+    setSelectedRelatedTorrents([]);
+  };
 
   const handleShowLogs = async (h) => { 
     setSelectedTorrentHash(h); setShowLogsModal(true); setLogsLoading(true);
@@ -221,7 +292,7 @@ export default function DownloadsList() {
         ) : (
           <div>
             {renderCarousel("Films", moviesTorrents)}
-            {renderCarousel("Séries", seriesTorrents)}
+            {renderCarousel("Séries", groupedSeriesTorrents)}
             {renderCarousel("Autres", otherTorrents)}
           </div>
         )}
@@ -303,6 +374,7 @@ export default function DownloadsList() {
       {selectedTorrent && (
         <DownloadDetailModal 
           torrent={selectedTorrent} 
+          relatedTorrents={selectedRelatedTorrents}
           onClose={handleCloseDetail} 
           onPause={async (h) => { await clientApi.pauseTorrent(h); await loadTorrents(); }} 
           onResume={async (h) => { await clientApi.resumeTorrent(h); await loadTorrents(); }} 
