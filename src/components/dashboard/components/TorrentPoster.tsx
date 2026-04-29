@@ -104,20 +104,22 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
           </div>
         )}
 
-        {/* Badge indexer en haut à gauche (design system) */}
-        <div className="absolute top-1 left-1 lg:top-2 lg:left-2 tv:top-3 tv:left-3 z-10 max-w-[calc(100%-0.5rem)]">
-          <span
-            className="inline-flex items-center px-1.5 py-0.5 lg:px-2 lg:py-1 tv:px-2.5 tv:py-1 rounded-[var(--ds-radius-sm)] text-[10px] lg:text-xs tv:text-sm font-semibold truncate border transition-all duration-200 shadow-sm"
-            style={{
-              backgroundColor: 'var(--ds-accent-violet-muted)',
-              color: 'var(--ds-accent-violet)',
-              borderColor: 'var(--ds-accent-violet)',
-            }}
-            title={item.indexerName || undefined}
-          >
-            {item.indexerName && item.indexerName.trim() ? item.indexerName.trim() : 'Popcorn'}
-          </span>
-        </div>
+        {/* Badge indexer en haut à gauche (design system) — masqué si l'indexer est inconnu */}
+        {item.indexerName && item.indexerName.trim() ? (
+          <div className="absolute top-1 left-1 lg:top-2 lg:left-2 tv:top-3 tv:left-3 z-10 max-w-[calc(100%-0.5rem)]">
+            <span
+              className="inline-flex items-center px-1.5 py-0.5 lg:px-2 lg:py-1 tv:px-2.5 tv:py-1 rounded-[var(--ds-radius-sm)] text-[10px] lg:text-xs tv:text-sm font-semibold truncate border transition-all duration-200 shadow-sm"
+              style={{
+                backgroundColor: 'var(--ds-accent-violet-muted)',
+                color: 'var(--ds-accent-violet)',
+                borderColor: 'var(--ds-accent-violet)',
+              }}
+              title={item.indexerName.trim()}
+            >
+              {item.indexerName.trim()}
+            </span>
+          </div>
+        ) : null}
 
         {/* Icône de complétion en haut à droite */}
         {isCompleted && (

@@ -126,6 +126,50 @@ const isWebOS = import.meta.env.WEBOS === 'true';
       })();
     </script>
     <script is:inline>
+      // Mesure la largeur reelle de la scrollbar verticale du viewport et l'expose comme
+      // variable CSS --scrollbar-width-real. Vaut 0 si le viewport n'a pas de scrollbar
+      // visible (overlay scrollbars OU contenu plus court que la fenetre).
+      // Permet de centrer le body (zoome a 0.8) symetriquement dans la zone visible.
+      (function() {
+        var osScrollbarWidth = null;
+        function getOsScrollbarWidth() {
+          if (osScrollbarWidth !== null) return osScrollbarWidth;
+          var probe = document.createElement('div');
+          probe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:100px;height:100px;overflow:scroll;visibility:hidden;';
+          document.documentElement.appendChild(probe);
+          osScrollbarWidth = probe.offsetWidth - probe.clientWidth;
+          document.documentElement.removeChild(probe);
+          if (!isFinite(osScrollbarWidth) || osScrollbarWidth < 0) osScrollbarWidth = 0;
+          return osScrollbarWidth;
+        }
+        function update() {
+          // Largeur reelle = innerWidth - clientWidth de l'element scrollant (html ou body).
+          // Methode robuste : prendre le max entre la mesure reelle et la mesure OS si un
+          // scroll vertical est present.
+          var docEl = document.documentElement;
+          var win = window.innerWidth || docEl.clientWidth;
+          var measured = win - docEl.clientWidth;
+          var sw = measured > 0 ? measured : 0;
+          // Si la page peut scroller verticalement et qu'on n'a rien mesure, prendre la valeur OS.
+          if (sw === 0 && docEl.scrollHeight > docEl.clientHeight) {
+            sw = getOsScrollbarWidth();
+          }
+          docEl.style.setProperty('--scrollbar-width-real', sw + 'px');
+        }
+        update();
+        window.addEventListener('resize', update, { passive: true });
+        // Re-mesurer apres le rendu initial des composants Preact (qui peuvent grandir la page).
+        if ('ResizeObserver' in window) {
+          var ro = new ResizeObserver(update);
+          ro.observe(document.documentElement);
+        }
+        // Filet de securite : reverifier apres quelques tics de rendu.
+        setTimeout(update, 100);
+        setTimeout(update, 500);
+        setTimeout(update, 1500);
+      })();
+    </script>
+    <script is:inline>
       // Placeholder: les handlers seront enregistres apres que le DOM du fallback existe
       window._popcornShowError = function(msg) {
         var fallback = document.getElementById('popcorn-loading-fallback');

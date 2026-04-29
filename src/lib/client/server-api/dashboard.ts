@@ -20,6 +20,26 @@ function toTmdbLanguage(lang?: string): string {
   return lang === 'fr' ? 'fr-FR' : lang === 'en' ? 'en-US' : `${lang}-${lang.toUpperCase()}`;
 }
 
+/**
+ * Extrait le nom d'indexer d'une entrée brute en supportant les variantes camelCase / snake_case
+ * et les fallbacks (uploader, tracker). Retourne `undefined` si rien de probant n'est trouvé,
+ * pour que l'UI puisse masquer le badge plutôt que d'afficher un libellé générique.
+ */
+function pickIndexerName(raw: any): string | undefined {
+  const candidates = [
+    raw?.indexerName,
+    raw?.indexer_name,
+    raw?.indexer?.name,
+    raw?.uploader,
+    raw?.trackerName,
+    raw?.tracker_name,
+  ];
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim()) return c.trim();
+  }
+  return undefined;
+}
+
 function detectCompletePackFromRaw(raw: any): boolean {
   const candidates = [
     raw?.name,
@@ -72,7 +92,7 @@ function toContentItem(raw: any): ContentItem {
   const genres = Array.isArray(raw?.genres) ? raw.genres : undefined;
   const seeds = raw?.seedCount ?? raw?.seed_count;
   const peers = raw?.leechCount ?? raw?.leech_count;
-  const indexerName = raw?.indexerName ?? raw?.indexer_name ?? raw?.uploader;
+  const indexerName = pickIndexerName(raw);
 
   const codecRaw = (raw?.codec || raw?.quality?.codec || '').toString().toLowerCase();
   const codec: ContentItem['codec'] =
@@ -110,7 +130,7 @@ function toContentItem(raw: any): ContentItem {
     tmdbId: typeof raw?.tmdbId === 'number' ? raw.tmdbId : (typeof raw?.tmdb_id === 'number' ? raw.tmdb_id : null),
     seeds: typeof seeds === 'number' ? seeds : undefined,
     peers: typeof peers === 'number' ? peers : undefined,
-    indexerName: typeof indexerName === 'string' && indexerName.trim() ? indexerName.trim() : undefined,
+    indexerName,
     codec,
     quality,
     fileSize: typeof fileSize === 'number' ? fileSize : undefined,
@@ -423,6 +443,7 @@ export const dashboardMethods = {
           seeds: typeof raw?.seedCount === 'number' ? raw.seedCount : raw?.seed_count,
           peers: typeof raw?.leechCount === 'number' ? raw.leechCount : raw?.leech_count,
           fileSize: typeof raw?.fileSize === 'number' ? raw.fileSize : raw?.file_size,
+          indexerName: pickIndexerName(raw),
         } satisfies FilmData;
       })
       .filter(Boolean) as FilmData[];
@@ -509,6 +530,7 @@ export const dashboardMethods = {
           peers: typeof raw?.leechCount === 'number' ? raw.leechCount : raw?.leech_count,
           fileSize: typeof raw?.fileSize === 'number' ? raw.fileSize : raw?.file_size,
           isCompletePack: detectCompletePackFromRaw(raw),
+          indexerName: pickIndexerName(raw),
         } satisfies SeriesData;
       })
       .filter(Boolean) as SeriesData[];
@@ -571,6 +593,7 @@ export const dashboardMethods = {
           seeds: typeof raw?.seedCount === 'number' ? raw.seedCount : raw?.seed_count,
           peers: typeof raw?.leechCount === 'number' ? raw.leechCount : raw?.leech_count,
           fileSize: typeof raw?.fileSize === 'number' ? raw.fileSize : raw?.file_size,
+          indexerName: pickIndexerName(raw),
         } satisfies FilmData;
       })
       .filter(Boolean) as FilmData[];
@@ -648,6 +671,7 @@ export const dashboardMethods = {
           seeds: typeof raw?.seedCount === 'number' ? raw.seedCount : raw?.seed_count,
           peers: typeof raw?.leechCount === 'number' ? raw.leechCount : raw?.leech_count,
           fileSize: typeof raw?.fileSize === 'number' ? raw.fileSize : raw?.file_size,
+          indexerName: pickIndexerName(raw),
         } satisfies SeriesData;
       })
       .filter(Boolean) as SeriesData[];
