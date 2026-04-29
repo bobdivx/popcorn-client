@@ -1,3 +1,4 @@
+import type { ComponentChildren } from 'preact';
 import type { ContentItem } from '../../lib/client/types';
 import TorrentCardsShadowLoader from '../ui/TorrentCardsShadowLoader';
 import { CarouselSection } from './CarouselSection';
@@ -14,7 +15,7 @@ interface SimpleTmdbSection {
 interface SimpleTmdbPageProps {
   pageId: string;
   title: string;
-  subtitle: string;
+  subtitle?: string;
   heroItems: ContentItem[];
   sections: SimpleTmdbSection[];
   loading: boolean;
@@ -22,6 +23,8 @@ interface SimpleTmdbPageProps {
   onNavigate: (item: ContentItem) => void;
   emptyTitle?: string;
   emptyDescription?: string;
+  /** Bloc optionnel rendu à droite du titre (ex. bouton bascule Bibliothèque). */
+  headerAction?: ComponentChildren;
 }
 
 export function SimpleTmdbPage({
@@ -35,24 +38,37 @@ export function SimpleTmdbPage({
   onNavigate,
   emptyTitle,
   emptyDescription,
+  headerAction,
 }: SimpleTmdbPageProps) {
   if (loading) {
     return (
-      <div className="min-h-[60vh] bg-black pt-4 sm:pt-6">
-        <TorrentCardsShadowLoader rows={3} showHero />
+      <div className="min-h-screen bg-black text-white relative" data-page={pageId}>
+        <PageHeader title={title} subtitle={subtitle} headerAction={headerAction} />
+        <div className="pt-4 sm:pt-6">
+          <TorrentCardsShadowLoader rows={3} showHero />
+        </div>
       </div>
     );
   }
 
   if (error) {
-    return <div className="flex min-h-[40vh] items-center justify-center px-4 text-red-400">{error}</div>;
+    return (
+      <div className="min-h-screen bg-black text-white relative" data-page={pageId}>
+        <PageHeader title={title} subtitle={subtitle} headerAction={headerAction} />
+        <div className="flex min-h-[40vh] items-center justify-center px-4 text-red-400">{error}</div>
+      </div>
+    );
   }
 
   const hasContent = sections.some((section) => section.items.length > 0);
 
   return (
-    <PageContainer pageId={pageId} heroItems={heroItems} onHeroPlay={onNavigate}>
-      <PageHeader title={title} subtitle={subtitle} />
+    <PageContainer
+      pageId={pageId}
+      heroItems={heroItems}
+      onHeroPlay={onNavigate}
+    >
+      <PageHeader title={title} subtitle={subtitle} headerAction={headerAction} />
       <div className="pb-8 tv:pb-12 pt-2 tv:pt-4 overflow-visible animate-[fade-in-up_0.6s_ease-out_forwards] opacity-0">
         {hasContent ? (
           sections.map((section) =>

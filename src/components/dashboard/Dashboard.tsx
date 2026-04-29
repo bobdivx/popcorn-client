@@ -9,13 +9,13 @@ export default function Dashboard() {
   const { data, loading, error } = useDashboardData();
   const popularMovies = data?.popularMovies ?? [];
   const popularSeries = data?.popularSeries ?? [];
-  const recentAdditions = data?.recentAdditions ?? [];
-  const fastTorrents = data?.fastTorrents ?? [];
+  const recentMovies = data?.recentMovies ?? [];
+  const recentSeries = data?.recentSeries ?? [];
 
   const heroItems = useMemo(
     () => {
       const seen = new Set<string>();
-      return [...popularMovies, ...popularSeries, ...recentAdditions]
+      return [...recentMovies, ...recentSeries, ...popularMovies, ...popularSeries]
         .filter((item) => {
           if (seen.has(item.id)) return false;
           seen.add(item.id);
@@ -23,7 +23,7 @@ export default function Dashboard() {
         })
         .slice(0, 5);
     },
-    [popularMovies, popularSeries, recentAdditions]
+    [popularMovies, popularSeries, recentMovies, recentSeries]
   );
 
   const handleNavigate = (item: ContentItem) => {
@@ -32,12 +32,12 @@ export default function Dashboard() {
 
   const sections = useMemo(
     () => [
-      { id: 'recentAdditions', title: t('dashboard.recentAdditions'), items: recentAdditions },
-      { id: 'popularMovies', title: t('dashboard.syncedMovies'), items: popularMovies },
-      { id: 'popularSeries', title: t('dashboard.syncedSeries'), items: popularSeries },
-      { id: 'fastTorrents', title: t('dashboard.fastTorrents'), items: fastTorrents },
+      { id: 'recentMovies', title: t('nav.films'), items: recentMovies },
+      { id: 'popularMovies', title: t('dashboard.popularMovies'), items: popularMovies },
+      { id: 'recentSeries', title: t('nav.series'), items: recentSeries },
+      { id: 'popularSeries', title: t('dashboard.popularSeries'), items: popularSeries },
     ],
-    [fastTorrents, popularMovies, popularSeries, recentAdditions, t]
+    [popularMovies, popularSeries, recentMovies, recentSeries, t]
   );
 
   return (
