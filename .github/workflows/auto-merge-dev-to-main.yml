@@ -51,11 +51,24 @@ jobs:
 
           PR_NUMBER="$(gh pr list --base "${TARGET_BRANCH}" --head "dev" --state open --json number --jq '.[0].number')"
           if [ -z "${PR_NUMBER}" ]; then
-            gh pr create \
+            set +e
+            CREATE_OUTPUT="$(gh pr create \
               --base "${TARGET_BRANCH}" \
               --head "dev" \
               --title "chore: merge dev into ${TARGET_BRANCH}" \
-              --body "Auto-generated after successful Docker workflow on dev."
+              --body "Auto-generated after successful Docker workflow on dev." 2>&1)"
+            CREATE_EXIT_CODE=$?
+            set -e
+
+            if [ "${CREATE_EXIT_CODE}" -ne 0 ]; then
+              if echo "${CREATE_OUTPUT}" | rg -q "not permitted to create or approve pull requests|createPullRequest"; then
+                echo "::warning::GitHub Actions token is not allowed to create PRs. Skipping auto-merge workflow."
+                exit 0
+              fi
+              echo "${CREATE_OUTPUT}"
+              exit "${CREATE_EXIT_CODE}"
+            fi
+
             PR_NUMBER="$(gh pr list --base "${TARGET_BRANCH}" --head "dev" --state open --json number --jq '.[0].number')"
           fi
 
