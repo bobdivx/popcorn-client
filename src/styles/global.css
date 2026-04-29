@@ -106,15 +106,33 @@ html[data-tv-platform] body {
   }
 }
 
+/* --scrollbar-width-real est mesuree par JS au runtime (cf. Layout.astro).
+   Vaut 0 si pas de scrollbar visible, sinon ~17px sur Windows. */
+:root {
+  --scrollbar-width-real: 0px;
+}
+
 @supports (zoom: 1) {
   @media (min-width: 1024px) and (min-height: 500px) {
     body:has(.app-main [data-page="dashboard"]),
     body:has(.app-main [data-page="films"]),
+    body:has(.app-main [data-page="films-library"]),
     body:has(.app-main [data-page="series"]),
+    body:has(.app-main [data-page="series-library"]),
     body:has(.app-main [data-page="demandes"]) {
       zoom: var(--app-visual-scale);
-      width: calc(100% * var(--app-visual-scale-inverse));
+      /* Cible visuelle = viewport - scrollbar (zone visible) - scrollbar (gutter gauche
+         pour symetriser visuellement). Largeur logique = visuelle * 1.25.
+         Si pas de scrollbar (valeur = 0), on revient au comportement plein viewport. */
+      width: calc((100vw - 2 * var(--scrollbar-width-real)) * var(--app-visual-scale-inverse));
+      max-width: calc((100vw - 2 * var(--scrollbar-width-real)) * var(--app-visual-scale-inverse));
+      /* Decaler le body de scrollbar/2 logique a gauche (= scrollbar/2 visuel apres zoom)
+         pour le centrer dans la zone visible : la scrollbar reelle occupe le bord droit,
+         on laisse une marge equivalente a gauche -> hero card visuellement symetrique. */
+      margin-left: calc(var(--scrollbar-width-real) * var(--app-visual-scale-inverse));
+      margin-right: 0;
       min-height: calc(100vh * var(--app-visual-scale-inverse));
+      overflow-x: hidden;
     }
   }
 }
