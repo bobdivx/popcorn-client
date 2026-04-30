@@ -40,3 +40,18 @@ export function generateId(): string {
 export function generateInviteCode(): string {
   return uint8ArrayToHex(getRandomBytes(8)).toUpperCase();
 }
+
+export function randomUUID(): string {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  // Fallback to v4 UUID generation using getRandomBytes
+  const bytes = getRandomBytes(16);
+  // Set version (4) and variant (8, 9, a, or b)
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+  const hex = uint8ArrayToHex(bytes);
+  return `${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}`;
+}
