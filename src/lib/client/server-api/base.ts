@@ -435,6 +435,7 @@ export class ServerApiClientBase {
     if (endpoint.includes('/api/library/uploader/preview')) return 60000;
     if (endpoint.includes('/api/library/uploader/validate-media')) return 120000;
     if (endpoint.includes('/api/library/uploader/generate-screenshots')) return 120000;
+    if (endpoint.includes('/api/admin/deployment/webos/')) return 600000;
     if (endpoint.includes('/health') || endpoint.includes('/api/client/health')) {
       const isAndroid = typeof window !== 'undefined' && /Android/i.test(navigator.userAgent || '');
       return isAndroid ? 10000 : 5000;

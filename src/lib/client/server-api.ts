@@ -92,6 +92,8 @@ export type {
   ConnectionSuccessListener
 } from './server-api/base.js';
 
+export type { WebOSInstallSimpleResponse, WebOSRelaunchResponse } from './server-api/system.js';
+
 class ServerApiClient extends ServerApiClientBase {
   /**
    * Définit l'URL du serveur (client Astro)
@@ -312,6 +314,12 @@ interface IServerApiClientPublic {
   >;
   getServerLogs(params?: { limit?: number }): Promise<ApiResponse<{ lines: string[] }>>;
   restartBackend(): Promise<ApiResponse<{ will_exit: boolean }>>;
+  installWebOSSimple(device?: string): Promise<
+    ApiResponse<import('./server-api/system.js').WebOSInstallSimpleResponse>
+  >;
+  relaunchWebOSApp(device?: string): Promise<
+    ApiResponse<import('./server-api/system.js').WebOSRelaunchResponse>
+  >;
 
   // Dashboard methods
   getDashboardData(): Promise<ApiResponse<DashboardData>>;

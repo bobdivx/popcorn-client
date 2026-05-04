@@ -16,6 +16,22 @@ export interface RestartBackendResponse {
   will_exit: boolean;
 }
 
+/** Réponse backend pour POST /api/admin/deployment/webos/install-simple */
+export interface WebOSInstallSimpleResponse {
+  success: boolean;
+  message: string;
+  ipk_path?: string | null;
+  logs: string;
+  stderr: string;
+}
+
+/** Réponse backend pour POST /api/admin/deployment/webos/relaunch */
+export interface WebOSRelaunchResponse {
+  success: boolean;
+  message: string;
+  logs: string;
+}
+
 export const systemMethods = {
   async resetBackendDatabase(this: ServerApiClientSystemAccess): Promise<ApiResponse<void>> {
     return this.backendRequest<void>('/api/admin/database/reset', { method: 'POST' });
@@ -64,6 +80,32 @@ export const systemMethods = {
       `/api/client/server/logs?limit=${Math.min(1000, limit)}`,
       { method: 'GET' }
     );
+  },
+
+  async installWebOSSimple(
+    this: ServerApiClientSystemAccess,
+    device?: string
+  ): Promise<ApiResponse<WebOSInstallSimpleResponse>> {
+    const body = JSON.stringify({
+      device: device && device.trim() ? device.trim() : undefined,
+    });
+    return this.backendRequest<WebOSInstallSimpleResponse>(
+      '/api/admin/deployment/webos/install-simple',
+      { method: 'POST', body }
+    );
+  },
+
+  async relaunchWebOSApp(
+    this: ServerApiClientSystemAccess,
+    device?: string
+  ): Promise<ApiResponse<WebOSRelaunchResponse>> {
+    const body = JSON.stringify({
+      device: device && device.trim() ? device.trim() : undefined,
+    });
+    return this.backendRequest<WebOSRelaunchResponse>('/api/admin/deployment/webos/relaunch', {
+      method: 'POST',
+      body,
+    });
   },
 };
 
