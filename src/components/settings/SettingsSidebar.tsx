@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   Upload,
   Download,
+  Tv,
 } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { useMemo, useState, useEffect } from 'preact/hooks';
@@ -55,6 +56,14 @@ const NAV_ITEMS: NavItem[] = [
     icon: Wrench,
     permission: 'settings.server',
     pathPrefix: '/settings/maintenance',
+  },
+  {
+    id: 'webos',
+    labelKey: 'settingsMenu.webosDeployment',
+    href: '/settings/webos-deployment/',
+    icon: Tv,
+    permission: 'settings.server',
+    pathPrefix: '/settings/webos-deployment',
   },
   {
     id: 'interface',
