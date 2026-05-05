@@ -3,6 +3,7 @@ export const prerender = false;
 import type { APIRoute } from 'astro';
 import type { Indexer, IndexerFormData } from '../../../../lib/client/types.js';
 import { z } from 'zod';
+import { randomUUID } from '../../../../lib/utils/uuid.js';
 
 function getBackendUrlOverrideFromRequest(request: Request): string | null {
   const raw = request.headers.get('x-popcorn-backend-url') || request.headers.get('X-Popcorn-Backend-Url');
@@ -202,11 +203,7 @@ export const POST: APIRoute = async ({ request }) => {
     // en utilisant le nom de l'indexer (ex: "c411" -> trouve "c411.json")
     
     // Générer un UUID v4
-    const id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = (Math.random() * 16) | 0;
-      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-      return v.toString(16);
-    });
+    const id = randomUUID();
 
     const { getBackendUrlAsync } = await import('../../../../lib/backend-url.js');
     const backendUrl =
