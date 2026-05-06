@@ -9,7 +9,7 @@ import { useContentSignals } from './hooks/useContentSignals';
 export default function Dashboard() {
   const { t } = useI18n();
   const { data, loading, error } = useDashboardData();
-  const { resumeWatching } = useResumeWatching();
+  const { inProgress, seriesInProgress } = useResumeWatching();
   const popularMovies = data?.popularMovies ?? [];
   const popularSeries = data?.popularSeries ?? [];
   const recentMovies = data?.recentMovies ?? [];
@@ -18,6 +18,9 @@ export default function Dashboard() {
     () => [...recentMovies, ...recentSeries, ...popularMovies, ...popularSeries],
     [popularMovies, popularSeries, recentMovies, recentSeries]
   );
+  // On utilise resumeWatching pour les signaux, mais on pourrait utiliser inProgress + seriesInProgress pour être plus large.
+  // Cependant, useContentSignals a besoin de la liste complète pour savoir quoi enrichir.
+  const { resumeWatching } = useResumeWatching();
   const { withSignals: allDashboardItemsWithSignals } = useContentSignals(allDashboardItems, resumeWatching);
 
   const heroItems = useMemo(
@@ -44,17 +47,34 @@ export default function Dashboard() {
         .filter((item) => item.heroSignal?.downloadedUnseen || item.heroSignal?.requestDownloaded)
         .slice(0, 25);
 
-      return [
-        // Reprendre la lecture en 1ère position si l'utilisateur a quelque chose à reprendre.
-        { id: 'resume', title: t('dashboard.resumeWatching'), items: resumeWatching, kind: 'resume' as const },
-        { id: 'watch-now', title: t('dashboard.watchNowHighlights'), items: watchNowItems },
+      const result = [];
+
+      // 1. Téléchargés récemment
+      if (watchNowItems.length > 0) {
+        result.push({ id: 'recently-downloaded', title: t('dashboard.recentlyDownloaded'), items: watchNowItems });
+      }
+
+      // 2. Reprendre la lecture (films ou épisodes en cours)
+      if (inProgress.length > 0) {
+        result.push({ id: 'resume-in-progress', title: t('dashboard.resumeWatching'), items: inProgress, kind: 'resume' as const });
+      }
+
+      // 3. Séries en cours (suivi des épisodes)
+      if (seriesInProgress.length > 0) {
+        result.push({ id: 'ongoing-series', title: t('dashboard.ongoingSeries'), items: seriesInProgress, kind: 'resume' as const });
+      }
+
+      // Reste des sections classiques
+      result.push(
         { id: 'recentMovies', title: t('nav.films'), items: allDashboardItemsWithSignals.filter((i) => recentMovies.some((r) => r.id === i.id)) },
         { id: 'popularMovies', title: t('dashboard.popularMovies'), items: allDashboardItemsWithSignals.filter((i) => popularMovies.some((r) => r.id === i.id)) },
         { id: 'recentSeries', title: t('nav.series'), items: allDashboardItemsWithSignals.filter((i) => recentSeries.some((r) => r.id === i.id)) },
-        { id: 'popularSeries', title: t('dashboard.popularSeries'), items: allDashboardItemsWithSignals.filter((i) => popularSeries.some((r) => r.id === i.id)) },
-      ];
+        { id: 'popularSeries', title: t('dashboard.popularSeries'), items: allDashboardItemsWithSignals.filter((i) => popularSeries.some((r) => r.id === i.id)) }
+      );
+
+      return result;
     },
-    [allDashboardItemsWithSignals, popularMovies, popularSeries, recentMovies, recentSeries, resumeWatching, t]
+    [allDashboardItemsWithSignals, popularMovies, popularSeries, recentMovies, recentSeries, inProgress, seriesInProgress, t]
   );
 
   return (

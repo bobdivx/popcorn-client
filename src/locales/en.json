@@ -990,7 +990,9 @@
     "heroNewEpisode": "New episode",
     "heroRequestDownloaded": "Request downloaded",
     "heroDownloadedUnseen": "To watch",
-    "watchNowHighlights": "New to watch"
+    "watchNowHighlights": "New to watch",
+    "ongoingSeries": "Ongoing series",
+    "recentlyDownloaded": "Recently downloaded"
   },
   "search": {
     "title": "Search",

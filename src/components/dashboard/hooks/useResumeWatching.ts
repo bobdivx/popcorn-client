@@ -263,6 +263,8 @@ export function useResumeWatching() {
 
     return {
       resumeWatching: resume.slice(0, 15),
+      inProgress: resume.filter((i) => i.resumeStatus === 'in_progress').slice(0, 15),
+      seriesInProgress: resume.filter((i) => i.type === 'tv').slice(0, 15),
       rewatchWatching: rewatch.slice(0, 15),
       waitingForNext: waitingForNext.slice(0, 15),
       watchedIds: ids,
