@@ -635,6 +635,8 @@ export default function Search({ onResultClick }: SearchProps) {
                 <span className="text-sm tv:text-base whitespace-nowrap">{t('search.forceIndexerLabel')}</span>
               </label>
             </div>
+          </div>
+        </div>
       {/* État vide pendant recherche indexeurs */}
       {searchPhase === 'indexer' && allResults.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in">
