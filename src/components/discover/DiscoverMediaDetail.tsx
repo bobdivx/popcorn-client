@@ -203,6 +203,9 @@ export default function DiscoverMediaDetail({
               <RequestButton
                 tmdbId={tmdbId}
                 mediaType={mediaType}
+                title={title}
+                posterPath={posterPath || undefined}
+                backdropPath={backdropPath || undefined}
                 onSuccess={() => setRequestSubmitted(true)}
                 onAlreadyExists={() => setRequestSubmitted(true)}
               />

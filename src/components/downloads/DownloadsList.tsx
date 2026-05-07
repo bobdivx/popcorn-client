@@ -237,7 +237,7 @@ export default function DownloadsList() {
         </div>
         <div className="flex gap-4 overflow-x-auto scrollbar-hide px-4 sm:px-12 pb-8 pt-2" style={{ scrollSnapType: 'x mandatory' }}>
           {items.map((torrent) => (
-            <div key={torrent.info_hash} className="shrink-0 w-[280px] sm:w-[320px]" style={{ scrollSnapAlign: 'start' }}>
+            <div key={torrent.info_hash} className="shrink-0 w-[240px] sm:w-[320px]" style={{ scrollSnapAlign: 'start' }}>
               <DownloadCard
                 torrent={torrent}
                 posterUrl={imageMap[torrent.info_hash.toLowerCase()]?.posterUrl}

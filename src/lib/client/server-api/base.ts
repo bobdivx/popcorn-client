@@ -199,7 +199,7 @@ export class ServerApiClientBase {
     } catch { return null; }
   }
 
-  protected getCurrentUserId(): string | null {
+  public getCurrentUserId(): string | null {
     const u = this.getUser();
     const id = u?.id || u?.user?.id;
     return typeof id === 'string' && id.trim() ? id : null;

@@ -44,17 +44,28 @@ interface SearchProps {
 interface SearchResultPosterProps {
   result: SearchResult;
   onClick?: (result: SearchResult) => void;
+  isRequested?: boolean;
 }
 
 /** URL de détail : priorité TMDB (tmdbId + type), fallback slug. Discover si pas de torrent (id tmdb-xxx). */
 function getDetailUrl(result: SearchResult): string {
+  // Si c'est un résultat TMDB pur (sans torrent), go Discover
   if (result.id?.startsWith('tmdb-') && result.tmdbId != null) {
     return `/discover?tmdbId=${result.tmdbId}&type=${result.type}`;
   }
-  if (result.tmdbId != null) {
+
+  // Si c'est téléchargé (déjà en bibliothèque), on peut aller sur la page torrent (détail/stream)
+  if (result.isDownloaded && result.tmdbId != null) {
     const typeParam = result.type === 'tv' ? 'tv' : 'movie';
     return `/torrents?tmdbId=${result.tmdbId}&type=${typeParam}&from=search${result.title ? `&title=${encodeURIComponent(result.title)}` : ''}`;
   }
+
+  // Pour les autres cas (indexer, etc.), si on a un tmdbId, on préfère passer par Discover
+  // pour permettre la demande ou voir les infos, car /torrents risque d'être vide.
+  if (result.tmdbId != null) {
+    return `/discover?tmdbId=${result.tmdbId}&type=${result.type}`;
+  }
+
   return `/torrents?slug=${encodeURIComponent(result.id)}&from=search`;
 }
 
@@ -67,7 +78,7 @@ function getRequestUrl(result: SearchResult): string | null {
 /**
  * Composant pour afficher un résultat de recherche dans un style moderne
  */
-function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
+function SearchResultPoster({ result, onClick, isRequested }: SearchResultPosterProps) {
   const { t } = useI18n();
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -136,7 +147,7 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
           )}
 
           {/* Badge type */}
-          <div className="absolute top-2 left-2 lg:top-3 lg:left-3 tv:top-4 tv:left-4 z-10">
+          <div className="absolute top-2 left-2 lg:top-3 lg:left-3 tv:top-4 tv:left-4 z-10 flex flex-col gap-2">
             <div className={`w-6 h-6 lg:w-8 lg:h-8 tv:w-12 tv:h-12 rounded flex items-center justify-center shadow-primary transition-all duration-200 ${
               result.type === 'movie' ? 'bg-primary-600' : 'bg-primary-500'
             }`}>
@@ -144,6 +155,28 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
                 {result.type === 'movie' ? 'F' : 'S'}
               </span>
             </div>
+            
+            {result.isDownloaded && (
+              <div className="bg-emerald-500/90 backdrop-blur-md rounded px-2 py-0.5 lg:px-2.5 lg:py-1 flex items-center gap-1.5 shadow-[0_4px_12px_rgba(16,185,129,0.3)] border border-emerald-400/30 animate-fade-in">
+                <svg className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="text-white text-[9px] lg:text-[11px] font-bold uppercase tracking-widest">
+                  {t('search.downloaded') || 'En bibliothèque'}
+                </span>
+              </div>
+            )}
+
+            {!result.isDownloaded && isRequested && (
+              <div className="bg-primary-500/90 backdrop-blur-md rounded px-2 py-0.5 lg:px-2.5 lg:py-1 flex items-center gap-1.5 shadow-[0_4px_12px_rgba(var(--primary-rgb),0.3)] border border-primary-400/30 animate-fade-in">
+                <svg className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-white text-[9px] lg:text-[11px] font-bold uppercase tracking-widest">
+                  {t('requests.requested') || 'Déjà demandé'}
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Overlay au survol */}
@@ -171,14 +204,29 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
             </div>
           )}
 
-          {showOverlay && getRequestUrl(result) && (
-            <a
-              href={getRequestUrl(result)!}
-              onClick={(e) => e.stopPropagation()}
-              className="absolute bottom-2 left-2 lg:bottom-3 lg:left-3 tv:bottom-4 tv:left-4 z-20 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-600 text-white text-xs font-medium pointer-events-auto transition-colors"
-            >
-              {t('requests.requestMedia')}
-            </a>
+          {showOverlay && (result.isDownloaded || getRequestUrl(result)) && (
+            <div className="absolute bottom-2 left-2 lg:bottom-3 lg:left-3 tv:bottom-4 tv:left-4 z-20 flex gap-2">
+              {result.isDownloaded ? (
+                <a
+                  href={detailUrl}
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold pointer-events-auto transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
+                >
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                  </svg>
+                  {t('common.watch') || 'Regarder'}
+                </a>
+              ) : getRequestUrl(result) && (
+                <a
+                  href={getRequestUrl(result)!}
+                  onClick={(e) => e.stopPropagation()}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-600 text-white text-xs font-medium pointer-events-auto transition-colors"
+                >
+                  {t('requests.requestMedia')}
+                </a>
+              )}
+            </div>
           )}
         </div>
       </FocusableCard>
@@ -225,8 +273,16 @@ export default function Search({ onResultClick }: SearchProps) {
   const [error, setError] = useState<string | null>(null);
   const [forceIndexerSearch, setForceIndexerSearch] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>(() => getSearchHistory());
+  const [myRequests, setMyRequests] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const prevLoadingRef = useRef(false);
+
+  // Charger les demandes de l'utilisateur
+  useEffect(() => {
+    serverApi.listMediaRequests({ limit: 100 }).then(res => {
+      if (res.success && res.data) setMyRequests(res.data);
+    });
+  }, []);
 
   useEffect(() => {
     if (inputRef.current && typeof window !== 'undefined') {
@@ -306,6 +362,7 @@ export default function Search({ onResultClick }: SearchProps) {
           type: typeParam,
           source: 'indexer',
           lang: language,
+          user_id: serverApi.getCurrentUserId() || undefined,
         });
         if (!indexerRes.success) {
           setError(indexerRes.message || t('search.indexerSearchError'));
@@ -374,6 +431,7 @@ export default function Search({ onResultClick }: SearchProps) {
         type: typeParam,
         source: 'indexer',
         lang: language,
+        user_id: serverApi.getCurrentUserId() || undefined,
       });
 
       if (!indexerRes.success) {
@@ -436,20 +494,23 @@ export default function Search({ onResultClick }: SearchProps) {
   return (
     <div className="min-h-screen bg-black text-white w-full">
       {/* Section Hero avec barre de recherche moderne */}
-      <div className="relative w-full min-h-[300px] tv:min-h-[400px] mb-8 overflow-hidden bg-gradient-to-b from-primary-900/20 via-black to-black">
-        {/* Pattern de fond dégradé */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0" style={{
-            backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(124, 58, 237, 0.3) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(124, 58, 237, 0.2) 0%, transparent 50%)'
-          }}></div>
-        </div>
+      <div className="relative w-full min-h-[350px] tv:min-h-[450px] mb-8 overflow-hidden bg-black flex flex-col items-center justify-center px-4">
+        {/* Cercles de lumière animés en arrière-plan */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary-600/20 blur-[120px] rounded-full pointer-events-none animate-pulse-slow" />
+        <div className="absolute top-1/4 right-1/4 w-[300px] h-[300px] bg-violet-600/10 blur-[100px] rounded-full pointer-events-none" />
         
-        <div className="relative z-10 h-full flex flex-col justify-center px-4 sm:px-6 lg:px-16 tv:px-24 py-12 tv:py-16">
-          <div className="max-w-4xl tv:max-w-5xl mx-auto w-full">
-            {/* Titre */}
-            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl tv:text-8xl font-bold text-white mb-6 tv:mb-8 drop-shadow-2xl">
-              {t('search.title')}
+        {/* Texture de grain subtile */}
+        <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]" />
+
+        <div className="relative z-10 w-full max-w-4xl mx-auto text-center space-y-8">
+          <div className="space-y-4">
+            <h1 className="text-4xl md:text-5xl lg:text-6xl font-black tracking-tight text-white drop-shadow-2xl">
+              {t('search.title').toUpperCase()}
             </h1>
+            <p className="text-white/40 text-sm md:text-base lg:text-lg max-w-2xl mx-auto font-medium">
+              {t('search.subtitle') || 'Explorez votre bibliothèque et au-delà'}
+            </p>
+          </div>
 
             {/* Barre de recherche moderne */}
             <form
@@ -574,9 +635,23 @@ export default function Search({ onResultClick }: SearchProps) {
                 <span className="text-sm tv:text-base whitespace-nowrap">{t('search.forceIndexerLabel')}</span>
               </label>
             </div>
+      {/* État vide pendant recherche indexeurs */}
+      {searchPhase === 'indexer' && allResults.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in">
+          <div className="relative mb-8">
+            <div className="absolute inset-0 bg-primary-500/20 blur-2xl rounded-full animate-pulse" />
+            <div className="relative w-20 h-20 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center backdrop-blur-xl">
+              <SearchIcon className="w-10 h-10 text-primary-400 animate-bounce-slow" />
+            </div>
           </div>
+          <h3 className="text-2xl font-bold text-white mb-3">
+            {t('search.indexing') || 'Recherche approfondie...'}
+          </h3>
+          <p className="text-white/40 max-w-md mx-auto leading-relaxed">
+            {t('search.noLocalResults') || 'Aucun résultat local trouvé. Popcorn interroge les indexeurs pour vous.'}
+          </p>
         </div>
-      </div>
+      )}
 
       {/* Affichage des résultats */}
       {error && (
@@ -596,7 +671,11 @@ export default function Search({ onResultClick }: SearchProps) {
                 <CarouselRow title={t('search.moviesFound')}>
                   {movies.map((result) => (
                     <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                      <SearchResultPoster result={result} onClick={onResultClick} />
+                      <SearchResultPoster 
+                        result={result} 
+                        onClick={onResultClick} 
+                        isRequested={myRequests.some(r => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                      />
                     </div>
                   ))}
                 </CarouselRow>
@@ -605,7 +684,11 @@ export default function Search({ onResultClick }: SearchProps) {
                 <CarouselRow title={t('search.seriesFound')}>
                   {series.map((result) => (
                     <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                      <SearchResultPoster result={result} onClick={onResultClick} />
+                      <SearchResultPoster 
+                        result={result} 
+                        onClick={onResultClick} 
+                        isRequested={myRequests.some(r => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                      />
                     </div>
                   ))}
                 </CarouselRow>
@@ -615,7 +698,11 @@ export default function Search({ onResultClick }: SearchProps) {
             <CarouselRow title={type === 'movie' ? t('search.moviesFound') : t('search.seriesFound')}>
               {allResults.map((result) => (
                 <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                  <SearchResultPoster result={result} onClick={onResultClick} />
+                  <SearchResultPoster 
+                    result={result} 
+                    onClick={onResultClick} 
+                    isRequested={myRequests.some(r => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                  />
                 </div>
               ))}
             </CarouselRow>
@@ -648,7 +735,11 @@ export default function Search({ onResultClick }: SearchProps) {
                     .filter((r) => r.type === 'movie')
                     .map((result) => (
                       <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                        <SearchResultPoster result={result} onClick={onResultClick} />
+                        <SearchResultPoster 
+                          result={result} 
+                          onClick={onResultClick} 
+                          isRequested={myRequests.some(r => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                        />
                       </div>
                     ))}
                 </CarouselRow>
@@ -659,7 +750,11 @@ export default function Search({ onResultClick }: SearchProps) {
                     .filter((r) => r.type === 'tv')
                     .map((result) => (
                       <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                        <SearchResultPoster result={result} onClick={onResultClick} />
+                        <SearchResultPoster 
+                          result={result} 
+                          onClick={onResultClick} 
+                          isRequested={myRequests.some(r => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                        />
                       </div>
                     ))}
                 </CarouselRow>
@@ -669,7 +764,11 @@ export default function Search({ onResultClick }: SearchProps) {
             <CarouselRow title={t('search.tmdbRequestTitle')}>
               {tmdbFallbackResults.map((result) => (
                 <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                  <SearchResultPoster result={result} onClick={onResultClick} />
+                  <SearchResultPoster 
+                    result={result} 
+                    onClick={onResultClick} 
+                    isRequested={myRequests.some(r => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                  />
                 </div>
               ))}
             </CarouselRow>

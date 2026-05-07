@@ -806,6 +806,7 @@ export default function MediaDetailRoute() {
         }
 
         // Cas tmdbId : recherche → détail (média peut ne pas être synchronisé)
+        const typeParam = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '').get('type') || 'movie';
         if (tmdbId) {
           // Depuis la bibliothèque avec un titre (nom de fichier) : privilégier l'entrée bibliothèque qui correspond
           if (fromParam === 'library' && titleFromQuery && titleFromQuery.trim().length > 0) {
@@ -974,6 +975,13 @@ export default function MediaDetailRoute() {
           }
 
           if (!cancelled) {
+            // Si on a un tmdbId mais aucun torrent trouvé (variants vide ou absent), rediriger vers Discover
+            const hasNoVariants = !data || !data.variants || (Array.isArray(data.variants) && data.variants.length === 0);
+            if (hasNoVariants && tmdbId && typeof window !== 'undefined') {
+              console.log('[MediaDetailRoute] Aucun torrent trouvé pour tmdbId, redirection vers Discover:', tmdbId);
+              window.location.href = `/discover?tmdbId=${tmdbId}&type=${typeParam}&from=not_found`;
+              return;
+            }
             setEmptyGroupMainTitle(emptyGroupTitle || null);
             setError(
               data?.variants && Array.isArray(data.variants) && data.variants.length === 0

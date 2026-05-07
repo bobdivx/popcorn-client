@@ -235,12 +235,12 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
           </div>
         </div>
 
-        <div className="p-3 sm:p-4 bg-transparent relative z-10 text-left">
-          <div className="text-base font-semibold text-white/90 truncate" title={displayTitle}>
+        <div className="p-2.5 sm:p-4 bg-transparent relative z-10 text-left">
+          <div className="text-sm sm:text-base font-semibold text-white/90 truncate" title={displayTitle}>
             {displayTitle || torrent.name}
           </div>
           
-          <div className="flex flex-wrap items-center gap-[6px] text-xs text-white/50 mt-1.5">
+          <div className="flex flex-wrap items-center gap-[6px] text-[10px] sm:text-xs text-white/50 mt-1.5">
             <span>{formatBytes(torrent.downloaded_bytes)} / {formatBytes(torrent.total_bytes)}</span>
             <span className="w-1 h-1 rounded-full bg-white/20" />
             <span className="font-medium text-white/70">{(torrent.progress * 100).toFixed(1)}%</span>

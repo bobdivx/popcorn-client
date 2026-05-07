@@ -142,7 +142,9 @@ export interface ContentItem {
     newEpisode?: boolean;
     requestDownloaded?: boolean;
     downloadedUnseen?: boolean;
+    availableInLibrary?: boolean;
   };
+  availableInLibrary?: boolean;
 }
 
 export interface FilmData extends ContentItem {
@@ -183,6 +185,8 @@ export interface SearchResult {
   overview?: string;
   /** TMDB id lorsque disponible (DB locale ou enrichissement indexeurs) */
   tmdbId?: number;
+  /** Indique si le média est déjà téléchargé dans la bibliothèque locale */
+  isDownloaded?: boolean;
 }
 
 // ==================== STREAMING ====================
