@@ -161,6 +161,40 @@ interface IServerApiClientPublic {
     backendUrl?: string;
   }>>;
 
+  // Media discovery and requests
+  discoverMovies(params?: {
+    page?: number;
+    language?: string;
+    sort_by?: string;
+    genre?: string;
+    primary_release_date_gte?: string;
+    primary_release_date_lte?: string;
+    vote_average_gte?: number;
+    vote_count_gte?: number;
+  }): Promise<ApiResponse<{ results: any[]; page: number; total_pages: number }>>;
+  
+  discoverTv(params?: {
+    page?: number;
+    language?: string;
+    sort_by?: string;
+    genre?: string;
+    first_air_date_gte?: string;
+    first_air_date_lte?: string;
+    vote_average_gte?: number;
+    vote_count_gte?: number;
+  }): Promise<ApiResponse<{ results: any[]; page: number; total_pages: number }>>;
+
+  getTmdbMovieDetail(tmdbId: number, language?: string): Promise<ApiResponse<any>>;
+  getTmdbTvDetail(tmdbId: number, language?: string): Promise<ApiResponse<any>>;
+  
+  listMediaRequests(params?: { user_id?: string; status?: string; limit?: number; offset?: number }): Promise<ApiResponse<import('./server-api/requests.js').MediaRequest[]>>;
+  createMediaRequest(data: { tmdb_id: number; media_type: string; season_numbers?: number[]; title?: string; poster_path?: string; backdrop_path?: string }): Promise<ApiResponse<import('./server-api/requests.js').MediaRequest>>;
+  deleteMediaRequest(id: string): Promise<ApiResponse<unknown>>;
+  updateRequestStatus(id: string, data: { status: string; notes?: string }): Promise<ApiResponse<import('./server-api/requests.js').MediaRequest>>;
+  
+  searchTmdb(params: { q: string; type?: 'movie' | 'tv' | 'all'; language?: string; page?: number }): Promise<ApiResponse<Array<{ id: string; title: string; type: string; poster?: string; year?: number; overview?: string; tmdbId: number }>>>;
+
+
   // Media methods
   search(params: SearchParams): Promise<ApiResponse<SearchResult[]>>;
   getTorrentGroup(slug: string): Promise<ApiResponse<any>>;

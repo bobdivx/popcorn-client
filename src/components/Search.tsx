@@ -279,7 +279,7 @@ export default function Search({ onResultClick }: SearchProps) {
 
   // Charger les demandes de l'utilisateur
   useEffect(() => {
-    serverApi.listMediaRequests({ limit: 100 }).then(res => {
+    serverApi.listMediaRequests({ user_id: serverApi.getCurrentUserId() ?? '' }).then((res: { success: boolean; data?: any[] }) => {
       if (res.success && res.data) setMyRequests(res.data);
     });
   }, []);
@@ -676,7 +676,7 @@ export default function Search({ onResultClick }: SearchProps) {
                       <SearchResultPoster 
                         result={result} 
                         onClick={onResultClick} 
-                        isRequested={myRequests.some(r => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                        isRequested={myRequests.some((r: any) => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
                       />
                     </div>
                   ))}
@@ -689,7 +689,7 @@ export default function Search({ onResultClick }: SearchProps) {
                       <SearchResultPoster 
                         result={result} 
                         onClick={onResultClick} 
-                        isRequested={myRequests.some(r => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                        isRequested={myRequests.some((r: any) => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
                       />
                     </div>
                   ))}
@@ -703,7 +703,7 @@ export default function Search({ onResultClick }: SearchProps) {
                   <SearchResultPoster 
                     result={result} 
                     onClick={onResultClick} 
-                    isRequested={myRequests.some(r => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                    isRequested={myRequests.some((r: any) => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
                   />
                 </div>
               ))}
@@ -740,7 +740,7 @@ export default function Search({ onResultClick }: SearchProps) {
                         <SearchResultPoster 
                           result={result} 
                           onClick={onResultClick} 
-                          isRequested={myRequests.some(r => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                          isRequested={myRequests.some((r: any) => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
                         />
                       </div>
                     ))}
@@ -755,7 +755,7 @@ export default function Search({ onResultClick }: SearchProps) {
                         <SearchResultPoster 
                           result={result} 
                           onClick={onResultClick} 
-                          isRequested={myRequests.some(r => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                          isRequested={myRequests.some((r: any) => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
                         />
                       </div>
                     ))}
@@ -769,7 +769,7 @@ export default function Search({ onResultClick }: SearchProps) {
                   <SearchResultPoster 
                     result={result} 
                     onClick={onResultClick} 
-                    isRequested={myRequests.some(r => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                    isRequested={myRequests.some((r: any) => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
                   />
                 </div>
               ))}
