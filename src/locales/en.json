@@ -995,7 +995,8 @@
     "heroDownloadedUnseen": "To watch",
     "watchNowHighlights": "New to watch",
     "ongoingSeries": "Ongoing series",
-    "recentlyDownloaded": "Recently downloaded"
+    "recentlyDownloaded": "Recently downloaded",
+    "activeDownloads": "Currently downloading"
   },
   "search": {
     "title": "Search",
@@ -1022,6 +1023,16 @@
     "indexerSearchError": "Indexer search failed",
     "recentSearches": "Recent Searches",
     "downloaded": "Already Downloaded"
+  },
+  "torrents": {
+    "state": {
+      "downloading": "Downloading",
+      "seeding": "Seeding",
+      "paused": "Paused",
+      "completed": "Completed",
+      "error": "Error",
+      "queued": "Queued"
+    }
   },
   "library": {
     "title": "Library",

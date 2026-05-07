@@ -64,6 +64,24 @@ function normalizeSeriesTitle(title: string): string {
     .toLowerCase();
 }
 
+/** Nettoie un titre TMDB brut (parsé depuis le nom de torrent) pour optimiser la recherche TMDB */
+function cleanTitleForTmdb(title: string): string {
+  return title
+    .replace(/\./g, ' ')
+    .replace(/_/g, ' ')
+    .replace(/\[.*?\]/g, '')
+    .replace(/\(.*?\)/g, '')
+    .replace(/\b(?:x264|x265|HEVC|HDR10?|DTS|AC3|DD5\.?1|BluRay|BDRip|WEB-DL|WEBRip|REMUX|4K|2160p|1080p|720p|480p|DVDRip|FRENCH|VOSTFR|VF|VO|MULTI|TRUEFRENCH|AAC|H\.?265|H\.?264|AVC|MKV|MP4|AVI)\b/gi, '')
+    .replace(/S\d{1,2}E\d{1,3}/gi, '')
+    .replace(/\bSaison\s+\d+\b/gi, '')
+    .replace(/\bSeason\s+\d+\b/gi, '')
+    .replace(/\b(COMPLETE|PACK|BOXSET|EXTENDED|THEATRICAL|REMASTERED|DIRECTORS?.?CUT|UNRATED)\b/gi, '')
+    // "First" isolé en fin de titre (ex. "Fantastic Four First" → nom torrent) 
+    .replace(/\bFirst\b$/i, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 function getTorrentPriority(torrent: ClientTorrentStats): number {
   if (torrent.state === 'downloading') return 5;
   if (torrent.state === 'seeding') return 4;
@@ -117,33 +135,91 @@ export default function DownloadsList() {
     }).filter(it => it.backdrop || it.poster);
   }, [torrents, imageMap, displayTitleMap, tmdbTypeMap]);
 
+  const hasEnrichedRef = useRef(false);
+
   const loadTorrents = useCallback(async () => {
     try {
       const list = await clientApi.listTorrents();
       setTorrents(list);
 
-      // Mettre à jour le torrent sélectionné s'il existe pour refléter les nouveaux états (ex: reprise, progression)
+      // Mettre à jour le torrent sélectionné s'il existe
       setSelectedTorrent(prev => {
         if (!prev) return null;
         return list.find(t => t.info_hash === prev.info_hash) || prev;
       });
 
-      if (loading) {
+      // Enrichissement TMDB — effectué une seule fois au chargement initial
+      if (!hasEnrichedRef.current) {
+        hasEnrichedRef.current = true;
         setLoading(false);
         const enriched = await clientApi.listTorrentsEnriched();
         const images: any = {}, titles: any = {}, types: any = {};
+        const needsTmdb: Array<{ key: string; title: string; type: string }> = [];
+
         for (const t of enriched) {
           const key = t.info_hash.toLowerCase();
-          images[key] = { posterUrl: t.poster_url, backdropUrl: t.hero_image_url };
+          images[key] = { posterUrl: t.poster_url ?? null, backdropUrl: t.hero_image_url ?? null };
           if (t.tmdb_title) titles[key] = t.tmdb_title;
           if (t.tmdb_type) types[key] = t.tmdb_type;
+
+          // Collecter les torrents sans image pour fallback TMDB
+          if (!t.poster_url && !t.hero_image_url && t.tmdb_title) {
+            needsTmdb.push({ key, title: t.tmdb_title, type: t.tmdb_type ?? 'movie' });
+          }
         }
-        setImageMap(prev => ({...prev, ...images}));
-        setDisplayTitleMap(prev => ({...prev, ...titles}));
-        setTmdbTypeMap(prev => ({...prev, ...types}));
+
+        setImageMap(prev => ({ ...prev, ...images }));
+        setDisplayTitleMap(prev => ({ ...prev, ...titles }));
+        setTmdbTypeMap(prev => ({ ...prev, ...types }));
+
+        // Fallback : recherche TMDB par titre pour les torrents sans image
+        if (needsTmdb.length > 0) {
+          try {
+            const { serverApi } = await import('../../lib/client/server-api');
+            const baseUrl = serverApi.getServerUrl().trim().replace(/\/$/, '');
+            const token = serverApi.getAccessToken();
+            const headers: Record<string, string> = {
+              'Content-Type': 'application/json',
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            };
+
+            const results = await Promise.allSettled(
+              needsTmdb.map(async ({ key, title, type }) => {
+                try {
+                  const params = new URLSearchParams({ q: title, type });
+                  const res = await fetch(`${baseUrl}/api/discover/search?${params}`, { headers });
+                  if (!res.ok) return;
+                  const data = await res.json();
+                  const hits: any[] = data.results ?? data.data ?? [];
+                  const hit = hits[0];
+                  if (!hit) return;
+                  const posterPath = hit.poster_path ?? hit.poster ?? null;
+                  const backdropPath = hit.backdrop_path ?? hit.backdrop ?? null;
+                  const posterUrl = posterPath
+                    ? (posterPath.startsWith('http') ? posterPath : `https://image.tmdb.org/t/p/w500${posterPath}`)
+                    : null;
+                  const backdropUrl = backdropPath
+                    ? (backdropPath.startsWith('http') ? backdropPath : `https://image.tmdb.org/t/p/w1280${backdropPath}`)
+                    : null;
+                  if (posterUrl || backdropUrl) {
+                    setImageMap(prev => ({
+                      ...prev,
+                      [key]: { posterUrl: posterUrl ?? prev[key]?.posterUrl ?? null, backdropUrl: backdropUrl ?? prev[key]?.backdropUrl ?? null },
+                    }));
+                  }
+                } catch {
+                  // silencieux
+                }
+              })
+            );
+            void results; // éviter unused warning
+          } catch {
+            // fallback TMDB optionnel, erreur silencieuse
+          }
+        }
       }
     } catch (e) { console.error(e); }
-  }, [loading]);
+  }, []);
 
   useEffect(() => {
     loadTorrents();
