@@ -109,7 +109,7 @@ export default function CarouselRow({
   return (
     <div 
       ref={containerRef}
-      className={`mb-8 sm:mb-10 md:mb-12 tv:mb-16 ${className} ${isTV ? 'opacity-100' : 'opacity-0'}`}
+      className={`mb-8 sm:mb-10 md:mb-12 tv:mb-16 w-full min-w-0 max-w-full overflow-x-hidden ${className} ${isTV ? 'opacity-100' : 'opacity-0'}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -150,7 +150,7 @@ export default function CarouselRow({
       <div
         ref={scrollContainerRef}
         data-carousel
-        className={`flex gap-1 sm:gap-1.5 md:gap-2 lg:gap-4 xl:gap-6 tv:gap-8 overflow-x-auto overflow-y-visible scrollbar-hide px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 py-3 tv:py-4 carousel-container ${isTV ? '' : 'scroll-smooth'}`}
+        className={`flex w-full min-w-0 max-w-full gap-1 sm:gap-1.5 md:gap-2 lg:gap-4 xl:gap-6 tv:gap-8 overflow-x-auto overscroll-x-contain overflow-y-visible scrollbar-hide px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 py-3 tv:py-4 carousel-container ${isTV ? '' : 'scroll-smooth'}`}
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',

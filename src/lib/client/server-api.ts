@@ -269,7 +269,15 @@ interface IServerApiClientPublic {
   getClientTorrentConfig(): Promise<ApiResponse<any>>;
   updateClientTorrentListenPort(port: number): Promise<ApiResponse<{ listen_port: number }>>;
   getRatioConfig(): Promise<ApiResponse<{ mode_enabled: boolean; source: string }>>;
-  getSeedingDiagnostic(): Promise<ApiResponse<{ upnp_enabled: boolean; ratio_mode_enabled: boolean; librqbit_ok: boolean; listen_port: number | null }>>;
+  getSeedingDiagnostic(): Promise<
+    ApiResponse<{
+      upnp_enabled: boolean;
+      ratio_mode_enabled: boolean;
+      librqbit_ok: boolean;
+      listen_port: number | null;
+      warnings?: string[];
+    }>
+  >;
   updateRatioConfig(mode_enabled: boolean): Promise<ApiResponse<{ mode_enabled: boolean; source: string }>>;
   getRatioStats(): Promise<ApiResponse<{
     total_uploaded_bytes: number;
@@ -381,6 +389,22 @@ interface IServerApiClientPublic {
   addMediaFavorite(data: { tmdb_id: number; tmdb_type: string; category: string }): Promise<ApiResponse<import('./server-api/requests.js').MediaFavorite>>;
   removeMediaFavorite(tmdbId: number, tmdbType: string): Promise<ApiResponse<boolean>>;
   checkMediaFavorite(tmdbId: number, tmdbType: string): Promise<ApiResponse<{ is_favorite: boolean }>>;
+  listResumeWatching(params?: { limit?: number; offset?: number }): Promise<ApiResponse<import('./server-api/requests.js').ResumeWatchingItem[]>>;
+  upsertResumeWatching(data: {
+    content_id: string;
+    tmdb_id?: number | null;
+    tmdb_type: 'movie' | 'tv';
+    title: string;
+    poster?: string | null;
+    progress: number;
+    season?: number | null;
+    episode?: number | null;
+    variant_id?: string | null;
+    position_seconds?: number | null;
+    duration_seconds?: number | null;
+    last_watched?: number;
+  }): Promise<ApiResponse<import('./server-api/requests.js').ResumeWatchingItem>>;
+  removeResumeWatching(contentId: string): Promise<ApiResponse<boolean>>;
 }
 
 /** Augmenter le type ServerApiClient pour inclure toutes les méthodes publiques */

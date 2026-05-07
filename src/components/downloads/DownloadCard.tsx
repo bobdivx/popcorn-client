@@ -1,11 +1,11 @@
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useRef } from 'preact/hooks';
 import { Download, Upload, Sprout, Users, Film } from 'lucide-preact';
 import type { ClientTorrentStats } from '../../lib/client/types';
 import { FocusableCard } from '../ui/FocusableCard';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { getBackendUrl } from '../../lib/backend-config';
 import { TorrentStatusBadge } from '../torrents/ui';
 import { formatBytes, formatSpeed, formatETA } from '../../lib/utils/formatBytes';
+import { isTorrentActivelySeeding } from '../../lib/utils/torrentSeeding';
 
 /** Nettoie le nom brut du torrent pour affichage (sans codec, résolution, etc.) */
 function cleanTorrentName(name: string | undefined): string {
@@ -36,44 +36,11 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
   const { t } = useI18n();
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
-  const [posterUrlLocal, setPosterUrlLocal] = useState<string | null>(null);
-  const [backdropUrlLocal, setBackdropUrlLocal] = useState<string | null>(null);
   const cardContainerRef = useRef<HTMLDivElement>(null);
 
-  const posterUrl = posterUrlProp ?? posterUrlLocal;
-  const backdropUrl = backdropUrlProp ?? backdropUrlLocal;
+  const posterUrl = posterUrlProp ?? null;
+  const backdropUrl = backdropUrlProp ?? null;
   const displayTitle = (displayTitleProp && displayTitleProp.trim()) || cleanTorrentName(torrent.name) || torrent.name || '';
-  useEffect(() => {
-    if (posterUrlProp != null || backdropUrlProp != null) return;
-    if (posterUrlLocal && backdropUrlLocal) return;
-
-    const loadTmdbImage = async () => {
-      try {
-        const { serverApi } = await import('../../lib/client/server-api');
-        const baseUrl = (getBackendUrl() || serverApi.getServerUrl()).trim().replace(/\/$/, '');
-        const token = serverApi.getAccessToken();
-        const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-
-        // Utiliser directement l'endpoint enrichi qui fournit poster_url/hero_image_url par info_hash
-        const response = await fetch(`${baseUrl}/api/client/torrents/enriched`, { headers });
-        if (response.ok) {
-          const list: Array<Record<string, any>> = await response.json();
-          const key = torrent.info_hash.toLowerCase();
-          const match = list.find((t) => (t.info_hash ?? '').toLowerCase() === key);
-          if (match) {
-            const image = match.poster_url ?? match.imageUrl ?? null;
-            const backdrop = match.hero_image_url ?? match.heroImageUrl ?? null;
-            if (image) setPosterUrlLocal(image);
-            if (backdrop) setBackdropUrlLocal(backdrop);
-          }
-        }
-      } catch {
-        // Échec silencieux
-      }
-    };
-
-    loadTmdbImage();
-  }, [torrent.info_hash, posterUrlProp, backdropUrlProp, posterUrlLocal, backdropUrlLocal]);
 
   const progressColor = torrent.state === 'downloading' ? 'bg-[var(--ds-accent-violet)]' :
                         torrent.state === 'seeding' ? 'bg-[var(--ds-accent-green)]' :
@@ -83,6 +50,7 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
   const isActive = torrent.state === 'downloading' || torrent.state === 'seeding';
   const showPulse = isActive && (torrent.download_speed > 0 || torrent.upload_speed > 0);
   const showOverlay = isHovered || isFocused;
+  const activeSeeding = isTorrentActivelySeeding(torrent);
 
   return (
     <div
@@ -118,17 +86,7 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
           {backdropUrl ? (
             <img src={backdropUrl} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover z-0" />
           ) : posterUrl ? (
-            // Pas de backdrop : étaler l'affiche en plein fond (flou + cover) pour éviter le portrait au centre
-            <div
-              className="absolute inset-0 z-0"
-              style={{
-                backgroundImage: `url(${posterUrl})`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center top',
-                filter: 'blur(8px)',
-                transform: 'scale(1.08)',
-              }}
-            />
+            <img src={posterUrl} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover z-0" />
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-white/10 via-black/40 to-black/80 z-0 p-2 text-white/20">
                <Film className="w-8 h-8 tv:w-10 tv:h-10 mb-2 shrink-0" size={40} />
@@ -138,7 +96,11 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
 
           {/* Badge d'état en haut à gauche */}
           <div className="absolute left-3 top-3 z-20">
-            <TorrentStatusBadge state={torrent.state} className="px-2.5 py-1 rounded-full text-[10px] tv:text-xs font-bold tracking-wide bg-black/50 border border-white/15 text-white/90" />
+            <TorrentStatusBadge
+              state={torrent.state}
+              seedingActive={activeSeeding}
+              className="px-2.5 py-1 rounded-full text-[10px] tv:text-xs font-bold tracking-wide bg-black/50 border border-white/15 text-white/90"
+            />
           </div>
 
           {/* Badges de stats, top right */}

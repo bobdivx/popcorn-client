@@ -865,7 +865,11 @@
       "testTrackerAnnounce": "Tester l'annonce tracker",
       "testPortExternal": "Tester le port (canyouseeme.org)",
       "listenPort": "Port TCP (rqbit)",
-      "portHintWithPort": "Ouvrez le port {port} en TCP et UDP sur votre box/routeur pour permettre les connexions entrantes (partage / ratio). En cas de double NAT (box + routeur), configurez la redirection sur les deux appareils. Testez avec l'outil ci-dessous."
+      "portHintWithPort": "Ouvrez le port {port} en TCP et UDP sur votre box/routeur pour permettre les connexions entrantes (partage / ratio). En cas de double NAT (box + routeur), configurez la redirection sur les deux appareils. Testez avec l'outil ci-dessous.",
+      "enableRatioModeNow": "Activer le mode compatibilité tracker (maintenant)",
+      "enableRatioModeHint": "Applique RQBIT_TRACKER_MODE pour la session en cours (sans redémarrer le serveur). Pour le conserver après un reboot, ajoutez tracker_mode = true dans config.toml, ou TRACKER_MODE=1 / RQBIT_TRACKER_MODE=1 dans l’environnement, ou utilisez la page Ratio ci-dessous.",
+      "ratioSettingsLink": "Ouvrir la page Ratio / tracker (réglages détaillés)",
+      "enableRatioError": "Impossible d’activer le mode depuis l’interface."
     },
     "reseedPanel": {
       "title": "Re-seed",
@@ -1012,8 +1016,10 @@
     "startSearchDescription": "Recherchez des films ou des séries en utilisant la barre de recherche ci-dessus",
     "searchingLocal": "Recherche dans la base locale (torrents synchronisés)...",
     "searchingIndexers": "Recherche approfondie sur les indexeurs...",
-    "localSearchNote": "Popcornn parcourt d'abord ta bibliothèque.",
-    "indexerSearchNote": "Nous explorons les indexeurs pour trouver ce contenu.",
+    "searchingTmdb": "Pas de torrent : consultation du catalogue TMDB...",
+    "searchLiveSubtitle": "Progression mise à jour après chaque étape ci-dessous.",
+    "localSearchNote": "Popcorn parcourt d'abord ta bibliothèque.",
+    "indexerSearchNote": "Interrogation des indexeurs configurés.",
     "indexing": "Recherche approfondie...",
     "noLocalResults": "Aucun résultat local trouvé. Popcorn interroge les indexeurs pour vous.",
     "mustBeLoggedIn": "Vous devez être connecté pour rechercher du contenu",
@@ -1025,7 +1031,27 @@
     "forceIndexerLabel": "Rechercher directement sur les indexeurs",
     "indexerSearchError": "Recherche sur les indexeurs impossible",
     "recentSearches": "Recherches récentes",
-    "downloaded": "Déjà téléchargé"
+    "downloaded": "Déjà téléchargé",
+    "progressAriaLabel": "Progression de la recherche",
+    "progressStepLocal": "Base Popcorn (bibliothèque sync)",
+    "progressStepIndexer": "Indexeurs Torznab / Jackett…",
+    "progressStepTmdb": "Catalogue TMDB",
+    "progressCounts": "{movies} film(s), {series} série(s)",
+    "progressLocalSkipped": "Étape locale ignorée",
+    "progressLocalSkippedDetail": "Recherche directe sur les indexeurs",
+    "progressIndexerErrorDetail": "Erreur — voir message ci-dessus",
+    "progressTmdbSkippedDetail": "Inutile : des résultats torrent existent déjà",
+    "progressTmdbSkippedIndexerFail": "Non consultée (échec ou arrêt après les indexeurs)",
+    "progressTmdbNoneDetail": "Aucun titre TMDB correspondant",
+    "cardAvailabilityGroup": "Infos de disponibilité",
+    "badgeLibrary": "Bibliothèque",
+    "badgeLibraryHint": "Média trouvé dans votre bibliothèque locale",
+    "badgeSyncedDb": "Synchronisé",
+    "badgeIndexer": "Indexeur",
+    "cardVariantsIndexer": "{count} version(s) torrent (indexeurs)",
+    "cardEpisodesIndexer": "{count} ép. avec release indexer connue",
+    "cardEpisodesLibrary": "{count} ép. sur disque (bibliothèque)",
+    "cardSeasonsInDb": "{count} saison(s) suivies dans la base"
   },
   "torrents": {
     "state": {
@@ -1144,6 +1170,8 @@
       "error": "Erreur",
       "unknown": "Inconnu"
     },
+    "seedingBadgeActiveTitle": "Partage actif vers le réseau (upload ou pairs connectés)",
+    "seedingBadgeIdleTitle": "Partage prêt — en attente de pairs",
     "stats": {
       "downloadSpeed": "Vitesse DL",
       "uploadSpeed": "Vitesse UL",

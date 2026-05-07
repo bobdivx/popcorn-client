@@ -61,7 +61,7 @@ export function EpisodeCardsCarousel({
   const showArrows = !isTV;
 
   return (
-    <div aria-label={ariaLabel} className="relative">
+    <div aria-label={ariaLabel} className="relative w-full min-w-0 max-w-full overflow-x-hidden">
       <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-black/60 to-transparent" />
       <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-black/60 to-transparent" />
 
@@ -89,7 +89,7 @@ export function EpisodeCardsCarousel({
       <div
         ref={scrollerRef}
         role="list"
-        className="overflow-x-auto scrollbar-hide px-4 sm:px-5 py-4 sm:py-5"
+        className="w-full min-w-0 overflow-x-auto overscroll-x-contain scrollbar-hide px-4 sm:px-5 py-4 sm:py-5"
         style={{ scrollSnapType: 'x mandatory' }}
       >
         <div className="flex gap-4">
