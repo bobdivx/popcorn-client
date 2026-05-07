@@ -1016,8 +1016,11 @@ export default function MediaDetailRoute() {
               fromParam === 'downloads' &&
               torrentNameLooksLikeSeriesEpisode(t.name) &&
               ttype !== 'movie';
+            /** Même hors page Téléchargements : un nom du type S01E04 doit charger saisons/episodes pour les pastilles. */
+            const inferTvFromEpisodeFilename =
+              torrentNameLooksLikeSeriesEpisode(t.name) && ttype !== 'movie';
             const shouldLoadEpisodesByTmdb =
-              tid != null && (explicitTv || inferTvFromDownloads);
+              tid != null && (explicitTv || inferTvFromDownloads || inferTvFromEpisodeFilename);
 
             /** Rempli seulement si l’API a renvoyé au moins une saison avec épisodes. */
             let episodesPayloadOk: SeriesEpisodesResponse | null = null;
@@ -1046,6 +1049,8 @@ export default function MediaDetailRoute() {
                 if (!cancelled) setSeriesEpisodes(null);
               }
               try {
+                let enrichmentVariants: Torrent[] | undefined;
+
                 const libraryResponse = await serverApi.getLibrary();
                 if (libraryResponse.success && libraryResponse.data && !cancelled) {
                   const libraryItems = Array.isArray(libraryResponse.data) ? libraryResponse.data : [];
@@ -1058,8 +1063,29 @@ export default function MediaDetailRoute() {
                       item.exists,
                   );
                   if (seriesInLibrary.length > 0) {
-                    setInitialVariants(seriesInLibrary.map((i: any) => libraryItemToTorrent(i)));
+                    enrichmentVariants = seriesInLibrary.map((i: any) => libraryItemToTorrent(i));
                   }
+                }
+
+                const mainTitleById =
+                  typeof byIdData?.main_title === 'string' && byIdData.main_title.trim()
+                    ? byIdData.main_title.trim()
+                    : undefined;
+
+                if (!enrichmentVariants?.length) {
+                  const raw = Array.isArray(byIdData?.variants) ? byIdData.variants : [];
+                  if (raw.length > 0) {
+                    enrichmentVariants = raw.map((v: any) => ({
+                      ...convertVariantToTorrent(v),
+                      mainTitle: mainTitleById,
+                    }));
+                  } else if (best) {
+                    enrichmentVariants = [{ ...best, mainTitle: mainTitleById }];
+                  }
+                }
+
+                if (enrichmentVariants?.length && !cancelled) {
+                  setInitialVariants(enrichmentVariants);
                 }
               } catch {
                 /* ignore */

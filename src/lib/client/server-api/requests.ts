@@ -61,6 +61,24 @@ export interface MediaFavorite {
   created_at: number;
 }
 
+export interface ResumeWatchingItem {
+  id: string;
+  user_id: string;
+  content_id: string;
+  tmdb_id: number | null;
+  tmdb_type: 'movie' | 'tv';
+  title: string;
+  poster: string | null;
+  progress: number;
+  season: number | null;
+  episode: number | null;
+  variant_id: string | null;
+  position_seconds: number | null;
+  duration_seconds: number | null;
+  last_watched: number;
+  updated_at: number;
+}
+
 export const requestsMethods = {
   // Favoris (à regarder plus tard) — header X-User-ID
   // Si le backend ne propose pas l'API favoris (404), on renvoie succès avec données vides pour éviter les erreurs en console.
@@ -134,6 +152,60 @@ export const requestsMethods = {
       return { success: true, data: { is_favorite: false } };
     }
     return res;
+  },
+
+  async listResumeWatching(
+    this: ServerApiClientAccess,
+    params?: { limit?: number; offset?: number }
+  ): Promise<ApiResponse<ResumeWatchingItem[]>> {
+    const userId = this.getCurrentUserId?.() ?? null;
+    const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
+    const q = new URLSearchParams();
+    if (params?.limit != null) q.set('limit', String(params.limit));
+    if (params?.offset != null) q.set('offset', String(params.offset));
+    const query = q.toString();
+    return this.backendRequest<ResumeWatchingItem[]>(
+      `/api/resume-watching${query ? '?' + query : ''}`,
+      { method: 'GET', headers }
+    );
+  },
+
+  async upsertResumeWatching(
+    this: ServerApiClientAccess,
+    data: {
+      content_id: string;
+      tmdb_id?: number | null;
+      tmdb_type: 'movie' | 'tv';
+      title: string;
+      poster?: string | null;
+      progress: number;
+      season?: number | null;
+      episode?: number | null;
+      variant_id?: string | null;
+      position_seconds?: number | null;
+      duration_seconds?: number | null;
+      last_watched?: number;
+    }
+  ): Promise<ApiResponse<ResumeWatchingItem>> {
+    const userId = this.getCurrentUserId?.() ?? null;
+    const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
+    return this.backendRequest<ResumeWatchingItem>('/api/resume-watching', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify(data),
+    });
+  },
+
+  async removeResumeWatching(
+    this: ServerApiClientAccess,
+    contentId: string
+  ): Promise<ApiResponse<boolean>> {
+    const userId = this.getCurrentUserId?.() ?? null;
+    const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
+    return this.backendRequest<boolean>(
+      `/api/resume-watching/${encodeURIComponent(contentId)}`,
+      { method: 'DELETE', headers }
+    );
   },
 
   async listMediaRequests(

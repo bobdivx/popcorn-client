@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'preact/hooks';
-import { Search as SearchIcon, X } from 'lucide-preact';
+import { Search as SearchIcon, X, Layers2, CloudDownload, HardDrive, FolderOpen, Film, Loader2, CheckCircle2, MinusCircle } from 'lucide-preact';
 import { serverApi, type SearchResult } from '../lib/client/server-api';
 import { CacheManager } from '../lib/client/storage';
 import { FocusableCard } from './ui/FocusableCard';
@@ -10,7 +10,171 @@ import { isTVPlatform } from '../lib/utils/device-detection';
 
 const SEARCH_HISTORY_KEY = 'popcorn_search_history';
 const SEARCH_HISTORY_MAX = 10;
-const SEARCH_CACHE_VERSION = 'v3';
+const SEARCH_CACHE_VERSION = 'v6';
+
+function yieldToPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => resolve());
+  });
+}
+
+function countMoviesSeries(items: SearchResult[]): { movies: number; series: number } {
+  let movies = 0;
+  let series = 0;
+  for (const r of items) {
+    if (r.type === 'movie') movies += 1;
+    else series += 1;
+  }
+  return { movies, series };
+}
+
+export interface SearchLiveProgressState {
+  localSkipped: boolean;
+  localDone: boolean;
+  localMovies: number;
+  localSeries: number;
+  indexerRunning: boolean;
+  indexerDone: boolean;
+  indexerMovies: number;
+  indexerSeries: number;
+  indexerError: boolean;
+  tmdbRunning: boolean;
+  tmdbDone: boolean;
+  tmdbSkipped: boolean;
+  tmdbMovies: number;
+  tmdbSeries: number;
+}
+
+function initialSearchLiveProgress(): SearchLiveProgressState {
+  return {
+    localSkipped: false,
+    localDone: false,
+    localMovies: 0,
+    localSeries: 0,
+    indexerRunning: false,
+    indexerDone: false,
+    indexerMovies: 0,
+    indexerSeries: 0,
+    indexerError: false,
+    tmdbRunning: false,
+    tmdbDone: false,
+    tmdbSkipped: false,
+    tmdbMovies: 0,
+    tmdbSeries: 0,
+  };
+}
+
+/** Timeligne sous la carte de chargement : étapes locales → indexeurs → TMDB avec comptages réels après chaque requête */
+function SearchLiveProgressTimeline({
+  live,
+  t,
+}: {
+  live: SearchLiveProgressState;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const formatCounts = (movies: number, series: number) =>
+    t('search.progressCounts', { movies: String(movies), series: String(series) });
+
+  const Row = ({
+    label,
+    done,
+    active,
+    error,
+    skipped,
+    detail,
+    dim,
+  }: {
+    label: string;
+    done: boolean;
+    active: boolean;
+    error?: boolean;
+    skipped?: boolean;
+    detail?: string;
+    dim?: boolean;
+  }) => (
+    <li
+      className={`flex items-start gap-2.5 text-left rounded-lg px-2 py-1.5 -mx-2 ${
+        dim ? 'text-white/35' : active ? 'text-white/95 bg-white/5' : 'text-white/80'
+      }`}
+    >
+      <span className="mt-0.5 shrink-0" aria-hidden>
+        {skipped ? (
+          <MinusCircle className="w-4 h-4 text-white/35" strokeWidth={2} />
+        ) : error ? (
+          <MinusCircle className="w-4 h-4 text-amber-400/90" strokeWidth={2} />
+        ) : done ? (
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" strokeWidth={2.25} />
+        ) : active ? (
+          <Loader2 className="w-4 h-4 text-primary-400 animate-spin" strokeWidth={2.25} />
+        ) : (
+          <span className="inline-block w-4 h-4 rounded-full border border-white/25" />
+        )}
+      </span>
+      <span className="leading-snug flex-1 min-w-0">
+        <span className="font-semibold block">{label}</span>
+        {detail ? <span className="text-xs text-white/50 block mt-0.5">{detail}</span> : null}
+      </span>
+    </li>
+  );
+
+  const localActive = !live.localSkipped && !live.localDone;
+  const localDetail =
+    live.localSkipped
+      ? t('search.progressLocalSkippedDetail')
+      : live.localDone
+        ? formatCounts(live.localMovies, live.localSeries)
+        : undefined;
+
+  const indexerDetail = live.indexerError
+    ? t('search.progressIndexerErrorDetail')
+    : live.indexerDone
+      ? formatCounts(live.indexerMovies, live.indexerSeries)
+      : undefined;
+
+  const tmdbDetail = live.tmdbSkipped
+    ? live.indexerError
+      ? t('search.progressTmdbSkippedIndexerFail')
+      : t('search.progressTmdbSkippedDetail')
+    : live.tmdbDone && !live.tmdbSkipped
+      ? live.tmdbMovies + live.tmdbSeries > 0
+        ? formatCounts(live.tmdbMovies, live.tmdbSeries)
+        : t('search.progressTmdbNoneDetail')
+      : undefined;
+
+  const indexerFinished = live.indexerDone || live.indexerError;
+  const tmdbWaitingBeforeIndexerFinishes = !indexerFinished;
+
+  return (
+    <ul className="mt-6 space-y-1 text-sm max-w-md mx-auto" aria-live="polite" aria-label={t('search.progressAriaLabel')}>
+      <Row
+        label={
+          live.localSkipped
+            ? t('search.progressLocalSkipped')
+            : t('search.progressStepLocal')
+        }
+        active={Boolean(localActive)}
+        done={live.localDone || live.localSkipped}
+        skipped={live.localSkipped}
+        detail={localDetail}
+      />
+      <Row
+        label={t('search.progressStepIndexer')}
+        active={live.indexerRunning && !live.indexerDone && !live.indexerError}
+        done={live.indexerDone}
+        error={live.indexerError}
+        detail={indexerDetail}
+      />
+      <Row
+        label={t('search.progressStepTmdb')}
+        active={live.tmdbRunning}
+        done={live.tmdbDone && !live.tmdbSkipped}
+        skipped={live.tmdbSkipped}
+        detail={tmdbDetail}
+        dim={tmdbWaitingBeforeIndexerFinishes}
+      />
+    </ul>
+  );
+}
 
 function getSearchHistory(): string[] {
   try {
@@ -44,7 +208,190 @@ interface SearchProps {
 interface SearchResultPosterProps {
   result: SearchResult;
   onClick?: (result: SearchResult) => void;
-  isRequested?: boolean;
+}
+
+/** Pastille type EpisodeCards (« ÉPISODE n ») : indexer connu ou origine biblio / base sync. */
+function SearchIndexerBadge({
+  result,
+  t,
+}: {
+  result: SearchResult;
+  t: (key: string, params?: Record<string, string | number>) => string;
+}) {
+  const raw = result.indexerName?.trim();
+  if (raw) {
+    const display = raw.length > 22 ? `${raw.slice(0, 20)}…` : raw;
+    return (
+      <span
+        className="inline-block max-w-[10rem] sm:max-w-[11rem] px-2.5 py-1 rounded-full text-[10px] lg:text-[11px] tv:text-xs font-bold tracking-wide bg-black/50 border border-white/15 text-white/90 truncate shadow-md"
+        title={raw}
+        aria-label={raw}
+      >
+        {display}
+      </span>
+    );
+  }
+
+  if (result.sourceSearch === 'library') {
+    const label = t('search.badgeLibrary');
+    return (
+      <span
+        className="inline-block max-w-[9rem] px-2.5 py-1 rounded-full text-[10px] lg:text-[11px] tv:text-xs font-bold tracking-wide bg-black/50 border border-white/15 text-white/90 truncate shadow-md"
+        title={t('search.badgeLibraryHint')}
+        aria-label={label}
+      >
+        {label}
+      </span>
+    );
+  }
+
+  if (result.sourceSearch === 'sync') {
+    const label = t('search.badgeSyncedDb');
+    return (
+      <span
+        className="inline-block max-w-[10rem] px-2.5 py-1 rounded-full text-[10px] lg:text-[11px] tv:text-xs font-bold tracking-wide bg-black/50 border border-white/15 text-white/90 truncate shadow-md"
+        title={label}
+        aria-label={label}
+      >
+        {label}
+      </span>
+    );
+  }
+
+  if (result.sourceSearch === 'indexer') {
+    const label = t('search.badgeIndexer');
+    return (
+      <span
+        className="inline-block max-w-[10rem] px-2.5 py-1 rounded-full text-[10px] lg:text-[11px] tv:text-xs font-bold tracking-wide bg-black/50 border border-white/15 text-white/90 truncate shadow-md"
+        title={label}
+        aria-label={label}
+      >
+        {label}
+      </span>
+    );
+  }
+
+  return null;
+}
+
+/** Même vocabulaire visuel que les pastilles épisode (EpisodeCardsCarousel) : ambre = indexeur, bleu = disque, primary = releases. */
+function SearchResultAvailability({
+  result,
+  t,
+  showDownloadedBadge,
+}: {
+  result: SearchResult;
+  t: (key: string, params?: Record<string, string | number>) => string;
+  /** Icône disque alignée avec les pastilles, en bas à droite */
+  showDownloadedBadge?: boolean;
+}) {
+  const v = result.variantCount ?? 0;
+  const ei = result.episodesIndexerCount ?? 0;
+  const el = result.episodesLibraryCount ?? 0;
+  const sc = result.seasonCount;
+
+  type PillKind = 'indexer' | 'library' | 'variants' | 'meta';
+
+  type PillCfg = {
+    Icon: typeof Layers2;
+    n: number;
+    hint: string;
+    kind: PillKind;
+  };
+
+  const pills: PillCfg[] = [];
+
+  if (result.type === 'movie') {
+    if (v > 0)
+      pills.push({
+        Icon: Layers2,
+        n: v,
+        hint: t('search.cardVariantsIndexer', { count: v }),
+        kind: 'variants',
+      });
+  } else {
+    if (ei > 0) {
+      pills.push({
+        Icon: CloudDownload,
+        n: ei,
+        hint: t('search.cardEpisodesIndexer', { count: ei }),
+        kind: 'indexer',
+      });
+    } else if (v > 0) {
+      pills.push({
+        Icon: Layers2,
+        n: v,
+        hint: t('search.cardVariantsIndexer', { count: v }),
+        kind: 'variants',
+      });
+    }
+    if (el > 0) {
+      pills.push({
+        Icon: HardDrive,
+        n: el,
+        hint: t('search.cardEpisodesLibrary', { count: el }),
+        kind: 'library',
+      });
+    }
+    if (typeof sc === 'number' && sc > 0) {
+      pills.push({
+        Icon: FolderOpen,
+        n: sc,
+        hint: t('search.cardSeasonsInDb', { count: sc }),
+        kind: 'meta',
+      });
+    }
+  }
+
+  if (pills.length === 0 && !showDownloadedBadge) return null;
+
+  const capsule = (kind: PillKind): string => {
+    switch (kind) {
+      case 'indexer':
+        return 'bg-amber-500/80 border-amber-400/50 shadow-lg';
+      case 'library':
+        return 'bg-blue-500/80 border-blue-400/50 shadow-lg';
+      case 'variants':
+        return 'bg-primary-600/85 border-primary-400/50 shadow-primary';
+      default:
+        return 'bg-black/50 border-white/15 shadow-md';
+    }
+  };
+
+  return (
+    <div
+      className="pointer-events-none absolute bottom-2 left-2 right-2 z-20 flex flex-wrap gap-1.5 justify-end items-center"
+      role="group"
+      aria-label={
+        pills.length > 0 && showDownloadedBadge
+          ? `${t('search.cardAvailabilityGroup')} — ${t('search.downloaded') || ''}`
+          : pills.length > 0
+            ? t('search.cardAvailabilityGroup')
+            : t('search.downloaded') || ''
+      }
+    >
+      {pills.map((p, i) => (
+        <span
+          key={`${i}-${p.hint}`}
+          title={p.hint}
+          aria-label={p.hint}
+          className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 ${capsule(p.kind)}`}
+        >
+          <p.Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white shrink-0" strokeWidth={2.5} aria-hidden />
+          <span className="text-[10px] sm:text-xs font-bold tabular-nums leading-none text-white">{p.n}</span>
+        </span>
+      ))}
+      {showDownloadedBadge ? (
+        <span
+          className="inline-flex items-center justify-center p-1.5 lg:p-2 rounded-full bg-blue-500/80 border border-blue-400/50 shadow-lg shrink-0 animate-fade-in"
+          title={t('search.downloaded') || 'En bibliothèque'}
+          aria-label={t('search.downloaded') || 'En bibliothèque'}
+        >
+          <HardDrive className="w-4 h-4 lg:w-[18px] lg:h-[18px] text-white" strokeWidth={2.5} />
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 /** URL de détail : priorité TMDB (tmdbId + type), fallback slug. Discover si pas de torrent (id tmdb-xxx). */
@@ -69,16 +416,10 @@ function getDetailUrl(result: SearchResult): string {
   return `/torrents?slug=${encodeURIComponent(result.id)}&from=search`;
 }
 
-/** URL page Discover pour demander le média (quand pas de torrent) */
-function getRequestUrl(result: SearchResult): string | null {
-  if (result.tmdbId == null) return null;
-  return `/discover?tmdbId=${result.tmdbId}&type=${result.type}`;
-}
-
 /**
  * Composant pour afficher un résultat de recherche dans un style moderne
  */
-function SearchResultPoster({ result, onClick, isRequested }: SearchResultPosterProps) {
+function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
   const { t } = useI18n();
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -104,16 +445,23 @@ function SearchResultPoster({ result, onClick, isRequested }: SearchResultPoster
     }
   };
 
+  const cardActive = isHovered || isFocused;
+
   return (
     <div
-      className="relative group cursor-pointer torrent-poster min-w-[140px] sm:min-w-[160px] md:min-w-[180px] lg:min-w-[280px] xl:min-w-[320px] tv:min-w-[400px]"
+      className="relative group torrent-poster min-w-[140px] sm:min-w-[160px] md:min-w-[180px] lg:min-w-[280px] xl:min-w-[320px] tv:min-w-[400px] cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <FocusableCard
-        className="w-full"
+        ariaLabel={result.title}
+        className={`w-full block text-left rounded-2xl overflow-hidden border transition duration-200 ${
+          cardActive
+            ? 'border-primary-500/50 bg-primary-500/10'
+            : 'border-white/10 bg-white/5 hover:bg-white/10'
+        }`}
         onClick={handleClick}
-        href={detailUrl}
+        href={onClick ? undefined : detailUrl}
         tabIndex={0}
         onFocus={(e) => {
           setIsFocused(true);
@@ -125,12 +473,13 @@ function SearchResultPoster({ result, onClick, isRequested }: SearchResultPoster
           setIsHovered(false);
         }}
       >
-          <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900 shadow-md rounded-lg transform transition-all duration-200 ease-out hover:scale-[1.02] focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-1 focus-within:ring-offset-black will-change-transform">
+        {/* Même principe que DownloadCard / EpisodeCardsCarousel : vignette 16:9 + bloc texte */}
+        <div className="relative aspect-video w-full overflow-hidden bg-black/30">
           {imageUrl ? (
             <img
               src={imageUrl}
-              alt={result.title}
-              className="w-full h-full object-cover"
+              alt=""
+              className="absolute inset-0 w-full h-full object-cover z-0"
               loading="lazy"
               decoding="async"
               onError={(e) => {
@@ -138,129 +487,160 @@ function SearchResultPoster({ result, onClick, isRequested }: SearchResultPoster
               }}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
-              <div className="text-center p-4">
-                <div className="text-4xl mb-2">🎬</div>
-                <p className="text-xs text-gray-400 line-clamp-2">{result.title}</p>
-              </div>
+            <div className="absolute inset-0 z-0 flex flex-col items-center justify-center bg-gradient-to-br from-white/10 via-black/40 to-black/80">
+              <Film className="w-10 h-10 tv:w-12 tv:h-12 text-white/25 shrink-0" strokeWidth={1.75} aria-hidden />
             </div>
           )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent z-10 pointer-events-none" />
 
-          {/* Badge type */}
-          <div className="absolute top-2 left-2 lg:top-3 lg:left-3 tv:top-4 tv:left-4 z-10 flex flex-col gap-2">
-            <div className={`w-6 h-6 lg:w-8 lg:h-8 tv:w-12 tv:h-12 rounded flex items-center justify-center shadow-primary transition-all duration-200 ${
-              result.type === 'movie' ? 'bg-primary-600' : 'bg-primary-500'
-            }`}>
-              <span className="text-white text-xs lg:text-sm tv:text-base font-bold">
-                {result.type === 'movie' ? 'F' : 'S'}
-              </span>
-            </div>
-            
-            {result.isDownloaded && (
-              <div className="bg-emerald-500/90 backdrop-blur-md rounded px-2 py-0.5 lg:px-2.5 lg:py-1 flex items-center gap-1.5 shadow-[0_4px_12px_rgba(16,185,129,0.3)] border border-emerald-400/30 animate-fade-in">
-                <svg className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-white text-[9px] lg:text-[11px] font-bold uppercase tracking-widest">
-                  {t('search.downloaded') || 'En bibliothèque'}
-                </span>
-              </div>
-            )}
-
-            {!result.isDownloaded && isRequested && (
-              <div className="bg-primary-500/90 backdrop-blur-md rounded px-2 py-0.5 lg:px-2.5 lg:py-1 flex items-center gap-1.5 shadow-[0_4px_12px_rgba(var(--primary-rgb),0.3)] border border-primary-400/30 animate-fade-in">
-                <svg className="w-3.5 h-3.5 lg:w-4 lg:h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-white text-[9px] lg:text-[11px] font-bold uppercase tracking-widest">
-                  {t('requests.requested') || 'Déjà demandé'}
-                </span>
-              </div>
-            )}
+          <div className="absolute left-3 top-3 z-20 flex flex-col gap-2 items-start">
+            <SearchIndexerBadge result={result} t={t} />
           </div>
 
-          {/* Overlay au survol */}
-          {showOverlay && (
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent flex flex-col justify-end p-3 lg:p-4 tv:p-6 pb-10 lg:pb-12 tv:pb-16 transition-opacity pointer-events-none">
-              <div className="space-y-1.5 lg:space-y-2 tv:space-y-3">
-                <h3 className="text-white font-semibold text-sm lg:text-base tv:text-lg line-clamp-1">
-                  {result.title}
-                </h3>
-                <div className="flex items-center gap-2 text-xs lg:text-sm tv:text-base text-gray-300 flex-wrap">
-                  {result.year && (
-                    <>
-                      <span>{result.year}</span>
-                      <span>•</span>
-                    </>
-                  )}
-                  <span className="capitalize">{result.type === 'movie' ? t('common.film') : t('common.serie')}</span>
-                </div>
-                {result.overview && (
-                  <p className="text-xs lg:text-sm tv:text-base text-gray-300 line-clamp-2 mt-2">
-                    {result.overview}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
+          <SearchResultAvailability result={result} t={t} showDownloadedBadge={result.isDownloaded === true} />
 
-          {showOverlay && (result.isDownloaded || getRequestUrl(result)) && (
-            <div className="absolute bottom-2 left-2 lg:bottom-3 lg:left-3 tv:bottom-4 tv:left-4 z-20 flex gap-2">
-              {result.isDownloaded ? (
-                <a
-                  href={detailUrl}
-                  onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold pointer-events-auto transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                  </svg>
-                  {t('common.watch') || 'Regarder'}
-                </a>
-              ) : getRequestUrl(result) && (
-                <a
-                  href={getRequestUrl(result)!}
-                  onClick={(e) => e.stopPropagation()}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-600 text-white text-xs font-medium pointer-events-auto transition-colors"
-                >
-                  {t('requests.requestMedia')}
-                </a>
-              )}
+          {/* Survol : résumé uniquement (titre lisible sous la vignette comme épisodes / téléchargements) */}
+          {showOverlay && result.overview && (
+            <div className="absolute inset-0 z-[18] bg-gradient-to-b from-black/20 via-black/55 to-black/90 flex flex-col justify-end p-3 lg:p-4 tv:p-5 pointer-events-none transition-opacity">
+              <p className="text-xs lg:text-sm tv:text-base text-white/90 line-clamp-3 leading-snug">{result.overview}</p>
             </div>
           )}
+        </div>
+
+        <div className="p-3 sm:p-4 tv:p-5 text-left">
+          <div className="text-base tv:text-lg font-semibold text-white truncate" title={result.title}>
+            {result.title}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm tv:text-base text-white/60 mt-1">
+            {result.year ? (
+              <>
+                <span>{result.year}</span>
+                <span className="w-1 h-1 shrink-0 rounded-full bg-white/25" aria-hidden />
+              </>
+            ) : null}
+            <span className="capitalize">{result.type === 'movie' ? t('common.film') : t('common.serie')}</span>
+          </div>
         </div>
       </FocusableCard>
     </div>
   );
 }
 
-/**
- * Regroupe les résultats de recherche par TMDB ID pour éviter les doublons (plusieurs torrents pour le même média).
- */
-function groupSearchResults(results: SearchResult[]): SearchResult[] {
-  const groups = new Map<string, SearchResult>();
+function normalizeForSearchMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[''`´]/g, '')
+    .replace(/[^a-z0-9À-ÿ\u00C0-\u024F\s]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
 
-  for (const r of results) {
-    // Clé de groupe : tmdbId si présent (>0), sinon titre + type (fallback)
-    const key = (r.tmdbId && r.tmdbId > 0)
-      ? `${r.tmdbId}-${r.type}`
-      : `${r.title.toLowerCase().trim()}-${r.type}`;
+/** Score 0–100 : à quel point le titre colle à la requête (sans bonus poster / bibliothèque). */
+function titleQueryMatchScore(query: string, title: string): number {
+  const q = normalizeForSearchMatch(query);
+  const tn = normalizeForSearchMatch(title);
+  if (!q || !tn) return 0;
 
-    if (!groups.has(key)) {
-      groups.set(key, r);
-    } else {
-      // Si on a déjà un résultat pour ce média, on garde celui qui a un poster s'il existe
-      const existing = groups.get(key)!;
-      if (!existing.poster && r.poster) {
-        groups.set(key, r);
+  const qWords = q.split(' ').filter((w) => w.length >= 2);
+  if (qWords.length === 0) return 0;
+
+  if (tn === q) return 100;
+  if (tn.startsWith(q) || q.startsWith(tn)) return 93;
+  if (tn.includes(q)) return 88 - Math.min(28, Math.max(0, tn.length - q.length) * 1.2);
+
+  let matched = 0;
+  const titleWords = new Set(tn.split(' ').filter((w) => w.length >= 2));
+  for (const w of qWords) {
+    if (titleWords.has(w)) {
+      matched += 1;
+      continue;
+    }
+    for (const tw of titleWords) {
+      if (tw.includes(w) || w.includes(tw)) {
+        matched += 0.55;
+        break;
       }
     }
   }
-
-  return Array.from(groups.values());
+  let score = (matched / qWords.length) * 78;
+  const significant = qWords.filter((w) => w.length >= 4);
+  if (significant.length > 0 && significant.every((w) => tn.includes(w))) {
+    score = Math.max(score, 72);
+  }
+  return score;
 }
 
-type SearchPhase = 'idle' | 'local' | 'indexer';
+/** Tri final : titre + petite prime bibliothèque / affichage. */
+function searchResultRank(result: SearchResult, query: string): number {
+  let s = titleQueryMatchScore(query, result.title);
+  if (result.isDownloaded) s += 15;
+  if (result.poster) s += 2;
+  return s;
+}
+
+function pickBetterDuplicateForQuery(a: SearchResult, b: SearchResult, query: string): SearchResult {
+  const ta = titleQueryMatchScore(query, a.title);
+  const tb = titleQueryMatchScore(query, b.title);
+
+  let chosen: SearchResult;
+  let other: SearchResult;
+
+  if (tb > ta) {
+    chosen = b;
+    other = a;
+  } else if (ta > tb) {
+    chosen = a;
+    other = b;
+  } else if (a.isDownloaded && !b.isDownloaded) {
+    chosen = a;
+    other = b;
+  } else if (b.isDownloaded && !a.isDownloaded) {
+    chosen = b;
+    other = a;
+  } else if (a.poster && !b.poster) {
+    chosen = a;
+    other = b;
+  } else if (b.poster && !a.poster) {
+    chosen = b;
+    other = a;
+  } else {
+    chosen = a;
+    other = b;
+  }
+
+  const rank = (s?: SearchResult['sourceSearch']) =>
+    s === 'indexer' ? 3 : s === 'sync' ? 2 : s === 'library' ? 1 : 0;
+  const sourceSearch =
+    rank(chosen.sourceSearch) >= rank(other.sourceSearch)
+      ? chosen.sourceSearch ?? other.sourceSearch
+      : other.sourceSearch ?? chosen.sourceSearch;
+  const mergedName =
+    chosen.indexerName?.trim() || other.indexerName?.trim() || undefined;
+
+  return { ...chosen, sourceSearch, indexerName: mergedName };
+}
+
+/**
+ * Déduplication par TMDB (ou titre+type), choix de la meilleure variante pour la requête,
+ * puis tri par pertinence (le titre qui correspond le plus en premier).
+ */
+function groupAndRankSearchResults(results: SearchResult[], query: string): SearchResult[] {
+  const q = query.trim();
+  const groups = new Map<string, SearchResult>();
+
+  for (const r of results) {
+    const key =
+      r.tmdbId && r.tmdbId > 0 ? `${r.tmdbId}-${r.type}` : `${r.title.toLowerCase().trim()}-${r.type}`;
+
+    const existing = groups.get(key);
+    if (!existing) groups.set(key, r);
+    else groups.set(key, pickBetterDuplicateForQuery(existing, r, q));
+  }
+
+  return Array.from(groups.values()).sort((a, b) => searchResultRank(b, q) - searchResultRank(a, q));
+}
+
+type SearchPhase = 'idle' | 'local' | 'indexer' | 'tmdb';
 
 export default function Search({ onResultClick }: SearchProps) {
   const { t, language } = useI18n();
@@ -270,19 +650,12 @@ export default function Search({ onResultClick }: SearchProps) {
   const [tmdbFallbackResults, setTmdbFallbackResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchPhase, setSearchPhase] = useState<SearchPhase>('idle');
+  const [searchLive, setSearchLive] = useState<SearchLiveProgressState>(() => initialSearchLiveProgress());
   const [error, setError] = useState<string | null>(null);
   const [forceIndexerSearch] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>(() => getSearchHistory());
-  const [myRequests, setMyRequests] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const prevLoadingRef = useRef(false);
-
-  // Charger les demandes de l'utilisateur
-  useEffect(() => {
-    serverApi.listMediaRequests({ user_id: serverApi.getCurrentUserId() ?? '' }).then((res: { success: boolean; data?: any[] }) => {
-      if (res.success && res.data) setMyRequests(res.data);
-    });
-  }, []);
 
   useEffect(() => {
     if (inputRef.current && typeof window !== 'undefined') {
@@ -292,7 +665,18 @@ export default function Search({ onResultClick }: SearchProps) {
 
   // Organiser les résultats par type (déclaré avant le useEffect qui en dépend)
   // Regrouper par TMDB ID pour éviter les doublons
-  const groupedResults = useMemo(() => groupSearchResults(results), [results]);
+  const groupedResults = useMemo(
+    () => groupAndRankSearchResults(results, query.trim()),
+    [results, query],
+  );
+
+  const sortedTmdbFallback = useMemo(
+    () =>
+      [...tmdbFallbackResults].sort(
+        (a, b) => searchResultRank(b, query.trim()) - searchResultRank(a, query.trim()),
+      ),
+    [tmdbFallbackResults, query],
+  );
   const movies = groupedResults.filter(r => r.type === 'movie');
   const series = groupedResults.filter(r => r.type === 'tv');
   const allResults = type === 'all' ? groupedResults : (type === 'movie' ? movies : series);
@@ -344,19 +728,28 @@ export default function Search({ onResultClick }: SearchProps) {
     try {
       setLoading(true);
       setError(null);
-      setSearchPhase('local');
-
-      if (!serverApi.isAuthenticated()) {
-        setError(t('search.mustBeLoggedIn'));
-        setLoading(false);
-        setSearchPhase('idle');
-        return;
-      }
+      setSearchLive(initialSearchLiveProgress());
 
       const typeParam = type === 'all' ? undefined : type;
 
+      if (!serverApi.isAuthenticated()) {
+        setError(t('search.mustBeLoggedIn'));
+        setSearchPhase('idle');
+        setSearchLive(initialSearchLiveProgress());
+        setLoading(false);
+        return;
+      }
+
+      /** Recherche directe indexeurs (sans étape locale) */
       if (forceIndexerSearch) {
         setSearchPhase('indexer');
+        setSearchLive({
+          ...initialSearchLiveProgress(),
+          localSkipped: true,
+          indexerRunning: true,
+        });
+        await yieldToPaint();
+
         const indexerRes = await serverApi.search({
           q: searchTerm,
           type: typeParam,
@@ -364,17 +757,52 @@ export default function Search({ onResultClick }: SearchProps) {
           lang: language,
           user_id: serverApi.getCurrentUserId() || undefined,
         });
+
+        const finalizeTmdbSkipped = () => {
+          setSearchLive((prev) => ({
+            ...prev,
+            tmdbSkipped: true,
+            tmdbDone: true,
+            tmdbMovies: 0,
+            tmdbSeries: 0,
+            tmdbRunning: false,
+          }));
+        };
+
         if (!indexerRes.success) {
           setError(indexerRes.message || t('search.indexerSearchError'));
+          setSearchLive((prev) => ({
+            ...prev,
+            indexerRunning: false,
+            indexerError: true,
+            indexerDone: false,
+          }));
+          finalizeTmdbSkipped();
           setLoading(false);
           setSearchPhase('idle');
           return;
         }
+
         const indexerData = indexerRes.data ?? [];
+        const idxCounts = countMoviesSeries(indexerData);
+        setSearchLive((prev) => ({
+          ...prev,
+          indexerRunning: false,
+          indexerDone: true,
+          indexerError: false,
+          indexerMovies: idxCounts.movies,
+          indexerSeries: idxCounts.series,
+        }));
         setResults(indexerData);
         CacheManager.set(cacheKey, indexerData, 60 * 60 * 1000);
         setTmdbFallbackResults([]);
+        await yieldToPaint();
+
         if (indexerData.length === 0 && searchTerm) {
+          setSearchPhase('tmdb');
+          setSearchLive((prev) => ({ ...prev, tmdbRunning: true }));
+          await yieldToPaint();
+
           const tmdbLang = language === 'fr' ? 'fr-FR' : 'en-US';
           const tmdbRes = await serverApi.searchTmdb({
             q: searchTerm,
@@ -382,28 +810,41 @@ export default function Search({ onResultClick }: SearchProps) {
             language: tmdbLang,
             page: 1,
           });
+
+          let mapped: SearchResult[] = [];
           if (tmdbRes.success && tmdbRes.data && tmdbRes.data.length > 0) {
-            setTmdbFallbackResults(
-              tmdbRes.data.map((r: any) => ({
-                id: r.id ?? `tmdb-${r.tmdbId}-${r.type}`,
-                title: r.title ?? '',
-                type: (r.type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv',
-                poster: r.poster ?? undefined,
-                year: r.year ?? undefined,
-                overview: r.overview ?? undefined,
-                tmdbId: r.tmdbId ?? 0,
-              }))
-            );
+            mapped = tmdbRes.data.map((r: Record<string, unknown>) => ({
+              id: String(r.id ?? `tmdb-${r.tmdbId}-${r.type}`),
+              title: String(r.title ?? ''),
+              type: ((r.type as string) === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv',
+              poster: r.poster as string | undefined,
+              year: r.year as number | undefined,
+              overview: r.overview as string | undefined,
+              tmdbId: Number(r.tmdbId ?? 0),
+            }));
+            setTmdbFallbackResults(mapped);
           } else {
             setTmdbFallbackResults([]);
           }
+          const tm = countMoviesSeries(mapped);
+          setSearchLive((prev) => ({
+            ...prev,
+            tmdbRunning: false,
+            tmdbDone: true,
+            tmdbSkipped: false,
+            tmdbMovies: tm.movies,
+            tmdbSeries: tm.series,
+          }));
         } else {
-          setTmdbFallbackResults([]);
+          finalizeTmdbSkipped();
         }
         setLoading(false);
         setSearchPhase('idle');
         return;
       }
+
+      setSearchPhase('local');
+      await yieldToPaint();
 
       const localRes = await serverApi.search({
         q: searchTerm,
@@ -414,18 +855,42 @@ export default function Search({ onResultClick }: SearchProps) {
 
       if (!localRes.success) {
         setError(localRes.message || 'Erreur lors de la recherche');
+        setSearchLive(initialSearchLiveProgress());
         setLoading(false);
         setSearchPhase('idle');
         return;
       }
 
       const localData = localRes.data ?? [];
+      const localCounts = countMoviesSeries(localData);
+      setSearchLive((prev) => ({
+        ...prev,
+        localDone: true,
+        localMovies: localCounts.movies,
+        localSeries: localCounts.series,
+        indexerRunning: true,
+      }));
       if (localData.length > 0) {
         setResults(localData);
         setTmdbFallbackResults([]);
       }
 
+      await yieldToPaint();
+
+      const finalizeSkipTmdb = () => {
+        setSearchLive((prev) => ({
+          ...prev,
+          tmdbSkipped: true,
+          tmdbDone: true,
+          tmdbMovies: 0,
+          tmdbSeries: 0,
+          tmdbRunning: false,
+        }));
+      };
+
       setSearchPhase('indexer');
+      await yieldToPaint();
+
       const indexerRes = await serverApi.search({
         q: searchTerm,
         type: typeParam,
@@ -438,18 +903,42 @@ export default function Search({ onResultClick }: SearchProps) {
         if (localData.length === 0) {
           setError(indexerRes.message || 'Erreur lors de la recherche sur les indexeurs');
         }
+        setSearchLive((prev) => ({
+          ...prev,
+          indexerRunning: false,
+          indexerError: true,
+          indexerDone: false,
+          indexerMovies: 0,
+          indexerSeries: 0,
+        }));
+        finalizeSkipTmdb();
         setLoading(false);
         setSearchPhase('idle');
         return;
       }
 
       const indexerData = indexerRes.data ?? [];
+      const idxCounts2 = countMoviesSeries(indexerData);
       const combinedData = [...localData, ...indexerData];
+
+      setSearchLive((prev) => ({
+        ...prev,
+        indexerRunning: false,
+        indexerDone: true,
+        indexerError: false,
+        indexerMovies: idxCounts2.movies,
+        indexerSeries: idxCounts2.series,
+      }));
+
       setResults(combinedData);
       CacheManager.set(cacheKey, combinedData, 60 * 60 * 1000);
+      await yieldToPaint();
 
-      // Si toujours aucun torrent trouvé : recherche TMDB pour permettre "Demander"
       if (combinedData.length === 0 && searchTerm) {
+        setSearchPhase('tmdb');
+        setSearchLive((prev) => ({ ...prev, tmdbRunning: true }));
+        await yieldToPaint();
+
         const tmdbLang = language === 'fr' ? 'fr-FR' : 'en-US';
         const tmdbRes = await serverApi.searchTmdb({
           q: searchTerm,
@@ -457,23 +946,34 @@ export default function Search({ onResultClick }: SearchProps) {
           language: tmdbLang,
           page: 1,
         });
+
+        let mapped2: SearchResult[] = [];
         if (tmdbRes.success && tmdbRes.data && tmdbRes.data.length > 0) {
-          setTmdbFallbackResults(
-            tmdbRes.data.map((r: any) => ({
-              id: r.id ?? `tmdb-${r.tmdbId}-${r.type}`,
-              title: r.title ?? '',
-              type: (r.type === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv',
-              poster: r.poster ?? undefined,
-              year: r.year ?? undefined,
-              overview: r.overview ?? undefined,
-              tmdbId: r.tmdbId ?? 0,
-            }))
-          );
+          mapped2 = tmdbRes.data.map((r: Record<string, unknown>) => ({
+            id: String(r.id ?? `tmdb-${r.tmdbId}-${r.type}`),
+            title: String(r.title ?? ''),
+            type: ((r.type as string) === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv',
+            poster: r.poster as string | undefined,
+            year: r.year as number | undefined,
+            overview: r.overview as string | undefined,
+            tmdbId: Number(r.tmdbId ?? 0),
+          }));
+          setTmdbFallbackResults(mapped2);
         } else {
           setTmdbFallbackResults([]);
         }
+        const tm2 = countMoviesSeries(mapped2);
+        setSearchLive((prev) => ({
+          ...prev,
+          tmdbRunning: false,
+          tmdbDone: true,
+          tmdbSkipped: false,
+          tmdbMovies: tm2.movies,
+          tmdbSeries: tm2.series,
+        }));
       } else {
         setTmdbFallbackResults([]);
+        finalizeSkipTmdb();
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
@@ -488,11 +988,12 @@ export default function Search({ onResultClick }: SearchProps) {
     setResults([]);
     setTmdbFallbackResults([]);
     setSearchPhase('idle');
+    setSearchLive(initialSearchLiveProgress());
     inputRef.current?.focus();
   };
 
   return (
-    <div className="min-h-screen bg-black text-white w-full">
+    <div className="min-h-screen bg-black text-white w-full min-w-0 max-w-[100vw] overflow-x-hidden">
       {/* Section Hero avec barre de recherche moderne */}
       <div className="relative w-full min-h-[350px] tv:min-h-[450px] mb-8 overflow-hidden bg-black flex flex-col items-center justify-center px-4">
         {/* Cercles de lumière animés en arrière-plan */}
@@ -573,26 +1074,9 @@ export default function Search({ onResultClick }: SearchProps) {
             </form>
 
 
-          </div>
-        </div>
-      {/* État vide pendant recherche indexeurs */}
-      {searchPhase === 'indexer' && allResults.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 text-center animate-fade-in">
-          <div className="relative mb-8">
-            <div className="absolute inset-0 bg-primary-500/20 blur-2xl rounded-full animate-pulse" />
-            <div className="relative w-20 h-20 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center backdrop-blur-xl">
-              <SearchIcon className="w-10 h-10 text-primary-400 animate-bounce-slow" />
-            </div>
-          </div>
-          <h3 className="text-2xl font-bold text-white mb-3">
-            {t('search.indexing') || 'Recherche approfondie...'}
-          </h3>
-          <p className="text-white/40 max-w-md mx-auto leading-relaxed">
-            {t('search.noLocalResults') || 'Aucun résultat local trouvé. Popcorn interroge les indexeurs pour vous.'}
-          </p>
-        </div>
-      )}
 
+          </div>
+        </div>
       {/* Affichage des résultats */}
       {error && (
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 tv:px-16 mb-6">
@@ -604,7 +1088,7 @@ export default function Search({ onResultClick }: SearchProps) {
 
       {/* Résultats organisés en carrousels */}
       {!loading && query && allResults.length > 0 && (
-        <div className="pb-8 tv:pb-12" data-search-results>
+        <div className="pb-8 tv:pb-12 w-full min-w-0 max-w-full overflow-x-hidden" data-search-results>
           {type === 'all' ? (
             <>
               {movies.length > 0 && (
@@ -613,8 +1097,7 @@ export default function Search({ onResultClick }: SearchProps) {
                     <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                       <SearchResultPoster 
                         result={result} 
-                        onClick={onResultClick} 
-                        isRequested={myRequests.some((r: any) => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                        onClick={onResultClick}
                       />
                     </div>
                   ))}
@@ -626,8 +1109,7 @@ export default function Search({ onResultClick }: SearchProps) {
                     <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                       <SearchResultPoster 
                         result={result} 
-                        onClick={onResultClick} 
-                        isRequested={myRequests.some((r: any) => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                        onClick={onResultClick}
                       />
                     </div>
                   ))}
@@ -640,8 +1122,7 @@ export default function Search({ onResultClick }: SearchProps) {
                 <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                   <SearchResultPoster 
                     result={result} 
-                    onClick={onResultClick} 
-                    isRequested={myRequests.some((r: any) => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                    onClick={onResultClick}
                   />
                 </div>
               ))}
@@ -654,46 +1135,52 @@ export default function Search({ onResultClick }: SearchProps) {
       {loading && (
         <div className="flex flex-col items-center justify-start py-6 tv:py-8 px-4 w-full max-w-[42rem] mx-auto -mt-2 sm:-mt-4">
           <LoadingCard
-            title={searchPhase === 'local' ? t('search.searchingLocal') : t('search.searchingIndexers')}
-            description={searchPhase === 'local' ? t('search.localSearchNote') : t('search.indexerSearchNote')}
+            title={
+              searchPhase === 'local'
+                ? t('search.searchingLocal')
+                : searchPhase === 'tmdb'
+                  ? t('search.searchingTmdb')
+                  : t('search.searchingIndexers')
+            }
+            description={t('search.searchLiveSubtitle')}
             showProgressBar={true}
-          />
+          >
+            <SearchLiveProgressTimeline live={searchLive} t={t} />
+          </LoadingCard>
         </div>
       )}
 
       {/* Aucun torrent trouvé mais résultats TMDB : proposer "Demander" */}
       {!loading && query && allResults.length === 0 && !error && tmdbFallbackResults.length > 0 && (
-        <div className="pb-8 tv:pb-12 container mx-auto px-4 sm:px-6 lg:px-8 tv:px-16" data-search-results>
+        <div className="pb-8 tv:pb-12 container mx-auto px-4 sm:px-6 lg:px-8 tv:px-16 w-full min-w-0 max-w-full overflow-x-hidden" data-search-results>
           <p className="text-gray-400 text-base tv:text-lg mb-4">
             {t('search.noTorrentsUseRequest')}
           </p>
           {type === 'all' ? (
             <>
-              {tmdbFallbackResults.filter((r) => r.type === 'movie').length > 0 && (
+              {sortedTmdbFallback.filter((r) => r.type === 'movie').length > 0 && (
                 <CarouselRow title={t('search.tmdbMoviesRequest')}>
-                  {tmdbFallbackResults
+                  {sortedTmdbFallback
                     .filter((r) => r.type === 'movie')
                     .map((result) => (
                       <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                         <SearchResultPoster 
                           result={result} 
-                          onClick={onResultClick} 
-                          isRequested={myRequests.some((r: any) => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                          onClick={onResultClick}
                         />
                       </div>
                     ))}
                 </CarouselRow>
               )}
-              {tmdbFallbackResults.filter((r) => r.type === 'tv').length > 0 && (
+              {sortedTmdbFallback.filter((r) => r.type === 'tv').length > 0 && (
                 <CarouselRow title={t('search.tmdbSeriesRequest')}>
-                  {tmdbFallbackResults
+                  {sortedTmdbFallback
                     .filter((r) => r.type === 'tv')
                     .map((result) => (
                       <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                         <SearchResultPoster 
                           result={result} 
-                          onClick={onResultClick} 
-                          isRequested={myRequests.some((r: any) => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                          onClick={onResultClick}
                         />
                       </div>
                     ))}
@@ -702,12 +1189,11 @@ export default function Search({ onResultClick }: SearchProps) {
             </>
           ) : (
             <CarouselRow title={t('search.tmdbRequestTitle')}>
-              {tmdbFallbackResults.map((result) => (
+              {sortedTmdbFallback.map((result) => (
                 <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                   <SearchResultPoster 
                     result={result} 
-                    onClick={onResultClick} 
-                    isRequested={myRequests.some((r: any) => r.tmdb_id === result.tmdbId && r.media_type === result.type)}
+                    onClick={onResultClick}
                   />
                 </div>
               ))}

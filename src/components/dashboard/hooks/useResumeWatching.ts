@@ -3,7 +3,6 @@ import type { ContentItem } from '../../../lib/client/types';
 import { RESUME_WATCHING_EVENT } from '../../../lib/resumeWatchingStorage';
 import { serverApi } from '../../../lib/client/server-api';
 
-const STORAGE_KEY = 'resumeWatching';
 const REWATCH_PROGRESS_THRESHOLD = 99;
 const TMDB_CACHE_TTL_MS = 60 * 60 * 1000; // 1h
 
@@ -16,7 +15,7 @@ const TMDB_CACHE_TTL_MS = 60 * 60 * 1000; // 1h
  */
 export type ResumeStatus = 'in_progress' | 'new_episode_available' | 'waiting_for_next' | 'finished';
 
-export interface EnrichedResumeItem extends ContentItem {
+export interface EnrichedResumeItem extends Omit<ContentItem, 'lastWatched'> {
   resumeStatus: ResumeStatus;
   /** Saison de l'épisode en cours (séries). */
   currentSeason?: number;
@@ -33,11 +32,11 @@ export interface EnrichedResumeItem extends ContentItem {
   nextEpisode?: number;
   /** Date ISO de diffusion du prochain épisode (si waiting_for_next). */
   nextEpisodeAirDate?: string;
-  /** Timestamp pour le tri. */
-  lastWatched?: number;
+  /** Date ISO (compatible ContentItem). */
+  lastWatched?: string;
 }
 
-interface StoredItem extends ContentItem {
+interface StoredItem extends Omit<ContentItem, 'lastWatched'> {
   lastWatched: number;
   season?: number;
   episode?: number;
@@ -91,25 +90,21 @@ async function getTmdbTv(tmdbId: number): Promise<TmdbTvData | null> {
   }
 }
 
-function readStoredItems(): StoredItem[] {
-  if (typeof localStorage === 'undefined') return [];
-  try {
-    let stored = localStorage.getItem(STORAGE_KEY);
-    // Migration silencieuse depuis l'ancien stockage sessionStorage.
-    if (!stored && typeof sessionStorage !== 'undefined') {
-      const legacy = sessionStorage.getItem(STORAGE_KEY);
-      if (legacy) {
-        localStorage.setItem(STORAGE_KEY, legacy);
-        sessionStorage.removeItem(STORAGE_KEY);
-        stored = legacy;
-      }
-    }
-    if (!stored) return [];
-    const data: StoredItem[] = JSON.parse(stored);
-    return data.slice().sort((a, b) => b.lastWatched - a.lastWatched);
-  } catch {
-    return [];
-  }
+function fromRemoteItem(item: any): StoredItem {
+  return {
+    id: item.content_id || item.id || '',
+    title: item.title || '',
+    type: item.tmdb_type === 'tv' ? 'tv' : 'movie',
+    poster: item.poster || undefined,
+    tmdbId: typeof item.tmdb_id === 'number' ? item.tmdb_id : null,
+    progress: typeof item.progress === 'number' ? item.progress : 0,
+    lastWatched: typeof item.last_watched === 'number' ? item.last_watched : Date.now(),
+    season: typeof item.season === 'number' ? item.season : undefined,
+    episode: typeof item.episode === 'number' ? item.episode : undefined,
+    variantId: typeof item.variant_id === 'string' ? item.variant_id : undefined,
+    positionSeconds: typeof item.position_seconds === 'number' ? item.position_seconds : undefined,
+    durationSeconds: typeof item.duration_seconds === 'number' ? item.duration_seconds : undefined,
+  };
 }
 
 /**
@@ -166,23 +161,29 @@ function computeTvStatus(
 }
 
 export function useResumeWatching() {
-  const [allItems, setAllItems] = useState<StoredItem[]>(() => readStoredItems());
+  const [allItems, setAllItems] = useState<StoredItem[]>([]);
   const [tmdbMap, setTmdbMap] = useState<Map<number, TmdbTvData | null>>(new Map());
 
-  // Recharge depuis sessionStorage à la demande (mount + events).
+  // Recharge depuis la DB.
   useEffect(() => {
-    const refresh = () => setAllItems(readStoredItems());
-    refresh();
+    const refresh = async () => {
+      const api = await serverApi.listResumeWatching({ limit: 50 });
+      if (api.success && Array.isArray(api.data)) {
+        const mapped = api.data.map(fromRemoteItem).sort((a, b) => b.lastWatched - a.lastWatched);
+        setAllItems(mapped);
+      } else {
+        setAllItems([]);
+      }
+    };
+    void refresh();
 
     if (typeof window === 'undefined') return;
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY || e.key === null) refresh();
+    const onResumeUpdated = () => {
+      void refresh();
     };
-    window.addEventListener('storage', onStorage);
-    window.addEventListener(RESUME_WATCHING_EVENT, refresh as EventListener);
+    window.addEventListener(RESUME_WATCHING_EVENT, onResumeUpdated as EventListener);
     return () => {
-      window.removeEventListener('storage', onStorage);
-      window.removeEventListener(RESUME_WATCHING_EVENT, refresh as EventListener);
+      window.removeEventListener(RESUME_WATCHING_EVENT, onResumeUpdated as EventListener);
     };
   }, []);
 
@@ -244,7 +245,7 @@ export function useResumeWatching() {
         variantId,
         positionSeconds,
         durationSeconds,
-        lastWatched,
+        lastWatched: new Date(lastWatched).toISOString(),
         ...statusInfo,
       };
 

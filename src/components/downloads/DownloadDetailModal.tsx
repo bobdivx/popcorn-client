@@ -10,6 +10,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { clientApi } from '../../lib/client/api';
 import { TorrentProgressBar, TorrentStatusBadge } from '../torrents/ui';
 import { formatBytes, formatSpeed, formatETA } from '../../lib/utils/formatBytes';
+import { isTorrentActivelySeeding } from '../../lib/utils/torrentSeeding';
 import { Modal } from '../ui/Modal';
 
 interface DownloadDetailModalProps {
@@ -105,6 +106,7 @@ export function DownloadDetailModal({
   const upSpeed = live?.upload_speed?.human_readable || formatSpeed(activeTorrent.upload_speed);
   const eta = live?.time_remaining?.human_readable || formatETA(activeTorrent.eta_seconds);
   const peers = live?.snapshot?.peer_stats?.live ?? (activeTorrent.peers_connected || 0);
+  const activeSeeding = isTorrentActivelySeeding(activeTorrent);
 
   const handleAddTracker = async () => {
     if (!newTrackerUrl.trim()) return;
@@ -145,7 +147,7 @@ export function DownloadDetailModal({
             <span className="font-semibold hidden sm:inline">{t('common.back')}</span>
           </button>
           <div className="flex items-center gap-3">
-             <TorrentStatusBadge state={activeTorrent.state} className="scale-90 sm:scale-110" />
+             <TorrentStatusBadge state={activeTorrent.state} seedingActive={activeSeeding} className="scale-90 sm:scale-110" />
           </div>
         </div>
 

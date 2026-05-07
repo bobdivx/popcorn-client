@@ -116,7 +116,15 @@ export const settingsMethods = {
     return this.backendRequest('/api/admin/tracker-mode/config', { method: 'GET' });
   },
   /** GET /api/admin/seeding-diagnostic — infos pour diagnostiquer le partage (UPnP, ratio, librqbit) */
-  async getSeedingDiagnostic(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{ upnp_enabled: boolean; ratio_mode_enabled: boolean; librqbit_ok: boolean; listen_port: number | null }>> {
+  async getSeedingDiagnostic(this: ServerApiClientSettingsAccess): Promise<
+    ApiResponse<{
+      upnp_enabled: boolean;
+      ratio_mode_enabled: boolean;
+      librqbit_ok: boolean;
+      listen_port: number | null;
+      warnings?: string[];
+    }>
+  > {
     return this.backendRequest('/api/admin/seeding-diagnostic', { method: 'GET' });
   },
   /** PUT /api/admin/tracker-mode/config — active/désactive le mode (session en cours) */

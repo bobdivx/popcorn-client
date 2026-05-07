@@ -187,6 +187,18 @@ export interface SearchResult {
   tmdbId?: number;
   /** Indique si le média est déjà téléchargé dans la bibliothèque locale */
   isDownloaded?: boolean;
+  /** Torrents synchronisés en base pour ce titre (film ou série agrégée) */
+  variantCount?: number;
+  /** Pour une série TMDB : saisons suivies dans la médiathèque sync */
+  seasonCount?: number;
+  /** Couples saison/épisode distincts ayant au moins une release indexer connue */
+  episodesIndexerCount?: number;
+  /** Fichiers épisode SERIES détectés en bibliothèque locale (scan disque) */
+  episodesLibraryCount?: number;
+  /** Nom d'indexeur (recherche live ou variante synchronisée). */
+  indexerName?: string;
+  /** Bibliothèque disque / sync base / résultat indexer. */
+  sourceSearch?: 'library' | 'sync' | 'indexer';
 }
 
 // ==================== STREAMING ====================

@@ -45,7 +45,7 @@ export function GenreCardsRow({
           </h2>
         </div>
 
-        <div className="relative">
+        <div className="relative w-full min-w-0 max-w-full overflow-x-hidden">
           <button
             type="button"
             onClick={() => scrollByCards(-1)}
@@ -68,7 +68,7 @@ export function GenreCardsRow({
 
           <div
             ref={scrollerRef}
-            className="overflow-x-auto no-scrollbar py-1 px-1"
+            className="w-full min-w-0 overflow-x-auto overscroll-x-contain no-scrollbar py-1 px-1"
             style={{
               scrollSnapType: 'x mandatory',
               scrollbarWidth: 'none',

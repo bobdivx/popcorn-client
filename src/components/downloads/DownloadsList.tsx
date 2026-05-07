@@ -13,8 +13,6 @@ import { Modal } from '../ui/Modal';
 
 const REFRESH_INTERVAL = 2000;
 
-const tmdbImageCache = new Map<string, { posterUrl: string | null; backdropUrl: string | null }>();
-
 function buildImageMapFromList(data: { data?: Array<Record<string, any>> }) {
   const map: Record<string, any> = {};
   if (!data?.data) return map;
@@ -91,6 +89,21 @@ function getTorrentPriority(torrent: ClientTorrentStats): number {
   return 0;
 }
 
+function sortTorrentsDeterministic(items: ClientTorrentStats[]): ClientTorrentStats[] {
+  return [...items].sort((a, b) => {
+    const prioDiff = getTorrentPriority(b) - getTorrentPriority(a);
+    if (prioDiff !== 0) return prioDiff;
+
+    const progressDiff = (b.progress ?? 0) - (a.progress ?? 0);
+    if (progressDiff !== 0) return progressDiff;
+
+    const seedDiff = (b.seeders ?? 0) - (a.seeders ?? 0);
+    if (seedDiff !== 0) return seedDiff;
+
+    return (a.name ?? '').localeCompare(b.name ?? '', 'fr', { sensitivity: 'base' });
+  });
+}
+
 export default function DownloadsList() {
   const { t } = useI18n();
   const [torrents, setTorrents] = useState<ClientTorrentStats[]>([]);
@@ -113,6 +126,7 @@ export default function DownloadsList() {
   const [selectedRelatedTorrents, setSelectedRelatedTorrents] = useState<ClientTorrentStats[]>([]);
   const [selectedTorrentPoster, setSelectedTorrentPoster] = useState<string | null>(null);
   const [selectedTorrentBackdrop, setSelectedTorrentBackdrop] = useState<string | null>(null);
+  const [initialHydrated, setInitialHydrated] = useState(false);
 
   const [showSessionLogsModal, setShowSessionLogsModal] = useState(false);
   const [sessionLogsLines, setSessionLogsLines] = useState<string[]>([]);
@@ -139,42 +153,48 @@ export default function DownloadsList() {
 
   const loadTorrents = useCallback(async () => {
     try {
+      // 1) Toujours récupérer la liste torrents
       const list = await clientApi.listTorrents();
-      setTorrents(list);
 
-      // Mettre à jour le torrent sélectionné s'il existe
-      setSelectedTorrent(prev => {
-        if (!prev) return null;
-        return list.find(t => t.info_hash === prev.info_hash) || prev;
-      });
-
-      // Enrichissement TMDB — effectué une seule fois au chargement initial
+      // 2) Hydratation initiale: enrichir avant premier rendu complet
       if (!hasEnrichedRef.current) {
-        hasEnrichedRef.current = true;
-        setLoading(false);
-        const enriched = await clientApi.listTorrentsEnriched();
-        const images: any = {}, titles: any = {}, types: any = {};
-        const needsTmdb: Array<{ key: string; title: string; type: string }> = [];
+        try {
+          const [enriched, libraryResponse] = await Promise.all([
+            clientApi.listTorrentsEnriched(),
+            (async () => {
+              const { serverApi } = await import('../../lib/client/server-api');
+              return serverApi.getLibrary().catch(() => null);
+            })(),
+          ]);
 
-        for (const t of enriched) {
-          const key = t.info_hash.toLowerCase();
-          images[key] = { posterUrl: t.poster_url ?? null, backdropUrl: t.hero_image_url ?? null };
-          if (t.tmdb_title) titles[key] = t.tmdb_title;
-          if (t.tmdb_type) types[key] = t.tmdb_type;
+          const images: Record<string, { posterUrl: string | null; backdropUrl: string | null }> = {};
+          const titles: Record<string, string> = {};
+          const types: Record<string, string> = {};
 
-          // Collecter les torrents sans image pour fallback TMDB
-          if (!t.poster_url && !t.hero_image_url && t.tmdb_title) {
-            needsTmdb.push({ key, title: t.tmdb_title, type: t.tmdb_type ?? 'movie' });
+          const needsTmdb: Array<{ key: string; title: string; type: string }> = [];
+          for (const t of enriched) {
+            const key = t.info_hash.toLowerCase();
+            images[key] = { posterUrl: t.poster_url ?? null, backdropUrl: t.hero_image_url ?? null };
+            if (t.tmdb_title) titles[key] = t.tmdb_title;
+            if (t.tmdb_type) types[key] = t.tmdb_type;
+            if (!t.poster_url && !t.hero_image_url && t.tmdb_title) {
+              needsTmdb.push({ key, title: t.tmdb_title, type: t.tmdb_type ?? 'movie' });
+            }
           }
-        }
 
-        setImageMap(prev => ({ ...prev, ...images }));
-        setDisplayTitleMap(prev => ({ ...prev, ...titles }));
-        setTmdbTypeMap(prev => ({ ...prev, ...types }));
+          if (libraryResponse?.success) {
+            const lib = buildImageMapFromLibrary(libraryResponse as any);
+            Object.assign(images, lib.images);
+            Object.assign(titles, lib.titles);
+            Object.assign(types, lib.types);
+          }
 
-        // Fallback : recherche TMDB par titre pour les torrents sans image
-        if (needsTmdb.length > 0) {
-          try {
+          setImageMap(images);
+          setDisplayTitleMap(titles);
+          setTmdbTypeMap(types);
+
+          // Fallback TMDB optionnel (non bloquant pour le premier rendu)
+          if (needsTmdb.length > 0) {
             const { serverApi } = await import('../../lib/client/server-api');
             const baseUrl = serverApi.getServerUrl().trim().replace(/\/$/, '');
             const token = serverApi.getAccessToken();
@@ -183,7 +203,7 @@ export default function DownloadsList() {
               ...(token ? { Authorization: `Bearer ${token}` } : {}),
             };
 
-            const results = await Promise.allSettled(
+            void Promise.allSettled(
               needsTmdb.map(async ({ key, title, type }) => {
                 try {
                   const params = new URLSearchParams({ q: title, type });
@@ -196,7 +216,7 @@ export default function DownloadsList() {
                   const posterPath = hit.poster_path ?? hit.poster ?? null;
                   const backdropPath = hit.backdrop_path ?? hit.backdrop ?? null;
                   const posterUrl = posterPath
-                    ? (posterPath.startsWith('http') ? posterPath : `https://image.tmdb.org/t/p/w500${posterPath}`)
+                    ? (posterPath.startsWith('http') ? posterPath : `https://image.tmdb.org/t/p/w780${posterPath}`)
                     : null;
                   const backdropUrl = backdropPath
                     ? (backdropPath.startsWith('http') ? backdropPath : `https://image.tmdb.org/t/p/w1280${backdropPath}`)
@@ -208,18 +228,34 @@ export default function DownloadsList() {
                     }));
                   }
                 } catch {
-                  // silencieux
+                  // optionnel
                 }
-              })
+              }),
             );
-            void results; // éviter unused warning
-          } catch {
-            // fallback TMDB optionnel, erreur silencieuse
           }
+
+          hasEnrichedRef.current = true;
+        } catch {
+          // En cas d'échec, on continue avec la liste brute.
         }
       }
-    } catch (e) { console.error(e); }
-  }, []);
+
+      setTorrents(list);
+      if (!initialHydrated) {
+        setInitialHydrated(true);
+      }
+
+      // Mettre à jour le torrent sélectionné s'il existe
+      setSelectedTorrent(prev => {
+        if (!prev) return null;
+        return list.find(t => t.info_hash === prev.info_hash) || prev;
+      });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }, [initialHydrated]);
 
   useEffect(() => {
     loadTorrents();
@@ -228,6 +264,7 @@ export default function DownloadsList() {
   }, [loadTorrents]);
 
   useEffect(() => {
+    if (!initialHydrated) return;
     if (torrents.length === 0) return;
     (async () => {
       try {
@@ -241,10 +278,16 @@ export default function DownloadsList() {
         }
       } catch {}
     })();
-  }, [torrents.length]);
+  }, [initialHydrated, torrents.length]);
 
-  const moviesTorrents = useMemo(() => torrents.filter(t => tmdbTypeMap[t.info_hash.toLowerCase()] === 'movie'), [torrents, tmdbTypeMap]);
-  const seriesTorrents = useMemo(() => torrents.filter(t => tmdbTypeMap[t.info_hash.toLowerCase()] === 'tv'), [torrents, tmdbTypeMap]);
+  const moviesTorrents = useMemo(
+    () => sortTorrentsDeterministic(torrents.filter(t => tmdbTypeMap[t.info_hash.toLowerCase()] === 'movie')),
+    [torrents, tmdbTypeMap],
+  );
+  const seriesTorrents = useMemo(
+    () => sortTorrentsDeterministic(torrents.filter(t => tmdbTypeMap[t.info_hash.toLowerCase()] === 'tv')),
+    [torrents, tmdbTypeMap],
+  );
   const groupedSeriesData = useMemo(() => {
     const groups = new Map<string, { representative: ClientTorrentStats; index: number; torrents: ClientTorrentStats[] }>();
     seriesTorrents.forEach((torrent, index) => {
@@ -271,7 +314,13 @@ export default function DownloadsList() {
       }
     });
 
-    const orderedGroups = Array.from(groups.values()).sort((a, b) => a.index - b.index);
+    const orderedGroups = Array.from(groups.values()).sort((a, b) => {
+      const prioDiff = getTorrentPriority(b.representative) - getTorrentPriority(a.representative);
+      if (prioDiff !== 0) return prioDiff;
+      const progressDiff = (b.representative.progress ?? 0) - (a.representative.progress ?? 0);
+      if (progressDiff !== 0) return progressDiff;
+      return a.index - b.index;
+    });
     const groupedSeriesTorrents = orderedGroups.map(group => group.representative);
     const representativeToGroupMap: Record<string, ClientTorrentStats[]> = {};
     orderedGroups.forEach((group) => {
@@ -281,48 +330,61 @@ export default function DownloadsList() {
   }, [seriesTorrents, displayTitleMap]);
   const groupedSeriesTorrents = groupedSeriesData.groupedSeriesTorrents;
   const representativeToGroupMap = groupedSeriesData.representativeToGroupMap;
-  const otherTorrents = useMemo(() => torrents.filter(t => {
-     const type = tmdbTypeMap[t.info_hash.toLowerCase()];
-     return type !== 'movie' && type !== 'tv';
-  }), [torrents, tmdbTypeMap]);
+  const otherTorrents = useMemo(
+    () =>
+      sortTorrentsDeterministic(
+        torrents.filter(t => {
+          const type = tmdbTypeMap[t.info_hash.toLowerCase()];
+          return type !== 'movie' && type !== 'tv';
+        }),
+      ),
+    [torrents, tmdbTypeMap],
+  );
 
-  const handleOpenDetail = (tor, p, b) => {
+  const handleOpenDetail = (
+    tor: ClientTorrentStats,
+    p?: string | null,
+    b?: string | null,
+  ) => {
     const group = representativeToGroupMap[tor.info_hash];
     setSelectedRelatedTorrents(group && group.length > 0 ? group : [tor]);
     setSelectedTorrent(tor);
-    setSelectedTorrentPoster(p);
-    setSelectedTorrentBackdrop(b);
+    setSelectedTorrentPoster(p ?? null);
+    setSelectedTorrentBackdrop(b ?? null);
   };
   const handleCloseDetail = () => {
     setSelectedTorrent(null);
     setSelectedRelatedTorrents([]);
   };
 
-  const handleShowLogs = async (h) => { 
+  const handleShowLogs = async (h: string) => { 
     setSelectedTorrentHash(h); setShowLogsModal(true); setLogsLoading(true);
     try { setLogs(filterLogs(await clientApi.getTorrentLogs(h))); } catch { } finally { setLogsLoading(false); }
   };
 
-  const renderCarousel = (title, items) => {
+  const renderCarousel = (title: string, items: ClientTorrentStats[]) => {
     if (items.length === 0) return null;
     return (
-      <div className="mb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="mb-12 w-full min-w-0 max-w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
         <div className="px-4 sm:px-12 mb-4 flex items-center gap-4">
           <h2 className="text-2xl sm:text-3xl font-bold text-white">{title}</h2>
           <span className="px-3 py-1 bg-white/5 rounded-full text-xs font-bold text-white/40 border border-white/10">{items.length}</span>
         </div>
-        <div className="flex gap-4 overflow-x-auto scrollbar-hide px-4 sm:px-12 pb-8 pt-2" style={{ scrollSnapType: 'x mandatory' }}>
-          {items.map((torrent) => (
-            <div key={torrent.info_hash} className="shrink-0 w-[240px] sm:w-[320px]" style={{ scrollSnapAlign: 'start' }}>
-              <DownloadCard
-                torrent={torrent}
-                posterUrl={imageMap[torrent.info_hash.toLowerCase()]?.posterUrl}
-                backdropUrl={imageMap[torrent.info_hash.toLowerCase()]?.backdropUrl}
-                displayTitle={displayTitleMap[torrent.info_hash.toLowerCase()]}
-                onOpenDetail={handleOpenDetail}
-              />
-            </div>
-          ))}
+        {/* Conteneur scroll séparé du flex interne : évite min-width:auto qui empêchait le scroll sous main overflow-x-hidden */}
+        <div className="w-full min-w-0 max-w-full overflow-x-auto overflow-y-visible scrollbar-hide px-4 sm:px-12 pb-8 pt-2" style={{ scrollSnapType: 'x mandatory' }}>
+          <div className="flex gap-4 w-max">
+            {items.map((torrent) => (
+              <div key={torrent.info_hash} className="shrink-0 w-[240px] sm:w-[320px]" style={{ scrollSnapAlign: 'start' }}>
+                <DownloadCard
+                  torrent={torrent}
+                  posterUrl={imageMap[torrent.info_hash.toLowerCase()]?.posterUrl}
+                  backdropUrl={imageMap[torrent.info_hash.toLowerCase()]?.backdropUrl}
+                  displayTitle={displayTitleMap[torrent.info_hash.toLowerCase()]}
+                  onOpenDetail={handleOpenDetail}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -331,7 +393,7 @@ export default function DownloadsList() {
   if (loading && torrents.length === 0) return <div className="flex-1 flex items-center justify-center min-h-[400px]"><HLSLoadingSpinner size="lg" text={t('downloads.loadingDownloads')} /></div>;
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col w-full min-w-0 max-w-full">
       {heroItems.length > 0 && (
         <HeroSection items={heroItems} onPlay={(it) => {
             const h = it.id.replace('download-', '');
@@ -344,7 +406,7 @@ export default function DownloadsList() {
         }} primaryButtonLabel="Lire" size="large" />
       )}
 
-      <div className="pt-4 sm:pt-8 pb-12 flex-1 safe-area-bottom">
+      <div className="pt-4 sm:pt-8 pb-12 flex-1 safe-area-bottom w-full min-w-0 max-w-full">
         <div className="px-4 sm:px-12 mb-6 sm:mb-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div>
             <h1 className="text-3xl sm:text-5xl font-bold text-white mb-1 sm:mb-2 tracking-tight">{t('downloads.title')}</h1>
@@ -366,7 +428,7 @@ export default function DownloadsList() {
             <p className="text-white/30 text-base sm:text-lg max-w-md">{t('downloads.torrentsWillAppear')}</p>
           </div>
         ) : (
-          <div>
+          <div className="w-full min-w-0 max-w-full">
             {renderCarousel("Films", moviesTorrents)}
             {renderCarousel("Séries", groupedSeriesTorrents)}
             {renderCarousel("Autres", otherTorrents)}

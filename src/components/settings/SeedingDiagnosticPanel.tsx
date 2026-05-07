@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { Activity, CheckCircle, XCircle, ExternalLink, RefreshCw } from 'lucide-preact';
+import { Activity, CheckCircle, XCircle, ExternalLink, RefreshCw, AlertTriangle } from 'lucide-preact';
 
 type Diagnostic = {
   upnp_enabled: boolean;
   ratio_mode_enabled: boolean;
   librqbit_ok: boolean;
   listen_port: number | null;
+  warnings?: string[];
 };
 
 export default function SeedingDiagnosticPanel() {
@@ -15,9 +16,10 @@ export default function SeedingDiagnosticPanel() {
   const [data, setData] = useState<Diagnostic | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [enablingRatioMode, setEnablingRatioMode] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     try {
       const res = await serverApi.getSeedingDiagnostic();
@@ -26,13 +28,28 @@ export default function SeedingDiagnosticPanel() {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [t]);
 
   useEffect(() => {
-    load();
+    load(false);
   }, [load]);
+
+  const enableRatioModeNow = async () => {
+    setEnablingRatioMode(true);
+    setError(null);
+    try {
+      const res = await serverApi.updateRatioConfig(true);
+      if (!res.success) {
+        setError(res.message || t('settings.seedingDiagnostic.enableRatioError'));
+        return;
+      }
+      await load(true);
+    } finally {
+      setEnablingRatioMode(false);
+    }
+  };
 
   if (loading && !data) {
     return (
@@ -54,7 +71,7 @@ export default function SeedingDiagnosticPanel() {
             </span>
             <button
               type="button"
-              onClick={load}
+              onClick={() => load(false)}
               disabled={loading}
               className="p-2 rounded-lg text-[var(--ds-text-secondary)] hover:bg-[var(--ds-surface-hover)] disabled:opacity-50"
               title={t('common.refresh')}
@@ -74,6 +91,44 @@ export default function SeedingDiagnosticPanel() {
             <p className="text-[var(--ds-text-negative)] text-sm mb-4" role="alert">
               {error}
             </p>
+          )}
+
+          {data?.warnings && data.warnings.length > 0 && (
+            <ul
+              className="mb-4 space-y-2 rounded-lg border border-[var(--ds-border-default)] bg-[var(--ds-surface-elevated)] p-3 text-sm text-[var(--ds-text-primary)]"
+              role="alert"
+            >
+              {data.warnings.map((w, i) => (
+                <li key={i} className="flex gap-2">
+                  <AlertTriangle className="w-5 h-5 flex-shrink-0 text-amber-500" strokeWidth={1.8} aria-hidden />
+                  <span>{w}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {data && !data.ratio_mode_enabled && (
+            <div className="mb-4 rounded-lg border border-[var(--ds-border-default)] bg-[var(--ds-accent-violet-muted)]/30 p-3 space-y-2">
+              <button
+                type="button"
+                onClick={enableRatioModeNow}
+                disabled={enablingRatioMode || !data.librqbit_ok}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--ds-accent-violet)] text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {enablingRatioMode ? t('common.loading') : t('settings.seedingDiagnostic.enableRatioModeNow')}
+              </button>
+              <p className="text-xs text-[var(--ds-text-tertiary)]">
+                {t('settings.seedingDiagnostic.enableRatioModeHint')}
+              </p>
+              <p className="text-xs">
+                <a
+                  href="/settings/ratio/"
+                  className="text-[var(--ds-accent-violet)] font-medium hover:underline"
+                >
+                  {t('settings.seedingDiagnostic.ratioSettingsLink')}
+                </a>
+              </p>
+            </div>
           )}
 
           {data && (

@@ -1,16 +1,11 @@
 /**
- * Persistance localStorage pour "Reprendre la lecture" et "Revoir".
- * Le dashboard lit cette clé via useResumeWatching ; le lecteur appelle
- * updateResumeWatching quand la position de lecture change (timeupdate, beforeunload).
- *
- * Pour les séries, on stocke en plus saison/épisode/variantId/position pour
- * que la rangée puisse afficher le bon "S2E5" et permettre une reprise précise.
+ * Persistance backend (DB) pour "Reprendre la lecture" et "Revoir".
+ * Le dashboard lit les entrées via API ; le lecteur appelle updateResumeWatching
+ * quand la position de lecture change.
  */
 
 import type { ContentItem } from './client/types';
-
-const STORAGE_KEY = 'resumeWatching';
-const MAX_ITEMS = 30;
+import { serverApi } from './client/server-api';
 
 /** Évènement émis quand la liste change pour forcer les vues à se rafraîchir. */
 export const RESUME_WATCHING_EVENT = 'resumeWatching:updated';
@@ -24,44 +19,6 @@ export interface ResumeEpisodeInfo {
   positionSeconds?: number;
   /** Durée totale de l'épisode en secondes (utile pour calculer le temps restant). */
   durationSeconds?: number;
-}
-
-export type StoredResumeItem = ContentItem &
-  ResumeEpisodeInfo & {
-    lastWatched: number;
-  };
-
-function getStored(): StoredResumeItem[] {
-  try {
-    if (typeof localStorage === 'undefined') return [];
-    let raw = localStorage.getItem(STORAGE_KEY);
-    // Migration silencieuse depuis l'ancien stockage sessionStorage.
-    if (!raw && typeof sessionStorage !== 'undefined') {
-      const legacy = sessionStorage.getItem(STORAGE_KEY);
-      if (legacy) {
-        localStorage.setItem(STORAGE_KEY, legacy);
-        sessionStorage.removeItem(STORAGE_KEY);
-        raw = legacy;
-      }
-    }
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function setStored(items: StoredResumeItem[]): void {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, MAX_ITEMS)));
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(RESUME_WATCHING_EVENT));
-    }
-  } catch {
-    // ignore
-  }
 }
 
 /**
@@ -81,23 +38,24 @@ export function updateResumeWatching(
   const id = item.id || (item.tmdbId != null ? String(item.tmdbId) : null);
   if (!id) return;
 
-  const list = getStored();
   const now = Date.now();
-  const entry: StoredResumeItem = {
-    ...item,
+  void serverApi.upsertResumeWatching({
+    content_id: id,
+    tmdb_id: item.tmdbId ?? null,
+    tmdb_type: item.type,
+    title: item.title || '',
+    poster: item.poster ?? null,
     progress: Math.min(100, Math.max(0, progressPercent)),
-    lastWatched: now,
-    ...(episodeInfo?.season != null ? { season: episodeInfo.season } : {}),
-    ...(episodeInfo?.episode != null ? { episode: episodeInfo.episode } : {}),
-    ...(episodeInfo?.variantId ? { variantId: episodeInfo.variantId } : {}),
-    ...(episodeInfo?.positionSeconds != null ? { positionSeconds: episodeInfo.positionSeconds } : {}),
-    ...(episodeInfo?.durationSeconds != null ? { durationSeconds: episodeInfo.durationSeconds } : {}),
-  };
-
-  const rest = list.filter(
-    (x) => x.id !== id && (x.tmdbId == null || String(x.tmdbId) !== id)
-  );
-  setStored([entry, ...rest]);
+    season: episodeInfo?.season ?? null,
+    episode: episodeInfo?.episode ?? null,
+    variant_id: episodeInfo?.variantId ?? null,
+    position_seconds: episodeInfo?.positionSeconds ?? null,
+    duration_seconds: episodeInfo?.durationSeconds ?? null,
+    last_watched: now,
+  });
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(RESUME_WATCHING_EVENT));
+  }
 }
 
 /**
@@ -105,11 +63,8 @@ export function updateResumeWatching(
  */
 export function removeResumeWatching(id: string): void {
   if (!id) return;
-  const list = getStored();
-  const filtered = list.filter(
-    (x) => x.id !== id && (x.tmdbId == null || String(x.tmdbId) !== id)
-  );
-  if (filtered.length !== list.length) {
-    setStored(filtered);
+  void serverApi.removeResumeWatching(id);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(RESUME_WATCHING_EVENT));
   }
 }
