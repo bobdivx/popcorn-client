@@ -130,13 +130,13 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
         {/* Badges signal + icône de complétion en haut à droite */}
         <div className="absolute top-1 right-1 lg:top-2 lg:right-2 tv:top-3 tv:right-3 z-10 flex flex-col items-end gap-1.5">
           {signal?.downloadedUnseen ? (
-            <span className="px-2 py-0.5 rounded-full bg-amber-500/25 border border-amber-300/40 text-[10px] lg:text-xs font-semibold uppercase tracking-wide text-white shadow-sm">
-              {t('dashboard.heroDownloadedUnseen')}
+            <span className="px-2 py-0.5 rounded-md bg-emerald-500/90 backdrop-blur-md border border-emerald-400/30 text-[10px] lg:text-xs font-bold uppercase tracking-widest text-white shadow-lg">
+              {t('dashboard.heroDownloadedUnseen') || 'À REGARDER'}
             </span>
           ) : null}
-          {signal?.requestDownloaded ? (
-            <span className="px-2 py-0.5 rounded-full bg-emerald-500/25 border border-emerald-300/40 text-[10px] lg:text-xs font-semibold uppercase tracking-wide text-white shadow-sm">
-              {t('dashboard.heroRequestDownloaded')}
+          {signal?.requestDownloaded || item.availableInLibrary ? (
+            <span className="px-2 py-0.5 rounded-md bg-emerald-500/90 backdrop-blur-md border border-emerald-400/30 text-[10px] lg:text-xs font-bold uppercase tracking-widest text-white shadow-lg">
+              {t('common.available') || 'DISPONIBLE'}
             </span>
           ) : null}
           {signal?.newEpisode ? (

@@ -10,6 +10,7 @@ interface ModalProps {
   closeOnBackdropClick?: boolean;
   closeOnEscape?: boolean;
   className?: string;
+  scrollable?: boolean;
 }
 
 /**
@@ -24,6 +25,7 @@ export function Modal({
   closeOnBackdropClick = true,
   closeOnEscape = true,
   className = '',
+  scrollable = true,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -215,7 +217,7 @@ export function Modal({
         )}
 
         {/* Content */}
-        <div className="ds-card-section flex-1 min-h-0 overflow-y-auto overscroll-contain pt-0">
+        <div className={`ds-card-section flex-1 min-h-0 overscroll-contain pt-0 ${scrollable ? 'overflow-y-auto' : 'overflow-hidden'}`}>
           {children}
         </div>
       </div>

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'preact/hooks';
 import type { EnrichedResumeItem } from '../hooks/useResumeWatching';
 import { FocusableCard } from '../../ui/FocusableCard';
 import { useI18n } from '../../../lib/i18n/useI18n';
+import { formatSpeed } from '../../../lib/utils/formatBytes';
+import { Download } from 'lucide-preact';
 
 interface ResumePosterProps {
   item: EnrichedResumeItem;
@@ -53,6 +55,13 @@ function statusBadge(item: EnrichedResumeItem, t: (k: string, p?: Record<string,
     return {
       label: t('dashboard.nextEpisodeBadge', { date: formatShortDate(item.nextEpisodeAirDate, locale) }),
       className: 'bg-blue-500 text-white',
+    };
+  }
+  if (item.isDownloading) {
+    return {
+      label: t('torrents.state.downloading') || 'Téléchargement',
+      className: 'bg-primary text-black animate-pulse',
+      icon: Download
     };
   }
   return null;
@@ -136,8 +145,11 @@ export function ResumePoster({ item, onNavigate }: ResumePosterProps) {
 
           {/* Badge statut (Nouveau / Prochain : date) en haut à droite */}
           {badge ? (
-            <div className="absolute top-2 right-2 z-20 px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-bold uppercase tracking-wide shadow-lg" >
-              <span className={`px-2 py-0.5 rounded-md ${badge.className}`}>{badge.label}</span>
+            <div className="absolute top-2 right-2 z-20 flex items-center gap-1 shadow-lg" >
+              <span className={`px-2 py-0.5 rounded-md text-[10px] sm:text-xs font-bold uppercase tracking-wide flex items-center gap-1 ${badge.className}`}>
+                {badge.icon && <badge.icon size={12} />}
+                {badge.label}
+              </span>
             </div>
           ) : null}
 
@@ -153,10 +165,13 @@ export function ResumePoster({ item, onNavigate }: ResumePosterProps) {
             </div>
           ) : null}
 
-          {/* Label S/E discret en bas à gauche pour les séries */}
-          {episodeLabel ? (
-            <div className="absolute bottom-2 left-2 z-10 px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px] sm:text-xs font-semibold tracking-wide">
+          {/* Label S/E discret en bas à gauche pour les séries ou vitesse pour DL */}
+          {episodeLabel || (item.isDownloading && item.downloadSpeed) ? (
+            <div className="absolute bottom-2 left-2 z-10 px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px] sm:text-xs font-semibold tracking-wide flex items-center gap-1.5">
               {episodeLabel}
+              {item.isDownloading && item.downloadSpeed && (
+                <span className="text-primary">{formatSpeed(item.downloadSpeed)}</span>
+              )}
             </div>
           ) : null}
 

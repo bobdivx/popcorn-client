@@ -44,6 +44,7 @@
     "others": "Autres",
     "verification": "Vérification...",
     "noData": "Aucune donnée disponible",
+    "available": "Disponible",
     "unknownError": "Erreur inconnue"
   },
   "demo": {
@@ -81,7 +82,9 @@
     "requestAlreadyExists": "Une demande existe déjà pour ce média",
     "quotaExceeded": "Quota de demandes dépassé",
     "requestedOn": "Demandé le",
-    "confirmDelete": "Êtes-vous sûr de vouloir annuler cette demande ?"
+    "confirmDelete": "Êtes-vous sûr de vouloir annuler cette demande ?",
+    "requested": "Déjà demandé",
+    "available": "Disponible"
   },
   "requestsAdmin": {
     "title": "Gestion des demandes",
@@ -997,6 +1000,7 @@
   "search": {
     "title": "Rechercher",
     "placeholder": "Rechercher un film ou une série...",
+    "subtitle": "Explorez votre bibliothèque et au-delà",
     "clearSearch": "Effacer la recherche",
     "moviesFound": "Films trouvés",
     "seriesFound": "Séries trouvées",
@@ -1006,9 +1010,11 @@
     "startSearch": "Commencez votre recherche",
     "startSearchDescription": "Recherchez des films ou des séries en utilisant la barre de recherche ci-dessus",
     "searchingLocal": "Recherche dans la base locale (torrents synchronisés)...",
-    "searchingIndexers": "Recherche sur les indexeurs...",
+    "searchingIndexers": "Recherche approfondie sur les indexeurs...",
     "localSearchNote": "Popcornn parcourt d'abord ta bibliothèque.",
-    "indexerSearchNote": "Aucun résultat local. Popcornn interroge les indexeurs.",
+    "indexerSearchNote": "Nous explorons les indexeurs pour trouver ce contenu.",
+    "indexing": "Recherche approfondie...",
+    "noLocalResults": "Aucun résultat local trouvé. Popcorn interroge les indexeurs pour vous.",
     "mustBeLoggedIn": "Vous devez être connecté pour rechercher du contenu",
     "content": "contenu",
     "noTorrentsUseRequest": "Aucun torrent trouvé pour cette recherche. Vous pouvez demander ces médias pour qu'ils soient ajoutés.",
@@ -1017,7 +1023,8 @@
     "tmdbRequestTitle": "Résultats TMDB — Demander le média",
     "forceIndexerLabel": "Rechercher directement sur les indexeurs",
     "indexerSearchError": "Recherche sur les indexeurs impossible",
-    "recentSearches": "Recherches récentes"
+    "recentSearches": "Recherches récentes",
+    "downloaded": "Déjà téléchargé"
   },
   "library": {
     "title": "Bibliothèque",

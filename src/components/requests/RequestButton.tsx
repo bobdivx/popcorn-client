@@ -9,6 +9,9 @@ interface RequestButtonProps {
   onSuccess?: () => void;
   onAlreadyExists?: () => void;
   onError?: (msg: string) => void;
+  title?: string;
+  posterPath?: string;
+  backdropPath?: string;
   /** Afficher le bouton Annuler quand la demande existe (défaut: true sur MediaDetail) */
   showCancel?: boolean;
   className?: string;
@@ -20,6 +23,9 @@ export default function RequestButton({
   onSuccess,
   onAlreadyExists,
   onError,
+  title,
+  posterPath,
+  backdropPath,
   showCancel = true,
   className = '',
 }: RequestButtonProps) {
@@ -56,6 +62,9 @@ export default function RequestButton({
       const res = await serverApi.createMediaRequest({
         tmdb_id: tmdbId,
         media_type: mediaType,
+        title,
+        poster_path: posterPath,
+        backdrop_path: backdropPath,
       });
       if (res.success) {
         const created = res.data as { id?: string } | undefined;

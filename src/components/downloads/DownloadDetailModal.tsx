@@ -121,9 +121,10 @@ export function DownloadDetailModal({
       isOpen={true} 
       onClose={onClose} 
       size="full"
+      scrollable={false}
       className="p-0 sm:p-0" // Reset standard padding to keep custom layout
     >
-      <div className="relative flex min-h-0 max-h-full flex-col overflow-hidden lg:h-full">
+      <div className="relative flex h-full min-h-0 max-h-full flex-col overflow-y-auto lg:overflow-hidden">
         {/* Immersive backdrop background inside the modal */}
         {backdropUrl && (
           <div 
@@ -148,7 +149,7 @@ export function DownloadDetailModal({
           </div>
         </div>
 
-        <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
+        <div className="relative z-10 flex min-h-0 flex-1 flex-col lg:overflow-hidden lg:flex-row">
           {/* Left Sidebar - Poster & Basic Info */}
           <div className="w-full flex-shrink-0 border-b border-white/5 bg-white/[0.02] p-4 sm:p-8 lg:w-96 lg:min-h-0 lg:max-h-full lg:overflow-y-auto lg:border-b-0 lg:border-r tv:lg:w-[min(24rem,32vw)] custom-scrollbar">
             <div className="relative mx-auto aspect-[2/3] w-full max-w-[min(100%,18rem)] overflow-hidden rounded-2xl shadow-2xl group tv:max-w-[min(100%,22rem)] lg:mx-0 lg:max-w-none">

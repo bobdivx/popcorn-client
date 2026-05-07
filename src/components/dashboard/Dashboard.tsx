@@ -5,18 +5,22 @@ import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
 import { useDashboardData } from './hooks/useDashboardData';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useContentSignals } from './hooks/useContentSignals';
+import { useActiveDownloads } from './hooks/useActiveDownloads';
 
 export default function Dashboard() {
   const { t } = useI18n();
-  const { data, loading, error } = useDashboardData();
+  const { data, loading: dataLoading, error } = useDashboardData();
+  const { activeDownloads, loading: downloadsLoading } = useActiveDownloads();
   const { inProgress, seriesInProgress } = useResumeWatching();
+  const loading = dataLoading && downloadsLoading;
+  
   const popularMovies = data?.popularMovies ?? [];
   const popularSeries = data?.popularSeries ?? [];
   const recentMovies = data?.recentMovies ?? [];
   const recentSeries = data?.recentSeries ?? [];
   const allDashboardItems = useMemo(
-    () => [...recentMovies, ...recentSeries, ...popularMovies, ...popularSeries],
-    [popularMovies, popularSeries, recentMovies, recentSeries]
+    () => [...recentMovies, ...recentSeries, ...popularMovies, ...popularSeries, ...activeDownloads],
+    [popularMovies, popularSeries, recentMovies, recentSeries, activeDownloads]
   );
   // On utilise resumeWatching pour les signaux, mais on pourrait utiliser inProgress + seriesInProgress pour être plus large.
   // Cependant, useContentSignals a besoin de la liste complète pour savoir quoi enrichir.
@@ -38,6 +42,11 @@ export default function Dashboard() {
   );
 
   const handleNavigate = (item: ContentItem) => {
+    // Si c'est un téléchargement en cours, aller vers la page des téléchargements ou ouvrir le lecteur
+    if (item.isDownloading) {
+      window.location.href = `/downloads`;
+      return;
+    }
     window.location.href = `/torrents?slug=${encodeURIComponent(item.id)}&from=dashboard`;
   };
 
@@ -49,19 +58,27 @@ export default function Dashboard() {
 
       const result = [];
 
-      // 1. Téléchargés récemment
+      // 0. Téléchargements en cours (HAUTE PRIORITÉ)
+      if (activeDownloads.length > 0) {
+        result.push({ 
+          id: 'active-downloads', 
+          title: t('dashboard.activeDownloads') || 'En cours de téléchargement', 
+          items: activeDownloads.map(ad => {
+             // Retrouver l'item avec signaux si possible
+             return allDashboardItemsWithSignals.find(i => i.infoHash === ad.infoHash) || ad;
+          }),
+          kind: 'resume' as const 
+        });
+      }
+
+      // 1. Reprendre la lecture (films ou épisodes en cours, séries à suivre) - HAUTE PRIORITÉ
+      if (resumeWatching.length > 0) {
+        result.push({ id: 'resume-watching', title: t('dashboard.resumeWatching') || 'Reprendre la lecture', items: resumeWatching, kind: 'resume' as const });
+      }
+
+      // 3. Téléchargés récemment
       if (watchNowItems.length > 0) {
         result.push({ id: 'recently-downloaded', title: t('dashboard.recentlyDownloaded'), items: watchNowItems });
-      }
-
-      // 2. Reprendre la lecture (films ou épisodes en cours)
-      if (inProgress.length > 0) {
-        result.push({ id: 'resume-in-progress', title: t('dashboard.resumeWatching'), items: inProgress, kind: 'resume' as const });
-      }
-
-      // 3. Séries en cours (suivi des épisodes)
-      if (seriesInProgress.length > 0) {
-        result.push({ id: 'ongoing-series', title: t('dashboard.ongoingSeries'), items: seriesInProgress, kind: 'resume' as const });
       }
 
       // Reste des sections classiques
@@ -74,7 +91,7 @@ export default function Dashboard() {
 
       return result;
     },
-    [allDashboardItemsWithSignals, popularMovies, popularSeries, recentMovies, recentSeries, inProgress, seriesInProgress, t]
+    [allDashboardItemsWithSignals, activeDownloads, popularMovies, popularSeries, recentMovies, recentSeries, inProgress, seriesInProgress, t]
   );
 
   return (

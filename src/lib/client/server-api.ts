@@ -198,6 +198,7 @@ interface IServerApiClientPublic {
   findLocalMediaByInfoHash(infoHash: string): Promise<ApiResponse<any>>;
 
   // Connection status
+  getCurrentUserId(): string | null;
   addConnectionFailureListener(cb: ConnectionFailureListener): void;
   addConnectionSuccessListener(cb: ConnectionSuccessListener): void;
 

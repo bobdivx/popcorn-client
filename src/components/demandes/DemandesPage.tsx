@@ -56,6 +56,8 @@ export default function DemandesPage() {
   const [popularSeries, setPopularSeries] = useState<TmdbItem[]>([]);
   const [topRatedSeries, setTopRatedSeries] = useState<TmdbItem[]>([]);
   const [newSeries, setNewSeries] = useState<TmdbItem[]>([]);
+  const [myRequests, setMyRequests] = useState<any[]>([]);
+  const [libraryItems, setLibraryItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -79,6 +81,8 @@ export default function DemandesPage() {
           popTvRes,
           topTvRes,
           newTvRes,
+          myRequestsRes,
+          libraryRes,
         ] = await Promise.all([
           serverApi.discoverMovies({ page: 1, language: lang, sort_by: 'popularity.desc' }),
           serverApi.discoverMovies({
@@ -113,6 +117,8 @@ export default function DemandesPage() {
             sort_by: 'first_air_date.desc',
             first_air_date_lte: today,
           }),
+          serverApi.listMediaRequests({ limit: 50 }),
+          serverApi.getLibrary(),
         ]);
 
         if (popMoviesRes.success && popMoviesRes.data?.results) {
@@ -135,6 +141,12 @@ export default function DemandesPage() {
         }
         if (newTvRes.success && newTvRes.data?.results) {
           setNewSeries(newTvRes.data.results);
+        }
+        if (myRequestsRes.success && myRequestsRes.data) {
+          setMyRequests(myRequestsRes.data);
+        }
+        if (libraryRes.success && libraryRes.data) {
+          setLibraryItems(libraryRes.data);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : t('errors.generic'));
@@ -210,6 +222,27 @@ export default function DemandesPage() {
     >
       <PageHeader title={t('nav.demandes')} subtitle={t('discover.pageSubtitle')} />
       <div className="pb-8 tv:pb-12 pt-2 tv:pt-4 overflow-visible animate-[fade-in-up_0.6s_ease-out_forwards] opacity-0">
+        {myRequests.length > 0 && (
+          <CarouselSection title={t('requests.myRequests')}>
+            {myRequests.map((r) => {
+              const inLibrary = libraryItems.some(
+                (lib) => lib.tmdb_id === r.tmdb_id && lib.tmdb_type === r.media_type
+              );
+              const item: ContentItem = {
+                id: r.id,
+                tmdbId: r.tmdb_id,
+                type: r.media_type as 'movie' | 'tv',
+                title: r.title || `TMDB ${r.tmdb_id}`,
+                poster: r.poster_path || undefined,
+                availableInLibrary: inLibrary,
+              };
+              return (
+                <PosterCard key={r.id} item={item} onNavigate={handlePlay} />
+              );
+            })}
+          </CarouselSection>
+        )}
+
         {popularMovies.length > 0 && (
           <CarouselSection title={t('discover.popularMovies')}>
             {popularMovies.map((m) => (

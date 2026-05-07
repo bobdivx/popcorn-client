@@ -20,6 +20,9 @@ export interface MediaRequest {
   notes: string | null;
   created_at: number;
   updated_at: number;
+  title: string | null;
+  poster_path: string | null;
+  backdrop_path: string | null;
 }
 
 export interface QuotaStats {
@@ -148,7 +151,7 @@ export const requestsMethods = {
 
   async createMediaRequest(
     this: ServerApiClientAccess,
-    data: { tmdb_id: number; media_type: string; season_numbers?: number[] }
+    data: { tmdb_id: number; media_type: string; season_numbers?: number[]; title?: string; poster_path?: string; backdrop_path?: string }
   ): Promise<ApiResponse<MediaRequest>> {
     return this.backendRequest<MediaRequest>('/api/requests', {
       method: 'POST',

@@ -183,17 +183,17 @@ function SourceSelectModal({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 tv:p-8 overflow-y-auto" role="dialog" aria-modal="true" aria-label="Choisir une source">
-      <div className="w-full max-w-2xl tv:max-w-4xl max-h-[90vh] tv:max-h-[85vh] flex flex-col bg-gray-900/95 rounded-xl border border-white/20 shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-[9999] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center p-2 sm:p-4 tv:p-8" role="dialog" aria-modal="true" aria-label="Choisir une source">
+      <div className="w-full max-w-2xl tv:max-w-4xl max-h-[95vh] sm:max-h-[90vh] tv:max-h-[85vh] flex flex-col bg-gray-900/95 rounded-xl border border-white/20 shadow-2xl overflow-hidden relative">
         <div className="flex items-center justify-between p-4 tv:p-6 border-b border-white/10 flex-shrink-0">
-          <h2 className="text-xl tv:text-3xl font-bold text-white">Choisir une source</h2>
+          <h2 className="text-xl tv:text-3xl font-bold text-white truncate mr-2">Choisir une source</h2>
           <button
             type="button"
             onClick={onClose}
-            className="w-12 h-12 tv:w-16 tv:h-16 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white focus:outline-none focus:ring-4 focus:ring-primary-500 data-focusable"
+            className="w-10 h-10 sm:w-12 sm:h-12 tv:w-16 tv:h-16 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white focus:outline-none focus:ring-4 focus:ring-primary-500 data-focusable flex-shrink-0"
             aria-label="Fermer"
           >
-            <svg className="w-6 h-6 tv:w-8 tv:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6 tv:w-8 tv:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>

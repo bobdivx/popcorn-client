@@ -44,6 +44,7 @@
     "others": "Others",
     "verification": "Checking...",
     "noData": "No data available",
+    "available": "Available",
     "unknownError": "Unknown error"
   },
   "demo": {
@@ -81,7 +82,9 @@
     "requestAlreadyExists": "A request already exists for this media",
     "quotaExceeded": "Request quota exceeded",
     "requestedOn": "Requested on",
-    "confirmDelete": "Are you sure you want to cancel this request?"
+    "confirmDelete": "Are you sure you want to cancel this request?",
+    "requested": "Already requested",
+    "available": "Available"
   },
   "requestsAdmin": {
     "title": "Manage requests",
@@ -1017,7 +1020,8 @@
     "tmdbRequestTitle": "TMDB results — Request media",
     "forceIndexerLabel": "Search indexers directly",
     "indexerSearchError": "Indexer search failed",
-    "recentSearches": "Recent searches"
+    "recentSearches": "Recent Searches",
+    "downloaded": "Already Downloaded"
   },
   "library": {
     "title": "Library",
