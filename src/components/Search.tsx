@@ -265,13 +265,13 @@ type SearchPhase = 'idle' | 'local' | 'indexer';
 export default function Search({ onResultClick }: SearchProps) {
   const { t, language } = useI18n();
   const [query, setQuery] = useState('');
-  const [type, setType] = useState<'movie' | 'tv' | 'all'>('all');
+  const type = 'all';
   const [results, setResults] = useState<SearchResult[]>([]);
   const [tmdbFallbackResults, setTmdbFallbackResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchPhase, setSearchPhase] = useState<SearchPhase>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [forceIndexerSearch, setForceIndexerSearch] = useState(false);
+  const [forceIndexerSearch] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>(() => getSearchHistory());
   const [myRequests, setMyRequests] = useState<any[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -572,69 +572,7 @@ export default function Search({ onResultClick }: SearchProps) {
               </button>
             </form>
 
-            {/* Filtres de catégories */}
-            <div className="flex flex-wrap gap-3 tv:gap-4">
-              <button
-                type="button"
-                data-focusable
-                onClick={() => {
-                  setType('all');
-                  if (query) handleSearch();
-                }}
-                className={`px-6 py-3 tv:px-8 tv:py-4 rounded-full font-semibold text-base tv:text-lg transition-all duration-200 min-h-[48px] tv:min-h-[56px] focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 ${
-                  type === 'all'
-                    ? 'bg-primary hover:bg-primary-700 text-white shadow-primary shadow-primary-600/30'
-                    : 'bg-gray-800/80 hover:bg-gray-700/80 text-gray-300 border border-gray-700 glass-panel'
-                }`}
-                tabIndex={0}
-              >
-                {t('common.all')}
-              </button>
-              <button
-                type="button"
-                data-focusable
-                onClick={() => {
-                  setType('movie');
-                  if (query) handleSearch();
-                }}
-                className={`px-6 py-3 tv:px-8 tv:py-4 rounded-full font-semibold text-base tv:text-lg transition-all duration-200 min-h-[48px] tv:min-h-[56px] focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 ${
-                  type === 'movie'
-                    ? 'bg-primary hover:bg-primary-700 text-white shadow-primary shadow-primary-600/30'
-                    : 'bg-gray-800/80 hover:bg-gray-700/80 text-gray-300 border border-gray-700 glass-panel'
-                }`}
-                tabIndex={0}
-              >
-                {t('nav.films')}
-              </button>
-              <button
-                type="button"
-                data-focusable
-                onClick={() => {
-                  setType('tv');
-                  if (query) handleSearch();
-                }}
-                className={`px-6 py-3 tv:px-8 tv:py-4 rounded-full font-semibold text-base tv:text-lg transition-all duration-200 min-h-[48px] tv:min-h-[56px] focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 ${
-                  type === 'tv'
-                    ? 'bg-primary hover:bg-primary-700 text-white shadow-primary shadow-primary-600/30'
-                    : 'bg-gray-800/80 hover:bg-gray-700/80 text-gray-300 border border-gray-700 glass-panel'
-                }`}
-                tabIndex={0}
-              >
-                {t('nav.series')}
-              </button>
-              <label className="flex items-center gap-2 px-4 py-2 rounded-full bg-gray-800/80 hover:bg-gray-700/80 text-gray-300 border border-gray-700 cursor-pointer focus-within:ring-2 focus-within:ring-primary-600">
-                <input
-                  type="checkbox"
-                  checked={forceIndexerSearch}
-                  onChange={(e) => {
-                    setForceIndexerSearch((e.target as HTMLInputElement).checked);
-                    if (query) handleSearch();
-                  }}
-                  className="checkbox checkbox-primary checkbox-sm"
-                />
-                <span className="text-sm tv:text-base whitespace-nowrap">{t('search.forceIndexerLabel')}</span>
-              </label>
-            </div>
+
           </div>
         </div>
       {/* État vide pendant recherche indexeurs */}
@@ -813,38 +751,25 @@ export default function Search({ onResultClick }: SearchProps) {
         </div>
       )}
 
-      {/* État initial - pas encore de recherche + historique cliquable */}
-      {!query && !loading && (
-        <div className="flex flex-col items-center justify-center py-12 tv:py-20 px-4">
-          <div className="text-center max-w-2xl tv:max-w-3xl w-full">
-            <div className="text-6xl tv:text-8xl mb-4 tv:mb-6">🎬</div>
-            <h2 className="text-2xl tv:text-3xl font-bold text-white mb-4 tv:mb-6">
-              {t('search.startSearch')}
-            </h2>
-            <p className="text-gray-400 text-base tv:text-lg mb-8 tv:mb-10">
-              {t('search.startSearchDescription')}
-            </p>
-            {searchHistory.length > 0 && (
-              <div className="text-left">
-                <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3 tv:mb-4">
-                  {t('search.recentSearches')}
-                </h3>
-                <div className="flex flex-wrap gap-2 tv:gap-3">
-                  {searchHistory.map((term) => (
-                    <button
-                      key={term}
-                      type="button"
-                      data-focusable
-                      onClick={() => handleSearch(term)}
-                      className="px-4 py-2 tv:px-5 tv:py-2.5 rounded-full bg-gray-800/90 hover:bg-gray-700 border border-gray-600 hover:border-primary-500 text-gray-200 hover:text-white text-sm tv:text-base transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black"
-                      tabIndex={0}
-                    >
-                      {term}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+      {/* Historique de recherche cliquable (état initial, pas de query) */}
+      {!query && !loading && searchHistory.length > 0 && (
+        <div className="px-4 sm:px-8 py-6">
+          <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            {t('search.recentSearches')}
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {searchHistory.map((term) => (
+              <button
+                key={term}
+                type="button"
+                data-focusable
+                onClick={() => handleSearch(term)}
+                className="px-4 py-2 rounded-full bg-gray-800/90 hover:bg-gray-700 border border-gray-600 hover:border-primary-500 text-gray-200 hover:text-white text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                tabIndex={0}
+              >
+                {term}
+              </button>
+            ))}
           </div>
         </div>
       )}

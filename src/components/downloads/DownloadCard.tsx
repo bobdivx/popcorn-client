@@ -43,8 +43,6 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
   const posterUrl = posterUrlProp ?? posterUrlLocal;
   const backdropUrl = backdropUrlProp ?? backdropUrlLocal;
   const displayTitle = (displayTitleProp && displayTitleProp.trim()) || cleanTorrentName(torrent.name) || torrent.name || '';
-
-  // Fallback : charger l'image TMDB seulement si la liste n'a pas fourni d'images
   useEffect(() => {
     if (posterUrlProp != null || backdropUrlProp != null) return;
     if (posterUrlLocal && backdropUrlLocal) return;
@@ -55,72 +53,27 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
         const baseUrl = (getBackendUrl() || serverApi.getServerUrl()).trim().replace(/\/$/, '');
         const token = serverApi.getAccessToken();
         const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
-        
-        // Chercher par info_hash dans la liste des torrents enrichis (plus fiable que par nom)
-        const response = await fetch(`${baseUrl}/api/torrents/list?limit=200`, { headers });
-        
+
+        // Utiliser directement l'endpoint enrichi qui fournit poster_url/hero_image_url par info_hash
+        const response = await fetch(`${baseUrl}/api/client/torrents/enriched`, { headers });
         if (response.ok) {
-          const data = await response.json();
-          if (data && data.success && data.data && Array.isArray(data.data)) {
-            // Chercher par info_hash d'abord (correspondance exacte, plus rapide et fiable)
-            let matchingTorrent = data.data.find((t: any) => 
-              t.infoHash === torrent.info_hash || 
-              t.info_hash === torrent.info_hash ||
-              (t.infoHash && t.infoHash.toLowerCase() === torrent.info_hash.toLowerCase()) ||
-              (t.info_hash && t.info_hash.toLowerCase() === torrent.info_hash.toLowerCase())
-            );
-            
-            // Si pas trouvé par info_hash, chercher par nom nettoyé (fallback)
-            if (!matchingTorrent && torrent.name) {
-              const cleanTitle = torrent.name
-                .replace(/\./g, ' ')
-                .replace(/\s+/g, ' ')
-                .replace(/\b\d{4}\b/g, '')
-                .replace(/\[.*?\]/g, '')
-                .replace(/\(.*?\)/g, '')
-                .replace(/\b(?:x264|x265|HEVC|HDR|DTS|AC3|BluRay|WEB-DL|REMUX|4K|1080p|720p|480p|BDRip|WEBRip|DVDRip|FRENCH|VOSTFR|VF)\b/gi, '')
-                .replace(/S\d{2}E\d{2}/gi, '')
-                .replace(/Season\s+\d+/gi, '')
-                .trim();
-              
-              if (cleanTitle && cleanTitle.length >= 3) {
-                const cleanLower = cleanTitle.toLowerCase();
-                matchingTorrent = data.data.find((t: any) => {
-                  const torrentName = (t.name || t.cleanTitle || '').toLowerCase();
-                  const torrentCleanTitle = (t.cleanTitle || t.name || '').toLowerCase();
-                  
-                  const nameMatch = torrentName.includes(cleanLower) || 
-                                    cleanLower.includes(torrentName.split(' ')[0] || '') ||
-                                    torrentCleanTitle.includes(cleanLower) ||
-                                    cleanLower.includes(torrentCleanTitle.split(' ')[0] || '');
-                  
-                  const hasImage = t.imageUrl || t.heroImageUrl || t.poster_url || t.hero_image_url;
-                  
-                  return nameMatch && hasImage;
-                });
-              }
-            }
-            
-            if (matchingTorrent) {
-              const image = matchingTorrent.imageUrl || matchingTorrent.poster_url || matchingTorrent.poster;
-              const backdrop = matchingTorrent.heroImageUrl || matchingTorrent.hero_image_url || matchingTorrent.backdrop;
-              
-              if (image && typeof image === 'string' && image.length > 0) {
-                setPosterUrl(image);
-              }
-              if (backdrop && typeof backdrop === 'string' && backdrop.length > 0) {
-                setBackdropUrl(backdrop);
-              }
-            }
+          const list: Array<Record<string, any>> = await response.json();
+          const key = torrent.info_hash.toLowerCase();
+          const match = list.find((t) => (t.info_hash ?? '').toLowerCase() === key);
+          if (match) {
+            const image = match.poster_url ?? match.imageUrl ?? null;
+            const backdrop = match.hero_image_url ?? match.heroImageUrl ?? null;
+            if (image) setPosterUrlLocal(image);
+            if (backdrop) setBackdropUrlLocal(backdrop);
           }
         }
       } catch {
-        // Échec silencieux : requête cross-origin (CORS) ou API indisponible ; l’image reste optionnelle
+        // Échec silencieux
       }
     };
 
     loadTmdbImage();
-  }, [torrent.info_hash, torrent.name, posterUrlProp, backdropUrlProp, posterUrlLocal, backdropUrlLocal]);
+  }, [torrent.info_hash, posterUrlProp, backdropUrlProp, posterUrlLocal, backdropUrlLocal]);
 
   const progressColor = torrent.state === 'downloading' ? 'bg-[var(--ds-accent-violet)]' :
                         torrent.state === 'seeding' ? 'bg-[var(--ds-accent-green)]' :
@@ -165,18 +118,17 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
           {backdropUrl ? (
             <img src={backdropUrl} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover z-0" />
           ) : posterUrl ? (
-            <>
-              <div
-                className="absolute inset-0 opacity-50 z-0"
-                style={{
-                  backgroundImage: `url(${posterUrl})`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  filter: 'blur(20px)',
-                }}
-              />
-              <img src={posterUrl} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-contain z-0" />
-            </>
+            // Pas de backdrop : étaler l'affiche en plein fond (flou + cover) pour éviter le portrait au centre
+            <div
+              className="absolute inset-0 z-0"
+              style={{
+                backgroundImage: `url(${posterUrl})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center top',
+                filter: 'blur(8px)',
+                transform: 'scale(1.08)',
+              }}
+            />
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-white/10 via-black/40 to-black/80 z-0 p-2 text-white/20">
                <Film className="w-8 h-8 tv:w-10 tv:h-10 mb-2 shrink-0" size={40} />
