@@ -21,8 +21,12 @@ function getRandomBytes(size: number): Uint8Array {
   
   // Fallback ultime : générer des valeurs pseudo-aléatoires
   const array = new Uint8Array(size);
-  for (let i = 0; i < size; i++) {
-    array[i] = Math.floor(Math.random() * 256);
+  if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.getRandomValues) {
+    globalThis.crypto.getRandomValues(array);
+  } else {
+    for (let i = 0; i < size; i++) {
+      array[i] = Math.floor(Math.random() * 256);
+    }
   }
   return array;
 }
@@ -39,4 +43,17 @@ export function generateId(): string {
 
 export function generateInviteCode(): string {
   return uint8ArrayToHex(getRandomBytes(8)).toUpperCase();
+}
+
+export function randomUUID(): string {
+  if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.randomUUID) {
+    return globalThis.crypto.randomUUID();
+  }
+
+  // Fallback v4 UUID generation
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = getRandomBytes(1)[0] % 16;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 }
