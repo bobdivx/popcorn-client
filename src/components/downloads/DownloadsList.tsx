@@ -587,6 +587,7 @@ export default function DownloadsList() {
           backdropUrl={selectedTorrentBackdrop}
           displayTitleByHash={displayTitleMap}
           tmdbIdByHash={tmdbIdMap}
+          tmdbTypeByHash={tmdbTypeMap as Record<string, string>}
           onTmdbMetadataChanged={handleTmdbMetadataChanged}
         />
       )}

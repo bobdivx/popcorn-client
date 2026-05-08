@@ -13,6 +13,7 @@ import { formatBytes, formatSpeed, formatETA } from '../../lib/utils/formatBytes
 import { isTorrentActivelySeeding } from '../../lib/utils/torrentSeeding';
 import { parseTmdbUserInput } from '../../lib/utils/parseTmdbUserInput';
 import { Modal } from '../ui/Modal';
+import { buildStrictTmdbDetailUrl } from '../../lib/utils/media-detail-url';
 
 interface DownloadDetailModalProps {
   torrent: ClientTorrentStats;
@@ -26,6 +27,7 @@ interface DownloadDetailModalProps {
   backdropUrl?: string | null;
   displayTitleByHash?: Record<string, string>;
   tmdbIdByHash?: Record<string, number>;
+  tmdbTypeByHash?: Record<string, string>;
   onTmdbMetadataChanged?: (infoHash: string) => Promise<void>;
 }
 
@@ -68,6 +70,7 @@ export function DownloadDetailModal({
   backdropUrl,
   displayTitleByHash,
   tmdbIdByHash,
+  tmdbTypeByHash,
   onTmdbMetadataChanged,
 }: DownloadDetailModalProps) {
   const { t } = useI18n();
@@ -91,6 +94,21 @@ export function DownloadDetailModal({
     (displayTitleByHash?.[keyLower]?.trim() ||
       (typeof activeTorrent.tmdb_title === 'string' && activeTorrent.tmdb_title.trim()) ||
       activeTorrent.name) as string;
+
+  const getTorrentDetailUrl = (t: ClientTorrentStats): string => {
+    const key = t.info_hash.toLowerCase();
+    const idFromMap = tmdbIdByHash?.[key];
+    const tmdbId = t.tmdb_id ?? idFromMap ?? null;
+    const tmdbTypeRaw = (t.tmdb_type || tmdbTypeByHash?.[key] || '').toString().toLowerCase();
+    const tmdbType = tmdbTypeRaw === 'tv' || tmdbTypeRaw === 'movie' ? tmdbTypeRaw : null;
+    const title = (displayTitleByHash?.[key] || t.tmdb_title || t.name || '').trim();
+    return buildStrictTmdbDetailUrl({
+      tmdbId: typeof tmdbId === 'number' && Number.isFinite(tmdbId) ? tmdbId : null,
+      type: tmdbType,
+      from: 'downloads',
+      title: title || null,
+    });
+  };
 
   useEffect(() => {
     setActiveInfoHash(torrent.info_hash);
@@ -162,6 +180,9 @@ export function DownloadDetailModal({
   const eta = live?.time_remaining?.human_readable || formatETA(activeTorrent.eta_seconds);
   const peers = live?.snapshot?.peer_stats?.live ?? (activeTorrent.peers_connected || 0);
   const activeSeeding = isTorrentActivelySeeding(activeTorrent);
+  const sharingStatusLabel = activeTorrent.state === 'seeding'
+    ? (activeSeeding ? 'Partage actif' : 'Partage (idle)')
+    : 'Hors partage';
 
   const handleAddTracker = async () => {
     if (!newTrackerUrl.trim()) return;
@@ -307,11 +328,17 @@ export function DownloadDetailModal({
 
           {/* Main Content - Stats & Actions */}
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-8 custom-scrollbar">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-              <StatCard icon={Download} label="Download" value={downSpeed} colorClass="text-blue-400" />
-              <StatCard icon={Upload} label="Upload" value={upSpeed} colorClass="text-emerald-400" />
-              <StatCard icon={Users} label="Peers" value={peers} colorClass="text-purple-400" />
-              <StatCard icon={Clock} label="ETA" value={eta} colorClass="text-amber-400" />
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
+              <StatCard icon={Download} label="Téléchargement" value={downSpeed} colorClass="text-blue-400" />
+              <StatCard icon={Upload} label="Envoi" value={upSpeed} colorClass="text-emerald-400" />
+              <StatCard
+                icon={Sprout}
+                label="Partage"
+                value={sharingStatusLabel}
+                colorClass={activeTorrent.state === 'seeding' ? 'text-emerald-400' : 'text-white/40'}
+              />
+              <StatCard icon={Users} label="Pairs" value={peers} colorClass="text-purple-400" />
+              <StatCard icon={Clock} label="Temps restant" value={eta} colorClass="text-amber-400" />
             </div>
 
             <div className="mb-10">
@@ -322,7 +349,7 @@ export function DownloadDetailModal({
                   label="Lire"
                   data-focusable
                   data-autofocus
-                  onClick={() => (window.location.href = `/torrents?infoHash=${activeTorrent.info_hash}`)}
+                  onClick={() => (window.location.href = getTorrentDetailUrl(activeTorrent))}
                 />
                 {activeTorrent.state === 'paused' ? (
                   <ActionTile icon={Play} label="Reprendre" onClick={() => onResume(activeTorrent.info_hash)} className="bg-emerald-500/10 border-emerald-500/20" />

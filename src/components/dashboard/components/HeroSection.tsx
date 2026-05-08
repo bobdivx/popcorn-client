@@ -5,6 +5,7 @@ import { getHighQualityTmdbImageUrl } from '../../../lib/utils/tmdb-images';
 import { getDisplayTitle } from '../../../lib/utils/title-display';
 import { YouTubeVideoPlayer } from '../../ui/YouTubeVideoPlayer';
 import { isTVPlatform } from '../../../lib/utils/device-detection';
+import { buildStrictTmdbDetailUrlFromContentItem } from '../../../lib/utils/media-detail-url';
 
 interface HeroSectionProps {
   items: ContentItem[];
@@ -120,10 +121,7 @@ export function HeroSection({
     if (item.id?.startsWith('tmdb-') && item.tmdbId) {
       return `/discover?tmdbId=${item.tmdbId}&type=${item.type}`;
     }
-    // Torrent (slug ou id) → page détail torrent
-    const slug = encodeURIComponent(item.id);
-    const infoHash = item.infoHash ? `&infoHash=${encodeURIComponent(item.infoHash)}` : '';
-    return `/torrents?slug=${slug}${infoHash}&from=dashboard`;
+    return buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
   };
 
   const handleMoreInfo = (item: ContentItem) => {

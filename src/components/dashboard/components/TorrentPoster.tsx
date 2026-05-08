@@ -5,6 +5,7 @@ import type { ContentItem } from '../../../lib/client/types';
 import { FocusableCard } from '../../ui/FocusableCard';
 import { useTorrentProgress } from '../hooks/useTorrentProgress';
 import { useI18n } from '../../../lib/i18n/useI18n';
+import { buildStrictTmdbDetailUrlFromContentItem } from '../../../lib/utils/media-detail-url';
 
 interface TorrentPosterProps {
   item: ContentItem;
@@ -22,9 +23,7 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
   const shouldPollStats = isHovered || isFocused || Boolean(item.isDownloading);
   const { torrentStats } = useTorrentProgress(item.infoHash, { enabled: shouldPollStats });
 
-  const playHref = item.infoHash
-    ? `/torrents?slug=${encodeURIComponent(item.id)}&infoHash=${encodeURIComponent(item.infoHash)}&from=dashboard`
-    : `/torrents?slug=${encodeURIComponent(item.id)}&from=dashboard`;
+  const playHref = buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
 
   useEffect(() => {
     if (item.poster && item.poster !== imageUrl) {
