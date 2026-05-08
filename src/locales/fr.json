@@ -1201,7 +1201,24 @@
     "private": "Privé",
     "statusReason": "Statut détaillé",
     "notLinkedToTmdb": "Non associé à un média (ajout manuel ou pas encore synchronisé)",
-    "notLinkedToTmdbShort": "Non associé"
+    "notLinkedToTmdbShort": "Non associé",
+    "tmdb": {
+      "sectionTitle": "Correction TMDB",
+      "hint": "Le champ affiche l’identifiant TMDB actuellement utilisé pour ce téléchargement (s’il est connu).",
+      "inputHelp": "Vous pouvez coller l’URL complète de la fiche (themoviedb.org) ou uniquement le numéro d’ID. Le type Film / Série est déduit de l’URL quand c’est possible.",
+      "idLabel": "ID ou URL TMDB",
+      "idPlaceholder": "Ex. 550 ou https://www.themoviedb.org/movie/550",
+      "typeLabel": "Type",
+      "typeMovie": "Film",
+      "typeTv": "Série",
+      "apply": "Appliquer",
+      "rematch": "Rescan depuis le nom du torrent",
+      "reset": "Supprimer la correction manuelle",
+      "busy": "Envoi…",
+      "error": "Impossible de mettre à jour les métadonnées.",
+      "emptyId": "Saisissez un ID TMDB ou l’URL de la fiche.",
+      "invalidInput": "Format non reconnu : utilisez un nombre (ID) ou une URL themoviedb.org contenant /movie/… ou /tv/…"
+    }
   },
   "settingsMenu": {
     "title": "Paramètres",

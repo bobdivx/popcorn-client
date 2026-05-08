@@ -8,6 +8,19 @@ import type { ClientApi } from './index.js';
 import { handleResponse, handleError, extractInfoHashFromError } from './utils.js';
 import { getBackendUrl } from '../../backend-config.js';
 
+function clientUserHeaders(): HeadersInit {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem('popcorn_user');
+    if (!raw) return {};
+    const u = JSON.parse(raw) as { id?: string };
+    const id = u?.id;
+    return id ? { 'X-User-ID': String(id) } : {};
+  } catch {
+    return {};
+  }
+}
+
 /**
  * Service pour la gestion des torrents
  */
@@ -624,7 +637,7 @@ export class TorrentsService {
       const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/bind`);
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...clientUserHeaders() },
         body: JSON.stringify({ tmdb_id: tmdbId, tmdb_type: tmdbType }),
       });
       if (!response.ok) {
@@ -635,6 +648,46 @@ export class TorrentsService {
     } catch {
       // Ne pas bloquer l'UX
     }
+  }
+
+  /** Corrige l’association TMDB d’un téléchargement (prioritaire sur binding / catalogue). */
+  async setDownloadTmdbOverride(
+    infoHash: string,
+    tmdbId: number,
+    tmdbType: 'movie' | 'tv'
+  ): Promise<void> {
+    const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/tmdb/override`);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...clientUserHeaders(),
+      },
+      body: JSON.stringify({ tmdb_id: tmdbId, tmdb_type: tmdbType }),
+    });
+    const data = await handleResponse<void>(response);
+    if (!data.success) throw new Error(data.error || 'Erreur API');
+  }
+
+  async clearDownloadTmdbOverride(infoHash: string): Promise<void> {
+    const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/tmdb/override`);
+    const response = await fetch(url, {
+      method: 'DELETE',
+      headers: { ...clientUserHeaders() },
+    });
+    const data = await handleResponse<void>(response);
+    if (!data.success) throw new Error(data.error || 'Erreur API');
+  }
+
+  /** Rematche TMDB depuis le nom du fichier torrent (serveur). */
+  async rematchDownloadTmdb(infoHash: string): Promise<void> {
+    const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/tmdb/rematch`);
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { ...clientUserHeaders() },
+    });
+    const data = await handleResponse<void>(response);
+    if (!data.success) throw new Error(data.error || 'Erreur API');
   }
 
   /**

@@ -471,6 +471,11 @@ export function createDemoServerApi(): Record<string, unknown> {
     async scanLocalMedia(): Promise<ApiResponse<string>> {
       return success('ok');
     },
+    async getLocalMediaTmdbGaps(): Promise<
+      ApiResponse<{ missing_tmdb_count: number; sample: Array<{ file_path: string; file_name: string }> }>
+    > {
+      return success({ missing_tmdb_count: 0, sample: [] });
+    },
 
     async getIndexerTypes(): Promise<ApiResponse<unknown[]>> {
       return success([]);

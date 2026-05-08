@@ -189,6 +189,19 @@ export class ClientApi {
     return this._torrents.bindDownloadToMedia(infoHash, tmdbId, tmdbType);
   }
 
+  /** Corriger TMDB pour un téléchargement (override manuel TMDB API). */
+  async setDownloadTmdbOverride(infoHash: string, tmdbId: number, tmdbType: 'movie' | 'tv'): Promise<void> {
+    return this._torrents.setDownloadTmdbOverride(infoHash, tmdbId, tmdbType);
+  }
+
+  async clearDownloadTmdbOverride(infoHash: string): Promise<void> {
+    return this._torrents.clearDownloadTmdbOverride(infoHash);
+  }
+
+  async rematchDownloadTmdb(infoHash: string): Promise<void> {
+    return this._torrents.rematchDownloadTmdb(infoHash);
+  }
+
   /**
    * Restreindre le téléchargement aux fichiers donnés (ex. streaming : un seul fichier vidéo).
    */
