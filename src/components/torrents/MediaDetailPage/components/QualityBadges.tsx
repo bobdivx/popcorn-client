@@ -10,12 +10,14 @@ interface QualityBadgesProps {
     full?: string | null;
   };
   align?: 'left' | 'right';
+  tmdbMatchSource?: string | null;
+  tmdbMatchConfidence?: string | null;
 }
 
 // Style unifié — même glass transparent que gtv-pill-btn
 const badge = "inline-flex items-center gap-1.5 px-3 py-1.5 tv:px-4 tv:py-2 glass-panel backdrop-blur-sm text-white/90 text-xs tv:text-sm font-semibold rounded-full border border-white/15";
 
-export function QualityBadges({ quality, align = 'left' }: QualityBadgesProps) {
+export function QualityBadges({ quality, align = 'left', tmdbMatchSource, tmdbMatchConfidence }: QualityBadgesProps) {
   const [isVisible, setIsVisible] = useState(true);
   const hoverTimeoutRef = useRef<number | null>(null);
 
@@ -162,6 +164,37 @@ export function QualityBadges({ quality, align = 'left' }: QualityBadgesProps) {
     badges.push(
       <div key="hdr" className={badge}>
         <span className="font-black tracking-tight">HDR</span>
+      </div>
+    );
+  }
+
+  // Fiabilité du matching TMDB (audit qualité indexer/matching)
+  const confidence = (tmdbMatchConfidence || '').toLowerCase();
+  if (confidence === 'high' || confidence === 'medium' || confidence === 'low') {
+    const label = confidence === 'high' ? 'TMDB fiable' : confidence === 'medium' ? 'TMDB moyen' : 'TMDB faible';
+    const classByLevel =
+      confidence === 'high'
+        ? 'border-emerald-300/40 text-emerald-100'
+        : confidence === 'medium'
+          ? 'border-amber-300/40 text-amber-100'
+          : 'border-rose-300/40 text-rose-100';
+    const sourceRaw = (tmdbMatchSource || '').toLowerCase();
+    const sourceLabel =
+      sourceRaw === 'indexer'
+        ? 'indexer'
+        : sourceRaw === 'tmdb_api'
+          ? 'api'
+          : sourceRaw === 'cache_cloud'
+            ? 'cache cloud'
+            : sourceRaw === 'cache_local'
+              ? 'cache local'
+              : sourceRaw === 'manual'
+                ? 'manuel'
+                : '';
+    badges.push(
+      <div key="tmdb-confidence" className={`${badge} ${classByLevel}`}>
+        <span className="font-semibold">{label}</span>
+        {sourceLabel ? <span className="text-[10px] opacity-80 uppercase">({sourceLabel})</span> : null}
       </div>
     );
   }

@@ -16,6 +16,50 @@ export interface RestartBackendResponse {
   will_exit: boolean;
 }
 
+export interface RepairDatabaseResponse {
+  dry_run: boolean;
+  preview: {
+    table_counts: Record<string, number>;
+    total_rows: number;
+  };
+  run_result?: {
+    backup_path?: string | null;
+    deleted_rows_by_table: Record<string, number>;
+    total_deleted_rows: number;
+  } | null;
+  scanned_local_media?: number | null;
+  seed_diagnostic?: {
+    ratio_mode_enabled: boolean;
+    upnp_enabled: boolean;
+    librqbit_ok: boolean;
+    listen_port?: number | null;
+    active_torrents: number;
+    seeding_torrents: number;
+    warnings: string[];
+  } | null;
+}
+
+export interface IndexerTmdbCoverageStat {
+  indexer_name: string;
+  total_torrents: number;
+  with_tmdb: number;
+  without_tmdb: number;
+  tmdb_rate_percent: number;
+  tmdb_from_indexer: number;
+  tmdb_from_api: number;
+  tmdb_from_cache_cloud: number;
+  tmdb_from_cache_local: number;
+  tmdb_from_manual: number;
+}
+
+export interface TmdbCoverageResponse {
+  global_total: number;
+  global_with_tmdb: number;
+  global_without_tmdb: number;
+  global_tmdb_rate_percent: number;
+  indexers: IndexerTmdbCoverageStat[];
+}
+
 /** Réponse backend pour POST /api/admin/deployment/webos/install-simple */
 export interface WebOSInstallSimpleResponse {
   success: boolean;
@@ -43,6 +87,30 @@ export const systemMethods = {
 
   async forceCacheCleanup(this: ServerApiClientSystemAccess): Promise<ApiResponse<CleanupCacheResponse>> {
     return this.backendRequest<CleanupCacheResponse>('/api/media/cache/cleanup', { method: 'POST' });
+  },
+
+  async repairDatabase(
+    this: ServerApiClientSystemAccess,
+    body: {
+      dry_run: boolean;
+      create_backup?: boolean;
+      run_library_scan?: boolean;
+      enrich_existing?: boolean;
+      confirm_phrase?: string;
+    }
+  ): Promise<ApiResponse<RepairDatabaseResponse>> {
+    return this.backendRequest<RepairDatabaseResponse>('/api/admin/database/repair', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+
+  async getTmdbCoverageStats(
+    this: ServerApiClientSystemAccess
+  ): Promise<ApiResponse<TmdbCoverageResponse>> {
+    return this.backendRequest<TmdbCoverageResponse>('/api/admin/database/tmdb-coverage', {
+      method: 'GET',
+    });
   },
 
   async getTranscodingConfig(

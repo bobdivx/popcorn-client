@@ -64,6 +64,10 @@ export interface MediaDetailPageProps {
     runtime?: number | null;
     tmdbId?: number | null;
     tmdbType?: string | null;
+    /** Provenance du mapping TMDB (indexer, tmdb_api, cache_cloud, cache_local, manual...). */
+    tmdbMatchSource?: string | null;
+    /** Confiance du mapping TMDB (high, medium, low). */
+    tmdbMatchConfidence?: string | null;
     // État du torrent depuis le backend Rust (si disponible)
     clientState?: 'queued' | 'downloading' | 'seeding' | 'paused' | 'completed' | 'error';
     clientProgress?: number; // 0.0 à 1.0

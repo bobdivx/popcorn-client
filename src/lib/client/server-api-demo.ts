@@ -529,6 +529,14 @@ export function createDemoServerApi(): Record<string, unknown> {
     async forceCacheCleanup(): Promise<ApiResponse<{ cleaned_count: number }>> {
       return success({ cleaned_count: 0 });
     },
+    async repairDatabase(): Promise<ApiResponse<import('./server-api/system.js').RepairDatabaseResponse>> {
+      return success({
+        dry_run: true,
+        preview: { table_counts: {}, total_rows: 0 },
+        run_result: null,
+        scanned_local_media: null,
+      });
+    },
     async getTranscodingConfig(): Promise<ApiResponse<{ max_concurrent_transcodings: number }>> {
       return success({ max_concurrent_transcodings: 2 });
     },

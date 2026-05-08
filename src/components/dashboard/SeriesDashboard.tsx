@@ -8,6 +8,7 @@ import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
 import { useInfiniteSeries } from './hooks/useInfiniteSeries';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useContentSignals } from './hooks/useContentSignals';
+import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
 
 const SECTION_LIMIT = 25;
 const MAX_GENRES = 12;
@@ -40,7 +41,7 @@ export default function SeriesDashboard() {
   );
 
   const handleNavigate = (item: ContentItem) => {
-    window.location.href = `/torrents?slug=${encodeURIComponent(item.id)}&from=dashboard`;
+    window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
   };
 
   const sections = useMemo(() => {
