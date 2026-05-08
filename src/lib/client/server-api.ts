@@ -342,6 +342,14 @@ interface IServerApiClientPublic {
   // System methods
   resetBackendDatabase(): Promise<ApiResponse<void>>;
   forceCacheCleanup(): Promise<ApiResponse<{ cleaned_count: number }>>;
+  repairDatabase(body: {
+    dry_run: boolean;
+    create_backup?: boolean;
+    run_library_scan?: boolean;
+    enrich_existing?: boolean;
+    confirm_phrase?: string;
+  }): Promise<ApiResponse<import('./server-api/system.js').RepairDatabaseResponse>>;
+  getTmdbCoverageStats(): Promise<ApiResponse<import('./server-api/system.js').TmdbCoverageResponse>>;
   getTranscodingConfig(): Promise<ApiResponse<{ max_concurrent_transcodings: number }>>;
   updateTranscodingConfig(body: {
     max_concurrent_transcodings: number;

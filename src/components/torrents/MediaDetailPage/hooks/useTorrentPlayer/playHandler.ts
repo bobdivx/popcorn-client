@@ -30,6 +30,10 @@ async function waitForStreamReady(
   setProgressMessage('Préparation du flux…');
   try {
     await clientApi.streamTorrentReady(infoHash, file.index ?? 0, file.name, token);
+    addDebugLog(
+      'info',
+      'Compatibilité stream-torrent: si le backend ne supporte pas /ready (404/405/501), fallback lecture directe activé'
+    );
     addDebugLog('success', 'Flux stream-torrent prêt');
     return true;
   } catch (e) {

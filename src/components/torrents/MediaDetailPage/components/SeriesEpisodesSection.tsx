@@ -197,7 +197,9 @@ export function SeriesEpisodesSection({
                       : null,
                   ),
                   watched,
-                  isAvailable: !!ep.info_hash,
+                  // Un épisode déjà en bibliothèque doit apparaître comme disponible même
+                  // si l'API séries n'a pas encore renseigné info_hash sur cet item.
+                  isAvailable: !!ep.info_hash || downloaded,
                   isDownloaded: !!ep.file_path || downloaded,
                   isDownloading: isSelected ? isDownloading : false,
                   downloadProgress: isSelected ? downloadProgress : undefined,

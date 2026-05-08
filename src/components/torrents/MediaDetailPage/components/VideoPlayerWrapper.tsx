@@ -58,6 +58,8 @@ interface VideoPlayerWrapperProps {
     language?: string;
     full?: string;
   };
+  tmdbMatchSource?: string | null;
+  tmdbMatchConfidence?: string | null;
   /** En mode démo : URL directe du MP4 (ex. popcorn-web/public/media), pour lecture sans HLS. */
   directStreamUrl?: string | null;
   /** Média partagé par un ami : URL du serveur ami pour le stream uniquement (on garde notre backend pour le reste). */
@@ -103,6 +105,8 @@ export function VideoPlayerWrapper({
   visible = true, 
   wrapperRef,
   quality,
+  tmdbMatchSource,
+  tmdbMatchConfidence,
   directStreamUrl,
   streamBackendUrl,
   posterUrl,
@@ -460,14 +464,24 @@ export function VideoPlayerWrapper({
       {/* Badges de qualité en haut à droite (mode non plein écran) */}
       {!isFullscreen && (
         <div className="absolute top-4 right-4 z-10">
-          <QualityBadges quality={quality} align="right" />
+          <QualityBadges
+            quality={quality}
+            align="right"
+            tmdbMatchSource={tmdbMatchSource}
+            tmdbMatchConfidence={tmdbMatchConfidence}
+          />
         </div>
       )}
       
       {/* Badges de qualité en plein écran aussi */}
       {isFullscreen && (
         <div className="absolute top-4 right-4 z-20">
-          <QualityBadges quality={quality} align="right" />
+          <QualityBadges
+            quality={quality}
+            align="right"
+            tmdbMatchSource={tmdbMatchSource}
+            tmdbMatchConfidence={tmdbMatchConfidence}
+          />
         </div>
       )}
 
