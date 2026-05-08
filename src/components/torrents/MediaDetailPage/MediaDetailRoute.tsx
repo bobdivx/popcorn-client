@@ -464,6 +464,8 @@ function convertVariantToTorrent(variant: any): Torrent {
     runtime: variant.runtime || null,
     tmdbId: variant.tmdb_id || variant.tmdbId || null,
     tmdbType: variant.tmdb_type || variant.tmdbType || null,
+    tmdbMatchSource: (variant as any).tmdb_match_source ?? (variant as any).tmdbMatchSource ?? null,
+    tmdbMatchConfidence: (variant as any).tmdb_match_confidence ?? (variant as any).tmdbMatchConfidence ?? null,
   } as Torrent;
 }
 
@@ -591,6 +593,8 @@ function libraryItemToTorrent(localMedia: any): Torrent {
     runtime: localMedia.runtime ?? null,
     tmdbId: localMedia.tmdb_id ?? null,
     tmdbType: localMedia.tmdb_type ?? null,
+    tmdbMatchSource: localMedia.tmdb_match_source ?? null,
+    tmdbMatchConfidence: localMedia.tmdb_match_confidence ?? null,
     downloadPath: localMedia.download_path ?? null,
   } as Torrent;
 }

@@ -6,6 +6,24 @@ import { useDashboardData } from './hooks/useDashboardData';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useContentSignals } from './hooks/useContentSignals';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
+import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
+
+function getDashboardItemKey(item: ContentItem): string {
+  if (typeof item.tmdbId === 'number') return `${item.type}:${item.tmdbId}`;
+  if (item.id) return `id:${item.id}`;
+  if (item.infoHash) return `infoHash:${item.infoHash}`;
+  return `fallback:${item.title}:${item.type}`;
+}
+
+function dedupeDashboardItems(items: ContentItem[]): ContentItem[] {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = getDashboardItemKey(item);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 export default function Dashboard() {
   const { t } = useI18n();
@@ -19,7 +37,7 @@ export default function Dashboard() {
   const recentMovies = data?.recentMovies ?? [];
   const recentSeries = data?.recentSeries ?? [];
   const allDashboardItems = useMemo(
-    () => [...recentMovies, ...recentSeries, ...popularMovies, ...popularSeries, ...activeDownloads],
+    () => dedupeDashboardItems([...recentMovies, ...recentSeries, ...popularMovies, ...popularSeries, ...activeDownloads]),
     [popularMovies, popularSeries, recentMovies, recentSeries, activeDownloads]
   );
   // On utilise resumeWatching pour les signaux, mais on pourrait utiliser inProgress + seriesInProgress pour être plus large.
@@ -47,7 +65,7 @@ export default function Dashboard() {
       window.location.href = `/downloads`;
       return;
     }
-    window.location.href = `/torrents?slug=${encodeURIComponent(item.id)}&from=dashboard`;
+    window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
   };
 
   const sections = useMemo(

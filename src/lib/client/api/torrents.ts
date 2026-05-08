@@ -566,6 +566,11 @@ export class TorrentsService {
       const response = await fetch(url);
       if (response.ok) return;
       const status = response.status;
+      // Compatibilité backend distant: certains déploiements n'ont pas encore
+      // /api/stream-torrent/ready. On n'empêche pas la lecture dans ce cas.
+      if (status === 404 || status === 405 || status === 501) {
+        return;
+      }
       const retryable = status === 502 || status === 503;
       const text = await response.text().catch(() => '');
       const elapsed = Date.now() - started;

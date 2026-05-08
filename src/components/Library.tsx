@@ -10,6 +10,7 @@ import { getSharedWithMe, logFriendActivity } from '../lib/api/popcorn-web';
 import { HeroSection } from './dashboard/components/HeroSection';
 import type { ContentItem } from '../lib/client/types';
 import { translateGenre } from '../lib/utils/genre-translation';
+import { buildStrictTmdbDetailUrl } from '../lib/utils/media-detail-url';
 
 export type LibraryContentFilter = 'all' | 'movies' | 'series';
 export type LibrarySourceFilter = 'all' | 'popcorn' | 'external' | 'shared' | 'local';
@@ -296,23 +297,14 @@ export default function Library({
     }
     const isSeries = item.category === 'SERIES' || item.tmdb_type === 'tv' || item.tmdb_type === 'series';
     const typeParam = isSeries ? 'tv' : 'movie';
-    let streamBackend = '';
-    if (item.__shared?.backendUrl) {
-      streamBackend = `&streamBackendUrl=${encodeURIComponent(item.__shared.backendUrl)}`;
-      if (item.info_hash) streamBackend += `&infoHash=${encodeURIComponent(item.info_hash)}`;
-      if (item.download_path) streamBackend += `&streamPath=${encodeURIComponent(item.download_path)}`;
-      if (item.name) streamBackend += `&title=${encodeURIComponent(item.name)}`;
-    }
-    // Priorité TMDB : ouvrir par tmdbId + type
-    if (item.tmdb_id != null) {
-      window.location.href = `/torrents?tmdbId=${item.tmdb_id}&type=${typeParam}&from=library${item.name ? `&title=${encodeURIComponent(item.name)}` : ''}${streamBackend}`;
-      return;
-    }
-    if (item.info_hash) {
-      window.location.href = `/torrents?slug=${encodeURIComponent(item.info_hash)}&type=${typeParam}&from=library${streamBackend}`;
-    } else if (item.slug) {
-      window.location.href = `/torrents?slug=${encodeURIComponent(item.slug)}&type=${typeParam}&from=library${streamBackend}`;
-    }
+    window.location.href = buildStrictTmdbDetailUrl({
+      tmdbId: item.tmdb_id ?? null,
+      type: typeParam,
+      from: 'library',
+      title: item.name || null,
+      streamBackendUrl: item.__shared?.backendUrl ?? null,
+      streamPath: item.download_path ?? null,
+    });
   };
 
   const handleScanLocalMedia = async () => {

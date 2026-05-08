@@ -41,7 +41,11 @@ export function HeroHeader({
         </div>
         {torrent.quality && (
           <div className="mt-3 sm:mt-4">
-            <QualityBadges quality={torrent.quality} />
+            <QualityBadges
+              quality={torrent.quality}
+              tmdbMatchSource={torrent.tmdbMatchSource ?? null}
+              tmdbMatchConfidence={torrent.tmdbMatchConfidence ?? null}
+            />
           </div>
         )}
       </div>
