@@ -21,6 +21,8 @@ env:
 
 jobs:
   # Sur main/master : pas de build (évite double build après merge dev→main). On promeut l'image dev.
+  # NB : le tag `latest` est aussi poussé à chaque build sur `dev` (voir job build-and-push / metadata),
+  # pour que la prod (NAS avec :latest) reste alignée même si dev→main ne merge pas tout de suite.
   promote-on-main:
     name: Promote dev → production (no build)
     runs-on: self-hosted
@@ -328,8 +330,8 @@ jobs:
           images: ${{ steps.check_creds.outputs.username }}/popcorn-frontend
           tags: |
             type=raw,value=${{ steps.increment_version.outputs.version || steps.version.outputs.version }},enable=${{ github.event_name != 'pull_request' }}
-            type=raw,value=v${{ steps.increment_version.outputs.version || steps.version.outputs.version }},enable=${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
-            type=raw,value=latest,enable=${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
+            type=raw,value=v${{ steps.increment_version.outputs.version || steps.version.outputs.version }},enable=${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev') }}
+            type=raw,value=latest,enable=${{ github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev') }}
             type=raw,value=dev,enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/dev' }}
             type=raw,value=dev-${{ steps.build_meta.outputs.short_sha }},enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/dev' }}
             type=raw,value=dev-v${{ steps.build_meta.outputs.version }},enable=${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/dev' }}
