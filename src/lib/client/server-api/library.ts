@@ -139,6 +139,20 @@ export const libraryMethods = {
   },
 
   /**
+   * Diagnostic serveur : nombre de fichiers bibliothèque sans TMDB + échantillon de chemins.
+   */
+  async getLocalMediaTmdbGaps(
+    this: ServerApiClientLibraryAccess,
+    sampleLimit?: number
+  ): Promise<ApiResponse<{ missing_tmdb_count: number; sample: Array<{ file_path: string; file_name: string }> }>> {
+    const q =
+      sampleLimit != null && sampleLimit > 0
+        ? `?sample_limit=${encodeURIComponent(String(sampleLimit))}`
+        : '';
+    return this.backendRequest(`/api/library/local-media-tmdb-gaps${q}`, { method: 'GET' });
+  },
+
+  /**
    * Indique si un scan bibliothèque est en cours et quelle source est en cours de scan
    */
   async getLibrarySyncStatus(

@@ -30,6 +30,7 @@ export function createDemoClientApi(): Record<string, unknown> {
     get torrents() {
       return {
         listTorrents: emptyList,
+        listTorrentsEnriched: emptyList,
         getTorrent: async (_infoHash: string) => null as ClientTorrentStats | null,
         getTorrentVerification: async () => ({ available: false, downloading: false, has_files: false }),
         getTorrentStatsV1: async () => null,
@@ -53,12 +54,18 @@ export function createDemoClientApi(): Record<string, unknown> {
         getTorrentDownloadPath: async () => '',
         downloadTorrentFile: async () => {},
         forceTrackerUpdate: async () => {},
+        setDownloadTmdbOverride: async () => {},
+        clearDownloadTmdbOverride: async () => {},
+        rematchDownloadTmdb: async () => {},
       };
     },
     async healthCheck() {
       return true;
     },
     async listTorrents() {
+      return emptyList();
+    },
+    async listTorrentsEnriched() {
       return emptyList();
     },
     async getTorrent(_infoHash: string) {
@@ -107,6 +114,9 @@ export function createDemoClientApi(): Record<string, unknown> {
     },
     async downloadTorrentFile() {},
     async forceTrackerUpdate() {},
+    async setDownloadTmdbOverride() {},
+    async clearDownloadTmdbOverride() {},
+    async rematchDownloadTmdb() {},
     async getRequestUrl(path: string) {
       return `http://demo.local/api/client/${path}`;
     },

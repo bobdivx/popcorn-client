@@ -11,6 +11,7 @@ import { clientApi } from '../../lib/client/api';
 import { TorrentProgressBar, TorrentStatusBadge } from '../torrents/ui';
 import { formatBytes, formatSpeed, formatETA } from '../../lib/utils/formatBytes';
 import { isTorrentActivelySeeding } from '../../lib/utils/torrentSeeding';
+import { parseTmdbUserInput } from '../../lib/utils/parseTmdbUserInput';
 import { Modal } from '../ui/Modal';
 
 interface DownloadDetailModalProps {
@@ -23,6 +24,9 @@ interface DownloadDetailModalProps {
   onShowLogs: (infoHash: string) => void;
   posterUrl?: string | null;
   backdropUrl?: string | null;
+  displayTitleByHash?: Record<string, string>;
+  tmdbIdByHash?: Record<string, number>;
+  onTmdbMetadataChanged?: (infoHash: string) => Promise<void>;
 }
 
 const StatCard = ({ icon: Icon, label, value, colorClass }: any) => (
@@ -61,7 +65,10 @@ export function DownloadDetailModal({
   onRemove, 
   onShowLogs,
   posterUrl,
-  backdropUrl 
+  backdropUrl,
+  displayTitleByHash,
+  tmdbIdByHash,
+  onTmdbMetadataChanged,
 }: DownloadDetailModalProps) {
   const { t } = useI18n();
   const [activeInfoHash, setActiveInfoHash] = useState<string>(torrent.info_hash);
@@ -72,12 +79,60 @@ export function DownloadDetailModal({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [newTrackerUrl, setNewTrackerUrl] = useState('');
   const [addTrackerLoading, setAddTrackerLoading] = useState(false);
+  const [tmdbIdInput, setTmdbIdInput] = useState('');
+  const [tmdbTypeSel, setTmdbTypeSel] = useState<'movie' | 'tv'>('movie');
+  const [tmdbBusy, setTmdbBusy] = useState(false);
+  const [tmdbError, setTmdbError] = useState<string | null>(null);
   const modalTorrents = relatedTorrents && relatedTorrents.length > 0 ? relatedTorrents : [torrent];
   const activeTorrent = modalTorrents.find(t => t.info_hash === activeInfoHash) || torrent;
+  const keyLower = activeTorrent.info_hash.toLowerCase();
+  const isLocalStub = activeTorrent.info_hash.startsWith('local_');
+  const headerTitle =
+    (displayTitleByHash?.[keyLower]?.trim() ||
+      (typeof activeTorrent.tmdb_title === 'string' && activeTorrent.tmdb_title.trim()) ||
+      activeTorrent.name) as string;
 
   useEffect(() => {
     setActiveInfoHash(torrent.info_hash);
   }, [torrent.info_hash]);
+
+  /** Préremplit ID / type : liste locale puis GET /torrents/:hash (hydraté TMDB côté serveur). */
+  useEffect(() => {
+    setTmdbError(null);
+    if (isLocalStub) {
+      setTmdbIdInput('');
+      return;
+    }
+    const idFromMap = tmdbIdByHash?.[keyLower];
+    const idSync = activeTorrent.tmdb_id ?? idFromMap;
+    setTmdbIdInput(
+      idSync != null && Number.isFinite(Number(idSync)) ? String(idSync) : '',
+    );
+    setTmdbTypeSel(activeTorrent.tmdb_type === 'tv' ? 'tv' : 'movie');
+
+    let cancelled = false;
+    void (async () => {
+      const full = await clientApi.getTorrent(activeTorrent.info_hash);
+      if (cancelled || !full) return;
+      const id = full.tmdb_id ?? idFromMap ?? activeTorrent.tmdb_id;
+      if (id != null && Number.isFinite(Number(id))) {
+        setTmdbIdInput(String(id));
+      }
+      if (full.tmdb_type === 'tv' || full.tmdb_type === 'movie') {
+        setTmdbTypeSel(full.tmdb_type);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeTorrent.info_hash,
+    activeTorrent.tmdb_id,
+    activeTorrent.tmdb_type,
+    keyLower,
+    tmdbIdByHash,
+    isLocalStub,
+  ]);
 
   // Background stats polling
   useEffect(() => {
@@ -118,6 +173,53 @@ export function DownloadDetailModal({
     } catch (e) {} finally { setAddTrackerLoading(false); }
   };
 
+  const runTmdbAction = async (fn: () => Promise<void>) => {
+    if (isLocalStub) return;
+    setTmdbBusy(true);
+    setTmdbError(null);
+    try {
+      await fn();
+      await onTmdbMetadataChanged?.(activeTorrent.info_hash);
+    } catch (e) {
+      setTmdbError(e instanceof Error ? e.message : t('downloads.tmdb.error'));
+    } finally {
+      setTmdbBusy(false);
+    }
+  };
+
+  const normalizeTmdbInputField = (raw: string) => {
+    const parsed = parseTmdbUserInput(raw);
+    if (parsed.ok) {
+      setTmdbIdInput(String(parsed.id));
+      if (parsed.typeHint) setTmdbTypeSel(parsed.typeHint);
+      setTmdbError(null);
+      return true;
+    }
+    return false;
+  };
+
+  const handleTmdbApply = () => {
+    const parsed = parseTmdbUserInput(tmdbIdInput);
+    if (!parsed.ok) {
+      setTmdbError(
+        t(parsed.reason === 'empty' ? 'downloads.tmdb.emptyId' : 'downloads.tmdb.invalidInput'),
+      );
+      return;
+    }
+    const typ = parsed.typeHint ?? tmdbTypeSel;
+    void runTmdbAction(() =>
+      clientApi.setDownloadTmdbOverride(activeTorrent.info_hash, parsed.id, typ),
+    );
+  };
+
+  const handleTmdbRematch = () => {
+    void runTmdbAction(() => clientApi.rematchDownloadTmdb(activeTorrent.info_hash));
+  };
+
+  const handleTmdbReset = () => {
+    void runTmdbAction(() => clientApi.clearDownloadTmdbOverride(activeTorrent.info_hash));
+  };
+
   return (
     <Modal 
       isOpen={true} 
@@ -156,7 +258,7 @@ export function DownloadDetailModal({
           <div className="w-full flex-shrink-0 border-b border-white/5 bg-white/[0.02] p-4 sm:p-8 lg:w-96 lg:min-h-0 lg:max-h-full lg:overflow-y-auto lg:border-b-0 lg:border-r tv:lg:w-[min(24rem,32vw)] custom-scrollbar">
             <div className="relative mx-auto aspect-[2/3] w-full max-w-[min(100%,18rem)] overflow-hidden rounded-2xl shadow-2xl group tv:max-w-[min(100%,22rem)] lg:mx-0 lg:max-w-none">
               {posterUrl ? (
-                <img src={posterUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={activeTorrent.name} />
+                <img src={posterUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={headerTitle} />
               ) : (
                 <div className="w-full h-full bg-neutral-800 flex items-center justify-center">
                   <Film size={80} className="text-white/10" />
@@ -166,7 +268,7 @@ export function DownloadDetailModal({
             </div>
 
             <h1 className="text-2xl font-bold text-white mb-4 line-clamp-2 leading-tight">
-              {activeTorrent.name}
+              {headerTitle}
             </h1>
             {modalTorrents.length > 1 && (
               <div className="mb-4">
@@ -231,6 +333,80 @@ export function DownloadDetailModal({
                 <ActionTile icon={Trash2} label="Supprimer" onClick={() => onRemove(activeTorrent.info_hash, false)} danger />
               </div>
             </div>
+
+            {!isLocalStub && (
+              <div className="mb-10 bg-white/[0.03] rounded-3xl border border-white/5 p-6 space-y-4">
+                <h2 className="text-xs font-bold uppercase tracking-widest text-white/40">
+                  {t('downloads.tmdb.sectionTitle')}
+                </h2>
+                <p className="text-sm text-white/50">{t('downloads.tmdb.hint')}</p>
+                <p className="text-xs text-white/35">{t('downloads.tmdb.inputHelp')}</p>
+                {tmdbError && <p className="text-sm text-red-400">{tmdbError}</p>}
+                <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+                  <div className="flex-1 space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-white/30">
+                      {t('downloads.tmdb.idLabel')}
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="text"
+                      autoComplete="off"
+                      value={tmdbIdInput}
+                      onChange={(e) => setTmdbIdInput((e.target as HTMLInputElement).value)}
+                      onBlur={() => {
+                        if (tmdbIdInput.trim()) normalizeTmdbInputField(tmdbIdInput);
+                      }}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[var(--ds-accent-violet)]"
+                      placeholder={t('downloads.tmdb.idPlaceholder')}
+                      disabled={tmdbBusy}
+                    />
+                  </div>
+                  <div className="sm:w-40 space-y-1">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-white/30">
+                      {t('downloads.tmdb.typeLabel')}
+                    </label>
+                    <select
+                      value={tmdbTypeSel}
+                      onChange={(e) => setTmdbTypeSel(((e.target as HTMLSelectElement).value === 'tv' ? 'tv' : 'movie'))}
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[var(--ds-accent-violet)]"
+                      disabled={tmdbBusy}
+                    >
+                      <option value="movie" className="bg-black">{t('downloads.tmdb.typeMovie')}</option>
+                      <option value="tv" className="bg-black">{t('downloads.tmdb.typeTv')}</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={handleTmdbApply}
+                    disabled={tmdbBusy}
+                    className="px-4 py-2 rounded-xl bg-[var(--ds-accent-violet)] text-white text-sm font-bold disabled:opacity-50"
+                    data-focusable
+                  >
+                    {tmdbBusy ? t('downloads.tmdb.busy') : t('downloads.tmdb.apply')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleTmdbRematch}
+                    disabled={tmdbBusy}
+                    className="px-4 py-2 rounded-xl bg-white/10 border border-white/15 text-white text-sm font-semibold disabled:opacity-50"
+                    data-focusable
+                  >
+                    {t('downloads.tmdb.rematch')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleTmdbReset}
+                    disabled={tmdbBusy}
+                    className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/25 text-red-300 text-sm font-semibold disabled:opacity-50"
+                    data-focusable
+                  >
+                    {t('downloads.tmdb.reset')}
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Advanced Toggle */}
             <div className="bg-white/[0.03] rounded-3xl border border-white/5 overflow-hidden">

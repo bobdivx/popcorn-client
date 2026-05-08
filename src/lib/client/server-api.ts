@@ -229,6 +229,7 @@ interface IServerApiClientPublic {
   addFavorite(contentId: string, encryptedData?: string): Promise<ApiResponse<LibraryItem>>;
   removeFavorite(favoriteId: string): Promise<ApiResponse<void>>;
   scanLocalMedia(): Promise<ApiResponse<string>>;
+  getLocalMediaTmdbGaps(sampleLimit?: number): Promise<ApiResponse<{ missing_tmdb_count: number; sample: Array<{ file_path: string; file_name: string }> }>>;
   findLocalMediaByInfoHash(infoHash: string): Promise<ApiResponse<any>>;
 
   // Connection status

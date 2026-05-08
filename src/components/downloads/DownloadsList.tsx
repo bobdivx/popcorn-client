@@ -121,6 +121,7 @@ export default function DownloadsList() {
   const [imageMap, setImageMap] = useState<Record<string, any>>({});
   const [displayTitleMap, setDisplayTitleMap] = useState<Record<string, string>>({});
   const [tmdbTypeMap, setTmdbTypeMap] = useState<Record<string, any>>({});
+  const [tmdbIdMap, setTmdbIdMap] = useState<Record<string, number>>({});
 
   const [selectedTorrent, setSelectedTorrent] = useState<ClientTorrentStats | null>(null);
   const [selectedRelatedTorrents, setSelectedRelatedTorrents] = useState<ClientTorrentStats[]>([]);
@@ -170,6 +171,7 @@ export default function DownloadsList() {
           const images: Record<string, { posterUrl: string | null; backdropUrl: string | null }> = {};
           const titles: Record<string, string> = {};
           const types: Record<string, string> = {};
+          const ids: Record<string, number> = {};
 
           const needsTmdb: Array<{ key: string; title: string; type: string }> = [];
           for (const t of enriched) {
@@ -177,6 +179,7 @@ export default function DownloadsList() {
             images[key] = { posterUrl: t.poster_url ?? null, backdropUrl: t.hero_image_url ?? null };
             if (t.tmdb_title) titles[key] = t.tmdb_title;
             if (t.tmdb_type) types[key] = t.tmdb_type;
+            if (t.tmdb_id != null && Number.isFinite(Number(t.tmdb_id))) ids[key] = Number(t.tmdb_id);
             if (!t.poster_url && !t.hero_image_url && t.tmdb_title) {
               needsTmdb.push({ key, title: t.tmdb_title, type: t.tmdb_type ?? 'movie' });
             }
@@ -192,6 +195,7 @@ export default function DownloadsList() {
           setImageMap(images);
           setDisplayTitleMap(titles);
           setTmdbTypeMap(types);
+          setTmdbIdMap(ids);
 
           // Fallback TMDB optionnel (non bloquant pour le premier rendu)
           if (needsTmdb.length > 0) {
@@ -221,6 +225,20 @@ export default function DownloadsList() {
                   const backdropUrl = backdropPath
                     ? (backdropPath.startsWith('http') ? backdropPath : `https://image.tmdb.org/t/p/w1280${backdropPath}`)
                     : null;
+                  const tmdbNumeric =
+                    typeof hit.tmdbId === 'number'
+                      ? hit.tmdbId
+                      : typeof hit.tmdb_id === 'number'
+                        ? hit.tmdb_id
+                        : null;
+                  const hitMediaType =
+                    hit.type === 'tv' ? 'tv' : hit.type === 'movie' ? 'movie' : null;
+                  if (tmdbNumeric != null && Number.isFinite(tmdbNumeric)) {
+                    setTmdbIdMap((prev) => ({ ...prev, [key]: tmdbNumeric }));
+                  }
+                  if (hitMediaType) {
+                    setTmdbTypeMap((prev) => ({ ...prev, [key]: hitMediaType }));
+                  }
                   if (posterUrl || backdropUrl) {
                     setImageMap(prev => ({
                       ...prev,
@@ -356,6 +374,53 @@ export default function DownloadsList() {
     setSelectedTorrent(null);
     setSelectedRelatedTorrents([]);
   };
+
+  const handleTmdbMetadataChanged = useCallback(
+    async (infoHash: string) => {
+      hasEnrichedRef.current = false;
+      await loadTorrents();
+      try {
+        const enriched = await clientApi.listTorrentsEnriched();
+        const hit = enriched.find((e) => e.info_hash.toLowerCase() === infoHash.toLowerCase());
+        if (!hit) return;
+        const key = infoHash.toLowerCase();
+        setDisplayTitleMap((prev) => {
+          const nextTitle = (hit.tmdb_title || prev[key] || '').trim();
+          return nextTitle ? { ...prev, [key]: nextTitle } : prev;
+        });
+        setTmdbTypeMap((prev) => ({
+          ...prev,
+          ...(hit.tmdb_type ? { [key]: hit.tmdb_type } : {}),
+        }));
+        setImageMap((prev) => ({
+          ...prev,
+          [key]: {
+            posterUrl: hit.poster_url ?? prev[key]?.posterUrl ?? null,
+            backdropUrl: hit.hero_image_url ?? prev[key]?.backdropUrl ?? null,
+          },
+        }));
+        setSelectedTorrentPoster((prev) => hit.poster_url ?? prev);
+        setSelectedTorrentBackdrop((prev) => hit.hero_image_url ?? prev);
+        if (hit.tmdb_id != null && Number.isFinite(Number(hit.tmdb_id))) {
+          setTmdbIdMap((prev) => ({ ...prev, [key]: Number(hit.tmdb_id) }));
+        }
+        setSelectedTorrent((prev) => {
+          if (!prev || prev.info_hash.toLowerCase() !== key) return prev;
+          return {
+            ...prev,
+            tmdb_id: hit.tmdb_id ?? prev.tmdb_id,
+            tmdb_title: hit.tmdb_title ?? prev.tmdb_title,
+            tmdb_type: (hit.tmdb_type as ClientTorrentStats['tmdb_type']) ?? prev.tmdb_type,
+            poster_url: hit.poster_url ?? prev.poster_url,
+            hero_image_url: hit.hero_image_url ?? prev.hero_image_url,
+          };
+        });
+      } catch {
+        /* ignore */
+      }
+    },
+    [loadTorrents],
+  );
 
   const handleShowLogs = async (h: string) => { 
     setSelectedTorrentHash(h); setShowLogsModal(true); setLogsLoading(true);
@@ -519,7 +584,10 @@ export default function DownloadsList() {
           onRemove={async (h, d) => { if(confirm("Supprimer ?")) { await clientApi.removeTorrent(h, d); await loadTorrents(); return true; } return false; }} 
           onShowLogs={handleShowLogs} 
           posterUrl={selectedTorrentPoster} 
-          backdropUrl={selectedTorrentBackdrop} 
+          backdropUrl={selectedTorrentBackdrop}
+          displayTitleByHash={displayTitleMap}
+          tmdbIdByHash={tmdbIdMap}
+          onTmdbMetadataChanged={handleTmdbMetadataChanged}
         />
       )}
     </div>

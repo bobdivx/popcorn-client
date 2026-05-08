@@ -267,6 +267,8 @@ export interface ClientTorrentStats {
   slug?: string | null;
   /** Type de média TMDB (endpoint enrichi). */
   tmdb_type?: 'movie' | 'tv' | null;
+  /** Identifiant TMDB lorsqu'il est connu (correction manuelle, binding ou bibliothèque). */
+  tmdb_id?: number | null;
 }
 
 export interface AddTorrentResponse {

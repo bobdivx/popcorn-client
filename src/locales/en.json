@@ -1198,7 +1198,24 @@
     "private": "Private",
     "statusReason": "Detailed status",
     "notLinkedToTmdb": "Not linked to a media (manual add or not synced yet)",
-    "notLinkedToTmdbShort": "Not linked"
+    "notLinkedToTmdbShort": "Not linked",
+    "tmdb": {
+      "sectionTitle": "Fix TMDB metadata",
+      "hint": "This field shows the TMDB ID currently used for this download (when known).",
+      "inputHelp": "Paste the full themoviedb.org page URL or just the numeric ID. Film vs TV is inferred from the URL when possible.",
+      "idLabel": "TMDB ID or URL",
+      "idPlaceholder": "e.g. 550 or https://www.themoviedb.org/movie/550",
+      "typeLabel": "Type",
+      "typeMovie": "Movie",
+      "typeTv": "TV series",
+      "apply": "Apply",
+      "rematch": "Rematch from torrent name",
+      "reset": "Remove manual override",
+      "busy": "Working…",
+      "error": "Could not update metadata.",
+      "emptyId": "Enter a TMDB ID or the title page URL.",
+      "invalidInput": "Unrecognized format: use a numeric ID or a themoviedb.org URL with /movie/… or /tv/…"
+    }
   },
   "settingsMenu": {
     "title": "Settings",

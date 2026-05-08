@@ -10,7 +10,7 @@ import { isTVPlatform } from '../lib/utils/device-detection';
 
 const SEARCH_HISTORY_KEY = 'popcorn_search_history';
 const SEARCH_HISTORY_MAX = 10;
-const SEARCH_CACHE_VERSION = 'v6';
+const SEARCH_CACHE_VERSION = 'v7';
 
 function yieldToPaint(): Promise<void> {
   return new Promise((resolve) => {
