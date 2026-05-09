@@ -11,6 +11,8 @@ const TMDB_IMG_BACKDROP = 'https://image.tmdb.org/t/p/original';
 interface DiscoverMediaDetailProps {
   tmdbId: number;
   mediaType: 'movie' | 'tv';
+  /** Titre affiché en recherche : aide le backend à résoudre le groupe (slug) si l’ID TMDB diverge. */
+  titleHint?: string;
 }
 
 function formatReleaseDate(dateStr: string | undefined, language: string): string {
@@ -35,6 +37,7 @@ function isReleaseDateFuture(dateStr: string | undefined): boolean {
 export default function DiscoverMediaDetail({
   tmdbId,
   mediaType,
+  titleHint,
 }: DiscoverMediaDetailProps) {
   const { t, language } = useI18n();
   const [data, setData] = useState<any>(null);
@@ -49,14 +52,22 @@ export default function DiscoverMediaDetail({
         setError(null);
 
         // Vérifier d'abord si un torrent existe déjà pour ce TMDB
-        const groupRes = await serverApi.getTorrentGroupByTmdbId(tmdbId);
+        const groupRes = await serverApi.getTorrentGroupByTmdbId(
+          tmdbId,
+          titleHint,
+          mediaType,
+        );
         if (groupRes.success && groupRes.data) {
           const groupData = groupRes.data as { variants?: unknown[]; variant_count?: number; slug?: string };
           const variants = groupData?.variants ?? [];
           const count = groupData?.variant_count ?? variants.length;
           if (count > 0 || variants.length > 0) {
             // Torrent disponible → rediriger vers la page détail torrent
-            window.location.href = `/torrents?tmdbId=${tmdbId}&type=${mediaType}&from=discover`;
+            const titleQ =
+              titleHint && titleHint.trim()
+                ? `&title=${encodeURIComponent(titleHint.trim())}`
+                : '';
+            window.location.href = `/torrents?tmdbId=${tmdbId}&type=${mediaType}&from=discover${titleQ}`;
             return;
           }
         }
@@ -91,7 +102,7 @@ export default function DiscoverMediaDetail({
       }
     };
     load();
-  }, [tmdbId, mediaType, language]);
+  }, [tmdbId, mediaType, language, titleHint]);
 
   const handleBack = () => {
     window.history.back();

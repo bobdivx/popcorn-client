@@ -288,6 +288,12 @@ function getTitleFromLocation(): string | null {
   return new URLSearchParams(window.location.search).get('title');
 }
 
+function getMediaTypeFromLocation(): 'movie' | 'tv' | null {
+  if (typeof window === 'undefined') return null;
+  const t = new URLSearchParams(window.location.search).get('type');
+  return t === 'movie' || t === 'tv' ? t : null;
+}
+
 /** Lit le paramètre `from` dans l'URL (ex. ?from=library). */
 function getFromFromLocation(): string | null {
   if (typeof window === 'undefined') return null;
@@ -603,6 +609,7 @@ export default function MediaDetailRoute() {
   const contentId = useMemo(() => getContentIdFromLocation(), []);
   const tmdbId = useMemo(() => getTmdbIdFromLocation(), []);
   const titleFromQuery = useMemo(() => getTitleFromLocation(), []);
+  const mediaTypeFromQuery = useMemo(() => getMediaTypeFromLocation(), []);
   const [torrent, setTorrent] = useState<Torrent | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -874,7 +881,11 @@ export default function MediaDetailRoute() {
             }
           }
 
-          const groupResponse = await serverApi.getTorrentGroupByTmdbId(tmdbId, titleFromQuery ?? undefined);
+          const groupResponse = await serverApi.getTorrentGroupByTmdbId(
+            tmdbId,
+            titleFromQuery ?? undefined,
+            mediaTypeFromQuery ?? undefined,
+          );
           let best = groupResponse.success && groupResponse.data
             ? pickBestTorrentFromGroupPayload(groupResponse, titleFromQuery ?? undefined)
             : null;
@@ -1302,7 +1313,7 @@ export default function MediaDetailRoute() {
     return () => {
       cancelled = true;
     };
-  }, [contentId, tmdbId, titleFromQuery, retryKey]);
+  }, [contentId, tmdbId, titleFromQuery, mediaTypeFromQuery, retryKey]);
 
   // Quand le backend redevient disponible, relancer le chargement pour mettre à jour la page
   useEffect(() => {
