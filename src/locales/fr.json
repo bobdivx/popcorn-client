@@ -1114,7 +1114,12 @@
     "episodeWithTitle": "{number}. {title}",
     "fullPack": "Pack complet",
     "minimumRatio": "Ratio min.",
-    "tracker": "Tracker"
+    "tracker": "Tracker",
+    "refreshEpisodesFromIndexers": "Chercher de nouveaux épisodes",
+    "refreshEpisodesBusy": "Recherche sur les indexeurs…",
+    "refreshEpisodesSuccess": "{imported} variante(s) importée(s) · {scanned} résultat(s) analysés",
+    "refreshEpisodesNone": "Aucune nouvelle variante trouvée ({scanned} résultats analysés).",
+    "refreshEpisodesError": "Impossible de mettre à jour depuis les indexeurs."
   },
   "torrentStats": {
     "downloading": "Téléchargement en cours",

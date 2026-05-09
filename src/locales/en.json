@@ -1111,7 +1111,12 @@
     "episodeWithTitle": "{number}. {title}",
     "fullPack": "Full pack",
     "minimumRatio": "Min. ratio",
-    "tracker": "Tracker"
+    "tracker": "Tracker",
+    "refreshEpisodesFromIndexers": "Search for new episodes",
+    "refreshEpisodesBusy": "Searching indexers…",
+    "refreshEpisodesSuccess": "{imported} release(s) imported · {scanned} result(s) scanned",
+    "refreshEpisodesNone": "No new releases found ({scanned} results scanned).",
+    "refreshEpisodesError": "Could not refresh from indexers."
   },
   "torrentStats": {
     "downloading": "Downloading",

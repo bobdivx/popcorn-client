@@ -40,6 +40,7 @@ import { isTVPlatform } from '../../../lib/utils/device-detection';
 import { getHighQualityTmdbImageUrl } from '../../../lib/utils/tmdb-images';
 import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-config';
 import { getMediaDisplayTitle } from './utils/mediaDisplayTitle';
+import { resolveDownloadTypeHeader } from './utils/resolveDownloadTypeHeader';
 import { useTmdbApiTitle } from './hooks/useTmdbApiTitle';
 
 /** Retourne l'Ã©pisode suivant (saison + id variante + titre) ou null. */
@@ -319,7 +320,16 @@ function SourceSelectModal({
   );
 }
 
-export default function MediaDetailPage({ torrent, initialVariants, seriesEpisodes, initialTorrentStats, backHref, streamBackendUrl }: MediaDetailPageProps) {
+export default function MediaDetailPage({
+  torrent,
+  initialVariants,
+  seriesEpisodes,
+  initialTorrentStats,
+  backHref,
+  streamBackendUrl,
+  seriesIndexerRefreshTmdbId,
+  reloadMediaDetail,
+}: MediaDetailPageProps) {
   const { t, language } = useI18n();
   // Ã‰tats de base
   const [isPlaying, setIsPlaying] = useState(false);
@@ -359,6 +369,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   /** Clic sur une carte épisode (série) : lancer la lecture une fois le torrent résolu. */
   const episodePlayIntentRef = useRef<string | null>(null);
   const isTV = isTVPlatform();
+  const [seriesIndexerRefreshBusy, setSeriesIndexerRefreshBusy] = useState(false);
   /** Compteur d'Ã©checs consÃ©cutifs de getTorrent (hors 404) pour invalider torrentStats si backend injoignable. */
   const getTorrentFailCountRef = useRef<number>(0);
   /** DerniÃ¨re valeur connue de torrentStats (pour ne pas Ã©craser un Ã©tat complÃ©tÃ© par une rÃ©ponse API invalide type unknown/0). */
@@ -454,6 +465,13 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   useEffect(() => {
     if (initialVariants && initialVariants.length > 0) {
       setAllVariants(initialVariants);
+
+      // Séries TV : ne pas réassigner selectedTorrent selon la qualité préférée — plusieurs variantes
+      // peuvent être des épisodes / releases différents (ex. bibliothèque). La sélection réelle est
+      // faite par saison/épisode (resolveVariantForSelectedEpisode). Sinon on écrase l’info_hash de
+      // l’épisode avec une autre ligne du groupe → oscillation useVideoFiles / fallback local.
+      const tmdbTy = String((torrent as { tmdb_type?: string }).tmdbType ?? (torrent as { tmdb_type?: string }).tmdb_type ?? '').toLowerCase();
+      if (tmdbTy === 'tv' || tmdbTy === 'series') return;
 
       // Appliquer la qualitÃ© prÃ©fÃ©rÃ©e des paramÃ¨tres si plusieurs variantes disponibles
       if (initialVariants.length > 1) {
@@ -612,6 +630,52 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     setShowSourceModal(false);
   }, [addNotification, allVariants, normalizeResolution]);
 
+  const handleRefreshSeriesFromIndexers = useCallback(async () => {
+    if (seriesIndexerRefreshTmdbId == null || seriesIndexerRefreshBusy) return;
+    setSeriesIndexerRefreshBusy(true);
+    try {
+      const srcTorrent = selectedTorrent || torrent;
+      const qRaw =
+        [srcTorrent.mainTitle, (srcTorrent as { cleanTitle?: string }).cleanTitle, srcTorrent.name]
+          .map((x) => (typeof x === 'string' ? x.trim() : ''))
+          .find((s) => s.length >= 2) ?? '';
+      const r = await serverApi.refreshSeriesEpisodesFromIndexers(seriesIndexerRefreshTmdbId, {
+        lang: language === 'fr' ? 'fr-FR' : language === 'en' ? 'en-US' : undefined,
+        /** Force la requête texte sur Torznab / indexeurs (sinon le backend se base surtout sur le titre en DB). */
+        q: qRaw.length >= 2 ? qRaw : undefined,
+      });
+      if (r.success) {
+        if (r.data) {
+          const { imported, scanned } = r.data;
+          if (imported > 0) {
+            addNotification(
+              'success',
+              t('mediaDetail.refreshEpisodesSuccess', { imported, scanned }),
+            );
+          } else {
+            addNotification('info', t('mediaDetail.refreshEpisodesNone', { scanned }));
+          }
+        }
+        reloadMediaDetail?.();
+      } else {
+        addNotification('error', r.message || t('mediaDetail.refreshEpisodesError'));
+      }
+    } catch (e) {
+      addNotification('error', e instanceof Error ? e.message : t('mediaDetail.refreshEpisodesError'));
+    } finally {
+      setSeriesIndexerRefreshBusy(false);
+    }
+  }, [
+    seriesIndexerRefreshTmdbId,
+    seriesIndexerRefreshBusy,
+    language,
+    addNotification,
+    t,
+    reloadMediaDetail,
+    selectedTorrent,
+    torrent,
+  ]);
+
   /** Ferme le lecteur puis dÃ©clenche un rafraÃ®chissement des stats et de la disponibilitÃ© (carte Ã  jour aprÃ¨s stream). */
   const handleClosePlayerAndRefresh = useCallback(async () => {
     await handleClosePlayer();
@@ -630,7 +694,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
       try {
         let infoHash: string;
         if (magnet) {
-          const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+          const downloadType = resolveDownloadTypeHeader(torrent);
           const result = await clientApi.addMagnetLink(magnet, torrent.name, false, downloadType, undefined, [fileIndex]);
           infoHash = result?.info_hash ?? '';
           if (infoHash) {
@@ -670,7 +734,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           }
           const blob = await res.blob();
           const file = new File([blob], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
-          const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+          const downloadType = resolveDownloadTypeHeader(torrent);
           const result = await clientApi.addTorrentFile(file, false, downloadType);
           infoHash = result?.info_hash ?? '';
           if (infoHash) {
@@ -1182,13 +1246,13 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
 
   // Détection des épisodes téléchargés dans la bibliothèque pour les séries
   useEffect(() => {
-    if (activeTorrent.tmdbType !== 'tv' || !activeTorrent.tmdbId || !seriesEpisodes?.seasons) return;
+    if (torrent.tmdbType !== 'tv' || !torrent.tmdbId || !seriesEpisodes?.seasons) return;
 
     let cancelled = false;
     const updateDownloadedEpisodes = async () => {
       try {
         // Source 1 : Médias locaux indexés par le serveur
-        const localMedias = await clientApi.findLocalMediaByTmdb(activeTorrent.tmdbId!, 'tv');
+        const localMedias = await clientApi.findLocalMediaByTmdb(torrent.tmdbId!, 'tv');
         
         // Source 2 : Liste des torrents en cours (pour détecter les épisodes complétés récemment)
         const allTorrents = await clientApi.listTorrents();
@@ -1220,8 +1284,10 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
           normalizeText(v)
             .split(' ')
             .filter((w) => w.length >= 3 && !['the', 'les', 'des', 'une', 'and', 'for', 'with', 'episode', 'saison'].includes(w));
+        // Toujours partir du torrent « page » (props), pas du torrent épisode actif : sinon le nom change
+        // à chaque bascule d’info_hash et relance cet effet en boucle (library / fallback local).
         const activeTitleTokens = new Set<string>(
-          tokenize(String(activeTorrent.mainTitle || activeTorrent.cleanTitle || activeTorrent.name || '')),
+          tokenize(String(torrent.mainTitle || torrent.cleanTitle || torrent.name || '')),
         );
         const hasTitleAffinity = (torrentName: string): boolean => {
           if (!torrentName || activeTitleTokens.size === 0) return false;
@@ -1268,7 +1334,7 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
             // Fallback contrôlé: similarité de titre quand tmdb_id absent côté client_torrents.
             let matched = false;
             const tTmdbId = (t as any).tmdb_id || (t as any).tmdbId;
-            if (activeTorrent.tmdbId && tTmdbId && Number(tTmdbId) === Number(activeTorrent.tmdbId)) {
+            if (torrent.tmdbId && tTmdbId && Number(tTmdbId) === Number(torrent.tmdbId)) {
               matched = true;
             }
             if (!matched && !tTmdbId && hasTitleAffinity(String(t.name || ''))) {
@@ -1290,26 +1356,19 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
             }
           }
         }
-        // Fallback final : garantir au moins l'épisode actuellement ouvert (URL infoHash)
-        // quand son nom porte un motif SxxEyy.
-        if (activeTorrent.infoHash && activeTorrent.name) {
-          const currentSe = parseSE(activeTorrent.name);
+        // Fallback final : entrée bibliothèque / route (props), pas le torrent épisode sélectionné.
+        if (torrent.infoHash && torrent.name) {
+          const currentSe = parseSE(torrent.name);
           if (currentSe) {
             const currentKey = `${currentSe.s}:${currentSe.e}`;
             episodesSet.add(currentKey);
             if (!infoHashMap[currentKey]) {
-              infoHashMap[currentKey] = String(activeTorrent.infoHash).trim();
+              infoHashMap[currentKey] = String(torrent.infoHash).trim();
             }
           }
         }
 
         if (!cancelled) {
-          console.debug('[MediaDetail][EpisodeMap] mapping téléchargements', {
-            tmdbId: activeTorrent.tmdbId,
-            episodesCount: episodesSet.size,
-            mappedInfoHashes: Object.keys(infoHashMap).length,
-            sampleEpisodeKeys: [...episodesSet].slice(0, 8),
-          });
           setDownloadedEpisodesSet(episodesSet);
           setLibraryEpisodesPathMap(pathMap);
           setLibraryEpisodesInfoHashMap(infoHashMap);
@@ -1325,7 +1384,14 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
       cancelled = true;
       clearInterval(iv);
     };
-  }, [activeTorrent.tmdbId, activeTorrent.tmdbType, seriesEpisodes, activeTorrent.name, activeTorrent.mainTitle]);
+  }, [
+    torrent.tmdbId,
+    torrent.tmdbType,
+    seriesEpisodes,
+    torrent.name,
+    torrent.mainTitle,
+    torrent.cleanTitle,
+  ]);
 
   // Auto-téléchargement des nouveaux épisodes :
   // si l'utilisateur a déjà commencé la série OU a déjà des épisodes téléchargés,
@@ -1756,51 +1822,19 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   const resolveVariantForSelectedEpisode = useCallback(
     (episodeVariantId: string | null): MediaDetailPageProps['torrent'] | null => {
       if (!seriesEpisodes?.seasons?.length || episodeVariantId == null) return null;
-      const debugPrefix = '[MediaDetail][EpisodeSource]';
       let variant: MediaDetailPageProps['torrent'] | null | undefined = allVariants.find((v: any) => v.id === episodeVariantId);
-      if (variant) {
-        console.debug(`${debugPrefix} variante trouvée par id`, {
-          episodeVariantId,
-          variantId: variant.id,
-          infoHash: variant.infoHash ?? (variant as any).info_hash ?? null,
-          downloadPath: variant.downloadPath ?? null,
-          strategy: 'match-by-id',
-        });
-      }
       if (!variant) {
         const season = seriesEpisodes.seasons.find((s) => s.episodes.some((e) => e.id === episodeVariantId));
         const ep = season?.episodes.find((e) => e.id === episodeVariantId);
         if (ep != null) {
           if (ep.info_hash) {
             variant = allVariants.find((v: any) => (v.infoHash || (v as any).info_hash) === ep.info_hash);
-            if (variant) {
-              console.debug(`${debugPrefix} variante trouvée par info_hash épisode`, {
-                episodeVariantId,
-                season: ep.season,
-                episode: ep.episode,
-                episodeInfoHash: ep.info_hash,
-                variantId: variant.id,
-                variantInfoHash: variant.infoHash ?? (variant as any).info_hash ?? null,
-                strategy: 'match-by-episode-info-hash',
-              });
-            }
           }
           if (!variant) {
             variant = allVariants.find((v: any) => {
               const se = parseSeasonEpisodeFromVariant(v);
               return se && se.season === ep.season && se.episode === ep.episode;
             });
-            if (variant) {
-              console.debug(`${debugPrefix} variante trouvée par parsing SxxEyy`, {
-                episodeVariantId,
-                season: ep.season,
-                episode: ep.episode,
-                variantId: variant.id,
-                infoHash: variant.infoHash ?? (variant as any).info_hash ?? null,
-                downloadPath: variant.downloadPath ?? null,
-                strategy: 'match-by-season-episode-parse',
-              });
-            }
           }
           if (!variant) {
             const key = `${ep.season}:${ep.episode}`;
@@ -1809,22 +1843,13 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
             const fallbackPath = libraryEpisodesPathMap[key] || null;
             if (fallbackInfoHash || fallbackPath) {
               variant = {
-                ...activeTorrent,
-                id: ep.id || `${activeTorrent.id || 'episode'}_${key}`,
+                ...torrent,
+                id: ep.id || `${torrent.id || 'episode'}_${key}`,
                 infoHash: fallbackInfoHash,
-                downloadPath: fallbackPath ?? activeTorrent.downloadPath ?? null,
-                name: ep.name || activeTorrent.name,
-                tmdbType: activeTorrent.tmdbType ?? 'tv',
+                downloadPath: fallbackPath ?? torrent.downloadPath ?? null,
+                name: ep.name || torrent.name,
+                tmdbType: torrent.tmdbType ?? 'tv',
               };
-              console.debug(`${debugPrefix} fallback local appliqué`, {
-                episodeVariantId,
-                season: ep.season,
-                episode: ep.episode,
-                key,
-                fallbackInfoHash,
-                fallbackPath,
-                strategy: 'fallback-library-maps',
-              });
             }
           }
           if (!variant && ep.episode === 0) {
@@ -1835,34 +1860,12 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
               .slice()
               .sort((a: any, b: any) => (b.seedCount ?? 0) - (a.seedCount ?? 0) || (b.fileSize ?? 0) - (a.fileSize ?? 0))[0];
             if (best) variant = best;
-            if (variant) {
-              console.debug(`${debugPrefix} fallback pack épisode 0`, {
-                episodeVariantId,
-                season: ep.season,
-                episode: ep.episode,
-                variantId: variant.id,
-                infoHash: variant.infoHash ?? (variant as any).info_hash ?? null,
-                strategy: 'fallback-pack-episode-0',
-              });
-            }
           }
         }
       }
-      if (!variant) {
-        console.debug(`${debugPrefix} aucune variante résolue`, {
-          episodeVariantId,
-          strategiesTried: [
-            'match-by-id',
-            'match-by-episode-info-hash',
-            'match-by-season-episode-parse',
-            'fallback-library-maps',
-            'fallback-pack-episode-0',
-          ],
-        });
-      }
       return variant ?? null;
     },
-    [seriesEpisodes, allVariants, parseSeasonEpisodeFromVariant, libraryEpisodesInfoHashMap, libraryEpisodesPathMap, activeTorrent],
+    [seriesEpisodes, allVariants, parseSeasonEpisodeFromVariant, libraryEpisodesInfoHashMap, libraryEpisodesPathMap, torrent],
   );
 
   const handleSeriesEpisodeSelect = useCallback(
@@ -1884,12 +1887,21 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
     if (!seriesEpisodes?.seasons?.length || selectedEpisodeVariantId == null) return;
     const variant = resolveVariantForSelectedEpisode(selectedEpisodeVariantId);
     if (variant) {
-      setSelectedTorrent(variant);
+      setSelectedTorrent((prev: MediaDetailPageProps['torrent']) => {
+        const vh = String(variant.infoHash || (variant as { info_hash?: string }).info_hash || '').toLowerCase();
+        const ph = String(prev?.infoHash || (prev as { info_hash?: string })?.info_hash || '').toLowerCase();
+        if (prev && variant.id === prev.id && vh === ph) return prev;
+        return variant;
+      });
       setCurrentSeedCount(variant.seedCount ?? 0);
       setCurrentLeechCount(variant.leechCount ?? 0);
       setCurrentFileSize(variant.fileSize ?? 0);
       if (variant.downloadPath) {
-        setLibraryDownloadPath(variant.downloadPath);
+        setLibraryDownloadPath((prev) => {
+          const next = variant.downloadPath ?? null;
+          if (!next) return prev;
+          return prev === next ? prev : next;
+        });
       }
     }
   }, [seriesEpisodes, selectedEpisodeVariantId, resolveVariantForSelectedEpisode]);
@@ -2174,6 +2186,13 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
   const tmdbApiTitleDisplay = useTmdbApiTitle(displayTorrent?.tmdbId, displayTorrent?.tmdbType, language);
   const mediaTitleForHero = getMediaDisplayTitle(activeTorrent, tmdbApiTitleActive);
   const mediaTitleForPlayer = getMediaDisplayTitle(displayTorrent, tmdbApiTitleDisplay);
+
+  /** Toujours proposer si on a un TMDB série : le POST interroge les indexeurs activés sur le serveur. */
+  const showSeriesIndexerRefresh =
+    typeof seriesIndexerRefreshTmdbId === 'number' &&
+    (torrent.tmdbType === 'tv' ||
+      torrent.category === 'series' ||
+      (seriesEpisodes?.seasons?.length ?? 0) > 0);
 
   // VÃ©rifier si on peut afficher le lecteur vidÃ©o (ou pendant la transition pour ne pas dÃ©monter)
   const canShowVideoPlayer = isPlaying && hasValidInfoHash && (!!displayFile && (videoFiles.length > 0 || isTransitioningToNext));
@@ -2538,6 +2557,14 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                 }
                 setTimeout(() => handlePlay(), 150);
               }}
+              seriesIndexerRefresh={
+                showSeriesIndexerRefresh
+                  ? {
+                      busy: seriesIndexerRefreshBusy,
+                      onRefresh: handleRefreshSeriesFromIndexers,
+                    }
+                  : undefined
+              }
             />
             </ActionsRow>
 
@@ -2579,7 +2606,13 @@ export default function MediaDetailPage({ torrent, initialVariants, seriesEpisod
                   selectedEpisodeVariantId={selectedEpisodeVariantId}
                   onSelectEpisode={handleSeriesEpisodeSelect}
                   savedPlaybackPosition={savedPlaybackPosition}
-                  episodesInLibraryCount={isLocalTorrent && allVariants.length > 0 ? allVariants.length : undefined}
+                  episodesInLibraryCount={
+                    isLocalTorrent && (allVariants.length > 0 || downloadedEpisodesSet.size > 0)
+                      ? downloadedEpisodesSet.size > 0
+                        ? downloadedEpisodesSet.size
+                        : allVariants.length
+                      : undefined
+                  }
                   downloadedEpisodesSet={downloadedEpisodesSet}
                   isPackSelected={isPackSelected}
                   videoFilesCount={videoFiles.length}

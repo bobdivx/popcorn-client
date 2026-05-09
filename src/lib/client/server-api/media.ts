@@ -181,8 +181,39 @@ export const mediaMethods = {
   async getSeriesEpisodesByTmdbId(
     this: ServerApiClientMediaAccess,
     tmdbId: number,
+    opts?: { title?: string; mediaType?: 'movie' | 'tv' },
   ): Promise<ApiResponse<SeriesEpisodesResponse>> {
-    return this.backendRequest(`/api/torrents/series/by-tmdb/${tmdbId}/episodes`, { method: 'GET' });
+    const params = new URLSearchParams();
+    if (opts?.title?.trim()) params.set('title', opts.title.trim());
+    if (opts?.mediaType) params.set('type', opts.mediaType);
+    const q = params.toString();
+    return this.backendRequest(
+      `/api/torrents/series/by-tmdb/${tmdbId}/episodes${q ? `?${q}` : ''}`,
+      { method: 'GET' },
+    );
+  },
+
+  /**
+   * Interroge les indexeurs pour la série (titre TMDB / base) et importe les variantes
+   * correspondant au `tmdb_id` (nouveaux épisodes / releases).
+   */
+  async refreshSeriesEpisodesFromIndexers(
+    this: ServerApiClientMediaAccess,
+    tmdbId: number,
+    opts?: { q?: string; lang?: string },
+  ): Promise<
+    ApiResponse<{ tmdb_id: number; query_used: string; scanned: number; imported: number }>
+  > {
+    const qp = new URLSearchParams();
+    const uid = this.getCurrentUserId();
+    if (uid) qp.set('user_id', uid);
+    if (opts?.q?.trim()) qp.set('q', opts.q.trim());
+    if (opts?.lang) qp.set('lang', opts.lang);
+    const qs = qp.toString();
+    const suffix = qs ? `?${qs}` : '';
+    return this.backendRequest(`/api/torrents/series/by-tmdb/${tmdbId}/refresh-from-indexers${suffix}`, {
+      method: 'POST',
+    });
   },
 
   /**

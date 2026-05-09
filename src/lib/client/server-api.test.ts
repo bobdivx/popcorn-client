@@ -18,9 +18,9 @@ describe('server-api (mode Tauri)', () => {
     }));
 
     const fetchSpy = vi.fn(async (url: any) => {
-      // endpoint attendu (pas /api/v1/* en Tauri)
+      // endpoint attendu (pas /api/v1/* en Tauri) — catégories alignées sur le backend Rust (minuscules)
       expect(String(url)).toContain('http://127.0.0.1:3000/api/torrents/list');
-      expect(String(url)).toContain('category=FILM');
+      expect(String(url)).toContain('category=films');
       return {
         ok: true,
         json: async () => ({
@@ -57,7 +57,7 @@ describe('server-api (mode Tauri)', () => {
 
     const fetchSpy = vi.fn(async (url: any) => {
       expect(String(url)).toContain('http://127.0.0.1:3000/api/torrents/list');
-      expect(String(url)).toContain('category=SERIES');
+      expect(String(url)).toContain('category=series');
       return {
         ok: true,
         json: async () => ({
@@ -91,22 +91,28 @@ describe('server-api (mode Tauri)', () => {
 
     const fetchSpy = vi.fn(async (url: any) => {
       const u = String(url);
-      if (u.includes('category=FILM')) {
+      if (u.includes('category=films')) {
         return {
           ok: true,
           json: async () => ({
             success: true,
-            data: [{ slug: 'm1', cleanTitle: 'Movie 1', category: 'FILM' }],
+            data: [{ slug: 'm1', cleanTitle: 'Movie 1', category: 'films' }],
           }),
         } as any;
       }
-      if (u.includes('category=SERIES')) {
+      if (u.includes('category=series')) {
         return {
           ok: true,
           json: async () => ({
             success: true,
-            data: [{ slug: 's1', cleanTitle: 'Series 1', category: 'SERIES', tmdbType: 'tv' }],
+            data: [{ slug: 's1', cleanTitle: 'Series 1', category: 'series', tmdbType: 'tv' }],
           }),
+        } as any;
+      }
+      if (u.includes('/api/torrents/fast')) {
+        return {
+          ok: true,
+          json: async () => ({ success: true, data: [] }),
         } as any;
       }
       throw new Error(`unexpected url: ${u}`);
