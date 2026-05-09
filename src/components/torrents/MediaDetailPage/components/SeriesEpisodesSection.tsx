@@ -184,6 +184,11 @@ export function SeriesEpisodesSection({
                   typeof tmdbId === 'number' && ep.episode > 0
                     ? watchedSet?.has(watchedEpisodeKey(ep.season, ep.episode)) ?? false
                     : false;
+                // Indexeur : souvent variante avec id BDD mais magnet sans hash 40c encore résolu.
+                const hasIndexerVariant =
+                  typeof ep.id === 'string' &&
+                  ep.id.trim().length > 0 &&
+                  !ep.id.startsWith('popcorn_tmdb_');
                 return {
                   key: ep.id,
                   episodeNumber: ep.episode === 0 ? '—' : ep.episode,
@@ -199,7 +204,7 @@ export function SeriesEpisodesSection({
                   watched,
                   // Un épisode déjà en bibliothèque doit apparaître comme disponible même
                   // si l'API séries n'a pas encore renseigné info_hash sur cet item.
-                  isAvailable: !!ep.info_hash || downloaded,
+                  isAvailable: !!ep.info_hash || downloaded || hasIndexerVariant,
                   isDownloaded: !!ep.file_path || downloaded,
                   isDownloading: isSelected ? isDownloading : false,
                   downloadProgress: isSelected ? downloadProgress : undefined,

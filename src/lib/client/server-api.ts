@@ -214,7 +214,14 @@ interface IServerApiClientPublic {
     indexerTypeId?: string;
   }): Promise<ApiResponse<import('./server-api/media.js').TorrentListFileEntry[]>>;
   getSeriesEpisodes(slug: string): Promise<ApiResponse<import('./server-api/media.js').SeriesEpisodesResponse>>;
-  getSeriesEpisodesByTmdbId(tmdbId: number): Promise<ApiResponse<import('./server-api/media.js').SeriesEpisodesResponse>>;
+  getSeriesEpisodesByTmdbId(
+    tmdbId: number,
+    opts?: { title?: string; mediaType?: 'movie' | 'tv' },
+  ): Promise<ApiResponse<import('./server-api/media.js').SeriesEpisodesResponse>>;
+  refreshSeriesEpisodesFromIndexers(
+    tmdbId: number,
+    opts?: { q?: string; lang?: string },
+  ): Promise<ApiResponse<{ tmdb_id: number; query_used: string; scanned: number; imported: number }>>;
   getTmdbTvSeasonDetail(tmdbId: number, seasonNumber: number, language?: string): Promise<ApiResponse<any>>;
   getScrubThumbnailsMeta(localMediaId: string, opts?: { torrentRelativePath?: string | null }): Promise<any>;
   generateScrubThumbnails(localMediaId: string, opts?: { force?: boolean; torrentRelativePath?: string | null; durationHintSeconds?: number | null }): Promise<any>;

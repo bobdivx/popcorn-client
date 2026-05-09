@@ -4,6 +4,7 @@ import { saveDownloadMeta } from '../../../../lib/utils/download-meta-storage';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
 import type { MediaDetailPageProps } from '../types';
 import { startProgressPolling, type ProgressPollingOptions } from './progressPolling';
+import { resolveDownloadTypeHeader } from '../utils/resolveDownloadTypeHeader';
 
 /** Stats initiales pour afficher la barre de progression dès le clic sur "Télécharger" */
 function createInitialTorrentStats(infoHash: string, name: string): ClientTorrentStats {
@@ -233,7 +234,7 @@ async function downloadFromExternalIndexerOnce(options: {
       const blob = await localRes.blob();
       const file = new File([blob], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
       const forStreaming = false;
-      const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+      const downloadType = resolveDownloadTypeHeader(torrent);
       const result = await clientApi.addTorrentFile(file, forStreaming, downloadType);
       addNotification('success', 'Torrent ajouté depuis la copie locale du serveur (sans appel à l’indexer).');
       const infoHash = result?.info_hash ?? torrent.infoHash ?? '';
@@ -298,7 +299,7 @@ async function downloadFromExternalIndexerOnce(options: {
     const blob = await response.blob();
     const file = new File([blob], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
     const forStreaming = false;
-    const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+    const downloadType = resolveDownloadTypeHeader(torrent);
 
     const result = await clientApi.addTorrentFile(file, forStreaming, downloadType);
     addNotification('success', 'Torrent ajouté au client avec succès depuis la DB locale !');
@@ -339,7 +340,7 @@ async function downloadFromExternalIndexerOnce(options: {
 
   if (magnetUri) {
     const forStreaming = false;
-    const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+    const downloadType = resolveDownloadTypeHeader(torrent);
     const result = await clientApi.addMagnetLink(magnetUri, torrent.name, forStreaming, downloadType);
     addNotification('success', 'Torrent ajouté au client avec succès !');
     const infoHashMagnet = result?.info_hash ?? torrent.infoHash ?? '';
@@ -521,7 +522,7 @@ async function downloadFromExternalIndexer(options: {
     } else if (jsonResponse.isMagnet && jsonResponse.magnetUri) {
       // Cas spécial : l'endpoint retourne un magnet link
       const forStreaming = false;
-      const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+      const downloadType = resolveDownloadTypeHeader(torrent);
       const result = await clientApi.addMagnetLink(jsonResponse.magnetUri, torrent.name, forStreaming, downloadType);
       addNotification('success', 'Torrent ajouté au client via magnet link !');
       const infoHashMagnet2 = result?.info_hash ?? torrent.infoHash ?? '';
@@ -559,7 +560,7 @@ async function downloadFromExternalIndexer(options: {
     const blob = await response.blob();
     const file = new File([blob], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
     const forStreaming = false;
-    const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+    const downloadType = resolveDownloadTypeHeader(torrent);
     
     const result = await clientApi.addTorrentFile(file, forStreaming, downloadType);
     addNotification('success', 'Torrent téléchargé depuis l\'indexer externe et ajouté au client avec succès !');
@@ -615,7 +616,7 @@ async function handleMagnetResponse(options: {
   } = options;
 
   const forStreaming = false;
-  const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+  const downloadType = resolveDownloadTypeHeader(torrent);
   const result = await clientApi.addMagnetLink(magnetUri, torrent.name, forStreaming, downloadType);
   addNotification('success', 'Torrent ajouté au client avec succès !');
   const infoHashMagnet3 = result?.info_hash ?? torrent.infoHash ?? '';
@@ -678,7 +679,7 @@ async function handleLocalDownload(options: {
   const blob = await response.blob();
   const file = new File([blob], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
   const forStreaming = false;
-  const downloadType = torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film');
+  const downloadType = resolveDownloadTypeHeader(torrent);
   const result = await clientApi.addTorrentFile(file, forStreaming, downloadType);
   addNotification('success', 'Torrent ajouté au client avec succès !');
   const infoHashLocal = result?.info_hash ?? torrent.infoHash ?? '';

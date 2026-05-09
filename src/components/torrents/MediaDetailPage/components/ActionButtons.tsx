@@ -1,4 +1,17 @@
-import { Play, RotateCw, Download, Link2, Check, Trash2, Loader2, XCircle, Radio, Bookmark, BookmarkCheck } from 'lucide-preact';
+import {
+  Play,
+  RotateCw,
+  Download,
+  Link2,
+  Check,
+  Trash2,
+  Loader2,
+  XCircle,
+  Radio,
+  Bookmark,
+  BookmarkCheck,
+  RefreshCw,
+} from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
 import { TorrentProgressBar } from '../../ui';
@@ -37,6 +50,11 @@ interface ActionButtonsProps {
     isFavorite: boolean;
     loading: boolean;
     onToggle: () => void | Promise<void>;
+  };
+  /** Rafraîchir les épisodes depuis les indexeurs (séries TMDB). */
+  seriesIndexerRefresh?: {
+    busy: boolean;
+    onRefresh: () => void | Promise<void>;
   };
 }
 
@@ -90,6 +108,7 @@ export function ActionButtons({
   onCopyMagnet,
   onDeleteMedia,
   watchLater,
+  seriesIndexerRefresh,
 }: ActionButtonsProps) {
   const { t } = useI18n();
   const hasSavedPosition = savedPlaybackPosition !== null && savedPlaybackPosition !== undefined && savedPlaybackPosition > 0;
@@ -350,6 +369,34 @@ export function ActionButtons({
               <Trash2 className="h-4 w-4 shrink-0" size={16} />
             )}
             Supprimer
+          </button>
+        )}
+
+        {/* Nouveaux épisodes (indexeurs) — même rangée que Lire / Magnet / … */}
+        {seriesIndexerRefresh && (
+          <button
+            type="button"
+            disabled={seriesIndexerRefresh.busy}
+            onClick={() => void seriesIndexerRefresh.onRefresh()}
+            title={
+              seriesIndexerRefresh.busy
+                ? t('mediaDetail.refreshEpisodesBusy')
+                : t('mediaDetail.refreshEpisodesFromIndexers')
+            }
+            aria-busy={seriesIndexerRefresh.busy}
+            data-focusable
+            tabIndex={0}
+            className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2 shrink-0 border border-white/15 bg-white/5 text-white/85 hover:bg-white/10 text-sm tv:text-lg disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <RefreshCw
+              className={`h-4 w-4 tv:h-6 tv:w-6 shrink-0 ${seriesIndexerRefresh.busy ? 'animate-spin' : ''}`}
+              aria-hidden
+            />
+            <span className="hidden sm:inline max-w-[11rem] tv:max-w-none truncate">
+              {seriesIndexerRefresh.busy
+                ? t('mediaDetail.refreshEpisodesBusy')
+                : t('mediaDetail.refreshEpisodesFromIndexers')}
+            </span>
           </button>
         )}
       </div>

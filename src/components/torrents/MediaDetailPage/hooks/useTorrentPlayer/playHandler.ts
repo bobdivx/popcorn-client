@@ -4,6 +4,7 @@ import { TokenManager } from '../../../../../lib/client/storage';
 import { setStreamingInfoHash } from '../../../../../lib/streamingInfoHashStorage';
 import { getCachedSubscription, loadSubscription } from '../../../../../lib/subscription-store';
 import { PROGRESS_POLL_INTERVAL_MS } from '../../utils/constants';
+import { resolveDownloadTypeHeader } from '../../utils/resolveDownloadTypeHeader';
 import type { PlayHandlerContext } from './types';
 
 /** En mode stream-torrent, attend que le flux soit prêt (déclencheur côté backend) avant d'ouvrir le lecteur. */
@@ -422,7 +423,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
             if (isTorrentUnavailable && (torrent._externalMagnetUri?.trim())) {
               addDebugLog('info', '📥 Fichier .torrent indisponible sur l\'indexeur, ajout via magnet (données de la recherche)', { hasMagnet: true });
               const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
-              const downloadType = forStreaming ? undefined : (torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film'));
+              const downloadType = forStreaming ? undefined : resolveDownloadTypeHeader(torrent);
               const addResult = await clientApi.addMagnetLink(torrent._externalMagnetUri!, torrent.name, forStreaming, downloadType);
               if (addResult.info_hash) {
                 if (forStreaming) setStreamingInfoHash(addResult.info_hash);
@@ -514,7 +515,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
             if (errorData.isMagnet && errorData.magnetUri) {
               addDebugLog('info', '📥 L\'API a retourné un magnet link (fallback)', { magnetUri: errorData.magnetUri });
               const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
-              const downloadType = forStreaming ? undefined : (torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film'));
+              const downloadType = forStreaming ? undefined : resolveDownloadTypeHeader(torrent);
               const addResult = await clientApi.addMagnetLink(errorData.magnetUri, torrent.name, forStreaming, downloadType);
               if (addResult.info_hash) {
                 if (forStreaming) setStreamingInfoHash(addResult.info_hash);
@@ -655,7 +656,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
           setProgressMessage('Ajout du fichier torrent...');
           
           const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
-          const downloadType = forStreaming ? undefined : (torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film'));
+          const downloadType = forStreaming ? undefined : resolveDownloadTypeHeader(torrent);
           const addResult = await clientApi.addTorrentFile(torrentFile, forStreaming, downloadType);
           if (addResult.info_hash) {
             if (forStreaming) setStreamingInfoHash(addResult.info_hash);
@@ -733,7 +734,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
 
         try {
           const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
-          const downloadType = forStreaming ? undefined : (torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film'));
+          const downloadType = forStreaming ? undefined : resolveDownloadTypeHeader(torrent);
           const addResult = await clientApi.addMagnetLink(constructedMagnet, torrent.name, forStreaming, downloadType);
           if (addResult.info_hash) {
             if (forStreaming) setStreamingInfoHash(addResult.info_hash);
@@ -982,7 +983,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
 
       try {
         const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
-        const downloadType = forStreaming ? undefined : (torrent.tmdbType === 'movie' ? 'film' : (torrent.tmdbType === 'tv' ? 'serie' : 'film'));
+        const downloadType = forStreaming ? undefined : resolveDownloadTypeHeader(torrent);
         const addResult = await clientApi.addMagnetLink(magnetUri, torrent.name, forStreaming, downloadType);
         if (addResult.info_hash) {
           if (forStreaming) setStreamingInfoHash(addResult.info_hash);
