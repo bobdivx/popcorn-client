@@ -2,21 +2,27 @@ import { useMemo } from 'preact/hooks';
 import DiscoverMediaDetail from './DiscoverMediaDetail';
 import { useI18n } from '../../lib/i18n';
 
-function getParamsFromLocation(): { tmdbId: number | null; type: 'movie' | 'tv' | null } {
-  if (typeof window === 'undefined') return { tmdbId: null, type: null };
+function getParamsFromLocation(): {
+  tmdbId: number | null;
+  type: 'movie' | 'tv' | null;
+  titleHint: string | null;
+} {
+  if (typeof window === 'undefined') return { tmdbId: null, type: null, titleHint: null };
   const params = new URLSearchParams(window.location.search);
   const tmdbIdStr = params.get('tmdbId');
   const type = params.get('type') as 'movie' | 'tv' | null;
-  if (!tmdbIdStr || !type) return { tmdbId: null, type: null };
+  const titleRaw = params.get('title');
+  const titleHint = titleRaw?.trim() ? titleRaw.trim() : null;
+  if (!tmdbIdStr || !type) return { tmdbId: null, type: null, titleHint: null };
   const tmdbId = parseInt(tmdbIdStr, 10);
-  if (Number.isNaN(tmdbId)) return { tmdbId: null, type: null };
-  if (type !== 'movie' && type !== 'tv') return { tmdbId: null, type: null };
-  return { tmdbId, type };
+  if (Number.isNaN(tmdbId)) return { tmdbId: null, type: null, titleHint: null };
+  if (type !== 'movie' && type !== 'tv') return { tmdbId: null, type: null, titleHint: null };
+  return { tmdbId, type, titleHint };
 }
 
 export default function DiscoverMediaDetailRoute() {
   const { t } = useI18n();
-  const { tmdbId, type } = useMemo(() => getParamsFromLocation(), []);
+  const { tmdbId, type, titleHint } = useMemo(() => getParamsFromLocation(), []);
 
   if (!tmdbId || !type) {
     return (
@@ -31,5 +37,5 @@ export default function DiscoverMediaDetailRoute() {
     );
   }
 
-  return <DiscoverMediaDetail tmdbId={tmdbId} mediaType={type} />;
+  return <DiscoverMediaDetail tmdbId={tmdbId} mediaType={type} titleHint={titleHint ?? undefined} />;
 }

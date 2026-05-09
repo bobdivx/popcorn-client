@@ -394,11 +394,18 @@ function SearchResultAvailability({
   );
 }
 
+/** Ajoute `title` à une URL discover pour que le backend résolve le groupe (slug) même si TMDB diffère. */
+function withDiscoverTitleHint(path: string, title?: string): string {
+  const t = title?.trim();
+  if (!t) return path;
+  return `${path}${path.includes('?') ? '&' : '?'}title=${encodeURIComponent(t)}`;
+}
+
 /** URL de détail : priorité TMDB (tmdbId + type), fallback slug. Discover si pas de torrent (id tmdb-xxx). */
 function getDetailUrl(result: SearchResult): string {
   // Si c'est un résultat TMDB pur (sans torrent), go Discover
   if (result.id?.startsWith('tmdb-') && result.tmdbId != null) {
-    return `/discover?tmdbId=${result.tmdbId}&type=${result.type}`;
+    return withDiscoverTitleHint(`/discover?tmdbId=${result.tmdbId}&type=${result.type}`, result.title);
   }
 
   // Si c'est téléchargé (déjà en bibliothèque), on peut aller sur la page torrent (détail/stream)
@@ -410,7 +417,7 @@ function getDetailUrl(result: SearchResult): string {
   // Pour les autres cas (indexer, etc.), si on a un tmdbId, on préfère passer par Discover
   // pour permettre la demande ou voir les infos, car /torrents risque d'être vide.
   if (result.tmdbId != null) {
-    return `/discover?tmdbId=${result.tmdbId}&type=${result.type}`;
+    return withDiscoverTitleHint(`/discover?tmdbId=${result.tmdbId}&type=${result.type}`, result.title);
   }
 
   return `/torrents?slug=${encodeURIComponent(result.id)}&from=search`;

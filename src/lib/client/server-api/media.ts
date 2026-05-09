@@ -148,9 +148,16 @@ export const mediaMethods = {
     this: ServerApiClientMediaAccess,
     tmdbId: number,
     title?: string,
+    mediaType?: 'movie' | 'tv',
   ): Promise<ApiResponse<any>> {
-    const q = title ? `?title=${encodeURIComponent(title)}` : '';
-    return this.backendRequest(`/api/torrents/group/by-tmdb/${tmdbId}${q}`, { method: 'GET' });
+    const params = new URLSearchParams();
+    if (title) params.set('title', title);
+    if (mediaType) params.set('type', mediaType);
+    const q = params.toString();
+    return this.backendRequest(
+      `/api/torrents/group/by-tmdb/${tmdbId}${q ? `?${q}` : ''}`,
+      { method: 'GET' },
+    );
   },
 
   /**
