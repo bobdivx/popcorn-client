@@ -356,6 +356,20 @@ export const requestsMethods = {
     return this.backendRequest<any>(`/api/discover/tv/${tmdbId}${q}`, { method: 'GET', headers });
   },
 
+  async getTmdbMovieRecommendations(this: ServerApiClientAccess, tmdbId: number, language?: string): Promise<ApiResponse<any>> {
+    const q = language ? `?language=${encodeURIComponent(language)}` : '';
+    const userId = this.getCurrentUserId?.() ?? null;
+    const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
+    return this.backendRequest<any>(`/api/discover/movie/${tmdbId}/recommendations${q}`, { method: 'GET', headers });
+  },
+
+  async getTmdbTvRecommendations(this: ServerApiClientAccess, tmdbId: number, language?: string): Promise<ApiResponse<any>> {
+    const q = language ? `?language=${encodeURIComponent(language)}` : '';
+    const userId = this.getCurrentUserId?.() ?? null;
+    const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
+    return this.backendRequest<any>(`/api/discover/tv/${tmdbId}/recommendations${q}`, { method: 'GET', headers });
+  },
+
   async discoverTv(
     this: ServerApiClientAccess,
     params?: {

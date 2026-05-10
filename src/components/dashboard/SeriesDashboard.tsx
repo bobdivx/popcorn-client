@@ -9,6 +9,7 @@ import { useInfiniteSeries } from './hooks/useInfiniteSeries';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useContentSignals } from './hooks/useContentSignals';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
+import SuggestionsSection from './SuggestionsSection';
 
 const SECTION_LIMIT = 25;
 const MAX_GENRES = 12;
@@ -122,6 +123,8 @@ export default function SeriesDashboard() {
       emptyTitle={t('sync.noSeriesSynced')}
       emptyDescription={t('sync.startSyncSeriesDescription')}
       headerAction={toggle}
-    />
+    >
+      <SuggestionsSection contextType="series" />
+    </SimpleTmdbPage>
   );
 }

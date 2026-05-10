@@ -7,6 +7,7 @@ import { useResumeWatching } from './hooks/useResumeWatching';
 import { useContentSignals } from './hooks/useContentSignals';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
+import SuggestionsSection from './SuggestionsSection';
 
 function getDashboardItemKey(item: ContentItem): string {
   if (typeof item.tmdbId === 'number') return `${item.type}:${item.tmdbId}`;
@@ -124,6 +125,8 @@ export default function Dashboard() {
       onNavigate={handleNavigate}
       emptyTitle={t('sync.noTorrentsSynced')}
       emptyDescription={t('sync.startSyncAllDescription')}
-    />
+    >
+      <SuggestionsSection contextType="all" />
+    </SimpleTmdbPage>
   );
 }
