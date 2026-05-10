@@ -348,6 +348,8 @@ export default function MediaDetailPage({
   const [trailerKey, setTrailerKey] = useState<string | null>(torrent.trailerKey || null);
   const [isLoadingTrailer, setIsLoadingTrailer] = useState(false);
   const [isPlayingTrailer, setIsPlayingTrailer] = useState(false);
+  const [startedAsStreamTorrent, setStartedAsStreamTorrent] = useState(false);
+
   /** En mode immersif (false), les infos et overlays sont masquÃ©s, luminositÃ© vidÃ©o normale. Clic ou touche rÃ©affiche. */
   const [trailerUiVisible, setTrailerUiVisible] = useState(true);
   const trailerCloseButtonRef = useRef<HTMLButtonElement>(null);
@@ -553,8 +555,16 @@ export default function MediaDetailPage({
   // MÃ©dias bibliothÃ¨que (local_xxx) : pas d'API stream-torrent cÃ´tÃ© backend, toujours utiliser le flux local.
   const useStreamTorrentMode =
     (streamingTorrentActive ?? false) &&
-    (!isAvailableLocally || isPlaying) &&
+    (!isAvailableLocally || startedAsStreamTorrent) &&
     !activeTorrent.infoHash?.startsWith('local_');
+
+  useEffect(() => {
+    if (isPlaying && !isAvailableLocally) {
+      setStartedAsStreamTorrent(true);
+    } else if (!isPlaying) {
+      setStartedAsStreamTorrent(false);
+    }
+  }, [isPlaying, isAvailableLocally]);
 
   // Log des paramÃ¨tres streaming en console (visible dans lâ€™onglet Console pour debug)
   useEffect(() => {
