@@ -29,7 +29,7 @@ jobs:
 
       - name: Create or update PR dev -> main/master
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.PAT || secrets.GH_PAT || github.token }}
         run: |
           set -euo pipefail
 
@@ -82,4 +82,16 @@ jobs:
           else
             echo "Could not enable auto-merge for PR #${PR_NUMBER}."
             exit 1
+          fi
+
+      - name: Trigger Vercel Deploy Hook (if configured)
+        if: success()
+        env:
+          VERCEL_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
+        run: |
+          if [ -n "$VERCEL_HOOK" ]; then
+            echo "Triggering Vercel deployment hook..."
+            curl -X POST "$VERCEL_HOOK"
+          else
+            echo "No VERCEL_DEPLOY_HOOK secret found, skipping."
           fi
