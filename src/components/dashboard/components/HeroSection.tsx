@@ -221,6 +221,7 @@ export function HeroSection({
                 backgroundImage: currentImageUrl || currentItem.backdrop ? `url(${currentImageUrl || currentItem.backdrop})` : 'none',
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
+                animation: 'hero-slide-fade 0.6s ease-out forwards, ken-burns 20s ease-out forwards',
               }}
             >
               <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/65 to-transparent" />
@@ -345,6 +346,10 @@ export function HeroSection({
           from { opacity: 0; }
           to { opacity: 1; }
         }
+        @keyframes ken-burns {
+          from { transform: scale(1); }
+          to { transform: scale(1.05); }
+        }
         .hero-slide-enter {
           animation: hero-slide-fade 0.6s ease-out forwards;
         }
@@ -375,6 +380,7 @@ export function HeroSection({
             backgroundImage: currentImageUrl || currentItem.backdrop ? `url(${currentImageUrl || currentItem.backdrop})` : 'none',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
+            animation: 'hero-slide-fade 0.6s ease-out forwards, ken-burns 20s ease-out forwards',
           }}
         >
           <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/65 to-transparent" />

@@ -9,6 +9,7 @@ import { useInfiniteFilms } from './hooks/useInfiniteFilms';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useContentSignals } from './hooks/useContentSignals';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
+import SuggestionsSection from './SuggestionsSection';
 
 const SECTION_LIMIT = 25;
 const MAX_GENRES = 12;
@@ -108,6 +109,8 @@ export default function FilmsDashboard() {
       emptyTitle={t('sync.noFilmsSynced')}
       emptyDescription={t('sync.startSyncDescription')}
       headerAction={toggle}
-    />
+    >
+      <SuggestionsSection contextType="movies" />
+    </SimpleTmdbPage>
   );
 }
