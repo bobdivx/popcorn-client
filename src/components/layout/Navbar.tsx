@@ -360,9 +360,8 @@ export default function Navbar() {
               </button>
             )}
 
-            <div className="hidden sm:block">
+              {/* ConnectivityWarning est maintenant géré en floating fixed via son propre composant */}
               <ConnectivityWarning />
-            </div>
 
             {user ? (
               <>

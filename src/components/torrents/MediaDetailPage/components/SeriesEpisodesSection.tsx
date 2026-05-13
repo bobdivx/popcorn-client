@@ -36,6 +36,7 @@ export function SeriesEpisodesSection({
   downloadedEpisodesSet,
   watchedSet,
   isTV,
+  isDownloading,
   downloadProgress,
   statusMessage,
   downloadingEpisodesMap,
