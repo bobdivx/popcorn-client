@@ -4,21 +4,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
-import {
-  Chart,
-  ArcElement,
-  DoughnutController,
-  BarController,
-  LineController,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  PointElement,
-  LineElement,
-  Filler,
-  Tooltip,
-  Legend,
-} from 'chart.js';
+import type { Chart } from 'chart.js';
 import { Play, Square, Settings, ChevronDown, ChevronUp, FileDown, Trash2, RefreshCw, AlertTriangle, Check, Activity, Database } from 'lucide-preact';
 import { serverApi } from '../../lib/client/server-api';
 import {
@@ -33,7 +19,18 @@ import type { Indexer } from '../../lib/client/types';
 import { useNativeNotifications } from '../../hooks/useNativeNotifications';
 import type { SyncHistoryEntry } from '../../lib/client/server-api/sync.js';
 
-Chart.register(ArcElement, DoughnutController, BarController, LineController, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Filler, Tooltip, Legend);
+let GlobalChart: any = null;
+async function getChart() {
+  if (GlobalChart) return GlobalChart;
+  const { 
+    Chart, ArcElement, DoughnutController, BarController, LineController, 
+    CategoryScale, LinearScale, BarElement, PointElement, LineElement, 
+    Filler, Tooltip, Legend 
+  } = await import('chart.js');
+  Chart.register(ArcElement, DoughnutController, BarController, LineController, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Filler, Tooltip, Legend);
+  GlobalChart = Chart;
+  return Chart;
+}
 
 /* ─────────────────────────────────────────────────────────────────────────── */
 /*  Helpers Chart.js communs                                                   */
@@ -101,58 +98,61 @@ function SyncHistoryChart({ history, animKey }: { history: SyncHistoryEntry[]; a
 
   useEffect(() => {
     if (!canvasRef.current || history.length === 0) return;
-    chartRef.current = new Chart(canvasRef.current, {
-      type: 'bar',
-      data: buildData(history),
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 800, easing: 'easeInOutQuart' },
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            ...TOOLTIP_BASE,
-            callbacks: {
-              title: (items) => {
-                const idx = items[0]?.dataIndex;
-                if (idx === undefined) return '';
-                const e = history[idx];
-                return new Date(e.synced_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
-              },
-              label: (ctx) => {
-                const idx = ctx.dataIndex;
-                const e = history[idx];
-                if (ctx.datasetIndex === 1) return '';
-                return [
-                  `  ${e.total_count.toLocaleString()} torrents`,
-                  `  Durée : ${e.duration_secs < 60 ? e.duration_secs + 's' : Math.floor(e.duration_secs / 60) + 'min'}`,
-                  `  ${e.success ? '✓ Réussite' : `✗ ${e.error_count} erreur(s)`}`,
-                ];
+    getChart().then(ChartClass => {
+      if (!canvasRef.current) return;
+      chartRef.current = new ChartClass(canvasRef.current, {
+        type: 'bar',
+        data: buildData(history),
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 800, easing: 'easeInOutQuart' },
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              ...TOOLTIP_BASE,
+              callbacks: {
+                title: (items) => {
+                  const idx = items[0]?.dataIndex;
+                  if (idx === undefined) return '';
+                  const e = history[idx];
+                  return new Date(e.synced_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+                },
+                label: (ctx) => {
+                  const idx = ctx.dataIndex;
+                  const e = history[idx];
+                  if (ctx.datasetIndex === 1) return '';
+                  return [
+                    `  ${e.total_count.toLocaleString()} torrents`,
+                    `  Durée : ${e.duration_secs < 60 ? e.duration_secs + 's' : Math.floor(e.duration_secs / 60) + 'min'}`,
+                    `  ${e.success ? '✓ Réussite' : `✗ ${e.error_count} erreur(s)`}`,
+                  ];
+                },
               },
             },
           },
-        },
-        scales: {
-          x: {
-            grid: { display: false },
-            ticks: {
-              color: 'rgba(255,255,255,0.35)',
-              font: { size: 9.5 },
-              maxRotation: 0,
-              minRotation: 0,
-              autoSkip: true,
-              autoSkipPadding: 6,
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: {
+                color: 'rgba(255,255,255,0.35)',
+                font: { size: 9.5 },
+                maxRotation: 0,
+                minRotation: 0,
+                autoSkip: true,
+                autoSkipPadding: 6,
+              },
+              border: { display: false },
             },
-            border: { display: false },
-          },
-          y: {
-            grid: { color: 'rgba(255,255,255,0.04)' },
-            ticks: { color: 'rgba(255,255,255,0.28)', font: { size: 10 }, callback: (v) => Number(v).toLocaleString() },
-            border: { color: 'rgba(255,255,255,0.05)' },
+            y: {
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: { color: 'rgba(255,255,255,0.28)', font: { size: 10 }, callback: (v) => Number(v).toLocaleString() },
+              border: { color: 'rgba(255,255,255,0.05)' },
+            },
           },
         },
-      },
+      });
     });
     return () => { chartRef.current?.destroy(); chartRef.current = null; };
   }, [history.length]);
@@ -184,22 +184,25 @@ function SyncMiniDonut({ value, total, color, label, animKey }: {
 
   useEffect(() => {
     if (!canvasRef.current) return;
-    chartRef.current = new Chart(canvasRef.current, {
-      type: 'doughnut',
-      data: {
-        datasets: [{
-          data: [value || 0.001, rest || 0.001],
-          backgroundColor: [color, 'rgba(255,255,255,0.06)'],
-          borderWidth: 0,
-          hoverOffset: 0,
-        }],
-      },
-      options: {
-        cutout: '76%',
-        animation: { duration: 700, easing: 'easeInOutQuart' },
-        events: [],
-        plugins: { legend: { display: false }, tooltip: { enabled: false } },
-      },
+    getChart().then(ChartClass => {
+      if (!canvasRef.current) return;
+      chartRef.current = new ChartClass(canvasRef.current, {
+        type: 'doughnut',
+        data: {
+          datasets: [{
+            data: [value || 0.001, rest || 0.001],
+            backgroundColor: [color, 'rgba(255,255,255,0.06)'],
+            borderWidth: 0,
+            hoverOffset: 0,
+          }],
+        },
+        options: {
+          cutout: '76%',
+          animation: { duration: 700, easing: 'easeInOutQuart' },
+          events: [],
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        },
+      });
     });
     return () => { chartRef.current?.destroy(); chartRef.current = null; };
   }, []);
@@ -237,26 +240,29 @@ function SyncDonutChart({ films, series, others, animKey }: {
 
   useEffect(() => {
     if (!canvasRef.current) return;
-    chartRef.current = new Chart(canvasRef.current, {
-      type: 'doughnut',
-      data: {
-        labels: ['Films', 'Séries', 'Autres'],
-        datasets: [{
-          data: [films || 0.001, series || 0.001, others || 0.001],
-          backgroundColor: ['rgba(251,191,36,0.88)', 'rgba(139,92,246,0.88)', 'rgba(34,197,94,0.88)'],
-          borderColor: 'rgba(255,255,255,0.03)',
-          borderWidth: 2,
-          hoverOffset: 8,
-        }],
-      },
-      options: {
-        cutout: '72%',
-        animation: { duration: 900, easing: 'easeInOutQuart' },
-        plugins: {
-          legend: { display: false },
-          tooltip: { ...TOOLTIP_BASE, callbacks: { label: (ctx) => `  ${ctx.label}: ${ctx.parsed.toLocaleString()}` } },
+    getChart().then(ChartClass => {
+      if (!canvasRef.current) return;
+      chartRef.current = new ChartClass(canvasRef.current, {
+        type: 'doughnut',
+        data: {
+          labels: ['Films', 'Séries', 'Autres'],
+          datasets: [{
+            data: [films || 0.001, series || 0.001, others || 0.001],
+            backgroundColor: ['rgba(251,191,36,0.88)', 'rgba(139,92,246,0.88)', 'rgba(34,197,94,0.88)'],
+            borderColor: 'rgba(255,255,255,0.03)',
+            borderWidth: 2,
+            hoverOffset: 8,
+          }],
         },
-      },
+        options: {
+          cutout: '72%',
+          animation: { duration: 900, easing: 'easeInOutQuart' },
+          plugins: {
+            legend: { display: false },
+            tooltip: { ...TOOLTIP_BASE, callbacks: { label: (ctx) => `  ${ctx.label}: ${ctx.parsed.toLocaleString()}` } },
+          },
+        },
+      });
     });
     return () => { chartRef.current?.destroy(); chartRef.current = null; };
   }, []);
@@ -301,42 +307,45 @@ function SyncBarChart({ items, animKey }: { items: BarChartItem[]; animKey: numb
 
   useEffect(() => {
     if (!canvasRef.current) return;
-    const max = Math.max(...items.map(i => i.value), 1);
-    chartRef.current = new Chart(canvasRef.current, {
-      type: 'bar',
-      data: {
-        labels: items.map(i => i.label),
-        datasets: [{
-          data: items.map(i => i.value),
-          backgroundColor: items.map(i => i.color),
-          borderWidth: 0,
-          borderRadius: 8,
-          borderSkipped: false,
-        }],
-      },
-      options: {
-        indexAxis: 'y',
-        animation: { duration: 900, easing: 'easeInOutQuart' },
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { ...TOOLTIP_BASE, callbacks: { label: (ctx) => `  ${ctx.parsed.x.toLocaleString()}` } },
+    getChart().then(ChartClass => {
+      if (!canvasRef.current) return;
+      const max = Math.max(...items.map(i => i.value), 1);
+      chartRef.current = new ChartClass(canvasRef.current, {
+        type: 'bar',
+        data: {
+          labels: items.map(i => i.label),
+          datasets: [{
+            data: items.map(i => i.value),
+            backgroundColor: items.map(i => i.color),
+            borderWidth: 0,
+            borderRadius: 8,
+            borderSkipped: false,
+          }],
         },
-        scales: {
-          x: {
-            max,
-            grid: { color: 'rgba(255,255,255,0.04)' },
-            ticks: { color: 'rgba(255,255,255,0.28)', font: { size: 10 }, callback: (v) => Number(v).toLocaleString() },
-            border: { color: 'rgba(255,255,255,0.05)' },
+        options: {
+          indexAxis: 'y',
+          animation: { duration: 900, easing: 'easeInOutQuart' },
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { ...TOOLTIP_BASE, callbacks: { label: (ctx) => `  ${ctx.parsed.x.toLocaleString()}` } },
           },
-          y: {
-            grid: { display: false },
-            ticks: { color: 'rgba(255,255,255,0.55)', font: { size: 11 } },
-            border: { display: false },
+          scales: {
+            x: {
+              max,
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: { color: 'rgba(255,255,255,0.28)', font: { size: 10 }, callback: (v) => Number(v).toLocaleString() },
+              border: { color: 'rgba(255,255,255,0.05)' },
+            },
+            y: {
+              grid: { display: false },
+              ticks: { color: 'rgba(255,255,255,0.55)', font: { size: 11 } },
+              border: { display: false },
+            },
           },
         },
-      },
+      });
     });
     return () => { chartRef.current?.destroy(); chartRef.current = null; };
   }, []);
@@ -388,22 +397,25 @@ function SyncIndexerBarChart({ indexers, statsByIndexer, animKey }: {
 
   useEffect(() => {
     if (!canvasRef.current) return;
-    chartRef.current = new Chart(canvasRef.current, {
-      type: 'bar',
-      data: buildData(),
-      options: {
-        animation: { duration: 900, easing: 'easeInOutQuart' },
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: true, position: 'bottom', labels: { color: 'rgba(255,255,255,0.45)', font: { size: 10 }, boxWidth: 8, padding: 10 } },
-          tooltip: { ...TOOLTIP_BASE, callbacks: { label: (ctx) => `  ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()}` } },
+    getChart().then(ChartClass => {
+      if (!canvasRef.current) return;
+      chartRef.current = new ChartClass(canvasRef.current, {
+        type: 'bar',
+        data: buildData(),
+        options: {
+          animation: { duration: 900, easing: 'easeInOutQuart' },
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: true, position: 'bottom', labels: { color: 'rgba(255,255,255,0.45)', font: { size: 10 }, boxWidth: 8, padding: 10 } },
+            tooltip: { ...TOOLTIP_BASE, callbacks: { label: (ctx) => `  ${ctx.dataset.label}: ${ctx.parsed.y.toLocaleString()}` } },
+          },
+          scales: {
+            x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.45)', font: { size: 10 } }, border: { display: false } },
+            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 10 }, callback: (v) => Number(v).toLocaleString() }, border: { color: 'rgba(255,255,255,0.05)' } },
+          },
         },
-        scales: {
-          x: { grid: { display: false }, ticks: { color: 'rgba(255,255,255,0.45)', font: { size: 10 } }, border: { display: false } },
-          y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 10 }, callback: (v) => Number(v).toLocaleString() }, border: { color: 'rgba(255,255,255,0.05)' } },
-        },
-      },
+      });
     });
     return () => { chartRef.current?.destroy(); chartRef.current = null; };
   }, [indexers.map(i => i.id).join(',')]);
