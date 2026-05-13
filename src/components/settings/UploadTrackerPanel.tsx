@@ -320,7 +320,8 @@ export default function UploadTrackerPanel({ onC411Configured }: UploadTrackerPa
           />
           <div className="text-sm text-base-content/60 pt-1">{t('settings.uploadTrackerPanel.passkeyLabel')}</div>
           <input
-            type="text"
+            type="password"
+            autoComplete="off"
             className="input input-bordered w-full max-w-md font-mono text-sm"
             placeholder={t('settings.uploadTrackerPanel.passkeyPlaceholder')}
             value={passkey}
