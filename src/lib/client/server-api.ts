@@ -283,6 +283,8 @@ interface IServerApiClientPublic {
       ratio_mode_enabled: boolean;
       librqbit_ok: boolean;
       listen_port: number | null;
+      status: 'ok' | 'warning' | 'error';
+      total_seeding: number;
       warnings?: string[];
     }>
   >;
