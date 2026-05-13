@@ -68,11 +68,13 @@ export default function Notification({ type, message, duration = 5000, onClose }
 
       {onClose && (
         <button
-          class="flex-shrink-0 text-white/30 hover:text-white/70 transition-colors p-1 rounded-lg hover:bg-white/8"
+          class="flex-shrink-0 text-white/40 hover:text-white transition-colors p-2 rounded-xl hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 active:scale-95"
           onClick={handleClose}
-          aria-label="Fermer"
+          aria-label="Fermer la notification"
+          tabIndex={0}
+          data-focusable
         >
-          <X size={12} />
+          <X size={18} />
         </button>
       )}
     </div>

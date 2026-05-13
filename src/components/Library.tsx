@@ -353,10 +353,13 @@ export default function Library({
   };
 
   // Tous les items : bibliothèque locale + partagés par amis (dédoublonnés par chemin / info_hash)
-  const allExistingItems = useMemo(() => {
+  const allVisibleItems = useMemo(() => {
     const local = items.filter((item) => item.exists);
+    const downloading = items.filter((item) => !item.exists);
     const shared = sharedByFriends.flatMap((s) => s.items);
-    const combined = [...local, ...shared];
+    
+    // On met les téléchargements en premier dans la liste globale si on ne trie pas par source plus tard
+    const combined = [...downloading, ...local, ...shared];
     const seen = new Set<string>();
     return combined.filter((item) => {
       const key = itemDedupKey(item);
@@ -379,13 +382,17 @@ export default function Library({
     return isSeries(item);
   };
 
-  const filteredExisting = useMemo(() => {
-    const list = allExistingItems.filter((i) => matchesSource(i) && matchesContent(i));
+  const filteredVisible = useMemo(() => {
+    const list = allVisibleItems.filter((i) => matchesSource(i) && matchesContent(i));
     // Prioriser les médias téléchargés avec Popconn, puis partagés, externe, local
-    return [...list].sort(
-      (a, b) => sourceSortOrder(getSourceType(a)) - sourceSortOrder(getSourceType(b))
-    );
-  }, [allExistingItems, sourceFilter, contentFilter]);
+    // Les téléchargements en cours sont considérés comme "popcorn" par défaut ou gardent leur source
+    return [...list].sort((a, b) => {
+      // Les items non existants (en cours) passent en premier
+      if (!a.exists && b.exists) return -1;
+      if (a.exists && !b.exists) return 1;
+      return sourceSortOrder(getSourceType(a)) - sourceSortOrder(getSourceType(b));
+    });
+  }, [allVisibleItems, sourceFilter, contentFilter]);
 
   const filteredDownloading = useMemo(
     () => allDownloadingItems.filter(matchesContent),
@@ -398,7 +405,7 @@ export default function Library({
     const seriesRaw: LibraryMedia[] = [];
     const othersList: LibraryMedia[] = [];
 
-    filteredExisting.forEach((item) => {
+    filteredVisible.forEach((item) => {
       if (isMovie(item)) {
         moviesList.push(item);
       } else if (isSeries(item)) {
@@ -423,7 +430,7 @@ export default function Library({
     });
 
     return { movies: moviesList, series: seriesList, others: othersList };
-  }, [filteredExisting]);
+  }, [filteredVisible]);
 
   // Grouper par genre (premier genre du tableau) pour lignes par genre
   const moviesByGenre = useMemo(() => {
@@ -450,12 +457,11 @@ export default function Library({
     return grouped;
   }, [series]);
 
-  const existingItems = filteredExisting;
-  const downloadingItems = filteredDownloading;
+  const visibleItems = filteredVisible;
   const groupedItems = { movies, series, others };
 
   const heroItems = useMemo<ContentItem[]>(() => {
-    const withPoster = existingItems
+    const withPoster = visibleItems
       .filter((item) => item.poster_url || item.hero_image_url)
       .slice(0, 3)
       .map((item) => ({
@@ -484,7 +490,7 @@ export default function Library({
         overview: t('library.emptyDescription'),
       },
     ];
-  }, [existingItems, t]);
+  }, [visibleItems, t]);
 
   /** Nombre d'items en chargement prioritaire (première ligne visible) par section */
   const PRIORITY_LOAD_COUNT = 12;
@@ -614,11 +620,7 @@ export default function Library({
 
   const sectionsContent = (
     <>
-      {/* 1) En cours de téléchargement en première ligne */}
-      {downloadingItems.length > 0 &&
-        renderSection(t('library.downloadingSection'), downloadingItems, { key: 'downloading' })}
-
-      {/* 2) Lignes par genre — Films */}
+      {/* Lignes par genre — Films */}
       {(contentFilter === 'all' || contentFilter === 'movies') &&
         Object.entries(moviesByGenre)
           .sort(([a], [b]) => (a === '__other__' ? 1 : b === '__other__' ? -1 : a.localeCompare(b)))
@@ -671,7 +673,7 @@ export default function Library({
             onPlay={() => null}
             onPrimaryAction={(item) => {
               if (item.id === 'library-placeholder') return;
-              const match = existingItems.find((it) => (it.info_hash || it.slug || it.name) === item.id);
+              const match = visibleItems.find((it) => (it.info_hash || it.slug || it.name) === item.id);
               if (match) handlePlay(match);
             }}
             primaryButtonLabel={t('library.playLatest')}
@@ -751,8 +753,8 @@ export default function Library({
           <div className="flex-1 min-w-0">
             {/* Nombre de médias reçus du serveur (exists) — correspond au log backend "X médias trouvés au total" */}
             <p className="text-sm text-gray-400 mt-2 mb-1 px-0" title={t('library.seriesGroupedHint')}>
-              {t('library.mediaCount', { count: existingItems.length })}
-              {existingItems.length > 0 && (movies.length + series.length) < existingItems.length && (
+              {t('library.mediaCount', { count: visibleItems.length })}
+              {visibleItems.length > 0 && (movies.length + series.length) < visibleItems.length && (
                 <span className="ml-2 text-gray-500">({t('library.seriesGroupedShort')})</span>
               )}
             </p>
@@ -785,8 +787,8 @@ export default function Library({
       ) : (
         <div className="px-4 tv:px-6">
           <p className="text-sm text-gray-400 mt-2 mb-1" title={t('library.seriesGroupedHint')}>
-            {t('library.mediaCount', { count: existingItems.length })}
-            {existingItems.length > 0 && (movies.length + series.length) < existingItems.length && (
+            {t('library.mediaCount', { count: visibleItems.length })}
+            {visibleItems.length > 0 && (movies.length + series.length) < visibleItems.length && (
               <span className="ml-2 text-gray-500">({t('library.seriesGroupedShort')})</span>
             )}
           </p>

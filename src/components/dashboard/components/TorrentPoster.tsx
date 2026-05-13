@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { memo } from 'preact/compat';
-import { Film, Users, Sprout, CheckCircle2 } from 'lucide-preact';
+import { Film, Users, Sprout, CheckCircle2, RotateCw } from 'lucide-preact';
 import type { ContentItem } from '../../../lib/client/types';
 import { FocusableCard } from '../../ui/FocusableCard';
 import { useTorrentProgress } from '../hooks/useTorrentProgress';
@@ -126,7 +126,7 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
           </div>
         ) : null}
 
-        {/* Badges signal + icône de complétion en haut à droite */}
+        {/* Badges signal + icône d'état en haut à droite */}
         <div className="absolute top-1 right-1 lg:top-2 lg:right-2 tv:top-3 tv:right-3 z-10 flex flex-col items-end gap-1.5">
           {signal?.downloadedUnseen ? (
             <span className="px-2 py-0.5 rounded-md bg-emerald-500/90 backdrop-blur-md border border-emerald-400/30 text-[10px] lg:text-xs font-bold uppercase tracking-widest text-white shadow-lg">
@@ -143,11 +143,18 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
               {t('dashboard.heroNewEpisode')}
             </span>
           ) : null}
-          {(isCompleted || item.availableInLibrary) && (
-            <div className="w-6 h-6 lg:w-8 lg:h-8 tv:w-12 tv:h-12 bg-green-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white/30">
-              <CheckCircle2 className="w-4 h-4 lg:w-5 lg:h-5 tv:w-8 tv:h-8 text-white" size={20} />
-            </div>
-          )}
+          
+          <div className="flex items-center gap-1.5">
+            {isDownloading ? (
+              <div className="w-6 h-6 lg:w-8 lg:h-8 tv:w-12 tv:h-12 bg-amber-500/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-amber-400/30">
+                <RotateCw className="w-3 h-3 lg:w-4 lg:h-4 tv:w-7 tv:h-7 text-white animate-spin" size={16} />
+              </div>
+            ) : (isCompleted || item.availableInLibrary) ? (
+              <div className="w-6 h-6 lg:w-8 lg:h-8 tv:w-12 tv:h-12 bg-green-500/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-green-400/30">
+                <CheckCircle2 className="w-3 h-3 lg:w-4 lg:h-4 tv:w-7 tv:h-7 text-white" size={16} />
+              </div>
+            ) : null}
+          </div>
         </div>
 
         {/* Badge de disponibilité + Stats temps réel (Seeds/Peers) - discret en bas de la tuile */}

@@ -24,24 +24,33 @@ export default function ConnectivityWarning() {
   const iconColor = isError ? 'text-red-500' : 'text-amber-500';
 
   return (
-    <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border backdrop-blur-md animate-in fade-in slide-in-from-top-2 duration-300 ${colorClass}`}>
+    <div 
+      className={`fixed bottom-4 right-4 z-[10000] flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-sm pointer-events-auto ${colorClass}`}
+      style={{
+        marginBottom: 'var(--safe-area-inset-bottom)',
+        marginRight: 'var(--safe-area-inset-right)',
+      }}
+    >
       <div className={`shrink-0 ${iconColor}`}>
-        {isError ? <AlertTriangle size={18} /> : <Info size={18} />}
+        {isError ? <AlertTriangle size={20} /> : <Info size={20} />}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold leading-tight">
+        <p className="text-xs font-bold leading-tight">
           {isError ? 'Erreur de connexion BitTorrent' : 'Problème de partage détecté'}
         </p>
-        <p className="text-[10px] opacity-80 truncate">
+        <p className="text-[10px] opacity-90 leading-normal mt-0.5">
           {diagnostic.warnings?.[0] || 'Vérifiez la configuration de vos ports.'}
         </p>
       </div>
       <button 
         onClick={() => setDismissed(true)}
-        className="shrink-0 p-1 hover:bg-white/10 rounded-lg transition-colors"
-        aria-label="Ignorer"
+        className="shrink-0 p-2.5 hover:bg-white/10 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-white/40 active:scale-95"
+        aria-label="Fermer la notification"
+        tabIndex={0}
+        data-focusable
+        data-autofocus-priority="low"
       >
-        <X size={14} />
+        <X size={20} />
       </button>
     </div>
   );
