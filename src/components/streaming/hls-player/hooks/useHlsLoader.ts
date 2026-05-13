@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
-import Hls from 'hls.js';
 
 /** Applique la config HLS.js type Jellyfin (htmlVideoPlayer requireHlsPlayer) */
-function applyJellyfinHlsDefaults(HlsClass: typeof Hls) {
+function applyJellyfinHlsDefaults(HlsClass: any) {
   HlsClass.DefaultConfig.lowLatencyMode = false;
   HlsClass.DefaultConfig.backBufferLength = Infinity;
   HlsClass.DefaultConfig.liveBackBufferLength = 90;
@@ -15,34 +14,39 @@ export function useHlsLoader() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    if (window.Hls) {
-      applyJellyfinHlsDefaults(window.Hls);
-      setHlsLoaded(true);
-      return;
+    async function initHls() {
+      if (window.Hls) {
+        applyJellyfinHlsDefaults(window.Hls);
+        setHlsLoaded(true);
+        return;
+      }
+
+      const existingScript = document.querySelector('script[src*="hls.js"]');
+      if (existingScript) {
+        const checkInterval = setInterval(() => {
+          if (window.Hls) {
+            clearInterval(checkInterval);
+            applyJellyfinHlsDefaults(window.Hls);
+            setHlsLoaded(true);
+          }
+        }, 100);
+        setTimeout(() => clearInterval(checkInterval), 10000);
+        return;
+      }
+
+      // Import dynamique au lieu de statique pour alléger le bundle
+      try {
+        const { default: HlsClass } = await import('hls.js');
+        applyJellyfinHlsDefaults(HlsClass);
+        (window as any).Hls = HlsClass;
+        setHlsLoaded(true);
+      } catch (err) {
+        console.error('Erreur lors du chargement de HLS.js:', err);
+        setError('Impossible de charger Hls.js');
+      }
     }
 
-    const existingScript = document.querySelector('script[src*="hls.js"]');
-    if (existingScript) {
-      const checkInterval = setInterval(() => {
-        if (window.Hls) {
-          clearInterval(checkInterval);
-          applyJellyfinHlsDefaults(window.Hls);
-          setHlsLoaded(true);
-        }
-      }, 100);
-      setTimeout(() => clearInterval(checkInterval), 10000);
-      return;
-    }
-
-    // Import statique : évite le 504 "Outdated Optimize Dep" de Vite en dev
-    try {
-      applyJellyfinHlsDefaults(Hls);
-      (window as unknown as { Hls: typeof Hls }).Hls = Hls;
-      setHlsLoaded(true);
-    } catch (err) {
-      console.error('Erreur lors du chargement de HLS.js:', err);
-      setError('Impossible de charger Hls.js');
-    }
+    initHls();
 
     return () => {};
   }, []);
