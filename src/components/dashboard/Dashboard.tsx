@@ -103,23 +103,6 @@ export default function Dashboard() {
 
       const result = [];
 
-      // 0. Téléchargements en cours (ceux qui ne sont pas déjà dans "Reprendre")
-      if (standaloneDownloads.length > 0) {
-        result.push({ 
-          id: 'active-downloads', 
-          title: t('dashboard.activeDownloads') || 'En cours de téléchargement', 
-          items: standaloneDownloads.map(ad => {
-             // Retrouver l'item avec signaux si possible
-             const withSignals = allDashboardItemsWithSignals.find(i => i.infoHash === ad.infoHash || (ad.tmdbId != null && i.tmdbId === ad.tmdbId && i.type === ad.type));
-             if (withSignals) {
-                return { ...withSignals, ...ad, downloadProgress: ad.progress, resumeStatus: 'in_progress' as const };
-             }
-             return { ...ad, downloadProgress: ad.progress, resumeStatus: 'in_progress' as const };
-          }),
-          kind: 'resume' as const 
-        });
-      }
-
       // 1. Reprendre la lecture (films ou épisodes en cours, séries à suivre) - HAUTE PRIORITÉ
       if (enrichedResumeWatching.length > 0) {
         result.push({ 

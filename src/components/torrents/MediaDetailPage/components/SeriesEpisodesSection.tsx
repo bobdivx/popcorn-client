@@ -20,6 +20,7 @@ export interface SeriesEpisodesSectionProps {
   isDownloading?: boolean;
   downloadProgress?: number;
   statusMessage?: string | null;
+  downloadingEpisodesMap?: Record<string, number>;
 }
 
 /**
@@ -35,9 +36,9 @@ export function SeriesEpisodesSection({
   downloadedEpisodesSet,
   watchedSet,
   isTV,
-  isDownloading,
   downloadProgress,
   statusMessage,
+  downloadingEpisodesMap,
 }: SeriesEpisodesSectionProps) {
   const { t } = useI18n();
   const hasSavedPosition = savedPlaybackPosition != null && savedPlaybackPosition > 0;
@@ -189,6 +190,9 @@ export function SeriesEpisodesSection({
                   typeof ep.id === 'string' &&
                   ep.id.trim().length > 0 &&
                   !ep.id.startsWith('popcorn_tmdb_');
+                const downloadingProgress = downloadingEpisodesMap?.[epKey];
+                const currentlyDownloading = downloadingProgress !== undefined;
+
                 return {
                   key: ep.id,
                   episodeNumber: ep.episode === 0 ? '—' : ep.episode,
@@ -204,10 +208,10 @@ export function SeriesEpisodesSection({
                   watched,
                   // Un épisode déjà en bibliothèque doit apparaître comme disponible même
                   // si l'API séries n'a pas encore renseigné info_hash sur cet item.
-                  isAvailable: !!ep.info_hash || downloaded || hasIndexerVariant,
+                  isAvailable: !!ep.info_hash || downloaded || hasIndexerVariant || currentlyDownloading,
                   isDownloaded: !!ep.file_path || downloaded,
-                  isDownloading: isSelected ? isDownloading : false,
-                  downloadProgress: isSelected ? downloadProgress : undefined,
+                  isDownloading: (isSelected ? isDownloading : false) || currentlyDownloading,
+                  downloadProgress: isSelected && downloadProgress !== undefined ? downloadProgress : (currentlyDownloading ? downloadingProgress : undefined),
                   statusMessage: isSelected ? statusMessage : null,
                   isSelected,
                   onSelect: () => onSelectEpisode(ep.id),

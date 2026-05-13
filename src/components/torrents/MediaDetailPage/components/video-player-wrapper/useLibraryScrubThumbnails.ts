@@ -5,6 +5,9 @@ import { normalizeScrubPath, scrubPathBaseName } from './scrubPathUtils';
 import { shouldForceRegenerateScrub } from './scrubRegenPolicy';
 import { mergeScrubMeta, metaFromApiPayload } from './scrubMetaMerge';
 
+/** Cache de session pour éviter de spammer l'API/console si un média n'a pas de vignettes (404 persistant). */
+const knownMissingScrubThumbnails = new Set<string>();
+
 export interface UseLibraryScrubThumbnailsParams {
   visible: boolean;
   streamBackendUrl?: string | null;
@@ -25,6 +28,8 @@ export function useLibraryScrubThumbnails({
   const scrubMetaRef = useRef<{ localMediaId: string; torrentRel?: string } | null>(null);
   const scrubRegenInFlightRef = useRef(false);
   const scrubAutoRegenDoneRef = useRef(false);
+  const isPermanentlyMissingRef = useRef(false);
+  const pollAttemptCountRef = useRef(0);
   const [playerDurationHint, setPlayerDurationHint] = useState<number | null>(null);
   const playerDurationHintRef = useRef<number | null>(null);
 
@@ -44,6 +49,8 @@ export function useLibraryScrubThumbnails({
     playerDurationHintRef.current = null;
     scrubMetaRef.current = null;
     scrubAutoRegenDoneRef.current = false;
+    isPermanentlyMissingRef.current = false;
+    pollAttemptCountRef.current = 0;
   }, [infoHash, hlsFilePath]);
 
   useEffect(() => {
@@ -117,20 +124,37 @@ export function useLibraryScrubThumbnails({
         }
         if (!localMediaId) return;
 
+        // Si on sait déjà que ce média n'a pas de vignettes, on s'arrête là pour éviter le spam console.
+        if (knownMissingScrubThumbnails.has(localMediaId) || isPermanentlyMissingRef.current) {
+          return;
+        }
+
         scrubMetaRef.current = { localMediaId, torrentRel: torrentRelForScrub };
 
         const fetchMeta = async () => {
-          const meta = await serverApi.getScrubThumbnailsMeta(localMediaId, {
-            torrentRelativePath: torrentRelForScrub,
-          });
-          const ok = (meta as any)?.success === true;
-          const data = (meta as any)?.data;
-          if (!ok || !data) throw new Error('meta not ready');
-          const next = metaFromApiPayload(data as Record<string, unknown>);
-          if (!next) throw new Error('meta invalid');
-          if (!cancelled) {
-            setScrubThumbnails((prev) => mergeScrubMeta(prev, next));
-            setScrubThumbnailsLoading(false);
+          try {
+            const meta = await serverApi.getScrubThumbnailsMeta(localMediaId, {
+              torrentRelativePath: torrentRelForScrub,
+            });
+            const ok = (meta as any)?.success === true;
+            const data = (meta as any)?.data;
+            if (!ok || !data) throw new Error('meta not ready');
+            const next = metaFromApiPayload(data as Record<string, unknown>);
+            if (!next) throw new Error('meta invalid');
+            if (!cancelled) {
+              setScrubThumbnails((prev) => mergeScrubMeta(prev, next));
+              setScrubThumbnailsLoading(false);
+            }
+          } catch (err: any) {
+            // Si on a un 404, on marque le média comme potentiellement manquant pour éviter le spam.
+            if (err?.message?.includes('404')) {
+              pollAttemptCountRef.current += 1;
+              if (pollAttemptCountRef.current >= 3) {
+                isPermanentlyMissingRef.current = true;
+                knownMissingScrubThumbnails.add(localMediaId);
+              }
+            }
+            throw err;
           }
         };
 
@@ -177,17 +201,19 @@ export function useLibraryScrubThumbnails({
           }
           let attempts = 0;
           const poll = () => {
-            if (cancelled) return;
+            if (cancelled || isPermanentlyMissingRef.current) return;
             attempts += 1;
             fetchMeta().catch(() => {
-              if (attempts >= 12) {
+              // Si on a déjà trop d'échecs (ou un 404 persistant détecté dans fetchMeta), on arrête le polling.
+              if (attempts >= 6 || isPermanentlyMissingRef.current) {
                 setScrubThumbnailsLoading(false);
                 return;
               }
-              scrubRetryTimeoutRef.current = setTimeout(poll, 2000);
+              // Polling plus lent (3s au lieu de 2s) pour être moins agressif.
+              scrubRetryTimeoutRef.current = setTimeout(poll, 3000);
             });
           };
-          scrubRetryTimeoutRef.current = setTimeout(poll, 1500);
+          scrubRetryTimeoutRef.current = setTimeout(poll, 2000);
         }
       } catch {
         if (!cancelled) setScrubThumbnailsLoading(false);

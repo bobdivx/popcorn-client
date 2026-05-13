@@ -122,7 +122,7 @@ export default function SuggestionsSection({ contextType = 'all' }: { contextTyp
     const tmdbId = item.tmdbId;
     const type = item.tmdbType || item.type;
     if (tmdbId) {
-      window.location.href = `/discover?tmdbId=${tmdbId}&type=${type}`;
+      window.location.href = `/torrents?tmdbId=${tmdbId}&type=${type}&from=dashboard`;
     }
   };
 
