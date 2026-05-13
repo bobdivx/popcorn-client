@@ -3,7 +3,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
 import type { LibraryMediaEntry, LibrarySource } from '../../lib/client/server-api/library';
 import { invalidateLibraryCache } from '../../lib/client/server-api/library';
-import { Film, FileX, FolderOpen, Pencil, RefreshCw, Trash2, Tv } from 'lucide-preact';
+import { Film, FileX, FolderOpen, Pencil, RefreshCw, Trash2, Tv, CheckSquare, Square, X } from 'lucide-preact';
 
 /** Valeur du filtre source : '' = toutes, 'local' = source locale, 'external' = toute externe, ou id de library_source */
 function matchSource(entry: LibraryMediaEntry, filterSource: string): boolean {
@@ -31,9 +31,19 @@ export default function LibraryMediaPanel() {
   const [sources, setSources] = useState<LibrarySource[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  
+  // Single edit state
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPath, setEditPath] = useState('');
+  const [editTmdbId, setEditTmdbId] = useState<string>('');
   const [savingId, setSavingId] = useState<string | null>(null);
+  
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchEditMode, setBatchEditMode] = useState(false);
+  const [batchTmdbId, setBatchTmdbId] = useState('');
+  const [batchSaving, setBatchSaving] = useState(false);
+
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null);
   const [filterCategory, setFilterCategory] = useState<string>('');
@@ -66,26 +76,33 @@ export default function LibraryMediaPanel() {
   const handleStartEdit = (entry: LibraryMediaEntry) => {
     setEditingId(entry.id);
     setEditPath(entry.file_path);
+    setEditTmdbId(entry.tmdb_id ? String(entry.tmdb_id) : '');
     setMessage(null);
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
     setEditPath('');
+    setEditTmdbId('');
   };
 
-  const handleSavePath = async () => {
-    if (!editingId || !editPath.trim()) return;
+  const handleSaveMedia = async () => {
+    if (!editingId) return;
     setSavingId(editingId);
     setMessage(null);
     try {
-      const res = await serverApi.updateLibraryMedia(editingId, editPath.trim());
+      const tmdbIdNum = editTmdbId.trim() ? parseInt(editTmdbId.trim(), 10) : null;
+      const res = await serverApi.updateLibraryMedia(editingId, {
+        file_path: editPath.trim() || undefined,
+        tmdb_id: isNaN(tmdbIdNum as any) ? null : tmdbIdNum,
+      });
       if (res.success) {
         invalidateLibraryCache();
         await loadMedia();
         setMessage({ type: 'success', text: t('settingsMenu.libraryMediaPanel.updateSuccess') });
         setEditingId(null);
         setEditPath('');
+        setEditTmdbId('');
       } else {
         setMessage({ type: 'error', text: res.error || t('settingsMenu.libraryMediaPanel.updateError') });
       }
@@ -93,6 +110,60 @@ export default function LibraryMediaPanel() {
       setMessage({ type: 'error', text: t('settingsMenu.libraryMediaPanel.updateError') });
     } finally {
       setSavingId(null);
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredList.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredList.map((m) => m.id)));
+    }
+  };
+
+  const handleBatchUpdateTmdbId = async () => {
+    if (selectedIds.size === 0 || !batchTmdbId.trim()) return;
+    setBatchSaving(true);
+    setMessage(null);
+    try {
+      const tmdbIdNum = parseInt(batchTmdbId.trim(), 10);
+      if (isNaN(tmdbIdNum)) {
+        setMessage({ type: 'error', text: 'TMDB ID invalide' });
+        return;
+      }
+
+      const items = Array.from(selectedIds).map((id) => ({
+        id,
+        tmdb_id: tmdbIdNum,
+      }));
+
+      const res = await serverApi.batchUpdateLibraryMedia(items);
+      if (res.success) {
+        invalidateLibraryCache();
+        await loadMedia();
+        setMessage({ type: 'success', text: t('settingsMenu.libraryMediaPanel.updateSuccess') });
+        setSelectedIds(new Set());
+        setBatchEditMode(false);
+        setBatchTmdbId('');
+      } else {
+        setMessage({ type: 'error', text: res.error || t('settingsMenu.libraryMediaPanel.updateError') });
+      }
+    } catch {
+      setMessage({ type: 'error', text: t('settingsMenu.libraryMediaPanel.updateError') });
+    } finally {
+      setBatchSaving(false);
     }
   };
 
@@ -251,6 +322,59 @@ export default function LibraryMediaPanel() {
         </button>
       </div>
 
+      {selectedIds.size > 0 && (
+        <div class="flex items-center gap-4 p-3 bg-primary/10 border border-primary/30 rounded-lg animate-in fade-in slide-in-from-top-2">
+          <div class="flex items-center gap-2 text-primary font-medium">
+            <CheckSquare className="w-5 h-5" />
+            <span>{selectedIds.size} {t('settingsMenu.libraryMediaPanel.selectedItems')}</span>
+          </div>
+          
+          {batchEditMode ? (
+            <div class="flex items-center gap-2 flex-1">
+              <input
+                type="text"
+                placeholder="Nouveau TMDB ID"
+                class="flex-1 max-w-[200px] rounded bg-gray-900 border border-primary/50 px-3 py-1.5 text-sm text-white focus:ring-1 focus:ring-primary outline-none"
+                value={batchTmdbId}
+                onInput={(e) => setBatchTmdbId((e.target as HTMLInputElement).value)}
+              />
+              <button
+                type="button"
+                class="rounded bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50"
+                onClick={handleBatchUpdateTmdbId}
+                disabled={batchSaving || !batchTmdbId.trim()}
+              >
+                {batchSaving ? t('common.loading') : t('common.apply')}
+              </button>
+              <button
+                type="button"
+                class="rounded bg-gray-700 px-3 py-1.5 text-sm font-medium text-gray-200 hover:bg-gray-600"
+                onClick={() => { setBatchEditMode(false); setBatchTmdbId(''); }}
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          ) : (
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                class="rounded bg-primary/20 border border-primary/40 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/30"
+                onClick={() => setBatchEditMode(true)}
+              >
+                {t('settingsMenu.libraryMediaPanel.batchEditTmdbId')}
+              </button>
+              <button
+                type="button"
+                class="text-gray-400 hover:text-white p-1"
+                onClick={() => { setSelectedIds(new Set()); setBatchEditMode(false); }}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {message && (
         <div
           class={`rounded px-3 py-2 text-sm ${
@@ -268,14 +392,24 @@ export default function LibraryMediaPanel() {
           <div class="overflow-x-auto max-h-[60vh] overflow-y-auto">
             <table class="w-full text-sm text-left table-fixed">
               <colgroup>
+                <col class="w-[40px]" />
                 <col class="w-[16%]" />
-                <col class="w-[38%]" />
+                <col class="w-[32%]" />
                 <col class="w-[10%]" />
                 <col class="w-[14%]" />
                 <col class="w-[22%]" />
               </colgroup>
-              <thead class="sticky top-0 bg-gray-800/95 text-gray-300 border-b border-gray-700">
+              <thead class="sticky top-0 bg-gray-800/95 text-gray-300 border-b border-gray-700 z-10">
                 <tr>
+                  <th class="px-3 py-2">
+                    <button type="button" onClick={toggleSelectAll} class="text-gray-400 hover:text-white">
+                      {selectedIds.size === filteredList.length && filteredList.length > 0 ? (
+                        <CheckSquare className="w-4 h-4 text-primary" />
+                      ) : (
+                        <Square className="w-4 h-4" />
+                      )}
+                    </button>
+                  </th>
                   <th class="px-3 py-2 font-medium truncate" title={t('settingsMenu.libraryMediaPanel.colTitle')}>{t('settingsMenu.libraryMediaPanel.colTitle')}</th>
                   <th class="px-3 py-2 font-medium">{t('settingsMenu.libraryMediaPanel.colPath')}</th>
                   <th class="px-3 py-2 font-medium">{t('settingsMenu.libraryMediaPanel.colCategory')}</th>
@@ -285,26 +419,51 @@ export default function LibraryMediaPanel() {
               </thead>
               <tbody class="text-gray-300">
                 {filteredList.map((entry) => (
-                  <tr key={entry.id} class="border-b border-gray-700/70 hover:bg-gray-800/50 align-top">
+                  <tr key={entry.id} class={`border-b border-gray-700/70 hover:bg-gray-800/50 align-top transition-colors ${selectedIds.has(entry.id) ? 'bg-primary/5' : ''}`}>
+                    <td class="px-3 py-3 align-top">
+                      <button type="button" onClick={() => toggleSelect(entry.id)} class="text-gray-400 hover:text-white">
+                        {selectedIds.has(entry.id) ? (
+                          <CheckSquare className="w-4 h-4 text-primary" />
+                        ) : (
+                          <Square className="w-4 h-4" />
+                        )}
+                      </button>
+                    </td>
                     <td class="px-3 py-2 align-top min-w-0">
                       <span class="font-medium text-white truncate block" title={entry.tmdb_title || entry.file_name || entry.id}>
                         {entry.tmdb_title || entry.file_name || entry.id}
                       </span>
+                      {entry.tmdb_id && (
+                        <span class="text-[10px] text-gray-500 font-mono">TMDB: {entry.tmdb_id}</span>
+                      )}
                     </td>
                     <td class="px-3 py-2 align-top min-w-0 max-w-0">
                       {editingId === entry.id ? (
-                        <div class="flex flex-col gap-1">
-                          <input
-                            type="text"
-                            class="w-full rounded bg-gray-900 border border-gray-600 px-2 py-1 text-xs text-white min-w-0"
-                            value={editPath}
-                            onInput={(e) => setEditPath((e.target as HTMLInputElement).value)}
-                          />
-                          <div class="flex gap-2 flex-wrap">
+                        <div class="flex flex-col gap-2 p-1 bg-gray-900/50 rounded">
+                          <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-bold">{t('settingsMenu.libraryMediaPanel.colPath')}</label>
+                            <input
+                              type="text"
+                              class="w-full rounded bg-gray-900 border border-gray-600 px-2 py-1 text-xs text-white min-w-0"
+                              value={editPath}
+                              onInput={(e) => setEditPath((e.target as HTMLInputElement).value)}
+                            />
+                          </div>
+                          <div class="space-y-1">
+                            <label class="text-[10px] text-gray-500 uppercase font-bold">TMDB ID</label>
+                            <input
+                              type="text"
+                              placeholder="TMDB ID"
+                              class="w-full rounded bg-gray-900 border border-gray-600 px-2 py-1 text-xs text-white min-w-0"
+                              value={editTmdbId}
+                              onInput={(e) => setEditTmdbId((e.target as HTMLInputElement).value)}
+                            />
+                          </div>
+                          <div class="flex gap-2 flex-wrap pt-1">
                             <button
                               type="button"
                               class="rounded bg-primary/80 hover:bg-primary px-2 py-1 text-xs text-white disabled:opacity-50"
-                              onClick={handleSavePath}
+                              onClick={handleSaveMedia}
                               disabled={savingId !== null}
                             >
                               {savingId === entry.id ? t('common.loading') : t('common.save')}
@@ -350,7 +509,7 @@ export default function LibraryMediaPanel() {
                             type="button"
                             class="inline-flex items-center gap-1 rounded border border-gray-600 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700"
                             onClick={() => handleStartEdit(entry)}
-                            title={t('settingsMenu.libraryMediaPanel.editPath')}
+                            title={t('settingsMenu.libraryMediaPanel.editMedia')}
                           >
                             <Pencil className="w-3.5 h-3.5" />
                             {t('common.edit')}
@@ -363,7 +522,7 @@ export default function LibraryMediaPanel() {
                             title={t('settingsMenu.libraryMediaPanel.removeFromLibrary')}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
-                            {t('settingsMenu.libraryMediaPanel.removeFromLibrary')}
+                            {/* Sur mobile on cache le texte si besoin, mais ici on garde par cohérence */}
                           </button>
                           <button
                             type="button"
@@ -373,7 +532,6 @@ export default function LibraryMediaPanel() {
                             title={t('settingsMenu.libraryMediaPanel.deleteFileAndLibrary')}
                           >
                             <FileX className="w-3.5 h-3.5" />
-                            {t('settingsMenu.libraryMediaPanel.deleteFileAndLibrary')}
                           </button>
                         </span>
                       )}

@@ -238,18 +238,33 @@ export const libraryMethods = {
     return this.backendRequest<LibraryMediaEntry[]>('/api/library/media', { method: 'GET' });
   },
 
-  /** Met à jour le chemin d'un média (ne déplace pas le fichier sur disque) */
+  /** Met à jour le chemin ou les métadonnées TMDB d'un média */
   async updateLibraryMedia(
     this: ServerApiClientLibraryAccess,
     id: string,
-    file_path: string
+    body: { file_path?: string; tmdb_id?: number | null; tmdb_type?: string | null }
   ): Promise<ApiResponse<LibraryMediaEntry>> {
     return this.backendRequest<LibraryMediaEntry>(
       `/api/library/media/${encodeURIComponent(id)}`,
       {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ file_path }),
+        body: JSON.stringify(body),
+      }
+    );
+  },
+
+  /** Mise à jour par lots des TMDB IDs */
+  async batchUpdateLibraryMedia(
+    this: ServerApiClientLibraryAccess,
+    items: Array<{ id: string; tmdb_id: number | null }>
+  ): Promise<ApiResponse<number>> {
+    return this.backendRequest<number>(
+      '/api/library/media/batch',
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items }),
       }
     );
   },
