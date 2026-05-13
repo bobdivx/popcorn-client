@@ -1000,7 +1000,9 @@
     "watchNowHighlights": "Nouveautés à regarder",
     "ongoingSeries": "Séries en cours",
     "recentlyDownloaded": "Téléchargés récemment",
-    "activeDownloads": "En cours de téléchargement"
+    "activeDownloads": "En cours de téléchargement",
+    "suggestionsMovies": "Films suggérés pour vous",
+    "suggestionsSeries": "Séries suggérées pour vous"
   },
   "search": {
     "title": "Rechercher",

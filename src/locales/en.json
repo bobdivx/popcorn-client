@@ -1000,7 +1000,9 @@
     "watchNowHighlights": "New to watch",
     "ongoingSeries": "Ongoing series",
     "recentlyDownloaded": "Recently downloaded",
-    "activeDownloads": "Currently downloading"
+    "activeDownloads": "Currently downloading",
+    "suggestionsMovies": "Suggested movies for you",
+    "suggestionsSeries": "Suggested series for you"
   },
   "search": {
     "title": "Search",

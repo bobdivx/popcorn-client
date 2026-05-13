@@ -143,7 +143,7 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
               {t('dashboard.heroNewEpisode')}
             </span>
           ) : null}
-          {isCompleted && (
+          {(isCompleted || item.availableInLibrary) && (
             <div className="w-6 h-6 lg:w-8 lg:h-8 tv:w-12 tv:h-12 bg-green-500 rounded-full flex items-center justify-center shadow-lg border-2 border-white/30">
               <CheckCircle2 className="w-4 h-4 lg:w-5 lg:h-5 tv:w-8 tv:h-8 text-white" size={20} />
             </div>
