@@ -168,14 +168,7 @@
   "fr": "Français",
   "en": "English"
   },
-  "settingsMenu": {
-    "syncCategories": {
-      "title": "Sync categories",
-      "description": "Choose which torrent categories (films, series, others) should be synchronized for each indexer.",
-      "selectorTitle": "Synchronized categories",
-      "selectorDescription": "Enable or disable torrent categories for this indexer. If you select nothing, all categories will be synchronized by default."
-    }
-  },
+
   "wizard": {
     "language": {
       "title": "Choose your language",
@@ -585,6 +578,7 @@
     "openSideNav": "Open side navigation",
     "language": "Language"
   },
+
   "settings": {
     "title": "Settings",
     "server": "Server",
@@ -1000,7 +994,9 @@
     "watchNowHighlights": "New to watch",
     "ongoingSeries": "Ongoing series",
     "recentlyDownloaded": "Recently downloaded",
-    "activeDownloads": "Currently downloading"
+    "activeDownloads": "Currently downloading",
+    "suggestionsMovies": "Suggested movies for you",
+    "suggestionsSeries": "Suggested series for you"
   },
   "search": {
     "title": "Search",
@@ -1492,7 +1488,9 @@
       "colCategory": "Type",
       "colSource": "Source",
       "colActions": "Actions",
-      "editPath": "Edit path",
+      "editMedia": "Edit media",
+      "selectedItems": "selected items",
+      "batchEditTmdbId": "Batch edit TMDB ID",
       "removeFromLibrary": "Remove from library",
       "removeFromLibraryConfirm": "Remove this entry from the library? The file on disk will not be deleted.",
       "removeFromLibrarySuccess": "Entry removed from library.",
@@ -1500,8 +1498,8 @@
       "deleteFileConfirm": "Delete the file from disk and remove from library? This action cannot be undone. (Local download folder only.)",
       "deleteFileSuccess": "File deleted and entry removed from library.",
       "deleteFileError": "Could not delete file (local folder only).",
-      "updateSuccess": "Path updated.",
-      "updateError": "Could not update path.",
+      "updateSuccess": "Media updated.",
+      "updateError": "Could not update media.",
       "deleteConfirm": "Remove this entry from the library? The file on disk will not be deleted.",
       "deleteSuccess": "Entry removed from library.",
       "deleteError": "Could not remove entry."

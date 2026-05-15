@@ -22,8 +22,19 @@ import {
 } from '../ui/design-system';
 import { Modal } from '../ui/Modal';
 import { DescriptionPreview } from '../upload/DescriptionPreview';
+import type { Chart } from 'chart.js';
 import { ArrowLeft, ArrowRight, Check, Loader2, Search, Upload, Film, Radar, Images, Activity } from 'lucide-preact';
-import { Chart, ArcElement, DoughnutController, PolarAreaController, RadialLinearScale, Tooltip, Legend } from 'chart.js';
+
+let GlobalChart: any = null;
+async function getChart() {
+  if (GlobalChart) return GlobalChart;
+  const { 
+    Chart, ArcElement, DoughnutController, PolarAreaController, RadialLinearScale, Tooltip, Legend 
+  } = await import('chart.js');
+  Chart.register(ArcElement, DoughnutController, PolarAreaController, RadialLinearScale, Tooltip, Legend);
+  GlobalChart = Chart;
+  return Chart;
+}
 
 const SAVED_MASK = '********';
 const WIZARD_STEPS = 3;
@@ -75,8 +86,6 @@ type UploadBatchStats = {
   error: number;
 };
 
-Chart.register(ArcElement, DoughnutController, PolarAreaController, RadialLinearScale, Tooltip, Legend);
-
 function PipelineDonutChart({
   steps,
 }: {
@@ -109,51 +118,52 @@ function PipelineDonutChart({
   const activeStepKey = activeStep?.key ?? null;
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    getChart().then(ChartClass => {
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    chartRef.current = new Chart(ctx, {
-      type: 'polarArea',
-      data: {
-        labels: steps.map((s) => s.title),
-        datasets: [
-          {
-            data: values.map((v) => (v <= 0 ? 0.001 : v)),
-            backgroundColor: steps.map((s) => toRgba(s.color, 0.9)),
-            borderColor: 'rgba(15, 23, 42, 0.8)',
-            borderWidth: 1.5,
-          },
-        ],
-      },
-      options: {
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const idx = ctx.dataIndex;
-                const step = steps[idx];
-                const pct = step.target > 0 ? Math.round((step.current / step.target) * 100) : 0;
-                return `${step.title}: ${step.current}/${step.target} (${pct}%)`;
+      chartRef.current = new ChartClass(ctx, {
+        type: 'polarArea',
+        data: {
+          labels: steps.map((s) => s.title),
+          datasets: [
+            {
+              data: values.map((v) => (v <= 0 ? 0.001 : v)),
+              backgroundColor: steps.map((s) => toRgba(s.color, 0.9)),
+              borderColor: 'rgba(15, 23, 42, 0.8)',
+              borderWidth: 1.5,
+            },
+          ],
+        },
+        options: {
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const idx = ctx.dataIndex;
+                  const step = steps[idx];
+                  const pct = step.target > 0 ? Math.round((step.current / step.target) * 100) : 0;
+                  return `${step.title}: ${step.current}/${step.target} (${pct}%)`;
+                },
               },
             },
           },
-        },
-        scales: {
-          r: {
-            beginAtZero: true,
-            max: 1,
-            ticks: { display: false },
-            grid: { display: false },
-            angleLines: { display: false },
-            pointLabels: { display: false },
+          scales: {
+            r: {
+              beginAtZero: true,
+              max: 1,
+              ticks: { display: false },
+              grid: { display: false },
+              angleLines: { display: false },
+              pointLabels: { display: false },
+            },
           },
+          responsive: true,
+          maintainAspectRatio: false,
         },
-        responsive: true,
-        maintainAspectRatio: false,
-      },
+      });
     });
 
     return () => {
@@ -228,45 +238,46 @@ function ExecutionChart({ stats }: { stats: UploadBatchStats }) {
   const hasData = stats.total > 0 && (stats.success > 0 || stats.duplicate > 0 || stats.error > 0);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !hasData) return;
+    getChart().then(ChartClass => {
+      if (!canvas || !hasData) return;
 
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-    const chart = new Chart(ctx, {
-      type: 'doughnut',
-      data: {
-        labels: ['Succès', 'Doublons', 'Erreurs'],
-        datasets: [
-          {
-            data: [stats.success, stats.duplicate, stats.error],
-            backgroundColor: [
-              'rgba(34, 197, 94, 0.9)',
-              'rgba(234, 179, 8, 0.9)',
-              'rgba(239, 68, 68, 0.9)',
-            ],
-            borderWidth: 0,
-          },
-        ],
-      },
-      options: {
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const label = ctx.label || '';
-                const value = ctx.parsed || 0;
-                return `${label}: ${value}`;
+      chartRef.current = new ChartClass(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Succès', 'Doublons', 'Erreurs'],
+          datasets: [
+            {
+              data: [stats.success, stats.duplicate, stats.error],
+              backgroundColor: [
+                'rgba(34, 197, 94, 0.9)',
+                'rgba(234, 179, 8, 0.9)',
+                'rgba(239, 68, 68, 0.9)',
+              ],
+              borderWidth: 0,
+            },
+          ],
+        },
+        options: {
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const label = ctx.label || '';
+                  const value = ctx.parsed || 0;
+                  return `${label}: ${value}`;
+                },
               },
             },
           },
+          cutout: '70%',
+          responsive: true,
+          maintainAspectRatio: false,
         },
-        cutout: '70%',
-        responsive: true,
-        maintainAspectRatio: false,
-      },
+      });
     });
 
     return () => {

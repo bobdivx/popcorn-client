@@ -71,28 +71,46 @@ export default function Dashboard() {
 
   const sections = useMemo(
     () => {
+      // 1. Enrichir ResumeWatching avec les infos de téléchargement
+      const enrichedResumeWatching = resumeWatching.map(item => {
+        const active = activeDownloads.find(ad => 
+          (ad.tmdbId != null && item.tmdbId != null && ad.tmdbId === item.tmdbId && ad.type === item.type) || 
+          (ad.infoHash && item.infoHash && ad.infoHash === item.infoHash)
+        );
+        if (active) {
+          return {
+            ...item,
+            isDownloading: true,
+            downloadProgress: active.progress,
+            downloadSpeed: active.downloadSpeed
+          };
+        }
+        return item;
+      });
+
+      // 2. Filtrer les téléchargements actifs pour ne garder que ceux qui NE sont PAS dans ResumeWatching
+      const standaloneDownloads = activeDownloads.filter(ad => {
+        const inResume = resumeWatching.some(rw => 
+          (ad.tmdbId != null && rw.tmdbId != null && ad.tmdbId === rw.tmdbId && ad.type === rw.type) || 
+          (ad.infoHash && rw.infoHash && ad.infoHash === rw.infoHash)
+        );
+        return !inResume;
+      });
+
       const watchNowItems = allDashboardItemsWithSignals
         .filter((item) => item.heroSignal?.downloadedUnseen || item.heroSignal?.requestDownloaded)
         .slice(0, 25);
 
       const result = [];
 
-      // 0. Téléchargements en cours (HAUTE PRIORITÉ)
-      if (activeDownloads.length > 0) {
+      // 1. Reprendre la lecture (films ou épisodes en cours, séries à suivre) - HAUTE PRIORITÉ
+      if (enrichedResumeWatching.length > 0) {
         result.push({ 
-          id: 'active-downloads', 
-          title: t('dashboard.activeDownloads') || 'En cours de téléchargement', 
-          items: activeDownloads.map(ad => {
-             // Retrouver l'item avec signaux si possible
-             return allDashboardItemsWithSignals.find(i => i.infoHash === ad.infoHash) || ad;
-          }),
+          id: 'resume-watching', 
+          title: t('dashboard.resumeWatching') || 'Reprendre la lecture', 
+          items: enrichedResumeWatching, 
           kind: 'resume' as const 
         });
-      }
-
-      // 1. Reprendre la lecture (films ou épisodes en cours, séries à suivre) - HAUTE PRIORITÉ
-      if (resumeWatching.length > 0) {
-        result.push({ id: 'resume-watching', title: t('dashboard.resumeWatching') || 'Reprendre la lecture', items: resumeWatching, kind: 'resume' as const });
       }
 
       // 3. Téléchargés récemment
@@ -110,7 +128,7 @@ export default function Dashboard() {
 
       return result;
     },
-    [allDashboardItemsWithSignals, activeDownloads, popularMovies, popularSeries, recentMovies, recentSeries, inProgress, seriesInProgress, t]
+    [allDashboardItemsWithSignals, activeDownloads, resumeWatching, popularMovies, popularSeries, recentMovies, recentSeries, t]
   );
 
   return (

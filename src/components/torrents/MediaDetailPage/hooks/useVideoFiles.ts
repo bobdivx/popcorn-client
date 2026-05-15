@@ -222,13 +222,14 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
             state: torrentStats.state,
           });
           
-          // Si le torrent a des métadonnées (total_bytes > 0) mais pas de fichiers,
-          // cela signifie que les fichiers n'ont pas encore été chargés
-          // Réessayer jusqu'à 10 fois (10 secondes)
-          if (torrentStats.total_bytes > 0 && retryCount < 10) {
-            console.log('[useVideoFiles] 🔄 Réessai dans 1 seconde...', {
+          // Si le torrent n'a pas encore de métadonnées (total_bytes === 0) ou pas de fichiers,
+          // cela signifie que les fichiers n'ont pas encore été chargés.
+          // Réessayer jusqu'à 15 fois (15 secondes)
+          if (retryCount < 15) {
+            console.log('[useVideoFiles] 🔄 Réessai dans 1 seconde (attente métadonnées/fichiers)...', {
               retryCount: retryCount + 1,
-              maxRetries: 10,
+              maxRetries: 15,
+              total_bytes: torrentStats.total_bytes,
             });
             await new Promise(resolve => setTimeout(resolve, 1000));
             setLoadingFiles(false);

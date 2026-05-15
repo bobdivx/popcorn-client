@@ -17,6 +17,7 @@ import { LANGUAGE_NAMES, type SupportedLanguage } from '../../lib/i18n';
 import { isDemoMode, setDemoMode } from '../../lib/backend-config';
 import { TokenManager } from '../../lib/client/storage';
 import { loadSubscription } from '../../lib/subscription-store';
+import ConnectivityWarning from './ConnectivityWarning';
 
 type NavTab = { label: string; href: string; match?: 'exact' | 'prefix'; icon?: ComponentType<{ className?: string }> };
 
@@ -358,6 +359,9 @@ export default function Navbar() {
                 <span className="sm:hidden">Demo</span>
               </button>
             )}
+
+              {/* ConnectivityWarning est maintenant géré en floating fixed via son propre composant */}
+              <ConnectivityWarning />
 
             {user ? (
               <>

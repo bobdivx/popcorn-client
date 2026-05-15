@@ -316,6 +316,9 @@
   border: 1px solid rgba(168, 85, 247, 0.2);
   box-shadow: 0 25px 50px -12px rgba(168, 85, 247, 0.05);
   overflow: hidden;
+  max-height: calc(100vh - 240px); /* Leave room for header */
+  display: flex;
+  flex-direction: column;
 }
 
 .ds-card-loading-bar {
@@ -323,15 +326,37 @@
   background: linear-gradient(to right, #c084fc, #a855f7, #c084fc);
   background-size: 200% 100%;
   animation: gradient-x 3s ease infinite;
+  flex-shrink: 0;
 }
 
 .ds-card-loading-content {
-  padding: 2rem;
+  padding: 1.5rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 @media (min-width: 640px) {
   .ds-card-loading-content {
-    padding: 3rem;
+    padding: 2rem 3rem;
+  }
+}
+@media (max-height: 800px) {
+  .loading-icon-container {
+    width: 5rem;
+    height: 5rem;
+    margin-bottom: 1rem;
+  }
+  .loading-icon-ring-outer, .loading-icon-ring-middle { display: none; }
+  .loading-icon-glow { width: 4.5rem; height: 4.5rem; inset: 0.25rem; }
+  .loading-icon-circle { width: 4.5rem; height: 4.5rem; }
+  .loading-icon-circle img, .loading-icon-circle svg { width: 2rem; height: 2rem; }
+  
+  .ds-loading-title {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+  .ds-card-loading-content {
+    padding: 1.5rem 2rem;
   }
 }
 

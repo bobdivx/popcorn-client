@@ -148,9 +148,6 @@ export function EpisodeCardsCarousel({
                       </div>
 
                       <div className="text-center">
-                        <div className="text-[10px] sm:text-xs font-bold text-white tracking-[0.2em] uppercase mb-1 drop-shadow-md opacity-80">
-                          En cours
-                        </div>
                         {typeof it.downloadProgress === 'number' && (
                           <div className="text-xl sm:text-2xl font-black text-white drop-shadow-lg tabular-nums">
                             {Math.round(it.downloadProgress)}%

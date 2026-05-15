@@ -10,7 +10,6 @@ import { useHlsTracks } from './hooks/useHlsTracks';
 import { usePlayerConfig } from '../player-shared/hooks/usePlayerConfig';
 import { shouldAutoFullscreen } from '../../../lib/utils/device-detection';
 import { isTauri } from '../../../lib/utils/tauri';
-import { SkipIntroOverlay } from '../player-shared/components/SkipIntroOverlay';
 import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
@@ -246,19 +245,7 @@ export default function HLSPlayer({
     }
   };
 
-  const introSkipSeconds = playerConfig.introSkipSeconds ?? 90;
   const nextEpisodeCountdownSeconds = playerConfig.nextEpisodeCountdownSeconds ?? 90;
-  const showSkipIntro =
-    isSeries &&
-    duration > introSkipSeconds &&
-    currentTime >= 0 &&
-    currentTime <= introSkipSeconds;
-  const handleSkipIntro = () => {
-    const video = videoRef.current;
-    if (video) {
-      video.currentTime = introSkipSeconds;
-    }
-  };
   const showNextEpisode =
     !!nextEpisodeInfo &&
     !!onPlayNextEpisode &&
@@ -460,6 +447,8 @@ export default function HLSPlayer({
           logoUrl={logoUrl}
           synopsis={synopsis}
           releaseDate={releaseDate}
+          seriesSeasonNum={seriesSeason}
+          seriesEpisodeNum={seriesEpisode}
           showControls={effectiveShowControls}
           isPlaying={isPlaying}
           currentTime={currentTime}
@@ -510,16 +499,7 @@ export default function HLSPlayer({
               ? onPlayNextEpisode
               : undefined
           }
-          seriesEpisodePickerItems={seriesEpisodePickerItems ?? null}
-          selectedSeriesEpisodeVariantId={selectedSeriesEpisodeVariantId ?? null}
-          onSelectSeriesEpisode={onSelectSeriesEpisode}
         />
-        {/* Overlays skip intro / épisode suivant au-dessus des contrôles (z-30) pour rester cliquables */}
-        {showSkipIntro && (
-          <div class="absolute inset-0 z-30 pointer-events-none">
-            <SkipIntroOverlay onSkip={handleSkipIntro} visible={showSkipIntro} />
-          </div>
-        )}
         {showNextEpisode && (
           <div class="absolute inset-0 z-30 pointer-events-none">
             <NextEpisodeOverlay

@@ -65,7 +65,7 @@ export function scrubVisibleWindow(
   isFullscreen: boolean
 ): { start: number; end: number } {
   if (count <= 0) return { start: 0, end: -1 };
-  const windowSize = Math.min(count, isTV ? 7 : isFullscreen ? 9 : 7);
+  const windowSize = Math.min(count, isTV ? 7 : isFullscreen ? 11 : 9);
   const half = Math.floor(windowSize / 2);
   const start = Math.max(0, Math.min(count - windowSize, selectedIndex - half));
   const end = Math.min(count - 1, start + windowSize - 1);

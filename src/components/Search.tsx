@@ -1002,7 +1002,13 @@ export default function Search({ onResultClick }: SearchProps) {
   return (
     <div className="min-h-screen bg-black text-white w-full min-w-0 max-w-[100vw] overflow-x-hidden">
       {/* Section Hero avec barre de recherche moderne */}
-      <div className="relative w-full min-h-[350px] tv:min-h-[450px] mb-8 overflow-hidden bg-black flex flex-col items-center justify-center px-4">
+      <div 
+        className={`relative w-full overflow-hidden bg-black flex flex-col items-center justify-center px-4 transition-all duration-500 ease-in-out ${
+          (loading || allResults.length > 0 || tmdbFallbackResults.length > 0) 
+            ? 'min-h-[180px] tv:min-h-[220px] mb-4' 
+            : 'min-h-[350px] tv:min-h-[450px] mb-8'
+        }`}
+      >
         {/* Cercles de lumière animés en arrière-plan */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary-600/20 blur-[120px] rounded-full pointer-events-none animate-pulse-slow" />
         <div className="absolute top-1/4 right-1/4 w-[300px] h-[300px] bg-violet-600/10 blur-[100px] rounded-full pointer-events-none" />
@@ -1140,7 +1146,7 @@ export default function Search({ onResultClick }: SearchProps) {
 
       {/* État de chargement : carte C411 avec LoadingCard */}
       {loading && (
-        <div className="flex flex-col items-center justify-start py-6 tv:py-8 px-4 w-full max-w-[42rem] mx-auto -mt-2 sm:-mt-4">
+        <div className="flex flex-col items-center justify-start py-2 tv:py-4 px-4 w-full max-w-[42rem] mx-auto transition-all">
           <LoadingCard
             title={
               searchPhase === 'local'

@@ -2,7 +2,10 @@
  * Utilitaires pour la génération de QR codes
  */
 
-import QRCode from 'qrcode';
+// Import dynamique au lieu de statique pour alléger le bundle initial
+async function getQRCode() {
+  return (await import('qrcode')).default;
+}
 
 export interface QuickConnectData {
   code: string;
@@ -22,6 +25,7 @@ export async function generateQRCode(data: QuickConnectData | string): Promise<s
 
   try {
     // Générer le QR code en data URL
+    const QRCode = await getQRCode();
     const dataUrl = await QRCode.toDataURL(content, {
       errorCorrectionLevel: 'M',
       type: 'image/png',
@@ -53,6 +57,7 @@ export async function generateQRCodeToCanvas(
   const content = typeof data === 'string' ? data : JSON.stringify(data);
 
   try {
+    const QRCode = await getQRCode();
     await QRCode.toCanvas(canvas, content, {
       errorCorrectionLevel: 'M',
       margin: 1,
