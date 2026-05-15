@@ -502,16 +502,30 @@ export class TorrentsService {
   /**
    * Restreindre le téléchargement aux fichiers dont les indices sont fournis (ex. streaming : un seul fichier vidéo).
    * À appeler après ajout si only_files n'a pas été fourni à l'ajout (métadonnées pas encore disponibles).
+   * Note: Certains backends ne supportent pas cette route (404/405). L'erreur est ignorée silencieusement.
    */
   async updateOnlyFiles(infoHash: string, onlyFiles: number[]): Promise<void> {
     if (onlyFiles.length === 0) return;
-    const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/update_only_files`);
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ only_files: onlyFiles }),
-    });
-    await handleResponse<void>(response);
+    try {
+      const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/update_only_files`);
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ only_files: onlyFiles }),
+      });
+      // Endpoint optionnel : certains backends ne l'implémentent pas.
+      if (response.status === 404 || response.status === 405 || response.status === 501) {
+        return;
+      }
+      if (!response.ok) {
+        // 500/503 « can't update initializing torrent » : la fonction appelante réessaiera.
+        throw new Error(`updateOnlyFiles: ${response.status}`);
+      }
+    } catch (err) {
+      // Ne pas bloquer le flux de lecture pour cette optimisation optionnelle.
+      // L'appelant (scheduleUpdateOnlyFilesWithRetry) gère les réessais.
+      throw err;
+    }
   }
 
   /**

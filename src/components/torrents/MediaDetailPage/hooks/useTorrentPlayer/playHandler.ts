@@ -93,7 +93,12 @@ export function scheduleUpdateOnlyFilesWithRetry(infoHash: string, fileIndex: nu
     clientApi
       .updateOnlyFiles(infoHash, [fileIndex])
       .then(() => {})
-      .catch(() => {
+      .catch((err) => {
+        // Si le backend ne supporte pas cette route, ne pas réessayer (updateOnlyFiles renvoie silencieusement)
+        // Seuls les codes 500/503 (torrent initializing) justifient un retry.
+        const msg = err instanceof Error ? err.message : String(err);
+        const isTransient = msg.includes('500') || msg.includes('502') || msg.includes('503');
+        if (!isTransient) return; // 404/405/501/network → stop
         attempt += 1;
         if (attempt < delaysMs.length) {
           window.setTimeout(run, delaysMs[attempt]);
