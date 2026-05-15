@@ -30,10 +30,21 @@ export function normalizeStreamPath(filePath: string): string {
   if (normalizedPath.startsWith('/') && !normalizedPath.startsWith('//')) {
     normalizedPath = normalizedPath.substring(1);
   }
-  // Éviter le double préfixe media/media/... si le chemin commence déjà par media/
-  if (normalizedPath.startsWith('media/')) {
-    normalizedPath = normalizedPath.substring(6);
+
+  // Éviter les préfixes redondants (ex: "media/media/..." ou "media/films/media/...")
+  // On boucle tant que le chemin commence par un préfixe connu que le serveur gère déjà comme racine.
+  let changed = true;
+  while (changed) {
+    changed = false;
+    if (normalizedPath.toLowerCase().startsWith('media/')) {
+      normalizedPath = normalizedPath.substring(6);
+      changed = true;
+    } else if (normalizedPath.toLowerCase().startsWith('downloads/')) {
+      normalizedPath = normalizedPath.substring(10);
+      changed = true;
+    }
   }
+
   return normalizedPath;
 }
 
