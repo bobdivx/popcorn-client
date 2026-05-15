@@ -30,6 +30,10 @@ export function normalizeStreamPath(filePath: string): string {
   if (normalizedPath.startsWith('/') && !normalizedPath.startsWith('//')) {
     normalizedPath = normalizedPath.substring(1);
   }
+  // Éviter le double préfixe media/media/... si le chemin commence déjà par media/
+  if (normalizedPath.startsWith('media/')) {
+    normalizedPath = normalizedPath.substring(6);
+  }
   return normalizedPath;
 }
 

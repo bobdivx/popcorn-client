@@ -8,7 +8,6 @@ import { useLuciePlayer } from './hooks/useLuciePlayer';
 import { useTVPlayerNavigation } from '../player-shared/hooks/useTVPlayerNavigation';
 import { usePlayerConfig } from '../player-shared/hooks/usePlayerConfig';
 import { shouldAutoFullscreen } from '../../../lib/utils/device-detection';
-import { SkipIntroOverlay } from '../player-shared/components/SkipIntroOverlay';
 import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
@@ -181,19 +180,7 @@ export default function LuciePlayer({
     }
   };
 
-  const introSkipSeconds = playerConfig.introSkipSeconds ?? 90;
   const nextEpisodeCountdownSeconds = playerConfig.nextEpisodeCountdownSeconds ?? 90;
-  const showSkipIntro =
-    isSeries &&
-    duration > introSkipSeconds &&
-    currentTime >= 0 &&
-    currentTime <= introSkipSeconds;
-  const handleSkipIntro = () => {
-    const video = videoRef.current;
-    if (video) {
-      video.currentTime = introSkipSeconds;
-    }
-  };
   const showNextEpisode =
     !!nextEpisodeInfo &&
     !!onPlayNextEpisode &&
@@ -356,6 +343,8 @@ export default function LuciePlayer({
           logoUrl={logoUrl}
           synopsis={synopsis}
           releaseDate={releaseDate}
+          seriesSeasonNum={seriesSeason}
+          seriesEpisodeNum={seriesEpisode}
           showControls={showControls}
           isPlaying={isPlaying}
           currentTime={currentTime}
@@ -402,16 +391,7 @@ export default function LuciePlayer({
               ? onPlayNextEpisode
               : undefined
           }
-          seriesEpisodePickerItems={seriesEpisodePickerItems ?? null}
-          selectedSeriesEpisodeVariantId={selectedSeriesEpisodeVariantId ?? null}
-          onSelectSeriesEpisode={onSelectSeriesEpisode}
         />
-        {/* Overlays skip intro / épisode suivant */}
-        {showSkipIntro && (
-          <div class="absolute inset-0 z-30 pointer-events-none">
-            <SkipIntroOverlay onSkip={handleSkipIntro} visible={showSkipIntro} />
-          </div>
-        )}
         {showNextEpisode && (
           <div class="absolute inset-0 z-30 pointer-events-none">
             <NextEpisodeOverlay

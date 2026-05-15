@@ -8,7 +8,6 @@ import type { ScrubThumbnailsMeta } from '../types/scrubThumbnails';
 import { useScrubNav } from './video-controls/useScrubNav';
 import { ScrubThumbnailsStrip } from './video-controls/ScrubThumbnailsStrip';
 import { persistVideoFillMode } from '../hooks/usePlayerConfig';
-import type { SeriesEpisodePickerItem } from '../types/seriesEpisodePicker';
 
 interface AudioTrack {
   id: number;
@@ -72,6 +71,10 @@ interface VideoControlsProps {
   synopsis?: string | null;
   /** Année de sortie (badge style Media Detail) */
   releaseDate?: string | null;
+  /** Numéro de saison en cours (séries) */
+  seriesSeasonNum?: number | null;
+  /** Numéro d'épisode en cours (séries) */
+  seriesEpisodeNum?: number | null;
   onClose?: () => void;
   onRestart?: () => void;
   /** Afficher le bouton « Épisode suivant » (séries) */
@@ -95,7 +98,7 @@ interface VideoControlsProps {
   /** Format d'image actuel (contain = bandes noires, cover = plein écran). Affiche le choix dans le menu Paramètres. */
   videoFillMode?: 'contain' | 'cover';
 
-  /** Miniatures scrub : carrousel sous la barre (pas d’aperçu flottant au survol). */
+  /** Miniatures scrub : carrousel sous la barre (pas d'aperçu flottant au survol). */
   scrubThumbnails?: ScrubThumbnailsMeta | null;
   /** Miniatures en cours de génération (placeholder animé). */
   scrubThumbnailsLoading?: boolean;
@@ -106,11 +109,6 @@ interface VideoControlsProps {
   tvScrubIndexExternal?: number;
   /** Sur TV : la rangée de vignettes est-elle la zone de focus active ? */
   tvScrubFocused?: boolean;
-
-  /** Série : rail d'épisodes cliquable sur l'overlay pause (affiche si infos pause + au moins 2 épisodes). */
-  seriesEpisodePickerItems?: SeriesEpisodePickerItem[] | null;
-  selectedSeriesEpisodeVariantId?: string | null;
-  onSelectSeriesEpisode?: (variantId: string) => void;
 }
 
 export function VideoControls({
@@ -150,6 +148,8 @@ export function VideoControls({
   logoUrl,
   synopsis,
   releaseDate,
+  seriesSeasonNum,
+  seriesEpisodeNum,
   onClose,
   onRestart,
   onPlayNextEpisode,
@@ -166,9 +166,6 @@ export function VideoControls({
   scrubThumbnailsLoading = false,
   tvScrubIndexExternal,
   tvScrubFocused = false,
-  seriesEpisodePickerItems = null,
-  selectedSeriesEpisodeVariantId = null,
-  onSelectSeriesEpisode,
 }: VideoControlsProps) {
   const { t } = useI18n();
   const effectiveFillMode = videoFillMode ?? 'contain';
@@ -272,13 +269,17 @@ export function VideoControls({
   };
 
   const showPosterSynopsisPause = !isPlaying && showControls && (posterUrl || synopsis);
-  const showEpisodePickerInPause =
-    !isPlaying &&
-    showControls &&
-    seriesEpisodePickerItems &&
-    seriesEpisodePickerItems.length > 1 &&
-    onSelectSeriesEpisode;
-  const showPausedChrome = showPosterSynopsisPause || showEpisodePickerInPause;
+  const showPausedChrome = showPosterSynopsisPause;
+  /** Sous-titre saison/épisode formaté (ex. « Saison 1 · Épisode 5 ») */
+  const seriesSubtitle =
+    seriesSeasonNum != null || seriesEpisodeNum != null
+      ? [
+          seriesSeasonNum != null ? `${t('mediaDetail.season')} ${seriesSeasonNum}` : null,
+          seriesEpisodeNum != null ? t('mediaDetail.episodeNumber', { number: seriesEpisodeNum }) : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : null;
 
   const seekToThumbnail =
     scrubEnabled && scrubThumbnails
@@ -333,7 +334,14 @@ export function VideoControls({
               </button>
             )}
             {torrentName && !showPosterSynopsisPause && (
-              <h3 class={`${titleSize} font-semibold tracking-wide truncate`}>{torrentName}</h3>
+              <div class="min-w-0">
+                <h3 class={`${titleSize} font-semibold tracking-wide truncate`}>{torrentName}</h3>
+                {seriesSubtitle && (
+                  <p class={`${isTV ? 'text-xl' : isFullscreen ? 'text-base' : 'text-xs sm:text-sm'} text-white/60 font-medium mt-0.5 truncate`}>
+                    {seriesSubtitle}
+                  </p>
+                )}
+              </div>
             )}
           </div>
           {showLogo && (
@@ -368,16 +376,23 @@ export function VideoControls({
               )}
               <div class="min-w-0 w-full sm:w-auto sm:max-w-md md:max-w-lg lg:max-w-xl flex flex-col gap-2 sm:gap-4 items-start text-left">
                 {(torrentName || releaseDate) && (
-                  <div class="flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4 flex-wrap justify-start">
-                    {torrentName && (
-                      <h2 class="text-xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight drop-shadow-2xl break-words">
-                        {torrentName}
-                      </h2>
-                    )}
-                    {releaseDate && (
-                      <span class="inline-flex items-center justify-center px-2 py-1 sm:px-4 sm:py-2 bg-gray-800/90 backdrop-blur-md text-white/95 text-xs sm:text-lg font-semibold rounded-lg border border-white/30 shadow-lg">
-                        {new Date(releaseDate).getFullYear()}
-                      </span>
+                  <div class="flex flex-col gap-1">
+                    <div class="flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4 flex-wrap justify-start">
+                      {torrentName && (
+                        <h2 class="text-xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight drop-shadow-2xl break-words">
+                          {torrentName}
+                        </h2>
+                      )}
+                      {releaseDate && (
+                        <span class="inline-flex items-center justify-center px-2 py-1 sm:px-4 sm:py-2 bg-gray-800/90 backdrop-blur-md text-white/95 text-xs sm:text-lg font-semibold rounded-lg border border-white/30 shadow-lg">
+                          {new Date(releaseDate).getFullYear()}
+                        </span>
+                      )}
+                    </div>
+                    {seriesSubtitle && (
+                      <p class="text-sm sm:text-lg md:text-xl text-white/60 font-medium drop-shadow-lg">
+                        {seriesSubtitle}
+                      </p>
                     )}
                   </div>
                 )}
@@ -391,63 +406,7 @@ export function VideoControls({
           </div>
         )}
         <div class={padding}>
-          {showEpisodePickerInPause && (
-            <div class="w-full max-w-6xl mb-3 sm:mb-5">
-              <p class="text-white/80 text-xs sm:text-sm font-medium mb-2 sm:mb-3 drop-shadow-md">
-                {t('playback.chooseEpisode')}
-              </p>
-              <div class="flex gap-2 sm:gap-3 overflow-x-auto pb-1 scrollbar-visible touch-pan-x">
-                {seriesEpisodePickerItems!.map((item) => {
-                  const selected = item.variantId === selectedSeriesEpisodeVariantId;
-                  return (
-                    <button
-                      key={item.variantId}
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        onSelectSeriesEpisode!(item.variantId);
-                      }}
-                      class={`group flex-shrink-0 w-[7.5rem] sm:w-36 md:w-40 text-left rounded-lg overflow-hidden border-2 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-white/80 ${
-                        selected
-                          ? 'border-purple-400 ring-2 ring-purple-500/60 shadow-lg scale-[1.02]'
-                          : 'border-white/20 hover:border-white/50 hover:scale-[1.02]'
-                      }`}
-                      aria-current={selected ? 'true' : undefined}
-                      aria-label={item.sublabel ? `${item.label} — ${item.sublabel}` : item.label}
-                    >
-                      <div class="relative aspect-video bg-black/80">
-                        {item.thumbnailUrl ? (
-                          <img
-                            src={item.thumbnailUrl}
-                            alt=""
-                            class="w-full h-full object-cover"
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        ) : (
-                          <div class="w-full h-full flex items-center justify-center bg-white/5">
-                            <Play class="w-8 h-8 text-white/40" />
-                          </div>
-                        )}
-                        {!selected && (
-                          <div class="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Play class="w-10 h-10 text-white drop-shadow-lg" />
-                          </div>
-                        )}
-                      </div>
-                      <div class="px-1.5 py-1.5 sm:px-2 sm:py-2 bg-black/75">
-                        {item.sublabel && (
-                          <p class="text-[10px] sm:text-xs text-white/60 truncate">{item.sublabel}</p>
-                        )}
-                        <p class="text-[11px] sm:text-sm text-white font-medium line-clamp-2 leading-tight">{item.label}</p>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+
           {/* Colonne barre + carrousel de vignettes scrub (pas d’aperçu flottant au survol) */}
           <div class="flex flex-col gap-2 mb-4 sm:mb-6 md:mb-8">
           <div
