@@ -86,10 +86,13 @@ export function useTorrentPlayer(options: UseTorrentPlayerOptions) {
             setTorrentStats(found);
             return;
           }
-          // Si absent de la liste (ex. tout juste ajouté), fallback sur getTorrent comme avant
-          clientApi.getTorrent(infoHash).then((stats) => {
-            if (stats) setTorrentStats(stats);
-          }).catch(() => {});
+          // Si absent de la liste (ex. tout juste ajouté), fallback sur getTorrent comme avant,
+          // SAUF si le média est déjà disponible localement (pour éviter des 404 inutiles si le torrent a été supprimé du client)
+          if (!isAvailableLocally && !infoHash.startsWith('local_')) {
+            clientApi.getTorrent(infoHash).then((stats) => {
+              if (stats) setTorrentStats(stats);
+            }).catch(() => {});
+          }
         })
         .catch(() => {});
     };

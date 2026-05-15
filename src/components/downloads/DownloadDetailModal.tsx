@@ -246,10 +246,11 @@ export function DownloadDetailModal({
       isOpen={true} 
       onClose={onClose} 
       size="full"
-      scrollable={false}
+      scrollable={true}
+      noPadding={true}
       className="p-0 sm:p-0" // Reset standard padding to keep custom layout
     >
-      <div className="relative flex h-full min-h-0 max-h-full flex-col overflow-y-auto lg:overflow-hidden">
+      <div className="relative flex flex-col lg:h-full lg:overflow-hidden">
         {/* Immersive backdrop background inside the modal */}
         {backdropUrl && (
           <div 
@@ -259,7 +260,7 @@ export function DownloadDetailModal({
         )}
 
         {/* Header bar */}
-        <div className="relative z-10 flex items-center justify-between px-4 sm:px-8 py-4 border-b border-white/5 bg-black/20 backdrop-blur-xl">
+        <div className="relative z-20 flex items-center justify-between px-4 sm:px-8 py-4 border-b border-white/5 bg-black/20 backdrop-blur-xl flex-shrink-0">
           <button
             onClick={onClose}
             className="flex items-center gap-2 text-white/60 hover:text-white transition-colors p-2 -ml-2 rounded-xl hover:bg-white/5"
@@ -274,10 +275,10 @@ export function DownloadDetailModal({
           </div>
         </div>
 
-        <div className="relative z-10 flex min-h-0 flex-1 flex-col lg:overflow-hidden lg:flex-row">
+        <div className="relative z-10 flex flex-col lg:flex-row lg:flex-1 lg:min-h-0 lg:overflow-hidden">
           {/* Left Sidebar - Poster & Basic Info */}
-          <div className="w-full flex-shrink-0 border-b border-white/5 bg-white/[0.02] p-4 sm:p-8 lg:w-96 lg:min-h-0 lg:max-h-full lg:overflow-y-auto lg:border-b-0 lg:border-r tv:lg:w-[min(24rem,32vw)] custom-scrollbar">
-            <div className="relative mx-auto aspect-[2/3] w-full max-w-[min(100%,18rem)] overflow-hidden rounded-2xl shadow-2xl group tv:max-w-[min(100%,22rem)] lg:mx-0 lg:max-w-none">
+          <div className="w-full flex-shrink-0 border-b border-white/5 bg-white/[0.02] p-4 sm:p-8 lg:w-96 lg:border-b-0 lg:border-r lg:overflow-y-auto tv:lg:w-[min(24rem,32vw)] custom-scrollbar">
+            <div className="relative mx-auto aspect-[2/3] w-full max-w-[min(100%,12rem)] sm:max-w-[min(100%,18rem)] overflow-hidden rounded-2xl shadow-2xl group tv:max-w-[min(100%,22rem)] lg:mx-0 lg:max-w-none">
               {posterUrl ? (
                 <img src={posterUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={headerTitle} />
               ) : (
@@ -288,7 +289,7 @@ export function DownloadDetailModal({
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </div>
 
-            <h1 className="text-2xl font-bold text-white mb-4 line-clamp-2 leading-tight">
+            <h1 className="text-2xl font-bold text-white mt-6 mb-4 line-clamp-2 leading-tight">
               {headerTitle}
             </h1>
             {modalTorrents.length > 1 && (
@@ -327,7 +328,7 @@ export function DownloadDetailModal({
           </div>
 
           {/* Main Content - Stats & Actions */}
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-8 custom-scrollbar">
+          <div className="flex-1 p-4 sm:p-8 lg:overflow-y-auto custom-scrollbar">
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
               <StatCard icon={Download} label="Téléchargement" value={downSpeed} colorClass="text-blue-400" />
               <StatCard icon={Upload} label="Envoi" value={upSpeed} colorClass="text-emerald-400" />

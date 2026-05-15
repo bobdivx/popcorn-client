@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks';
-import { Film, Download, HardDrive, FolderOpen, Users } from 'lucide-preact';
+import { Film, Download, HardDrive, FolderOpen, Users, RotateCw, CheckCircle2 } from 'lucide-preact';
 import type { LibraryMedia } from '../Library';
 import { FocusableCard } from '../ui/FocusableCard';
 import { useI18n } from '../../lib/i18n/useI18n';
@@ -82,22 +82,24 @@ export function LibraryPoster({ item, onPlay, className, priorityLoad }: Library
             </div>
           )}
 
-          {/* Badge "En cours" pour médias en téléchargement */}
-          {isDownloading && (
-            <div className="absolute top-2 left-2 lg:top-3 lg:left-3 tv:top-4 tv:left-4 z-10">
-              <span className="badge badge-sm badge-warning glass-panel border border-amber-400/50 animate-pulse max-w-[calc(100%-0.5rem)] truncate">
-                {t('library.downloadingBadge')}
-              </span>
-            </div>
-          )}
-          {/* Badge de résolution en haut à droite (masqué si en cours pour éviter la surcharge) */}
-          {item.resolution && !isDownloading && (
-            <div className="absolute top-2 right-2 lg:top-3 lg:right-3 tv:top-4 tv:right-4 z-10">
-              <span className="badge badge-sm badge-primary glass-panel border border-white/30 max-w-[calc(100%-0.5rem)] truncate">
+          {/* Icône d'état en haut à droite */}
+          <div className="absolute top-2 right-2 lg:top-3 lg:right-3 tv:top-4 tv:right-4 z-10 flex items-center gap-1.5">
+            {isDownloading ? (
+              <div className="w-8 h-8 lg:w-9 lg:h-9 tv:w-12 tv:h-12 bg-amber-500/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-amber-400/30">
+                <RotateCw className="w-4 h-4 lg:w-5 lg:h-5 tv:w-7 tv:h-7 text-white animate-spin" />
+              </div>
+            ) : (
+              <div className="w-8 h-8 lg:w-9 lg:h-9 tv:w-12 tv:h-12 bg-green-500/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg border border-green-400/30">
+                <CheckCircle2 className="w-4 h-4 lg:w-5 lg:h-5 tv:w-7 tv:h-7 text-white" />
+              </div>
+            )}
+            
+            {item.resolution && !isDownloading && (
+              <span className="badge badge-sm badge-primary glass-panel border border-white/30 px-2 py-1 h-auto text-[10px] lg:text-xs tv:text-sm font-bold">
                 {item.resolution}
               </span>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Badge source : partagé par ami / bibliothèque externe / Popconn / local */}
           <div className="absolute bottom-2 left-2 lg:bottom-3 lg:left-3 tv:bottom-4 tv:left-4 z-10 flex flex-wrap gap-1.5 max-w-[calc(100%-0.5rem)]">

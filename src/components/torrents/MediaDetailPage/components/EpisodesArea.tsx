@@ -39,6 +39,7 @@ export function EpisodesArea(props: {
   savedPlaybackPosition: number | null;
   episodesInLibraryCount?: number;
   downloadedEpisodesSet?: Set<string>;
+  downloadingEpisodesMap?: Record<string, number>;
 
   isPackSelected: boolean;
   videoFilesCount: number;
@@ -86,6 +87,7 @@ export function EpisodesArea(props: {
     isDownloading,
     downloadProgress,
     statusMessage,
+    downloadingEpisodesMap,
   } = props;
 
   const [watchedTick, setWatchedTick] = useState(0);
@@ -137,6 +139,7 @@ export function EpisodesArea(props: {
           isDownloading={isDownloading}
           downloadProgress={downloadProgress}
           statusMessage={statusMessage}
+          downloadingEpisodesMap={downloadingEpisodesMap}
         />
       ) : null}
 

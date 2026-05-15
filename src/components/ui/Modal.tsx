@@ -11,6 +11,7 @@ interface ModalProps {
   closeOnEscape?: boolean;
   className?: string;
   scrollable?: boolean;
+  noPadding?: boolean;
 }
 
 /**
@@ -26,6 +27,7 @@ export function Modal({
   closeOnEscape = true,
   className = '',
   scrollable = true,
+  noPadding = false,
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -217,7 +219,7 @@ export function Modal({
         )}
 
         {/* Content */}
-        <div className={`ds-card-section flex-1 min-h-0 overscroll-contain pt-0 ${scrollable ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+        <div className={`${noPadding ? '' : 'ds-card-section'} flex-1 min-h-0 overscroll-contain pt-0 ${scrollable ? 'overflow-y-auto' : 'overflow-hidden'}`}>
           {children}
         </div>
       </div>

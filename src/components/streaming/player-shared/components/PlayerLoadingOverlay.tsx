@@ -1,3 +1,4 @@
+import { useI18n } from '../../../../lib/i18n/useI18n';
 import { StreamingStepIndicator } from './StreamingStepIndicator';
 import { formatBytes, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
 
@@ -34,8 +35,27 @@ export default function PlayerLoadingOverlay({
   progressMessage,
   torrentStats,
   onCancel,
-  cancelLabel = 'Annuler',
+  cancelLabel,
 }: PlayerLoadingOverlayProps) {
+  const { t } = useI18n();
+  const defaultCancelLabel = t('common.cancel') ?? 'Annuler';
+  const closeLabel = t('common.close') ?? 'Fermer';
+
+  // Déterminer si le fichier est déjà téléchargé (ne pas afficher les stats de téléchargement)
+  const isCompleted =
+    torrentStats != null &&
+    (torrentStats.state === 'completed' ||
+      torrentStats.state === 'seeding' ||
+      (torrentStats.progress != null && torrentStats.progress >= 0.99));
+
+  // Le téléchargement est réellement en cours (pas terminé, pas en file d'attente)
+  const isActivelyDownloading =
+    torrentStats != null &&
+    !isCompleted &&
+    (torrentStats.state === 'downloading' ||
+      (torrentStats.download_speed ?? 0) > 0 ||
+      (torrentStats.progress != null && torrentStats.progress > 0 && torrentStats.progress < 0.99));
+
   const progressFromBytes =
     torrentStats?.total_bytes != null &&
     torrentStats.total_bytes > 0 &&
@@ -59,17 +79,23 @@ export default function PlayerLoadingOverlay({
     torrentStats?.eta_seconds != null && torrentStats.eta_seconds > 0
       ? formatTimeRemaining(torrentStats.eta_seconds)
       : null;
-  const stateLabel =
-    torrentStats?.state === 'queued'
-      ? 'En file d\'attente'
-      : torrentStats?.state === 'downloading'
-        ? 'Téléchargement en cours'
+
+  // Message adapté à la situation réelle
+  const stateLabel = isCompleted
+    ? (t('playback.preparingStream') || 'Préparation du flux…')
+    : torrentStats?.state === 'queued'
+      ? (t('playback.queued') || 'En file d\'attente')
+      : torrentStats?.state === 'downloading' || isActivelyDownloading
+        ? (t('playback.downloading') || 'Téléchargement en cours')
         : message;
+
+  // Bouton d'annulation : adapter le libellé
+  const effectiveCancelLabel = isCompleted ? closeLabel : (cancelLabel || defaultCancelLabel);
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-30">
       <div className="text-center max-w-md px-4 flex flex-col items-center">
-        {/* Animation existante : spinner + message principal + points */}
+        {/* Spinner + message principal */}
         <div className="relative w-32 h-32 mb-4 mx-auto">
           <div className="absolute inset-0 border-4 border-primary-600/20 rounded-full" />
           <div className="absolute inset-0 border-4 border-primary-600 border-t-transparent rounded-full animate-spin" />
@@ -89,8 +115,8 @@ export default function PlayerLoadingOverlay({
           <span className="w-2 h-2 bg-primary-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }} />
         </div>
 
-        {/* Stats réelles du torrent (progression, vitesse, ETA, peers) */}
-        {torrentStats &&
+        {/* Stats réelles du torrent — seulement si le téléchargement est réellement en cours */}
+        {isActivelyDownloading && torrentStats &&
           (torrentStats.progress != null ||
             (torrentStats.download_speed ?? 0) > 0 ||
             (torrentStats.downloaded_bytes != null && torrentStats.total_bytes != null && torrentStats.total_bytes > 0)) && (
@@ -131,8 +157,8 @@ export default function PlayerLoadingOverlay({
           </div>
         )}
 
-        {/* Indicateur d'étapes (en dessous de l'animation existante) */}
-        {loadingStep >= 1 && (
+        {/* Indicateur d'étapes — seulement si le téléchargement est en cours (pas pour les fichiers déjà prêts) */}
+        {!isCompleted && loadingStep >= 1 && (
           <div className="mt-6 w-full">
             <StreamingStepIndicator
               currentStep={loadingStep}
@@ -142,14 +168,19 @@ export default function PlayerLoadingOverlay({
           </div>
         )}
 
-        {/* Bouton Annuler : focusable pour télécommande (min taille 44px, ring focus) */}
+        {/* Message de progression pour fichiers complétés (préparation du transcodage HLS) */}
+        {isCompleted && progressMessage && (
+          <p className="text-white/50 text-sm mt-4 font-light">{progressMessage}</p>
+        )}
+
+        {/* Bouton Annuler/Fermer */}
         {onCancel && (
           <div className="mt-8">
             <button
               type="button"
               onClick={onCancel}
-              title={cancelLabel}
-              aria-label={cancelLabel}
+              title={effectiveCancelLabel}
+              aria-label={effectiveCancelLabel}
               tabIndex={0}
               data-focusable
               className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-white/10 hover:bg-white/20 text-white/90 hover:text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:ring-offset-2 focus:ring-offset-black min-h-[44px] min-w-[44px] transition-colors"
@@ -170,7 +201,7 @@ export default function PlayerLoadingOverlay({
                 <path d="m15 9-6 6" />
                 <path d="m9 9 6 6" />
               </svg>
-              {cancelLabel}
+              {effectiveCancelLabel}
             </button>
           </div>
         )}

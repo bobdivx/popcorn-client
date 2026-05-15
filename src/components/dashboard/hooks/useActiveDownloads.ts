@@ -25,7 +25,8 @@ export function useActiveDownloads() {
         infoHash: t.info_hash,
         downloadSpeed: t.download_speed,
         seeds: t.seeders,
-        peers: t.peers_connected
+        peers: t.peers_connected,
+        tmdbId: t.tmdb_id
       }));
 
       setActiveItems(items);

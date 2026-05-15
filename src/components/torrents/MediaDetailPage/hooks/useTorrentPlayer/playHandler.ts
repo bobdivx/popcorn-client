@@ -93,7 +93,12 @@ export function scheduleUpdateOnlyFilesWithRetry(infoHash: string, fileIndex: nu
     clientApi
       .updateOnlyFiles(infoHash, [fileIndex])
       .then(() => {})
-      .catch(() => {
+      .catch((err) => {
+        // Si le backend ne supporte pas cette route, ne pas réessayer (updateOnlyFiles renvoie silencieusement)
+        // Seuls les codes 500/503 (torrent initializing) justifient un retry.
+        const msg = err instanceof Error ? err.message : String(err);
+        const isTransient = msg.includes('500') || msg.includes('502') || msg.includes('503');
+        if (!isTransient) return; // 404/405/501/network → stop
         attempt += 1;
         if (attempt < delaysMs.length) {
           window.setTimeout(run, delaysMs[attempt]);
@@ -166,7 +171,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
         scheduleUpdateOnlyFilesWithRetry(torrent.infoHash, idx);
       }
       const ok = await waitForStreamReady(
-        streamingTorrentActive, torrent.infoHash, selectedFile,
+                streamingTorrentActive && !isAvailableLocally, torrent.infoHash, selectedFile,
         setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
       );
       if (!ok) return;
@@ -191,7 +196,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
         setSelectedFile(libraryVideos[0]);
         await markStreamingIfActive();
         const okLib = await waitForStreamReady(
-          streamingTorrentActive, torrent.infoHash!, libraryVideos[0],
+                streamingTorrentActive && !isAvailableLocally, torrent.infoHash!, libraryVideos[0],
           setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
         );
         if (!okLib) return;
@@ -255,7 +260,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
               setSelectedFile(videos[0]);
               await markStreamingIfActive();
               const ok1 = await waitForStreamReady(
-                streamingTorrentActive, torrent.infoHash!, videos[0],
+                streamingTorrentActive && !isAvailableLocally, torrent.infoHash!, videos[0],
                 setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
               );
               if (!ok1) return;
@@ -457,7 +462,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                         if (forStreaming) {
                           await markStreamingIfActive();
                           const okM = await waitForStreamReady(
-                            streamingTorrentActive, addResult.info_hash, videos[0],
+                streamingTorrentActive && !isAvailableLocally, addResult.info_hash, videos[0],
                             setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
                           );
                           if (!okM) return;
@@ -558,7 +563,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                         if (forStreaming) {
                           await markStreamingIfActive();
                           const okM = await waitForStreamReady(
-                            streamingTorrentActive, addResult.info_hash, videos[0],
+                streamingTorrentActive && !isAvailableLocally, addResult.info_hash, videos[0],
                             setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
                           );
                           if (!okM) return;
@@ -684,7 +689,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
               if (forStreaming) {
                 await markStreamingIfActive();
                 const okT = await waitForStreamReady(
-                  streamingTorrentActive, addResult.info_hash, videos[0],
+                streamingTorrentActive && !isAvailableLocally, addResult.info_hash, videos[0],
                   setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
                 );
                 if (!okT) return;
@@ -787,7 +792,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                     if (forStreaming) {
                       await markStreamingIfActive();
                       const okMag = await waitForStreamReady(
-                        streamingTorrentActive, addResult.info_hash, videos[0],
+                streamingTorrentActive && !isAvailableLocally, addResult.info_hash, videos[0],
                         setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
                       );
                       if (!okMag) return;
@@ -894,7 +899,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
         await markStreamingIfActive();
         if (!isLocalMedia) {
           const okH = await waitForStreamReady(
-            streamingTorrentActive, torrent.infoHash!, videos[0],
+                streamingTorrentActive && !isAvailableLocally, torrent.infoHash!, videos[0],
             setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
           );
           if (!okH) return;
@@ -939,7 +944,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
               setSelectedFile(videos2[0]);
               await markStreamingIfActive();
               const ok2 = await waitForStreamReady(
-                streamingTorrentActive, torrent.infoHash!, videos2[0],
+                streamingTorrentActive && !isAvailableLocally, torrent.infoHash!, videos2[0],
                 setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
               );
               if (!ok2) return;
@@ -1035,7 +1040,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                   if (forStreaming) {
                     await markStreamingIfActive();
                     const okC = await waitForStreamReady(
-                      streamingTorrentActive, addResult.info_hash, videos[0],
+                streamingTorrentActive && !isAvailableLocally, addResult.info_hash, videos[0],
                       setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
                     );
                     if (!okC) return;

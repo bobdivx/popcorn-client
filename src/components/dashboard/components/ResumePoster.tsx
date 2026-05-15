@@ -57,13 +57,6 @@ function statusBadge(item: EnrichedResumeItem, t: (k: string, p?: Record<string,
       className: 'bg-blue-500 text-white',
     };
   }
-  if (item.isDownloading) {
-    return {
-      label: t('torrents.state.downloading') || 'Téléchargement',
-      className: 'bg-primary text-black animate-pulse',
-      icon: Download
-    };
-  }
   return null;
 }
 
@@ -143,6 +136,56 @@ export function ResumePoster({ item, onNavigate }: ResumePosterProps) {
             </div>
           )}
 
+          {/* Overlay Premium de Téléchargement (identique aux cartes épisodes) */}
+          {item.isDownloading && (
+            <div className="absolute inset-0 z-10 overflow-hidden pointer-events-none">
+              {/* Gradient de fond */}
+              <div className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/90 to-black transition-opacity duration-500" />
+              
+              {/* Contenu de l'overlay */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
+                {/* Anneau de progression ou icône pulsante */}
+                <div className="relative w-14 h-14 sm:w-16 sm:h-16 mb-3">
+                  <div className="absolute inset-0 rounded-full border-2 border-white/5" />
+                  <div 
+                    className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" 
+                    style={{ 
+                      animationDuration: '1s',
+                      maskImage: `conic-gradient(transparent 20%, black 100%)`
+                    }} 
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Download className="w-6 h-6 sm:w-7 sm:h-7 text-primary animate-pulse" />
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <div className="text-[10px] sm:text-xs font-bold text-white tracking-[0.2em] uppercase mb-1 drop-shadow-md opacity-80">
+                    {t('torrents.state.downloading') || 'Téléchargement'}
+                  </div>
+                  {typeof item.downloadProgress === 'number' && (
+                    <div className="text-xl sm:text-2xl font-black text-white drop-shadow-lg tabular-nums">
+                      {Math.round(item.downloadProgress)}%
+                    </div>
+                  )}
+                  {item.downloadSpeed && (
+                    <div className="text-[9px] sm:text-[10px] text-white/50 uppercase tracking-tighter mt-1 truncate max-w-[180px]">
+                      {formatSpeed(item.downloadSpeed)}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Lueur d'activité en bas */}
+              <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/5">
+                <div 
+                  className="h-full bg-primary transition-all duration-500 shadow-[0_0_12px_rgba(168,85,247,0.6)]"
+                  style={{ width: `${item.downloadProgress ?? 0}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Badge statut (Nouveau / Prochain : date) en haut à droite */}
           {badge ? (
             <div className="absolute top-2 right-2 z-20 flex items-center gap-1 shadow-lg" >
@@ -154,7 +197,7 @@ export function ResumePoster({ item, onNavigate }: ResumePosterProps) {
           ) : null}
 
           {/* Dégradé bas + barre de progression (toujours visible si > 0) */}
-          {progress > 0 ? (
+          {progress > 0 && !item.isDownloading ? (
             <div className="absolute bottom-0 left-0 right-0 z-10 pb-1">
               <div className="h-1 tv:h-1.5 mx-2 rounded-full bg-white/15 overflow-hidden">
                 <div
@@ -165,13 +208,10 @@ export function ResumePoster({ item, onNavigate }: ResumePosterProps) {
             </div>
           ) : null}
 
-          {/* Label S/E discret en bas à gauche pour les séries ou vitesse pour DL */}
-          {episodeLabel || (item.isDownloading && item.downloadSpeed) ? (
-            <div className="absolute bottom-2 left-2 z-10 px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px] sm:text-xs font-semibold tracking-wide flex items-center gap-1.5">
+          {/* Label S/E discret en bas à gauche pour les séries */}
+          {episodeLabel ? (
+            <div className="absolute bottom-2 left-2 z-20 px-1.5 py-0.5 rounded bg-black/70 text-white text-[10px] sm:text-xs font-semibold tracking-wide flex items-center gap-1.5">
               {episodeLabel}
-              {item.isDownloading && item.downloadSpeed && (
-                <span className="text-primary">{formatSpeed(item.downloadSpeed)}</span>
-              )}
             </div>
           ) : null}
 

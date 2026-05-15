@@ -25,7 +25,7 @@ export function PosterCard({ item, onNavigate }: PosterCardProps) {
         }
       }}
     >
-      <LazyTorrentPoster item={{ ...item, infoHash: '' }} />
+      <LazyTorrentPoster item={item} />
     </div>
   );
 }

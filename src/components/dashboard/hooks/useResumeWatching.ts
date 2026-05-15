@@ -34,6 +34,10 @@ export interface EnrichedResumeItem extends Omit<ContentItem, 'lastWatched'> {
   nextEpisodeAirDate?: string;
   /** Date ISO (compatible ContentItem). */
   lastWatched?: string;
+  /** Progression du téléchargement (0 à 100). */
+  downloadProgress?: number;
+  /** Vitesse de téléchargement. */
+  downloadSpeed?: number;
 }
 
 interface StoredItem extends Omit<ContentItem, 'lastWatched'> {

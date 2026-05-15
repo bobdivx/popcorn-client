@@ -43,6 +43,7 @@ export default function SuggestionsSection({ contextType = 'all' }: { contextTyp
   const { resumeWatching } = useResumeWatching();
   const [suggestedMovies, setSuggestedMovies] = useState<any[]>([]);
   const [suggestedTv, setSuggestedTv] = useState<any[]>([]);
+  const [libraryItems, setLibraryItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -79,7 +80,14 @@ export default function SuggestionsSection({ contextType = 'all' }: { contextTyp
           }
         }
 
-        const results = await Promise.all(promises);
+        const [libraryRes, ...results] = await Promise.all([
+          serverApi.getLibrary(),
+          ...promises
+        ]);
+        
+        if (libraryRes.success && Array.isArray(libraryRes.data)) {
+          setLibraryItems(libraryRes.data);
+        }
         
         // Filter out items the user is already watching
         const watchedTmdbIds = new Set(resumeWatching.map(i => i.tmdbId).filter(Boolean));
@@ -121,8 +129,23 @@ export default function SuggestionsSection({ contextType = 'all' }: { contextTyp
   const handleItemClick = (item: any) => {
     const tmdbId = item.tmdbId;
     const type = item.tmdbType || item.type;
+    
     if (tmdbId) {
-      window.location.href = `/discover?tmdbId=${tmdbId}&type=${type}`;
+      // Vérifier si l'item est déjà dans la bibliothèque synchronisée
+      const inLibrary = libraryItems.find(lib => 
+        lib.tmdb_id === tmdbId && 
+        (lib.tmdb_type === type || (lib.category === 'SERIES' && type === 'tv') || (lib.category === 'FILM' && type === 'movie'))
+      );
+
+      if (inLibrary) {
+        // Rediriger vers la page détail avec les infos de la bibliothèque
+        const isSeries = type === 'tv' || type === 'series' || inLibrary.category === 'SERIES';
+        const typeParam = isSeries ? 'tv' : 'movie';
+        window.location.href = `/torrents?tmdbId=${tmdbId}&type=${typeParam}&from=dashboard&variantId=library`;
+      } else {
+        // Rediriger vers la page de recherche/demande
+        window.location.href = `/torrents?tmdbId=${tmdbId}&type=${type}&from=dashboard`;
+      }
     }
   };
 

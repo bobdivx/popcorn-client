@@ -348,6 +348,8 @@ export default function MediaDetailPage({
   const [trailerKey, setTrailerKey] = useState<string | null>(torrent.trailerKey || null);
   const [isLoadingTrailer, setIsLoadingTrailer] = useState(false);
   const [isPlayingTrailer, setIsPlayingTrailer] = useState(false);
+  const [startedAsStreamTorrent, setStartedAsStreamTorrent] = useState(false);
+
   /** En mode immersif (false), les infos et overlays sont masquÃ©s, luminositÃ© vidÃ©o normale. Clic ou touche rÃ©affiche. */
   const [trailerUiVisible, setTrailerUiVisible] = useState(true);
   const trailerCloseButtonRef = useRef<HTMLButtonElement>(null);
@@ -408,6 +410,8 @@ export default function MediaDetailPage({
   const [libraryEpisodesPathMap, setLibraryEpisodesPathMap] = useState<Record<string, string>>({});
   /** Map "season:episode" -> "info_hash" pour les épisodes téléchargés */
   const [libraryEpisodesInfoHashMap, setLibraryEpisodesInfoHashMap] = useState<Record<string, string>>({});
+  /** Map "season:episode" -> progression (0-100) pour les épisodes en cours de téléchargement */
+  const [downloadingEpisodesMap, setDownloadingEpisodesMap] = useState<Record<string, number>>({});
 
   /** Chemin du fichier en bibliothÃ¨que (library ou findLocalMediaByTmdb), pour lecture sans torrent dans le client. */
   const [libraryDownloadPath, setLibraryDownloadPath] = useState<string | null>(null);
@@ -553,8 +557,16 @@ export default function MediaDetailPage({
   // MÃ©dias bibliothÃ¨que (local_xxx) : pas d'API stream-torrent cÃ´tÃ© backend, toujours utiliser le flux local.
   const useStreamTorrentMode =
     (streamingTorrentActive ?? false) &&
-    (!isAvailableLocally || isPlaying) &&
+    (!isAvailableLocally || startedAsStreamTorrent) &&
     !activeTorrent.infoHash?.startsWith('local_');
+
+  useEffect(() => {
+    if (isPlaying && !isAvailableLocally) {
+      setStartedAsStreamTorrent(true);
+    } else if (!isPlaying) {
+      setStartedAsStreamTorrent(false);
+    }
+  }, [isPlaying, isAvailableLocally]);
 
   // Log des paramÃ¨tres streaming en console (visible dans lâ€™onglet Console pour debug)
   useEffect(() => {
@@ -1325,11 +1337,13 @@ export default function MediaDetailPage({
           }
         }
 
-        // 2. Analyser les torrents complétés
+        const downloadingMap: Record<string, number> = {};
+        // 2. Analyser les torrents (complétés ou en cours)
         for (const t of allTorrents) {
           const isCompleted = t.state === 'completed' || t.state === 'seeding' || (t.progress ?? 0) >= 0.99;
+          const isDownloading = t.state === 'downloading' || t.state === 'queued' || (t.state === 'active' && (t.progress ?? 0) < 0.99);
 
-          if (isCompleted && t.name) {
+          if (t.name) {
             // Matching prioritaire: ID TMDB quand disponible.
             // Fallback contrôlé: similarité de titre quand tmdb_id absent côté client_torrents.
             let matched = false;
@@ -1345,9 +1359,14 @@ export default function MediaDetailPage({
                const se = parseSE(t.name);
                if (se) {
                  const key = `${se.s}:${se.e}`;
-                 if (!episodesSet.has(key)) {
-                    episodesSet.add(key);
+                 if (isCompleted) {
+                   if (!episodesSet.has(key)) {
+                      episodesSet.add(key);
+                   }
+                 } else if (isDownloading) {
+                   downloadingMap[key] = Math.round((t.progress ?? 0) * 100);
                  }
+                 
                  const torrentInfoHash = ((t as any).info_hash || (t as any).infoHash || '').toString().trim();
                  if (torrentInfoHash && !infoHashMap[key]) {
                    infoHashMap[key] = torrentInfoHash;
@@ -1361,7 +1380,10 @@ export default function MediaDetailPage({
           const currentSe = parseSE(torrent.name);
           if (currentSe) {
             const currentKey = `${currentSe.s}:${currentSe.e}`;
-            episodesSet.add(currentKey);
+            // On ne l'ajoute que s'il n'est pas déjà détecté comme complété (pour éviter les doublons dans le set)
+            if (!episodesSet.has(currentKey)) {
+              episodesSet.add(currentKey);
+            }
             if (!infoHashMap[currentKey]) {
               infoHashMap[currentKey] = String(torrent.infoHash).trim();
             }
@@ -1372,6 +1394,7 @@ export default function MediaDetailPage({
           setDownloadedEpisodesSet(episodesSet);
           setLibraryEpisodesPathMap(pathMap);
           setLibraryEpisodesInfoHashMap(infoHashMap);
+          setDownloadingEpisodesMap(downloadingMap);
         }
       } catch (err) {
         console.error('[MediaDetailPage] Erreur updateDownloadedEpisodes:', err);
@@ -2614,6 +2637,7 @@ export default function MediaDetailPage({
                       : undefined
                   }
                   downloadedEpisodesSet={downloadedEpisodesSet}
+                  downloadingEpisodesMap={downloadingEpisodesMap}
                   isPackSelected={isPackSelected}
                   videoFilesCount={videoFiles.length}
                   hasInfoHash={hasInfoHash}

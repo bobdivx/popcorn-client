@@ -168,14 +168,7 @@
   "fr": "Français",
   "en": "English"
   },
-  "settingsMenu": {
-    "syncCategories": {
-      "title": "Catégories de synchronisation",
-      "description": "Choisissez quelles catégories de torrents (films, séries, autres) doivent être synchronisées pour chaque indexer.",
-      "selectorTitle": "Catégories synchronisées",
-      "selectorDescription": "Activez ou désactivez les catégories de torrents pour cet indexer. Si vous ne sélectionnez rien, toutes les catégories seront synchronisées par défaut."
-    }
-  },
+
   "wizard": {
     "language": {
       "title": "Choisissez votre langue",
@@ -585,6 +578,7 @@
     "openSideNav": "Ouvrir la navigation latérale",
     "language": "Langue"
   },
+
   "settings": {
     "title": "Paramètres",
     "server": "Serveur",
@@ -1000,7 +994,9 @@
     "watchNowHighlights": "Nouveautés à regarder",
     "ongoingSeries": "Séries en cours",
     "recentlyDownloaded": "Téléchargés récemment",
-    "activeDownloads": "En cours de téléchargement"
+    "activeDownloads": "En cours de téléchargement",
+    "suggestionsMovies": "Films suggérés pour vous",
+    "suggestionsSeries": "Séries suggérées pour vous"
   },
   "search": {
     "title": "Rechercher",
@@ -1495,7 +1491,9 @@
       "colCategory": "Type",
       "colSource": "Source",
       "colActions": "Actions",
-      "editPath": "Modifier le chemin",
+      "editMedia": "Modifier le média",
+      "selectedItems": "éléments sélectionnés",
+      "batchEditTmdbId": "Modifier TMDB ID par lot",
       "removeFromLibrary": "Retirer de la bibliothèque",
       "removeFromLibraryConfirm": "Retirer cette entrée de la bibliothèque ? Le fichier sur disque ne sera pas supprimé.",
       "removeFromLibrarySuccess": "Entrée retirée de la bibliothèque.",
@@ -1503,8 +1501,8 @@
       "deleteFileConfirm": "Supprimer le fichier du disque et retirer de la bibliothèque ? Cette action est irréversible. (Uniquement pour les médias du répertoire local.)",
       "deleteFileSuccess": "Fichier supprimé et entrée retirée de la bibliothèque.",
       "deleteFileError": "Impossible de supprimer le fichier (répertoire local uniquement).",
-      "updateSuccess": "Chemin mis à jour.",
-      "updateError": "Impossible de mettre à jour le chemin.",
+      "updateSuccess": "Média mis à jour.",
+      "updateError": "Impossible de mettre à jour le média.",
       "deleteConfirm": "Retirer cette entrée de la bibliothèque ? Le fichier sur disque ne sera pas supprimé.",
       "deleteSuccess": "Entrée retirée de la bibliothèque.",
       "deleteError": "Impossible de supprimer l'entrée."
