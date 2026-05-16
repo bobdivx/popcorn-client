@@ -348,7 +348,6 @@ export default function MediaDetailPage({
   const [trailerKey, setTrailerKey] = useState<string | null>(torrent.trailerKey || null);
   const [isLoadingTrailer, setIsLoadingTrailer] = useState(false);
   const [isPlayingTrailer, setIsPlayingTrailer] = useState(false);
-  const [startedAsStreamTorrent, setStartedAsStreamTorrent] = useState(false);
 
   /** En mode immersif (false), les infos et overlays sont masquÃ©s, luminositÃ© vidÃ©o normale. Clic ou touche rÃ©affiche. */
   const [trailerUiVisible, setTrailerUiVisible] = useState(true);
@@ -552,21 +551,19 @@ export default function MediaDetailPage({
   const { debugLogs, showDebug, setShowDebug, addDebugLog, clearDebugLogs } = useDebug();
   const { streamingTorrentActive } = useSubscriptionMe();
 
-  // En mode streaming : garder l'URL stream-torrent pendant la lecture mÃªme si isAvailableLocally
-  // passe Ã  true (fichier en stream_cache), pour Ã©viter de basculer sur HLS local (transcodage, timeout).
-  // MÃ©dias bibliothÃ¨que (local_xxx) : pas d'API stream-torrent cÃ´tÃ© backend, toujours utiliser le flux local.
+  // Stream-torrent = proxy librqbit (MKV brut, illisible en <video> direct). Réservé au téléchargement en cours
+  // sans fichier bibliothèque. Dès qu'un chemin local ou isAvailableLocally est connu → HLS local (FFmpeg).
+  const hasLibraryFilePath = Boolean(
+    libraryDownloadPath ||
+      activeTorrent.downloadPath ||
+      (selectedEpisodeMeta &&
+        libraryEpisodesPathMap[`${selectedEpisodeMeta.season}:${selectedEpisodeMeta.episode}`]),
+  );
   const useStreamTorrentMode =
     (streamingTorrentActive ?? false) &&
-    (!isAvailableLocally || startedAsStreamTorrent) &&
+    !isAvailableLocally &&
+    !hasLibraryFilePath &&
     !activeTorrent.infoHash?.startsWith('local_');
-
-  useEffect(() => {
-    if (isPlaying && !isAvailableLocally) {
-      setStartedAsStreamTorrent(true);
-    } else if (!isPlaying) {
-      setStartedAsStreamTorrent(false);
-    }
-  }, [isPlaying, isAvailableLocally]);
 
   // Log des paramÃ¨tres streaming en console (visible dans lâ€™onglet Console pour debug)
   useEffect(() => {
@@ -1215,8 +1212,7 @@ export default function MediaDetailPage({
               if (completed) {
                 try {
                   const videos = await loadVideoFiles(activeTorrent.infoHash!);
-                  // En mode streaming actif, ne pas marquer "disponible localement" pour garder l'URL stream-torrent (Ã©vite bascule HLS / 502).
-                  if (videos.length > 0 && !streamingTorrentActive) setIsAvailableLocally(true);
+                  if (videos.length > 0) setIsAvailableLocally(true);
                 } catch (_) {}
                 return;
               }
@@ -1330,7 +1326,14 @@ export default function MediaDetailPage({
              if (typeof s === 'number' && typeof e === 'number') {
                const key = `${s}:${e}`;
                episodesSet.add(key);
-               pathMap[key] = media.file_path || media.downloadPath;
+               const rawPath = media.file_path || media.downloadPath;
+               if (rawPath) {
+                 let p = String(rawPath).replace(/\\/g, '/');
+                 while (p.toLowerCase().startsWith('media/media/')) {
+                   p = p.slice(6);
+                 }
+                 pathMap[key] = p;
+               }
                const localInfoHash = (media.info_hash || media.infoHash || '').toString().trim();
                if (localInfoHash) infoHashMap[key] = localInfoHash;
              }
