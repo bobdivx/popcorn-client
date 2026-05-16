@@ -8,6 +8,9 @@ interface TmdbConfigProps {
   embedded?: boolean;
 }
 
+/** Affichage visuel lorsqu'une clé existe déjà (pas une vraie clé TMDB). */
+const TMDB_KEY_VISUAL_PLACEHOLDER = '••••••••••••••••••••••••';
+
 export default function TmdbConfig({ embedded = false }: TmdbConfigProps) {
   const [tmdbKey, setTmdbKey] = useState('');
   const [tmdbHasKey, setTmdbHasKey] = useState(false);
@@ -31,7 +34,7 @@ export default function TmdbConfig({ embedded = false }: TmdbConfigProps) {
         setTmdbHasKey(hasKey);
 
         if (hasKey) {
-          setTmdbKey('••••••••••••••••••••••••');
+          setTmdbKey(TMDB_KEY_VISUAL_PLACEHOLDER);
         } else {
           setTmdbKey('');
           // Fallback: si le backend n'a pas de clé, tenter une fois de récupérer depuis le cloud (après reset / import)
@@ -66,9 +69,15 @@ export default function TmdbConfig({ embedded = false }: TmdbConfigProps) {
 
   const saveTmdbKey = async () => {
     const trimmedKey = tmdbKey.trim();
-    
-    if (!trimmedKey || trimmedKey === '••••••••••••••••••••••••') {
+
+    if (!trimmedKey || trimmedKey === TMDB_KEY_VISUAL_PLACEHOLDER) {
       setError('La clé API TMDB ne peut pas être vide');
+      return;
+    }
+    if (trimmedKey.includes('•')) {
+      setError(
+        'La valeur contient encore un masque (•). Effacez le champ puis saisissez une clé API complète.'
+      );
       return;
     }
 
@@ -95,7 +104,7 @@ export default function TmdbConfig({ embedded = false }: TmdbConfigProps) {
 
   const testTmdbKey = async () => {
     const trimmedKey = tmdbKey?.trim() || '';
-    const isPlaceholder = trimmedKey === '••••••••••••••••••••••••';
+    const isPlaceholder = trimmedKey === TMDB_KEY_VISUAL_PLACEHOLDER;
     
     // Si c'est le placeholder masqué et qu'une clé existe, tester via le backend
     if (isPlaceholder && tmdbHasKey) {
@@ -204,27 +213,30 @@ export default function TmdbConfig({ embedded = false }: TmdbConfigProps) {
         </label>
         <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4">
           <input
-            type="text"
+            type="password"
+            autoComplete="off"
             class={inputClass}
             placeholder={tmdbHasKey ? "Clé API TMDB configurée (masquée)" : "Entrez votre clé API TMDB"}
             value={tmdbKey || ''}
             onInput={(e) => {
               const value = (e.target as HTMLInputElement).value || '';
-              if (tmdbHasKey && value !== '••••••••••••••••••••••••') setTmdbKey(value);
+              if (tmdbHasKey && value !== TMDB_KEY_VISUAL_PLACEHOLDER) setTmdbKey(value);
               else if (!tmdbHasKey) setTmdbKey(value);
             }}
             onChange={(e) => {
               const value = (e.target as HTMLInputElement).value || '';
-              if (tmdbHasKey && value !== '••••••••••••••••••••••••') setTmdbKey(value);
+              if (tmdbHasKey && value !== TMDB_KEY_VISUAL_PLACEHOLDER) setTmdbKey(value);
               else if (!tmdbHasKey) setTmdbKey(value);
             }}
-            onFocus={() => { if (tmdbHasKey && tmdbKey === '••••••••••••••••••••••••') setTmdbKey(''); }}
+            onFocus={() => {
+              if (tmdbHasKey && tmdbKey === TMDB_KEY_VISUAL_PLACEHOLDER) setTmdbKey('');
+            }}
             disabled={tmdbLoading}
           />
           <button
             class="btn text-sm sm:text-base md:text-lg px-4 sm:px-6 md:px-8 py-2 sm:py-3 md:py-4 min-h-[44px] sm:min-h-[48px] md:min-h-[52px] bg-[#01B4E4] hover:bg-[#01A0D0] border-[#01B4E4] text-white shadow-lg"
             onClick={saveTmdbKey}
-            disabled={tmdbLoading || tmdbTesting || !tmdbKey || tmdbKey.trim().length === 0 || tmdbKey === '••••••••••••••••••••••••'}
+            disabled={tmdbLoading || tmdbTesting || !tmdbKey || tmdbKey.trim().length === 0 || tmdbKey === TMDB_KEY_VISUAL_PLACEHOLDER}
           >
             {tmdbLoading ? <span class="loading loading-spinner loading-sm"></span> : 'Sauvegarder'}
           </button>
@@ -234,7 +246,7 @@ export default function TmdbConfig({ embedded = false }: TmdbConfigProps) {
               : 'btn text-sm sm:text-base md:text-lg px-4 sm:px-6 md:px-8 py-2 sm:py-3 md:py-4 min-h-[44px] sm:min-h-[48px] md:min-h-[52px] bg-white/10 hover:bg-white/20 border-white/30 text-white backdrop-blur-sm'}
             onClick={testTmdbKey}
             disabled={tmdbTesting || tmdbLoading || ((!tmdbKey || (tmdbKey || '').trim().length === 0) && !tmdbHasKey)}
-            title={tmdbHasKey && tmdbKey === '••••••••••••••••••••••••' ? 'Tester la clé configurée via le serveur' : 'Tester la clé saisie'}
+            title={tmdbHasKey && tmdbKey === TMDB_KEY_VISUAL_PLACEHOLDER ? 'Tester la clé configurée via le serveur' : 'Tester la clé saisie'}
           >
             {tmdbTesting ? <><span class="loading loading-spinner loading-sm"></span> Test en cours...</> : 'Tester'}
           </button>
