@@ -977,7 +977,11 @@ export default function MediaDetailPage({
               }
             } else {
               setTorrentStats(null);
-              setIsAvailableLocally(false);
+              // Média bibliothèque (local_*) : absent de listTorrents, ne pas repasser à false
+              // (évite un flash isAvailableLocally et un redémarrage HLS en boucle).
+              if (!ih.startsWith('local_') && !libraryDownloadPath && !(activeTorrent as { downloadPath?: string }).downloadPath) {
+                setIsAvailableLocally(false);
+              }
             }
           } catch (_) {
             // listTorrents en Ã©chec (ex. client non dispo)
