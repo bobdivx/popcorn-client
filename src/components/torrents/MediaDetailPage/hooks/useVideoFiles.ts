@@ -10,6 +10,15 @@ export interface TorrentFile {
   index?: number; // Index dans le torrent pour créer l'URL blob
 }
 
+/** Corrige les chemins bibliothèque avec préfixe media/ dupliqué (media/media/series/…). */
+function dedupeLibraryMediaPrefix(filePath: string): string {
+  let normalized = filePath.replace(/\\/g, '/');
+  while (normalized.toLowerCase().startsWith('media/media/')) {
+    normalized = normalized.slice(6);
+  }
+  return normalized;
+}
+
 interface UseVideoFilesOptions {
   torrentName: string;
   onError?: (error: Error) => void;
@@ -138,7 +147,7 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
           console.log('[useVideoFiles] 📁 Média local détecté, utilisation du chemin direct:', torrent.downloadPath);
           const fileName = torrentName || torrent.downloadPath.split(/[/\\]/).pop() || 'video';
           const localFile: TorrentFile = {
-            path: torrent.downloadPath,
+            path: dedupeLibraryMediaPrefix(torrent.downloadPath),
             name: fileName,
             size: 0, // Taille inconnue pour les médias locaux
             is_video: true,
@@ -158,7 +167,7 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
           console.log('[useVideoFiles] 📁 Utilisation du chemin bibliothèque (sans appel getTorrent):', torrent.downloadPath);
           const fileName = torrentName || torrent.downloadPath.split(/[/\\]/).pop() || 'video';
           const libraryFile: TorrentFile = {
-            path: torrent.downloadPath,
+            path: dedupeLibraryMediaPrefix(torrent.downloadPath),
             name: fileName,
             size: 0,
             is_video: true,
