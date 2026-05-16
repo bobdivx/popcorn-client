@@ -582,7 +582,10 @@ export function VideoPlayerWrapper({
               synopsis: synopsis ?? undefined,
               releaseDate: releaseDate ?? undefined,
               torrentId,
-              filePath: selectedFile?.path || selectedFile?.name || torrentName || 'video',
+              filePath:
+                hlsFilePath && hlsFilePath !== 'direct'
+                  ? hlsFilePath
+                  : selectedFile?.path || selectedFile?.name || torrentName || 'video',
               tmdbId,
               tmdbType,
               seriesSeason: seriesSeasonNum ?? undefined,
@@ -596,7 +599,10 @@ export function VideoPlayerWrapper({
               canUseSeekReload: computeCanUseSeekReload({
                 infoHash,
                 streamBackendUrl,
-                filePath: selectedFile?.path ?? selectedFile?.name ?? null,
+                filePath:
+                  hlsFilePath && hlsFilePath !== 'direct'
+                    ? hlsFilePath
+                    : selectedFile?.path ?? selectedFile?.name ?? null,
               }),
               baseUrl,
               isRemoteStream: !!streamBackendUrl?.trim(),

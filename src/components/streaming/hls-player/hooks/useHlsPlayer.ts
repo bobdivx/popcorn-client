@@ -12,7 +12,7 @@ import {
 } from '../../../../lib/streaming/torrent-storage';
 import { getOrCreateDeviceId } from '../../../../lib/utils/device-id';
 import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
-import { buildProxyUrl } from '../../player-core/utils/buildStreamUrl';
+import { buildProxyUrl, normalizeStreamPath } from '../../player-core/utils/buildStreamUrl';
 
 interface UseHlsPlayerProps {
   src: string;
@@ -173,7 +173,7 @@ export function useHlsPlayer({
     const baseUrl = (baseUrlProp && baseUrlProp.trim()) || serverApi.getServerUrl();
     const useProxy = Boolean(streamBackendUrl?.trim());
     const buildHlsUrl = (forceVod = false, seekSeconds?: number) => {
-      const normalizedPath = (filePath || '').replace(/\\/g, '/');
+      const normalizedPath = normalizeStreamPath(filePath || '');
       const encodedPath = encodeURIComponent(normalizedPath);
       const path = `/api/local/stream/${encodedPath}/playlist.m3u8`;
       const params: Record<string, string> = { info_hash: infoHash || '' };
@@ -1011,9 +1011,18 @@ export function useHlsPlayer({
             ) {
               segment404RetryCountRef.current += 1;
               const url = currentSrcRef.current;
+              const resumeAt =
+                Number.isFinite(video.currentTime) && video.currentTime > 0.25
+                  ? video.currentTime
+                  : 0;
+              if (resumeAt > 0) {
+                pendingSeekRef.current = resumeAt;
+                setPendingSeekPosition(resumeAt);
+              }
               console.debug(
                 '[useHlsPlayer] 404 segment, rechargement playlist (retry',
                 segment404RetryCountRef.current,
+                resumeAt > 0 ? `, reprise @${resumeAt.toFixed(1)}s` : '',
                 ')'
               );
               window.setTimeout(() => {
@@ -1023,6 +1032,8 @@ export function useHlsPlayer({
                     setIsLoading(true);
                   } catch (e) {
                     segment404RetryCountRef.current = 0;
+                    pendingSeekRef.current = 0;
+                    setPendingSeekPosition(0);
                   }
                 }
               }, 2000);
@@ -1249,9 +1260,16 @@ export function useHlsPlayer({
           } else {
             // Erreur non-fatale : bufferStalledError = buffer vide, reprendre le chargement
             if (data.details === 'bufferStalledError') {
-              console.debug('[useHlsPlayer] bufferStalledError, reprise du chargement (startLoad)');
+              const resumeAt =
+                Number.isFinite(video.currentTime) && video.currentTime > 0.25
+                  ? Math.max(0, video.currentTime - 0.25)
+                  : undefined;
+              console.debug(
+                '[useHlsPlayer] bufferStalledError, reprise du chargement (startLoad)',
+                resumeAt != null ? `@${resumeAt.toFixed(1)}s` : ''
+              );
               try {
-                hls.startLoad();
+                hls.startLoad(resumeAt);
               } catch (e) {
                 console.warn('[useHlsPlayer] startLoad après bufferStalledError:', e);
               }
