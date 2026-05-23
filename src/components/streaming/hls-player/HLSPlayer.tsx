@@ -13,6 +13,7 @@ import { isTauri } from '../../../lib/utils/tauri';
 import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
+import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
 
 export default function HLSPlayer({ 
   src, 
@@ -208,6 +209,35 @@ export default function HLSPlayer({
       seekFeedbackTimeoutRef.current = null;
     }, 800);
   };
+
+  const handleDoubleTap = (direction: 'left' | 'right') => {
+    const video = videoRef.current;
+    if (!video) return;
+    const durValue = duration > 0 ? duration : (video.duration || 0);
+    if (!durValue) return;
+
+    const targetTime = direction === 'left'
+      ? Math.max(0, video.currentTime - 10)
+      : Math.min(durValue, video.currentTime + 10);
+    
+    seekToTargetTime(targetTime);
+
+    if (seekFeedbackTimeoutRef.current) clearTimeout(seekFeedbackTimeoutRef.current);
+    setSeekFeedback({ direction, seconds: 10 });
+    seekFeedbackTimeoutRef.current = setTimeout(() => {
+      setSeekFeedback(null);
+      seekFeedbackTimeoutRef.current = null;
+    }, 800);
+  };
+
+  useTouchGestures({
+    containerRef,
+    onDoubleTap: handleDoubleTap,
+    onSingleTap: () => {
+      setShowControls((prev) => !prev);
+    },
+    enabled: !isTV,
+  });
 
   const handleVolumeChangeTV = (direction: 'up' | 'down') => {
     const video = videoRef.current;
@@ -451,6 +481,7 @@ export default function HLSPlayer({
           seriesEpisodeNum={seriesEpisode}
           showControls={effectiveShowControls}
           isPlaying={isPlaying}
+          bufferedPercent={bufferedPercent}
           currentTime={currentTime}
           duration={duration}
           isMuted={isMuted}

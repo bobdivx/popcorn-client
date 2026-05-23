@@ -393,6 +393,7 @@ export function useTVPlayerNavigation({
     };
     // Phase capture : intercepter toutes les touches avant que le DOM ne déplace le focus.
     // On garde `window` (le plus standard). Éviter `document` pour ne pas double-déclencher selon les WebViews.
+    if (!isTV) return;
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('webosback', handleWebOSBack);
