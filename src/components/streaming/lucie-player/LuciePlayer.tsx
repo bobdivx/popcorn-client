@@ -391,6 +391,9 @@ export default function LuciePlayer({
               ? onPlayNextEpisode
               : undefined
           }
+          seriesEpisodePickerItems={seriesEpisodePickerItems}
+          selectedSeriesEpisodeVariantId={selectedSeriesEpisodeVariantId}
+          onSelectSeriesEpisode={onSelectSeriesEpisode}
         />
         {showNextEpisode && (
           <div class="absolute inset-0 z-30 pointer-events-none">
