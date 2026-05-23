@@ -1261,6 +1261,14 @@ export default function MediaDetailPage({
     if (torrent.tmdbType !== 'tv' || !torrent.tmdbId || !seriesEpisodes?.seasons) return;
 
     let cancelled = false;
+
+    const areRecordsEqual = (a: Record<string, any>, b: Record<string, any>) => {
+      const keysA = Object.keys(a);
+      const keysB = Object.keys(b);
+      if (keysA.length !== keysB.length) return false;
+      return keysA.every((key) => a[key] === b[key]);
+    };
+
     const updateDownloadedEpisodes = async () => {
       try {
         // Source 1 : Médias locaux indexés par le serveur
@@ -1398,10 +1406,22 @@ export default function MediaDetailPage({
         }
 
         if (!cancelled) {
-          setDownloadedEpisodesSet(episodesSet);
-          setLibraryEpisodesPathMap(pathMap);
-          setLibraryEpisodesInfoHashMap(infoHashMap);
-          setDownloadingEpisodesMap(downloadingMap);
+          setDownloadedEpisodesSet((prev) => {
+            if (prev.size === episodesSet.size) {
+              let hasChanged = false;
+              for (const item of episodesSet) {
+                if (!prev.has(item)) {
+                  hasChanged = true;
+                  break;
+                }
+              }
+              if (!hasChanged) return prev;
+            }
+            return episodesSet;
+          });
+          setLibraryEpisodesPathMap((prev) => areRecordsEqual(prev, pathMap) ? prev : pathMap);
+          setLibraryEpisodesInfoHashMap((prev) => areRecordsEqual(prev, infoHashMap) ? prev : infoHashMap);
+          setDownloadingEpisodesMap((prev) => areRecordsEqual(prev, downloadingMap) ? prev : downloadingMap);
         }
       } catch (err) {
         console.error('[MediaDetailPage] Erreur updateDownloadedEpisodes:', err);
@@ -1428,6 +1448,8 @@ export default function MediaDetailPage({
   // ajouter automatiquement les nouveaux épisodes disponibles.
   useEffect(() => {
     if (activeTorrent.tmdbType !== 'tv' || !activeTorrent.tmdbId || !seriesEpisodes?.seasons?.length) return;
+    if (downloadingToClient) return;
+    if (playStatus === 'error') return;
 
     let cancelled = false;
     (async () => {
@@ -1469,7 +1491,9 @@ export default function MediaDetailPage({
           const parsed = raw ? JSON.parse(raw) : [];
           if (Array.isArray(parsed)) {
             for (const infoHash of parsed) {
-              if (typeof infoHash === 'string' && infoHash.trim()) alreadyRequested.add(infoHash.trim());
+              if (typeof infoHash === 'string' && infoHash.trim()) {
+                alreadyRequested.add(infoHash.trim().toLowerCase());
+              }
             }
           }
         } catch {
@@ -1484,13 +1508,13 @@ export default function MediaDetailPage({
           if (!isAfterWatched(ep.season, ep.episode)) continue;
           const episodeKey = keyForEpisode(ep.season, ep.episode);
           if (downloadedEpisodesSet.has(episodeKey)) continue;
-          if (alreadyRequested.has(ep.info_hash)) continue;
+          if (alreadyRequested.has(ep.info_hash.toLowerCase())) continue;
 
           const variantMatch = allVariants.find((v) => (v.infoHash ?? '').toLowerCase() === ep.info_hash.toLowerCase());
           if (!variantMatch) continue;
-          const prev = candidatesByInfoHash.get(ep.info_hash);
+          const prev = candidatesByInfoHash.get(ep.info_hash.toLowerCase());
           if (!prev || (variantMatch.seedCount ?? 0) > (prev.seedCount ?? 0)) {
-            candidatesByInfoHash.set(ep.info_hash, variantMatch);
+            candidatesByInfoHash.set(ep.info_hash.toLowerCase(), variantMatch);
           }
         }
       }
@@ -1500,7 +1524,9 @@ export default function MediaDetailPage({
 
       for (const variant of toDownload) {
         mediaDetailActionsRef.current?.handleDownload(variant);
-        if (variant.infoHash) alreadyRequested.add(variant.infoHash);
+        if (variant.infoHash) {
+          alreadyRequested.add(variant.infoHash.toLowerCase());
+        }
       }
 
       if (typeof localStorage !== 'undefined') {
