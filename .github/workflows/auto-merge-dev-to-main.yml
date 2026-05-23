@@ -77,10 +77,12 @@ jobs:
             exit 1
           fi
 
-          if gh pr merge "${PR_NUMBER}" --auto --merge; then
+          if gh pr merge "${PR_NUMBER}" --auto --merge 2>/dev/null; then
             echo "Auto-merge enabled for PR #${PR_NUMBER}."
+          elif gh pr merge "${PR_NUMBER}" --merge; then
+            echo "Direct merge succeeded for PR #${PR_NUMBER}."
           else
-            echo "Could not enable auto-merge for PR #${PR_NUMBER}."
+            echo "Could not merge or enable auto-merge for PR #${PR_NUMBER}."
             exit 1
           fi
 
