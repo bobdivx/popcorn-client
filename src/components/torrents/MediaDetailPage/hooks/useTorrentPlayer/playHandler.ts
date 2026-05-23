@@ -176,7 +176,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, torrent.infoHash, selectedFile,
         setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
       );
-      if (!ok) return;
+      if (!ok) {
+        setIsPlaying(false);
+        return;
+      }
       setPlayStatus('ready');
       setProgressMessage('Lancement de la lecture...');
       setIsPlaying(true);
@@ -201,7 +204,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, torrent.infoHash!, libraryVideos[0],
           setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
         );
-        if (!okLib) return;
+        if (!okLib) {
+          setIsPlaying(false);
+          return;
+        }
         setPlayStatus('ready');
         setProgressMessage('Lancement de la lecture...');
         setIsPlaying(true);
@@ -265,7 +271,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, torrent.infoHash!, videos[0],
                 setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
               );
-              if (!ok1) return;
+              if (!ok1) {
+                setIsPlaying(false);
+                return;
+              }
               setPlayStatus('ready');
               setProgressMessage('Lancement de la lecture...');
               setIsPlaying(true);
@@ -323,6 +332,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
           setPlayStatus('error');
           setErrorMessage('Serveur inaccessible. Vérifiez que le backend est démarré.');
           addDebugLog('error', '❌ Impossible de joindre le serveur', { error: msg });
+          setIsPlaying(false);
           return;
         }
         // Le torrent n'existe pas encore, continuer avec le téléchargement
@@ -467,7 +477,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, addResult.info_hash, videos[0],
                             setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
                           );
-                          if (!okM) return;
+                          if (!okM) {
+                            setIsPlaying(false);
+                            return;
+                          }
                           setPlayStatus('ready');
                           setProgressMessage('Lancement de la lecture...');
                           setIsPlaying(true);
@@ -516,6 +529,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
               setErrorMessage(errorMsg || 'Ce torrent n\'est plus disponible sur l\'indexeur. Choisissez une autre source.');
               setPlayStatus('idle');
               setProgressMessage('');
+              setIsPlaying(false);
               return;
             }
             // Si l'API retourne un magnet link en cas d'erreur, l'utiliser
@@ -568,7 +582,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, addResult.info_hash, videos[0],
                             setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
                           );
-                          if (!okM) return;
+                          if (!okM) {
+                            setIsPlaying(false);
+                            return;
+                          }
                           setPlayStatus('ready');
                           setProgressMessage('Lancement de la lecture...');
                           setIsPlaying(true);
@@ -694,7 +711,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, addResult.info_hash, videos[0],
                   setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
                 );
-                if (!okT) return;
+                if (!okT) {
+                  setIsPlaying(false);
+                  return;
+                }
                 setPlayStatus('ready');
                 setProgressMessage('Lancement de la lecture...');
                 setIsPlaying(true);
@@ -797,7 +817,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, addResult.info_hash, videos[0],
                         setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
                       );
-                      if (!okMag) return;
+                      if (!okMag) {
+                        setIsPlaying(false);
+                        return;
+                      }
                       setPlayStatus('ready');
                       setProgressMessage('Lancement de la lecture...');
                       setIsPlaying(true);
@@ -878,6 +901,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
           addDebugLog('error', 'Erreur lors de l\'ajout du torrent via infoHash', errorMsg);
           setPlayStatus('error');
           setErrorMessage(errorMsg);
+          setIsPlaying(false);
           return;
         }
       }
@@ -904,7 +928,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, torrent.infoHash!, videos[0],
             setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
           );
-          if (!okH) return;
+          if (!okH) {
+            setIsPlaying(false);
+            return;
+          }
         }
         setPlayStatus('ready');
         setProgressMessage('Lancement de la lecture...');
@@ -949,7 +976,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, torrent.infoHash!, videos2[0],
                 setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
               );
-              if (!ok2) return;
+              if (!ok2) {
+                setIsPlaying(false);
+                return;
+              }
               setPlayStatus('ready');
               setProgressMessage('Lancement de la lecture...');
               setIsPlaying(true);
@@ -1045,7 +1075,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, addResult.info_hash, videos[0],
                       setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
                     );
-                    if (!okC) return;
+                    if (!okC) {
+                      setIsPlaying(false);
+                      return;
+                    }
                     setPlayStatus('ready');
                     setProgressMessage('Lancement de la lecture...');
                     setIsPlaying(true);
@@ -1122,6 +1155,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
         addDebugLog('error', 'Erreur lors de l\'ajout du magnet link', errorMsg);
         setPlayStatus('error');
         setErrorMessage(errorMsg);
+        setIsPlaying(false);
       }
     } else if (torrent.infoHash) {
       // Torrent local - vérifier si disponible localement
@@ -1141,14 +1175,17 @@ export function createHandlePlay(context: PlayHandlerContext) {
         } else {
           setPlayStatus('error');
           setErrorMessage('Aucun fichier vidéo trouvé dans le torrent');
+          setIsPlaying(false);
         }
       } else {
         setPlayStatus('error');
         setErrorMessage('Le torrent n\'est pas disponible. Vérifiez qu\'il est bien téléchargé.');
+        setIsPlaying(false);
       }
     } else {
       setPlayStatus('error');
       setErrorMessage('Ce torrent ne peut pas être streamé. Aucun lien disponible.');
+      setIsPlaying(false);
     }
   };
 }
