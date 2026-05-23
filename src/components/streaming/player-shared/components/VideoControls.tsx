@@ -113,6 +113,7 @@ interface VideoControlsProps {
   seriesEpisodePickerItems?: SeriesEpisodePickerItem[] | null;
   selectedSeriesEpisodeVariantId?: string | null;
   onSelectSeriesEpisode?: (variantId: string) => void;
+  bufferedPercent?: number;
 }
 
 export function VideoControls({
@@ -173,6 +174,7 @@ export function VideoControls({
   seriesEpisodePickerItems = null,
   selectedSeriesEpisodeVariantId = null,
   onSelectSeriesEpisode,
+  bufferedPercent = 0,
 }: VideoControlsProps) {
   const { t } = useI18n();
   const effectiveFillMode = videoFillMode ?? 'contain';
@@ -268,11 +270,11 @@ export function VideoControls({
     // Quand le focus est sur les vignettes, on n'affiche pas le ring sur les boutons.
     if (!isTV || focusedOnProgress || (scrubEnabled && tvScrubIndexExternal != null && tvScrubFocused)) return '';
     if (focusedControlIndex !== index) return '';
-    return 'ring-4 ring-purple-600 ring-opacity-75 scale-110 z-30';
+    return 'ring-4 ring-purple-500 ring-offset-2 ring-offset-black/55 shadow-[0_0_20px_rgba(168,85,247,0.7)] border-purple-400 bg-purple-600/20 scale-110 z-30 transition-all duration-200';
   };
   const getProgressFocusClass = () => {
     if (!isTV || !focusedOnProgress) return '';
-    return 'ring-2 ring-purple-600 ring-opacity-90 ring-inset';
+    return 'ring-4 ring-purple-500/80 ring-offset-2 ring-offset-black/55 shadow-[0_0_20px_rgba(168,85,247,0.7)] bg-purple-600/20 transition-all duration-200';
   };
 
   const showPosterSynopsisPause = !isPlaying && showControls && (posterUrl || synopsis);
@@ -622,6 +624,14 @@ export function VideoControls({
             aria-valuemax={100}
           >
             <div class="absolute left-0 top-0 h-full bg-white/20 rounded-full" style={{ width: '100%' }} />
+            {/* Barre de mise en mémoire tampon (buffer) */}
+            {bufferedPercent !== undefined && bufferedPercent > 0 && (
+              <div
+                class="absolute left-0 top-0 h-full rounded-full bg-white/40 transition-all duration-300"
+                style={{ width: `${Math.min(100, bufferedPercent)}%` }}
+                aria-hidden
+              />
+            )}
             {/* Partie déjà téléchargée par le client torrent : segment visible (couleur assortie au violet) */}
             {torrentProgress != null && torrentProgress > 0 && (
               <div
