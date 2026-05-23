@@ -86,6 +86,7 @@ interface VideoPlayerWrapperProps {
   seriesEpisodePickerItems?: SeriesEpisodePickerItem[] | null;
   selectedSeriesEpisodeVariantId?: string | null;
   onSelectSeriesEpisode?: (variantId: string) => void;
+  errorMessage?: string | null;
 }
 
 export function VideoPlayerWrapper({ 
@@ -121,6 +122,7 @@ export function VideoPlayerWrapper({
   seriesEpisodePickerItems,
   selectedSeriesEpisodeVariantId,
   onSelectSeriesEpisode,
+  errorMessage,
 }: VideoPlayerWrapperProps) {
   const baseUrl = serverApi.getServerUrl();
   const [forceHlsFallback, setForceHlsFallback] = useState(false);
@@ -129,6 +131,26 @@ export function VideoPlayerWrapper({
   const [adsConfig, setAdsConfig] = useState<AdsConfig | null>(null);
   /** Message d’overlay pendant le chargement HLS (ex. « Préparation en cours » pendant retries 503) */
   const [hlsLoadingMessage, setHlsLoadingMessage] = useState<string | null>(null);
+
+  const hasLoggedStartRef = useRef(false);
+  const lastLoggedErrorRef = useRef<string | null>(null);
+
+  const logErrorEvent = useCallback((errorDetails: string) => {
+    serverApi.logPlaybackEvent({
+      eventType: 'error',
+      mediaName: torrentName,
+      infoHash: infoHash,
+      filePath: selectedFile?.path || selectedFile?.name,
+      errorDetails,
+    }).catch((err) => console.error('[VideoPlayerWrapper] Failed to log playback error:', err));
+  }, [torrentName, infoHash, selectedFile]);
+
+  useEffect(() => {
+    if (errorMessage && lastLoggedErrorRef.current !== errorMessage) {
+      lastLoggedErrorRef.current = errorMessage;
+      logErrorEvent(errorMessage);
+    }
+  }, [errorMessage, logErrorEvent]);
   /** En mode stream-torrent : nombre de tentatives du lecteur direct (remount pour réessayer après 503). */
   const [directStreamRetryCount, setDirectStreamRetryCount] = useState(0);
   const directStreamRetryTimeoutRef = useRef<number | null>(null);
@@ -182,6 +204,17 @@ export function VideoPlayerWrapper({
 
   const handlePlaybackProgress = useCallback(
     (currentTime: number, duration: number) => {
+      // Log start event once when playback actually starts (currentTime > 0)
+      if (currentTime > 0 && !hasLoggedStartRef.current) {
+        hasLoggedStartRef.current = true;
+        serverApi.logPlaybackEvent({
+          eventType: 'start',
+          mediaName: torrentName,
+          infoHash: infoHash,
+          filePath: selectedFile?.path || selectedFile?.name,
+        }).catch((err) => console.error('[VideoPlayerWrapper] Failed to log playback start:', err));
+      }
+
       reportPlaybackDuration(duration);
       if (tmdbId == null || !tmdbType || duration <= 0) return;
       const progressPercent = (currentTime / duration) * 100;
@@ -262,6 +295,8 @@ export function VideoPlayerWrapper({
     setForceHlsFallback(false);
     setStreamQuality(null);
     setDirectStreamRetryCount(0);
+    hasLoggedStartRef.current = false;
+    lastLoggedErrorRef.current = null;
   }, [infoHash, selectedFile?.path, directStreamUrl, visible]);
 
   useEffect(() => {
@@ -425,6 +460,44 @@ export function VideoPlayerWrapper({
     );
   }
 
+  if (errorMessage) {
+    return (
+      <div 
+        ref={wrapperElementRef}
+        id="video-player-wrapper" 
+        className="fixed inset-0 z-50 bg-black w-full h-full flex flex-col items-center justify-center p-6"
+        style={{
+          ...(isFullscreen ? { width: '100vw', height: '100vh' } : {}),
+          display: visible ? 'flex' : 'none',
+        }}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 left-4 flex items-center justify-center w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 transition-all border border-white/20 text-white cursor-pointer pointer-events-auto"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+        </button>
+        <div className="max-w-md w-full bg-black/60 border border-white/10 backdrop-blur-xl p-8 rounded-2xl text-center shadow-2xl flex flex-col items-center gap-4">
+          <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20 text-red-500">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-white">Erreur de lecture</h2>
+          <p className="text-white/60 text-sm leading-relaxed">{errorMessage}</p>
+          <button
+            onClick={onClose}
+            className="mt-2 px-6 py-2 bg-red-600 hover:bg-red-700 active:scale-95 transition-all text-white font-semibold rounded-lg cursor-pointer pointer-events-auto"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!selectedFile && !directStreamUrl) {
     return (
       <div 
@@ -524,6 +597,11 @@ export function VideoPlayerWrapper({
             onDirectLoadedData={() => setIsLoading(false)}
             onDirectError={(e) => {
               const videoEl = e.target instanceof HTMLVideoElement ? e.target : null;
+              let errDetail = 'Direct video error';
+              if (videoEl && videoEl.error) {
+                errDetail = `Code ${videoEl.error.code}: ${videoEl.error.message || 'Direct video element error'}`;
+              }
+              logErrorEvent(errDetail);
               if (useStreamTorrentMode) {
                 // Le flux peut mettre 30–60 s à être prêt (torrent initializing côté librqbit) : plus de tentatives et délai 5 s
                 const maxRetries = 12;
@@ -650,6 +728,8 @@ export function VideoPlayerWrapper({
             onHlsLoadingChange={(loading) => setIsLoading(loading)}
             onHlsError={(e) => {
               console.error('[VideoPlayerWrapper] Player error:', e);
+              const errDetail = e?.message || (typeof e === 'string' ? e : 'HLS / Lucie player error');
+              logErrorEvent(errDetail);
               if (isLucieMode && !forceHlsFallback) {
                 console.warn('[VideoPlayerWrapper] Fallback automatique vers HLS après échec Lucie (ex. manifest 404).');
                 emitPlaybackStep('fallback_lucie_to_hls', { message: e?.message ?? 'Lucie failed' });
