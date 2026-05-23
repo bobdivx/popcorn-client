@@ -225,6 +225,13 @@ interface IServerApiClientPublic {
   getTmdbTvSeasonDetail(tmdbId: number, seasonNumber: number, language?: string): Promise<ApiResponse<any>>;
   getScrubThumbnailsMeta(localMediaId: string, opts?: { torrentRelativePath?: string | null }): Promise<any>;
   generateScrubThumbnails(localMediaId: string, opts?: { force?: boolean; torrentRelativePath?: string | null; durationHintSeconds?: number | null }): Promise<any>;
+  logPlaybackEvent(params: {
+    eventType: 'start' | 'error';
+    mediaName: string;
+    infoHash?: string | null;
+    filePath?: string | null;
+    errorDetails?: string | null;
+  }): Promise<ApiResponse<void>>;
 
   // Library methods
   getLibrary(): Promise<ApiResponse<LibraryItem[]>>;

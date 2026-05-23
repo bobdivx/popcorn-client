@@ -2225,7 +2225,7 @@ export default function MediaDetailPage({
       (seriesEpisodes?.seasons?.length ?? 0) > 0);
 
   // VÃ©rifier si on peut afficher le lecteur vidÃ©o (ou pendant la transition pour ne pas dÃ©monter)
-  const canShowVideoPlayer = isPlaying && hasValidInfoHash && (!!displayFile && (videoFiles.length > 0 || isTransitioningToNext));
+  const canShowVideoPlayer = isPlaying && hasValidInfoHash;
   
   // Ref pour le wrapper vidÃ©o
   const videoWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -2379,6 +2379,7 @@ export default function MediaDetailPage({
         playStatus={playStatus}
         progressMessage={progressMessage}
         torrentStats={torrentStats}
+        errorMessage={errorMessage}
         seriesEpisodePickerItems={playerSeriesEpisodePickerItems}
         selectedSeriesEpisodeVariantId={selectedEpisodeVariantId}
         onSelectSeriesEpisode={handleSeriesEpisodeSelect}
@@ -2423,6 +2424,7 @@ export default function MediaDetailPage({
         releaseDate={displayTorrent.releaseDate ?? null}
         useStreamTorrentMode={useStreamTorrentMode}
         streamingTorrentToken={TokenManager.getCloudAccessToken()}
+        errorMessage={errorMessage}
         seriesEpisodePickerItems={playerSeriesEpisodePickerItems}
         selectedSeriesEpisodeVariantId={selectedEpisodeVariantId}
         onSelectSeriesEpisode={handleSeriesEpisodeSelect}

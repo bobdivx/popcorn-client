@@ -352,4 +352,29 @@ export const mediaMethods = {
     }
     return res.json();
   },
+
+  async logPlaybackEvent(
+    this: ServerApiClientMediaAccess,
+    params: {
+      eventType: 'start' | 'error';
+      mediaName: string;
+      infoHash?: string | null;
+      filePath?: string | null;
+      errorDetails?: string | null;
+    }
+  ): Promise<ApiResponse<void>> {
+    return this.backendRequest<void>('/api/media/playback/event', {
+      method: 'POST',
+      body: JSON.stringify({
+        event_type: params.eventType,
+        media_name: params.mediaName,
+        info_hash: params.infoHash,
+        file_path: params.filePath,
+        error_details: params.errorDetails,
+      }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  },
 };

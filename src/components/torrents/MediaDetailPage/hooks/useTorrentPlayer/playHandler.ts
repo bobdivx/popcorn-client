@@ -136,6 +136,8 @@ export function createHandlePlay(context: PlayHandlerContext) {
 
   return async () => {
     setErrorMessage(null);
+    setIsPlaying(true);
+    setShowInfo(false);
     const streamingCache: { value: boolean | null } = { value: null };
     /** Marque ce torrent comme "en streaming" pour masquer la carte téléchargement quand on revient sur la page. */
     const markStreamingIfActive = async () => {
