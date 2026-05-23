@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
 import { usePlayerConfig } from './usePlayerConfig';
 import { isTVPlatform } from '../../../../lib/utils/device-detection';
+import { toggleFullscreen } from './useFullscreen';
 
 interface UseVideoControlsProps {
   videoRef: { current: HTMLVideoElement | null };
@@ -139,6 +140,65 @@ export function useVideoControls({
       }, playerConfig.controlsTimeout);
     };
 
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (isTVPlatform()) return;
+
+      const key = e.key;
+      switch (key.toLowerCase()) {
+        case ' ':
+        case 'k':
+          e.preventDefault();
+          handlePlayPause();
+          break;
+        case 'arrowleft':
+        case 'j':
+          e.preventDefault();
+          if (video.duration) {
+            seekToTargetTime(Math.max(0, video.currentTime - 10));
+          }
+          break;
+        case 'arrowright':
+        case 'l':
+          e.preventDefault();
+          if (video.duration) {
+            seekToTargetTime(Math.min(video.duration, video.currentTime + 10));
+          }
+          break;
+        case 'arrowup':
+          e.preventDefault();
+          video.volume = Math.min(1, video.volume + 0.1);
+          video.muted = false;
+          break;
+        case 'arrowdown':
+          e.preventDefault();
+          video.volume = Math.max(0, video.volume - 0.1);
+          video.muted = video.volume === 0;
+          break;
+        case 'm':
+          e.preventDefault();
+          toggleMute();
+          break;
+        case 'f':
+          e.preventDefault();
+          const wrapper = document.getElementById('video-player-wrapper') || video.parentElement?.parentElement;
+          if (wrapper) {
+            toggleFullscreen(wrapper).catch(() => {});
+          }
+          break;
+        default:
+          if (/^[0-9]$/.test(key)) {
+            e.preventDefault();
+            const pct = parseInt(key, 10) / 10;
+            const durationValue = video.duration || duration || hlsDuration || 0;
+            if (durationValue && isFinite(durationValue)) {
+              seekToTargetTime(pct * durationValue);
+            }
+          }
+          break;
+      }
+    };
+
     if (container) {
       container.addEventListener('mousemove', handleMouseMove);
       container.addEventListener('mouseleave', handleMouseLeave);
@@ -154,6 +214,7 @@ export function useVideoControls({
     video.addEventListener('volumechange', handleVolumeChange);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('durationchange', handleDurationChange);
+    window.addEventListener('keydown', handleKeyDown);
 
     video.volume = playerConfig.volume;
     video.muted = playerConfig.muted;
@@ -186,6 +247,7 @@ export function useVideoControls({
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('durationchange', handleDurationChange);
       video.removeEventListener('playing', handlePlayingUnmuteTV);
+      window.removeEventListener('keydown', handleKeyDown);
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     };
   }, [videoRef, hlsLoaded, playerConfig, hlsDuration]);

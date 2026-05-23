@@ -60,6 +60,13 @@ export function useTVPlayerNavigation({
   const onScrubSeekRef = useRef(onScrubSeek);
   onScrubSeekRef.current = onScrubSeek;
   const scrubAutoSeekTimeoutRef = useRef<number | null>(null);
+  const hasUserNavigatedScrubRef = useRef(false);
+
+  useEffect(() => {
+    if (!showControls) {
+      hasUserNavigatedScrubRef.current = false;
+    }
+  }, [showControls]);
 
   /** Calcule le timestamp (secondes) correspondant à l'index de vignette. */
   const timeForScrubIndex = (idx: number) => {
@@ -101,6 +108,7 @@ export function useTVPlayerNavigation({
     if (!isTV || !showControls) return;
     if (!scrubThumbnailsActive || !focusedOnScrub) return;
     if (!onScrubSeekRef.current) return;
+    if (!hasUserNavigatedScrubRef.current) return; // Only seek if user actually navigated!
     if (scrubAutoSeekTimeoutRef.current != null) {
       window.clearTimeout(scrubAutoSeekTimeoutRef.current);
       scrubAutoSeekTimeoutRef.current = null;
@@ -249,11 +257,13 @@ export function useTVPlayerNavigation({
         setFocusedOnScrub(true);
 
         if (kc === 412 || keyNormalized === 'ArrowLeft') {
+          hasUserNavigatedScrubRef.current = true;
           setTvScrubIndex((prev) => Math.max(0, prev - 1));
           resetControlsTimeout();
           return;
         }
         if (kc === 417 || keyNormalized === 'ArrowRight') {
+          hasUserNavigatedScrubRef.current = true;
           setTvScrubIndex((prev) => Math.min(count - 1, prev + 1));
           resetControlsTimeout();
           return;
@@ -383,6 +393,7 @@ export function useTVPlayerNavigation({
     };
     // Phase capture : intercepter toutes les touches avant que le DOM ne déplace le focus.
     // On garde `window` (le plus standard). Éviter `document` pour ne pas double-déclencher selon les WebViews.
+    if (!isTV) return;
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('webosback', handleWebOSBack);

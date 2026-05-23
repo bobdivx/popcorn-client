@@ -11,6 +11,7 @@ import { shouldAutoFullscreen } from '../../../lib/utils/device-detection';
 import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
+import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
 
 export default function LuciePlayer({ 
   src, 
@@ -138,13 +139,57 @@ export default function LuciePlayer({
     setShowControls(baseShowControls);
   }, [baseShowControls]);
 
+  const [seekFeedback, setSeekFeedback] = useState<{ direction: 'left' | 'right'; seconds: number } | null>(null);
+  const seekFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleSeekTV = (direction: 'left' | 'right', stepSeconds = 10) => {
     if (!duration) return;
     const newTime = direction === 'left'
       ? Math.max(0, currentTime - stepSeconds)
       : Math.min(duration, currentTime + stepSeconds);
     seekToTargetTime(newTime);
+    if (seekFeedbackTimeoutRef.current) clearTimeout(seekFeedbackTimeoutRef.current);
+    setSeekFeedback({ direction, seconds: stepSeconds });
+    seekFeedbackTimeoutRef.current = setTimeout(() => {
+      setSeekFeedback(null);
+      seekFeedbackTimeoutRef.current = null;
+    }, 800);
   };
+
+  const handleDoubleTap = (direction: 'left' | 'right') => {
+    const video = videoRef.current;
+    if (!video) return;
+    const durValue = duration > 0 ? duration : (video.duration || 0);
+    if (!durValue) return;
+
+    const targetTime = direction === 'left'
+      ? Math.max(0, video.currentTime - 10)
+      : Math.min(durValue, video.currentTime + 10);
+    
+    seekToTargetTime(targetTime);
+
+    if (seekFeedbackTimeoutRef.current) clearTimeout(seekFeedbackTimeoutRef.current);
+    setSeekFeedback({ direction, seconds: 10 });
+    seekFeedbackTimeoutRef.current = setTimeout(() => {
+      setSeekFeedback(null);
+      seekFeedbackTimeoutRef.current = null;
+    }, 800);
+  };
+
+  useTouchGestures({
+    containerRef,
+    onDoubleTap: handleDoubleTap,
+    onSingleTap: () => {
+      setShowControls((prev) => !prev);
+    },
+    enabled: !isTV,
+  });
+
+  useEffect(() => {
+    return () => {
+      if (seekFeedbackTimeoutRef.current) clearTimeout(seekFeedbackTimeoutRef.current);
+    };
+  }, []);
 
   const handleVolumeChangeTV = (direction: 'up' | 'down') => {
     const video = videoRef.current;
@@ -266,6 +311,16 @@ export default function LuciePlayer({
           willChange: 'transform',
         }}
       >
+        {seekFeedback && (
+          <div
+            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-6 py-3 rounded-lg bg-black/85 text-white text-2xl font-semibold shadow-lg animate-pulse"
+            role="status"
+          >
+            {seekFeedback.direction === 'left'
+              ? t('playback.seekBack', { seconds: seekFeedback.seconds })
+              : t('playback.seekForward', { seconds: seekFeedback.seconds })}
+          </div>
+        )}
         {shouldShowBuffering && (
           <div class="absolute inset-0 flex flex-col items-center justify-center bg-black z-10">
             <div class="loading-icon-container mb-6">
@@ -347,6 +402,7 @@ export default function LuciePlayer({
           seriesEpisodeNum={seriesEpisode}
           showControls={showControls}
           isPlaying={isPlaying}
+          bufferedPercent={bufferedPercent}
           currentTime={currentTime}
           duration={duration}
           isMuted={isMuted}

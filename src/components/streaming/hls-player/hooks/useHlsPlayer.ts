@@ -374,6 +374,14 @@ export function useHlsPlayer({
           highBufferWatchdogPeriod: isRemoteStream ? 2 : 1, // Vérifier les soucis de buffer plus souvent
           nudgeOffset: 0.1,
           nudgeMaxRetry: isRemoteStream ? 50 : 30, // Tenter plus de nudges pour combler les micro-coupures
+          // Estimations de bande passante et seuils d'adaptation
+          abrEwmaFastLive: 1,
+          abrEwmaSlowLive: 9,
+          abrEwmaFastVOD: 1.5,
+          abrEwmaSlowVOD: 12,
+          abrBandWidthFactor: 0.85, // Prendre 85% de la bande passante estimée pour éviter les stalls
+          abrBandWidthUpFactor: 0.7, // Seuil pour monter de qualité
+          abrMaxWithRealBitrate: true, // Utiliser le bitrate réel
           // Qualité adaptée au player et démarrage rapide
           capLevelToPlayerSize: true,
           startLevel: -1,
@@ -655,7 +663,7 @@ export function useHlsPlayer({
           // Démarrer la lecture seulement quand on a assez de buffer (évite stall après ~3 s).
           // Doit être appelé APRÈS que la position sauvegardée soit appliquée, sinon on play() puis
           // un seek vers la position coupe le buffer et provoque une pause.
-          const MIN_BUFFER_BEFORE_PLAY_SEC = 10;
+          const MIN_BUFFER_BEFORE_PLAY_SEC = isRemoteStream ? 4 : 2.5;
           const MAX_WAIT_FOR_BUFFER_MS = 20000;
           const startDelayedPlayWhenReady = () => {
             if (!video.paused || (canAutoPlayRef.current !== undefined && !canAutoPlayRef.current())) return;
