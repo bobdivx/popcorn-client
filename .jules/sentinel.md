@@ -6,3 +6,8 @@
 **Vulnerability:** Weak PRNG `Math.random()` was used for generating IDs and UUIDs across multiple files (`src/lib/client/server-api/indexers.ts`, `src/api-routes-backup/v1/setup/indexers.ts`, `src/lib/utils/device-id.ts`, `src/components/torrents/MediaDetailPage/hooks/useNotifications.ts`).
 **Learning:** `Math.random()` is not cryptographically secure and shouldn't be used for IDs, especially not for indexer setups and device IDs. Moreover, calling `globalThis.crypto.randomUUID()` directly fails on HTTP non-localhost sites since it requires a Secure Context.
 **Prevention:** Always use the Web Crypto API (`crypto.getRandomValues()` or `crypto.randomUUID()`) through a centralized utility like `src/lib/utils/uuid.ts` that provides safe fallbacks for unsupported environments and non-secure contexts.
+
+## 2025-02-21 - [Plaintext Inputs For Sensitive Credentials]
+**Vulnerability:** API keys and passkeys in frontend settings and configuration components were implemented as `<input type="text">` without `autoComplete="off"`. This exposes sensitive credentials to physical shoulder-surfing and browser auto-fill/history features.
+**Learning:** React/Preact applications must enforce `type="password"` with `autoComplete="off"` for any field accepting an authentication token, API key, passkey, or equivalent secret, to align with the principle of least privilege regarding data visibility.
+**Prevention:** Add a linting rule or perform a pre-commit check to identify strings like "apiKey", "passkey", "secret", or "token" combined with `type="text"` in JSX/TSX elements. Always pair `type="password"` with `autoComplete="off"`.
