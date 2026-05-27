@@ -194,26 +194,27 @@ export function SeriesEpisodesSection({
                 const downloadingProgress = downloadingEpisodesMap?.[epKey];
                 const currentlyDownloading = downloadingProgress !== undefined;
 
-                return {
-                  key: ep.id,
-                  episodeNumber: ep.episode === 0 ? '—' : ep.episode,
-                  title,
-                  subtitle: null,
-                  thumbnailUrl: getPreferredThumb(
-                    ep.season,
-                    typeof ep.episode === 'number' && ep.episode > 0 ? ep.episode : null,
-                    ep.info_hash && ep.file_path
-                      ? `/api/media/episode-thumbnail?info_hash=${encodeURIComponent(ep.info_hash)}&t=60&w=480`
-                      : null,
-                  ),
-                  watched,
-                  // Un épisode déjà en bibliothèque doit apparaître comme disponible même
-                  // si l'API séries n'a pas encore renseigné info_hash sur cet item.
-                  isAvailable: !!ep.info_hash || downloaded || hasIndexerVariant || currentlyDownloading,
-                  isDownloaded: !!ep.file_path || downloaded,
-                  isDownloading: (isSelected ? isDownloading : false) || currentlyDownloading,
-                  downloadProgress: isSelected && downloadProgress !== undefined ? downloadProgress : (currentlyDownloading ? downloadingProgress : undefined),
-                  statusMessage: isSelected ? statusMessage : null,
+                  const finalIsDownloaded = !!ep.file_path || downloaded;
+                  return {
+                    key: ep.id,
+                    episodeNumber: ep.episode === 0 ? '—' : ep.episode,
+                    title,
+                    subtitle: null,
+                    thumbnailUrl: getPreferredThumb(
+                      ep.season,
+                      typeof ep.episode === 'number' && ep.episode > 0 ? ep.episode : null,
+                      ep.info_hash && ep.file_path
+                        ? `/api/media/episode-thumbnail?info_hash=${encodeURIComponent(ep.info_hash)}&t=60&w=480`
+                        : null,
+                    ),
+                    watched,
+                    // Un épisode déjà en bibliothèque doit apparaître comme disponible même
+                    // si l'API séries n'a pas encore renseigné info_hash sur cet item.
+                    isAvailable: !!ep.info_hash || downloaded || hasIndexerVariant || currentlyDownloading,
+                    isDownloaded: finalIsDownloaded,
+                    isDownloading: !finalIsDownloaded && ((isSelected ? isDownloading : false) || currentlyDownloading),
+                    downloadProgress: isSelected && downloadProgress !== undefined ? downloadProgress : (currentlyDownloading ? downloadingProgress : undefined),
+                    statusMessage: isSelected ? statusMessage : null,
                   isSelected,
                   onSelect: () => onSelectEpisode(ep.id),
                   isTV,

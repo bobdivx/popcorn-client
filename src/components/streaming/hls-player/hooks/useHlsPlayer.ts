@@ -430,7 +430,7 @@ export function useHlsPlayer({
 
         // Permet de recharger la playlist avec seek= pour avancer au-delà du buffer (ex. >90s).
         // En mode stream-torrent, pas de reload avec seek (librqbit gère le range), on met à jour currentTime.
-        reloadWithSeekRef.current = (seekSeconds: number) => {
+        const reloadWithSeekRefCurrent = (seekSeconds: number) => {
           if (!hlsRef.current || !hlsRef.current.media) return;
           if (useStreamTorrentUrl) {
             video.currentTime = seekSeconds;
@@ -461,8 +461,9 @@ export function useHlsPlayer({
             setIsLoading(false);
           }
         };
+        reloadWithSeekRef.current = reloadWithSeekRefCurrent;
 
-        const applyDurationCandidate = (candidate: number) => {
+        function applyDurationCandidate(candidate: number) {
           if (!candidate || !isFinite(candidate) || candidate <= 0) return;
           const apiDuration = apiDurationRef.current;
           if (apiDuration > 0 && isFinite(apiDuration)) {
@@ -488,7 +489,7 @@ export function useHlsPlayer({
         // et garantir qu'une seule instance écoute les événements
         let lastVideoDuration = 0;
         let durationStableCount = 0;
-        const checkDuration = () => {
+        function checkDuration() {
           const videoDuration = video.duration;
           if (videoDuration && isFinite(videoDuration) && videoDuration > 0) {
             // Si la durée vidéo a changé, réinitialiser le compteur de stabilité
@@ -644,28 +645,28 @@ export function useHlsPlayer({
           });
           
           // Jellyfin seekOnPlaybackStart / setCurrentTimeIfNeeded: ne seek que si diff >= 1s
-          const setCurrentTimeIfNeeded = (seconds: number) => {
+          function setCurrentTimeIfNeeded(seconds: number) {
             if (Math.abs((video.currentTime || 0) - seconds) >= 1) {
               video.currentTime = seconds;
             }
-          };
+          }
 
           // Appliquer la position de reprise ET dire à HLS.js de charger depuis cette position.
           // Sans hls.startLoad(), HLS charge depuis 0 → buffer [0,X], currentTime=102 hors buffer → image figée.
-          const applyResumePosition = (finalPosition: number) => {
+          function applyResumePosition(finalPosition: number) {
             pendingSeekRef.current = finalPosition;
             setCurrentTimeIfNeeded(finalPosition);
             try {
               hls.startLoad(finalPosition);
             } catch (_) {}
-          };
+          }
 
           // Démarrer la lecture seulement quand on a assez de buffer (évite stall après ~3 s).
           // Doit être appelé APRÈS que la position sauvegardée soit appliquée, sinon on play() puis
           // un seek vers la position coupe le buffer et provoque une pause.
           const MIN_BUFFER_BEFORE_PLAY_SEC = isRemoteStream ? 4 : 2.5;
           const MAX_WAIT_FOR_BUFFER_MS = 20000;
-          const startDelayedPlayWhenReady = () => {
+          function startDelayedPlayWhenReady() {
             if (!video.paused || (canAutoPlayRef.current !== undefined && !canAutoPlayRef.current())) return;
             let intervalId: ReturnType<typeof setInterval> | null = null;
             const timeoutId = window.setTimeout(() => {
