@@ -230,14 +230,7 @@ export default function HLSPlayer({
     }, 800);
   };
 
-  useTouchGestures({
-    containerRef,
-    onDoubleTap: handleDoubleTap,
-    onSingleTap: () => {
-      setShowControls((prev) => !prev);
-    },
-    enabled: !isTV,
-  });
+
 
   const handleVolumeChangeTV = (direction: 'up' | 'down') => {
     const video = videoRef.current;
@@ -334,6 +327,15 @@ export default function HLSPlayer({
     progressBarRef,
     scrubThumbnails: scrubThumbnails?.mediaId && scrubThumbnails.count > 0 ? scrubThumbnails : null,
     onScrubSeek: seekToTargetTime,
+  });
+
+  useTouchGestures({
+    containerRef,
+    onDoubleTap: handleDoubleTap,
+    onSingleTap: () => {
+      setShowControls((prev) => !prev);
+    },
+    enabled: !isTV,
   });
 
   // Message informatif "autres transcodages arrêtés" : afficher 5 s puis masquer
