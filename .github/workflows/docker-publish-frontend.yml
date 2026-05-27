@@ -100,12 +100,13 @@ jobs:
           docker push ${USER}/popcorn-frontend:v${V}
 
       - name: Trigger Watchtower Webhook
+        continue-on-error: true
         env:
           WATCHTOWER_TOKEN: ${{ secrets.WATCHTOWER_TOKEN }}
           SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
           curl -H "Authorization: Bearer $WATCHTOWER_TOKEN" \
-               http://$SERVER_IP:8080/v1/update
+               http://$SERVER_IP:8080/v1/update || true
 
   build-and-push:
     runs-on: self-hosted
@@ -428,9 +429,10 @@ jobs:
 
       - name: Trigger Watchtower Webhook
         if: github.event_name != 'pull_request'
+        continue-on-error: true
         env:
           WATCHTOWER_TOKEN: ${{ secrets.WATCHTOWER_TOKEN }}
           SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
           curl -H "Authorization: Bearer $WATCHTOWER_TOKEN" \
-               http://$SERVER_IP:8080/v1/update
+               http://$SERVER_IP:8080/v1/update || true
