@@ -61,11 +61,6 @@ export default function Dashboard() {
   );
 
   const handleNavigate = (item: ContentItem) => {
-    // Si c'est un téléchargement en cours, aller vers la page des téléchargements ou ouvrir le lecteur
-    if (item.isDownloading) {
-      window.location.href = `/downloads`;
-      return;
-    }
     window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
   };
 
