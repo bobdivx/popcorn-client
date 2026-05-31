@@ -854,6 +854,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
                   </label>
                   <input
                     type="password"
+                    autoComplete="off"
                     class="input input-bordered bg-gray-800 border-gray-700 text-white"
                     value={formData.apiKey}
                     onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })}
@@ -954,6 +955,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
             </label>
             <input
               type="password"
+              autoComplete="off"
               class="input input-bordered bg-gray-800 border-gray-700 text-white"
               value={formData.apiKey}
               onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })}
