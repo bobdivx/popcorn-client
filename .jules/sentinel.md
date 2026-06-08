@@ -6,3 +6,7 @@
 **Vulnerability:** Weak PRNG `Math.random()` was used for generating IDs and UUIDs across multiple files (`src/lib/client/server-api/indexers.ts`, `src/api-routes-backup/v1/setup/indexers.ts`, `src/lib/utils/device-id.ts`, `src/components/torrents/MediaDetailPage/hooks/useNotifications.ts`).
 **Learning:** `Math.random()` is not cryptographically secure and shouldn't be used for IDs, especially not for indexer setups and device IDs. Moreover, calling `globalThis.crypto.randomUUID()` directly fails on HTTP non-localhost sites since it requires a Secure Context.
 **Prevention:** Always use the Web Crypto API (`crypto.getRandomValues()` or `crypto.randomUUID()`) through a centralized utility like `src/lib/utils/uuid.ts` that provides safe fallbacks for unsupported environments and non-secure contexts.
+## 2024-05-24 - [MEDIUM] Fix sensitive inputs lacking type="password"
+**Vulnerability:** Several sensitive input fields (API keys and Passkeys for Indexers and Trackers like TMDB, C411) were implemented using `type="text"`, which leaves them vulnerable to shoulder surfing and potential auto-fill leakages by the browser.
+**Learning:** This repo has custom wizard components and setting panels scattered across multiple directories (`src/components/settings/`, `src/components/setup/steps/`) where the default behavior of input components was not secure for keys.
+**Prevention:** Ensure any form field collecting or configuring API keys, passkeys, or passwords uses `<input type="password" autoComplete="off">` to prevent UI leakage and browser history storage.
