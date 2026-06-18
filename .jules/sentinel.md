@@ -6,3 +6,8 @@
 **Vulnerability:** Weak PRNG `Math.random()` was used for generating IDs and UUIDs across multiple files (`src/lib/client/server-api/indexers.ts`, `src/api-routes-backup/v1/setup/indexers.ts`, `src/lib/utils/device-id.ts`, `src/components/torrents/MediaDetailPage/hooks/useNotifications.ts`).
 **Learning:** `Math.random()` is not cryptographically secure and shouldn't be used for IDs, especially not for indexer setups and device IDs. Moreover, calling `globalThis.crypto.randomUUID()` directly fails on HTTP non-localhost sites since it requires a Secure Context.
 **Prevention:** Always use the Web Crypto API (`crypto.getRandomValues()` or `crypto.randomUUID()`) through a centralized utility like `src/lib/utils/uuid.ts` that provides safe fallbacks for unsupported environments and non-secure contexts.
+
+## 2025-02-27 - Exposed Credentials in Configuration Inputs
+**Vulnerability:** Several configuration panels (TmdbConfig, NotificationSettings, UploadAssistantPanel) exposed sensitive information (API keys, Webhook URLs, Telegram Chat IDs, Passkeys) as plain text `<input type="text">` without disabling autocomplete, posing a risk of physical security exposure (shoulder-surfing) and browser autofill leakage.
+**Learning:** Sensitive credential inputs in frontend components must always use `<input type="password">` combined with `autoComplete="off"`. Relying on plain text inputs, even in private administrative panels, violates defense-in-depth principles.
+**Prevention:** Enforce a strict review process or automated linting rule for input fields handling tokens, API keys, and webhooks to ensure they are configured securely as password fields with autocomplete disabled.
