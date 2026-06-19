@@ -4,4 +4,5 @@ export interface ScrubThumbnailsMeta {
   count: number;
   durationSeconds?: number;
   intervalSeconds?: number;
+  completed?: boolean;
 }
