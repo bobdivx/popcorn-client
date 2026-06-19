@@ -131,7 +131,7 @@ export function useLibraryScrubThumbnails({
 
         scrubMetaRef.current = { localMediaId, torrentRel: torrentRelForScrub };
 
-        const fetchMeta = async () => {
+        const fetchMeta = async (isPolling = false) => {
           try {
             const meta = await serverApi.getScrubThumbnailsMeta(localMediaId, {
               torrentRelativePath: torrentRelForScrub,
@@ -146,8 +146,8 @@ export function useLibraryScrubThumbnails({
               setScrubThumbnailsLoading(false);
             }
           } catch (err: any) {
-            // Si on a un 404, on marque le média comme potentiellement manquant pour éviter le spam.
-            if (err?.message?.includes('404')) {
+            // Si on a un 404 et qu'on ne poll pas déjà, on marque le média comme potentiellement manquant pour éviter le spam.
+            if (!isPolling && err?.message?.includes('404')) {
               pollAttemptCountRef.current += 1;
               if (pollAttemptCountRef.current >= 3) {
                 isPermanentlyMissingRef.current = true;
@@ -159,7 +159,7 @@ export function useLibraryScrubThumbnails({
         };
 
         try {
-          await fetchMeta();
+          await fetchMeta(false);
           const meta = await serverApi
             .getScrubThumbnailsMeta(localMediaId, { torrentRelativePath: torrentRelForScrub })
             .catch(() => null);
@@ -203,15 +203,26 @@ export function useLibraryScrubThumbnails({
           const poll = () => {
             if (cancelled || isPermanentlyMissingRef.current) return;
             attempts += 1;
-            fetchMeta().catch(() => {
-              // Si on a déjà trop d'échecs (ou un 404 persistant détecté dans fetchMeta), on arrête le polling.
-              if (attempts >= 6 || isPermanentlyMissingRef.current) {
-                setScrubThumbnailsLoading(false);
-                return;
-              }
-              // Polling plus lent (3s au lieu de 2s) pour être moins agressif.
-              scrubRetryTimeoutRef.current = setTimeout(poll, 3000);
-            });
+            fetchMeta(true)
+              .then(() => {
+                const st = scrubThumbnailsRef.current;
+                if (st && !st.completed && attempts < 40) {
+                  scrubRetryTimeoutRef.current = setTimeout(poll, 3000);
+                } else {
+                  setScrubThumbnailsLoading(false);
+                }
+              })
+              .catch(() => {
+                // Si on a déjà trop d'échecs (ou un 404 persistant détecté), on arrête le polling et marque comme manquant.
+                if (attempts >= 15 || isPermanentlyMissingRef.current) {
+                  isPermanentlyMissingRef.current = true;
+                  knownMissingScrubThumbnails.add(localMediaId);
+                  setScrubThumbnailsLoading(false);
+                  return;
+                }
+                // Polling plus lent (3s au lieu de 2s) pour être moins agressif.
+                scrubRetryTimeoutRef.current = setTimeout(poll, 3000);
+              });
           };
           scrubRetryTimeoutRef.current = setTimeout(poll, 2000);
         }
@@ -233,7 +244,7 @@ export function useLibraryScrubThumbnails({
     if (!ctx?.localMediaId || scrubRegenInFlightRef.current || scrubAutoRegenDoneRef.current) return;
     const st = scrubThumbnailsRef.current;
     const expected = Math.min(2000, Math.ceil(d / 10));
-    if (!st || st.count <= 0) return;
+    if (!st || st.count <= 0 || !st.completed) return;
     if (st.count >= expected - 2) return;
     if (st.count * 10 >= d * 0.88) return;
     const interval = st.intervalSeconds && st.intervalSeconds > 0 ? st.intervalSeconds : 10;
