@@ -235,6 +235,7 @@ export function VideoControls({
     timeForScrubIndex,
     setScrubFromPointer,
     setScrubFromPercent,
+    stepScrubIndex,
     progressPercent,
   } = useScrubNav({
     scrubEnabled,
@@ -507,6 +508,8 @@ export function VideoControls({
                 e.stopPropagation();
                 setScrubFromPointer(e);
                 onSeek(e);
+              } else if (scrubEnabled) {
+                setScrubFromPointer(e);
               }
             }}
             onPointerUp={(e) => {
@@ -678,7 +681,10 @@ export function VideoControls({
             getScrubUrlForIndex={getScrubUrlForIndex}
             timeForScrubIndex={timeForScrubIndex}
             seekToThumbnail={seekToThumbnail}
+            stepScrubIndex={stepScrubIndex}
             seekToPositionLabel={(time) => t('playback.seekToPosition', { time })}
+            previousThumbnailLabel={t('playback.scrubPreviousThumbnail')}
+            nextThumbnailLabel={t('playback.scrubNextThumbnail')}
           />
           </div>
           <div class={`flex items-center ${gap} relative z-30 overflow-x-auto min-w-0 scrollbar-visible`} data-tv-video-controls-row>
@@ -741,19 +747,7 @@ export function VideoControls({
               )}
             </div>
             <div class={`flex items-center gap-2 text-white ${textSize} font-medium flex-shrink-0`}>
-              {isTV && scrubEnabled && tvScrubIndexExternal != null ? (
-                <>
-                  <span class="text-purple-300">{formatTime(timeForScrubIndex(tvScrubIndex))}</span>
-                  <span class="text-white/30 text-sm">({formatTime(currentTime)})</span>
-                </>
-              ) : scrubPreviewActiveDesktop && scrubPreviewTimeDesktop != null ? (
-                <>
-                  <span class="text-purple-300">{formatTime(scrubPreviewTimeDesktop)}</span>
-                  <span class="text-white/30 text-xs sm:text-sm">({formatTime(currentTime)})</span>
-                </>
-              ) : (
-                <span>{formatTime(currentTime)}</span>
-              )}
+              <span>{formatTime(currentTime)}</span>
               <span class="text-white/50">/</span>
               <span class="text-white/70">{formatTime(duration > 0 ? duration : (scrubThumbnails?.durationSeconds ?? 0))}</span>
             </div>

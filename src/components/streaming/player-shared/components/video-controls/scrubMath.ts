@@ -58,6 +58,11 @@ export function scrubIndexFromTimelinePercent(
  * Fenêtre glissante autour de la vignette sélectionnée : peu de tuiles larges, sans scrollbar
  * (le nombre total de captures reste `count` côté serveur ; on navigue barre / clavier / clic).
  */
+export function scrubWindowSize(count: number, isTV: boolean, isFullscreen: boolean): number {
+  if (count <= 0) return 0;
+  return Math.min(count, isTV ? 7 : isFullscreen ? 11 : 9);
+}
+
 export function scrubVisibleWindow(
   count: number,
   selectedIndex: number,
@@ -65,7 +70,7 @@ export function scrubVisibleWindow(
   isFullscreen: boolean
 ): { start: number; end: number } {
   if (count <= 0) return { start: 0, end: -1 };
-  const windowSize = Math.min(count, isTV ? 7 : isFullscreen ? 11 : 9);
+  const windowSize = scrubWindowSize(count, isTV, isFullscreen);
   const half = Math.floor(windowSize / 2);
   const start = Math.max(0, Math.min(count - windowSize, selectedIndex - half));
   const end = Math.min(count - 1, start + windowSize - 1);

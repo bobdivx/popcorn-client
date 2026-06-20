@@ -38,7 +38,7 @@ import type {
   MultiTrackerUploadResult,
 } from './server-api/upload-tracker.js';
 
-import type { LibraryMediaEntry } from './server-api/library.js';
+import type { LibraryMediaEntry, LibraryIntegrityStatus, DeleteCorruptedLibraryMediaResult } from './server-api/library.js';
 
 // Imports des utilitaires
 import { isDemoMode } from '../backend-config.js';
@@ -319,6 +319,9 @@ interface IServerApiClientPublic {
   updateLibraryMedia(id: string, file_path: string): Promise<ApiResponse<LibraryMediaEntry>>;
   deleteLibraryMedia(id: string): Promise<ApiResponse<void>>;
   deleteLibraryMediaFile(id: string): Promise<ApiResponse<void>>;
+  startLibraryIntegrityCheck(): Promise<ApiResponse<string>>;
+  getLibraryIntegrityStatus(): Promise<ApiResponse<LibraryIntegrityStatus>>;
+  deleteCorruptedLibraryMedia(ids: string[], deleteFiles: boolean): Promise<ApiResponse<DeleteCorruptedLibraryMediaResult>>;
   createTorrentForLibraryMedia(params: CreateTorrentParams): Promise<ApiResponse<void>>;
   publishC411(params: PublishC411Params): Promise<ApiResponse<PublishC411Response>>;
   getC411UploadCookies(): Promise<ApiResponse<C411UploadCookiesResponse>>;
