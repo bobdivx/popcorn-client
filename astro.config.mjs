@@ -1,6 +1,7 @@
 import { defineConfig } from 'astro/config';
 import preact from '@astrojs/preact';
 import tailwind from '@astrojs/tailwind';
+import { prefreshResolveFix, prefreshResolveAlias } from './scripts/vite/prefresh-resolve-fix.mjs';
 
 /** Re-pré-bundle toutes les deps Vite au démarrage (lent) — utile si 504 Outdated Optimize Dep persiste après dev:clean. */
 const viteOptimizeForce = process.env.VITE_OPTIMIZE_FORCE === '1';
@@ -24,8 +25,10 @@ export default defineConfig({
     assets: '_assets',
   },
   vite: {
+    plugins: [prefreshResolveFix()],
     resolve: {
       extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
+      alias: prefreshResolveAlias(),
     },
     // Pré-bundler les dépendances pour éviter 504 Outdated Optimize Dep
     // (Preact, lucide, qrcode/html5-qrcode, hls.js: player / MediaDetail)
@@ -52,6 +55,14 @@ export default defineConfig({
     server: {
       host: true, // Écouter sur 0.0.0.0 pour accès via IP (ex. 10.1.0.86:4326), évite "Failed to fetch dynamically imported module"
       allowedHosts: true, // Autoriser tout host (localhost, IP locale, etc.) pour éviter 504 sur les deps quand on accède via IP
+      // Proxy API cloud en dev : évite CORS (Quick Connect, login cloud, etc. depuis localhost)
+      proxy: {
+        '/api/v1': {
+          target: 'https://popcornn.app',
+          changeOrigin: true,
+          secure: true,
+        },
+      },
       // Précharger les modules SSR (ex. @astrojs/preact) pour éviter
       // "transport invoke timed out after 60000ms" au premier chargement
       warmup: {

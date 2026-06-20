@@ -218,6 +218,13 @@ export function useScrubNav(options: {
     setScrubFromPercent(percent);
   };
 
+  const stepScrubIndex = (delta: number) => {
+    const st = scrubThumbnailsRef.current;
+    const total = st?.count ?? 0;
+    if (total <= 0 || delta === 0) return;
+    setTvScrubIndexInternal((prev) => Math.min(total - 1, Math.max(0, prev + delta)));
+  };
+
   const effectiveDurationForProgress = getEffectiveDuration();
   /** En lecture desktop : la barre suit la tête de lecture (pas l’état interne des vignettes, sinon conflit avec la resync). */
   const progressPercent = (() => {
@@ -242,6 +249,7 @@ export function useScrubNav(options: {
     timeForScrubIndex,
     setScrubFromPointer,
     setScrubFromPercent,
+    stepScrubIndex,
     progressPercent,
   };
 }

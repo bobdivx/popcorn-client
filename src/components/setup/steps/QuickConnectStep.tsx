@@ -63,7 +63,11 @@ export function QuickConnectStep({ focusedButtonIndex, buttonRefs, onNext, onSta
       const response = await serverApi.initQuickConnect();
 
       if (!response.success) {
-        setError(response.message || 'Erreur lors de l\'initialisation de la connexion rapide');
+        setError(
+          response.message?.includes('Failed to fetch')
+            ? 'Impossible de joindre popcorn-web. Vérifiez votre connexion internet.'
+            : (response.message || 'Erreur lors de l\'initialisation de la connexion rapide')
+        );
         setLoading(false);
         return;
       }
