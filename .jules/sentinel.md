@@ -1,3 +1,7 @@
+## 2025-02-27 - Exposure of sensitive credentials in UI forms
+**Vulnerability:** Settings and onboarding used `<input type="text">` for TMDB keys, indexer API keys, passkeys and similar secrets.
+**Learning:** Visible text inputs encourage shoulder surfing, screen-share leaks, and browser autofill caching of secrets.
+**Prevention:** Use `<input type="password">` with `autoComplete="off"` for API keys, tokens and passkeys. For fields such as tracker announce URLs that cannot be masked, still use `autoComplete="off"` to reduce history and suggestion leakage.
 ## 2025-02-27 - Implicit Trust of Backend-Rendered HTML
 **Vulnerability:** The `DescriptionPreview` component was implicitly trusting and rendering raw HTML injected by the backend (e.g., descriptions) via `dangerouslySetInnerHTML` without any prior validation or sanitization, introducing a critical Cross-Site Scripting (XSS) vulnerability.
 **Learning:** In this codebase, data described as 'already rendered by the backend' cannot be implicitly trusted for safety on the frontend, especially if it may contain untrusted user input from an upstream source (e.g., tracker descriptions).
