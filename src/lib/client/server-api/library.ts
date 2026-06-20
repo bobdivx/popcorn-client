@@ -288,6 +288,31 @@ export const libraryMethods = {
       method: 'DELETE',
     });
   },
+
+  /** Lance un contrôle d'intégrité de tous les médias indexés */
+  async startLibraryIntegrityCheck(this: ServerApiClientLibraryAccess): Promise<ApiResponse<string>> {
+    return this.backendRequest<string>('/api/library/integrity/check', { method: 'POST' });
+  },
+
+  /** État et rapport du contrôle d'intégrité bibliothèque */
+  async getLibraryIntegrityStatus(
+    this: ServerApiClientLibraryAccess
+  ): Promise<ApiResponse<LibraryIntegrityStatus>> {
+    return this.backendRequest<LibraryIntegrityStatus>('/api/library/integrity/status', { method: 'GET' });
+  },
+
+  /** Supprime les médias corrompus (optionnellement les fichiers sur disque) */
+  async deleteCorruptedLibraryMedia(
+    this: ServerApiClientLibraryAccess,
+    ids: string[],
+    deleteFiles: boolean
+  ): Promise<ApiResponse<DeleteCorruptedLibraryMediaResult>> {
+    return this.backendRequest<DeleteCorruptedLibraryMediaResult>('/api/library/integrity/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids, delete_files: deleteFiles }),
+    });
+  },
 };
 
 export interface LibrarySource {
@@ -321,4 +346,30 @@ export interface LibraryMediaEntry {
   poster_url: string | null;
   hero_image_url: string | null;
   library_source_id: string | null;
+}
+
+export interface LibraryIntegrityItem {
+  id: string;
+  file_path: string;
+  file_name: string;
+  tmdb_title: string | null;
+  valid: boolean;
+  issues: string[];
+}
+
+export interface LibraryIntegrityStatus {
+  in_progress: boolean;
+  total: number;
+  checked: number;
+  valid_count: number;
+  corrupted_count: number;
+  current_file: string | null;
+  corrupted: LibraryIntegrityItem[];
+  finished_at: number | null;
+}
+
+export interface DeleteCorruptedLibraryMediaResult {
+  removed_from_library: number;
+  deleted_files: number;
+  errors: string[];
 }

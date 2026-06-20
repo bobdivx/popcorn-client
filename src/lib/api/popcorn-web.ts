@@ -22,8 +22,12 @@ export function getPopcornWebBaseUrl(): string {
 
 /**
  * Obtient l'URL de base de l'API popcorn-web.
+ * En dev navigateur, utilise le proxy Vite (/api/v1 → popcornn.app) pour éviter CORS sur localhost.
  */
 export function getPopcornWebApiUrl(): string {
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    return '/api/v1';
+  }
   return getPopcornWebBaseUrl() + '/api/v1';
 }
 

@@ -9,7 +9,7 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Copier les fichiers de dépendances d'abord (pour le cache Docker)
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json* .npmrc* ./
 
 # Réduire les échecs réseau en CI (timeouts, émulation arm64)
 RUN npm config set fetch-retries 5 && \
