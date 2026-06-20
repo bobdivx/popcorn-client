@@ -1,7 +1,7 @@
 # Dockerfile multi-stage pour le frontend Astro Popcorn
 # Build depuis la racine du repo : docker build -f docker/Dockerfile .
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 # Installer les dépendances nécessaires
 RUN apk add --no-cache libc6-compat
