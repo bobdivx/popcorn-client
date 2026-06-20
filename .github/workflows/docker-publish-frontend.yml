@@ -89,15 +89,20 @@ jobs:
 
       - name: Promote frontend image (dev → latest + version)
         run: |
+          set -euo pipefail
           USER="${{ steps.check_creds.outputs.username }}"
-          V="${{ steps.increment_version.outputs.version }}"
-          docker pull ${USER}/popcorn-frontend:dev
-          docker tag ${USER}/popcorn-frontend:dev ${USER}/popcorn-frontend:latest
-          docker tag ${USER}/popcorn-frontend:dev ${USER}/popcorn-frontend:${V}
-          docker tag ${USER}/popcorn-frontend:dev ${USER}/popcorn-frontend:v${V}
-          docker push ${USER}/popcorn-frontend:latest
-          docker push ${USER}/popcorn-frontend:${V}
-          docker push ${USER}/popcorn-frontend:v${V}
+          V="$(echo "${{ steps.increment_version.outputs.version }}" | tr -d '[:space:]')"
+          if [ -z "${V}" ]; then echo "ERROR: empty version"; exit 1; fi
+          IMAGE="${USER}/popcorn-frontend"
+          docker pull "${IMAGE}:dev"
+          IMG_ID="$(docker image inspect "${IMAGE}:dev" --format '{{.Id}}')"
+          docker tag "${IMG_ID}" "${IMAGE}:latest"
+          docker tag "${IMG_ID}" "${IMAGE}:v${V}"
+          docker tag "${IMG_ID}" "${IMAGE}:${V}"
+          docker image ls "${IMAGE}" --format '{{.Repository}}:{{.Tag}}' | grep -E ":latest$|:v${V}$|:${V}$" || true
+          docker push "${IMAGE}:v${V}"
+          docker push "${IMAGE}:${V}"
+          docker push "${IMAGE}:latest"
 
       - name: Trigger Watchtower Webhook
         continue-on-error: true
