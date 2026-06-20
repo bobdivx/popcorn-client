@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
-import type { LibraryMediaEntry, LibrarySource } from '../../lib/client/server-api/library';
+import type { LibraryMediaEntry, LibrarySource, LibraryIntegrityItem, LibraryIntegrityStatus } from '../../lib/client/server-api/library';
 import { invalidateLibraryCache } from '../../lib/client/server-api/library';
-import { Film, FileX, FolderOpen, Pencil, RefreshCw, Trash2, Tv, CheckSquare, Square, X } from 'lucide-preact';
+import { Film, FileX, FolderOpen, Pencil, RefreshCw, Trash2, Tv, CheckSquare, Square, X, ShieldAlert, ShieldCheck } from 'lucide-preact';
 
 /** Valeur du filtre source : '' = toutes, 'local' = source locale, 'external' = toute externe, ou id de library_source */
 function matchSource(entry: LibraryMediaEntry, filterSource: string): boolean {
@@ -49,6 +49,42 @@ export default function LibraryMediaPanel() {
   const [filterCategory, setFilterCategory] = useState<string>('');
   const [filterSource, setFilterSource] = useState<string>('');
   const [scanning, setScanning] = useState(false);
+
+  const [integrityStatus, setIntegrityStatus] = useState<LibraryIntegrityStatus | null>(null);
+  const [integrityStarting, setIntegrityStarting] = useState(false);
+  const [integrityDeleting, setIntegrityDeleting] = useState(false);
+  const [selectedCorruptedIds, setSelectedCorruptedIds] = useState<Set<string>>(new Set());
+  const integrityPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopIntegrityPolling = useCallback(() => {
+    if (integrityPollRef.current) {
+      clearInterval(integrityPollRef.current);
+      integrityPollRef.current = null;
+    }
+  }, []);
+
+  const pollIntegrityStatus = useCallback(async () => {
+    const res = await serverApi.getLibraryIntegrityStatus();
+    if (res.success && res.data) {
+      setIntegrityStatus(res.data);
+      if (!res.data.in_progress) {
+        stopIntegrityPolling();
+      }
+    }
+  }, [stopIntegrityPolling]);
+
+  const startIntegrityPolling = useCallback(() => {
+    stopIntegrityPolling();
+    void pollIntegrityStatus();
+    integrityPollRef.current = setInterval(() => {
+      void pollIntegrityStatus();
+    }, 2000);
+  }, [pollIntegrityStatus, stopIntegrityPolling]);
+
+  useEffect(() => {
+    void pollIntegrityStatus();
+    return () => stopIntegrityPolling();
+  }, [pollIntegrityStatus, stopIntegrityPolling]);
 
   const loadMedia = useCallback(async () => {
     setLoading(true);
@@ -236,6 +272,84 @@ export default function LibraryMediaPanel() {
     }
   };
 
+  const handleStartIntegrityCheck = async () => {
+    setMessage(null);
+    setIntegrityStarting(true);
+    setSelectedCorruptedIds(new Set());
+    try {
+      const res = await serverApi.startLibraryIntegrityCheck();
+      if (res.success) {
+        const text = res.data?.includes('déjà') || res.data?.includes('already')
+          ? t('settingsMenu.libraryMediaPanel.integrityAlreadyRunning')
+          : t('settingsMenu.libraryMediaPanel.integrityStarted');
+        setMessage({ type: 'success', text });
+        startIntegrityPolling();
+      } else {
+        setMessage({ type: 'error', text: res.error || t('errors.generic') });
+      }
+    } catch {
+      setMessage({ type: 'error', text: t('errors.generic') });
+    } finally {
+      setIntegrityStarting(false);
+    }
+  };
+
+  const toggleCorruptedSelect = (id: string) => {
+    setSelectedCorruptedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllCorrupted = (items: LibraryIntegrityItem[]) => {
+    if (selectedCorruptedIds.size === items.length) {
+      setSelectedCorruptedIds(new Set());
+    } else {
+      setSelectedCorruptedIds(new Set(items.map((m) => m.id)));
+    }
+  };
+
+  const handleDeleteCorrupted = async (ids: string[], deleteFiles: boolean) => {
+    if (ids.length === 0) return;
+    const confirmKey = deleteFiles
+      ? 'settingsMenu.libraryMediaPanel.integrityDeleteConfirmFiles'
+      : 'settingsMenu.libraryMediaPanel.integrityDeleteConfirmLibrary';
+    if (!confirm(t(confirmKey, { count: ids.length }))) return;
+
+    setIntegrityDeleting(true);
+    setMessage(null);
+    try {
+      const res = await serverApi.deleteCorruptedLibraryMedia(ids, deleteFiles);
+      if (res.success && res.data) {
+        invalidateLibraryCache();
+        await loadMedia();
+        await pollIntegrityStatus();
+        setSelectedCorruptedIds(new Set());
+        setMessage({
+          type: 'success',
+          text: t('settingsMenu.libraryMediaPanel.integrityDeleteSuccess', {
+            removed: res.data.removed_from_library,
+            files: res.data.deleted_files,
+          }),
+        });
+        if (res.data.errors.length > 0) {
+          setMessage({
+            type: 'error',
+            text: res.data.errors.join(' · '),
+          });
+        }
+      } else {
+        setMessage({ type: 'error', text: res.error || t('settingsMenu.libraryMediaPanel.integrityDeleteError') });
+      }
+    } catch {
+      setMessage({ type: 'error', text: t('settingsMenu.libraryMediaPanel.integrityDeleteError') });
+    } finally {
+      setIntegrityDeleting(false);
+    }
+  };
+
   const filteredList = list.filter((m) => {
     const matchCat = !filterCategory || m.category === filterCategory;
     const matchSrc = matchSource(m, filterSource);
@@ -321,6 +435,135 @@ export default function LibraryMediaPanel() {
           {scanning ? t('library.scanning') : t('library.syncLibrary')}
         </button>
       </div>
+
+      <section class="rounded-lg border border-gray-700 bg-gray-800/40 p-4 space-y-3">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 class="inline-flex items-center gap-2 text-sm font-semibold text-white">
+              <ShieldCheck className="w-4 h-4 text-primary" />
+              {t('settingsMenu.libraryMediaPanel.integrityTitle')}
+            </h3>
+            <p class="text-xs text-gray-400 mt-1 max-w-2xl">{t('settingsMenu.libraryMediaPanel.integrityIntro')}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleStartIntegrityCheck}
+            disabled={integrityStarting || integrityStatus?.in_progress}
+            class="inline-flex items-center gap-2 rounded bg-amber-700/80 hover:bg-amber-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          >
+            <ShieldAlert className={`w-4 h-4 ${integrityStatus?.in_progress ? 'animate-pulse' : ''}`} />
+            {integrityStatus?.in_progress
+              ? t('settingsMenu.libraryMediaPanel.integrityChecking')
+              : t('settingsMenu.libraryMediaPanel.integrityStart')}
+          </button>
+        </div>
+
+        {integrityStatus && (integrityStatus.in_progress || integrityStatus.finished_at) && (
+          <div class="space-y-2">
+            {integrityStatus.in_progress && (
+              <p class="text-xs text-gray-300">
+                {t('settingsMenu.libraryMediaPanel.integrityProgress', {
+                  checked: integrityStatus.checked,
+                  total: integrityStatus.total,
+                  current: integrityStatus.current_file || '…',
+                })}
+              </p>
+            )}
+            {!integrityStatus.in_progress && integrityStatus.finished_at && (
+              <p class="text-xs text-gray-300">
+                {t('settingsMenu.libraryMediaPanel.integrityReport', {
+                  valid: integrityStatus.valid_count,
+                  corrupted: integrityStatus.corrupted_count,
+                })}
+              </p>
+            )}
+
+            {integrityStatus.corrupted.length === 0 && !integrityStatus.in_progress && integrityStatus.finished_at && (
+              <p class="text-xs text-green-400">{t('settingsMenu.libraryMediaPanel.integrityNoCorrupted')}</p>
+            )}
+
+            {integrityStatus.corrupted.length > 0 && (
+              <div class="space-y-2">
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    class="rounded border border-gray-600 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700 disabled:opacity-50"
+                    disabled={integrityDeleting || selectedCorruptedIds.size === 0}
+                    onClick={() => handleDeleteCorrupted(Array.from(selectedCorruptedIds), false)}
+                  >
+                    {t('settingsMenu.libraryMediaPanel.integrityDeleteFromLibrary')}
+                    {selectedCorruptedIds.size > 0 ? ` (${selectedCorruptedIds.size})` : ''}
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded border border-red-800/80 px-2 py-1 text-xs text-red-300 hover:bg-red-900/30 disabled:opacity-50"
+                    disabled={integrityDeleting || selectedCorruptedIds.size === 0}
+                    onClick={() => handleDeleteCorrupted(Array.from(selectedCorruptedIds), true)}
+                  >
+                    {t('settingsMenu.libraryMediaPanel.integrityDeleteFiles')}
+                    {selectedCorruptedIds.size > 0 ? ` (${selectedCorruptedIds.size})` : ''}
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded border border-red-900 px-2 py-1 text-xs text-red-200 hover:bg-red-900/40 disabled:opacity-50"
+                    disabled={integrityDeleting}
+                    onClick={() => handleDeleteCorrupted(integrityStatus.corrupted.map((c) => c.id), false)}
+                  >
+                    {t('settingsMenu.libraryMediaPanel.integrityDeleteAll')}
+                  </button>
+                </div>
+
+                <div class="rounded border border-red-900/40 bg-red-950/20 overflow-hidden">
+                  <div class="overflow-x-auto max-h-[30vh] overflow-y-auto">
+                    <table class="w-full text-xs text-left">
+                      <thead class="sticky top-0 bg-gray-900/95 text-gray-300 border-b border-gray-700">
+                        <tr>
+                          <th class="px-2 py-2 w-8">
+                            <button
+                              type="button"
+                              onClick={() => toggleSelectAllCorrupted(integrityStatus.corrupted)}
+                              class="text-gray-400 hover:text-white"
+                            >
+                              {selectedCorruptedIds.size === integrityStatus.corrupted.length ? (
+                                <CheckSquare className="w-3.5 h-3.5 text-primary" />
+                              ) : (
+                                <Square className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </th>
+                          <th class="px-2 py-2">{t('settingsMenu.libraryMediaPanel.colTitle')}</th>
+                          <th class="px-2 py-2">{t('settingsMenu.libraryMediaPanel.colPath')}</th>
+                          <th class="px-2 py-2">{t('settingsMenu.libraryMediaPanel.integrityColIssues')}</th>
+                        </tr>
+                      </thead>
+                      <tbody class="text-gray-300">
+                        {integrityStatus.corrupted.map((item) => (
+                          <tr key={item.id} class="border-b border-gray-800/80 align-top">
+                            <td class="px-2 py-2">
+                              <button type="button" onClick={() => toggleCorruptedSelect(item.id)} class="text-gray-400 hover:text-white">
+                                {selectedCorruptedIds.has(item.id) ? (
+                                  <CheckSquare className="w-3.5 h-3.5 text-primary" />
+                                ) : (
+                                  <Square className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </td>
+                            <td class="px-2 py-2 font-medium text-white">
+                              {item.tmdb_title || item.file_name}
+                            </td>
+                            <td class="px-2 py-2 text-gray-400 break-all">{item.file_path}</td>
+                            <td class="px-2 py-2 text-red-300">{item.issues.join(' · ')}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
 
       {selectedIds.size > 0 && (
         <div class="flex items-center gap-4 p-3 bg-primary/10 border border-primary/30 rounded-lg animate-in fade-in slide-in-from-top-2">

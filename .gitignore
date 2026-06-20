@@ -56,3 +56,4 @@ src-tauri/gen/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+.env*.local

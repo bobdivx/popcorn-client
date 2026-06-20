@@ -6,6 +6,7 @@
  */
 
 import { spawnSync } from 'child_process';
+import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 
@@ -18,6 +19,21 @@ const command = args[0];
 if (!command || command === 'help') {
   printHelp();
   process.exit(0);
+}
+
+function binPath(name) {
+  const ext = process.platform === 'win32' ? '.cmd' : '';
+  return path.join(ROOT, 'node_modules', '.bin', `${name}${ext}`);
+}
+
+/** Exécute un binaire local (node_modules/.bin), jamais npx (évite un Astro isolé du projet). */
+function runBin(name, binArgs = [], options = {}) {
+  const bin = binPath(name);
+  if (!existsSync(bin)) {
+    console.error(`\x1b[31m[Popcorn CLI] « ${name} » introuvable. Exécutez « npm install » dans popcorn-client.\x1b[0m`);
+    process.exit(1);
+  }
+  return run(bin, binArgs, options);
 }
 
 function run(cmd, args = [], options = {}) {
@@ -39,10 +55,10 @@ function runPS(scriptPath, scriptArgs = []) {
 
 const commands = {
   // --- Développement ---
-  dev: () => run('npx', ['astro', 'dev', '--port', '4326', '--host']),
+  dev: () => runBin('astro', ['dev', '--port', '4326', '--host']),
   'dev:tauri': () => {
     process.env.TAURI_PLATFORM = 'desktop';
-    run('npx', ['tauri', 'dev']);
+    runBin('tauri', ['dev']);
   },
   'dev:clean': () => {
     run('node', ['-e', '"const fs=require(\'fs\'); try { fs.rmSync(\'node_modules/.vite\', { recursive: true, force: true }); } catch(e) {}"']);
@@ -58,11 +74,11 @@ const commands = {
 
     switch (target) {
       case 'web':
-        run('npx', ['astro', 'build']);
+        runBin('astro', ['build']);
         break;
       case 'windows':
         process.env.TAURI_PLATFORM = 'desktop';
-        run('npx', ['tauri', 'build', '--target', 'x86_64-pc-windows-msvc']);
+        runBin('tauri', ['build', '--target', 'x86_64-pc-windows-msvc']);
         break;
       case 'android':
         const psArgs = [];
@@ -75,7 +91,7 @@ const commands = {
       case 'ios':
         process.env.TAURI_PLATFORM = 'ios';
         const config = isDemo ? ['-c', 'src-tauri/tauri.ios.conf.json'] : [];
-        run('npx', ['tauri', 'ios', 'build', '--ci', ...config]);
+        runBin('tauri', ['ios', 'build', '--ci', ...config]);
         break;
       case 'webos':
         const webosCmd = isDemo ? '-Demo -Native' : '-Native';
@@ -102,8 +118,8 @@ const commands = {
   clean: () => runPS('scripts/cleanup-artifacts.ps1'),
   setup: () => runPS('scripts/android/setup/setup.ps1'),
   check: () => runPS('scripts/android/setup/check.ps1'),
-  test: () => run('npx', ['vitest', 'run']),
-  preview: () => run('npx', ['astro', 'preview']),
+  test: () => runBin('vitest', ['run']),
+  preview: () => runBin('astro', ['preview']),
   smoke: () => {
     const target = args[1] || 'backend';
     if (target === 'backend') {

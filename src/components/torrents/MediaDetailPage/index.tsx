@@ -962,6 +962,10 @@ export default function MediaDetailPage({
           const { clientApi } = await import('../../../lib/client/api');
           const ih = activeTorrent.infoHash!.toLowerCase();
           let fromList: import('../../../lib/client/types').ClientTorrentStats | undefined;
+          let isAvailableInClient = false;
+          let isAvailableInLibrary = false;
+          let isAvailableInLocalMedia = false;
+
           // MÃªme source que la page /downloads : rÃ©cupÃ©rer les stats depuis la liste des torrents
           try {
             const list = await clientApi.listTorrents();
@@ -974,20 +978,15 @@ export default function MediaDetailPage({
               const completed = fromList.state === 'completed' || fromList.state === 'seeding' || (fromList.progress ?? 0) >= 0.99;
               if (completed) {
                 setIsAvailableLocally(true);
+                isAvailableInClient = true;
               }
             } else {
               setTorrentStats(null);
-              // Média bibliothèque (local_*) : absent de listTorrents, ne pas repasser à false
-              // (évite un flash isAvailableLocally et un redémarrage HLS en boucle).
-              if (!ih.startsWith('local_') && !libraryDownloadPath && !(activeTorrent as { downloadPath?: string }).downloadPath) {
-                setIsAvailableLocally(false);
-              }
             }
           } catch (_) {
             // listTorrents en Ã©chec (ex. client non dispo)
           }
-          // Ne pas appeler getTorrent quand le torrent n'est pas dans la liste : Ã©vite le 404 en console.
-          // On s'appuie sur la library et findLocalMediaByTmdb pour afficher "Lire" si le fichier est sur disque.
+
           // 1) VÃ©rifier la library (info_hash ou tmdb_id) â€” fichier sur disque mÃªme si torrent supprimÃ© du client
           if (hasInfoHash && activeTorrent.infoHash) {
             try {
@@ -1006,8 +1005,8 @@ export default function MediaDetailPage({
                 });
                 if (item && (item.download_path || item.exists)) {
                   setIsAvailableLocally(true);
+                  isAvailableInLibrary = true;
                   const hasExistingPath = !!(activeTorrent as any).downloadPath;
-                  // Ne pas Ã©craser si le torrent a dÃ©jÃ  un chemin ; ne pas utiliser un chemin qui est un dossier (streaming a besoin du fichier)
                   const pathIsFile = item.download_path && /\.(mkv|mp4|avi|webm|mov|m4v|wmv|ts|m2ts)$/i.test(item.download_path.replace(/\\/g, '/'));
                   if (item.download_path && !hasExistingPath && pathIsFile) {
                     setLibraryDownloadPath(item.download_path);
@@ -1023,8 +1022,6 @@ export default function MediaDetailPage({
                     const prevIsComplete =
                       prevState === 'completed' || prevState === 'seeding' || prevProgress >= 0.99;
 
-                    // Si la bibliothèque confirme que le média existe déjà, on doit écraser
-                    // les stats "queued 0%" (souvent après reboot) pour éviter l'incohérence UI.
                     if (prev && !looksStaleQueued && !prevIsComplete) return prev;
                     return {
                       info_hash: activeTorrent.infoHash!,
@@ -1044,23 +1041,20 @@ export default function MediaDetailPage({
                       download_started: true,
                     };
                   });
-                  addDebugLog('success', 'ðŸ“š MÃ©dia trouvÃ© dans la bibliothÃ¨que (library)', {
-                    info_hash: activeTorrent.infoHash,
-                    download_path: item.download_path,
-                    by: (item.info_hash || item.infoHash || '').toLowerCase() === ih ? 'info_hash' : 'tmdb_id',
-                  });
                 }
               }
             } catch (_e) {
-              // Ignorer les erreurs (ex. endpoint /library non disponible)
+              // Ignorer les erreurs
             }
           }
+
           // 2) VÃ©rifier par TMDB ID (local-media by tmdb) si pas dÃ©jÃ  disponible
           if (activeTorrent.tmdbId) {
             try {
               const localMedia = await clientApi.findLocalMediaByTmdb(activeTorrent.tmdbId, activeTorrent.tmdbType || undefined);
               if (localMedia.length > 0) {
                 setIsAvailableLocally(true);
+                isAvailableInLocalMedia = true;
                 const hasExistingPathTmdb = !!(activeTorrent as any).downloadPath;
                 const currentName = (activeTorrent.name || '').toLowerCase();
                 const matchByName = currentName
@@ -1068,7 +1062,6 @@ export default function MediaDetailPage({
                   : null;
                 const chosen = matchByName ?? localMedia[0];
                 const firstPath = (chosen as { file_path?: string }).file_path;
-                // Ne pas Ã©craser le chemin si le torrent en a dÃ©jÃ  un ; ne pas utiliser un chemin qui est un dossier
                 const firstPathIsFile = firstPath && /\.(mkv|mp4|avi|webm|mov|m4v|wmv|ts|m2ts)$/i.test(firstPath.replace(/\\/g, '/'));
                 if (!hasExistingPathTmdb && firstPathIsFile) {
                   setLibraryDownloadPath(firstPath);
@@ -1102,24 +1095,18 @@ export default function MediaDetailPage({
                     download_started: true,
                   };
                 });
-                if (localMedia.length === 1) {
-                  addDebugLog('success', `ðŸ“š MÃ©dia local trouvÃ© (TMDB ID: ${activeTorrent.tmdbId})`, {
-                    file: localMedia[0].file_name,
-                    quality: localMedia[0].quality || 'N/A',
-                    resolution: localMedia[0].resolution || 'N/A',
-                  });
-                } else {
-                  addDebugLog('success', `ðŸ“š ${localMedia.length} version(s) locale(s) trouvÃ©e(s) (TMDB ID: ${activeTorrent.tmdbId})`, {
-                    versions: localMedia.map(m => ({
-                      file: m.file_name,
-                      quality: m.quality || 'N/A',
-                      resolution: m.resolution || 'N/A',
-                    })),
-                  });
-                }
               }
             } catch (_) {
-              // findLocalMediaByTmdb en Ã©chec : on a dÃ©jÃ  tentÃ© la library au-dessus
+              // Ignorer
+            }
+          }
+
+          // Si le média n'est trouvé dans AUCUNE source, on le marque non disponible.
+          if (!isAvailableInClient && !isAvailableInLibrary && !isAvailableInLocalMedia) {
+            // Média bibliothèque (local_*) : absent de listTorrents, ne pas repasser à false
+            // (évite un flash isAvailableLocally et un redémarrage HLS en boucle).
+            if (!ih.startsWith('local_') && !libraryDownloadPath && !(activeTorrent as { downloadPath?: string }).downloadPath) {
+              setIsAvailableLocally(false);
             }
           }
           // Ne pas logger si stats est null (torrent non tÃ©lÃ©chargÃ©, c'est normal)
@@ -1372,13 +1359,13 @@ export default function MediaDetailPage({
 
             if (matched) {
                const se = parseSE(t.name);
-               if (se) {
+                 if (se) {
                  const key = `${se.s}:${se.e}`;
                  if (isCompleted) {
                    if (!episodesSet.has(key)) {
                       episodesSet.add(key);
                    }
-                 } else if (isDownloading) {
+                 } else if (isDownloading && !episodesSet.has(key)) {
                    downloadingMap[key] = Math.round((t.progress ?? 0) * 100);
                  }
                  

@@ -104,7 +104,9 @@ export function QuickConnectDisplay({
       const response = await serverApi.initQuickConnect();
 
       if (!response.success) {
-        const errorMsg = response.message || t('settingsPages.quickConnect.initError');
+        const errorMsg = response.message?.includes('Failed to fetch')
+          ? 'Impossible de joindre popcorn-web. Vérifiez votre connexion internet.'
+          : (response.message || t('settingsPages.quickConnect.initError'));
         setError(errorMsg);
         onError?.(errorMsg);
         setLoading(false);

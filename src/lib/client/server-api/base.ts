@@ -434,6 +434,9 @@ export class ServerApiClientBase {
     if (endpoint.includes('/api/library/uploader/upload-one')) return 1800000;
     if (endpoint.includes('/api/library/uploader/preview')) return 60000;
     if (endpoint.includes('/api/library/uploader/validate-media')) return 120000;
+    if (endpoint.includes('/api/library/integrity/check')) return 60000;
+    if (endpoint.includes('/api/library/integrity/status')) return 15000;
+    if (endpoint.includes('/api/library/integrity/delete')) return 120000;
     if (endpoint.includes('/api/library/uploader/generate-screenshots')) return 120000;
     if (endpoint.includes('/api/admin/deployment/webos/')) return 600000;
     if (endpoint.includes('/health') || endpoint.includes('/api/client/health')) {

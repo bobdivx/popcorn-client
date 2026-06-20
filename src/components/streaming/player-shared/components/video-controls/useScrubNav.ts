@@ -60,6 +60,7 @@ export function useScrubNav(options: {
   tvScrubInternalRef.current = tvScrubIndexInternal;
   const onSeekToTimeRef = useRef(onSeekToTime);
   onSeekToTimeRef.current = onSeekToTime;
+  const userScrubbedRef = useRef(false);
 
   const prevShowControlsRef = useRef(false);
   /** Identité stable des meta scrub (évite de relancer les effets à chaque nouvelle référence d’objet). */
@@ -178,6 +179,9 @@ export function useScrubNav(options: {
         if (keyNormalized === 'ArrowRight' || keyNormalized === 'PageUp') nextIdx = Math.min(count - 1, prev + step);
         if (keyNormalized === 'Home') nextIdx = 0;
         if (keyNormalized === 'End') nextIdx = count - 1;
+        if (nextIdx !== prev) {
+          userScrubbedRef.current = true;
+        }
         return nextIdx;
       });
     };
@@ -189,8 +193,10 @@ export function useScrubNav(options: {
     if (isTV) return;
     if (!showControls || !scrubEnabled) return;
     const id = window.setTimeout(() => {
+      if (!userScrubbedRef.current) return;
       const targetTime = timeForScrubIndexRef.current(tvScrubInternalRef.current);
       onSeekToTimeRef.current?.(targetTime);
+      userScrubbedRef.current = false;
     }, 2000);
     return () => window.clearTimeout(id);
   }, [isTV, showControls, scrubEnabled, tvScrubIndexInternal]);
@@ -210,6 +216,13 @@ export function useScrubNav(options: {
     const x = Math.min(rect.width, Math.max(0, e.clientX - rect.left));
     const percent = rect.width > 0 ? (x / rect.width) * 100 : 0;
     setScrubFromPercent(percent);
+  };
+
+  const stepScrubIndex = (delta: number) => {
+    const st = scrubThumbnailsRef.current;
+    const total = st?.count ?? 0;
+    if (total <= 0 || delta === 0) return;
+    setTvScrubIndexInternal((prev) => Math.min(total - 1, Math.max(0, prev + delta)));
   };
 
   const effectiveDurationForProgress = getEffectiveDuration();
@@ -236,6 +249,7 @@ export function useScrubNav(options: {
     timeForScrubIndex,
     setScrubFromPointer,
     setScrubFromPercent,
+    stepScrubIndex,
     progressPercent,
   };
 }
