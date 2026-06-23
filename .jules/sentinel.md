@@ -10,3 +10,8 @@
 **Vulnerability:** Weak PRNG `Math.random()` was used for generating IDs and UUIDs across multiple files (`src/lib/client/server-api/indexers.ts`, `src/api-routes-backup/v1/setup/indexers.ts`, `src/lib/utils/device-id.ts`, `src/components/torrents/MediaDetailPage/hooks/useNotifications.ts`).
 **Learning:** `Math.random()` is not cryptographically secure and shouldn't be used for IDs, especially not for indexer setups and device IDs. Moreover, calling `globalThis.crypto.randomUUID()` directly fails on HTTP non-localhost sites since it requires a Secure Context.
 **Prevention:** Always use the Web Crypto API (`crypto.getRandomValues()` or `crypto.randomUUID()`) through a centralized utility like `src/lib/utils/uuid.ts` that provides safe fallbacks for unsupported environments and non-secure contexts.
+
+## 2024-05-18 - Prevent Shoulder Surfing and Browser Autofill of Sensitive Keys
+**Vulnerability:** Sensitive tokens, keys, and webhook URLs (Slack, Discord, Telegram, custom API/passkeys) were implemented using `type="text"` in frontend `<input>` elements. This exposes critical credentials to shoulder surfing (visible on screen) and browser autofill history/leakage.
+**Learning:** Even internal settings pages must handle credentials securely. In frontend components (especially Preact/React forms), sensitive settings that look like standard inputs must explicitly mask values.
+**Prevention:** Always use `<input type="password">` combined with `autoComplete="off"` (or at least `autoComplete="off"` for valid URL fields that must remain somewhat visible) for any tokens, API keys, webhook URLs, and passkeys to ensure physical and local context security.
