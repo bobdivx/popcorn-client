@@ -10,3 +10,7 @@
 **Vulnerability:** Weak PRNG `Math.random()` was used for generating IDs and UUIDs across multiple files (`src/lib/client/server-api/indexers.ts`, `src/api-routes-backup/v1/setup/indexers.ts`, `src/lib/utils/device-id.ts`, `src/components/torrents/MediaDetailPage/hooks/useNotifications.ts`).
 **Learning:** `Math.random()` is not cryptographically secure and shouldn't be used for IDs, especially not for indexer setups and device IDs. Moreover, calling `globalThis.crypto.randomUUID()` directly fails on HTTP non-localhost sites since it requires a Secure Context.
 **Prevention:** Always use the Web Crypto API (`crypto.getRandomValues()` or `crypto.randomUUID()`) through a centralized utility like `src/lib/utils/uuid.ts` that provides safe fallbacks for unsupported environments and non-secure contexts.
+## 2026-07-09 - Secure Input Fields for Sensitive Tokens
+**Vulnerability:** Sensitive authentication tokens (e.g., Telegram bot tokens, Webhook URLs, API keys, Passkeys) were exposed through `<input type="text">`, increasing the risk of shoulder surfing and browser autofill leakage.
+**Learning:** React/Preact components handling credentials must explicitly render as `type="password"` to obscure content on-screen.
+**Prevention:** Always use `<input type="password" autoComplete="off">` when taking sensitive inputs (like bot tokens, webhooks, or API keys) instead of standard text inputs.
