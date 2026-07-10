@@ -1,21 +1,74 @@
-import { useSeedingHealth } from '../../hooks/useSeedingHealth';
+import { useSeedingHealth, type SeedingDiagnostic } from '../../hooks/useSeedingHealth';
 import { AlertTriangle, Info, X } from 'lucide-preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
+
+const DISMISS_STORAGE_KEY = 'popcorn_connectivity_warning_dismissed';
+
+function warningFingerprint(diagnostic: SeedingDiagnostic): string {
+  return `${diagnostic.status}|${(diagnostic.warnings ?? []).join('\u0000')}`;
+}
+
+function readDismissedFingerprint(): string | null {
+  try {
+    return sessionStorage.getItem(DISMISS_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
 
 export default function ConnectivityWarning() {
   const { diagnostic, loading } = useSeedingHealth();
   const { t } = useI18n();
-  const [dismissed, setDismissed] = useState(false);
+  const prevStatusRef = useRef<SeedingDiagnostic['status'] | undefined>();
+  const [dismissedFingerprint, setDismissedFingerprint] = useState<string | null>(() => readDismissedFingerprint());
 
-  // Re-show if status changes to error/warning
+  const fingerprint =
+    diagnostic && diagnostic.status !== 'ok' ? warningFingerprint(diagnostic) : '';
+
+  // Réafficher seulement si le problème était résolu (ok) puis réapparaît, ou si l'alerte change.
   useEffect(() => {
-    if (diagnostic?.status && diagnostic.status !== 'ok') {
-      setDismissed(false);
-    }
-  }, [diagnostic?.status]);
+    if (!diagnostic) return;
 
-  if (loading || !diagnostic || diagnostic.status === 'ok' || dismissed) {
+    const prevStatus = prevStatusRef.current;
+    prevStatusRef.current = diagnostic.status;
+
+    if (prevStatus === 'ok' && diagnostic.status !== 'ok') {
+      setDismissedFingerprint(null);
+      try {
+        sessionStorage.removeItem(DISMISS_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+
+    if (!fingerprint) return;
+
+    const stored = readDismissedFingerprint();
+    if (stored && stored !== fingerprint) {
+      setDismissedFingerprint(null);
+      try {
+        sessionStorage.removeItem(DISMISS_STORAGE_KEY);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [diagnostic?.status, fingerprint]);
+
+  const isDismissed = fingerprint !== '' && dismissedFingerprint === fingerprint;
+
+  const handleDismiss = () => {
+    if (!fingerprint) return;
+    setDismissedFingerprint(fingerprint);
+    try {
+      sessionStorage.setItem(DISMISS_STORAGE_KEY, fingerprint);
+    } catch {
+      /* ignore */
+    }
+  };
+
+  if (loading || !diagnostic || diagnostic.status === 'ok' || isDismissed) {
     return null;
   }
 
@@ -43,7 +96,7 @@ export default function ConnectivityWarning() {
         </p>
       </div>
       <button 
-        onClick={() => setDismissed(true)}
+        onClick={handleDismiss}
         className="shrink-0 p-2.5 hover:bg-white/10 rounded-xl transition-colors focus:outline-none focus:ring-2 focus:ring-white/40 active:scale-95"
         aria-label="Fermer la notification"
         tabIndex={0}
