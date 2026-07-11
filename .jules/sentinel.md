@@ -10,3 +10,7 @@
 **Vulnerability:** Weak PRNG `Math.random()` was used for generating IDs and UUIDs across multiple files (`src/lib/client/server-api/indexers.ts`, `src/api-routes-backup/v1/setup/indexers.ts`, `src/lib/utils/device-id.ts`, `src/components/torrents/MediaDetailPage/hooks/useNotifications.ts`).
 **Learning:** `Math.random()` is not cryptographically secure and shouldn't be used for IDs, especially not for indexer setups and device IDs. Moreover, calling `globalThis.crypto.randomUUID()` directly fails on HTTP non-localhost sites since it requires a Secure Context.
 **Prevention:** Always use the Web Crypto API (`crypto.getRandomValues()` or `crypto.randomUUID()`) through a centralized utility like `src/lib/utils/uuid.ts` that provides safe fallbacks for unsupported environments and non-secure contexts.
+## 2026-07-11 - Prevent Webhook & Token Leakage in UI
+**Vulnerability:** Several input fields managing sensitive data (like Slack/Discord Webhook URLs and Tracker Passkeys) were configured as `type="text"`, leaving them visually exposed to shoulder-surfing and potentially leaking via browser autofill.
+**Learning:** React/Preact inputs handling tokens, API keys, or Webhooks should strictly use `type="password"` with `autoComplete="off"` to avoid both physical and digital credentials leakage.
+**Prevention:** Always use password fields with autocomplete disabled for fields mapped to keys/secrets/tokens in settings interfaces.
