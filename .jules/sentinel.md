@@ -10,3 +10,8 @@
 **Vulnerability:** Weak PRNG `Math.random()` was used for generating IDs and UUIDs across multiple files (`src/lib/client/server-api/indexers.ts`, `src/api-routes-backup/v1/setup/indexers.ts`, `src/lib/utils/device-id.ts`, `src/components/torrents/MediaDetailPage/hooks/useNotifications.ts`).
 **Learning:** `Math.random()` is not cryptographically secure and shouldn't be used for IDs, especially not for indexer setups and device IDs. Moreover, calling `globalThis.crypto.randomUUID()` directly fails on HTTP non-localhost sites since it requires a Secure Context.
 **Prevention:** Always use the Web Crypto API (`crypto.getRandomValues()` or `crypto.randomUUID()`) through a centralized utility like `src/lib/utils/uuid.ts` that provides safe fallbacks for unsupported environments and non-secure contexts.
+
+## 2024-05-18 - Prevent Secret Leakage in UI
+**Vulnerability:** Sensitive tokens and keys (like webhook URLs and passkeys) were displayed using `<input type="text">`, making them vulnerable to shoulder surfing and browser autofill leakage.
+**Learning:** Using `type="text"` for any credential or secret allows the browser to potentially cache it in autofill data and makes the secret visible on screen to onlookers.
+**Prevention:** Always use `<input type="password">` with `autoComplete="off"` for sensitive fields like API keys, tokens, webhooks, and tracker passkeys in frontend settings panels.
