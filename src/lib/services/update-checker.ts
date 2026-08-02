@@ -3,7 +3,7 @@
  * Vérifie au démarrage si une nouvelle version est disponible
  */
 
-import { getPopcornWebBaseUrl } from '../api/popcorn-web.js';
+import { getPopcornWebApiUrl } from '../api/popcorn-web.js';
 import { notificationService } from './notification-service.js';
 
 interface VersionInfo {
@@ -69,54 +69,48 @@ class UpdateChecker {
   }
 
   /**
-   * Retourne l'URL de base alternative (apex ↔ www) pour popcornn.app si besoin de contourner une redirection.
+   * Récupère la dernière version via l'API JSON popcorn-web (CORS OK),
+   * au lieu de scraper la page HTML /downloads (bloquée en cross-origin).
    */
-  private static getAlternatePopcornBase(base: string): string {
-    const u = base.replace(/\/$/, '');
-    if (u === 'https://popcornn.app') return 'https://www.popcornn.app';
-    if (u === 'https://www.popcornn.app') return 'https://popcornn.app';
-    return u;
-  }
-
-  /**
-   * Parse la page de téléchargements sur popcornn.app pour extraire la dernière version client.
-   * Ne garde que les versions 1.x.x (client Popcorn), pour éviter de prendre une version de dépendance (ex. Astro 5.16.7).
-   */
-  private async parseDownloadsPage(): Promise<VersionInfo | null> {
+  private async fetchLatestFromReleasesApi(): Promise<VersionInfo | null> {
     if (this.isDevelopment()) {
       return null;
     }
 
-    const base = getPopcornWebBaseUrl();
-    const other = UpdateChecker.getAlternatePopcornBase(base);
-    const urlsToTry = [`${base}/downloads`, `${other}/downloads`];
-
-    for (const downloadsUrl of urlsToTry) {
-      try {
-        const response = await fetch(downloadsUrl);
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
-        const html = await response.text();
-        // Ne matcher que les versions 1.x.x (client Popcorn), pas les versions de dépendances (ex. Astro 5.x)
-        const versionRegex = /(?:v|version[:\s]+)(1\.\d+\.\d+)/gi;
-        const matches = html.match(versionRegex);
-        if (!matches || matches.length === 0) {
-          continue;
-        }
-        const latestVersion = matches[0].replace(/[^\d.]/g, '');
-        const apkLinkRegex = /href=["']([^"']*\.apk[^"']*)["']/i;
-        const apkMatch = html.match(apkLinkRegex);
-        const downloadUrl = apkMatch ? apkMatch[1] : undefined;
-        return {
-          version: latestVersion,
-          downloadUrl: downloadUrl ? (downloadUrl.startsWith('http') ? downloadUrl : `${downloadsUrl.replace(/\/downloads$/, '')}${downloadUrl}`) : undefined,
-        };
-      } catch (_e) {
-        continue;
+    try {
+      const apiUrl = `${getPopcornWebApiUrl()}/downloads/releases?limit=10`;
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        return null;
       }
+      const data = await response.json();
+      // API: { success, data: ReleaseInfo[] }
+      const releases = Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.data?.releases)
+          ? data.data.releases
+          : Array.isArray(data?.releases)
+            ? data.releases
+            : [];
+      if (!Array.isArray(releases) || releases.length === 0) {
+        return null;
+      }
+
+      for (const release of releases) {
+        const tag = String(release.tag || release.tag_name || release.name || '');
+        const match = tag.match(/1\.\d+\.\d+/);
+        if (!match) continue;
+        const apks = Array.isArray(release.apks) ? release.apks : [];
+        const apk = apks.find((a: { type?: string; downloadUrl?: string }) => a?.downloadUrl) || apks[0];
+        return {
+          version: match[0],
+          downloadUrl: apk?.downloadUrl,
+        };
+      }
+      return null;
+    } catch {
+      return null;
     }
-    return null;
   }
 
   /**
@@ -158,7 +152,7 @@ class UpdateChecker {
     this.checkInProgress = true;
 
     try {
-      const latestVersionInfo = await this.parseDownloadsPage();
+      const latestVersionInfo = await this.fetchLatestFromReleasesApi();
 
       if (!latestVersionInfo) {
         return null;

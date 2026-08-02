@@ -8,6 +8,7 @@ import { getBackendUrl } from '../../backend-config.js';
 import { isTauri } from '../../utils/tauri.js';
 // Utiliser la version client compatible navigateur pour JWT
 import { generateAccessToken, generateRefreshToken } from '../../auth/jwt-client.js';
+import { TokenManager } from '../storage.js';
 
 /** Callbacks appelés quand une requête échoue avec ConnectionError/Timeout (serveur hors ligne). Utilisé par le store pour remonter l'état dans l'UI. */
 export type ConnectionFailureListener = () => void;
@@ -504,7 +505,42 @@ export class ServerApiClientBase {
       const timeoutMs = this.getTimeoutMs(endpoint);
       const response = await this.nativeFetch(url, { ...options, headers }, timeoutMs);
 
+      // Access expiré (souvent après 1h) : tenter un refresh cloud avant de forcer un re-login.
+      // loginCloud / quick-connect utilisent les mêmes JWT côté local et cloud.
       if (!isAuthBootstrapEndpoint && response.status === 401 && this.accessToken) {
+        const { refreshCloudToken } = await import('../../api/popcorn-web.js');
+        const refreshed = await refreshCloudToken();
+        if (refreshed) {
+          this.loadTokens();
+          const newToken =
+            TokenManager.getAccessToken() || TokenManager.getCloudAccessToken() || this.accessToken;
+          if (newToken) {
+            this.accessToken = newToken;
+            headers.Authorization = `Bearer ${newToken}`;
+            const retryResponse = await this.nativeFetch(url, { ...options, headers }, timeoutMs);
+            if (retryResponse.status !== 401) {
+              return await this.handleResponse<T>(retryResponse);
+            }
+          }
+        }
+
+        // Fallback : régénérer des JWT locaux avec le secret utilisateur (évite un re-login)
+        const user = TokenManager.getUser();
+        if (user?.id && TokenManager.getJWTSecret()) {
+          try {
+            const username = user.email || user.username || user.id;
+            const { accessToken, refreshToken } = await this.generateClientTokens(user.id, username);
+            this.saveTokens(accessToken, refreshToken);
+            headers.Authorization = `Bearer ${accessToken}`;
+            const retryResponse = await this.nativeFetch(url, { ...options, headers }, timeoutMs);
+            if (retryResponse.status !== 401) {
+              return await this.handleResponse<T>(retryResponse);
+            }
+          } catch {
+            // ignore — tombe sur session-expired ci-dessous
+          }
+        }
+
         this.clearTokens();
         this.saveUser(null);
         if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('popcorn:session-expired'));

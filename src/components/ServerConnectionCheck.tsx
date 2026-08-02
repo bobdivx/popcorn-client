@@ -161,6 +161,23 @@ export default function ServerConnectionCheck() {
     return () => window.removeEventListener('popcorn:session-expired', handler);
   }, []);
 
+  // Session cloud morte (refresh invalide) : notifier sans forcer la déconnexion backend
+  useEffect(() => {
+    const handler = () => {
+      import('../lib/services/notification-service.js')
+        .then(({ notificationService }) =>
+          notificationService.notifyError(
+            t('auth.cloudSessionExpiredTitle') || 'Session cloud expirée',
+            t('auth.cloudSessionExpiredMessage') ||
+              'Reconnectez-vous à votre compte cloud pour synchroniser abonnement et config.'
+          )
+        )
+        .catch(() => {});
+    };
+    window.addEventListener('popcorn:cloud-session-expired', handler);
+    return () => window.removeEventListener('popcorn:cloud-session-expired', handler);
+  }, [t]);
+
   // Vérification rapide sans afficher l'animation si le serveur répond rapidement
   const checkConnectionQuick = async () => {
     // Si l'utilisateur est déjà authentifié, c'est une preuve que le backend est accessible

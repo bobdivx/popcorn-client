@@ -282,7 +282,9 @@
       "quickConnect": "Connexion rapide",
       "cloudLogin": "Connexion cloud",
       "noAccount": "Pas encore de compte ?",
-      "hasAccount": "Déjà un compte ?"
+      "hasAccount": "Déjà un compte ?",
+      "cloudSessionExpiredTitle": "Session cloud expirée",
+      "cloudSessionExpiredMessage": "Reconnectez-vous à votre compte cloud pour synchroniser abonnement et config."
     },
     "welcome": {
       "title": "Bienvenue !",
@@ -532,6 +534,12 @@
     "resumeLabel": "Reprendre",
     "buffering": "Mise en buffer…",
     "bufferingProgress": "Mise en buffer {percent}%",
+    "bufferLabel": "Buffer",
+    "downloadProgress": "Téléchargement",
+    "downloadSpeed": "Vitesse",
+    "downloading": "Téléchargement en cours",
+    "queued": "En file d'attente",
+    "stopPlayback": "Arrêter la lecture",
     "loadingVideo": "Chargement de la vidéo…",
     "preparingStream": "Préparation de la lecture en cours…",
     "streamPreparingRetry": "Préparation du flux, nouvelle tentative…",
@@ -1102,7 +1110,7 @@
     "packFilesList": "Fichiers du pack (pour la lecture)",
     "packAddTorrentHint": "Après avoir ajouté le torrent, les épisodes seront listés ici par fichier (S01E01, …).",
     "packListFilesFailed": "Impossible de charger la liste des fichiers du pack.",
-    "packListFilesFailedIndexerHint": "L’indexeur a souvent renvoyé une page web au lieu du fichier .torrent (ex. C411 sans passkey / cookies). Vérifiez la clé API de l’indexeur dans les réglages, ou ajoutez d’abord le torrent entier au client.",
+    "packListFilesFailedIndexerHint": "L’indexeur a souvent renvoyé une page web au lieu du fichier .torrent (ex. C411 : clé API Torznab manquante ou invalide). Vérifiez la clé API de l’indexeur dans Paramètres > Indexers, puis relancez une synchronisation.",
     "downloadThisEpisode": "Télécharger cet épisode",
     "playThisEpisode": "Lire cet épisode",
     "season": "Saison",

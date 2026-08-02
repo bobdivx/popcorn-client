@@ -37,8 +37,14 @@ export default function FeedbackFAB() {
     })();
   }, []);
 
-  const hasCloud = user != null && !!TokenManager.getCloudAccessToken();
+  const hasCloud = user != null && (!!TokenManager.getCloudAccessToken() || !!TokenManager.getCloudRefreshToken());
   const visible = hasCloud && !isTV;
+
+  useEffect(() => {
+    const onCloudExpired = () => setUser((u) => (u ? { ...u } : null));
+    window.addEventListener('popcorn:cloud-session-expired', onCloudExpired);
+    return () => window.removeEventListener('popcorn:cloud-session-expired', onCloudExpired);
+  }, []);
 
   useEffect(() => {
     if (!hasCloud) {

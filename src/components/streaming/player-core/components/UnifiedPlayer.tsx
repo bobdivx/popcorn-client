@@ -62,6 +62,7 @@ export default function UnifiedPlayer({
       {loading && (
         <PlayerLoadingOverlay
           message={loadingMessage}
+          title={hlsProps.torrentName ?? hlsProps.fileName}
           loadingStep={loadingStep}
           progressMessage={progressMessage}
           torrentStats={torrentStats}
@@ -93,6 +94,7 @@ export default function UnifiedPlayer({
         <LuciePlayer
           src={src}
           {...lucieProps}
+          torrentStats={torrentStats}
           onLoadingChange={onHlsLoadingChange}
           onError={onHlsError}
           onProgress={onProgress}
@@ -101,6 +103,7 @@ export default function UnifiedPlayer({
         <HLSPlayer
           src={src}
           {...hlsProps}
+          torrentStats={torrentStats}
           onLoadingChange={onHlsLoadingChange}
           onError={onHlsError}
           onProgress={onProgress}
