@@ -282,7 +282,9 @@
       "quickConnect": "Quick Connect",
       "cloudLogin": "Cloud login",
       "noAccount": "Don't have an account?",
-      "hasAccount": "Already have an account?"
+      "hasAccount": "Already have an account?",
+      "cloudSessionExpiredTitle": "Cloud session expired",
+      "cloudSessionExpiredMessage": "Sign in again to your cloud account to sync subscription and config."
     },
     "welcome": {
       "title": "Welcome!",
@@ -532,6 +534,12 @@
     "resumeLabel": "Resume",
     "buffering": "Buffering…",
     "bufferingProgress": "Buffering {percent}%",
+    "bufferLabel": "Buffer",
+    "downloadProgress": "Download",
+    "downloadSpeed": "Speed",
+    "downloading": "Downloading",
+    "queued": "Queued",
+    "stopPlayback": "Stop playback",
     "loadingVideo": "Loading video…",
     "preparingStream": "Preparing playback…",
     "streamPreparingRetry": "Preparing stream, retrying…",
@@ -1099,7 +1107,7 @@
     "packFilesList": "Pack files (for playback)",
     "packAddTorrentHint": "After adding the torrent, episodes will be listed here by file (S01E01, …).",
     "packListFilesFailed": "Could not load the pack file list.",
-    "packListFilesFailedIndexerHint": "The indexer often returned a web page instead of a .torrent file (e.g. C411 without passkey / cookies). Check the indexer API key in settings, or add the full torrent to the client first.",
+    "packListFilesFailedIndexerHint": "The indexer often returned a web page instead of a .torrent file (e.g. C411: missing or invalid Torznab API key). Check the indexer API key in Settings > Indexers, then re-run a sync.",
     "downloadThisEpisode": "Download this episode",
     "playThisEpisode": "Play this episode",
     "season": "Season",

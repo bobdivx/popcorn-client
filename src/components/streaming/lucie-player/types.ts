@@ -1,4 +1,5 @@
 import type { SeriesEpisodePickerItem } from '../player-shared/types/seriesEpisodePicker';
+import type { PlayerLoadingTorrentStats } from '../player-shared/components/PlayerLoadingOverlay';
 
 export type { SeriesEpisodePickerItem };
 
@@ -7,6 +8,8 @@ export interface LuciePlayerProps {
   infoHash?: string;
   fileName: string;
   torrentName?: string;
+  /** Stats torrent pour l'overlay de buffering (vitesse, peers, progression). */
+  torrentStats?: PlayerLoadingTorrentStats | null;
   posterUrl?: string;
   logoUrl?: string;
   synopsis?: string;
