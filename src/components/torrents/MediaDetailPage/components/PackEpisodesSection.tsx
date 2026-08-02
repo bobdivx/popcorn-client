@@ -22,6 +22,8 @@ export interface PackEpisodesSectionProps {
   /** Si présent, permet d'afficher des vignettes par épisode (fichier local). */
   infoHash?: string | null;
   watchedSet?: Set<string>;
+  downloadedEpisodesSet?: Set<string>;
+  downloadingEpisodesMap?: Record<string, number>;
   isTV?: boolean;
 }
 
@@ -34,6 +36,8 @@ export function PackEpisodesSection({
   onSelectEpisodeKey,
   infoHash,
   watchedSet,
+  downloadedEpisodesSet,
+  downloadingEpisodesMap,
   isTV,
 }: PackEpisodesSectionProps) {
   const { t } = useI18n();
@@ -142,6 +146,12 @@ export function PackEpisodesSection({
             typeof tmdbId === 'number' && season != null && ep.episode > 0
               ? watchedSet?.has(watchedEpisodeKey(season, ep.episode)) ?? false
               : false;
+          const epKey = season != null && typeof ep.episode === 'number' ? `${season}:${ep.episode}` : null;
+          const downloaded =
+            (epKey != null && !!downloadedEpisodesSet?.has(epKey)) || ep.key.kind === 'file';
+          const downloadingProgress =
+            epKey != null ? downloadingEpisodesMap?.[epKey] : undefined;
+          const currentlyDownloading = downloadingProgress !== undefined && !downloaded;
           const tmdbEpisodeName =
             typeof ep.episode === 'number' && ep.episode > 0 ? tmdbNameByEpisode[ep.episode] : undefined;
           return {
@@ -152,7 +162,10 @@ export function PackEpisodesSection({
             thumbnailUrl: getPreferredThumb(typeof ep.episode === 'number' && ep.episode > 0 ? ep.episode : null, fallback),
             watched,
             isAvailable: true,
-            isDownloaded: ep.key.kind === 'file', // If we have the file object, consider it potentially downloaded
+            isDownloaded: downloaded,
+            isDownloading: currentlyDownloading,
+            downloadProgress: currentlyDownloading ? downloadingProgress : undefined,
+            statusMessage: currentlyDownloading ? 'Téléchargement…' : null,
             isSelected: keyEquals(selectedEpisodeKey, ep.key),
             onSelect: () => onSelectEpisodeKey(ep.key),
             isTV,

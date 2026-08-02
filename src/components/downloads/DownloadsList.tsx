@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'preact/hooks';
-import { createPortal } from 'preact/compat';
 import { Download, Upload, Pause, Play, Trash2, Plus, FileText as LogsIcon, Link2, X, HardDrive, Info } from 'lucide-preact';
 import { clientApi } from '../../lib/client/api';
 import type { ClientTorrentStats, ContentItem, TorrentLogEntry } from '../../lib/client/types';
@@ -10,8 +9,9 @@ import { HeroSection } from '../dashboard/components/HeroSection';
 import { DownloadCard } from './DownloadCard';
 import { DownloadDetailModal } from './DownloadDetailModal';
 import { Modal } from '../ui/Modal';
+import { ConfirmModal } from '../ui/ConfirmModal';
 
-const REFRESH_INTERVAL = 2000;
+const REFRESH_INTERVAL = 4000;
 
 function buildImageMapFromList(data: { data?: Array<Record<string, any>> }) {
   const map: Record<string, any> = {};
@@ -127,6 +127,11 @@ export default function DownloadsList() {
   const [selectedRelatedTorrents, setSelectedRelatedTorrents] = useState<ClientTorrentStats[]>([]);
   const [selectedTorrentPoster, setSelectedTorrentPoster] = useState<string | null>(null);
   const [selectedTorrentBackdrop, setSelectedTorrentBackdrop] = useState<string | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<{
+    hash: string;
+    deleteFiles: boolean;
+  } | null>(null);
+  const pendingRemoveResolveRef = useRef<((ok: boolean) => void) | null>(null);
   const [initialHydrated, setInitialHydrated] = useState(false);
 
   const [showSessionLogsModal, setShowSessionLogsModal] = useState(false);
@@ -435,11 +440,11 @@ export default function DownloadsList() {
           <h2 className="text-2xl sm:text-3xl font-bold text-white">{title}</h2>
           <span className="px-3 py-1 bg-white/5 rounded-full text-xs font-bold text-white/40 border border-white/10">{items.length}</span>
         </div>
-        {/* Conteneur scroll séparé du flex interne : évite min-width:auto qui empêchait le scroll sous main overflow-x-hidden */}
-        <div className="w-full min-w-0 max-w-full overflow-x-auto overflow-y-visible scrollbar-hide px-4 sm:px-12 pb-8 pt-2" style={{ scrollSnapType: 'x mandatory' }}>
-          <div className="flex gap-4 w-max">
+        {/* Mobile: carrousel horizontal ; md+: grille lisible */}
+        <div className="w-full min-w-0 max-w-full overflow-x-auto overflow-y-visible scrollbar-hide md:overflow-visible px-4 sm:px-12 pb-8 pt-2 [scroll-snap-type:x_mandatory] md:[scroll-snap-type:none]">
+          <div className="flex gap-4 w-max md:w-full md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:gap-5">
             {items.map((torrent) => (
-              <div key={torrent.info_hash} className="shrink-0 w-[240px] sm:w-[320px]" style={{ scrollSnapAlign: 'start' }}>
+              <div key={torrent.info_hash} className="shrink-0 w-[240px] sm:w-[320px] md:w-auto md:min-w-0 md:shrink" style={{ scrollSnapAlign: 'start' }}>
                 <DownloadCard
                   torrent={torrent}
                   posterUrl={imageMap[torrent.info_hash.toLowerCase()]?.posterUrl}
@@ -478,8 +483,28 @@ export default function DownloadsList() {
             <p className="text-white/40 text-base sm:text-lg font-medium">{t('downloads.activeDownloads', { count: torrents.length, plural: torrents.length > 1 ? 's' : '' })}</p>
           </div>
           <div className="flex items-center gap-2 p-1.5 sm:p-2 bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl backdrop-blur-xl shrink-0">
-             <button onClick={() => setShowAddMagnetModal(true)} className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all"><Link2 size={24} /></button>
-             <button onClick={() => setShowSessionLogsModal(true)} className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-all"><LogsIcon size={24} /></button>
+             <button
+               type="button"
+               onClick={() => setShowAddMagnetModal(true)}
+               data-focusable
+               tabIndex={0}
+               aria-label={t('downloads.addMagnetLink')}
+               title={t('downloads.addMagnetLink')}
+               className="min-w-11 min-h-11 w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+             >
+               <Link2 size={24} />
+             </button>
+             <button
+               type="button"
+               onClick={() => setShowSessionLogsModal(true)}
+               data-focusable
+               tabIndex={0}
+               aria-label={t('downloads.logs') || 'Logs'}
+               title={t('downloads.logs') || 'Logs'}
+               className="min-w-11 min-h-11 w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors"
+             >
+               <LogsIcon size={24} />
+             </button>
           </div>
         </div>
 
@@ -581,9 +606,14 @@ export default function DownloadsList() {
           onClose={handleCloseDetail} 
           onPause={async (h) => { await clientApi.pauseTorrent(h); await loadTorrents(); }} 
           onResume={async (h) => { await clientApi.resumeTorrent(h); await loadTorrents(); }} 
-          onRemove={async (h, d) => { if(confirm("Supprimer ?")) { await clientApi.removeTorrent(h, d); await loadTorrents(); return true; } return false; }} 
-          onShowLogs={handleShowLogs} 
-          posterUrl={selectedTorrentPoster} 
+          onRemove={async (h, d) => {
+            return new Promise<boolean>((resolve) => {
+              pendingRemoveResolveRef.current = resolve;
+              setPendingRemove({ hash: h, deleteFiles: d });
+            });
+          }}
+          onShowLogs={handleShowLogs}
+          posterUrl={selectedTorrentPoster}
           backdropUrl={selectedTorrentBackdrop}
           displayTitleByHash={displayTitleMap}
           tmdbIdByHash={tmdbIdMap}
@@ -591,6 +621,42 @@ export default function DownloadsList() {
           onTmdbMetadataChanged={handleTmdbMetadataChanged}
         />
       )}
+
+      <ConfirmModal
+        isOpen={!!pendingRemove}
+        title={t('downloads.confirmDeleteTorrentTitle') || 'Supprimer le torrent'}
+        message={
+          pendingRemove?.deleteFiles
+            ? t('downloads.confirmDeleteTorrentMessage') ||
+              'Supprimer ce torrent et les fichiers du disque ?'
+            : t('downloads.confirmRemove')?.replace('{withFiles}', '') ||
+              'Supprimer ce torrent du client ?'
+        }
+        danger
+        confirmLabel={t('common.delete') || 'Supprimer'}
+        onCancel={() => {
+          pendingRemoveResolveRef.current?.(false);
+          pendingRemoveResolveRef.current = null;
+          setPendingRemove(null);
+        }}
+        onConfirm={async () => {
+          const pending = pendingRemove;
+          setPendingRemove(null);
+          if (!pending) {
+            pendingRemoveResolveRef.current?.(false);
+            pendingRemoveResolveRef.current = null;
+            return;
+          }
+          try {
+            await clientApi.removeTorrent(pending.hash, pending.deleteFiles);
+            await loadTorrents();
+            pendingRemoveResolveRef.current?.(true);
+          } catch {
+            pendingRemoveResolveRef.current?.(false);
+          }
+          pendingRemoveResolveRef.current = null;
+        }}
+      />
     </div>
   );
 }

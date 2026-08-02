@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { createPortal } from 'preact/compat';
 import { serverApi } from '../../lib/client/server-api';
 import { clientApi } from '../../lib/client/api';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { ExternalLink, Download, Upload, FileText, Settings, Database, X, Network } from 'lucide-preact';
+import { ExternalLink, Download, Upload, FileText, Settings, Database, Network } from 'lucide-preact';
+import { Modal } from '../ui/Modal';
 
 const REFRESH_STATS_MS = 5000;
 
@@ -146,6 +146,20 @@ export default function LibRbitSettings() {
     })();
     return () => ctrl.abort();
   }, [showLogsModal, t]);
+
+  // TV : Backspace ferme les logs (Escape est géré par Modal)
+  useEffect(() => {
+    if (!showLogsModal) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Backspace') return;
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      e.preventDefault();
+      setShowLogsModal(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [showLogsModal]);
 
   const handleSaveLimits = async () => {
     setLimitsError(null);
@@ -441,42 +455,23 @@ export default function LibRbitSettings() {
         </section>
       </div>
 
-      {/* Modal Logs */}
-      {showLogsModal && createPortal(
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
-          onClick={e => e.target === e.currentTarget && setShowLogsModal(false)}
-          onKeyDown={e => (e.key === 'Escape' || e.key === 'Backspace') && setShowLogsModal(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="logs-modal-title"
-        >
-          <div className="bg-gray-900 border border-gray-800 rounded-xl p-4 sm:p-6 max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="flex justify-between items-center mb-4">
-              <h3 id="logs-modal-title" className="text-lg font-semibold text-white">
-                {t('settingsPages.librqbit.logs')}
-              </h3>
-              <button
-                onClick={() => setShowLogsModal(false)}
-                className="text-gray-400 hover:text-white p-1 rounded focus:ring-2 focus:ring-cyan-500 focus:outline-none transition-colors"
-                aria-label={t('settingsPages.librqbit.logsClose')}
-              >
-                <X className="h-5 w-5" size={20} />
-              </button>
-            </div>
-            {logsConnecting && logLines.length === 0 ? (
-              <p className="text-gray-400 py-8 text-center">{t('settingsPages.librqbit.logsConnecting')}</p>
-            ) : logsError ? (
-              <p className="text-red-400 py-4">{logsError}</p>
-            ) : (
-              <pre className="flex-1 overflow-auto rounded-lg border border-white/10 bg-black/30 p-4 text-xs text-gray-300 whitespace-pre-wrap font-mono min-h-[200px]">
-                {logLines.length === 0 && !logsConnecting ? t('settingsPages.librqbit.logsEmpty') : logLines.join('\n')}
-              </pre>
-            )}
-          </div>
-        </div>,
-        document.body
-      )}
+      <Modal
+        isOpen={showLogsModal}
+        onClose={() => setShowLogsModal(false)}
+        title={t('settingsPages.librqbit.logs')}
+        size="xl"
+        scrollable={false}
+      >
+        {logsConnecting && logLines.length === 0 ? (
+          <p className="text-gray-400 py-8 text-center">{t('settingsPages.librqbit.logsConnecting')}</p>
+        ) : logsError ? (
+          <p className="text-red-400 py-4">{logsError}</p>
+        ) : (
+          <pre className="overflow-auto rounded-lg border border-white/10 bg-black/30 p-4 text-xs text-gray-300 whitespace-pre-wrap font-mono min-h-[200px] max-h-[60vh]">
+            {logLines.length === 0 && !logsConnecting ? t('settingsPages.librqbit.logsEmpty') : logLines.join('\n')}
+          </pre>
+        )}
+      </Modal>
     </div>
   );
 }

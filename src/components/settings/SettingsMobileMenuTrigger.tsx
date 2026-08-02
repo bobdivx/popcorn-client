@@ -12,7 +12,7 @@ export default function SettingsMobileMenuTrigger() {
     <>
       {/* Sur mobile : bouton fixe toujours visible sous le header pour ouvrir le menu */}
       <div
-        className="lg:hidden fixed left-0 z-[28] top-[calc(3.75rem+var(--safe-area-inset-top,0px))] sm:top-[calc(5rem+var(--safe-area-inset-top,0px))] md:top-[calc(5.5rem+var(--safe-area-inset-top,0px))] pt-2 pl-[max(0.75rem,env(safe-area-inset-left,0px))]"
+        className="md:hidden fixed left-0 z-[28] top-[calc(3.75rem+var(--safe-area-inset-top,0px))] sm:top-[calc(5rem+var(--safe-area-inset-top,0px))] pt-2 pl-[max(0.75rem,env(safe-area-inset-left,0px))]"
         aria-hidden
       >
         <button
@@ -27,7 +27,7 @@ export default function SettingsMobileMenuTrigger() {
         </button>
       </div>
       {/* Placeholder pour éviter que le contenu passe sous le bouton fixe */}
-      <div className="lg:hidden h-14 shrink-0" aria-hidden />
+      <div className="md:hidden h-14 shrink-0" aria-hidden />
     </>
   );
 }

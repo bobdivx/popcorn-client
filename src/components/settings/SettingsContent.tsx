@@ -18,6 +18,7 @@ import DsPageHeader from '../ui/DsPageHeader';
 import { LogOut } from 'lucide-preact';
 import { serverApi } from '../../lib/client/server-api';
 import { redirectTo } from '../../lib/utils/navigation.js';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
 
 type CategoryId = 'system' | 'interface' | 'content' | 'downloads' | 'library' | 'discovery' | 'account' | 'playback' | 'maintenance';
 
@@ -187,12 +188,22 @@ function LazyPageServer() {
 
 function LazyPageAccount() {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [AccountSubMenuPanel, setAccountSubMenuPanel] = useState<ComponentType<{ baseUrl?: string }> | null>(null);
   useEffect(() => {
     import('./AccountSubMenuPanel').then((m) => setAccountSubMenuPanel(() => m.default));
   }, []);
   const handleLogout = async () => {
-    if (!confirm(t('account.logoutConfirm'))) return;
+    if (
+      !(await confirm({
+        title: t('account.logout') || 'Déconnexion',
+        message: t('account.logoutConfirm'),
+        danger: true,
+        confirmLabel: t('account.logout') || 'Déconnexion',
+      }))
+    ) {
+      return;
+    }
     try {
       await serverApi.logout();
     } catch (err) {
@@ -210,7 +221,9 @@ function LazyPageAccount() {
           <button
             type="button"
             onClick={handleLogout}
-            className="ds-btn-danger btn btn-sm gap-2 px-4 py-2.5 font-semibold text-white min-h-[var(--ds-touch-target-sm)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-red)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex-shrink-0"
+            data-focusable
+            tabIndex={0}
+            className="ds-btn-danger btn btn-sm gap-2 px-4 py-2.5 font-semibold text-white min-h-11 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-red)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex-shrink-0"
             aria-label={t('account.logout')}
           >
             <LogOut className="w-4 h-4" aria-hidden />
@@ -218,6 +231,7 @@ function LazyPageAccount() {
           </button>
         </div>
         <AccountSubMenuPanel baseUrl="/settings/account" />
+        {confirmDialog}
       </div>
     </PermissionGuard>
   );

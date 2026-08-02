@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
-import { createPortal } from 'preact/compat';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
 import { FolderOpen, Folder, Loader2 } from 'lucide-preact';
+import { Modal } from '../ui/Modal';
 
 type MediaPathType = 'films' | 'series';
 
@@ -194,96 +194,85 @@ export default function MediaPathsPanel({ onBack }: MediaPathsPanelProps) {
         Racine serveur : <code className="bg-[var(--ds-surface-elevated)] px-1 rounded-[var(--ds-radius-sm)] text-[var(--ds-text-primary)]">{data.download_dir_root}</code>
       </p>
 
-      {/* Modal Parcourir */}
-      {browseType !== null && createPortal(
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={t('settingsMenu.mediaPathsPanel.browseTitle')}
-        >
-          <div className="bg-[#1a1c20] border border-white/10 rounded-2xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-              <h3 className="text-lg font-semibold text-white">
-                {t('settingsMenu.mediaPathsPanel.browseTitle')} — {browseType === 'films' ? t('settingsMenu.mediaPathsPanel.filmsPath') : t('settingsMenu.mediaPathsPanel.seriesPath')}
-              </h3>
-              <button
-                type="button"
-                onClick={closeBrowse}
-                className="text-gray-400 hover:text-white p-1 rounded"
-                aria-label={t('common.close')}
-              >
-                ×
-              </button>
-            </div>
-            <div className="px-2 py-1 text-sm text-gray-500 font-mono truncate border-b border-white/5">
-              {browsePath || '/'}
-            </div>
-            <div className="flex-1 overflow-y-auto p-2 min-h-[200px]">
-              {browseLoading ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
-                </div>
-              ) : (
-                <ul className="space-y-0.5">
-                  {browsePath && (
-                    <li>
+      <Modal
+        isOpen={browseType !== null}
+        onClose={closeBrowse}
+        title={
+          browseType
+            ? `${t('settingsMenu.mediaPathsPanel.browseTitle')} — ${browseType === 'films' ? t('settingsMenu.mediaPathsPanel.filmsPath') : t('settingsMenu.mediaPathsPanel.seriesPath')}`
+            : t('settingsMenu.mediaPathsPanel.browseTitle')
+        }
+        size="md"
+        noPadding
+      >
+        <div className="flex flex-col max-h-[70vh]">
+          <div className="px-4 py-2 text-sm text-gray-500 font-mono truncate border-b border-white/5">
+            {browsePath || '/'}
+          </div>
+          <div className="flex-1 overflow-y-auto p-2 min-h-[200px]">
+            {browseLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
+              </div>
+            ) : (
+              <ul className="space-y-0.5">
+                {browsePath && (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const parts = browsePath.replace(/\/$/, '').split('/').filter(Boolean);
+                        parts.pop();
+                        setBrowsePath(parts.join('/'));
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-gray-300 hover:bg-white/10"
+                    >
+                      <Folder className="w-5 h-5 text-amber-500" />
+                      ..
+                    </button>
+                  </li>
+                )}
+                {entries
+                  .filter((e) => e.is_directory)
+                  .map((entry) => (
+                    <li key={entry.path}>
                       <button
                         type="button"
-                        onClick={() => {
-                          const parts = browsePath.replace(/\/$/, '').split('/').filter(Boolean);
-                          parts.pop();
-                          setBrowsePath(parts.join('/'));
-                        }}
+                        onClick={() => handleEntryClick(entry)}
                         className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-gray-300 hover:bg-white/10"
                       >
                         <Folder className="w-5 h-5 text-amber-500" />
-                        ..
+                        {entry.name}
                       </button>
                     </li>
-                  )}
-                  {entries
-                    .filter((e) => e.is_directory)
-                    .map((entry) => (
-                      <li key={entry.path}>
-                        <button
-                          type="button"
-                          onClick={() => handleEntryClick(entry)}
-                          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-gray-300 hover:bg-white/10"
-                        >
-                          <Folder className="w-5 h-5 text-amber-500" />
-                          {entry.name}
-                        </button>
-                      </li>
-                    ))}
-                  {entries.filter((e) => e.is_directory).length === 0 && !browsePath && (
-                    <li className="px-3 py-4 text-gray-500 text-sm">{t('settingsMenu.mediaPathsPanel.noSubfolders')}</li>
-                  )}
-                </ul>
-              )}
-            </div>
-            <div className="flex gap-2 px-4 py-3 border-t border-white/10">
-              <button
-                type="button"
-                onClick={closeBrowse}
-                className="btn btn-ghost btn-sm text-gray-400"
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                type="button"
-                onClick={handleChooseFolder}
-                disabled={saving}
-                className="btn btn-primary btn-sm ml-auto"
-              >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                {t('settingsMenu.mediaPathsPanel.chooseFolder')}
-              </button>
-            </div>
+                  ))}
+                {entries.filter((e) => e.is_directory).length === 0 && !browsePath && (
+                  <li className="px-3 py-4 text-gray-500 text-sm">{t('settingsMenu.mediaPathsPanel.noSubfolders')}</li>
+                )}
+              </ul>
+            )}
           </div>
-        </div>,
-        document.body
-      )}
+          <div className="flex gap-2 px-4 py-3 border-t border-white/10">
+            <button
+              type="button"
+              onClick={closeBrowse}
+              className="btn btn-ghost btn-sm text-gray-400"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={handleChooseFolder}
+              disabled={saving}
+              className="btn btn-primary btn-sm ml-auto"
+              data-autofocus
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {t('settingsMenu.mediaPathsPanel.chooseFolder')}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

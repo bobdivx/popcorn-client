@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 import { X, Sliders } from 'lucide-preact';
+import { useEscapeClose } from '../../hooks/useEscapeClose';
 
 interface FiltersPanelProps {
   codecs?: ('x264' | 'x265' | 'AV1')[];
@@ -32,6 +33,8 @@ export function FiltersPanel({
   const [localSelectedCodecs, setLocalSelectedCodecs] = useState<('x264' | 'x265' | 'AV1')[]>(selectedCodecs);
   const [localMinFileSize, setLocalMinFileSize] = useState<number | undefined>(minFileSize);
   const [localMaxFileSize, setLocalMaxFileSize] = useState<number | undefined>(maxFileSize);
+
+  useEscapeClose(isOpen, onClose);
 
   const handleCodecToggle = (codec: 'x264' | 'x265' | 'AV1') => {
     const newCodecs = localSelectedCodecs.includes(codec)
@@ -69,7 +72,12 @@ export function FiltersPanel({
       />
 
       {/* Panel */}
-      <div className="fixed top-0 right-0 h-screen w-96 max-w-[90vw] z-50 transform transition-transform duration-300 ease-out glass-panel-lg border-l border-white/10 shadow-2xl overflow-y-auto">
+      <div
+        className="fixed top-0 right-0 h-screen w-96 max-w-[90vw] z-50 transform transition-transform duration-300 ease-out glass-panel-lg border-l border-white/10 shadow-2xl overflow-y-auto"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Filtres Avancés"
+      >
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-white/10 flex-shrink-0">
@@ -82,6 +90,7 @@ export function FiltersPanel({
               className="p-2 text-white hover:bg-glass-hover rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-opacity-50"
               aria-label="Fermer les filtres"
               tabIndex={0}
+              data-autofocus
             >
               <X className="w-5 h-5 tv:w-6 tv:h-6" size={20} />
             </button>

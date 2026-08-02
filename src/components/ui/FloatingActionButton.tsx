@@ -21,10 +21,27 @@ type Props = {
 };
 
 const positionClasses: Record<Position, string> = {
-  'bottom-right': 'bottom-6 right-6 sm:bottom-8 sm:right-8',
-  'bottom-left': 'bottom-6 left-6 sm:bottom-8 sm:left-8',
-  'top-right': 'top-20 right-6 sm:right-8',
-  'top-left': 'top-20 left-6 sm:left-8',
+  'bottom-right': '',
+  'bottom-left': '',
+  'top-right': 'top-20',
+  'top-left': 'top-20',
+};
+
+const positionStyles: Record<Position, Record<string, string>> = {
+  'bottom-right': {
+    bottom: 'var(--fab-stack-bottom)',
+    right: 'var(--floating-offset-right)',
+  },
+  'bottom-left': {
+    bottom: 'var(--fab-stack-bottom)',
+    left: 'calc(1.5rem + var(--safe-area-inset-left))',
+  },
+  'top-right': {
+    right: 'var(--floating-offset-right)',
+  },
+  'top-left': {
+    left: 'calc(1.5rem + var(--safe-area-inset-left))',
+  },
 };
 
 export default function FloatingActionButton({
@@ -42,10 +59,7 @@ export default function FloatingActionButton({
     <div
       data-tv-nav-skip
       className={`fixed z-40 ${positionClasses[position]} flex flex-col items-center gap-2`}
-      style={{
-        paddingBottom: 'var(--safe-area-inset-bottom)',
-        paddingRight: 'var(--safe-area-inset-right)',
-      }}
+      style={positionStyles[position]}
     >
       <button
         type="button"
