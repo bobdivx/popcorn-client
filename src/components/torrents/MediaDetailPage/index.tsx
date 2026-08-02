@@ -41,6 +41,10 @@ import { getHighQualityTmdbImageUrl } from '../../../lib/utils/tmdb-images';
 import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-config';
 import { getMediaDisplayTitle } from './utils/mediaDisplayTitle';
 import { resolveDownloadTypeHeader } from './utils/resolveDownloadTypeHeader';
+import {
+  buildExternalDownloadParams,
+  looksLikeBencodedTorrent,
+} from '../../../lib/torrents/externalDownloadParams';
 import { useTmdbApiTitle } from './hooks/useTmdbApiTitle';
 
 /** Retourne l'Ã©pisode suivant (saison + id variante + titre) ou null. */
@@ -717,32 +721,33 @@ export default function MediaDetailPage({
           const token = serverApi.getAccessToken();
           const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
           const isRelative = !externalLink.startsWith('http://') && !externalLink.startsWith('https://');
+          const ext = buildExternalDownloadParams(torrent as any);
           const q = new URLSearchParams();
           if (isRelative) {
-            q.set('indexerId', String((torrent as { indexerId?: string }).indexerId ?? (torrent as { indexer_id?: string }).indexer_id ?? ''));
-            q.set('torrentId', (() => {
-              const m = externalLink.match(/[?&]id=(\d+)/);
-              return (m && m[1]) || (torrent.id && torrent.id.includes('_') ? torrent.id.split('_').pop() : torrent.id) || '';
-            })());
-            if ((torrent as { _guid?: string })._guid) q.set('guid', (torrent as { _guid: string })._guid);
-            const typeMatch = torrent.id && torrent.id.match(/^external_([^_]+)_/);
-            if (typeMatch && typeMatch[1]) q.set('indexerTypeId', typeMatch[1]);
+            if (ext.indexerId) q.set('indexerId', ext.indexerId);
+            const idFromLink = externalLink.match(/[?&]id=(\d+)/)?.[1];
+            q.set('torrentId', idFromLink || ext.torrentId || '');
+            if (ext.guid) q.set('guid', ext.guid);
+            if (ext.indexerTypeId) q.set('indexerTypeId', ext.indexerTypeId);
             q.set('relativeUrl', externalLink);
           } else {
             q.set('url', externalLink);
-            if ((torrent as { indexerId?: string }).indexerId) q.set('indexerId', String((torrent as { indexerId: string }).indexerId));
-            if ((torrent as { _guid?: string })._guid) q.set('guid', (torrent as { _guid: string })._guid);
-            if (torrent.id?.includes('_')) q.set('torrentId', torrent.id!.split('_').pop()!);
-            const extMatch = torrent.id && torrent.id.match(/^external_(.+?)_\d+$/);
-            if (extMatch && extMatch[1]) q.set('indexerTypeId', extMatch[1]);
+            if (ext.indexerId) q.set('indexerId', ext.indexerId);
+            if (ext.guid) q.set('guid', ext.guid);
+            if (ext.torrentId) q.set('torrentId', ext.torrentId);
+            if (ext.indexerTypeId) q.set('indexerTypeId', ext.indexerTypeId);
+            if (ext.infoHash) q.set('infoHash', ext.infoHash);
           }
           const res = await fetch(`${baseUrl}/api/torrents/external/download?${q.toString()}`, { headers });
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             throw new Error((err as { error?: string }).error || `Erreur ${res.status}`);
           }
-          const blob = await res.blob();
-          const file = new File([blob], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
+          const buf = new Uint8Array(await res.arrayBuffer());
+          if (!looksLikeBencodedTorrent(buf)) {
+            throw new Error('La réponse n\'est pas un fichier .torrent (souvent page HTML C411). Vérifiez la clé API Torznab.');
+          }
+          const file = new File([buf], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
           const downloadType = resolveDownloadTypeHeader(torrent);
           const result = await clientApi.addTorrentFile(file, false, downloadType);
           infoHash = result?.info_hash ?? '';
@@ -757,7 +762,7 @@ export default function MediaDetailPage({
           throw new Error('Aucun lien magnet ou URL externe');
         }
         if (infoHash!) {
-          addNotification('success', 'Ã‰pisode ajoutÃ© au tÃ©lÃ©chargement.');
+          addNotification('success', 'Épisode ajouté au téléchargement.');
           setTorrentStats({ info_hash: infoHash, name: torrent.name, state: 'queued', downloaded_bytes: 0, uploaded_bytes: 0, total_bytes: 0, progress: 0, download_speed: 0, upload_speed: 0, peers_connected: 0, peers_total: 0, seeders: 0, leechers: 0, eta_seconds: null, download_started: true });
           startProgressPolling(infoHash, { torrent: activeTorrent, pollTorrentProgress, progressPollIntervalRef, PROGRESS_POLL_INTERVAL_MS, setPlayStatus });
         }
@@ -787,32 +792,33 @@ export default function MediaDetailPage({
           const token = serverApi.getAccessToken();
           const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
           const isRelative = !externalLink.startsWith('http://') && !externalLink.startsWith('https://');
+          const ext = buildExternalDownloadParams(torrent as any);
           const q = new URLSearchParams();
           if (isRelative) {
-            q.set('indexerId', String((torrent as { indexerId?: string }).indexerId ?? (torrent as { indexer_id?: string }).indexer_id ?? ''));
-            q.set('torrentId', (() => {
-              const m = externalLink.match(/[?&]id=(\d+)/);
-              return (m && m[1]) || (torrent.id && torrent.id.includes('_') ? torrent.id.split('_').pop() : torrent.id) || '';
-            })());
-            if ((torrent as { _guid?: string })._guid) q.set('guid', (torrent as { _guid: string })._guid);
-            const typeMatch = torrent.id && torrent.id.match(/^external_([^_]+)_/);
-            if (typeMatch && typeMatch[1]) q.set('indexerTypeId', typeMatch[1]);
+            if (ext.indexerId) q.set('indexerId', ext.indexerId);
+            const idFromLink = externalLink.match(/[?&]id=(\d+)/)?.[1];
+            q.set('torrentId', idFromLink || ext.torrentId || '');
+            if (ext.guid) q.set('guid', ext.guid);
+            if (ext.indexerTypeId) q.set('indexerTypeId', ext.indexerTypeId);
             q.set('relativeUrl', externalLink);
           } else {
             q.set('url', externalLink);
-            if ((torrent as { indexerId?: string }).indexerId) q.set('indexerId', String((torrent as { indexerId: string }).indexerId));
-            if ((torrent as { _guid?: string })._guid) q.set('guid', (torrent as { _guid: string })._guid);
-            if (torrent.id?.includes('_')) q.set('torrentId', torrent.id!.split('_').pop()!);
-            const extMatch = torrent.id && torrent.id.match(/^external_(.+?)_\d+$/);
-            if (extMatch && extMatch[1]) q.set('indexerTypeId', extMatch[1]);
+            if (ext.indexerId) q.set('indexerId', ext.indexerId);
+            if (ext.guid) q.set('guid', ext.guid);
+            if (ext.torrentId) q.set('torrentId', ext.torrentId);
+            if (ext.indexerTypeId) q.set('indexerTypeId', ext.indexerTypeId);
+            if (ext.infoHash) q.set('infoHash', ext.infoHash);
           }
           const res = await fetch(`${baseUrl}/api/torrents/external/download?${q.toString()}`, { headers });
           if (!res.ok) {
             const err = await res.json().catch(() => ({}));
             throw new Error((err as { error?: string }).error || `Erreur ${res.status}`);
           }
-          const blob = await res.blob();
-          const file = new File([blob], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
+          const buf = new Uint8Array(await res.arrayBuffer());
+          if (!looksLikeBencodedTorrent(buf)) {
+            throw new Error('La réponse n\'est pas un fichier .torrent (souvent page HTML C411). Vérifiez la clé API Torznab.');
+          }
+          const file = new File([buf], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
           const result = await clientApi.addTorrentFile(file, true);
           infoHash = result?.info_hash ?? '';
           if (infoHash) scheduleUpdateOnlyFilesWithRetry(infoHash, fileIndex);
@@ -826,7 +832,7 @@ export default function MediaDetailPage({
             clientApi.bindDownloadToMedia(infoHash, torrent.tmdbId, torrent.tmdbType).catch(() => {});
           }
           setPlayStatus('downloading');
-          setProgressMessage('PrÃ©paration du fluxâ€¦');
+          setProgressMessage('Préparation du flux…');
           const waitForFiles = async (attempts = 0): Promise<void> => {
             if (attempts > 30) return;
             try {

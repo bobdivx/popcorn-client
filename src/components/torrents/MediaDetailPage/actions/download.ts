@@ -2,6 +2,7 @@ import { clientApi } from '../../../../lib/client/api';
 import { serverApi } from '../../../../lib/client/server-api';
 import { saveDownloadMeta } from '../../../../lib/utils/download-meta-storage';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
+import { buildExternalDownloadParams } from '../../../../lib/torrents/externalDownloadParams';
 import type { MediaDetailPageProps } from '../types';
 import { startProgressPolling, type ProgressPollingOptions } from './progressPolling';
 import { resolveDownloadTypeHeader } from '../utils/resolveDownloadTypeHeader';
@@ -434,23 +435,18 @@ async function downloadFromExternalIndexer(options: {
     externalUrl.searchParams.set('infoHash', ihExt.toLowerCase());
   }
 
-  // Ajouter les informations de l'indexer si disponibles (gérer les deux formats: camelCase et snake_case)
-  const indexerId = (torrent as any).indexerId || (torrent as any).indexer_id;
-  const indexerName = (torrent as any).indexerName || (torrent as any).indexer_name;
-  
-  if (indexerId) {
-    externalUrl.searchParams.set('indexerId', String(indexerId));
+  // Params indexer (C411 = infohash hex ; YGG = id numérique) — voir externalDownloadParams
+  const extParams = buildExternalDownloadParams(torrent as any);
+  if (extParams.indexerId) {
+    externalUrl.searchParams.set('indexerId', extParams.indexerId);
   }
-  if (indexerName) {
-    externalUrl.searchParams.set('indexerName', indexerName);
+  if (extParams.indexerName) {
+    externalUrl.searchParams.set('indexerName', extParams.indexerName);
   }
-  if (torrent._guid) {
-    externalUrl.searchParams.set('guid', torrent._guid);
+  if (extParams.guid) {
+    externalUrl.searchParams.set('guid', extParams.guid);
   }
-  // ID du torrent : depuis l'id variant ou extrait du lien (ex. ?id=70811 ou &torrentid=70811)
-  let torrentIdFromVariant = torrent.id?.includes('_')
-    ? torrent.id.split('_').pop()
-    : torrent.id;
+  let torrentIdFromVariant = extParams.torrentId;
   if (isRelativeLink && torrent._externalLink) {
     const idMatch = torrent._externalLink.match(/[?&](?:id|torrentid)=(\d+)/i);
     if (idMatch) {
@@ -460,11 +456,8 @@ async function downloadFromExternalIndexer(options: {
   if (torrentIdFromVariant) {
     externalUrl.searchParams.set('torrentId', String(torrentIdFromVariant));
   }
-  // indexerTypeId pour fallback quand indexer_id obsolète (ex. indexer recréé) : external_ygg-api_1420257 → ygg-api
-  const indexerTypeIdFromVariant =
-    torrent.id?.match(/^external_(.+?)_\d+$/)?.[1];
-  if (indexerTypeIdFromVariant) {
-    externalUrl.searchParams.set('indexerTypeId', indexerTypeIdFromVariant);
+  if (extParams.indexerTypeId) {
+    externalUrl.searchParams.set('indexerTypeId', extParams.indexerTypeId);
   }
 
   if (setPlayStatus) {

@@ -7,6 +7,7 @@ import { VideoControls } from '../player-shared/components/VideoControls';
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import type { PlayerLoadingTorrentStats } from '../player-shared/components/PlayerLoadingOverlay';
+import PlayerBufferingOverlay from '../player-shared/components/PlayerBufferingOverlay';
 import { getMediaErrorDiagnostics, logVideoPlaybackError, type MediaErrorDiagnostics } from './mediaErrorDiagnostics';
 
 interface DirectVideoPlayerProps {
@@ -219,9 +220,7 @@ export default function DirectVideoPlayer({
   const bufferingMessage =
     loadingProp
       ? loadingMessage || t('playback.loadingVideo')
-      : bufferedPercent > 0
-        ? t('playback.bufferingProgress', { percent: Math.round(bufferedPercent) })
-        : t('playback.buffering');
+      : null;
 
   return (
     <div
@@ -249,55 +248,14 @@ export default function DirectVideoPlayer({
         }}
       >
         {shouldShowBuffering && (
-          <div class="absolute inset-0 flex flex-col items-center justify-center bg-black z-10 pointer-events-none">
-            <div class="relative w-32 h-32 mb-6">
-              <div class="absolute inset-0 border-4 border-primary-600/20 rounded-full" />
-              <div
-                class="absolute inset-0 border-4 border-primary-600 border-t-transparent rounded-full"
-                style={{ animation: 'spin 1s linear infinite' }}
-              />
-              <div
-                class="absolute inset-2 flex items-center justify-center"
-                style={{ animation: 'pulse 2s ease-in-out infinite' }}
-              >
-                <img
-                  src="/popcorn_logo.png"
-                  alt="Popcorn"
-                  class="w-full h-full object-contain drop-shadow-lg"
-                  style={{ filter: 'drop-shadow(0 0 10px rgba(220, 38, 38, 0.5))' }}
-                />
-              </div>
-            </div>
-            <p class="text-white/80 text-lg font-medium">{bufferingMessage}</p>
-            <div class="flex gap-1 mt-2">
-              <span
-                class="w-2 h-2 bg-primary-600 rounded-full"
-                style={{ animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0s' }}
-              />
-              <span
-                class="w-2 h-2 bg-primary-600 rounded-full"
-                style={{ animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.2s' }}
-              />
-              <span
-                class="w-2 h-2 bg-primary-600 rounded-full"
-                style={{ animation: 'bounce 1.4s infinite ease-in-out both', animationDelay: '0.4s' }}
-              />
-            </div>
-            <style>{`
-              @keyframes spin {
-                from { transform: rotate(0deg); }
-                to { transform: rotate(360deg); }
-              }
-              @keyframes pulse {
-                0%, 100% { transform: scale(1); opacity: 1; }
-                50% { transform: scale(0.9); opacity: 0.8; }
-              }
-              @keyframes bounce {
-                0%, 80%, 100% { transform: scale(0); }
-                40% { transform: scale(1); }
-              }
-            `}</style>
-          </div>
+          <PlayerBufferingOverlay
+            title={torrentName || undefined}
+            bufferedPercent={bufferedPercent}
+            message={bufferingMessage}
+            torrentStats={torrentStats}
+            onClose={onClose}
+            closeLabel={t('playback.stopPlayback') || closeLabel}
+          />
         )}
         <video
           ref={videoRef}

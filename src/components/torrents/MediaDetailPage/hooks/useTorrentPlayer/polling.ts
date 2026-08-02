@@ -19,6 +19,7 @@ export function createPollTorrentProgress(context: PollingContext) {
     addDebugLog,
     playStatus,
     isPlaying,
+    isPlayingRef,
     videoFiles,
     selectedFile,
     torrent,
@@ -32,9 +33,11 @@ export function createPollTorrentProgress(context: PollingContext) {
   } = context;
 
   return async (infoHash: string) => {
+    // Lire isPlaying via ref (évite closure stale de l'interval créé avant setIsPlaying(true))
+    const playingNow = isPlayingRef?.current ?? isPlaying;
     // Ne pas poller si la lecture est déjà en cours (pour le streaming)
     // Mais permettre le polling pendant le téléchargement (isPlaying = false)
-    if (isPlaying) {
+    if (playingNow) {
       stopProgressPolling();
       if (playStatus !== 'ready' && playStatus !== 'error') {
         setPlayStatus('ready');
@@ -134,7 +137,7 @@ export function createPollTorrentProgress(context: PollingContext) {
         // Traiter selon l'état du torrent
         // Ne traiter l'état "queued" que si on est en mode streaming (isPlaying = true)
         // Sinon, on ne veut pas démarrer automatiquement le téléchargement
-        if (state === 'queued' && isPlaying) {
+        if (state === 'queued' && (isPlayingRef?.current ?? isPlaying)) {
           await handleQueuedState(infoHash, stats, now, context);
         } else if (state === 'downloading') {
           await handleDownloadingState(infoHash, stats, progress, context);
@@ -167,7 +170,7 @@ export function createPollTorrentProgress(context: PollingContext) {
         }
 
         // Pour le streaming (overlay), afficher un message d'attente. Pour le téléchargement, on laisse silencieux.
-        if (isPlaying) {
+        if (isPlayingRef?.current ?? isPlaying) {
           setPlayStatus('adding');
           setProgressMessage('Initialisation du torrent...');
         }
@@ -184,7 +187,8 @@ async function handleQueuedState(
   now: number,
   context: PollingContext
 ) {
-  const { setPlayStatus, setProgressMessage, addDebugLog, loadVideoFiles, setVideoFiles, setSelectedFile, lastResumeAttemptRef, torrent, isPlaying, videoFiles } = context;
+  const { setPlayStatus, setProgressMessage, addDebugLog, loadVideoFiles, setVideoFiles, setSelectedFile, lastResumeAttemptRef, torrent, isPlaying, isPlayingRef, videoFiles } = context;
+  const playingNow = isPlayingRef?.current ?? isPlaying;
 
   setPlayStatus('adding');
 
@@ -214,7 +218,7 @@ async function handleQueuedState(
     // Essayer de reprendre le torrent périodiquement
     // Mais seulement si on est en mode streaming (isPlaying = true)
     // Si on n'est pas en mode streaming, on ne veut pas démarrer automatiquement le téléchargement
-    if (isPlaying && (!lastResumeAttempt || nowTime - lastResumeAttempt >= QUEUED_RETRY_RESUME_MS)) {
+    if (playingNow && (!lastResumeAttempt || nowTime - lastResumeAttempt >= QUEUED_RETRY_RESUME_MS)) {
       lastResumeAttemptRef.current = nowTime;
       
       // Ne pas essayer de reprendre si on n'a pas de peers - cela peut causer des erreurs
@@ -249,7 +253,7 @@ async function handleQueuedState(
     // Essayer de reprendre le torrent périodiquement
     // Mais seulement si on est en mode streaming (isPlaying = true)
     // Si on n'est pas en mode streaming, on ne veut pas démarrer automatiquement le téléchargement
-    const shouldRetryResume = isPlaying && (lastResumeAttemptRef.current === null || now - lastResumeAttemptRef.current >= QUEUED_RETRY_RESUME_MS);
+    const shouldRetryResume = playingNow && (lastResumeAttemptRef.current === null || now - lastResumeAttemptRef.current >= QUEUED_RETRY_RESUME_MS);
     if (shouldRetryResume) {
       lastResumeAttemptRef.current = now;
       clientApi.resumeTorrent(infoHash).then(() => {
@@ -265,7 +269,8 @@ async function handleDownloadingState(
   progress: number,
   context: PollingContext
 ) {
-  const { setPlayStatus, setProgressMessage, addDebugLog, loadVideoFiles, setVideoFiles, setSelectedFile, videoFiles, torrent, isPlaying, setIsPlaying, setShowInfo, stopProgressPolling } = context;
+  const { setPlayStatus, setProgressMessage, addDebugLog, loadVideoFiles, setVideoFiles, setSelectedFile, videoFiles, torrent, isPlaying, isPlayingRef, setIsPlaying, setShowInfo, stopProgressPolling } = context;
+  const playingNow = isPlayingRef?.current ?? isPlaying;
 
   setPlayStatus('downloading');
   const downloadedMB = (stats.downloaded_bytes / (1024 * 1024)).toFixed(2);
@@ -289,7 +294,7 @@ async function handleDownloadingState(
   // Charger les fichiers vidéo UNIQUEMENT si on est en mode streaming (isPlaying = true)
   // Pendant le téléchargement (isPlaying = false), ne pas charger les fichiers pour éviter de déclencher le lecteur HLS
   // Les fichiers seront chargés uniquement quand l'utilisateur clique sur "Lire"
-  if (videoFiles.length === 0 && isPlaying) {
+  if (videoFiles.length === 0 && playingNow) {
     loadVideoFiles(infoHash).then((videos) => {
       if (videos.length > 0) {
         addDebugLog('success', '✅ Fichiers vidéo chargés en préparation', {
