@@ -12,6 +12,7 @@ import { redirectTo } from '../../lib/utils/navigation.js';
 import { SettingsNavCard } from './SettingsNavCard';
 import { SettingsSubPageFrame } from './SettingsSubPageFrame';
 import { Bell, Settings, Package, Activity, HardDrive } from 'lucide-preact';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
 
 const BASE_URL = '/settings?category=system';
 
@@ -49,12 +50,22 @@ function SetupSection({ embedded = false }: { embedded?: boolean }) {
 
 function HardResetSection({ embedded = false }: { embedded?: boolean }) {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [hardResetting, setHardResetting] = useState(false);
   const [hardResetError, setHardResetError] = useState<string>('');
 
   const handleHardReset = async () => {
     if (hardResetting) return;
-    if (!confirm(t('versionInfo.hardResetConfirm'))) return;
+    if (
+      !(await confirm({
+        title: t('versionInfo.hardReset') || 'Hard reset',
+        message: t('versionInfo.hardResetConfirm'),
+        danger: true,
+        confirmLabel: t('common.confirm') || 'Confirmer',
+      }))
+    ) {
+      return;
+    }
     setHardResetting(true);
     setHardResetError('');
     try {
@@ -90,13 +101,20 @@ function HardResetSection({ embedded = false }: { embedded?: boolean }) {
     </div>
   );
 
-  if (embedded) return <div className="min-w-0">{content}</div>;
+  if (embedded)
+    return (
+      <div className="min-w-0">
+        {content}
+        {confirmDialog}
+      </div>
+    );
   return (
     <section className="rounded-xl border border-red-900/30 bg-white/5 overflow-hidden">
       <div className="p-4 sm:p-6">
         <p className="text-sm font-semibold text-red-300 mb-2">{t('versionInfo.hardResetTitle')}</p>
         {content}
       </div>
+      {confirmDialog}
     </section>
   );
 }

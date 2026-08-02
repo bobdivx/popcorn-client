@@ -41,6 +41,18 @@ export default function FeedbackFAB() {
   const visible = hasCloud && !isTV;
 
   useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (visible) {
+      document.documentElement.dataset.fabVisible = 'true';
+    } else {
+      delete document.documentElement.dataset.fabVisible;
+    }
+    return () => {
+      delete document.documentElement.dataset.fabVisible;
+    };
+  }, [visible]);
+
+  useEffect(() => {
     const onCloudExpired = () => setUser((u) => (u ? { ...u } : null));
     window.addEventListener('popcorn:cloud-session-expired', onCloudExpired);
     return () => window.removeEventListener('popcorn:cloud-session-expired', onCloudExpired);

@@ -6,6 +6,7 @@ import { IndexerTestModal, formatProgressEvent } from './IndexerTestModal';
 import { CookieWizardModal } from './CookieWizardModal';
 import IndexerDetailPanel from './IndexerDetailPanel';
 import { Modal } from '../ui/Modal';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
 import { Plus, ChevronRight, Search } from 'lucide-preact';
 import { getIndexerDefinitionsWithBackendFallback, getUserConfig, type IndexerDefinition } from '../../lib/api/popcorn-web';
 import {
@@ -44,6 +45,7 @@ interface IndexersManagerProps {
 
 export default function IndexersManager({ editIndexer, onEditClose, initialModeAdd, onAddSuccess }: IndexersManagerProps = {}) {
   const { t, language: userLocale } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [indexers, setIndexers] = useState<Indexer[]>([]);
   /** IDs des indexers visibles dans la bibliothèque (Films/Séries). null = tous visibles. */
   const [visibleInLibraryIds, setVisibleInLibraryIds] = useState<string[] | null>(null);
@@ -409,7 +411,14 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(t('indexersManager.confirmDelete'))) {
+    if (
+      !(await confirm({
+        title: t('common.delete') || 'Supprimer',
+        message: t('indexersManager.confirmDelete'),
+        danger: true,
+        confirmLabel: t('common.delete') || 'Supprimer',
+      }))
+    ) {
       return;
     }
 
@@ -1091,6 +1100,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
         finalResult={testFinalResult}
         errorMessage={testErrorMessage}
       />
+      {confirmDialog}
     </div>
   );
 }

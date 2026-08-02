@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import { getUserConfig } from '../../lib/api/popcorn-web';
 import { isTmdbKeyMaskedOrInvalid } from '../../lib/utils/tmdb-key';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
 
 interface TmdbConfigProps {
   /** Si true, affiche uniquement le formulaire (sans image de fond ni en-tête), pour intégration dans DsSettingsSectionCard */
@@ -12,6 +13,7 @@ interface TmdbConfigProps {
 const TMDB_KEY_VISUAL_PLACEHOLDER = '••••••••••••••••••••••••';
 
 export default function TmdbConfig({ embedded = false }: TmdbConfigProps) {
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [tmdbKey, setTmdbKey] = useState('');
   const [tmdbHasKey, setTmdbHasKey] = useState(false);
   const [tmdbLoading, setTmdbLoading] = useState(false);
@@ -167,7 +169,12 @@ export default function TmdbConfig({ embedded = false }: TmdbConfigProps) {
   };
 
   const deleteTmdbKey = async () => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer le token TMDB ?')) {
+    if (!(await confirm({
+      title: 'Supprimer',
+      message: 'Êtes-vous sûr de vouloir supprimer le token TMDB ?',
+      danger: true,
+      confirmLabel: 'Supprimer',
+    }))) {
       return;
     }
 
@@ -284,6 +291,7 @@ export default function TmdbConfig({ embedded = false }: TmdbConfigProps) {
       <div class="min-w-0">
         {messages}
         {formFields}
+        {confirmDialog}
       </div>
     );
   }
@@ -319,6 +327,7 @@ export default function TmdbConfig({ embedded = false }: TmdbConfigProps) {
           <div class="sc-frame-body">{formFields}</div>
         </div>
       </div>
+      {confirmDialog}
     </div>
   );
 }

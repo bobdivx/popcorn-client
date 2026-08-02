@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
-import { createPortal } from 'preact/compat';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi, type LibrarySource } from '../../lib/client/server-api';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
 import { CheckCircle, Folder, FolderOpen, FolderPlus, Pencil, RefreshCw, ToggleLeft, ToggleRight, Trash2, Users } from 'lucide-preact';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
+import { Modal } from '../ui/Modal';
 
 interface ExplorerEntry {
   name: string;
@@ -55,6 +56,7 @@ const getParentPath = (value: string): string => {
 
 export default function LibrarySourcesPanel() {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const saveSourceLabelRaw = t('settingsMenu.librarySourcesPanel.saveSource');
   const saveSourceLabel =
     saveSourceLabelRaw === 'settingsMenu.librarySourcesPanel.saveSource'
@@ -272,7 +274,12 @@ export default function LibrarySourcesPanel() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(t('common.confirm'))) return;
+    if (!(await confirm({
+      title: t('common.delete') || 'Supprimer',
+      message: t('common.confirm'),
+      danger: true,
+      confirmLabel: t('common.delete') || 'Supprimer',
+    }))) return;
     setDeletingId(id);
     setMessage(null);
     try {
@@ -567,91 +574,79 @@ export default function LibrarySourcesPanel() {
         )}
       </div>
 
-      {browseOpen && createPortal(
-        <div
-          class="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label={t('settingsMenu.librarySourcesPanel.browseTitle')}
-        >
-          <div class="bg-[#1a1c20] border border-gray-700 rounded-2xl shadow-xl max-w-lg w-full max-h-[80vh] flex flex-col">
-            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-              <h3 class="text-lg font-semibold text-white">{t('settingsMenu.librarySourcesPanel.browseTitle')}</h3>
-              <button
-                type="button"
-                onClick={closeBrowse}
-                class="text-gray-400 hover:text-white p-1 rounded"
-                aria-label={t('common.close')}
-              >
-                ×
-              </button>
-            </div>
+      <Modal
+        isOpen={browseOpen}
+        onClose={closeBrowse}
+        title={t('settingsMenu.librarySourcesPanel.browseTitle')}
+        size="md"
+        noPadding
+      >
+        <div class="flex flex-col max-h-[70vh]">
+          <div class="px-4 py-2 border-b border-white/10 text-xs text-gray-400 font-mono truncate">
+            {browsePath || '/'}
+          </div>
 
-            <div class="px-4 py-2 border-b border-gray-700 text-xs text-gray-400 font-mono truncate">
-              {browsePath || '/'}
-            </div>
-
-            <div class="flex-1 overflow-y-auto p-2 min-h-[220px]">
-              {browseLoading ? (
-                <div class="flex items-center justify-center py-8 text-gray-300">
-                  <RefreshCw className="w-5 h-5 animate-spin" />
-                </div>
-              ) : (
-                <ul class="space-y-1">
-                  {browsePath && (
-                    <li>
+          <div class="flex-1 overflow-y-auto p-2 min-h-[220px]">
+            {browseLoading ? (
+              <div class="flex items-center justify-center py-8 text-gray-300">
+                <RefreshCw className="w-5 h-5 animate-spin" />
+              </div>
+            ) : (
+              <ul class="space-y-1">
+                {browsePath && (
+                  <li>
+                    <button
+                      type="button"
+                      onClick={handleBrowseUp}
+                      class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-gray-300 hover:bg-gray-800"
+                    >
+                      <Folder className="w-5 h-5 text-amber-500" />
+                      ..
+                    </button>
+                  </li>
+                )}
+                {browseEntries
+                  .filter((entry) => entry.is_directory)
+                  .map((entry) => (
+                    <li key={entry.path}>
                       <button
                         type="button"
-                        onClick={handleBrowseUp}
+                        onClick={() => setBrowsePath(entry.path)}
                         class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-gray-300 hover:bg-gray-800"
                       >
                         <Folder className="w-5 h-5 text-amber-500" />
-                        ..
+                        <span class="truncate">{entry.name}</span>
                       </button>
                     </li>
-                  )}
-                  {browseEntries
-                    .filter((entry) => entry.is_directory)
-                    .map((entry) => (
-                      <li key={entry.path}>
-                        <button
-                          type="button"
-                          onClick={() => setBrowsePath(entry.path)}
-                          class="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left text-gray-300 hover:bg-gray-800"
-                        >
-                          <Folder className="w-5 h-5 text-amber-500" />
-                          <span class="truncate">{entry.name}</span>
-                        </button>
-                      </li>
-                    ))}
-                  {browseEntries.filter((entry) => entry.is_directory).length === 0 && (
-                    <li class="px-3 py-4 text-gray-500 text-sm">{t('settingsMenu.librarySourcesPanel.noFolders')}</li>
-                  )}
-                </ul>
-              )}
-            </div>
-
-            <div class="flex items-center gap-2 px-4 py-3 border-t border-gray-700">
-              <button
-                type="button"
-                onClick={closeBrowse}
-                class="btn btn-ghost btn-sm text-gray-400"
-              >
-                {t('common.cancel')}
-              </button>
-              <button
-                type="button"
-                onClick={handleChooseCurrentFolder}
-                disabled={!browsePath.trim() && !explorerRoot.trim()}
-                class="btn btn-primary btn-sm ml-auto disabled:opacity-50"
-              >
-                {t('settingsMenu.librarySourcesPanel.chooseCurrentFolder')}
-              </button>
-            </div>
+                  ))}
+                {browseEntries.filter((entry) => entry.is_directory).length === 0 && (
+                  <li class="px-3 py-4 text-gray-500 text-sm">{t('settingsMenu.librarySourcesPanel.noFolders')}</li>
+                )}
+              </ul>
+            )}
           </div>
-        </div>,
-        document.body
-      )}
+
+          <div class="flex items-center gap-2 px-4 py-3 border-t border-white/10">
+            <button
+              type="button"
+              onClick={closeBrowse}
+              class="btn btn-ghost btn-sm text-gray-400"
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={handleChooseCurrentFolder}
+              disabled={!browsePath.trim() && !explorerRoot.trim()}
+              class="btn btn-primary btn-sm ml-auto disabled:opacity-50"
+              data-autofocus
+            >
+              {t('settingsMenu.librarySourcesPanel.chooseCurrentFolder')}
+            </button>
+          </div>
+        </div>
+      </Modal>
+      {confirmDialog}
     </div>
   );
 }

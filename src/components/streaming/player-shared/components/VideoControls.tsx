@@ -257,7 +257,7 @@ export function VideoControls({
 
   const buttonSize = isTV ? 'w-20 h-20' : isFullscreen ? 'w-[4.5rem] h-[4.5rem] min-w-[4.5rem] min-h-[4.5rem]' : 'w-11 h-11 min-w-11 min-h-11 sm:w-14 sm:h-14 sm:min-w-14 sm:min-h-14 md:w-16 md:h-16 md:min-w-16 md:min-h-16';
   const iconSize = isTV ? 'w-10 h-10' : isFullscreen ? 'w-9 h-9' : 'w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8';
-  const progressHeight = isTV ? 'h-3' : isFullscreen ? 'h-2.5' : 'h-2';
+  const progressHeight = isTV ? 'h-3' : isFullscreen ? 'h-3' : 'h-3 sm:h-2.5';
   const textSize = isTV ? 'text-xl' : isFullscreen ? 'text-lg' : 'text-xs sm:text-sm md:text-base';
   const titleSize = isTV ? 'text-4xl' : isFullscreen ? 'text-3xl md:text-4xl' : 'text-lg sm:text-2xl md:text-3xl';
   const padding = isTV ? 'px-10 pt-10 pb-10' : isFullscreen ? 'px-8 pt-8 pb-8 md:px-12 md:pt-10 md:pb-10' : 'px-3 pt-3 pb-3 sm:px-6 sm:pt-6 sm:pb-6 md:px-8 md:pt-8 md:pb-8';
@@ -317,15 +317,15 @@ export function VideoControls({
 
   return (
     <>
-      <div class={`absolute inset-0 pointer-events-none transition-opacity duration-500 ${showControls ? 'opacity-100' : 'opacity-0'}`} style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0.3) 50%, transparent 100%)' }} />
+      <div class={`absolute inset-0 pointer-events-none transition-opacity duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`} style={{ background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0.3) 50%, transparent 100%)' }} />
       {/* Assombrissement pause (sous les contrôles z-20) */}
       {showPausedChrome && (
         <div
-          class="absolute inset-0 z-[19] pointer-events-none bg-gradient-to-b from-black/45 via-black/55 to-black/75"
+          class="absolute inset-0 z-[19] pointer-events-none bg-gradient-to-b from-black/45 via-black/55 to-black/75 transition-opacity duration-300"
           aria-hidden="true"
         />
       )}
-      <div class={`absolute inset-0 flex flex-col justify-between transition-all duration-300 z-20 ${showControls || showQualityMenu ? 'opacity-100' : 'opacity-0'} ${showControls || showQualityMenu ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+      <div class={`video-controls-chrome absolute inset-0 flex flex-col justify-between z-20 transition-[opacity,transform] duration-200 ease-out ${showControls || showQualityMenu ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'}`}>
         <div class={`flex items-center justify-between ${padding.split(' ')[0]} ${padding.split(' ')[1]}`}>
           <div class="flex items-center gap-3 text-white drop-shadow-2xl min-w-0 flex-1">
             {/* Bouton retour */}
@@ -336,7 +336,7 @@ export function VideoControls({
                   e.stopPropagation();
                   onClose();
                 }} 
-                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none ${getFocusClass(0)}`}
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-[opacity,transform,background-color] duration-200 active:scale-95 backdrop-blur-md border-2 border-white/20 focus:outline-none ${getFocusClass(0)}`}
                 title={t('common.back')}
                 aria-label={t('common.back')}
               >
@@ -485,7 +485,7 @@ export function VideoControls({
             tabIndex={isTV && scrubEnabled ? -1 : 0}
             data-tv-video-progress
             role="slider"
-            class={`relative ${progressHeight} bg-white/30 rounded-full cursor-pointer group/progress transition-all outline-none focus:outline-none ${getProgressFocusClass()}`}
+            class={`relative ${progressHeight} bg-white/30 rounded-full cursor-pointer group/progress transition-[opacity,transform] outline-none focus:outline-none touch-manipulation ${getProgressFocusClass()}`}
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -664,7 +664,7 @@ export function VideoControls({
             )}
             {/* Curseur de position */}
             <div
-              class={`absolute top-1/2 -translate-y-1/2 ${isTV ? 'w-6 h-6' : 'w-4 h-4'} bg-purple-600 rounded-full transition-all border-2 border-white ${isTV ? 'opacity-100' : 'opacity-0 group-hover/progress:opacity-100'}`}
+              class={`absolute top-1/2 -translate-y-1/2 ${isTV ? 'w-6 h-6' : 'w-4 h-4'} bg-purple-600 rounded-full transition-[opacity,transform] border-2 border-white opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/progress:opacity-100 [@media(hover:hover)]:group-focus-within/progress:opacity-100`}
               style={{ left: `calc(${progressPercent}% - ${progressPercent > 0 && progressPercent < 100 ? (isTV ? '12px' : '8px') : progressPercent === 100 ? (isTV ? '24px' : '16px') : '0px'})` }}
             />
           </div>
@@ -736,7 +736,15 @@ export function VideoControls({
                 {isMuted || volume === 0 ? <VolumeX class={`${iconSize} text-white`} /> : volume < 0.5 ? <Volume1 class={`${iconSize} text-white`} /> : <Volume2 class={`${iconSize} text-white`} />}
               </button>
               {!isTV && (
-                <div class="hidden group-hover/volume:flex items-center w-24 h-2 bg-white/30 rounded-full cursor-pointer" onClick={onVolumeChange}>
+                <div
+                  class="flex items-center w-20 sm:w-24 h-3 sm:h-2 bg-white/30 rounded-full cursor-pointer opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/volume:opacity-100 [@media(hover:hover)]:group-focus-within/volume:opacity-100 transition-opacity"
+                  onClick={onVolumeChange}
+                  role="slider"
+                  aria-label={t('playback.volumeLabel') || 'Volume'}
+                  aria-valuenow={Math.round(volumePercent)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
                   <div class="h-full bg-white rounded-full" style={{ width: `${volumePercent}%` }} />
                 </div>
               )}

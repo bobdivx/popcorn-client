@@ -21,6 +21,7 @@ import {
   FullScreenLoadingOverlay,
 } from '../ui/design-system';
 import { Modal } from '../ui/Modal';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
 import { DescriptionPreview } from '../upload/DescriptionPreview';
 import type { Chart } from 'chart.js';
 import { ArrowLeft, ArrowRight, Check, Loader2, Search, Upload, Film, Radar, Images, Activity } from 'lucide-preact';
@@ -376,6 +377,7 @@ function LoadingAssistantView({
 /** Assistant d'upload type wizard : 1) trackers → 2) médias → 3) Torrent factory (préparation + review + envoi). */
 export default function UploadAssistantPanel() {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [step, setStep] = useState(1);
 
   const [mediaList, setMediaList] = useState<LibraryMediaEntry[]>([]);
@@ -1022,8 +1024,12 @@ export default function UploadAssistantPanel() {
   };
 
   const removeMediaFileAndLibrary = async (mediaId: string) => {
-    const confirmed = window.confirm(t('settings.uploadTrackerPanel.confirmDeleteMediaFile'));
-    if (!confirmed) return;
+    if (!(await confirm({
+      title: t('common.delete') || 'Supprimer',
+      message: t('settings.uploadTrackerPanel.confirmDeleteMediaFile'),
+      danger: true,
+      confirmLabel: t('common.delete') || 'Supprimer',
+    }))) return;
     const res = await serverApi.deleteLibraryMediaFile(mediaId);
     if (res.success) {
       setExcludedMediaIds((prev) => prev.filter((id) => id !== mediaId));
@@ -2227,6 +2233,7 @@ export default function UploadAssistantPanel() {
           {message.text}
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

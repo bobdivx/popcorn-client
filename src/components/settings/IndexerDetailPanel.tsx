@@ -8,6 +8,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import IndexerCategoriesSelector from './IndexerCategoriesSelector';
 import IndexerBulkZipPanel from './IndexerBulkZipPanel';
 import { Trash2, Pencil, RefreshCw, PlayCircle } from 'lucide-preact';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
 
 interface IndexerDetailPanelProps {
   indexer: Indexer;
@@ -20,6 +21,7 @@ interface IndexerDetailPanelProps {
 
 export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, onBack, onIndexerUpdated }: IndexerDetailPanelProps) {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [showEdit, setShowEdit] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testProgress, setTestProgress] = useState<{ index: number; total: number; lastQuery?: string; lastCount?: number; lastSuccess?: boolean } | undefined>();
@@ -60,7 +62,16 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
   };
 
   const handleDelete = async () => {
-    if (!confirm(t('indexersManager.confirmDelete'))) return;
+    if (
+      !(await confirm({
+        title: t('common.delete') || 'Supprimer',
+        message: t('indexersManager.confirmDelete'),
+        danger: true,
+        confirmLabel: t('common.delete') || 'Supprimer',
+      }))
+    ) {
+      return;
+    }
     try {
       const res = await serverApi.deleteIndexer(indexer.id);
       if (res.success) {
@@ -306,6 +317,7 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
         finalResult={testFinalResult}
         errorMessage={testErrorMessage}
       />
+      {confirmDialog}
     </div>
   );
 }

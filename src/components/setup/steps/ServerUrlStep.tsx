@@ -7,6 +7,7 @@ import { useI18n } from '../../../lib/i18n';
 import { redirectTo } from '../../../lib/utils/navigation.js';
 import { shouldDisplayQRCode } from '../../../lib/utils/device-detection';
 import QRCode from 'qrcode';
+import { useConfirmDialog } from '../../ui/useConfirmDialog';
 
 interface ServerUrlStepProps {
   focusedButtonIndex: number;
@@ -21,6 +22,7 @@ export type InstallationChoice = 'firstTime' | 'alreadyConfigured' | 'localAccou
 
 export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChange, skipInitialChoice = false }: ServerUrlStepProps) {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   /** Choix explicite de l'utilisateur : première installation ou déjà configuré ailleurs (ignoré si skipInitialChoice) */
   const [installationChoice, setInstallationChoice] = useState<InstallationChoice | null>(skipInitialChoice ? 'firstTime' : null);
   const [showManualConfig, setShowManualConfig] = useState(skipInitialChoice);
@@ -200,10 +202,11 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
         setSuccess(`✅ Connexion réussie ! Le serveur est accessible.`);
         // Si l'URL backend est identique à l'adresse du client, demander confirmation avant de sauvegarder
         if (typeof window !== 'undefined' && isBackendUrlSameAsClientUrl(normalizedUrl)) {
-          const confirmed = window.confirm(
-            t('wizard.serverUrl.sameOriginConfirmMessage')
-          );
-          if (!confirmed) {
+          if (!(await confirm({
+            title: t('common.confirm'),
+            message: t('wizard.serverUrl.sameOriginConfirmMessage'),
+            danger: true,
+          }))) {
             setTesting(false);
             return;
           }
@@ -270,10 +273,11 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
       
       // Si l'URL backend est identique à l'adresse du client (même host + port), demander confirmation
       if (typeof window !== 'undefined' && isBackendUrlSameAsClientUrl(normalizedUrl)) {
-        const confirmed = window.confirm(
-          t('wizard.serverUrl.sameOriginConfirmMessage')
-        );
-        if (!confirmed) {
+        if (!(await confirm({
+          title: t('common.confirm'),
+          message: t('wizard.serverUrl.sameOriginConfirmMessage'),
+          danger: true,
+        }))) {
           setTesting(false);
           return;
         }
@@ -583,6 +587,7 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
   if (installationChoice === null) {
     return (
       <div className="space-y-6">
+        {confirmDialog}
         <h3 className="text-2xl font-bold text-white text-center">{t('wizard.serverUrl.connectClientTitle')}</h3>
         <p className="text-gray-400 text-center text-sm sm:text-base mb-6">
           {t('wizard.serverUrl.choiceQuestion')}
@@ -654,6 +659,7 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
   // Affichage principal (après choix)
   return (
     <div className="space-y-6">
+      {confirmDialog}
       {!skipInitialChoice && (
       <div className="flex items-center gap-3 mb-2">
         <button

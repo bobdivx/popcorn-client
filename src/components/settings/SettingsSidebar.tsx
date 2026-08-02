@@ -371,9 +371,9 @@ export default function SettingsSidebar() {
     <>
       <style>{SIDEBAR_CSS}</style>
 
-      {/* Overlay mobile */}
+      {/* Overlay mobile / petit écran */}
       <div
-        class="sn-overlay lg:hidden"
+        class="sn-overlay md:hidden"
         aria-hidden
         style={{ opacity: sidebarOpen ? 1 : 0, pointerEvents: sidebarOpen ? 'auto' : 'none' }}
         onClick={() => setSidebarOpen(false)}
@@ -382,11 +382,11 @@ export default function SettingsSidebar() {
       <nav
         class={`
           sn-sidebar flex-shrink-0
-          w-[min(18rem,85vw)] sm:w-72 lg:w-72 xl:w-80
+          w-[min(18rem,85vw)] sm:w-72 md:w-72 xl:w-80
           fixed left-0 z-[30] bottom-0
-          top-[calc(3.75rem+var(--safe-area-inset-top,0px))] sm:top-[calc(5rem+var(--safe-area-inset-top,0px))] md:top-[calc(5.5rem+var(--safe-area-inset-top,0px))] lg:top-auto lg:bottom-auto lg:h-full
+          top-[calc(3.75rem+var(--safe-area-inset-top,0px))] sm:top-[calc(5rem+var(--safe-area-inset-top,0px))] md:top-auto md:bottom-auto md:h-full
           transform transition-transform duration-200 ease-out
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
         `}
         aria-label={t('settingsMenu.title')}
         data-tv-settings-nav

@@ -43,9 +43,12 @@ const StatCard = ({ icon: Icon, label, value, colorClass }: any) => (
 
 const ActionTile = ({ icon: Icon, label, onClick, className = "", danger = false, ...rest }: any) => (
   <button
+    type="button"
+    data-focusable
+    tabIndex={0}
     {...rest}
     onClick={onClick}
-    className={`group flex flex-col items-center justify-center p-4 sm:p-6 rounded-2xl border transition-all duration-300 gap-3 
+    className={`group flex flex-col items-center justify-center p-4 sm:p-6 min-h-[88px] rounded-2xl border transition-[opacity,transform,background-color,border-color] duration-200 gap-3 
       ${danger 
         ? 'bg-red-500/10 border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40' 
         : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'

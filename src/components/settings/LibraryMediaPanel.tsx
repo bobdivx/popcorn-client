@@ -4,6 +4,7 @@ import { serverApi } from '../../lib/client/server-api';
 import type { LibraryMediaEntry, LibrarySource, LibraryIntegrityItem, LibraryIntegrityStatus } from '../../lib/client/server-api/library';
 import { invalidateLibraryCache } from '../../lib/client/server-api/library';
 import { Film, FileX, FolderOpen, Pencil, RefreshCw, Trash2, Tv, CheckSquare, Square, X, ShieldAlert, ShieldCheck } from 'lucide-preact';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
 
 /** Valeur du filtre source : '' = toutes, 'local' = source locale, 'external' = toute externe, ou id de library_source */
 function matchSource(entry: LibraryMediaEntry, filterSource: string): boolean {
@@ -27,6 +28,7 @@ function getSourceLabel(
 
 export default function LibraryMediaPanel() {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [list, setList] = useState<LibraryMediaEntry[]>([]);
   const [sources, setSources] = useState<LibrarySource[]>([]);
   const [loading, setLoading] = useState(true);
@@ -204,7 +206,16 @@ export default function LibraryMediaPanel() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm(t('settingsMenu.libraryMediaPanel.removeFromLibraryConfirm'))) return;
+    if (
+      !(await confirm({
+        title: t('common.delete') || 'Supprimer',
+        message: t('settingsMenu.libraryMediaPanel.removeFromLibraryConfirm'),
+        danger: true,
+        confirmLabel: t('common.delete') || 'Supprimer',
+      }))
+    ) {
+      return;
+    }
     setDeletingId(id);
     setMessage(null);
     try {
@@ -224,7 +235,16 @@ export default function LibraryMediaPanel() {
   };
 
   const handleDeleteFile = async (id: string) => {
-    if (!confirm(t('settingsMenu.libraryMediaPanel.deleteFileConfirm'))) return;
+    if (
+      !(await confirm({
+        title: t('common.delete') || 'Supprimer',
+        message: t('settingsMenu.libraryMediaPanel.deleteFileConfirm'),
+        danger: true,
+        confirmLabel: t('common.delete') || 'Supprimer',
+      }))
+    ) {
+      return;
+    }
     setDeletingFileId(id);
     setMessage(null);
     try {
@@ -316,7 +336,16 @@ export default function LibraryMediaPanel() {
     const confirmKey = deleteFiles
       ? 'settingsMenu.libraryMediaPanel.integrityDeleteConfirmFiles'
       : 'settingsMenu.libraryMediaPanel.integrityDeleteConfirmLibrary';
-    if (!confirm(t(confirmKey, { count: ids.length }))) return;
+    if (
+      !(await confirm({
+        title: t('common.delete') || 'Supprimer',
+        message: t(confirmKey, { count: ids.length }),
+        danger: true,
+        confirmLabel: t('common.delete') || 'Supprimer',
+      }))
+    ) {
+      return;
+    }
 
     setIntegrityDeleting(true);
     setMessage(null);
@@ -786,6 +815,7 @@ export default function LibraryMediaPanel() {
           </div>
         </div>
       )}
+      {confirmDialog}
     </div>
   );
 }

@@ -228,23 +228,22 @@ export function useTVPlayerNavigation({
       }
 
       // --- Navigation vignettes scrub (TV) ---
-      // Quand les miniatures sont disponibles et les contrôles visibles, les flèches naviguent
-      // dans le carousel et Enter/OK lance le seek vers la vignette sélectionnée.
-      const isScrubKey =
+      // Uniquement si déjà en mode scrub, ou 1re pression ←/→ avec contrôles masqués
+      // (évite de capturer OK/←/→ quand le focus est sur Play / Mute / etc.).
+      const isScrubNavKey =
         scrubThumbnailsActive &&
         (kc === 412 ||
           kc === 417 ||
           kc === 21 ||
           kc === 22 ||
-          kc === 23 ||
           keyNormalized === 'ArrowLeft' ||
-          keyNormalized === 'ArrowRight' ||
-          keyNormalized === 'Enter' ||
-          keyNormalized === ' ');
+          keyNormalized === 'ArrowRight');
+      const isScrubConfirmKey =
+        scrubThumbnailsActive &&
+        focusedOnScrub &&
+        (kc === 23 || keyNormalized === 'Enter' || keyNormalized === ' ');
 
-      // Important: même si showControls=false, une première pression sur ←/→ doit déjà
-      // entrer en mode vignettes (afficher les contrôles + déplacer la sélection).
-      if (isScrubKey) {
+      if (isScrubNavKey && (focusedOnScrub || !showControls)) {
         e.preventDefault();
         e.stopPropagation();
         if (!showControls) setShowControls(true);
@@ -252,7 +251,6 @@ export function useTVPlayerNavigation({
         const count = scrubThumbnailsRef.current?.count ?? 0;
         if (count <= 0) return;
 
-        // En mode scrub: les flèches ne doivent pas manipuler d'autres zones.
         setFocusedOnProgress(false);
         setFocusedOnScrub(true);
 
@@ -268,12 +266,14 @@ export function useTVPlayerNavigation({
           resetControlsTimeout();
           return;
         }
-        if (keyNormalized === 'Enter' || keyNormalized === ' ') {
-          const targetTime = timeForScrubIndex(tvScrubIndexRef.current);
-          onScrubSeekRef.current?.(targetTime);
-          resetControlsTimeout();
-          return;
-        }
+      }
+      if (isScrubConfirmKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        const targetTime = timeForScrubIndex(tvScrubIndexRef.current);
+        onScrubSeekRef.current?.(targetTime);
+        resetControlsTimeout();
+        return;
       }
 
       // --- Codes webOS seek (hors mode scrub) ---

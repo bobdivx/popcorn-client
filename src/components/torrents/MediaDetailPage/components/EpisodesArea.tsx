@@ -164,6 +164,8 @@ export function EpisodesArea(props: {
               onSelectEpisodeKey={onSelectPackEpisodeKey}
               infoHash={packInfoHash}
               watchedSet={watchedSet}
+              downloadedEpisodesSet={downloadedEpisodesSet}
+              downloadingEpisodesMap={downloadingEpisodesMap}
               isTV={isTV}
             />
           ) : (
