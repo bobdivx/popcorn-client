@@ -1,3 +1,4 @@
+import { useEffect } from 'preact/hooks';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { StreamingStepIndicator } from './StreamingStepIndicator';
 import { formatBytes, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
@@ -17,6 +18,8 @@ export interface PlayerLoadingTorrentStats {
 
 interface PlayerLoadingOverlayProps {
   message: string;
+  /** Titre du média affiché au-dessus du spinner. */
+  title?: string | null;
   /** Étape courante (1-4) pour la barre d'étapes streaming. */
   loadingStep?: number;
   /** Message de détail (ex. "Recherche de peers..."). */
@@ -31,6 +34,7 @@ interface PlayerLoadingOverlayProps {
 
 export default function PlayerLoadingOverlay({
   message,
+  title,
   loadingStep = 0,
   progressMessage,
   torrentStats,
@@ -92,9 +96,68 @@ export default function PlayerLoadingOverlay({
   // Bouton d'annulation : adapter le libellé
   const effectiveCancelLabel = isCompleted ? closeLabel : (cancelLabel || defaultCancelLabel);
 
+  useEffect(() => {
+    if (!onCancel) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const key = e.key;
+      const code = e.keyCode ?? e.which;
+      const isBack =
+        key === 'Escape' ||
+        key === 'Backspace' ||
+        key === 'Back' ||
+        key === 'BrowserBack' ||
+        key === 'GoBack' ||
+        code === 27 ||
+        code === 8 ||
+        code === 461 ||
+        code === 10009;
+      if (!isBack) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onCancel();
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [onCancel]);
+
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center bg-black z-30">
+      {/* Bouton fermer toujours accessible en haut à gauche */}
+      {onCancel && (
+        <button
+          type="button"
+          onClick={onCancel}
+          title={effectiveCancelLabel}
+          aria-label={effectiveCancelLabel}
+          tabIndex={0}
+          data-focusable
+          className="absolute top-4 left-4 z-40 inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden
+          >
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
+      )}
+
       <div className="text-center max-w-md px-4 flex flex-col items-center">
+        {title && (
+          <h2 className="text-white text-xl sm:text-2xl font-semibold tracking-tight mb-4 line-clamp-2 px-2">
+            {title}
+          </h2>
+        )}
+
         {/* Spinner + message principal */}
         <div className="relative w-32 h-32 mb-4 mx-auto">
           <div className="absolute inset-0 border-4 border-primary-600/20 rounded-full" />

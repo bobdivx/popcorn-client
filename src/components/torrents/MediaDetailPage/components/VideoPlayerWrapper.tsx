@@ -11,7 +11,9 @@ import PrerollPlayer from '../../../streaming/hls-player/components/PrerollPlaye
 import { getPublicAdsSettings, type AdsConfig } from '../../../../lib/api/popcorn-web';
 import { useHlsLoader } from '../../../streaming/hls-player/hooks/useHlsLoader';
 import { usePlayerConfig } from '../../../streaming/player-shared/hooks/usePlayerConfig';
-import PlayerLoadingOverlay from '../../../streaming/player-shared/components/PlayerLoadingOverlay';
+import PlayerLoadingOverlay, {
+  type PlayerLoadingTorrentStats,
+} from '../../../streaming/player-shared/components/PlayerLoadingOverlay';
 import { getLoadingStep } from '../../../streaming/player-shared/utils/streamingSteps';
 import UnifiedPlayer from '../../../streaming/player-core/components/UnifiedPlayer';
 import { useStreamSource } from '../../../streaming/player-core/hooks/useStreamSource';
@@ -80,8 +82,8 @@ interface VideoPlayerWrapperProps {
   playStatus?: string;
   /** Message de progression (ex. "Recherche de peers..."). */
   progressMessage?: string;
-  /** Stats du torrent (pour déduire l'étape courante). */
-  torrentStats?: { progress?: number; download_speed?: number } | null;
+  /** Stats du torrent (pour déduire l'étape courante et l'overlay buffering). */
+  torrentStats?: PlayerLoadingTorrentStats | null;
   /** Rail « autre épisode » sur l'overlay pause (séries). */
   seriesEpisodePickerItems?: SeriesEpisodePickerItem[] | null;
   selectedSeriesEpisodeVariantId?: string | null;
@@ -160,6 +162,12 @@ export function VideoPlayerWrapper({
   const isFullscreen = useFullscreen();
   const wrapperElementRef = useRef<HTMLDivElement>(null);
   const stopBufferRef = useRef<(() => void) | null>(null);
+
+  /** Ferme le lecteur en arrêtant d'abord le buffer HLS/Lucie. */
+  const handleClosePlayer = useCallback(() => {
+    stopBufferRef.current?.();
+    onClose();
+  }, [onClose]);
   const isMobile = isMobileDevice();
   const { t } = useI18n();
   const playerConfig = usePlayerConfig();
@@ -511,10 +519,11 @@ export function VideoPlayerWrapper({
       >
         <PlayerLoadingOverlay
           message="Chargement des fichiers vidéo..."
+          title={torrentName}
           loadingStep={loadingStep}
           progressMessage={progressMessage}
           torrentStats={torrentStats ?? undefined}
-          onCancel={onClose}
+          onCancel={handleClosePlayer}
           cancelLabel={t('downloads.cancelDownload')}
         />
       </div>
@@ -589,11 +598,8 @@ export function VideoPlayerWrapper({
             progressMessage={progressMessage ?? undefined}
             torrentStats={torrentStats ?? undefined}
             closeLabel={t('common.close')}
-            cancelLabel={t('downloads.cancelDownload')}
-            onClose={() => {
-              stopBufferRef.current?.();
-              onClose();
-            }}
+            cancelLabel={t('playback.stopPlayback') || t('downloads.cancelDownload')}
+            onClose={handleClosePlayer}
             onDirectLoadedData={() => setIsLoading(false)}
             onDirectError={(e) => {
               const videoEl = e.target instanceof HTMLVideoElement ? e.target : null;
@@ -673,7 +679,7 @@ export function VideoPlayerWrapper({
               isSeries,
               nextEpisodeInfo,
               onPlayNextEpisode,
-              onClose,
+              onClose: handleClosePlayer,
               canUseSeekReload: computeCanUseSeekReload({
                 infoHash,
                 streamBackendUrl,
@@ -716,7 +722,7 @@ export function VideoPlayerWrapper({
               isSeries,
               nextEpisodeInfo,
               onPlayNextEpisode,
-              onClose,
+              onClose: handleClosePlayer,
               baseUrl,
               stopBufferRef,
               scrubThumbnails,

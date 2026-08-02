@@ -101,4 +101,6 @@ export interface PlayHandlerContext {
   addDebugLog: (type: 'info' | 'success' | 'error' | 'warning', message: string, data?: any) => void;
   progressPollIntervalRef: { current: number | null };
   pollTorrentProgress: (infoHash: string) => Promise<void>;
+  /** Incrémenté à chaque play / close pour annuler les chemins async obsolètes. */
+  playGenerationRef: { current: number };
 }

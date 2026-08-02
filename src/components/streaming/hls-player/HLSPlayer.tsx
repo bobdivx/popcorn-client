@@ -11,6 +11,7 @@ import { usePlayerConfig } from '../player-shared/hooks/usePlayerConfig';
 import { shouldAutoFullscreen } from '../../../lib/utils/device-detection';
 import { isTauri } from '../../../lib/utils/tauri';
 import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
+import PlayerBufferingOverlay from '../player-shared/components/PlayerBufferingOverlay';
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
@@ -20,6 +21,7 @@ export default function HLSPlayer({
   infoHash, 
   fileName, 
   torrentName,
+  torrentStats,
   posterUrl,
   logoUrl,
   synopsis,
@@ -161,18 +163,24 @@ export default function HLSPlayer({
     canAutoPlayRef.current = canAutoPlay;
   }, [canAutoPlay]);
 
-  // Reprendre / Revoir : enregistrer la progression périodiquement et à la fermeture
+  // Reprendre / Revoir : progress via refs (éviter spam API à chaque timeupdate)
   const effectiveDuration = duration > 0 ? duration : (hlsDuration ?? 0);
+  const currentTimeRef = useRef(currentTime);
+  const effectiveDurationRef = useRef(effectiveDuration);
+  currentTimeRef.current = currentTime;
+  effectiveDurationRef.current = effectiveDuration;
   useEffect(() => {
     if (!onProgress || effectiveDuration <= 0) return;
-    // Important : notifier tout de suite quand la durée HLS devient connue (reprise + miniatures scrub côté parent).
-    onProgress(currentTime, effectiveDuration);
-    const id = setInterval(() => onProgress(currentTime, effectiveDuration), 15000);
+    // Notifier dès que la durée HLS est connue (reprise + miniatures scrub).
+    onProgress(currentTimeRef.current, effectiveDuration);
+    const id = setInterval(() => {
+      onProgress(currentTimeRef.current, effectiveDurationRef.current);
+    }, 15000);
     return () => {
       clearInterval(id);
-      onProgress(currentTime, effectiveDuration);
+      onProgress(currentTimeRef.current, effectiveDurationRef.current);
     };
-  }, [onProgress, currentTime, effectiveDuration]);
+  }, [onProgress, effectiveDuration]);
 
   const {
     audioTracks,
@@ -352,8 +360,24 @@ export default function HLSPlayer({
     };
   }, []);
 
+  const [isWaiting, setIsWaiting] = useState(false);
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const onWaiting = () => setIsWaiting(true);
+    const onReady = () => setIsWaiting(false);
+    video.addEventListener('waiting', onWaiting);
+    video.addEventListener('canplay', onReady);
+    video.addEventListener('playing', onReady);
+    return () => {
+      video.removeEventListener('waiting', onWaiting);
+      video.removeEventListener('canplay', onReady);
+      video.removeEventListener('playing', onReady);
+    };
+  }, [videoRef, src]);
+
   const displayError = error;
-  const shouldShowBuffering = isLoading || (isSeeking && bufferedPercent < 100);
+  const shouldShowBuffering = isLoading || isWaiting || (isSeeking && bufferedPercent < 100);
   /** En cas d'erreur, garder les contrôles visibles pour permettre d'appuyer sur Retour */
   const effectiveShowControls = showControls || !!displayError;
 
@@ -406,44 +430,14 @@ export default function HLSPlayer({
           </div>
         )}
         {shouldShowBuffering && (
-          <div class="absolute inset-0 flex flex-col items-center justify-center bg-black z-10">
-            <div class="loading-icon-container mb-6">
-              <div class="loading-icon-ring-outer"></div>
-              <div class="loading-icon-ring-middle"></div>
-              <div class="loading-icon-glow"></div>
-              <div class="loading-icon-circle">
-                <img
-                  src="/popcorn_logo.png"
-                  alt=""
-                  class="w-full h-full object-contain"
-                  style={{ filter: 'drop-shadow(0 0 10px rgba(168, 85, 247, 0.5))' }}
-                />
-              </div>
-            </div>
-            <p class="text-white/80 text-lg font-medium">
-              {bufferedPercent > 0
-                ? t('playback.bufferingProgress', { percent: Math.round(bufferedPercent) })
-                : t('playback.buffering')}
-            </p>
-            <div class="ds-progress-container mt-4 mb-2 max-w-[16rem]">
-              <div class="ds-progress-bar"></div>
-              <div class="ds-progress-wave"></div>
-            </div>
-            <div class="flex gap-1 mt-2">
-              <span
-                class="w-2 h-2 bg-primary-500 rounded-full"
-                style={{ animation: 'hls-bounce 1.4s infinite ease-in-out both', animationDelay: '0s' }}
-              />
-              <span
-                class="w-2 h-2 bg-primary-500 rounded-full"
-                style={{ animation: 'hls-bounce 1.4s infinite ease-in-out both', animationDelay: '0.2s' }}
-              />
-              <span
-                class="w-2 h-2 bg-primary-500 rounded-full"
-                style={{ animation: 'hls-bounce 1.4s infinite ease-in-out both', animationDelay: '0.4s' }}
-              />
-            </div>
-          </div>
+          <PlayerBufferingOverlay
+            title={torrentName || fileName}
+            bufferedPercent={bufferedPercent}
+            detailMessage={loadingStatusMessage}
+            torrentStats={torrentStats}
+            onClose={onClose}
+            closeLabel={t('playback.stopPlayback') || t('common.close')}
+          />
         )}
         <video
           ref={videoRef}

@@ -5,6 +5,7 @@ import { useI18n } from '../../../../lib/i18n/useI18n';
 import { translateGenres } from '../../../../lib/utils/genre-translation';
 import { serverApi } from '../../../../lib/client/server-api';
 import { getLibraryDisplayConfig } from '../../../../lib/utils/library-display-config';
+import { buildExternalDownloadParams } from '../../../../lib/torrents/externalDownloadParams';
 
 type QualityVariant = {
   id: string;
@@ -171,21 +172,16 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
         return;
       }
 
-      const indexerId = (torrent as any).indexerId || (torrent as any).indexer_id || null;
-      const guid = (torrent as any)._guid || (torrent as any)._externalGuid || null;
-      const indexerTypeId =
-        (torrent as any).id && typeof (torrent as any).id === 'string'
-          ? ((torrent as any).id as string).match(/^external_(.+?)_\d+$/)?.[1] ?? null
-          : null;
+      const extParams = buildExternalDownloadParams(torrent as any);
 
       const resIndexer = await serverApi.downloadTorrentFromIndexer({
         externalLink,
         torrentName: torrent.name,
-        indexerId,
-        indexerName,
-        guid,
-        torrentId: (torrent as any).id ?? null,
-        indexerTypeId,
+        indexerId: extParams.indexerId,
+        indexerName: indexerName || extParams.indexerName,
+        guid: extParams.guid,
+        torrentId: extParams.torrentId,
+        indexerTypeId: extParams.indexerTypeId,
       });
 
       if (resIndexer.success && resIndexer.data) {

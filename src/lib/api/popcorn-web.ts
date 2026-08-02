@@ -1586,14 +1586,71 @@ export async function inviteLocalUser(email: string, displayName?: string): Prom
   }
 }
 
+/** Single-flight : évite N POST /auth/refresh en parallèle sur une rafale de 401. */
+let cloudRefreshInFlight: Promise<boolean> | null = null;
+
 /**
- * Rafraîchit le token cloud d'accès
+ * Décode le payload JWT (base64url) sans vérifier la signature — pour lire `exp` / `type`.
  */
-async function refreshCloudToken(): Promise<boolean> {
+function decodeJwtPayloadUnsafe(token: string): { exp?: number; type?: string } | null {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = b64 + '='.repeat((4 - (b64.length % 4)) % 4);
+    const json =
+      typeof atob === 'function'
+        ? decodeURIComponent(
+            Array.prototype.map
+              .call(atob(padded), (c: string) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+              .join('')
+          )
+        : Buffer.from(padded, 'base64').toString('utf8');
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Applique les nouveaux tokens cloud et aligne les tokens locaux s'ils étaient la même session
+ * (cas loginCloud / quick-connect : mêmes JWT dans access_token et cloud_access_token).
+ */
+function applyRefreshedCloudTokens(accessToken: string, refreshToken: string): void {
+  const prevCloudRefresh = TokenManager.getCloudRefreshToken();
+  const localRefresh = TokenManager.getRefreshToken();
+  TokenManager.setCloudTokens(accessToken, refreshToken);
+  if (!localRefresh || localRefresh === prevCloudRefresh) {
+    TokenManager.setTokens(accessToken, refreshToken);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('popcorn-auth-changed'));
+    }
+  }
+}
+
+function notifyCloudSessionExpired(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('popcorn:cloud-session-expired'));
+}
+
+/**
+ * Rafraîchit le token cloud d'accès (single-flight).
+ * En cas de 401/404 authentique, nettoie les tokens cloud (sans toucher la session backend
+ * si les tokens locaux sont distincts) et émet `popcorn:cloud-session-expired`.
+ * Les erreurs réseau / 5xx ne clearent pas les tokens (retry possible).
+ */
+export async function refreshCloudToken(): Promise<boolean> {
+  if (cloudRefreshInFlight) return cloudRefreshInFlight;
+  cloudRefreshInFlight = doRefreshCloudToken().finally(() => {
+    cloudRefreshInFlight = null;
+  });
+  return cloudRefreshInFlight;
+}
+
+async function doRefreshCloudToken(): Promise<boolean> {
   try {
     const refreshToken = TokenManager.getCloudRefreshToken();
     if (!refreshToken) {
-      console.warn('[POPCORN-WEB] Aucun refresh token cloud disponible');
       return false;
     }
 
@@ -1611,21 +1668,44 @@ async function refreshCloudToken(): Promise<boolean> {
     );
 
     if (!res.ok || !res.data?.success) {
-      console.warn('[POPCORN-WEB] Impossible de rafraîchir le token cloud:', res.data);
+      // Uniquement une vraie invalidation auth → clear. Réseau/5xx : garder le refresh pour retry.
+      if (res.status === 401 || res.status === 400 || res.status === 404) {
+        console.warn('[POPCORN-WEB] Refresh token cloud invalide (session cloud expirée)');
+        TokenManager.clearCloudTokens();
+        notifyCloudSessionExpired();
+      } else {
+        console.warn('[POPCORN-WEB] Refresh cloud temporairement indisponible:', res.status);
+      }
       return false;
     }
 
     const { accessToken, refreshToken: newRefreshToken } = res.data.data || {};
     if (accessToken && newRefreshToken) {
-      TokenManager.setCloudTokens(accessToken, newRefreshToken);
+      applyRefreshedCloudTokens(accessToken, newRefreshToken);
       return true;
     }
 
     return false;
   } catch (error) {
-    console.warn('[POPCORN-WEB] Erreur lors du rafraîchissement du token cloud:', error);
+    // Erreur réseau : ne pas clear les tokens
+    console.warn('[POPCORN-WEB] Erreur réseau lors du rafraîchissement du token cloud:', error);
     return false;
   }
+}
+
+/**
+ * Rafraîchit le token cloud de façon proactive s'il expire bientôt (évite les rafales 401).
+ */
+export async function ensureFreshCloudToken(skewSeconds: number = 120): Promise<boolean> {
+  const refresh = TokenManager.getCloudRefreshToken();
+  if (!refresh) return false;
+  const access = TokenManager.getCloudAccessToken();
+  if (!access) return refreshCloudToken();
+  const payload = decodeJwtPayloadUnsafe(access);
+  if (!payload?.exp) return true;
+  const now = Math.floor(Date.now() / 1000);
+  if (payload.exp > now + skewSeconds) return true;
+  return refreshCloudToken();
 }
 
 /**
@@ -1636,6 +1716,8 @@ async function requestWithTokenRefresh(
   init: RequestInit,
   timeoutMs: number = 10000
 ): Promise<JsonResult> {
+  await ensureFreshCloudToken();
+
   let token = TokenManager.getCloudAccessToken();
   if (!token) {
     return { ok: false, status: 401, data: { error: 'Unauthorized', message: 'Token d\'authentification cloud manquant' } };
@@ -1648,16 +1730,14 @@ async function requestWithTokenRefresh(
 
   let res = await requestJson(apiUrl, init, timeoutMs);
 
-  // Si erreur 401, essayer de rafraîchir le token et réessayer
+  // Si erreur 401, essayer de rafraîchir le token et réessayer (une seule fois, single-flight)
   if (!res.ok && res.status === 401) {
     const refreshed = await refreshCloudToken();
     if (refreshed) {
       token = TokenManager.getCloudAccessToken();
       if (token) {
-        // Mettre à jour l'en-tête avec le nouveau token
         headers.set('Authorization', `Bearer ${token}`);
         init.headers = headers;
-        // Réessayer avec le nouveau token
         res = await requestJson(apiUrl, init, timeoutMs);
       }
     }
@@ -2187,7 +2267,7 @@ export async function sendFeedbackMessage(params: {
 
 export async function getFeedbackUnreadCount(): Promise<number | null> {
   try {
-    if (!TokenManager.getCloudAccessToken()) {
+    if (!TokenManager.getCloudAccessToken() && !TokenManager.getCloudRefreshToken()) {
       return null;
     }
     const apiUrl = `${getPopcornWebApiUrl()}/feedback/count/unread`;
@@ -2197,14 +2277,11 @@ export async function getFeedbackUnreadCount(): Promise<number | null> {
       8000
     );
     if (!res.ok) {
-      // 401 = token cloud expiré ou invalide : invalider les tokens cloud pour arrêter le polling (évite des 401 en boucle)
-      if (res.status === 401) {
-        TokenManager.clearCloudTokens();
-      }
+      // Le clear cloud (session vraiment expirée) est centralisé dans refreshCloudToken.
       return null;
     }
     return res.data?.data?.unreadCount ?? 0;
-  } catch (error) {
+  } catch {
     return null;
   }
 }

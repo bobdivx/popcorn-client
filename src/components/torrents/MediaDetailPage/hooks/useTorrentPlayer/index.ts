@@ -44,6 +44,10 @@ export function useTorrentPlayer(options: UseTorrentPlayerOptions) {
   const lastQueuedLogTimeRef = useRef<number | null>(null);
   const lastResumeAttemptRef = useRef<number | null>(null);
   const lastTorrentStatsRef = useRef<{ state?: string; progress?: number } | null>(null);
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
+  /** Annule les play async en cours quand on ferme ou relance. */
+  const playGenerationRef = useRef(0);
   useEffect(() => {
     lastTorrentStatsRef.current = torrentStats
       ? { state: torrentStats.state, progress: torrentStats.progress }
@@ -122,6 +126,7 @@ export function useTorrentPlayer(options: UseTorrentPlayerOptions) {
     addDebugLog,
     playStatus,
     isPlaying,
+    isPlayingRef,
     videoFiles,
     selectedFile,
     torrent,
@@ -162,6 +167,7 @@ export function useTorrentPlayer(options: UseTorrentPlayerOptions) {
     addDebugLog,
     progressPollIntervalRef,
     pollTorrentProgress,
+    playGenerationRef,
   };
 
   // Créer la fonction handlePlay
@@ -221,6 +227,7 @@ export function useTorrentPlayer(options: UseTorrentPlayerOptions) {
 
   // Fonction pour fermer le lecteur
   const handleClosePlayer = async () => {
+    playGenerationRef.current += 1; // invalide tout handlePlay en cours
     const currentInfoHash = torrentStats?.info_hash || torrent.infoHash;
     if (streamingTorrentActive && currentInfoHash) {
       clientApi.notifyStreamingEnded(currentInfoHash).catch(() => {});

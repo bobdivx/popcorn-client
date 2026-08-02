@@ -3,6 +3,10 @@ import { serverApi } from '../../../../../lib/client/server-api';
 import { TokenManager } from '../../../../../lib/client/storage';
 import { setStreamingInfoHash } from '../../../../../lib/streamingInfoHashStorage';
 import { getCachedSubscription, loadSubscription } from '../../../../../lib/subscription-store';
+import {
+  buildExternalDownloadParams,
+  shouldAvoidBareMagnetFallback,
+} from '../../../../../lib/torrents/externalDownloadParams';
 import { PROGRESS_POLL_INTERVAL_MS } from '../../utils/constants';
 import { resolveDownloadTypeHeader } from '../../utils/resolveDownloadTypeHeader';
 import type { PlayHandlerContext } from './types';
@@ -132,22 +136,30 @@ export function createHandlePlay(context: PlayHandlerContext) {
     addDebugLog,
     progressPollIntervalRef,
     pollTorrentProgress,
+    playGenerationRef,
   } = context;
 
   return async () => {
+    playGenerationRef.current += 1;
+    const playGen = playGenerationRef.current;
+    const isPlayCancelled = () => playGenerationRef.current !== playGen;
+
     setErrorMessage(null);
     setIsPlaying(true);
     setShowInfo(false);
     const streamingCache: { value: boolean | null } = { value: null };
     /** Marque ce torrent comme "en streaming" pour masquer la carte téléchargement quand on revient sur la page. */
     const markStreamingIfActive = async () => {
+      if (isPlayCancelled()) return;
       const forStreaming = await resolveStreamingActiveOnce(streamingTorrentActive, streamingCache);
+      if (isPlayCancelled()) return;
       if (forStreaming && torrent.infoHash) setStreamingInfoHash(torrent.infoHash);
     };
     addDebugLog('info', '🎯 === DÉBUT: Clic sur bouton Lire ===', {
       hasInfoHash,
       isExternal,
       hasMagnetLink,
+      playGen,
     });
 
     // PRIORITÉ 0: Si on a déjà des fichiers vidéo chargés (ex. par useVideoFiles au montage), lancer la lecture directement.
@@ -176,8 +188,8 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, torrent.infoHash, selectedFile,
         setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
       );
-      if (!ok) {
-        setIsPlaying(false);
+      if (!ok || isPlayCancelled()) {
+        if (!isPlayCancelled()) setIsPlaying(false);
         return;
       }
       setPlayStatus('ready');
@@ -204,10 +216,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, torrent.infoHash!, libraryVideos[0],
           setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
         );
-        if (!okLib) {
-          setIsPlaying(false);
-          return;
-        }
+        if (!okLib || isPlayCancelled()) { if (!isPlayCancelled()) setIsPlaying(false); return; }
         setPlayStatus('ready');
         setProgressMessage('Lancement de la lecture...');
         setIsPlaying(true);
@@ -367,36 +376,22 @@ export function createHandlePlay(context: PlayHandlerContext) {
           const token = serverApi.getAccessToken();
           const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
           
-          // Toujours utiliser le backend comme proxy pour éviter les problèmes CORS
-          // Le backend fera la requête côté serveur et renverra le fichier .torrent
-          // Passer indexerId, indexerName, torrentId, indexerTypeId pour le backend (template YGG etc.)
-          const indexerId = (torrent as any).indexerId || (torrent as any).indexer_id;
-          const indexerName = (torrent as any).indexerName || (torrent as any).indexer_name;
-          const guid =
-            torrent._guid ||
-            (torrent as any).guid ||
-            (torrent as any).torrent_guid ||
-            (torrent as any)._externalGuid ||
-            null; // GUID Torznab stocké lors de la synchronisation
-
-          // IMPORTANT: l'id UI peut être "external_c411_<infoHash>" et n'est pas forcément le torrentId attendu par l'indexer.
-          // On privilégie les champs dédiés (torrent_id / torrentId) s'ils existent.
-          const torrentIdFromVariant =
-            (torrent as any).torrentId ||
-            (torrent as any).torrent_id ||
-            (torrent as any)._torrentId ||
-            null;
-
-          // indexerTypeId : toujours dérivable du préfixe "external_{type}_..."
-          const indexerTypeIdFromVariant = torrent.id?.match(/^external_([^_]+)_/)?.[1] ?? null;
+          // Toujours utiliser le backend comme proxy pour éviter les problèmes CORS.
+          // C411 : indexerTypeId + guid/infohash hex (pas l'id UI brut).
+          const extParams = buildExternalDownloadParams(torrent as any);
+          const indexerId = extParams.indexerId;
+          const indexerName = extParams.indexerName;
+          const guid = extParams.guid;
+          const torrentIdFromVariant = extParams.torrentId;
+          const indexerTypeIdFromVariant = extParams.indexerTypeId;
           const indexerIdParam = indexerId ? `&indexerId=${encodeURIComponent(indexerId)}` : '';
           const indexerNameParam = indexerName ? `&indexerName=${encodeURIComponent(indexerName)}` : '';
           const guidParam = guid ? `&guid=${encodeURIComponent(guid)}` : '';
           const torrentIdParam = torrentIdFromVariant ? `&torrentId=${encodeURIComponent(String(torrentIdFromVariant))}` : '';
           const indexerTypeIdParam = indexerTypeIdFromVariant ? `&indexerTypeId=${encodeURIComponent(indexerTypeIdFromVariant)}` : '';
-          const ihForUrl = torrent.infoHash?.trim() ?? '';
-          const infoHashQueryParam =
-            /^[a-f0-9]{40}$/i.test(ihForUrl) ? `&infoHash=${encodeURIComponent(ihForUrl.toLowerCase())}` : '';
+          const infoHashQueryParam = extParams.infoHash
+            ? `&infoHash=${encodeURIComponent(extParams.infoHash)}`
+            : '';
           const downloadUrl = `${baseUrl}/api/torrents/external/download?url=${encodeURIComponent(torrent._externalLink)}&torrentName=${encodeURIComponent(torrent.name)}${indexerIdParam}${indexerNameParam}${guidParam}${torrentIdParam}${indexerTypeIdParam}${infoHashQueryParam}`;
 
           let response: Response;
@@ -477,10 +472,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, addResult.info_hash, videos[0],
                             setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
                           );
-                          if (!okM) {
-                            setIsPlaying(false);
-                            return;
-                          }
+                          if (!okM || isPlayCancelled()) { if (!isPlayCancelled()) setIsPlaying(false); return; }
                           setPlayStatus('ready');
                           setProgressMessage('Lancement de la lecture...');
                           setIsPlaying(true);
@@ -582,10 +574,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, addResult.info_hash, videos[0],
                             setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
                           );
-                          if (!okM) {
-                            setIsPlaying(false);
-                            return;
-                          }
+                          if (!okM || isPlayCancelled()) { if (!isPlayCancelled()) setIsPlaying(false); return; }
                           setPlayStatus('ready');
                           setProgressMessage('Lancement de la lecture...');
                           setIsPlaying(true);
@@ -711,10 +700,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, addResult.info_hash, videos[0],
                   setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
                 );
-                if (!okT) {
-                  setIsPlaying(false);
-                  return;
-                }
+                if (!okT || isPlayCancelled()) { if (!isPlayCancelled()) setIsPlaying(false); return; }
                 setPlayStatus('ready');
                 setProgressMessage('Lancement de la lecture...');
                 setIsPlaying(true);
@@ -743,13 +729,16 @@ export function createHandlePlay(context: PlayHandlerContext) {
         }
       }
       
-      // PRIORITÉ 2: Vérifier si on a un magnet link (direct ou dans _externalLink), ou construire à partir de l'infoHash
+      // PRIORITÉ 2: magnet (direct) ou construction depuis infoHash.
+      // C411 est privé : un magnet nu (sans announce/passkey) ne trouve aucun peer → on refuse ce fallback.
       const magnetUri = torrent._externalMagnetUri || 
         (torrent._externalLink && torrent._externalLink.startsWith('magnet:') 
           ? torrent._externalLink 
           : null);
+      const c411TypeId = buildExternalDownloadParams(torrent as any).indexerTypeId;
+      const bareMagnetBlocked = !magnetUri && shouldAvoidBareMagnetFallback(c411TypeId);
       
-      if (magnetUri || torrent.infoHash) {
+      if ((magnetUri || torrent.infoHash) && !bareMagnetBlocked) {
         addDebugLog('info', '🔨 Utilisation ou construction du magnet link (fallback)', {
           infoHash: torrent.infoHash,
           hasMagnet: !!magnetUri,
@@ -817,10 +806,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, addResult.info_hash, videos[0],
                         setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
                       );
-                      if (!okMag) {
-                        setIsPlaying(false);
-                        return;
-                      }
+                      if (!okMag || isPlayCancelled()) { if (!isPlayCancelled()) setIsPlaying(false); return; }
                       setPlayStatus('ready');
                       setProgressMessage('Lancement de la lecture...');
                       setIsPlaying(true);
@@ -904,6 +890,14 @@ export function createHandlePlay(context: PlayHandlerContext) {
           setIsPlaying(false);
           return;
         }
+      } else if (bareMagnetBlocked) {
+        const msg =
+          'Impossible de récupérer le fichier .torrent C411. Vérifiez la clé API Torznab de l\'indexer (Paramètres > Indexers), puis relancez une synchronisation. Un magnet sans trackers privés ne fonctionne pas sur C411.';
+        addDebugLog('error', msg, { indexerTypeId: c411TypeId, infoHash: torrent.infoHash });
+        setPlayStatus('error');
+        setErrorMessage(msg);
+        setIsPlaying(false);
+        return;
       }
     }
 
@@ -928,10 +922,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, torrent.infoHash!, videos[0],
             setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
           );
-          if (!okH) {
-            setIsPlaying(false);
-            return;
-          }
+          if (!okH || isPlayCancelled()) { if (!isPlayCancelled()) setIsPlaying(false); return; }
         }
         setPlayStatus('ready');
         setProgressMessage('Lancement de la lecture...');
@@ -1075,10 +1066,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
                 streamingTorrentActive && !isAvailableLocally, addResult.info_hash, videos[0],
                       setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
                     );
-                    if (!okC) {
-                      setIsPlaying(false);
-                      return;
-                    }
+                    if (!okC || isPlayCancelled()) { if (!isPlayCancelled()) setIsPlaying(false); return; }
                     setPlayStatus('ready');
                     setProgressMessage('Lancement de la lecture...');
                     setIsPlaying(true);
