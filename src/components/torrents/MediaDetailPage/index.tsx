@@ -453,13 +453,21 @@ export default function MediaDetailPage({
   const isExternal = activeTorrent.id.startsWith('external_');
   const hasInfoHash = typeof activeTorrent.infoHash === 'string' && activeTorrent.infoHash.trim().length > 0;
   const hasMagnetLink = typeof activeTorrent._externalMagnetUri === 'string' && activeTorrent._externalMagnetUri.trim().length > 0;
-  // Pouvoir lancer la lecture si on a un infoHash (stream-torrent ou dÃ©jÃ  ajoutÃ©) ou un magnet/lien pour ajouter puis stream
-  const canStream = hasInfoHash || !!(activeTorrent as { _externalLink?: string })._externalLink || hasMagnetLink;
+  const hasLocalPlaybackPath = !!(
+    (activeTorrent as { downloadPath?: string }).downloadPath ||
+    libraryDownloadPath
+  );
+  // Lecture possible via infoHash, lien/magnet, ou fichier bibliothèque déjà résolu
+  const canStream =
+    hasInfoHash ||
+    !!(activeTorrent as { _externalLink?: string })._externalLink ||
+    hasMagnetLink ||
+    hasLocalPlaybackPath;
   const isLocalTorrent =
     activeTorrent.id?.startsWith('local_') ||
     activeTorrent.slug?.startsWith('local_') ||
     activeTorrent.infoHash?.startsWith('local_') ||
-    !!(activeTorrent as any).downloadPath;
+    hasLocalPlaybackPath;
 
   // Pack complet (Ã©pisode 0) : l'utilisateur a sÃ©lectionnÃ© l'entrÃ©e "pack complet" dans la liste d'Ã©pisodes.
   // Doit Ãªtre calculÃ© avant useVideoFiles (utilisÃ© pour garder tous les fichiers du torrent).
