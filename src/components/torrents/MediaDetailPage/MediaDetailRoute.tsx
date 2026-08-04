@@ -4,6 +4,7 @@ import { getDownloadClientStats } from '../../../lib/utils/download-meta-storage
 import { normalizeTorrentStats } from '../../../lib/utils/torrentStatsUtils';
 import MediaDetailPage from './index';
 import type { MediaDetailPageProps } from './types';
+import { clientApi } from '../../../lib/client/api';
 import { serverApi } from '../../../lib/client/server-api';
 import type {
   SeriesEpisodesResponse,
@@ -603,14 +604,26 @@ function convertVariantToTorrent(variant: any): Torrent {
     full: qualityObj?.full || variant.quality || null,
   };
 
-  const infoHash = variant.info_hash || variant.infoHash || null;
+  // Stubs bibliothèque (local_*) : le groupe by-tmdb peut renvoyer info_hash null.
+  // Sans fallback sur l'id, hasInfoHash reste faux et la lecture est bloquée.
+  const rawInfoHash = variant.info_hash || variant.infoHash || null;
+  const localId =
+    typeof variant.id === 'string' && variant.id.startsWith('local_') ? variant.id : null;
+  const infoHash = rawInfoHash || localId || null;
   const tmdbTitleRaw = (variant as any).tmdb_title ?? (variant as any).tmdbTitle;
   const tmdbTitle =
     typeof tmdbTitleRaw === 'string' && tmdbTitleRaw.trim().length > 0 ? tmdbTitleRaw.trim() : null;
+  const downloadPathRaw =
+    variant.download_path ||
+    variant.downloadPath ||
+    variant.file_path ||
+    variant.filePath ||
+    null;
   return {
     id: variant.id || '',
     slug: variant.slug || variant.id || null,
     infoHash: infoHash,
+    downloadPath: typeof downloadPathRaw === 'string' && downloadPathRaw.trim() ? downloadPathRaw : null,
     name: variant.name || '',
     tmdbTitle,
     cleanTitle: variant.clean_title || variant.cleanTitle || null,
@@ -647,7 +660,7 @@ function convertVariantToTorrent(variant: any): Torrent {
     tmdbType: variant.tmdb_type || variant.tmdbType || null,
     tmdbMatchSource: (variant as any).tmdb_match_source ?? (variant as any).tmdbMatchSource ?? null,
     tmdbMatchConfidence: (variant as any).tmdb_match_confidence ?? (variant as any).tmdbMatchConfidence ?? null,
-  } as Torrent;
+  } as unknown as Torrent;
 }
 
 function pickBestTorrentFromGroupPayload(payload: any, titleHint?: string | null): Torrent | null {
@@ -777,7 +790,134 @@ function libraryItemToTorrent(localMedia: any): Torrent {
     tmdbMatchSource: localMedia.tmdb_match_source ?? null,
     tmdbMatchConfidence: localMedia.tmdb_match_confidence ?? null,
     downloadPath: localMedia.download_path ?? null,
-  } as Torrent;
+  } as unknown as Torrent;
+}
+
+/**
+ * Rattache un info_hash client et/ou un chemin fichier quand la fiche TMDB ne renvoie
+ * que des stubs local_* (info_hash null) — cas typique depuis /downloads.
+ */
+async function enrichTorrentForPlayback(
+  t: Torrent,
+  opts: {
+    urlInfoHash?: string | null;
+    fromParam?: string | null;
+    tmdbId?: number | null;
+    titleHint?: string | null;
+    mediaType?: string | null;
+  },
+): Promise<Torrent> {
+  let result: Torrent = { ...t };
+  const urlHash = (opts.urlInfoHash || '').trim();
+  if (
+    urlHash &&
+    (urlHash.startsWith('local_') ||
+      ((urlHash.length === 40 || urlHash.length === 32) && /^[a-fA-F0-9]+$/.test(urlHash)))
+  ) {
+    result = { ...result, infoHash: urlHash };
+  }
+
+  const currentHash = (result.infoHash || '').trim();
+  const hasRealHash =
+    (currentHash.length === 40 || currentHash.length === 32) && /^[a-fA-F0-9]+$/.test(currentHash);
+  const needsClientMatch =
+    opts.fromParam === 'downloads' || !hasRealHash || !(result as { downloadPath?: string }).downloadPath;
+
+  if (needsClientMatch) {
+    try {
+      const list = await clientApi.listTorrents();
+      if (hasRealHash) {
+        const byHash = list.find(
+          (item) => (item.info_hash || '').toLowerCase() === currentHash.toLowerCase(),
+        );
+        if (byHash?.info_hash) {
+          result = { ...result, infoHash: byHash.info_hash, name: result.name || byHash.name };
+        }
+      } else {
+        const hintNorm = normalizeTitleForMatch(opts.titleHint || result.name || '');
+        const nameNorm = normalizeTitleForMatch(result.name || '');
+        const scoreName = (candidate: string): number => {
+          const n = normalizeTitleForMatch(candidate);
+          if (!n) return 0;
+          if (nameNorm && (n === nameNorm || n.includes(nameNorm) || nameNorm.includes(n))) return 100;
+          const hintFirst = hintNorm.split(/[.\s\-_]+/).filter((w) => w.length >= 3);
+          const nameFirst = nameNorm.split(/[.\s\-_]+/).filter((w) => w.length >= 3);
+          const tokens = [...new Set([...hintFirst, ...nameFirst])];
+          if (!tokens.length) return 0;
+          let matched = 0;
+          for (const tok of tokens) {
+            if (n.includes(tok)) matched += 1;
+          }
+          return matched / tokens.length;
+        };
+        const ranked = list
+          .map((item) => ({ item, s: scoreName(item.name || '') }))
+          .filter((x) => x.s >= 0.55)
+          .sort((a, b) => b.s - a.s);
+        const bestClient = ranked[0]?.item;
+        if (bestClient?.info_hash) {
+          result = {
+            ...result,
+            infoHash: bestClient.info_hash,
+            name: result.name || bestClient.name,
+          };
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // Stub local_* sans hash réel : garder l'id comme infoHash pour useVideoFiles.
+  if (
+    !result.infoHash &&
+    typeof result.id === 'string' &&
+    result.id.startsWith('local_')
+  ) {
+    result = { ...result, infoHash: result.id };
+  }
+
+  if (!(result as { downloadPath?: string }).downloadPath && opts.tmdbId) {
+    try {
+      const localMedias = await clientApi.findLocalMediaByTmdb(
+        opts.tmdbId,
+        opts.mediaType || (result.tmdbType as string | undefined) || undefined,
+      );
+      if (Array.isArray(localMedias) && localMedias.length > 0) {
+        const nameNorm = normalizeTitleForMatch(result.name || opts.titleHint || '');
+        const scored = localMedias
+          .map((m) => {
+            const path = (m.file_path || '').trim();
+            const n = normalizeTitleForMatch(m.file_name || '');
+            let s = 0;
+            if (pathLooksLikeFile(path)) s += 2;
+            if (nameNorm && n && (n.includes(nameNorm.split(/[.\s\-_]+/)[0] || '') || nameNorm.includes(n.split(/[.\s\-_]+/)[0] || ''))) {
+              s += 3;
+            }
+            if (/^[a-zA-Z]:[\\/]/.test(path) || path.startsWith('/')) s += 1;
+            return { m, path, s };
+          })
+          .filter((x) => x.path && pathLooksLikeFile(x.path))
+          .sort((a, b) => b.s - a.s);
+        const bestLocal = scored[0];
+        if (bestLocal) {
+          result = {
+            ...result,
+            downloadPath: bestLocal.path,
+            infoHash:
+              result.infoHash ||
+              (bestLocal.m.info_hash && String(bestLocal.m.info_hash).length >= 32
+                ? String(bestLocal.m.info_hash)
+                : `local_${bestLocal.m.id}`),
+          } as Torrent;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return result;
 }
 
 /** Fusionne bibliothèque + variantes indexeurs (DB), dédoublonnage par info_hash / id. */
@@ -1143,15 +1283,25 @@ export default function MediaDetailRoute() {
 
           if (best && !cancelled) {
             const mainTitle = data?.main_title ?? undefined;
-            const torrentPayload = { ...best, mainTitle } as Torrent;
-            const typeParam = new URLSearchParams(
+            const torrentPayload = await enrichTorrentForPlayback(
+              { ...best, mainTitle } as Torrent,
+              {
+                urlInfoHash: streamInfoHash,
+                fromParam,
+                tmdbId,
+                titleHint: titleFromQuery || mainTitle || best.name,
+                mediaType: mediaTypeFromQuery || typeParam,
+              },
+            );
+            if (cancelled) return;
+            const typeParamInner = new URLSearchParams(
               typeof window !== 'undefined' ? window.location.search : '',
             ).get('type');
             const bestTmdbType = String(
               best.tmdbType ?? (best as { tmdb_type?: string }).tmdb_type ?? '',
             ).toLowerCase();
             const isTvDetail =
-              typeParam === 'tv' || bestTmdbType === 'tv' || bestTmdbType === 'series';
+              typeParamInner === 'tv' || bestTmdbType === 'tv' || bestTmdbType === 'series';
 
             if (isTvDetail) {
               try {
@@ -1179,6 +1329,8 @@ export default function MediaDetailRoute() {
               }
             } else {
               setSeriesEpisodes(null);
+              // Film : exposer la variante enrichie (hash client / chemin) pour la lecture
+              setInitialVariants([torrentPayload]);
             }
 
             setTorrent(torrentPayload);
@@ -1264,8 +1416,47 @@ export default function MediaDetailRoute() {
               const withPoster = moviesInLibrary.find((i: any) => i.poster_url || i.hero_image_url);
               const main = withPoster ?? moviesInLibrary[0];
               const variants = moviesInLibrary.map((i: any) => libraryItemToTorrent(i));
-              setTorrent(libraryItemToTorrent(main));
+              const enrichedMain = await enrichTorrentForPlayback(libraryItemToTorrent(main), {
+                urlInfoHash: streamInfoHash,
+                fromParam,
+                tmdbId,
+                titleHint: titleFromQuery || main.name,
+                mediaType: mediaTypeFromQuery || 'movie',
+              });
+              if (cancelled) return;
+              setTorrent(enrichedMain);
               setInitialVariants(variants);
+              setLoading(false);
+              return;
+            }
+          }
+
+          // Dernier recours downloads : rattacher le torrent client même sans groupe / bibliothèque
+          if (!cancelled && (fromParam === 'downloads' || streamInfoHash)) {
+            const stub = {
+              id: streamInfoHash || `tmdb_${tmdbId}`,
+              slug: null,
+              infoHash: streamInfoHash || null,
+              name: titleFromQuery || emptyGroupTitle || 'Film',
+              cleanTitle: titleFromQuery || emptyGroupTitle || null,
+              tmdbId,
+              tmdbType: mediaTypeFromQuery || typeParam || 'movie',
+            } as Torrent;
+            const recovered = await enrichTorrentForPlayback(stub, {
+              urlInfoHash: streamInfoHash,
+              fromParam,
+              tmdbId,
+              titleHint: titleFromQuery || emptyGroupTitle,
+              mediaType: mediaTypeFromQuery || typeParam || 'movie',
+            });
+            const recoveredHash = (recovered.infoHash || '').trim();
+            const recoveredPath = (recovered as { downloadPath?: string }).downloadPath;
+            if (
+              recoveredHash &&
+              (recoveredHash.length >= 32 || recoveredHash.startsWith('local_') || recoveredPath)
+            ) {
+              setTorrent(recovered);
+              setInitialVariants([recovered]);
               setLoading(false);
               return;
             }

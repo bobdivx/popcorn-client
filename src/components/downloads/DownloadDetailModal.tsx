@@ -110,6 +110,8 @@ export function DownloadDetailModal({
       type: tmdbType,
       from: 'downloads',
       title: title || null,
+      // Sans infoHash, la fiche TMDB peut charger un stub local_* sans hash → lecture impossible.
+      infoHash: t.info_hash || null,
     });
   };
 
