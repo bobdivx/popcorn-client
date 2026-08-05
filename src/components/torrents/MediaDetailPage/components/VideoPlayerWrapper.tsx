@@ -3,6 +3,7 @@ import { serverApi } from '../../../../lib/client/server-api';
 import { updateResumeWatching } from '../../../../lib/resumeWatchingStorage';
 import type { ContentItem } from '../../../../lib/client/types';
 import type { TorrentFile } from '../hooks/useVideoFiles';
+import { isSparseOrEmptyMessage } from '../hooks/useVideoFiles';
 import { useFullscreen } from '../../../streaming/player-shared/hooks/useFullscreen';
 import { QualityBadges } from './QualityBadges';
 import { isMobileDevice } from '../../../../lib/utils/device-detection';
@@ -89,6 +90,10 @@ interface VideoPlayerWrapperProps {
   selectedSeriesEpisodeVariantId?: string | null;
   onSelectSeriesEpisode?: (variantId: string) => void;
   errorMessage?: string | null;
+  /** Erreur HLS fatale remontée au parent (ex. SPARSE_OR_EMPTY). */
+  onPlaybackError?: (message: string) => void;
+  /** Supprimer les fichiers sparses/vides (confirmation gérée par le parent ou ici). */
+  onDeleteEmptyFiles?: () => void;
 }
 
 export function VideoPlayerWrapper({ 
@@ -125,6 +130,8 @@ export function VideoPlayerWrapper({
   selectedSeriesEpisodeVariantId,
   onSelectSeriesEpisode,
   errorMessage,
+  onPlaybackError,
+  onDeleteEmptyFiles,
 }: VideoPlayerWrapperProps) {
   const baseUrl = serverApi.getServerUrl();
   const [forceHlsFallback, setForceHlsFallback] = useState(false);
@@ -133,6 +140,8 @@ export function VideoPlayerWrapper({
   const [adsConfig, setAdsConfig] = useState<AdsConfig | null>(null);
   /** Message d’overlay pendant le chargement HLS (ex. « Préparation en cours » pendant retries 503) */
   const [hlsLoadingMessage, setHlsLoadingMessage] = useState<string | null>(null);
+  const [localPlayerError, setLocalPlayerError] = useState<string | null>(null);
+  const [confirmingDeleteEmpty, setConfirmingDeleteEmpty] = useState(false);
 
   const hasLoggedStartRef = useRef(false);
   const lastLoggedErrorRef = useRef<string | null>(null);
@@ -170,6 +179,8 @@ export function VideoPlayerWrapper({
   }, [onClose]);
   const isMobile = isMobileDevice();
   const { t } = useI18n();
+  const displayError = errorMessage || localPlayerError;
+  const sparseOrEmpty = isSparseOrEmptyMessage(displayError);
   const playerConfig = usePlayerConfig();
   const isDirectMode = playerConfig.streamingMode === 'direct';
   const isLucieMode = playerConfig.streamingMode === 'lucie';

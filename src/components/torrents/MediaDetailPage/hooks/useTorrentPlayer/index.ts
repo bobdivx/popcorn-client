@@ -151,6 +151,7 @@ export function useTorrentPlayer(options: UseTorrentPlayerOptions) {
     hasMagnetLink,
     streamingTorrentActive,
     isAvailableLocally,
+    setIsAvailableLocally,
     loadVideoFiles,
     videoFiles,
     selectedFile,

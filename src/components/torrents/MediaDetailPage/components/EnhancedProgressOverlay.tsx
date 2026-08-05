@@ -16,6 +16,7 @@ interface EnhancedProgressOverlayProps {
   onCancel: () => void;
   onContinueInBackground?: () => void;
   onRetry: () => void;
+  onDeleteEmptyFiles?: () => void;
   onToggleDebug: () => void;
   onCopyLogs: () => void;
   onClearLogs: () => void;
@@ -37,6 +38,7 @@ export function EnhancedProgressOverlay({
   onCancel,
   onContinueInBackground,
   onRetry,
+  onDeleteEmptyFiles,
   onToggleDebug,
   onCopyLogs,
   onClearLogs,
@@ -62,6 +64,7 @@ export function EnhancedProgressOverlay({
       onCancel={onCancel}
       onContinueInBackground={onContinueInBackground}
       onRetry={onRetry}
+      onDeleteEmptyFiles={onDeleteEmptyFiles}
       onToggleDebug={onToggleDebug}
       onCopyLogs={onCopyLogs}
       onClearLogs={onClearLogs}
