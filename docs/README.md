@@ -19,11 +19,11 @@ Les anciennes documentations spécifiques **Android, Windows, WebOS, Tauri deskt
 
 ## Docker (rappel)
 
-Le **Dockerfile** et les fichiers associés (nginx, entrypoint) sont dans `docker/` à la racine du projet.  
+Le **Dockerfile** est à la racine du projet (compatible Coolify). Nginx et l’entrypoint sont dans `docker/`.  
 Build depuis la racine :
 
 ```bash
-docker build -f docker/Dockerfile -t popcorn-client .
+docker build -t popcorn-client .
 ```
 
 ## Lien avec la stack complète

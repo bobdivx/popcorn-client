@@ -1,5 +1,5 @@
-# Dockerfile multi-stage pour le frontend Astro Popcorn
-# Build depuis la racine du repo : docker build -f docker/Dockerfile .
+# Alias of the root Dockerfile for older CI/docs (`-f docker/Dockerfile`).
+# Prefer building from the repository root: docker build -t popcorn-client .
 # Stage 1: Build
 FROM node:22-alpine AS builder
 
