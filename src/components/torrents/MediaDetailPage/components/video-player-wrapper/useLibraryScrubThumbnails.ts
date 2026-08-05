@@ -168,11 +168,13 @@ export function useLibraryScrubThumbnails({
           const durationSeconds = Number(data?.duration_seconds ?? 0);
           const intervalSeconds = Number(data?.interval_seconds ?? 0);
 
+          const completed = data?.completed === true;
           if (
             shouldForceRegenerateScrub({
               count,
               durationSeconds,
               intervalSeconds,
+              completed,
             })
           ) {
             // Ne pas vider le strip : sinon l’UI bascule sur les placeholders puis un count
@@ -244,6 +246,7 @@ export function useLibraryScrubThumbnails({
     if (!ctx?.localMediaId || scrubRegenInFlightRef.current || scrubAutoRegenDoneRef.current) return;
     const st = scrubThumbnailsRef.current;
     const expected = Math.min(2000, Math.ceil(d / 10));
+    // Pas de force tant que la génération initiale n'a pas écrit meta.json.
     if (!st || st.count <= 0 || !st.completed) return;
     if (st.count >= expected - 2) return;
     if (st.count * 10 >= d * 0.88) return;

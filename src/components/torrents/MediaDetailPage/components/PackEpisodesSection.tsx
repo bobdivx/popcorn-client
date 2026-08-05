@@ -4,6 +4,7 @@ import { useI18n } from '../../../../lib/i18n/useI18n';
 import type { PackEpisodeKey, PackEpisodesModel } from '../hooks/usePackEpisodes';
 import { serverApi } from '../../../../lib/client/server-api';
 import { watchedEpisodeKey } from '../../../../lib/streaming/torrent-storage';
+import { isGenericEpisodeName } from '../utils/isGenericEpisodeName';
 import { EpisodeCardsCarousel } from './EpisodeCardsCarousel';
 
 function keyEquals(a: PackEpisodeKey | null, b: PackEpisodeKey): boolean {
@@ -40,12 +41,13 @@ export function PackEpisodesSection({
   downloadingEpisodesMap,
   isTV,
 }: PackEpisodesSectionProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const season = selectedSeason ?? model.seasons[0] ?? null;
   const items = season != null ? model.episodesBySeason.get(season) ?? [] : [];
   const episodeCount = items.length;
   const [tmdbStillByEpisode, setTmdbStillByEpisode] = useState<Record<number, string>>({});
   const [tmdbNameByEpisode, setTmdbNameByEpisode] = useState<Record<number, string>>({});
+  const tmdbLanguage = language === 'en' ? 'en-US' : 'fr-FR';
 
   useEffect(() => {
     let cancelled = false;
@@ -55,7 +57,7 @@ export function PackEpisodesSection({
         if (!cancelled) setTmdbNameByEpisode({});
         return;
       }
-      const res = await serverApi.getTmdbTvSeasonDetail(tmdbId, season, 'fr-FR');
+      const res = await serverApi.getTmdbTvSeasonDetail(tmdbId, season, tmdbLanguage);
       if (cancelled) return;
       if (!res?.success || !res.data) {
         setTmdbStillByEpisode({});
@@ -73,17 +75,33 @@ export function PackEpisodesSection({
         }
         if (num) {
           const episodeName = typeof ep?.name === 'string' ? ep.name.trim() : '';
-          if (episodeName) names[num] = episodeName;
+          if (episodeName && !isGenericEpisodeName(episodeName, num)) names[num] = episodeName;
         }
       }
-      setTmdbStillByEpisode(map);
-      setTmdbNameByEpisode(names);
+      const missing = episodes
+        .map((ep: { episode_number?: number }) => ep?.episode_number)
+        .filter((n: number | undefined): n is number => typeof n === 'number' && n > 0 && !names[n]);
+      if (missing.length > 0 && !tmdbLanguage.startsWith('en')) {
+        const en = await serverApi.getTmdbTvSeasonDetail(tmdbId, season, 'en-US');
+        if (!cancelled && en?.success && en.data && Array.isArray(en.data.episodes)) {
+          for (const ep of en.data.episodes) {
+            const num = typeof ep?.episode_number === 'number' ? ep.episode_number : null;
+            if (num == null || names[num]) continue;
+            const episodeName = typeof ep?.name === 'string' ? ep.name.trim() : '';
+            if (episodeName && !isGenericEpisodeName(episodeName, num)) names[num] = episodeName;
+          }
+        }
+      }
+      if (!cancelled) {
+        setTmdbStillByEpisode(map);
+        setTmdbNameByEpisode(names);
+      }
     }
     load();
     return () => {
       cancelled = true;
     };
-  }, [tmdbId, season]);
+  }, [tmdbId, season, tmdbLanguage]);
 
   const getPreferredThumb = useMemo(() => {
     return (episodeNumber: number | null, fallback: string | null) => {

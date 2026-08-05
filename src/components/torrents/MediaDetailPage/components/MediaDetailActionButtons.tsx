@@ -58,6 +58,8 @@ export interface MediaDetailActionButtonsProps {
   onActionsReady?: (actions: UseMediaDetailActionsResult) => void;
   /** Recherche de nouveaux épisodes sur les indexeurs (rangée d’actions principale). */
   seriesIndexerRefresh?: { busy: boolean; onRefresh: () => void | Promise<void> };
+  /** Dossier série pour le bouton Info. */
+  seriesLibraryPath?: string | null;
 }
 
 /**
@@ -105,6 +107,7 @@ export function MediaDetailActionButtons({
   onPlayAuto,
   onActionsReady,
   seriesIndexerRefresh,
+  seriesLibraryPath,
 }: MediaDetailActionButtonsProps) {
   const { t } = useI18n();
   const { streamingTorrentActive } = useSubscriptionMe();
@@ -190,6 +193,7 @@ export function MediaDetailActionButtons({
           onToggle: watchLater.toggle,
         }}
         seriesIndexerRefresh={seriesIndexerRefresh}
+        seriesLibraryPath={seriesLibraryPath}
       />
 
       {/* Modal de confirmation : supprimer le torrent du client et les fichiers du disque */}

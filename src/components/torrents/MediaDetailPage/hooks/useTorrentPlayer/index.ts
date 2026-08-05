@@ -192,7 +192,9 @@ export function useTorrentPlayer(options: UseTorrentPlayerOptions) {
         const freshProgress = fresh?.progress ?? 0;
         const isReady =
           !!fresh &&
-          (freshState === 'completed' || freshState === 'seeding' || freshProgress >= 0.99);
+          (freshState === 'completed' ||
+            freshState === 'seeding' ||
+            fresh.files_available === true);
 
         if (isReady) {
           handlePlayRef.current();

@@ -1,5 +1,6 @@
 import { clientApi } from '../../../../../lib/client/api';
 import type { ClientTorrentStats } from '../../../../../lib/client/types';
+import { isTorrentReallyComplete } from '../../../../streaming/player-shared/derivePlaybackPhase';
 import { QUEUED_TIMEOUT_MS, QUEUED_LOG_INTERVAL_MS, QUEUED_RETRY_RESUME_MS } from '../../utils/constants';
 import type { PollingContext } from './types';
 
@@ -74,8 +75,8 @@ export function createPollTorrentProgress(context: PollingContext) {
         const state = (stats.state || '').toLowerCase();
         const now = Date.now();
 
-        // Si le torrent est complété, arrêter le polling
-        if (state === 'completed' || state === 'seeding' || progress >= 1.0) {
+        // Si le torrent est vraiment complété, arrêter le polling (pas sur progress seul)
+        if (isTorrentReallyComplete(stats) || (state === 'completed' || state === 'seeding')) {
           stopProgressPolling();
         }
 
@@ -141,7 +142,7 @@ export function createPollTorrentProgress(context: PollingContext) {
           await handleQueuedState(infoHash, stats, now, context);
         } else if (state === 'downloading') {
           await handleDownloadingState(infoHash, stats, progress, context);
-        } else if (state === 'seeding' || state === 'completed' || progress >= 0.99) {
+        } else if (isTorrentReallyComplete(stats) || state === 'seeding' || state === 'completed') {
           await handleCompletedState(infoHash, stats, progress, context);
         } else if (state === 'paused') {
           await handlePausedState(infoHash, context);

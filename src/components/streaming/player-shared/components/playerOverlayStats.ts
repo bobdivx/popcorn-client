@@ -1,4 +1,10 @@
 import { formatBytes, formatSpeed, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
+import {
+  computeReliableProgressPercent,
+  derivePlaybackPhase,
+  isTorrentReallyComplete,
+  type PlaybackStatsLike,
+} from '../derivePlaybackPhase';
 import type { PlayerLoadingTorrentStats } from './PlayerLoadingOverlay';
 
 export interface DerivedTorrentOverlayStats {
@@ -14,34 +20,19 @@ export interface DerivedTorrentOverlayStats {
 
 /** Dérive les stats affichables pour les overlays player (loading / buffering). */
 export function deriveTorrentOverlayStats(
-  torrentStats: PlayerLoadingTorrentStats | null | undefined
+  torrentStats: PlayerLoadingTorrentStats | null | undefined,
+  opts?: { hasVideoFiles?: boolean; isHlsPreparing?: boolean; isBuffering?: boolean },
 ): DerivedTorrentOverlayStats {
-  const isCompleted =
-    torrentStats != null &&
-    (torrentStats.state === 'completed' ||
-      torrentStats.state === 'seeding' ||
-      (torrentStats.progress != null && torrentStats.progress >= 0.99));
+  const stats = torrentStats as PlaybackStatsLike | null | undefined;
+  const derived = derivePlaybackPhase({
+    torrentStats: stats,
+    hasVideoFiles: opts?.hasVideoFiles,
+    isHlsPreparing: opts?.isHlsPreparing,
+    isBuffering: opts?.isBuffering,
+  });
 
-  const isActivelyDownloading =
-    torrentStats != null &&
-    !isCompleted &&
-    (torrentStats.state === 'downloading' ||
-      (torrentStats.download_speed ?? 0) > 0 ||
-      (torrentStats.progress != null && torrentStats.progress > 0 && torrentStats.progress < 0.99));
-
-  const progressFromBytes =
-    torrentStats?.total_bytes != null &&
-    torrentStats.total_bytes > 0 &&
-    torrentStats?.downloaded_bytes != null
-      ? (torrentStats.downloaded_bytes / torrentStats.total_bytes) * 100
-      : null;
-
-  const progressPercent =
-    progressFromBytes != null
-      ? Math.round(progressFromBytes * 10) / 10
-      : torrentStats?.progress != null
-        ? Math.round(torrentStats.progress * 100 * 10) / 10
-        : null;
+  const isCompleted = isTorrentReallyComplete(stats, { hasVideoFiles: opts?.hasVideoFiles });
+  const progressPercent = computeReliableProgressPercent(stats);
 
   const downloadSpeedLabel =
     torrentStats?.download_speed != null && torrentStats.download_speed > 0
@@ -51,23 +42,24 @@ export function deriveTorrentOverlayStats(
   const downloadedFormatted =
     torrentStats?.downloaded_bytes != null ? formatBytes(torrentStats.downloaded_bytes) : null;
   const totalFormatted =
-    torrentStats?.total_bytes != null ? formatBytes(torrentStats.total_bytes) : null;
+    torrentStats?.total_bytes != null && torrentStats.total_bytes > 0
+      ? formatBytes(torrentStats.total_bytes)
+      : null;
   const etaFormatted =
     torrentStats?.eta_seconds != null && torrentStats.eta_seconds > 0
       ? formatTimeRemaining(torrentStats.eta_seconds)
       : null;
 
   const showStats =
-    isActivelyDownloading &&
+    derived.isActivelyDownloading &&
     torrentStats != null &&
     (progressPercent != null ||
       downloadSpeedLabel != null ||
-      (downloadedFormatted != null && totalFormatted != null) ||
-      (torrentStats.download_speed ?? 0) > 0);
+      (downloadedFormatted != null && totalFormatted != null));
 
   return {
     isCompleted,
-    isActivelyDownloading,
+    isActivelyDownloading: derived.isActivelyDownloading,
     progressPercent,
     downloadSpeedLabel,
     downloadedFormatted,

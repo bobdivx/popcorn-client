@@ -454,6 +454,8 @@ export default function HLSPlayer({
             bufferedPercent={bufferedPercent}
             detailMessage={loadingStatusMessage}
             torrentStats={torrentStats}
+            posterUrl={posterUrl}
+            imageUrl={posterUrl}
             onClose={onClose}
             closeLabel={t('playback.stopPlayback') || t('common.close')}
           />
