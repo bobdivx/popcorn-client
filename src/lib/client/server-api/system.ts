@@ -85,6 +85,27 @@ export const systemMethods = {
     return this.backendRequest<RestartBackendResponse>('/api/admin/system/restart', { method: 'POST' });
   },
 
+  async getDockerUpdateStatus(this: ServerApiClientSystemAccess): Promise<
+    ApiResponse<{
+      enabled: boolean;
+      reason?: string | null;
+      compose_dir?: string | null;
+      client_channel?: string;
+      server_channel?: string;
+    }>
+  > {
+    return this.backendRequest('/api/client/docker-update/status', { method: 'GET' });
+  },
+
+  async startDockerUpdate(
+    this: ServerApiClientSystemAccess
+  ): Promise<ApiResponse<{ started: boolean; message: string; helper_container?: string | null }>> {
+    return this.backendRequest('/api/admin/system/docker-update', {
+      method: 'POST',
+      body: JSON.stringify({ confirm: true }),
+    });
+  },
+
   async forceCacheCleanup(this: ServerApiClientSystemAccess): Promise<ApiResponse<CleanupCacheResponse>> {
     return this.backendRequest<CleanupCacheResponse>('/api/media/cache/cleanup', { method: 'POST' });
   },

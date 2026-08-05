@@ -24,6 +24,9 @@ RUN npm ci || (echo "Retry npm ci after network failure..." && sleep 60 && npm c
 # Copier le reste des fichiers source
 COPY . .
 
+# Garantir VERSION.json dans public/ (source de vérité runtime)
+RUN node scripts/copy-version.js || true
+
 # Builder l'application Astro
 RUN npm run build
 
