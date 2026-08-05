@@ -1,7 +1,30 @@
-import { useState, useEffect } from 'preact/hooks';
-import { Bell, Hash, Send, Mail, Globe, MessageSquare, AlertCircle, Save, CheckCircle2 } from 'lucide-preact';
+import { useState, useEffect, useRef } from 'preact/hooks';
+import {
+  Bell,
+  Hash,
+  Send,
+  Mail,
+  Globe,
+  MessageSquare,
+  AlertCircle,
+  Save,
+  CheckCircle2,
+  AlertTriangle,
+  Info,
+  Smartphone,
+  History,
+  X,
+} from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
+import { useSeedingHealth, type SeedingDiagnostic } from '../../hooks/useSeedingHealth';
+import { useNativeNotifications } from '../../hooks/useNativeNotifications';
+import {
+  connectivityWarningFingerprint,
+  readConnectivityDismissedFingerprint,
+  writeConnectivityDismissedFingerprint,
+  clearConnectivityDismissedFingerprint,
+} from '../../lib/connectivity-warning';
 
 interface NotificationSettingsData {
   webhook_enabled: boolean;
@@ -18,11 +41,35 @@ interface NotificationSettingsData {
   system_enabled: boolean;
 }
 
+interface SentNotificationItem {
+  id: string;
+  user_id: string;
+  tmdb_id: number;
+  season_number: number;
+  episode_number: number;
+  sent_at: number;
+}
+
+function formatSentAt(ts: number, locale: string): string {
+  const ms = ts > 1e12 ? ts : ts * 1000;
+  try {
+    return new Date(ms).toLocaleString(locale.startsWith('fr') ? 'fr-FR' : 'en-US', {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+  } catch {
+    return new Date(ms).toLocaleString();
+  }
+}
+
 export default function NotificationSettings() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const { diagnostic, loading: seedingLoading, refetch: refetchSeeding } = useSeedingHealth();
+  const { permissionStatus, requestPermission, notifySuccess } = useNativeNotifications();
+  const prevStatusRef = useRef<SeedingDiagnostic['status'] | undefined>();
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [settings, setSettings] = useState<NotificationSettingsData>({
     webhook_enabled: false,
@@ -32,9 +79,44 @@ export default function NotificationSettings() {
     email_enabled: false,
     system_enabled: true,
   });
+  const [dismissedFingerprint, setDismissedFingerprint] = useState<string | null>(() =>
+    readConnectivityDismissedFingerprint()
+  );
+  const [history, setHistory] = useState<SentNotificationItem[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [nativeBusy, setNativeBusy] = useState(false);
+
+  const fingerprint =
+    diagnostic && diagnostic.status !== 'ok' ? connectivityWarningFingerprint(diagnostic) : '';
+
+  useEffect(() => {
+    if (!diagnostic) return;
+    const prevStatus = prevStatusRef.current;
+    prevStatusRef.current = diagnostic.status;
+
+    if (prevStatus === 'ok' && diagnostic.status !== 'ok') {
+      setDismissedFingerprint(null);
+      clearConnectivityDismissedFingerprint();
+      return;
+    }
+
+    if (!fingerprint) return;
+    const stored = readConnectivityDismissedFingerprint();
+    if (stored && stored !== fingerprint) {
+      setDismissedFingerprint(null);
+      clearConnectivityDismissedFingerprint();
+    }
+  }, [diagnostic?.status, fingerprint]);
+
+  const isDismissed = fingerprint !== '' && dismissedFingerprint === fingerprint;
+  const hasActiveAlert =
+    !seedingLoading && !!diagnostic && diagnostic.status !== 'ok' && !isDismissed;
+  const hasHiddenAlert =
+    !seedingLoading && !!diagnostic && diagnostic.status !== 'ok' && isDismissed;
 
   useEffect(() => {
     fetchSettings();
+    fetchHistory();
   }, []);
 
   const fetchSettings = async () => {
@@ -63,6 +145,52 @@ export default function NotificationSettings() {
     }
   };
 
+  const fetchHistory = async () => {
+    setHistoryLoading(true);
+    try {
+      const res = await serverApi.getSentNotificationsHistory(30);
+      if (res.success && Array.isArray(res.data)) {
+        setHistory(res.data as SentNotificationItem[]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch notification history:', err);
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleDismissAlert = () => {
+    if (!fingerprint) return;
+    setDismissedFingerprint(fingerprint);
+    writeConnectivityDismissedFingerprint(fingerprint);
+  };
+
+  const handleRestoreAlert = () => {
+    setDismissedFingerprint(null);
+    clearConnectivityDismissedFingerprint();
+  };
+
+  const handleNativeEnable = async () => {
+    setNativeBusy(true);
+    setMessage(null);
+    try {
+      const granted = await requestPermission();
+      if (granted) {
+        setMessage({ type: 'success', text: t('notificationSettings.nativeGranted') });
+        await notifySuccess(
+          t('notificationSettings.nativeTestTitle'),
+          t('notificationSettings.nativeTestBody')
+        );
+      } else {
+        setMessage({ type: 'error', text: t('notificationSettings.nativeDenied') });
+      }
+    } catch {
+      setMessage({ type: 'error', text: t('notificationSettings.nativeDenied') });
+    } finally {
+      setNativeBusy(false);
+    }
+  };
+
   const handleSave = async (e: Event) => {
     e.preventDefault();
     setSaving(true);
@@ -81,22 +209,6 @@ export default function NotificationSettings() {
     }
   };
 
-  const handleTest = async () => {
-    setTesting(true);
-    setMessage(null);
-    try {
-        // En vrai il faudrait un endpoint /test-notification, mais on va utiliser un flag ou juste logger
-        // Pour l'instant on simule si l'endpoint n'existe pas, ou on appelle un endpoint générique si possible
-        // Le backend n'a pas encore /test-notification officiellement mais on peut imaginer qu'il arrive
-        // On va juste informer l'utilisateur de sauvegarder d'abord
-        setMessage({ type: 'success', text: t('notificationSettings.testSuccess') });
-    } catch (err) {
-      setMessage({ type: 'error', text: t('notificationSettings.testError') });
-    } finally {
-      setTesting(false);
-    }
-  };
-
   const toggle = (key: keyof NotificationSettingsData) => {
     setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -106,6 +218,15 @@ export default function NotificationSettings() {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
+  const nativeStatusLabel =
+    permissionStatus === 'granted'
+      ? t('notificationSettings.nativeStatusGranted')
+      : permissionStatus === 'denied'
+        ? t('notificationSettings.nativeStatusDenied')
+        : permissionStatus === 'pending'
+          ? t('common.loading')
+          : t('notificationSettings.nativeStatusUnknown');
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
@@ -114,10 +235,230 @@ export default function NotificationSettings() {
     );
   }
 
+  const alertIsError = diagnostic?.status === 'error';
+  const alertTitle = alertIsError
+    ? t('connectivity.errorTitle')
+    : t('connectivity.warningTitle');
+  const alertDetail = diagnostic?.warnings?.[0] || t('connectivity.defaultDetail');
+
   return (
     <form onSubmit={handleSave} className="space-y-6">
       <div className="flex flex-col gap-6">
-        
+        {/* Active alerts (same as avatar badge) */}
+        <section className="ds-card ds-card-glass p-4 sm:p-6 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-500/10 rounded-lg">
+              <Bell className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-white">
+                {t('notificationSettings.activeAlertsTitle')}
+              </h3>
+              <p className="text-sm ds-text-secondary">
+                {t('notificationSettings.activeAlertsDescription')}
+              </p>
+            </div>
+          </div>
+
+          {seedingLoading && (
+            <p className="text-sm ds-text-tertiary">{t('common.loading')}</p>
+          )}
+
+          {!seedingLoading && !diagnostic && (
+            <p className="text-sm ds-text-tertiary">{t('notificationSettings.noActiveAlerts')}</p>
+          )}
+
+          {!seedingLoading && diagnostic?.status === 'ok' && (
+            <div className="flex items-start gap-3 rounded-xl border border-green-500/20 bg-green-500/5 p-3">
+              <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-white">
+                  {t('notificationSettings.seedingOkTitle')}
+                </p>
+                <p className="text-xs ds-text-secondary mt-1">
+                  {t('notificationSettings.seedingOkDetail', {
+                    count: String(diagnostic.total_seeding ?? 0),
+                  })}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {hasActiveAlert && (
+            <div
+              className={`flex items-start gap-3 rounded-xl border p-3 ${
+                alertIsError
+                  ? 'border-red-500/25 bg-red-500/5'
+                  : 'border-amber-500/25 bg-amber-500/5'
+              }`}
+            >
+              <div className={`shrink-0 mt-0.5 ${alertIsError ? 'text-red-400' : 'text-amber-400'}`}>
+                {alertIsError ? <AlertTriangle size={20} /> : <Info size={20} />}
+              </div>
+              <div className="flex-1 min-w-0 space-y-2">
+                <p className="text-sm font-semibold text-white">{alertTitle}</p>
+                <p className="text-xs ds-text-secondary leading-relaxed">{alertDetail}</p>
+                {(diagnostic?.warnings?.length ?? 0) > 1 && (
+                  <ul className="text-xs ds-text-tertiary list-disc pl-4 space-y-0.5">
+                    {diagnostic!.warnings.slice(1).map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
+                  </ul>
+                )}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  <a
+                    href="/settings/uploads/seeding-diagnostic"
+                    className="btn btn-ghost btn-sm"
+                  >
+                    {t('connectivity.openDiagnostic')}
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => refetchSeeding()}
+                    className="btn btn-ghost btn-sm"
+                  >
+                    {t('notificationSettings.refreshAlert')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDismissAlert}
+                    className="btn btn-ghost btn-sm inline-flex items-center gap-1.5"
+                  >
+                    <X size={14} />
+                    {t('connectivity.dismiss')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {hasHiddenAlert && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+              <p className="text-sm ds-text-secondary">
+                {t('notificationSettings.alertDismissedHint')}
+              </p>
+              <button type="button" onClick={handleRestoreAlert} className="btn btn-ghost btn-sm shrink-0">
+                {t('notificationSettings.restoreAlert')}
+              </button>
+            </div>
+          )}
+        </section>
+
+        {/* Native / device notifications */}
+        <section className="ds-card ds-card-glass p-4 sm:p-6 space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-sky-500/10 rounded-lg">
+                <Smartphone className="w-5 h-5 text-sky-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">
+                  {t('notificationSettings.nativeTitle')}
+                </h3>
+                <p className="text-sm ds-text-secondary">
+                  {t('notificationSettings.nativeDescription')}
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
+            <div>
+              <p className="text-sm text-white font-medium">
+                {t('notificationSettings.nativeStatusLabel')}
+              </p>
+              <p className="text-xs ds-text-secondary mt-0.5">{nativeStatusLabel}</p>
+            </div>
+            {permissionStatus !== 'granted' && (
+              <button
+                type="button"
+                onClick={handleNativeEnable}
+                disabled={nativeBusy || permissionStatus === 'pending'}
+                className="btn btn-primary btn-sm shrink-0"
+              >
+                {nativeBusy || permissionStatus === 'pending'
+                  ? t('common.loading')
+                  : t('notificationSettings.nativeEnable')}
+              </button>
+            )}
+            {permissionStatus === 'granted' && (
+              <button
+                type="button"
+                onClick={async () => {
+                  setNativeBusy(true);
+                  try {
+                    await notifySuccess(
+                      t('notificationSettings.nativeTestTitle'),
+                      t('notificationSettings.nativeTestBody')
+                    );
+                    setMessage({ type: 'success', text: t('notificationSettings.nativeTestSent') });
+                  } finally {
+                    setNativeBusy(false);
+                  }
+                }}
+                disabled={nativeBusy}
+                className="btn btn-ghost btn-sm shrink-0"
+              >
+                {t('notificationSettings.nativeSendTest')}
+              </button>
+            )}
+          </div>
+        </section>
+
+        {/* History */}
+        <section className="ds-card ds-card-glass p-4 sm:p-6 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-violet-500/10 rounded-lg">
+                <History className="w-5 h-5 text-violet-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white">
+                  {t('notificationSettings.historyTitle')}
+                </h3>
+                <p className="text-sm ds-text-secondary">
+                  {t('notificationSettings.historyDescription')}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={fetchHistory}
+              disabled={historyLoading}
+              className="btn btn-ghost btn-sm shrink-0"
+            >
+              {t('notificationSettings.refreshAlert')}
+            </button>
+          </div>
+
+          {historyLoading && (
+            <p className="text-sm ds-text-tertiary">{t('common.loading')}</p>
+          )}
+          {!historyLoading && history.length === 0 && (
+            <p className="text-sm ds-text-tertiary">{t('notificationSettings.historyEmpty')}</p>
+          )}
+          {!historyLoading && history.length > 0 && (
+            <ul className="divide-y divide-white/5 rounded-xl border border-white/10 overflow-hidden">
+              {history.map((item) => (
+                <li
+                  key={item.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 px-3 py-2.5 bg-white/[0.02]"
+                >
+                  <span className="text-sm text-white">
+                    {t('notificationSettings.historyEpisode', {
+                      tmdb: String(item.tmdb_id),
+                      season: String(item.season_number),
+                      episode: String(item.episode_number),
+                    })}
+                  </span>
+                  <span className="text-xs ds-text-tertiary">
+                    {formatSentAt(item.sent_at, language || 'fr')}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
         {/* System Logs */}
         <section className="ds-card ds-card-glass p-4 sm:p-6 space-y-4">
           <div className="flex items-center justify-between">
@@ -130,10 +471,10 @@ export default function NotificationSettings() {
               </div>
             </div>
             <label className="ds-switch">
-              <input 
-                type="checkbox" 
-                checked={settings.system_enabled} 
-                onChange={() => toggle('system_enabled')} 
+              <input
+                type="checkbox"
+                checked={settings.system_enabled}
+                onChange={() => toggle('system_enabled')}
               />
               <span className="ds-switch-slider"></span>
             </label>
@@ -152,10 +493,10 @@ export default function NotificationSettings() {
               </div>
             </div>
             <label className="ds-switch">
-              <input 
-                type="checkbox" 
-                checked={settings.slack_enabled} 
-                onChange={() => toggle('slack_enabled')} 
+              <input
+                type="checkbox"
+                checked={settings.slack_enabled}
+                onChange={() => toggle('slack_enabled')}
               />
               <span className="ds-switch-slider"></span>
             </label>
@@ -164,7 +505,7 @@ export default function NotificationSettings() {
             <div className="ds-animate-fade-in space-y-3 pt-2">
               <div className="space-y-1">
                 <label className="text-sm ds-text-secondary">{t('notificationSettings.slackWebhookUrl')}</label>
-                <input 
+                <input
                   type="text"
                   value={settings.slack_webhook_url || ''}
                   onInput={updateField('slack_webhook_url')}
@@ -189,10 +530,10 @@ export default function NotificationSettings() {
               </div>
             </div>
             <label className="ds-switch">
-              <input 
-                type="checkbox" 
-                checked={settings.discord_enabled} 
-                onChange={() => toggle('discord_enabled')} 
+              <input
+                type="checkbox"
+                checked={settings.discord_enabled}
+                onChange={() => toggle('discord_enabled')}
               />
               <span className="ds-switch-slider"></span>
             </label>
@@ -201,7 +542,7 @@ export default function NotificationSettings() {
             <div className="ds-animate-fade-in space-y-3 pt-2">
               <div className="space-y-1">
                 <label className="text-sm ds-text-secondary">{t('notificationSettings.discordWebhookUrl')}</label>
-                <input 
+                <input
                   type="text"
                   value={settings.discord_webhook_url || ''}
                   onInput={updateField('discord_webhook_url')}
@@ -226,10 +567,10 @@ export default function NotificationSettings() {
               </div>
             </div>
             <label className="ds-switch">
-              <input 
-                type="checkbox" 
-                checked={settings.telegram_enabled} 
-                onChange={() => toggle('telegram_enabled')} 
+              <input
+                type="checkbox"
+                checked={settings.telegram_enabled}
+                onChange={() => toggle('telegram_enabled')}
               />
               <span className="ds-switch-slider"></span>
             </label>
@@ -239,7 +580,7 @@ export default function NotificationSettings() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-sm ds-text-secondary">{t('notificationSettings.telegramBotToken')}</label>
-                  <input 
+                  <input
                     type="password"
                     value={settings.telegram_bot_token || ''}
                     onInput={updateField('telegram_bot_token')}
@@ -249,7 +590,7 @@ export default function NotificationSettings() {
                 </div>
                 <div className="space-y-1">
                   <label className="text-sm ds-text-secondary">{t('notificationSettings.telegramChatId')}</label>
-                  <input 
+                  <input
                     type="text"
                     value={settings.telegram_chat_id || ''}
                     onInput={updateField('telegram_chat_id')}
@@ -275,10 +616,10 @@ export default function NotificationSettings() {
               </div>
             </div>
             <label className="ds-switch">
-              <input 
-                type="checkbox" 
-                checked={settings.webhook_enabled} 
-                onChange={() => toggle('webhook_enabled')} 
+              <input
+                type="checkbox"
+                checked={settings.webhook_enabled}
+                onChange={() => toggle('webhook_enabled')}
               />
               <span className="ds-switch-slider"></span>
             </label>
@@ -287,7 +628,7 @@ export default function NotificationSettings() {
             <div className="ds-animate-fade-in space-y-3 pt-2">
               <div className="space-y-1">
                 <label className="text-sm ds-text-secondary">{t('notificationSettings.webhookUrl')}</label>
-                <input 
+                <input
                   type="text"
                   value={settings.webhook_url || ''}
                   onInput={updateField('webhook_url')}
@@ -312,10 +653,10 @@ export default function NotificationSettings() {
               </div>
             </div>
             <label className="ds-switch">
-              <input 
-                type="checkbox" 
-                checked={settings.email_enabled} 
-                onChange={() => toggle('email_enabled')} 
+              <input
+                type="checkbox"
+                checked={settings.email_enabled}
+                onChange={() => toggle('email_enabled')}
               />
               <span className="ds-switch-slider"></span>
             </label>
@@ -324,7 +665,7 @@ export default function NotificationSettings() {
             <div className="ds-animate-fade-in space-y-3 pt-2">
               <div className="space-y-1">
                 <label className="text-sm ds-text-secondary">{t('notificationSettings.emailAddress')}</label>
-                <input 
+                <input
                   type="email"
                   value={settings.email_address || ''}
                   onInput={updateField('email_address')}
@@ -336,33 +677,26 @@ export default function NotificationSettings() {
             </div>
           )}
         </section>
-
       </div>
 
       <div className="sticky bottom-0 bg-[var(--ds-surface-glass)] backdrop-blur-md p-4 flex items-center justify-between border-t border-white/5 -mx-4 sm:rounded-b-2xl">
         {message && (
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium animate-in fade-in slide-in-from-bottom-2 ${
-            message.type === 'success' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
-          }`}>
-            {message.type === 'success' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+          <div
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium animate-in fade-in slide-in-from-bottom-2 ${
+              message.type === 'success' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+            }`}
+          >
+            {message.type === 'success' ? (
+              <CheckCircle2 className="w-3.5 h-3.5" />
+            ) : (
+              <AlertCircle className="w-3.5 h-3.5" />
+            )}
             {message.text}
           </div>
         )}
         {!message && <div />}
         <div className="flex items-center gap-2">
-          {/* <button 
-            type="button" 
-            onClick={handleTest}
-            disabled={testing || saving}
-            className="btn btn-ghost btn-sm"
-          >
-            {testing ? t('common.loading') : t('common.test')}
-          </button> */}
-          <button 
-            type="submit" 
-            disabled={saving}
-            className="btn btn-primary btn-sm min-w-[100px]"
-          >
+          <button type="submit" disabled={saving} className="btn btn-primary btn-sm min-w-[100px]">
             {saving ? (
               <span className="flex items-center gap-2">
                 <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>

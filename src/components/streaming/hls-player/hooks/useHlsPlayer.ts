@@ -1103,7 +1103,26 @@ export function useHlsPlayer({
             } catch (_) {}
             hlsRef.current = null;
             seekLoadUrlRef.current = null;
-            const defaultMsg = `Erreur serveur HLS (HTTP ${statusCode})`;
+            let defaultMsg = `Erreur serveur HLS (HTTP ${statusCode})`;
+            if (statusCode === 422) {
+              defaultMsg =
+                'SPARSE_OR_EMPTY: Le fichier est sparse ou vide (aucune donnée téléchargée). Lecture impossible.';
+            } else {
+              const responseText =
+                typeof data?.response?.text === 'string'
+                  ? data.response.text
+                  : typeof data?.response?.code === 'string'
+                    ? data.response.code
+                    : '';
+              if (
+                typeof responseText === 'string' &&
+                responseText.includes('SPARSE_OR_EMPTY')
+              ) {
+                defaultMsg = responseText.includes('SPARSE_OR_EMPTY')
+                  ? responseText
+                  : 'SPARSE_OR_EMPTY: Fichier sparse/vide.';
+              }
+            }
             setError(defaultMsg);
             setIsLoading(false);
             onErrorRef.current?.(new Error(defaultMsg));

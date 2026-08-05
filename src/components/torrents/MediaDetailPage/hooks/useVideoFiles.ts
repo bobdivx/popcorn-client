@@ -1,6 +1,24 @@
 import { useState, useRef, useEffect } from 'preact/hooks';
 import { clientApi } from '../../../../lib/client/api';
 
+export const SPARSE_OR_EMPTY_CODE = 'SPARSE_OR_EMPTY';
+
+export function isSparseOrEmptyMessage(message: string | null | undefined): boolean {
+  if (!message) return false;
+  return message.includes(SPARSE_OR_EMPTY_CODE) || /sparse|fichier vide|empty file/i.test(message);
+}
+
+export class SparseOrEmptyError extends Error {
+  readonly code = SPARSE_OR_EMPTY_CODE;
+  constructor(message?: string) {
+    super(
+      message ||
+        `${SPARSE_OR_EMPTY_CODE}: Fichier sparse/vide (aucune donnée téléchargée). Lecture impossible.`
+    );
+    this.name = 'SparseOrEmptyError';
+  }
+}
+
 export interface TorrentFile {
   path: string;
   name: string;
@@ -37,6 +55,8 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
   const [videoFiles, setVideoFiles] = useState<TorrentFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<TorrentFile | null>(null);
   const [loadingFiles, setLoadingFiles] = useState(false);
+  /** True si le chemin bibliothèque existe mais le torrent est à 0% (fichiers sparses). */
+  const [emptyOrSparse, setEmptyOrSparse] = useState(false);
   // Cache pour éviter les appels multiples pour le même infoHash
   const loadingCacheRef = useRef<Map<string, Promise<TorrentFile[]>>>(new Map());
   const filesCacheRef = useRef<Map<string, TorrentFile[]>>(new Map());
@@ -56,6 +76,7 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
       loadingCacheRef.current.clear();
       setVideoFiles([]);
       setSelectedFile(null);
+      setEmptyOrSparse(false);
     }
     lastInfoHashRef.current = infoHash || null;
   }, [torrent?.infoHash]);
@@ -161,10 +182,9 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
           return files;
         }
 
-        // Si on a un chemin bibliothèque (média "disponible localement"), l'utiliser sans appeler getTorrent
-        // pour éviter un 404 quand le torrent n'est pas sur ce backend (ex. bibliothèque partagée / autre machine).
+        // Chemin bibliothèque : vérifier d'abord le torrent si hash réel.
+        // Si progress=0 / !files_available → fichiers sparses possibles : ne pas traiter comme prêt.
         if (torrent?.downloadPath) {
-          console.log('[useVideoFiles] 📁 Utilisation du chemin bibliothèque (sans appel getTorrent):', torrent.downloadPath);
           const fileName = torrentName || torrent.downloadPath.split(/[/\\]/).pop() || 'video';
           const libraryFile: TorrentFile = {
             path: dedupeLibraryMediaPrefix(torrent.downloadPath),
@@ -172,6 +192,61 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
             size: 0,
             is_video: true,
           };
+
+          try {
+            const torrentStats = await clientApi.getTorrent(infoHash);
+            if (torrentStats) {
+              const progress =
+                typeof torrentStats.progress === 'number' ? torrentStats.progress : 0;
+              const filesAvailable = torrentStats.files_available === true;
+              const downloaded = torrentStats.downloaded_bytes ?? 0;
+              const isEmpty =
+                !filesAvailable &&
+                progress <= 0.001 &&
+                downloaded <= 0;
+
+              if (isEmpty) {
+                console.warn(
+                  '[useVideoFiles] ⚠️ Chemin bibliothèque mais torrent à 0% (sparse/vide):',
+                  { infoHash, progress, filesAvailable, downloaded, path: torrent.downloadPath }
+                );
+                setEmptyOrSparse(true);
+                setVideoFiles([]);
+                setSelectedFile(null);
+                setLoadingFiles(false);
+                filesCacheRef.current.delete(infoHash);
+                const err = new SparseOrEmptyError();
+                onError?.(err);
+                return [];
+              }
+
+              // Torrent présent avec données : chemin bibliothèque OK
+              console.log(
+                '[useVideoFiles] 📁 Chemin bibliothèque validé (torrent progress>0 ou files_available):',
+                torrent.downloadPath
+              );
+              setEmptyOrSparse(false);
+              const files = [libraryFile];
+              filesCacheRef.current.set(infoHash, files);
+              setVideoFiles(files);
+              setSelectedFile(files[0]);
+              setLoadingFiles(false);
+              return files;
+            }
+          } catch (e) {
+            // 404 / backend sans ce torrent : garder le bypass (bibliothèque partagée)
+            console.log(
+              '[useVideoFiles] 📁 getTorrent indisponible, bypass bibliothèque:',
+              torrent.downloadPath,
+              e
+            );
+          }
+
+          console.log(
+            '[useVideoFiles] 📁 Utilisation du chemin bibliothèque (sans stats torrent):',
+            torrent.downloadPath
+          );
+          setEmptyOrSparse(false);
           const files = [libraryFile];
           filesCacheRef.current.set(infoHash, files);
           setVideoFiles(files);
@@ -424,6 +499,8 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
     videoFiles,
     selectedFile,
     loadingFiles,
+    emptyOrSparse,
+    setEmptyOrSparse,
     setVideoFiles,
     setSelectedFile,
     loadVideoFiles,
