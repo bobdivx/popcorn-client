@@ -112,6 +112,13 @@
     "newReplyBody": "Vous avez reçu une nouvelle réponse à votre feedback",
     "unread": "non lu(s)"
   },
+  "connectivity": {
+    "warningTitle": "Problème de partage détecté",
+    "errorTitle": "Erreur de connexion BitTorrent",
+    "defaultDetail": "Vérifiez la configuration de vos ports.",
+    "openDiagnostic": "Ouvrir le diagnostic partage",
+    "dismiss": "Masquer la notification"
+  },
   "backend": {
     "badgeTitleOk": "Serveur backend démarré",
     "badgeTitleError": "Serveur backend arrêté ou erreur",
@@ -898,6 +905,8 @@
       "testPortExternal": "Tester le port (canyouseeme.org)",
       "listenPort": "Port TCP (rqbit)",
       "portHintWithPort": "Ouvrez le port {port} en TCP et UDP sur votre box/routeur pour permettre les connexions entrantes (partage / ratio). En cas de double NAT (box + routeur), configurez la redirection sur les deux appareils. Testez avec l'outil ci-dessous.",
+      "doubleNatTipTitle": "Double NAT détecté souvent chez vous",
+      "doubleNatTip": "Si UPnP est activé mais le port reste fermé : 1) sur le routeur interne, redirigez TCP/UDP {port} vers le PC ; 2) sur la box ISP, redirigez le même port vers l’IP WAN du routeur (ou activez la DMZ / le mode bridge). Sans cela, les pairs ne peuvent pas se connecter.",
       "enableRatioModeNow": "Activer le mode compatibilité tracker (maintenant)",
       "enableRatioModeHint": "Applique RQBIT_TRACKER_MODE pour la session en cours (sans redémarrer le serveur). Pour le conserver après un reboot, ajoutez tracker_mode = true dans config.toml, ou TRACKER_MODE=1 / RQBIT_TRACKER_MODE=1 dans l’environnement, ou utilisez la page Ratio ci-dessous.",
       "ratioSettingsLink": "Ouvrir la page Ratio / tracker (réglages détaillés)",

@@ -4,7 +4,8 @@ import { PlaybackStatusSurface } from './PlaybackStatusSurface';
 
 export interface PlayerBufferingOverlayProps {
   title?: string | null;
-  bufferedPercent?: number;
+  /** null = indéterminé (préparation HLS locale, pas un faux 85–100 %). */
+  bufferedPercent?: number | null;
   message?: string | null;
   detailMessage?: string | null;
   torrentStats?: PlayerLoadingTorrentStats | null;
@@ -20,7 +21,7 @@ export interface PlayerBufferingOverlayProps {
  */
 export default function PlayerBufferingOverlay({
   title,
-  bufferedPercent = 0,
+  bufferedPercent = null,
   message,
   detailMessage,
   torrentStats,

@@ -112,6 +112,13 @@
     "newReplyBody": "You have received a new reply to your feedback",
     "unread": "unread"
   },
+  "connectivity": {
+    "warningTitle": "Sharing issue detected",
+    "errorTitle": "BitTorrent connection error",
+    "defaultDetail": "Check your port configuration.",
+    "openDiagnostic": "Open seeding diagnostic",
+    "dismiss": "Dismiss notification"
+  },
   "backend": {
     "badgeTitleOk": "Backend server running",
     "badgeTitleError": "Backend server stopped or error",
@@ -897,6 +904,8 @@
       "testPortExternal": "Test port (canyouseeme.org)",
       "listenPort": "TCP port (rqbit)",
       "portHintWithPort": "Open port {port} (TCP and UDP) on your router to allow incoming connections (seeding / ratio). If you have double NAT (modem + router), configure port forwarding on both devices. Test it with the tool below.",
+      "doubleNatTipTitle": "Double NAT is a common cause",
+      "doubleNatTip": "If UPnP is on but the port stays closed: 1) on the inner router, forward TCP/UDP {port} to this PC; 2) on the ISP box, forward the same port to the router WAN IP (or enable DMZ / bridge mode). Otherwise peers cannot connect inbound.",
       "enableRatioModeNow": "Enable tracker compatibility mode (now)",
       "enableRatioModeHint": "Sets RQBIT_TRACKER_MODE for the current session (no server restart). To keep it after a reboot, add tracker_mode = true in config.toml, or set TRACKER_MODE=1 / RQBIT_TRACKER_MODE=1 in the environment, or use the Ratio page below.",
       "ratioSettingsLink": "Open Ratio / tracker settings",
