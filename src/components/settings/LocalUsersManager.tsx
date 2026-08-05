@@ -3,9 +3,11 @@ import { inviteLocalUser, getLocalUsers, deleteLocalUser, resendLocalUserInvitat
 import { TokenManager } from '../../lib/client/storage';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { Mail, Trash2, RefreshCw, UserPlus } from 'lucide-preact';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
 
 export default function LocalUsersManager() {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [users, setUsers] = useState<LocalUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +82,12 @@ export default function LocalUsersManager() {
   };
 
   const handleDelete = async (userId: string, userEmail: string) => {
-    if (!confirm(t('settingsMenu.localUsers.deleteConfirm', { email: userEmail }))) {
+    if (!(await confirm({
+      title: t('common.delete') || 'Supprimer',
+      message: t('settingsMenu.localUsers.deleteConfirm', { email: userEmail }),
+      danger: true,
+      confirmLabel: t('common.delete') || 'Supprimer',
+    }))) {
       return;
     }
 
@@ -266,6 +273,7 @@ export default function LocalUsersManager() {
           )}
         </div>
       </div>
+      {confirmDialog}
     </div>
   );
 }

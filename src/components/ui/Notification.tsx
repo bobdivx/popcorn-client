@@ -129,7 +129,13 @@ export function NotificationContainer({ notifications, onRemove, seedingStatus }
   }
 
   return (
-    <div class="fixed bottom-4 right-4 z-[9999] max-w-xs w-full space-y-2 pointer-events-none">
+    <div
+      class="fixed z-[9999] max-w-xs w-full space-y-2 pointer-events-none"
+      style={{
+        bottom: 'var(--toast-stack-bottom)',
+        right: 'var(--floating-offset-right)',
+      }}
+    >
       {seedingStatus && (
         <div class="pointer-events-auto">
           <SeedingStatusItem info={seedingStatus} />

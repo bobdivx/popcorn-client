@@ -14,6 +14,7 @@ import {
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
 import { Modal } from '../ui/Modal';
 import { IndexerDefinitionDocsModal } from '../indexers/IndexerDefinitionDocsModal';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
 
 const DEFAULT_SEARCH_PARAMS: Record<string, string> = {};
 const DEFAULT_RESPONSE_MAPPING: Record<string, string> = { results: 'Results', title: 'Title', id: 'Guid', size: 'Size', seeders: 'Seeders', leechers: 'Peers', uploaded_at: 'PublishDate', link: 'Link' };
@@ -31,6 +32,7 @@ function safeJsonParse<T>(str: string, fallback: T): T {
 
 export default function IndexerDefinitionsManager() {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [definitions, setDefinitions] = useState<IndexerDefinition[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +106,12 @@ export default function IndexerDefinitionsManager() {
     msg?.includes('401');
 
   const handleDelete = async (def: IndexerDefinition) => {
-    if (!confirm(t('indexerDefinitionsManager.confirmDeleteDefinition'))) return;
+    if (!(await confirm({
+      title: t('common.delete') || 'Supprimer',
+      message: t('indexerDefinitionsManager.confirmDeleteDefinition'),
+      danger: true,
+      confirmLabel: t('common.delete') || 'Supprimer',
+    }))) return;
     setError(null);
     const res = await deleteIndexerDefinition(def.id);
     if (res.success) await load();
@@ -532,6 +539,7 @@ export default function IndexerDefinitionsManager() {
             </div>
           </form>
       </Modal>
+      {confirmDialog}
     </div>
   );
 }

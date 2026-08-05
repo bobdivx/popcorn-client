@@ -11,6 +11,7 @@ import { usePlayerConfig } from '../player-shared/hooks/usePlayerConfig';
 import { shouldAutoFullscreen } from '../../../lib/utils/device-detection';
 import { isTauri } from '../../../lib/utils/tauri';
 import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
+import { SkipIntroOverlay } from '../player-shared/components/SkipIntroOverlay';
 import PlayerBufferingOverlay from '../player-shared/components/PlayerBufferingOverlay';
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
@@ -276,6 +277,24 @@ export default function HLSPlayer({
     }
   };
 
+  const introSkipSeconds = playerConfig.introSkipSeconds ?? 90;
+  const showSkipIntro =
+    isSeries &&
+    (playerConfig.skipIntroEnabled ?? true) &&
+    introSkipSeconds > 0 &&
+    duration > introSkipSeconds &&
+    currentTime >= 3 &&
+    currentTime < introSkipSeconds - 1;
+  const handleSkipIntro = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const target = Math.min(
+      introSkipSeconds,
+      Number.isFinite(video.duration) && video.duration > 0 ? video.duration - 1 : introSkipSeconds
+    );
+    if (target > 0) video.currentTime = target;
+  };
+
   const nextEpisodeCountdownSeconds = playerConfig.nextEpisodeCountdownSeconds ?? 90;
   const showNextEpisode =
     !!nextEpisodeInfo &&
@@ -530,15 +549,14 @@ export default function HLSPlayer({
           selectedSeriesEpisodeVariantId={selectedSeriesEpisodeVariantId}
           onSelectSeriesEpisode={onSelectSeriesEpisode}
         />
-        {showNextEpisode && (
-          <div class="absolute inset-0 z-30 pointer-events-none">
-            <NextEpisodeOverlay
-              onNext={handleNextEpisode}
-              visible={showNextEpisode}
-              nextTitle={nextEpisodeInfo?.title}
-            />
-          </div>
-        )}
+        <div class="absolute inset-0 z-30 pointer-events-none">
+          <SkipIntroOverlay onSkip={handleSkipIntro} visible={showSkipIntro} />
+          <NextEpisodeOverlay
+            onNext={handleNextEpisode}
+            visible={showNextEpisode}
+            nextTitle={nextEpisodeInfo?.title}
+          />
+        </div>
       </div>
     </div>
   );

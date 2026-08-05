@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { createPortal } from 'preact/compat';
 import { Users, Mail, Trash2, RefreshCw, UserPlus, Activity as ActivityIcon } from 'lucide-preact';
 import { TokenManager } from '../../lib/client/storage';
 import { useI18n } from '../../lib/i18n/useI18n';
@@ -16,6 +15,8 @@ import {
   type LocalUser,
 } from '../../lib/api/popcorn-web';
 import { serverApi } from '../../lib/client/server-api';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
+import { Modal } from '../ui/Modal';
 
 type ShareType = 'none' | 'all' | 'selected';
 
@@ -30,6 +31,7 @@ function extractLocalMediaIdFromInfoHash(infoHash: string): string | null {
 
 export default function FriendsManager() {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const hasCloudToken = TokenManager.getCloudAccessToken() !== null;
 
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -159,7 +161,16 @@ export default function FriendsManager() {
     const msg = friendEmail
       ? t('friendsManager.confirmDeleteFriendWithEmail', { email: friendEmail })
       : t('friendsManager.confirmDeleteFriend');
-    if (!confirm(msg)) return;
+    if (
+      !(await confirm({
+        title: t('common.delete') || 'Supprimer',
+        message: msg,
+        danger: true,
+        confirmLabel: t('common.delete') || 'Supprimer',
+      }))
+    ) {
+      return;
+    }
     try {
       setError(null);
       setSuccess(null);
@@ -436,45 +447,48 @@ export default function FriendsManager() {
         )}
       </div>
 
-      {/* Modal sélection médias */}
-      {selectingForFriendId && createPortal(
-        <div class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-50">
-          <div class="w-full max-w-3xl bg-gray-900 border border-gray-700 rounded-lg p-6 max-h-[80vh] overflow-auto">
-            <div class="flex items-center justify-between mb-4">
-              <h4 class="text-lg font-semibold text-white">{t('friendsManager.selectMediaToShare')}</h4>
-              <button class="text-gray-300 hover:text-white" onClick={() => setSelectingForFriendId(null)}>
-                {t('common.close')}
-              </button>
-            </div>
-            {libraryChoices.length === 0 ? (
-              <p class="text-gray-400">{t('friendsManager.noMediaSelectable')}</p>
-            ) : (
-              <div class="space-y-2">
-                {libraryChoices.map((m) => (
-                  <label key={m.id} class="flex items-center gap-3 p-2 rounded hover:bg-gray-800 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={!!librarySelected[m.id]}
-                      onChange={(e) => setLibrarySelected((s) => ({ ...s, [m.id]: (e.target as HTMLInputElement).checked }))}
-                    />
-                    <span class="text-gray-200">{m.title}</span>
-                    <span class="text-xs text-gray-500">{m.id}</span>
-                  </label>
-                ))}
-              </div>
-            )}
-            <div class="mt-4 flex justify-end gap-2">
-              <button class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg" onClick={() => setSelectingForFriendId(null)}>
-                {t('common.cancel')}
-              </button>
-              <button class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg" onClick={applyMediaSelection}>
-                {t('common.apply')}
-              </button>
-            </div>
+      <Modal
+        isOpen={!!selectingForFriendId}
+        onClose={() => setSelectingForFriendId(null)}
+        title={t('friendsManager.selectMediaToShare')}
+        size="xl"
+      >
+        {libraryChoices.length === 0 ? (
+          <p class="text-gray-400">{t('friendsManager.noMediaSelectable')}</p>
+        ) : (
+          <div class="space-y-2 max-h-[50vh] overflow-y-auto">
+            {libraryChoices.map((m) => (
+              <label key={m.id} class="flex items-center gap-3 p-2 rounded hover:bg-gray-800 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!librarySelected[m.id]}
+                  onChange={(e) => setLibrarySelected((s) => ({ ...s, [m.id]: (e.target as HTMLInputElement).checked }))}
+                />
+                <span class="text-gray-200">{m.title}</span>
+                <span class="text-xs text-gray-500">{m.id}</span>
+              </label>
+            ))}
           </div>
-        </div>,
-        document.body
-      )}
+        )}
+        <div class="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-lg"
+            onClick={() => setSelectingForFriendId(null)}
+          >
+            {t('common.cancel')}
+          </button>
+          <button
+            type="button"
+            class="px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-lg"
+            onClick={applyMediaSelection}
+            data-autofocus
+          >
+            {t('common.apply')}
+          </button>
+        </div>
+      </Modal>
+      {confirmDialog}
     </div>
   );
 }
