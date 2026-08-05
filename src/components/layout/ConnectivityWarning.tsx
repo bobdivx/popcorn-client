@@ -3,20 +3,12 @@ import { AlertTriangle, Info, X } from 'lucide-preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { useI18n } from '../../lib/i18n/useI18n';
-
-const DISMISS_STORAGE_KEY = 'popcorn_connectivity_warning_dismissed';
-
-function warningFingerprint(diagnostic: SeedingDiagnostic): string {
-  return `${diagnostic.status}|${(diagnostic.warnings ?? []).join('\u0000')}`;
-}
-
-function readDismissedFingerprint(): string | null {
-  try {
-    return sessionStorage.getItem(DISMISS_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
+import {
+  connectivityWarningFingerprint,
+  readConnectivityDismissedFingerprint,
+  writeConnectivityDismissedFingerprint,
+  clearConnectivityDismissedFingerprint,
+} from '../../lib/connectivity-warning';
 
 type Props = {
   /** Avatar (ou autre trigger) sur lequel afficher la pastille de notif. */
@@ -33,13 +25,13 @@ export default function ConnectivityWarning({ children, className = '' }: Props)
   const { t } = useI18n();
   const prevStatusRef = useRef<SeedingDiagnostic['status'] | undefined>();
   const [dismissedFingerprint, setDismissedFingerprint] = useState<string | null>(() =>
-    readDismissedFingerprint()
+    readConnectivityDismissedFingerprint()
   );
   const [menuOpen, setMenuOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
   const fingerprint =
-    diagnostic && diagnostic.status !== 'ok' ? warningFingerprint(diagnostic) : '';
+    diagnostic && diagnostic.status !== 'ok' ? connectivityWarningFingerprint(diagnostic) : '';
 
   useEffect(() => {
     if (!diagnostic) return;
@@ -49,24 +41,16 @@ export default function ConnectivityWarning({ children, className = '' }: Props)
 
     if (prevStatus === 'ok' && diagnostic.status !== 'ok') {
       setDismissedFingerprint(null);
-      try {
-        sessionStorage.removeItem(DISMISS_STORAGE_KEY);
-      } catch {
-        /* ignore */
-      }
+      clearConnectivityDismissedFingerprint();
       return;
     }
 
     if (!fingerprint) return;
 
-    const stored = readDismissedFingerprint();
+    const stored = readConnectivityDismissedFingerprint();
     if (stored && stored !== fingerprint) {
       setDismissedFingerprint(null);
-      try {
-        sessionStorage.removeItem(DISMISS_STORAGE_KEY);
-      } catch {
-        /* ignore */
-      }
+      clearConnectivityDismissedFingerprint();
     }
   }, [diagnostic?.status, fingerprint]);
 
@@ -97,11 +81,7 @@ export default function ConnectivityWarning({ children, className = '' }: Props)
     if (!fingerprint) return;
     setDismissedFingerprint(fingerprint);
     setMenuOpen(false);
-    try {
-      sessionStorage.setItem(DISMISS_STORAGE_KEY, fingerprint);
-    } catch {
-      /* ignore */
-    }
+    writeConnectivityDismissedFingerprint(fingerprint);
   };
 
   const isError = diagnostic?.status === 'error';
@@ -146,13 +126,22 @@ export default function ConnectivityWarning({ children, className = '' }: Props)
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold text-white leading-tight">{title}</p>
                   <p className="text-[11px] text-white/75 leading-snug mt-1">{detail}</p>
-                  <a
-                    href="/settings/uploads/seeding-diagnostic"
-                    className="inline-flex mt-2.5 text-[11px] font-semibold text-[var(--ds-accent-violet)] hover:underline"
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    {t('connectivity.openDiagnostic')}
-                  </a>
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2.5">
+                    <a
+                      href="/settings/uploads/seeding-diagnostic"
+                      className="inline-flex text-[11px] font-semibold text-[var(--ds-accent-violet)] hover:underline"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      {t('connectivity.openDiagnostic')}
+                    </a>
+                    <a
+                      href="/settings/notifications"
+                      className="inline-flex text-[11px] font-semibold text-white/70 hover:text-white hover:underline"
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      {t('connectivity.openSettings')}
+                    </a>
+                  </div>
                 </div>
                 <button
                   type="button"

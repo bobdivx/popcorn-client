@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { RefreshCw, PlusCircle, Loader2 } from 'lucide-preact';
+import { RefreshCw, PlusCircle, Loader2, ArrowRightLeft } from 'lucide-preact';
 
 type TorrentRow = {
   info_hash: string;
@@ -23,8 +23,11 @@ export default function ClientTorrentsAddTrackerList() {
   const [error, setError] = useState<string | null>(null);
   const [trackerUrl, setTrackerUrl] = useState('');
   const [addingFor, setAddingFor] = useState<string | null>(null);
+  const [addingAll, setAddingAll] = useState(false);
+  const [migrating, setMigrating] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [trackersAfterAdd, setTrackersAfterAdd] = useState<string[] | null>(null);
+  const [migrateFailedDetails, setMigrateFailedDetails] = useState<string | null>(null);
 
   const loadTorrents = useCallback(async () => {
     setLoading(true);
@@ -51,6 +54,8 @@ export default function ClientTorrentsAddTrackerList() {
     loadC411Announce();
   }, [loadTorrents, loadC411Announce]);
 
+  const busy = addingAll || migrating || addingFor !== null;
+
   const handleAddTracker = async (infoHash: string) => {
     const url = trackerUrl.trim();
     if (!url) {
@@ -59,6 +64,7 @@ export default function ClientTorrentsAddTrackerList() {
     }
     setAddingFor(infoHash);
     setMessage(null);
+    setMigrateFailedDetails(null);
     const res = await serverApi.addClientTracker(infoHash, url);
     setAddingFor(null);
     if (res.success) {
@@ -78,6 +84,95 @@ export default function ClientTorrentsAddTrackerList() {
       const errorText = res.message || res.error || t('common.error');
       setMessage({ type: 'error', text: errorText });
     }
+  };
+
+  const handleAddTrackerToAll = async () => {
+    const url = trackerUrl.trim();
+    if (!url) {
+      setMessage({ type: 'error', text: t('settings.clientTorrentsList.trackerUrlRequired') });
+      return;
+    }
+    const targets = torrents.filter((row) => {
+      const state = (row.state || '').toLowerCase();
+      const progress = typeof row.progress === 'number' ? row.progress : 0;
+      return state.includes('seed') || state === 'finished' || progress >= 0.999;
+    });
+    if (targets.length === 0) {
+      setMessage({ type: 'error', text: t('settings.clientTorrentsList.addAllNone') });
+      return;
+    }
+    setAddingAll(true);
+    setMessage(null);
+    setTrackersAfterAdd(null);
+    setMigrateFailedDetails(null);
+    let ok = 0;
+    let skipped = 0;
+    let failed = 0;
+    for (const row of targets) {
+      const existing = Array.isArray(row.trackers)
+        ? row.trackers.some((tr) => tr.trim() === url)
+        : false;
+      if (existing) {
+        skipped += 1;
+        continue;
+      }
+      const res = await serverApi.addClientTracker(row.info_hash, url);
+      if (res.success) ok += 1;
+      else failed += 1;
+    }
+    setAddingAll(false);
+    setMessage({
+      type: failed > 0 && ok === 0 ? 'error' : 'success',
+      text: t('settings.clientTorrentsList.addAllResult')
+        .replace('{ok}', String(ok))
+        .replace('{skipped}', String(skipped))
+        .replace('{failed}', String(failed)),
+    });
+    await loadTorrents();
+    setTimeout(() => setMessage(null), 10000);
+  };
+
+  const handleMigrateC411 = async () => {
+    setMigrating(true);
+    setMessage(null);
+    setTrackersAfterAdd(null);
+    setMigrateFailedDetails(null);
+    const res = await serverApi.migrateC411Seeds({});
+    setMigrating(false);
+    if (!res.success || !res.data) {
+      setMessage({
+        type: 'error',
+        text: res.message || res.error || t('common.error'),
+      });
+      return;
+    }
+    const data = res.data;
+    const failedCount = data.failed?.length ?? 0;
+    setMessage({
+      type: failedCount > 0 && data.migrated === 0 && data.resnatched === 0 ? 'error' : 'success',
+      text: t('settings.clientTorrentsList.migrateC411Result')
+        .replace('{migrated}', String(data.migrated))
+        .replace('{skipped}', String(data.skipped))
+        .replace('{resnatched}', String(data.resnatched))
+        .replace('{failed}', String(failedCount)),
+    });
+    if (failedCount > 0) {
+      const details = data.failed
+        .slice(0, 5)
+        .map((f) => `${f.name.slice(0, 40)}: ${f.reason}`)
+        .join(' · ');
+      setMigrateFailedDetails(
+        t('settings.clientTorrentsList.migrateC411FailedHint').replace('{details}', details)
+      );
+    }
+    if (data.announce_url) {
+      setTrackerUrl(data.announce_url);
+    }
+    await loadTorrents();
+    setTimeout(() => {
+      setMessage(null);
+      setMigrateFailedDetails(null);
+    }, 15000);
   };
 
   return (
@@ -107,6 +202,9 @@ export default function ClientTorrentsAddTrackerList() {
         >
           {message.text}
         </p>
+      )}
+      {migrateFailedDetails && (
+        <p className="text-xs text-amber-500/90 break-words">{migrateFailedDetails}</p>
       )}
       {message?.type === 'success' && trackersAfterAdd && (
         <p className="text-xs text-[var(--ds-text-secondary)] mt-1">
@@ -170,7 +268,7 @@ export default function ClientTorrentsAddTrackerList() {
                       type="button"
                       className="btn btn-ghost btn-sm gap-1"
                       onClick={() => handleAddTracker(row.info_hash)}
-                      disabled={!trackerUrl.trim() || addingFor !== null}
+                      disabled={!trackerUrl.trim() || busy}
                       title={t('settings.clientTorrentsList.addTrackerTitle')}
                     >
                       {addingFor === row.info_hash ? (
@@ -189,14 +287,45 @@ export default function ClientTorrentsAddTrackerList() {
       )}
 
       {!loading && torrents.length > 0 && (
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm gap-2"
-          onClick={loadTorrents}
-        >
-          <RefreshCw className="w-4 h-4" />
-          {t('common.refresh')}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            className="btn btn-primary btn-sm gap-2"
+            onClick={handleMigrateC411}
+            disabled={busy}
+            title={t('settings.clientTorrentsList.migrateC411Title')}
+          >
+            {migrating ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <ArrowRightLeft className="w-4 h-4" />
+            )}
+            {t('settings.clientTorrentsList.migrateC411')}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm gap-2"
+            onClick={handleAddTrackerToAll}
+            disabled={!trackerUrl.trim() || busy}
+            title={t('settings.clientTorrentsList.addAllTitle')}
+          >
+            {addingAll ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <PlusCircle className="w-4 h-4" />
+            )}
+            {t('settings.clientTorrentsList.addAll')}
+          </button>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm gap-2"
+            onClick={loadTorrents}
+            disabled={busy}
+          >
+            <RefreshCw className="w-4 h-4" />
+            {t('common.refresh')}
+          </button>
+        </div>
       )}
     </div>
   );

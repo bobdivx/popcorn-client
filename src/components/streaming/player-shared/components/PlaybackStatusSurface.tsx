@@ -19,6 +19,14 @@ export interface PlaybackStatusDebugLog {
   [key: string]: unknown;
 }
 
+function isSparseOrEmptyError(message: string | null | undefined): boolean {
+  if (!message) return false;
+  return (
+    message.includes('SPARSE_OR_EMPTY') ||
+    /sparse|fichier vide|empty file|aucune donnée téléchargée/i.test(message)
+  );
+}
+
 export interface PlaybackStatusSurfaceProps {
   variant: PlaybackStatusVariant;
   playStatus?: PlayStatusLike | null;
@@ -40,6 +48,8 @@ export interface PlaybackStatusSurfaceProps {
   onCancel?: () => void;
   onContinueInBackground?: () => void;
   onRetry?: () => void;
+  /** Supprimer les fichiers sparses/vides (après confirmation UI). */
+  onDeleteEmptyFiles?: () => void;
   onToggleDebug?: () => void;
   onCopyLogs?: () => void;
   onClearLogs?: () => void;
@@ -228,6 +238,7 @@ export function PlaybackStatusSurface({
   onCancel,
   onContinueInBackground,
   onRetry,
+  onDeleteEmptyFiles,
   onToggleDebug,
   onCopyLogs,
   onClearLogs,
@@ -236,7 +247,9 @@ export function PlaybackStatusSurface({
 }: PlaybackStatusSurfaceProps) {
   const { t } = useI18n();
   const [confirmingCancel, setConfirmingCancel] = useState(false);
+  const [confirmingDeleteEmpty, setConfirmingDeleteEmpty] = useState(false);
   const [posterFailed, setPosterFailed] = useState(false);
+  const sparseOrEmpty = isSparseOrEmptyError(errorMessage);
 
   const derived = derivePlaybackPhase({
     playStatus,
@@ -425,11 +438,62 @@ export function PlaybackStatusSurface({
                   ×
                 </span>
               </div>
-              <h3 className="text-white text-2xl font-bold mb-2">{phaseLabel(t, 'error')}</h3>
+              <h3 className="text-white text-2xl font-bold mb-2">
+                {sparseOrEmpty
+                  ? t('playback.sparseOrEmptyTitle') || phaseLabel(t, 'error')
+                  : phaseLabel(t, 'error')}
+              </h3>
               <p className="text-white/65 text-sm mb-6 max-w-md">
-                {errorMessage || progressMessage || t('playback.errorStream')}
+                {sparseOrEmpty
+                  ? t('playback.sparseOrEmptyDetail') ||
+                    errorMessage ||
+                    progressMessage ||
+                    t('playback.errorStream')
+                  : errorMessage || progressMessage || t('playback.errorStream')}
               </p>
+              {sparseOrEmpty && onDeleteEmptyFiles && confirmingDeleteEmpty ? (
+                <div className="w-full rounded-2xl border border-white/15 bg-black/45 px-4 py-3 text-center space-y-3 mb-4">
+                  <p className="text-sm text-white/85">
+                    {t('playback.sparseOrEmptyConfirm') ||
+                      'Supprimer les fichiers vides du disque ?'}
+                  </p>
+                  <div className="flex justify-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingDeleteEmpty(false)}
+                      data-focusable
+                      tabIndex={0}
+                      className="px-5 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-sm"
+                    >
+                      {t('common.back') || 'Retour'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConfirmingDeleteEmpty(false);
+                        onDeleteEmptyFiles();
+                      }}
+                      data-focusable
+                      tabIndex={0}
+                      className="px-5 py-2 rounded-xl bg-red-600/85 hover:bg-red-600 text-white text-sm"
+                    >
+                      {t('common.confirm') || 'Confirmer'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
               <div className="flex flex-wrap justify-center gap-3">
+                {sparseOrEmpty && onDeleteEmptyFiles && !confirmingDeleteEmpty ? (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingDeleteEmpty(true)}
+                    data-focusable
+                    tabIndex={0}
+                    className="px-6 py-2.5 rounded-xl bg-red-600/85 hover:bg-red-600 text-white font-medium transition-colors"
+                  >
+                    {t('playback.sparseOrEmptyDelete') || 'Supprimer les fichiers vides'}
+                  </button>
+                ) : null}
                 {onCancel ? (
                   <button
                     type="button"
@@ -441,7 +505,7 @@ export function PlaybackStatusSurface({
                     {t('common.back') || 'Retour'}
                   </button>
                 ) : null}
-                {onRetry ? (
+                {!sparseOrEmpty && onRetry ? (
                   <button
                     type="button"
                     onClick={onRetry}

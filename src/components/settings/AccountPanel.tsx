@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import AccountSettings, { type AccountSection } from './AccountSettings';
+import ConnectivityAlertCard from './ConnectivityAlertCard';
 import TwoFactorSettings from './TwoFactorSettings';
 import QuickConnectAuthorize from './QuickConnectAuthorize';
 import LocalUsersLink from './LocalUsersLink';
@@ -94,6 +95,7 @@ export default function AccountPanel() {
 
   return (
     <div className="flex-1 py-4 px-4 sm:px-6 space-y-6 overflow-y-auto scrollbar-visible">
+      <ConnectivityAlertCard />
       {demoMode && (
         <section className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 sm:p-6">
           <h3 className="text-lg font-semibold text-amber-200 mb-2">{t('demo.modeActive')}</h3>

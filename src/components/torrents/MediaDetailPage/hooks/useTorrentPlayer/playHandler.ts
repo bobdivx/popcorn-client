@@ -121,6 +121,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
     hasMagnetLink,
     streamingTorrentActive = false,
     isAvailableLocally,
+    setIsAvailableLocally,
     loadVideoFiles,
     videoFiles,
     selectedFile,
@@ -230,6 +231,29 @@ export function createHandlePlay(context: PlayHandlerContext) {
         setShowInfo(false);
         stopProgressPolling();
         return;
+      }
+
+      // Chemin bibliothèque mais fichiers sparses/vides (torrent à 0%)
+      try {
+        const sparseStats = await clientApi.getTorrent(torrent.infoHash);
+        if (
+          sparseStats &&
+          sparseStats.files_available !== true &&
+          (sparseStats.progress ?? 0) <= 0.001 &&
+          (sparseStats.downloaded_bytes ?? 0) <= 0
+        ) {
+          addDebugLog('error', 'Fichiers bibliothèque sparses/vides (torrent 0%)');
+          setIsAvailableLocally(false);
+          setErrorMessage(
+            'SPARSE_OR_EMPTY: Le fichier est sparse ou vide (aucune donnée téléchargée). Lecture impossible.'
+          );
+          setPlayStatus('error');
+          setIsPlaying(true);
+          setTorrentStats(sparseStats);
+          return;
+        }
+      } catch (_) {
+        // ignore
       }
     }
 

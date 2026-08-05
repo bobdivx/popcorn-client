@@ -85,6 +85,7 @@ export interface PlayHandlerContext {
   hasMagnetLink: boolean;
   streamingTorrentActive?: boolean;
   isAvailableLocally: boolean;
+  setIsAvailableLocally: (value: boolean) => void;
   loadVideoFiles: (infoHash: string, retryCount?: number) => Promise<any[]>;
   videoFiles: any[];
   selectedFile: any;
