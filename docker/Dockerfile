@@ -43,7 +43,7 @@ COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
 COPY docker/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
-EXPOSE 80
+EXPOSE 80 4326
 
 ENV APP_GIT_SHA=${APP_GIT_SHA}
 ENV APP_BUILD_REF=${APP_BUILD_REF}
