@@ -126,6 +126,8 @@ export default function HLSPlayer({
   }, [stopBuffer, stopBufferRef]);
 
   const isFullscreen = useFullscreen();
+  const isLocalLibraryMedia =
+    typeof infoHash === 'string' && infoHash.startsWith('local_');
   
   const {
     showControls: baseShowControls,
@@ -153,6 +155,15 @@ export default function HLSPlayer({
     canUseSeekReload: canUseSeekReloadProp ?? true,
     reloadWithSeek,
   });
+
+  // Pendant la préparation HLS (surtout local/AV1), end/duration peut être ~100%
+  // sur une playlist prématurée de quelques secondes — indéterminé plutôt que faux %.
+  const overlayBufferedPercent =
+    isLoading || (isLocalLibraryMedia && bufferedPercent >= 85 && !isPlaying)
+      ? null
+      : bufferedPercent > 0
+        ? bufferedPercent
+        : null;
 
   useEffect(() => {
     if (onBufferProgress) {
@@ -451,9 +462,14 @@ export default function HLSPlayer({
         {shouldShowBuffering && (
           <PlayerBufferingOverlay
             title={torrentName || fileName}
-            bufferedPercent={bufferedPercent}
-            detailMessage={loadingStatusMessage}
-            torrentStats={torrentStats}
+            bufferedPercent={overlayBufferedPercent}
+            detailMessage={
+              loadingStatusMessage ||
+              (isLocalLibraryMedia && isLoading
+                ? t('playback.phase.preparingPlayback') || 'Préparation de la lecture…'
+                : undefined)
+            }
+            torrentStats={isLocalLibraryMedia ? null : torrentStats}
             posterUrl={posterUrl}
             imageUrl={posterUrl}
             onClose={onClose}
