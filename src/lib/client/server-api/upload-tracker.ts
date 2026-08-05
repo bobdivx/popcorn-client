@@ -148,6 +148,8 @@ export interface RestoreFromIndexerBody {
   local_media_id: string;
   indexer_id: string;
   query?: string | null;
+  /** Re-télécharge le .torrent même s'il est déjà en base. */
+  force?: boolean;
 }
 
 export interface RestoreFromIndexerResult {
@@ -155,6 +157,20 @@ export interface RestoreFromIndexerResult {
   matched: boolean;
   info_hash?: string | null;
   message: string;
+}
+
+export interface MigrateC411FailedItem {
+  info_hash: string;
+  name: string;
+  reason: string;
+}
+
+export interface MigrateC411SeedsResult {
+  announce_url: string;
+  migrated: number;
+  skipped: number;
+  resnatched: number;
+  failed: MigrateC411FailedItem[];
 }
 
 export interface PrepareReseedFromLibraryResult {
@@ -508,6 +524,20 @@ export const uploadTrackerMethods = {
     return this.backendRequest<RestoreFromIndexerResult>('/api/library/upload-tracker/restore-from-indexer', {
       method: 'POST',
       body: JSON.stringify(body),
+    });
+  },
+
+  /**
+   * Migre les torrents en seed vers le compte C411 actuel :
+   * ajoute l’announce (passkey), puis re-snatch ceux qui échouent / sans .torrent.
+   */
+  async migrateC411Seeds(
+    this: UploadTrackerClientAccess,
+    body?: { indexer_id?: string; force_resnatch?: boolean }
+  ): Promise<ApiResponse<MigrateC411SeedsResult>> {
+    return this.backendRequest<MigrateC411SeedsResult>('/api/library/upload-tracker/migrate-c411-seeds', {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
     });
   },
 

@@ -15,6 +15,7 @@ import {
   CreditCard,
 } from 'lucide-preact';
 import AccountSettings from './AccountSettings';
+import ConnectivityAlertCard from './ConnectivityAlertCard';
 import TwoFactorSettings from './TwoFactorSettings';
 import QuickConnectAuthorize from './QuickConnectAuthorize';
 import LocalUsersManager from './LocalUsersManager';
@@ -133,7 +134,9 @@ export default function AccountSubMenuPanel({ baseUrl = BASE_URL_DEFAULT }: { ba
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
+    <div className="space-y-6">
+      <ConnectivityAlertCard />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
       {visible.map((item) => {
         const href = item.kind === 'link' ? item.href : `${baseUrl}${subParam}${item.id}`;
         const isExternal = item.kind === 'link' && !!item.isExternal;
@@ -172,6 +175,7 @@ export default function AccountSubMenuPanel({ baseUrl = BASE_URL_DEFAULT }: { ba
           />
         );
       })}
+      </div>
     </div>
   );
 }
