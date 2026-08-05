@@ -1,5 +1,6 @@
-# Alias of the root Dockerfile for older CI/docs (`-f docker/Dockerfile`).
-# Prefer building from the repository root: docker build -t popcorn-client .
+# Dockerfile multi-stage pour le frontend Astro Popcorn
+# Build depuis la racine du repo : docker build -t popcorn-client .
+# Coolify : Build Pack = Dockerfile (chemin par défaut ./Dockerfile), port 80
 # Stage 1: Build
 FROM node:22-alpine AS builder
 

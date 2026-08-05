@@ -1,0 +1,43 @@
+# Dependencies & build output
+node_modules
+dist
+.output
+.astro
+
+# Git / IDE / local
+.git
+.github
+.cursor
+.vscode
+.idea
+*.md
+docs
+docs-backup-temp
+agent-transcripts
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Native / desktop / mobile (not needed for web image)
+src-tauri
+popcorn-tauri
+*.apk
+*.aab
+*.keystore
+*.jks
+
+# Tests & caches
+test-results
+playwright-report
+blob-report
+playwright
+coverage
+**/.cache
+**/target
+
+# Misc
+.DS_Store
+.vercel
+npm-debug.log*
