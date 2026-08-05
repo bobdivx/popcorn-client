@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'preact/hooks';
-import { createPortal } from 'preact/compat';
 import { getBackendUrl, setBackendUrl as saveBackendUrl, clearBackendUrl, hasBackendUrl, isBackendUrlSameAsClientUrl } from '../../lib/backend-config.js';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { HelpCircle, X } from 'lucide-preact';
+import { HelpCircle } from 'lucide-preact';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web.js';
 import { TokenManager } from '../../lib/client/storage.js';
 import { serverApi } from '../../lib/client/server-api.js';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
+import { Modal } from '../ui/Modal';
 
 export default function ServerSettings() {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [backendUrl, setBackendUrl] = useState('');
   const [savedBackendUrl, setSavedBackendUrl] = useState<string | null>(null);
@@ -145,8 +147,11 @@ export default function ServerSettings() {
         const previousUrl = getBackendUrl()?.trim().replace(/\/$/, '') ?? '';
         const newUrl = backendUrl.trim().replace(/\/$/, '');
         if (typeof window !== 'undefined' && isBackendUrlSameAsClientUrl(newUrl)) {
-          const confirmed = window.confirm(t('serverSettings.sameOriginConfirmMessage'));
-          if (!confirmed) {
+          if (!(await confirm({
+            title: t('common.confirm'),
+            message: t('serverSettings.sameOriginConfirmMessage'),
+            danger: true,
+          }))) {
             setSaving(false);
             return;
           }
@@ -181,8 +186,11 @@ export default function ServerSettings() {
       // Si l'URL backend est identique à l'adresse du client, demander confirmation
       const newUrl = backendUrl.trim().replace(/\/$/, '');
       if (typeof window !== 'undefined' && isBackendUrlSameAsClientUrl(newUrl)) {
-        const confirmed = window.confirm(t('serverSettings.sameOriginConfirmMessage'));
-        if (!confirmed) {
+        if (!(await confirm({
+          title: t('common.confirm'),
+          message: t('serverSettings.sameOriginConfirmMessage'),
+          danger: true,
+        }))) {
           setSaving(false);
           return;
         }
@@ -356,42 +364,30 @@ export default function ServerSettings() {
         </div>
       </div>
 
-      {/* Modal Informations */}
-      {showInfoModal && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[var(--ds-surface-overlay)]" onClick={() => setShowInfoModal(false)}>
-          <div class="sc-frame" style="max-width:28rem;width:100%;box-shadow:0 24px 60px rgba(0,0,0,0.5);" onClick={(e) => e.stopPropagation()}>
-            <div class="sc-frame-body">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="ds-title-section text-[var(--ds-text-primary)]">{t('serverSettings.info.title')}</h3>
-                <button
-                  type="button"
-                  onClick={() => setShowInfoModal(false)}
-                  className="p-2 rounded-lg text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-primary)] hover:bg-white/10 transition-colors"
-                  aria-label={t('common.close')}
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="space-y-3 text-sm ds-text-secondary">
-                <p>• {t('serverSettings.info.point1')}</p>
-                <p>• {t('serverSettings.info.point2')}</p>
-                <p>• {t('serverSettings.info.point3')}</p>
-                <p>• {t('serverSettings.info.point4')}</p>
-              </div>
-              <div className="mt-6">
-                <button
-                  type="button"
-                  onClick={() => setShowInfoModal(false)}
-                  className="w-full min-h-[48px] rounded-[var(--ds-radius-sm)] font-semibold bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)]"
-                >
-                  {t('common.close')}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      <Modal
+        isOpen={showInfoModal}
+        onClose={() => setShowInfoModal(false)}
+        title={t('serverSettings.info.title')}
+        size="sm"
+      >
+        <div className="space-y-3 text-sm ds-text-secondary">
+          <p>• {t('serverSettings.info.point1')}</p>
+          <p>• {t('serverSettings.info.point2')}</p>
+          <p>• {t('serverSettings.info.point3')}</p>
+          <p>• {t('serverSettings.info.point4')}</p>
+        </div>
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={() => setShowInfoModal(false)}
+            className="w-full min-h-[48px] rounded-[var(--ds-radius-sm)] font-semibold bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)]"
+            data-autofocus
+          >
+            {t('common.close')}
+          </button>
+        </div>
+      </Modal>
+      {confirmDialog}
     </div>
   );
 }

@@ -214,7 +214,11 @@ export function SeriesEpisodesSection({
                     isDownloaded: finalIsDownloaded,
                     isDownloading: !finalIsDownloaded && ((isSelected ? isDownloading : false) || currentlyDownloading),
                     downloadProgress: isSelected && downloadProgress !== undefined ? downloadProgress : (currentlyDownloading ? downloadingProgress : undefined),
-                    statusMessage: isSelected ? statusMessage : null,
+                    statusMessage: isSelected
+                      ? statusMessage
+                      : currentlyDownloading
+                        ? 'Téléchargement…'
+                        : null,
                   isSelected,
                   onSelect: () => onSelectEpisode(ep.id),
                   isTV,

@@ -6,6 +6,7 @@ import { serverApi } from '../../lib/client/server-api';
 import ResourceMonitorDev from './ResourceMonitorDev';
 import { SettingsNavCard } from './SettingsNavCard';
 import { SettingsSubPageFrame } from './SettingsSubPageFrame';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
 
 const BASE_URL = '/settings/maintenance/';
 
@@ -288,15 +289,22 @@ function TranscodingConfigSection({ embedded = false }: { embedded?: boolean }) 
 
 function RestartBackendSection({ embedded = false }: { embedded?: boolean }) {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleRestart = async () => {
     if (loading) return;
     setMessage(null);
-    const ok =
-      typeof window !== 'undefined' ? window.confirm(t('settingsMenu.maintenance.restartBackend.confirm')) : true;
-    if (!ok) return;
+    if (
+      !(await confirm({
+        title: t('settingsMenu.maintenance.restartBackend.title') || 'Redémarrer',
+        message: t('settingsMenu.maintenance.restartBackend.confirm'),
+        danger: true,
+      }))
+    ) {
+      return;
+    }
     setLoading(true);
     try {
       const res = await serverApi.restartBackend();
@@ -337,7 +345,13 @@ function RestartBackendSection({ embedded = false }: { embedded?: boolean }) {
     </>
   );
 
-  if (embedded) return <div className="min-w-0">{content}</div>;
+  if (embedded)
+    return (
+      <div className="min-w-0">
+        {content}
+        {confirmDialog}
+      </div>
+    );
   return (
     <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
       <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-4">
@@ -345,20 +359,29 @@ function RestartBackendSection({ embedded = false }: { embedded?: boolean }) {
         {t('settingsMenu.maintenance.restartBackend.title')}
       </h3>
       {content}
+      {confirmDialog}
     </section>
   );
 }
 
 function HardResetSection({ embedded = false }: { embedded?: boolean }) {
   const { t } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleHardReset = async () => {
     if (loading) return;
-    const ok =
-      typeof window !== 'undefined' ? window.confirm(t('versionInfo.hardResetConfirm')) : true;
-    if (!ok) return;
+    if (
+      !(await confirm({
+        title: t('versionInfo.hardReset') || 'Hard reset',
+        message: t('versionInfo.hardResetConfirm'),
+        danger: true,
+        confirmLabel: t('common.confirm') || 'Confirmer',
+      }))
+    ) {
+      return;
+    }
 
     setLoading(true);
     setMessage(null);
@@ -406,13 +429,20 @@ function HardResetSection({ embedded = false }: { embedded?: boolean }) {
     </>
   );
 
-  if (embedded) return <div className="min-w-0">{content}</div>;
+  if (embedded)
+    return (
+      <div className="min-w-0">
+        {content}
+        {confirmDialog}
+      </div>
+    );
   return (
     <section className="rounded-xl border border-red-900/30 bg-white/5 overflow-hidden">
       <div className="p-4 sm:p-6">
         <p className="text-sm font-semibold text-red-300 mb-2">{t('versionInfo.hardResetTitle')}</p>
         {content}
       </div>
+      {confirmDialog}
     </section>
   );
 }

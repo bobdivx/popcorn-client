@@ -5,6 +5,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { Clock, CheckCircle, XCircle, Film, Tv, Trash2 } from 'lucide-preact';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
 import { FocusableCard } from '../ui/FocusableCard';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
 
 const STATUS_PENDING = 1;
 const STATUS_APPROVED = 2;
@@ -158,6 +159,7 @@ function RequestCard({ req, onDelete, deletingId, t }: { req: RequestWithTmdb, o
 
 export default function MyRequests() {
   const { t, locale } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [requests, setRequests] = useState<RequestWithTmdb[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -209,7 +211,12 @@ export default function MyRequests() {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm(t('requests.confirmDelete'))) return;
+    if (!(await confirm({
+      title: t('common.delete') || 'Supprimer',
+      message: t('requests.confirmDelete'),
+      danger: true,
+      confirmLabel: t('common.delete') || 'Supprimer',
+    }))) return;
     setDeletingId(id);
     try {
       const res = await serverApi.deleteMediaRequest(id);
@@ -304,6 +311,7 @@ export default function MyRequests() {
           </div>
         )}
       </div>
+      {confirmDialog}
     </div>
   );
 }

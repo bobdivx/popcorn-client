@@ -180,7 +180,7 @@ export function ActionButtons({
   return (
     <div className="mb-6 space-y-3">
       {/* ── Rangée principale ── */}
-      <div className="flex flex-nowrap gap-3 tv:gap-4 items-center overflow-x-auto scrollbar-hide">
+      <div className="flex flex-wrap gap-3 tv:gap-4 items-center overflow-visible">
 
         {/* Bouton Lire / Télécharger — gradient animé, rounded-full */}
         {(!hidePrimaryPlayForTvSeries || !shouldShowPlayButton) &&
@@ -223,7 +223,7 @@ export function ActionButtons({
               isPackPreview && isPackEpisodeSelected ? primaryPackMode : shouldShowPlayButton ? 'play' : 'download'
             }
             tabIndex={0}
-            className="gtv-pill-btn ds-focus-glow ds-active-glow ds-sync-active-pulse inline-flex items-center gap-2.5 font-bold text-base tv:text-2xl tv:px-10 tv:py-5 tv:min-h-[68px] disabled:opacity-50 disabled:cursor-not-allowed border border-violet-500/40 hover:border-violet-400/60 hover:bg-violet-900/20"
+            className="gtv-pill-btn ds-focus-glow ds-active-glow ds-sync-active-pulse inline-flex items-center gap-2.5 font-bold text-base min-w-[9.5rem] tv:text-2xl tv:px-10 tv:py-5 tv:min-h-[68px] disabled:opacity-50 disabled:cursor-not-allowed border border-violet-500/40 hover:border-violet-400/60 hover:bg-violet-900/20 transition-[opacity,transform,background-color,border-color] duration-200 active:scale-[0.97]"
           >
             {downloadingToClient ? (
               <>
@@ -274,7 +274,7 @@ export function ActionButtons({
             onClick={onDownloadAllEpisodes}
             data-focusable
             tabIndex={0}
-            className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 tv:text-xl tv:px-8 tv:py-4 tv:min-h-[68px] border border-emerald-500/40 hover:border-emerald-400/60 hover:bg-emerald-900/20"
+            className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 tv:text-xl tv:px-8 tv:py-4 tv:min-h-[68px] border border-emerald-500/40 hover:border-emerald-400/60 hover:bg-emerald-900/20 transition-[opacity,transform,background-color,border-color] duration-200 active:scale-[0.97]"
             title="Télécharger tous les épisodes disponibles"
           >
             <Download className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" size={20} />
@@ -290,7 +290,7 @@ export function ActionButtons({
             data-focusable
             data-media-detail-action="download"
             tabIndex={0}
-            className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 tv:text-xl tv:px-8 tv:py-4 tv:min-h-[68px]"
+            className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 tv:text-xl tv:px-8 tv:py-4 tv:min-h-[68px] transition-[opacity,transform,background-color] duration-200 active:scale-[0.97]"
             title={isPackWithMultipleFiles ? t('playback.downloadFullSeason') : t('common.download')}
           >
             <Download className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" size={20} />
@@ -300,7 +300,7 @@ export function ActionButtons({
 
         {/* Pack sans sélection */}
         {isPackWithMultipleFiles && !(selectedPackEpisodePreviewIndex != null && (onDownloadSingleEpisode != null || (canStream && onPlaySingleEpisode != null))) && !shouldShowPlayButton && (
-          <button type="button" disabled tabIndex={0}
+          <button type="button" disabled tabIndex={-1}
             className="gtv-pill-btn inline-flex items-center gap-2.5 opacity-40 cursor-not-allowed">
             <Download className="h-5 w-5 shrink-0" size={20} />
             {t('mediaDetail.downloadThisEpisode')}
@@ -446,7 +446,7 @@ export function ActionButtons({
             aria-label={t('downloads.cancelDownload')}
             data-focusable
             data-media-detail-primary-action
-            className="gtv-icon-btn ds-focus-glow ds-active-glow shrink-0 w-9 h-9 min-w-9 min-h-9 text-white/60 hover:text-red-400"
+            className="gtv-icon-btn ds-focus-glow ds-active-glow shrink-0 min-w-11 min-h-11 text-white/60 hover:text-red-400"
           >
             <XCircle className="h-5 w-5" size={20} />
           </button>

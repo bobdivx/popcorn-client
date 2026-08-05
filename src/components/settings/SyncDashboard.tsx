@@ -18,6 +18,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import type { Indexer } from '../../lib/client/types';
 import { useNativeNotifications } from '../../hooks/useNativeNotifications';
 import type { SyncHistoryEntry } from '../../lib/client/server-api/sync.js';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
 
 let GlobalChart: any = null;
 async function getChart() {
@@ -502,6 +503,7 @@ function formatNextSync(lastSync: number | null, frequencyMin: number): string {
 /* ─────────────────────────────────────────────────────────────────────────── */
 export default function SyncDashboard() {
   const { t, language } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [status, setStatus] = useState<SyncStatusStore | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState('');
@@ -658,7 +660,15 @@ export default function SyncDashboard() {
   };
 
   const handleStopSync = async () => {
-    if (!confirm(t('torrentSyncManager.stopSyncConfirm'))) return;
+    if (
+      !(await confirm({
+        title: t('common.confirm') || 'Confirmer',
+        message: t('torrentSyncManager.stopSyncConfirm'),
+        danger: true,
+      }))
+    ) {
+      return;
+    }
     try {
       setSyncing(true); setError(''); setSuccess('');
       const res = await serverApi.stopSync();
@@ -676,7 +686,16 @@ export default function SyncDashboard() {
   };
 
   const handleClearTorrents = async () => {
-    if (!confirm(t('torrentSyncManager.confirmClearAll'))) return;
+    if (
+      !(await confirm({
+        title: t('common.delete') || 'Supprimer',
+        message: t('torrentSyncManager.confirmClearAll'),
+        danger: true,
+        confirmLabel: t('common.delete') || 'Supprimer',
+      }))
+    ) {
+      return;
+    }
     try {
       setSyncing(true); setError(''); setSuccess('');
       const res = await serverApi.clearSyncTorrents();
@@ -1088,6 +1107,7 @@ export default function SyncDashboard() {
         )}
       </div>
 
+      {confirmDialog}
     </div>
   );
 }

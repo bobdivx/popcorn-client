@@ -822,8 +822,12 @@ export default function TVNavigationProvider() {
         return;
       }
 
-      // Ignorer si player vidéo actif
-      if (document.querySelector('.hls-player-container:focus-within')) {
+      // Ignorer si player vidéo actif (HLS, Lucie, wrapper unifié)
+      if (
+        document.querySelector(
+          '.hls-player-container:focus-within, #lucie-player-container:focus-within, #video-player-wrapper:focus-within, [data-tv-player-active]:focus-within'
+        )
+      ) {
         return;
       }
 

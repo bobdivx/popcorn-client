@@ -18,6 +18,7 @@ function getStoredUseJackett(): boolean {
 import { IndexerDefinitionDocsModal } from '../../indexers/IndexerDefinitionDocsModal';
 import { CookieWizardModal } from '../../settings/CookieWizardModal';
 import { normalizeCookieInput } from '../../../lib/utils/cookie-format';
+import { useConfirmDialog } from '../../ui/useConfirmDialog';
 
 interface IndexersStepProps {
   setupStatus: SetupStatus | null;
@@ -37,6 +38,7 @@ export function IndexersStep({
   onStatusChange,
 }: IndexersStepProps) {
   const { t, language: userLocale } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [indexers, setIndexers] = useState<Indexer[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -288,7 +290,12 @@ export function IndexersStep({
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cet indexer ?')) {
+    if (!(await confirm({
+      title: t('common.delete') || 'Supprimer',
+      message: t('indexersManager.confirmDelete'),
+      danger: true,
+      confirmLabel: t('common.delete') || 'Supprimer',
+    }))) {
       return;
     }
 
@@ -408,6 +415,7 @@ export function IndexersStep({
 
   return (
     <div className="space-y-6">
+      {confirmDialog}
       <CookieWizardModal isOpen={showCookieWizard} onClose={() => setShowCookieWizard(false)} />
       <IndexerDefinitionDocsModal isOpen={showDocs} onClose={() => setShowDocs(false)} />
       <h3 className="text-2xl font-bold text-white">Configuration des indexers</h3>

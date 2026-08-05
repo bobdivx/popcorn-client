@@ -18,6 +18,7 @@ import { calculateSyncProgress } from '../../lib/utils/sync-progress';
 import { useI18n } from '../../lib/i18n/useI18n';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
 import { Modal } from '../ui/Modal';
+import { useConfirmDialog } from '../ui/useConfirmDialog';
 import { DsIconButton, DsMetricCard, DsBarChart } from '../ui/design-system';
 
 interface SyncSettings {
@@ -262,6 +263,7 @@ function IndexerDetailsModalContent({
 
 export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManagerProps = {}) {
   const { t, language } = useI18n();
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   // Initialiser loading à false pour que l'interface s'affiche immédiatement
   // Le statut par défaut sera créé dans loadStatus si nécessaire
   const [loading, setLoading] = useState(false);
@@ -772,7 +774,14 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
   };
 
   const clearTorrents = async () => {
-    if (!confirm(t('torrentSyncManager.confirmClearAll'))) {
+    if (
+      !(await confirm({
+        title: t('common.delete') || 'Supprimer',
+        message: t('torrentSyncManager.confirmClearAll'),
+        danger: true,
+        confirmLabel: t('common.delete') || 'Supprimer',
+      }))
+    ) {
       return;
     }
 
@@ -1658,6 +1667,7 @@ export default function TorrentSyncManager({ section = 'all' }: TorrentSyncManag
           />
         </Modal>
       )}
+      {confirmDialog}
     </div>
   );
 }

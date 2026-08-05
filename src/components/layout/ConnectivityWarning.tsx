@@ -57,6 +57,20 @@ export default function ConnectivityWarning() {
   }, [diagnostic?.status, fingerprint]);
 
   const isDismissed = fingerprint !== '' && dismissedFingerprint === fingerprint;
+  const visible =
+    !loading && !!diagnostic && diagnostic.status !== 'ok' && !isDismissed;
+
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    if (visible) {
+      document.documentElement.dataset.connectivityVisible = 'true';
+    } else {
+      delete document.documentElement.dataset.connectivityVisible;
+    }
+    return () => {
+      delete document.documentElement.dataset.connectivityVisible;
+    };
+  }, [visible]);
 
   const handleDismiss = () => {
     if (!fingerprint) return;
@@ -68,7 +82,7 @@ export default function ConnectivityWarning() {
     }
   };
 
-  if (loading || !diagnostic || diagnostic.status === 'ok' || isDismissed) {
+  if (!visible || !diagnostic) {
     return null;
   }
 
@@ -78,10 +92,10 @@ export default function ConnectivityWarning() {
 
   return (
     <div 
-      className={`fixed bottom-4 right-4 z-[10000] flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-sm pointer-events-auto ${colorClass}`}
+      className={`fixed z-[10000] flex items-center gap-3 px-4 py-3 rounded-xl border shadow-2xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-sm pointer-events-auto ${colorClass}`}
       style={{
-        marginBottom: 'var(--safe-area-inset-bottom)',
-        marginRight: 'var(--safe-area-inset-right)',
+        bottom: 'var(--connectivity-stack-bottom)',
+        right: 'var(--floating-offset-right)',
       }}
     >
       <div className={`shrink-0 ${iconColor}`}>

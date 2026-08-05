@@ -12,6 +12,8 @@ export interface BuildMediaDetailUrlOptions {
   slug?: string | null;
   from?: string | null;
   title?: string | null;
+  /** Info-hash du torrent actif (ex. depuis /downloads) pour la lecture. */
+  infoHash?: string | null;
   streamBackendUrl?: string | null;
   streamPath?: string | null;
 }
@@ -21,6 +23,7 @@ export function buildMediaDetailUrl(options: BuildMediaDetailUrlOptions): string
   const params = new URLSearchParams();
   if (options.from) params.set('from', options.from);
   if (options.title) params.set('title', options.title);
+  if (options.infoHash) params.set('infoHash', options.infoHash);
   if (options.streamBackendUrl) params.set('streamBackendUrl', options.streamBackendUrl);
   if (options.streamPath) params.set('streamPath', options.streamPath);
 
