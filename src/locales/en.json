@@ -112,6 +112,13 @@
     "newReplyBody": "You have received a new reply to your feedback",
     "unread": "unread"
   },
+  "connectivity": {
+    "warningTitle": "Sharing issue detected",
+    "errorTitle": "BitTorrent connection error",
+    "defaultDetail": "Check your port configuration.",
+    "openDiagnostic": "Open seeding diagnostic",
+    "dismiss": "Dismiss notification"
+  },
   "backend": {
     "badgeTitleOk": "Backend server running",
     "badgeTitleError": "Backend server stopped or error",
@@ -544,6 +551,32 @@
     "loadingVideo": "Loading video…",
     "preparingStream": "Preparing playback…",
     "streamPreparingRetry": "Preparing stream, retrying…",
+    "phase": {
+      "idle": "",
+      "resolving": "Connecting to torrent…",
+      "findingPeers": "Looking for peers…",
+      "downloading": "Downloading",
+      "preparingPlayback": "Preparing playback…",
+      "buffering": "Buffering…",
+      "ready": "Ready",
+      "error": "Error"
+    },
+    "metric": {
+      "downloaded": "Downloaded",
+      "speed": "Speed",
+      "eta": "Time left",
+      "peers": "Peers",
+      "na": "—"
+    },
+    "step": {
+      "queue": "Queue",
+      "metadata": "Metadata",
+      "peers": "Peers",
+      "download": "Download"
+    },
+    "continueInBackground": "Continue in background",
+    "showDebug": "Show debug",
+    "hideDebug": "Hide debug",
     "streamingFallbackToHls": "Switched to HLS playback due to direct stream issue.",
     "errorStream": "Unable to play video. Check server connection.",
     "errorStreamDetailAborted": "Video loading was aborted.",
@@ -871,6 +904,8 @@
       "testPortExternal": "Test port (canyouseeme.org)",
       "listenPort": "TCP port (rqbit)",
       "portHintWithPort": "Open port {port} (TCP and UDP) on your router to allow incoming connections (seeding / ratio). If you have double NAT (modem + router), configure port forwarding on both devices. Test it with the tool below.",
+      "doubleNatTipTitle": "Double NAT is a common cause",
+      "doubleNatTip": "If UPnP is on but the port stays closed: 1) on the inner router, forward TCP/UDP {port} to this PC; 2) on the ISP box, forward the same port to the router WAN IP (or enable DMZ / bridge mode). Otherwise peers cannot connect inbound.",
       "enableRatioModeNow": "Enable tracker compatibility mode (now)",
       "enableRatioModeHint": "Sets RQBIT_TRACKER_MODE for the current session (no server restart). To keep it after a reboot, add tracker_mode = true in config.toml, or set TRACKER_MODE=1 / RQBIT_TRACKER_MODE=1 in the environment, or use the Ratio page below.",
       "ratioSettingsLink": "Open Ratio / tracker settings",
@@ -1124,7 +1159,13 @@
     "refreshEpisodesBusy": "Searching indexers…",
     "refreshEpisodesSuccess": "{imported} release(s) imported · {scanned} result(s) scanned",
     "refreshEpisodesNone": "No new releases found ({scanned} results scanned).",
-    "refreshEpisodesError": "Could not refresh from indexers."
+    "refreshEpisodesError": "Could not refresh from indexers.",
+    "episodeNoSource": "No source found for this episode.",
+    "infoButton": "Info",
+    "seriesPathTitle": "Series path",
+    "seriesPathLabel": "Series folder",
+    "seedersShort": "seeders",
+    "leechersShort": "leechers"
   },
   "torrentStats": {
     "downloading": "Downloading",

@@ -192,6 +192,16 @@ export default function SeedingDiagnosticPanel() {
                 {t('settings.seedingDiagnostic.portHint')}
               </p>
             )}
+            {data?.upnp_enabled && data.listen_port != null && (data.warnings?.length ?? 0) > 0 && (
+              <div className="rounded-lg border border-amber-500/25 bg-amber-500/10 p-3 space-y-1">
+                <p className="text-sm font-semibold text-amber-200">
+                  {t('settings.seedingDiagnostic.doubleNatTipTitle')}
+                </p>
+                <p className="text-xs text-amber-100/80 leading-relaxed">
+                  {t('settings.seedingDiagnostic.doubleNatTip', { port: String(data.listen_port) })}
+                </p>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2">
               <a
                 href="https://www.popcornn.app/subscription"

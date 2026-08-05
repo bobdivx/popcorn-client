@@ -525,6 +525,8 @@ export function VideoPlayerWrapper({
           torrentStats={torrentStats ?? undefined}
           onCancel={handleClosePlayer}
           cancelLabel={t('downloads.cancelDownload')}
+          isHlsPreparing
+          hasVideoFiles={Boolean(selectedFile)}
         />
       </div>
     );

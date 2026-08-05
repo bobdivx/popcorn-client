@@ -253,6 +253,8 @@ export default function DirectVideoPlayer({
             bufferedPercent={bufferedPercent}
             message={bufferingMessage}
             torrentStats={torrentStats}
+            posterUrl={posterUrl}
+            imageUrl={posterUrl}
             onClose={onClose}
             closeLabel={t('playback.stopPlayback') || closeLabel}
           />

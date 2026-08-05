@@ -187,8 +187,9 @@ function mergeLibraryEpisodesIntoTmdbPayload(
             : ep.id,
         info_hash: lib.info_hash ?? ep.info_hash,
         file_size: lib.file_size > 0 ? lib.file_size : ep.file_size,
-        seed_count: lib.seed_count,
-        leech_count: lib.leech_count,
+        // Ne pas écraser les stats indexeur par des 0 bibliothèque
+        seed_count: lib.seed_count > 0 ? lib.seed_count : ep.seed_count,
+        leech_count: lib.leech_count > 0 ? lib.leech_count : ep.leech_count,
         file_path: lib.file_path ?? ep.file_path,
         is_from_multi_torrent: lib.is_from_multi_torrent || ep.is_from_multi_torrent,
       };

@@ -6,6 +6,10 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { TorrentStatusBadge } from '../torrents/ui';
 import { formatBytes, formatSpeed, formatETA } from '../../lib/utils/formatBytes';
 import { isTorrentActivelySeeding } from '../../lib/utils/torrentSeeding';
+import {
+  PLAYBACK_PHASE_I18N_KEYS,
+  derivePlaybackPhase,
+} from '../streaming/player-shared/derivePlaybackPhase';
 
 /** Nettoie le nom brut du torrent pour affichage (sans codec, résolution, etc.) */
 function cleanTorrentName(name: string | undefined): string {
@@ -42,15 +46,34 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
   const backdropUrl = backdropUrlProp ?? null;
   const displayTitle = (displayTitleProp && displayTitleProp.trim()) || cleanTorrentName(torrent.name) || torrent.name || '';
 
-  const progressColor = torrent.state === 'downloading' ? 'bg-[var(--ds-accent-violet)]' :
-                        torrent.state === 'seeding' ? 'bg-[var(--ds-accent-green)]' :
-                        torrent.state === 'completed' ? 'bg-[var(--ds-accent-green)]' :
-                        'bg-[var(--ds-surface-elevated)]';
+  const phaseDerived = derivePlaybackPhase({
+    playStatus:
+      torrent.state === 'queued'
+        ? 'adding'
+        : torrent.state === 'downloading'
+          ? 'downloading'
+          : torrent.state === 'error'
+            ? 'error'
+            : torrent.state === 'completed' || torrent.state === 'seeding'
+              ? 'ready'
+              : 'idle',
+    torrentStats: torrent,
+    isActiveSession: true,
+  });
+  const reliablePercent = phaseDerived.progressPercent ?? Math.round((torrent.progress ?? 0) * 1000) / 10;
+
+  const progressColor =
+    phaseDerived.phase === 'downloading' || phaseDerived.phase === 'findingPeers'
+      ? 'bg-primary-500'
+      : phaseDerived.phase === 'ready' || torrent.state === 'seeding' || torrent.state === 'completed'
+        ? 'bg-[var(--ds-accent-green)]'
+        : 'bg-[var(--ds-surface-elevated)]';
 
   const isActive = torrent.state === 'downloading' || torrent.state === 'seeding';
   const showPulse = isActive && (torrent.download_speed > 0 || torrent.upload_speed > 0);
   const showOverlay = isHovered || isFocused;
   const activeSeeding = isTorrentActivelySeeding(torrent);
+  const phaseLabel = t(PLAYBACK_PHASE_I18N_KEYS[phaseDerived.phase]) || '';
 
   return (
     <div
@@ -94,13 +117,24 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
           )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent z-10" />
 
-          {/* Badge d'état en haut à gauche */}
-          <div className="absolute left-3 top-3 z-20">
+          {/* Badge d'état glass (même vocabulaire que MediaDetail) */}
+          <div className="absolute left-3 top-3 z-20 flex flex-col gap-1.5 items-start">
             <TorrentStatusBadge
               state={torrent.state}
               seedingActive={activeSeeding}
-              className="px-2.5 py-1 rounded-full text-[10px] tv:text-xs font-bold tracking-wide bg-black/50 border border-white/15 text-white/90"
+              className="px-2.5 py-1 rounded-full text-[10px] tv:text-xs font-bold tracking-wide bg-black/45 border border-white/15 text-white/90 backdrop-blur-md"
             />
+            {phaseLabel &&
+            (phaseDerived.phase === 'findingPeers' ||
+              phaseDerived.phase === 'resolving' ||
+              phaseDerived.phase === 'downloading') ? (
+              <span className="px-2.5 py-1 rounded-full text-[10px] font-semibold tracking-wide bg-black/45 border border-white/12 text-white/80 backdrop-blur-md">
+                {phaseLabel}
+                {phaseDerived.phase === 'downloading' && reliablePercent != null
+                  ? ` · ${Math.round(reliablePercent)}%`
+                  : ''}
+              </span>
+            ) : null}
           </div>
 
           {/* Badges de stats, top right */}
@@ -140,11 +174,11 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
              <Film className="w-5 h-5 ml-0.5" strokeWidth={2} />
           </div>
 
-          {/* Barre de progression */}
+          {/* Barre de progression fiable */}
           <div className="absolute bottom-0 left-0 right-0 h-1 tv:h-1.5 bg-black/40 z-20">
             <div
-              className={`${progressColor} h-full transition-all duration-500 ${showPulse ? 'animate-[pulse_2s_ease-in-out_infinite]' : ''}`}
-              style={{ width: `${torrent.progress * 100}%` }}
+              className={`${progressColor} h-full transition-[width] duration-500 ease-out ${showPulse ? 'animate-[pulse_2s_ease-in-out_infinite]' : ''}`}
+              style={{ width: `${Math.min(100, Math.max(0, reliablePercent))}%` }}
             />
           </div>
         </div>
@@ -155,9 +189,15 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
           </div>
           
           <div className="flex flex-wrap items-center gap-[6px] text-[10px] sm:text-xs text-white/50 mt-1.5">
-            <span>{formatBytes(torrent.downloaded_bytes)} / {formatBytes(torrent.total_bytes)}</span>
+            <span>
+              {torrent.total_bytes > 0
+                ? `${formatBytes(torrent.downloaded_bytes)} / ${formatBytes(torrent.total_bytes)}`
+                : t('playback.metric.na')}
+            </span>
             <span className="w-1 h-1 rounded-full bg-white/20" />
-            <span className="font-medium text-white/70">{(torrent.progress * 100).toFixed(1)}%</span>
+            <span className="font-medium text-white/70 tabular-nums">
+              {reliablePercent != null ? `${reliablePercent.toFixed(1)}%` : t('playback.metric.na')}
+            </span>
             {torrent.eta_seconds && torrent.eta_seconds > 0 ? (
               <>
                 <span className="w-1 h-1 rounded-full bg-white/20" />

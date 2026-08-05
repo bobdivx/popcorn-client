@@ -370,6 +370,8 @@ export default function LuciePlayer({
             title={torrentName || fileName}
             bufferedPercent={bufferedPercent}
             torrentStats={torrentStats}
+            posterUrl={posterUrl}
+            imageUrl={posterUrl}
             onClose={onClose}
             closeLabel={t('playback.stopPlayback') || t('common.close')}
             badge="Lucie Player"

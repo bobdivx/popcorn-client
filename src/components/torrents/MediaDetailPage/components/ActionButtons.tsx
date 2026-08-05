@@ -1,3 +1,4 @@
+import { useState } from 'preact/hooks';
 import {
   Play,
   RotateCw,
@@ -6,17 +7,21 @@ import {
   Check,
   Trash2,
   Loader2,
-  XCircle,
   Radio,
   Bookmark,
   BookmarkCheck,
   RefreshCw,
+  Info,
 } from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
-import { TorrentProgressBar } from '../../ui';
 import { useI18n } from '../../../../lib/i18n/useI18n';
-import { formatBytes, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
+import {
+  derivePlaybackPhase,
+  isTorrentReallyComplete,
+} from '../../../streaming/player-shared/derivePlaybackPhase';
+import { PlaybackStatusSurface } from '../../../streaming/player-shared/components/PlaybackStatusSurface';
+import { Modal } from '../../../ui/Modal';
 
 interface ActionButtonsProps {
   torrent: MediaDetailPageProps['torrent'];
@@ -56,6 +61,8 @@ interface ActionButtonsProps {
     busy: boolean;
     onRefresh: () => void | Promise<void>;
   };
+  /** Dossier série (bibliothèque) — bouton Info + modal. */
+  seriesLibraryPath?: string | null;
 }
 
 function selectBestTorrent(variants: MediaDetailPageProps['torrent'][]): MediaDetailPageProps['torrent'] | null {
@@ -109,25 +116,40 @@ export function ActionButtons({
   onDeleteMedia,
   watchLater,
   seriesIndexerRefresh,
+  seriesLibraryPath,
 }: ActionButtonsProps) {
   const { t } = useI18n();
+  const [showSeriesPathModal, setShowSeriesPathModal] = useState(false);
   const hasSavedPosition = savedPlaybackPosition !== null && savedPlaybackPosition !== undefined && savedPlaybackPosition > 0;
 
   const stateLower = typeof torrentStats?.state === 'string' ? torrentStats.state.toLowerCase() : '';
-  const isDownloading = !!torrentStats && (stateLower === 'downloading' || stateLower === 'queued');
-  const isCompleted = !!torrentStats && (stateLower === 'completed' || stateLower === 'seeding');
-  const progressValue = typeof torrentStats?.progress === 'number' ? torrentStats.progress : 0;
-  const progressPercent = torrentStats ? Math.round(progressValue * 100) : 0;
-  const progressComplete = !!(torrentStats && torrentStats.progress >= 0.99);
-  const isDownloadComplete = isCompleted || progressComplete;
-  const isSeeding = !!torrentStats && stateLower === 'seeding';
-  // Après reboot, il arrive que le client remonte un état "queued/downloading" avec 0% et 0 octet,
-  // alors que le média existe déjà sur disque. Dans ce cas, on ne veut pas afficher la carte de progression
-  // (ni masquer le bouton Lire).
+  const phaseDerived = derivePlaybackPhase({
+    playStatus: downloadingToClient
+      ? 'adding'
+      : torrentStats
+        ? stateLower === 'queued'
+          ? 'adding'
+          : stateLower === 'downloading'
+            ? 'downloading'
+            : 'idle'
+        : 'idle',
+    torrentStats,
+    hasVideoFiles: isAvailableLocally,
+    isActiveSession: downloadingToClient || !!torrentStats,
+  });
+  const isDownloading =
+    phaseDerived.phase === 'downloading' ||
+    phaseDerived.phase === 'findingPeers' ||
+    phaseDerived.phase === 'resolving';
+  const isCompleted = isTorrentReallyComplete(torrentStats, { hasVideoFiles: isAvailableLocally });
+  const progressPercent =
+    phaseDerived.progressPercent != null ? Math.round(phaseDerived.progressPercent) : 0;
+  const isDownloadComplete = isCompleted || isAvailableLocally;
+  // Après reboot : état queued/downloading à 0% sans activité → ne pas masquer Lire.
   const looksStaleQueuedZero =
     !!torrentStats &&
     (stateLower === 'queued' || stateLower === 'downloading') &&
-    progressValue <= 0.001 &&
+    (phaseDerived.progressPercent ?? 0) <= 0.1 &&
     (torrentStats.downloaded_bytes ?? 0) === 0 &&
     (torrentStats.download_speed ?? 0) === 0 &&
     (torrentStats.peers_connected ?? 0) === 0;
@@ -137,17 +159,19 @@ export function ActionButtons({
     !isDownloadComplete &&
     !isAvailableLocally &&
     !looksStaleQueuedZero &&
-    (isDownloading ||
-      progressValue > 0 ||
-      (torrentStats.download_speed ?? 0) > 0 ||
-      (torrentStats.peers_connected ?? 0) > 0 ||
-      (torrentStats.downloaded_bytes ?? 0) > 0);
+    phaseDerived.isActivelyDownloading;
 
   const isDownloadInProgress =
-    ((!!torrentStats && !isDownloadComplete && !isAvailableLocally && !looksStaleQueuedZero) || downloadingToClient);
+    ((!!torrentStats && !isDownloadComplete && !isAvailableLocally && !looksStaleQueuedZero) ||
+      downloadingToClient);
   const showProgressInButton = hasActiveDownloadStats;
   const displayProgressPercent = hasActiveDownloadStats ? progressPercent : 0;
-  const showProgressNextToCancel = !isStreamingThisTorrent && (isDownloadInProgress && !!onCancelDownload && !!torrentStats) && hasActiveDownloadStats;
+  const showProgressNextToCancel =
+    !isStreamingThisTorrent &&
+    isDownloadInProgress &&
+    !!onCancelDownload &&
+    !!torrentStats &&
+    hasActiveDownloadStats;
 
   const isLocalTorrent =
     torrent.id?.startsWith('local_') ||
@@ -372,7 +396,7 @@ export function ActionButtons({
           </button>
         )}
 
-        {/* Nouveaux épisodes (indexeurs) — même rangée que Lire / Magnet / … */}
+        {/* Nouveaux épisodes (indexeurs) — icône seule */}
         {seriesIndexerRefresh && (
           <button
             type="button"
@@ -383,93 +407,80 @@ export function ActionButtons({
                 ? t('mediaDetail.refreshEpisodesBusy')
                 : t('mediaDetail.refreshEpisodesFromIndexers')
             }
+            aria-label={
+              seriesIndexerRefresh.busy
+                ? t('mediaDetail.refreshEpisodesBusy')
+                : t('mediaDetail.refreshEpisodesFromIndexers')
+            }
             aria-busy={seriesIndexerRefresh.busy}
             data-focusable
             tabIndex={0}
-            className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2 shrink-0 border border-white/15 bg-white/5 text-white/85 hover:bg-white/10 text-sm tv:text-lg disabled:opacity-50 disabled:pointer-events-none"
+            className="gtv-icon-btn ds-focus-glow ds-active-glow tv:w-16 tv:h-16 disabled:opacity-50 disabled:pointer-events-none"
           >
             <RefreshCw
-              className={`h-4 w-4 tv:h-6 tv:w-6 shrink-0 ${seriesIndexerRefresh.busy ? 'animate-spin' : ''}`}
+              className={`h-5 w-5 tv:h-7 tv:w-7 ${seriesIndexerRefresh.busy ? 'animate-spin' : ''}`}
               aria-hidden
             />
-            <span className="hidden sm:inline max-w-[11rem] tv:max-w-none truncate">
-              {seriesIndexerRefresh.busy
-                ? t('mediaDetail.refreshEpisodesBusy')
-                : t('mediaDetail.refreshEpisodesFromIndexers')}
-            </span>
+          </button>
+        )}
+
+        {/* Info — chemin dossier série (icône seule) */}
+        {seriesLibraryPath && (
+          <button
+            type="button"
+            onClick={() => setShowSeriesPathModal(true)}
+            data-focusable
+            tabIndex={0}
+            title={t('mediaDetail.seriesPathTitle')}
+            aria-label={t('mediaDetail.infoButton')}
+            className="gtv-icon-btn ds-focus-glow ds-active-glow tv:w-16 tv:h-16"
+          >
+            <Info className="h-5 w-5 tv:h-7 tv:w-7" aria-hidden />
           </button>
         )}
       </div>
 
-      {/* Carte progression en cours – sous la rangée de boutons pour ne pas déplacer les icônes */}
-      {showProgressNextToCancel && torrentStats && onCancelDownload && (
-        <div
-          className="flex items-center gap-3 min-w-[200px] max-w-[480px] w-full px-4 py-3.5 rounded-xl border border-violet-500/20 bg-gradient-to-r from-violet-950/60 to-black/40 backdrop-blur-md"
-          aria-label={t('downloads.progress')}
-        >
-          <div className="flex flex-col gap-1.5 flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-white/55 text-xs font-semibold uppercase tracking-wider truncate">
-                {torrentStats.state === 'queued' ? t('torrentStats.queued') : t('torrentStats.downloading')}
-              </span>
-              <span className="text-lg font-bold tabular-nums text-white shrink-0">{displayProgressPercent}%</span>
-            </div>
-            <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{
-                  width: `${Math.min(100, displayProgressPercent)}%`,
-                  background: 'linear-gradient(90deg, #7c3aed, #a78bfa)',
-                }}
-                role="progressbar"
-                aria-valuenow={displayProgressPercent}
-                aria-valuemin={0}
-                aria-valuemax={100}
-              />
-            </div>
-            <div className="flex items-center gap-2 text-xs text-white/40">
-              {(torrentStats.download_speed ?? 0) > 0 && (
-                <span>{((torrentStats.download_speed! / (1024 * 1024)).toFixed(1))} MB/s</span>
-              )}
-              {torrentStats.eta_seconds != null && torrentStats.eta_seconds > 0 && (
-                <span>· {formatTimeRemaining(torrentStats.eta_seconds)}</span>
-              )}
-              {torrentStats.total_bytes > 0 && (
-                <span>· {formatBytes(torrentStats.downloaded_bytes ?? 0)} / {formatBytes(torrentStats.total_bytes)}</span>
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onCancelDownload}
-            title={t('downloads.cancelDownload')}
-            aria-label={t('downloads.cancelDownload')}
-            data-focusable
-            data-media-detail-primary-action
-            className="gtv-icon-btn ds-focus-glow ds-active-glow shrink-0 min-w-11 min-h-11 text-white/60 hover:text-red-400"
-          >
-            <XCircle className="h-5 w-5" size={20} />
-          </button>
-        </div>
-      )}
-
-      {/* Barre de progression détaillée */}
-      {!isStreamingThisTorrent && hasActiveDownloadStats && torrentStats && !showProgressNextToCancel && (
-        <div className="px-4 py-3 rounded-xl border border-white/8 bg-white/3 backdrop-blur-sm">
-          <TorrentProgressBar
-            progress={torrentStats.progress}
-            downloadedBytes={torrentStats.downloaded_bytes}
-            totalBytes={torrentStats.total_bytes}
-            downloadSpeed={torrentStats.download_speed}
-            etaSeconds={torrentStats.eta_seconds ?? null}
-            statusLabel={torrentStats.state === 'queued' ? t('torrentStats.queued') : t('torrentStats.downloading')}
-            variant="full"
-            progressColor="blue"
+      {/* Carte progression glass – même dérivation que l’overlay */}
+      {!isStreamingThisTorrent &&
+        (showProgressNextToCancel || hasActiveDownloadStats) &&
+        torrentStats && (
+          <PlaybackStatusSurface
+            variant="inline"
+            playStatus={
+              phaseDerived.phase === 'resolving'
+                ? 'adding'
+                : phaseDerived.phase === 'findingPeers' || phaseDerived.phase === 'downloading'
+                  ? 'downloading'
+                  : 'downloading'
+            }
+            torrentStats={torrentStats}
+            posterUrl={torrent.imageUrl ?? null}
+            imageUrl={torrent.heroImageUrl ?? torrent.imageUrl ?? null}
+            title={torrent.cleanTitle || torrent.name || null}
+            isActiveSession
+            onCancel={onCancelDownload}
+            cancelLabel={t('downloads.cancelDownload')}
+            className="min-w-[200px] max-w-[520px] w-full"
           />
-          {torrentStats.status_reason && (
-            <p className="text-white/35 text-xs mt-1">{torrentStats.status_reason}</p>
-          )}
-        </div>
+        )}
+
+      {seriesLibraryPath && (
+        <Modal
+          isOpen={showSeriesPathModal}
+          onClose={() => setShowSeriesPathModal(false)}
+          title={t('mediaDetail.seriesPathTitle')}
+          size="lg"
+        >
+          <div className="space-y-3 pt-2">
+            <p className="text-sm text-white/60">{t('mediaDetail.seriesPathLabel')}</p>
+            <code
+              className="block w-full px-4 py-3 rounded-lg bg-white/5 border border-white/10 text-white/90 break-all font-mono text-xs sm:text-sm"
+              title={seriesLibraryPath}
+            >
+              {seriesLibraryPath}
+            </code>
+          </div>
+        </Modal>
       )}
 
     </div>
