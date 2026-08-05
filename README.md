@@ -102,7 +102,7 @@ Le dépôt fournit un `Dockerfile` (dossier `docker/`) qui construit une image n
 Depuis la racine du dépôt :
 
 ```bash
-docker build -f docker/Dockerfile -t popcorn-client .
+docker build -t popcorn-client .
 
 docker run -d \
   -p 8080:80 \
