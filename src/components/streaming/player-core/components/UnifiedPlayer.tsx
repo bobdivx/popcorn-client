@@ -66,6 +66,8 @@ export default function UnifiedPlayer({
           loadingStep={loadingStep}
           progressMessage={progressMessage}
           torrentStats={torrentStats}
+          posterUrl={hlsProps.posterUrl}
+          imageUrl={hlsProps.posterUrl}
           onCancel={onClose}
           cancelLabel={cancelLabel ?? closeLabel}
         />

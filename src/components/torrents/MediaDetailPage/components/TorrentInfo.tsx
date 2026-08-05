@@ -23,6 +23,8 @@ interface TorrentInfoProps {
   leechCount: number;
   fileSize: number;
   showSeederWarning?: boolean;
+  /** Série TV : masquer chemin fichier + stats globales (déplacées vers les cartes épisode). */
+  isSeries?: boolean;
   sources?: Array<{
     tracker: string;
     seeds: number;
@@ -56,7 +58,7 @@ function qualityBadgeClass(_resolution: string, isSelected: boolean): string {
   return 'glass-panel backdrop-blur-sm text-white/70 border-white/15 hover:text-white hover:border-white/30';
 }
 
-export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeederWarning = true, sources, allVariants, selectedVariantId, onSelectVariant }: TorrentInfoProps) {
+export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeederWarning = true, isSeries = false, sources, allVariants, selectedVariantId, onSelectVariant }: TorrentInfoProps) {
   const { language, t } = useI18n();
   const [isDownloadingTorrent, setIsDownloadingTorrent] = useState(false);
   const [seederAlertVisible, setSeederAlertVisible] = useState(true);
@@ -223,8 +225,8 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
 
   return (
     <div className="space-y-4">
-      {/* Chemin du fichier (média en bibliothèque / local) */}
-      {(torrent as any).downloadPath && (
+      {/* Chemin du fichier — films uniquement (séries : bouton Info → modal dossier série) */}
+      {!isSeries && (torrent as any).downloadPath && (
         <div className="mb-4">
           <div className="inline-flex flex-col gap-1 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm">
             <span className="font-semibold text-white/90">
@@ -345,8 +347,8 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
         </div>
       )}
 
-      {/* Avertissement éphémère si peu de seeders */}
-      {showSeederWarning && seedCount < 10 && seederAlertVisible && (
+      {/* Avertissement éphémère si peu de seeders (films uniquement) */}
+      {!isSeries && showSeederWarning && seedCount < 10 && seederAlertVisible && (
         <div
           className={`mb-4 p-3 rounded-lg flex items-start gap-3 transition-opacity duration-400 ${
             seederAlertFading ? 'opacity-0' : 'opacity-100'
@@ -372,45 +374,47 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
         </div>
       )}
 
-      {/* Statistiques */}
-      <div className="flex flex-wrap gap-6 text-sm mb-4">
-        <div className="flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${
-            seedCount >= 50 ? 'text-green-500' 
-            : seedCount >= 10 ? 'text-green-500'
-            : seedCount >= 1 ? 'text-amber-500'
-            : 'text-red-500'
-          }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span className={`font-semibold ${
-            seedCount >= 50 ? 'text-green-500' 
-            : seedCount >= 10 ? 'text-green-500'
-            : seedCount >= 1 ? 'text-amber-500'
-            : 'text-red-500'
-          }`}>{seedCount}</span>
-          <span className="text-white/70">{language === 'fr' ? 'seeders' : 'seeders'}</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <span className="text-yellow-500 font-semibold">{leechCount}</span>
-          <span className="text-white/70">{language === 'fr' ? 'leechers' : 'leechers'}</span>
-        </div>
-        <div className="text-white/70">
-          {formatSize(fileSize)}
-        </div>
-        {torrent.voteAverage && (
+      {/* Statistiques globales — films uniquement (séries : par carte épisode) */}
+      {!isSeries && (
+        <div className="flex flex-wrap gap-6 text-sm mb-4">
           <div className="flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${
+              seedCount >= 50 ? 'text-green-500'
+              : seedCount >= 10 ? 'text-green-500'
+              : seedCount >= 1 ? 'text-amber-500'
+              : 'text-red-500'
+            }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span className="text-yellow-400 font-semibold">{torrent.voteAverage.toFixed(1)}</span>
-            <span className="text-white/70">/10</span>
+            <span className={`font-semibold ${
+              seedCount >= 50 ? 'text-green-500'
+              : seedCount >= 10 ? 'text-green-500'
+              : seedCount >= 1 ? 'text-amber-500'
+              : 'text-red-500'
+            }`}>{seedCount}</span>
+            <span className="text-white/70">{language === 'fr' ? 'seeders' : 'seeders'}</span>
           </div>
-        )}
-      </div>
+          <div className="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-yellow-500 font-semibold">{leechCount}</span>
+            <span className="text-white/70">{language === 'fr' ? 'leechers' : 'leechers'}</span>
+          </div>
+          <div className="text-white/70">
+            {formatSize(fileSize)}
+          </div>
+          {torrent.voteAverage && (
+            <div className="flex items-center gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+              </svg>
+              <span className="text-yellow-400 font-semibold">{torrent.voteAverage.toFixed(1)}</span>
+              <span className="text-white/70">/10</span>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Métadonnées TMDB */}
       {(torrent.releaseDate || torrent.genres || torrent.runtime) && (

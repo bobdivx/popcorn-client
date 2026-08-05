@@ -30,11 +30,11 @@ export function EpisodeCardsGrid({ items, ariaLabel }: { items: EpisodeCardItem[
           >
             <div className="relative aspect-video w-full overflow-hidden bg-black/30">
               {it.thumbnailUrl ? (
-                <img src={it.thumbnailUrl} alt="" loading="lazy" className="absolute inset-0 w-full h-full object-cover" />
+                <img src={it.thumbnailUrl} alt="" loading="lazy" className="pointer-events-none absolute inset-0 w-full h-full object-cover" />
               ) : (
-                <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-black/40 to-black/80" />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/10 via-black/40 to-black/80" />
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
 
               <div className="absolute left-3 top-3 flex items-center gap-2">
                 <span className="px-2.5 py-1 rounded-full text-xs font-bold tracking-wide bg-black/50 border border-white/15 text-white/90">

@@ -6,8 +6,14 @@ export function shouldForceRegenerateScrub(data: {
   count: number;
   durationSeconds: number;
   intervalSeconds: number;
+  /** Si false, génération encore en cours — ne jamais forcer (effacerait le progrès). */
+  completed?: boolean;
 }): boolean {
-  const { count, durationSeconds, intervalSeconds } = data;
+  const { count, durationSeconds, intervalSeconds, completed } = data;
+
+  // Pendant une génération en cours, forcer = wipe + recommencer → bande vide.
+  if (completed === false) return false;
+
   const expected =
     durationSeconds > 0 ? Math.min(2000, Math.ceil(durationSeconds / 10)) : 0;
 

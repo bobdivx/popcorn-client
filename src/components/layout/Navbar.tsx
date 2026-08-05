@@ -266,28 +266,38 @@ export default function Navbar() {
             {user && useHamburger && mobileMenuOpen && (
               <div className="absolute top-full left-0 right-0 z-50 dropdown-menu-mobile animate-slide-down mt-1 mx-3 sm:mx-4 rounded-xl">
                 <div className="px-2 py-3 space-y-1">
-                  <a
-                    href="/settings/account"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center gap-3 px-4 py-3 rounded-lg text-white hover:bg-white/10 transition-all duration-200"
-                    tabIndex={0}
-                    data-focusable
-                    aria-label={t('nav.account')}
-                  >
-                    <Avatar
-                      email={user.email}
-                      displayName={profile.displayName}
-                      profile={profile}
-                      sizeClassName="w-10 h-10"
-                      shape="circle"
-                    />
-                    <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-lg text-white hover:bg-white/10 transition-all duration-200">
+                    <ConnectivityWarning>
+                      <a
+                        href="/settings/account"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="rounded-full"
+                        tabIndex={0}
+                        data-focusable
+                        aria-label={t('nav.account')}
+                      >
+                        <Avatar
+                          email={user.email}
+                          displayName={profile.displayName}
+                          profile={profile}
+                          sizeClassName="w-10 h-10"
+                          shape="circle"
+                        />
+                      </a>
+                    </ConnectivityWarning>
+                    <a
+                      href="/settings/account"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="min-w-0 flex-1"
+                      tabIndex={0}
+                      data-focusable
+                    >
                       <p className="font-semibold truncate">{profile.displayName || user.email}</p>
                       {profile.displayName && user.email && (
                         <p className="text-xs text-white/60 truncate">{user.email}</p>
                       )}
-                    </div>
-                  </a>
+                    </a>
+                  </div>
                   <div className="border-t border-white/10 my-1" aria-hidden />
                   <BackendStatusBadge variant="inline" />
                   <div className="border-t border-white/10 my-1" aria-hidden />
@@ -360,9 +370,6 @@ export default function Navbar() {
               </button>
             )}
 
-              {/* ConnectivityWarning est maintenant géré en floating fixed via son propre composant */}
-              <ConnectivityWarning />
-
             {user ? (
               <>
                 {/* Recherche — toujours visible */}
@@ -432,22 +439,24 @@ export default function Navbar() {
                   </a>
                 )}
 
-                {/* Avatar — lg+ uniquement (dans hamburger sinon) */}
-                <a
-                  href="/settings/account"
-                  className="hidden lg:block nav-avatar-btn flex-shrink-0 rounded-full overflow-hidden transition-all duration-200 hover:scale-105 hover:ring-2 hover:ring-primary-500/70 hover:ring-offset-1 hover:ring-offset-black focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-accent-violet)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-surface-elevated)] active:scale-95 w-10 h-10 lg:w-11 lg:h-11 tv:w-12 tv:h-12"
-                  tabIndex={0}
-                  data-focusable
-                  aria-label={t('nav.account')}
-                >
-                  <Avatar
-                    email={user.email}
-                    displayName={profile.displayName}
-                    profile={profile}
-                    sizeClassName="w-full h-full"
-                    shape="circle"
-                  />
-                </a>
+                {/* Avatar — lg+ uniquement (dans hamburger sinon) ; pastille notif partage si besoin */}
+                <ConnectivityWarning className="hidden lg:inline-flex flex-shrink-0">
+                  <a
+                    href="/settings/account"
+                    className="nav-avatar-btn rounded-full overflow-hidden transition-all duration-200 hover:scale-105 hover:ring-2 hover:ring-primary-500/70 hover:ring-offset-1 hover:ring-offset-black focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-accent-violet)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-surface-elevated)] active:scale-95 w-10 h-10 lg:w-11 lg:h-11 tv:w-12 tv:h-12 block"
+                    tabIndex={0}
+                    data-focusable
+                    aria-label={t('nav.account')}
+                  >
+                    <Avatar
+                      email={user.email}
+                      displayName={profile.displayName}
+                      profile={profile}
+                      sizeClassName="w-full h-full"
+                      shape="circle"
+                    />
+                  </a>
+                </ConnectivityWarning>
 
                 {/* Horloge — lg+ */}
                 <div className="hidden lg:flex items-center pl-1 tv:pl-3">

@@ -112,6 +112,13 @@
     "newReplyBody": "Vous avez reçu une nouvelle réponse à votre feedback",
     "unread": "non lu(s)"
   },
+  "connectivity": {
+    "warningTitle": "Problème de partage détecté",
+    "errorTitle": "Erreur de connexion BitTorrent",
+    "defaultDetail": "Vérifiez la configuration de vos ports.",
+    "openDiagnostic": "Ouvrir le diagnostic partage",
+    "dismiss": "Masquer la notification"
+  },
   "backend": {
     "badgeTitleOk": "Serveur backend démarré",
     "badgeTitleError": "Serveur backend arrêté ou erreur",
@@ -544,6 +551,33 @@
     "loadingVideo": "Chargement de la vidéo…",
     "preparingStream": "Préparation de la lecture en cours…",
     "streamPreparingRetry": "Préparation du flux, nouvelle tentative…",
+    "phase": {
+      "idle": "",
+      "resolving": "Connexion au torrent…",
+      "findingPeers": "Recherche de peers…",
+      "downloading": "Téléchargement",
+      "preparingPlayback": "Préparation de la lecture…",
+      "buffering": "Mise en buffer…",
+      "ready": "Prêt",
+      "error": "Erreur"
+    },
+    "metric": {
+      "downloaded": "Téléchargé",
+      "speed": "Vitesse",
+      "eta": "Temps restant",
+      "peers": "Peers",
+      "na": "—"
+    },
+    "step": {
+      "queue": "File",
+      "metadata": "Métadonnées",
+      "peers": "Peers",
+      "download": "Téléchargement"
+    },
+    "continueInBackground": "Continuer en arrière-plan",
+    "showDebug": "Afficher debug",
+    "hideDebug": "Masquer debug",
+
     "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct.",
     "errorStream": "Impossible de lire la vidéo. Vérifiez la connexion au serveur.",
     "errorStreamDetailAborted": "Chargement de la vidéo interrompu.",
@@ -871,6 +905,8 @@
       "testPortExternal": "Tester le port (canyouseeme.org)",
       "listenPort": "Port TCP (rqbit)",
       "portHintWithPort": "Ouvrez le port {port} en TCP et UDP sur votre box/routeur pour permettre les connexions entrantes (partage / ratio). En cas de double NAT (box + routeur), configurez la redirection sur les deux appareils. Testez avec l'outil ci-dessous.",
+      "doubleNatTipTitle": "Double NAT détecté souvent chez vous",
+      "doubleNatTip": "Si UPnP est activé mais le port reste fermé : 1) sur le routeur interne, redirigez TCP/UDP {port} vers le PC ; 2) sur la box ISP, redirigez le même port vers l’IP WAN du routeur (ou activez la DMZ / le mode bridge). Sans cela, les pairs ne peuvent pas se connecter.",
       "enableRatioModeNow": "Activer le mode compatibilité tracker (maintenant)",
       "enableRatioModeHint": "Applique RQBIT_TRACKER_MODE pour la session en cours (sans redémarrer le serveur). Pour le conserver après un reboot, ajoutez tracker_mode = true dans config.toml, ou TRACKER_MODE=1 / RQBIT_TRACKER_MODE=1 dans l’environnement, ou utilisez la page Ratio ci-dessous.",
       "ratioSettingsLink": "Ouvrir la page Ratio / tracker (réglages détaillés)",
@@ -1127,7 +1163,13 @@
     "refreshEpisodesBusy": "Recherche sur les indexeurs…",
     "refreshEpisodesSuccess": "{imported} variante(s) importée(s) · {scanned} résultat(s) analysés",
     "refreshEpisodesNone": "Aucune nouvelle variante trouvée ({scanned} résultats analysés).",
-    "refreshEpisodesError": "Impossible de mettre à jour depuis les indexeurs."
+    "refreshEpisodesError": "Impossible de mettre à jour depuis les indexeurs.",
+    "episodeNoSource": "Aucune source trouvée pour cet épisode.",
+    "infoButton": "Info",
+    "seriesPathTitle": "Chemin de la série",
+    "seriesPathLabel": "Dossier de la série",
+    "seedersShort": "seeders",
+    "leechersShort": "leechers"
   },
   "torrentStats": {
     "downloading": "Téléchargement en cours",

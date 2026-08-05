@@ -37,7 +37,6 @@ export function EpisodesArea(props: {
   /** Sélection d’un épisode (saison + id) — le parent gère saison et lecture au clic. */
   onSelectEpisode: (episodeVariantId: string) => void;
   savedPlaybackPosition: number | null;
-  episodesInLibraryCount?: number;
   downloadedEpisodesSet?: Set<string>;
   downloadingEpisodesMap?: Record<string, number>;
 
@@ -69,7 +68,6 @@ export function EpisodesArea(props: {
     selectedEpisodeVariantId,
     onSelectEpisode,
     savedPlaybackPosition,
-    episodesInLibraryCount,
     downloadedEpisodesSet,
     isPackSelected,
     videoFilesCount,
@@ -132,7 +130,6 @@ export function EpisodesArea(props: {
           selectedEpisodeVariantId={selectedEpisodeVariantId}
           onSelectEpisode={onSelectEpisode}
           savedPlaybackPosition={savedPlaybackPosition}
-          episodesInLibraryCount={episodesInLibraryCount}
           downloadedEpisodesSet={downloadedEpisodesSet}
           watchedSet={watchedSet}
           isTV={isTV}
