@@ -110,7 +110,7 @@ export function ScrubThumbnailsStrip({
       >
         <ScrubThumbnailImage
           src={getScrubUrlForIndex(idx)}
-          loading={selected ? 'eager' : 'lazy'}
+          loading="eager"
           fetchPriority={selected ? 'high' : 'low'}
           retryWhileLoading={scrubThumbnailsLoading}
         />

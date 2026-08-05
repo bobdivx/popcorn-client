@@ -3,7 +3,26 @@ import { useI18n } from '../../../../lib/i18n/useI18n';
 import type { SeriesEpisodesResponse } from '../../../../lib/client/server-api/media';
 import { serverApi } from '../../../../lib/client/server-api';
 import { watchedEpisodeKey } from '../../../../lib/streaming/torrent-storage';
+import { isGenericEpisodeName } from '../utils/isGenericEpisodeName';
 import { EpisodeCardsCarousel } from './EpisodeCardsCarousel';
+
+function extractTmdbStillsAndNames(
+  seasonNum: number,
+  episodes: Array<{ episode_number?: number; still_path?: string | null; name?: string | null }>,
+): { stills: Record<string, string>; names: Record<string, string> } {
+  const stills: Record<string, string> = {};
+  const names: Record<string, string> = {};
+  for (const ep of episodes) {
+    const num = typeof ep?.episode_number === 'number' ? ep.episode_number : null;
+    if (num == null || num <= 0) continue;
+    const key = `${seasonNum}:${num}`;
+    const stillPath = typeof ep?.still_path === 'string' ? ep.still_path : null;
+    if (stillPath) stills[key] = `https://image.tmdb.org/t/p/w780${stillPath}`;
+    const episodeName = typeof ep?.name === 'string' ? ep.name.trim() : '';
+    if (episodeName && !isGenericEpisodeName(episodeName, num)) names[key] = episodeName;
+  }
+  return { stills, names };
+}
 
 export interface SeriesEpisodesSectionProps {
   seriesEpisodes: SeriesEpisodesResponse;
@@ -11,8 +30,6 @@ export interface SeriesEpisodesSectionProps {
   selectedEpisodeVariantId: string | null;
   onSelectEpisode: (episodeVariantId: string) => void;
   savedPlaybackPosition: number | null;
-  /** Nombre d'épisodes en bibliothèque (série depuis library) */
-  episodesInLibraryCount?: number;
   downloadedEpisodesSet?: Set<string>;
   watchedSet?: Set<string>;
   isTV?: boolean;
@@ -32,7 +49,6 @@ export function SeriesEpisodesSection({
   selectedEpisodeVariantId,
   onSelectEpisode,
   savedPlaybackPosition,
-  episodesInLibraryCount,
   downloadedEpisodesSet,
   watchedSet,
   isTV,
@@ -41,7 +57,7 @@ export function SeriesEpisodesSection({
   statusMessage,
   downloadingEpisodesMap,
 }: SeriesEpisodesSectionProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const hasSavedPosition = savedPlaybackPosition != null && savedPlaybackPosition > 0;
   /** Clés : `${season}:${episodeNumber}` (TMDB par saison ; numéros d'épisode peuvent se répéter entre saisons). */
   const [tmdbStillBySeasonEpisode, setTmdbStillBySeasonEpisode] = useState<Record<string, string>>({});
@@ -51,6 +67,8 @@ export function SeriesEpisodesSection({
     () => seriesEpisodes.seasons.map((s) => s.season).join(','),
     [seriesEpisodes.seasons],
   );
+
+  const tmdbLanguage = language === 'en' ? 'en-US' : 'fr-FR';
 
   useEffect(() => {
     let cancelled = false;
@@ -70,19 +88,29 @@ export function SeriesEpisodesSection({
       const names: Record<string, string> = {};
       await Promise.all(
         seasons.map(async (seasonNum) => {
-          const res = await serverApi.getTmdbTvSeasonDetail(tmdbId, seasonNum, 'fr-FR');
+          const primary = await serverApi.getTmdbTvSeasonDetail(tmdbId, seasonNum, tmdbLanguage);
           if (cancelled) return;
-          if (!res?.success || !res.data) return;
-          const episodes = Array.isArray(res.data.episodes) ? res.data.episodes : [];
-          for (const ep of episodes) {
-            const num = typeof ep?.episode_number === 'number' ? ep.episode_number : null;
-            const stillPath = typeof ep?.still_path === 'string' ? ep.still_path : null;
-            if (num && stillPath) {
-              merged[`${seasonNum}:${num}`] = `https://image.tmdb.org/t/p/w780${stillPath}`;
-            }
-            if (num) {
-              const episodeName = typeof ep?.name === 'string' ? ep.name.trim() : '';
-              if (episodeName) names[`${seasonNum}:${num}`] = episodeName;
+          const primaryEps = primary?.success && primary.data && Array.isArray(primary.data.episodes)
+            ? primary.data.episodes
+            : [];
+          const extracted = extractTmdbStillsAndNames(seasonNum, primaryEps);
+          Object.assign(merged, extracted.stills);
+          Object.assign(names, extracted.names);
+
+          // Titres FR souvent « Épisode N » non traduits → fallback en-US
+          const missing = primaryEps
+            .map((ep: { episode_number?: number }) => ep?.episode_number)
+            .filter((n: number | undefined): n is number => typeof n === 'number' && n > 0)
+            .filter((n: number) => !names[`${seasonNum}:${n}`]);
+          if (missing.length > 0 && !tmdbLanguage.startsWith('en')) {
+            const en = await serverApi.getTmdbTvSeasonDetail(tmdbId, seasonNum, 'en-US');
+            if (cancelled) return;
+            if (en?.success && en.data && Array.isArray(en.data.episodes)) {
+              const enNames = extractTmdbStillsAndNames(seasonNum, en.data.episodes).names;
+              for (const n of missing) {
+                const key = `${seasonNum}:${n}`;
+                if (enNames[key]) names[key] = enNames[key];
+              }
             }
           }
         }),
@@ -95,7 +123,7 @@ export function SeriesEpisodesSection({
     return () => {
       cancelled = true;
     };
-  }, [tmdbId, seasonListKey]);
+  }, [tmdbId, seasonListKey, tmdbLanguage]);
 
   const getPreferredThumb = useMemo(() => {
     return (seasonNum: number, episodeNumber: number | null, fallback: string | null) => {
@@ -107,44 +135,8 @@ export function SeriesEpisodesSection({
     };
   }, [tmdbStillBySeasonEpisode]);
 
-  const currentEpisode = useMemo(() => {
-    for (const s of seriesEpisodes.seasons) {
-      const e = s.episodes.find((x) => x.id === selectedEpisodeVariantId);
-      if (e) return e;
-    }
-    return null;
-  }, [seriesEpisodes.seasons, selectedEpisodeVariantId]);
-
   return (
     <div className="space-y-8">
-      {episodesInLibraryCount != null && episodesInLibraryCount > 0 && (
-        <p className="text-sm text-white/70">
-          {episodesInLibraryCount === 1
-            ? t('library.episodesInLibrary', { count: 1 })
-            : t('library.episodesInLibrary_plural', { count: episodesInLibraryCount })}
-        </p>
-      )}
-
-      {hasSavedPosition && currentEpisode && (
-        <div
-          className="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl bg-white/10 border border-white/20 backdrop-blur-sm"
-          role="region"
-          aria-label={t('dashboard.resumeWatching')}
-        >
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white/80 mb-0.5">{t('dashboard.resumeWatching')}</p>
-            <p className="text-lg font-semibold text-white truncate">
-              {currentEpisode.episode === 0
-                ? t('mediaDetail.fullPack')
-                : t('mediaDetail.episodeWithTitle', {
-                    number: currentEpisode.episode,
-                    title: currentEpisode.name || t('mediaDetail.episodeNumber', { number: currentEpisode.episode }),
-                  })}
-            </p>
-          </div>
-        </div>
-      )}
-
       {seriesEpisodes.seasons.map((seasonData) => {
         const seasonNum = seasonData.season;
         const episodes = seasonData.episodes ?? [];
@@ -167,20 +159,29 @@ export function SeriesEpisodesSection({
             </div>
             <EpisodeCardsCarousel
               ariaLabel={`${t('mediaDetail.seasonNumber', { number: seasonNum })} — ${t('mediaDetail.episodes')}`}
-              items={episodes.map((ep) => {
+              items={(() => {
+                const seasonHasPackSource = episodes.some((e) => {
+                  if (e.episode !== 0) return false;
+                  const packIndexerId =
+                    typeof e.id === 'string' &&
+                    e.id.trim().length > 0 &&
+                    !e.id.startsWith('popcorn_tmdb_');
+                  return Boolean(e.info_hash) || packIndexerId;
+                });
+                return episodes.map((ep) => {
                 const epKey = `${ep.season}:${ep.episode}`;
                 const downloaded = downloadedEpisodesSet?.has(epKey) ?? false;
                 const isSelected = selectedEpisodeVariantId === ep.id;
                 const tmdbEpisodeName =
                   ep.episode === 0 ? null : tmdbNameBySeasonEpisode[`${ep.season}:${ep.episode}`] ?? null;
+                const apiName = ep.name?.trim() || '';
+                const usableApiName =
+                  apiName && !isGenericEpisodeName(apiName, ep.episode) ? apiName : null;
+                const episodeTitle = tmdbEpisodeName || usableApiName;
                 const title =
                   ep.episode === 0
                     ? t('mediaDetail.fullPack')
-                    : tmdbEpisodeName
-                      ? t('mediaDetail.episodeWithTitle', { number: ep.episode, title: tmdbEpisodeName })
-                      : ep.name?.trim()
-                        ? t('mediaDetail.episodeWithTitle', { number: ep.episode, title: ep.name })
-                      : t('mediaDetail.episodeNumber', { number: ep.episode });
+                    : episodeTitle || t('mediaDetail.episodeNumber', { number: ep.episode });
 
                 const watched =
                   typeof tmdbId === 'number' && ep.episode > 0
@@ -191,10 +192,17 @@ export function SeriesEpisodesSection({
                   typeof ep.id === 'string' &&
                   ep.id.trim().length > 0 &&
                   !ep.id.startsWith('popcorn_tmdb_');
+                // Pack MULTI : les épisodes 1..N n'ont pas de release dédiée mais le pack (ep 0) oui.
+                const availableViaSeasonPack = ep.episode > 0 && seasonHasPackSource;
                 const downloadingProgress = downloadingEpisodesMap?.[epKey];
                 const currentlyDownloading = downloadingProgress !== undefined;
 
                   const finalIsDownloaded = !!ep.file_path || downloaded;
+                  // Stats pairs : uniquement si > 0 (bibliothèque locale → souvent 0, inutile d’afficher).
+                  const seedCount =
+                    typeof ep.seed_count === 'number' && ep.seed_count > 0 ? ep.seed_count : undefined;
+                  const leechCount =
+                    typeof ep.leech_count === 'number' && ep.leech_count > 0 ? ep.leech_count : undefined;
                   return {
                     key: ep.id,
                     episodeNumber: ep.episode === 0 ? '—' : ep.episode,
@@ -210,7 +218,12 @@ export function SeriesEpisodesSection({
                     watched,
                     // Un épisode déjà en bibliothèque doit apparaître comme disponible même
                     // si l'API séries n'a pas encore renseigné info_hash sur cet item.
-                    isAvailable: !!ep.info_hash || downloaded || hasIndexerVariant || currentlyDownloading,
+                    isAvailable:
+                      !!ep.info_hash ||
+                      downloaded ||
+                      hasIndexerVariant ||
+                      availableViaSeasonPack ||
+                      currentlyDownloading,
                     isDownloaded: finalIsDownloaded,
                     isDownloading: !finalIsDownloaded && ((isSelected ? isDownloading : false) || currentlyDownloading),
                     downloadProgress: isSelected && downloadProgress !== undefined ? downloadProgress : (currentlyDownloading ? downloadingProgress : undefined),
@@ -219,11 +232,15 @@ export function SeriesEpisodesSection({
                       : currentlyDownloading
                         ? 'Téléchargement…'
                         : null,
+                    seedCount,
+                    leechCount,
+                    canResume: isSelected && hasSavedPosition,
                   isSelected,
                   onSelect: () => onSelectEpisode(ep.id),
                   isTV,
                 };
-              })}
+              });
+              })()}
             />
           </section>
         );

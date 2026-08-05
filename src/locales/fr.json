@@ -544,6 +544,33 @@
     "loadingVideo": "Chargement de la vidéo…",
     "preparingStream": "Préparation de la lecture en cours…",
     "streamPreparingRetry": "Préparation du flux, nouvelle tentative…",
+    "phase": {
+      "idle": "",
+      "resolving": "Connexion au torrent…",
+      "findingPeers": "Recherche de peers…",
+      "downloading": "Téléchargement",
+      "preparingPlayback": "Préparation de la lecture…",
+      "buffering": "Mise en buffer…",
+      "ready": "Prêt",
+      "error": "Erreur"
+    },
+    "metric": {
+      "downloaded": "Téléchargé",
+      "speed": "Vitesse",
+      "eta": "Temps restant",
+      "peers": "Peers",
+      "na": "—"
+    },
+    "step": {
+      "queue": "File",
+      "metadata": "Métadonnées",
+      "peers": "Peers",
+      "download": "Téléchargement"
+    },
+    "continueInBackground": "Continuer en arrière-plan",
+    "showDebug": "Afficher debug",
+    "hideDebug": "Masquer debug",
+
     "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct.",
     "errorStream": "Impossible de lire la vidéo. Vérifiez la connexion au serveur.",
     "errorStreamDetailAborted": "Chargement de la vidéo interrompu.",
@@ -1127,7 +1154,13 @@
     "refreshEpisodesBusy": "Recherche sur les indexeurs…",
     "refreshEpisodesSuccess": "{imported} variante(s) importée(s) · {scanned} résultat(s) analysés",
     "refreshEpisodesNone": "Aucune nouvelle variante trouvée ({scanned} résultats analysés).",
-    "refreshEpisodesError": "Impossible de mettre à jour depuis les indexeurs."
+    "refreshEpisodesError": "Impossible de mettre à jour depuis les indexeurs.",
+    "episodeNoSource": "Aucune source trouvée pour cet épisode.",
+    "infoButton": "Info",
+    "seriesPathTitle": "Chemin de la série",
+    "seriesPathLabel": "Dossier de la série",
+    "seedersShort": "seeders",
+    "leechersShort": "leechers"
   },
   "torrentStats": {
     "downloading": "Téléchargement en cours",

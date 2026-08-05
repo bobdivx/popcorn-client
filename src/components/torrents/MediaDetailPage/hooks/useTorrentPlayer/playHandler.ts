@@ -7,6 +7,7 @@ import {
   buildExternalDownloadParams,
   shouldAvoidBareMagnetFallback,
 } from '../../../../../lib/torrents/externalDownloadParams';
+import { isTorrentReallyComplete } from '../../../../streaming/player-shared/derivePlaybackPhase';
 import { PROGRESS_POLL_INTERVAL_MS } from '../../utils/constants';
 import { resolveDownloadTypeHeader } from '../../utils/resolveDownloadTypeHeader';
 import type { PlayHandlerContext } from './types';
@@ -155,10 +156,16 @@ export function createHandlePlay(context: PlayHandlerContext) {
       if (isPlayCancelled()) return;
       if (forStreaming && torrent.infoHash) setStreamingInfoHash(torrent.infoHash);
     };
+    const hasExternalSource = !!(
+      (typeof torrent._externalLink === 'string' && torrent._externalLink.trim()) ||
+      (typeof torrent._externalMagnetUri === 'string' && torrent._externalMagnetUri.trim())
+    );
     addDebugLog('info', '🎯 === DÉBUT: Clic sur bouton Lire ===', {
       hasInfoHash,
       isExternal,
+      hasExternalSource,
       hasMagnetLink,
+      torrentId: torrent.id,
       playGen,
     });
 
@@ -226,10 +233,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
       }
     }
 
-    // PRIORITÉ 1: Vérifier si le torrent existe dans le client (avec réessais en cas de 404 temporaire).
-    // Variant externe avec lien .torrent ou magnet : on va l'ajouter, ne pas appeler getTorrent (évite 404 en console).
-    const isExternalWillAdd = isExternal && (torrent._externalLink || torrent._externalMagnetUri);
-    if (hasInfoHash && torrent.infoHash && !isExternalWillAdd) {
+    // PRIORITÉ 1: Vérifier si le torrent existe déjà dans le client (réessais si 404 temporaire).
+    // Toujours tenter getTorrent d'abord — même pour les variantes sync/indexeur avec _externalLink
+    // (id UUID/slug, pas forcément préfixe external_*).
+    if (hasInfoHash && torrent.infoHash) {
       try {
         let stats = await clientApi.getTorrent(torrent.infoHash);
         const maxGetTorrentRetries = 3;
@@ -244,7 +251,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
             progress: `${(stats.progress * 100).toFixed(1)}%`,
           });
           
-          const isCompleted = stats.state === 'completed' || stats.state === 'seeding' || stats.progress >= 0.95;
+          const isCompleted = isTorrentReallyComplete(stats) || stats.state === 'completed' || stats.state === 'seeding';
           
           // Si le torrent est complété, essayer de charger les fichiers avec plusieurs tentatives
           if (isCompleted) {
@@ -349,9 +356,9 @@ export function createHandlePlay(context: PlayHandlerContext) {
       }
     }
 
-    // Pour un torrent externe avec infoHash, prioriser le fichier .torrent s'il est disponible
-    // car il contient tous les trackers (important pour les trackers privés comme C411)
-    if (isExternal && hasInfoHash && torrent.infoHash) {
+    // Torrent indexeur (sync DB ou external_*) pas encore dans le client : ajouter via .torrent / magnet.
+    // Ne pas exiger id.startsWith('external_') — les variantes sync ont un id UUID/slug.
+    if (hasExternalSource && hasInfoHash && torrent.infoHash) {
       addDebugLog('info', '🔍 Vérification des liens disponibles', {
         hasExternalLink: !!torrent._externalLink,
         externalLink: torrent._externalLink ? (torrent._externalLink.substring(0, 100) + '...') : null,
@@ -901,8 +908,9 @@ export function createHandlePlay(context: PlayHandlerContext) {
       }
     }
 
-    // Si on a déjà un infoHash (torrent local ou déjà ajouté), vérifier d'abord si les fichiers vidéo existent
-    if (hasInfoHash && torrent.infoHash && !isExternal) {
+    // Si on a déjà un infoHash (torrent local ou déjà ajouté), vérifier d'abord si les fichiers vidéo existent.
+    // Les sources indexeur viennent d'être tentées plus haut si absentes du client.
+    if (hasInfoHash && torrent.infoHash && !hasExternalSource) {
       // Détecter si c'est un média local
       const isLocalMedia = torrent.infoHash.startsWith('local_');
       
@@ -956,7 +964,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
           });
           setTorrentStats(stats);
 
-          if (stats.state === 'seeding' || stats.state === 'completed' || stats.progress >= 0.95) {
+          if (isTorrentReallyComplete(stats) || stats.state === 'seeding' || stats.state === 'completed') {
             addDebugLog('info', '📚 Torrent terminé, chargement des fichiers vidéo...');
             const videos2 = await loadVideoFiles(torrent.infoHash);
             if (videos2.length > 0) {
@@ -1002,9 +1010,10 @@ export function createHandlePlay(context: PlayHandlerContext) {
       }
     }
 
-    // Torrent externe ou indexeur avec magnet (sans infoHash) : ajouter via magnet puis lancer la lecture
+    // Magnet (avec ou sans infoHash) : fallback si le torrent n'est pas encore dans le client
+    // et que l'ajout via fichier .torrent n'a pas abouti / n'était pas possible.
     const magnetUri = torrent._externalMagnetUri || (torrent._externalLink?.startsWith('magnet:') ? torrent._externalLink : null);
-    if ((isExternal || !hasInfoHash) && magnetUri) {
+    if (magnetUri) {
       setPlayStatus('adding');
       setProgressMessage('Ajout du lien magnet...');
       addDebugLog('info', 'Utilisation du magnet link direct');

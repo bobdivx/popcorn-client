@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 
-const RETRY_DELAY_MS = 1500;
+const RETRY_DELAY_MS = 1200;
+/** Quelques retries même hors génération (404 transitoire / swap force). */
+const MAX_IDLE_RETRIES = 4;
 
 export function ScrubThumbnailSkeleton() {
   return (
@@ -27,8 +29,15 @@ export function ScrubThumbnailImage({
   const [loaded, setLoaded] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const loadedSrcRef = useRef<string | null>(null);
 
   useEffect(() => {
+    // Même URL logique (sans cache-buster) déjà affichée → pas de flash skeleton.
+    if (loadedSrcRef.current === src) {
+      setLoaded(true);
+      setAttempt(0);
+      return;
+    }
     setLoaded(false);
     setAttempt(0);
   }, [src]);
@@ -47,17 +56,18 @@ export function ScrubThumbnailImage({
       clearTimeout(retryTimeoutRef.current);
       retryTimeoutRef.current = null;
     }
+    loadedSrcRef.current = src;
     setLoaded(true);
   };
 
   const handleError = () => {
     setLoaded(false);
-    if (retryWhileLoading) {
-      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = setTimeout(() => {
-        setAttempt((n) => n + 1);
-      }, RETRY_DELAY_MS);
-    }
+    const canRetry = retryWhileLoading || attempt < MAX_IDLE_RETRIES;
+    if (!canRetry) return;
+    if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+    retryTimeoutRef.current = setTimeout(() => {
+      setAttempt((n) => n + 1);
+    }, RETRY_DELAY_MS);
   };
 
   return (

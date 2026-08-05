@@ -544,6 +544,32 @@
     "loadingVideo": "Loading video…",
     "preparingStream": "Preparing playback…",
     "streamPreparingRetry": "Preparing stream, retrying…",
+    "phase": {
+      "idle": "",
+      "resolving": "Connecting to torrent…",
+      "findingPeers": "Looking for peers…",
+      "downloading": "Downloading",
+      "preparingPlayback": "Preparing playback…",
+      "buffering": "Buffering…",
+      "ready": "Ready",
+      "error": "Error"
+    },
+    "metric": {
+      "downloaded": "Downloaded",
+      "speed": "Speed",
+      "eta": "Time left",
+      "peers": "Peers",
+      "na": "—"
+    },
+    "step": {
+      "queue": "Queue",
+      "metadata": "Metadata",
+      "peers": "Peers",
+      "download": "Download"
+    },
+    "continueInBackground": "Continue in background",
+    "showDebug": "Show debug",
+    "hideDebug": "Hide debug",
     "streamingFallbackToHls": "Switched to HLS playback due to direct stream issue.",
     "errorStream": "Unable to play video. Check server connection.",
     "errorStreamDetailAborted": "Video loading was aborted.",
@@ -1124,7 +1150,13 @@
     "refreshEpisodesBusy": "Searching indexers…",
     "refreshEpisodesSuccess": "{imported} release(s) imported · {scanned} result(s) scanned",
     "refreshEpisodesNone": "No new releases found ({scanned} results scanned).",
-    "refreshEpisodesError": "Could not refresh from indexers."
+    "refreshEpisodesError": "Could not refresh from indexers.",
+    "episodeNoSource": "No source found for this episode.",
+    "infoButton": "Info",
+    "seriesPathTitle": "Series path",
+    "seriesPathLabel": "Series folder",
+    "seedersShort": "seeders",
+    "leechersShort": "leechers"
   },
   "torrentStats": {
     "downloading": "Downloading",
