@@ -1468,7 +1468,13 @@ export default function MediaDetailRoute() {
             const hasNoVariants = !data || !data.variants || (Array.isArray(data.variants) && data.variants.length === 0);
             if (hasNoVariants && tmdbId && typeof window !== 'undefined') {
               console.log('[MediaDetailRoute] Aucun torrent trouvé pour tmdbId, redirection vers Discover:', tmdbId);
-              window.location.href = `/discover?tmdbId=${tmdbId}&type=${typeParam}&from=not_found`;
+              const titleQ =
+                titleFromQuery && titleFromQuery.trim()
+                  ? `&title=${encodeURIComponent(titleFromQuery.trim())}`
+                  : emptyGroupTitle && emptyGroupTitle.trim()
+                    ? `&title=${encodeURIComponent(emptyGroupTitle.trim())}`
+                    : '';
+              window.location.href = `/discover?tmdbId=${tmdbId}&type=${typeParam}&from=not_found${titleQ}`;
               return;
             }
             setEmptyGroupMainTitle(emptyGroupTitle || null);
