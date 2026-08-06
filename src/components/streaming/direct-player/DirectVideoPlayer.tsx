@@ -8,6 +8,7 @@ import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import type { PlayerLoadingTorrentStats } from '../player-shared/components/PlayerLoadingOverlay';
 import PlayerBufferingOverlay from '../player-shared/components/PlayerBufferingOverlay';
+import { useDebouncedVideoWaiting } from '../player-shared/hooks/useDebouncedVideoWaiting';
 import { getMediaErrorDiagnostics, logVideoPlaybackError, type MediaErrorDiagnostics } from './mediaErrorDiagnostics';
 
 interface DirectVideoPlayerProps {
@@ -75,7 +76,6 @@ export default function DirectVideoPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const [loaded, setLoaded] = useState(false);
-  const [isWaiting, setIsWaiting] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [errorDiag, setErrorDiag] = useState<MediaErrorDiagnostics | null>(null);
 
@@ -93,6 +93,7 @@ export default function DirectVideoPlayer({
     currentTime,
     duration,
     bufferedPercent,
+    bufferedTimelinePercent,
     isSeeking,
     isMuted,
     volume,
@@ -106,6 +107,8 @@ export default function DirectVideoPlayer({
     hlsLoaded: loaded,
     canUseSeekReload: false,
   });
+
+  const isWaiting = useDebouncedVideoWaiting(videoRef, [src, loaded]);
 
   const [showControls, setShowControls] = useState(baseShowControls);
   useEffect(() => {
@@ -179,24 +182,13 @@ export default function DirectVideoPlayer({
 
     const handleLoadedData = () => {
       setLoaded(true);
-      setIsWaiting(false);
       onLoadedData();
     };
 
-    const handleWaiting = () => setIsWaiting(true);
-    const handleCanPlay = () => setIsWaiting(false);
-    const handlePlaying = () => setIsWaiting(false);
-
     video.addEventListener('loadeddata', handleLoadedData);
-    video.addEventListener('waiting', handleWaiting);
-    video.addEventListener('canplay', handleCanPlay);
-    video.addEventListener('playing', handlePlaying);
 
     return () => {
       video.removeEventListener('loadeddata', handleLoadedData);
-      video.removeEventListener('waiting', handleWaiting);
-      video.removeEventListener('canplay', handleCanPlay);
-      video.removeEventListener('playing', handlePlaying);
     };
   }, [onLoadedData]);
 
@@ -215,7 +207,7 @@ export default function DirectVideoPlayer({
     `${errorDiag.codeLabel}${errorDiag.mediaErrorCode != null ? ` (${errorDiag.mediaErrorCode})` : ''} · networkState=${errorDiag.networkState} · readyState=${errorDiag.readyState}`;
 
   const shouldShowBuffering =
-    loadingProp || isWaiting || (isSeeking && bufferedPercent < 100);
+    loadingProp || isWaiting || (isSeeking && bufferedPercent < 95);
   const effectiveShowControls = showControls;
   const bufferingMessage =
     loadingProp
@@ -334,6 +326,7 @@ export default function DirectVideoPlayer({
           torrentProgress={torrentProgress}
           showControls={hasError ? true : effectiveShowControls}
           isPlaying={isPlaying}
+          bufferedPercent={bufferedTimelinePercent}
           currentTime={currentTime}
           duration={duration}
           isMuted={isMuted}

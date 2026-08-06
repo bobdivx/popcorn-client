@@ -16,6 +16,7 @@ import PlayerBufferingOverlay from '../player-shared/components/PlayerBufferingO
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
+import { useDebouncedVideoWaiting } from '../player-shared/hooks/useDebouncedVideoWaiting';
 
 export default function HLSPlayer({ 
   src, 
@@ -135,6 +136,7 @@ export default function HLSPlayer({
     currentTime,
     duration,
     bufferedPercent,
+    bufferedTimelinePercent,
     isSeeking,
     isMuted,
     volume,
@@ -156,11 +158,13 @@ export default function HLSPlayer({
     reloadWithSeek,
   });
 
-  // Pendant la préparation HLS (surtout local/AV1), end/duration peut être ~100%
-  // sur une playlist prématurée de quelques secondes — indéterminé plutôt que faux %.
+  const isSeekSettling = isLoading && pendingSeekPosition > 0;
+  // Overlay : buffer ahead (jamais end/duration). Indéterminé pendant seek settling.
   const overlayBufferedPercent =
-    isLoading || (isLocalLibraryMedia && bufferedPercent >= 85 && !isPlaying)
-      ? null
+    isSeekSettling || isLoading
+      ? bufferedPercent > 0 && bufferedPercent < 100
+        ? bufferedPercent
+        : null
       : bufferedPercent > 0
         ? bufferedPercent
         : null;
@@ -390,24 +394,15 @@ export default function HLSPlayer({
     };
   }, []);
 
-  const [isWaiting, setIsWaiting] = useState(false);
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const onWaiting = () => setIsWaiting(true);
-    const onReady = () => setIsWaiting(false);
-    video.addEventListener('waiting', onWaiting);
-    video.addEventListener('canplay', onReady);
-    video.addEventListener('playing', onReady);
-    return () => {
-      video.removeEventListener('waiting', onWaiting);
-      video.removeEventListener('canplay', onReady);
-      video.removeEventListener('playing', onReady);
-    };
-  }, [videoRef, src]);
+  const isWaiting = useDebouncedVideoWaiting(videoRef, [src, hlsLoaded]);
 
   const displayError = error;
-  const shouldShowBuffering = isLoading || isWaiting || (isSeeking && bufferedPercent < 100);
+  // Garder l’overlay pendant seek settling même si le % affiche 100 (artefact timeline).
+  const shouldShowBuffering =
+    isLoading ||
+    isWaiting ||
+    isSeekSettling ||
+    (isSeeking && (bufferedPercent < 95 || pendingSeekPosition > 0));
   /** En cas d'erreur, garder les contrôles visibles pour permettre d'appuyer sur Retour */
   const effectiveShowControls = showControls || !!displayError;
 
@@ -514,7 +509,7 @@ export default function HLSPlayer({
           seriesEpisodeNum={seriesEpisode}
           showControls={effectiveShowControls}
           isPlaying={isPlaying}
-          bufferedPercent={bufferedPercent}
+          bufferedPercent={bufferedTimelinePercent}
           currentTime={currentTime}
           duration={duration}
           isMuted={isMuted}
