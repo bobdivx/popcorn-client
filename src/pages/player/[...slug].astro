@@ -2,9 +2,9 @@
 import '../../styles/global.css';
 
 // Route dynamique /player/[slug] pour éviter 404 en dev (et en prod si le serveur sert cette page pour /player/*).
-// En build static, une seule page est générée (slug par défaut) ; un rewrite /player/* -> cette page en prod évite le 404.
+// En build static (format: file), ne pas utiliser slug "index" : ça génère /player/index et entre en conflit avec player.astro.
 export function getStaticPaths() {
-  return [{ params: { slug: 'index' } }];
+  return [{ params: { slug: '_' } }];
 }
 ---
 <!doctype html>
@@ -27,7 +27,7 @@ export function getStaticPaths() {
         try {
           var pathname = window.location.pathname || '';
           var m = pathname.match(/^\/player\/(.+)$/);
-          var id = (m && m[1] && m[1] !== 'index') ? m[1] : null;
+          var id = (m && m[1] && m[1] !== '_' && m[1] !== 'index') ? m[1] : null;
           if (!id) {
             var params = new URLSearchParams(window.location.search);
             id = params.get('contentId') || params.get('id') || params.get('slug');
