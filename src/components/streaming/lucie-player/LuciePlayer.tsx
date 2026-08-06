@@ -14,6 +14,7 @@ import PlayerBufferingOverlay from '../player-shared/components/PlayerBufferingO
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
+import { useDebouncedVideoWaiting } from '../player-shared/hooks/useDebouncedVideoWaiting';
 
 export default function LuciePlayer({ 
   src, 
@@ -97,6 +98,7 @@ export default function LuciePlayer({
     currentTime,
     duration,
     bufferedPercent,
+    bufferedTimelinePercent,
     isSeeking,
     isMuted,
     volume,
@@ -307,24 +309,11 @@ export default function LuciePlayer({
     onScrubSeek: seekToTargetTime,
   });
 
-  const [isWaiting, setIsWaiting] = useState(false);
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const onWaiting = () => setIsWaiting(true);
-    const onReady = () => setIsWaiting(false);
-    video.addEventListener('waiting', onWaiting);
-    video.addEventListener('canplay', onReady);
-    video.addEventListener('playing', onReady);
-    return () => {
-      video.removeEventListener('waiting', onWaiting);
-      video.removeEventListener('canplay', onReady);
-      video.removeEventListener('playing', onReady);
-    };
-  }, [videoRef, src]);
+  const isWaiting = useDebouncedVideoWaiting(videoRef, [src]);
 
   const displayError = error;
-  const shouldShowBuffering = isLoading || isWaiting || (isSeeking && bufferedPercent < 100);
+  const shouldShowBuffering =
+    isLoading || isWaiting || (isSeeking && bufferedPercent < 95);
 
   if (displayError) {
     return <ErrorDisplay error={displayError} />;
@@ -415,7 +404,7 @@ export default function LuciePlayer({
           seriesEpisodeNum={seriesEpisode}
           showControls={showControls}
           isPlaying={isPlaying}
-          bufferedPercent={bufferedPercent}
+          bufferedPercent={bufferedTimelinePercent}
           currentTime={currentTime}
           duration={duration}
           isMuted={isMuted}

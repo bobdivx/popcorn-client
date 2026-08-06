@@ -1,8 +1,20 @@
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
+import {
+  SEEK_RELOAD_BUFFER_MARGIN_SEC,
+  SEEK_RELOAD_LARGE_JUMP_SEC,
+  SEEK_RELOAD_MIN_BUFFERED_END_SEC,
+} from '../../player-core/policies/SeekPolicy';
 import { usePlayerConfig } from './usePlayerConfig';
 import { isTVPlatform } from '../../../../lib/utils/device-detection';
 import { toggleFullscreen } from './useFullscreen';
+import {
+  getBufferAheadPercent,
+  getBufferAheadSeconds,
+  getBufferedEndAround,
+  getBufferedTimelinePercent,
+  isTimeInBuffered,
+} from '../utils/bufferMetrics';
 
 interface UseVideoControlsProps {
   videoRef: { current: HTMLVideoElement | null };
@@ -28,7 +40,10 @@ export function useVideoControls({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  /** Buffer ahead 0–100 (overlay / readiness). */
   const [bufferedPercent, setBufferedPercent] = useState(0);
+  /** Fin du buffer le long de la timeline 0–100 (barre de progression). */
+  const [bufferedTimelinePercent, setBufferedTimelinePercent] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
   const [isMuted, setIsMuted] = useState(playerConfig.muted);
   const [volume, setVolume] = useState(playerConfig.volume);
@@ -69,15 +84,19 @@ export function useVideoControls({
     };
 
     const updateBuffered = () => {
-      const total = duration > 0 && isFinite(duration) ? duration : (video.duration && isFinite(video.duration) ? video.duration : 0);
-      if (!total || !isFinite(total)) { setBufferedPercent(0); return; }
+      const total =
+        (hlsDuration && hlsDuration > 0 && isFinite(hlsDuration) ? hlsDuration : 0) ||
+        (duration > 0 && isFinite(duration) ? duration : 0) ||
+        (video.duration && isFinite(video.duration) ? video.duration : 0);
+      const pos = Number.isFinite(video.currentTime) ? video.currentTime : 0;
       try {
         const buffered = video.buffered;
-        if (!buffered || buffered.length === 0) { setBufferedPercent(0); return; }
-        const end = buffered.end(buffered.length - 1);
-        setBufferedPercent(Math.max(0, Math.min(100, (end / total) * 100)));
-      } catch (e) {
+        const ahead = getBufferAheadSeconds(buffered, pos);
+        setBufferedPercent(getBufferAheadPercent(ahead));
+        setBufferedTimelinePercent(getBufferedTimelinePercent(buffered, pos, total));
+      } catch {
         setBufferedPercent(0);
+        setBufferedTimelinePercent(0);
       }
     };
 
@@ -276,20 +295,28 @@ export function useVideoControls({
         duration > 0 && isFinite(duration) ? duration : video.duration && isFinite(video.duration) ? video.duration : 0;
       if (!durationValue) return;
       const clamped = Math.max(0, Math.min(durationValue, targetTime));
-      let bufferedEnd = 0;
-      try {
-        if (video.buffered?.length > 0) bufferedEnd = video.buffered.end(video.buffered.length - 1);
-      } catch (_) {}
+      const buffered = video.buffered;
+      const bufferedEnd = getBufferedEndAround(buffered, video.currentTime);
       if (!canUseSeekReload) {
         emitPlaybackStep('seek_native', { position: clamped });
         video.currentTime = clamped;
         return;
       }
       if (reloadWithSeek && clamped > 0 && !isLoading) {
-        const margin = 2;
-        const isBeyondBufferedWindow = clamped > bufferedEnd + margin;
-        const isLargeJump = Math.abs(clamped - video.currentTime) > 60;
-        if (isLargeJump || (bufferedEnd >= 20 && isBeyondBufferedWindow)) {
+        // Seek natif si la cible est déjà dans une range bufferée (évite un reload FFmpeg inutile).
+        if (isTimeInBuffered(buffered, clamped, SEEK_RELOAD_BUFFER_MARGIN_SEC)) {
+          emitPlaybackStep('seek_native', { position: clamped });
+          video.currentTime = clamped;
+          return;
+        }
+        const isBeyondBufferedWindow =
+          clamped > bufferedEnd + SEEK_RELOAD_BUFFER_MARGIN_SEC;
+        const isLargeJump =
+          Math.abs(clamped - video.currentTime) > SEEK_RELOAD_LARGE_JUMP_SEC;
+        if (
+          isLargeJump ||
+          (bufferedEnd >= SEEK_RELOAD_MIN_BUFFERED_END_SEC && isBeyondBufferedWindow)
+        ) {
           emitPlaybackStep('seek_reload', { position: clamped });
           reloadWithSeek(clamped);
           return;
@@ -337,7 +364,10 @@ export function useVideoControls({
     isPlaying,
     currentTime: displayCurrentTime,
     duration,
+    /** Buffer ahead (overlay). */
     bufferedPercent,
+    /** Position buffer sur la timeline (barre). */
+    bufferedTimelinePercent,
     isSeeking,
     isMuted,
     volume,
