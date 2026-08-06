@@ -242,15 +242,24 @@ export function createHandlePlay(context: PlayHandlerContext) {
           (sparseStats.progress ?? 0) <= 0.001 &&
           (sparseStats.downloaded_bytes ?? 0) <= 0
         ) {
-          addDebugLog('error', 'Fichiers bibliothèque sparses/vides (torrent 0%)');
           setIsAvailableLocally(false);
-          setErrorMessage(
-            'SPARSE_OR_EMPTY: Le fichier est sparse ou vide (aucune donnée téléchargée). Lecture impossible.'
-          );
-          setPlayStatus('error');
-          setIsPlaying(true);
           setTorrentStats(sparseStats);
-          return;
+          // Option streaming torrent active → continuer vers le flux librqbit au lieu d'échouer en HLS.
+          if (streamingTorrentActive) {
+            addDebugLog(
+              'warning',
+              'Fichiers bibliothèque sparses/vides — bascule stream-torrent (option active)'
+            );
+            // Fall-through vers PRIORITÉ 1 (getTorrent / stream-torrent)
+          } else {
+            addDebugLog('error', 'Fichiers bibliothèque sparses/vides (torrent 0%)');
+            setErrorMessage(
+              'SPARSE_OR_EMPTY: Le fichier est sparse ou vide (aucune donnée téléchargée). Lecture impossible.'
+            );
+            setPlayStatus('error');
+            setIsPlaying(true);
+            return;
+          }
         }
       } catch (_) {
         // ignore
