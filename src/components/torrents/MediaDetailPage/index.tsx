@@ -5,7 +5,12 @@ import { NotificationContainer, type SeedingStatusInfo } from '../../ui/Notifica
 import type { MediaDetailPageProps } from './types';
 import { useTorrentPlayer } from './hooks/useTorrentPlayer';
 import { scheduleUpdateOnlyFilesWithRetry } from './hooks/useTorrentPlayer/playHandler';
-import { useVideoFiles } from './hooks/useVideoFiles';
+import {
+  useVideoFiles,
+  isSparseOrEmptyMessage,
+  SparseOrEmptyError,
+  SPARSE_OR_EMPTY_CODE,
+} from './hooks/useVideoFiles';
 import { usePackEpisodes } from './hooks/usePackEpisodes';
 import { useDebug } from './hooks/useDebug';
 import { useNotifications } from './hooks/useNotifications';
@@ -383,6 +388,8 @@ export default function MediaDetailPage({
   const [seriesIndexerRefreshBusy, setSeriesIndexerRefreshBusy] = useState(false);
   /** Compteur d'Ã©checs consÃ©cutifs de getTorrent (hors 404) pour invalider torrentStats si backend injoignable. */
   const getTorrentFailCountRef = useRef<number>(0);
+  /** Message sparse en attente tant que setErrorMessage n'est pas encore disponible. */
+  const sparseErrorPendingRef = useRef<string | null>(null);
   /** DerniÃ¨re valeur connue de torrentStats (pour ne pas Ã©craser un Ã©tat complÃ©tÃ© par une rÃ©ponse API invalide type unknown/0). */
   const lastTorrentStatsRef = useRef<{ state?: string; progress?: number } | null>(null);
   /** Snapshot partagé listTorrents (évite un 2e fetch dans le poll épisodes). */
@@ -557,7 +564,15 @@ export default function MediaDetailPage({
   }, [selectedEpisodeMeta, libraryEpisodesPathMap, activeTorrent.tmdbType, libraryDownloadPath]);
 
   // Hooks personnalisÃ©s
-  const { videoFiles, selectedFile, setVideoFiles, setSelectedFile, loadVideoFiles } = useVideoFiles({
+  const {
+    videoFiles,
+    selectedFile,
+    setVideoFiles,
+    setSelectedFile,
+    loadVideoFiles,
+    emptyOrSparse,
+    setEmptyOrSparse,
+  } = useVideoFiles({
     torrentName: activeTorrent.name,
     torrent: activeTorrentWithLibraryPath,
     keepAllVideoFiles: isPackSelected,
@@ -566,9 +581,21 @@ export default function MediaDetailPage({
     // Passer le chemin spécifique de l'épisode s'il est connu dans la bibliothèque
     filePath: selectedEpisodeMeta ? libraryEpisodesPathMap[`${selectedEpisodeMeta.season}:${selectedEpisodeMeta.episode}`] : null,
     onError: (error) => {
-      console.error('Erreur lors du chargement des fichiers vidÃ©o:', error);
+      console.error('Erreur lors du chargement des fichiers vidéo:', error);
+      if (error instanceof SparseOrEmptyError || isSparseOrEmptyMessage(error.message)) {
+        setIsAvailableLocally(false);
+        // setErrorMessage est branché après useTorrentPlayer (effet dédié + playHandler)
+        sparseErrorPendingRef.current = error.message || `${SPARSE_OR_EMPTY_CODE}: fichiers vides`;
+      }
     },
   });
+
+  useEffect(() => {
+    if (emptyOrSparse) {
+      setIsAvailableLocally(false);
+    }
+  }, [emptyOrSparse]);
+
   const { notifications, addNotification, removeNotification } = useNotifications();
   const { debugLogs, showDebug, setShowDebug, addDebugLog, clearDebugLogs } = useDebug();
   const { streamingTorrentActive } = useSubscriptionMe();
@@ -636,6 +663,58 @@ export default function MediaDetailPage({
     setShowInfo,
     addDebugLog,
   });
+
+  useEffect(() => {
+    if (sparseErrorPendingRef.current) {
+      setErrorMessage(sparseErrorPendingRef.current);
+      sparseErrorPendingRef.current = null;
+    }
+  }, [setErrorMessage, emptyOrSparse, errorMessage]);
+
+  const handleDeleteEmptyFiles = useCallback(async () => {
+    const activeInfoHash = (selectedTorrent || torrent).infoHash;
+    if (!activeInfoHash || activeInfoHash.startsWith('local_')) {
+      addNotification('error', t('playback.sparseOrEmptyDeleteError') || 'Impossible de supprimer');
+      return;
+    }
+    try {
+      addDebugLog('info', 'Suppression des fichiers sparses/vides...', { infoHash: activeInfoHash });
+      await clientApi.removeTorrent(activeInfoHash, true);
+      setEmptyOrSparse(false);
+      setIsAvailableLocally(false);
+      setLibraryDownloadPath(null);
+      setVideoFiles([]);
+      setSelectedFile(null);
+      setTorrentStats(null);
+      setErrorMessage(null);
+      setPlayStatus('idle');
+      setIsPlaying(false);
+      addNotification(
+        'success',
+        t('playback.sparseOrEmptyDeleteSuccess') || 'Fichiers vides supprimés'
+      );
+      addDebugLog('success', 'Fichiers sparses/vides supprimés');
+    } catch (err) {
+      addDebugLog('error', 'Erreur suppression fichiers vides', { error: err });
+      addNotification(
+        'error',
+        t('playback.sparseOrEmptyDeleteError') || 'Erreur lors de la suppression'
+      );
+    }
+  }, [
+    selectedTorrent,
+    torrent,
+    addNotification,
+    t,
+    addDebugLog,
+    setEmptyOrSparse,
+    setVideoFiles,
+    setSelectedFile,
+    setTorrentStats,
+    setErrorMessage,
+    setPlayStatus,
+    setIsPlaying,
+  ]);
 
   const handleDownloadWholeSeriesByQuality = useCallback((quality: string) => {
     const target = normalizeResolution(quality);
@@ -1018,6 +1097,21 @@ export default function MediaDetailPage({
             markLibrary?: boolean;
             markLocalMedia?: boolean;
           }) => {
+            // Ne pas marquer « complété » si le client a ce torrent à 0% (fichiers sparses).
+            const listProgress =
+              typeof fromList?.progress === 'number' ? fromList.progress : null;
+            const listDownloaded = fromList?.downloaded_bytes ?? 0;
+            const torrentEmptyOnClient =
+              !!fromList &&
+              fromList.files_available !== true &&
+              (listProgress == null || listProgress <= 0.001) &&
+              listDownloaded <= 0 &&
+              fromList.state !== 'completed' &&
+              fromList.state !== 'seeding';
+            if (torrentEmptyOnClient) {
+              return;
+            }
+
             if (opts.markLibrary) isAvailableInLibrary = true;
             if (opts.markLocalMedia) isAvailableInLocalMedia = true;
             setIsAvailableLocally(true);
@@ -1031,7 +1125,9 @@ export default function MediaDetailPage({
                 (prev?.download_speed ?? 0) === 0;
               const prevIsComplete =
                 prevState === 'completed' || prevState === 'seeding' || prevProgress >= 0.99;
-              if (prev && !looksStaleQueued && !prevIsComplete) return prev;
+              // Ne jamais écraser un torrent réellement à 0% (sparse) par un faux « completed ».
+              if (looksStaleQueued) return prev;
+              if (prev && !prevIsComplete) return prev;
               return {
                 info_hash: activeTorrent.infoHash!,
                 name: opts.name || activeTorrent.name || '',
@@ -2390,6 +2486,7 @@ export default function MediaDetailPage({
           setProgressMessage('');
           handlePlay();
         }}
+        onDeleteEmptyFiles={handleDeleteEmptyFiles}
         onToggleDebug={() => setShowDebug(!showDebug)}
         onCopyLogs={async () => {
           try {
@@ -2461,6 +2558,15 @@ export default function MediaDetailPage({
         seriesEpisodePickerItems={playerSeriesEpisodePickerItems}
         selectedSeriesEpisodeVariantId={selectedEpisodeVariantId}
         onSelectSeriesEpisode={handleSeriesEpisodeSelect}
+        onPlaybackError={(msg) => {
+          if (isSparseOrEmptyMessage(msg)) {
+            setIsAvailableLocally(false);
+            setEmptyOrSparse(true);
+            setErrorMessage(msg);
+            setPlayStatus('error');
+          }
+        }}
+        onDeleteEmptyFiles={handleDeleteEmptyFiles}
       />
     );
   }
