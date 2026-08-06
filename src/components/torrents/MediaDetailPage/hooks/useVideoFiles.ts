@@ -206,18 +206,19 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
                 downloaded <= 0;
 
               if (isEmpty) {
+                // getTorrent sans stats (ou stub à 0%) ≠ preuve que le fichier disque est vide.
+                // On laisse le playHandler décider : lecture bibliothèque, stream, ou téléchargement.
                 console.warn(
-                  '[useVideoFiles] ⚠️ Chemin bibliothèque mais torrent à 0% (sparse/vide):',
+                  '[useVideoFiles] ⚠️ Chemin bibliothèque mais getTorrent à 0% — on ne bloque pas en sparse:',
                   { infoHash, progress, filesAvailable, downloaded, path: torrent.downloadPath }
                 );
-                setEmptyOrSparse(true);
-                setVideoFiles([]);
-                setSelectedFile(null);
+                setEmptyOrSparse(false);
+                const files = [libraryFile];
+                filesCacheRef.current.set(infoHash, files);
+                setVideoFiles(files);
+                setSelectedFile(files[0]);
                 setLoadingFiles(false);
-                filesCacheRef.current.delete(infoHash);
-                const err = new SparseOrEmptyError();
-                onError?.(err);
-                return [];
+                return files;
               }
 
               // Torrent présent avec données : chemin bibliothèque OK
