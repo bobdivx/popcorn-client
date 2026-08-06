@@ -479,7 +479,7 @@ export function VideoPlayerWrapper({
     );
   }
 
-  if (errorMessage) {
+  if (displayError) {
     return (
       <div 
         ref={wrapperElementRef}
@@ -504,14 +504,59 @@ export function VideoPlayerWrapper({
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold text-white">Erreur de lecture</h2>
-          <p className="text-white/60 text-sm leading-relaxed">{errorMessage}</p>
-          <button
-            onClick={onClose}
-            className="mt-2 px-6 py-2 bg-red-600 hover:bg-red-700 active:scale-95 transition-all text-white font-semibold rounded-lg cursor-pointer pointer-events-auto"
-          >
-            Fermer
-          </button>
+          <h2 className="text-xl font-bold text-white">
+            {sparseOrEmpty
+              ? t('playback.sparseOrEmptyTitle') || 'Fichiers vides'
+              : t('playback.phase.error') || 'Erreur de lecture'}
+          </h2>
+          <p className="text-white/60 text-sm leading-relaxed">
+            {sparseOrEmpty
+              ? t('playback.sparseOrEmptyDetail') || displayError
+              : displayError}
+          </p>
+          {sparseOrEmpty && onDeleteEmptyFiles && confirmingDeleteEmpty ? (
+            <div className="w-full rounded-xl border border-white/15 bg-black/40 px-4 py-3 space-y-3">
+              <p className="text-sm text-white/85">
+                {t('playback.sparseOrEmptyConfirm') || 'Supprimer les fichiers vides du disque ?'}
+              </p>
+              <div className="flex justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDeleteEmpty(false)}
+                  className="px-5 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm cursor-pointer"
+                >
+                  {t('common.back') || 'Retour'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmingDeleteEmpty(false);
+                    onDeleteEmptyFiles();
+                  }}
+                  className="px-5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-sm cursor-pointer"
+                >
+                  {t('common.confirm') || 'Confirmer'}
+                </button>
+              </div>
+            </div>
+          ) : null}
+          <div className="flex flex-wrap justify-center gap-3 mt-2">
+            {sparseOrEmpty && onDeleteEmptyFiles && !confirmingDeleteEmpty ? (
+              <button
+                type="button"
+                onClick={() => setConfirmingDeleteEmpty(true)}
+                className="px-6 py-2 bg-red-600 hover:bg-red-700 active:scale-95 transition-all text-white font-semibold rounded-lg cursor-pointer pointer-events-auto"
+              >
+                {t('playback.sparseOrEmptyDelete') || 'Supprimer les fichiers vides'}
+              </button>
+            ) : null}
+            <button
+              onClick={onClose}
+              className="px-6 py-2 bg-white/10 hover:bg-white/20 border border-white/20 active:scale-95 transition-all text-white font-semibold rounded-lg cursor-pointer pointer-events-auto"
+            >
+              {t('common.close') || 'Fermer'}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -749,6 +794,12 @@ export function VideoPlayerWrapper({
               console.error('[VideoPlayerWrapper] Player error:', e);
               const errDetail = e?.message || (typeof e === 'string' ? e : 'HLS / Lucie player error');
               logErrorEvent(errDetail);
+              if (isSparseOrEmptyMessage(errDetail)) {
+                setLocalPlayerError(errDetail);
+                onPlaybackError?.(errDetail);
+                setIsLoading(false);
+                return;
+              }
               if (isLucieMode && !forceHlsFallback) {
                 console.warn('[VideoPlayerWrapper] Fallback automatique vers HLS après échec Lucie (ex. manifest 404).');
                 emitPlaybackStep('fallback_lucie_to_hls', { message: e?.message ?? 'Lucie failed' });
