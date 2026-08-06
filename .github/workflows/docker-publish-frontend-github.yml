@@ -1,0 +1,180 @@
+# Fallback : build/push frontend sur runners GitHub (ubuntu-latest)
+# quand les self-hosted sont HS. Déclenchement manuel uniquement.
+name: Build Frontend Docker (GitHub-hosted fallback)
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_version:
+        description: 'Incrémenter VERSION.json et commit'
+        type: boolean
+        default: true
+      trigger_watchtower:
+        description: 'Appeler le webhook Watchtower après push'
+        type: boolean
+        default: false
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: popcorn-frontend
+
+jobs:
+  build-and-push:
+    name: Build and Publish Frontend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    environment: production
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Increment version in VERSION.json
+        id: increment_version
+        if: inputs.bump_version
+        run: |
+          if [ -f "VERSION.json" ]; then
+            CURRENT_VERSION=$(jq -r '.client.version' VERSION.json)
+            echo "📦 Version actuelle: ${CURRENT_VERSION}"
+            IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+            patch=$((patch + 1))
+            if [ $patch -ge 100 ]; then patch=0; minor=$((minor + 1)); fi
+            if [ $minor -ge 100 ]; then minor=0; major=$((major + 1)); fi
+            NEW_VERSION="${major}.${minor}.${patch}"
+            jq --arg v "$NEW_VERSION" '.client.version = $v' VERSION.json > VERSION.json.tmp
+            mv VERSION.json.tmp VERSION.json
+            BUILD=$(jq -r '.client.build' VERSION.json)
+            BUILD=$((BUILD + 1))
+            jq --argjson b "$BUILD" '.client.build = $b' VERSION.json > VERSION.json.tmp
+            mv VERSION.json.tmp VERSION.json
+            echo "✅ Version incrémentée: ${CURRENT_VERSION} → ${NEW_VERSION} (build: ${BUILD})"
+            echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
+            echo "build=${BUILD}" >> $GITHUB_OUTPUT
+          else
+            echo '{"client":{"version":"1.0.1","build":1},"server":{"version":"1.0.1","build":1}}' > VERSION.json
+            echo "version=1.0.1" >> $GITHUB_OUTPUT
+            echo "build=1" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Stamp gitSha/builtAt into VERSION.json
+        run: |
+          set -euo pipefail
+          SHORT_SHA="$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          BUILT_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          CHANNEL="dev"
+          if [ "${GITHUB_REF}" = "refs/heads/main" ] || [ "${GITHUB_REF}" = "refs/heads/master" ]; then CHANNEL="latest"; fi
+          if [ -z "${{ steps.increment_version.outputs.version }}" ] && [ "${{ inputs.bump_version }}" = "true" ]; then
+            CURRENT_VERSION=$(jq -r '.client.version' VERSION.json)
+            IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+            patch=$((patch + 1))
+            if [ $patch -ge 100 ]; then patch=0; minor=$((minor + 1)); fi
+            if [ $minor -ge 100 ]; then minor=0; major=$((major + 1)); fi
+            NEW_VERSION="${major}.${minor}.${patch}"
+            BUILD=$(jq -r '.client.build // 0' VERSION.json)
+            BUILD=$((BUILD + 1))
+            jq --arg v "$NEW_VERSION" --argjson b "$BUILD" ' .client.version=$v | .client.build=$b ' VERSION.json > VERSION.json.tmp && mv VERSION.json.tmp VERSION.json
+          fi
+          jq --arg sha "$SHORT_SHA" --arg at "$BUILT_AT" --arg ch "$CHANNEL" \
+            '.client.gitSha=$sha | .client.builtAt=$at | .client.channel=$ch' \
+            VERSION.json > VERSION.json.tmp && mv VERSION.json.tmp VERSION.json
+          mkdir -p public && cp VERSION.json public/VERSION.json
+          echo "Stamped client gitSha=$SHORT_SHA channel=$CHANNEL"
+
+      - name: Commit version update
+        if: inputs.bump_version && steps.increment_version.outputs.version != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add VERSION.json
+          git commit -m "chore: bump client version to ${{ steps.increment_version.outputs.version }} (GitHub-hosted)" || echo "Aucun changement à commiter"
+          git push || echo "Push échoué (peut-être déjà à jour)"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Check Docker Hub credentials
+        id: check_creds
+        env:
+          DOCKER_USER_SECRET: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_USER_VAR: ${{ vars.DOCKERHUB_USERNAME }}
+        run: |
+          DOCKER_USER="${DOCKER_USER_SECRET}"
+          if [ -z "${DOCKER_USER}" ] || [ "${DOCKER_USER}" = "null" ]; then
+            DOCKER_USER="${DOCKER_USER_VAR}"
+          fi
+          if [ -z "${DOCKER_USER}" ] || [ "${DOCKER_USER}" = "null" ]; then
+            echo "ERROR: No Docker Hub username configured!"
+            exit 1
+          fi
+          echo "username=${DOCKER_USER}" >> $GITHUB_OUTPUT
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ steps.check_creds.outputs.username }}
+          password: ${{ secrets.DOCKER_PASSWORD || secrets.DOCKERHUB_TOKEN || vars.DOCKER_PASSWORD }}
+
+      - name: Compute build metadata
+        id: build_meta
+        run: |
+          SHORT_SHA="$(echo "${GITHUB_SHA}" | cut -c1-7)"
+          VERSION="${{ steps.increment_version.outputs.version }}"
+          if [ -z "${VERSION}" ] || [ "${VERSION}" = "null" ]; then
+            VERSION="$(jq -r '.client.version' VERSION.json 2>/dev/null || echo "1.0.0")"
+          fi
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.check_creds.outputs.username }}/popcorn-frontend
+          tags: |
+            type=raw,value=${{ steps.build_meta.outputs.version }}
+            type=raw,value=v${{ steps.build_meta.outputs.version }},enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' }}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/dev' }}
+            type=raw,value=dev,enable=${{ github.ref == 'refs/heads/dev' }}
+            type=raw,value=dev-${{ steps.build_meta.outputs.short_sha }},enable=${{ github.ref == 'refs/heads/dev' }}
+            type=raw,value=dev-v${{ steps.build_meta.outputs.version }},enable=${{ github.ref == 'refs/heads/dev' }}
+            type=sha,prefix=sha-
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            APP_GIT_SHA=${{ github.sha }}
+            APP_BUILD_REF=${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Log success
+        run: |
+          echo "✅ Frontend Docker Image published successfully!"
+          echo "You can find it at: https://hub.docker.com/r/${{ steps.check_creds.outputs.username }}/popcorn-frontend/tags"
+
+      - name: Trigger Watchtower Webhook
+        if: inputs.trigger_watchtower
+        continue-on-error: true
+        env:
+          WATCHTOWER_TOKEN: ${{ secrets.WATCHTOWER_TOKEN }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
+        run: |
+          curl -H "Authorization: Bearer $WATCHTOWER_TOKEN" \
+               http://$SERVER_IP:8080/v1/update || true
