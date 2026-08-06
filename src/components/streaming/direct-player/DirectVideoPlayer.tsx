@@ -9,6 +9,7 @@ import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import type { PlayerLoadingTorrentStats } from '../player-shared/components/PlayerLoadingOverlay';
 import PlayerBufferingOverlay from '../player-shared/components/PlayerBufferingOverlay';
 import { useDebouncedVideoWaiting } from '../player-shared/hooks/useDebouncedVideoWaiting';
+import { formatTime } from '../player-shared/utils/formatTime';
 import { getMediaErrorDiagnostics, logVideoPlaybackError, type MediaErrorDiagnostics } from './mediaErrorDiagnostics';
 
 interface DirectVideoPlayerProps {
@@ -142,6 +143,13 @@ export default function DirectVideoPlayer({
     }
   };
 
+  const [seekFeedback, setSeekFeedback] = useState<{
+    direction: 'left' | 'right';
+    seconds: number;
+    targetTime?: number;
+  } | null>(null);
+  const seekFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleSeekTV = (direction: 'left' | 'right', stepSeconds = 10) => {
     if (!duration) return;
     const newTime =
@@ -149,6 +157,30 @@ export default function DirectVideoPlayer({
         ? Math.max(0, currentTime - stepSeconds)
         : Math.min(duration, currentTime + stepSeconds);
     seekToTargetTime(newTime);
+    if (seekFeedbackTimeoutRef.current) clearTimeout(seekFeedbackTimeoutRef.current);
+    setSeekFeedback({ direction, seconds: stepSeconds, targetTime: newTime });
+    seekFeedbackTimeoutRef.current = setTimeout(() => {
+      setSeekFeedback(null);
+      seekFeedbackTimeoutRef.current = null;
+    }, 800);
+  };
+
+  const handleSeekPreview = (
+    info: { targetTime: number; direction: 'left' | 'right'; stepSeconds: number } | null,
+  ) => {
+    if (seekFeedbackTimeoutRef.current) {
+      clearTimeout(seekFeedbackTimeoutRef.current);
+      seekFeedbackTimeoutRef.current = null;
+    }
+    if (!info) {
+      setSeekFeedback(null);
+      return;
+    }
+    setSeekFeedback({
+      direction: info.direction,
+      seconds: info.stepSeconds,
+      targetTime: info.targetTime,
+    });
   };
 
   const handleVolumeChangeTV = (direction: 'up' | 'down') => {
@@ -174,6 +206,7 @@ export default function DirectVideoPlayer({
     progressBarRef,
     scrubThumbnails: scrubThumbnails?.mediaId && scrubThumbnails.count > 0 ? scrubThumbnails : null,
     onScrubSeek: seekToTargetTime,
+    onSeekPreview: handleSeekPreview,
   });
 
   useEffect(() => {
@@ -239,6 +272,18 @@ export default function DirectVideoPlayer({
           willChange: 'transform',
         }}
       >
+        {seekFeedback && (
+          <div
+            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-6 py-3 rounded-lg bg-black/85 text-white text-2xl font-semibold shadow-lg"
+            role="status"
+          >
+            {seekFeedback.targetTime != null
+              ? formatTime(seekFeedback.targetTime)
+              : seekFeedback.direction === 'left'
+                ? `−${seekFeedback.seconds}s`
+                : `+${seekFeedback.seconds}s`}
+          </div>
+        )}
         {shouldShowBuffering && (
           <PlayerBufferingOverlay
             title={torrentName || undefined}

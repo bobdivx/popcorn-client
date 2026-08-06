@@ -5,24 +5,36 @@ import { useSeekStepAcceleration } from './useSeekStepAcceleration';
 const BACK_KEY_CODES = [27, 8, 461, 4];
 const BACK_KEYS = ['Escape', 'Backspace', 'Back', 'BrowserBack', 'GoBack'];
 
+/** Après arrêt des flèches : un seul seek vers la vignette / position preview. */
+const SCRUB_SETTLE_MS = 1200;
+const PREVIEW_SETTLE_MS = 1000;
+
+export interface SeekPreviewInfo {
+  targetTime: number;
+  direction: 'left' | 'right';
+  stepSeconds: number;
+}
+
 interface UseTVPlayerNavigationProps {
   showControls: boolean;
   setShowControls: (show: boolean) => void;
   onPlayPause: () => void;
+  /** Seek immédiat (fallback boutons / sans preview). Préférer le chemin scrub/preview. */
   onSeek: (direction: 'left' | 'right', stepSeconds?: number) => void;
   onVolumeChange: (direction: 'up' | 'down') => void;
   onToggleMute: () => void;
   onToggleFullscreen: () => void;
   onClose?: () => void;
-  /** Si fourni, ajoute un contrôle « Paramètres / Qualité » accessible à la télécommande (avant plein écran). */
   onOpenQualityMenu?: () => void;
   duration: number;
   currentTime: number;
   progressBarRef?: { current: HTMLElement | null };
-  /** Miniatures scrub disponibles (TV) : les flèches naviguent dans les vignettes, Enter seek. */
+  /** Miniatures scrub : flèches = naviguer les vignettes, Enter / settle = seek. */
   scrubThumbnails?: { count: number; intervalSeconds?: number; durationSeconds?: number } | null;
-  /** Seek direct vers un timestamp (secondes) — utilisé quand Enter est pressé sur une vignette scrub. */
+  /** Commit seek (vignette ou preview sans scrub). */
   onScrubSeek?: (timeSeconds: number) => void;
+  /** Feedback UI pendant preview sans scrub (pas de seek). */
+  onSeekPreview?: (info: SeekPreviewInfo | null) => void;
 }
 
 export function useTVPlayerNavigation({
@@ -38,6 +50,7 @@ export function useTVPlayerNavigation({
   progressBarRef,
   scrubThumbnails = null,
   onScrubSeek,
+  onSeekPreview,
   duration,
   currentTime,
 }: UseTVPlayerNavigationProps) {
@@ -48,32 +61,49 @@ export function useTVPlayerNavigation({
   const focusedOnScrubRef = useRef(false);
   focusedOnScrubRef.current = focusedOnScrub;
 
-  // --- Scrub thumbnails (TV) ---
   const scrubThumbnailsActive = !!(scrubThumbnails && scrubThumbnails.count > 0);
   const [tvScrubIndex, setTvScrubIndex] = useState(0);
 
-  // Refs pour éviter les closures périmées dans les listeners capturés.
   const tvScrubIndexRef = useRef(0);
   tvScrubIndexRef.current = tvScrubIndex;
   const scrubThumbnailsRef = useRef(scrubThumbnails);
   scrubThumbnailsRef.current = scrubThumbnails;
   const onScrubSeekRef = useRef(onScrubSeek);
   onScrubSeekRef.current = onScrubSeek;
+  const onSeekPreviewRef = useRef(onSeekPreview);
+  onSeekPreviewRef.current = onSeekPreview;
+  const durationRef = useRef(duration);
+  durationRef.current = duration;
+  const currentTimeRef = useRef(currentTime);
+  currentTimeRef.current = currentTime;
+  const showControlsRef = useRef(showControls);
+  showControlsRef.current = showControls;
+  const scrubThumbnailsActiveRef = useRef(scrubThumbnailsActive);
+  scrubThumbnailsActiveRef.current = scrubThumbnailsActive;
+
   const scrubAutoSeekTimeoutRef = useRef<number | null>(null);
+  const previewSeekTimeoutRef = useRef<number | null>(null);
   const hasUserNavigatedScrubRef = useRef(false);
+  /** Position preview accumulée (sans scrub) — commit au settle. */
+  const previewTargetTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!showControls) {
       hasUserNavigatedScrubRef.current = false;
+      previewTargetTimeRef.current = null;
+      onSeekPreviewRef.current?.(null);
+      if (previewSeekTimeoutRef.current != null) {
+        window.clearTimeout(previewSeekTimeoutRef.current);
+        previewSeekTimeoutRef.current = null;
+      }
     }
   }, [showControls]);
 
-  /** Calcule le timestamp (secondes) correspondant à l'index de vignette. */
   const timeForScrubIndex = (idx: number) => {
     const st = scrubThumbnailsRef.current;
     if (!st || !st.count) return 0;
     const count = st.count;
-    const dur = (st.durationSeconds ?? 0) > 0 ? st.durationSeconds! : duration;
+    const dur = (st.durationSeconds ?? 0) > 0 ? st.durationSeconds! : durationRef.current;
     if (!dur) return 0;
     const safe = Math.min(count - 1, Math.max(0, Math.floor(idx)));
     const interval = st.intervalSeconds;
@@ -81,18 +111,60 @@ export function useTVPlayerNavigation({
     return ((safe + 0.5) / count) * dur;
   };
 
+  const commitScrubSeek = () => {
+    if (!onScrubSeekRef.current) return;
+    const targetTime = timeForScrubIndex(tvScrubIndexRef.current);
+    hasUserNavigatedScrubRef.current = false;
+    onScrubSeekRef.current(targetTime);
+  };
+
+  const commitPreviewSeek = () => {
+    const t = previewTargetTimeRef.current;
+    previewTargetTimeRef.current = null;
+    onSeekPreviewRef.current?.(null);
+    if (t == null || !Number.isFinite(t)) return;
+    if (onScrubSeekRef.current) {
+      onScrubSeekRef.current(t);
+    }
+  };
+
+  const scheduleScrubSettle = () => {
+    if (scrubAutoSeekTimeoutRef.current != null) {
+      window.clearTimeout(scrubAutoSeekTimeoutRef.current);
+    }
+    scrubAutoSeekTimeoutRef.current = window.setTimeout(() => {
+      scrubAutoSeekTimeoutRef.current = null;
+      if (!hasUserNavigatedScrubRef.current) return;
+      commitScrubSeek();
+    }, SCRUB_SETTLE_MS) as unknown as number;
+  };
+
+  const schedulePreviewSettle = () => {
+    if (previewSeekTimeoutRef.current != null) {
+      window.clearTimeout(previewSeekTimeoutRef.current);
+    }
+    previewSeekTimeoutRef.current = window.setTimeout(() => {
+      previewSeekTimeoutRef.current = null;
+      commitPreviewSeek();
+    }, PREVIEW_SETTLE_MS) as unknown as number;
+  };
+
   // Initialiser l'index depuis la position courante quand les contrôles apparaissent.
   useEffect(() => {
     if (!isTV || !scrubThumbnailsActive || !showControls) return;
     const st = scrubThumbnails!;
     const dur = (st.durationSeconds ?? 0) > 0 ? st.durationSeconds! : duration;
-    if (!dur || !st.count) { setTvScrubIndex(0); return; }
-    const idx = Math.min(st.count - 1, Math.max(0, Math.floor((currentTime / dur) * st.count)));
+    if (!dur || !st.count) {
+      setTvScrubIndex(0);
+      return;
+    }
+    const interval = st.intervalSeconds && st.intervalSeconds > 0 ? st.intervalSeconds : dur / st.count;
+    const idx = Math.min(st.count - 1, Math.max(0, Math.floor(currentTime / interval)));
     setTvScrubIndex(idx);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync une fois à l'ouverture des contrôles
   }, [isTV, scrubThumbnailsActive, showControls]);
 
-  // Sur TV : si les miniatures scrub sont disponibles, considérer la rangée de vignettes comme zone de focus par défaut.
+  // Focus scrub par défaut dès que les vignettes sont dispo.
   useEffect(() => {
     if (!isTV || !showControls) return;
     if (scrubThumbnailsActive) {
@@ -103,28 +175,21 @@ export function useTVPlayerNavigation({
     }
   }, [isTV, showControls, scrubThumbnailsActive]);
 
-  // Sur TV : valider automatiquement la position après 2s sur une vignette (debounce).
+  // Debounce settle scrub (dépend de l'index).
   useEffect(() => {
     if (!isTV || !showControls) return;
-    if (!scrubThumbnailsActive || !focusedOnScrub) return;
-    if (!onScrubSeekRef.current) return;
-    if (!hasUserNavigatedScrubRef.current) return; // Only seek if user actually navigated!
-    if (scrubAutoSeekTimeoutRef.current != null) {
-      window.clearTimeout(scrubAutoSeekTimeoutRef.current);
-      scrubAutoSeekTimeoutRef.current = null;
-    }
-    scrubAutoSeekTimeoutRef.current = window.setTimeout(() => {
-      scrubAutoSeekTimeoutRef.current = null;
-      const targetTime = timeForScrubIndex(tvScrubIndexRef.current);
-      onScrubSeekRef.current?.(targetTime);
-    }, 2000) as unknown as number;
+    if (!scrubThumbnailsActive || !focusedOnScrubRef.current) return;
+    if (!hasUserNavigatedScrubRef.current) return;
+    scheduleScrubSettle();
     return () => {
       if (scrubAutoSeekTimeoutRef.current != null) {
         window.clearTimeout(scrubAutoSeekTimeoutRef.current);
         scrubAutoSeekTimeoutRef.current = null;
       }
     };
-  }, [isTV, showControls, scrubThumbnailsActive, focusedOnScrub, tvScrubIndex]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTV, showControls, scrubThumbnailsActive, tvScrubIndex]);
+
   const controlsTimeoutRef = useRef<number | null>(null);
   const { getSeekStep, recordKeyDown, recordKeyUp } = useSeekStepAcceleration();
   const hasBack = !!onClose;
@@ -147,11 +212,11 @@ export function useTVPlayerNavigation({
     else onToggleFullscreen();
   };
 
-  /** Relance le compte à rebours de masquage des contrôles (5 s). */
   const resetControlsTimeout = () => {
     if (!isTV) return;
-    // En navigation vignettes : ne pas masquer l'UI, sinon la rangée disparaît avant qu'on puisse naviguer.
-    if (scrubThumbnailsActive && focusedOnScrubRef.current) return;
+    // En navigation vignettes / preview : garder les contrôles visibles.
+    if (scrubThumbnailsActiveRef.current && focusedOnScrubRef.current) return;
+    if (previewTargetTimeRef.current != null) return;
     if (controlsTimeoutRef.current) {
       clearTimeout(controlsTimeoutRef.current);
       controlsTimeoutRef.current = null;
@@ -163,11 +228,60 @@ export function useTVPlayerNavigation({
     }, 5000);
   };
 
+  /** Pas de vignettes en index selon l'accélération (10/30/60s → 1/3/6 vignettes à 10s d'intervalle). */
+  const scrubStepFromAcceleration = (direction: 'left' | 'right') => {
+    const stepSec = getSeekStep(direction);
+    recordKeyDown(direction);
+    const interval = scrubThumbnailsRef.current?.intervalSeconds;
+    const base = interval && interval > 0 ? interval : 10;
+    return Math.max(1, Math.round(stepSec / base));
+  };
+
+  const navigateScrub = (direction: 'left' | 'right') => {
+    const count = scrubThumbnailsRef.current?.count ?? 0;
+    if (count <= 0) return;
+    const step = scrubStepFromAcceleration(direction);
+    hasUserNavigatedScrubRef.current = true;
+    setFocusedOnProgress(false);
+    setFocusedOnScrub(true);
+    setTvScrubIndex((prev) => {
+      if (direction === 'left') return Math.max(0, prev - step);
+      return Math.min(count - 1, prev + step);
+    });
+    // Settle géré par l'effet tvScrubIndex ; on s'assure aussi ici si l'index ne change pas (borne).
+    scheduleScrubSettle();
+  };
+
+  const navigatePreviewSeek = (direction: 'left' | 'right') => {
+    const dur = durationRef.current;
+    if (!dur || !Number.isFinite(dur)) return;
+    const step = getSeekStep(direction);
+    recordKeyDown(direction);
+    const base =
+      previewTargetTimeRef.current != null
+        ? previewTargetTimeRef.current
+        : currentTimeRef.current;
+    const next =
+      direction === 'left'
+        ? Math.max(0, base - step)
+        : Math.min(dur, base + step);
+    previewTargetTimeRef.current = next;
+    onSeekPreviewRef.current?.({
+      targetTime: next,
+      direction,
+      stepSeconds: step,
+    });
+    if (!showControlsRef.current) setShowControls(true);
+    schedulePreviewSettle();
+  };
+
   useEffect(() => {
+    if (!isTV) return;
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      // Quand les contrôles sont masqués : OK/Retour sur webOS peut envoyer le même code que Retour (461).
-      if (!showControls && isBackKey(e)) {
+
+      if (!showControlsRef.current && isBackKey(e)) {
         e.preventDefault();
         e.stopPropagation();
         setShowControls(true);
@@ -180,6 +294,7 @@ export function useTVPlayerNavigation({
         handleBack();
         return;
       }
+
       const kc = e.keyCode ?? e.which;
       const keyRaw = e.key || '';
       const key =
@@ -196,111 +311,118 @@ export function useTVPlayerNavigation({
                   ? 'ArrowLeft'
                   : kc === 22
                     ? 'ArrowRight'
-            : kc === 37
-              ? 'ArrowLeft'
-              : kc === 38
-                ? 'ArrowUp'
-                : kc === 39
-                  ? 'ArrowRight'
-                  : kc === 40
-                    ? 'ArrowDown'
-                    : '');
-      // Certaines TV exposent "Left"/"Right" au lieu de "ArrowLeft"/"ArrowRight".
+                    : kc === 37
+                      ? 'ArrowLeft'
+                      : kc === 38
+                        ? 'ArrowUp'
+                        : kc === 39
+                          ? 'ArrowRight'
+                          : kc === 40
+                            ? 'ArrowDown'
+                            : '');
       const codeRaw = (e as any).code as string | undefined;
       const fromCode =
-        codeRaw === 'ArrowLeft' || codeRaw === 'ArrowRight' || codeRaw === 'Enter' || codeRaw === 'Space'
-          ? (codeRaw === 'Space' ? ' ' : codeRaw)
-          : // Android TV / certains devices
-            (codeRaw === 'DPadLeft' ? 'ArrowLeft' : codeRaw === 'DPadRight' ? 'ArrowRight' : codeRaw === 'DPadCenter' ? 'Enter' : '');
+        codeRaw === 'ArrowLeft' ||
+        codeRaw === 'ArrowRight' ||
+        codeRaw === 'Enter' ||
+        codeRaw === 'Space'
+          ? codeRaw === 'Space'
+            ? ' '
+            : codeRaw
+          : codeRaw === 'DPadLeft'
+            ? 'ArrowLeft'
+            : codeRaw === 'DPadRight'
+              ? 'ArrowRight'
+              : codeRaw === 'DPadCenter'
+                ? 'Enter'
+                : '';
       const keyNormalized =
-        (key === 'Left' ? 'ArrowLeft' : key === 'Right' ? 'ArrowRight' : key === 'Select' ? 'Enter' : key) || fromCode;
+        (key === 'Left'
+          ? 'ArrowLeft'
+          : key === 'Right'
+            ? 'ArrowRight'
+            : key === 'Select'
+              ? 'Enter'
+              : key) || fromCode;
 
-      // kc=23 : touche OK sur certaines TV (Enter spécial). Pas de stopPropagation car on veut que
-      // la logique ci-dessous (ex. scrub) puisse aussi traiter l'événement normalement.
       if (kc === 23) e.preventDefault();
 
-      // Touches media Play/Pause (varie selon plateformes).
-      // IMPORTANT: sur Android TV, kc=19 correspond à DPAD_UP (pas Play/Pause).
       if (kc === 415 || keyNormalized === 'MediaPlayPause') {
         e.preventDefault();
         onPlayPause();
         return;
       }
 
-      // --- Navigation vignettes scrub (TV) ---
-      // Uniquement si déjà en mode scrub, ou 1re pression ←/→ avec contrôles masqués
-      // (évite de capturer OK/←/→ quand le focus est sur Play / Mute / etc.).
-      const isScrubNavKey =
-        scrubThumbnailsActive &&
-        (kc === 412 ||
-          kc === 417 ||
-          kc === 21 ||
-          kc === 22 ||
-          keyNormalized === 'ArrowLeft' ||
-          keyNormalized === 'ArrowRight');
-      const isScrubConfirmKey =
-        scrubThumbnailsActive &&
-        focusedOnScrub &&
-        (kc === 23 || keyNormalized === 'Enter' || keyNormalized === ' ');
+      const isLeft =
+        kc === 412 || kc === 21 || keyNormalized === 'ArrowLeft';
+      const isRight =
+        kc === 417 || kc === 22 || keyNormalized === 'ArrowRight';
+      const isConfirm =
+        kc === 23 || keyNormalized === 'Enter' || keyNormalized === ' ';
 
-      if (isScrubNavKey && (focusedOnScrub || !showControls)) {
+      // --- Scrub : flèches = preview vignettes UNIQUEMENT (jamais onSeek / reload HLS) ---
+      if (scrubThumbnailsActiveRef.current && (isLeft || isRight)) {
         e.preventDefault();
         e.stopPropagation();
-        if (!showControls) setShowControls(true);
-
-        const count = scrubThumbnailsRef.current?.count ?? 0;
-        if (count <= 0) return;
-
-        setFocusedOnProgress(false);
-        setFocusedOnScrub(true);
-
-        if (kc === 412 || keyNormalized === 'ArrowLeft') {
-          hasUserNavigatedScrubRef.current = true;
-          setTvScrubIndex((prev) => Math.max(0, prev - 1));
-          resetControlsTimeout();
-          return;
-        }
-        if (kc === 417 || keyNormalized === 'ArrowRight') {
-          hasUserNavigatedScrubRef.current = true;
-          setTvScrubIndex((prev) => Math.min(count - 1, prev + 1));
-          resetControlsTimeout();
-          return;
-        }
-      }
-      if (isScrubConfirmKey) {
-        e.preventDefault();
-        e.stopPropagation();
-        const targetTime = timeForScrubIndex(tvScrubIndexRef.current);
-        onScrubSeekRef.current?.(targetTime);
+        if (!showControlsRef.current) setShowControls(true);
+        navigateScrub(isLeft ? 'left' : 'right');
         resetControlsTimeout();
         return;
       }
 
-      // --- Codes webOS seek (hors mode scrub) ---
-      if (kc === 412) {
+      // Confirm scrub (Enter / OK)
+      if (scrubThumbnailsActiveRef.current && focusedOnScrubRef.current && isConfirm) {
         e.preventDefault();
-        recordKeyDown('left');
-        onSeek('left', getSeekStep('left'));
-        return;
-      }
-      if (kc === 417) {
-        e.preventDefault();
-        recordKeyDown('right');
-        onSeek('right', getSeekStep('right'));
+        e.stopPropagation();
+        if (scrubAutoSeekTimeoutRef.current != null) {
+          window.clearTimeout(scrubAutoSeekTimeoutRef.current);
+          scrubAutoSeekTimeoutRef.current = null;
+        }
+        if (hasUserNavigatedScrubRef.current) {
+          commitScrubSeek();
+        } else {
+          // Enter sans navigation → play/pause via contrôles
+          if (showControlsRef.current) {
+            const control = controls[focusedControlIndex];
+            if (control) control.action();
+          } else onPlayPause();
+        }
+        resetControlsTimeout();
         return;
       }
 
-      if (!showControls && [' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(keyNormalized)) {
+      // --- Sans scrub : preview + settle (pas de seek à chaque flèche) ---
+      if (!scrubThumbnailsActiveRef.current && (isLeft || isRight)) {
+        e.preventDefault();
+        e.stopPropagation();
+        navigatePreviewSeek(isLeft ? 'left' : 'right');
+        resetControlsTimeout();
+        return;
+      }
+
+      if (
+        !showControlsRef.current &&
+        [' ', 'Enter', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(keyNormalized)
+      ) {
         setShowControls(true);
       }
 
-      if (isTV && showControls && keyNormalized) resetControlsTimeout();
+      if (showControlsRef.current && keyNormalized) resetControlsTimeout();
 
       switch (keyNormalized) {
         case ' ':
         case 'Enter':
           e.preventDefault();
-          if (showControls) {
+          // Commit preview en cours si présent
+          if (previewTargetTimeRef.current != null) {
+            if (previewSeekTimeoutRef.current != null) {
+              window.clearTimeout(previewSeekTimeoutRef.current);
+              previewSeekTimeoutRef.current = null;
+            }
+            commitPreviewSeek();
+            return;
+          }
+          if (showControlsRef.current) {
             if (focusedOnProgress) onPlayPause();
             else {
               const control = controls[focusedControlIndex];
@@ -308,31 +430,15 @@ export function useTVPlayerNavigation({
             }
           } else onPlayPause();
           break;
-        case 'ArrowLeft': {
-          e.preventDefault();
-          const stepLeft = getSeekStep('left');
-          recordKeyDown('left');
-          onSeek('left', stepLeft);
-          break;
-        }
-        case 'ArrowRight': {
-          e.preventDefault();
-          const stepRight = getSeekStep('right');
-          recordKeyDown('right');
-          onSeek('right', stepRight);
-          break;
-        }
         case 'ArrowUp':
           e.preventDefault();
-          if (showControls) {
-            // En mode vignettes scrub : ↑ met le focus sur les vignettes (ou remonte dans les boutons si déjà dessus).
-            if (scrubThumbnailsActive) {
+          if (showControlsRef.current) {
+            if (scrubThumbnailsActiveRef.current) {
               setFocusedOnProgress(false);
-              if (!focusedOnScrub) {
+              if (!focusedOnScrubRef.current) {
                 setFocusedOnScrub(true);
                 return;
               }
-              // Déjà sur scrub → remonter dans les boutons
               setFocusedOnScrub(false);
               setFocusedControlIndex(Math.max(0, focusedControlIndex - 1));
               return;
@@ -349,18 +455,19 @@ export function useTVPlayerNavigation({
           break;
         case 'ArrowDown':
           e.preventDefault();
-          if (showControls) {
-            // En mode vignettes scrub : ↓ descend vers les boutons depuis scrub.
-            if (scrubThumbnailsActive) {
+          if (showControlsRef.current) {
+            if (scrubThumbnailsActiveRef.current) {
               setFocusedOnProgress(false);
-              if (focusedOnScrub) {
+              if (focusedOnScrubRef.current) {
                 setFocusedOnScrub(false);
-                // garder l'index actuel, ou revenir au premier bouton si out of range
-                setFocusedControlIndex((idx) => Math.min(Math.max(0, idx), Math.max(0, controls.length - 1)));
+                setFocusedControlIndex((idx) =>
+                  Math.min(Math.max(0, idx), Math.max(0, controls.length - 1)),
+                );
                 return;
               }
-              if (focusedControlIndex < controls.length - 1) setFocusedControlIndex(focusedControlIndex + 1);
-              else onVolumeChange('down');
+              if (focusedControlIndex < controls.length - 1) {
+                setFocusedControlIndex(focusedControlIndex + 1);
+              } else onVolumeChange('down');
               return;
             }
             if (focusedOnProgress) {
@@ -385,15 +492,14 @@ export function useTVPlayerNavigation({
           break;
       }
     };
+
     const handleWebOSBack = () => handleBack();
     const handleKeyUp = (e: KeyboardEvent) => {
       const kc = e.keyCode ?? e.which;
       const key = e.key || (kc === 37 ? 'ArrowLeft' : kc === 39 ? 'ArrowRight' : '');
       if (key === 'ArrowLeft' || key === 'ArrowRight' || kc === 412 || kc === 417) recordKeyUp();
     };
-    // Phase capture : intercepter toutes les touches avant que le DOM ne déplace le focus.
-    // On garde `window` (le plus standard). Éviter `document` pour ne pas double-déclencher selon les WebViews.
-    if (!isTV) return;
+
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('webosback', handleWebOSBack);
@@ -402,21 +508,32 @@ export function useTVPlayerNavigation({
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('webosback', handleWebOSBack);
     };
-  }, [showControls, focusedControlIndex, focusedOnProgress, scrubThumbnailsActive, onPlayPause, onSeek, onVolumeChange, onToggleMute, onToggleFullscreen, onClose, onOpenQualityMenu, controls, setShowControls, getSeekStep, recordKeyDown, recordKeyUp]);
+  }, [
+    isTV,
+    hasBack,
+    focusedControlIndex,
+    focusedOnProgress,
+    controls,
+    onPlayPause,
+    onSeek,
+    onVolumeChange,
+    onToggleMute,
+    onToggleFullscreen,
+    onClose,
+    setShowControls,
+    getSeekStep,
+    recordKeyDown,
+    recordKeyUp,
+    progressBarRef,
+  ]);
 
-  // Sur TV : afficher les contrôles au montage uniquement. Ne pas forcer la réaffichage
-  // quand ils se cachent (sinon ils ne se cachent jamais). Le keydown handler affiche
-  // déjà les contrôles quand l'utilisateur appuie sur une touche.
   useEffect(() => {
     if (isTV) setShowControls(true);
   }, [isTV, setShowControls]);
 
-  // Sur TV : mettre le focus sur la barre de progression quand les contrôles s'affichent.
-  // En mode scrub (miniatures), on ne focus pas la barre : la navigation se fait via le keyboard handler.
   useEffect(() => {
     if (!isTV || !showControls) return;
     if (scrubThumbnailsActive) {
-      // Pas de focus DOM : le carousel est piloté par tvScrubIndex.
       setFocusedOnProgress(false);
       return;
     }
@@ -425,7 +542,6 @@ export function useTVPlayerNavigation({
     return () => clearTimeout(id);
   }, [isTV, showControls, scrubThumbnailsActive]);
 
-  // Sur TV : masquer les contrôles après 5 s d'inactivité.
   useEffect(() => {
     if (!isTV || !showControls) {
       if (controlsTimeoutRef.current) {
@@ -434,9 +550,8 @@ export function useTVPlayerNavigation({
       }
       return;
     }
-    // En navigation vignettes : ne pas planifier l'auto-hide.
     if (scrubThumbnailsActive && focusedOnScrubRef.current) return;
-    if (controlsTimeoutRef.current !== null) return; // déjà un masquage programmé
+    if (controlsTimeoutRef.current !== null) return;
     controlsTimeoutRef.current = window.setTimeout(() => {
       controlsTimeoutRef.current = null;
       setShowControls(false);
@@ -445,12 +560,17 @@ export function useTVPlayerNavigation({
     return () => {};
   }, [isTV, showControls, setShowControls, scrubThumbnailsActive, focusedOnScrub]);
 
-  // Cleanup du timer au démontage du lecteur.
   useEffect(() => {
     return () => {
       if (controlsTimeoutRef.current) {
         clearTimeout(controlsTimeoutRef.current);
         controlsTimeoutRef.current = null;
+      }
+      if (scrubAutoSeekTimeoutRef.current != null) {
+        window.clearTimeout(scrubAutoSeekTimeoutRef.current);
+      }
+      if (previewSeekTimeoutRef.current != null) {
+        window.clearTimeout(previewSeekTimeoutRef.current);
       }
     };
   }, []);
