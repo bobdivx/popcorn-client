@@ -17,6 +17,7 @@ import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
 import { useDebouncedVideoWaiting } from '../player-shared/hooks/useDebouncedVideoWaiting';
+import { formatTime } from '../player-shared/utils/formatTime';
 
 export default function HLSPlayer({ 
   src, 
@@ -212,7 +213,7 @@ export default function HLSPlayer({
 
   const [showControls, setShowControls] = useState(baseShowControls);
   const [transcodingsEvictedMessage, setTranscodingsEvictedMessage] = useState<string | null>(null);
-  const [seekFeedback, setSeekFeedback] = useState<{ direction: 'left' | 'right'; seconds: number } | null>(null);
+  const [seekFeedback, setSeekFeedback] = useState<{ direction: 'left' | 'right'; seconds: number; targetTime?: number } | null>(null);
   const seekFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -225,13 +226,31 @@ export default function HLSPlayer({
       ? Math.max(0, currentTime - stepSeconds)
       : Math.min(duration, currentTime + stepSeconds);
     seekToTargetTime(newTime);
-    // Retour visuel seek : afficher "-10 s" ou "+10 s" pendant ~800 ms
     if (seekFeedbackTimeoutRef.current) clearTimeout(seekFeedbackTimeoutRef.current);
-    setSeekFeedback({ direction, seconds: stepSeconds });
+    setSeekFeedback({ direction, seconds: stepSeconds, targetTime: newTime });
     seekFeedbackTimeoutRef.current = setTimeout(() => {
       setSeekFeedback(null);
       seekFeedbackTimeoutRef.current = null;
     }, 800);
+  };
+
+  /** Preview télécommande sans seek (flèches) — le commit arrive via onScrubSeek au settle / Enter. */
+  const handleSeekPreview = (
+    info: { targetTime: number; direction: 'left' | 'right'; stepSeconds: number } | null,
+  ) => {
+    if (seekFeedbackTimeoutRef.current) {
+      clearTimeout(seekFeedbackTimeoutRef.current);
+      seekFeedbackTimeoutRef.current = null;
+    }
+    if (!info) {
+      setSeekFeedback(null);
+      return;
+    }
+    setSeekFeedback({
+      direction: info.direction,
+      seconds: info.stepSeconds,
+      targetTime: info.targetTime,
+    });
   };
 
   const handleDoubleTap = (direction: 'left' | 'right') => {
@@ -369,6 +388,7 @@ export default function HLSPlayer({
     progressBarRef,
     scrubThumbnails: scrubThumbnails?.mediaId && scrubThumbnails.count > 0 ? scrubThumbnails : null,
     onScrubSeek: seekToTargetTime,
+    onSeekPreview: handleSeekPreview,
   });
 
   useTouchGestures({
@@ -441,12 +461,14 @@ export default function HLSPlayer({
         )}
         {seekFeedback && (
           <div
-            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-6 py-3 rounded-lg bg-black/85 text-white text-2xl font-semibold shadow-lg animate-pulse"
+            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-6 py-3 rounded-lg bg-black/85 text-white text-2xl font-semibold shadow-lg"
             role="status"
           >
-            {seekFeedback.direction === 'left'
-              ? t('playback.seekBack', { seconds: seekFeedback.seconds })
-              : t('playback.seekForward', { seconds: seekFeedback.seconds })}
+            {seekFeedback.targetTime != null
+              ? formatTime(seekFeedback.targetTime)
+              : seekFeedback.direction === 'left'
+                ? t('playback.seekBack', { seconds: seekFeedback.seconds })
+                : t('playback.seekForward', { seconds: seekFeedback.seconds })}
           </div>
         )}
         {displayError && (
