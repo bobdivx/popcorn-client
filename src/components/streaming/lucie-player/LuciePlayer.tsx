@@ -16,6 +16,7 @@ import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
 import { useDebouncedVideoWaiting } from '../player-shared/hooks/useDebouncedVideoWaiting';
 import { formatTime } from '../player-shared/utils/formatTime';
+import { useEffectiveVideoFillMode } from '../player-shared/hooks/useEffectiveVideoFillMode';
 
 export default function LuciePlayer({ 
   src, 
@@ -52,6 +53,7 @@ export default function LuciePlayer({
   onSelectSeriesEpisode,
 }: LuciePlayerProps) {
   const playerConfig = usePlayerConfig();
+  const effectiveVideoFillMode = useEffectiveVideoFillMode(playerConfig.videoFillMode);
   const { t } = useI18n();
   const chromecast = useChromecast();
   const canAutoPlayRef = useRef<(() => boolean) | null>(null);
@@ -402,7 +404,10 @@ export default function LuciePlayer({
             backfaceVisibility: playerConfig.hardwareAcceleration ? 'hidden' : 'visible',
             width: '100%',
             height: '100%',
-            objectFit: playerConfig.videoFillMode ?? 'contain',
+            maxWidth: '100%',
+            maxHeight: '100%',
+            objectFit: effectiveVideoFillMode,
+            objectPosition: 'center center',
             display: 'block',
             backgroundColor: '#000',
           }}
