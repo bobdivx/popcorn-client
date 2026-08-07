@@ -233,28 +233,15 @@ export function createHandlePlay(context: PlayHandlerContext) {
         return;
       }
 
-      // Chemin bibliothèque mais fichiers sparses/vides (torrent à 0%)
-      try {
-        const sparseStats = await clientApi.getTorrent(torrent.infoHash);
-        if (
-          sparseStats &&
-          sparseStats.files_available !== true &&
-          (sparseStats.progress ?? 0) <= 0.001 &&
-          (sparseStats.downloaded_bytes ?? 0) <= 0
-        ) {
-          addDebugLog('error', 'Fichiers bibliothèque sparses/vides (torrent 0%)');
-          setIsAvailableLocally(false);
-          setErrorMessage(
-            'SPARSE_OR_EMPTY: Le fichier est sparse ou vide (aucune donnée téléchargée). Lecture impossible.'
-          );
-          setPlayStatus('error');
-          setIsPlaying(true);
-          setTorrentStats(sparseStats);
-          return;
-        }
-      } catch (_) {
-        // ignore
-      }
+      // Ancien garde-fou « torrent à 0% = sparse » : trop agressif (GET /torrents/{id}
+      // sans stats/v1 renvoyait progress=0 alors que le fichier était complet).
+      // Si loadVideoFiles n'a rien trouvé malgré isAvailableLocally, laisser tomber
+      // vers téléchargement / stream-torrent plutôt que d'afficher SPARSE_OR_EMPTY.
+      addDebugLog(
+        'warning',
+        'Bibliothèque marquée locale mais aucun fichier chargé — bascule téléchargement/stream'
+      );
+      setIsAvailableLocally(false);
     }
 
     // PRIORITÉ 1: Vérifier si le torrent existe déjà dans le client (réessais si 404 temporaire).

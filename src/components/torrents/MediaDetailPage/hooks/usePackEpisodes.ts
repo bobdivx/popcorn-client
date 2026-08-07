@@ -23,13 +23,28 @@ export interface PackEpisodesModel {
   episodesBySeason: Map<number, PackEpisodeItem[]>;
 }
 
-function parseSeasonEpisodeFromName(name: string): { season: number; episode: number } | null {
+/** Extrait SxxExx / NxN depuis un nom de fichier (pack saison). */
+export function parseSeasonEpisodeFromName(name: string): { season: number; episode: number } | null {
   const m = name.match(/[Ss](\d{1,2})[.\s-]*[Ee](\d{1,2})|(\d{1,2})[xX](\d{1,2})/);
   if (!m) return null;
   const s = parseInt(m[1] ?? m[3] ?? '1', 10);
   const e = parseInt(m[2] ?? m[4] ?? '1', 10);
   if (Number.isNaN(s) || Number.isNaN(e)) return null;
   return { season: s, episode: e };
+}
+
+/** Index du fichier du pack correspondant à un épisode (ordre list-files = only_files). */
+export function findPackFileIndexForEpisode(
+  files: Array<{ name?: string | null }>,
+  season: number,
+  episode: number,
+): number | null {
+  if (!files?.length || episode <= 0) return null;
+  for (let i = 0; i < files.length; i++) {
+    const se = parseSeasonEpisodeFromName(files[i]?.name || '');
+    if (se && se.season === season && se.episode === episode) return i;
+  }
+  return null;
 }
 
 function fileBaseName(p: string): string {

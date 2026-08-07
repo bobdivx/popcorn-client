@@ -14,6 +14,9 @@ import PlayerBufferingOverlay from '../player-shared/components/PlayerBufferingO
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
+import { useDebouncedVideoWaiting } from '../player-shared/hooks/useDebouncedVideoWaiting';
+import { formatTime } from '../player-shared/utils/formatTime';
+import { useEffectiveVideoFillMode } from '../player-shared/hooks/useEffectiveVideoFillMode';
 
 export default function LuciePlayer({ 
   src, 
@@ -50,6 +53,7 @@ export default function LuciePlayer({
   onSelectSeriesEpisode,
 }: LuciePlayerProps) {
   const playerConfig = usePlayerConfig();
+  const effectiveVideoFillMode = useEffectiveVideoFillMode(playerConfig.videoFillMode);
   const { t } = useI18n();
   const chromecast = useChromecast();
   const canAutoPlayRef = useRef<(() => boolean) | null>(null);
@@ -97,6 +101,7 @@ export default function LuciePlayer({
     currentTime,
     duration,
     bufferedPercent,
+    bufferedTimelinePercent,
     isSeeking,
     isMuted,
     volume,
@@ -149,7 +154,7 @@ export default function LuciePlayer({
     setShowControls(baseShowControls);
   }, [baseShowControls]);
 
-  const [seekFeedback, setSeekFeedback] = useState<{ direction: 'left' | 'right'; seconds: number } | null>(null);
+  const [seekFeedback, setSeekFeedback] = useState<{ direction: 'left' | 'right'; seconds: number; targetTime?: number } | null>(null);
   const seekFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSeekTV = (direction: 'left' | 'right', stepSeconds = 10) => {
@@ -159,11 +164,29 @@ export default function LuciePlayer({
       : Math.min(duration, currentTime + stepSeconds);
     seekToTargetTime(newTime);
     if (seekFeedbackTimeoutRef.current) clearTimeout(seekFeedbackTimeoutRef.current);
-    setSeekFeedback({ direction, seconds: stepSeconds });
+    setSeekFeedback({ direction, seconds: stepSeconds, targetTime: newTime });
     seekFeedbackTimeoutRef.current = setTimeout(() => {
       setSeekFeedback(null);
       seekFeedbackTimeoutRef.current = null;
     }, 800);
+  };
+
+  const handleSeekPreview = (
+    info: { targetTime: number; direction: 'left' | 'right'; stepSeconds: number } | null,
+  ) => {
+    if (seekFeedbackTimeoutRef.current) {
+      clearTimeout(seekFeedbackTimeoutRef.current);
+      seekFeedbackTimeoutRef.current = null;
+    }
+    if (!info) {
+      setSeekFeedback(null);
+      return;
+    }
+    setSeekFeedback({
+      direction: info.direction,
+      seconds: info.stepSeconds,
+      targetTime: info.targetTime,
+    });
   };
 
   const handleDoubleTap = (direction: 'left' | 'right') => {
@@ -305,26 +328,14 @@ export default function LuciePlayer({
     progressBarRef,
     scrubThumbnails: scrubThumbnails?.mediaId && scrubThumbnails.count > 0 ? scrubThumbnails : null,
     onScrubSeek: seekToTargetTime,
+    onSeekPreview: handleSeekPreview,
   });
 
-  const [isWaiting, setIsWaiting] = useState(false);
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const onWaiting = () => setIsWaiting(true);
-    const onReady = () => setIsWaiting(false);
-    video.addEventListener('waiting', onWaiting);
-    video.addEventListener('canplay', onReady);
-    video.addEventListener('playing', onReady);
-    return () => {
-      video.removeEventListener('waiting', onWaiting);
-      video.removeEventListener('canplay', onReady);
-      video.removeEventListener('playing', onReady);
-    };
-  }, [videoRef, src]);
+  const isWaiting = useDebouncedVideoWaiting(videoRef, [src]);
 
   const displayError = error;
-  const shouldShowBuffering = isLoading || isWaiting || (isSeeking && bufferedPercent < 100);
+  const shouldShowBuffering =
+    isLoading || isWaiting || (isSeeking && bufferedPercent < 95);
 
   if (displayError) {
     return <ErrorDisplay error={displayError} />;
@@ -357,12 +368,14 @@ export default function LuciePlayer({
       >
         {seekFeedback && (
           <div
-            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-6 py-3 rounded-lg bg-black/85 text-white text-2xl font-semibold shadow-lg animate-pulse"
+            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-6 py-3 rounded-lg bg-black/85 text-white text-2xl font-semibold shadow-lg"
             role="status"
           >
-            {seekFeedback.direction === 'left'
-              ? t('playback.seekBack', { seconds: seekFeedback.seconds })
-              : t('playback.seekForward', { seconds: seekFeedback.seconds })}
+            {seekFeedback.targetTime != null
+              ? formatTime(seekFeedback.targetTime)
+              : seekFeedback.direction === 'left'
+                ? t('playback.seekBack', { seconds: seekFeedback.seconds })
+                : t('playback.seekForward', { seconds: seekFeedback.seconds })}
           </div>
         )}
         {shouldShowBuffering && (
@@ -391,7 +404,10 @@ export default function LuciePlayer({
             backfaceVisibility: playerConfig.hardwareAcceleration ? 'hidden' : 'visible',
             width: '100%',
             height: '100%',
-            objectFit: playerConfig.videoFillMode ?? 'contain',
+            maxWidth: '100%',
+            maxHeight: '100%',
+            objectFit: effectiveVideoFillMode,
+            objectPosition: 'center center',
             display: 'block',
             backgroundColor: '#000',
           }}
@@ -415,7 +431,7 @@ export default function LuciePlayer({
           seriesEpisodeNum={seriesEpisode}
           showControls={showControls}
           isPlaying={isPlaying}
-          bufferedPercent={bufferedPercent}
+          bufferedPercent={bufferedTimelinePercent}
           currentTime={currentTime}
           duration={duration}
           isMuted={isMuted}

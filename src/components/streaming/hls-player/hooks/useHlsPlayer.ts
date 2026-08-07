@@ -12,7 +12,9 @@ import {
 } from '../../../../lib/streaming/torrent-storage';
 import { getOrCreateDeviceId } from '../../../../lib/utils/device-id';
 import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
+import { minBufferAfterSeekSec } from '../../player-core/policies/SeekPolicy';
 import { buildProxyUrl, normalizeStreamPath } from '../../player-core/utils/buildStreamUrl';
+import { getBufferAheadSeconds } from '../../player-shared/utils/bufferMetrics';
 
 interface UseHlsPlayerProps {
   src: string;
@@ -581,8 +583,16 @@ export function useHlsPlayer({
           seekLoadRetryCountRef.current = 0;
           initialLoad503RetryCountRef.current = 0;
           setLoadingStatusMessage(null);
-          setIsLoading(false);
-          onLoadingChangeRef.current?.(false);
+          // Ne pas lever isLoading trop tôt pendant un seek reload : le manifest
+          // arrive avant que les fragments soient jouables → overlay qui clignote.
+          const isSeekReload =
+            pendingSeekRef.current > 0 || seekLoadUrlRef.current != null;
+          if (!isSeekReload) {
+            setIsLoading(false);
+            onLoadingChangeRef.current?.(false);
+          } else {
+            setLoadingStatusMessage('Préparation du seek…');
+          }
           
           // Extraire la durée totale depuis la playlist HLS
           // La durée totale peut être obtenue depuis les niveaux de qualité
@@ -784,15 +794,38 @@ export function useHlsPlayer({
             console.log(`[SEEK FLOW] 4️⃣ LEVEL_LOADED: video.currentTime mis à jour de ${oldTime}s à ${pendingSeek}s (${Math.floor(pendingSeek / 60)}:${Math.floor(pendingSeek % 60).toString().padStart(2, '0')})`);
             const maxSeekVerifyRetries = 25;
             const toleranceSec = 1;
+            const minAhead = minBufferAfterSeekSec(!!isRemoteStream);
             let retries = 0;
+            const finishSeekSettle = () => {
+              seekLoadUrlRef.current = null;
+              setPendingSeekPosition(0);
+              setLoadingStatusMessage(null);
+              setIsLoading(false);
+              onLoadingChangeRef.current?.(false);
+              console.log(`[SEEK FLOW] ✅ Seek settled: pos≈${video.currentTime}s, bufAhead≥${minAhead}s`);
+            };
+            const waitForBufferAhead = () => {
+              if (seekVerifyTimeoutRef.current != null) clearTimeout(seekVerifyTimeoutRef.current);
+              const startedAt = Date.now();
+              const MAX_WAIT_MS = 25000;
+              const tick = () => {
+                seekVerifyTimeoutRef.current = null;
+                const ahead = getBufferAheadSeconds(video.buffered, pendingSeek);
+                if (ahead >= minAhead || Date.now() - startedAt >= MAX_WAIT_MS) {
+                  finishSeekSettle();
+                  return;
+                }
+                seekVerifyTimeoutRef.current = window.setTimeout(tick, 200);
+              };
+              tick();
+            };
             const runVerify = () => {
               if (seekVerifyTimeoutRef.current != null) clearTimeout(seekVerifyTimeoutRef.current);
               seekVerifyTimeoutRef.current = window.setTimeout(() => {
                 seekVerifyTimeoutRef.current = null;
                 const now = video.currentTime;
                 if (Math.abs(now - pendingSeek) <= toleranceSec || retries >= maxSeekVerifyRetries) {
-                  setPendingSeekPosition(0);
-                  setIsLoading(false);
+                  waitForBufferAhead();
                   return;
                 }
                 retries += 1;
