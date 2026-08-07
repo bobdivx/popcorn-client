@@ -121,8 +121,21 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         var isOtherTV = /webOS|Web0S/i.test(ua) || /AppleTV|Apple TV/i.test(ua);
         var isAndroidBrowserTV = /Android/i.test(ua) && w >= 1280 && h >= 720 && w > h;
         var isForcedTV = window.location.search.indexOf('tv=1') !== -1;
-        var isTV = isTauriAndroidTV || isTauriFallback || isAndroidTVUA || isTVGeneric || isOtherTV || isAndroidBrowserTV || isForcedTV;
-        if (isTV) document.documentElement.setAttribute('data-tv-platform', 'true');
+        var isWebOSBuild = document.documentElement.getAttribute('data-webos') === 'true';
+        // App « simple » / navigateur TV : pas de build WEBOS, on se base sur l’UA + APIs LG.
+        var isWebOSRuntime = /webOS|Web0S|WebAppManager|NetCast/i.test(ua)
+          || typeof window.webOS !== 'undefined'
+          || typeof window.PalmSystem !== 'undefined';
+        var isWebOS = isWebOSBuild || isWebOSRuntime;
+        var isTV = isTauriAndroidTV || isTauriFallback || isAndroidTVUA || isTVGeneric || isOtherTV || isAndroidBrowserTV || isForcedTV || isWebOS;
+        if (isTV) {
+          document.documentElement.setAttribute('data-tv-platform', 'true');
+          try { sessionStorage.setItem('popcorn_is_tv', '1'); } catch (e) {}
+        }
+        if (isWebOS) {
+          document.documentElement.setAttribute('data-webos', 'true');
+          try { sessionStorage.setItem('popcorn_is_webos', '1'); } catch (e) {}
+        }
       })();
     </script>
     <script is:inline>
