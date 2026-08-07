@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from 'preact/hooks';
-import { isTVPlatform } from '../../../../lib/utils/device-detection';
+import { isTVPlatform, isWebOSTV, stampTvPlatformHints } from '../../../../lib/utils/device-detection';
 import { useSeekStepAcceleration } from './useSeekStepAcceleration';
 
 const BACK_KEY_CODES = [27, 8, 461, 4];
@@ -8,6 +8,9 @@ const BACK_KEYS = ['Escape', 'Backspace', 'Back', 'BrowserBack', 'GoBack'];
 /** Après arrêt des flèches : un seul seek vers la vignette / position preview. */
 const SCRUB_SETTLE_MS = 1200;
 const PREVIEW_SETTLE_MS = 1000;
+/** webOS : hide plus rapide ; autres TV : 5s. */
+const CONTROLS_HIDE_MS_WEBOS = 3200;
+const CONTROLS_HIDE_MS_TV = 5000;
 
 export interface SeekPreviewInfo {
   targetTime: number;
@@ -30,6 +33,8 @@ interface UseTVPlayerNavigationProps {
   currentTime: number;
   /** Si false, ne pas auto-masquer (pause). */
   isPlaying?: boolean;
+  /** Vidéo courante — cross-check pause sur webOS (isPlaying peut rester faux). */
+  videoRef?: { current: HTMLVideoElement | null };
   progressBarRef?: { current: HTMLElement | null };
   /** Miniatures scrub : flèches = naviguer les vignettes, Enter / settle = seek. */
   scrubThumbnails?: { count: number; intervalSeconds?: number; durationSeconds?: number } | null;
@@ -56,15 +61,27 @@ export function useTVPlayerNavigation({
   duration,
   currentTime,
   isPlaying = true,
+  videoRef,
 }: UseTVPlayerNavigationProps) {
+  // App simple (URL) : stamp avant isTVPlatform() pour désactiver la Magic Remote / activer le hide.
+  stampTvPlatformHints();
   const [focusedControlIndex, setFocusedControlIndex] = useState(0);
   const [focusedOnProgress, setFocusedOnProgress] = useState(false);
   const [focusedOnScrub, setFocusedOnScrub] = useState(false);
-  const isTV = isTVPlatform();
+  const isTV = isTVPlatform() || isWebOSTV();
   const focusedOnScrubRef = useRef(false);
   focusedOnScrubRef.current = focusedOnScrub;
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
+  const videoRefInternal = useRef(videoRef?.current ?? null);
+  videoRefInternal.current = videoRef?.current ?? null;
+
+  /** true si la vidéo est réellement en pause (DOM prioritaire sur webOS). */
+  const isVideoPaused = () => {
+    const v = videoRefInternal.current;
+    if (v) return v.paused;
+    return !isPlayingRef.current;
+  };
 
   const scrubThumbnailsActive = !!(scrubThumbnails && scrubThumbnails.count > 0);
   const [tvScrubIndex, setTvScrubIndex] = useState(0);
@@ -133,7 +150,7 @@ export function useTVPlayerNavigation({
     if (!isTV) return;
     clearControlsHideTimeout();
     // En pause : garder les commandes visibles.
-    if (!isPlayingRef.current) return;
+    if (isVideoPaused()) return;
     // Pendant un scrub/preview : réessayer bientôt au lieu de laisser l’UI collée.
     if (isActivelyBrowsingTimeline()) {
       controlsTimeoutRef.current = window.setTimeout(() => {
@@ -142,13 +159,19 @@ export function useTVPlayerNavigation({
       }, 400);
       return;
     }
+    const hideMs = isWebOSTV() ? CONTROLS_HIDE_MS_WEBOS : CONTROLS_HIDE_MS_TV;
     controlsTimeoutRef.current = window.setTimeout(() => {
       controlsTimeoutRef.current = null;
-      if (!isPlayingRef.current) return;
+      if (isActivelyBrowsingTimeline()) {
+        scheduleControlsHide();
+        return;
+      }
+      // Pause réelle uniquement (DOM) — ne pas bloquer si isPlaying React a lag.
+      if (isVideoPaused()) return;
       setShowControls(false);
       setFocusedOnProgress(false);
       setFocusedOnScrub(false);
-    }, 5000);
+    }, hideMs);
   };
 
   const commitScrubSeek = () => {
@@ -583,11 +606,11 @@ export function useTVPlayerNavigation({
       clearControlsHideTimeout();
       return;
     }
-    if (!isPlaying) {
+    if (isVideoPaused()) {
       clearControlsHideTimeout();
       return;
     }
-    // Relancer le timer si absent (ex. après scrub settle / reprise lecture).
+    // Ne pas reset le timer à chaque render — sinon webOS ne masque jamais.
     if (controlsTimeoutRef.current !== null) return;
     scheduleControlsHide();
   }, [isTV, showControls, isPlaying, setShowControls]);

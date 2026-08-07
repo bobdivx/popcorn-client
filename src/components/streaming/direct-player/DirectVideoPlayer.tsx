@@ -202,6 +202,7 @@ export default function DirectVideoPlayer({
     duration,
     currentTime,
     isPlaying,
+    videoRef,
     progressBarRef,
     scrubThumbnails: scrubThumbnails?.mediaId && scrubThumbnails.count > 0 ? scrubThumbnails : null,
     onScrubSeek: seekToTargetTime,

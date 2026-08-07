@@ -385,6 +385,7 @@ export default function HLSPlayer({
     duration,
     currentTime,
     isPlaying,
+    videoRef,
     progressBarRef,
     scrubThumbnails: scrubThumbnails?.mediaId && scrubThumbnails.count > 0 ? scrubThumbnails : null,
     onScrubSeek: seekToTargetTime,
@@ -592,11 +593,16 @@ export default function HLSPlayer({
           onSelectSeriesEpisode={onSelectSeriesEpisode}
         />
         <div class="absolute inset-0 z-30 pointer-events-none">
-          <SkipIntroOverlay onSkip={handleSkipIntro} visible={showSkipIntro} />
+          <SkipIntroOverlay
+            onSkip={handleSkipIntro}
+            visible={showSkipIntro}
+            chromeVisible={effectiveShowControls}
+          />
           <NextEpisodeOverlay
             onNext={handleNextEpisode}
             visible={showNextEpisode}
             nextTitle={nextEpisodeInfo?.title}
+            chromeVisible={effectiveShowControls}
           />
         </div>
       </div>
