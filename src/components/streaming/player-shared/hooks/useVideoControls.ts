@@ -6,7 +6,7 @@ import {
   SEEK_RELOAD_MIN_BUFFERED_END_SEC,
 } from '../../player-core/policies/SeekPolicy';
 import { usePlayerConfig } from './usePlayerConfig';
-import { isTVPlatform } from '../../../../lib/utils/device-detection';
+import { isTVPlatform, isWebOSTV, stampTvPlatformHints } from '../../../../lib/utils/device-detection';
 import { toggleFullscreen } from './useFullscreen';
 import {
   getBufferAheadPercent,
@@ -59,6 +59,8 @@ export function useVideoControls({
   }, [hlsDuration]);
 
   useEffect(() => {
+    // App simple webOS (URL) : s’assurer que data-webos / data-tv-platform sont posés avant les listeners.
+    stampTvPlatformHints();
     const video = videoRef.current;
     if (!video || !hlsLoaded) return;
 
@@ -76,8 +78,8 @@ export function useVideoControls({
       clearControlsTimeout();
       if (!playerConfig.autoHideControls) return;
       if (video.paused) return;
-      // Sur TV, useTVPlayerNavigation gère son propre timer (5s) — éviter le double hide/race.
-      if (isTVPlatform()) return;
+      // Sur TV / webOS (app simple URL incluse), useTVPlayerNavigation gère le timer.
+      if (isTVPlatform() || isWebOSTV()) return;
       controlsTimeoutRef.current = window.setTimeout(() => {
         controlsTimeoutRef.current = null;
         if (!video.paused) setShowControls(false);
@@ -233,7 +235,7 @@ export function useVideoControls({
       }
     };
 
-    if (container && !isTVPlatform()) {
+    if (container && !(isTVPlatform() || isWebOSTV())) {
       container.addEventListener('mousemove', handleMouseMove);
       container.addEventListener('mouseleave', handleMouseLeave);
       container.addEventListener('touchstart', handleTouchStart, { passive: true });
@@ -266,7 +268,7 @@ export function useVideoControls({
     video.addEventListener('playing', handlePlayingUnmuteTV);
 
     return () => {
-      if (container && !isTVPlatform()) {
+      if (container && !(isTVPlatform() || isWebOSTV())) {
         container.removeEventListener('mousemove', handleMouseMove);
         container.removeEventListener('mouseleave', handleMouseLeave);
         container.removeEventListener('touchstart', handleTouchStart);

@@ -42,13 +42,36 @@ export function isMobileDevice(): boolean {
 }
 
 /**
- * Détecte si l'appareil est LG WebOS TV
+ * Détecte si l'appareil est LG WebOS TV.
+ * Couvre :
+ * - build IPK embarqué (`data-webos` au build)
+ * - app « simple » / navigateur TV qui charge l’URL du client (UA Web0S, window.webOS)
  */
 export function isWebOSTV(): boolean {
   if (typeof window === 'undefined') return false;
+  try {
+    if (document.documentElement.getAttribute('data-webos') === 'true') return true;
+  } catch {
+    // ignore
+  }
+  try {
+    if (sessionStorage.getItem('popcorn_is_webos') === '1') return true;
+  } catch {
+    // ignore
+  }
   const ua = navigator.userAgent || '';
-  if (/webOS|Web0S/i.test(ua)) return true;
+  // UA LG : "Web0S" (zéro) est le plus courant ; aussi WebAppManager / NetCast.
+  if (/webOS|Web0S|WebAppManager|NetCast/i.test(ua)) return true;
   if (typeof (window as any).webOS !== 'undefined') return true;
+  if (typeof (window as any).PalmSystem !== 'undefined') return true;
+  // IPK / WebView file://
+  if (
+    typeof location !== 'undefined' &&
+    location.protocol === 'file:' &&
+    /LG|NetCast|SmartTV|Large Screen/i.test(ua)
+  ) {
+    return true;
+  }
   return false;
 }
 
@@ -72,10 +95,37 @@ export function isTVPlatform(): boolean {
   if (typeof window !== 'undefined') {
     // Force via paramètre URL pour le test facile (?tv=1)
     if (window.location.search.includes('tv=1')) return true;
-    // Force via attribut HTML (DevTools)
-    if (document.documentElement.getAttribute('data-tv-platform') === 'true') return true;
+    try {
+      if (document.documentElement.getAttribute('data-tv-platform') === 'true') return true;
+      if (document.documentElement.getAttribute('data-webos') === 'true') return true;
+      if (sessionStorage.getItem('popcorn_is_tv') === '1') return true;
+    } catch {
+      // ignore
+    }
   }
   return isAndroidTV() || isWebOSTV() || isAppleTV();
+}
+
+/** Pose les attributs HTML + sessionStorage dès qu’on détecte webOS/TV (app simple URL incluse). */
+export function stampTvPlatformHints(): { isTV: boolean; isWebOS: boolean } {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return { isTV: false, isWebOS: false };
+  }
+  const webos = isWebOSTV();
+  const tv = isTVPlatform() || webos;
+  try {
+    if (webos) {
+      document.documentElement.setAttribute('data-webos', 'true');
+      sessionStorage.setItem('popcorn_is_webos', '1');
+    }
+    if (tv) {
+      document.documentElement.setAttribute('data-tv-platform', 'true');
+      sessionStorage.setItem('popcorn_is_tv', '1');
+    }
+  } catch {
+    // ignore
+  }
+  return { isTV: tv, isWebOS: webos };
 }
 
 /**
