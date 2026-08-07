@@ -298,10 +298,15 @@ export function VideoControls({
   const padding = isTV ? 'px-10 pt-10 pb-10' : isFullscreen ? 'px-8 pt-8 pb-8 md:px-12 md:pt-10 md:pb-10' : 'px-3 pt-3 pb-3 sm:px-6 sm:pt-6 sm:pb-6 md:px-8 md:pt-8 md:pb-8';
   const gap = isTV ? 'gap-8' : isFullscreen ? 'gap-6' : 'gap-2 sm:gap-4 md:gap-5';
 
-  // Indices de focus : back(0 si hasBack), play, mute, [quality], [cast], fullscreen
-  const qualityIndex = hasBackButton ? 3 : 2;
-  const castIndex = (showQualitySelector && onQualityChange ? (hasBackButton ? 4 : 3) : (hasBackButton ? 3 : 2));
-  const fullscreenIndex = (showCastButton && onCastClick ? castIndex + 1 : castIndex);
+  // Indices de focus : back(0 si hasBack), play, [mute si !TV], [quality], [cast], fullscreen
+  const playIndex = hasBackButton ? 1 : 0;
+  const muteIndex = isTV ? -1 : playIndex + 1;
+  const afterPlay = isTV ? playIndex + 1 : muteIndex + 1;
+  const qualityIndex = afterPlay;
+  const castIndex =
+    showQualitySelector && onQualityChange ? afterPlay + 1 : afterPlay;
+  const fullscreenIndex =
+    showCastButton && onCastClick ? castIndex + 1 : castIndex;
   const getFocusClass = (index: number) => {
     // Quand le focus est sur les vignettes, on n'affiche pas le ring sur les boutons.
     if (!isTV || focusedOnProgress || (scrubEnabled && tvScrubIndexExternal != null && tvScrubFocused)) return '';
@@ -738,7 +743,7 @@ export function VideoControls({
                 e.stopPropagation();
                 onPlayPause(); 
               }} 
-              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none relative z-40 ${getFocusClass(hasBackButton ? 1 : 0)}`}
+              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none relative z-40 ${getFocusClass(playIndex)}`}
             >
               {isPlaying ? <Pause class={`${iconSize} text-white`} /> : <Play class={`${iconSize} text-white ml-0.5`} />}
             </button>
@@ -772,32 +777,28 @@ export function VideoControls({
                 <SkipForward class={`${iconSize} text-white`} />
               </button>
             )}
+            {/* Volume : inutile sur TV (télécommande / OS gère le volume système). */}
+            {!isTV && (
             <div class="flex items-center gap-2 group/volume flex-shrink-0">
               <button 
                 onClick={(e) => { e.stopPropagation(); onToggleMute(); }} 
-                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${getFocusClass(hasBackButton ? 2 : 1)}`}
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${getFocusClass(muteIndex)}`}
               >
                 {isMuted || volume === 0 ? <VolumeX class={`${iconSize} text-white`} /> : volume < 0.5 ? <Volume1 class={`${iconSize} text-white`} /> : <Volume2 class={`${iconSize} text-white`} />}
               </button>
-              {!isTV && (
-                <div
-                  class="flex items-center w-20 sm:w-24 h-3 sm:h-2 bg-white/30 rounded-full cursor-pointer opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/volume:opacity-100 [@media(hover:hover)]:group-focus-within/volume:opacity-100 transition-opacity"
-                  onClick={onVolumeChange}
-                  role="slider"
-                  aria-label={t('playback.volumeLabel') || 'Volume'}
-                  aria-valuenow={Math.round(volumePercent)}
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                >
-                  <div class="h-full bg-white rounded-full" style={{ width: `${volumePercent}%` }} />
-                </div>
-              )}
-              {isTV && (
-                <div class="flex items-center w-40 h-2.5 bg-white/30 rounded-full">
-                  <div class="h-full bg-white rounded-full" style={{ width: `${volumePercent}%` }} />
-                </div>
-              )}
+              <div
+                class="flex items-center w-20 sm:w-24 h-3 sm:h-2 bg-white/30 rounded-full cursor-pointer opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/volume:opacity-100 [@media(hover:hover)]:group-focus-within/volume:opacity-100 transition-opacity"
+                onClick={onVolumeChange}
+                role="slider"
+                aria-label={t('playback.volumeLabel') || 'Volume'}
+                aria-valuenow={Math.round(volumePercent)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+              >
+                <div class="h-full bg-white rounded-full" style={{ width: `${volumePercent}%` }} />
+              </div>
             </div>
+            )}
             <div class={`flex items-center gap-2 text-white ${textSize} font-medium flex-shrink-0`}>
               <span>{formatTime(isDraggingScrub || scrubPreviewActiveDesktop ? previewTime : currentTime)}</span>
               <span class="text-white/50">/</span>
