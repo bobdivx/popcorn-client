@@ -49,7 +49,7 @@ export function useTVPlayerNavigation({
   setShowControls,
   onPlayPause,
   onSeek,
-  onVolumeChange,
+  onVolumeChange: _onVolumeChange,
   onToggleMute,
   onToggleFullscreen,
   onClose,
@@ -69,6 +69,7 @@ export function useTVPlayerNavigation({
   const [focusedOnProgress, setFocusedOnProgress] = useState(false);
   const [focusedOnScrub, setFocusedOnScrub] = useState(false);
   const isTV = isTVPlatform() || isWebOSTV();
+  void _onVolumeChange; // volume système TV — plus de volume in-app
   const focusedOnScrubRef = useRef(false);
   focusedOnScrubRef.current = focusedOnScrub;
   const isPlayingRef = useRef(isPlaying);
@@ -259,15 +260,14 @@ export function useTVPlayerNavigation({
   const { getSeekStep, recordKeyDown, recordKeyUp } = useSeekStepAcceleration();
   const hasBack = !!onClose;
   const controls = useMemo(() => {
-    const c = [
-      { id: 'playpause', action: onPlayPause },
-      { id: 'mute', action: onToggleMute },
-    ];
+    // Pas de mute/volume sur TV : le volume système est géré par la télécommande.
+    const c = [{ id: 'playpause', action: onPlayPause }];
+    if (!isTV) c.push({ id: 'mute', action: onToggleMute });
     if (onOpenQualityMenu) c.push({ id: 'quality', action: onOpenQualityMenu });
     c.push({ id: 'fullscreen', action: onToggleFullscreen });
     if (hasBack) c.unshift({ id: 'back', action: onClose! });
     return c;
-  }, [hasBack, onClose, onPlayPause, onToggleMute, onToggleFullscreen, onOpenQualityMenu]);
+  }, [isTV, hasBack, onClose, onPlayPause, onToggleMute, onToggleFullscreen, onOpenQualityMenu]);
 
   const isBackKey = (e: KeyboardEvent) =>
     BACK_KEYS.includes(e.key) || BACK_KEY_CODES.includes(e.keyCode ?? e.which);
@@ -506,8 +506,10 @@ export function useTVPlayerNavigation({
               } else {
                 setFocusedControlIndex(focusedControlIndex - 1);
               }
-            } else onVolumeChange('up');
-          } else onVolumeChange('up');
+            }
+            // Sur TV : pas de volume in-app (télécommande système).
+          }
+          // Contrôles masqués : ne pas intercepter le volume système.
           break;
         case 'ArrowDown':
           e.preventDefault();
@@ -523,7 +525,7 @@ export function useTVPlayerNavigation({
               }
               if (focusedControlIndex < controls.length - 1) {
                 setFocusedControlIndex(focusedControlIndex + 1);
-              } else onVolumeChange('down');
+              }
               return;
             }
             if (focusedOnProgress) {
@@ -531,13 +533,14 @@ export function useTVPlayerNavigation({
               setFocusedControlIndex(0);
             } else if (focusedControlIndex < controls.length - 1) {
               setFocusedControlIndex(focusedControlIndex + 1);
-            } else {
-              onVolumeChange('down');
             }
-          } else onVolumeChange('down');
+            // Sur TV : pas de volume in-app.
+          }
           break;
         case 'm':
         case 'M':
+          // Mute in-app inutile sur TV.
+          if (isTV) break;
           e.preventDefault();
           onToggleMute();
           break;
@@ -572,7 +575,6 @@ export function useTVPlayerNavigation({
     controls,
     onPlayPause,
     onSeek,
-    onVolumeChange,
     onToggleMute,
     onToggleFullscreen,
     onClose,
