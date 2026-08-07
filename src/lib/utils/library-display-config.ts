@@ -23,7 +23,8 @@ export interface LibraryDisplayConfig {
 
 const DEFAULTS: LibraryDisplayConfig = {
   showZeroSeedTorrents: true,
-  torrentsInitialLimit: 250,
+  // Premier paint rapide ; le reste se charge en arrière-plan (useInfiniteFilms/Series)
+  torrentsInitialLimit: 40,
   torrentsLoadMoreLimit: 100,
   torrentsRecentLimit: 50,
   mediaLanguages: [],

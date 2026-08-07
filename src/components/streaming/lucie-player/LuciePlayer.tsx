@@ -96,7 +96,9 @@ export default function LuciePlayer({
   const isFullscreen = useFullscreen();
   
   const {
-    showControls: baseShowControls,
+    showControls,
+    setShowControls,
+    revealControls,
     isPlaying,
     currentTime,
     duration,
@@ -147,12 +149,6 @@ export default function LuciePlayer({
   useEffect(() => {
     canAutoPlayRef.current = canAutoPlay;
   }, [canAutoPlay]);
-
-  const [showControls, setShowControls] = useState(baseShowControls);
-
-  useEffect(() => {
-    setShowControls(baseShowControls);
-  }, [baseShowControls]);
 
   const [seekFeedback, setSeekFeedback] = useState<{ direction: 'left' | 'right'; seconds: number; targetTime?: number } | null>(null);
   const seekFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -208,15 +204,6 @@ export default function LuciePlayer({
       seekFeedbackTimeoutRef.current = null;
     }, 800);
   };
-
-  useTouchGestures({
-    containerRef,
-    onDoubleTap: handleDoubleTap,
-    onSingleTap: () => {
-      setShowControls((prev) => !prev);
-    },
-    enabled: !isTV,
-  });
 
   useEffect(() => {
     return () => {
@@ -325,10 +312,24 @@ export default function LuciePlayer({
     onClose,
     duration,
     currentTime,
+    isPlaying,
     progressBarRef,
     scrubThumbnails: scrubThumbnails?.mediaId && scrubThumbnails.count > 0 ? scrubThumbnails : null,
     onScrubSeek: seekToTargetTime,
     onSeekPreview: handleSeekPreview,
+  });
+
+  useTouchGestures({
+    containerRef,
+    onDoubleTap: handleDoubleTap,
+    onSingleTap: () => {
+      if (showControls) {
+        setShowControls(false);
+      } else {
+        revealControls();
+      }
+    },
+    enabled: !isTV,
   });
 
   const isWaiting = useDebouncedVideoWaiting(videoRef, [src]);
