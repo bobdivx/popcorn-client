@@ -218,7 +218,7 @@ export function useVideoControls({
       }
     };
 
-    if (container) {
+    if (container && !isTVPlatform()) {
       container.addEventListener('mousemove', handleMouseMove);
       container.addEventListener('mouseleave', handleMouseLeave);
       container.addEventListener('touchstart', handleTouchStart, { passive: true });
@@ -251,7 +251,7 @@ export function useVideoControls({
     video.addEventListener('playing', handlePlayingUnmuteTV);
 
     return () => {
-      if (container) {
+      if (container && !isTVPlatform()) {
         container.removeEventListener('mousemove', handleMouseMove);
         container.removeEventListener('mouseleave', handleMouseLeave);
         container.removeEventListener('touchstart', handleTouchStart);
