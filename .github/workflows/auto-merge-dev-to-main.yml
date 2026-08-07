@@ -1,9 +1,11 @@
 name: Auto-merge dev to main (after Docker success)
 
 on:
+  workflow_dispatch:
   workflow_run:
     workflows:
       - Build and Publish Frontend Docker Image
+      - Build Frontend Docker (GitHub-hosted fallback)
     types:
       - completed
     branches:
@@ -15,11 +17,15 @@ permissions:
 
 concurrency:
   group: auto-merge-dev-to-main-client
-  cancel-in-progress: true
+  # Ne pas annuler un merge en cours quand un Docker cancelled/failed
+  # déclenche un run "skipped" concurrent.
+  cancel-in-progress: false
 
 jobs:
   open-and-auto-merge-pr:
-    if: github.event.workflow_run.conclusion == 'success'
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -79,6 +85,12 @@ jobs:
 
           if gh pr merge "${PR_NUMBER}" --auto --merge 2>/dev/null; then
             echo "Auto-merge enabled for PR #${PR_NUMBER}."
+            sleep 2
+            STATE="$(gh pr view "${PR_NUMBER}" --json state --jq .state 2>/dev/null || true)"
+            if [ "${STATE}" = "OPEN" ]; then
+              echo "PR still open after --auto; attempting direct merge…"
+              gh pr merge "${PR_NUMBER}" --merge || true
+            fi
           elif gh pr merge "${PR_NUMBER}" --merge; then
             echo "Direct merge succeeded for PR #${PR_NUMBER}."
           else
