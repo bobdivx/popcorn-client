@@ -17,7 +17,7 @@ export interface SeekPreviewInfo {
 
 interface UseTVPlayerNavigationProps {
   showControls: boolean;
-  setShowControls: (show: boolean) => void;
+  setShowControls: (show: boolean | ((prev: boolean) => boolean)) => void;
   onPlayPause: () => void;
   /** Seek immédiat (fallback boutons / sans preview). Préférer le chemin scrub/preview. */
   onSeek: (direction: 'left' | 'right', stepSeconds?: number) => void;
@@ -28,6 +28,8 @@ interface UseTVPlayerNavigationProps {
   onOpenQualityMenu?: () => void;
   duration: number;
   currentTime: number;
+  /** Si false, ne pas auto-masquer (pause). */
+  isPlaying?: boolean;
   progressBarRef?: { current: HTMLElement | null };
   /** Miniatures scrub : flèches = naviguer les vignettes, Enter / settle = seek. */
   scrubThumbnails?: { count: number; intervalSeconds?: number; durationSeconds?: number } | null;
@@ -53,6 +55,7 @@ export function useTVPlayerNavigation({
   onSeekPreview,
   duration,
   currentTime,
+  isPlaying = true,
 }: UseTVPlayerNavigationProps) {
   const [focusedControlIndex, setFocusedControlIndex] = useState(0);
   const [focusedOnProgress, setFocusedOnProgress] = useState(false);
@@ -60,6 +63,8 @@ export function useTVPlayerNavigation({
   const isTV = isTVPlatform();
   const focusedOnScrubRef = useRef(false);
   focusedOnScrubRef.current = focusedOnScrub;
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
 
   const scrubThumbnailsActive = !!(scrubThumbnails && scrubThumbnails.count > 0);
   const [tvScrubIndex, setTvScrubIndex] = useState(0);
@@ -127,10 +132,19 @@ export function useTVPlayerNavigation({
   const scheduleControlsHide = () => {
     if (!isTV) return;
     clearControlsHideTimeout();
-    // Garder l’UI visible seulement pendant un scrub/preview en cours — pas juste parce que le focus est sur les vignettes.
-    if (isActivelyBrowsingTimeline()) return;
+    // En pause : garder les commandes visibles.
+    if (!isPlayingRef.current) return;
+    // Pendant un scrub/preview : réessayer bientôt au lieu de laisser l’UI collée.
+    if (isActivelyBrowsingTimeline()) {
+      controlsTimeoutRef.current = window.setTimeout(() => {
+        controlsTimeoutRef.current = null;
+        scheduleControlsHide();
+      }, 400);
+      return;
+    }
     controlsTimeoutRef.current = window.setTimeout(() => {
       controlsTimeoutRef.current = null;
+      if (!isPlayingRef.current) return;
       setShowControls(false);
       setFocusedOnProgress(false);
       setFocusedOnScrub(false);
@@ -138,10 +152,11 @@ export function useTVPlayerNavigation({
   };
 
   const commitScrubSeek = () => {
-    if (!onScrubSeekRef.current) return;
     const targetTime = timeForScrubIndex(tvScrubIndexRef.current);
     hasUserNavigatedScrubRef.current = false;
-    onScrubSeekRef.current(targetTime);
+    if (onScrubSeekRef.current) {
+      onScrubSeekRef.current(targetTime);
+    }
     scheduleControlsHide();
   };
 
@@ -177,9 +192,10 @@ export function useTVPlayerNavigation({
     }, PREVIEW_SETTLE_MS) as unknown as number;
   };
 
-  // Initialiser l'index depuis la position courante quand les contrôles apparaissent.
+  // Sync l'index scrub avec la lecture tant que l'utilisateur ne navigue pas les vignettes.
   useEffect(() => {
     if (!isTV || !scrubThumbnailsActive || !showControls) return;
+    if (hasUserNavigatedScrubRef.current) return;
     const st = scrubThumbnails!;
     const dur = (st.durationSeconds ?? 0) > 0 ? st.durationSeconds! : duration;
     if (!dur || !st.count) {
@@ -188,9 +204,8 @@ export function useTVPlayerNavigation({
     }
     const interval = st.intervalSeconds && st.intervalSeconds > 0 ? st.intervalSeconds : dur / st.count;
     const idx = Math.min(st.count - 1, Math.max(0, Math.floor(currentTime / interval)));
-    setTvScrubIndex(idx);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync une fois à l'ouverture des contrôles
-  }, [isTV, scrubThumbnailsActive, showControls]);
+    setTvScrubIndex((prev) => (prev === idx ? prev : idx));
+  }, [isTV, scrubThumbnailsActive, showControls, currentTime, duration, scrubThumbnails]);
 
   // Focus scrub par défaut dès que les vignettes sont dispo.
   useEffect(() => {
@@ -545,8 +560,11 @@ export function useTVPlayerNavigation({
     progressBarRef,
   ]);
 
+  // Sur TV : dès l’ouverture, afficher puis programmer le masquage (même avec vignettes focus).
   useEffect(() => {
-    if (isTV) setShowControls(true);
+    if (!isTV) return;
+    setShowControls(true);
+    scheduleControlsHide();
   }, [isTV, setShowControls]);
 
   useEffect(() => {
@@ -565,11 +583,14 @@ export function useTVPlayerNavigation({
       clearControlsHideTimeout();
       return;
     }
-    // Ne pas démarrer un timer tant qu'un scrub/preview flèches est en cours.
-    if (isActivelyBrowsingTimeline()) return;
+    if (!isPlaying) {
+      clearControlsHideTimeout();
+      return;
+    }
+    // Relancer le timer si absent (ex. après scrub settle / reprise lecture).
     if (controlsTimeoutRef.current !== null) return;
     scheduleControlsHide();
-  }, [isTV, showControls, setShowControls]);
+  }, [isTV, showControls, isPlaying, setShowControls]);
 
   useEffect(() => {
     return () => {

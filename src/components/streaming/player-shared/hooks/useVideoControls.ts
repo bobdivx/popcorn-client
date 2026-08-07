@@ -65,18 +65,34 @@ export function useVideoControls({
     // Synchroniser l'état play/pause avec la vidéo (évite un bouton play fixe si la vidéo est déjà en lecture ou en pause)
     setIsPlaying(!video.paused);
 
-    // Si la vidéo est déjà en lecture (ex. autoplay, reprise), programmer le masquage des contrôles après quelques secondes (TV et desktop)
+    const clearControlsTimeout = () => {
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+        controlsTimeoutRef.current = null;
+      }
+    };
+
+    const scheduleAutoHide = () => {
+      clearControlsTimeout();
+      if (!playerConfig.autoHideControls) return;
+      if (video.paused) return;
+      // Sur TV, useTVPlayerNavigation gère son propre timer (5s) — éviter le double hide/race.
+      if (isTVPlatform()) return;
+      controlsTimeoutRef.current = window.setTimeout(() => {
+        controlsTimeoutRef.current = null;
+        if (!video.paused) setShowControls(false);
+      }, playerConfig.controlsTimeout);
+    };
+
+    // Si déjà en lecture (autoplay / reprise) : afficher puis masquer.
     if (!video.paused && playerConfig.autoHideControls) {
-      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-      controlsTimeoutRef.current = window.setTimeout(() => setShowControls(false), playerConfig.controlsTimeout);
+      setShowControls(true);
+      scheduleAutoHide();
     }
 
     const handleMouseMove = () => {
       setShowControls(true);
-      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-      controlsTimeoutRef.current = window.setTimeout(() => {
-        if (!video.paused && playerConfig.autoHideControls) setShowControls(false);
-      }, playerConfig.controlsTimeout);
+      scheduleAutoHide();
     };
 
     const handleMouseLeave = () => {
@@ -118,14 +134,16 @@ export function useVideoControls({
       }
       setIsPlaying(true);
       userPausedRef.current = false;
-      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-      if (playerConfig.autoHideControls) {
-        controlsTimeoutRef.current = window.setTimeout(() => setShowControls(false), playerConfig.controlsTimeout);
-      }
+      // Afficher brièvement les commandes puis auto-hide (desktop/mobile uniquement).
+      setShowControls(true);
+      scheduleAutoHide();
     };
 
     const handlePause = () => {
       setIsPlaying(false);
+      // Pendant un seek HLS, le navigateur peut émettre pause/play : ne pas coller l’UI.
+      if (video.seeking) return;
+      clearControlsTimeout();
       setShowControls(true);
     };
 
@@ -153,10 +171,7 @@ export function useVideoControls({
     const container = video.parentElement?.parentElement;
     const handleTouchStart = () => {
       setShowControls(true);
-      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-      controlsTimeoutRef.current = window.setTimeout(() => {
-        if (!video.paused && playerConfig.autoHideControls) setShowControls(false);
-      }, playerConfig.controlsTimeout);
+      scheduleAutoHide();
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -359,8 +374,22 @@ export function useVideoControls({
 
   const displayCurrentTime = pendingSeekPosition > 0 && isLoading ? pendingSeekPosition : currentTime;
 
+  /** Affiche les contrôles et programme le masquage (desktop/mobile). Sur TV, no-op timer (TV hook). */
+  const revealControls = useCallback(() => {
+    setShowControls(true);
+    const video = videoRef.current;
+    if (!video || video.paused || !playerConfig.autoHideControls || isTVPlatform()) return;
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    controlsTimeoutRef.current = window.setTimeout(() => {
+      controlsTimeoutRef.current = null;
+      if (videoRef.current && !videoRef.current.paused) setShowControls(false);
+    }, playerConfig.controlsTimeout);
+  }, [playerConfig.autoHideControls, playerConfig.controlsTimeout, videoRef]);
+
   return {
     showControls,
+    setShowControls,
+    revealControls,
     isPlaying,
     currentTime: displayCurrentTime,
     duration,

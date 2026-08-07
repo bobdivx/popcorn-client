@@ -263,6 +263,7 @@ export function VideoControls({
     setScrubFromPercent,
     stepScrubIndex,
     progressPercent,
+    playheadPercent,
     isDraggingScrub,
     beginScrubDrag,
     updateScrubDrag,
@@ -703,10 +704,11 @@ export function VideoControls({
                 aria-hidden
               />
             )}
-            {/* Curseur de position */}
+            {/* Curseur de position (tête de lecture) — glass, suit toujours currentTime */}
             <div
-              class={`absolute top-1/2 -translate-y-1/2 ${isTV ? 'w-6 h-6' : 'w-4 h-4'} bg-purple-600 rounded-full transition-[opacity,transform] border-2 border-white opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/progress:opacity-100 [@media(hover:hover)]:group-focus-within/progress:opacity-100`}
-              style={{ left: `calc(${progressPercent}% - ${progressPercent > 0 && progressPercent < 100 ? (isTV ? '12px' : '8px') : progressPercent === 100 ? (isTV ? '24px' : '16px') : '0px'})` }}
+              class={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${isTV ? 'w-6 h-6' : 'w-4 h-4'} rounded-full transition-[opacity,transform] opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/progress:opacity-100 [@media(hover:hover)]:group-focus-within/progress:opacity-100 bg-white/25 backdrop-blur-md border border-white/55 shadow-[0_0_12px_rgba(168,85,247,0.35),inset_0_1px_0_rgba(255,255,255,0.35)] ring-1 ring-purple-400/40`}
+              style={{ left: `${playheadPercent}%` }}
+              aria-hidden
             />
           </div>
           {/* Carrousel de miniatures (module dédié : ./video-controls/) */}
