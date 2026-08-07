@@ -6,7 +6,7 @@ import { isTVPlatform } from '../../../../lib/utils/device-detection';
 interface SkipIntroOverlayProps {
   onSkip: () => void;
   visible: boolean;
-  /** Si true, remonte le bouton au-dessus de la barre + miniatures. */
+  /** Si true, le chrome lecteur est ouvert (barre + miniatures). */
   chromeVisible?: boolean;
 }
 
@@ -30,7 +30,7 @@ export function SkipIntroOverlay({ onSkip, visible, chromeVisible = false }: Ski
   }, [visible]);
 
   useEffect(() => {
-    // Ne pas voler le focus TV tant que le chrome lecteur est ouvert (conflit télécommande).
+    // Ne pas voler le focus TV tant que le chrome lecteur est ouvert.
     if (!shown || !isTV || chromeVisible) return;
     const id = window.setTimeout(() => btnRef.current?.focus(), 50);
     return () => clearTimeout(id);
@@ -38,23 +38,30 @@ export function SkipIntroOverlay({ onSkip, visible, chromeVisible = false }: Ski
 
   if (!mounted) return null;
 
-  // Chrome ouvert (miniatures + boutons) : remonter clairement au-dessus.
-  // Chrome masqué : bas-droite type Netflix.
-  const bottom = chromeVisible
-    ? isTV
-      ? 'calc(15.5rem + env(safe-area-inset-bottom, 0px))'
-      : 'calc(11rem + env(safe-area-inset-bottom, 0px))'
-    : 'calc(5rem + env(safe-area-inset-bottom, 0px))';
+  // TV : milieu-droite (hors de la zone barre/miniatures), style Netflix.
+  // Desktop : bas-droite, remonté si chrome ouvert.
+  const positionStyle = isTV
+    ? {
+        top: '48%',
+        right: 'calc(2rem + env(safe-area-inset-right, 0px))',
+        bottom: 'auto' as const,
+        transform: shown ? 'translateY(-50%)' : 'translateY(calc(-50% + 8px))',
+      }
+    : {
+        bottom: chromeVisible
+          ? 'calc(11rem + env(safe-area-inset-bottom, 0px))'
+          : 'calc(5rem + env(safe-area-inset-bottom, 0px))',
+        right: 'calc(1rem + env(safe-area-inset-right, 0px))',
+        top: 'auto' as const,
+        transform: shown ? 'translateY(0)' : 'translateY(8px)',
+      };
 
   return (
     <div
-      className={`player-overlay absolute z-30 transition-[opacity,transform,bottom] duration-200 ease-out ${
-        shown ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-2 pointer-events-none'
+      className={`player-overlay absolute z-40 transition-[opacity,transform,bottom,top] duration-200 ease-out ${
+        shown ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
       }`}
-      style={{
-        bottom,
-        right: 'calc(1rem + env(safe-area-inset-right, 0px))',
-      }}
+      style={positionStyle}
       aria-hidden={!shown}
     >
       <button
@@ -64,7 +71,7 @@ export function SkipIntroOverlay({ onSkip, visible, chromeVisible = false }: Ski
         data-focusable
         data-player-overlay-action
         tabIndex={0}
-        className="flex items-center gap-2 px-4 py-2.5 min-h-11 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md border-2 border-white/25 text-white font-medium text-sm shadow-lg transition-[opacity,transform,background-color] duration-200 focus:outline-none focus:ring-2 focus:ring-primary-400 active:scale-95"
+        className="flex items-center gap-2 px-5 py-3 min-h-12 rounded-full bg-black/55 hover:bg-black/70 backdrop-blur-md border-2 border-white/35 text-white font-semibold text-sm sm:text-base shadow-[0_8px_28px_rgba(0,0,0,0.45)] transition-[opacity,transform,background-color] duration-200 focus:outline-none focus:ring-2 focus:ring-primary-400 active:scale-95"
         aria-label={t('interfaceSettings.skipIntro')}
       >
         <SkipForward className="w-5 h-5 shrink-0" />
