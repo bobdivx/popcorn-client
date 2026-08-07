@@ -134,7 +134,9 @@ export default function HLSPlayer({
     typeof infoHash === 'string' && infoHash.startsWith('local_');
   
   const {
-    showControls: baseShowControls,
+    showControls,
+    setShowControls,
+    revealControls,
     isPlaying,
     currentTime,
     duration,
@@ -213,14 +215,9 @@ export default function HLSPlayer({
     setShowSubtitleSelector,
   } = useHlsTracks({ videoRef, hlsRef, hlsLoaded, src });
 
-  const [showControls, setShowControls] = useState(baseShowControls);
   const [transcodingsEvictedMessage, setTranscodingsEvictedMessage] = useState<string | null>(null);
   const [seekFeedback, setSeekFeedback] = useState<{ direction: 'left' | 'right'; seconds: number; targetTime?: number } | null>(null);
   const seekFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    setShowControls(baseShowControls);
-  }, [baseShowControls]);
 
   const handleSeekTV = (direction: 'left' | 'right', stepSeconds = 10) => {
     if (!duration) return;
@@ -387,6 +384,7 @@ export default function HLSPlayer({
     onOpenQualityMenu: onQualityChange != null ? () => openQualityMenuRef.current?.() : undefined,
     duration,
     currentTime,
+    isPlaying,
     progressBarRef,
     scrubThumbnails: scrubThumbnails?.mediaId && scrubThumbnails.count > 0 ? scrubThumbnails : null,
     onScrubSeek: seekToTargetTime,
@@ -397,7 +395,11 @@ export default function HLSPlayer({
     containerRef,
     onDoubleTap: handleDoubleTap,
     onSingleTap: () => {
-      setShowControls((prev) => !prev);
+      if (showControls) {
+        setShowControls(false);
+      } else {
+        revealControls();
+      }
     },
     enabled: !isTV,
   });

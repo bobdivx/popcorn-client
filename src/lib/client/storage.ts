@@ -96,7 +96,7 @@ export class PreferencesManager {
       autoplay: false,
       quality: 'auto',
       showZeroSeedTorrents: true,
-      torrentsInitialLimit: 100,
+      torrentsInitialLimit: 40,
       torrentsLoadMoreLimit: 50,
       torrentsRecentLimit: 50,
       mediaLanguages: [],

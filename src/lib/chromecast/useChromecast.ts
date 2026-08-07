@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { isTVPlatform, isWebOSTV } from '../utils/device-detection';
 
 declare global {
   interface Window {
@@ -99,6 +100,14 @@ export function useChromecast(): UseChromecastReturn {
 
   useEffect(() => {
     mountedRef.current = true;
+
+    // Cast sender inutile / trompeur sur TV (webOS etc.) — on est déjà sur le téléviseur.
+    if (isTVPlatform() || isWebOSTV()) {
+      setIsAvailable(false);
+      return () => {
+        mountedRef.current = false;
+      };
+    }
 
     ensureCastSdkLoaded()
       .then(() => {
