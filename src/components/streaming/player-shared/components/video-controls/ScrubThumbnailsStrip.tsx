@@ -1,3 +1,4 @@
+import { useRef } from 'preact/hooks';
 import { ChevronLeft, ChevronRight } from 'lucide-preact';
 import type { ScrubThumbnailsMeta } from '../../types/scrubThumbnails';
 import { formatTime } from '../../utils/formatTime';
@@ -24,6 +25,9 @@ interface ScrubThumbnailsStripProps {
   nextThumbnailLabel: string;
 }
 
+/** Seuil px pour avancer d'une vignette au swipe. */
+const SWIPE_STEP_PX = 48;
+
 export function ScrubThumbnailsStrip({
   scrubEnabled,
   scrubThumbnailsLoading,
@@ -42,13 +46,21 @@ export function ScrubThumbnailsStrip({
   previousThumbnailLabel,
   nextThumbnailLabel,
 }: ScrubThumbnailsStripProps) {
+  const swipeRef = useRef<{
+    x: number;
+    y: number;
+    lastStepX: number;
+    moved: boolean;
+    axis: 'h' | 'v' | null;
+  } | null>(null);
+  const suppressClickUntilRef = useRef(0);
+
   if (!showControls) return null;
 
   const tileClass = isMobile
-    ? 'relative rounded-xl overflow-hidden bg-black/70 border flex-none w-[30vw] max-w-[9.5rem] min-w-[6.75rem] aspect-video'
+    ? 'relative rounded-xl overflow-hidden bg-black/70 border flex-none w-[32vw] max-w-[10rem] min-w-[7.25rem] aspect-video'
     : 'relative rounded-xl overflow-hidden bg-black/70 border flex-1 min-w-0 basis-0 max-w-[10.5rem] aspect-video';
 
-  // Squelette uniquement au tout premier chargement (aucune meta encore).
   const showInitialSkeleton = scrubThumbnailsLoading && !scrubThumbnails;
   if (showInitialSkeleton) {
     const skeletonCount = isMobile ? 3 : 5;
@@ -77,19 +89,63 @@ export function ScrubThumbnailsStrip({
   const count = scrubThumbnails.count;
   const selectedIndex = Math.min(count - 1, Math.max(0, tvScrubIndex));
   const windowSize = scrubWindowSize(count, isTV, isFullscreen, isMobile);
-  const showCarouselNav = !isTV && count > windowSize;
+  // Mobile : swipe doigt, pas de flèches.
+  const showCarouselNav = !isTV && !isMobile && count > windowSize;
   const canGoPrev = selectedIndex > 0;
   const canGoNext = selectedIndex < count - 1;
   const { start, end } = scrubVisibleWindow(count, selectedIndex, isTV, isFullscreen, isMobile);
 
   const navButtonClass = (enabled: boolean) =>
-    `flex-shrink-0 flex items-center justify-center ${
-      isMobile ? 'w-10 h-10' : 'w-8 h-8 sm:w-9 sm:h-9'
-    } rounded-full border transition-all ${
+    `flex-shrink-0 flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full border transition-all ${
       enabled
         ? 'bg-white/10 border-white/25 text-white hover:bg-white/20 hover:border-white/40 cursor-pointer'
         : 'bg-white/5 border-white/10 text-white/25 cursor-default pointer-events-none'
     }`;
+
+  const onPointerDown = (e: any) => {
+    if (!isMobile || isTV) return;
+    const t = e.touches?.[0] ?? e;
+    swipeRef.current = {
+      x: t.clientX,
+      y: t.clientY,
+      lastStepX: t.clientX,
+      moved: false,
+      axis: null,
+    };
+  };
+
+  const onPointerMove = (e: any) => {
+    if (!isMobile || isTV || !swipeRef.current) return;
+    const t = e.touches?.[0] ?? e;
+    const dx = t.clientX - swipeRef.current.x;
+    const dy = t.clientY - swipeRef.current.y;
+    if (swipeRef.current.axis == null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      swipeRef.current.axis = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
+    }
+    if (swipeRef.current.axis !== 'h') return;
+
+    e.preventDefault?.();
+    e.stopPropagation?.();
+    swipeRef.current.moved = true;
+
+    // Avance / recule en direct pendant le glissement.
+    const stepDx = t.clientX - swipeRef.current.lastStepX;
+    if (Math.abs(stepDx) >= SWIPE_STEP_PX) {
+      const steps = Math.trunc(stepDx / SWIPE_STEP_PX);
+      // Swipe gauche (dx négatif) → avancer ; droite → reculer.
+      stepScrubIndex(-steps);
+      swipeRef.current.lastStepX += steps * SWIPE_STEP_PX;
+      suppressClickUntilRef.current = Date.now() + 450;
+    }
+  };
+
+  const onPointerUp = () => {
+    if (!isMobile || isTV || !swipeRef.current) return;
+    if (swipeRef.current.moved) {
+      suppressClickUntilRef.current = Date.now() + 450;
+    }
+    swipeRef.current = null;
+  };
 
   const items = [];
   for (let idx = start; idx <= end; idx++) {
@@ -106,11 +162,17 @@ export function ScrubThumbnailsStrip({
               ? 'border-white ring-4 ring-white/95 scale-[1.04]'
               : 'border-white ring-2 ring-white/90 scale-[1.03]'
             : 'border-white/20'
-        } shadow-lg focus:outline-none focus:ring-2 focus:ring-white/80 transition-all ${
+        } shadow-lg focus:outline-none focus:ring-2 focus:ring-white/80 transition-transform ${
           isTV ? 'cursor-default pointer-events-none' : 'cursor-pointer hover:border-white/50'
         }`}
         onClick={(e: Event) => {
           if (isTV) return;
+          // Après un swipe, ignore le click fantôme.
+          if (isMobile && Date.now() < suppressClickUntilRef.current) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
           e.preventDefault();
           e.stopPropagation();
           seekToThumbnail(idx);
@@ -135,10 +197,17 @@ export function ScrubThumbnailsStrip({
 
   return (
     <div
-      class={`relative z-10 flex w-full max-w-full items-center gap-1.5 sm:gap-2 box-border pb-1 min-h-0 transition-opacity ${
+      class={`relative z-10 flex w-full max-w-full items-center gap-1.5 sm:gap-2 box-border pb-1 min-h-0 transition-opacity touch-pan-y select-none ${
         scrubThumbnailsLoading ? 'opacity-80' : 'opacity-100'
       }`}
+      style={isMobile ? { touchAction: 'pan-y' } : undefined}
       aria-hidden
+      onTouchStart={onPointerDown}
+      onTouchMove={onPointerMove}
+      onTouchEnd={onPointerUp}
+      onTouchCancel={() => {
+        swipeRef.current = null;
+      }}
     >
       {showCarouselNav && (
         <button
@@ -153,12 +222,12 @@ export function ScrubThumbnailsStrip({
             if (canGoPrev) stepScrubIndex(-1);
           }}
         >
-          <ChevronLeft class={isMobile ? 'w-6 h-6' : 'w-5 h-5 sm:w-6 sm:h-6'} />
+          <ChevronLeft class="w-5 h-5 sm:w-6 sm:h-6" />
         </button>
       )}
       <div
         class={`flex flex-1 min-w-0 flex-nowrap justify-center overflow-hidden ${
-          isMobile ? 'gap-2.5' : 'gap-2 sm:gap-3'
+          isMobile ? 'gap-2.5 px-1' : 'gap-2 sm:gap-3'
         }`}
       >
         {items}
@@ -176,8 +245,11 @@ export function ScrubThumbnailsStrip({
             if (canGoNext) stepScrubIndex(1);
           }}
         >
-          <ChevronRight class={isMobile ? 'w-6 h-6' : 'w-5 h-5 sm:w-6 sm:h-6'} />
+          <ChevronRight class="w-5 h-5 sm:w-6 sm:h-6" />
         </button>
+      )}
+      {isMobile && (
+        <span class="sr-only">Glissez horizontalement pour parcourir les miniatures</span>
       )}
     </div>
   );

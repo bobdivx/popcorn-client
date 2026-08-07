@@ -11,6 +11,7 @@ import PlayerBufferingOverlay from '../player-shared/components/PlayerBufferingO
 import { useDebouncedVideoWaiting } from '../player-shared/hooks/useDebouncedVideoWaiting';
 import { formatTime } from '../player-shared/utils/formatTime';
 import { getMediaErrorDiagnostics, logVideoPlaybackError, type MediaErrorDiagnostics } from './mediaErrorDiagnostics';
+import { useEffectiveVideoFillMode } from '../player-shared/hooks/useEffectiveVideoFillMode';
 
 interface DirectVideoPlayerProps {
   src: string;
@@ -58,6 +59,7 @@ export default function DirectVideoPlayer({
 }: DirectVideoPlayerProps) {
   const { t } = useI18n();
   const playerConfig = usePlayerConfig();
+  const effectiveVideoFillMode = useEffectiveVideoFillMode(playerConfig.videoFillMode);
   const chromecast = useChromecast();
 
   /** Progression téléchargement (0–1) pour la barre verte. Utilise downloaded_bytes/total_bytes ou state completed/seeding pour éviter les incohérences (ex. fichier 100% téléchargé mais progress incorrect). */
@@ -310,7 +312,10 @@ export default function DirectVideoPlayer({
             backfaceVisibility: playerConfig.hardwareAcceleration ? 'hidden' : 'visible',
             width: '100%',
             height: '100%',
-            objectFit: playerConfig.videoFillMode ?? 'contain',
+            maxWidth: '100%',
+            maxHeight: '100%',
+            objectFit: effectiveVideoFillMode,
+            objectPosition: 'center center',
             display: 'block',
             backgroundColor: '#000',
           }}
