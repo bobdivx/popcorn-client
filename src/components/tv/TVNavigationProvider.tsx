@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'preact/hooks';
+import { stampTvPlatformHints } from '../../lib/utils/device-detection';
 
 /**
  * Fournisseur de navigation TV global - Style Netflix
@@ -26,6 +27,11 @@ export default function TVNavigationProvider() {
   const lastFocusedRef = useRef<HTMLElement | null>(null);
   /** Dernier élément auquel on a appliqué l’effet visuel (pour retrait ciblé, évite querySelectorAll). */
   const lastEffectTargetRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    // App simple webOS (URL hébergée) : stamp data-webos / data-tv-platform depuis l’UA LG.
+    stampTvPlatformHints();
+  }, []);
 
   useEffect(() => {
     // Sélecteur universel pour tous les éléments interactifs
