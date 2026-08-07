@@ -297,9 +297,23 @@ export function useScrubNav(options: {
   };
 
   const effectiveDurationForProgress = getEffectiveDuration();
+  /** Tête de lecture réelle (curseur) — toujours currentTime, sauf drag. */
+  const playheadPercent = (() => {
+    if (isDraggingScrub && dragPreviewPercent != null) return dragPreviewPercent;
+    if (effectiveDurationForProgress > 0) {
+      return Math.min(100, Math.max(0, (currentTime / effectiveDurationForProgress) * 100));
+    }
+    return duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
+  })();
+
+  /**
+   * Remplissage de la barre :
+   * - drag / scrub desktop → aperçu
+   * - TV : suit la lecture ; n’utilise l’index scrub que s’il a divergé (nav flèches)
+   */
   const progressPercent = (() => {
     if (effectiveDurationForProgress <= 0) {
-      return duration > 0 ? (currentTime / duration) * 100 : 0;
+      return playheadPercent;
     }
     if (isDraggingScrub && dragPreviewPercent != null) {
       return dragPreviewPercent;
@@ -307,15 +321,19 @@ export function useScrubNav(options: {
     if (scrubEnabled) {
       if (isTV && tvScrubIndexExternal != null) {
         const scrubTime = timeForScrubIndex(tvScrubIndex);
-        return (scrubTime / effectiveDurationForProgress) * 100;
+        // Aperçu scrub uniquement si l’utilisateur a navigué loin de la tête de lecture.
+        if (Math.abs(scrubTime - currentTime) >= 0.75) {
+          return Math.min(100, Math.max(0, (scrubTime / effectiveDurationForProgress) * 100));
+        }
+        return playheadPercent;
       }
       if (!isTV) {
         const followScrub = !isPlaying || isDraggingScrub;
         const t = followScrub ? timeForScrubIndex(tvScrubIndex) : currentTime;
-        return (t / effectiveDurationForProgress) * 100;
+        return Math.min(100, Math.max(0, (t / effectiveDurationForProgress) * 100));
       }
     }
-    return (currentTime / effectiveDurationForProgress) * 100;
+    return playheadPercent;
   })();
 
   const previewTime =
@@ -335,6 +353,7 @@ export function useScrubNav(options: {
     setScrubFromPercent,
     stepScrubIndex,
     progressPercent,
+    playheadPercent,
     isDraggingScrub,
     beginScrubDrag,
     updateScrubDrag,

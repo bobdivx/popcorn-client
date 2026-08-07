@@ -1,5 +1,5 @@
 # Fallback : build/push frontend sur runners GitHub (ubuntu-latest)
-# quand les self-hosted sont HS. Déclenchement manuel uniquement.
+# uniquement si aucun runner self-hosted n'est en ligne.
 name: Build Frontend Docker (GitHub-hosted fallback)
 
 on:
@@ -13,14 +13,52 @@ on:
         description: 'Appeler le webhook Watchtower après push'
         type: boolean
         default: false
+      force:
+        description: 'Forcer le fallback même si des self-hosted sont en ligne'
+        type: boolean
+        default: false
 
 env:
   REGISTRY: docker.io
   IMAGE_NAME: popcorn-frontend
 
 jobs:
+  check-runners:
+    name: Self-hosted doivent être offline
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+    steps:
+      - name: Vérifier qu'aucun runner self-hosted n'est en ligne
+        env:
+          GH_TOKEN: ${{ secrets.RUNNERS_CHECK_TOKEN || github.token }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          if [ "${FORCE}" = "true" ]; then
+            echo "⚠️ force=true — garde-fou désactivé"
+            exit 0
+          fi
+
+          if ! RESPONSE=$(gh api "repos/${{ github.repository }}/actions/runners" --paginate 2>/tmp/runners_err.txt); then
+            echo "::error::Impossible de lister les runners (permissions API). Ajoute le secret RUNNERS_CHECK_TOKEN (PAT repo admin) ou passe force=true en urgence."
+            cat /tmp/runners_err.txt || true
+            exit 1
+          fi
+
+          ONLINE=$(echo "$RESPONSE" | jq -s '[.[].runners[]? // empty | select(.status == "online")] | length')
+          echo "Runners self-hosted en ligne: ${ONLINE}"
+          echo "$RESPONSE" | jq -s -r '[.[].runners[]? // empty] | .[] | select(.status == "online") | "- \(.name): status=\(.status) busy=\(.busy)"' || true
+
+          if [ "${ONLINE:-0}" -gt 0 ]; then
+            echo "::error::Des runners self-hosted sont en ligne (${ONLINE}). Utilise le workflow principal (self-hosted), pas le fallback GitHub-hosted."
+            exit 1
+          fi
+          echo "✅ Aucun runner self-hosted en ligne — fallback autorisé."
+
   build-and-push:
     name: Build and Publish Frontend
+    needs: check-runners
     runs-on: ubuntu-latest
     permissions:
       contents: write

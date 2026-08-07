@@ -91,7 +91,8 @@ export default function DirectVideoPlayer({
   const isFullscreen = useFullscreen();
 
   const {
-    showControls: baseShowControls,
+    showControls,
+    setShowControls,
     isPlaying,
     currentTime,
     duration,
@@ -112,11 +113,6 @@ export default function DirectVideoPlayer({
   });
 
   const isWaiting = useDebouncedVideoWaiting(videoRef, [src, loaded]);
-
-  const [showControls, setShowControls] = useState(baseShowControls);
-  useEffect(() => {
-    setShowControls(baseShowControls);
-  }, [baseShowControls]);
 
   // Reprendre / Revoir : enregistrer la progression périodiquement et à la fermeture
   useEffect(() => {
@@ -205,6 +201,7 @@ export default function DirectVideoPlayer({
     onClose,
     duration,
     currentTime,
+    isPlaying,
     progressBarRef,
     scrubThumbnails: scrubThumbnails?.mediaId && scrubThumbnails.count > 0 ? scrubThumbnails : null,
     onScrubSeek: seekToTargetTime,
