@@ -1,17 +1,33 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'preact/hooks';
-import { Download, Upload, Pause, Play, Trash2, Plus, FileText as LogsIcon, Link2, X, HardDrive, Info } from 'lucide-preact';
+import { Download, Upload, FileText as LogsIcon, Link2, HardDrive, Users, Clock } from 'lucide-preact';
 import { clientApi } from '../../lib/client/api';
-import type { ClientTorrentStats, ContentItem, TorrentLogEntry } from '../../lib/client/types';
+import type { ClientTorrentStats, TorrentLogEntry } from '../../lib/client/types';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { getDownloadMeta } from '../../lib/utils/download-meta-storage';
+import { formatBytes, formatSpeed } from '../../lib/utils/formatBytes';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
-import { HeroSection } from '../dashboard/components/HeroSection';
 import { DownloadCard } from './DownloadCard';
 import { DownloadDetailModal } from './DownloadDetailModal';
 import { Modal } from '../ui/Modal';
 import { ConfirmModal } from '../ui/ConfirmModal';
 
 const REFRESH_INTERVAL = 4000;
+
+type SpeedStat = { human_readable?: string; mbps?: number };
+type PeersStat = { live?: number; seen?: number; connecting?: number };
+
+function readSpeedLabel(stat: unknown, fallbackBps: number): string {
+  const human = (stat as SpeedStat | undefined)?.human_readable;
+  if (typeof human === 'string' && human.trim()) return human;
+  return formatSpeed(fallbackBps);
+}
+
+function formatUptime(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return `${h}h ${m.toString().padStart(2, '0')}m`;
+  return `${m}m`;
+}
 
 function buildImageMapFromList(data: { data?: Array<Record<string, any>> }) {
   const map: Record<string, any> = {};
@@ -137,25 +153,29 @@ export default function DownloadsList() {
   const [showSessionLogsModal, setShowSessionLogsModal] = useState(false);
   const [sessionLogsLines, setSessionLogsLines] = useState<string[]>([]);
   const sessionLogsAbortRef = useRef<AbortController | null>(null);
-
-  const heroItems = useMemo<ContentItem[]>(() => {
-    return torrents.slice(0, 5).map(tor => {
-      const key = tor.info_hash.toLowerCase();
-      const meta = imageMap[key];
-      const title = displayTitleMap[key] || tor.name;
-      return {
-        id: `download-${key}`,
-        title,
-        tmdbTitle: title,
-        type: tmdbTypeMap[key] || 'movie',
-        poster: meta?.posterUrl || undefined,
-        backdrop: meta?.backdropUrl || undefined,
-        progress: tor.progress
-      };
-    }).filter(it => it.backdrop || it.poster);
-  }, [torrents, imageMap, displayTitleMap, tmdbTypeMap]);
+  const [sessionStats, setSessionStats] = useState<Record<string, unknown> | null>(null);
 
   const hasEnrichedRef = useRef(false);
+
+  const aggregateSpeeds = useMemo(() => {
+    let download = 0;
+    let upload = 0;
+    for (const tor of torrents) {
+      download += tor.download_speed || 0;
+      upload += tor.upload_speed || 0;
+    }
+    return { download, upload };
+  }, [torrents]);
+
+  const heroDownloadSpeed = readSpeedLabel(sessionStats?.download_speed, aggregateSpeeds.download);
+  const heroUploadSpeed = readSpeedLabel(sessionStats?.upload_speed, aggregateSpeeds.upload);
+  const heroPeersLive = (sessionStats?.peers as PeersStat | undefined)?.live;
+  const heroUptimeSeconds =
+    typeof sessionStats?.uptime_seconds === 'number' ? sessionStats.uptime_seconds : null;
+  const heroFetchedBytes =
+    typeof sessionStats?.fetched_bytes === 'number' ? sessionStats.fetched_bytes : null;
+  const heroUploadedBytes =
+    typeof sessionStats?.uploaded_bytes === 'number' ? sessionStats.uploaded_bytes : null;
 
   const loadTorrents = useCallback(async () => {
     try {
@@ -285,6 +305,24 @@ export default function DownloadsList() {
     const interval = setInterval(loadTorrents, REFRESH_INTERVAL);
     return () => clearInterval(interval);
   }, [loadTorrents]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadStats = async () => {
+      try {
+        const stats = await clientApi.getLibrqbitSessionStats();
+        if (!cancelled && stats) setSessionStats(stats);
+      } catch {
+        // fallback agrégé depuis la liste torrents
+      }
+    };
+    loadStats();
+    const interval = setInterval(loadStats, REFRESH_INTERVAL);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     if (!initialHydrated) return;
@@ -464,17 +502,65 @@ export default function DownloadsList() {
 
   return (
     <div className="flex flex-col w-full min-w-0 max-w-full">
-      {heroItems.length > 0 && (
-        <HeroSection items={heroItems} onPlay={(it) => {
-            const h = it.id.replace('download-', '');
-            const tor = torrents.find(t=>t.info_hash.toLowerCase()===h);
-            if(tor) handleOpenDetail(tor, it.poster, it.backdrop);
-        }} onPrimaryAction={(it) => {
-            const h = it.id.replace('download-', '');
-            const tor = torrents.find(t=>t.info_hash.toLowerCase()===h);
-            if(tor) handleOpenDetail(tor, it.poster, it.backdrop);
-        }} primaryButtonLabel="Lire" size="large" />
-      )}
+      <section
+        className="relative w-full overflow-hidden border-b border-white/10"
+        aria-label={t('settingsPages.librqbit.sessionStats')}
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--ds-accent-violet)]/20 via-black to-[var(--ds-accent-green)]/10" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(255,255,255,0.08),transparent_55%)]" />
+        <div className="relative px-4 sm:px-12 pt-8 sm:pt-12 pb-8 sm:pb-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-10 max-w-4xl">
+            <div className="rounded-2xl sm:rounded-3xl border border-white/10 bg-black/30 backdrop-blur-md p-5 sm:p-7">
+              <div className="flex items-center gap-2 text-[var(--ds-accent-violet)] mb-3">
+                <Download className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.5} size={24} />
+                <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider">
+                  {t('downloads.stats.downloadSpeed')}
+                </span>
+              </div>
+              <p className="text-3xl sm:text-5xl font-bold text-white tracking-tight tabular-nums">
+                {heroDownloadSpeed}
+              </p>
+              {heroFetchedBytes != null && (
+                <p className="mt-2 text-sm text-white/40">
+                  {formatBytes(heroFetchedBytes)} {t('downloads.stats.totalDownloaded')}
+                </p>
+              )}
+            </div>
+            <div className="rounded-2xl sm:rounded-3xl border border-white/10 bg-black/30 backdrop-blur-md p-5 sm:p-7">
+              <div className="flex items-center gap-2 text-[var(--ds-accent-green)] mb-3">
+                <Upload className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.5} size={24} />
+                <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider">
+                  {t('downloads.stats.uploadSpeed')}
+                </span>
+              </div>
+              <p className="text-3xl sm:text-5xl font-bold text-white tracking-tight tabular-nums">
+                {heroUploadSpeed}
+              </p>
+              {heroUploadedBytes != null && (
+                <p className="mt-2 text-sm text-white/40">
+                  {formatBytes(heroUploadedBytes)} {t('downloads.stats.totalUploaded')}
+                </p>
+              )}
+            </div>
+          </div>
+          {(heroPeersLive != null || heroUptimeSeconds != null) && (
+            <div className="mt-5 flex flex-wrap items-center gap-3 sm:gap-4 text-sm text-white/50">
+              {heroPeersLive != null && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+                  <Users className="w-4 h-4 text-white/40" size={16} />
+                  {heroPeersLive} {t('downloads.stats.peers')}
+                </span>
+              )}
+              {heroUptimeSeconds != null && (
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
+                  <Clock className="w-4 h-4 text-white/40" size={16} />
+                  {t('downloads.sessionUptime')}: {formatUptime(heroUptimeSeconds)}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </section>
 
       <div className="pt-4 sm:pt-8 pb-12 flex-1 safe-area-bottom w-full min-w-0 max-w-full">
         <div className="px-4 sm:px-12 mb-6 sm:mb-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">

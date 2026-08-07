@@ -8,7 +8,10 @@ import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import type { PlayerLoadingTorrentStats } from '../player-shared/components/PlayerLoadingOverlay';
 import PlayerBufferingOverlay from '../player-shared/components/PlayerBufferingOverlay';
+import { useDebouncedVideoWaiting } from '../player-shared/hooks/useDebouncedVideoWaiting';
+import { formatTime } from '../player-shared/utils/formatTime';
 import { getMediaErrorDiagnostics, logVideoPlaybackError, type MediaErrorDiagnostics } from './mediaErrorDiagnostics';
+import { useEffectiveVideoFillMode } from '../player-shared/hooks/useEffectiveVideoFillMode';
 
 interface DirectVideoPlayerProps {
   src: string;
@@ -56,6 +59,7 @@ export default function DirectVideoPlayer({
 }: DirectVideoPlayerProps) {
   const { t } = useI18n();
   const playerConfig = usePlayerConfig();
+  const effectiveVideoFillMode = useEffectiveVideoFillMode(playerConfig.videoFillMode);
   const chromecast = useChromecast();
 
   /** Progression téléchargement (0–1) pour la barre verte. Utilise downloaded_bytes/total_bytes ou state completed/seeding pour éviter les incohérences (ex. fichier 100% téléchargé mais progress incorrect). */
@@ -75,7 +79,6 @@ export default function DirectVideoPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const [loaded, setLoaded] = useState(false);
-  const [isWaiting, setIsWaiting] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [errorDiag, setErrorDiag] = useState<MediaErrorDiagnostics | null>(null);
 
@@ -93,6 +96,7 @@ export default function DirectVideoPlayer({
     currentTime,
     duration,
     bufferedPercent,
+    bufferedTimelinePercent,
     isSeeking,
     isMuted,
     volume,
@@ -106,6 +110,8 @@ export default function DirectVideoPlayer({
     hlsLoaded: loaded,
     canUseSeekReload: false,
   });
+
+  const isWaiting = useDebouncedVideoWaiting(videoRef, [src, loaded]);
 
   const [showControls, setShowControls] = useState(baseShowControls);
   useEffect(() => {
@@ -139,6 +145,13 @@ export default function DirectVideoPlayer({
     }
   };
 
+  const [seekFeedback, setSeekFeedback] = useState<{
+    direction: 'left' | 'right';
+    seconds: number;
+    targetTime?: number;
+  } | null>(null);
+  const seekFeedbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const handleSeekTV = (direction: 'left' | 'right', stepSeconds = 10) => {
     if (!duration) return;
     const newTime =
@@ -146,6 +159,30 @@ export default function DirectVideoPlayer({
         ? Math.max(0, currentTime - stepSeconds)
         : Math.min(duration, currentTime + stepSeconds);
     seekToTargetTime(newTime);
+    if (seekFeedbackTimeoutRef.current) clearTimeout(seekFeedbackTimeoutRef.current);
+    setSeekFeedback({ direction, seconds: stepSeconds, targetTime: newTime });
+    seekFeedbackTimeoutRef.current = setTimeout(() => {
+      setSeekFeedback(null);
+      seekFeedbackTimeoutRef.current = null;
+    }, 800);
+  };
+
+  const handleSeekPreview = (
+    info: { targetTime: number; direction: 'left' | 'right'; stepSeconds: number } | null,
+  ) => {
+    if (seekFeedbackTimeoutRef.current) {
+      clearTimeout(seekFeedbackTimeoutRef.current);
+      seekFeedbackTimeoutRef.current = null;
+    }
+    if (!info) {
+      setSeekFeedback(null);
+      return;
+    }
+    setSeekFeedback({
+      direction: info.direction,
+      seconds: info.stepSeconds,
+      targetTime: info.targetTime,
+    });
   };
 
   const handleVolumeChangeTV = (direction: 'up' | 'down') => {
@@ -171,6 +208,7 @@ export default function DirectVideoPlayer({
     progressBarRef,
     scrubThumbnails: scrubThumbnails?.mediaId && scrubThumbnails.count > 0 ? scrubThumbnails : null,
     onScrubSeek: seekToTargetTime,
+    onSeekPreview: handleSeekPreview,
   });
 
   useEffect(() => {
@@ -179,24 +217,13 @@ export default function DirectVideoPlayer({
 
     const handleLoadedData = () => {
       setLoaded(true);
-      setIsWaiting(false);
       onLoadedData();
     };
 
-    const handleWaiting = () => setIsWaiting(true);
-    const handleCanPlay = () => setIsWaiting(false);
-    const handlePlaying = () => setIsWaiting(false);
-
     video.addEventListener('loadeddata', handleLoadedData);
-    video.addEventListener('waiting', handleWaiting);
-    video.addEventListener('canplay', handleCanPlay);
-    video.addEventListener('playing', handlePlaying);
 
     return () => {
       video.removeEventListener('loadeddata', handleLoadedData);
-      video.removeEventListener('waiting', handleWaiting);
-      video.removeEventListener('canplay', handleCanPlay);
-      video.removeEventListener('playing', handlePlaying);
     };
   }, [onLoadedData]);
 
@@ -215,7 +242,7 @@ export default function DirectVideoPlayer({
     `${errorDiag.codeLabel}${errorDiag.mediaErrorCode != null ? ` (${errorDiag.mediaErrorCode})` : ''} · networkState=${errorDiag.networkState} · readyState=${errorDiag.readyState}`;
 
   const shouldShowBuffering =
-    loadingProp || isWaiting || (isSeeking && bufferedPercent < 100);
+    loadingProp || isWaiting || (isSeeking && bufferedPercent < 95);
   const effectiveShowControls = showControls;
   const bufferingMessage =
     loadingProp
@@ -247,6 +274,18 @@ export default function DirectVideoPlayer({
           willChange: 'transform',
         }}
       >
+        {seekFeedback && (
+          <div
+            class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 px-6 py-3 rounded-lg bg-black/85 text-white text-2xl font-semibold shadow-lg"
+            role="status"
+          >
+            {seekFeedback.targetTime != null
+              ? formatTime(seekFeedback.targetTime)
+              : seekFeedback.direction === 'left'
+                ? `−${seekFeedback.seconds}s`
+                : `+${seekFeedback.seconds}s`}
+          </div>
+        )}
         {shouldShowBuffering && (
           <PlayerBufferingOverlay
             title={torrentName || undefined}
@@ -273,7 +312,10 @@ export default function DirectVideoPlayer({
             backfaceVisibility: playerConfig.hardwareAcceleration ? 'hidden' : 'visible',
             width: '100%',
             height: '100%',
-            objectFit: playerConfig.videoFillMode ?? 'contain',
+            maxWidth: '100%',
+            maxHeight: '100%',
+            objectFit: effectiveVideoFillMode,
+            objectPosition: 'center center',
             display: 'block',
             backgroundColor: '#000',
           }}
@@ -334,6 +376,7 @@ export default function DirectVideoPlayer({
           torrentProgress={torrentProgress}
           showControls={hasError ? true : effectiveShowControls}
           isPlaying={isPlaying}
+          bufferedPercent={bufferedTimelinePercent}
           currentTime={currentTime}
           duration={duration}
           isMuted={isMuted}

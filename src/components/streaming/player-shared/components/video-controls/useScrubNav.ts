@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { serverApi } from '../../../../../lib/client/server-api';
 import type { ScrubThumbnailsMeta } from '../../types/scrubThumbnails';
 import {
@@ -33,11 +33,19 @@ export function useScrubNav(options: {
   } = options;
 
   const [tvScrubIndexInternal, setTvScrubIndexInternal] = useState(0);
-  const tvScrubIndex = isTV && tvScrubIndexExternal != null ? tvScrubIndexExternal : tvScrubIndexInternal;
+  /** Drag / scrub barre en cours : preview uniquement, pas de seek HLS. */
+  const [isDraggingScrub, setIsDraggingScrub] = useState(false);
+  /** Temps preview pendant un drag (avec ou sans vignettes). */
+  const [dragPreviewTime, setDragPreviewTime] = useState<number | null>(null);
+  const [dragPreviewPercent, setDragPreviewPercent] = useState<number | null>(null);
 
-  const scrubBase = scrubEnabled && scrubThumbnails
-    ? scrubBaseUrl(serverApi.getServerUrl(), scrubThumbnails.mediaId)
-    : '';
+  const tvScrubIndex =
+    isTV && tvScrubIndexExternal != null ? tvScrubIndexExternal : tvScrubIndexInternal;
+
+  const scrubBase =
+    scrubEnabled && scrubThumbnails
+      ? scrubBaseUrl(serverApi.getServerUrl(), scrubThumbnails.mediaId)
+      : '';
 
   const getEffectiveDuration = () => scrubEffectiveDuration(duration, scrubThumbnails);
 
@@ -61,16 +69,18 @@ export function useScrubNav(options: {
   const onSeekToTimeRef = useRef(onSeekToTime);
   onSeekToTimeRef.current = onSeekToTime;
   const userScrubbedRef = useRef(false);
+  const isDraggingRef = useRef(false);
+  isDraggingRef.current = isDraggingScrub;
+  const dragPreviewTimeRef = useRef<number | null>(null);
+  dragPreviewTimeRef.current = dragPreviewTime;
 
   const prevShowControlsRef = useRef(false);
-  /** Identité stable des meta scrub (évite de relancer les effets à chaque nouvelle référence d’objet). */
   const scrubMetaKey =
     scrubEnabled && scrubThumbnails
       ? `${scrubThumbnails.mediaId}:${scrubThumbnails.count}:${scrubThumbnails.intervalSeconds ?? 'n'}`
       : '';
   const prevScrubMetaKeyRef = useRef('');
 
-  /** À l’ouverture des contrôles : aligner le carrousel sur la position actuelle (desktop). */
   useEffect(() => {
     const wasOpen = prevShowControlsRef.current;
     prevShowControlsRef.current = showControls;
@@ -84,11 +94,6 @@ export function useScrubNav(options: {
     setTvScrubIndexInternal(idx);
   }, [showControls, scrubEnabled, isTV, scrubMetaKey, duration]);
 
-  /**
-   * Quand les meta scrub arrivent ou changent (ex. fin de génération) en pause avec contrôles ouverts :
-   * aligner une fois. Ne jamais vider `prevScrubMetaKeyRef` quand la meta disparaît un instant (merge / fetch) :
-   * sinon on croit à un « nouveau » lot de vignettes et on resynchronise sur la tête → souvent vignette 0.
-   */
   useEffect(() => {
     if (!scrubMetaKey) return;
     if (scrubMetaKey === prevScrubMetaKeyRef.current) return;
@@ -103,14 +108,13 @@ export function useScrubNav(options: {
     setTvScrubIndexInternal(idx);
   }, [scrubMetaKey, showControls, isTV, isPlaying, scrubEnabled, duration]);
 
-  /** En pause uniquement : resynchroniser quand la tête de lecture change (seek), pas à chaque render parent. */
   const prevPausedTimeRef = useRef<number | null>(null);
   useEffect(() => {
     if (isPlaying) {
       prevPausedTimeRef.current = null;
       return;
     }
-    if (!scrubEnabled || isTV || !showControls) return;
+    if (!scrubEnabled || isTV || !showControls || isDraggingRef.current) return;
     const st = scrubThumbnailsRef.current;
     if (!st?.count) return;
     const t = currentTime;
@@ -175,13 +179,13 @@ export function useScrubNav(options: {
       setTvScrubIndexInternal((prev) => {
         let nextIdx = prev;
         const step = keyNormalized === 'PageUp' || keyNormalized === 'PageDown' ? 5 : 1;
-        if (keyNormalized === 'ArrowLeft' || keyNormalized === 'PageDown') nextIdx = Math.max(0, prev - step);
-        if (keyNormalized === 'ArrowRight' || keyNormalized === 'PageUp') nextIdx = Math.min(count - 1, prev + step);
+        if (keyNormalized === 'ArrowLeft' || keyNormalized === 'PageDown')
+          nextIdx = Math.max(0, prev - step);
+        if (keyNormalized === 'ArrowRight' || keyNormalized === 'PageUp')
+          nextIdx = Math.min(count - 1, prev + step);
         if (keyNormalized === 'Home') nextIdx = 0;
         if (keyNormalized === 'End') nextIdx = count - 1;
-        if (nextIdx !== prev) {
-          userScrubbedRef.current = true;
-        }
+        if (nextIdx !== prev) userScrubbedRef.current = true;
         return nextIdx;
       });
     };
@@ -190,56 +194,136 @@ export function useScrubNav(options: {
   }, [isTV, showControls, scrubEnabled, scrubThumbnails?.count]);
 
   useEffect(() => {
-    if (isTV) return;
+    if (isTV || isDraggingScrub) return;
     if (!showControls || !scrubEnabled) return;
     const id = window.setTimeout(() => {
       if (!userScrubbedRef.current) return;
       const targetTime = timeForScrubIndexRef.current(tvScrubInternalRef.current);
       onSeekToTimeRef.current?.(targetTime);
       userScrubbedRef.current = false;
-    }, 2000);
+    }, 1400);
     return () => window.clearTimeout(id);
-  }, [isTV, showControls, scrubEnabled, tvScrubIndexInternal]);
+  }, [isTV, showControls, scrubEnabled, tvScrubIndexInternal, isDraggingScrub]);
 
-  const setScrubFromPercent = (percent: number) => {
-    const effectiveDuration = getEffectiveDuration();
-    if (!scrubEnabled || !scrubThumbnails || effectiveDuration <= 0) return;
-    const idx = scrubIndexFromTimelinePercent(percent, effectiveDuration, scrubThumbnails);
-    setTvScrubIndexInternal(idx);
-  };
-
-  const setScrubFromPointer = (e: any) => {
-    const effectiveDuration = getEffectiveDuration();
-    if (!scrubEnabled || !scrubThumbnails || effectiveDuration <= 0) return;
-    const el = e.currentTarget as HTMLDivElement;
+  const percentFromPointerEvent = (e: any): number | null => {
+    const el = e.currentTarget as HTMLDivElement | null;
+    if (!el) return null;
     const rect = el.getBoundingClientRect();
-    const x = Math.min(rect.width, Math.max(0, e.clientX - rect.left));
-    const percent = rect.width > 0 ? (x / rect.width) * 100 : 0;
-    setScrubFromPercent(percent);
+    const clientX =
+      typeof e.clientX === 'number'
+        ? e.clientX
+        : e.touches?.[0]?.clientX ?? e.changedTouches?.[0]?.clientX;
+    if (typeof clientX !== 'number' || !rect.width) return null;
+    const x = Math.min(rect.width, Math.max(0, clientX - rect.left));
+    return (x / rect.width) * 100;
   };
+
+  const setScrubFromPercent = (percent: number, asDragPreview = false) => {
+    const effectiveDuration = getEffectiveDuration();
+    if (effectiveDuration <= 0) return;
+    const p = Math.min(100, Math.max(0, percent));
+    const t = (p / 100) * effectiveDuration;
+    if (asDragPreview || isDraggingRef.current) {
+      setDragPreviewPercent(p);
+      setDragPreviewTime(t);
+    }
+    if (scrubEnabled && scrubThumbnails) {
+      const idx = scrubIndexFromTimelinePercent(p, effectiveDuration, scrubThumbnails);
+      setTvScrubIndexInternal(idx);
+    }
+  };
+
+  const setScrubFromPointer = (e: any, asDragPreview = false) => {
+    const percent = percentFromPointerEvent(e);
+    if (percent == null) return;
+    setScrubFromPercent(percent, asDragPreview);
+  };
+
+  const beginScrubDrag = useCallback((e: any) => {
+    setIsDraggingScrub(true);
+    userScrubbedRef.current = false;
+    const percent = percentFromPointerEvent(e);
+    if (percent != null) setScrubFromPercent(percent, true);
+  }, [scrubEnabled, scrubThumbnails, duration]);
+
+  const updateScrubDrag = useCallback((e: any) => {
+    if (!isDraggingRef.current) return;
+    const percent = percentFromPointerEvent(e);
+    if (percent != null) setScrubFromPercent(percent, true);
+  }, [scrubEnabled, scrubThumbnails, duration]);
+
+  const commitScrubDrag = useCallback(
+    (e?: any) => {
+      if (e) {
+        const percent = percentFromPointerEvent(e);
+        if (percent != null) setScrubFromPercent(percent, true);
+      }
+      const effectiveDuration = getEffectiveDuration();
+      let target =
+        dragPreviewTimeRef.current != null
+          ? dragPreviewTimeRef.current
+          : scrubEnabled
+            ? timeForScrubIndexRef.current(tvScrubInternalRef.current)
+            : null;
+      if (target == null && e) {
+        const percent = percentFromPointerEvent(e);
+        if (percent != null && effectiveDuration > 0) {
+          target = (percent / 100) * effectiveDuration;
+        }
+      }
+      setIsDraggingScrub(false);
+      setDragPreviewTime(null);
+      setDragPreviewPercent(null);
+      userScrubbedRef.current = false;
+      if (target == null || !Number.isFinite(target)) return;
+      const clamped = Math.max(0, Math.min(effectiveDuration || target, target));
+      onSeekToTimeRef.current?.(clamped);
+    },
+    [scrubEnabled, duration, scrubThumbnails],
+  );
+
+  const cancelScrubDrag = useCallback(() => {
+    setIsDraggingScrub(false);
+    setDragPreviewTime(null);
+    setDragPreviewPercent(null);
+  }, []);
 
   const stepScrubIndex = (delta: number) => {
     const st = scrubThumbnailsRef.current;
     const total = st?.count ?? 0;
     if (total <= 0 || delta === 0) return;
+    userScrubbedRef.current = true;
     setTvScrubIndexInternal((prev) => Math.min(total - 1, Math.max(0, prev + delta)));
   };
 
   const effectiveDurationForProgress = getEffectiveDuration();
-  /** En lecture desktop : la barre suit la tête de lecture (pas l’état interne des vignettes, sinon conflit avec la resync). */
   const progressPercent = (() => {
-    if (scrubEnabled && effectiveDurationForProgress > 0) {
+    if (effectiveDurationForProgress <= 0) {
+      return duration > 0 ? (currentTime / duration) * 100 : 0;
+    }
+    if (isDraggingScrub && dragPreviewPercent != null) {
+      return dragPreviewPercent;
+    }
+    if (scrubEnabled) {
       if (isTV && tvScrubIndexExternal != null) {
         const scrubTime = timeForScrubIndex(tvScrubIndex);
         return (scrubTime / effectiveDurationForProgress) * 100;
       }
       if (!isTV) {
-        const t = isPlaying ? currentTime : timeForScrubIndex(tvScrubIndex);
+        const followScrub = !isPlaying || isDraggingScrub;
+        const t = followScrub ? timeForScrubIndex(tvScrubIndex) : currentTime;
         return (t / effectiveDurationForProgress) * 100;
       }
     }
-    return duration > 0 ? (currentTime / duration) * 100 : 0;
+    return (currentTime / effectiveDurationForProgress) * 100;
   })();
+
+  const previewTime =
+    isDraggingScrub && dragPreviewTime != null
+      ? dragPreviewTime
+      : scrubEnabled && !isTV
+        ? timeForScrubIndex(tvScrubIndex)
+        : currentTime;
 
   return {
     tvScrubIndex,
@@ -251,5 +335,12 @@ export function useScrubNav(options: {
     setScrubFromPercent,
     stepScrubIndex,
     progressPercent,
+    isDraggingScrub,
+    beginScrubDrag,
+    updateScrubDrag,
+    commitScrubDrag,
+    cancelScrubDrag,
+    previewTime,
+    dragPreviewPercent,
   };
 }
