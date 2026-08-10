@@ -401,22 +401,28 @@ function withDiscoverTitleHint(path: string, title?: string): string {
   return `${path}${path.includes('?') ? '&' : '?'}title=${encodeURIComponent(t)}`;
 }
 
-/** URL de détail : priorité TMDB (tmdbId + type), fallback slug. Discover si pas de torrent (id tmdb-xxx). */
+/** URL de détail : torrents si dispo (bibliothèque / indexeur), sinon Discover (demande). */
 function getDetailUrl(result: SearchResult): string {
-  // Si c'est un résultat TMDB pur (sans torrent), go Discover
+  // Résultat TMDB pur (fallback « Demander ») → Discover
   if (result.id?.startsWith('tmdb-') && result.tmdbId != null) {
     return withDiscoverTitleHint(`/discover?tmdbId=${result.tmdbId}&type=${result.type}`, result.title);
   }
 
-  // Si c'est téléchargé (déjà en bibliothèque), on peut aller sur la page torrent (détail/stream)
-  if (result.isDownloaded && result.tmdbId != null) {
-    const typeParam = result.type === 'tv' ? 'tv' : 'movie';
-    return `/torrents?tmdbId=${result.tmdbId}&type=${typeParam}&from=search${result.title ? `&title=${encodeURIComponent(result.title)}` : ''}`;
-  }
+  const typeParam = result.type === 'tv' ? 'tv' : 'movie';
+  const titleQ = result.title ? `&title=${encodeURIComponent(result.title)}` : '';
 
-  // Pour les autres cas (indexer, etc.), si on a un tmdbId, on préfère passer par Discover
-  // pour permettre la demande ou voir les infos, car /torrents risque d'être vide.
+  // Déjà en bibliothèque ou trouvé via indexeur/sync → page torrents (pas Discover/Demander)
   if (result.tmdbId != null) {
+    if (
+      result.isDownloaded ||
+      result.sourceSearch === 'indexer' ||
+      result.sourceSearch === 'sync' ||
+      result.sourceSearch === 'library' ||
+      (result.episodesIndexerCount ?? 0) > 0
+    ) {
+      return `/torrents?tmdbId=${result.tmdbId}&type=${typeParam}&from=search${titleQ}`;
+    }
+    // Autre cas avec tmdbId mais sans preuve de torrent → Discover
     return withDiscoverTitleHint(`/discover?tmdbId=${result.tmdbId}&type=${result.type}`, result.title);
   }
 
