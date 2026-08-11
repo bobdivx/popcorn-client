@@ -198,7 +198,14 @@ export function VideoPlayerWrapper({
   // Désactiver Lucie pour la bibliothèque (local_) : la MSE ne remplit pas le buffer avec les segments actuels.
   // Utiliser HLS pour que la lecture fonctionne. Lucie reste utilisé pour les torrents si config = lucie.
   const useLucieForThisSource = isLucieMode && !forceHlsFallback && !infoHash?.startsWith('local_');
-  const effectiveDirectMode = isDirectMode && !forceHlsFallback;
+  // Bibliothèque locale : Direct Play auto pour conteneurs natifs navigateur (MP4/WebM) =
+  // lecture disque sans réencode (4K fluide, comme VLC). MKV → HLS remux/transcode côté serveur.
+  const localFilePath = selectedFile?.path || selectedFile?.name || '';
+  const isBrowserNativeLocal =
+    !!infoHash?.startsWith('local_') &&
+    /\.(mp4|m4v|webm)(\?|$)/i.test(localFilePath);
+  const effectiveDirectMode =
+    (isDirectMode || isBrowserNativeLocal) && !forceHlsFallback;
   /** Qualité stream HLS : hauteur max en pixels (720, 480, 360) ou null = source. Modifiable dans le player. */
   const [streamQuality, setStreamQuality] = useState<number | null>(null);
   const {
@@ -727,12 +734,12 @@ export function VideoPlayerWrapper({
               if (videoEl) {
                 logVideoPlaybackError('VideoPlayerWrapper', videoEl, {
                   note: 'direct playback',
-                  willTryHlsFallback: !directStreamUrl && isDirectMode && !forceHlsFallback,
+                  willTryHlsFallback: !directStreamUrl && (isDirectMode || isBrowserNativeLocal) && !forceHlsFallback,
                 });
               } else {
                 console.error('[VideoPlayerWrapper] Direct video error:', e);
               }
-              if (!directStreamUrl && isDirectMode && !forceHlsFallback) {
+              if (!directStreamUrl && (isDirectMode || isBrowserNativeLocal) && !forceHlsFallback) {
                 console.warn('[VideoPlayerWrapper] Fallback automatique vers HLS après échec du mode direct.');
                 emitPlaybackStep('fallback_direct_to_hls', { message: 'Direct stream failed' });
                 emitPlaybackStep('fallback_message_shown');
