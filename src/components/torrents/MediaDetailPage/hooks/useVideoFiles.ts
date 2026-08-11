@@ -162,24 +162,73 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
       try {
         // Détecter si c'est un média local (infoHash commence par "local_")
         const isLocalMedia = infoHash.startsWith('local_');
-        
-        // Pour les médias locaux, utiliser directement le downloadPath
-        if (isLocalMedia && torrent?.downloadPath) {
-          console.log('[useVideoFiles] 📁 Média local détecté, utilisation du chemin direct:', torrent.downloadPath);
-          const fileName = torrentName || torrent.downloadPath.split(/[/\\]/).pop() || 'video';
-          const localFile: TorrentFile = {
-            path: dedupeLibraryMediaPrefix(torrent.downloadPath),
-            name: fileName,
-            size: 0, // Taille inconnue pour les médias locaux
-            is_video: true,
-          };
-          
-          const files = [localFile];
-          filesCacheRef.current.set(infoHash, files);
-          setVideoFiles(files);
-          setSelectedFile(files[0]);
+
+        /** Construit un TorrentFile unique depuis un chemin bibliothèque. */
+        const fileFromLibraryPath = (rawPath: string, size = 0): TorrentFile[] => {
+          const path = dedupeLibraryMediaPrefix(rawPath);
+          const fileName = torrentName || path.split(/[/\\]/).pop() || 'video';
+          return [{ path, name: fileName, size, is_video: true }];
+        };
+
+        // Pour les médias locaux : jamais d'appel /torrents/local_*/files (librqbit → 502).
+        // Résoudre le chemin via downloadPath, filePath, ou local-media by id.
+        if (isLocalMedia) {
+          let resolvedPath =
+            (torrent?.downloadPath && String(torrent.downloadPath).trim()) ||
+            (filePath && String(filePath).trim()) ||
+            '';
+
+          if (!resolvedPath) {
+            try {
+              const byPath = await clientApi.getTorrentDownloadPath(infoHash);
+              if (typeof byPath === 'string' && byPath.trim()) {
+                resolvedPath = byPath.trim();
+              }
+            } catch {
+              /* ignore */
+            }
+          }
+
+          if (!resolvedPath) {
+            try {
+              // findLocalMediaByInfoHash accepte local_<uuid> côté serveur.
+              const { serverApi } = await import('../../../../lib/client/server-api');
+              const res = await serverApi.findLocalMediaByInfoHash(infoHash);
+              const item = res?.success ? (res.data as { file_path?: string; file_size?: number } | null) : null;
+              if (item?.file_path) {
+                resolvedPath = String(item.file_path).trim();
+                const files = fileFromLibraryPath(resolvedPath, item.file_size ?? 0);
+                filesCacheRef.current.set(infoHash, files);
+                setEmptyOrSparse(false);
+                setVideoFiles(files);
+                setSelectedFile(files[0]);
+                setLoadingFiles(false);
+                loadingCacheRef.current.delete(infoHash);
+                return files;
+              }
+            } catch (e) {
+              console.warn('[useVideoFiles] Résolution local_media échouée:', e);
+            }
+          }
+
+          if (resolvedPath) {
+            console.log('[useVideoFiles] 📁 Média local, chemin bibliothèque:', resolvedPath);
+            const files = fileFromLibraryPath(resolvedPath);
+            filesCacheRef.current.set(infoHash, files);
+            setEmptyOrSparse(false);
+            setVideoFiles(files);
+            setSelectedFile(files[0]);
+            setLoadingFiles(false);
+            loadingCacheRef.current.delete(infoHash);
+            return files;
+          }
+
+          console.warn('[useVideoFiles] ⚠️ local_* sans chemin résolvable — pas de retry /files', {
+            infoHash,
+          });
           setLoadingFiles(false);
-          return files;
+          loadingCacheRef.current.delete(infoHash);
+          return [];
         }
 
         // Chemin bibliothèque : vérifier d'abord le torrent si hash réel.

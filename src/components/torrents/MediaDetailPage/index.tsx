@@ -347,6 +347,8 @@ export default function MediaDetailPage({
   // Ã‰tats de base
   const [isPlaying, setIsPlaying] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
+  /** Flag pour indiquer qu'on continue en arrière-plan (pour éviter que l'overlay se réaffiche). */
+  const continueInBackgroundRef = useRef<boolean>(false);
   const [imageUrl, setImageUrl] = useState<string | null>(torrent.imageUrl || null);
   const [heroImageUrl, setHeroImageUrl] = useState<string | null>(torrent.heroImageUrl || null);
   const isCompletedFromProps = torrent.clientState === 'completed' || 
@@ -795,14 +797,50 @@ export default function MediaDetailPage({
     torrent,
   ]);
 
-  /** Ferme le lecteur puis dÃ©clenche un rafraÃ®chissement des stats et de la disponibilitÃ© (carte Ã  jour aprÃ¨s stream). */
+  /** Ferme le lecteur puis déclenche un rafraîchissement des stats et de la disponibilité (carte à jour après stream). */
   const handleClosePlayerAndRefresh = useCallback(async () => {
     await handleClosePlayer();
     setRefreshAfterClose((r) => r + 1);
     setWatchedEpisodesRefresh((n) => n + 1);
   }, [handleClosePlayer]);
 
-  /** TÃ©lÃ©charger un seul Ã©pisode du pack (preview) : ajoute le torrent avec only_files [fileIndex]. */
+  /** Annule vraiment le téléchargement (retire le torrent du client, sans supprimer les fichiers). */
+  const handleAbortDownload = useCallback(async () => {
+    const activeInfoHash = (selectedTorrent || torrent).infoHash;
+    continueInBackgroundRef.current = false;
+
+    if (activeInfoHash) {
+      const { isLocalMedia } = await import('./actions/delete');
+      if (!isLocalMedia(activeInfoHash)) {
+        try {
+          const { clientApi } = await import('../../../lib/client/api');
+          addDebugLog('info', 'Suppression du torrent en cours...', { infoHash: activeInfoHash });
+          await clientApi.removeTorrent(activeInfoHash, false);
+          addDebugLog('success', 'Torrent supprimé');
+          addNotification('success', 'Téléchargement annulé et supprimé');
+        } catch (err) {
+          addDebugLog('error', 'Erreur lors de la suppression du torrent', { error: err });
+          addNotification('error', 'Erreur lors de la suppression du torrent');
+        }
+      }
+    }
+
+    stopProgressPolling();
+    setPlayStatus('idle');
+    setProgressMessage('');
+    setTorrentStats(null);
+    setErrorMessage(null);
+    setIsPlaying(false);
+    addDebugLog('info', '=== Annulation ===');
+  }, [
+    selectedTorrent,
+    torrent,
+    addDebugLog,
+    addNotification,
+    stopProgressPolling,
+  ]);
+
+  /** Télécharger un seul épisode du pack (preview) : ajoute le torrent avec only_files [fileIndex]. */
   const handleDownloadSingleEpisode = useCallback(
     async (fileIndex: number) => {
       const torrent = activeTorrent;
@@ -821,6 +859,7 @@ export default function MediaDetailPage({
             if (typeof torrent.tmdbId === 'number' && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) {
               clientApi.bindDownloadToMedia(infoHash, torrent.tmdbId, torrent.tmdbType).catch(() => {});
             }
+            scheduleUpdateOnlyFilesWithRetry(infoHash, fileIndex);
           }
         } else if (externalLink) {
           const baseUrl = serverApi.getServerUrl();
@@ -855,7 +894,7 @@ export default function MediaDetailPage({
           }
           const file = new File([buf], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
           const downloadType = resolveDownloadTypeHeader(torrent);
-          const result = await clientApi.addTorrentFile(file, false, downloadType);
+          const result = await clientApi.addTorrentFile(file, false, downloadType, undefined, [fileIndex]);
           infoHash = result?.info_hash ?? '';
           if (infoHash) {
             saveDownloadMeta(infoHash, { ...torrent, imageUrl: torrent.imageUrl ?? undefined, heroImageUrl: torrent.heroImageUrl ?? undefined, cleanTitle: torrent.cleanTitle ?? torrent.name ?? undefined });
@@ -893,6 +932,7 @@ export default function MediaDetailPage({
         if (magnet) {
           const result = await clientApi.addMagnetLink(magnet, torrent.name, true, undefined, undefined, [fileIndex]);
           infoHash = result?.info_hash ?? '';
+          if (infoHash) scheduleUpdateOnlyFilesWithRetry(infoHash, fileIndex);
         } else if (externalLink) {
           const baseUrl = serverApi.getServerUrl();
           const token = serverApi.getAccessToken();
@@ -925,7 +965,7 @@ export default function MediaDetailPage({
             throw new Error('La réponse n\'est pas un fichier .torrent (souvent page HTML C411). Vérifiez la clé API Torznab.');
           }
           const file = new File([buf], `${torrent.name}.torrent`, { type: 'application/x-bittorrent' });
-          const result = await clientApi.addTorrentFile(file, true);
+          const result = await clientApi.addTorrentFile(file, true, undefined, undefined, [fileIndex]);
           infoHash = result?.info_hash ?? '';
           if (infoHash) scheduleUpdateOnlyFilesWithRetry(infoHash, fileIndex);
         } else {
@@ -1161,7 +1201,7 @@ export default function MediaDetailPage({
             });
           };
 
-          // 1) Lookup ciblé par info_hash (évite getLibrary() full)
+          // 1) Lookup ciblé par info_hash (évite getLibrary() full) — accepte aussi local_<uuid>
           if (hasInfoHash && activeTorrent.infoHash) {
             try {
               const byHash = await serverApi.findLocalMediaByInfoHash(activeTorrent.infoHash);
@@ -1169,7 +1209,7 @@ export default function MediaDetailPage({
               const path =
                 item?.file_path || item?.download_path || item?.downloadPath || null;
               if (item && (path || item.exists)) {
-                const hasExistingPath = !!(activeTorrent as any).downloadPath;
+                const hasExistingPath = !!(activeTorrent as any).downloadPath || !!libraryDownloadPath;
                 const pathIsFile =
                   typeof path === 'string' &&
                   /\.(mkv|mp4|avi|webm|mov|m4v|wmv|ts|m2ts)$/i.test(path.replace(/\\/g, '/'));
@@ -1187,7 +1227,7 @@ export default function MediaDetailPage({
             }
           }
 
-          // 2) Lookup ciblé par TMDB si pas déjà trouvé
+          // 2) Lookup ciblé par TMDB si pas déjà trouvé — matcher SxxExx du nom actif
           if (!isAvailableInLibrary && activeTorrent.tmdbId) {
             try {
               const localMedia = await clientApi.findLocalMediaByTmdb(
@@ -1195,16 +1235,44 @@ export default function MediaDetailPage({
                 activeTorrent.tmdbType || undefined
               );
               if (localMedia.length > 0) {
-                const hasExistingPathTmdb = !!(activeTorrent as any).downloadPath;
+                const hasExistingPathTmdb =
+                  !!(activeTorrent as any).downloadPath || !!libraryDownloadPath;
                 const currentName = (activeTorrent.name || '').toLowerCase();
-                const matchByName = currentName
+                const seFromName =
+                  currentName.match(/s([0-9]{1,2})[.\s-]*e([0-9]{1,3})/i) ||
+                  currentName.match(/([0-9]{1,2})x([0-9]{1,3})/i);
+                const matchByEpisode = seFromName
                   ? localMedia.find((m: any) => {
-                      const n = (m.file_name || m.name || '').toLowerCase();
-                      const token = currentName.split(/[.\s\-_]+/)[0] || '';
-                      return (token && n.includes(token)) || (n && currentName.includes(n.split(/[.\s\-_]+/)[0] || ''));
+                      const n = `${m.file_name || ''} ${m.file_path || ''}`.toLowerCase();
+                      const s = String(parseInt(seFromName[1], 10)).padStart(2, '0');
+                      const e = String(parseInt(seFromName[2], 10)).padStart(2, '0');
+                      return (
+                        new RegExp(`s0?${parseInt(seFromName[1], 10)}[.\\s-]*e0?${parseInt(seFromName[2], 10)}\\b`, 'i').test(n) ||
+                        n.includes(`s${s}e${e}`)
+                      );
                     })
                   : null;
-                const chosen = matchByName ?? localMedia[0];
+                const matchByName = !matchByEpisode && currentName
+                  ? localMedia.find((m: any) => {
+                      const n = (m.file_name || m.name || '').toLowerCase();
+                      // Éviter un match trop large sur le premier token (ex. "house" → mauvais épisode).
+                      const tokens = currentName.split(/[.\s\-_]+/).filter((t) => t.length > 3);
+                      const hit = tokens.filter((t) => n.includes(t)).length;
+                      return hit >= 2;
+                    })
+                  : null;
+                const chosen =
+                  matchByEpisode ??
+                  matchByName ??
+                  (activeTorrent.infoHash?.startsWith('local_')
+                    ? localMedia.find(
+                        (m: any) =>
+                          m.id &&
+                          (`local_${m.id}` === activeTorrent.infoHash ||
+                            m.id === activeTorrent.infoHash.replace(/^local_/, '')),
+                      )
+                    : null) ??
+                  localMedia[0];
                 const firstPath = (chosen as { file_path?: string }).file_path;
                 const firstPathIsFile =
                   firstPath &&
@@ -1448,8 +1516,13 @@ export default function MediaDetailPage({
                  }
                  pathMap[key] = p;
                }
+               // Préférer un vrai hash hex ; sinon stub local_<id> pour la lecture bibliothèque.
                const localInfoHash = (media.info_hash || media.infoHash || '').toString().trim();
-               if (localInfoHash) infoHashMap[key] = localInfoHash;
+               if (localInfoHash && /^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$/.test(localInfoHash)) {
+                 infoHashMap[key] = localInfoHash;
+               } else if (!infoHashMap[key] && media.id) {
+                 infoHashMap[key] = `local_${media.id}`;
+               }
              }
           }
         }
@@ -1486,8 +1559,12 @@ export default function MediaDetailPage({
                  }
                  
                  const torrentInfoHash = ((t as any).info_hash || (t as any).infoHash || '').toString().trim();
-                 if (torrentInfoHash && !infoHashMap[key]) {
-                   infoHashMap[key] = torrentInfoHash;
+                 // Un hash torrent réel remplace toujours un stub local_* (lecture via librqbit).
+                 if (torrentInfoHash && /^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$/.test(torrentInfoHash)) {
+                   const existing = infoHashMap[key];
+                   if (!existing || existing.startsWith('local_')) {
+                     infoHashMap[key] = torrentInfoHash;
+                   }
                  }
                }
             }
@@ -1982,9 +2059,17 @@ export default function MediaDetailPage({
     (episodeVariantId: string | null): MediaDetailPageProps['torrent'] | null => {
       if (!seriesEpisodes?.seasons?.length || episodeVariantId == null) return null;
       let variant: MediaDetailPageProps['torrent'] | null | undefined = allVariants.find((v: any) => v.id === episodeVariantId);
+      let episodeSeason: number | null = null;
+      let episodeNumber: number | null = null;
+      const seasonForEp = seriesEpisodes.seasons.find((s) => s.episodes.some((e) => e.id === episodeVariantId));
+      const epMeta = seasonForEp?.episodes.find((e) => e.id === episodeVariantId);
+      if (epMeta) {
+        episodeSeason = epMeta.season;
+        episodeNumber = epMeta.episode;
+      }
       if (!variant) {
-        const season = seriesEpisodes.seasons.find((s) => s.episodes.some((e) => e.id === episodeVariantId));
-        const ep = season?.episodes.find((e) => e.id === episodeVariantId);
+        const season = seasonForEp;
+        const ep = epMeta;
         if (ep != null) {
           if (ep.info_hash) {
             variant = allVariants.find((v: any) => (v.infoHash || (v as any).info_hash) === ep.info_hash);
@@ -2014,7 +2099,7 @@ export default function MediaDetailPage({
           // Pack MULTI / S01 complet : souvent seul l'épisode 0 a une source indexeur.
           // Pour un épisode N sans variante dédiée, retomber sur le pack (ou la meilleure variante).
           if (!variant) {
-            const packEp = season.episodes.find((e) => e.episode === 0);
+            const packEp = season?.episodes.find((e) => e.episode === 0);
             if (packEp?.id) {
               variant = allVariants.find((v: any) => v.id === packEp.id);
               if (!variant && packEp.info_hash) {
@@ -2035,6 +2120,28 @@ export default function MediaDetailPage({
           }
         }
       }
+
+      // Enrichir avec chemin / hash bibliothèque pour l'épisode (évite local_* sans downloadPath).
+      if (variant && episodeSeason != null && episodeNumber != null && episodeNumber > 0) {
+        const key = `${episodeSeason}:${episodeNumber}`;
+        const libPath = libraryEpisodesPathMap[key];
+        const libHash = (libraryEpisodesInfoHashMap[key] || '').toString().trim();
+        const currentHash = String(
+          variant.infoHash || (variant as { info_hash?: string }).info_hash || '',
+        ).trim();
+        const preferLibHash =
+          libHash &&
+          /^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$/.test(libHash) &&
+          (!currentHash || currentHash.startsWith('local_'));
+        if (libPath || preferLibHash || (!currentHash && libHash)) {
+          variant = {
+            ...variant,
+            downloadPath: libPath || (variant as { downloadPath?: string }).downloadPath || null,
+            infoHash: preferLibHash ? libHash : currentHash || libHash || null,
+          };
+        }
+      }
+
       return variant ?? null;
     },
     [seriesEpisodes, allVariants, parseSeasonEpisodeFromVariant, libraryEpisodesInfoHashMap, libraryEpisodesPathMap, torrent],
@@ -2384,6 +2491,250 @@ export default function MediaDetailPage({
   const [isTransitioningToNext, setIsTransitioningToNext] = useState(false);
   const previousActiveTorrentRef = useRef<typeof activeTorrent | null>(null);
   const previousSelectedFileRef = useRef<typeof selectedFile>(null);
+  /** Prefetch déjà lancé pour cet épisode suivant (évite doublons). */
+  const nextEpisodePrefetchedKeyRef = useRef<string | null>(null);
+
+  const prefetchNextEpisode = useCallback(async () => {
+    const next = getNextEpisode(seriesEpisodes ?? undefined, selectedSeasonNum, selectedEpisodeVariantId);
+    if (!next) return;
+    const prefetchKey = `${next.seasonNum}:${next.episodeVariantId}`;
+    if (nextEpisodePrefetchedKeyRef.current === prefetchKey) return;
+    nextEpisodePrefetchedKeyRef.current = prefetchKey;
+
+    try {
+      const season = seriesEpisodes?.seasons?.find((s) => s.season === next.seasonNum);
+      const nextEp = season?.episodes?.find((e) => e.id === next.episodeVariantId);
+      if (!nextEp || nextEp.episode <= 0) return;
+
+      // Déjà en bibliothèque locale → rien à prefetch.
+      const localKey = `${nextEp.season}:${nextEp.episode}`;
+      if (libraryEpisodesPathMap[localKey]) return;
+
+      const expected = resolveVariantForSelectedEpisode(next.episodeVariantId);
+      if (!expected) return;
+
+      const magnet =
+        (expected as { _externalMagnetUri?: string })._externalMagnetUri ??
+        ((expected as { _externalLink?: string })._externalLink?.startsWith('magnet:')
+          ? (expected as { _externalLink: string })._externalLink
+          : null);
+      const externalLink =
+        (expected as { _externalLink?: string })._externalLink &&
+        !(expected as { _externalLink?: string })._externalLink?.startsWith('magnet:')
+          ? (expected as { _externalLink: string })._externalLink
+          : null;
+      const rawHash = String(
+        expected.infoHash || (expected as { info_hash?: string }).info_hash || '',
+      ).toLowerCase();
+      const packInfoHash = /^[a-f0-9]{40}$/i.test(rawHash) ? rawHash : '';
+      if (!magnet && !externalLink && !packInfoHash) return;
+
+      const isRelativeLink =
+        externalLink != null &&
+        !externalLink.startsWith('http://') &&
+        !externalLink.startsWith('https://');
+      const idMatch = externalLink != null ? externalLink.match(/[?&]id=(\d+)/) : null;
+      const numericTorrentId = (idMatch && idMatch[1]) ?? null;
+      const listParams = magnet
+        ? { ...(packInfoHash ? { infoHash: packInfoHash } : {}), magnet }
+        : {
+            ...(packInfoHash ? { infoHash: packInfoHash } : {}),
+            url: isRelativeLink ? undefined : externalLink || undefined,
+            indexerId: (expected as { indexerId?: string }).indexerId,
+            torrentId:
+              numericTorrentId ??
+              (expected.id?.includes('_') ? expected.id.split('_').pop() : expected.id),
+            guid: (expected as { _guid?: string })._guid,
+            indexerTypeId:
+              (expected as { indexer_type_id?: string }).indexer_type_id ??
+              (() => {
+                const tm = expected.id && expected.id.match(/^external_([^_]+)_/);
+                return (tm && tm[1]) || undefined;
+              })(),
+            ...(isRelativeLink && externalLink ? { relativeUrl: externalLink } : {}),
+          };
+      const listRes = await serverApi.getTorrentFileList(listParams);
+      const files = listRes.success && Array.isArray(listRes.data) ? listRes.data : null;
+
+      if (files && files.length > 1) {
+        const nextFileIndex = findPackFileIndexForEpisode(files, nextEp.season, nextEp.episode);
+        if (nextFileIndex == null) return;
+
+        const currentHash = String(
+          addedTorrentInfoHash ||
+            activeTorrent.infoHash ||
+            (activeTorrent as { info_hash?: string }).info_hash ||
+            '',
+        ).toLowerCase();
+        const samePackAlreadyActive =
+          packInfoHash && currentHash && packInfoHash === currentHash;
+
+        if (samePackAlreadyActive) {
+          // Même pack en lecture : élargir only_files (épisode courant + suivant), ne pas remplacer.
+          const currentIdx =
+            typeof selectedFile?.index === 'number'
+              ? selectedFile.index
+              : findPackFileIndexForEpisode(
+                  files,
+                  selectedEpisodeMeta?.season ?? nextEp.season,
+                  selectedEpisodeMeta?.episode ?? -1,
+                );
+          const only = [
+            ...new Set(
+              [currentIdx, nextFileIndex].filter((i): i is number => typeof i === 'number' && i >= 0),
+            ),
+          ];
+          if (only.length > 0) {
+            await clientApi.updateOnlyFiles(currentHash, only).catch(() => {
+              scheduleUpdateOnlyFilesWithRetry(currentHash, nextFileIndex);
+            });
+          }
+          return;
+        }
+
+        // Autre pack : ajouter avec only_files = épisode suivant uniquement.
+        const downloadType = resolveDownloadTypeHeader(expected);
+        if (magnet) {
+          const result = await clientApi.addMagnetLink(
+            magnet,
+            expected.name,
+            false,
+            downloadType,
+            undefined,
+            [nextFileIndex],
+          );
+          const ih = result?.info_hash ?? '';
+          if (ih) {
+            saveDownloadMeta(ih, {
+              posterUrl: expected.imageUrl ?? null,
+              backdropUrl: expected.heroImageUrl ?? null,
+              cleanTitle: expected.cleanTitle ?? expected.name ?? null,
+            });
+            if (typeof expected.tmdbId === 'number' && (expected.tmdbType === 'movie' || expected.tmdbType === 'tv')) {
+              clientApi.bindDownloadToMedia(ih, expected.tmdbId, expected.tmdbType).catch(() => {});
+            }
+            scheduleUpdateOnlyFilesWithRetry(ih, nextFileIndex);
+          }
+          return;
+        }
+
+        if (externalLink) {
+          const baseUrl = serverApi.getServerUrl();
+          const token = serverApi.getAccessToken();
+          const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+          const ext = buildExternalDownloadParams(expected as any);
+          const q = new URLSearchParams();
+          if (isRelativeLink) {
+            if (ext.indexerId) q.set('indexerId', ext.indexerId);
+            const idFromLink = externalLink.match(/[?&]id=(\d+)/)?.[1];
+            q.set('torrentId', idFromLink || ext.torrentId || '');
+            if (ext.guid) q.set('guid', ext.guid);
+            if (ext.indexerTypeId) q.set('indexerTypeId', ext.indexerTypeId);
+            q.set('relativeUrl', externalLink);
+          } else {
+            q.set('url', externalLink);
+            if (ext.indexerId) q.set('indexerId', ext.indexerId);
+            if (ext.guid) q.set('guid', ext.guid);
+            if (ext.torrentId) q.set('torrentId', ext.torrentId);
+            if (ext.indexerTypeId) q.set('indexerTypeId', ext.indexerTypeId);
+            if (ext.infoHash) q.set('infoHash', ext.infoHash);
+          }
+          const res = await fetch(`${baseUrl}/api/torrents/external/download?${q.toString()}`, { headers });
+          if (!res.ok) return;
+          const buf = new Uint8Array(await res.arrayBuffer());
+          if (!looksLikeBencodedTorrent(buf)) return;
+          const file = new File([buf], `${expected.name}.torrent`, { type: 'application/x-bittorrent' });
+          const result = await clientApi.addTorrentFile(file, false, downloadType, undefined, [nextFileIndex]);
+          const ih = result?.info_hash ?? '';
+          if (ih) {
+            saveDownloadMeta(ih, {
+              posterUrl: expected.imageUrl ?? null,
+              backdropUrl: expected.heroImageUrl ?? null,
+              cleanTitle: expected.cleanTitle ?? expected.name ?? null,
+            });
+            if (typeof expected.tmdbId === 'number' && (expected.tmdbType === 'movie' || expected.tmdbType === 'tv')) {
+              clientApi.bindDownloadToMedia(ih, expected.tmdbId, expected.tmdbType).catch(() => {});
+            }
+            scheduleUpdateOnlyFilesWithRetry(ih, nextFileIndex);
+          }
+          return;
+        }
+        return;
+      }
+
+      // Mono-fichier / épisode dédié : ajout silencieux en arrière-plan.
+      const downloadType = resolveDownloadTypeHeader(expected);
+      if (magnet) {
+        const result = await clientApi.addMagnetLink(magnet, expected.name, false, downloadType);
+        const ih = result?.info_hash ?? '';
+        if (ih) {
+          saveDownloadMeta(ih, {
+            posterUrl: expected.imageUrl ?? null,
+            backdropUrl: expected.heroImageUrl ?? null,
+            cleanTitle: expected.cleanTitle ?? expected.name ?? null,
+          });
+          if (typeof expected.tmdbId === 'number' && (expected.tmdbType === 'movie' || expected.tmdbType === 'tv')) {
+            clientApi.bindDownloadToMedia(ih, expected.tmdbId, expected.tmdbType).catch(() => {});
+          }
+        }
+        return;
+      }
+      if (externalLink) {
+        const baseUrl = serverApi.getServerUrl();
+        const token = serverApi.getAccessToken();
+        const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+        const ext = buildExternalDownloadParams(expected as any);
+        const q = new URLSearchParams();
+        if (isRelativeLink) {
+          if (ext.indexerId) q.set('indexerId', ext.indexerId);
+          const idFromLink = externalLink.match(/[?&]id=(\d+)/)?.[1];
+          q.set('torrentId', idFromLink || ext.torrentId || '');
+          if (ext.guid) q.set('guid', ext.guid);
+          if (ext.indexerTypeId) q.set('indexerTypeId', ext.indexerTypeId);
+          q.set('relativeUrl', externalLink);
+        } else {
+          q.set('url', externalLink);
+          if (ext.indexerId) q.set('indexerId', ext.indexerId);
+          if (ext.guid) q.set('guid', ext.guid);
+          if (ext.torrentId) q.set('torrentId', ext.torrentId);
+          if (ext.indexerTypeId) q.set('indexerTypeId', ext.indexerTypeId);
+          if (ext.infoHash) q.set('infoHash', ext.infoHash);
+        }
+        const res = await fetch(`${baseUrl}/api/torrents/external/download?${q.toString()}`, { headers });
+        if (!res.ok) return;
+        const buf = new Uint8Array(await res.arrayBuffer());
+        if (!looksLikeBencodedTorrent(buf)) return;
+        const file = new File([buf], `${expected.name}.torrent`, { type: 'application/x-bittorrent' });
+        const result = await clientApi.addTorrentFile(file, false, downloadType);
+        const ih = result?.info_hash ?? '';
+        if (ih) {
+          saveDownloadMeta(ih, {
+            posterUrl: expected.imageUrl ?? null,
+            backdropUrl: expected.heroImageUrl ?? null,
+            cleanTitle: expected.cleanTitle ?? expected.name ?? null,
+          });
+          if (typeof expected.tmdbId === 'number' && (expected.tmdbType === 'movie' || expected.tmdbType === 'tv')) {
+            clientApi.bindDownloadToMedia(ih, expected.tmdbId, expected.tmdbType).catch(() => {});
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[prefetch-next] failed', e);
+      if (nextEpisodePrefetchedKeyRef.current === prefetchKey) {
+        nextEpisodePrefetchedKeyRef.current = null;
+      }
+    }
+  }, [
+    seriesEpisodes,
+    selectedSeasonNum,
+    selectedEpisodeVariantId,
+    libraryEpisodesPathMap,
+    resolveVariantForSelectedEpisode,
+    activeTorrent,
+    selectedFile,
+    selectedEpisodeMeta,
+  ]);
+
   const onPlayNextEpisode = () => {
     const next = getNextEpisode(seriesEpisodes ?? undefined, selectedSeasonNum, selectedEpisodeVariantId);
     if (!next) return;
@@ -2391,8 +2742,11 @@ export default function MediaDetailPage({
     previousSelectedFileRef.current = selectedFile;
     pendingNextEpisodeRef.current = true;
     setIsTransitioningToNext(true);
+    // Déclencher le même chemin que le clic carte (only_files si pack).
+    episodePlayIntentRef.current = next.episodeVariantId;
     setSelectedSeasonNum(next.seasonNum);
     setSelectedEpisodeVariantId(next.episodeVariantId);
+    setEpisodePlayNonce((n) => n + 1);
   };
   // Quand on a demandÃ© l'Ã©pisode suivant, loadVideoFiles (nouvel infoHash) vide puis remplit videoFiles.
   // useVideoFiles met dÃ©jÃ  Ã  jour selectedFile Ã  la fin de loadVideoFiles ; on ne fait que rÃ©initialiser le ref.
@@ -2495,15 +2849,12 @@ export default function MediaDetailPage({
   // VÃ©rifier si on peut afficher le lecteur vidÃ©o (ou pendant la transition pour ne pas dÃ©monter)
   const canShowVideoPlayer = isPlaying && hasValidInfoHash;
   
-  // Ref pour le wrapper vidÃ©o
+  // Ref pour le wrapper vidéo
   const videoWrapperRef = useRef<HTMLDivElement | null>(null);
   
-  // Flag pour indiquer qu'on continue en arriÃ¨re-plan (pour Ã©viter que l'overlay se rÃ©affiche)
-  const continueInBackgroundRef = useRef<boolean>(false);
-  
   // Afficher l'overlay de progression UNIQUEMENT pour le streaming (bouton "Lire")
-  // Pas pour le tÃ©lÃ©chargement (bouton "TÃ©lÃ©charger") - le statut sera affichÃ© sur la page dÃ©tail
-  // L'overlay ne doit s'afficher que si on a cliquÃ© sur "Lire" ET que le torrent n'est pas encore prÃªt
+  // Pas pour le téléchargement (bouton "Télécharger") - le statut sera affiché sur la page détail
+  // L'overlay ne doit s'afficher que si on a cliqué sur "Lire" ET que le torrent n'est pas encore prêt
   // Si playStatus === 'ready' et qu'on a des fichiers, ne jamais afficher l'overlay (lecteur doit s'afficher)
   const shouldShowOverlay =
     !canShowVideoPlayer &&
@@ -2532,51 +2883,23 @@ export default function MediaDetailPage({
           (Boolean(torrentStats && (torrentStats.state === 'completed' || torrentStats.state === 'seeding')) &&
             !canShowVideoPlayer)
         }
-        onCancel={async () => {
-          const activeInfoHash = (selectedTorrent || torrent).infoHash;
-
-          continueInBackgroundRef.current = false;
-
-          // Confirmation déjà gérée dans PlaybackStatusSurface (dialog focusable TV).
-          if (activeInfoHash && torrentStats) {
-            const { isLocalMedia } = await import('./actions/delete');
-            if (!isLocalMedia(activeInfoHash)) {
-              try {
-                const { clientApi } = await import('../../../lib/client/api');
-                addDebugLog('info', 'Suppression du torrent en cours...', { infoHash: activeInfoHash });
-                await clientApi.removeTorrent(activeInfoHash, false);
-                addDebugLog('success', 'Torrent supprimé');
-                addNotification('success', 'Téléchargement annulé et supprimé');
-              } catch (err) {
-                addDebugLog('error', 'Erreur lors de la suppression du torrent', { error: err });
-                addNotification('error', 'Erreur lors de la suppression du torrent');
-              }
-            }
-          }
-          
-          stopProgressPolling();
-          setPlayStatus('idle');
-          setProgressMessage('');
-          setTorrentStats(null);
-          setErrorMessage(null);
-          addDebugLog('info', '=== Annulation ===');
-        }}
+        onCancel={handleAbortDownload}
         onContinueInBackground={() => {
-          // Fermer l'overlay mais continuer le tÃ©lÃ©chargement en arriÃ¨re-plan
-          // Ne pas arrÃªter le polling, juste masquer l'overlay
+          // Fermer l'overlay mais continuer le téléchargement en arrière-plan
+          // Ne pas arrêter le polling, juste masquer l'overlay
           continueInBackgroundRef.current = true;
-          // Ne pas appeler stopProgressPolling() - on veut continuer Ã  suivre la progression
-          // Le polling continue en arriÃ¨re-plan pour suivre la progression
+          // Ne pas appeler stopProgressPolling() - on veut continuer à suivre la progression
+          // Le polling continue en arrière-plan pour suivre la progression
           setPlayStatus('idle'); // Masquer l'overlay
           // Garder torrentStats pour qu'on puisse voir la progression si on revient
-          // Ne pas rÃ©initialiser torrentStats pour garder les stats actuelles
+          // Ne pas réinitialiser torrentStats pour garder les stats actuelles
           setProgressMessage('');
           setErrorMessage(null);
-          addDebugLog('info', 'ðŸ“± TÃ©lÃ©chargement continuÃ© en arriÃ¨re-plan', { 
+          addDebugLog('info', 'Téléchargement continué en arrière-plan', { 
             hasPolling: !!progressPollIntervalRef.current,
             torrentStats: torrentStats ? { progress: torrentStats.progress, state: torrentStats.state } : null
           });
-          addNotification('info', 'Le tÃ©lÃ©chargement continue en arriÃ¨re-plan');
+          addNotification('info', 'Le téléchargement continue en arrière-plan');
         }}
         onRetry={() => {
           // RÃ©initialiser le flag de continuation en arriÃ¨re-plan quand on rÃ©essaie
@@ -2637,7 +2960,9 @@ export default function MediaDetailPage({
         isSeries={!!(seriesEpisodes?.seasons?.length)}
         nextEpisodeInfo={nextEpisodeInfo}
         onPlayNextEpisode={onPlayNextEpisode}
+        onPrefetchNextEpisode={prefetchNextEpisode}
         onClose={handleClosePlayerAndRefresh}
+        onAbortDownload={() => void handleAbortDownload()}
         visible={true}
         wrapperRef={(el) => { videoWrapperRef.current = el; }}
         quality={displayTorrent.quality}
@@ -2675,7 +3000,7 @@ export default function MediaDetailPage({
   return (
     <>
       {/* Ne rendre VideoPlayerWrapper QUE si on est en mode streaming (isPlaying = true) */}
-      {/* Pendant le tÃ©lÃ©chargement (isPlaying = false), ne pas rendre le composant pour Ã©viter de dÃ©clencher le lecteur HLS */}
+      {/* Pendant le téléchargement (isPlaying = false), ne pas rendre le composant pour éviter de déclencher le lecteur HLS */}
       {displayInfoHash && !shouldShowOverlay && isPlaying && canShowVideoPlayer && (
         <VideoPlayerWrapper
           key={`player-${displayInfoHash}-${displayFile?.path ?? displayFile?.name ?? ''}`}
@@ -2691,7 +3016,9 @@ export default function MediaDetailPage({
         isSeries={!!(seriesEpisodes?.seasons?.length)}
         nextEpisodeInfo={nextEpisodeInfo}
         onPlayNextEpisode={onPlayNextEpisode}
+        onPrefetchNextEpisode={prefetchNextEpisode}
         onClose={handleClosePlayerAndRefresh}
+        onAbortDownload={() => void handleAbortDownload()}
         visible={true}
         wrapperRef={(el) => { videoWrapperRef.current = el; }}
         quality={displayTorrent.quality}
