@@ -363,27 +363,29 @@ export function useHlsPlayer({
           throw new Error('HLS.js n\'est pas disponible ou n\'est pas supporté par ce navigateur');
         }
 
-        // Options HLS.js optimisées pour une mise en buffer agressive et un TTFF (Time-To-First-Frame) bas
-        const maxBufferLength = isRemoteStream ? 600 : 300; // Jusqu'à 10 mins de preload
+        // Options HLS.js : VOD local = buffer large sans low-latency (évite les micro-coupures).
+        // Stream distant : lowLatencyMode pour TTFF.
+        const maxBufferLength = isRemoteStream ? 120 : 90;
         const hls = new window.Hls({
           enableWorker: true,
-          lowLatencyMode: true, // Autoriser le chargement anticipé
+          lowLatencyMode: Boolean(isRemoteStream),
           // Jellyfin-style: backBufferLength défini globalement dans useHlsLoader
           maxBufferLength,
-          maxMaxBufferLength: maxBufferLength * 2, // Permettre l'ingestion massive si connexion fibre
+          maxMaxBufferLength: maxBufferLength * 2,
           maxBufferSize: (playerConfig.maxBufferSize * 1000 * 1000) * 2, // 2x RAM allouée (par défaut 60M -> 120MB)
-          maxBufferHole: 0.3,
-          highBufferWatchdogPeriod: isRemoteStream ? 2 : 1, // Vérifier les soucis de buffer plus souvent
-          nudgeOffset: 0.1,
-          nudgeMaxRetry: isRemoteStream ? 50 : 30, // Tenter plus de nudges pour combler les micro-coupures
+          // Trous MSE plus tolérants : segments HLS ~4s + micro-gaps FFmpeg.
+          maxBufferHole: isRemoteStream ? 0.8 : 1.0,
+          highBufferWatchdogPeriod: 2,
+          nudgeOffset: 0.2,
+          nudgeMaxRetry: isRemoteStream ? 50 : 40,
           // Estimations de bande passante et seuils d'adaptation
           abrEwmaFastLive: 1,
           abrEwmaSlowLive: 9,
-          abrEwmaFastVOD: 1.5,
-          abrEwmaSlowVOD: 12,
-          abrBandWidthFactor: 0.85, // Prendre 85% de la bande passante estimée pour éviter les stalls
-          abrBandWidthUpFactor: 0.7, // Seuil pour monter de qualité
-          abrMaxWithRealBitrate: true, // Utiliser le bitrate réel
+          abrEwmaFastVOD: 3,
+          abrEwmaSlowVOD: 9,
+          abrBandWidthFactor: 0.8,
+          abrBandWidthUpFactor: 0.7,
+          abrMaxWithRealBitrate: true,
           // Qualité adaptée au player et démarrage rapide
           capLevelToPlayerSize: true,
           startLevel: -1,
@@ -526,13 +528,31 @@ export function useHlsPlayer({
           waitingTimeoutId = window.setTimeout(() => {
             waitingTimeoutId = null;
             const hls = hlsRef.current;
-            if (hls && hls.media) {
+            if (!hls || !hls.media) return;
+            try {
+              const pos = Number.isFinite(video.currentTime) ? video.currentTime : -1;
+              // Reprendre un peu avant la tête pour recharger le fragment courant.
+              hls.startLoad(pos >= 0.25 ? Math.max(0, pos - 0.25) : pos >= 0 ? pos : undefined);
+              // Si un trou MSE bloque juste après la tête, avancer légèrement (nudge manuel).
               try {
-                const pos = Number.isFinite(video.currentTime) ? video.currentTime : -1;
-                hls.startLoad(pos >= 0 ? pos : undefined);
+                const buffered = video.buffered;
+                if (buffered && buffered.length > 0 && pos >= 0) {
+                  for (let i = 0; i < buffered.length; i++) {
+                    const start = buffered.start(i);
+                    const end = buffered.end(i);
+                    if (pos >= start && pos <= end + 0.05) {
+                      // Dans une range : rien à sauter.
+                      return;
+                    }
+                    if (start > pos && start - pos <= 1.5) {
+                      video.currentTime = start + 0.05;
+                      return;
+                    }
+                  }
+                }
               } catch (_) {}
-            }
-          }, 400);
+            } catch (_) {}
+          }, 250);
         };
         video.addEventListener('waiting', handleWaiting);
         cleanupFunctions.push(() => {
