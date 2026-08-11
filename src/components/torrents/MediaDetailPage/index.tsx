@@ -2174,15 +2174,23 @@ export default function MediaDetailPage({
         const currentHash = String(
           variant.infoHash || (variant as { info_hash?: string }).info_hash || '',
         ).trim();
-        const preferLibHash =
-          libHash &&
-          /^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$/.test(libHash) &&
-          (!currentHash || currentHash.startsWith('local_'));
-        if (libPath || preferLibHash || (!currentHash && libHash)) {
+        const isHexHash = (h: string) => /^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$/.test(h);
+        // Ne jamais remplacer un vrai infoHash torrent par un stub local_* (reset lecteur / mauvaises URLs).
+        let nextHash = currentHash || libHash || null;
+        if (isHexHash(currentHash)) {
+          nextHash = currentHash;
+        } else if (isHexHash(libHash)) {
+          nextHash = libHash;
+        } else if (currentHash) {
+          nextHash = currentHash;
+        } else {
+          nextHash = libHash || null;
+        }
+        if (libPath || nextHash !== (variant.infoHash || null)) {
           variant = {
             ...variant,
             downloadPath: libPath || (variant as { downloadPath?: string }).downloadPath || null,
-            infoHash: preferLibHash ? libHash : currentHash || libHash || null,
+            infoHash: nextHash,
           };
         }
       }
@@ -2216,6 +2224,36 @@ export default function MediaDetailPage({
         const vh = String(variant.infoHash || (variant as { info_hash?: string }).info_hash || '').toLowerCase();
         const ph = String(prev?.infoHash || (prev as { info_hash?: string })?.info_hash || '').toLowerCase();
         if (prev && variant.id === prev.id && vh === ph) return prev;
+        // Même épisode : garder le hash torrent réel plutôt qu'un stub local_* (évite reset HLS).
+        const prevIsHex = /^[a-f0-9]{32}$|^[a-f0-9]{40}$/.test(ph);
+        const nextIsLocal = vh.startsWith('local_');
+        if (prev && prevIsHex && nextIsLocal) {
+          const parseSe = (name: string) => {
+            const m =
+              name.match(/s(\d{1,2})[.\s_-]*e(\d{1,3})/i) ||
+              name.match(/(\d{1,2})x(\d{1,3})/i);
+            return m
+              ? { s: parseInt(m[1], 10), e: parseInt(m[2], 10) }
+              : null;
+          };
+          const prevSe = parseSe(String(prev.name || ''));
+          const nextSe = parseSe(String(variant.name || ''));
+          const sameEpisode =
+            prevSe &&
+            nextSe &&
+            prevSe.s === nextSe.s &&
+            prevSe.e === nextSe.e;
+          if (sameEpisode) {
+            return {
+              ...variant,
+              infoHash: prev.infoHash,
+              downloadPath:
+                variant.downloadPath ||
+                (prev as { downloadPath?: string | null }).downloadPath ||
+                null,
+            };
+          }
+        }
         return variant;
       });
       setCurrentSeedCount(variant.seedCount ?? 0);
