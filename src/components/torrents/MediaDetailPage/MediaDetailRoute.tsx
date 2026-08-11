@@ -1847,65 +1847,11 @@ export default function MediaDetailRoute() {
     return () => window.removeEventListener('backendReconnected', onReconnected);
   }, []);
 
-  if (loading) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative w-16 h-16 mb-4 mx-auto">
-            <div className="absolute inset-0 border-4 border-primary-600/20 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-          <p className="text-white/80">Chargement...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-    const tmdbIdParam = urlParams?.get('tmdbId');
-    const typeParam = urlParams?.get('type') || 'movie';
-    const discoverHref =
-      tmdbIdParam && (typeParam === 'movie' || typeParam === 'tv')
-        ? `/discover?tmdbId=${tmdbIdParam}&type=${typeParam}`
-        : null;
-
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center px-4">
-        <div className="text-center max-w-md">
-          <h1 className="text-2xl font-bold mb-3">{error}</h1>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
-            {discoverHref && (
-              <a
-                href={discoverHref}
-                className="text-primary-400 hover:text-primary-300 font-medium"
-              >
-                Demander ce média
-              </a>
-            )}
-            {emptyGroupMainTitle && !discoverHref && (
-              <a
-                href={`/search?q=${encodeURIComponent(emptyGroupMainTitle)}`}
-                className="text-primary-400 hover:text-primary-300 font-medium"
-              >
-                Rechercher sur les indexeurs
-              </a>
-            )}
-            <a href="/dashboard" className="text-blue-400 hover:text-blue-300">
-              Retour au dashboard
-            </a>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!torrent) return null;
   // Depuis la page Téléchargements avec slug + infoHash : utiliser l'infoHash de l'URL pour le streaming
   // (le groupe chargé par slug peut avoir des variantes sans info_hash en DB).
-  const urlInfoHash = getStreamInfoHashFromLocation();
+  const urlInfoHash = useMemo(() => getStreamInfoHashFromLocation(), []);
 
-  // Enrichir les épisodes avec les variantes trouvées en recherche (id/info_hash/disponibilité)
+  // Hooks avant tout early return (Rules of Hooks) — sinon crash TDZ au premier rendu post-chargement.
   const enrichedSeriesEpisodes = useMemo(() => {
     if (!seriesEpisodes || !initialVariants?.length) return seriesEpisodes;
 
@@ -1982,7 +1928,8 @@ export default function MediaDetailRoute() {
    * Sans alignement, selectedTorrent / useVideoFiles oscillent entre deux info_hash. On aligne donc sur le
    * premier épisode enrichi sauf deep-link explicite (infoHash / variantId / season+episode dans l’URL).
    */
-  const pageTorrent = useMemo((): Torrent => {
+  const pageTorrent = useMemo((): Torrent | null => {
+    if (!torrent) return null;
     const base: Torrent = urlInfoHash ? { ...torrent, infoHash: urlInfoHash } : torrent;
     if (typeof window === 'undefined') return base;
 
@@ -2041,18 +1988,73 @@ export default function MediaDetailRoute() {
     } as Torrent;
   }, [torrent, urlInfoHash, enrichedSeriesEpisodes, initialVariants]);
 
-  const initialTorrentStats: ClientTorrentStats | null = pageTorrent.infoHash
+  const initialTorrentStats: ClientTorrentStats | null = pageTorrent?.infoHash
     ? (getDownloadClientStats(pageTorrent.infoHash) as ClientTorrentStats | null)
     : null;
 
-  const backHref = getBackHrefFromLocation();
-  const streamBackendUrl = getStreamBackendUrlFromLocation();
+  const backHref = useMemo(() => getBackHrefFromLocation(), []);
+  const streamBackendUrl = useMemo(() => getStreamBackendUrlFromLocation(), []);
   const seriesIndexerRefreshTmdbId =
     typeof tmdbId === 'number' && !Number.isNaN(tmdbId)
       ? tmdbId
-      : typeof pageTorrent.tmdbId === 'number'
+      : typeof pageTorrent?.tmdbId === 'number'
         ? pageTorrent.tmdbId
         : null;
+
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-center">
+          <div className="relative w-16 h-16 mb-4 mx-auto">
+            <div className="absolute inset-0 border-4 border-primary-600/20 rounded-full"></div>
+            <div className="absolute inset-0 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+          <p className="text-white/80">Chargement...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const tmdbIdParam = urlParams?.get('tmdbId');
+    const typeParam = urlParams?.get('type') || 'movie';
+    const discoverHref =
+      tmdbIdParam && (typeParam === 'movie' || typeParam === 'tv')
+        ? `/discover?tmdbId=${tmdbIdParam}&type=${typeParam}`
+        : null;
+
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center px-4">
+        <div className="text-center max-w-md">
+          <h1 className="text-2xl font-bold mb-3">{error}</h1>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center items-center">
+            {discoverHref && (
+              <a
+                href={discoverHref}
+                className="text-primary-400 hover:text-primary-300 font-medium"
+              >
+                Demander ce média
+              </a>
+            )}
+            {emptyGroupMainTitle && !discoverHref && (
+              <a
+                href={`/search?q=${encodeURIComponent(emptyGroupMainTitle)}`}
+                className="text-primary-400 hover:text-primary-300 font-medium"
+              >
+                Rechercher sur les indexeurs
+              </a>
+            )}
+            <a href="/dashboard" className="text-blue-400 hover:text-blue-300">
+              Retour au dashboard
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!pageTorrent) return null;
 
   return (
     <MediaDetailPage
