@@ -164,15 +164,6 @@ export default function HLSPlayer({
   });
 
   const isSeekSettling = isLoading && pendingSeekPosition > 0;
-  // Overlay : buffer ahead (jamais end/duration). Indéterminé pendant seek settling.
-  const overlayBufferedPercent =
-    isSeekSettling || isLoading
-      ? bufferedPercent > 0 && bufferedPercent < 100
-        ? bufferedPercent
-        : null
-      : bufferedPercent > 0
-        ? bufferedPercent
-        : null;
 
   useEffect(() => {
     if (onBufferProgress) {
@@ -420,6 +411,17 @@ export default function HLSPlayer({
   }, []);
 
   const isWaiting = useDebouncedVideoWaiting(videoRef, [src, hlsLoaded]);
+
+  // Overlay : buffer ahead uniquement. Pendant waiting/seek/loading, ne jamais
+  // afficher 100 % (artefact ou cible atteinte alors que le décodeur attend encore).
+  const overlayBufferedPercent =
+    isSeekSettling || isLoading || isWaiting || bufferedPercent >= 100
+      ? bufferedPercent > 0 && bufferedPercent < 100
+        ? bufferedPercent
+        : null
+      : bufferedPercent > 0
+        ? bufferedPercent
+        : null;
 
   const displayError = error;
   // Garder l’overlay pendant seek settling même si le % affiche 100 (artefact timeline).
