@@ -1,7 +1,4 @@
-import type { SeriesEpisodePickerItem } from '../player-shared/types/seriesEpisodePicker';
 import type { PlayerLoadingTorrentStats } from '../player-shared/components/PlayerLoadingOverlay';
-
-export type { SeriesEpisodePickerItem };
 
 export interface HLSPlayerProps {
   src: string;
@@ -70,11 +67,6 @@ export interface HLSPlayerProps {
 
   /** Miniatures en cours de génération (placeholder animé). */
   scrubThumbnailsLoading?: boolean;
-
-  /** Série : rail d'épisodes sur l'overlay pause (plusieurs épisodes). */
-  seriesEpisodePickerItems?: SeriesEpisodePickerItem[] | null;
-  selectedSeriesEpisodeVariantId?: string | null;
-  onSelectSeriesEpisode?: (variantId: string) => void;
 }
 
 declare global {

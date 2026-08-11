@@ -323,7 +323,12 @@ export function ServerUrlStep({ focusedButtonIndex, buttonRefs, onNext, onStatus
       const response = await serverApi.initQuickConnect();
 
       if (!response.success) {
-        setQuickConnectError(`${t('wizard.serverUrl.errors.quickConnectInitError')}\n\n${t('wizard.serverUrl.errors.quickConnectInitErrorDetails')}`);
+        const cloudDetail = [response.message, response.details].filter(Boolean).join(' — ');
+        setQuickConnectError(
+          `${t('wizard.serverUrl.errors.quickConnectInitError')}\n\n${t('wizard.serverUrl.errors.quickConnectInitErrorDetails')}` +
+            (cloudDetail ? `\n\n${cloudDetail}` : '') +
+            `\n\nAstuce locale : choisissez « Première installation » et utilisez http://127.0.0.1:3000`
+        );
         return;
       }
 

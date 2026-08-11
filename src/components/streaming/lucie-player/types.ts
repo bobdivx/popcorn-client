@@ -1,7 +1,4 @@
-import type { SeriesEpisodePickerItem } from '../player-shared/types/seriesEpisodePicker';
 import type { PlayerLoadingTorrentStats } from '../player-shared/components/PlayerLoadingOverlay';
-
-export type { SeriesEpisodePickerItem };
 
 export interface LuciePlayerProps {
   src: string; // URL de base pour récupérer les segments et le manifest
@@ -49,10 +46,6 @@ export interface LuciePlayerProps {
 
   /** Miniatures en cours de génération (placeholder animé). */
   scrubThumbnailsLoading?: boolean;
-
-  seriesEpisodePickerItems?: SeriesEpisodePickerItem[] | null;
-  selectedSeriesEpisodeVariantId?: string | null;
-  onSelectSeriesEpisode?: (variantId: string) => void;
 }
 
 /**

@@ -51,6 +51,7 @@ async function requestPopcornWeb<T>(
       success: false,
       error: data.error || 'UnknownError',
       message: data.message || `Erreur ${response.status}`,
+      details: typeof data.details === 'string' ? data.details : undefined,
     };
   } catch (error) {
     return {

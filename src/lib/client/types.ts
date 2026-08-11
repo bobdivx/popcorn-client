@@ -8,6 +8,8 @@ export interface ApiResponse<T = any> {
   data?: T;
   error?: string;
   message?: string;
+  /** Détail court renvoyé par certaines API cloud (ex. quick-connect init). */
+  details?: string;
 }
 
 // ==================== SETUP ====================
