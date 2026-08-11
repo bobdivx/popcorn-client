@@ -27,6 +27,8 @@ interface UnifiedPlayerProps {
   /** Libellé du bouton Annuler dans l'overlay de chargement (télécommande). */
   cancelLabel?: string;
   onClose: () => void;
+  /** Annuler vraiment le téléchargement (retirer le torrent). */
+  onAbortDownload?: () => void;
   onDirectError: (event: Event) => void;
   onDirectLoadedData: () => void;
   hlsProps: Omit<HLSPlayerProps, 'src'>;
@@ -49,6 +51,7 @@ export default function UnifiedPlayer({
   closeLabel,
   cancelLabel,
   onClose,
+  onAbortDownload,
   onDirectError,
   onDirectLoadedData,
   hlsProps,
@@ -69,6 +72,7 @@ export default function UnifiedPlayer({
           posterUrl={hlsProps.posterUrl}
           imageUrl={hlsProps.posterUrl}
           onCancel={onClose}
+          onAbortDownload={onAbortDownload}
           cancelLabel={cancelLabel ?? closeLabel}
         />
       )}

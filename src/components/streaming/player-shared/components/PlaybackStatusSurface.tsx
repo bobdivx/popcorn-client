@@ -45,8 +45,11 @@ export interface PlaybackStatusSurfaceProps {
   bufferedPercent?: number | null;
   showDebug?: boolean;
   debugLogs?: PlaybackStatusDebugLog[];
+  /** Retour / fermer l’overlay (le téléchargement continue). */
   onCancel?: () => void;
   onContinueInBackground?: () => void;
+  /** Annuler vraiment le téléchargement (retirer le torrent). */
+  onAbortDownload?: () => void;
   onRetry?: () => void;
   /** Supprimer les fichiers sparses/vides (après confirmation UI). */
   onDeleteEmptyFiles?: () => void;
@@ -237,6 +240,7 @@ export function PlaybackStatusSurface({
   debugLogs,
   onCancel,
   onContinueInBackground,
+  onAbortDownload,
   onRetry,
   onDeleteEmptyFiles,
   onToggleDebug,
@@ -267,6 +271,9 @@ export function PlaybackStatusSurface({
     derived.downloadSpeed != null && derived.downloadSpeed > 0
       ? formatSpeed(derived.downloadSpeed)
       : na;
+  /** Retour = quitter l’overlay sans supprimer ; Annuler = retirer le torrent. */
+  const backAction = onContinueInBackground ?? (onAbortDownload ? onCancel : undefined);
+  const abortAction = onAbortDownload ?? onCancel;
   const etaLabel =
     derived.etaSeconds != null && derived.etaSeconds > 0
       ? formatTimeRemaining(derived.etaSeconds)
@@ -562,7 +569,7 @@ export function PlaybackStatusSurface({
                 </div>
               ) : null}
 
-              {!isPlayer && (onCancel || onContinueInBackground) ? (
+              {!isPlayer && (backAction || abortAction) ? (
                 <div className="flex flex-col items-center gap-3 mt-1">
                   {confirmingCancel ? (
                     <div className="w-full rounded-2xl border border-white/15 bg-black/45 px-4 py-3 text-center space-y-3">
@@ -584,7 +591,7 @@ export function PlaybackStatusSurface({
                           type="button"
                           onClick={() => {
                             setConfirmingCancel(false);
-                            onCancel?.();
+                            abortAction?.();
                           }}
                           data-focusable
                           tabIndex={0}
@@ -596,21 +603,18 @@ export function PlaybackStatusSurface({
                     </div>
                   ) : (
                     <div className="flex flex-wrap justify-center gap-3">
-                      {onContinueInBackground &&
-                      (derived.phase === 'downloading' ||
-                        derived.phase === 'findingPeers' ||
-                        derived.phase === 'resolving') ? (
+                      {backAction ? (
                         <button
                           type="button"
-                          onClick={onContinueInBackground}
+                          onClick={backAction}
                           data-focusable
                           tabIndex={0}
-                          className="px-6 py-2.5 rounded-xl bg-emerald-600/85 hover:bg-emerald-600 text-white font-medium transition-colors"
+                          className="px-6 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
                         >
-                          {t('playback.continueInBackground')}
+                          {t('common.back') || 'Retour'}
                         </button>
                       ) : null}
-                      {onCancel ? (
+                      {abortAction ? (
                         <button
                           type="button"
                           onClick={() => setConfirmingCancel(true)}
@@ -671,17 +675,64 @@ export function PlaybackStatusSurface({
                 </div>
               ) : null}
 
-              {isPlayer && onCancel ? (
-                <div className="flex justify-center mt-3">
-                  <button
-                    type="button"
-                    onClick={onCancel}
-                    data-focusable
-                    tabIndex={0}
-                    className="px-5 py-2 rounded-xl border border-white/20 bg-white/10 text-white text-sm"
-                  >
-                    {cancelLabel || t('common.close') || 'Fermer'}
-                  </button>
+              {isPlayer && (onCancel || onAbortDownload) ? (
+                <div className="flex flex-col items-center gap-3 mt-3">
+                  {confirmingCancel && onAbortDownload ? (
+                    <div className="w-full rounded-2xl border border-white/15 bg-black/45 px-4 py-3 text-center space-y-3">
+                      <p className="text-sm text-white/85">
+                        {t('mediaDetail.cancelDownloadConfirm') ||
+                          'Annuler et supprimer le téléchargement ?'}
+                      </p>
+                      <div className="flex justify-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setConfirmingCancel(false)}
+                          data-focusable
+                          tabIndex={0}
+                          className="px-5 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-sm"
+                        >
+                          {t('common.back') || 'Retour'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setConfirmingCancel(false);
+                            onAbortDownload();
+                          }}
+                          data-focusable
+                          tabIndex={0}
+                          className="px-5 py-2 rounded-xl bg-red-600/85 hover:bg-red-600 text-white text-sm"
+                        >
+                          {t('common.confirm') || 'Confirmer'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap justify-center gap-3">
+                      {onCancel ? (
+                        <button
+                          type="button"
+                          onClick={onCancel}
+                          data-focusable
+                          tabIndex={0}
+                          className="px-6 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
+                        >
+                          {t('common.back') || 'Retour'}
+                        </button>
+                      ) : null}
+                      {onAbortDownload ? (
+                        <button
+                          type="button"
+                          onClick={() => setConfirmingCancel(true)}
+                          data-focusable
+                          tabIndex={0}
+                          className="px-6 py-2.5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/15 text-white font-medium transition-colors"
+                        >
+                          {cancelLabel || t('common.cancel') || 'Annuler'}
+                        </button>
+                      ) : null}
+                    </div>
+                  )}
                 </div>
               ) : null}
             </>
@@ -731,7 +782,22 @@ export function PlaybackStatusSurface({
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.12)_0%,transparent_55%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.8)_100%)]" />
 
-      {onCancel && !confirmingCancel ? (
+      {backAction && !confirmingCancel ? (
+        <button
+          type="button"
+          onClick={backAction}
+          title={t('common.back') || 'Retour'}
+          aria-label={t('common.back') || 'Retour'}
+          tabIndex={0}
+          data-focusable
+          className="absolute top-4 left-4 z-40 inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors backdrop-blur-md"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </button>
+      ) : abortAction && !confirmingCancel ? (
         <button
           type="button"
           onClick={() => setConfirmingCancel(true)}
