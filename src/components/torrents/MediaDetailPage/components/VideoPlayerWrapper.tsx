@@ -18,7 +18,7 @@ import PlayerLoadingOverlay, {
 import { getLoadingStep } from '../../../streaming/player-shared/utils/streamingSteps';
 import UnifiedPlayer from '../../../streaming/player-core/components/UnifiedPlayer';
 import { useStreamSource } from '../../../streaming/player-core/hooks/useStreamSource';
-import { buildProxyUrl } from '../../../streaming/player-core/utils/buildStreamUrl';
+import { buildProxyUrl, normalizeStreamPath } from '../../../streaming/player-core/utils/buildStreamUrl';
 import { canUseSeekReload as computeCanUseSeekReload } from '../../../streaming/player-core/utils/streamSourceUtils';
 import { emitPlaybackStep } from '../../../streaming/player-core/observability/playbackEvents';
 import { logVideoPlaybackError } from '../../../streaming/direct-player/mediaErrorDiagnostics';
@@ -361,7 +361,7 @@ export function VideoPlayerWrapper({
 
     const preloadHls = () => {
       try {
-        const normalizedPath = hlsFilePath.replace(/\\/g, '/');
+        const normalizedPath = normalizeStreamPath(hlsFilePath);
         const encodedPath = encodeURIComponent(normalizedPath);
         const path = `/api/local/stream/${encodedPath}/playlist.m3u8`;
         const hlsUrl = streamBackendUrl?.trim()
