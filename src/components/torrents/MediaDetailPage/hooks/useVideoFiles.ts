@@ -240,10 +240,38 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
 
         // Chemin bibliothèque : vérifier d'abord le torrent si hash réel.
         // Si progress=0 / !files_available → fichiers sparses possibles : ne pas traiter comme prêt.
-        if (torrent?.downloadPath) {
-          const fileName = torrentName || torrent.downloadPath.split(/[/\\]/).pop() || 'video';
+        // Priorité filePath (épisode sélectionné) ; ignorer downloadPath d'un autre SxxExx.
+        const pathMatchesSelectedEpisode = (rawPath: string): boolean => {
+          if (season == null || episode == null || episode <= 0) return true;
+          const m =
+            rawPath.match(/s(\d{1,2})[.\s_-]*e(\d{1,3})/i) ||
+            rawPath.match(/(\d{1,2})x(\d{1,3})/i);
+          if (!m) return true; // pack saison / dossier sans Exx
+          return parseInt(m[1], 10) === season && parseInt(m[2], 10) === episode;
+        };
+        const fp = filePath && String(filePath).trim() ? String(filePath).trim() : '';
+        const dp =
+          torrent?.downloadPath && String(torrent.downloadPath).trim()
+            ? String(torrent.downloadPath).trim()
+            : '';
+        let libraryPathCandidate = '';
+        if (season != null && episode != null && episode > 0) {
+          if (fp && pathMatchesSelectedEpisode(fp)) libraryPathCandidate = fp;
+          else if (dp && pathMatchesSelectedEpisode(dp)) libraryPathCandidate = dp;
+          else if (dp && !pathMatchesSelectedEpisode(dp)) {
+            console.warn(
+              '[useVideoFiles] ⚠️ downloadPath ignore (SxxExx ≠ épisode sélectionné):',
+              { downloadPath: dp, season, episode, filePath: fp || null }
+            );
+          }
+        } else {
+          libraryPathCandidate = fp || dp;
+        }
+
+        if (libraryPathCandidate) {
+          const fileName = torrentName || libraryPathCandidate.split(/[/\\]/).pop() || 'video';
           const libraryFile: TorrentFile = {
-            path: dedupeLibraryMediaPrefix(torrent.downloadPath),
+            path: dedupeLibraryMediaPrefix(libraryPathCandidate),
             name: fileName,
             size: 0,
             is_video: true,
@@ -266,7 +294,7 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
                 // On laisse le playHandler décider : lecture bibliothèque, stream, ou téléchargement.
                 console.warn(
                   '[useVideoFiles] ⚠️ Chemin bibliothèque mais getTorrent à 0% — on ne bloque pas en sparse:',
-                  { infoHash, progress, filesAvailable, downloaded, path: torrent.downloadPath }
+                  { infoHash, progress, filesAvailable, downloaded, path: libraryPathCandidate }
                 );
                 setEmptyOrSparse(false);
                 const files = [libraryFile];
@@ -280,7 +308,7 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
               // Torrent présent avec données : chemin bibliothèque OK
               console.log(
                 '[useVideoFiles] 📁 Chemin bibliothèque validé (torrent progress>0 ou files_available):',
-                torrent.downloadPath
+                libraryPathCandidate
               );
               setEmptyOrSparse(false);
               const files = [libraryFile];
@@ -294,14 +322,14 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
             // 404 / backend sans ce torrent : garder le bypass (bibliothèque partagée)
             console.log(
               '[useVideoFiles] 📁 getTorrent indisponible, bypass bibliothèque:',
-              torrent.downloadPath,
+              libraryPathCandidate,
               e
             );
           }
 
           console.log(
             '[useVideoFiles] 📁 Utilisation du chemin bibliothèque (sans stats torrent):',
-            torrent.downloadPath
+            libraryPathCandidate
           );
           setEmptyOrSparse(false);
           const files = [libraryFile];
