@@ -22,6 +22,8 @@ export interface UseTorrentPlayerOptions {
   canStream: boolean;
   /** Abonnement streaming torrent actif : ajout avec for_streaming + only_files pour un seul fichier. */
   streamingTorrentActive?: boolean;
+  /** Fichier bibliothèque sparse/vide : ne pas lancer la lecture locale, forcer add/stream. */
+  emptyOrSparse?: boolean;
   isAvailableLocally: boolean;
   setIsAvailableLocally: (value: boolean) => void;
   loadVideoFiles: (infoHash: string, retryCount?: number) => Promise<any[]>;
@@ -84,6 +86,8 @@ export interface PlayHandlerContext {
   hasInfoHash: boolean;
   hasMagnetLink: boolean;
   streamingTorrentActive?: boolean;
+  /** Fichier bibliothèque sparse/vide : ne pas lancer la lecture locale, forcer add/stream. */
+  emptyOrSparse?: boolean;
   isAvailableLocally: boolean;
   setIsAvailableLocally: (value: boolean) => void;
   loadVideoFiles: (infoHash: string, retryCount?: number) => Promise<any[]>;

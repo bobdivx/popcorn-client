@@ -25,24 +25,44 @@ export interface BuildStreamUrlResult {
   pathForUrl: string;
 }
 
+/**
+ * Chemin relatif sous download_dir (`/app/downloads` en Docker).
+ * Conserve `media/series/...` / `media/films/...` — ne strippe PAS le préfixe `media/` seul.
+ */
 export function normalizeStreamPath(filePath: string): string {
-  let normalizedPath = filePath.replace(/\\/g, '/');
-  if (normalizedPath.startsWith('/') && !normalizedPath.startsWith('//')) {
-    normalizedPath = normalizedPath.substring(1);
+  let normalizedPath = (filePath || '').replace(/\\/g, '/').trim();
+  if (!normalizedPath) return normalizedPath;
+
+  // Préfixe Windows extended-length
+  if (normalizedPath.startsWith('//?/')) {
+    normalizedPath = normalizedPath.slice(4);
   }
 
-  // Éviter les préfixes redondants (ex: "media/media/..." ou "media/films/media/...")
-  // On boucle tant que le chemin commence par un préfixe connu que le serveur gère déjà comme racine.
-  let changed = true;
-  while (changed) {
-    changed = false;
-    if (normalizedPath.toLowerCase().startsWith('media/')) {
-      normalizedPath = normalizedPath.substring(6);
-      changed = true;
-    } else if (normalizedPath.toLowerCase().startsWith('downloads/')) {
-      normalizedPath = normalizedPath.substring(10);
-      changed = true;
+  // Racines download absolues / résiduelles (Docker NAS, chemins mal stripés)
+  const downloadRoots = ['/app/downloads/', 'app/downloads/', '/downloads/'];
+  for (const root of downloadRoots) {
+    if (normalizedPath.toLowerCase().startsWith(root.toLowerCase())) {
+      normalizedPath = normalizedPath.slice(root.length);
+      break;
     }
+  }
+
+  // Absolu restant → relatif (sauf UNC //server/...)
+  while (normalizedPath.startsWith('/') && !normalizedPath.startsWith('//')) {
+    normalizedPath = normalizedPath.slice(1);
+  }
+
+  // Uniquement les doublons ; `media/` seul est valide sous download_dir
+  while (normalizedPath.toLowerCase().startsWith('media/media/')) {
+    normalizedPath = normalizedPath.slice(6);
+  }
+  while (normalizedPath.toLowerCase().startsWith('downloads/downloads/')) {
+    normalizedPath = normalizedPath.slice(10);
+  }
+
+  // `downloads/` redondant si présent en tête après strip de la racine
+  if (normalizedPath.toLowerCase().startsWith('downloads/')) {
+    normalizedPath = normalizedPath.slice(10);
   }
 
   return normalizedPath;

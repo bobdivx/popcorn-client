@@ -338,6 +338,14 @@ export default function LuciePlayer({
   const displayError = error;
   const shouldShowBuffering =
     isLoading || isWaiting || (isSeeking && bufferedPercent < 95);
+  const overlayBufferedPercent =
+    isLoading || isWaiting || bufferedPercent >= 100
+      ? bufferedPercent > 0 && bufferedPercent < 100
+        ? bufferedPercent
+        : null
+      : bufferedPercent > 0
+        ? bufferedPercent
+        : null;
 
   if (displayError) {
     return <ErrorDisplay error={displayError} />;
@@ -383,7 +391,7 @@ export default function LuciePlayer({
         {shouldShowBuffering && (
           <PlayerBufferingOverlay
             title={torrentName || fileName}
-            bufferedPercent={bufferedPercent}
+            bufferedPercent={overlayBufferedPercent}
             torrentStats={torrentStats}
             posterUrl={posterUrl}
             imageUrl={posterUrl}

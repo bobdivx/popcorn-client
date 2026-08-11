@@ -529,8 +529,12 @@ export function PlaybackStatusSurface({
             <>
               <ProgressRing
                 percent={
-                  isBuffering && bufferedPercent != null
-                    ? bufferedPercent
+                  // Pendant un vrai buffering lecture : jamais le % torrent (souvent 100 %
+                  // sur un fichier déjà seedé) — sinon overlay trompeur "buffer 100%".
+                  isBuffering || derived.phase === 'buffering' || derived.phase === 'preparingPlayback'
+                    ? bufferedPercent != null && bufferedPercent > 0 && bufferedPercent < 100
+                      ? bufferedPercent
+                      : null
                     : derived.progressPercent
                 }
                 spinning={
