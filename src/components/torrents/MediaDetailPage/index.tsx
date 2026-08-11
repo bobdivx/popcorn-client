@@ -445,14 +445,32 @@ export default function MediaDetailPage({
 
   // Torrent actif (sÃ©lectionnÃ© ou dÃ©faut) â€” utilisÃ© pour lecture / tÃ©lÃ©chargement
   const activeTorrent = selectedTorrent || torrent;
-  // Torrent avec chemin bibliothÃ¨que si connu (permet Ã  useVideoFiles de lire depuis le disque sans getTorrent)
-  const activeTorrentWithLibraryPath = useMemo(
-    () =>
-      libraryDownloadPath
-        ? { ...activeTorrent, downloadPath: libraryDownloadPath }
-        : activeTorrent,
-    [activeTorrent, libraryDownloadPath]
-  );
+
+  /** Extrait SxxExx / NxN d'un nom ou chemin fichier. */
+  const parseSeasonEpisodeLabel = useCallback((label: string | null | undefined) => {
+    if (!label) return null;
+    const m =
+      String(label).match(/s(\d{1,2})[.\s_-]*e(\d{1,3})/i) ||
+      String(label).match(/(\d{1,2})x(\d{1,3})/i);
+    if (!m) return null;
+    return { season: parseInt(m[1], 10), episode: parseInt(m[2], 10) };
+  }, []);
+
+  // Torrent avec chemin bibliothèque si connu — uniquement si le chemin correspond à l'épisode sélectionné
+  // (évite d'injecter S03E08 pendant la lecture de S01E01 après un fallback localMedia[0]).
+  const activeTorrentWithLibraryPath = useMemo(() => {
+    if (!libraryDownloadPath) return activeTorrent;
+    if (selectedEpisodeMeta && selectedEpisodeMeta.episode > 0) {
+      const se = parseSeasonEpisodeLabel(libraryDownloadPath);
+      if (
+        se &&
+        (se.season !== selectedEpisodeMeta.season || se.episode !== selectedEpisodeMeta.episode)
+      ) {
+        return activeTorrent;
+      }
+    }
+    return { ...activeTorrent, downloadPath: libraryDownloadPath };
+  }, [activeTorrent, libraryDownloadPath, selectedEpisodeMeta, parseSeasonEpisodeLabel]);
 
   /** TMDB série pour vignettes épisodes : torrent ou ids synthétiques popcorn_tmdb_{id}_s_e */
   const episodeCarouselTmdbId = useMemo(() => {
@@ -1259,7 +1277,17 @@ export default function MediaDetailPage({
                   typeof path === 'string' &&
                   /\.(mkv|mp4|avi|webm|mov|m4v|wmv|ts|m2ts)$/i.test(path.replace(/\\/g, '/'));
                 if (path && !hasExistingPath && pathIsFile) {
-                  setLibraryDownloadPath(path);
+                  // Ne pas coller un fichier d'un autre SxxExx (ex. pack S01 → localMedia hors épisode).
+                  const se = parseSeasonEpisodeLabel(path);
+                  const episodeOk =
+                    !selectedEpisodeMeta ||
+                    selectedEpisodeMeta.episode <= 0 ||
+                    !se ||
+                    (se.season === selectedEpisodeMeta.season &&
+                      se.episode === selectedEpisodeMeta.episode);
+                  if (episodeOk) {
+                    setLibraryDownloadPath(path);
+                  }
                 }
                 applyCompletedLocalStats({
                   name: item.name || item.file_name,
@@ -1272,7 +1300,7 @@ export default function MediaDetailPage({
             }
           }
 
-          // 2) Lookup ciblé par TMDB si pas déjà trouvé — matcher SxxExx du nom actif
+          // 2) Lookup ciblé par TMDB si pas déjà trouvé — matcher l'épisode sélectionné (pas localMedia[0])
           if (!isAvailableInLibrary && activeTorrent.tmdbId) {
             try {
               const localMedia = await clientApi.findLocalMediaByTmdb(
@@ -1286,49 +1314,75 @@ export default function MediaDetailPage({
                 const seFromName =
                   currentName.match(/s([0-9]{1,2})[.\s-]*e([0-9]{1,3})/i) ||
                   currentName.match(/([0-9]{1,2})x([0-9]{1,3})/i);
-                const matchByEpisode = seFromName
-                  ? localMedia.find((m: any) => {
-                      const n = `${m.file_name || ''} ${m.file_path || ''}`.toLowerCase();
-                      const s = String(parseInt(seFromName[1], 10)).padStart(2, '0');
-                      const e = String(parseInt(seFromName[2], 10)).padStart(2, '0');
-                      return (
-                        new RegExp(`s0?${parseInt(seFromName[1], 10)}[.\\s-]*e0?${parseInt(seFromName[2], 10)}\\b`, 'i').test(n) ||
-                        n.includes(`s${s}e${e}`)
-                      );
-                    })
+                const targetSe =
+                  selectedEpisodeMeta && selectedEpisodeMeta.episode > 0
+                    ? { s: selectedEpisodeMeta.season, e: selectedEpisodeMeta.episode }
+                    : seFromName
+                      ? {
+                          s: parseInt(seFromName[1], 10),
+                          e: parseInt(seFromName[2], 10),
+                        }
+                      : null;
+                const matchesSE = (m: any, s: number, e: number) => {
+                  const n = `${m.file_name || ''} ${m.file_path || ''}`;
+                  return (
+                    new RegExp(`s0?${s}[.\\s_-]*e0?${e}\\b`, 'i').test(n) ||
+                    new RegExp(`${s}x0?${e}\\b`, 'i').test(n)
+                  );
+                };
+                const pathMapKey = targetSe ? `${targetSe.s}:${targetSe.e}` : null;
+                const pathFromMap =
+                  pathMapKey && libraryEpisodesPathMap[pathMapKey]
+                    ? libraryEpisodesPathMap[pathMapKey]
+                    : null;
+                const matchByEpisode = targetSe
+                  ? localMedia.find((m: any) => matchesSE(m, targetSe.s, targetSe.e))
                   : null;
-                const matchByName = !matchByEpisode && currentName
-                  ? localMedia.find((m: any) => {
-                      const n = (m.file_name || m.name || '').toLowerCase();
-                      // Éviter un match trop large sur le premier token (ex. "house" → mauvais épisode).
-                      const tokens = currentName.split(/[.\s\-_]+/).filter((t) => t.length > 3);
-                      const hit = tokens.filter((t) => n.includes(t)).length;
-                      return hit >= 2;
-                    })
+                // Match flou uniquement sans cible SxxExx (évite pack S01 → S03E08 via "house"/"dragon").
+                const matchByName =
+                  !targetSe && !matchByEpisode && currentName
+                    ? localMedia.find((m: any) => {
+                        const n = (m.file_name || m.name || '').toLowerCase();
+                        const tokens = currentName.split(/[.\s\-_]+/).filter((t) => t.length > 3);
+                        const hit = tokens.filter((t) => n.includes(t)).length;
+                        return hit >= 2;
+                      })
+                    : null;
+                const matchByLocalId = activeTorrent.infoHash?.startsWith('local_')
+                  ? localMedia.find(
+                      (m: any) =>
+                        m.id &&
+                        (`local_${m.id}` === activeTorrent.infoHash ||
+                          m.id === activeTorrent.infoHash.replace(/^local_/, '')),
+                    )
                   : null;
                 const chosen =
                   matchByEpisode ??
+                  matchByLocalId ??
                   matchByName ??
-                  (activeTorrent.infoHash?.startsWith('local_')
-                    ? localMedia.find(
-                        (m: any) =>
-                          m.id &&
-                          (`local_${m.id}` === activeTorrent.infoHash ||
-                            m.id === activeTorrent.infoHash.replace(/^local_/, '')),
-                      )
-                    : null) ??
-                  localMedia[0];
-                const firstPath = (chosen as { file_path?: string }).file_path;
+                  // Jamais localMedia[0] pour une série avec épisode ciblé (souvent un autre SxxExx).
+                  (targetSe ? null : localMedia[0]);
+                const firstPath =
+                  pathFromMap || (chosen as { file_path?: string } | null)?.file_path;
                 const firstPathIsFile =
                   firstPath &&
                   /\.(mkv|mp4|avi|webm|mov|m4v|wmv|ts|m2ts)$/i.test(firstPath.replace(/\\/g, '/'));
                 if (!hasExistingPathTmdb && firstPathIsFile) {
-                  setLibraryDownloadPath(firstPath);
+                  const se = parseSeasonEpisodeLabel(firstPath);
+                  const episodeOk =
+                    !targetSe ||
+                    !se ||
+                    (se.season === targetSe.s && se.episode === targetSe.e);
+                  if (episodeOk) {
+                    setLibraryDownloadPath(firstPath);
+                  }
                 }
-                applyCompletedLocalStats({
-                  fileSize: (chosen as { file_size?: number }).file_size,
-                  markLocalMedia: true,
-                });
+                if (chosen || pathFromMap) {
+                  applyCompletedLocalStats({
+                    fileSize: (chosen as { file_size?: number } | null)?.file_size,
+                    markLocalMedia: true,
+                  });
+                }
               }
             } catch (_) {
               // Ignorer
@@ -1361,7 +1415,19 @@ export default function MediaDetailPage({
 
       checkAvailability();
     }
-  }, [hasInfoHash, activeTorrent.infoHash, activeTorrent.tmdbId, activeTorrent.tmdbType, activeTorrent.clientState, activeTorrent.clientProgress, isExternal, refreshAfterClose]);
+  }, [
+    hasInfoHash,
+    activeTorrent.infoHash,
+    activeTorrent.tmdbId,
+    activeTorrent.tmdbType,
+    activeTorrent.clientState,
+    activeTorrent.clientProgress,
+    isExternal,
+    refreshAfterClose,
+    selectedEpisodeMeta,
+    libraryEpisodesPathMap,
+    parseSeasonEpisodeLabel,
+  ]);
 
   // VÃ©rifier si un tÃ©lÃ©chargement est en cours au montage (torrent actif)
   useEffect(() => {

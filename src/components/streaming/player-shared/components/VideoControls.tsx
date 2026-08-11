@@ -10,7 +10,6 @@ import { useScrubNav } from './video-controls/useScrubNav';
 import { ScrubThumbnailsStrip } from './video-controls/ScrubThumbnailsStrip';
 import { ScrubThumbnailImage } from './video-controls/ScrubThumbnailImage';
 import { persistVideoFillMode } from '../hooks/usePlayerConfig';
-import type { SeriesEpisodePickerItem } from '../types/seriesEpisodePicker';
 
 interface AudioTrack {
   id: number;
@@ -112,9 +111,6 @@ interface VideoControlsProps {
   tvScrubIndexExternal?: number;
   /** Sur TV : la rangée de vignettes est-elle la zone de focus active ? */
   tvScrubFocused?: boolean;
-  seriesEpisodePickerItems?: SeriesEpisodePickerItem[] | null;
-  selectedSeriesEpisodeVariantId?: string | null;
-  onSelectSeriesEpisode?: (variantId: string) => void;
   bufferedPercent?: number;
 }
 
@@ -173,9 +169,6 @@ export function VideoControls({
   scrubThumbnailsLoading = false,
   tvScrubIndexExternal,
   tvScrubFocused = false,
-  seriesEpisodePickerItems = null,
-  selectedSeriesEpisodeVariantId = null,
-  onSelectSeriesEpisode,
   bufferedPercent = 0,
 }: VideoControlsProps) {
   const { t } = useI18n();
@@ -466,67 +459,6 @@ export function VideoControls({
           </div>
         )}
         <div class={padding}>
-          {/* Rail d'épisodes (overlay pause, style Netflix) */}
-          {seriesEpisodePickerItems && seriesEpisodePickerItems.length > 0 && !isPlaying && showControls && (
-            <div class="w-full flex flex-col gap-2 mb-6 relative z-30 pointer-events-auto mt-2">
-              <h4 class="text-white/70 font-semibold tracking-wide text-xs sm:text-sm uppercase text-left px-1">
-                {t('mediaDetail.episodes') || 'Épisodes'}
-              </h4>
-              <div class="flex gap-4 overflow-x-auto pb-3 pt-1 scrollbar-thin scrollbar-thumb-purple-600/50 scrollbar-track-transparent">
-                {seriesEpisodePickerItems.map((item) => {
-                  const isCurrent = item.variantId === selectedSeriesEpisodeVariantId;
-                  return (
-                    <button
-                      key={item.variantId}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (onSelectSeriesEpisode) {
-                          onSelectSeriesEpisode(item.variantId);
-                        }
-                      }}
-                      class={`flex-shrink-0 flex flex-col w-32 sm:w-40 md:w-48 rounded-lg overflow-hidden border text-left bg-black/40 hover:bg-black/60 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer pointer-events-auto backdrop-blur-md ${
-                        isCurrent ? 'border-purple-600 ring-2 ring-purple-600/40' : 'border-white/10 hover:border-white/30'
-                      }`}
-                    >
-                      <div class="relative w-full aspect-video bg-gray-900 overflow-hidden flex-shrink-0">
-                        {item.thumbnailUrl ? (
-                          <img
-                            src={item.thumbnailUrl}
-                            alt=""
-                            class="w-full h-full object-cover"
-                            loading="lazy"
-                          />
-                        ) : (
-                          <div class="w-full h-full flex items-center justify-center bg-purple-950/20">
-                            <Play class="w-6 h-6 text-purple-400 opacity-60" />
-                          </div>
-                        )}
-                        {isCurrent && (
-                          <div class="absolute inset-0 bg-purple-900/30 flex items-center justify-center">
-                            <span class="px-2 py-0.5 rounded bg-purple-600 text-white font-bold text-[8px] sm:text-[10px]">
-                              LECTURE EN COURS
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                      <div class="p-2 flex flex-col min-w-0">
-                        <span class="text-white font-medium text-[10px] sm:text-xs truncate">
-                          {item.label}
-                        </span>
-                        {item.sublabel && (
-                          <span class="text-white/50 text-[8px] sm:text-[10px] truncate mt-0.5">
-                            {item.sublabel}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {/* Colonne barre + carrousel de vignettes scrub (style Netflix : preview au drag, seek au relâchement) */}
           <div class={`relative flex flex-col gap-2 mb-4 sm:mb-6 md:mb-8 ${isDraggingScrub ? 'z-30' : ''}`}>
           {/* Aperçu flottant Netflix pendant le drag */}
@@ -790,17 +722,20 @@ export function VideoControls({
             )}
             {/* Bouton épisode suivant (séries) */}
             {onPlayNextEpisode && (
-              <button 
+              <button
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   onPlayNextEpisode();
-                }} 
-                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none`}
+                }}
+                class={`flex items-center justify-center flex-shrink-0 gap-1.5 sm:gap-2 ${buttonSize} sm:!w-auto sm:!h-auto sm:!min-w-0 sm:px-3.5 sm:py-2.5 md:px-4 rounded-full bg-white/15 hover:bg-white/25 transition-all backdrop-blur-md border-2 border-white/25 focus:outline-none`}
                 title={t('playback.nextEpisode')}
                 aria-label={t('playback.nextEpisode')}
               >
                 <SkipForward class={`${iconSize} text-white`} />
+                <span class={`hidden sm:inline text-white font-medium ${textSize} whitespace-nowrap`}>
+                  {t('playback.nextEpisode')}
+                </span>
               </button>
             )}
             {/* Volume : inutile sur TV (télécommande / OS gère le volume système). */}

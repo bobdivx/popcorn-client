@@ -55,10 +55,11 @@ export default defineConfig({
     server: {
       host: true, // Écouter sur 0.0.0.0 pour accès via IP (ex. 10.1.0.86:4326), évite "Failed to fetch dynamically imported module"
       allowedHosts: true, // Autoriser tout host (localhost, IP locale, etc.) pour éviter 504 sur les deps quand on accède via IP
-      // Proxy API cloud en dev : évite CORS (Quick Connect, login cloud, etc. depuis localhost)
+      // Proxy API cloud en dev : évite CORS (Quick Connect, login cloud, etc. depuis localhost).
+      // Override local : POPCORN_WEB_PROXY_TARGET=http://127.0.0.1:4321
       proxy: {
         '/api/v1': {
-          target: 'https://popcornn.app',
+          target: process.env.POPCORN_WEB_PROXY_TARGET || 'https://popcornn.app',
           changeOrigin: true,
           secure: true,
         },

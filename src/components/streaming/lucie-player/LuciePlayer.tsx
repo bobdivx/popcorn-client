@@ -48,9 +48,6 @@ export default function LuciePlayer({
   onProgress,
   scrubThumbnails,
   scrubThumbnailsLoading,
-  seriesEpisodePickerItems,
-  selectedSeriesEpisodeVariantId,
-  onSelectSeriesEpisode,
 }: LuciePlayerProps) {
   const playerConfig = usePlayerConfig();
   const effectiveVideoFillMode = useEffectiveVideoFillMode(playerConfig.videoFillMode);
@@ -486,9 +483,6 @@ export default function LuciePlayer({
               ? onPlayNextEpisode
               : undefined
           }
-          seriesEpisodePickerItems={seriesEpisodePickerItems}
-          selectedSeriesEpisodeVariantId={selectedSeriesEpisodeVariantId}
-          onSelectSeriesEpisode={onSelectSeriesEpisode}
         />
         <div class="absolute inset-0 z-30 pointer-events-none">
           <SkipIntroOverlay
