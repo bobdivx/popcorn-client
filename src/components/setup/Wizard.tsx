@@ -15,6 +15,7 @@ import { DownloadLocationStep } from './steps/DownloadLocationStep';
 import { SyncStep } from './steps/SyncStep';
 import { CompleteStep } from './steps/CompleteStep';
 import { hasBackendUrl } from '../../lib/backend-config.js';
+import { ensureEmbeddedDesktopBackendUrl } from '../../lib/embedded-desktop';
 import { isTVPlatform } from '../../lib/utils/device-detection';
 import { dbgLog } from '../../lib/debug/debug-store';
 import { serverApi } from '../../lib/client/server-api';
@@ -124,6 +125,8 @@ export default function Wizard() {
 
   useEffect(() => {
     clearStorageAndCookiesForSetup();
+    // Desktop embarqué : le clear du wizard ne doit pas effacer l'URL locale auto-détectée.
+    void ensureEmbeddedDesktopBackendUrl({ force: true });
   }, []);
 
   useEffect(() => {

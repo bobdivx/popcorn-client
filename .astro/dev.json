@@ -1,5 +1,5 @@
 {
-	"pid": 27660,
+	"pid": 45136,
 	"port": 4326,
 	"url": "http://localhost:4326",
 	"urls": {
@@ -8,15 +8,13 @@
 		],
 		"network": [
 			"http://10.1.0.53:4326/",
-			"http://10.242.88.32:4326/",
-			"http://192.168.1.112:4326/"
+			"http://10.242.88.32:4326/"
 		],
 		"networkInterfaceNames": [
 			"Ethernet 3",
-			"ZeroTier One [f88cb0903b648f33]",
-			"Wi-Fi 2"
+			"ZeroTier One [f88cb0903b648f33]"
 		]
 	},
 	"background": false,
-	"startedAt": "2026-08-05T20:35:38.062Z"
+	"startedAt": "2026-08-11T07:05:57.655Z"
 }

@@ -58,9 +58,6 @@ export default function HLSPlayer({
   onProgress,
   scrubThumbnails,
   scrubThumbnailsLoading,
-  seriesEpisodePickerItems,
-  selectedSeriesEpisodeVariantId,
-  onSelectSeriesEpisode,
 }: HLSPlayerProps) {
   const playerConfig = usePlayerConfig();
   const effectiveVideoFillMode = useEffectiveVideoFillMode(playerConfig.videoFillMode);
@@ -590,9 +587,6 @@ export default function HLSPlayer({
               ? onPlayNextEpisode
               : undefined
           }
-          seriesEpisodePickerItems={seriesEpisodePickerItems}
-          selectedSeriesEpisodeVariantId={selectedSeriesEpisodeVariantId}
-          onSelectSeriesEpisode={onSelectSeriesEpisode}
         />
         <div class="absolute inset-0 z-30 pointer-events-none">
           <SkipIntroOverlay

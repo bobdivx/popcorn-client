@@ -9,6 +9,13 @@ import {
   setBackendUrl,
   hasDeploymentBackend,
 } from '../lib/backend-config';
+import {
+  EMBEDDED_DESKTOP_BACKEND_URL,
+  ensureEmbeddedDesktopBackendUrl,
+  isEmbeddedDesktopPlatform,
+  startEmbeddedDesktopServer,
+  waitForEmbeddedBackend,
+} from '../lib/embedded-desktop';
 import { isTauri } from '../lib/utils/tauri';
 import { redirectTo } from '../lib/utils/navigation.js';
 import IntroVideoWithHlsPreload from './IntroVideoWithHlsPreload';
@@ -132,28 +139,32 @@ export default function IndexRedirect() {
           console.warn('[IndexRedirect] Tauri invoke error (non-fatal):', invokeErr);
         }
 
-        // Sur Windows/Linux (Tauri desktop), démarrer le serveur local au lancement de l'app,
-        // avant toute vérification, pour que l'utilisateur n'ait pas à le lancer à la main.
-        if (isTauri() && !serverStartAttempted) {
-          try {
-            const { invoke } = await import('@tauri-apps/api/core');
-            const platform = await invoke<string>('get-platform').catch(() => '');
-            if (platform === 'win32' || platform === 'linux') {
-              serverStartAttempted = true;
-              setMessage('Démarrage du backend...');
-              try {
-                await invoke('start_server');
-                setMessage('Backend démarré.');
-                saveBackendStartResult({ attempted: true, ok: true });
-              } catch (startErr: unknown) {
-                const errMsg = startErr instanceof Error ? startErr.message : String(startErr);
-                setMessage(`Backend: échec — ${errMsg}`);
-                saveBackendStartResult({ attempted: true, ok: false, error: errMsg });
-              }
-              await new Promise((r) => setTimeout(r, 2000));
-            }
-          } catch {
-            // ignorer (ex: get-platform échoue)
+        // Windows/Linux Tauri : serveur embarqué → démarrer + auto-config URL (pas de saisie manuelle).
+        if (isTauri() && !serverStartAttempted && (await isEmbeddedDesktopPlatform())) {
+          serverStartAttempted = true;
+          setMessage('Démarrage du backend...');
+          const started = await startEmbeddedDesktopServer();
+          if (started.ok) {
+            setMessage('Backend démarré.');
+            saveBackendStartResult({ attempted: true, ok: true });
+          } else {
+            setMessage(`Backend: ${started.error || 'démarrage…'}`);
+            saveBackendStartResult({
+              attempted: true,
+              ok: false,
+              error: started.error || 'start_server failed',
+            });
+          }
+          await ensureEmbeddedDesktopBackendUrl();
+          setMessage('Connexion au backend local...');
+          const ready = await waitForEmbeddedBackend(EMBEDDED_DESKTOP_BACKEND_URL);
+          if (ready) {
+            setMessage('Backend local prêt.');
+            saveBackendStartResult({ attempted: true, ok: true });
+          } else if (!started.ok) {
+            setMessage(`Backend local injoignable — ${started.error || 'timeout'}`);
+          } else {
+            setMessage('Backend local : démarré, en attente de disponibilité…');
           }
         }
 
