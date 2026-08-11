@@ -456,6 +456,16 @@ export default function MediaDetailPage({
     return { season: parseInt(m[1], 10), episode: parseInt(m[2], 10) };
   }, []);
 
+  // Métadonnées de l'épisode sélectionné — doit être déclaré AVANT activeTorrentWithLibraryPath
+  // (sinon TDZ: Cannot access '…' before initialization au premier rendu).
+  const selectedEpisodeMeta = useMemo(() => {
+    if (!seriesEpisodes?.seasons?.length || selectedSeasonNum == null || selectedEpisodeVariantId == null) return null;
+    const season = seriesEpisodes.seasons.find((s) => s.season === selectedSeasonNum);
+    const ep = season?.episodes.find((e) => e.id === selectedEpisodeVariantId);
+    if (!ep) return null;
+    return { season: ep.season, episode: ep.episode, variantId: ep.id };
+  }, [seriesEpisodes, selectedSeasonNum, selectedEpisodeVariantId]);
+
   // Torrent avec chemin bibliothèque si connu — uniquement si le chemin correspond à l'épisode sélectionné
   // (évite d'injecter S03E08 pendant la lecture de S01E01 après un fallback localMedia[0]).
   const activeTorrentWithLibraryPath = useMemo(() => {
@@ -564,15 +574,6 @@ export default function MediaDetailPage({
       }
     }
   }, [initialVariants]);
-
-  // Métadonnées de l'épisode sélectionné (pour useVideoFiles et VideoPlayer)
-  const selectedEpisodeMeta = useMemo(() => {
-    if (!seriesEpisodes?.seasons?.length || selectedSeasonNum == null || selectedEpisodeVariantId == null) return null;
-    const season = seriesEpisodes.seasons.find((s) => s.season === selectedSeasonNum);
-    const ep = season?.episodes.find((e) => e.id === selectedEpisodeVariantId);
-    if (!ep) return null;
-    return { season: ep.season, episode: ep.episode, variantId: ep.id };
-  }, [seriesEpisodes, selectedSeasonNum, selectedEpisodeVariantId]);
 
   // Met à jour libraryDownloadPath quand l'épisode sélectionné change (pour les séries)
   useEffect(() => {
