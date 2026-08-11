@@ -8,6 +8,7 @@ import { scheduleUpdateOnlyFilesWithRetry } from './hooks/useTorrentPlayer/playH
 import {
   useVideoFiles,
   isSparseOrEmptyMessage,
+  isStreamTorrentAuthMessage,
   SparseOrEmptyError,
   SPARSE_OR_EMPTY_CODE,
 } from './hooks/useVideoFiles';
@@ -16,7 +17,6 @@ import { useDebug } from './hooks/useDebug';
 import { useNotifications } from './hooks/useNotifications';
 import { EnhancedProgressOverlay } from './components/EnhancedProgressOverlay';
 import { VideoPlayerWrapper } from './components/VideoPlayerWrapper';
-import type { SeriesEpisodePickerItem } from '../../streaming/player-shared/types/seriesEpisodePicker';
 import { MediaDetailActionButtons } from './components/MediaDetailActionButtons';
 import { TorrentInfo } from './components/TorrentInfo';
 import { HeroHeader } from './components/HeroHeader';
@@ -392,6 +392,10 @@ export default function MediaDetailPage({
   const getTorrentFailCountRef = useRef<number>(0);
   /** Message sparse en attente tant que setErrorMessage n'est pas encore disponible. */
   const sparseErrorPendingRef = useRef<string | null>(null);
+  /** Évite une boucle de recovery sparse → play → sparse. */
+  const playbackRecoveryRef = useRef(false);
+  /** Après échec auth stream-torrent : forcer le téléchargement classique. */
+  const [forceDownloadFallback, setForceDownloadFallback] = useState(false);
   /** DerniÃ¨re valeur connue de torrentStats (pour ne pas Ã©craser un Ã©tat complÃ©tÃ© par une rÃ©ponse API invalide type unknown/0). */
   const lastTorrentStatsRef = useRef<{ state?: string; progress?: number } | null>(null);
   /** Snapshot partagé listTorrents (évite un 2e fetch dans le poll épisodes). */
@@ -610,18 +614,22 @@ export default function MediaDetailPage({
       (selectedEpisodeMeta &&
         libraryEpisodesPathMap[`${selectedEpisodeMeta.season}:${selectedEpisodeMeta.episode}`]),
   );
+  const effectiveStreamingActive = (streamingTorrentActive ?? false) && !forceDownloadFallback;
+  // Stream-torrent uniquement si le média n'est PAS jouable en local.
+  // Ne pas utiliser `isPlaying` ici : dès le clic Lire, isPlaying=true basculait à tort
+  // vers stream-torrent même quand isAvailableLocally=true (fichier présent, sans path library).
   const useStreamTorrentMode =
-    (streamingTorrentActive ?? false) &&
+    effectiveStreamingActive &&
     !activeTorrent.infoHash?.startsWith('local_') &&
-    // Sparses : forcer stream-torrent. Sinon HLS local seulement si vraiment dispo (chemin library OK).
-    (emptyOrSparse ||
-      ((!isAvailableLocally || isPlaying) && !hasLibraryFilePath));
+    (Boolean(emptyOrSparse) || (!isAvailableLocally && !hasLibraryFilePath));
 
   // Log des paramètres streaming en console (visible dans l’onglet Console pour debug)
   useEffect(() => {
     const token = typeof TokenManager?.getCloudAccessToken === 'function' ? TokenManager.getCloudAccessToken() : null;
     console.debug('[MediaDetail] Paramètres streaming', {
       streamingTorrentActive: streamingTorrentActive ?? false,
+      effectiveStreamingActive,
+      forceDownloadFallback,
       useStreamTorrentMode,
       isAvailableLocally: Boolean(isAvailableLocally),
       emptyOrSparse: Boolean(emptyOrSparse),
@@ -630,6 +638,8 @@ export default function MediaDetailPage({
     });
   }, [
     streamingTorrentActive,
+    effectiveStreamingActive,
+    forceDownloadFallback,
     isAvailableLocally,
     useStreamTorrentMode,
     emptyOrSparse,
@@ -661,7 +671,8 @@ export default function MediaDetailPage({
     hasInfoHash: effectiveHasInfoHash,
     hasMagnetLink,
     canStream: Boolean(canStream),
-    streamingTorrentActive: streamingTorrentActive ?? false,
+    streamingTorrentActive: effectiveStreamingActive,
+    emptyOrSparse: Boolean(emptyOrSparse),
     isAvailableLocally: Boolean(isAvailableLocally),
     setIsAvailableLocally,
     loadVideoFiles,
@@ -681,6 +692,40 @@ export default function MediaDetailPage({
       sparseErrorPendingRef.current = null;
     }
   }, [setErrorMessage, emptyOrSparse, errorMessage]);
+
+  // Reset recovery quand on change de média / épisode
+  useEffect(() => {
+    playbackRecoveryRef.current = false;
+    setForceDownloadFallback(false);
+  }, [activeTorrent.infoHash, selectedEpisodeVariantId]);
+
+  // Si playHandler a échoué sur auth stream-torrent (sans passer par le lecteur), basculer en téléchargement.
+  // Même après une recovery sparse : on autorise une 2e passe en mode download (forceDownloadFallback).
+  useEffect(() => {
+    if (!errorMessage || !isStreamTorrentAuthMessage(errorMessage)) return;
+    if (forceDownloadFallback) return;
+    setForceDownloadFallback(true);
+    setIsAvailableLocally(false);
+    setEmptyOrSparse(true);
+    setIsPlaying(false);
+    setPlayStatus('idle');
+    setErrorMessage(null);
+    playbackRecoveryRef.current = true;
+    addDebugLog('warning', 'Stream-torrent auth échoué (playHandler) — retéléchargement');
+    window.setTimeout(() => {
+      void handlePlay();
+    }, 150);
+  }, [
+    errorMessage,
+    forceDownloadFallback,
+    handlePlay,
+    addDebugLog,
+    setPlayStatus,
+    setErrorMessage,
+    setIsPlaying,
+    setIsAvailableLocally,
+    setEmptyOrSparse,
+  ]);
 
   const handleDeleteEmptyFiles = useCallback(async () => {
     const activeInfoHash = (selectedTorrent || torrent).infoHash;
@@ -2765,32 +2810,6 @@ export default function MediaDetailPage({
   /** Saison / numéro d'épisode / id variante pour le lecteur (reprise TMDB + « vu »). */
   // Déjà défini plus haut pour useVideoFiles
 
-  /** Liste aplatie pour le rail d'épisodes sur l'overlay pause du lecteur (style Netflix). */
-  const playerSeriesEpisodePickerItems = useMemo((): SeriesEpisodePickerItem[] | null => {
-    if (!seriesEpisodes?.seasons?.length) return null;
-    const items: SeriesEpisodePickerItem[] = [];
-    for (const s of seriesEpisodes.seasons) {
-      for (const ep of s.episodes ?? []) {
-        if (ep.episode === 0) continue;
-        const thumb =
-          ep.info_hash && ep.file_path
-            ? `/api/media/episode-thumbnail?info_hash=${encodeURIComponent(ep.info_hash)}&t=60&w=320`
-            : null;
-        const label =
-          ep.name?.trim()
-            ? t('mediaDetail.episodeWithTitle', { number: ep.episode, title: ep.name })
-            : t('mediaDetail.episodeNumber', { number: ep.episode });
-        items.push({
-          variantId: ep.id,
-          label,
-          sublabel: t('mediaDetail.seasonNumber', { number: s.season }),
-          thumbnailUrl: thumb,
-        });
-      }
-    }
-    return items.length > 1 ? items : null;
-  }, [seriesEpisodes, t]);
-
   /** Pendant la transition, on affiche encore l'Ã©pisode prÃ©cÃ©dent pour garder le lecteur montÃ© (mÃªme Ã©lÃ©ment vidÃ©o) et permettre play() aprÃ¨s changement de source. */
   const displayTorrent = isTransitioningToNext && previousActiveTorrentRef.current ? previousActiveTorrentRef.current : activeTorrent;
   const displayFile = isTransitioningToNext && previousSelectedFileRef.current ? previousSelectedFileRef.current : selectedFile;
@@ -2980,16 +2999,49 @@ export default function MediaDetailPage({
         progressMessage={progressMessage}
         torrentStats={torrentStats}
         errorMessage={errorMessage}
-        seriesEpisodePickerItems={playerSeriesEpisodePickerItems}
-        selectedSeriesEpisodeVariantId={selectedEpisodeVariantId}
-        onSelectSeriesEpisode={handleSeriesEpisodeSelect}
         onPlaybackError={(msg) => {
-          if (isSparseOrEmptyMessage(msg)) {
-            setIsAvailableLocally(false);
-            setEmptyOrSparse(true);
+          const sparse = isSparseOrEmptyMessage(msg);
+          const streamAuth = isStreamTorrentAuthMessage(msg);
+          if (!sparse && !streamAuth) return;
+
+          setIsAvailableLocally(false);
+          setEmptyOrSparse(true);
+          setLibraryDownloadPath(null);
+          setVideoFiles([]);
+          setSelectedFile(null);
+          setIsPlaying(false);
+          setPlayStatus('idle');
+          setErrorMessage(null);
+
+          if (streamAuth) {
+            // Auth stream échouée : une 2e passe en download même si recovery sparse déjà faite
+            if (forceDownloadFallback) {
+              setErrorMessage(msg);
+              setPlayStatus('error');
+              return;
+            }
+            setForceDownloadFallback(true);
+            addDebugLog('warning', 'Stream-torrent refusé — bascule téléchargement classique', { msg });
+            playbackRecoveryRef.current = true;
+            window.setTimeout(() => {
+              void handlePlay();
+            }, 150);
+            return;
+          }
+
+          addDebugLog('warning', 'Fichier local sparse/vide — relance lecture (stream ou retéléchargement)', {
+            msg,
+            streaming: effectiveStreamingActive,
+          });
+          if (playbackRecoveryRef.current) {
             setErrorMessage(msg);
             setPlayStatus('error');
+            return;
           }
+          playbackRecoveryRef.current = true;
+          window.setTimeout(() => {
+            void handlePlay();
+          }, 150);
         }}
         onDeleteEmptyFiles={handleDeleteEmptyFiles}
       />
@@ -3036,9 +3088,6 @@ export default function MediaDetailPage({
         useStreamTorrentMode={useStreamTorrentMode}
         streamingTorrentToken={TokenManager.getCloudAccessToken()}
         errorMessage={errorMessage}
-        seriesEpisodePickerItems={playerSeriesEpisodePickerItems}
-        selectedSeriesEpisodeVariantId={selectedEpisodeVariantId}
-        onSelectSeriesEpisode={handleSeriesEpisodeSelect}
         />
       )}
     <div className="relative bg-page text-white animate-fade-in-up">

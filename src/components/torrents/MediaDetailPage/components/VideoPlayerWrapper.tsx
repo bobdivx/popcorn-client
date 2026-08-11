@@ -23,7 +23,6 @@ import { canUseSeekReload as computeCanUseSeekReload } from '../../../streaming/
 import { emitPlaybackStep } from '../../../streaming/player-core/observability/playbackEvents';
 import { logVideoPlaybackError } from '../../../streaming/direct-player/mediaErrorDiagnostics';
 import { useI18n } from '../../../../lib/i18n/useI18n';
-import type { SeriesEpisodePickerItem } from '../../../streaming/player-shared/types/seriesEpisodePicker';
 import { useLibraryScrubThumbnails } from './video-player-wrapper/useLibraryScrubThumbnails';
 
 /** Info épisode suivant (série) pour le bouton « Épisode suivant » */
@@ -89,10 +88,6 @@ interface VideoPlayerWrapperProps {
   progressMessage?: string;
   /** Stats du torrent (pour déduire l'étape courante et l'overlay buffering). */
   torrentStats?: PlayerLoadingTorrentStats | null;
-  /** Rail « autre épisode » sur l'overlay pause (séries). */
-  seriesEpisodePickerItems?: SeriesEpisodePickerItem[] | null;
-  selectedSeriesEpisodeVariantId?: string | null;
-  onSelectSeriesEpisode?: (variantId: string) => void;
   errorMessage?: string | null;
   /** Erreur HLS fatale remontée au parent (ex. SPARSE_OR_EMPTY). */
   onPlaybackError?: (message: string) => void;
@@ -132,9 +127,6 @@ export function VideoPlayerWrapper({
   playStatus,
   progressMessage,
   torrentStats,
-  seriesEpisodePickerItems,
-  selectedSeriesEpisodeVariantId,
-  onSelectSeriesEpisode,
   errorMessage,
   onPlaybackError,
   onDeleteEmptyFiles,
@@ -283,9 +275,7 @@ export function VideoPlayerWrapper({
           ? {
               ...(seriesSeasonNum != null ? { season: seriesSeasonNum } : {}),
               ...(seriesEpisodeNum != null ? { episode: seriesEpisodeNum } : {}),
-              ...(selectedSeriesEpisodeVariantId
-                ? { variantId: selectedSeriesEpisodeVariantId }
-                : {}),
+              ...(torrentId ? { variantId: torrentId } : {}),
               positionSeconds: currentTime,
               durationSeconds: duration,
             }
@@ -300,7 +290,7 @@ export function VideoPlayerWrapper({
       reportPlaybackDuration,
       seriesSeasonNum,
       seriesEpisodeNum,
-      selectedSeriesEpisodeVariantId,
+      torrentId,
       nextEpisodeInfo,
       onPrefetchNextEpisode,
     ]
@@ -703,32 +693,81 @@ export function VideoPlayerWrapper({
               }
               logErrorEvent(errDetail);
               if (useStreamTorrentMode) {
-                // Le flux peut mettre 30–60 s à être prêt (torrent initializing côté librqbit) : plus de tentatives et délai 5 s
-                const maxRetries = 12;
-                const retryDelayMs = 5000;
-                if (directStreamRetryCount < maxRetries - 1) {
-                  // 503 / flux pas encore prêt : normal au démarrage, on réessaie automatiquement
-                  console.warn('[VideoPlayerWrapper] Flux pas encore prêt (503?), nouvelle tentative dans', retryDelayMs / 1000, 's…', e);
-                  directStreamRetryTimeoutRef.current && clearTimeout(directStreamRetryTimeoutRef.current);
-                  setHlsLoadingMessage(t('playback.streamPreparingRetry') ?? 'Préparation du flux, nouvelle tentative…');
-                  setIsLoading(true);
-                  directStreamRetryTimeoutRef.current = window.setTimeout(() => {
-                    directStreamRetryTimeoutRef.current = null;
-                    setDirectStreamRetryCount((c) => c + 1);
-                    setHlsLoadingMessage(null);
-                  }, retryDelayMs);
+                // Distinguer 401/402 (auth) des 503 (pas encore prêt) avant de retry.
+                const probeUrl =
+                  (typeof videoEl?.currentSrc === 'string' && videoEl.currentSrc) ||
+                  (typeof videoEl?.src === 'string' && videoEl.src) ||
+                  '';
+                const failAuth = (status: number) => {
+                  const msg =
+                    status === 402
+                      ? 'STREAM_TORRENT_AUTH: Option streaming torrent non active.'
+                      : 'STREAM_TORRENT_AUTH: Token invalide ou refusé par le backend.';
+                  setLocalPlayerError(msg);
+                  onPlaybackError?.(msg);
+                  setIsLoading(false);
+                };
+                const scheduleRetry = () => {
+                  const maxRetries = 12;
+                  const retryDelayMs = 5000;
+                  if (directStreamRetryCount < maxRetries - 1) {
+                    console.warn(
+                      '[VideoPlayerWrapper] Flux pas encore prêt (503?), nouvelle tentative dans',
+                      retryDelayMs / 1000,
+                      's…',
+                      e
+                    );
+                    directStreamRetryTimeoutRef.current && clearTimeout(directStreamRetryTimeoutRef.current);
+                    setHlsLoadingMessage(
+                      t('playback.streamPreparingRetry') ?? 'Préparation du flux, nouvelle tentative…'
+                    );
+                    setIsLoading(true);
+                    directStreamRetryTimeoutRef.current = window.setTimeout(() => {
+                      directStreamRetryTimeoutRef.current = null;
+                      setDirectStreamRetryCount((c) => c + 1);
+                      setHlsLoadingMessage(null);
+                    }, retryDelayMs);
+                    return;
+                  }
+                  if (videoEl) {
+                    logVideoPlaybackError('VideoPlayerWrapper', videoEl, {
+                      note: 'stream-torrent gave up after retries',
+                      attempts: maxRetries,
+                    });
+                  } else {
+                    console.error('[VideoPlayerWrapper] Direct video error après', maxRetries, 'tentatives:', e);
+                  }
+                  setHlsLoadingMessage(
+                    t('playback.torrentUnavailableOnIndexer') ??
+                      "Ce torrent n'est plus disponible sur l'indexeur. Choisissez une autre source."
+                  );
+                  setIsLoading(false);
+                };
+                if (probeUrl) {
+                  fetch(probeUrl, { method: 'GET', headers: { Range: 'bytes=0-0' } })
+                    .then((res) => {
+                      if (res.status === 401 || res.status === 402) {
+                        failAuth(res.status);
+                        return;
+                      }
+                      if (res.status === 502 || res.status === 503) {
+                        scheduleRetry();
+                        return;
+                      }
+                      // Autre erreur (404, etc.) : pas de retry infini — remonter pour retélécharger
+                      if (!res.ok) {
+                        const msg = `STREAM_TORRENT_AUTH: Flux stream-torrent indisponible (${res.status}).`;
+                        setLocalPlayerError(msg);
+                        onPlaybackError?.(msg);
+                        setIsLoading(false);
+                        return;
+                      }
+                      scheduleRetry();
+                    })
+                    .catch(() => scheduleRetry());
                   return;
                 }
-                if (videoEl) {
-                  logVideoPlaybackError('VideoPlayerWrapper', videoEl, {
-                    note: 'stream-torrent gave up after retries',
-                    attempts: maxRetries,
-                  });
-                } else {
-                  console.error('[VideoPlayerWrapper] Direct video error après', maxRetries, 'tentatives:', e);
-                }
-                setHlsLoadingMessage(t('playback.torrentUnavailableOnIndexer') ?? 'Ce torrent n\'est plus disponible sur l\'indexeur. Choisissez une autre source.');
-                setIsLoading(false);
+                scheduleRetry();
                 return;
               }
               if (videoEl) {
@@ -793,9 +832,6 @@ export function VideoPlayerWrapper({
               useStreamTorrentUrl: useStreamTorrentMode,
               scrubThumbnails,
               scrubThumbnailsLoading,
-              seriesEpisodePickerItems: seriesEpisodePickerItems ?? null,
-              selectedSeriesEpisodeVariantId: selectedSeriesEpisodeVariantId ?? null,
-              onSelectSeriesEpisode,
             }}
             lucieProps={{
               infoHash,
@@ -821,9 +857,6 @@ export function VideoPlayerWrapper({
               stopBufferRef,
               scrubThumbnails,
               scrubThumbnailsLoading,
-              seriesEpisodePickerItems: seriesEpisodePickerItems ?? null,
-              selectedSeriesEpisodeVariantId: selectedSeriesEpisodeVariantId ?? null,
-              onSelectSeriesEpisode,
             }}
             onHlsLoadingChange={(loading) => setIsLoading(loading)}
             onHlsError={(e) => {

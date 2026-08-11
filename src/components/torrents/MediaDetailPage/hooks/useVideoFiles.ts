@@ -2,10 +2,17 @@ import { useState, useRef, useEffect } from 'preact/hooks';
 import { clientApi } from '../../../../lib/client/api';
 
 export const SPARSE_OR_EMPTY_CODE = 'SPARSE_OR_EMPTY';
+/** Stream-torrent refusé (token / entitlement) — basculer vers téléchargement classique. */
+export const STREAM_TORRENT_AUTH_CODE = 'STREAM_TORRENT_AUTH';
 
 export function isSparseOrEmptyMessage(message: string | null | undefined): boolean {
   if (!message) return false;
   return message.includes(SPARSE_OR_EMPTY_CODE) || /sparse|fichier vide|empty file/i.test(message);
+}
+
+export function isStreamTorrentAuthMessage(message: string | null | undefined): boolean {
+  if (!message) return false;
+  return message.includes(STREAM_TORRENT_AUTH_CODE);
 }
 
 export class SparseOrEmptyError extends Error {
