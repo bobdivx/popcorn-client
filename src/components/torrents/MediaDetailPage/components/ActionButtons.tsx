@@ -190,16 +190,16 @@ export function ActionButtons({
     streamingTorrentActive && canStream && shouldShowPlayButton &&
     !isDownloadComplete && !showProgressNextToCancel && !downloadingToClient;
 
-  // Pack preview (torrent unique mais sélection possible via only_files) :
-  // le bouton principal doit agir sur l'épisode sélectionné, jamais sur tout le pack.
+  // Pack multi-fichiers : le bouton principal doit agir sur l'épisode sélectionné, jamais sur tout le pack.
+  const isPackEpisodeSelected = isPackWithMultipleFiles && selectedPackEpisodePreviewIndex != null;
+  /** Preview = pack listé avant ajout (pas encore d'infoHash côté client). */
   const isPackPreview = isPackWithMultipleFiles && !hasInfoHash;
   /** Série TV : lecture / téléchargement par épisode dans le carrousel — pas de pill « Lire » global (sauf pack preview). */
-  const hidePrimaryPlayForTvSeries = torrent.tmdbType === 'tv' && !isPackPreview;
-  const isPackEpisodeSelected = isPackPreview && selectedPackEpisodePreviewIndex != null;
+  const hidePrimaryPlayForTvSeries = torrent.tmdbType === 'tv' && !isPackPreview && !isPackEpisodeSelected;
   const canPlayPackPreviewEpisode = isPackEpisodeSelected && canStream && onPlaySingleEpisode != null;
   const canDownloadPackPreviewEpisode = isPackEpisodeSelected && onDownloadSingleEpisode != null;
   const primaryPackMode: 'play' | 'download' = canPlayPackPreviewEpisode ? 'play' : 'download';
-  const isPrimaryPackSelectionMissing = isPackPreview && !isPackEpisodeSelected;
+  const isPrimaryPackSelectionMissing = isPackWithMultipleFiles && !isPackEpisodeSelected && !hasInfoHash;
 
   return (
     <div className="mb-6 space-y-3">
@@ -212,8 +212,8 @@ export function ActionButtons({
           !(isDownloadInProgress && onCancelDownload && showProgressNextToCancel) && (
           <button
             onClick={() => {
-              // Override pack preview : Play/Download portent sur l'épisode sélectionné.
-              if (isPackPreview && isPackEpisodeSelected) {
+              // Override pack : Play/Download portent sur l'épisode sélectionné (only_files).
+              if (isPackEpisodeSelected) {
                 if (primaryPackMode === 'play' && canPlayPackPreviewEpisode) {
                   void onPlaySingleEpisode!(selectedPackEpisodePreviewIndex!);
                   return;
@@ -228,10 +228,10 @@ export function ActionButtons({
             disabled={
               (countdownRemaining !== null && countdownRemaining > 0) ||
               isPrimaryPackSelectionMissing ||
-              (isPackPreview && isPackEpisodeSelected && !canPlayPackPreviewEpisode && !canDownloadPackPreviewEpisode)
+              (isPackEpisodeSelected && !canPlayPackPreviewEpisode && !canDownloadPackPreviewEpisode)
             }
             title={
-              isPackPreview && isPackEpisodeSelected
+              isPackEpisodeSelected
                 ? primaryPackMode === 'play'
                   ? t('mediaDetail.playThisEpisode')
                   : t('mediaDetail.downloadThisEpisode')
@@ -244,7 +244,7 @@ export function ActionButtons({
             data-focusable
             data-media-detail-primary-action
             data-media-detail-action={
-              isPackPreview && isPackEpisodeSelected ? primaryPackMode : shouldShowPlayButton ? 'play' : 'download'
+              isPackEpisodeSelected ? primaryPackMode : shouldShowPlayButton ? 'play' : 'download'
             }
             tabIndex={0}
             className="gtv-pill-btn ds-focus-glow ds-active-glow ds-sync-active-pulse inline-flex items-center gap-2.5 font-bold text-base min-w-[9.5rem] tv:text-2xl tv:px-10 tv:py-5 tv:min-h-[68px] disabled:opacity-50 disabled:cursor-not-allowed border border-violet-500/40 hover:border-violet-400/60 hover:bg-violet-900/20 transition-[opacity,transform,background-color,border-color] duration-200 active:scale-[0.97]"
@@ -264,7 +264,7 @@ export function ActionButtons({
                 <Loader2 className="h-5 w-5 tv:h-7 tv:w-7 animate-spin shrink-0" size={20} />
                 {countdownRemaining} s...
               </>
-            ) : isPackPreview && isPackEpisodeSelected ? (
+            ) : isPackEpisodeSelected ? (
               primaryPackMode === 'play' ? (
                 <>
                   <Play className="h-5 w-5 tv:h-7 tv:w-7 fill-current shrink-0" size={20} />

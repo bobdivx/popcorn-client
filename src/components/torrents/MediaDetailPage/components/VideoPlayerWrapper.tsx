@@ -50,7 +50,11 @@ interface VideoPlayerWrapperProps {
   /** Épisode suivant (série) : afficher bouton « Épisode suivant » peu avant la fin */
   nextEpisodeInfo?: NextEpisodeInfo | null;
   onPlayNextEpisode?: () => void;
+  /** Prefetch silencieux de l'épisode suivant (ex. à ~50 % de lecture). */
+  onPrefetchNextEpisode?: () => void;
   onClose: () => void;
+  /** Annuler vraiment le téléchargement (retirer le torrent du client). */
+  onAbortDownload?: () => void;
   visible?: boolean;
   wrapperRef?: (element: HTMLDivElement | null) => void;
   quality?: {
@@ -109,7 +113,9 @@ export function VideoPlayerWrapper({
   isSeries = false,
   nextEpisodeInfo,
   onPlayNextEpisode,
-  onClose, 
+  onPrefetchNextEpisode,
+  onClose,
+  onAbortDownload,
   visible = true, 
   wrapperRef,
   quality,
@@ -145,6 +151,11 @@ export function VideoPlayerWrapper({
 
   const hasLoggedStartRef = useRef(false);
   const lastLoggedErrorRef = useRef<string | null>(null);
+  const hasPrefetchedNextRef = useRef(false);
+
+  useEffect(() => {
+    hasPrefetchedNextRef.current = false;
+  }, [nextEpisodeInfo?.seasonNum, nextEpisodeInfo?.episodeVariantId]);
 
   const logErrorEvent = useCallback((errorDetails: string) => {
     serverApi.logPlaybackEvent({
@@ -237,6 +248,20 @@ export function VideoPlayerWrapper({
       reportPlaybackDuration(duration);
       if (tmdbId == null || !tmdbType || duration <= 0) return;
       const progressPercent = (currentTime / duration) * 100;
+      // Prefetch épisode suivant dès ~50 % (une seule fois par épisode).
+      if (
+        progressPercent >= 50 &&
+        nextEpisodeInfo &&
+        onPrefetchNextEpisode &&
+        !hasPrefetchedNextRef.current
+      ) {
+        hasPrefetchedNextRef.current = true;
+        try {
+          onPrefetchNextEpisode();
+        } catch (e) {
+          console.warn('[VideoPlayerWrapper] prefetch next episode failed', e);
+        }
+      }
       const item: ContentItem = {
         id: String(tmdbId),
         title: torrentName || '',
@@ -269,6 +294,8 @@ export function VideoPlayerWrapper({
       seriesSeasonNum,
       seriesEpisodeNum,
       selectedSeriesEpisodeVariantId,
+      nextEpisodeInfo,
+      onPrefetchNextEpisode,
     ]
   );
 
@@ -580,7 +607,8 @@ export function VideoPlayerWrapper({
           progressMessage={progressMessage}
           torrentStats={torrentStats ?? undefined}
           onCancel={handleClosePlayer}
-          cancelLabel={t('downloads.cancelDownload')}
+          onAbortDownload={onAbortDownload}
+          cancelLabel={t('common.cancel') || 'Annuler'}
           isHlsPreparing
           hasVideoFiles={Boolean(selectedFile)}
         />
@@ -656,8 +684,9 @@ export function VideoPlayerWrapper({
             progressMessage={progressMessage ?? undefined}
             torrentStats={torrentStats ?? undefined}
             closeLabel={t('common.close')}
-            cancelLabel={t('playback.stopPlayback') || t('downloads.cancelDownload')}
+            cancelLabel={t('common.cancel') || 'Annuler'}
             onClose={handleClosePlayer}
+            onAbortDownload={onAbortDownload}
             onDirectLoadedData={() => setIsLoading(false)}
             onDirectError={(e) => {
               const videoEl = e.target instanceof HTMLVideoElement ? e.target : null;

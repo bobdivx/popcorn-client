@@ -886,30 +886,57 @@ async function enrichTorrentForPlayback(
       );
       if (Array.isArray(localMedias) && localMedias.length > 0) {
         const nameNorm = normalizeTitleForMatch(result.name || opts.titleHint || '');
+        const seFromName =
+          (result.name || opts.titleHint || '').match(/s([0-9]{1,2})[.\s-]*e([0-9]{1,3})/i) ||
+          (result.name || opts.titleHint || '').match(/([0-9]{1,2})x([0-9]{1,3})/i);
         const scored = localMedias
           .map((m) => {
             const path = (m.file_path || '').trim();
             const n = normalizeTitleForMatch(m.file_name || '');
+            const fileBlob = `${m.file_name || ''} ${path}`;
             let s = 0;
             if (pathLooksLikeFile(path)) s += 2;
-            if (nameNorm && n && (n.includes(nameNorm.split(/[.\s\-_]+/)[0] || '') || nameNorm.includes(n.split(/[.\s\-_]+/)[0] || ''))) {
-              s += 3;
+            // Priorité absolue au matching SxxExx (évite de coller S03E03 sur une fiche S03E04).
+            if (seFromName) {
+              const season = parseInt(seFromName[1], 10);
+              const episode = parseInt(seFromName[2], 10);
+              if (
+                new RegExp(`s0?${season}[.\\s-]*e0?${episode}\\b`, 'i').test(fileBlob) ||
+                new RegExp(`${season}x0?${episode}\\b`, 'i').test(fileBlob)
+              ) {
+                s += 10;
+              }
+            }
+            if (nameNorm && n) {
+              const tokens = nameNorm.split(/[.\s\-_]+/).filter((t) => t.length > 3);
+              const hits = tokens.filter((t) => n.includes(t)).length;
+              if (hits >= 2) s += 3;
+              else if (hits === 1) s += 1;
             }
             if (/^[a-zA-Z]:[\\/]/.test(path) || path.startsWith('/')) s += 1;
+            // Préférer les chemins absolus Docker (/app/downloads/...) aux relatifs dupliqués.
+            if (path.startsWith('/app/') || path.includes('/downloads/')) s += 1;
             return { m, path, s };
           })
           .filter((x) => x.path && pathLooksLikeFile(x.path))
           .sort((a, b) => b.s - a.s);
         const bestLocal = scored[0];
-        if (bestLocal) {
+        if (bestLocal && bestLocal.s >= 2) {
+          const realHash =
+            bestLocal.m.info_hash && /^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$/.test(String(bestLocal.m.info_hash))
+              ? String(bestLocal.m.info_hash)
+              : null;
           result = {
             ...result,
             downloadPath: bestLocal.path,
             infoHash:
+              (result.infoHash &&
+              /^[a-fA-F0-9]{32}$|^[a-fA-F0-9]{40}$/.test(String(result.infoHash))
+                ? result.infoHash
+                : null) ||
+              realHash ||
               result.infoHash ||
-              (bestLocal.m.info_hash && String(bestLocal.m.info_hash).length >= 32
-                ? String(bestLocal.m.info_hash)
-                : `local_${bestLocal.m.id}`),
+              `local_${bestLocal.m.id}`,
           } as Torrent;
         }
       }
