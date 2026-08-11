@@ -45,8 +45,13 @@ async function waitForStreamReady(
   } catch (e) {
     addDebugLog('error', 'Flux stream-torrent indisponible', e);
     setPlayStatus('error');
+    const msg = e instanceof Error ? e.message : String(e);
+    const isAuth =
+      /\b401\b|\b402\b|STREAM_TORRENT_AUTH|Token invalide|non active|Unauthorized/i.test(msg);
     setErrorMessage(
-      'Le flux n\'est pas encore prêt (torrent en initialisation). Attendez 1 à 2 minutes puis réessayez.'
+      isAuth
+        ? 'STREAM_TORRENT_AUTH: Impossible de valider le streaming torrent. Bascule vers téléchargement.'
+        : 'Le flux n\'est pas encore prêt (torrent en initialisation). Attendez 1 à 2 minutes puis réessayez.'
     );
     return false;
   }
@@ -120,6 +125,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
     hasInfoHash,
     hasMagnetLink,
     streamingTorrentActive = false,
+    emptyOrSparse = false,
     isAvailableLocally,
     setIsAvailableLocally,
     loadVideoFiles,
@@ -172,7 +178,14 @@ export function createHandlePlay(context: PlayHandlerContext) {
 
     // PRIORITÉ 0: Si on a déjà des fichiers vidéo chargés (ex. par useVideoFiles au montage), lancer la lecture directement.
     // Permet de lire même quand getTorrent renvoie 404 temporairement alors que les fichiers sont bien présents.
-    if (hasInfoHash && torrent.infoHash && videoFiles.length > 0 && selectedFile) {
+    // Skip si sparse/vide : il faut retélécharger ou passer par stream-torrent, pas rejouer le chemin local.
+    if (
+      !emptyOrSparse &&
+      hasInfoHash &&
+      torrent.infoHash &&
+      videoFiles.length > 0 &&
+      selectedFile
+    ) {
       // Sécurité : vérifier que le fichier sélectionné semble appartenir au torrent actuel (infoHash ou name)
       const fileNameLower = selectedFile.path.toLowerCase();
       const torrentHashLower = torrent.infoHash.toLowerCase();
@@ -210,7 +223,7 @@ export function createHandlePlay(context: PlayHandlerContext) {
     }
 
     // PRIORITÉ 0.5: Média disponible en bibliothèque (fichier sur disque, torrent peut être absent du client) — charger depuis le chemin library puis lancer
-    if (isAvailableLocally && hasInfoHash && torrent.infoHash) {
+    if (!emptyOrSparse && isAvailableLocally && hasInfoHash && torrent.infoHash) {
       addDebugLog('info', '📚 Média disponible localement, chargement des fichiers depuis la bibliothèque...');
       const libraryVideos = await loadVideoFiles(torrent.infoHash);
       if (libraryVideos.length > 0) {
@@ -264,8 +277,47 @@ export function createHandlePlay(context: PlayHandlerContext) {
           
           const isCompleted = isTorrentReallyComplete(stats) || stats.state === 'completed' || stats.state === 'seeding';
           
+          // Sparse connu : ne pas rejouer le chemin bibliothèque (boucle 422). Stream-torrent ou re-téléchargement.
+          if (emptyOrSparse && streamingTorrentActive) {
+            addDebugLog('info', 'Fichier sparse — lecture via stream-torrent (torrent déjà présent)');
+            const videosSparse = videoFiles.length > 0 && selectedFile
+              ? videoFiles
+              : await loadVideoFiles(torrent.infoHash);
+            const file = selectedFile || videosSparse[0];
+            if (file) {
+              if (videosSparse.length > 0) {
+                setVideoFiles(videosSparse);
+                setSelectedFile(file);
+              }
+              if (!getStreamingDownloadFull()) {
+                scheduleUpdateOnlyFilesWithRetry(torrent.infoHash, file.index ?? 0);
+              }
+              await markStreamingIfActive();
+              const okSparse = await waitForStreamReady(
+                true,
+                torrent.infoHash!,
+                file,
+                setProgressMessage,
+                setPlayStatus,
+                setErrorMessage,
+                addDebugLog
+              );
+              if (!okSparse || isPlayCancelled()) {
+                if (!isPlayCancelled()) setIsPlaying(false);
+                return;
+              }
+              setPlayStatus('ready');
+              setProgressMessage('Lancement de la lecture...');
+              setIsPlaying(true);
+              setShowInfo(false);
+              stopProgressPolling();
+              setTorrentStats(stats);
+              return;
+            }
+          }
+
           // Si le torrent est complété, essayer de charger les fichiers avec plusieurs tentatives
-          if (isCompleted) {
+          if (isCompleted && !emptyOrSparse) {
             let videos: any[] = [];
             let retryCount = 0;
             const maxRetries = 10;
@@ -1166,8 +1218,8 @@ export function createHandlePlay(context: PlayHandlerContext) {
         setIsPlaying(false);
       }
     } else if (torrent.infoHash) {
-      // Torrent local - vérifier si disponible localement
-      if (isAvailableLocally) {
+      // Torrent local - vérifier si disponible localement (sauf sparse : forcer erreur → recovery parent)
+      if (!emptyOrSparse && isAvailableLocally) {
         addDebugLog('info', '📚 Torrent disponible localement, utilisation directe');
         setPlayStatus('ready');
         setProgressMessage('Chargement depuis la bibliothèque locale...');
@@ -1187,7 +1239,11 @@ export function createHandlePlay(context: PlayHandlerContext) {
         }
       } else {
         setPlayStatus('error');
-        setErrorMessage('Le torrent n\'est pas disponible. Vérifiez qu\'il est bien téléchargé.');
+        setErrorMessage(
+          emptyOrSparse
+            ? 'SPARSE_OR_EMPTY: Fichier local vide — retéléchargement requis.'
+            : 'Le torrent n\'est pas disponible. Vérifiez qu\'il est bien téléchargé.'
+        );
         setIsPlaying(false);
       }
     } else {
