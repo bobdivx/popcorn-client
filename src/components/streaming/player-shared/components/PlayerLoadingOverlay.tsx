@@ -23,6 +23,8 @@ interface PlayerLoadingOverlayProps {
   progressMessage?: string;
   torrentStats?: PlayerLoadingTorrentStats | null;
   onCancel?: () => void;
+  /** Annuler vraiment le téléchargement (retirer le torrent). */
+  onAbortDownload?: () => void;
   cancelLabel?: string;
   isHlsPreparing?: boolean;
   hasVideoFiles?: boolean;
@@ -36,6 +38,7 @@ export default function PlayerLoadingOverlay({
   progressMessage,
   torrentStats,
   onCancel,
+  onAbortDownload,
   cancelLabel,
   isHlsPreparing = true,
   hasVideoFiles,
@@ -72,7 +75,8 @@ export default function PlayerLoadingOverlay({
       hasVideoFiles={hasVideoFiles}
       isActiveSession
       onCancel={onCancel}
-      cancelLabel={cancelLabel || t('common.close') || 'Fermer'}
+      onAbortDownload={onAbortDownload}
+      cancelLabel={cancelLabel || t('common.cancel') || 'Annuler'}
     />
   );
 }

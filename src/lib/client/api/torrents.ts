@@ -312,15 +312,17 @@ export class TorrentsService {
   /**
    * Ajouter un torrent depuis un fichier .torrent
    * @param file - Le fichier .torrent
-   * @param forStreaming - DEPRECATED: Ne plus utiliser, toujours false. Les téléchargements vont dans media/films ou media/series
+   * @param forStreaming - true pour streaming (output temporaire)
    * @param downloadType - Type de téléchargement: "film" ou "serie" (détermine le chemin: media/films ou media/series)
    * @param customDownloadPath - Chemin personnalisé (optionnel)
+   * @param onlyFiles - Indices de fichiers à télécharger uniquement (ex. un épisode d'un pack)
    */
   async addTorrentFile(
     file: File, 
     forStreaming: boolean = false,
     downloadType?: string,
-    customDownloadPath?: string
+    customDownloadPath?: string,
+    onlyFiles?: number[]
   ): Promise<AddTorrentResponse> {
     try {
       const fileBuffer = await file.arrayBuffer();
@@ -340,6 +342,9 @@ export class TorrentsService {
         if (customDownloadPath) {
           headers['X-Custom-Download-Path'] = customDownloadPath;
         }
+      }
+      if (onlyFiles != null && onlyFiles.length > 0) {
+        headers['X-Only-Files'] = onlyFiles.join(',');
       }
       
       // Créer un AbortController avec un timeout plus long pour l'ajout de torrent
@@ -746,6 +751,29 @@ export class TorrentsService {
    */
   async getTorrentFiles(infoHash: string): Promise<Array<{path: string, size: number, mime_type: string, is_video: boolean}>> {
     try {
+      // Garde-fou client : un id local_* n'est pas un torrent librqbit.
+      // (Le serveur résout aussi via local_media ; on évite tout de même les appels inutiles.)
+      if ((infoHash || '').startsWith('local_')) {
+        try {
+          const path = await this.getTorrentDownloadPath(infoHash);
+          if (path) {
+            const mime =
+              /\.(mkv)$/i.test(path) ? 'video/x-matroska'
+              : /\.(mp4|m4v)$/i.test(path) ? 'video/mp4'
+              : /\.(webm)$/i.test(path) ? 'video/webm'
+              : 'application/octet-stream';
+            return [{
+              path,
+              size: 0,
+              mime_type: mime,
+              is_video: /\.(mkv|mp4|avi|webm|mov|m4v|wmv|ts|m2ts)$/i.test(path),
+            }];
+          }
+        } catch {
+          /* fall through to /files (serveur enrichi) */
+        }
+      }
+
       const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/files`);
       const response = await fetch(url);
       
