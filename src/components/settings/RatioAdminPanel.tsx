@@ -5,6 +5,7 @@ import { Shield, TrendingUp, RefreshCw, Zap, AlertCircle } from 'lucide-preact';
 import PermissionGuard from '../ui/PermissionGuard';
 import SubscriptionGuard from '../ui/SubscriptionGuard';
 import DsPageHeader from '../ui/DsPageHeader';
+import RatioBoostWizard from './RatioBoostWizard';
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -263,6 +264,8 @@ export default function RatioAdminPanel() {
             <p className="text-sm text-red-200">{error}</p>
           </div>
         )}
+
+        <RatioBoostWizard />
 
         {/* Mode tracker */}
         <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">

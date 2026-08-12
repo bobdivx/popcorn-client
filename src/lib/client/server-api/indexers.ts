@@ -130,6 +130,44 @@ export const indexersMethods = {
   async deleteIndexer(this: ServerApiClientIndexersAccess, id: string): Promise<ApiResponse<void>> {
     return this.backendRequest<void>(`/api/client/admin/indexers/${encodeURIComponent(id)}`, { method: 'DELETE' });
   },
+  /**
+   * Clone un indexer (ex. C411) avec une nouvelle clé API pour snatch en parallèle.
+   * Le clone est is_default + skip_sync.
+   */
+  async duplicateIndexerAccount(
+    this: ServerApiClientIndexersAccess,
+    id: string,
+    params: { apiKey: string; name?: string }
+  ): Promise<ApiResponse<Indexer>> {
+    const res = await this.backendRequest<any>(
+      `/api/client/admin/indexers/${encodeURIComponent(id)}/duplicate-account`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          api_key: params.apiKey,
+          ...(params.name?.trim() ? { name: params.name.trim() } : {}),
+        }),
+      }
+    );
+    if (!res.success) return res as ApiResponse<Indexer>;
+    const idx: any = res.data;
+    return {
+      success: true,
+      data: {
+        id: idx.id,
+        name: idx.name,
+        baseUrl: idx.base_url,
+        apiKey: idx.api_key || null,
+        jackettIndexerName: idx.jackett_indexer_name || null,
+        isEnabled: idx.is_enabled === 1 || idx.is_enabled === true,
+        isDefault: idx.is_default === 1 || idx.is_default === true,
+        priority: idx.priority || 0,
+        fallbackIndexerId: idx.fallback_indexer_id || null,
+        indexerTypeId: idx.indexer_type_id || null,
+        configJson: idx.config_json || null,
+      },
+    };
+  },
   async getIndexerCategories(this: ServerApiClientIndexersAccess, indexerId: string): Promise<ApiResponse<Record<string, { enabled: boolean; genres?: number[] }>>> {
     return this.backendRequest<Record<string, { enabled: boolean; genres?: number[] }>>(`/api/admin/indexers/${encodeURIComponent(indexerId)}/categories`, { method: 'GET' });
   },
