@@ -193,7 +193,7 @@ export const settingsMethods = {
     return this.backendRequest(`/api/client/torrents/${encodeURIComponent(hash)}/trackers`, { method: 'GET' });
   },
   /** GET /api/client/torrents — liste des torrents du client (librqbit) pour affichage dans Réglages. */
-  async getClientTorrents(this: ServerApiClientSettingsAccess): Promise<ApiResponse<Array<{ info_hash: string; name: string; state: string; progress?: number; trackers?: string[] }>>> {
+  async getClientTorrents(this: ServerApiClientSettingsAccess): Promise<ApiResponse<Array<{ info_hash: string; name: string; state: string; progress?: number; total_bytes?: number; trackers?: string[] }>>> {
     return this.backendRequest('/api/client/torrents', { method: 'GET' });
   },
   /** POST /api/admin/tracker-mode/check — test connexion librqbit et état du mode */

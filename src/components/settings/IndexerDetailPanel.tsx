@@ -7,8 +7,20 @@ import { syncIndexersToCloud } from '../../lib/utils/cloud-sync';
 import { useI18n } from '../../lib/i18n/useI18n';
 import IndexerCategoriesSelector from './IndexerCategoriesSelector';
 import IndexerBulkZipPanel from './IndexerBulkZipPanel';
-import { Trash2, Pencil, RefreshCw, PlayCircle } from 'lucide-preact';
+import { Trash2, Pencil, RefreshCw, PlayCircle, CopyPlus } from 'lucide-preact';
 import { useConfirmDialog } from '../ui/useConfirmDialog';
+import { Modal } from '../ui/Modal';
+
+function indexerHasSkipSync(configJson: string | null | undefined): boolean {
+  if (!configJson) return false;
+  try {
+    const parsed = JSON.parse(configJson) as Record<string, unknown>;
+    const v = parsed?.skip_sync;
+    return v === true || v === 1 || v === '1' || v === 'true';
+  } catch {
+    return false;
+  }
+}
 
 interface IndexerDetailPanelProps {
   indexer: Indexer;
@@ -24,14 +36,22 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [showEdit, setShowEdit] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [testProgress, setTestProgress] = useState<{ index: number; total: number; lastQuery?: string; lastCount?: number; lastSuccess?: boolean } | undefined>();
-  const [testResult, setTestResult] = useState<any>(null);
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [testProgressLog, setTestProgressLog] = useState<string[]>([]);
   const [testRunning, setTestRunning] = useState(false);
   const [testFinalResult, setTestFinalResult] = useState<any>(null);
   const [testErrorMessage, setTestErrorMessage] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'categories' | 'bulkZip'>('overview');
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [duplicateName, setDuplicateName] = useState('C411 (DL)');
+  const [duplicateApiKey, setDuplicateApiKey] = useState('');
+  const [duplicating, setDuplicating] = useState(false);
+  const [duplicateError, setDuplicateError] = useState<string | null>(null);
+  const [duplicateSuccess, setDuplicateSuccess] = useState<string | null>(null);
+
+  const skipSync = useMemo(() => indexerHasSkipSync(indexer.configJson), [indexer.configJson]);
+  const canDuplicateAccount = (indexer.indexerTypeId || '').toLowerCase() === 'c411';
 
   const extraConfig = useMemo(() => {
     if (!indexer.configJson) return undefined as Record<string, string> | undefined;
@@ -84,6 +104,47 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
     }
   };
 
+  const openDuplicateModal = () => {
+    setDuplicateName('C411 (DL)');
+    setDuplicateApiKey('');
+    setDuplicateError(null);
+    setDuplicateSuccess(null);
+    setDuplicateOpen(true);
+  };
+
+  const handleDuplicateAccount = async (e: Event) => {
+    e.preventDefault();
+    const key = duplicateApiKey.trim();
+    if (!key) {
+      setDuplicateError(t('indexersManager.duplicateAccount.apiKeyRequired'));
+      return;
+    }
+    setDuplicating(true);
+    setDuplicateError(null);
+    setDuplicateSuccess(null);
+    try {
+      const res = await serverApi.duplicateIndexerAccount(indexer.id, {
+        apiKey: key,
+        name: duplicateName.trim() || undefined,
+      });
+      if (!res.success || !res.data) {
+        setDuplicateError(res.message || t('indexersManager.duplicateAccount.error'));
+        return;
+      }
+      await syncIndexersToCloud();
+      setDuplicateSuccess(
+        t('indexersManager.duplicateAccount.success').replace('{name}', res.data.name)
+      );
+      setDuplicateOpen(false);
+      onIndexerUpdated?.();
+      onEditClose?.();
+    } catch (err) {
+      setDuplicateError(err instanceof Error ? err.message : t('indexersManager.duplicateAccount.error'));
+    } finally {
+      setDuplicating(false);
+    }
+  };
+
   const handleTest = async () => {
     setTestProgressLog([]);
     setTestFinalResult(null);
@@ -95,13 +156,6 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
     try {
       const response = await serverApi.testIndexerStream(indexer.id, (event) => {
         setTestProgressLog((prev) => [...prev, formatProgressEvent(event)]);
-        setTestProgress({
-          index: event.index ?? 0,
-          total: event.total ?? 0,
-          lastQuery: event.query,
-          lastCount: event.count,
-          lastSuccess: event.success,
-        });
       });
 
       if (response.success && response.data) {
@@ -118,29 +172,14 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
           apiKeyTest: d.apiKeyTest,
           downloadTest: d.downloadTest,
         });
-        setTestResult({
-          success: d.success !== false,
-          message: d.message,
-          totalResults: d.totalResults,
-          resultsCount: d.resultsCount,
-          successfulQueries: d.successfulQueries,
-          failedQueries: d.failedQueries,
-          testQueries: d.testQueries,
-          sampleResults: d.sampleResults,
-          sampleResult: d.sampleResults?.[0],
-          apiKeyTest: d.apiKeyTest,
-          downloadTest: d.downloadTest,
-        });
       } else {
         const msg = response.message || t('indexersManager.errorTesting');
         setTestFinalResult({ success: false, message: msg });
-        setTestResult({ success: false, message: msg });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : t('indexersManager.errorTesting');
       setTestErrorMessage(msg);
       setTestFinalResult({ success: false, message: msg });
-      setTestResult({ success: false, message: msg });
     } finally {
       setTestRunning(false);
       setTesting(false);
@@ -172,10 +211,13 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
     );
   }
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'categories' | 'bulkZip'>('overview');
-
   return (
     <div className="space-y-6">
+      {duplicateSuccess && (
+        <div className="p-3 rounded-lg border border-emerald-600/50 bg-emerald-900/20 text-emerald-200 text-sm">
+          {duplicateSuccess}
+        </div>
+      )}
       {/* Carte principale infos + onglets + actions */}
       <div className="ds-card-section rounded-2xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]/85 shadow-lg space-y-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -195,11 +237,31 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
                   {t('indexerCard.default')}
                 </span>
               )}
+              {canDuplicateAccount && (skipSync ? (
+                <span className="px-2 py-0.5 rounded-full border border-amber-500/60 text-amber-200 bg-amber-500/10" title={t('indexerCard.downloadAccountHint')}>
+                  {t('indexerCard.downloadAccount')}
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full border border-cyan-500/60 text-cyan-200 bg-cyan-500/10" title={t('indexerCard.syncAccountHint')}>
+                  {t('indexerCard.syncAccount')}
+                </span>
+              ))}
             </div>
           </div>
 
           {/* Actions principales */}
           <div className="flex flex-wrap gap-2 justify-end">
+            {canDuplicateAccount && (
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost gap-1 text-amber-200 border border-amber-500/40"
+                onClick={openDuplicateModal}
+                title={t('indexersManager.duplicateAccount.hint')}
+              >
+                <CopyPlus className="w-4 h-4" aria-hidden />
+                {t('indexersManager.duplicateAccount.button')}
+              </button>
+            )}
             <button
               type="button"
               className="btn btn-sm btn-ghost gap-1 text-primary-300 border border-primary-500/40"
@@ -213,7 +275,8 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
               type="button"
               className="btn btn-sm btn-ghost gap-1 text-emerald-300 border border-emerald-500/40"
               onClick={handleSync}
-              disabled={syncing}
+              disabled={syncing || skipSync}
+              title={skipSync ? t('indexerCard.downloadAccountHint') : undefined}
             >
               {syncing ? <span className="loading loading-spinner loading-xs" /> : <RefreshCw className="w-4 h-4" aria-hidden />}
               {t('torrentSyncManager.syncNow') ?? 'Sync'}
@@ -307,6 +370,67 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
           <IndexerBulkZipPanel indexerId={indexer.id} onConfigSaved={onIndexerUpdated} />
         )}
       </div>
+
+      <Modal
+        isOpen={duplicateOpen}
+        onClose={() => !duplicating && setDuplicateOpen(false)}
+        title={t('indexersManager.duplicateAccount.title')}
+        size="md"
+      >
+        <form onSubmit={handleDuplicateAccount} className="space-y-4">
+          <p className="text-sm ds-text-secondary">{t('indexersManager.duplicateAccount.hint')}</p>
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text text-white">{t('indexersManager.duplicateAccount.nameLabel')}</span>
+            </label>
+            <input
+              type="text"
+              className="input input-bordered bg-gray-800 border-gray-700 text-white w-full"
+              value={duplicateName}
+              onInput={(e) => setDuplicateName((e.target as HTMLInputElement).value)}
+              placeholder="C411 (DL)"
+              disabled={duplicating}
+            />
+          </div>
+          <div className="form-control">
+            <label className="label">
+              <span className="label-text text-white">{t('indexersManager.duplicateAccount.apiKeyLabel')}</span>
+            </label>
+            <input
+              type="password"
+              className="input input-bordered bg-gray-800 border-gray-700 text-white w-full"
+              value={duplicateApiKey}
+              onInput={(e) => setDuplicateApiKey((e.target as HTMLInputElement).value)}
+              placeholder={t('indexersManager.duplicateAccount.apiKeyPlaceholder')}
+              disabled={duplicating}
+              autoComplete="off"
+            />
+          </div>
+          {duplicateError && (
+            <p className="text-sm text-red-300">{duplicateError}</p>
+          )}
+          <div className="flex gap-3 justify-end">
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={duplicating}
+              onClick={() => setDuplicateOpen(false)}
+            >
+              {t('common.cancel')}
+            </button>
+            <button type="submit" className="btn btn-primary" disabled={duplicating}>
+              {duplicating ? (
+                <>
+                  <span className="loading loading-spinner loading-sm" />
+                  {t('indexersManager.duplicateAccount.saving')}
+                </>
+              ) : (
+                t('indexersManager.duplicateAccount.confirm')
+              )}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       <IndexerTestModal
         isOpen={testModalOpen}
