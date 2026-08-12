@@ -173,6 +173,38 @@ export interface MigrateC411SeedsResult {
   failed: MigrateC411FailedItem[];
 }
 
+export interface RatioBoostFailedItem {
+  info_hash: string;
+  name: string;
+  error: string;
+}
+
+export interface RatioBoostStatus {
+  in_progress: boolean;
+  queued: number;
+  started: number;
+  completed: number;
+  failed: RatioBoostFailedItem[];
+  bytes_boosted: number;
+  current_hash?: string | null;
+  current_name?: string | null;
+  current_progress?: number | null;
+  message?: string | null;
+  finished_at?: number | null;
+}
+
+export interface DownloadClientRow {
+  id: string;
+  name: string;
+  client_type: string;
+  host: string;
+  port?: number | null;
+  username?: string | null;
+  password?: string | null;
+  api_key?: string | null;
+  is_enabled: boolean;
+}
+
 export interface PrepareReseedFromLibraryResult {
   local_media_id: string;
   torrent_expected_name?: string | null;
@@ -539,6 +571,122 @@ export const uploadTrackerMethods = {
       method: 'POST',
       body: JSON.stringify(body ?? {}),
     });
+  },
+
+  async startC411RatioBoost(
+    this: UploadTrackerClientAccess,
+    body?: {
+      info_hashes?: string[];
+      max_concurrent?: number;
+      delete_after_complete?: boolean;
+      save_dir?: string;
+    }
+  ): Promise<ApiResponse<RatioBoostStatus>> {
+    return this.backendRequest<RatioBoostStatus>('/api/library/upload-tracker/c411-ratio-boost', {
+      method: 'POST',
+      body: JSON.stringify(body ?? {}),
+    });
+  },
+
+  async getC411RatioBoostStatus(
+    this: UploadTrackerClientAccess
+  ): Promise<ApiResponse<RatioBoostStatus>> {
+    return this.backendRequest<RatioBoostStatus>(
+      '/api/library/upload-tracker/c411-ratio-boost/status',
+      { method: 'GET' }
+    );
+  },
+
+  async listDownloadClients(
+    this: UploadTrackerClientAccess
+  ): Promise<ApiResponse<DownloadClientRow[]>> {
+    const res = await this.backendRequest<any[]>('/api/admin/download-clients', { method: 'GET' });
+    if (!res.success) return res as ApiResponse<DownloadClientRow[]>;
+    const rows: DownloadClientRow[] = (Array.isArray(res.data) ? res.data : []).map((c: any) => ({
+      id: c.id,
+      name: c.name,
+      client_type: c.client_type,
+      host: c.host,
+      port: c.port ?? null,
+      username: c.username ?? null,
+      password: c.password ?? null,
+      api_key: c.api_key ?? null,
+      is_enabled: c.is_enabled === 1 || c.is_enabled === true,
+    }));
+    return { success: true, data: rows };
+  },
+
+  async saveQbittorrentClient(
+    this: UploadTrackerClientAccess,
+    params: {
+      id?: string;
+      host: string;
+      port: number;
+      username: string;
+      password: string;
+      name?: string;
+    }
+  ): Promise<ApiResponse<DownloadClientRow>> {
+    const payload = {
+      name: params.name || 'qBittorrent (ratio boost)',
+      client_type: 'qbittorrent',
+      host: params.host,
+      port: params.port,
+      username: params.username,
+      password: params.password,
+      api_key: null as string | null,
+      is_enabled: true,
+    };
+    if (params.id) {
+      const res = await this.backendRequest<any>(
+        `/api/admin/download-clients/${encodeURIComponent(params.id)}`,
+        { method: 'PUT', body: JSON.stringify(payload) }
+      );
+      if (!res.success) return res as ApiResponse<DownloadClientRow>;
+      const c = res.data;
+      return {
+        success: true,
+        data: {
+          id: c.id || params.id,
+          name: c.name,
+          client_type: c.client_type,
+          host: c.host,
+          port: c.port,
+          username: c.username,
+          password: c.password,
+          is_enabled: true,
+        },
+      };
+    }
+    const res = await this.backendRequest<any>('/api/admin/download-clients', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    if (!res.success) return res as ApiResponse<DownloadClientRow>;
+    const c = res.data;
+    return {
+      success: true,
+      data: {
+        id: c.id,
+        name: c.name,
+        client_type: c.client_type,
+        host: c.host,
+        port: c.port,
+        username: c.username,
+        password: c.password,
+        is_enabled: true,
+      },
+    };
+  },
+
+  async testQbittorrent(
+    this: UploadTrackerClientAccess,
+    body?: { host?: string; port?: number; username?: string; password?: string }
+  ): Promise<ApiResponse<{ ok: boolean; message?: string }>> {
+    return this.backendRequest<{ ok: boolean; message?: string }>(
+      '/api/admin/download-clients/qbittorrent/test',
+      { method: 'POST', body: JSON.stringify(body ?? {}) }
+    );
   },
 
   /**
