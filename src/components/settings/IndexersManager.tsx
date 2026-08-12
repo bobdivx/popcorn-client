@@ -593,6 +593,17 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
               const truncatedUrl = indexer.baseUrl.length > 45 ? indexer.baseUrl.slice(0, 42) + '…' : indexer.baseUrl;
               const isVisibleInLibrary =
                 visibleInLibraryIds === null || (Array.isArray(visibleInLibraryIds) && visibleInLibraryIds.includes(indexer.id));
+              let skipSync = false;
+              if (indexer.configJson) {
+                try {
+                  const parsed = JSON.parse(indexer.configJson) as Record<string, unknown>;
+                  const v = parsed?.skip_sync;
+                  skipSync = v === true || v === 1 || v === '1' || v === 'true';
+                } catch {
+                  skipSync = false;
+                }
+              }
+              const isC411 = (indexer.indexerTypeId || '').toLowerCase() === 'c411';
               return (
                 <button
                   key={indexer.id}
@@ -627,6 +638,15 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
                           {t('indexerCard.default')}
                         </span>
                       )}
+                      {isC411 && (skipSync ? (
+                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-amber-900/30 border border-amber-600 text-amber-300" title={t('indexerCard.downloadAccountHint')}>
+                          {t('indexerCard.downloadAccount')}
+                        </span>
+                      ) : (
+                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-cyan-900/30 border border-cyan-600 text-cyan-300" title={t('indexerCard.syncAccountHint')}>
+                          {t('indexerCard.syncAccount')}
+                        </span>
+                      ))}
                       <span class="px-2 py-0.5 rounded text-xs ds-text-tertiary">
                         {t('indexerCard.priority')}: {indexer.priority}
                       </span>
