@@ -208,7 +208,7 @@ export default function Navbar() {
   return (
     <nav
       data-tv-site-header
-      className={`fixed top-0 left-0 right-0 w-full z-50 transition-all duration-500 navbar-tv ${isScrolled ? 'navbar-scrolled' : ''}`}
+      className={`fixed top-0 left-0 right-0 w-full z-[200] transition-all duration-500 navbar-tv ${isScrolled ? 'navbar-scrolled' : ''}`}
       style={{
         paddingTop: 'var(--safe-area-inset-top)',
         paddingLeft: 'var(--safe-area-inset-left)',
@@ -268,7 +268,7 @@ export default function Navbar() {
 
             {/* Dropdown hamburger — affiché sous lg (1024px) */}
             {user && useHamburger && mobileMenuOpen && (
-              <div className="absolute top-full left-0 right-0 z-50 dropdown-menu-mobile animate-slide-down mt-1 mx-3 sm:mx-4 rounded-xl">
+              <div className="absolute top-full left-0 right-0 z-[210] dropdown-menu-mobile animate-slide-down mt-1 mx-3 sm:mx-4 rounded-xl">
                 <div className="px-2 py-3 space-y-1">
                   <div className="flex items-center gap-3 px-4 py-3 rounded-lg text-white hover:bg-white/10 transition-all duration-200">
                     <ConnectivityWarning>
@@ -491,7 +491,7 @@ export default function Navbar() {
                       }
                     </button>
                     {guestMenuOpen && (
-                      <div className="absolute top-full right-0 mt-2 mx-4 sm:mx-6 rounded-xl z-50 dropdown-menu-mobile animate-slide-down min-w-[200px]">
+                      <div className="absolute top-full right-0 mt-2 mx-4 sm:mx-6 rounded-xl z-[210] dropdown-menu-mobile animate-slide-down min-w-[200px]">
                         <div className="px-2 py-3 space-y-1">
                           <label className="flex items-center gap-3 px-4 py-3 rounded-lg text-white/90 text-sm">
                             <Globe className="w-4 h-4 flex-shrink-0" aria-hidden />

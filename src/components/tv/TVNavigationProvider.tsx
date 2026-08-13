@@ -1155,7 +1155,7 @@ export default function TVNavigationProvider() {
       
       html:not([data-tv-platform="true"]) .tv-card-focused {
         transform: scale(1.08) !important;
-        z-index: 50 !important;
+        z-index: 10 !important;
         box-shadow: var(--tv-focus-shadow) !important;
       }
       
@@ -1271,7 +1271,7 @@ export default function TVNavigationProvider() {
         
         html:not([data-tv-platform="true"]) .tv-card-focused {
           transform: scale(1.08) !important;
-          z-index: 50 !important;
+          z-index: 10 !important;
           box-shadow: var(--tv-focus-shadow) !important;
         }
         

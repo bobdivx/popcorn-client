@@ -150,13 +150,12 @@ export default function CarouselRow({
       <div
         ref={scrollContainerRef}
         data-carousel
-        className={`flex w-full min-w-0 max-w-full gap-1 sm:gap-1.5 md:gap-2 lg:gap-4 xl:gap-6 tv:gap-8 overflow-x-auto overscroll-x-contain overflow-y-visible scrollbar-hide px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 py-3 tv:py-4 carousel-container ${isTV ? '' : 'scroll-smooth'}`}
+        className={`flex w-full min-w-0 max-w-full gap-1 sm:gap-1.5 md:gap-2 lg:gap-4 xl:gap-6 tv:gap-8 overflow-x-auto overscroll-x-contain overflow-y-hidden scrollbar-hide px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 py-3 tv:py-4 carousel-container ${isTV ? '' : 'scroll-smooth'}`}
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
           scrollBehavior: isTV ? 'auto' : 'smooth',
-          // Autoriser aussi le scroll vertical de la page quand le geste commence sur une carte
-          touchAction: 'auto',
+          touchAction: 'pan-x pan-y',
         }}
       >
         {childrenArray.map((child, index) => (

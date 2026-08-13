@@ -68,11 +68,12 @@ export function GenreCardsRow({
 
           <div
             ref={scrollerRef}
-            className="w-full min-w-0 overflow-x-auto overscroll-x-contain no-scrollbar py-1 px-1"
+            className="w-full min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar py-1 px-1"
             style={{
               scrollSnapType: 'x mandatory',
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
+              touchAction: 'pan-x pan-y',
             }}
             data-carousel
           >
