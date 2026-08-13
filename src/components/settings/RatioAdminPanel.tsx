@@ -60,6 +60,12 @@ export default function RatioAdminPanel() {
     min_ratio_required?: number;
     uploaded_from_tracker?: number;
     downloaded_from_tracker?: number;
+    failure_reason?: string;
+    warning_message?: string;
+    tracker_interval?: number;
+    seeders?: number;
+    leechers?: number;
+    tracker_body_preview?: string;
   } | null>(null);
   const [testSeedLoading, setTestSeedLoading] = useState(false);
   const [testSeedMb, setTestSeedMb] = useState(1000);
@@ -503,7 +509,32 @@ export default function RatioAdminPanel() {
                 </p>
               )}
               <p><span className="text-gray-500">{t('ratioAdmin.testSeedUploaded')}:</span> {formatBytes(testSeedResult.uploaded_bytes)}</p>
+              {testSeedResult.failure_reason && (
+                <p><span className="text-gray-500">{t('ratioAdmin.testSeedFailureReason')}:</span> {testSeedResult.failure_reason}</p>
+              )}
+              {testSeedResult.warning_message && (
+                <p><span className="text-gray-500">{t('ratioAdmin.testSeedWarning')}:</span> {testSeedResult.warning_message}</p>
+              )}
+              {(testSeedResult.tracker_interval != null || testSeedResult.seeders != null || testSeedResult.leechers != null) && (
+                <p>
+                  {testSeedResult.tracker_interval != null && (
+                    <><span className="text-gray-500">{t('ratioAdmin.testSeedInterval')}:</span> <span className="font-mono">{testSeedResult.tracker_interval}s</span>{' '}</>
+                  )}
+                  {testSeedResult.seeders != null && (
+                    <><span className="text-gray-500">{t('ratioAdmin.testSeedSeeders')}:</span> <span className="font-mono">{testSeedResult.seeders}</span>{' '}</>
+                  )}
+                  {testSeedResult.leechers != null && (
+                    <><span className="text-gray-500">{t('ratioAdmin.testSeedLeechers')}:</span> <span className="font-mono">{testSeedResult.leechers}</span></>
+                  )}
+                </p>
+              )}
               <p><span className="text-gray-500">{t('ratioAdmin.testSeedMessage')}:</span> {testSeedResult.message}</p>
+              {testSeedResult.tracker_body_preview && (
+                <p className="break-all font-mono text-xs text-gray-400">
+                  <span className="text-gray-500 font-sans">{t('ratioAdmin.testSeedBody')}:</span> {testSeedResult.tracker_body_preview}
+                </p>
+              )}
+              <p className="text-xs text-gray-500 mt-2">{t('ratioAdmin.testSeedCreditNote')}</p>
             </div>
           )}
         </section>
