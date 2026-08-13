@@ -1099,8 +1099,8 @@ export default function TVNavigationProvider() {
       html[data-tv-platform="true"] .torrent-poster.tv-card-focused,
       html[data-tv-platform="true"] [data-settings-card].tv-card-focused {
         animation: none !important;
-        outline: 3px solid rgba(255, 255, 255, 0.55) !important;
-        outline-offset: 2px !important;
+        outline: 3px solid rgba(255, 255, 255, 0.75) !important;
+        outline-offset: -3px !important;
         box-shadow: none !important;
       }
       html[data-tv-platform="true"] [data-torrent-card]:focus-visible,
@@ -1141,8 +1141,8 @@ export default function TVNavigationProvider() {
     style.textContent = `
       /* Marquer le body comme TV active — halo blanc (même norme que cartes) */
       body {
-        --tv-focus-color: rgba(255, 255, 255, 0.4);
-        --tv-focus-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4);
+        --tv-focus-color: rgba(255, 255, 255, 0.75);
+        --tv-focus-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
       }
       
       /* Style « Netflix » (desktop / mobile) — pas sur html[data-tv-platform] (mode perf ci-dessous) */
@@ -1163,10 +1163,9 @@ export default function TVNavigationProvider() {
       html:not([data-tv-platform="true"]) .torrent-poster.tv-card-focused,
       html:not([data-tv-platform="true"]) [data-settings-card].tv-card-focused {
         box-shadow: unset !important;
-        outline: 4px solid rgba(255, 255, 255, 0.4) !important;
-        outline-offset: 4px !important;
+        outline: 2px solid var(--tv-focus-color) !important;
+        outline-offset: -2px !important;
         border-radius: 0.5rem !important;
-        animation: tv-halo-pulse 2s ease-in-out infinite !important;
       }
       html:not([data-tv-platform="true"]) [data-settings-card].tv-card-focused {
         border-radius: var(--ds-radius-lg) !important;
@@ -1175,11 +1174,9 @@ export default function TVNavigationProvider() {
       html:not([data-tv-platform="true"]) [data-torrent-card]:focus-within,
       html:not([data-tv-platform="true"]) .torrent-poster:focus-visible,
       html:not([data-tv-platform="true"]) .torrent-poster:focus-within {
-        outline: 2px solid rgba(255, 255, 255, 0.4) !important;
-        outline-offset: 2px !important;
+        outline: 2px solid var(--tv-focus-color) !important;
+        outline-offset: -2px !important;
         border-radius: 0.5rem !important;
-        box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4) !important;
-        animation: tv-halo-pulse 2s ease-in-out infinite !important;
       }
       
       html:not([data-tv-platform="true"]) [data-carousel]:has(.tv-card-focused) [data-torrent-card]:not(.tv-card-focused),
@@ -1195,10 +1192,8 @@ export default function TVNavigationProvider() {
       html:not([data-tv-platform="true"]) select:focus-visible,
       html:not([data-tv-platform="true"]) textarea:focus-visible,
       html:not([data-tv-platform="true"]) [tabindex]:focus-visible {
-        outline: 3px solid var(--tv-focus-color) !important;
-        outline-offset: 2px !important;
-        box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4) !important;
-        animation: tv-halo-pulse 2s ease-in-out infinite !important;
+        outline: 2px solid var(--tv-focus-color) !important;
+        outline-offset: -2px !important;
       }
       
       html:not([data-tv-platform="true"]) .tv-card-focused a:focus-visible,
@@ -1258,8 +1253,8 @@ export default function TVNavigationProvider() {
     if (!CSS.supports('selector(:has(*))')) {
       style.textContent = `
         body {
-          --tv-focus-color: rgba(255, 255, 255, 0.4);
-          --tv-focus-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4);
+          --tv-focus-color: rgba(255, 255, 255, 0.75);
+          --tv-focus-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
         }
         
         html:not([data-tv-platform="true"]) [data-torrent-card],
@@ -1279,10 +1274,9 @@ export default function TVNavigationProvider() {
         html:not([data-tv-platform="true"]) .torrent-poster.tv-card-focused,
         html:not([data-tv-platform="true"]) [data-settings-card].tv-card-focused {
           box-shadow: unset !important;
-          outline: 4px solid rgba(255, 255, 255, 0.4) !important;
-          outline-offset: 4px !important;
+          outline: 2px solid rgba(255, 255, 255, 0.85) !important;
+          outline-offset: -2px !important;
           border-radius: 0.5rem !important;
-          animation: tv-halo-pulse 2s ease-in-out infinite !important;
         }
         html:not([data-tv-platform="true"]) [data-settings-card].tv-card-focused {
           border-radius: var(--ds-radius-lg) !important;
@@ -1295,10 +1289,8 @@ export default function TVNavigationProvider() {
         html:not([data-tv-platform="true"]) select:focus-visible,
         html:not([data-tv-platform="true"]) textarea:focus-visible,
         html:not([data-tv-platform="true"]) [tabindex]:focus-visible {
-          outline: 3px solid var(--tv-focus-color) !important;
-          outline-offset: 2px !important;
-          box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4) !important;
-          animation: tv-halo-pulse 2s ease-in-out infinite !important;
+          outline: 2px solid var(--tv-focus-color) !important;
+          outline-offset: -2px !important;
         }
         
         html:not([data-tv-platform="true"]) .tv-card-focused a:focus-visible,
