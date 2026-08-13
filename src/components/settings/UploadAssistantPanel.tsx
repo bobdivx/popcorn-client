@@ -1678,8 +1678,7 @@ export default function UploadAssistantPanel() {
                         {t('settings.uploadTrackerPanel.wizardC411ApiKeyLabel')}
                       </label>
                       <input
-                        type="password"
-                        autoComplete="off"
+                        type="text"
                         className="input input-bordered input-sm w-full max-w-md font-mono"
                         placeholder={t('settings.uploadTrackerPanel.wizardC411ApiKeyPlaceholder')}
                         value={apiKey}
@@ -1695,8 +1694,7 @@ export default function UploadAssistantPanel() {
                         {t('settings.uploadTrackerPanel.wizardC411PasskeyLabel')}
                       </label>
                       <input
-                        type="password"
-                        autoComplete="off"
+                        type="text"
                         className="input input-bordered input-sm w-full max-w-md font-mono"
                         placeholder={t('settings.uploadTrackerPanel.passkeyPlaceholder')}
                         value={passkey}
