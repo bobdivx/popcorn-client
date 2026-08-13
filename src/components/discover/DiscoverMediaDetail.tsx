@@ -211,15 +211,17 @@ export default function DiscoverMediaDetail({
             </div>
 
             {!requestSubmitted && (
-              <RequestButton
-                tmdbId={tmdbId}
-                mediaType={mediaType}
-                title={title}
-                posterPath={posterPath || undefined}
-                backdropPath={backdropPath || undefined}
-                onSuccess={() => setRequestSubmitted(true)}
-                onAlreadyExists={() => setRequestSubmitted(true)}
-              />
+              <div data-tv-initial-focus>
+                <RequestButton
+                  tmdbId={tmdbId}
+                  mediaType={mediaType}
+                  title={title}
+                  posterPath={posterPath || undefined}
+                  backdropPath={backdropPath || undefined}
+                  onSuccess={() => setRequestSubmitted(true)}
+                  onAlreadyExists={() => setRequestSubmitted(true)}
+                />
+              </div>
             )}
           </div>
         </div>

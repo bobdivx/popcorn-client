@@ -8,6 +8,7 @@ import { useContentSignals } from './hooks/useContentSignals';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
 import SuggestionsSection from './SuggestionsSection';
+import { pickHeroItems, filterWatchNow, standaloneDownloads } from './utils/browsePriority';
 
 function getDashboardItemKey(item: ContentItem): string {
   if (typeof item.tmdbId === 'number') return `${item.type}:${item.tmdbId}`;
@@ -47,17 +48,12 @@ export default function Dashboard() {
   const { withSignals: allDashboardItemsWithSignals } = useContentSignals(allDashboardItems, resumeWatching);
 
   const heroItems = useMemo(
-    () => {
-      const seen = new Set<string>();
-      return allDashboardItemsWithSignals
-        .filter((item) => {
-          if (seen.has(item.id)) return false;
-          seen.add(item.id);
-          return Boolean(item.poster || item.backdrop);
-        })
-        .slice(0, 5);
-    },
-    [allDashboardItemsWithSignals]
+    () =>
+      pickHeroItems(
+        [...resumeWatching, ...filterWatchNow(allDashboardItemsWithSignals), ...activeDownloads],
+        allDashboardItemsWithSignals
+      ),
+    [allDashboardItemsWithSignals, resumeWatching, activeDownloads]
   );
 
   const handleNavigate = (item: ContentItem) => {
@@ -83,34 +79,37 @@ export default function Dashboard() {
         return item;
       });
 
-      // 2. Filtrer les téléchargements actifs pour ne garder que ceux qui NE sont PAS dans ResumeWatching
-      const standaloneDownloads = activeDownloads.filter(ad => {
-        const inResume = resumeWatching.some(rw => 
-          (ad.tmdbId != null && rw.tmdbId != null && ad.tmdbId === rw.tmdbId && ad.type === rw.type) || 
-          (ad.infoHash && rw.infoHash && ad.infoHash === rw.infoHash)
-        );
-        return !inResume;
-      });
-
-      const watchNowItems = allDashboardItemsWithSignals
-        .filter((item) => item.heroSignal?.downloadedUnseen || item.heroSignal?.requestDownloaded)
-        .slice(0, 25);
+      const watchNowItems = filterWatchNow(allDashboardItemsWithSignals);
+      const downloadingNow = standaloneDownloads(activeDownloads, resumeWatching);
 
       const result = [];
 
-      // 1. Reprendre la lecture (films ou épisodes en cours, séries à suivre) - HAUTE PRIORITÉ
       if (enrichedResumeWatching.length > 0) {
-        result.push({ 
-          id: 'resume-watching', 
-          title: t('dashboard.resumeWatching') || 'Reprendre la lecture', 
-          items: enrichedResumeWatching, 
-          kind: 'resume' as const 
+        result.push({
+          id: 'resume-watching',
+          title: t('dashboard.resumeWatching') || 'Reprendre la lecture',
+          items: enrichedResumeWatching,
+          kind: 'resume' as const,
+          priority: true,
         });
       }
 
-      // 3. Téléchargés récemment
+      if (downloadingNow.length > 0) {
+        result.push({
+          id: 'active-downloads',
+          title: t('dashboard.activeDownloads'),
+          items: downloadingNow,
+          priority: true,
+        });
+      }
+
       if (watchNowItems.length > 0) {
-        result.push({ id: 'recently-downloaded', title: t('dashboard.recentlyDownloaded'), items: watchNowItems });
+        result.push({
+          id: 'recently-downloaded',
+          title: t('dashboard.recentlyDownloaded'),
+          items: watchNowItems,
+          priority: true,
+        });
       }
 
       // Reste des sections classiques

@@ -6,6 +6,8 @@
 export { DsCard, DsCardSection } from '../DsCard';
 export { DsSettingsSectionCard } from '../DsSettingsSectionCard';
 export type { DsSettingsSectionCardProps, SettingsSectionCardAccent, StatusBadgeVariant } from '../DsSettingsSectionCard';
+export { SettingsCard, SettingsNestedCard } from '../../settings/SettingsCard';
+export type { SettingsCardAccent, SettingsCardProps } from '../../settings/SettingsCard';
 export { DsNavTabs } from '../DsNavTabs';
 export type { DsNavTabItem } from '../DsNavTabs';
 export { DsIconButton } from '../DsIconButton';

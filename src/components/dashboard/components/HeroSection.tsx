@@ -6,6 +6,7 @@ import { getDisplayTitle } from '../../../lib/utils/title-display';
 import { YouTubeVideoPlayer } from '../../ui/YouTubeVideoPlayer';
 import { isTVPlatform } from '../../../lib/utils/device-detection';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../../lib/utils/media-detail-url';
+import { contentItemKey } from '../utils/browsePriority';
 
 interface HeroSectionProps {
   items: ContentItem[];
@@ -42,9 +43,11 @@ export function HeroSection({
   const [trailerKeys, setTrailerKeys] = useState<Record<string, string | null>>({});
   const [isPlayingTrailer, setIsPlayingTrailer] = useState(true);
   const [isLoadingTrailer, setIsLoadingTrailer] = useState<Record<string, boolean>>({});
+  const [heroPaused, setHeroPaused] = useState(false);
   const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
   const trailerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartX = useRef<number>(0);
+  const heroRootRef = useRef<HTMLDivElement>(null);
 
   if (!items || items.length === 0) {
     return null;
@@ -87,7 +90,7 @@ export function HeroSection({
 
   // Carousel automatique : défilement toutes les 6 secondes
   useEffect(() => {
-    if (items.length <= 1) return;
+    if (items.length <= 1 || heroPaused) return;
 
     if (autoPlayRef.current) {
       clearInterval(autoPlayRef.current);
@@ -103,7 +106,33 @@ export function HeroSection({
       clearInterval(interval);
       autoPlayRef.current = null;
     };
+  }, [items.length, heroPaused]);
+
+  useEffect(() => {
+    const root = heroRootRef.current;
+    if (!root) return;
+    const onCycle = (e: Event) => {
+      const delta = (e as CustomEvent<{ delta?: number }>).detail?.delta ?? 1;
+      if (items.length <= 1) return;
+      setHeroPaused(true);
+      setCurrentIndex((prev) => (prev + delta + items.length) % items.length);
+    };
+    root.addEventListener('tv-hero-cycle', onCycle);
+    return () => root.removeEventListener('tv-hero-cycle', onCycle);
   }, [items.length]);
+
+  useEffect(() => {
+    if (!heroPaused || !isTVPlatform()) return;
+    const btn = heroRootRef.current?.querySelector<HTMLElement>('[data-tv-hero-cycle]');
+    if (!btn) return;
+    requestAnimationFrame(() => {
+      try {
+        btn.focus({ preventScroll: true });
+      } catch {
+        btn.focus();
+      }
+    });
+  }, [currentIndex, heroPaused]);
 
   useEffect(() => {
     return () => {
@@ -154,8 +183,10 @@ export function HeroSection({
     const touchEndX = e.changedTouches[0].clientX;
     const deltaX = touchEndX - touchStartX.current;
     if (deltaX < -MIN_SWIPE_DISTANCE) {
+      setHeroPaused(true);
       setCurrentIndex((prev) => (prev + 1) % items.length);
     } else if (deltaX > MIN_SWIPE_DISTANCE) {
+      setHeroPaused(true);
       setCurrentIndex((prev) => (prev - 1 + items.length) % items.length);
     }
   };
@@ -180,6 +211,7 @@ export function HeroSection({
 
   return (
     <div
+      ref={heroRootRef}
       className={`hero-dashboard relative z-0 w-full mb-8 touch-pan-y ${
         (isLargeHero && !isTV) ? 'px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16' : ''
       }`}
@@ -306,10 +338,13 @@ export function HeroSection({
 
             <div className={`flex-shrink-0 py-3 sm:py-4 bg-gradient-to-t from-black/95 via-black/85 to-transparent backdrop-blur-[2px] hero-slide-enter ${isTV ? 'px-12 tv:px-24' : 'px-4 sm:px-6 lg:px-16'}`}>
               <div className="max-w-2xl tv:max-w-4xl w-full flex flex-col sm:flex-row sm:items-center sm:justify-start gap-3">
-                <div className="flex flex-col xs:flex-row gap-3 tv:gap-6">
+                <div className={`flex flex-col gap-3 tv:gap-6 ${isTV ? '' : 'xs:flex-row'}`}>
                   <button
                     onClick={handlePrimaryAction}
                     data-focusable
+                    data-tv-initial-focus
+                    data-tv-hero-cycle
+                    data-tv-item-key={contentItemKey(currentItem)}
                     tabIndex={0}
                     disabled={primaryActionDisabled}
                     aria-busy={primaryActionDisabled}
@@ -471,10 +506,13 @@ export function HeroSection({
         {/* Zone 2 : barre d’actions — hauteur fixe, toujours visible en bas */}
         <div className="flex-shrink-0 px-4 sm:px-6 lg:px-16 tv:px-24 py-3 sm:py-4 bg-gradient-to-t from-black/95 via-black/85 to-transparent backdrop-blur-[2px] hero-slide-enter">
           <div className="max-w-2xl tv:max-w-3xl w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div className="flex flex-col xs:flex-row gap-2 sm:gap-3">
+            <div className={`flex flex-col gap-2 sm:gap-3 ${isTV ? '' : 'xs:flex-row'}`}>
               <button
                 onClick={handlePrimaryAction}
                 data-focusable
+                data-tv-initial-focus
+                data-tv-hero-cycle
+                data-tv-item-key={contentItemKey(currentItem)}
                 tabIndex={0}
                 disabled={primaryActionDisabled}
                 aria-busy={primaryActionDisabled}

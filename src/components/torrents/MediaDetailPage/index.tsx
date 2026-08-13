@@ -1932,21 +1932,28 @@ export default function MediaDetailPage({
     selectedEpisodeVariantId,
   ]);
 
-  // TÃ©lÃ©commande : premiÃ¨re touche Retour met le focus sur le bouton Retour, deuxiÃ¨me touche navigue
+  // Télécommande : Retour quitte la fiche (pas de bouton Retour à l'écran en TV)
   useEffect(() => {
     const el = tvBackHandlerRef.current;
     if (!el) return;
+    const goBack = () => {
+      if (typeof window !== 'undefined' && window.history.length > 1) {
+        window.history.back();
+      } else if (backHref) {
+        window.location.href = backHref;
+      } else {
+        window.location.href = '/dashboard';
+      }
+    };
     (el as HTMLElement & { _tvBack?: () => void })._tvBack = () => {
       const backLink = backLinkRef.current;
-      if (backLink && document.activeElement === backLink) {
-        if (typeof window !== 'undefined' && window.history.length > 1) {
-          window.history.back();
-        } else if (backHref) {
-          window.location.href = backHref;
-        } else {
-          window.location.href = '/dashboard';
-        }
-      } else if (backLink) {
+      if (!backLink) {
+        goBack();
+        return;
+      }
+      if (document.activeElement === backLink) {
+        goBack();
+      } else {
         backLink.focus();
       }
     };

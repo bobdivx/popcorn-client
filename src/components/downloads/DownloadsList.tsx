@@ -10,6 +10,7 @@ import { DownloadCard } from './DownloadCard';
 import { DownloadDetailModal } from './DownloadDetailModal';
 import { Modal } from '../ui/Modal';
 import { ConfirmModal } from '../ui/ConfirmModal';
+import CarouselRow from '../torrents/CarouselRow';
 
 const REFRESH_INTERVAL = 4000;
 
@@ -103,6 +104,14 @@ function getTorrentPriority(torrent: ClientTorrentStats): number {
   if (torrent.state === 'paused') return 2;
   if (torrent.state === 'completed') return 1;
   return 0;
+}
+
+function isInProgressTorrent(t: ClientTorrentStats): boolean {
+  return t.state === 'downloading' || t.state === 'queued';
+}
+
+function isReadyTorrent(t: ClientTorrentStats): boolean {
+  return t.state === 'completed' || t.state === 'seeding';
 }
 
 function sortTorrentsDeterministic(items: ClientTorrentStats[]): ClientTorrentStats[] {
@@ -402,6 +411,23 @@ export default function DownloadsList() {
     [torrents, tmdbTypeMap],
   );
 
+  const downloadingNow = useMemo(
+    () => sortTorrentsDeterministic(torrents.filter(isInProgressTorrent)),
+    [torrents],
+  );
+  const readyMovies = useMemo(
+    () => moviesTorrents.filter(isReadyTorrent),
+    [moviesTorrents],
+  );
+  const readySeries = useMemo(
+    () => groupedSeriesTorrents.filter(isReadyTorrent),
+    [groupedSeriesTorrents],
+  );
+  const readyOthers = useMemo(
+    () => otherTorrents.filter(isReadyTorrent),
+    [otherTorrents],
+  );
+
   const handleOpenDetail = (
     tor: ClientTorrentStats,
     p?: string | null,
@@ -470,38 +496,33 @@ export default function DownloadsList() {
     try { setLogs(filterLogs(await clientApi.getTorrentLogs(h))); } catch { } finally { setLogsLoading(false); }
   };
 
-  const renderCarousel = (title: string, items: ClientTorrentStats[]) => {
+  const renderCarousel = (title: string, items: ClientTorrentStats[], initialFocus = false) => {
     if (items.length === 0) return null;
     return (
-      <div className="mb-12 w-full min-w-0 max-w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="px-4 sm:px-12 mb-4 flex items-center gap-4">
-          <h2 className="text-2xl sm:text-3xl font-bold text-white">{title}</h2>
-          <span className="px-3 py-1 bg-white/5 rounded-full text-xs font-bold text-white/40 border border-white/10">{items.length}</span>
-        </div>
-        {/* Mobile: carrousel horizontal ; md+: grille lisible */}
-        <div className="w-full min-w-0 max-w-full overflow-x-auto overflow-y-visible scrollbar-hide md:overflow-visible px-4 sm:px-12 pb-8 pt-2 [scroll-snap-type:x_mandatory] md:[scroll-snap-type:none]">
-          <div className="flex gap-4 w-max md:w-full md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 md:gap-5">
-            {items.map((torrent) => (
-              <div key={torrent.info_hash} className="shrink-0 w-[240px] sm:w-[320px] md:w-auto md:min-w-0 md:shrink" style={{ scrollSnapAlign: 'start' }}>
-                <DownloadCard
-                  torrent={torrent}
-                  posterUrl={imageMap[torrent.info_hash.toLowerCase()]?.posterUrl}
-                  backdropUrl={imageMap[torrent.info_hash.toLowerCase()]?.backdropUrl}
-                  displayTitle={displayTitleMap[torrent.info_hash.toLowerCase()]}
-                  onOpenDetail={handleOpenDetail}
-                />
-              </div>
-            ))}
+      <CarouselRow title={`${title} (${items.length})`} autoScroll={false}>
+        {items.map((torrent, index) => (
+          <div
+            key={torrent.info_hash}
+            className="flex-shrink-0 w-[240px] sm:w-[320px] lg:w-[360px] tv:w-[400px]"
+            data-tv-initial-focus={initialFocus && index === 0 ? true : undefined}
+          >
+            <DownloadCard
+              torrent={torrent}
+              posterUrl={imageMap[torrent.info_hash.toLowerCase()]?.posterUrl}
+              backdropUrl={imageMap[torrent.info_hash.toLowerCase()]?.backdropUrl}
+              displayTitle={displayTitleMap[torrent.info_hash.toLowerCase()]}
+              onOpenDetail={handleOpenDetail}
+            />
           </div>
-        </div>
-      </div>
+        ))}
+      </CarouselRow>
     );
   };
 
   if (loading && torrents.length === 0) return <div className="flex-1 flex items-center justify-center min-h-[400px]"><HLSLoadingSpinner size="lg" text={t('downloads.loadingDownloads')} /></div>;
 
   return (
-    <div className="flex flex-col w-full min-w-0 max-w-full">
+    <div className="flex flex-col w-full min-w-0 max-w-full" data-page="downloads">
       <section
         className="relative w-full overflow-hidden border-b border-white/10"
         aria-label={t('settingsPages.librqbit.sessionStats')}
@@ -605,9 +626,11 @@ export default function DownloadsList() {
           </div>
         ) : (
           <div className="w-full min-w-0 max-w-full">
-            {renderCarousel("Films", moviesTorrents)}
-            {renderCarousel("Séries", groupedSeriesTorrents)}
-            {renderCarousel("Autres", otherTorrents)}
+            {renderCarousel(t('downloads.downloadingNow'), downloadingNow, downloadingNow.length > 0)}
+            {renderCarousel(t('downloads.readyToWatch'), [...readyMovies, ...readySeries, ...readyOthers], downloadingNow.length === 0)}
+            {renderCarousel(t('nav.films'), moviesTorrents.filter((t) => !isInProgressTorrent(t) && !isReadyTorrent(t)))}
+            {renderCarousel(t('nav.series'), groupedSeriesTorrents.filter((t) => !isInProgressTorrent(t) && !isReadyTorrent(t)))}
+            {renderCarousel(t('library.others'), otherTorrents.filter((t) => !isInProgressTorrent(t) && !isReadyTorrent(t)))}
           </div>
         )}
       </div>

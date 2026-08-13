@@ -9,6 +9,7 @@ import type { RatioBoostStatus } from '../../lib/client/server-api/upload-tracke
 import type { Indexer } from '../../lib/client/types';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { CheckCircle2, Circle, Loader2, Zap, ExternalLink, Save } from 'lucide-preact';
+import { SettingsCard, SettingsNestedCard } from './SettingsCard';
 
 function formatGiB(bytes: number): string {
   return (bytes / (1024 * 1024 * 1024)).toFixed(2);
@@ -277,20 +278,11 @@ export default function RatioBoostWizard() {
   };
 
   return (
-    <section className="rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-950/40 to-[var(--ds-surface-elevated)]/80 p-5 sm:p-6 space-y-6">
-      <header className="space-y-2">
-        <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-          <Zap className="w-6 h-6 text-amber-300" aria-hidden />
-          {t('ratioBoost.title')}
-        </h2>
-        <p className="text-sm text-[var(--ds-text-secondary)] max-w-3xl leading-relaxed">
-          {t('ratioBoost.intro')}
-        </p>
-        <p className="text-xs text-amber-200/80 max-w-3xl">{t('ratioBoost.howItWorks')}</p>
-      </header>
+    <SettingsCard accent="amber" icon={Zap} title={t('ratioBoost.title')} description={t('ratioBoost.intro')} bodyClassName="space-y-6">
+      <p className="text-xs text-amber-200/80 max-w-3xl -mt-2">{t('ratioBoost.howItWorks')}</p>
 
       {/* Étape 1 — Comprendre + compte C411 */}
-      <div className="rounded-xl border border-white/10 bg-black/20 p-4 space-y-3">
+      <SettingsNestedCard bodyClassName="space-y-3">
         <div className="flex items-start gap-3">
           <StepBadge n={1} done={step1Done && step2Done} active={!step2Done} />
           <div className="min-w-0 flex-1 space-y-2">
@@ -312,10 +304,10 @@ export default function RatioBoostWizard() {
             </a>
           </div>
         </div>
-      </div>
+      </SettingsNestedCard>
 
       {/* Étape 2 — Clé API */}
-      <div className="rounded-xl border border-white/10 bg-black/20 p-4 space-y-3">
+      <SettingsNestedCard bodyClassName="space-y-3">
         <div className="flex items-start gap-3">
           <StepBadge n={2} done={step2Done} active={step1Done && !step2Done} />
           <div className="min-w-0 flex-1 space-y-3">
@@ -367,10 +359,10 @@ export default function RatioBoostWizard() {
             )}
           </div>
         </div>
-      </div>
+      </SettingsNestedCard>
 
       {/* Étape 3 — qBittorrent */}
-      <div className="rounded-xl border border-white/10 bg-black/20 p-4 space-y-3">
+      <SettingsNestedCard bodyClassName="space-y-3">
         <div className="flex items-start gap-3">
           <StepBadge n={3} done={step3Done && qbitOk} active={step2Done && !qbitOk} />
           <div className="min-w-0 flex-1 space-y-3">
@@ -455,10 +447,10 @@ export default function RatioBoostWizard() {
             </form>
           </div>
         </div>
-      </div>
+      </SettingsNestedCard>
 
       {/* Étape 4 — Lancer + suivi */}
-      <div className="rounded-xl border border-white/10 bg-black/20 p-4 space-y-3">
+      <SettingsNestedCard bodyClassName="space-y-3">
         <div className="flex items-start gap-3">
           <StepBadge n={4} done={Boolean(boostStatus?.finished_at && !boostStatus.in_progress)} active={step4Active} />
           <div className="min-w-0 flex-1 space-y-3">
@@ -486,7 +478,6 @@ export default function RatioBoostWizard() {
               {t('ratioBoost.startButton')}
             </button>
 
-            {/* Suivi live */}
             {boostStatus && (boostStatus.in_progress || boostStatus.finished_at) && (
               <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-950/40 p-4 space-y-2">
                 <p className="font-medium text-amber-100">
@@ -541,7 +532,7 @@ export default function RatioBoostWizard() {
             )}
           </div>
         </div>
-      </div>
-    </section>
+      </SettingsNestedCard>
+    </SettingsCard>
   );
 }

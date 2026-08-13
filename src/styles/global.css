@@ -141,7 +141,9 @@ html[data-tv-platform] body {
     body:has(.app-main [data-page="films-library"]),
     body:has(.app-main [data-page="series"]),
     body:has(.app-main [data-page="series-library"]),
-    body:has(.app-main [data-page="demandes"]) {
+    body:has(.app-main [data-page="demandes"]),
+    body:has(.app-main [data-page="search"]),
+    body:has(.app-main [data-page="downloads"]) {
       zoom: var(--app-visual-scale);
       /* Cible visuelle = viewport - scrollbar (zone visible) - scrollbar (gutter gauche
          pour symetriser visuellement). Largeur logique = visuelle * 1.25.
@@ -192,11 +194,44 @@ html[data-tv-platform] body {
 }
 
 /* ── TV : contenu sous la navbar (plus de barre latérale dédiée) ── */
+html[data-tv-platform="true"] {
+  --tv-overscan-x: max(5vw, 4.5rem);
+  --tv-overscan-y: max(3.5vh, 1.75rem);
+}
 html[data-tv-platform="true"] .app-main {
   padding-left: 0 !important;
   padding-right: 0 !important;
-  padding-bottom: max(8vh, calc(4rem + var(--safe-area-inset-bottom))) !important;
+  padding-bottom: max(8vh, calc(4rem + var(--safe-area-inset-bottom) + var(--tv-overscan-y))) !important;
   margin-left: 0 !important;
+}
+
+/* TV : marges overscan pour que les cartes / le focus ne soient plus coupés */
+html[data-tv-platform="true"] .carousel-container,
+html[data-tv-platform="true"] [data-carousel] {
+  padding-left: var(--tv-overscan-x) !important;
+  padding-right: var(--tv-overscan-x) !important;
+  scroll-padding-inline: var(--tv-overscan-x);
+}
+html[data-tv-platform="true"] .tv-overscan-x {
+  padding-left: var(--tv-overscan-x) !important;
+  padding-right: var(--tv-overscan-x) !important;
+}
+
+/* TV : chrome de page — titre masqué (déjà dans la navbar), action à gauche sous le hero */
+html[data-tv-platform="true"] .tv-page-title-block {
+  display: none;
+}
+html[data-tv-platform="true"] .tv-page-header {
+  padding-top: 0.75rem;
+  padding-bottom: 0.35rem;
+  padding-left: var(--tv-overscan-x);
+  padding-right: var(--tv-overscan-x);
+}
+html[data-tv-platform="true"] .tv-page-header-action {
+  align-self: flex-start;
+}
+html[data-tv-platform="true"] .library-sync-btn {
+  display: none;
 }
 
 /* Carousel horizontal : défilement tactile fluide (torrent cards, etc.) */

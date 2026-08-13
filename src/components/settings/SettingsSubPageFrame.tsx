@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact';
 import type { LucideIcon } from 'lucide-preact';
 import { ArrowLeft } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
+import { SettingsCard, type SettingsCardAccent } from './SettingsCard';
 
 interface SettingsSubPageFrameProps {
   /** URL du bouton "retour" (navigation via <a href>) */
@@ -12,19 +13,22 @@ interface SettingsSubPageFrameProps {
   title: string;
   description?: string;
   children: ComponentChildren;
+  /** Accent de la carte (violet par défaut, amber pour CTA) */
+  accent?: SettingsCardAccent;
 }
 
 /**
  * Frame standard pour les sous-pages des paramètres.
- * Remplace le pattern SubPageFrame copié-collé dans chaque SubMenuPanel.
+ * Carte Boost / C411 via SettingsCard.
  */
 export function SettingsSubPageFrame({
   backHref,
   backOnClick,
-  icon: Icon,
+  icon,
   title,
   description,
   children,
+  accent = 'violet',
 }: SettingsSubPageFrameProps) {
   const { t } = useI18n();
 
@@ -53,18 +57,14 @@ export function SettingsSubPageFrame({
   return (
     <div class="sc-frame-wrap">
       {backEl}
-      <div class="sc-frame">
-        <div class="sc-frame-header">
-          <div class="sc-frame-icon">
-            <Icon className="w-5 h-5" strokeWidth={1.8} aria-hidden />
-          </div>
-          <div>
-            <div class="sc-frame-title">{title}</div>
-            {description && <div class="sc-frame-desc">{description}</div>}
-          </div>
-        </div>
-        <div class="sc-frame-body">{children}</div>
-      </div>
+      <SettingsCard
+        accent={accent}
+        icon={icon}
+        title={title}
+        description={description}
+      >
+        {children}
+      </SettingsCard>
     </div>
   );
 }

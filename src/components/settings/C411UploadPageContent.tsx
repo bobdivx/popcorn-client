@@ -2,12 +2,10 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { ArrowLeft, Upload } from 'lucide-preact';
 import { serverApi } from '../../lib/client/server-api';
-import { DsCard, DsCardSection } from '../ui/design-system';
+import { SettingsCard } from './SettingsCard';
 import UploadTrackerPanel from './UploadTrackerPanel';
 
 const BASE_URL = '/settings/uploads/';
-const ACCENT_ICON_BG = 'var(--ds-accent-violet-muted)';
-const ACCENT_ICON_COLOR = 'var(--ds-accent-violet)';
 
 /** Contenu de la sous-page Uploads → Publication tracker (C411). Carte grisée si non configuré. */
 export default function C411UploadPageContent() {
@@ -34,11 +32,11 @@ export default function C411UploadPageContent() {
   const onC411Configured = useCallback(() => setC411Configured(true), []);
 
   return (
-    <div className="space-y-6">
+    <div className="sc-frame-wrap">
       <a
         href={BASE_URL}
         data-astro-prefetch
-        className="inline-flex items-center gap-2 text-sm font-medium text-[var(--ds-accent-violet)] hover:underline focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 rounded"
+        class="sc-back"
         aria-label={t('common.back')}
       >
         <ArrowLeft className="w-4 h-4" aria-hidden />
@@ -47,30 +45,19 @@ export default function C411UploadPageContent() {
       <div
         className={`min-w-0 transition-opacity duration-200 ${!c411Configured && !loadingC411Status ? 'opacity-60' : ''}`}
       >
-        <DsCard variant="elevated" className="min-w-0 overflow-hidden">
-          <DsCardSection className="flex flex-col min-h-0">
-            <div className="flex items-center gap-3 mb-3">
-              <span
-                className="inline-flex w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex-shrink-0 items-center justify-center"
-                style={{ backgroundColor: ACCENT_ICON_BG, color: ACCENT_ICON_COLOR }}
-                aria-hidden
-              >
-                <Upload className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.8} />
-              </span>
-              <h2 className="ds-title-card text-[var(--ds-text-primary)] text-base sm:text-lg truncate">
-                {t('settings.uploadTrackerPanel.title')}
-              </h2>
+        <SettingsCard
+          icon={Upload}
+          title={t('settings.uploadTrackerPanel.title')}
+        >
+          {!c411Configured && !loadingC411Status && (
+            <div className="rounded-lg bg-[var(--ds-surface-overlay)] border border-[var(--ds-border)] p-3 mb-4 text-sm ds-text-secondary">
+              {t('settings.uploadTrackerPanel.c411NotConfiguredHint')}
             </div>
-            {!c411Configured && !loadingC411Status && (
-              <div className="rounded-lg bg-[var(--ds-surface-overlay)] border border-[var(--ds-border)] p-3 mb-4 text-sm ds-text-secondary">
-                {t('settings.uploadTrackerPanel.c411NotConfiguredHint')}
-              </div>
-            )}
-            <div className="min-w-0 overflow-auto">
-              <UploadTrackerPanel onC411Configured={onC411Configured} />
-            </div>
-          </DsCardSection>
-        </DsCard>
+          )}
+          <div className="min-w-0 overflow-auto">
+            <UploadTrackerPanel onC411Configured={onC411Configured} />
+          </div>
+        </SettingsCard>
       </div>
     </div>
   );

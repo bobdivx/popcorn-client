@@ -264,9 +264,9 @@ export default function SettingsOverview() {
   }, []);
 
   return (
-    <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
-      <h1 style="font-size:1.5rem;font-weight:700;color:rgba(255,255,255,0.92);margin-bottom:6px;">{t('settingsMenu.overview')}</h1>
-      <p style="font-size:13px;color:rgba(255,255,255,0.42);margin-bottom:24px;">{t('settingsMenu.subtitle')}</p>
+    <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6 ds-card-animate">
+      <h1 class="sc-page-title">{t('settingsMenu.overview')}</h1>
+      <p class="sc-page-subtitle">{t('settingsMenu.subtitle')}</p>
 
       {canAccess('settings.server' as any) && (
         <div className="mb-4 sm:mb-5">
@@ -363,7 +363,7 @@ export default function SettingsOverview() {
         </a>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
+      <div className="sc-overview-grid ds-card-animate-stagger" role="list">
         {visibleItems.map((item) => {
           const Icon = item.icon;
           const summary = summaries[item.id];

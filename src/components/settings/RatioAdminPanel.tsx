@@ -6,6 +6,7 @@ import PermissionGuard from '../ui/PermissionGuard';
 import SubscriptionGuard from '../ui/SubscriptionGuard';
 import DsPageHeader from '../ui/DsPageHeader';
 import RatioBoostWizard from './RatioBoostWizard';
+import { SettingsCard } from './SettingsCard';
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -122,7 +123,7 @@ export default function RatioAdminPanel() {
   return (
     <PermissionGuard permission="settings.server">
       <SubscriptionGuard>
-      <div className="flex-1 py-4 px-4 sm:px-6 space-y-6 overflow-y-auto scrollbar-visible">
+      <div className="flex-1 py-4 px-4 sm:px-6 sc-stack overflow-y-auto scrollbar-visible">
         <DsPageHeader
           titleKey="ratioAdmin.title"
           subtitleKey="ratioAdmin.subtitle"
@@ -138,12 +139,7 @@ export default function RatioAdminPanel() {
         <RatioBoostWizard />
 
         {/* Mode tracker */}
-        <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-          <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-2">
-            <Shield className="w-5 h-5 text-primary-400" />
-            {t('ratioAdmin.modeTitle')}
-          </h3>
-          <p className="text-sm text-gray-400 mb-4">{t('ratioAdmin.modeDescription')}</p>
+        <SettingsCard icon={Shield} title={t('ratioAdmin.modeTitle')} description={t('ratioAdmin.modeDescription')}>
           {loadingConfig ? (
             <span className="loading loading-spinner loading-sm text-primary-400" />
           ) : config ? (
@@ -166,15 +162,10 @@ export default function RatioAdminPanel() {
               {savingTxAlt && <span className="loading loading-spinner loading-xs" />}
             </div>
           ) : null}
-        </section>
+        </SettingsCard>
 
         {/* Stats ratio */}
-        <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-          <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-2">
-            <TrendingUp className="w-5 h-5 text-primary-400" />
-            {t('ratioAdmin.statsTitle')}
-          </h3>
-          <p className="text-sm text-gray-400 mb-4">{t('ratioAdmin.statsDescription')}</p>
+        <SettingsCard icon={TrendingUp} title={t('ratioAdmin.statsTitle')} description={t('ratioAdmin.statsDescription')}>
           {loadingStats ? (
             <span className="loading loading-spinner loading-sm text-primary-400" />
           ) : stats ? (
@@ -206,15 +197,10 @@ export default function RatioAdminPanel() {
             <RefreshCw className={`w-4 h-4 ${loadingStats ? 'animate-spin' : ''}`} />
             {t('ratioAdmin.refreshStats')}
           </button>
-        </section>
+        </SettingsCard>
 
         {/* Test */}
-        <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6">
-          <h3 className="flex items-center gap-2 text-lg font-semibold text-white mb-2">
-            <Zap className="w-5 h-5 text-primary-400" />
-            {t('ratioAdmin.testTitle')}
-          </h3>
-          <p className="text-sm text-gray-400 mb-4">{t('ratioAdmin.testDescription')}</p>
+        <SettingsCard icon={Zap} title={t('ratioAdmin.testTitle')} description={t('ratioAdmin.testDescription')}>
           <button
             type="button"
             className="btn btn-primary gap-2"
@@ -232,12 +218,11 @@ export default function RatioAdminPanel() {
               <p><span className="text-gray-500">{t('ratioAdmin.testMessage')}:</span> {testResult.message}</p>
             </div>
           )}
-        </section>
+        </SettingsCard>
 
         {/* Liste torrents (résumée) */}
         {stats && stats.torrents.length > 0 && (
-          <section className="rounded-xl border border-white/10 bg-white/5 p-4 sm:p-6 overflow-hidden">
-            <h3 className="text-lg font-semibold text-white mb-2">{t('ratioAdmin.torrentsList')}</h3>
+          <SettingsCard title={t('ratioAdmin.torrentsList')} className="overflow-hidden">
             <div className="overflow-x-auto max-h-64 overflow-y-auto">
               <table className="table table-zebra table-pin-rows table-xs">
                 <thead>
@@ -262,7 +247,7 @@ export default function RatioAdminPanel() {
                 </tbody>
               </table>
             </div>
-          </section>
+          </SettingsCard>
         )}
       </div>
       </SubscriptionGuard>

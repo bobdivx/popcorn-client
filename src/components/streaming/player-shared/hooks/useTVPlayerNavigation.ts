@@ -29,6 +29,7 @@ interface UseTVPlayerNavigationProps {
   onToggleFullscreen: () => void;
   onClose?: () => void;
   onOpenQualityMenu?: () => void;
+  onToggleSubtitles?: () => void;
   duration: number;
   currentTime: number;
   /** Si false, ne pas auto-masquer (pause). */
@@ -54,6 +55,7 @@ export function useTVPlayerNavigation({
   onToggleFullscreen,
   onClose,
   onOpenQualityMenu,
+  onToggleSubtitles,
   progressBarRef,
   scrubThumbnails = null,
   onScrubSeek,
@@ -65,7 +67,7 @@ export function useTVPlayerNavigation({
 }: UseTVPlayerNavigationProps) {
   // App simple (URL) : stamp avant isTVPlatform() pour désactiver la Magic Remote / activer le hide.
   stampTvPlatformHints();
-  const [focusedControlIndex, setFocusedControlIndex] = useState(0);
+  const [focusedControlIndex, setFocusedControlIndex] = useState(isTVPlatform() || isWebOSTV() ? 1 : 0);
   const [focusedOnProgress, setFocusedOnProgress] = useState(false);
   const [focusedOnScrub, setFocusedOnScrub] = useState(false);
   const isTV = isTVPlatform() || isWebOSTV();
@@ -260,14 +262,22 @@ export function useTVPlayerNavigation({
   const { getSeekStep, recordKeyDown, recordKeyUp } = useSeekStepAcceleration();
   const hasBack = !!onClose;
   const controls = useMemo(() => {
-    // Pas de mute/volume sur TV : le volume système est géré par la télécommande.
+    if (isTV) {
+      const c = [
+        { id: 'skipback', action: () => onSeek('left', 10) },
+        { id: 'playpause', action: onPlayPause },
+        { id: 'skipforward', action: () => onSeek('right', 10) },
+      ];
+      if (onToggleSubtitles) c.push({ id: 'subtitles', action: onToggleSubtitles });
+      return c;
+    }
     const c = [{ id: 'playpause', action: onPlayPause }];
-    if (!isTV) c.push({ id: 'mute', action: onToggleMute });
+    c.push({ id: 'mute', action: onToggleMute });
     if (onOpenQualityMenu) c.push({ id: 'quality', action: onOpenQualityMenu });
     c.push({ id: 'fullscreen', action: onToggleFullscreen });
     if (hasBack) c.unshift({ id: 'back', action: onClose! });
     return c;
-  }, [isTV, hasBack, onClose, onPlayPause, onToggleMute, onToggleFullscreen, onOpenQualityMenu]);
+  }, [isTV, hasBack, onClose, onPlayPause, onToggleMute, onToggleFullscreen, onOpenQualityMenu, onToggleSubtitles, onSeek]);
 
   const isBackKey = (e: KeyboardEvent) =>
     BACK_KEYS.includes(e.key) || BACK_KEY_CODES.includes(e.keyCode ?? e.which);
@@ -341,7 +351,7 @@ export function useTVPlayerNavigation({
         e.preventDefault();
         e.stopPropagation();
         setShowControls(true);
-        setFocusedControlIndex(hasBack ? 1 : 0);
+        setFocusedControlIndex(isTV ? 1 : hasBack ? 1 : 0);
         return;
       }
       if (isBackKey(e)) {
@@ -415,6 +425,24 @@ export function useTVPlayerNavigation({
         kc === 417 || kc === 22 || keyNormalized === 'ArrowRight';
       const isConfirm =
         kc === 23 || keyNormalized === 'Enter' || keyNormalized === ' ';
+
+      const onButtonRow =
+        showControlsRef.current &&
+        !focusedOnScrubRef.current &&
+        !focusedOnProgress;
+
+      // Rangée de boutons TV : gauche/droite change de contrôle (pas seek)
+      if (isTV && onButtonRow && (isLeft || isRight)) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!showControlsRef.current) setShowControls(true);
+        setFocusedControlIndex((idx) => {
+          if (isLeft) return Math.max(0, idx - 1);
+          return Math.min(controls.length - 1, idx + 1);
+        });
+        resetControlsTimeout();
+        return;
+      }
 
       // --- Scrub : flèches = preview vignettes UNIQUEMENT (jamais onSeek / reload HLS) ---
       if (scrubThumbnailsActiveRef.current && (isLeft || isRight)) {
@@ -578,6 +606,7 @@ export function useTVPlayerNavigation({
     onToggleMute,
     onToggleFullscreen,
     onClose,
+    onToggleSubtitles,
     setShowControls,
     getSeekStep,
     recordKeyDown,
