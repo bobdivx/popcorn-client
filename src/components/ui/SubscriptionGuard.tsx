@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { CreditCard, ExternalLink } from 'lucide-preact';
-import { getCachedSubscription, loadSubscription } from '../../lib/subscription-store';
+import { getCachedSubscription, hasPayingAccess, loadSubscription } from '../../lib/subscription-store';
 import { getPopcornWebBaseUrl } from '../../lib/api/popcorn-web';
 
 interface SubscriptionGuardProps {
@@ -13,17 +13,17 @@ export default function SubscriptionGuard({ children }: SubscriptionGuardProps) 
   const [isAllowed, setIsAllowed] = useState<boolean | null>(() => {
     const cached = getCachedSubscription();
     if (cached === null) return null;
-    return cached.subscription?.status === 'active';
+    return hasPayingAccess(cached);
   });
 
   useEffect(() => {
     const cached = getCachedSubscription();
     if (cached !== null) {
-      setIsAllowed(cached.subscription?.status === 'active');
+      setIsAllowed(hasPayingAccess(cached));
       return;
     }
     loadSubscription()
-      .then((data) => setIsAllowed(data?.subscription?.status === 'active'))
+      .then((data) => setIsAllowed(hasPayingAccess(data)))
       .catch(() => setIsAllowed(false));
   }, []);
 

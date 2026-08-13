@@ -4,7 +4,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { getBackendUrl } from '../../lib/backend-config';
 import { serverApi } from '../../lib/client/server-api';
 import { canAccess } from '../../lib/permissions';
-import { getCachedSubscription, loadSubscription } from '../../lib/subscription-store';
+import { getCachedSubscription, hasPayingAccess, loadSubscription } from '../../lib/subscription-store';
 import LibRbitSettings from './LibRbitSettings';
 import { SettingsNavCard } from './SettingsNavCard';
 import { SettingsSubPageFrame } from './SettingsSubPageFrame';
@@ -47,7 +47,7 @@ export default function DownloadsSubMenuPanel() {
   const [librqbitWebHref, setLibrqbitWebHref] = useState('#');
   const [isPayingSubscriber, setIsPayingSubscriber] = useState(() => {
     const cached = getCachedSubscription();
-    return cached !== null ? cached.subscription?.status === 'active' : false;
+    return cached !== null ? hasPayingAccess(cached) : false;
   });
 
   useEffect(() => {
@@ -62,11 +62,11 @@ export default function DownloadsSubMenuPanel() {
   useEffect(() => {
     const cached = getCachedSubscription();
     if (cached !== null) {
-      setIsPayingSubscriber(cached.subscription?.status === 'active');
+      setIsPayingSubscriber(hasPayingAccess(cached));
       return;
     }
     loadSubscription()
-      .then((data) => setIsPayingSubscriber(data?.subscription?.status === 'active'))
+      .then((data) => setIsPayingSubscriber(hasPayingAccess(data)))
       .catch(() => setIsPayingSubscriber(false));
   }, []);
 
