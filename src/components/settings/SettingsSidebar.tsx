@@ -241,7 +241,7 @@ const SIDEBAR_CSS = `
   }
   .sn-item:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px rgba(124,58,237,0.55), inset 0 0 0 1px rgba(124,58,237,0.3);
+    border-color: rgba(255, 255, 255, 0.55);
   }
 
   /* Icône */
@@ -287,9 +287,9 @@ const SIDEBAR_CSS = `
     50% { opacity: 0.4; transform: scale(0.6); }
   }
 
-  /* Overlay mobile */
+  /* Overlay mobile — au-dessus des cartes, sous la navbar (z 200) */
   .sn-overlay {
-    position: fixed; inset: 0; z-index: 25;
+    position: fixed; inset: 0; z-index: 40;
     background: rgba(0,0,0,0.65);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
@@ -428,7 +428,7 @@ export default function SettingsSidebar() {
         class={`
           sn-sidebar flex-shrink-0
           w-[min(18rem,85vw)] sm:w-72 md:w-72 xl:w-80
-          fixed left-0 z-[30] bottom-0
+          fixed left-0 z-[45] bottom-0
           top-[calc(3.75rem+var(--safe-area-inset-top,0px))] sm:top-[calc(5rem+var(--safe-area-inset-top,0px))] md:top-auto md:bottom-auto md:h-full
           transform transition-transform duration-200 ease-out
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}

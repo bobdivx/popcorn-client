@@ -21,8 +21,11 @@ const { title = 'Paramètres - Popcorn Client' } = Astro.props;
       transition:name="settings-content"
       data-tv-settings-content
     >
-      <SettingsMobileMenuTrigger client:idle />
+      <div class="md:hidden h-14 shrink-0" aria-hidden />
       <slot />
+    </div>
+    <div class="settings-mobile-menu-trigger-host md:hidden">
+      <SettingsMobileMenuTrigger client:idle />
     </div>
   </div>
 </Layout>
