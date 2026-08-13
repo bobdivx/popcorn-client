@@ -361,7 +361,7 @@ export default function ClientTorrentsAddTrackerList() {
               className="input input-bordered input-sm"
               value={qbitPass}
               onInput={(e) => setQbitPass((e.target as HTMLInputElement).value)}
-              autoComplete="off"
+              autoComplete="new-password"
             />
           </label>
         </div>

@@ -506,7 +506,8 @@ export default function NotificationSettings() {
               <div className="space-y-1">
                 <label className="text-sm ds-text-secondary">{t('notificationSettings.slackWebhookUrl')}</label>
                 <input
-                  type="text"
+                  type="password"
+                  autoComplete="new-password"
                   value={settings.slack_webhook_url || ''}
                   onInput={updateField('slack_webhook_url')}
                   placeholder="https://hooks.slack.com/services/..."
@@ -543,7 +544,8 @@ export default function NotificationSettings() {
               <div className="space-y-1">
                 <label className="text-sm ds-text-secondary">{t('notificationSettings.discordWebhookUrl')}</label>
                 <input
-                  type="text"
+                  type="password"
+                  autoComplete="new-password"
                   value={settings.discord_webhook_url || ''}
                   onInput={updateField('discord_webhook_url')}
                   placeholder="https://discord.com/api/webhooks/..."
@@ -582,6 +584,7 @@ export default function NotificationSettings() {
                   <label className="text-sm ds-text-secondary">{t('notificationSettings.telegramBotToken')}</label>
                   <input
                     type="password"
+                    autoComplete="new-password"
                     value={settings.telegram_bot_token || ''}
                     onInput={updateField('telegram_bot_token')}
                     placeholder="123456789:ABC..."
@@ -629,7 +632,8 @@ export default function NotificationSettings() {
               <div className="space-y-1">
                 <label className="text-sm ds-text-secondary">{t('notificationSettings.webhookUrl')}</label>
                 <input
-                  type="text"
+                  type="password"
+                  autoComplete="new-password"
                   value={settings.webhook_url || ''}
                   onInput={updateField('webhook_url')}
                   placeholder="https://votre-site.com/api/callback"

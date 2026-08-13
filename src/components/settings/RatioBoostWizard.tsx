@@ -338,7 +338,7 @@ export default function RatioBoostWizard() {
                     value={apiKey}
                     onInput={(e) => setApiKey((e.target as HTMLInputElement).value)}
                     placeholder={t('ratioBoost.apiKeyPlaceholder')}
-                    autoComplete="off"
+                    autoComplete="new-password"
                   />
                 </label>
                 {accountError && <p className="text-sm text-red-300">{accountError}</p>}
@@ -409,7 +409,7 @@ export default function RatioBoostWizard() {
                     setQbitPass((e.target as HTMLInputElement).value);
                     setQbitOk(false);
                   }}
-                  autoComplete="off"
+                  autoComplete="new-password"
                 />
               </label>
             </div>
