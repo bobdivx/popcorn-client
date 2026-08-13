@@ -216,6 +216,12 @@ export const settingsMethods = {
     min_ratio_required?: number;
     uploaded_from_tracker?: number;
     downloaded_from_tracker?: number;
+    failure_reason?: string;
+    warning_message?: string;
+    tracker_interval?: number;
+    seeders?: number;
+    leechers?: number;
+    tracker_body_preview?: string;
   }>> {
     const hasOptions = options && (options.tracker_url != null && options.tracker_url.trim() !== '' || options.uploaded_mb != null || (options.info_hash != null && options.info_hash.trim() !== ''));
     const body = hasOptions

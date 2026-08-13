@@ -69,6 +69,7 @@ export default function RatioBoostWizard() {
   const [qbitPort, setQbitPort] = useState(8080);
   const [qbitUser, setQbitUser] = useState('admin');
   const [qbitPass, setQbitPass] = useState('');
+  const [qbitSavePath, setQbitSavePath] = useState('/DATA/ratio-boost');
   const [qbitSaving, setQbitSaving] = useState(false);
   const [qbitTesting, setQbitTesting] = useState(false);
   const [qbitOk, setQbitOk] = useState(false);
@@ -132,6 +133,7 @@ export default function RatioBoostWizard() {
     setQbitPort(q.port || 8080);
     setQbitUser(q.username || 'admin');
     if (q.password) setQbitPass(q.password);
+    if (q.download_path) setQbitSavePath(q.download_path);
   }, []);
 
   const loadSeeds = useCallback(async () => {
@@ -218,6 +220,7 @@ export default function RatioBoostWizard() {
         port: qbitPort,
         username: qbitUser.trim(),
         password: qbitPass,
+        download_path: qbitSavePath.trim(),
       });
       if (!save.success || !save.data) {
         setQbitError(save.message || t('ratioBoost.qbitSaveError'));
@@ -234,7 +237,15 @@ export default function RatioBoostWizard() {
       });
       if (!test.success) {
         setQbitOk(false);
-        setQbitError(test.message || t('ratioBoost.qbitTestFail'));
+        const msg = test.message || '';
+        const isCreds =
+          test.error === 'InvalidCredentials' ||
+          /identifiants|mot de passe|password|credentials/i.test(msg);
+        setQbitError(
+          isCreds
+            ? (msg.includes('Identifiants') ? msg : t('ratioBoost.qbitBadCredentials'))
+            : msg || t('ratioBoost.qbitTestFail')
+        );
         return;
       }
       setQbitOk(true);
@@ -255,6 +266,7 @@ export default function RatioBoostWizard() {
       info_hashes: seedHashes,
       max_concurrent: 1,
       delete_after_complete: true,
+      save_dir: qbitSavePath.trim() || '/DATA/ratio-boost',
     });
     if (!res.success || !res.data) {
       setBoosting(false);
@@ -364,6 +376,13 @@ export default function RatioBoostWizard() {
           <div className="min-w-0 flex-1 space-y-3">
             <h3 className="font-semibold text-white">{t('ratioBoost.step3Title')}</h3>
             <p className="text-sm text-[var(--ds-text-secondary)]">{t('ratioBoost.step3Body')}</p>
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSaveAndTestQbit();
+              }}
+            >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
               <label className="form-control">
                 <span className="label-text text-xs">{t('ratioBoost.qbitHost')}</span>
@@ -397,6 +416,7 @@ export default function RatioBoostWizard() {
                     setQbitUser((e.target as HTMLInputElement).value);
                     setQbitOk(false);
                   }}
+                  autoComplete="username"
                 />
               </label>
               <label className="form-control">
@@ -409,7 +429,7 @@ export default function RatioBoostWizard() {
                     setQbitPass((e.target as HTMLInputElement).value);
                     setQbitOk(false);
                   }}
-                  autoComplete="new-password"
+                  autoComplete="current-password"
                 />
               </label>
             </div>
@@ -421,9 +441,8 @@ export default function RatioBoostWizard() {
               </p>
             )}
             <button
-              type="button"
+              type="submit"
               className="btn btn-sm btn-primary gap-2"
-              onClick={handleSaveAndTestQbit}
               disabled={qbitSaving || qbitTesting}
             >
               {qbitSaving || qbitTesting ? (
@@ -433,6 +452,7 @@ export default function RatioBoostWizard() {
               )}
               {t('ratioBoost.saveAndTestQbit')}
             </button>
+            </form>
           </div>
         </div>
       </div>
