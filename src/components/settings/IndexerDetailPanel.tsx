@@ -403,7 +403,7 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
               onInput={(e) => setDuplicateApiKey((e.target as HTMLInputElement).value)}
               placeholder={t('indexersManager.duplicateAccount.apiKeyPlaceholder')}
               disabled={duplicating}
-              autoComplete="off"
+              autoComplete="new-password"
             />
           </div>
           {duplicateError && (
