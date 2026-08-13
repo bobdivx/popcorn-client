@@ -302,7 +302,7 @@ export default function UploadTrackerPanel({ onC411Configured }: UploadTrackerPa
           <div className="text-sm text-base-content/60">{t('settings.uploadTrackerPanel.orSeparator')}</div>
           <input
             type="password"
-            autoComplete="off"
+            autoComplete="new-password"
             className="input input-bordered w-full font-mono text-sm"
             placeholder={t('settings.uploadTrackerPanel.c411SessionPlaceholder')}
             value={c411SessionCookie}
@@ -311,7 +311,7 @@ export default function UploadTrackerPanel({ onC411Configured }: UploadTrackerPa
           />
           <input
             type="password"
-            autoComplete="off"
+            autoComplete="new-password"
             className="input input-bordered w-full font-mono text-sm"
             placeholder={t('settings.uploadTrackerPanel.c411CsrfPlaceholder')}
             value={c411CsrfCookie}
@@ -320,7 +320,8 @@ export default function UploadTrackerPanel({ onC411Configured }: UploadTrackerPa
           />
           <div className="text-sm text-base-content/60 pt-1">{t('settings.uploadTrackerPanel.passkeyLabel')}</div>
           <input
-            type="text"
+            type="password"
+            autoComplete="new-password"
             className="input input-bordered w-full max-w-md font-mono text-sm"
             placeholder={t('settings.uploadTrackerPanel.passkeyPlaceholder')}
             value={passkey}

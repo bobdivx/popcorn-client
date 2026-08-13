@@ -48,8 +48,8 @@ export function DsSettingsSectionCard({
   accent = 'violet',
   statusBadge,
   children,
-  cardVariant = 'elevated',
-  showBar = false,
+  cardVariant = 'glass',
+  showBar = true,
   className = '',
   sectionClassName = '',
 }: DsSettingsSectionCardProps) {

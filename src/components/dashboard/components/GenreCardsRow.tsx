@@ -49,7 +49,7 @@ export function GenreCardsRow({
           <button
             type="button"
             onClick={() => scrollByCards(-1)}
-            className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 items-center justify-center rounded-full border border-white/20 bg-black/45 hover:bg-black/65 text-white/90"
+            className="hidden sm:flex tv:hidden absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 items-center justify-center rounded-full border border-white/20 bg-black/45 hover:bg-black/65 text-white/90"
             aria-label={t('common.previous')}
           >
             <ChevronLeft className="w-5 h-5" />
@@ -57,7 +57,7 @@ export function GenreCardsRow({
           <button
             type="button"
             onClick={() => scrollByCards(1)}
-            className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 items-center justify-center rounded-full border border-white/20 bg-black/45 hover:bg-black/65 text-white/90"
+            className="hidden sm:flex tv:hidden absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 items-center justify-center rounded-full border border-white/20 bg-black/45 hover:bg-black/65 text-white/90"
             aria-label={t('common.next')}
           >
             <ChevronRight className="w-5 h-5" />
@@ -68,11 +68,12 @@ export function GenreCardsRow({
 
           <div
             ref={scrollerRef}
-            className="w-full min-w-0 overflow-x-auto overscroll-x-contain no-scrollbar py-1 px-1"
+            className="w-full min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar py-1 px-1"
             style={{
               scrollSnapType: 'x mandatory',
               scrollbarWidth: 'none',
               msOverflowStyle: 'none',
+              touchAction: 'pan-x pan-y',
             }}
             data-carousel
           >

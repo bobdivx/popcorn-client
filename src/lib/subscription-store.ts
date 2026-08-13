@@ -32,14 +32,17 @@ export async function loadSubscription(): Promise<SubscriptionMe | null> {
   return data;
 }
 
+/** True si abonnement stockage actif ou option streaming torrent. */
+export function hasPayingAccess(sub: SubscriptionMe | null | undefined): boolean {
+  return sub?.subscription?.status === 'active' || sub?.streamingTorrent === true;
+}
+
 /** Indique si l'option streaming torrent est active (lecture depuis le cache). */
 export function isStreamingTorrentActive(): boolean {
-  const sub = getCachedSubscription();
-  return sub?.streamingTorrent === true;
+  return getCachedSubscription()?.streamingTorrent === true;
 }
 
 /** Indique si l'utilisateur a un abonnement payant actif ou l'option streaming torrent (lecture depuis le cache). */
 export function isPayingSubscriber(): boolean {
-  const sub = getCachedSubscription();
-  return sub?.subscription?.status === 'active' || sub?.streamingTorrent === true;
+  return hasPayingAccess(getCachedSubscription());
 }

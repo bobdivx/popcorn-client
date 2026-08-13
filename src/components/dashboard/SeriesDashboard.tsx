@@ -3,13 +3,14 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import type { ContentItem } from '../../lib/client/types';
 import Library from '../Library';
 import { LibraryViewToggle, type LibraryViewMode } from '../page-model/LibraryViewToggle';
-import { PageHeader } from '../page-model/PageHeader';
 import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
 import { useInfiniteSeries } from './hooks/useInfiniteSeries';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useContentSignals } from './hooks/useContentSignals';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
 import SuggestionsSection from './SuggestionsSection';
+import { useActiveDownloads } from './hooks/useActiveDownloads';
+import { pickHeroItems, filterWatchNow, filterByMediaType, standaloneDownloads } from './utils/browsePriority';
 
 const SECTION_LIMIT = 25;
 const MAX_GENRES = 12;
@@ -20,8 +21,10 @@ export default function SeriesDashboard() {
   const { t } = useI18n();
   const { series, loading, error } = useInfiniteSeries();
   const { resumeWatching, waitingForNext } = useResumeWatching();
+  const { activeDownloads } = useActiveDownloads();
   const [view, setView] = useState<LibraryViewMode>('torrents');
   const { withSignals: seriesWithSignals } = useContentSignals(series, resumeWatching);
+  const seriesDownloads = useMemo(() => filterByMediaType(activeDownloads, 'tv'), [activeDownloads]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -36,10 +39,13 @@ export default function SeriesDashboard() {
     }
   };
 
-  const heroItems = useMemo(
-    () => seriesWithSignals.slice(0, 5).filter((item) => item.poster || item.backdrop),
-    [seriesWithSignals]
-  );
+  const heroItems = useMemo(() => {
+    const resumeSeries = resumeWatching.filter((item) => item.type === 'tv');
+    return pickHeroItems(
+      [...resumeSeries, ...filterWatchNow(seriesWithSignals), ...seriesDownloads],
+      seriesWithSignals
+    );
+  }, [seriesWithSignals, resumeWatching, seriesDownloads]);
 
   const handleNavigate = (item: ContentItem) => {
     window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
@@ -54,6 +60,8 @@ export default function SeriesDashboard() {
 
     const resumeSeries = resumeWatching.filter((item) => item.type === 'tv');
     const waitingSeries = waitingForNext.filter((item) => item.type === 'tv');
+    const watchNow = filterWatchNow(seriesWithSignals);
+    const downloadingNow = standaloneDownloads(seriesDownloads, resumeSeries);
 
     const genreMap = new Map<string, ContentItem[]>();
     for (const tv of seriesWithSignals) {
@@ -75,11 +83,9 @@ export default function SeriesDashboard() {
       }));
 
     return [
-      // Reprendre la lecture en tête : visibilité immédiate des séries à reprendre + badges
-      // « Nouveau » / « Prochain : <date> » TMDB pour le suivi multi-épisodes.
-      { id: 'resume-series', title: t('dashboard.resumeWatching'), items: resumeSeries, kind: 'resume' as const },
-      // « En attente » : séries à jour pour lesquelles un nouvel épisode est annoncé mais pas
-      // encore diffusé. Triées par date de diffusion (plus proche d'abord).
+      { id: 'resume-series', title: t('dashboard.resumeWatching'), items: resumeSeries, kind: 'resume' as const, priority: true },
+      { id: 'active-downloads-series', title: t('dashboard.activeDownloads'), items: downloadingNow, priority: true },
+      { id: 'recently-downloaded-series', title: t('dashboard.recentlyDownloaded'), items: watchNow, priority: true },
       {
         id: 'waiting-series',
         title: t('dashboard.waitingForNext'),
@@ -89,12 +95,13 @@ export default function SeriesDashboard() {
           return da.localeCompare(db);
         }),
         kind: 'resume' as const,
+        priority: true,
       },
       { id: 'recent-series', title: t('dashboard.newReleasesSeries'), items: newest },
       { id: 'popular-series', title: t('dashboard.popularSeries'), items: popular },
       ...genreSections,
     ];
-  }, [seriesWithSignals, resumeWatching, waitingForNext, t]);
+  }, [seriesWithSignals, resumeWatching, waitingForNext, seriesDownloads, t]);
 
   const toggle = (
     <LibraryViewToggle mode={view} onChange={handleChangeView} contentType="series" />
@@ -103,9 +110,8 @@ export default function SeriesDashboard() {
   if (view === 'library') {
     return (
       <div className="min-h-screen bg-black text-white relative" data-page="series-library">
-        <PageHeader title={t('nav.series')} headerAction={toggle} />
         <div className="px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16">
-          <Library showHero showFilters={false} initialContentFilter="series" />
+          <Library showHero showFilters={false} initialContentFilter="series" headerAction={toggle} />
         </div>
       </div>
     );

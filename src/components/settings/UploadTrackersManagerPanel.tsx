@@ -270,7 +270,7 @@ export default function UploadTrackersManagerPanel() {
               </label>
               <input
                 type="password"
-                autoComplete="off"
+                autoComplete="new-password"
                 className="input input-bordered input-sm w-full max-w-xl font-mono"
                 value={apiKey}
                 placeholder={t('settings.uploadTrackerPanel.wizardC411ApiKeyPlaceholder')}
@@ -284,7 +284,7 @@ export default function UploadTrackersManagerPanel() {
               </label>
               <input
                 type="password"
-                autoComplete="off"
+                autoComplete="new-password"
                 className="input input-bordered input-sm w-full max-w-xl font-mono"
                 value={passkey}
                 placeholder={t('settings.uploadTrackerPanel.passkeyPlaceholder')}

@@ -370,6 +370,7 @@ export default function HLSPlayer({
     onToggleFullscreen: handleToggleFullscreen,
     onClose,
     onOpenQualityMenu: onQualityChange != null ? () => openQualityMenuRef.current?.() : undefined,
+    onToggleSubtitles: toggleSubtitleSelector,
     duration,
     currentTime,
     isPlaying,

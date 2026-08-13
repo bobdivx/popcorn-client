@@ -3,13 +3,14 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import type { ContentItem } from '../../lib/client/types';
 import Library from '../Library';
 import { LibraryViewToggle, type LibraryViewMode } from '../page-model/LibraryViewToggle';
-import { PageHeader } from '../page-model/PageHeader';
 import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
 import { useInfiniteFilms } from './hooks/useInfiniteFilms';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useContentSignals } from './hooks/useContentSignals';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
 import SuggestionsSection from './SuggestionsSection';
+import { useActiveDownloads } from './hooks/useActiveDownloads';
+import { pickHeroItems, filterWatchNow, filterByMediaType, standaloneDownloads } from './utils/browsePriority';
 
 const SECTION_LIMIT = 25;
 const MAX_GENRES = 12;
@@ -20,8 +21,10 @@ export default function FilmsDashboard() {
   const { t } = useI18n();
   const { films, loading, error } = useInfiniteFilms();
   const { resumeWatching } = useResumeWatching();
+  const { activeDownloads } = useActiveDownloads();
   const [view, setView] = useState<LibraryViewMode>('torrents');
   const { withSignals: filmsWithSignals } = useContentSignals(films, resumeWatching);
+  const movieDownloads = useMemo(() => filterByMediaType(activeDownloads, 'movie'), [activeDownloads]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -36,10 +39,13 @@ export default function FilmsDashboard() {
     }
   };
 
-  const heroItems = useMemo(
-    () => filmsWithSignals.slice(0, 5).filter((item) => item.poster || item.backdrop),
-    [filmsWithSignals]
-  );
+  const heroItems = useMemo(() => {
+    const resumeMovies = resumeWatching.filter((item) => item.type === 'movie');
+    return pickHeroItems(
+      [...resumeMovies, ...filterWatchNow(filmsWithSignals), ...movieDownloads],
+      filmsWithSignals
+    );
+  }, [filmsWithSignals, resumeWatching, movieDownloads]);
 
   const handleNavigate = (item: ContentItem) => {
     window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
@@ -53,6 +59,8 @@ export default function FilmsDashboard() {
       .slice(0, SECTION_LIMIT);
 
     const resumeMovies = resumeWatching.filter((item) => item.type === 'movie');
+    const watchNow = filterWatchNow(filmsWithSignals);
+    const downloadingNow = standaloneDownloads(movieDownloads, resumeMovies);
 
     const genreMap = new Map<string, ContentItem[]>();
     for (const film of filmsWithSignals) {
@@ -74,13 +82,14 @@ export default function FilmsDashboard() {
       }));
 
     return [
-      // Reprendre la lecture en tête : visibilité immédiate des films à terminer.
-      { id: 'resume-films', title: t('dashboard.resumeWatching'), items: resumeMovies, kind: 'resume' as const },
+      { id: 'resume-films', title: t('dashboard.resumeWatching'), items: resumeMovies, kind: 'resume' as const, priority: true },
+      { id: 'active-downloads-films', title: t('dashboard.activeDownloads'), items: downloadingNow, priority: true },
+      { id: 'recently-downloaded-films', title: t('dashboard.recentlyDownloaded'), items: watchNow, priority: true },
       { id: 'recent-films', title: t('dashboard.newReleasesMovies'), items: newest },
       { id: 'popular-films', title: t('dashboard.popularMovies'), items: popular },
       ...genreSections,
     ];
-  }, [filmsWithSignals, resumeWatching, t]);
+  }, [filmsWithSignals, resumeWatching, movieDownloads, t]);
 
   const toggle = (
     <LibraryViewToggle mode={view} onChange={handleChangeView} contentType="movies" />
@@ -89,9 +98,8 @@ export default function FilmsDashboard() {
   if (view === 'library') {
     return (
       <div className="min-h-screen bg-black text-white relative" data-page="films-library">
-        <PageHeader title={t('nav.films')} headerAction={toggle} />
         <div className="px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16">
-          <Library showHero showFilters={false} initialContentFilter="movies" />
+          <Library showHero showFilters={false} initialContentFilter="movies" headerAction={toggle} />
         </div>
       </div>
     );
