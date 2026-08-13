@@ -12,6 +12,7 @@ import {
   BookmarkCheck,
   RefreshCw,
   Info,
+  MoreHorizontal,
 } from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
@@ -22,6 +23,7 @@ import {
 } from '../../../streaming/player-shared/derivePlaybackPhase';
 import { PlaybackStatusSurface } from '../../../streaming/player-shared/components/PlaybackStatusSurface';
 import { Modal } from '../../../ui/Modal';
+import { isTVPlatform } from '../../../../lib/utils/device-detection';
 
 interface ActionButtonsProps {
   torrent: MediaDetailPageProps['torrent'];
@@ -119,7 +121,9 @@ export function ActionButtons({
   seriesLibraryPath,
 }: ActionButtonsProps) {
   const { t } = useI18n();
+  const isTV = isTVPlatform();
   const [showSeriesPathModal, setShowSeriesPathModal] = useState(false);
+  const [showMoreActions, setShowMoreActions] = useState(false);
   const hasSavedPosition = savedPlaybackPosition !== null && savedPlaybackPosition !== undefined && savedPlaybackPosition > 0;
 
   const stateLower = typeof torrentStats?.state === 'string' ? torrentStats.state.toLowerCase() : '';
@@ -201,6 +205,27 @@ export function ActionButtons({
   const primaryPackMode: 'play' | 'download' = canPlayPackPreviewEpisode ? 'play' : 'download';
   const isPrimaryPackSelectionMissing = isPackWithMultipleFiles && !isPackEpisodeSelected && !hasInfoHash;
 
+  const showWatchLaterBtn = !!(
+    watchLater &&
+    torrent.tmdbId &&
+    (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')
+  );
+  const showMagnetBtn = !!(
+    torrent._externalMagnetUri ||
+    (torrent._externalLink && torrent._externalLink.startsWith('magnet:'))
+  );
+  const showDeleteBtn = (isAvailableLocally || isDownloadComplete) && hasInfoHash && !isExternal;
+  const hasMoreActions = !!(
+    onDownloadAllEpisodes ||
+    showWatchLaterBtn ||
+    showMagnetBtn ||
+    showDeleteBtn ||
+    seriesIndexerRefresh ||
+    seriesLibraryPath
+  );
+  const moreActionClass =
+    'w-full min-h-[56px] tv:min-h-[68px] inline-flex items-center gap-3 px-4 rounded-xl bg-white/10 border border-white/15 text-white text-left text-lg tv:text-xl font-medium focus:outline-none focus:ring-4 focus:ring-primary-600/70 disabled:opacity-40';
+
   return (
     <div className="mb-6 space-y-3">
       {/* ── Rangée principale ── */}
@@ -242,6 +267,7 @@ export function ActionButtons({
                     : undefined
             }
             data-focusable
+            data-tv-initial-focus
             data-media-detail-primary-action
             data-media-detail-action={
               isPackEpisodeSelected ? primaryPackMode : shouldShowPlayButton ? 'play' : 'download'
@@ -291,18 +317,18 @@ export function ActionButtons({
           </button>
         )}
 
-        {/* Tout télécharger (Series) */}
-        {onDownloadAllEpisodes && (
+        {/* Tout télécharger (Series) — desktop ; TV : menu Plus */}
+        {!isTV && onDownloadAllEpisodes && (
           <button
             type="button"
             onClick={onDownloadAllEpisodes}
             data-focusable
             tabIndex={0}
             className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 tv:text-xl tv:px-8 tv:py-4 tv:min-h-[68px] border border-emerald-500/40 hover:border-emerald-400/60 hover:bg-emerald-900/20 transition-[opacity,transform,background-color,border-color] duration-200 active:scale-[0.97]"
-            title="Télécharger tous les épisodes disponibles"
+            title={t('mediaDetail.downloadAllEpisodes')}
           >
             <Download className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" size={20} />
-            Tout télécharger
+            {t('mediaDetail.downloadAllEpisodes')}
           </button>
         )}
 
@@ -322,6 +348,20 @@ export function ActionButtons({
           </button>
         )}
 
+        {isTV && hasMoreActions && (
+          <button
+            type="button"
+            onClick={() => setShowMoreActions(true)}
+            data-focusable
+            tabIndex={0}
+            aria-label={t('mediaDetail.moreActions')}
+            className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 tv:text-xl tv:px-8 tv:py-4 tv:min-h-[68px] border border-white/20"
+          >
+            <MoreHorizontal className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" size={20} />
+            {t('common.more')}
+          </button>
+        )}
+
         {/* Pack sans sélection */}
         {isPackWithMultipleFiles && !(selectedPackEpisodePreviewIndex != null && (onDownloadSingleEpisode != null || (canStream && onPlaySingleEpisode != null))) && !shouldShowPlayButton && (
           <button type="button" disabled tabIndex={-1}
@@ -331,13 +371,16 @@ export function ActionButtons({
           </button>
         )}
 
+        {/* ── Actions secondaires (desktop) ── */}
+        {!isTV && (
+          <>
         {/* ── Séparateur ── */}
         {(watchLater || (torrent._externalMagnetUri || (torrent._externalLink && torrent._externalLink.startsWith('magnet:'))) || ((isAvailableLocally || isDownloadComplete) && hasInfoHash && !isExternal)) && (
           <div className="w-px h-7 bg-white/12 mx-0.5 self-center max-sm:hidden" aria-hidden />
         )}
 
         {/* À regarder plus tard — icône ronde */}
-        {watchLater && (torrent.tmdbId && (torrent.tmdbType === 'movie' || torrent.tmdbType === 'tv')) && (
+        {showWatchLaterBtn && watchLater && (
           <button
             type="button"
             onClick={() => void watchLater.onToggle()}
@@ -360,13 +403,13 @@ export function ActionButtons({
         )}
 
         {/* Magnet — icône ronde */}
-        {(torrent._externalMagnetUri || (torrent._externalLink && torrent._externalLink.startsWith('magnet:'))) && (
+        {showMagnetBtn && (
           <button
             onClick={onCopyMagnet}
             data-focusable
             tabIndex={0}
-            title={magnetCopied ? 'Copié !' : 'Copier le lien magnet'}
-            aria-label={magnetCopied ? 'Copié !' : 'Copier le lien magnet'}
+            title={magnetCopied ? t('mediaDetail.magnetCopied') : t('mediaDetail.copyMagnet')}
+            aria-label={magnetCopied ? t('mediaDetail.magnetCopied') : t('mediaDetail.copyMagnet')}
             className={`gtv-icon-btn ds-focus-glow ds-active-glow tv:w-16 tv:h-16 ${magnetCopied ? 'text-green-400 bg-green-900/30' : ''}`}
           >
             {magnetCopied ? (
@@ -378,21 +421,21 @@ export function ActionButtons({
         )}
 
         {/* Supprimer — danger discret */}
-        {((isAvailableLocally || isDownloadComplete) && hasInfoHash && !isExternal) && (
+        {showDeleteBtn && (
           <button
             onClick={onDeleteMedia}
             disabled={deletingMedia}
             data-focusable
             tabIndex={0}
             className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2 text-white/45 hover:text-red-400 text-sm font-medium disabled:opacity-40"
-            title={isLocalTorrent ? 'Supprimer le fichier local' : 'Supprimer le torrent'}
+            title={isLocalTorrent ? t('mediaDetail.deleteLocalFile') : t('mediaDetail.deleteTorrent')}
           >
             {deletingMedia ? (
               <Loader2 className="h-4 w-4 animate-spin shrink-0" size={16} />
             ) : (
               <Trash2 className="h-4 w-4 shrink-0" size={16} />
             )}
-            Supprimer
+            {t('common.delete')}
           </button>
         )}
 
@@ -438,6 +481,8 @@ export function ActionButtons({
             <Info className="h-5 w-5 tv:h-7 tv:w-7" aria-hidden />
           </button>
         )}
+          </>
+        )}
       </div>
 
       {/* Carte progression glass – même dérivation que l’overlay */}
@@ -463,6 +508,139 @@ export function ActionButtons({
             className="min-w-[200px] max-w-[520px] w-full"
           />
         )}
+
+      {isTV && (
+        <Modal
+          isOpen={showMoreActions}
+          onClose={() => setShowMoreActions(false)}
+          title={t('mediaDetail.moreActions')}
+          size="md"
+        >
+          <div className="flex flex-col gap-3 pt-2">
+            {(() => {
+              let usedAutofocus = false;
+              const autofocus = () => {
+                if (usedAutofocus) return undefined;
+                usedAutofocus = true;
+                return true;
+              };
+              return (
+                <>
+                  {onDownloadAllEpisodes && (
+                    <button
+                      type="button"
+                      data-focusable
+                      data-autofocus={autofocus()}
+                      tabIndex={0}
+                      className={moreActionClass}
+                      onClick={() => {
+                        setShowMoreActions(false);
+                        onDownloadAllEpisodes();
+                      }}
+                    >
+                      <Download className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
+                      {t('mediaDetail.downloadAllEpisodes')}
+                    </button>
+                  )}
+                  {showWatchLaterBtn && watchLater && (
+                    <button
+                      type="button"
+                      data-focusable
+                      data-autofocus={autofocus()}
+                      tabIndex={0}
+                      disabled={watchLater.loading}
+                      aria-pressed={watchLater.isFavorite}
+                      className={moreActionClass}
+                      onClick={() => void watchLater.onToggle()}
+                    >
+                      {watchLater.loading ? (
+                        <Loader2 className="h-5 w-5 tv:h-7 tv:w-7 animate-spin shrink-0" />
+                      ) : watchLater.isFavorite ? (
+                        <BookmarkCheck className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
+                      ) : (
+                        <Bookmark className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
+                      )}
+                      {watchLater.isFavorite ? t('playback.watchLaterRemove') : t('playback.watchLaterAdd')}
+                    </button>
+                  )}
+                  {showMagnetBtn && (
+                    <button
+                      type="button"
+                      data-focusable
+                      data-autofocus={autofocus()}
+                      tabIndex={0}
+                      className={moreActionClass}
+                      onClick={onCopyMagnet}
+                    >
+                      {magnetCopied ? (
+                        <Check className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
+                      ) : (
+                        <Link2 className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
+                      )}
+                      {magnetCopied ? t('mediaDetail.magnetCopied') : t('mediaDetail.copyMagnet')}
+                    </button>
+                  )}
+                  {seriesIndexerRefresh && (
+                    <button
+                      type="button"
+                      data-focusable
+                      data-autofocus={autofocus()}
+                      tabIndex={0}
+                      disabled={seriesIndexerRefresh.busy}
+                      className={moreActionClass}
+                      onClick={() => void seriesIndexerRefresh.onRefresh()}
+                    >
+                      <RefreshCw
+                        className={`h-5 w-5 tv:h-7 tv:w-7 shrink-0 ${seriesIndexerRefresh.busy ? 'animate-spin' : ''}`}
+                      />
+                      {seriesIndexerRefresh.busy
+                        ? t('mediaDetail.refreshEpisodesBusy')
+                        : t('mediaDetail.refreshEpisodesFromIndexers')}
+                    </button>
+                  )}
+                  {seriesLibraryPath && (
+                    <button
+                      type="button"
+                      data-focusable
+                      data-autofocus={autofocus()}
+                      tabIndex={0}
+                      className={moreActionClass}
+                      onClick={() => {
+                        setShowMoreActions(false);
+                        setShowSeriesPathModal(true);
+                      }}
+                    >
+                      <Info className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
+                      {t('mediaDetail.seriesPathTitle')}
+                    </button>
+                  )}
+                  {showDeleteBtn && (
+                    <button
+                      type="button"
+                      data-focusable
+                      data-autofocus={autofocus()}
+                      tabIndex={0}
+                      disabled={deletingMedia}
+                      className={`${moreActionClass} text-red-300 border-red-400/30`}
+                      onClick={() => {
+                        setShowMoreActions(false);
+                        onDeleteMedia();
+                      }}
+                    >
+                      {deletingMedia ? (
+                        <Loader2 className="h-5 w-5 tv:h-7 tv:w-7 animate-spin shrink-0" />
+                      ) : (
+                        <Trash2 className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
+                      )}
+                      {isLocalTorrent ? t('mediaDetail.deleteLocalFile') : t('mediaDetail.deleteTorrent')}
+                    </button>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        </Modal>
+      )}
 
       {seriesLibraryPath && (
         <Modal

@@ -3,6 +3,7 @@ import { Film, Download, HardDrive, FolderOpen, Users, RotateCw, CheckCircle2 } 
 import type { LibraryMedia } from '../Library';
 import { FocusableCard } from '../ui/FocusableCard';
 import { useI18n } from '../../lib/i18n/useI18n';
+import { tvBrowseItemKey } from '../../lib/tv-browse-restore';
 
 interface LibraryPosterProps {
   item: LibraryMedia;
@@ -41,6 +42,12 @@ export function LibraryPoster({ item, onPlay, className, priorityLoad }: Library
   return (
     <div
       data-torrent-card
+      data-tv-item-key={tvBrowseItemKey({
+        tmdbId: item.tmdb_id,
+        type: item.category === 'SERIES' || item.tmdb_type === 'tv' || item.tmdb_type === 'series' ? 'tv' : 'movie',
+        info_hash: item.info_hash,
+        id: item.slug || item.name,
+      })}
       className={`relative group cursor-pointer torrent-poster ${sizeClassName}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

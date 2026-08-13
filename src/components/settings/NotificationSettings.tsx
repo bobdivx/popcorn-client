@@ -245,7 +245,8 @@ export default function NotificationSettings() {
     <form onSubmit={handleSave} className="space-y-6">
       <div className="flex flex-col gap-6">
         {/* Active alerts (same as avatar badge) */}
-        <section className="ds-card ds-card-glass p-4 sm:p-6 space-y-4">
+        <section className="sc-frame">
+          <div className="sc-frame-body space-y-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-amber-500/10 rounded-lg">
               <Bell className="w-5 h-5 text-amber-400" />
@@ -342,10 +343,12 @@ export default function NotificationSettings() {
               </button>
             </div>
           )}
+          </div>
         </section>
 
         {/* Native / device notifications */}
-        <section className="ds-card ds-card-glass p-4 sm:p-6 space-y-4">
+        <section className="sc-frame">
+          <div className="sc-frame-body space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-sky-500/10 rounded-lg">
@@ -402,10 +405,12 @@ export default function NotificationSettings() {
               </button>
             )}
           </div>
+          </div>
         </section>
 
         {/* History */}
-        <section className="ds-card ds-card-glass p-4 sm:p-6 space-y-4">
+        <section className="sc-frame">
+          <div className="sc-frame-body space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-violet-500/10 rounded-lg">
@@ -457,10 +462,12 @@ export default function NotificationSettings() {
               ))}
             </ul>
           )}
+          </div>
         </section>
 
         {/* System Logs */}
-        <section className="ds-card ds-card-glass p-4 sm:p-6 space-y-4">
+        <section className="sc-frame">
+          <div className="sc-frame-body space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary-500/10 rounded-lg">
@@ -479,10 +486,12 @@ export default function NotificationSettings() {
               <span className="ds-switch-slider"></span>
             </label>
           </div>
+          </div>
         </section>
 
         {/* Slack */}
-        <section className="ds-card ds-card-glass p-4 sm:p-6 space-y-4">
+        <section className="sc-frame">
+          <div className="sc-frame-body space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-purple-500/10 rounded-lg">
@@ -517,10 +526,12 @@ export default function NotificationSettings() {
               </div>
             </div>
           )}
+          </div>
         </section>
 
         {/* Discord */}
-        <section className="ds-card ds-card-glass p-4 sm:p-6 space-y-4">
+        <section className="sc-frame">
+          <div className="sc-frame-body space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-indigo-500/10 rounded-lg">
@@ -555,10 +566,12 @@ export default function NotificationSettings() {
               </div>
             </div>
           )}
+          </div>
         </section>
 
         {/* Telegram */}
-        <section className="ds-card ds-card-glass p-4 sm:p-6 space-y-4">
+        <section className="sc-frame">
+          <div className="sc-frame-body space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-blue-500/10 rounded-lg">
@@ -605,10 +618,12 @@ export default function NotificationSettings() {
               <p className="text-xs ds-text-tertiary">{t('notificationSettings.telegramHint')}</p>
             </div>
           )}
+          </div>
         </section>
 
         {/* Webhook */}
-        <section className="ds-card ds-card-glass p-4 sm:p-6 space-y-4">
+        <section className="sc-frame">
+          <div className="sc-frame-body space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-green-500/10 rounded-lg">
@@ -643,10 +658,12 @@ export default function NotificationSettings() {
               </div>
             </div>
           )}
+          </div>
         </section>
 
         {/* Email */}
-        <section className="ds-card ds-card-glass p-4 sm:p-6 space-y-4">
+        <section className="sc-frame">
+          <div className="sc-frame-body space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-orange-500/10 rounded-lg">
@@ -680,6 +697,7 @@ export default function NotificationSettings() {
               </div>
             </div>
           )}
+          </div>
         </section>
       </div>
 

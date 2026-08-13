@@ -7,6 +7,7 @@ import { CarouselSection } from '../page-model/CarouselSection';
 import { PageContainer } from '../page-model/PageContainer';
 import { PageHeader } from '../page-model/PageHeader';
 import { PosterCard } from '../page-model/PosterCard';
+import { pickHeroItems } from '../dashboard/utils/browsePriority';
 
 const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_IMG_BACKDROP = 'https://image.tmdb.org/t/p/original';
@@ -157,12 +158,38 @@ export default function DemandesPage() {
     load();
   }, [language]);
 
+  const requestItems = useMemo(() => {
+    return myRequests.map((r) => {
+      const inLibrary = libraryItems.some(
+        (lib) => lib.tmdb_id === r.tmdb_id && lib.tmdb_type === r.media_type
+      );
+      const item: ContentItem = {
+        id: r.id,
+        tmdbId: r.tmdb_id,
+        type: r.media_type as 'movie' | 'tv',
+        title: r.title || `TMDB ${r.tmdb_id}`,
+        poster: r.poster_path || undefined,
+        availableInLibrary: inLibrary,
+      };
+      return item;
+    });
+  }, [myRequests, libraryItems]);
+
+  const readyRequests = useMemo(
+    () => requestItems.filter((item) => item.availableInLibrary),
+    [requestItems]
+  );
+  const pendingRequests = useMemo(
+    () => requestItems.filter((item) => !item.availableInLibrary),
+    [requestItems]
+  );
+
   const heroItems = useMemo(() => {
-    return popularMovies
+    const popularAsContent = popularMovies
       .filter((m) => m.poster_path || m.backdrop_path)
-      .slice(0, 5)
       .map((m) => toContentItem(m, 'movie'));
-  }, [popularMovies]);
+    return pickHeroItems([...readyRequests, ...pendingRequests], popularAsContent);
+  }, [readyRequests, pendingRequests, popularMovies]);
 
   const handlePlay = (item: ContentItem) => {
     const tmdbId = item.tmdbId;
@@ -198,7 +225,8 @@ export default function DemandesPage() {
     topRatedSeries.length > 0 ||
     cinemaReleases.length > 0 ||
     vodReleases.length > 0 ||
-    newSeries.length > 0;
+    newSeries.length > 0 ||
+    myRequests.length > 0;
 
   if (!hasAnyContent) {
     return (
@@ -222,24 +250,19 @@ export default function DemandesPage() {
     >
       <PageHeader title={t('nav.demandes')} subtitle={t('discover.pageSubtitle')} />
       <div className="pb-8 tv:pb-12 pt-2 tv:pt-4 overflow-visible animate-[fade-in-up_0.6s_ease-out_forwards] opacity-0">
-        {myRequests.length > 0 && (
-          <CarouselSection title={t('requests.myRequests')}>
-            {myRequests.map((r) => {
-              const inLibrary = libraryItems.some(
-                (lib) => lib.tmdb_id === r.tmdb_id && lib.tmdb_type === r.media_type
-              );
-              const item: ContentItem = {
-                id: r.id,
-                tmdbId: r.tmdb_id,
-                type: r.media_type as 'movie' | 'tv',
-                title: r.title || `TMDB ${r.tmdb_id}`,
-                poster: r.poster_path || undefined,
-                availableInLibrary: inLibrary,
-              };
-              return (
-                <PosterCard key={r.id} item={item} onNavigate={handlePlay} />
-              );
-            })}
+        {readyRequests.length > 0 && (
+          <CarouselSection title={t('requests.readyToWatch')}>
+            {readyRequests.map((item) => (
+              <PosterCard key={item.id} item={item} onNavigate={handlePlay} />
+            ))}
+          </CarouselSection>
+        )}
+
+        {pendingRequests.length > 0 && (
+          <CarouselSection title={t('requests.pendingRequests')}>
+            {pendingRequests.map((item) => (
+              <PosterCard key={item.id} item={item} onNavigate={handlePlay} />
+            ))}
           </CarouselSection>
         )}
 

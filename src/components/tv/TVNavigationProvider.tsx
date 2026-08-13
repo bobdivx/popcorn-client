@@ -1,5 +1,12 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { stampTvPlatformHints } from '../../lib/utils/device-detection';
+import {
+  clearTvBrowseRestore,
+  findTvBrowseRestoreCard,
+  isTvBrowsePath,
+  peekTvBrowseRestore,
+  saveTvBrowseRestoreFromElement,
+} from '../../lib/tv-browse-restore';
 
 /**
  * Fournisseur de navigation TV global - Style Netflix
@@ -36,13 +43,13 @@ export default function TVNavigationProvider() {
   useEffect(() => {
     // Sélecteur universel pour tous les éléments interactifs
     const FOCUSABLE_SELECTOR = `
-      a[href]:not([disabled]):not([aria-hidden="true"]),
-      button:not([disabled]):not([aria-hidden="true"]),
+      a[href]:not([disabled]):not([aria-hidden="true"]):not([tabindex="-1"]),
+      button:not([disabled]):not([aria-hidden="true"]):not([tabindex="-1"]),
       input:not([disabled]):not([type="hidden"]),
       select:not([disabled]),
       textarea:not([disabled]),
       [tabindex]:not([tabindex="-1"]):not([aria-hidden="true"]),
-      [data-focusable]
+      [data-focusable]:not([tabindex="-1"])
     `.replace(/\s+/g, ' ').trim();
 
     // Sélecteurs pour les cartes (effet Netflix)
@@ -163,6 +170,8 @@ export default function TVNavigationProvider() {
         const inViewportY = rect.bottom >= -pad - aboveViewport && rect.top <= window.innerHeight + pad + belowViewport;
         if (rect.width <= 0 || rect.height <= 0 || !inViewportX || !inViewportY) return false;
         if (el.closest('[aria-hidden="true"]')) return false;
+        if (el.closest('[data-tv-nav-skip]')) return false;
+        if (el.getAttribute('tabindex') === '-1') return false;
         if (!webos) {
           const style = window.getComputedStyle(el);
           if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
@@ -450,7 +459,7 @@ export default function TVNavigationProvider() {
 
     // Position d'ancrage du focus : la carte focusée reste à cet X en pixels (depuis le bord gauche du viewport).
     // Le carousel défile pour amener chaque carte à cette position → navigation fluide type Netflix.
-    const FOCUS_ANCHOR_RATIO = 0.18;
+    const FOCUS_ANCHOR_RATIO = 0.12;
     const getFocusAnchorX = () => typeof window !== 'undefined' ? window.innerWidth * FOCUS_ANCHOR_RATIO : 120;
 
     // Carousel : on scroll pour que la carte focusée soit à la position d'ancrage (focus fixe, carousel qui bouge).
@@ -570,19 +579,45 @@ export default function TVNavigationProvider() {
         return focusableElements[0];
       }
 
+      // Retour d’une fiche : restaurer la carte avant le hero / data-tv-initial-focus
+      if (isTvDoc() && isTvBrowsePath()) {
+        const restore = peekTvBrowseRestore();
+        if (restore) {
+          const card = findTvBrowseRestoreCard(restore.itemKey);
+          if (card) {
+            const inner = card.matches(FOCUSABLE_SELECTOR)
+              ? card
+              : card.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+            if (inner && (focusableElements.includes(inner) || inner.offsetWidth > 0)) return inner;
+          }
+          return null;
+        }
+      }
+
+      const marked = document.querySelector<HTMLElement>('[data-tv-initial-focus]');
+      if (marked && !document.querySelector('[data-episode-card]')) {
+        if (focusableElements.includes(marked)) return marked;
+        const inner = marked.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+        if (inner && (focusableElements.includes(inner) || inner.offsetWidth > 0)) return inner;
+        if (marked.matches(FOCUSABLE_SELECTOR)) return marked;
+      }
+
       // TV + Pages avec hero (Dashboard / Films / Séries) : commencer sur le hero
       // (évite de scroller vers les carrousels et de « perdre » le bandeau).
       if (isTvDoc() && typeof window !== 'undefined') {
         const path = window.location.pathname.replace(/\/$/, '') || '/';
-        if (path === '/dashboard' || path === '/films' || path === '/series') {
+        if (path === '/dashboard' || path === '/films' || path === '/series' || path === '/demandes') {
           const heroBtn = document.querySelector<HTMLElement>('.hero-dashboard button[data-focusable]');
           if (heroBtn && focusableElements.includes(heroBtn)) return heroBtn;
         }
       }
 
-      // Page Media Detail : priorité au bouton Retour pour que la télécommande y accède (flèches ou premier focus)
-      const mediaDetailBack = document.querySelector<HTMLElement>('[data-media-detail-back]');
-      if (mediaDetailBack && focusableElements.includes(mediaDetailBack)) return mediaDetailBack;
+      // Fiche média : Lire / Télécharger, pas Retour (Retour = Escape / Back)
+      const mediaDetailPrimary =
+        document.querySelector<HTMLElement>('[data-media-detail-primary-action]') ||
+        document.querySelector<HTMLElement>('[data-media-detail-action="play"]') ||
+        document.querySelector<HTMLElement>('[data-media-detail-action="download"]');
+      if (mediaDetailPrimary && focusableElements.includes(mediaDetailPrimary)) return mediaDetailPrimary;
 
       // Page Settings : priorité au contenu (première carte ou premier focusable) sur toute sous-page
       const settingsContainer = document.querySelector(SETTINGS_CONTAINER_SELECTOR);
@@ -774,6 +809,18 @@ export default function TVNavigationProvider() {
         }
       }
 
+      // Clavier à l'écran : Backspace télécommande = effacer un caractère (quitter si vide)
+      const tvKeyboard = target.closest?.('[data-tv-keyboard]') as HTMLElement | null;
+      if (tvKeyboard && (e.key === 'Backspace' || e.keyCode === 8)) {
+        const backspaceBtn = tvKeyboard.querySelector<HTMLButtonElement>('[data-tv-keyboard-backspace]');
+        if (backspaceBtn && !backspaceBtn.disabled) {
+          e.preventDefault();
+          e.stopPropagation();
+          backspaceBtn.click();
+          return;
+        }
+      }
+
       // Modal ouverte : navigation D-pad limitée à l'intérieur de la modal (piège à focus)
       const modal = document.querySelector<HTMLElement>('[role="dialog"]:not([aria-hidden="true"])');
       if (modal && !isBackButton) {
@@ -835,6 +882,27 @@ export default function TVNavigationProvider() {
         )
       ) {
         return;
+      }
+
+      // Hero TV : gauche/droite cycle les titres au lieu de changer de bouton
+      if (
+        isTvDoc() &&
+        !modal &&
+        (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+      ) {
+        const activeHero = document.activeElement as HTMLElement | null;
+        const heroCycle = activeHero?.closest?.('[data-tv-hero-cycle]') as HTMLElement | null;
+        if (heroCycle) {
+          heroCycle.dispatchEvent(
+            new CustomEvent('tv-hero-cycle', {
+              bubbles: true,
+              detail: { delta: e.key === 'ArrowRight' ? 1 : -1 },
+            })
+          );
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
       }
 
       if (
@@ -1295,6 +1363,16 @@ export default function TVNavigationProvider() {
         if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) {
           return;
         }
+        const tvKeyboard = active?.closest?.('[data-tv-keyboard]') as HTMLElement | null;
+        if (tvKeyboard) {
+          const backspaceBtn = tvKeyboard.querySelector<HTMLButtonElement>('[data-tv-keyboard-backspace]');
+          if (backspaceBtn && !backspaceBtn.disabled) {
+            backspaceBtn.click();
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+          }
+        }
       }
       // webOS peut envoyer un événement personnalisé ou un KeyboardEvent
       if (event.type === 'webosback' || (event instanceof KeyboardEvent && (event.key === 'Backspace' || event.key === 'Escape'))) {
@@ -1391,26 +1469,81 @@ export default function TVNavigationProvider() {
     window.addEventListener('popstate', maybeFocusSettingsContent);
     document.addEventListener('astro:page-load', maybeFocusSettingsContent);
 
-    // Page Media Detail : focus initial sur le bouton Retour à l'arrivée (télécommande)
-    const maybeFocusMediaDetailBack = () => {
+    // Fiche média : focus Lire / Télécharger (pas Retour). Les séries gèrent le carrousel d’épisodes elles-mêmes.
+    const maybeFocusMediaDetailPrimary = () => {
       if (typeof window === 'undefined') return;
-      if (window.location.pathname !== '/torrents' || !new URLSearchParams(window.location.search).get('slug')) return;
+      if (window.location.pathname !== '/torrents') return;
+      const params = new URLSearchParams(window.location.search);
+      if (!params.get('slug') && !params.get('tmdbId')) return;
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
-          const back = document.querySelector<HTMLElement>('[data-media-detail-back]');
-          if (back) focusElement(back);
+          if (document.querySelector('[data-episode-card]')) return;
+          const primary =
+            document.querySelector<HTMLElement>('[data-media-detail-primary-action]') ||
+            document.querySelector<HTMLElement>('[data-media-detail-action="play"]') ||
+            document.querySelector<HTMLElement>('[data-media-detail-action="download"]');
+          if (primary) focusElement(primary);
         });
       });
     };
-    const tMediaDetail = setTimeout(maybeFocusMediaDetailBack, 200);
-    window.addEventListener('popstate', maybeFocusMediaDetailBack);
-    document.addEventListener('astro:page-load', maybeFocusMediaDetailBack);
+    const tMediaDetail = setTimeout(maybeFocusMediaDetailPrimary, 200);
+    window.addEventListener('popstate', maybeFocusMediaDetailPrimary);
+    document.addEventListener('astro:page-load', maybeFocusMediaDetailPrimary);
+
+    const onBrowseCardActivate = (e: Event) => {
+      if (!isTvDoc()) return;
+      const el = (e.target as HTMLElement | null)?.closest?.('[data-tv-item-key]') as HTMLElement | null;
+      if (el) saveTvBrowseRestoreFromElement(el);
+    };
+    document.addEventListener('click', onBrowseCardActivate, true);
+
+    let browseRestoreTimeouts: ReturnType<typeof setTimeout>[] = [];
+    const tryRestoreBrowseFocus = (): boolean => {
+      if (!isTvDoc() || !isTvBrowsePath()) return false;
+      const restore = peekTvBrowseRestore();
+      if (!restore) return false;
+      window.scrollTo(0, restore.scrollY);
+      const card = findTvBrowseRestoreCard(restore.itemKey);
+      if (!card) return false;
+      const focusable = card.matches(FOCUSABLE_SELECTOR)
+        ? card
+        : card.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      if (!focusable) return false;
+      focusElement(focusable);
+      clearTvBrowseRestore();
+      return true;
+    };
+    const scheduleBrowseRestore = () => {
+      browseRestoreTimeouts.forEach(clearTimeout);
+      browseRestoreTimeouts = [];
+      if (!isTvDoc() || !isTvBrowsePath() || !peekTvBrowseRestore()) return;
+      let attempts = 0;
+      const tick = () => {
+        if (tryRestoreBrowseFocus()) return;
+        attempts += 1;
+        if (attempts >= 16) {
+          clearTvBrowseRestore();
+          const first = getInitialFocusElement();
+          if (first) focusElement(first);
+          return;
+        }
+        browseRestoreTimeouts.push(setTimeout(tick, 120));
+      };
+      browseRestoreTimeouts.push(
+        setTimeout(() => requestAnimationFrame(() => requestAnimationFrame(tick)), 50)
+      );
+    };
+    scheduleBrowseRestore();
+    document.addEventListener('astro:page-load', scheduleBrowseRestore);
 
     return () => {
       if (settingsFocusTimeoutId) clearTimeout(settingsFocusTimeoutId);
       clearTimeout(tMediaDetail);
-      window.removeEventListener('popstate', maybeFocusMediaDetailBack);
-      document.removeEventListener('astro:page-load', maybeFocusMediaDetailBack);
+      browseRestoreTimeouts.forEach(clearTimeout);
+      document.removeEventListener('click', onBrowseCardActivate, true);
+      document.removeEventListener('astro:page-load', scheduleBrowseRestore);
+      window.removeEventListener('popstate', maybeFocusMediaDetailPrimary);
+      document.removeEventListener('astro:page-load', maybeFocusMediaDetailPrimary);
       window.removeEventListener('popstate', maybeFocusSettingsContent);
       document.removeEventListener('astro:page-load', maybeFocusSettingsContent);
       if (carouselDomObserver) carouselDomObserver.disconnect();

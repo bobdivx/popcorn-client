@@ -10,6 +10,7 @@ import {
   PLAYBACK_PHASE_I18N_KEYS,
   derivePlaybackPhase,
 } from '../streaming/player-shared/derivePlaybackPhase';
+import { tvBrowseItemKey } from '../../lib/tv-browse-restore';
 
 /** Nettoie le nom brut du torrent pour affichage (sans codec, résolution, etc.) */
 function cleanTorrentName(name: string | undefined): string {
@@ -79,6 +80,7 @@ export function DownloadCard({ torrent, posterUrl: posterUrlProp, backdropUrl: b
     <div
       ref={cardContainerRef}
       data-torrent-card
+      data-tv-item-key={tvBrowseItemKey({ info_hash: torrent.info_hash })}
       className="relative w-full max-w-full"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

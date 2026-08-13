@@ -2,6 +2,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import { useI18n } from '../../lib/i18n/useI18n';
 import CarouselRow from '../torrents/CarouselRow';
+import { PosterCard } from '../page-model/PosterCard';
 
 const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p/w500';
 
@@ -89,68 +90,14 @@ export default function DiscoverSection() {
       {popularMovies.length > 0 && (
         <CarouselRow title={t('discover.discoverMovies')} autoScroll={false}>
           {popularMovies.map((item) => (
-            <div
-              key={item.id}
-              className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px] cursor-pointer"
-              onClick={() => handleItemClick(item)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleItemClick(item);
-                }
-              }}
-            >
-              <div className="aspect-[2/3] rounded-lg overflow-hidden bg-white/5">
-                {item.poster ? (
-                  <img
-                    src={item.poster}
-                    alt={item.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-500">
-                    {item.title?.slice(0, 2) || '?'}
-                  </div>
-                )}
-              </div>
-              <p className="mt-2 text-sm text-white truncate">{item.title}</p>
-            </div>
+            <PosterCard key={item.id} item={item} onNavigate={handleItemClick} />
           ))}
         </CarouselRow>
       )}
       {popularTv.length > 0 && (
         <CarouselRow title={t('discover.discoverSeries')} autoScroll={false}>
           {popularTv.map((item) => (
-            <div
-              key={item.id}
-              className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px] cursor-pointer"
-              onClick={() => handleItemClick(item)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleItemClick(item);
-                }
-              }}
-            >
-              <div className="aspect-[2/3] rounded-lg overflow-hidden bg-white/5">
-                {item.poster ? (
-                  <img
-                    src={item.poster}
-                    alt={item.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-500">
-                    {item.title?.slice(0, 2) || '?'}
-                  </div>
-                )}
-              </div>
-              <p className="mt-2 text-sm text-white truncate">{item.title}</p>
-            </div>
+            <PosterCard key={item.id} item={item} onNavigate={handleItemClick} />
           ))}
         </CarouselRow>
       )}

@@ -68,6 +68,34 @@ const CATEGORY_LOADERS: Record<CategoryId, () => Promise<{ default: ComponentTyp
   account: () => import('./AccountSubMenuPanel'),
 };
 
+const PAGE_LOADERS = {
+  server: () => import('./ServerSettings'),
+  account: () => import('./AccountSubMenuPanel'),
+  ratio: () => import('./RatioAdminPanel'),
+} as const;
+
+/** Cache module-level : navigation retour instantanée sans re-fetch du chunk. */
+const panelCache = new Map<string, ComponentType<any>>();
+
+function loadCached(
+  key: string,
+  loader: () => Promise<{ default: ComponentType<any> }>
+): Promise<ComponentType<any>> {
+  const hit = panelCache.get(key);
+  if (hit) return Promise.resolve(hit);
+  return loader().then((m) => {
+    panelCache.set(key, m.default);
+    return m.default;
+  });
+}
+
+function idlePrefetch(fn: () => void) {
+  if (typeof window === 'undefined') return;
+  const ric = (window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number }).requestIdleCallback;
+  if (ric) ric(fn, { timeout: 2500 });
+  else setTimeout(fn, 400);
+}
+
 const CATEGORY_LABELS: Record<CategoryId, string> = {
   system: 'settingsMenu.category.system',
   maintenance: 'settingsMenu.category.maintenance',
@@ -130,15 +158,23 @@ export default function SettingsContent() {
     }
   }, []);
 
-  // Précharger les chunks des panneaux en arrière-plan pour que la navigation soit instantanée (sans spinner)
+  // Précharger en idle uniquement les chunks utiles (pas tout le settings d’un coup)
   useEffect(() => {
-    import('./ServerSettings');
-    import('./AccountSettings');
-    import('./TwoFactorSettings');
-    import('./QuickConnectAuthorize');
-    import('./LocalUsersLink');
-    VALID_CATEGORIES.forEach((id) => CATEGORY_LOADERS[id]?.());
-  }, []);
+    idlePrefetch(() => {
+      if (route.type === 'overview') {
+        void loadCached('cat:system', CATEGORY_LOADERS.system);
+        void loadCached('page:server', PAGE_LOADERS.server);
+        return;
+      }
+      if (route.type === 'category') {
+        void loadCached(`cat:${route.id}`, CATEGORY_LOADERS[route.id]);
+        return;
+      }
+      if (route.type === 'page') {
+        void loadCached(`page:${route.page}`, PAGE_LOADERS[route.page]);
+      }
+    });
+  }, [route]);
 
   if (route.type === 'overview') {
     return <SettingsOverview />;
@@ -147,7 +183,7 @@ export default function SettingsContent() {
   if (route.type === 'page') {
     return (
       <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
-        <div className="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
+        <div className="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6 sc-stack ds-card-animate">
           {route.page === 'server' && <LazyPageServer />}
           {route.page === 'account' && <LazyPageAccount />}
           {route.page === 'ratio' && <LazyPageRatio />}
@@ -161,9 +197,9 @@ export default function SettingsContent() {
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
-      <div className="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6">
-        <h1 className="ds-title-page truncate">{t(CATEGORY_LABELS[visibleCategory])}</h1>
-        <p className="ds-text-secondary mb-4 sm:mb-6 text-sm sm:text-base">{t('settingsMenu.subtitle')}</p>
+      <div className="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6 ds-card-animate">
+        <h1 className="sc-page-title">{t(CATEGORY_LABELS[visibleCategory])}</h1>
+        <p className="sc-page-subtitle">{t('settingsMenu.subtitle')}</p>
         <LazyCategoryPanel category={visibleCategory} />
       </div>
     </div>
@@ -171,15 +207,21 @@ export default function SettingsContent() {
 }
 
 function LazyPageServer() {
-  const [ServerSettings, setServerSettings] = useState<ComponentType<any> | null>(null);
+  const [ServerSettings, setServerSettings] = useState<ComponentType<any> | null>(
+    () => panelCache.get('page:server') ?? null
+  );
   useEffect(() => {
-    import('./ServerSettings').then((m) => setServerSettings(() => m.default));
+    let cancelled = false;
+    loadCached('page:server', PAGE_LOADERS.server).then((C) => {
+      if (!cancelled) setServerSettings(() => C);
+    });
+    return () => { cancelled = true; };
   }, []);
   if (!ServerSettings) return <SettingsRouteSkeleton />;
   return (
     <PermissionGuard permission="settings.server">
       <DsPageHeader titleKey="settingsPages.server.title" subtitleKey="settingsPages.server.subtitle" />
-      <div className="space-y-6 sm:space-y-8">
+      <div className="sc-stack">
         <ServerSettings />
       </div>
     </PermissionGuard>
@@ -189,9 +231,15 @@ function LazyPageServer() {
 function LazyPageAccount() {
   const { t } = useI18n();
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
-  const [AccountSubMenuPanel, setAccountSubMenuPanel] = useState<ComponentType<{ baseUrl?: string }> | null>(null);
+  const [AccountSubMenuPanel, setAccountSubMenuPanel] = useState<ComponentType<{ baseUrl?: string }> | null>(
+    () => panelCache.get('page:account') ?? null
+  );
   useEffect(() => {
-    import('./AccountSubMenuPanel').then((m) => setAccountSubMenuPanel(() => m.default));
+    let cancelled = false;
+    loadCached('page:account', PAGE_LOADERS.account).then((C) => {
+      if (!cancelled) setAccountSubMenuPanel(() => C);
+    });
+    return () => { cancelled = true; };
   }, []);
   const handleLogout = async () => {
     if (
@@ -238,9 +286,15 @@ function LazyPageAccount() {
 }
 
 function LazyPageRatio() {
-  const [RatioAdminPanel, setRatioAdminPanel] = useState<ComponentType<any> | null>(null);
+  const [RatioAdminPanel, setRatioAdminPanel] = useState<ComponentType<any> | null>(
+    () => panelCache.get('page:ratio') ?? null
+  );
   useEffect(() => {
-    import('./RatioAdminPanel').then((m) => setRatioAdminPanel(() => m.default));
+    let cancelled = false;
+    loadCached('page:ratio', PAGE_LOADERS.ratio).then((C) => {
+      if (!cancelled) setRatioAdminPanel(() => C);
+    });
+    return () => { cancelled = true; };
   }, []);
   if (!RatioAdminPanel) return <SettingsRouteSkeleton />;
   return <RatioAdminPanel />;
@@ -248,32 +302,33 @@ function LazyPageRatio() {
 
 function SettingsRouteSkeleton() {
   return (
-    <div className="flex items-center justify-center min-h-[120px]" aria-busy="true">
-      <span className="loading loading-spinner loading-md text-[var(--ds-accent-violet)]" />
+    <div className="sc-skeleton" aria-busy="true" aria-label="Chargement">
+      <div className="sc-skeleton-card sc-skeleton-card--lg" />
+      <div className="sc-skeleton-card" />
+      <div className="sc-skeleton-card" />
     </div>
   );
 }
 
 function LazyCategoryPanel({ category }: { category: CategoryId }) {
-  const [Component, setComponent] = useState<ComponentType<any> | null>(null);
+  const cacheKey = `cat:${category}`;
+  const [Component, setComponent] = useState<ComponentType<any> | null>(
+    () => panelCache.get(cacheKey) ?? null
+  );
 
   useEffect(() => {
     let cancelled = false;
-    setComponent(null);
+    if (!panelCache.has(cacheKey)) setComponent(null);
     const loader = CATEGORY_LOADERS[category];
     if (!loader) return;
-    loader().then((m) => {
-      if (!cancelled) setComponent(() => m.default);
+    loadCached(cacheKey, loader).then((C) => {
+      if (!cancelled) setComponent(() => C);
     });
     return () => { cancelled = true; };
-  }, [category]);
+  }, [category, cacheKey]);
 
   if (!Component) {
-    return (
-      <div className="flex items-center justify-center min-h-[120px]" aria-busy="true">
-        <span className="loading loading-spinner loading-md text-[var(--ds-accent-violet)]" />
-      </div>
-    );
+    return <SettingsRouteSkeleton />;
   }
   return <Component />;
 }

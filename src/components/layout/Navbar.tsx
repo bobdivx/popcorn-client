@@ -18,6 +18,7 @@ import { isDemoMode, setDemoMode } from '../../lib/backend-config';
 import { TokenManager } from '../../lib/client/storage';
 import { loadSubscription } from '../../lib/subscription-store';
 import ConnectivityWarning from './ConnectivityWarning';
+import { isTVPlatform } from '../../lib/utils/device-detection';
 
 type NavTab = { label: string; href: string; match?: 'exact' | 'prefix'; icon?: ComponentType<{ className?: string }> };
 
@@ -44,6 +45,7 @@ export default function Navbar() {
   const [storeState, setStoreState] = useState(() => getSyncStatusStore());
   const previousStatsRef = useRef<Record<string, number>>({});
   const [demoMode, setDemoModeNav] = useState(false);
+  const [isTvNav, setIsTvNav] = useState(false);
 
   useEffect(() => {
     const status = storeState.status;
@@ -68,6 +70,7 @@ export default function Navbar() {
   })();
   useEffect(() => {
     setDemoModeNav(isDemoMode());
+    setIsTvNav(isTVPlatform());
   }, []);
 
   // Écrans étroits : menu hamburger pour les invités (langue, Connexion, S'inscrire)
@@ -220,8 +223,9 @@ export default function Navbar() {
             <a
               href={user ? '/dashboard' : '/'}
               className="flex items-center gap-2 sm:gap-3 group rounded-xl py-1 pr-2 focus:outline-none focus:ring-4 focus:ring-primary-600/50 focus:ring-offset-2 focus:ring-offset-black transition-opacity duration-200 hover:opacity-90"
-              tabIndex={0}
-              data-focusable
+              tabIndex={isTvNav ? -1 : 0}
+              data-focusable={isTvNav ? undefined : true}
+              data-tv-nav-skip={isTvNav ? true : undefined}
               aria-label="Popcornn"
             >
               <img
@@ -444,8 +448,9 @@ export default function Navbar() {
                   <a
                     href="/settings/account"
                     className="nav-avatar-btn rounded-full overflow-hidden transition-all duration-200 hover:scale-105 hover:ring-2 hover:ring-primary-500/70 hover:ring-offset-1 hover:ring-offset-black focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-accent-violet)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-surface-elevated)] active:scale-95 w-10 h-10 lg:w-11 lg:h-11 tv:w-12 tv:h-12 block"
-                    tabIndex={0}
-                    data-focusable
+                    tabIndex={isTvNav ? -1 : 0}
+                    data-focusable={isTvNav ? undefined : true}
+                    data-tv-nav-skip={isTvNav ? true : undefined}
                     aria-label={t('nav.account')}
                   >
                     <Avatar

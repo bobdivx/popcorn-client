@@ -113,14 +113,14 @@ export default function CarouselRow({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="flex items-end mb-2 sm:mb-3 tv:mb-4 px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 gap-3">
+      <div className="flex items-end mb-2 sm:mb-3 tv:mb-4 px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 tv-overscan-x gap-3">
         <div className="min-w-0">
           <h2 className="text-lg sm:text-xl md:text-2xl tv:text-3xl font-bold text-white truncate">{title}</h2>
           {subtitle ? (
             <p className="text-xs sm:text-sm text-white/55 mt-1 truncate">{subtitle}</p>
           ) : null}
         </div>
-        {(isHovered || (scrollContainerRef.current?.scrollLeft || 0) > 0) && (
+        {!isTV && (isHovered || (scrollContainerRef.current?.scrollLeft || 0) > 0) && (
           <div className="hidden xs:flex gap-1.5 sm:gap-2 tv:gap-4 ml-auto">
             <button
               onClick={() => scroll('left')}
