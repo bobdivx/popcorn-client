@@ -306,7 +306,6 @@ interface IServerApiClientPublic {
   }>>;
   getRatioTorrentTrackers(infoHash: string): Promise<ApiResponse<{ tracker_urls: string[] }>>;
   postRatioTest(): Promise<ApiResponse<{ mode_enabled: boolean; librqbit_ok: boolean; torrent_count: number; message: string }>>;
-  postRatioTestSeed(options?: { tracker_url?: string; uploaded_mb?: number; info_hash?: string }): Promise<ApiResponse<{ success: boolean; tracker_url: string; uploaded_bytes: number; response_status: number; message: string }>>;
   getMediaPaths(): Promise<ApiResponse<{ download_dir_root: string; films_path: string | null; series_path: string | null; default_path: string | null; films_root: string; series_root: string }>>;
   putMediaPaths(body: { films_path?: string | null; series_path?: string | null; default_path?: string | null }): Promise<ApiResponse<{ download_dir_root: string; films_path: string | null; series_path: string | null; default_path: string | null; films_root: string; series_root: string }>>;
   listExplorerFiles(path?: string): Promise<ApiResponse<Array<{ name: string; path: string; is_directory: boolean; size?: number; modified?: number }>>>;

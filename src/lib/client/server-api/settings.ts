@@ -205,31 +205,6 @@ export const settingsMethods = {
   }>> {
     return this.backendRequest('/api/admin/tracker-mode/check', { method: 'POST' });
   },
-  /** POST /api/admin/tracker-mode/probe-seed — envoie une annonce de test (même format que le client), quantité en Mo configurable, info_hash optionnel */
-  async postRatioTestSeed(this: ServerApiClientSettingsAccess, options?: { tracker_url?: string; uploaded_mb?: number; info_hash?: string }): Promise<ApiResponse<{
-    success: boolean;
-    tracker_url: string;
-    uploaded_bytes: number;
-    response_status: number;
-    message: string;
-    ratio_from_tracker?: number;
-    min_ratio_required?: number;
-    uploaded_from_tracker?: number;
-    downloaded_from_tracker?: number;
-  }>> {
-    const hasOptions = options && (options.tracker_url != null && options.tracker_url.trim() !== '' || options.uploaded_mb != null || (options.info_hash != null && options.info_hash.trim() !== ''));
-    const body = hasOptions
-      ? JSON.stringify({
-          ...(options!.tracker_url != null && options!.tracker_url.trim() !== '' ? { tracker_url: options!.tracker_url!.trim() } : {}),
-          ...(options!.uploaded_mb != null ? { uploaded_mb: options!.uploaded_mb } : {}),
-          ...(options!.info_hash != null && options!.info_hash.trim() !== '' ? { info_hash: options!.info_hash.trim() } : {}),
-        })
-      : undefined;
-    return this.backendRequest('/api/admin/tracker-mode/probe-seed', {
-      method: 'POST',
-      body,
-    });
-  },
 
   /** GET /api/client/config/media-paths — chemins par type (films, séries), style Jellyfin */
   async getMediaPaths(this: ServerApiClientSettingsAccess): Promise<ApiResponse<{

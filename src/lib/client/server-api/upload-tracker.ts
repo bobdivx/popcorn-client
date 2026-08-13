@@ -202,6 +202,7 @@ export interface DownloadClientRow {
   username?: string | null;
   password?: string | null;
   api_key?: string | null;
+  download_path?: string | null;
   is_enabled: boolean;
 }
 
@@ -611,6 +612,7 @@ export const uploadTrackerMethods = {
       username: c.username ?? null,
       password: c.password ?? null,
       api_key: c.api_key ?? null,
+      download_path: c.download_path ?? null,
       is_enabled: c.is_enabled === 1 || c.is_enabled === true,
     }));
     return { success: true, data: rows };
@@ -625,6 +627,7 @@ export const uploadTrackerMethods = {
       username: string;
       password: string;
       name?: string;
+      download_path?: string;
     }
   ): Promise<ApiResponse<DownloadClientRow>> {
     const payload = {
@@ -635,6 +638,7 @@ export const uploadTrackerMethods = {
       username: params.username,
       password: params.password,
       api_key: null as string | null,
+      download_path: params.download_path?.trim() || null,
       is_enabled: true,
     };
     if (params.id) {
@@ -654,6 +658,7 @@ export const uploadTrackerMethods = {
           port: c.port,
           username: c.username,
           password: c.password,
+          download_path: c.download_path ?? params.download_path ?? null,
           is_enabled: true,
         },
       };
@@ -674,6 +679,7 @@ export const uploadTrackerMethods = {
         port: c.port,
         username: c.username,
         password: c.password,
+        download_path: c.download_path ?? params.download_path ?? null,
         is_enabled: true,
       },
     };

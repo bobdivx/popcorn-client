@@ -221,7 +221,7 @@ export default function TmdbConfig({ embedded = false }: TmdbConfigProps) {
         <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4">
           <input
             type="password"
-            autoComplete="off"
+            autoComplete="new-password"
             class={inputClass}
             placeholder={tmdbHasKey ? "Clé API TMDB configurée (masquée)" : "Entrez votre clé API TMDB"}
             value={tmdbKey || ''}

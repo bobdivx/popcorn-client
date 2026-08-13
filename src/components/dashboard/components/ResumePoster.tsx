@@ -4,6 +4,7 @@ import { FocusableCard } from '../../ui/FocusableCard';
 import { useI18n } from '../../../lib/i18n/useI18n';
 import { formatSpeed } from '../../../lib/utils/formatBytes';
 import { Download } from 'lucide-preact';
+import { contentItemKey } from '../utils/browsePriority';
 
 interface ResumePosterProps {
   item: EnrichedResumeItem;
@@ -99,6 +100,7 @@ export function ResumePoster({ item, onNavigate }: ResumePosterProps) {
   return (
     <div
       className="relative group cursor-pointer torrent-poster min-w-[140px] sm:min-w-[160px] md:min-w-[180px] lg:min-w-[280px] xl:min-w-[320px] tv:min-w-[400px]"
+      data-tv-item-key={contentItemKey(item)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

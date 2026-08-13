@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'preact/hooks';
+import type { ComponentChildren } from 'preact';
 import { serverApi } from '../lib/client/server-api';
 import { invalidateLibraryCache } from '../lib/client/server-api/library';
 import { LibraryPoster } from './library/LibraryPoster';
@@ -10,7 +11,10 @@ import { getSharedWithMe, logFriendActivity } from '../lib/api/popcorn-web';
 import { HeroSection } from './dashboard/components/HeroSection';
 import type { ContentItem } from '../lib/client/types';
 import { translateGenre } from '../lib/utils/genre-translation';
-import { buildStrictTmdbDetailUrl } from '../lib/utils/media-detail-url';
+import { buildStrictTmdbDetailUrl, buildStrictTmdbDetailUrlFromContentItem } from '../lib/utils/media-detail-url';
+import { isTVPlatform } from '../lib/utils/device-detection';
+import { PosterCard } from './page-model/PosterCard';
+import { useActiveDownloads } from './dashboard/hooks/useActiveDownloads';
 
 export type LibraryContentFilter = 'all' | 'movies' | 'series';
 export type LibrarySourceFilter = 'all' | 'popcorn' | 'external' | 'shared' | 'local';
@@ -113,6 +117,7 @@ interface LibraryProps {
   showHero?: boolean;
   showFilters?: boolean;
   showSync?: boolean;
+  headerAction?: ComponentChildren;
 }
 
 export default function Library({
@@ -122,8 +127,13 @@ export default function Library({
   showHero = true,
   showFilters = true,
   showSync = true,
+  headerAction,
 }: LibraryProps) {
   const { t, language } = useI18n();
+  const [isTV, setIsTV] = useState(false);
+  useEffect(() => {
+    setIsTV(isTVPlatform());
+  }, []);
   const lang = language === 'fr' ? 'fr' : 'en';
   const [items, setItems] = useState<LibraryMedia[]>([]);
   const [sharedByFriends, setSharedByFriends] = useState<Array<{ friendLabel: string; backendUrl: string; localUserId: string | null; items: LibraryMedia[] }>>([]);
@@ -136,6 +146,7 @@ export default function Library({
   const [syncInProgress, setSyncInProgress] = useState(false);
   const [contentFilter, setContentFilter] = useState<LibraryContentFilter>(initialContentFilter);
   const [sourceFilter, setSourceFilter] = useState<LibrarySourceFilter>(initialSourceFilter);
+  const { activeDownloads } = useActiveDownloads();
 
   useEffect(() => {
     loadLibrary();
@@ -307,6 +318,10 @@ export default function Library({
     });
   };
 
+  const handleContentNavigate = (item: ContentItem) => {
+    window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'library');
+  };
+
   const handleScanLocalMedia = async () => {
     try {
       setScanning(true);
@@ -460,25 +475,49 @@ export default function Library({
   const visibleItems = filteredVisible;
   const groupedItems = { movies, series, others };
 
+  const popcornRecent = useMemo(
+    () => visibleItems.filter((item) => isPopconnDownloadedInfoHash(item.info_hash)).slice(0, 20),
+    [visibleItems]
+  );
+
+  const activeForPage = useMemo(
+    () =>
+      activeDownloads.filter((item) => {
+        if (contentFilter === 'movies') return item.type === 'movie';
+        if (contentFilter === 'series') return item.type === 'tv';
+        return true;
+      }),
+    [activeDownloads, contentFilter]
+  );
+
   const heroItems = useMemo<ContentItem[]>(() => {
-    const withPoster = visibleItems
-      .filter((item) => item.poster_url || item.hero_image_url)
-      .slice(0, 3)
-      .map((item) => ({
-        id: item.info_hash || item.slug || item.name,
-        title: item.name,
-        type:
-          item.category === 'SERIES' || item.tmdb_type === 'tv' || item.tmdb_type === 'series'
-            ? 'tv'
-            : 'movie',
-        poster: item.poster_url || undefined,
-        backdrop: item.hero_image_url || undefined,
-        overview: item.synopsis || undefined,
-        rating: item.vote_average ?? undefined,
-        releaseDate: item.release_date ?? undefined,
-        tmdbId: item.tmdb_id ?? undefined,
-      }));
-    if (withPoster.length > 0) return withPoster;
+    const toHero = (item: LibraryMedia): ContentItem => ({
+      id: item.info_hash || item.slug || item.name,
+      title: item.name,
+      type:
+        item.category === 'SERIES' || item.tmdb_type === 'tv' || item.tmdb_type === 'series'
+          ? 'tv'
+          : 'movie',
+      poster: item.poster_url || undefined,
+      backdrop: item.hero_image_url || undefined,
+      overview: item.synopsis || undefined,
+      rating: item.vote_average ?? undefined,
+      releaseDate: item.release_date ?? undefined,
+      tmdbId: item.tmdb_id ?? undefined,
+    });
+    const withPoster = [...popcornRecent, ...visibleItems].filter(
+      (item) => item.poster_url || item.hero_image_url
+    );
+    const seen = new Set<string>();
+    const unique: ContentItem[] = [];
+    for (const item of withPoster) {
+      const key = item.info_hash || item.slug || item.name;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push(toHero(item));
+      if (unique.length >= 5) break;
+    }
+    if (unique.length > 0) return unique;
     // Toujours afficher une image dans le hero : placeholder Bibliothèque
     return [
       {
@@ -490,7 +529,7 @@ export default function Library({
         overview: t('library.emptyDescription'),
       },
     ];
-  }, [visibleItems, t]);
+  }, [visibleItems, popcornRecent, t]);
 
   /** Nombre d'items en chargement prioritaire (première ligne visible) par section */
   const PRIORITY_LOAD_COUNT = 12;
@@ -530,7 +569,7 @@ export default function Library({
     const start = options?.priorityFromIndex ?? 0;
     const gridKey = options?.key ?? title;
     return (
-      <div key={gridKey} className="mb-8 tv:mb-10 px-4 tv:px-6">
+      <div key={gridKey} className="mb-8 tv:mb-10 px-4 tv:px-6 tv-overscan-x">
         <h2 className="text-lg sm:text-xl tv:text-2xl font-semibold text-white mb-4">{title}</h2>
         <div
           data-carousel
@@ -620,6 +659,16 @@ export default function Library({
 
   const sectionsContent = (
     <>
+      {activeForPage.length > 0 && (
+        <CarouselRow title={t('library.downloadingSection')} autoScroll={false}>
+          {activeForPage.map((item) => (
+            <PosterCard key={item.id} item={item} onNavigate={handleContentNavigate} />
+          ))}
+        </CarouselRow>
+      )}
+      {popcornRecent.length > 0 &&
+        renderSection(t('library.latestDownload'), popcornRecent, { key: 'popcorn-recent' })}
+
       {/* Lignes par genre — Films */}
       {(contentFilter === 'all' || contentFilter === 'movies') &&
         Object.entries(moviesByGenre)
@@ -682,7 +731,77 @@ export default function Library({
         </div>
       )}
 
-      {showFilters ? (
+      {headerAction ? (
+        <div className="tv-page-header px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 pt-4 pb-2">
+          <div className="tv-page-header-action">{headerAction}</div>
+        </div>
+      ) : null}
+
+      {isTV ? (
+        <div className="tv-overscan-x flex flex-wrap items-center gap-4 px-4 sm:px-6 pb-4">
+          {showFilters ? (
+            <div
+              className="inline-flex items-center gap-2 p-1.5 rounded-full bg-black/60 border border-white/10"
+              role="tablist"
+              aria-label={t('library.title')}
+            >
+              {(
+                [
+                  { id: 'all' as const, label: t('library.filterAll'), icon: Layers },
+                  { id: 'movies' as const, label: t('library.filterFilms'), icon: Film },
+                  { id: 'series' as const, label: t('library.filterSeries'), icon: Tv },
+                ] as const
+              ).map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="tab"
+                  aria-selected={contentFilter === id}
+                  onClick={() => setContentFilter(id)}
+                  className={`inline-flex items-center justify-center w-14 h-14 rounded-full focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-offset-2 focus:ring-offset-black ${
+                    contentFilter === id ? 'bg-white text-black shadow-md' : 'bg-white/10 text-white/80'
+                  }`}
+                  title={label}
+                  data-focusable
+                >
+                  <Icon className="w-7 h-7" />
+                  <span className="sr-only">{label}</span>
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div
+            className="inline-flex items-center gap-2 p-1.5 rounded-full bg-black/50 border border-white/10"
+            aria-label={t('library.filterSourceAll')}
+          >
+            {(
+              [
+                { id: 'all' as const, label: t('library.filterSourceAll'), icon: Layers },
+                { id: 'popcorn' as const, label: t('library.filterSourcePopcorn'), icon: Server },
+                { id: 'external' as const, label: t('library.filterSourceExternal'), icon: HardDrive },
+                { id: 'shared' as const, label: t('library.filterSourceShared'), icon: Users },
+                { id: 'local' as const, label: t('library.filterSourceLocal'), icon: Folder },
+              ] as const
+            ).map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setSourceFilter(id)}
+                className={`inline-flex items-center justify-center w-14 h-14 rounded-full focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-offset-2 focus:ring-offset-black ${
+                  sourceFilter === id ? 'bg-white text-black shadow-sm' : 'bg-white/5 text-white/70'
+                }`}
+                title={label}
+                data-focusable
+              >
+                <Icon className="w-6 h-6" />
+                <span className="sr-only">{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {showFilters && !isTV ? (
         <div className="flex gap-4 tv:gap-6 px-4 tv:px-6">
           {/* Barre verticale (type + source) */}
           <aside className="sticky top-24 self-start z-10">
@@ -771,9 +890,10 @@ export default function Library({
                   <button
                     onClick={handleScanLocalMedia}
                     disabled={scanning}
-                    className="btn btn-primary gap-2 min-h-[48px] tv:min-h-[56px] focus:outline-none focus:ring-4 focus:ring-primary-600"
+                    className="btn btn-primary gap-2 min-h-[48px] tv:min-h-[56px] focus:outline-none focus:ring-4 focus:ring-primary-600 library-sync-btn"
                     title={t('library.syncLibrary')}
                     data-focusable
+                    data-tv-nav-skip
                   >
                     <RefreshCw className={`w-5 h-5 ${scanning ? 'animate-spin' : ''}`} />
                     {scanning ? t('library.scanning') : t('library.syncLibrary')}
@@ -785,7 +905,7 @@ export default function Library({
           </div>
         </div>
       ) : (
-        <div className="px-4 tv:px-6">
+        <div className="px-4 tv:px-6 tv-overscan-x">
           <p className="text-sm text-gray-400 mt-2 mb-1" title={t('library.seriesGroupedHint')}>
             {t('library.mediaCount', { count: visibleItems.length })}
             {visibleItems.length > 0 && (movies.length + series.length) < visibleItems.length && (
@@ -805,9 +925,10 @@ export default function Library({
                 <button
                   onClick={handleScanLocalMedia}
                   disabled={scanning}
-                  className="btn btn-primary gap-2 min-h-[48px] tv:min-h-[56px] focus:outline-none focus:ring-4 focus:ring-primary-600"
+                  className="btn btn-primary gap-2 min-h-[48px] tv:min-h-[56px] focus:outline-none focus:ring-4 focus:ring-primary-600 library-sync-btn"
                   title={t('library.syncLibrary')}
                   data-focusable
+                  data-tv-nav-skip
                 >
                   <RefreshCw className={`w-5 h-5 ${scanning ? 'animate-spin' : ''}`} />
                   {scanning ? t('library.scanning') : t('library.syncLibrary')}

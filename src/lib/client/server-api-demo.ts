@@ -362,15 +362,6 @@ export function createDemoServerApi(): Record<string, unknown> {
     async postRatioTest(): Promise<ApiResponse<{ mode_enabled: boolean; librqbit_ok: boolean; torrent_count: number; message: string }>> {
       return success({ mode_enabled: false, librqbit_ok: true, torrent_count: 0, message: 'Connexion librqbit OK' });
     },
-    async postRatioTestSeed(_options?: { tracker_url?: string; uploaded_mb?: number; info_hash?: string }): Promise<ApiResponse<{ success: boolean; tracker_url: string; uploaded_bytes: number; response_status: number; message: string }>> {
-      return success({
-        success: true,
-        tracker_url: 'http://127.0.0.1:3000/announce',
-        uploaded_bytes: 1000 * 1024 * 1024,
-        response_status: 200,
-        message: 'Annonce envoyée avec uploaded=1048576000 (1000 MiB)',
-      });
-    },
     async getMediaPaths(): Promise<ApiResponse<{ download_dir_root: string; films_path: string | null; series_path: string | null; default_path: string | null; films_root: string; series_root: string }>> {
       return success({
         download_dir_root: '/data/downloads',

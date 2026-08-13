@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
-import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Minimize, Subtitles, ArrowLeft, RotateCcw, SkipForward, Settings } from 'lucide-preact';
+import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Minimize, Subtitles, ArrowLeft, RotateCcw, SkipForward, SkipBack, Settings } from 'lucide-preact';
 import { useI18n } from '../../../../lib/i18n';
 import { formatTime } from '../utils/formatTime';
 import { isMobileDevice } from '../../../../lib/utils/device-detection';
@@ -695,6 +695,74 @@ export function VideoControls({
           />
           </div>
           <div class={`flex items-center ${gap} relative z-30 overflow-x-auto min-w-0 scrollbar-visible`} data-tv-video-controls-row>
+            {isTV ? (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onSeekTV?.('left', 10);
+                  }}
+                  class={`flex flex-col items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border-2 border-white/20 focus:outline-none ${getFocusClass(tvSkipBackIndex)}`}
+                  title={t('playback.skipBack10')}
+                  aria-label={t('playback.skipBack10')}
+                >
+                  <SkipBack class={`${iconSize} text-white`} />
+                  <span class="text-xs font-bold text-white/90 -mt-0.5">10</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onPlayPause();
+                  }}
+                  class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border-2 border-white/20 focus:outline-none relative z-40 ${getFocusClass(playIndex)}`}
+                  title={isPlaying ? t('playback.pauseLabel') : t('playback.playLabel')}
+                  aria-label={isPlaying ? t('playback.pauseLabel') : t('playback.playLabel')}
+                >
+                  {isPlaying ? <Pause class={`${iconSize} text-white`} /> : <Play class={`${iconSize} text-white ml-0.5`} />}
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onSeekTV?.('right', 10);
+                  }}
+                  class={`flex flex-col items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border-2 border-white/20 focus:outline-none ${getFocusClass(tvSkipFwdIndex)}`}
+                  title={t('playback.skipForward10')}
+                  aria-label={t('playback.skipForward10')}
+                >
+                  <SkipForward class={`${iconSize} text-white`} />
+                  <span class="text-xs font-bold text-white/90 -mt-0.5">10</span>
+                </button>
+                <div class={`flex items-center gap-2 text-white ${textSize} font-medium flex-shrink-0`}>
+                  <span>{formatTime(currentTime)}</span>
+                  <span class="text-white/50">/</span>
+                  <span class="text-white/70">{formatTime(duration > 0 ? duration : (scrubThumbnails?.durationSeconds ?? 0))}</span>
+                </div>
+                <div class="flex-1 min-w-2" />
+                {(audioTracks.length > 0 || subtitleTracks.length > 0) && onToggleSubtitleSelector && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleSubtitleSelector();
+                    }}
+                    class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 border-2 border-white/20 focus:outline-none ${getFocusClass(tvSubsIndex)} ${
+                      currentSubtitleTrack !== -1 ? 'bg-red-600/30 border-red-500/50' : ''
+                    }`}
+                    title={t('playback.audioAndSubtitles')}
+                    aria-label={t('playback.audioAndSubtitles')}
+                  >
+                    <Subtitles class={`${iconSize} text-white`} />
+                  </button>
+                )}
+              </>
+            ) : (
+            <>
             <button 
               onClick={(e) => { 
                 e.preventDefault();
@@ -909,6 +977,8 @@ export function VideoControls({
             >
               {isFullscreen ? <Minimize class={`${iconSize} text-white`} /> : <Maximize class={`${iconSize} text-white`} />}
             </button>
+            </>
+            )}
           </div>
         </div>
       </div>

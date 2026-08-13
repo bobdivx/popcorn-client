@@ -322,8 +322,9 @@ export class ServerApiClientBase {
           (endpoint.includes('/api/library/uploader/upload-one') || endpoint.includes('/api/library/uploader/generate-screenshots') ||
             endpoint.includes('/api/library/upload-tracker/create-torrent') || endpoint.includes('/api/admin/system/restart') ||
             endpoint.includes('/bulk-torrent-zip/import'));
+        const isQbitTest = endpoint.includes('/download-clients/qbittorrent/test');
         
-        if (retryCount < maxRetries && !isNonIdempotentPost && this.isRetryableError(null, response)) {
+        if (retryCount < maxRetries && !isNonIdempotentPost && !isQbitTest && this.isRetryableError(null, response)) {
           const delay = Math.min(1000 * Math.pow(2, retryCount), 3000);
           await new Promise(resolve => setTimeout(resolve, delay));
           return this.backendRequest<T>(endpoint, options, retryCount + 1, baseUrlOverride);
@@ -334,12 +335,20 @@ export class ServerApiClientBase {
         if (data && typeof data === 'object') {
           if ((data as any).error && typeof (data as any).error === 'string') {
             errorMessage = (data as any).error;
-            errorCode = (data as any).error.includes('mot de passe') ? 'InvalidCredentials' : 'BackendError';
+            errorCode = (data as any).error.includes('mot de passe') || (data as any).error.includes('Identifiants')
+              ? 'InvalidCredentials'
+              : 'BackendError';
           } else if ((data as any).message && typeof (data as any).message === 'string') {
             errorMessage = (data as any).message;
           } else if ((data as any).detail && typeof (data as any).detail === 'string') {
             errorMessage = (data as any).detail;
           }
+        }
+        // 502 opaque (Cloudflare) sur le test qBit → message métier, pas « backend down »
+        if (isQbitTest && response.status === 502 && (!data || !(data as any).error)) {
+          errorMessage =
+            'Échec du test qBittorrent (hôte, port, utilisateur ou mot de passe incorrect).';
+          errorCode = 'InvalidCredentials';
         }
         return { success: false, error: errorCode, message: errorMessage };
       }
@@ -357,13 +366,24 @@ export class ServerApiClientBase {
         (endpoint.includes('/api/library/uploader/upload-one') || endpoint.includes('/api/library/uploader/generate-screenshots') ||
           endpoint.includes('/api/library/upload-tracker/create-torrent') || endpoint.includes('/api/admin/system/restart') ||
           endpoint.includes('/bulk-torrent-zip/import'));
+      const isQbitTest = endpoint.includes('/download-clients/qbittorrent/test');
       
-      if (retryCount < maxRetries && !isNonIdempotentPost && this.isRetryableError(error)) {
+      if (retryCount < maxRetries && !isNonIdempotentPost && !isQbitTest && this.isRetryableError(error)) {
         const delay = Math.min(1000 * Math.pow(2, retryCount), 3000);
         await new Promise(resolve => setTimeout(resolve, delay));
         return this.backendRequest<T>(endpoint, options, retryCount + 1, baseUrlOverride);
       }
       
+      // Failed to fetch / CORS sur le test qBit : souvent un 502 Cloudflare (mauvais MDP), pas un backend down
+      if (isQbitTest) {
+        return {
+          success: false,
+          error: 'InvalidCredentials',
+          message:
+            'Échec du test qBittorrent — vérifie l’hôte, le port, l’utilisateur et le mot de passe.',
+        };
+      }
+
       const errorInfo = this.getErrorMessage(error, undefined, endpoint, url);
       const isOffline = errorInfo.code === 'ConnectionError' || errorInfo.code === 'Timeout';
       if (isOffline) {

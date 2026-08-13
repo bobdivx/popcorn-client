@@ -9,6 +9,7 @@ import type { RatioBoostStatus } from '../../lib/client/server-api/upload-tracke
 import type { Indexer } from '../../lib/client/types';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { CheckCircle2, Circle, Loader2, Zap, ExternalLink, Save } from 'lucide-preact';
+import { SettingsCard, SettingsNestedCard } from './SettingsCard';
 
 function formatGiB(bytes: number): string {
   return (bytes / (1024 * 1024 * 1024)).toFixed(2);
@@ -69,6 +70,7 @@ export default function RatioBoostWizard() {
   const [qbitPort, setQbitPort] = useState(8080);
   const [qbitUser, setQbitUser] = useState('admin');
   const [qbitPass, setQbitPass] = useState('');
+  const [qbitSavePath, setQbitSavePath] = useState('/DATA/ratio-boost');
   const [qbitSaving, setQbitSaving] = useState(false);
   const [qbitTesting, setQbitTesting] = useState(false);
   const [qbitOk, setQbitOk] = useState(false);
@@ -132,6 +134,7 @@ export default function RatioBoostWizard() {
     setQbitPort(q.port || 8080);
     setQbitUser(q.username || 'admin');
     if (q.password) setQbitPass(q.password);
+    if (q.download_path) setQbitSavePath(q.download_path);
   }, []);
 
   const loadSeeds = useCallback(async () => {
@@ -218,6 +221,7 @@ export default function RatioBoostWizard() {
         port: qbitPort,
         username: qbitUser.trim(),
         password: qbitPass,
+        download_path: qbitSavePath.trim(),
       });
       if (!save.success || !save.data) {
         setQbitError(save.message || t('ratioBoost.qbitSaveError'));
@@ -234,7 +238,15 @@ export default function RatioBoostWizard() {
       });
       if (!test.success) {
         setQbitOk(false);
-        setQbitError(test.message || t('ratioBoost.qbitTestFail'));
+        const msg = test.message || '';
+        const isCreds =
+          test.error === 'InvalidCredentials' ||
+          /identifiants|mot de passe|password|credentials/i.test(msg);
+        setQbitError(
+          isCreds
+            ? (msg.includes('Identifiants') ? msg : t('ratioBoost.qbitBadCredentials'))
+            : msg || t('ratioBoost.qbitTestFail')
+        );
         return;
       }
       setQbitOk(true);
@@ -255,6 +267,7 @@ export default function RatioBoostWizard() {
       info_hashes: seedHashes,
       max_concurrent: 1,
       delete_after_complete: true,
+      save_dir: qbitSavePath.trim() || '/DATA/ratio-boost',
     });
     if (!res.success || !res.data) {
       setBoosting(false);
@@ -265,20 +278,11 @@ export default function RatioBoostWizard() {
   };
 
   return (
-    <section className="rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-950/40 to-[var(--ds-surface-elevated)]/80 p-5 sm:p-6 space-y-6">
-      <header className="space-y-2">
-        <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-          <Zap className="w-6 h-6 text-amber-300" aria-hidden />
-          {t('ratioBoost.title')}
-        </h2>
-        <p className="text-sm text-[var(--ds-text-secondary)] max-w-3xl leading-relaxed">
-          {t('ratioBoost.intro')}
-        </p>
-        <p className="text-xs text-amber-200/80 max-w-3xl">{t('ratioBoost.howItWorks')}</p>
-      </header>
+    <SettingsCard accent="amber" icon={Zap} title={t('ratioBoost.title')} description={t('ratioBoost.intro')} bodyClassName="space-y-6">
+      <p className="text-xs text-amber-200/80 max-w-3xl -mt-2">{t('ratioBoost.howItWorks')}</p>
 
       {/* Étape 1 — Comprendre + compte C411 */}
-      <div className="rounded-xl border border-white/10 bg-black/20 p-4 space-y-3">
+      <SettingsNestedCard bodyClassName="space-y-3">
         <div className="flex items-start gap-3">
           <StepBadge n={1} done={step1Done && step2Done} active={!step2Done} />
           <div className="min-w-0 flex-1 space-y-2">
@@ -300,10 +304,10 @@ export default function RatioBoostWizard() {
             </a>
           </div>
         </div>
-      </div>
+      </SettingsNestedCard>
 
       {/* Étape 2 — Clé API */}
-      <div className="rounded-xl border border-white/10 bg-black/20 p-4 space-y-3">
+      <SettingsNestedCard bodyClassName="space-y-3">
         <div className="flex items-start gap-3">
           <StepBadge n={2} done={step2Done} active={step1Done && !step2Done} />
           <div className="min-w-0 flex-1 space-y-3">
@@ -338,7 +342,7 @@ export default function RatioBoostWizard() {
                     value={apiKey}
                     onInput={(e) => setApiKey((e.target as HTMLInputElement).value)}
                     placeholder={t('ratioBoost.apiKeyPlaceholder')}
-                    autoComplete="off"
+                    autoComplete="new-password"
                   />
                 </label>
                 {accountError && <p className="text-sm text-red-300">{accountError}</p>}
@@ -355,15 +359,22 @@ export default function RatioBoostWizard() {
             )}
           </div>
         </div>
-      </div>
+      </SettingsNestedCard>
 
       {/* Étape 3 — qBittorrent */}
-      <div className="rounded-xl border border-white/10 bg-black/20 p-4 space-y-3">
+      <SettingsNestedCard bodyClassName="space-y-3">
         <div className="flex items-start gap-3">
           <StepBadge n={3} done={step3Done && qbitOk} active={step2Done && !qbitOk} />
           <div className="min-w-0 flex-1 space-y-3">
             <h3 className="font-semibold text-white">{t('ratioBoost.step3Title')}</h3>
             <p className="text-sm text-[var(--ds-text-secondary)]">{t('ratioBoost.step3Body')}</p>
+            <form
+              className="space-y-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void handleSaveAndTestQbit();
+              }}
+            >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
               <label className="form-control">
                 <span className="label-text text-xs">{t('ratioBoost.qbitHost')}</span>
@@ -397,6 +408,7 @@ export default function RatioBoostWizard() {
                     setQbitUser((e.target as HTMLInputElement).value);
                     setQbitOk(false);
                   }}
+                  autoComplete="username"
                 />
               </label>
               <label className="form-control">
@@ -409,7 +421,7 @@ export default function RatioBoostWizard() {
                     setQbitPass((e.target as HTMLInputElement).value);
                     setQbitOk(false);
                   }}
-                  autoComplete="off"
+                  autoComplete="current-password"
                 />
               </label>
             </div>
@@ -421,9 +433,8 @@ export default function RatioBoostWizard() {
               </p>
             )}
             <button
-              type="button"
+              type="submit"
               className="btn btn-sm btn-primary gap-2"
-              onClick={handleSaveAndTestQbit}
               disabled={qbitSaving || qbitTesting}
             >
               {qbitSaving || qbitTesting ? (
@@ -433,12 +444,13 @@ export default function RatioBoostWizard() {
               )}
               {t('ratioBoost.saveAndTestQbit')}
             </button>
+            </form>
           </div>
         </div>
-      </div>
+      </SettingsNestedCard>
 
       {/* Étape 4 — Lancer + suivi */}
-      <div className="rounded-xl border border-white/10 bg-black/20 p-4 space-y-3">
+      <SettingsNestedCard bodyClassName="space-y-3">
         <div className="flex items-start gap-3">
           <StepBadge n={4} done={Boolean(boostStatus?.finished_at && !boostStatus.in_progress)} active={step4Active} />
           <div className="min-w-0 flex-1 space-y-3">
@@ -466,7 +478,6 @@ export default function RatioBoostWizard() {
               {t('ratioBoost.startButton')}
             </button>
 
-            {/* Suivi live */}
             {boostStatus && (boostStatus.in_progress || boostStatus.finished_at) && (
               <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-950/40 p-4 space-y-2">
                 <p className="font-medium text-amber-100">
@@ -521,7 +532,7 @@ export default function RatioBoostWizard() {
             )}
           </div>
         </div>
-      </div>
-    </section>
+      </SettingsNestedCard>
+    </SettingsCard>
   );
 }
