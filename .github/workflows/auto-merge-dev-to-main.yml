@@ -32,6 +32,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.PAT || secrets.GH_PAT || github.token }}
 
       - name: Create or update PR dev -> main/master
         env:
@@ -40,6 +41,8 @@ jobs:
           set -euo pipefail
 
           git fetch origin
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
           if git show-ref --verify --quiet refs/remotes/origin/main; then
             TARGET_BRANCH="main"
@@ -48,6 +51,40 @@ jobs:
           else
             echo "Neither main nor master exists on origin."
             exit 1
+          fi
+
+          # Résoudre les conflits récurrents VERSION.json avant d'ouvrir/merger le PR.
+          git checkout -B dev origin/dev
+          set +e
+          git merge "origin/${TARGET_BRANCH}" --no-edit
+          MERGE_EXIT=$?
+          set -e
+
+          if [ "${MERGE_EXIT}" -ne 0 ]; then
+            CONFLICTS="$(git diff --name-only --diff-filter=U || true)"
+            if [ "${CONFLICTS}" = "VERSION.json" ]; then
+              echo "Resolving VERSION.json conflict (keep highest client.version)…"
+              OURS_VER="$(git show HEAD:VERSION.json | jq -r '.client.version // "0.0.0"')"
+              THEIRS_VER="$(git show MERGE_HEAD:VERSION.json | jq -r '.client.version // "0.0.0"')"
+              HIGHER="$(printf '%s\n%s\n' "${OURS_VER}" "${THEIRS_VER}" | sort -V | tail -n1)"
+              if [ "${HIGHER}" = "${OURS_VER}" ]; then
+                git show HEAD:VERSION.json > VERSION.json
+              else
+                git show MERGE_HEAD:VERSION.json > VERSION.json
+              fi
+              echo "Kept client.version=$(jq -r '.client.version' VERSION.json) (ours=${OURS_VER}, theirs=${THEIRS_VER})"
+              git add VERSION.json
+              git commit --no-edit -m "chore: resolve VERSION.json conflict with ${TARGET_BRANCH}"
+            else
+              echo "::error::Merge conflict with ${TARGET_BRANCH}: ${CONFLICTS}"
+              git merge --abort || true
+              exit 1
+            fi
+          fi
+
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse "origin/dev")" ]; then
+            git push origin HEAD:dev
+            git fetch origin
           fi
 
           if [ "$(git rev-parse "origin/dev")" = "$(git rev-parse "origin/${TARGET_BRANCH}")" ]; then
@@ -83,7 +120,12 @@ jobs:
             exit 1
           fi
 
-          if gh pr merge "${PR_NUMBER}" --auto --merge 2>/dev/null; then
+          set +e
+          AUTO_MERGE_OUTPUT="$(gh pr merge "${PR_NUMBER}" --auto --merge 2>&1)"
+          AUTO_MERGE_EXIT=$?
+          set -e
+
+          if [ "${AUTO_MERGE_EXIT}" -eq 0 ]; then
             echo "Auto-merge enabled for PR #${PR_NUMBER}."
             sleep 2
             STATE="$(gh pr view "${PR_NUMBER}" --json state --jq .state 2>/dev/null || true)"
@@ -91,11 +133,23 @@ jobs:
               echo "PR still open after --auto; attempting direct merge…"
               gh pr merge "${PR_NUMBER}" --merge || true
             fi
-          elif gh pr merge "${PR_NUMBER}" --merge; then
-            echo "Direct merge succeeded for PR #${PR_NUMBER}."
           else
-            echo "Could not merge or enable auto-merge for PR #${PR_NUMBER}."
-            exit 1
+            if echo "${AUTO_MERGE_OUTPUT}" | grep -Eq "Auto merge is not allowed|enablePullRequestAutoMerge"; then
+              echo "::warning::Repo auto-merge setting unavailable. Falling back to direct merge."
+            else
+              echo "${AUTO_MERGE_OUTPUT}"
+            fi
+            set +e
+            DIRECT_MERGE_OUTPUT="$(gh pr merge "${PR_NUMBER}" --merge 2>&1)"
+            DIRECT_MERGE_EXIT=$?
+            set -e
+            if [ "${DIRECT_MERGE_EXIT}" -eq 0 ]; then
+              echo "PR #${PR_NUMBER} merged directly."
+            else
+              echo "${DIRECT_MERGE_OUTPUT}"
+              echo "::error::Could not merge PR #${PR_NUMBER}."
+              exit 1
+            fi
           fi
 
       - name: Trigger Vercel Deploy Hook (if configured)
