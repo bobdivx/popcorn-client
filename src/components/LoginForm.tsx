@@ -3,9 +3,10 @@ import { serverApi } from '../lib/client/server-api';
 import { redirectTo, getPathHref } from '../lib/utils/navigation.js';
 import { QuickConnectDisplay } from './ui/QuickConnectDisplay';
 import { useI18n } from '../lib/i18n/useI18n';
-import { registerCloudDevice } from '../lib/api/popcorn-web';
+import { registerCloudDevice, getOidcStatus } from '../lib/api/popcorn-web';
 import { isTauri } from '../lib/utils/tauri';
 import { isTVPlatform } from '../lib/utils/device-detection';
+import PocketIdButton from './PocketIdButton';
 
 export default function LoginForm() {
   const { t } = useI18n();
@@ -16,6 +17,8 @@ export default function LoginForm() {
   const [sessionExpiredMessage, setSessionExpiredMessage] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [checkingUsers, setCheckingUsers] = useState(true);
+  const [ssoRequired, setSsoRequired] = useState(false);
+  const [ssoCompleting, setSsoCompleting] = useState(false);
 
   // Détection TV pour adapter la taille de la carte de login
   const isTV = typeof window !== 'undefined' ? isTVPlatform() : false;
@@ -32,10 +35,30 @@ export default function LoginForm() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('reason') === 'session_expired') {
       setSessionExpiredMessage(true);
-      // Nettoyer l'URL sans recharger la page
       const url = new URL(window.location.href);
       url.searchParams.delete('reason');
       window.history.replaceState({}, '', url.pathname + url.search);
+    }
+    const ssoError = params.get('sso_error');
+    if (ssoError) {
+      setError(ssoError);
+    }
+    const ticket = params.get('sso_ticket');
+    if (ticket) {
+      setSsoCompleting(true);
+      serverApi.completeCloudSso(ticket).then(async (response) => {
+        if (!response.success) {
+          setError(response.message || t('loginForm.sso.error'));
+          setSsoCompleting(false);
+          return;
+        }
+        void registerDeviceIfPossible();
+        redirectTo('/dashboard');
+      }).catch((err) => {
+        console.error(err);
+        setError(t('loginForm.errors.networkError'));
+        setSsoCompleting(false);
+      });
     }
   }, []);
 
@@ -96,6 +119,9 @@ export default function LoginForm() {
         
         if (response.error === 'DatabaseError' || errorMessage.includes('Base de données non configurée')) {
           errorMessage = t('loginForm.errors.dbNotConfigured');
+        } else if (response.error === 'SsoRequired' || errorMessage.includes('Pocket ID')) {
+          setSsoRequired(true);
+          errorMessage = t('loginForm.sso.required');
         } else if (response.error === 'InvalidCredentials') {
           errorMessage = t('loginForm.errors.invalidCredentials');
         } else if (errorMessage.includes('500') || errorMessage.includes('Internal Server Error')) {
@@ -193,6 +219,23 @@ export default function LoginForm() {
               <span>{error}</span>
             </div>
           )}
+          {ssoCompleting && (
+            <p className="text-gray-300 text-sm mb-4">{t('loginForm.sso.completing')}</p>
+          )}
+          {ssoRequired ? (
+            <div className="mb-4">
+              <PocketIdButton emphasize />
+            </div>
+          ) : (
+            <div className="mb-4">
+              <PocketIdButton />
+              <div className="flex items-center gap-3 my-4">
+                <div className="flex-1 h-px bg-white/20" />
+                <span className="text-gray-500 text-xs uppercase">{t('loginForm.sso.or')}</span>
+                <div className="flex-1 h-px bg-white/20" />
+              </div>
+            </div>
+          )}
           <div className="mb-3 sm:mb-4">
             <label className="block text-white text-sm font-medium mb-1.5 sm:mb-2">
               {t('loginForm.email')}
@@ -201,13 +244,27 @@ export default function LoginForm() {
               type="email"
               className="form-tv-input w-full bg-white/10 border border-white/20 text-white placeholder-gray-400 px-3 sm:px-4 py-2.5 sm:py-3 rounded text-sm sm:text-base focus:outline-none focus:border-white/40 transition-colors"
               value={email}
-              onInput={(e) => setEmail((e.target as HTMLInputElement).value)}
+              onInput={(e) => {
+                const value = (e.target as HTMLInputElement).value;
+                setEmail(value);
+              }}
+              onBlur={async () => {
+                if (!email.includes('@')) return;
+                const status = await getOidcStatus(email);
+                setSsoRequired(status.ssoRequired);
+                if (status.ssoRequired) {
+                  setError(status.message || t('loginForm.sso.required'));
+                }
+              }}
               placeholder={t('loginForm.emailPlaceholder')}
-              required
+              required={!ssoRequired}
               autoFocus
               autocomplete="email"
+              disabled={ssoCompleting}
             />
           </div>
+          {!ssoRequired && (
+            <>
           <div className="mb-4 sm:mb-6">
             <label className="block text-white text-sm font-medium mb-1.5 sm:mb-2">
               {t('loginForm.password')}
@@ -220,17 +277,20 @@ export default function LoginForm() {
               placeholder={t('loginForm.passwordPlaceholder')}
               required
               autocomplete="current-password"
+              disabled={ssoCompleting}
             />
           </div>
           <button
             type="submit"
             className={`form-tv-button w-full bg-primary hover:bg-primary-700 text-white font-medium py-2.5 sm:py-3 rounded text-sm sm:text-base transition-colors shadow-primary ${
-              isLoading ? 'opacity-50 cursor-not-allowed' : ''
+              isLoading || ssoCompleting ? 'opacity-50 cursor-not-allowed' : ''
             }`}
-            disabled={isLoading}
+            disabled={isLoading || ssoCompleting}
           >
             {isLoading ? t('loginForm.submitting') : t('loginForm.submit')}
           </button>
+            </>
+          )}
         </form>
       )}
 

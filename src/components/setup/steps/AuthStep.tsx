@@ -2,6 +2,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../../../lib/client/server-api';
 import { TokenManager } from '../../../lib/client/storage';
 import { getUserConfig } from '../../../lib/api/popcorn-web';
+import PocketIdButton from '../../PocketIdButton';
 import { PreferencesManager } from '../../../lib/client/storage';
 import type { UserConfig } from '../../../lib/api/popcorn-web';
 import type { SetupStatus } from '../../../lib/client/types';
@@ -62,6 +63,33 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
+  const [ssoRequired, setSsoRequired] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const ssoError = params.get('sso_error');
+    if (ssoError) setError(ssoError);
+    const ticket = params.get('sso_ticket');
+    if (!ticket) return;
+    setLoading(true);
+    serverApi.completeCloudSso(ticket).then(async (res) => {
+      if (!res.success) {
+        setError(res.message || t('loginForm.sso.error'));
+        setLoading(false);
+        return;
+      }
+      const cloudToken = TokenManager.getCloudAccessToken();
+      if (cloudToken) {
+        await afterCloudLogin(cloudToken);
+      } else {
+        onNext();
+      }
+    }).catch(() => {
+      setError(t('loginForm.sso.error'));
+      setLoading(false);
+    });
+  }, []);
 
   const afterCloudLogin = async (cloudToken: string) => {
     dbg('afterCloudLogin start');
@@ -155,7 +183,10 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
 
       if (!response.success) {
         let errorMessage = response.message || 'Erreur de connexion cloud';
-        if (response.error === 'CloudUnavailable') {
+        if (response.error === 'SsoRequired' || (response.message || '').includes('Pocket ID')) {
+          setSsoRequired(true);
+          errorMessage = t('loginForm.sso.required');
+        } else if (response.error === 'CloudUnavailable') {
           errorMessage = 'Le service cloud est indisponible. Vérifiez votre connexion internet.';
         } else if (response.error === 'CloudLoginError') {
           const msg = response.message || '';
@@ -313,6 +344,18 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
           {view === 'login' && (
             <div class="auth-step-tv__form">
               <div class="auth-section-label">Connexion avec email</div>
+              {ssoRequired ? (
+                <div style="margin-bottom:16px;"><PocketIdButton emphasize /></div>
+              ) : (
+                <div style="margin-bottom:16px;">
+                  <PocketIdButton />
+                  <div class="flex items-center gap-3 my-4">
+                    <div class="flex-1 h-px bg-white/20" />
+                    <span class="text-gray-500 text-xs uppercase">{t('loginForm.sso.or')}</span>
+                    <div class="flex-1 h-px bg-white/20" />
+                  </div>
+                </div>
+              )}
               <form onSubmit={handleLogin}>
                 <div class="auth-step-tv__field">
                   <label class="wizard-label">{t('wizard.auth.email')}</label>
@@ -335,11 +378,12 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                     placeholder={t('wizard.auth.passwordPlaceholder')}
                     value={loginPassword}
                     onInput={(e) => setLoginPassword((e.target as HTMLInputElement).value)}
-                    required
-                    disabled={loading}
+                    required={!ssoRequired}
+                    disabled={loading || ssoRequired}
                     autocomplete="current-password"
                   />
                 </div>
+                {!ssoRequired && (
                 <button
                   ref={(el) => { buttonRefs.current[0] = el; }}
                   type="submit"
@@ -348,6 +392,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                 >
                   {loading ? 'Connexion...' : 'Se connecter'}
                 </button>
+                )}
               </form>
               <button
                 type="button"
@@ -361,6 +406,14 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
           {view === 'register' && (
             <div class="auth-step-tv__form">
               <div class="auth-section-label">Créer un compte</div>
+              <div style="margin-bottom:16px;">
+                <PocketIdButton />
+                <div class="flex items-center gap-3 my-4">
+                  <div class="flex-1 h-px bg-white/20" />
+                  <span class="text-gray-500 text-xs uppercase">{t('loginForm.sso.or')}</span>
+                  <div class="flex-1 h-px bg-white/20" />
+                </div>
+              </div>
               <form onSubmit={handleRegister}>
                 <div class="auth-step-tv__field">
                   <label class="wizard-label">{t('wizard.auth.email')}</label>
@@ -708,6 +761,18 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
               {/* Colonne gauche : formulaire */}
               <div>
                 <div class="auth-section-label">Connexion avec email</div>
+                {ssoRequired ? (
+                  <div style="margin-bottom:16px;"><PocketIdButton emphasize /></div>
+                ) : (
+                  <div style="margin-bottom:16px;">
+                    <PocketIdButton />
+                    <div class="flex items-center gap-3 my-4">
+                      <div class="flex-1 h-px bg-white/20" />
+                      <span class="text-gray-500 text-xs uppercase">{t('loginForm.sso.or')}</span>
+                      <div class="flex-1 h-px bg-white/20" />
+                    </div>
+                  </div>
+                )}
                 <form onSubmit={handleLogin}>
                   <div style="margin-bottom:14px;">
                     <label class="wizard-label">{t('wizard.auth.email')}</label>
@@ -730,11 +795,12 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                       placeholder={t('wizard.auth.passwordPlaceholder')}
                       value={loginPassword}
                       onInput={(e) => setLoginPassword((e.target as HTMLInputElement).value)}
-                      required
-                      disabled={loading}
-                      autocomplete="current-password"
-                    />
-                  </div>
+                    required={!ssoRequired}
+                    disabled={loading || ssoRequired}
+                    autocomplete="current-password"
+                  />
+                </div>
+                {!ssoRequired && (
                   <button
                     ref={(el) => { buttonRefs.current[0] = el; }}
                     type="submit"
@@ -756,6 +822,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                       </>
                     )}
                   </button>
+                )}
                 </form>
 
                 <div style="margin-top:16px;text-align:center;">
@@ -795,6 +862,14 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
           {view === 'register' && (
             <div>
               <div class="auth-section-label">Créer un compte</div>
+              <div style="margin-bottom:16px;">
+                <PocketIdButton />
+                <div class="flex items-center gap-3 my-4">
+                  <div class="flex-1 h-px bg-white/20" />
+                  <span class="text-gray-500 text-xs uppercase">{t('loginForm.sso.or')}</span>
+                  <div class="flex-1 h-px bg-white/20" />
+                </div>
+              </div>
               <form onSubmit={handleRegister}>
                 <div style="margin-bottom:14px;">
                   <label class="wizard-label">{t('wizard.auth.email')}</label>

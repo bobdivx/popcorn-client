@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
 import { redirectTo } from '../lib/utils/navigation.js';
 import { useI18n } from '../lib/i18n/useI18n';
+import PocketIdButton from './PocketIdButton';
 
 interface RegisterFormData {
   email: string;
@@ -84,6 +85,14 @@ export default function RegisterForm() {
   return (
     <div className="w-full max-w-md bg-black/80 backdrop-blur-sm border border-white/20 rounded-lg p-4 sm:p-6 md:p-8 shadow-2xl mx-3 sm:mx-4">
       <h2 className="text-2xl sm:text-3xl font-bold text-white text-center mb-4 sm:mb-6">{t('registerForm.title')}</h2>
+      <div className="mb-4">
+        <PocketIdButton />
+        <div className="flex items-center gap-3 my-4">
+          <div className="flex-1 h-px bg-white/20" />
+          <span className="text-gray-500 text-xs uppercase">{t('loginForm.sso.or')}</span>
+          <div className="flex-1 h-px bg-white/20" />
+        </div>
+      </div>
       <form onSubmit={handleSubmit}>
         {error && (
           <div className="bg-red-900/20 border border-red-600 text-red-400 px-4 py-3 rounded mb-4">

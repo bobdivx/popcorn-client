@@ -2088,6 +2088,21 @@
     "noAccount": "No account?",
     "register": "Register",
     "sessionExpired": "Your session has expired. Please sign in again.",
+    "sso": {
+      "continue": "Continue with Pocket ID",
+      "or": "or",
+      "checking": "Checking SSO…",
+      "completing": "Signing in with Pocket ID…",
+      "required": "This account signs in with Pocket ID",
+      "error": "Pocket ID sign-in failed",
+      "settingsTitle": "Pocket ID (SSO)",
+      "link": "Link Pocket ID",
+      "unlink": "Unlink Pocket ID",
+      "linkedDescription": "This account signs in with Pocket ID. Password login is disabled while SSO is linked.",
+      "unlinkedDescription": "Link Pocket ID to sign in via DevForge SSO. Email/password stays available until you link it.",
+      "linkSuccess": "Pocket ID has been linked to your account.",
+      "unlinkSuccess": "Pocket ID has been unlinked. You can use a password again."
+    },
     "errors": {
       "dbNotConfigured": "The server does not have a configured database. Please contact the server administrator.",
       "invalidCredentials": "Invalid email or password",
