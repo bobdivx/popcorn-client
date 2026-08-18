@@ -129,6 +129,7 @@ interface IServerApiClientPublic {
   register(email: string, password: string): Promise<ApiResponse<{ user: { id: string; email: string } }>>;
   login(email: string, password: string): Promise<ApiResponse<AuthResponse>>;
   loginCloud(email: string, password: string): Promise<ApiResponse<AuthResponse>>;
+  completeCloudSso(ticket: string): Promise<ApiResponse<AuthResponse>>;
   registerCloud(email: string, password: string): Promise<ApiResponse<AuthResponse>>;
   logout(): void;
   getMe(): Promise<ApiResponse<{ id: string; email: string }>>;

@@ -2092,6 +2092,21 @@
     "noAccount": "Pas de compte ?",
     "register": "S'inscrire",
     "sessionExpired": "Votre session a expiré. Veuillez vous reconnecter.",
+    "sso": {
+      "continue": "Continuer avec Pocket ID",
+      "or": "ou",
+      "checking": "Vérification SSO…",
+      "completing": "Connexion Pocket ID…",
+      "required": "Ce compte se connecte avec Pocket ID",
+      "error": "La connexion Pocket ID a échoué",
+      "settingsTitle": "Pocket ID (SSO)",
+      "link": "Lier Pocket ID",
+      "unlink": "Délier Pocket ID",
+      "linkedDescription": "Ce compte se connecte avec Pocket ID. Le mot de passe est désactivé tant que le SSO est lié.",
+      "unlinkedDescription": "Liez Pocket ID pour vous connecter via le SSO DevForge. Le login email/mot de passe reste disponible tant que vous n’avez pas lié.",
+      "linkSuccess": "Pocket ID a été lié à votre compte.",
+      "unlinkSuccess": "Pocket ID a été délié. Vous pouvez à nouveau utiliser un mot de passe."
+    },
     "errors": {
       "dbNotConfigured": "Le serveur n'a pas de base de données configurée. Veuillez contacter l'administrateur du serveur.",
       "invalidCredentials": "Email ou mot de passe incorrect",

@@ -5,7 +5,7 @@
 import type { ApiResponse } from './types.js';
 import type { AuthResponse } from './types.js';
 import { TokenManager } from '../storage.js';
-import { loginCloud as popcornWebLogin, registerCloud as popcornWebRegister } from '../../api/popcorn-web.js';
+import { loginCloud as popcornWebLogin, registerCloud as popcornWebRegister, completeOidcTicket } from '../../api/popcorn-web.js';
 
 /**
  * Interface pour accéder aux méthodes privées de ServerApiClient nécessaires pour l'authentification
@@ -17,6 +17,55 @@ interface ServerApiClientAuthAccess {
   saveUser(user: any): void;
   getUser(): any | null;
   clearTokens(): void;
+}
+
+async function persistCloudLogin(
+  ctx: ServerApiClientAuthAccess,
+  result: {
+    user: { id: string; email: string; is_admin?: boolean; username?: string };
+    accessToken: string;
+    refreshToken: string;
+    jwtSecret?: string;
+  }
+): Promise<ApiResponse<AuthResponse>> {
+  TokenManager.setCloudTokens(result.accessToken, result.refreshToken);
+  if (result.jwtSecret) {
+    TokenManager.setJWTSecret(result.jwtSecret);
+  }
+  ctx.saveUser(result.user);
+
+  if (result.user?.id && result.user?.email) {
+    try {
+      const username = result.user.username || result.user.email.split('@')[0];
+      await ctx.backendRequest('/api/client/auth/users/sync-cloud', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-ID': result.user.id,
+        },
+        body: JSON.stringify({
+          id: result.user.id,
+          email: result.user.email,
+          username,
+          is_admin: result.user.is_admin,
+        }),
+      });
+    } catch (syncError) {
+      console.error('[server-api] Erreur sync cloud après SSO:', syncError);
+    }
+  }
+
+  ctx.saveTokens(result.accessToken, result.refreshToken);
+  return {
+    success: true,
+    data: {
+      user: result.user,
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      cloudAccessToken: result.accessToken,
+      cloudRefreshToken: result.refreshToken,
+    },
+  };
 }
 
 export const authMethods = {
@@ -227,98 +276,7 @@ export const authMethods = {
         };
       }
 
-      // Stocker les tokens cloud
-      console.log('[server-api] Stockage des tokens cloud...', {
-        hasAccessToken: !!result.accessToken,
-        hasRefreshToken: !!result.refreshToken,
-        hasUser: !!result.user,
-        hasJwtSecret: !!result.jwtSecret,
-      });
-      
-      TokenManager.setCloudTokens(result.accessToken, result.refreshToken);
-      console.log('[server-api] Tokens cloud stockés');
-      
-      // Stocker le secret JWT si fourni (important pour les connexions suivantes)
-      if (result.jwtSecret) {
-        TokenManager.setJWTSecret(result.jwtSecret);
-        console.log('[server-api] Secret JWT stocké depuis la connexion cloud');
-      }
-
-      // Stocker user localement pour pouvoir faire les appels backend qui demandent X-User-ID (TMDB/sync)
-      console.log('[server-api] Sauvegarde de l\'utilisateur...', {
-        userId: result.user?.id,
-        userEmail: result.user?.email,
-      });
-      this.saveUser(result.user);
-      console.log('[server-api] Utilisateur sauvegardé');
-
-      // Synchroniser l'utilisateur cloud dans la base de données locale du backend
-      // IMPORTANT: Créer l'utilisateur dans la base locale dès la connexion cloud réussie
-      // avec toutes les informations disponibles pour éviter de créer un utilisateur minimal plus tard
-      if (result.user?.id && result.user?.email) {
-        try {
-          // Utiliser l'email comme username si aucun username n'est fourni
-          const username = result.user.username || result.user.email.split('@')[0];
-          
-          console.log('[server-api] Synchronisation de l\'utilisateur cloud dans la base locale...', {
-            userId: result.user.id,
-            email: result.user.email,
-            username: username,
-          });
-          
-          const syncResponse = await this.backendRequest('/api/client/auth/users/sync-cloud', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'X-User-ID': result.user.id,
-            },
-            body: JSON.stringify({
-              id: result.user.id,
-              email: result.user.email,
-              username: username,
-              is_admin: result.user.is_admin, // Inclure le statut admin si disponible
-            }),
-          });
-          
-          if (syncResponse.success) {
-            console.log('[server-api] ✅ Utilisateur cloud synchronisé dans la base locale avec succès');
-          } else {
-            console.warn('[server-api] ⚠️ Impossible de synchroniser l\'utilisateur cloud:', syncResponse.message || syncResponse.error);
-            // Ne pas bloquer la connexion, mais logger l'erreur
-          }
-        } catch (syncError) {
-          console.error('[server-api] ❌ Erreur lors de la synchronisation de l\'utilisateur cloud:', syncError);
-          // Ne pas bloquer la connexion si la synchronisation échoue
-          // L'utilisateur sera créé de manière minimale plus tard si nécessaire
-        }
-      } else {
-        console.warn('[server-api] ⚠️ Informations utilisateur incomplètes, impossible de synchroniser:', {
-          hasId: !!result.user?.id,
-          hasEmail: !!result.user?.email,
-        });
-      }
-
-      // Les tokens cloud sont déjà stockés et fonctionnent
-      // Pour les appels au backend local, on peut utiliser les tokens cloud directement
-      // car ils sont valides et signés avec le secret JWT de l'utilisateur
-      // Pas besoin de générer des tokens locaux supplémentaires
-      console.log('[server-api] Utilisation des tokens cloud pour les appels backend local');
-      
-      // Sauvegarder les tokens cloud comme tokens locaux (même tokens, même secret JWT)
-      // Cela permet d'utiliser les mêmes tokens pour popcorn-web et popcorn-server
-      this.saveTokens(result.accessToken, result.refreshToken);
-      console.log('[server-api] Tokens cloud sauvegardés comme tokens locaux');
-
-      return {
-        success: true,
-        data: {
-          user: result.user,
-          accessToken: result.accessToken, // Utiliser les tokens cloud directement
-          refreshToken: result.refreshToken,
-          cloudAccessToken: result.accessToken,
-          cloudRefreshToken: result.refreshToken,
-        },
-      };
+      return persistCloudLogin(this, result);
     } catch (e) {
       // Log détaillé pour le diagnostic
       const errorMessage = e instanceof Error ? e.message : String(e);
@@ -348,6 +306,27 @@ export const authMethods = {
         success: false,
         error: 'CloudLoginError',
         message: userMessage,
+      };
+    }
+  },
+
+  async completeCloudSso(this: ServerApiClientAuthAccess, ticket: string): Promise<ApiResponse<AuthResponse>> {
+    try {
+      const result = await completeOidcTicket(ticket);
+      if (!result) {
+        return {
+          success: false,
+          error: 'CloudUnavailable',
+          message: 'API cloud indisponible',
+        };
+      }
+      return persistCloudLogin(this, result);
+    } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      return {
+        success: false,
+        error: 'SsoError',
+        message: errorMessage || 'Connexion Pocket ID échouée',
       };
     }
   },

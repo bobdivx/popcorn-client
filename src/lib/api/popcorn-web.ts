@@ -367,6 +367,122 @@ export async function loginCloud(email: string, password: string): Promise<{
   }
 }
 
+export async function getOidcAvailable(): Promise<boolean> {
+  try {
+    const res = await requestJson(`${getPopcornWebApiUrl()}/auth/oidc/available`, {}, 8000);
+    return !!(res.ok && res.data?.data?.available);
+  } catch {
+    return false;
+  }
+}
+
+export async function getOidcStatus(email: string): Promise<{ ssoRequired: boolean; message?: string }> {
+  try {
+    const res = await requestJson(
+      `${getPopcornWebApiUrl()}/auth/oidc/status?email=${encodeURIComponent(email)}`,
+      {},
+      8000
+    );
+    return {
+      ssoRequired: !!(res.ok && res.data?.data?.ssoRequired),
+      message: res.data?.data?.message,
+    };
+  } catch {
+    return { ssoRequired: false };
+  }
+}
+
+export function getOidcStartUrl(returnTo: string): string {
+  const params = new URLSearchParams({ returnTo });
+  return `${getPopcornWebApiUrl()}/auth/oidc/start?${params.toString()}`;
+}
+
+export async function completeOidcTicket(ticket: string): Promise<{
+  user: { id: string; email: string; is_admin?: boolean; username?: string };
+  accessToken: string;
+  refreshToken: string;
+  jwtSecret?: string;
+} | null> {
+  const res = await requestJson(
+    `${getPopcornWebApiUrl()}/auth/oidc/complete`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ticket }),
+    },
+    15000
+  );
+  if (!res.ok || !res.data?.success || !res.data?.data) {
+    const message = res.data?.message || 'Connexion Pocket ID échouée';
+    const error = new Error(message) as Error & { status?: number };
+    error.status = res.status;
+    throw error;
+  }
+  return {
+    user: res.data.data.user,
+    accessToken: res.data.data.accessToken,
+    refreshToken: res.data.data.refreshToken,
+    jwtSecret: res.data.data.jwtSecret,
+  };
+}
+
+export async function getOidcLinkStatus(): Promise<{ available: boolean; linked: boolean }> {
+  const token = TokenManager.getCloudAccessToken() || TokenManager.getAccessToken();
+  const res = await requestJson(
+    `${getPopcornWebApiUrl()}/auth/oidc/link-status`,
+    {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    },
+    8000
+  );
+  if (!res.ok || !res.data?.success) {
+    throw new Error(res.data?.message || 'Impossible de lire l’état Pocket ID');
+  }
+  return {
+    available: !!res.data.data?.available,
+    linked: !!res.data.data?.linked,
+  };
+}
+
+export async function startOidcLink(returnTo: string): Promise<string> {
+  const token = TokenManager.getCloudAccessToken() || TokenManager.getAccessToken();
+  const res = await requestJson(
+    `${getPopcornWebApiUrl()}/auth/oidc/link-start`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ returnTo }),
+    },
+    10000
+  );
+  if (!res.ok || !res.data?.success || !res.data?.data?.redirectUrl) {
+    throw new Error(res.data?.message || 'Impossible de démarrer la liaison Pocket ID');
+  }
+  return res.data.data.redirectUrl as string;
+}
+
+export async function unlinkOidc(): Promise<void> {
+  const token = TokenManager.getCloudAccessToken() || TokenManager.getAccessToken();
+  const res = await requestJson(
+    `${getPopcornWebApiUrl()}/auth/oidc/unlink`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    },
+    10000
+  );
+  if (!res.ok || !res.data?.success) {
+    throw new Error(res.data?.message || 'Impossible de délier Pocket ID');
+  }
+}
+
 /**
  * Crée un compte cloud via l'API popcorn-web
  * @param email Email de l'utilisateur
