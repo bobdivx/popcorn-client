@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from 'preact/hooks';
+import { Info, Loader2 } from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
 import { formatSize } from '../utils/formatSize';
 import { useI18n } from '../../../../lib/i18n/useI18n';
-import { translateGenres } from '../../../../lib/utils/genre-translation';
 import { serverApi } from '../../../../lib/client/server-api';
 import { getLibraryDisplayConfig } from '../../../../lib/utils/library-display-config';
 import { buildExternalDownloadParams } from '../../../../lib/torrents/externalDownloadParams';
+import { Modal } from '../../../ui/Modal';
 
 type QualityVariant = {
   id: string;
@@ -61,6 +62,7 @@ function qualityBadgeClass(_resolution: string, isSelected: boolean): string {
 export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeederWarning = true, isSeries = false, sources, allVariants, selectedVariantId, onSelectVariant }: TorrentInfoProps) {
   const { language, t } = useI18n();
   const [isDownloadingTorrent, setIsDownloadingTorrent] = useState(false);
+  const [showTechInfoModal, setShowTechInfoModal] = useState(false);
   const [seederAlertVisible, setSeederAlertVisible] = useState(true);
   const [seederAlertFading, setSeederAlertFading] = useState(false);
 
@@ -135,6 +137,8 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
   const minimumRatio = (torrent as any).minimumRatio ?? (torrent as any).minimum_ratio ?? null;
   const trackerName = (torrent as any).tracker ?? null;
   const infoHash = (torrent as any).infoHash || (torrent as any).info_hash || null;
+  const filePath = !isSeries ? ((torrent as any).downloadPath as string | undefined) || null : null;
+  const showMovieTechInfo = !isSeries && !!(filePath || indexerName || minimumRatio != null || trackerName);
 
   const canDownloadTorrentFile = !!infoHash || !!(torrent as any)._externalLink;
 
@@ -225,25 +229,25 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
 
   return (
     <div className="space-y-4">
-      {/* Chemin du fichier — films uniquement (séries : bouton Info → modal dossier série) */}
-      {!isSeries && (torrent as any).downloadPath && (
-        <div className="mb-4">
-          <div className="inline-flex flex-col gap-1 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm">
-            <span className="font-semibold text-white/90">
-              {language === 'fr' ? 'Chemin du fichier' : 'File path'}
-            </span>
-            <code className="text-white/80 break-all font-mono text-xs" title={(torrent as any).downloadPath}>
-              {(torrent as any).downloadPath}
-            </code>
-          </div>
-        </div>
-      )}
-
-      {/* Indexer + Sélecteur de qualité */}
-      {(indexerName || qualityGroups || currentQuality) && (
+      {/* Info technique (chemin / indexer) en modal — films. Séries : bouton Info dossier dans ActionButtons. */}
+      {(showMovieTechInfo || (isSeries && indexerName) || qualityGroups || currentQuality) && (
         <div className="mb-4 flex flex-wrap items-center gap-3">
-          {/* Carte indexer */}
-          {indexerName && (
+          {showMovieTechInfo && (
+            <button
+              type="button"
+              onClick={() => setShowTechInfoModal(true)}
+              data-focusable
+              tabIndex={0}
+              title={t('mediaDetail.techInfoTitle')}
+              aria-label={t('mediaDetail.infoButton')}
+              className="gtv-icon-btn ds-focus-glow ds-active-glow tv:w-16 tv:h-16"
+            >
+              <Info className="h-5 w-5 tv:h-7 tv:w-7" aria-hidden />
+            </button>
+          )}
+
+          {/* Carte indexer — séries uniquement (films : dans la modal Info) */}
+          {isSeries && indexerName && (
             <div
               className={
                 'inline-flex flex-wrap items-center gap-2 px-4 py-2 bg-black/50 border border-white/20 text-white rounded-lg text-sm font-semibold flex-shrink-0' +
@@ -260,17 +264,14 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
                         handleIndexerClick();
                       }
                     },
-                    title:
-                      language === 'fr'
-                        ? 'Télécharger le fichier .torrent pour ce média'
-                        : 'Download the .torrent file for this media',
+                    title: t('mediaDetail.downloadTorrentHint'),
                   }
                 : {})}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
               </svg>
-              <span className="text-white/70">{language === 'fr' ? 'Indexer:' : 'Indexer:'}</span>
+              <span className="text-white/70">{t('mediaDetail.indexerLabel')}:</span>
               <span className="text-white font-bold">{indexerName}</span>
               {minimumRatio != null && (
                 <>
@@ -331,8 +332,8 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
         </div>
       )}
 
-      {/* Ratio / Tracker sans indexer (si fournis seuls par l'API) */}
-      {!indexerName && (minimumRatio != null || trackerName) && (
+      {/* Ratio / Tracker sans indexer — séries uniquement (films : modal Info) */}
+      {isSeries && !indexerName && (minimumRatio != null || trackerName) && (
         <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/70">
           {minimumRatio != null && (
             <span title={language === 'fr' ? 'Ratio minimum requis par le tracker' : 'Minimum ratio required by tracker'}>
@@ -464,6 +465,96 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
             day: 'numeric',
           })}
         </div>
+      )}
+
+      {showMovieTechInfo && (
+        <Modal
+          isOpen={showTechInfoModal}
+          onClose={() => setShowTechInfoModal(false)}
+          title={t('mediaDetail.techInfoTitle')}
+          size="lg"
+        >
+          <div className="space-y-4 pt-2 min-w-0">
+            {filePath && (
+              <div className="flex min-w-0 flex-col gap-1 rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface)] px-4 py-3 text-sm">
+                <span className="font-semibold text-[var(--ds-text-primary)]">
+                  {t('mediaDetail.filePathLabel')}
+                </span>
+                <code
+                  className="break-all font-mono text-xs text-[var(--ds-text-secondary)]"
+                  title={filePath}
+                >
+                  {filePath}
+                </code>
+              </div>
+            )}
+
+            {indexerName && (
+              <button
+                type="button"
+                onClick={() => void handleIndexerClick()}
+                disabled={!canDownloadTorrentFile || isDownloadingTorrent}
+                data-focusable
+                data-autofocus
+                tabIndex={0}
+                title={canDownloadTorrentFile ? t('mediaDetail.downloadTorrentHint') : undefined}
+                className="flex w-full min-w-0 flex-wrap items-center gap-2 rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] px-4 py-3 text-left text-sm font-semibold text-[var(--ds-text-primary)] transition-colors hover:bg-[var(--ds-surface-overlay)] disabled:cursor-default disabled:opacity-70"
+              >
+                {isDownloadingTorrent ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
+                  </svg>
+                )}
+                <span className="text-[var(--ds-text-secondary)]">{t('mediaDetail.indexerLabel')}:</span>
+                <span className="font-bold">{indexerName}</span>
+                {minimumRatio != null && (
+                  <>
+                    <span className="text-[var(--ds-text-tertiary)]" aria-hidden="true">·</span>
+                    <span>
+                      {t('mediaDetail.minimumRatio')}{' '}
+                      <span className="font-bold">
+                        {Number(minimumRatio) === Math.floor(Number(minimumRatio))
+                          ? String(Math.floor(Number(minimumRatio)))
+                          : Number(minimumRatio).toFixed(1)}
+                      </span>
+                    </span>
+                  </>
+                )}
+                {trackerName && (
+                  <>
+                    <span className="text-[var(--ds-text-tertiary)]" aria-hidden="true">·</span>
+                    <span className="max-w-full truncate" title={trackerName}>
+                      {t('mediaDetail.tracker')}: <span className="font-bold">{trackerName}</span>
+                    </span>
+                  </>
+                )}
+              </button>
+            )}
+
+            {!indexerName && (minimumRatio != null || trackerName) && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--ds-text-secondary)]">
+                {minimumRatio != null && (
+                  <span>
+                    {t('mediaDetail.minimumRatio')}{' '}
+                    <strong className="text-[var(--ds-text-primary)]">
+                      {Number(minimumRatio) === Math.floor(Number(minimumRatio))
+                        ? String(Math.floor(Number(minimumRatio)))
+                        : Number(minimumRatio).toFixed(1)}
+                    </strong>
+                  </span>
+                )}
+                {trackerName && (
+                  <span className="min-w-0 truncate" title={trackerName}>
+                    {t('mediaDetail.tracker')}:{' '}
+                    <strong className="text-[var(--ds-text-primary)]">{trackerName}</strong>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        </Modal>
       )}
     </div>
   );

@@ -270,8 +270,8 @@ export default function Navbar() {
             {user && useHamburger && mobileMenuOpen && (
               <div className="absolute top-full left-0 right-0 z-[210] dropdown-menu-mobile animate-slide-down mt-1 mx-3 sm:mx-4 rounded-xl">
                 <div className="px-2 py-3 space-y-1">
-                  <div className="flex items-center gap-3 px-4 py-3 rounded-lg text-white hover:bg-white/10 transition-all duration-200">
-                    <ConnectivityWarning>
+                  <div className="flex items-center gap-3 px-4 py-3 rounded-lg text-[var(--ds-text-primary)] hover:bg-[var(--ds-surface)] transition-all duration-200">
+                    <ConnectivityWarning accountHref="/settings/account" accountLabel={t('nav.account')}>
                       <a
                         href="/settings/account"
                         onClick={() => setMobileMenuOpen(false)}
@@ -298,13 +298,13 @@ export default function Navbar() {
                     >
                       <p className="font-semibold truncate">{profile.displayName || user.email}</p>
                       {profile.displayName && user.email && (
-                        <p className="text-xs text-white/60 truncate">{user.email}</p>
+                        <p className="text-xs text-[var(--ds-text-tertiary)] truncate">{user.email}</p>
                       )}
                     </a>
                   </div>
-                  <div className="border-t border-white/10 my-1" aria-hidden />
+                  <div className="border-t border-[var(--ds-border)] my-1" aria-hidden />
                   <BackendStatusBadge variant="inline" />
-                  <div className="border-t border-white/10 my-1" aria-hidden />
+                  <div className="border-t border-[var(--ds-border)] my-1" aria-hidden />
                   {tabs.map((tab, index) => {
                     const active = tab.match === 'exact' ? isActive(tab.href) : isActivePrefix(tab.href);
                     const TabIcon = tab.icon;
@@ -313,8 +313,10 @@ export default function Navbar() {
                         key={tab.href}
                         href={tab.href}
                         onClick={() => setMobileMenuOpen(false)}
-                        className={`flex items-center gap-3 px-4 py-3.5 rounded-lg text-white transition-all duration-200 ${
-                          active ? 'bg-primary-600 font-bold' : 'hover:bg-white/10 text-white/85 hover:text-white'
+                        className={`flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all duration-200 ${
+                          active
+                            ? 'bg-primary-600 text-[var(--ds-text-on-accent)] font-bold'
+                            : 'text-[var(--ds-text-primary)] hover:bg-[var(--ds-surface)]'
                         }`}
                         style={{ animationDelay: `${index * 30}ms` }}
                         tabIndex={0}
@@ -326,12 +328,14 @@ export default function Navbar() {
                       </a>
                     );
                   })}
-                  <div className="border-t border-white/10 my-2" aria-hidden />
+                  <div className="border-t border-[var(--ds-border)] my-2" aria-hidden />
                   <a
                     href="/downloads"
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 px-4 py-3.5 rounded-lg text-white transition-all duration-200 ${
-                      isActivePrefix('/downloads') ? 'bg-primary-600 font-bold' : 'hover:bg-white/10 text-white/85 hover:text-white'
+                    className={`flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all duration-200 ${
+                      isActivePrefix('/downloads')
+                        ? 'bg-primary-600 text-[var(--ds-text-on-accent)] font-bold'
+                        : 'text-[var(--ds-text-primary)] hover:bg-[var(--ds-surface)]'
                     }`}
                     tabIndex={0}
                     data-focusable
@@ -343,8 +347,10 @@ export default function Navbar() {
                   <a
                     href="/settings"
                     onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 px-4 py-3.5 rounded-lg text-white transition-all duration-200 ${
-                      isActivePrefix('/settings') ? 'bg-primary-600 font-bold' : 'hover:bg-white/10 text-white/85 hover:text-white'
+                    className={`flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all duration-200 ${
+                      isActivePrefix('/settings')
+                        ? 'bg-primary-600 text-[var(--ds-text-on-accent)] font-bold'
+                        : 'text-[var(--ds-text-primary)] hover:bg-[var(--ds-surface)]'
                     }`}
                     tabIndex={0}
                     data-focusable
@@ -444,13 +450,16 @@ export default function Navbar() {
                 )}
 
                 {/* Avatar — lg+ uniquement (dans hamburger sinon) ; pastille notif partage si besoin */}
-                <ConnectivityWarning className="hidden lg:inline-flex flex-shrink-0">
+                <ConnectivityWarning
+                  className="hidden lg:inline-flex flex-shrink-0"
+                  accountHref="/settings/account"
+                  accountLabel={t('nav.account')}
+                >
                   <a
                     href="/settings/account"
-                    className="nav-avatar-btn rounded-full overflow-hidden transition-all duration-200 hover:scale-105 hover:ring-2 hover:ring-primary-500/70 hover:ring-offset-1 hover:ring-offset-black focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-accent-violet)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-surface-elevated)] active:scale-95 w-10 h-10 lg:w-11 lg:h-11 tv:w-12 tv:h-12 block"
-                    tabIndex={isTvNav ? -1 : 0}
-                    data-focusable={isTvNav ? undefined : true}
-                    data-tv-nav-skip={isTvNav ? true : undefined}
+                    className="nav-avatar-btn rounded-full overflow-hidden transition-all duration-200 hover:scale-105 hover:ring-2 hover:ring-primary-500/70 hover:ring-offset-1 hover:ring-offset-[var(--ds-surface-elevated)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-accent-violet)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-surface-elevated)] active:scale-95 w-10 h-10 lg:w-11 lg:h-11 tv:w-12 tv:h-12 block"
+                    tabIndex={0}
+                    data-focusable
                     aria-label={t('nav.account')}
                   >
                     <Avatar
@@ -493,26 +502,26 @@ export default function Navbar() {
                     {guestMenuOpen && (
                       <div className="absolute top-full right-0 mt-2 mx-4 sm:mx-6 rounded-xl z-[210] dropdown-menu-mobile animate-slide-down min-w-[200px]">
                         <div className="px-2 py-3 space-y-1">
-                          <label className="flex items-center gap-3 px-4 py-3 rounded-lg text-white/90 text-sm">
+                          <label className="flex items-center gap-3 px-4 py-3 rounded-lg text-[var(--ds-text-primary)] text-sm">
                             <Globe className="w-4 h-4 flex-shrink-0" aria-hidden />
                             <span className="flex-1">{t('nav.language')}</span>
                             <select
                               value={language}
                               onChange={(e) => setLanguage((e.target as HTMLSelectElement).value as SupportedLanguage)}
-                              className="bg-white/10 border border-white/20 text-white rounded-lg px-2.5 py-1.5 text-sm cursor-pointer focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
+                              className="bg-[var(--ds-surface)] border border-[var(--ds-border)] text-[var(--ds-text-primary)] rounded-lg px-2.5 py-1.5 text-sm cursor-pointer focus:outline-none focus:border-[var(--ds-accent-violet)] focus:ring-1 focus:ring-[var(--ds-accent-violet)] transition-colors"
                               aria-label={t('nav.language')}
                               onClick={(e) => e.stopPropagation()}
                             >
                               {availableLanguages.map((lang) => (
-                                <option key={lang} value={lang} className="bg-gray-900 text-white">{LANGUAGE_NAMES[lang]}</option>
+                                <option key={lang} value={lang}>{LANGUAGE_NAMES[lang]}</option>
                               ))}
                             </select>
                           </label>
-                          <div className="border-t border-white/10 my-1" aria-hidden />
-                          <a href="/login" onClick={() => setGuestMenuOpen(false)} className="block px-4 py-3.5 rounded-lg text-white hover:bg-white/10 transition-all duration-200" tabIndex={0} data-focusable>
+                          <div className="border-t border-[var(--ds-border)] my-1" aria-hidden />
+                          <a href="/login" onClick={() => setGuestMenuOpen(false)} className="block px-4 py-3.5 rounded-lg text-[var(--ds-text-primary)] hover:bg-[var(--ds-surface)] transition-all duration-200" tabIndex={0} data-focusable>
                             {t('common.login')}
                           </a>
-                          <a href="/register" onClick={() => setGuestMenuOpen(false)} className="block px-4 py-3.5 rounded-lg bg-primary-600 text-white font-semibold hover:bg-primary-500 transition-all duration-200" tabIndex={0} data-focusable>
+                          <a href="/register" onClick={() => setGuestMenuOpen(false)} className="block px-4 py-3.5 rounded-lg bg-primary-600 text-[var(--ds-text-on-accent)] font-semibold hover:opacity-90 transition-all duration-200" tabIndex={0} data-focusable>
                             {t('common.register')}
                           </a>
                         </div>

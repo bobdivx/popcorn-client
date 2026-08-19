@@ -231,10 +231,10 @@ export default function BackendStatusBadge({
 
   const serverBlock = (
     <>
-      <div className="px-3 py-2.5 border-b border-white/10 space-y-2">
+      <div className="px-3 py-2.5 border-b border-[var(--ds-border)] space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-semibold text-white/95">{t('backend.menuTitle')}</span>
-          <span className="flex items-center gap-1.5 text-xs text-white/80 shrink-0">
+          <span className="text-xs font-semibold text-[var(--ds-text-primary)]">{t('backend.menuTitle')}</span>
+          <span className="flex items-center gap-1.5 text-xs text-[var(--ds-text-secondary)] shrink-0">
             <span
               className={`w-2 h-2 rounded-full shrink-0 ${
                 isOk ? 'bg-emerald-400' : isError ? 'bg-red-400' : 'bg-amber-400 animate-pulse'
@@ -247,15 +247,15 @@ export default function BackendStatusBadge({
         {hasBackendUrl() && (() => {
           const url = getBackendUrl();
           return url ? (
-            <p className="text-[11px] text-white/50 truncate" title={url}>
+            <p className="text-[11px] text-[var(--ds-text-tertiary)] truncate" title={url}>
               {url.replace(/^https?:\/\//, '')}
             </p>
           ) : null;
         })()}
         <div className="space-y-1.5 text-xs">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-white/60 w-12 shrink-0">{t('backend.versionServer')}</span>
-            <span className="font-mono text-white/90 truncate min-w-0">
+            <span className="text-[var(--ds-text-secondary)] w-12 shrink-0">{t('backend.versionServer')}</span>
+            <span className="font-mono text-[var(--ds-text-primary)] truncate min-w-0">
               {backendVersion ? `v${backendVersion}` : '—'}
             </span>
             {hasServerUpdate && (
@@ -265,8 +265,8 @@ export default function BackendStatusBadge({
             )}
           </div>
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-white/60 w-12 shrink-0">{t('backend.versionClient')}</span>
-            <span className="font-mono text-white/90 truncate min-w-0">
+            <span className="text-[var(--ds-text-secondary)] w-12 shrink-0">{t('backend.versionClient')}</span>
+            <span className="font-mono text-[var(--ds-text-primary)] truncate min-w-0">
               {clientVersion ? `v${clientVersion}` : '—'}
             </span>
             {hasClientUpdate && (
@@ -287,7 +287,9 @@ export default function BackendStatusBadge({
             role="menuitem"
             onClick={() => runAction('start')}
             disabled={actionLoading !== null}
-            className="w-full px-3 py-2 text-left text-sm text-white hover:bg-white/10 disabled:opacity-50 flex items-center gap-2"
+            className="w-full px-3 py-2 text-left text-sm text-[var(--ds-text-primary)] hover:bg-[var(--ds-surface-overlay)] disabled:opacity-50 flex items-center gap-2"
+            data-focusable
+            tabIndex={0}
           >
             {actionLoading === 'start' ? (
               <span className="loading loading-spinner loading-xs" />
@@ -301,7 +303,9 @@ export default function BackendStatusBadge({
             role="menuitem"
             onClick={() => runAction('stop')}
             disabled={actionLoading !== null}
-            className="w-full px-3 py-2 text-left text-sm text-white hover:bg-white/10 disabled:opacity-50 flex items-center gap-2"
+            className="w-full px-3 py-2 text-left text-sm text-[var(--ds-text-primary)] hover:bg-[var(--ds-surface-overlay)] disabled:opacity-50 flex items-center gap-2"
+            data-focusable
+            tabIndex={0}
           >
             {actionLoading === 'stop' ? (
               <span className="loading loading-spinner loading-xs" />
@@ -315,7 +319,9 @@ export default function BackendStatusBadge({
             role="menuitem"
             onClick={() => runAction('restart')}
             disabled={actionLoading !== null}
-            className="w-full px-3 py-2 text-left text-sm text-white hover:bg-white/10 disabled:opacity-50 flex items-center gap-2"
+            className="w-full px-3 py-2 text-left text-sm text-[var(--ds-text-primary)] hover:bg-[var(--ds-surface-overlay)] disabled:opacity-50 flex items-center gap-2"
+            data-focusable
+            tabIndex={0}
           >
             {actionLoading === 'restart' ? (
               <span className="loading loading-spinner loading-xs" />
@@ -383,19 +389,21 @@ export default function BackendStatusBadge({
 
       {menuOpen && (
         <div
-          className="absolute top-full right-0 mt-2 min-w-[13rem] max-w-[18rem] w-56 rounded-xl bg-gray-900 border border-white/20 shadow-xl py-2 z-[100]"
+          className="ds-popover absolute top-full right-0 mt-2 min-w-[13rem] max-w-[18rem] w-56 rounded-xl py-2 z-[100]"
           role="menu"
         >
           {variant === 'avatar' && accountHref && accountLabel && (
             <>
               <a
                 href={accountHref}
-                className="block px-3 py-2.5 text-sm text-white hover:bg-white/10 rounded-t-xl"
+                className="block px-3 py-2.5 text-sm text-[var(--ds-text-primary)] hover:bg-[var(--ds-surface-overlay)] rounded-t-xl"
                 role="menuitem"
+                data-focusable
+                tabIndex={0}
               >
                 {accountLabel}
               </a>
-              <div className="border-b border-white/10 my-1" aria-hidden />
+              <div className="border-b border-[var(--ds-border)] my-1" aria-hidden />
             </>
           )}
           {serverBlock}

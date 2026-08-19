@@ -52,8 +52,8 @@ export default function Notification({ type, message, duration = 5000, onClose }
 
   return (
     <div
-      class={`relative flex items-center gap-3 pl-4 pr-3 py-3 rounded-xl overflow-hidden
-        bg-[rgba(28,28,30,0.96)] backdrop-blur-xl border border-white/10 shadow-xl
+      class={`ds-toast relative flex items-center gap-3 pl-4 pr-3 py-3 rounded-xl overflow-hidden
+        backdrop-blur-xl
         transition-all duration-300 ease-out
         ${show ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-5'}`}
     >
@@ -64,11 +64,11 @@ export default function Notification({ type, message, duration = 5000, onClose }
         {icons[type]}
       </span>
 
-      <span class="flex-1 text-xs font-medium text-white/85 leading-relaxed">{message}</span>
+      <span class="flex-1 text-xs font-medium text-[var(--ds-text-primary)] leading-relaxed">{message}</span>
 
       {onClose && (
         <button
-          class="flex-shrink-0 text-white/40 hover:text-white transition-colors p-2 rounded-xl hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40 active:scale-95"
+          class="flex-shrink-0 text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-primary)] transition-colors p-2 rounded-xl hover:bg-[var(--ds-surface-overlay)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] active:scale-95"
           onClick={handleClose}
           aria-label="Fermer la notification"
           tabIndex={0}
@@ -95,16 +95,16 @@ function formatSpeed(bytesPerSec: number): string {
 
 function SeedingStatusItem({ info }: { info: SeedingStatusInfo }) {
   return (
-    <div class="relative flex items-center gap-3 pl-4 pr-3.5 py-2.5 rounded-xl overflow-hidden bg-[rgba(28,28,30,0.96)] backdrop-blur-xl border border-white/10 shadow-xl">
+    <div class="ds-toast relative flex items-center gap-3 pl-4 pr-3.5 py-2.5 rounded-xl overflow-hidden">
       <div class="absolute left-0 inset-y-0 w-[3px] bg-green-400" />
-      <span class="flex-shrink-0 text-green-400">
+      <span class="flex-shrink-0 text-[var(--ds-accent-green)]">
         <Upload size={14} class="shrink-0 w-3.5 h-3.5" />
       </span>
-      <span class="text-xs font-semibold text-green-400">Partage actif</span>
-      <div class="w-px h-3 bg-white/15 flex-shrink-0" />
-      <span class="text-xs text-white/60">{formatSpeed(info.uploadSpeed)}</span>
-      <div class="w-px h-3 bg-white/15 flex-shrink-0" />
-      <span class="text-xs text-white/60">{info.peersConnected} pair(s)</span>
+      <span class="text-xs font-semibold text-[var(--ds-accent-green)]">Partage actif</span>
+      <div class="w-px h-3 bg-[var(--ds-border)] flex-shrink-0" />
+      <span class="text-xs text-[var(--ds-text-secondary)]">{formatSpeed(info.uploadSpeed)}</span>
+      <div class="w-px h-3 bg-[var(--ds-border)] flex-shrink-0" />
+      <span class="text-xs text-[var(--ds-text-secondary)]">{info.peersConnected} pair(s)</span>
     </div>
   );
 }

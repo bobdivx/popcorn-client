@@ -238,20 +238,43 @@ html[data-ui-pack="tesla"] nav select {
   border-color: rgba(0, 0, 0, 0.12) !important;
   color: #1c1c1c !important;
 }
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile a,
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile p {
+html[data-ui-pack="tesla"] .dropdown-menu-mobile,
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.14) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
   color: #1c1c1c !important;
 }
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile a.bg-primary-600 {
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile,
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile a,
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile p,
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile span,
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile label,
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile [class*="text-white"] {
+  color: #1c1c1c !important;
+}
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile a.bg-primary-600,
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile a.bg-primary-600 span,
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile a.bg-primary-600 [class*="text-white"] {
   background: #3b6ae1 !important;
   color: #fff !important;
+}
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile a:hover:not(.bg-primary-600),
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile [class*="hover:bg-white"]:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
 }
 html[data-ui-pack="tesla"] nav .dropdown-menu-mobile .border-t,
 html[data-ui-pack="tesla"] nav .dropdown-menu-mobile [class*="border-white"] {
   border-color: rgba(0, 0, 0, 0.1) !important;
 }
-html[data-ui-pack="tesla"] nav .group:hover img {
-  filter: drop-shadow(0 0 8px rgba(59, 106, 225, 0.45));
+html[data-ui-pack="tesla"] .ds-popover,
+html[data-ui-pack="tesla"] .ds-toast {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.14);
+  color: #1c1c1c;
 }
 
 /* ── Modales Tesla ── */
@@ -265,6 +288,13 @@ html[data-ui-pack="tesla"] .ds-modal-glass {
   -webkit-backdrop-filter: none;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
   color: #1c1c1c;
+}
+@media (max-width: 639px) {
+  html[data-ui-pack="tesla"] .ds-modal-glass {
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+  }
 }
 html[data-ui-pack="tesla"] .ds-modal-glass .ds-card-bar,
 html[data-ui-pack="tesla"] .ds-modal-glass .ds-card-bar-static {

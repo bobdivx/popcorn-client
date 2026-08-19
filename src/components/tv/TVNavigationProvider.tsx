@@ -221,6 +221,13 @@ export default function TVNavigationProvider() {
       elements: HTMLElement[],
       direction: 'up' | 'down' | 'left' | 'right'
     ): HTMLElement[] => {
+      // Menu ouvert (notif avatar, badge serveur…) : rester dans le menu
+      const openMenu = current.closest('[role="menu"]');
+      if (openMenu) {
+        const inMenu = elements.filter((el) => openMenu.contains(el));
+        if (inMenu.length > 0) return inMenu;
+      }
+
       // Header global (logo Popcorn, nav) : gauche/droite restent dans le header
       const siteHeader = current.closest(SITE_HEADER_SELECTOR);
       if (siteHeader && (direction === 'left' || direction === 'right')) {
