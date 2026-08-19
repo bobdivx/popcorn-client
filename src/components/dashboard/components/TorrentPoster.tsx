@@ -64,6 +64,7 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
   return (
     <div
       data-torrent-card
+      data-dark-context
       data-tv-item-key={contentItemKey(item)}
       className="relative group cursor-pointer torrent-poster min-w-[140px] sm:min-w-[160px] md:min-w-[180px] lg:min-w-[280px] xl:min-w-[320px] tv:min-w-[400px]"
       onMouseEnter={() => setIsHovered(true)}

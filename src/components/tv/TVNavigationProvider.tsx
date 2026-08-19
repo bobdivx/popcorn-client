@@ -55,11 +55,18 @@ export default function TVNavigationProvider() {
     // Sélecteurs pour les cartes (effet Netflix)
     const CARD_SELECTOR = '[data-torrent-card], .torrent-poster, [data-settings-card], [data-focusable-card]';
     const CAROUSEL_SELECTOR = '[data-carousel]';
+    const LIST_SELECTOR = '[data-tv-list]';
+    const LIST_ITEM_SELECTOR = '[data-tv-list-item]';
+    const LIST_HEADER_SELECTOR = '[data-tv-list-header]';
     const SETTINGS_CONTAINER_SELECTOR = '[data-tv-settings-container]';
     const SITE_HEADER_SELECTOR = '[data-tv-site-header]';
 
     const isTvDoc = () =>
       typeof document !== 'undefined' && document.documentElement.getAttribute('data-tv-platform') === 'true';
+
+    /** Mobile tactile : ne pas appliquer le focus Netflix (scale/z-index) ni l’auto-focus settings. */
+    const isCoarsePointer = () =>
+      typeof window !== 'undefined' && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
 
     const isWebOSCheck = () =>
       typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
@@ -232,6 +239,12 @@ export default function TVNavigationProvider() {
         });
         if (inRow.length > 0) return inRow;
       }
+      // Liste verticale (téléchargements, etc.) : gauche/droite restent dans la même ligne
+      const currentListItem = current.closest(LIST_ITEM_SELECTOR);
+      if (currentListItem && (direction === 'left' || direction === 'right')) {
+        const inRow = elements.filter((el) => currentListItem.contains(el));
+        if (inRow.length > 0) return inRow;
+      }
       // Dans un carousel : gauche/droite dans le même carrousel
       const currentCarousel = current.closest(CAROUSEL_SELECTOR);
       if (currentCarousel && (direction === 'left' || direction === 'right')) {
@@ -249,6 +262,22 @@ export default function TVNavigationProvider() {
         if (header) {
           return elements.filter((el) => settingsContainerForNav.contains(el) || header.contains(el));
         }
+      }
+      // Menu latéral settings : haut/bas restent dans la nav (évite de sauter vers une carte contenu)
+      if (settingsNav && (direction === 'up' || direction === 'down')) {
+        if (direction === 'down') {
+          return elements.filter((el) => settingsNav.contains(el));
+        }
+        const header = document.querySelector(SITE_HEADER_SELECTOR);
+        if (header) {
+          return elements.filter((el) => settingsNav.contains(el) || header.contains(el));
+        }
+        return elements.filter((el) => settingsNav.contains(el));
+      }
+      // Contenu settings : haut/bas restent dans le panneau (évite de retomber dans la sidebar)
+      const settingsContent = current.closest('[data-tv-settings-content]');
+      if (settingsContent && (direction === 'up' || direction === 'down')) {
+        return elements.filter((el) => settingsContent.contains(el) && !el.closest('[data-tv-settings-nav]'));
       }
       // À l'intérieur du menu settings : gauche/droite uniquement dans le même conteneur
       const settingsContainer = current.closest(SETTINGS_CONTAINER_SELECTOR);
@@ -294,7 +323,11 @@ export default function TVNavigationProvider() {
       // l'atteindre même s'il est éloigné horizontalement (sinon le score spatial le rate
       // car le voisin direct vertical aligné en X gagne presque toujours).
       // Actif sur toutes les plateformes (TV + desktop avec flèches), pas seulement TV.
-      if (direction === 'up' || direction === 'down') {
+      if (
+        (direction === 'up' || direction === 'down') &&
+        !current.closest(LIST_ITEM_SELECTOR) &&
+        !current.closest('[data-tv-settings-nav]')
+      ) {
         const curRect = current.getBoundingClientRect();
         const cy = curRect.top + curRect.height / 2;
         const inAction = !!current.closest('[data-tv-page-action]');
@@ -338,6 +371,79 @@ export default function TVNavigationProvider() {
               }
             }
           }
+        }
+      }
+
+      // Liste verticale : haut/bas = même « colonne » de la ligne voisine ; gauche/droite = boutons de la ligne
+      const listItem = current.closest(LIST_ITEM_SELECTOR) as HTMLElement | null;
+      const list = (listItem?.closest(LIST_SELECTOR) as HTMLElement | null) ?? (current.closest(LIST_SELECTOR) as HTMLElement | null);
+      if (listItem && (direction === 'left' || direction === 'right')) {
+        const rowEls = getFocusableElements(listItem);
+        const idx = rowEls.indexOf(current);
+        if (idx !== -1) {
+          const nextIdx = direction === 'left' ? idx - 1 : idx + 1;
+          if (nextIdx >= 0 && nextIdx < rowEls.length) return rowEls[nextIdx];
+        }
+        return null;
+      }
+      if (list && listItem && (direction === 'up' || direction === 'down')) {
+        const items = Array.from(list.querySelectorAll<HTMLElement>(LIST_ITEM_SELECTOR));
+        const itemIdx = items.indexOf(listItem);
+        const nextIdx = direction === 'up' ? itemIdx - 1 : itemIdx + 1;
+        if (nextIdx >= 0 && nextIdx < items.length) {
+          const nextItem = items[nextIdx];
+          const currentRow = getFocusableElements(listItem);
+          const nextRow = getFocusableElements(nextItem);
+          if (nextRow.length === 0) return null;
+          const slot = Math.max(0, currentRow.indexOf(current));
+          const primary = nextItem.querySelector<HTMLElement>('[data-tv-list-primary]');
+          if (slot <= 0 && primary && nextRow.includes(primary)) return primary;
+          return nextRow[Math.min(slot, nextRow.length - 1)] ?? primary ?? nextRow[0];
+        }
+        if (direction === 'up' && itemIdx === 0) {
+          const page = list.closest('[data-page]') ?? list.parentElement;
+          const header = page?.querySelector<HTMLElement>(LIST_HEADER_SELECTOR);
+          if (header) {
+            const inAction = header.querySelector<HTMLElement>(
+              '[data-tv-page-action] button:not([disabled]), [data-tv-page-action] [data-focusable]'
+            );
+            if (inAction) return inAction;
+            const headerEls = getFocusableElements(header);
+            if (headerEls.length > 0) return headerEls[headerEls.length - 1];
+          }
+        }
+        return null;
+      }
+      const listHeader = current.closest(LIST_HEADER_SELECTOR) as HTMLElement | null;
+      if (listHeader && direction === 'down') {
+        const page = listHeader.closest('[data-page]') ?? listHeader.parentElement;
+        const listEl = page?.querySelector<HTMLElement>(LIST_SELECTOR);
+        const firstItem = listEl?.querySelector<HTMLElement>(LIST_ITEM_SELECTOR);
+        if (firstItem) {
+          const primary = firstItem.querySelector<HTMLElement>('[data-tv-list-primary]');
+          if (primary) return primary;
+          const firsts = getFocusableElements(firstItem);
+          if (firsts[0]) return firsts[0];
+        }
+      }
+
+      // Sidebar settings : haut/bas = item précédent/suivant (ordre DOM), pas le score spatial
+      const settingsNavEl = current.closest('[data-tv-settings-nav]') as HTMLElement | null;
+      if (settingsNavEl && (direction === 'up' || direction === 'down')) {
+        const navItems = getFocusableElements(settingsNavEl);
+        const navIdx = navItems.indexOf(current);
+        if (navIdx !== -1) {
+          const nextNavIdx = direction === 'up' ? navIdx - 1 : navIdx + 1;
+          if (nextNavIdx >= 0 && nextNavIdx < navItems.length) return navItems[nextNavIdx];
+          if (direction === 'down') {
+            const contentArea = document.querySelector('[data-tv-settings-content]') as HTMLElement | null;
+            if (contentArea) {
+              const first = getInitialFocusElement(contentArea);
+              if (first && !settingsNavEl.contains(first)) return first;
+            }
+            return current;
+          }
+          // Haut depuis le 1er item : laisser le spatial atteindre le header
         }
       }
 
@@ -490,9 +596,11 @@ export default function TVNavigationProvider() {
     // Focus un élément
     const focusElement = (element: HTMLElement) => {
       const inHeroDashboard = element.closest('.hero-dashboard');
+      const inListItem = element.closest(LIST_ITEM_SELECTOR);
       // TV / webOS : éviter scrollIntoView(center) coûteux ; nearest limite les reflows.
+      // Liste verticale : nearest pour ne pas recentrer la page à chaque flèche.
       const scrollOpts =
-        isInstantScroll || inHeroDashboard
+        isInstantScroll || inHeroDashboard || inListItem
           ? {
               behavior: scrollBehavior,
               block: 'nearest' as ScrollLogicalPosition,
@@ -922,38 +1030,51 @@ export default function TVNavigationProvider() {
 
       switch (e.key) {
         case 'ArrowLeft': {
-          // Settings : depuis le contenu, la flèche gauche ramène toujours au menu latéral
+          // Settings : gauche dans le contenu d'abord (grille, pastilles thème) ;
+          // seulement s'il n'y a plus de voisin à gauche → menu latéral.
           const settingsContainer = document.querySelector(SETTINGS_CONTAINER_SELECTOR);
           const contentArea = document.querySelector('[data-tv-settings-content]');
           const nav = document.querySelector<HTMLElement>('[data-tv-settings-nav]');
           const active = document.activeElement as HTMLElement;
-          if (settingsContainer && contentArea && nav && active && contentArea.contains(active)) {
-            const navRect = nav.getBoundingClientRect();
-            const navOffScreen = navRect.right < 0 || navRect.left > window.innerWidth;
-            const focusNav = () => {
-              const currentItem = nav.querySelector<HTMLElement>('[aria-current="page"]');
-              const firstInNav = nav.querySelector<HTMLElement>('a[href], button, [data-focusable], [tabindex]:not([tabindex="-1"])');
-              const toFocus = currentItem || firstInNav;
-              if (toFocus) toFocus.focus();
-            };
-            if (navOffScreen) {
-              document.dispatchEvent(new CustomEvent('open-settings-drawer'));
-              requestAnimationFrame(() => requestAnimationFrame(focusNav));
+          if (settingsContainer && contentArea && nav && active && contentArea.contains(active) && !nav.contains(active)) {
+            const movedInContent = navigate('left', contentArea as HTMLElement);
+            if (movedInContent) {
+              handled = true;
             } else {
-              focusNav();
+              const navRect = nav.getBoundingClientRect();
+              const navOffScreen = navRect.right < 0 || navRect.left > window.innerWidth;
+              const focusNav = () => {
+                const currentItem = nav.querySelector<HTMLElement>('[aria-current="page"]');
+                const firstInNav = nav.querySelector<HTMLElement>('a[href], button, [data-focusable], [tabindex]:not([tabindex="-1"])');
+                const toFocus = currentItem || firstInNav;
+                if (toFocus) toFocus.focus();
+              };
+              if (navOffScreen) {
+                document.dispatchEvent(new CustomEvent('open-settings-drawer'));
+                requestAnimationFrame(() => requestAnimationFrame(focusNav));
+              } else {
+                focusNav();
+              }
+              handled = true;
             }
-            handled = true;
           }
           if (!handled) {
-            // Navigation synchrone pour savoir si un déplacement a eu lieu (fallback barre d’app géré dans getCandidatesForDirection)
             const moved = navigate('left');
             handled = moved;
           }
           break;
         }
-        case 'ArrowRight':
+        case 'ArrowRight': {
+          const settingsNav = document.querySelector<HTMLElement>('[data-tv-settings-nav]');
+          const contentArea = document.querySelector<HTMLElement>('[data-tv-settings-content]');
+          const activeRight = document.activeElement as HTMLElement;
+          if (settingsNav && contentArea && activeRight && settingsNav.contains(activeRight)) {
+            handled = navigate('right', contentArea);
+            break;
+          }
           handled = scheduleOrRunNavigate('right');
           break;
+        }
         case 'ArrowUp':
           handled = scheduleOrRunNavigate('up');
           break;
@@ -1044,7 +1165,13 @@ export default function TVNavigationProvider() {
           break;
       }
 
-      if (handled) {
+      const activeAfter = document.activeElement as HTMLElement | null;
+      const trapSettingsArrows =
+        !!activeAfter &&
+        ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key) &&
+        !!activeAfter.closest?.(SETTINGS_CONTAINER_SELECTOR);
+
+      if (handled || trapSettingsArrows) {
         e.preventDefault();
         e.stopPropagation();
       }
@@ -1052,6 +1179,8 @@ export default function TVNavigationProvider() {
 
     // Gestionnaire de focus pour effet visuel
     const handleFocusIn = (e: FocusEvent) => {
+      // Sur mobile, le tap focus une carte : le scale/z-index recouvre les voisines et bloque le swipe.
+      if (!isTvDoc() && isCoarsePointer()) return;
       const target = e.target as HTMLElement;
       applyFocusEffect(target);
     };
@@ -1068,6 +1197,25 @@ export default function TVNavigationProvider() {
         }
       }, delay);
     };
+
+    /** Mobile : les styles injectés (scale 1.08) passent après global.css — il faut les désactiver ici. */
+    const MOBILE_TOUCH_CSS = `
+      @media (hover: none) and (pointer: coarse) {
+        html:not([data-tv-platform="true"]) .tv-card-focused {
+          transform: none !important;
+          z-index: auto !important;
+          outline: none !important;
+          box-shadow: none !important;
+          animation: none !important;
+        }
+        html:not([data-tv-platform="true"]) .grid:has(.tv-card-focused) [data-settings-card]:not(.tv-card-focused):not(:focus-within) {
+          opacity: 1 !important;
+        }
+        html:not([data-tv-platform="true"]) .carousel-container {
+          scroll-behavior: auto !important;
+        }
+      }
+    `;
 
     /** TV : pas d’animations sur cartes / carrousels (surcharge des styles « Netflix » et des utilitaires Tailwind). */
     const TV_PLATFORM_PERF_CSS = `
@@ -1247,7 +1395,7 @@ export default function TVNavigationProvider() {
       html[data-webos="true"] [data-focusable] {
         transition: none !important;
       }
-    ` + TV_PLATFORM_PERF_CSS;
+    ` + TV_PLATFORM_PERF_CSS + MOBILE_TOUCH_CSS;
 
     // Version sans :has() pour les navigateurs plus anciens
     if (!CSS.supports('selector(:has(*))')) {
@@ -1339,7 +1487,7 @@ export default function TVNavigationProvider() {
         html[data-webos="true"] [data-focusable] {
           transition: none !important;
         }
-      ` + TV_PLATFORM_PERF_CSS;
+      ` + TV_PLATFORM_PERF_CSS + MOBILE_TOUCH_CSS;
     }
 
     if (!document.getElementById('tv-navigation-styles')) {
@@ -1436,6 +1584,8 @@ export default function TVNavigationProvider() {
     let settingsFocusTimeoutId: ReturnType<typeof setTimeout> | null = null;
     const maybeFocusSettingsContent = () => {
       if (typeof window === 'undefined') return;
+      // Mobile : ne pas voler le focus (scale + scrollIntoView bloquent le swipe et le scroll).
+      if (!isTvDoc()) return;
       const pathname = window.location.pathname.replace(/\/$/, '') || '/';
       if (!pathname.startsWith('/settings')) return;
       if (settingsFocusTimeoutId) {
@@ -1464,6 +1614,7 @@ export default function TVNavigationProvider() {
     // Fiche média : focus Lire / Télécharger (pas Retour). Les séries gèrent le carrousel d’épisodes elles-mêmes.
     const maybeFocusMediaDetailPrimary = () => {
       if (typeof window === 'undefined') return;
+      if (!isTvDoc()) return;
       if (window.location.pathname !== '/torrents') return;
       const params = new URLSearchParams(window.location.search);
       if (!params.get('slug') && !params.get('tmdbId')) return;

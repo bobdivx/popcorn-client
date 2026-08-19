@@ -50,23 +50,23 @@ function CardInner({
   const { t } = useI18n();
   return (
     <div class="sc-nav-card">
-      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-        <div class={`sc-nav-icon sc-nav-icon--${accent}`}>
-          <Icon className="w-5 h-5" strokeWidth={1.8} aria-hidden />
-        </div>
-        <div class="sc-nav-chevron">
-          {rightSlot ?? <ChevronRight className="w-5 h-5 mt-0.5" aria-hidden />}
+      <div class={`sc-nav-icon sc-nav-icon--${accent}`}>
+        <Icon className="w-5 h-5" strokeWidth={1.8} aria-hidden />
+      </div>
+      <div class="sc-nav-copy">
+        <div class="sc-nav-title">{title}</div>
+        <div class="sc-nav-desc">{description}</div>
+        <div class="sc-nav-footer" aria-hidden>
+          {badge && (
+            <span class={`sc-nav-badge sc-nav-badge--${badge.variant ?? 'subscription'}`}>
+              {badge.text}
+            </span>
+          )}
+          <span class="sc-nav-open">{t('common.open')}</span>
         </div>
       </div>
-      <div class="sc-nav-title">{title}</div>
-      <div class="sc-nav-desc">{description}</div>
-      <div class="sc-nav-footer" aria-hidden>
-        {badge && (
-          <span class={`sc-nav-badge sc-nav-badge--${badge.variant ?? 'subscription'}`}>
-            {badge.text}
-          </span>
-        )}
-        <span class="sc-nav-open">{t('common.open')}</span>
+      <div class="sc-nav-chevron">
+        {rightSlot ?? <ChevronRight className="w-5 h-5 mt-0.5" aria-hidden />}
       </div>
     </div>
   );

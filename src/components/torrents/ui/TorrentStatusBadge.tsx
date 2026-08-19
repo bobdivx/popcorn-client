@@ -17,7 +17,7 @@ const stateColors: Record<ClientTorrentStats['state'], string> = {
   seeding: 'bg-[var(--ds-accent-green)] text-[var(--ds-text-on-accent)]',
   paused: 'bg-[var(--ds-accent-yellow)] text-[var(--ds-text-on-accent)]',
   completed: 'bg-[var(--ds-accent-green)] text-[var(--ds-text-on-accent)]',
-  error: 'bg-[var(--ds-accent-red)] text-white',
+  error: 'bg-[var(--ds-accent-red)] text-[var(--ds-text-on-accent)]',
 };
 
 export function TorrentStatusBadge({

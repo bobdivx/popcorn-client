@@ -455,12 +455,16 @@
   },
   "interfaceSettings": {
     "theme": "Thème",
-    "themeDescription": "Choisissez l'apparence de l'interface (clair, sombre ou automatique selon le système)",
+    "themeDescription": "Clair, sombre ou automatique selon le système",
     "themeOptions": {
       "dark": "Sombre",
       "light": "Clair",
       "auto": "Système"
     },
+    "uiPack": "Langage visuel",
+    "uiPackDescription": "Chaque pack reprend le même agencement (mobile, tablette, PC). Tesla est le thème actuel. Popcornn conserve l’ancienne peau sombre violette.",
+    "uiPackClassicHint": "Ancien thème (sombre, violet, cartes)",
+    "uiPackTeslaHint": "Thème actuel — réglages type Tesla",
     "autoplay": "Lecture automatique",
     "autoplayDescription": "Démarrer automatiquement la lecture des épisodes suivants",
     "skipIntro": "Passer le générique",
@@ -1273,8 +1277,12 @@
     "addTorrentFile": "Ajouter fichier .torrent",
     "addMagnetLink": "Ajouter magnet link",
     "adding": "Ajout en cours...",
-    "pauseAll": "Pause tous",
-    "resumeAll": "Reprendre tous",
+    "pauseAll": "Tout mettre en pause",
+    "resumeAll": "Tout reprendre",
+    "filterAll": "Tous",
+    "filterActive": "En cours",
+    "filterPaused": "En pause",
+    "filterReady": "Prêts",
     "removeAll": "Supprimer tous",
     "removeWithFiles": "Supprimer avec fichiers",
     "confirmRemove": "Voulez-vous supprimer ce torrent{withFiles} ?",
@@ -1496,7 +1504,7 @@
     },
     "interface": {
       "languageDescription": "Langue de l'application",
-      "themeDescription": "Thème clair, sombre ou système"
+      "themeDescription": "Tesla, Popcornn, et clair / sombre"
     },
     "server": {
       "title": "Serveur",

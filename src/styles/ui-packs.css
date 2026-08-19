@@ -1,0 +1,808 @@
+/**
+ * Packs visuels (classic | tesla).
+ * Tesla s’applique à toute l’app (header + pages). Classic conserve le sombre violet.
+ */
+
+html[data-ui-pack="tesla"] {
+  --page-bg: #e6e6e8;
+  --bg-primary: #e6e6e8;
+  --bg-glass: rgba(0, 0, 0, 0.045);
+  --bg-glass-hover: rgba(0, 0, 0, 0.08);
+  --bg-glass-active: rgba(0, 0, 0, 0.12);
+  --neon-violet: #3b6ae1;
+  --neon-violet-glow: rgba(59, 106, 225, 0.45);
+  --ds-surface: #e6e6e8;
+  --ds-surface-elevated: #ffffff;
+  --ds-surface-overlay: rgba(0, 0, 0, 0.12);
+  --ds-accent-violet: #3b6ae1;
+  --ds-accent-violet-muted: rgba(59, 106, 225, 0.12);
+  --ds-accent-green: #15803d;
+  --ds-accent-yellow: #b45309;
+  --ds-accent-red: #dc2626;
+  --ds-text-primary: #1c1c1c;
+  --ds-text-secondary: #52525b;
+  --ds-text-tertiary: #71717a;
+  --ds-text-on-accent: #ffffff;
+  --ds-border: rgba(0, 0, 0, 0.12);
+  --ds-border-strong: rgba(0, 0, 0, 0.2);
+  color-scheme: light;
+  /* DaisyUI (cartes bg-base-*, text-base-content, btn-primary) */
+  --p: 49% 0.14 264;
+  --pc: 100% 0 0;
+  --b1: 91% 0.002 0;
+  --b2: 100% 0 0;
+  --b3: 85% 0.002 0;
+  --bc: 18% 0.006 0;
+  --n: 32% 0.01 0;
+  --nc: 98% 0 0;
+  --su: 55% 0.15 145;
+  --suc: 98% 0.01 145;
+  --er: 55% 0.18 27;
+  --erc: 98% 0.01 25;
+}
+
+html[data-ui-pack="tesla"] body {
+  background: #e6e6e8;
+  color: #1c1c1c;
+}
+
+html[data-ui-pack="tesla"] .bg-page,
+html[data-ui-pack="tesla"] .app-main .bg-black,
+html[data-ui-pack="tesla"] .min-h-screen.bg-black {
+  background-color: #e6e6e8 !important;
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"] .bg-page-gradient {
+  background: #e6e6e8 !important;
+}
+
+html[data-ui-pack="tesla"] h1,
+html[data-ui-pack="tesla"] h2,
+html[data-ui-pack="tesla"] h3,
+html[data-ui-pack="tesla"] h4 {
+  color: #1c1c1c;
+}
+
+html[data-ui-pack="tesla"] [class*="text-white"] {
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"] [class*="hover:text-white"]:hover {
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"] [class*="text-gray-"] {
+  color: #52525b;
+}
+html[data-ui-pack="tesla"] [class*="text-primary-"],
+html[data-ui-pack="tesla"] [class*="text-purple-"],
+html[data-ui-pack="tesla"] [class*="text-violet-"] {
+  color: #2f58c4;
+}
+html[data-ui-pack="tesla"] [class*="border-white"] {
+  border-color: rgba(0, 0, 0, 0.12);
+}
+html[data-ui-pack="tesla"] [class*="bg-white/5"],
+html[data-ui-pack="tesla"] [class*="bg-white/10"] {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+html[data-ui-pack="tesla"] [class*="hover:bg-white"]:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+html[data-ui-pack="tesla"] .bg-gray-900,
+html[data-ui-pack="tesla"] .bg-gray-800 {
+  background-color: #ffffff;
+}
+html[data-ui-pack="tesla"] .glass-panel,
+html[data-ui-pack="tesla"] .glass-panel-lg {
+  background-color: #ffffff;
+  border-color: rgba(0, 0, 0, 0.1);
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"] .bg-base-100,
+html[data-ui-pack="tesla"] .bg-base-200,
+html[data-ui-pack="tesla"] [class*="bg-base-200"],
+html[data-ui-pack="tesla"] [class*="bg-base-300"] {
+  background-color: #ffffff !important;
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"] [class*="text-base-content"],
+html[data-ui-pack="tesla"] .label-text {
+  color: #1c1c1c !important;
+}
+html[data-ui-pack="tesla"] [class*="border-base-"] {
+  border-color: rgba(0, 0, 0, 0.12) !important;
+}
+html[data-ui-pack="tesla"] .btn-primary {
+  background-color: #3b6ae1 !important;
+  border-color: #3b6ae1 !important;
+  color: #fff !important;
+}
+html[data-ui-pack="tesla"] .bg-primary-600,
+html[data-ui-pack="tesla"] .bg-primary-500 {
+  background-color: #3b6ae1 !important;
+  color: #fff !important;
+}
+
+/* Image / lecture : texte clair conservé */
+html[data-ui-pack="tesla"] [data-dark-context],
+html[data-ui-pack="tesla"] [data-dark-context] h1,
+html[data-ui-pack="tesla"] [data-dark-context] h2,
+html[data-ui-pack="tesla"] [data-dark-context] h3 {
+  color: #fff;
+}
+html[data-ui-pack="tesla"] [data-dark-context] [class*="text-white"],
+html[data-ui-pack="tesla"] [data-dark-context] [class*="text-gray-"],
+html[data-ui-pack="tesla"] .hero-dashboard [class*="text-white"],
+html[data-ui-pack="tesla"] .torrent-poster [class*="text-white"],
+html[data-ui-pack="tesla"] [data-page="player"] [class*="text-white"] {
+  color: #fff !important;
+}
+html[data-ui-pack="tesla"] [data-dark-context] [class*="border-white"] {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+html[data-ui-pack="tesla"] [data-dark-context] .bg-gray-900 {
+  background-color: #111 !important;
+}
+html[data-ui-pack="tesla"] [data-dark-context].bg-page,
+html[data-ui-pack="tesla"] [data-page="player"] {
+  background-color: #000 !important;
+  color: #fff !important;
+}
+html[data-ui-pack="tesla"] [data-dark-context] .glass-panel,
+html[data-ui-pack="tesla"] [data-dark-context] .glass-panel-lg {
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #fff !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+html[data-ui-pack="tesla"] [data-dark-context] [class*="text-primary-"],
+html[data-ui-pack="tesla"] [data-dark-context] [class*="text-purple-"],
+html[data-ui-pack="tesla"] [data-dark-context] [class*="text-violet-"] {
+  color: #c4b5fd !important;
+}
+/* Fiche média / lecteur uniquement — pas le hero dashboard ni les posters
+   (sinon une bande noire apparaît sous le header Tesla gris). */
+html[data-ui-pack="tesla"] .app-main:has([data-dark-context].bg-page),
+html[data-ui-pack="tesla"] .app-main:has([data-page="player"]) {
+  background: #000 !important;
+  padding-bottom: 0;
+}
+
+/* Header Tesla — même gris que la page */
+html[data-ui-pack="tesla"] nav.navbar-tv,
+html[data-ui-pack="tesla"] nav.navbar-tv.navbar-scrolled,
+html[data-ui-pack="tesla"] nav.navbar-scrolled {
+  background: #e6e6e8 !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none;
+}
+html[data-ui-pack="tesla"] nav .text-white,
+html[data-ui-pack="tesla"] nav [class*="text-white"],
+html[data-ui-pack="tesla"] nav span.font-extrabold {
+  color: #1c1c1c !important;
+}
+html[data-ui-pack="tesla"] nav .nav-tab {
+  color: #52525b !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+html[data-ui-pack="tesla"] nav .nav-tab:hover {
+  color: #1c1c1c !important;
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+html[data-ui-pack="tesla"] nav .nav-tab-active {
+  color: #1c1c1c !important;
+  background: #ffffff !important;
+  font-weight: 650;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 10px;
+}
+html[data-ui-pack="tesla"] nav .nav-tab-active::after {
+  display: none !important;
+}
+html[data-ui-pack="tesla"] nav .gtv-icon-btn {
+  color: #1c1c1c !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+html[data-ui-pack="tesla"] nav .gtv-icon-btn:hover:not(:disabled) {
+  color: #1c1c1c !important;
+  background: #f3f3f5 !important;
+  transform: none;
+}
+html[data-ui-pack="tesla"] nav .gtv-icon-btn.bg-glass-active,
+html[data-ui-pack="tesla"] nav .gtv-icon-btn.bg-primary-600 {
+  background: #3b6ae1 !important;
+  color: #fff !important;
+  border-color: transparent;
+}
+html[data-ui-pack="tesla"] nav .gtv-pill-btn {
+  color: #1c1c1c !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+html[data-ui-pack="tesla"] nav .gtv-pill-btn-primary,
+html[data-ui-pack="tesla"] nav .gtv-pill-btn.gtv-pill-btn-primary {
+  background: #3b6ae1 !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+html[data-ui-pack="tesla"] nav .tabular-nums {
+  color: #52525b !important;
+}
+html[data-ui-pack="tesla"] nav select {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+  color: #1c1c1c !important;
+}
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile a,
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile p {
+  color: #1c1c1c !important;
+}
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile a.bg-primary-600 {
+  background: #3b6ae1 !important;
+  color: #fff !important;
+}
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile .border-t,
+html[data-ui-pack="tesla"] nav .dropdown-menu-mobile [class*="border-white"] {
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+html[data-ui-pack="tesla"] nav .group:hover img {
+  filter: drop-shadow(0 0 8px rgba(59, 106, 225, 0.45));
+}
+
+/* ── Modales Tesla ── */
+html[data-ui-pack="tesla"] [role="dialog"] > .bg-black\/80 {
+  background-color: rgba(0, 0, 0, 0.4) !important;
+}
+html[data-ui-pack="tesla"] .ds-modal-glass {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.18);
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"] .ds-modal-glass .ds-card-bar,
+html[data-ui-pack="tesla"] .ds-modal-glass .ds-card-bar-static {
+  height: 3px;
+  background: #3b6ae1;
+  background-size: auto;
+  animation: none;
+}
+html[data-ui-pack="tesla"] .ds-modal-glass [class*="bg-black"] {
+  background-color: #f4f4f5 !important;
+}
+html[data-ui-pack="tesla"] .ds-modal-glass [class*="bg-white/"] {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+html[data-ui-pack="tesla"] .ds-modal-glass [class*="hover:bg-white"]:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+html[data-ui-pack="tesla"] .ds-modal-glass input,
+html[data-ui-pack="tesla"] .ds-modal-glass select,
+html[data-ui-pack="tesla"] .ds-modal-glass textarea {
+  background: #ffffff !important;
+  color: #1c1c1c !important;
+  border-color: rgba(0, 0, 0, 0.14) !important;
+}
+html[data-ui-pack="tesla"] .ds-modal-glass input::placeholder,
+html[data-ui-pack="tesla"] .ds-modal-glass textarea::placeholder {
+  color: #71717a;
+}
+html[data-ui-pack="tesla"] .ds-modal-glass option {
+  background: #ffffff;
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"] .ds-modal-glass [class*="bg-[var(--ds-accent"],
+html[data-ui-pack="tesla"] .ds-modal-glass .ds-btn-accent {
+  color: #ffffff !important;
+}
+html[data-ui-pack="tesla"] .ds-modal-glass .text-red-300,
+html[data-ui-pack="tesla"] .ds-modal-glass .text-red-400 {
+  color: #b91c1c !important;
+}
+
+/* ── Réglages Tesla (Safety) : clair, même si le reste de l’app est sombre ── */
+html[data-ui-pack="tesla"] .settings-page {
+  --ds-surface: #e6e6e8;
+  --ds-surface-elevated: #ffffff;
+  --ds-surface-overlay: rgba(0, 0, 0, 0.12);
+  --ds-accent-violet: #3b6ae1;
+  --ds-accent-violet-muted: rgba(59, 106, 225, 0.12);
+  --ds-accent-green: #15803d;
+  --ds-accent-yellow: #b45309;
+  --ds-accent-red: #dc2626;
+  --ds-text-primary: #1c1c1c;
+  --ds-text-secondary: #52525b;
+  --ds-text-tertiary: #71717a;
+  --ds-text-on-accent: #ffffff;
+  --ds-border: rgba(0, 0, 0, 0.12);
+  --ds-border-strong: rgba(0, 0, 0, 0.2);
+  background: #e6e6e8;
+  color: #1c1c1c;
+  color-scheme: light;
+}
+
+html[data-ui-pack="tesla"] .settings-page .ds-title-page,
+html[data-ui-pack="tesla"] .settings-page .sc-page-title {
+  color: #1c1c1c;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-page-subtitle,
+html[data-ui-pack="tesla"] .settings-page .ds-text-secondary {
+  color: #6d6d6d;
+}
+
+html[data-ui-pack="tesla"] .settings-page [class*="text-white"] {
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"] .settings-page [class*="text-gray-"] {
+  color: #52525b;
+}
+html[data-ui-pack="tesla"] .settings-page [class*="text-primary-"],
+html[data-ui-pack="tesla"] .settings-page [class*="text-purple-"] {
+  color: #2f58c4;
+}
+html[data-ui-pack="tesla"] .settings-page [class*="text-green-"],
+html[data-ui-pack="tesla"] .settings-page [class*="text-emerald-"] {
+  color: #15803d;
+}
+html[data-ui-pack="tesla"] .settings-page [class*="text-amber-"],
+html[data-ui-pack="tesla"] .settings-page [class*="text-yellow-"] {
+  color: #b45309;
+}
+html[data-ui-pack="tesla"] .settings-page [class*="text-red-"] {
+  color: #b91c1c;
+}
+html[data-ui-pack="tesla"] .settings-page [class*="border-white"] {
+  border-color: rgba(0, 0, 0, 0.12);
+}
+html[data-ui-pack="tesla"] .settings-page [class*="bg-white/5"],
+html[data-ui-pack="tesla"] .settings-page [class*="bg-white/10"] {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+html[data-ui-pack="tesla"] .settings-page [class*="hover:bg-white"]:hover {
+  background-color: rgba(0, 0, 0, 0.06);
+}
+html[data-ui-pack="tesla"] .settings-page [class*="text-on-accent"],
+html[data-ui-pack="tesla"] .settings-page [class*="bg-[var(--ds-accent"] [class*="text-white"] {
+  color: #fff;
+}
+
+/* Badges lisibles sur fond clair */
+html[data-ui-pack="tesla"] .settings-page .sc-status-badge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 100%;
+  margin-top: 6px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 550;
+  line-height: 1.4;
+  white-space: normal;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-status-badge--success {
+  background: #dcfce7;
+  color: #14532d;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-status-badge--warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-status-badge--error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-status-badge--neutral {
+  background: rgba(0, 0, 0, 0.06);
+  color: #3f3f46;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-nav-badge--subscription {
+  background: #fef3c7;
+  color: #92400e;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-nav-badge--warning {
+  background: #fee2e2;
+  color: #991b1b;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-nav-badge--beta {
+  background: #dbeafe;
+  color: #1e40af;
+}
+html[data-ui-pack="tesla"] .settings-page .ds-status-badge--success {
+  background: #dcfce7;
+  color: #14532d;
+}
+html[data-ui-pack="tesla"] .settings-page .ds-status-badge--warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+html[data-ui-pack="tesla"] .settings-page .ds-status-badge--error {
+  background: #fee2e2;
+  color: #991b1b;
+}
+html[data-ui-pack="tesla"] .settings-page .ds-status-badge--neutral {
+  background: rgba(0, 0, 0, 0.06);
+  color: #3f3f46;
+}
+html[data-ui-pack="tesla"] .settings-page .loading {
+  color: #3b6ae1;
+}
+
+/* Cartes réglages : plus de glass violet, sections plates */
+html[data-ui-pack="tesla"] .settings-page .sc-frame {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  contain: layout style;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-frame::before {
+  display: none;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-frame--amber,
+html[data-ui-pack="tesla"] .settings-page .sc-frame--nested {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-frame-header {
+  align-items: flex-start;
+  padding: 8px 0 4px;
+  border-bottom: 0;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-frame-title {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-frame-desc {
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: #6d6d6d;
+  margin-top: 6px;
+  max-width: 58%;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-frame-body {
+  padding: 8px 0 18px;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-frame-icon,
+html[data-ui-pack="tesla"] .settings-page .sc-frame-icon--amber {
+  background: #d2d2d6;
+  color: #1c1c1c;
+  box-shadow: none;
+  border-radius: 10px;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-stack {
+  gap: 8px;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-frame + .sc-frame {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  margin-top: 10px;
+  padding-top: 18px;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-back {
+  color: #3b6ae1;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-back:hover {
+  color: #2f58c4;
+  background: rgba(59, 106, 225, 0.08);
+}
+
+/* Nav cards : rangées Tesla (icône | texte | chevron) */
+html[data-ui-pack="tesla"] .settings-page .sc-nav-card {
+  background: #ffffff;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  backdrop-filter: none;
+  min-height: 76px;
+  padding: 14px 16px;
+  transform: none;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "icon copy chevron";
+  align-items: center;
+  gap: 12px;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-nav-card--block {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  min-height: 0;
+  grid-template-areas: none;
+  grid-template-columns: none;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-nav-card::before,
+html[data-ui-pack="tesla"] .settings-page .sc-nav-card::after {
+  display: none;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-nav-link:hover .sc-nav-card,
+html[data-ui-pack="tesla"] .settings-page .sc-nav-btn:hover .sc-nav-card {
+  background: #f3f3f5;
+  transform: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  border-color: transparent;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-nav-icon,
+html[data-ui-pack="tesla"] .settings-page .sc-nav-icon--violet,
+html[data-ui-pack="tesla"] .settings-page .sc-nav-icon--green,
+html[data-ui-pack="tesla"] .settings-page .sc-nav-icon--yellow,
+html[data-ui-pack="tesla"] .settings-page .sc-nav-icon--red {
+  width: 36px;
+  height: 36px;
+  background: #ececee;
+  box-shadow: none;
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-nav-copy {
+  min-width: 0;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-nav-title {
+  margin-top: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1c1c1c;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-nav-desc {
+  color: #52525b;
+  font-size: 13px;
+  -webkit-line-clamp: 3;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-nav-open {
+  display: none;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-nav-footer {
+  margin-top: 6px;
+  padding-top: 0;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-nav-chevron {
+  color: #71717a;
+  align-self: center;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-nav-link:hover .sc-nav-chevron,
+html[data-ui-pack="tesla"] .settings-page .sc-nav-btn:hover .sc-nav-chevron {
+  color: #1c1c1c;
+  transform: none;
+}
+
+/* Boutons type Tesla (gros, gris) */
+html[data-ui-pack="tesla"] .settings-page .sc-frame-body button:not(.sn-item):not(.sc-nav-btn):not(.sc-back),
+html[data-ui-pack="tesla"] .settings-page .sc-frame-body a.btn,
+html[data-ui-pack="tesla"] .settings-page button.px-4 {
+  border-radius: 12px;
+}
+html[data-ui-pack="tesla"] .settings-page input,
+html[data-ui-pack="tesla"] .settings-page select,
+html[data-ui-pack="tesla"] .settings-page textarea {
+  background: #fff;
+  color: #1c1c1c;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+html[data-ui-pack="tesla"] .settings-page input::placeholder,
+html[data-ui-pack="tesla"] .settings-page textarea::placeholder {
+  color: #71717a;
+}
+
+/* Interrupteur Tesla */
+html[data-ui-pack="tesla"] .settings-page .ds-switch {
+  position: relative;
+  display: inline-block;
+  width: 51px;
+  height: 31px;
+  flex-shrink: 0;
+}
+html[data-ui-pack="tesla"] .settings-page .ds-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+html[data-ui-pack="tesla"] .settings-page .ds-switch-slider {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: #c8c8cc;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+html[data-ui-pack="tesla"] .settings-page .ds-switch-slider::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.18s ease;
+}
+html[data-ui-pack="tesla"] .settings-page .ds-switch input:checked + .ds-switch-slider {
+  background: #3b6ae1;
+}
+html[data-ui-pack="tesla"] .settings-page .ds-switch input:checked + .ds-switch-slider::after {
+  transform: translateX(20px);
+}
+
+/* Sidebar Tesla */
+html[data-ui-pack="tesla"] .sn-sidebar {
+  background: #e6e6e8;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-ui-pack="tesla"] .sn-sidebar::before,
+html[data-ui-pack="tesla"] .sn-sidebar::after {
+  display: none;
+}
+html[data-ui-pack="tesla"] .sn-item {
+  border: 0;
+  border-radius: 14px;
+  min-height: 46px;
+  padding: 10px 12px;
+}
+html[data-ui-pack="tesla"] .sn-item:hover:not(.sn-item--active) {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: transparent;
+}
+html[data-ui-pack="tesla"] .sn-item--active {
+  background: #fff;
+  border-color: transparent;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+html[data-ui-pack="tesla"] .sn-icon--active,
+html[data-ui-pack="tesla"] .sn-icon--inactive {
+  background: transparent;
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"] .sn-item:hover .sn-icon--inactive {
+  background: transparent;
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"] .sn-label {
+  font-size: 16px;
+  font-weight: 400;
+}
+html[data-ui-pack="tesla"] .sn-label--active,
+html[data-ui-pack="tesla"] .sn-label--inactive {
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"] .sn-dot {
+  display: none;
+}
+html[data-ui-pack="tesla"] .sn-overlay {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+html[data-ui-pack="tesla"] .settings-mobile-menu-trigger-host button {
+  background: #fff;
+  color: #1c1c1c;
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+/* Mobile / tablette : cartes pleine largeur, titres non coupés */
+@media (max-width: 767px) {
+  html[data-ui-pack="tesla"] .settings-page .sc-frame-desc {
+    max-width: 100%;
+  }
+  html[data-ui-pack="tesla"] .settings-page .sc-nav-card {
+    min-height: 64px;
+  }
+  html[data-ui-pack="tesla"] .settings-page .sc-frame-title {
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 1023px) and (min-width: 768px) {
+  html[data-ui-pack="tesla"] .settings-page .sc-frame-desc {
+    max-width: 72%;
+  }
+}
+
+/* ── Chargement Tesla : splash clair, accent bleu, sans carte C411 ── */
+@keyframes tesla-indeterminate {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(380%); }
+}
+
+html[data-ui-pack="tesla"] #popcorn-loading-fallback {
+  background: #e6e6e8 !important;
+}
+html[data-ui-pack="tesla"] #popcorn-loading-fallback .bg-page-gradient,
+html[data-ui-pack="tesla"] #popcorn-loading-fallback .bg-page-grid,
+html[data-ui-pack="tesla"] #popcorn-loading-fallback .bg-page-orbs {
+  display: none;
+}
+html[data-ui-pack="tesla"] #popcorn-loading-fallback .loading-icon-container,
+html[data-ui-pack="tesla"] #popcorn-loading-fallback .pl-boot-dots {
+  display: none;
+}
+html[data-ui-pack="tesla"] #popcorn-loading-fallback .pl-boot-brand {
+  margin-bottom: 1.25rem;
+}
+html[data-ui-pack="tesla"] #popcorn-loading-fallback .pl-boot-brand img {
+  height: 4.5rem;
+  filter: none;
+  opacity: 1;
+}
+
+html[data-ui-pack="tesla"] .ds-card-loading-glow,
+html[data-ui-pack="tesla"] .ds-card-loading-bar {
+  display: none;
+}
+html[data-ui-pack="tesla"] .ds-card-loading {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  max-height: none;
+  overflow: visible;
+}
+html[data-ui-pack="tesla"] .ds-card-loading-content {
+  padding: 0;
+}
+html[data-ui-pack="tesla"] .ds-loading-title {
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  color: #1c1c1c !important;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+html[data-ui-pack="tesla"] .ds-loading-description,
+html[data-ui-pack="tesla"] .ds-loading-description-subtle {
+  color: #6d6d6d;
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+}
+html[data-ui-pack="tesla"] .ds-progress-container {
+  height: 3px;
+  background: #d2d2d6;
+  max-width: 12rem;
+}
+html[data-ui-pack="tesla"] .ds-progress-bar {
+  inset: 0 auto 0 0;
+  width: 38%;
+  background: #3b6ae1;
+  background-size: auto;
+  animation: tesla-indeterminate 1.15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+html[data-ui-pack="tesla"] .ds-progress-wave {
+  display: none;
+}
+html[data-ui-pack="tesla"] .ds-loading-info-box {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+html[data-ui-pack="tesla"] .ds-loading-info-box-content {
+  color: #52525b;
+}
+html[data-ui-pack="tesla"] .loading-icon-logo {
+  filter: none !important;
+}
+html[data-ui-pack="tesla"] .pl-boot-hint {
+  color: #6d6d6d;
+}
+html[data-ui-pack="tesla"] .pl-boot-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}

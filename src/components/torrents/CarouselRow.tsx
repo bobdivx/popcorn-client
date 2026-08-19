@@ -23,6 +23,9 @@ export default function CarouselRow({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isTV] = useState(() => typeof window !== 'undefined' && isTVPlatform());
+  const [isCoarsePointer] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(hover: none) and (pointer: coarse)').matches
+  );
 
   const scroll = useCallback((direction: 'left' | 'right') => {
     if (!scrollContainerRef.current) return;
@@ -42,9 +45,9 @@ export default function CarouselRow({
   const isHoveredRef = useRef(false);
   isHoveredRef.current = isHovered;
 
-  // Défilement automatique — désactivé sur TV (évite scroll JS + reflows en arrière-plan)
+  // Défilement automatique — désactivé sur TV et mobile (le scroll JS combat le swipe doigt)
   useEffect(() => {
-    if (!autoScroll || isTV) return;
+    if (!autoScroll || isTV || isCoarsePointer) return;
     const el = scrollContainerRef.current;
     if (!el) return;
 
@@ -62,7 +65,7 @@ export default function CarouselRow({
 
     const id = setInterval(tick, autoScrollInterval);
     return () => clearInterval(id);
-  }, [autoScroll, autoScrollInterval, isTV]);
+  }, [autoScroll, autoScrollInterval, isTV, isCoarsePointer]);
 
   // Animation au scroll avec Intersection Observer — sur TV : affichage immédiat (pas d’IO + pas de keyframes)
   useEffect(() => {
@@ -115,16 +118,16 @@ export default function CarouselRow({
     >
       <div className="flex items-end mb-2 sm:mb-3 tv:mb-4 px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 tv-overscan-x gap-3">
         <div className="min-w-0">
-          <h2 className="text-lg sm:text-xl md:text-2xl tv:text-3xl font-bold text-white truncate">{title}</h2>
+          <h2 className="text-lg sm:text-xl md:text-2xl tv:text-3xl font-bold text-[var(--ds-text-primary)] truncate">{title}</h2>
           {subtitle ? (
-            <p className="text-xs sm:text-sm text-white/55 mt-1 truncate">{subtitle}</p>
+            <p className="text-xs sm:text-sm text-[var(--ds-text-tertiary)] mt-1 truncate">{subtitle}</p>
           ) : null}
         </div>
         {!isTV && (isHovered || (scrollContainerRef.current?.scrollLeft || 0) > 0) && (
           <div className="hidden xs:flex gap-1.5 sm:gap-2 tv:gap-4 ml-auto">
             <button
               onClick={() => scroll('left')}
-              className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 tv:w-14 tv:h-14 rounded-full glass-panel hover:bg-glass-hover border border-white/30 flex items-center justify-center text-white transition-all hover:scale-110 ds-focus-glow ds-active-glow min-h-[28px] tv:min-h-[56px]"
+              className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 tv:w-14 tv:h-14 rounded-full border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] hover:border-[var(--ds-border-strong)] flex items-center justify-center text-[var(--ds-text-primary)] transition-all hover:scale-110 ds-focus-glow ds-active-glow min-h-[28px] tv:min-h-[56px]"
               aria-label="Défiler vers la gauche"
               tabIndex={0}
               data-focusable
@@ -135,7 +138,7 @@ export default function CarouselRow({
             </button>
             <button
               onClick={() => scroll('right')}
-              className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 tv:w-14 tv:h-14 rounded-full glass-panel hover:bg-glass-hover border border-white/30 flex items-center justify-center text-white transition-all hover:scale-110 ds-focus-glow ds-active-glow min-h-[28px] tv:min-h-[56px]"
+              className="w-7 h-7 sm:w-8 sm:h-8 md:w-10 md:h-10 tv:w-14 tv:h-14 rounded-full border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] hover:border-[var(--ds-border-strong)] flex items-center justify-center text-[var(--ds-text-primary)] transition-all hover:scale-110 ds-focus-glow ds-active-glow min-h-[28px] tv:min-h-[56px]"
               aria-label="Défiler vers la droite"
               tabIndex={0}
               data-focusable
@@ -150,11 +153,11 @@ export default function CarouselRow({
       <div
         ref={scrollContainerRef}
         data-carousel
-        className={`flex w-full min-w-0 max-w-full gap-1 sm:gap-1.5 md:gap-2 lg:gap-4 xl:gap-6 tv:gap-8 overflow-x-auto overscroll-x-contain overflow-y-hidden scrollbar-hide px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 py-3 tv:py-4 carousel-container ${isTV ? '' : 'scroll-smooth'}`}
+        className={`flex w-full min-w-0 max-w-full gap-1 sm:gap-1.5 md:gap-2 lg:gap-4 xl:gap-6 tv:gap-8 overflow-x-auto overscroll-x-contain overflow-y-hidden scrollbar-hide px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 py-3 tv:py-4 carousel-container ${isTV || isCoarsePointer ? '' : 'scroll-smooth'}`}
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
-          scrollBehavior: isTV ? 'auto' : 'smooth',
+          scrollBehavior: isTV || isCoarsePointer ? 'auto' : 'smooth',
           touchAction: 'pan-x pan-y',
         }}
       >

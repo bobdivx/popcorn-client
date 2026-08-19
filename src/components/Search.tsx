@@ -3,7 +3,6 @@ import { Search as SearchIcon, X, Layers2, CloudDownload, HardDrive, FolderOpen,
 import { serverApi, type SearchResult } from '../lib/client/server-api';
 import { CacheManager } from '../lib/client/storage';
 import { FocusableCard } from './ui/FocusableCard';
-import { LoadingCard } from './ui/design-system';
 import CarouselRow from './torrents/CarouselRow';
 import { useI18n } from '../lib/i18n/useI18n';
 import { isTVPlatform } from '../lib/utils/device-detection';
@@ -96,25 +95,29 @@ function SearchLiveProgressTimeline({
   }) => (
     <li
       className={`flex items-start gap-2.5 text-left rounded-lg px-2 py-1.5 -mx-2 ${
-        dim ? 'text-white/35' : active ? 'text-white/95 bg-white/5' : 'text-white/80'
+        dim
+          ? 'text-[var(--ds-text-tertiary)] opacity-60'
+          : active
+            ? 'text-[var(--ds-text-primary)] bg-[var(--ds-surface)]'
+            : 'text-[var(--ds-text-secondary)]'
       }`}
     >
       <span className="mt-0.5 shrink-0" aria-hidden>
         {skipped ? (
-          <MinusCircle className="w-4 h-4 text-white/35" strokeWidth={2} />
+          <MinusCircle className="w-4 h-4 text-[var(--ds-text-tertiary)]" strokeWidth={2} />
         ) : error ? (
-          <MinusCircle className="w-4 h-4 text-amber-400/90" strokeWidth={2} />
+          <MinusCircle className="w-4 h-4 text-amber-500" strokeWidth={2} />
         ) : done ? (
-          <CheckCircle2 className="w-4 h-4 text-emerald-400" strokeWidth={2.25} />
+          <CheckCircle2 className="w-4 h-4 text-emerald-500" strokeWidth={2.25} />
         ) : active ? (
-          <Loader2 className="w-4 h-4 text-primary-400 animate-spin" strokeWidth={2.25} />
+          <Loader2 className="w-4 h-4 text-[var(--ds-accent-violet)] animate-spin" strokeWidth={2.25} />
         ) : (
-          <span className="inline-block w-4 h-4 rounded-full border border-white/25" />
+          <span className="inline-block w-4 h-4 rounded-full border border-[var(--ds-border-strong)]" />
         )}
       </span>
       <span className="leading-snug flex-1 min-w-0">
-        <span className="font-semibold block">{label}</span>
-        {detail ? <span className="text-xs text-white/50 block mt-0.5">{detail}</span> : null}
+        <span className="font-semibold block text-[var(--ds-text-primary)]">{label}</span>
+        {detail ? <span className="text-xs text-[var(--ds-text-tertiary)] block mt-0.5">{detail}</span> : null}
       </span>
     </li>
   );
@@ -147,7 +150,7 @@ function SearchLiveProgressTimeline({
   const tmdbWaitingBeforeIndexerFinishes = !indexerFinished;
 
   return (
-    <ul className="mt-6 space-y-1 text-sm max-w-md mx-auto" aria-live="polite" aria-label={t('search.progressAriaLabel')}>
+    <ul className="mt-2 space-y-1 text-sm" aria-live="polite" aria-label={t('search.progressAriaLabel')}>
       <Row
         label={
           live.localSkipped
@@ -473,8 +476,8 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
         ariaLabel={result.title}
         className={`w-full block text-left rounded-2xl overflow-hidden border transition duration-200 ${
           cardActive
-            ? 'border-primary-500/50 bg-primary-500/10'
-            : 'border-white/10 bg-white/5 hover:bg-white/10'
+            ? 'border-[var(--ds-accent-violet)] bg-[var(--ds-surface-elevated)]'
+            : 'border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] hover:border-[var(--ds-border-strong)]'
         }`}
         onClick={handleClick}
         href={onClick ? undefined : detailUrl}
@@ -490,7 +493,7 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
         }}
       >
         {/* Même principe que DownloadCard / EpisodeCardsCarousel : vignette 16:9 + bloc texte */}
-        <div className="relative aspect-video w-full overflow-hidden bg-black/30">
+        <div className="relative aspect-video w-full overflow-hidden bg-[#111]">
           {imageUrl ? (
             <img
               src={imageUrl}
@@ -524,14 +527,14 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
         </div>
 
         <div className="p-3 sm:p-4 tv:p-5 text-left">
-          <div className="text-base tv:text-lg font-semibold text-white truncate" title={result.title}>
+          <div className="text-base tv:text-lg font-semibold text-[var(--ds-text-primary)] truncate" title={result.title}>
             {result.title}
           </div>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm tv:text-base text-white/60 mt-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm tv:text-base text-[var(--ds-text-tertiary)] mt-1">
             {result.year ? (
               <>
                 <span>{result.year}</span>
-                <span className="w-1 h-1 shrink-0 rounded-full bg-white/25" aria-hidden />
+                <span className="w-1 h-1 shrink-0 rounded-full bg-[var(--ds-border-strong)]" aria-hidden />
               </>
             ) : null}
             <span className="capitalize">{result.type === 'movie' ? t('common.film') : t('common.serie')}</span>
@@ -1017,168 +1020,152 @@ export default function Search({ onResultClick }: SearchProps) {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-black text-white w-full min-w-0 max-w-[100vw] overflow-x-hidden" data-page="search">
-      {/* Section Hero avec barre de recherche moderne */}
-      <div 
-        className={`relative w-full overflow-hidden bg-black flex flex-col items-center justify-center px-4 transition-all duration-500 ease-in-out ${
-          isTV
-            ? 'min-h-0 py-6 tv:py-8 mb-4'
-            : (loading || allResults.length > 0 || tmdbFallbackResults.length > 0)
-              ? 'min-h-[180px] tv:min-h-[220px] mb-4'
-              : 'min-h-[350px] tv:min-h-[450px] mb-8'
-        }`}
-      >
-        {/* Cercles de lumière animés en arrière-plan */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary-600/20 blur-[120px] rounded-full pointer-events-none animate-pulse-slow" />
-        <div className="absolute top-1/4 right-1/4 w-[300px] h-[300px] bg-violet-600/10 blur-[100px] rounded-full pointer-events-none" />
-        
-        {/* Texture de grain subtile */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/stardust.png')]" />
+  const filterTabs = [
+    { id: 'all' as const, label: t('search.filterAll'), count: groupedResults.length },
+    { id: 'movie' as const, label: t('search.filterMovies'), count: movies.length },
+    { id: 'tv' as const, label: t('search.filterSeries'), count: series.length },
+  ];
+  const showResultCounts = Boolean(query && !loading && (allResults.length > 0 || tmdbFallbackResults.length > 0));
 
-        <div className="relative z-10 w-full max-w-4xl mx-auto text-center space-y-8">
-          <div className="space-y-4">
-            <h1 className={`font-black tracking-tight text-white drop-shadow-2xl ${isTV ? 'text-3xl tv:text-4xl' : 'text-4xl md:text-5xl lg:text-6xl'}`}>
-              {t('search.title').toUpperCase()}
+  return (
+    <div className="flex flex-col min-h-screen w-full min-w-0 max-w-[100vw] overflow-x-hidden bg-[var(--ds-surface)] text-[var(--ds-text-primary)]" data-page="search">
+      <header className="px-4 sm:px-8 lg:px-12 pt-4 sm:pt-6 pb-3 border-b border-[var(--ds-border)]">
+        <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
+          <div className="min-w-0 lg:mr-auto">
+            <h1 className="text-xl sm:text-2xl tv:text-3xl font-bold text-[var(--ds-text-primary)] tracking-tight">
+              {t('search.title')}
             </h1>
             {!isTV && (
-              <p className="text-white/40 text-sm md:text-base lg:text-lg max-w-2xl mx-auto font-medium">
-                {t('search.subtitle') || 'Explorez votre bibliothèque et au-delà'}
+              <p className="text-sm text-[var(--ds-text-tertiary)]">
+                {t('search.subtitle')}
               </p>
             )}
           </div>
 
-            {/* Barre de recherche moderne */}
-            <form
-              className="flex flex-col sm:flex-row gap-3 tv:gap-4 mb-6"
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleSearch();
-              }}
-            >
-              <div className="relative flex-1">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-4 tv:pl-6 pointer-events-none z-10">
-                  <SearchIcon className="w-5 h-5 tv:w-7 tv:h-7 text-gray-400" size={24} />
-                </div>
-                <input
-                  ref={inputRef}
-                  type="text"
-                  placeholder={t('search.placeholder')}
-                  className="w-full pl-12 tv:pl-16 pr-12 tv:pr-16 py-3 tv:py-4 bg-gray-900/90 backdrop-blur-sm border-2 border-gray-700 rounded-lg text-white placeholder-gray-400 focus:border-primary-600 focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 text-base tv:text-lg min-h-[56px] tv:min-h-[72px] transition-all duration-200"
-                  value={query}
-                  readOnly={isTV}
-                  inputMode={isTV ? 'none' : undefined}
-                  onInput={(e) => {
-                    if (isTV) return;
-                    const el = e.target as HTMLInputElement;
-                    setQuery(el?.value ?? '');
-                  }}
-                  onKeyDown={(e) => {
-                    if (isTV) {
-                      e.preventDefault();
-                      return;
-                    }
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleSearch();
-                    }
-                  }}
-                  tabIndex={isTV ? -1 : 0}
-                  data-focusable={isTV ? undefined : true}
-                  data-tv-initial-focus={isTV ? undefined : true}
-                  autoComplete="off"
-                />
-                {query && !isTV && (
-                  <button
-                    type="button"
-                    onClick={handleClear}
-                    className="absolute inset-y-0 right-0 flex items-center pr-4 tv:pr-6 text-gray-400 hover:text-white transition-colors focus:outline-none focus:ring-2 focus:ring-primary-600 focus:ring-opacity-50 rounded"
-                    tabIndex={0}
-                    data-focusable
-                    aria-label={t('search.clearSearch')}
-                  >
-                    <X className="w-5 h-5 tv:w-6 tv:h-6" size={24} />
-                  </button>
-                )}
+          <form
+            className="flex w-full lg:max-w-2xl xl:max-w-3xl gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSearch();
+            }}
+          >
+            <div className="relative flex-1 min-w-0">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 tv:pl-5 pointer-events-none z-10">
+                <SearchIcon className="w-4 h-4 tv:w-6 tv:h-6 text-[var(--ds-text-tertiary)]" size={18} />
               </div>
-              {!isTV && (
+              <input
+                ref={inputRef}
+                type="text"
+                placeholder={t('search.placeholder')}
+                className="w-full pl-10 tv:pl-14 pr-10 tv:pr-14 py-2.5 tv:py-3.5 rounded-full border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] placeholder:text-[var(--ds-text-tertiary)] focus:outline-none focus:border-[var(--ds-accent-violet)] focus:ring-2 focus:ring-[var(--ds-accent-violet)]/20 text-sm tv:text-lg min-h-[44px] tv:min-h-[56px] transition-colors"
+                value={query}
+                readOnly={isTV}
+                inputMode={isTV ? 'none' : undefined}
+                onInput={(e) => {
+                  if (isTV) return;
+                  const el = e.target as HTMLInputElement;
+                  setQuery(el?.value ?? '');
+                }}
+                onKeyDown={(e) => {
+                  if (isTV) {
+                    e.preventDefault();
+                    return;
+                  }
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
+                tabIndex={isTV ? -1 : 0}
+                data-focusable={isTV ? undefined : true}
+                data-tv-initial-focus={isTV ? undefined : true}
+                autoComplete="off"
+              />
+              {query && !isTV && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3.5 tv:pr-5 text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-primary)] transition-colors focus:outline-none rounded-full"
+                  tabIndex={0}
+                  data-focusable
+                  aria-label={t('search.clearSearch')}
+                >
+                  <X className="w-4 h-4 tv:w-5 tv:h-5" size={18} />
+                </button>
+              )}
+            </div>
+            {!isTV && (
               <button
                 type="submit"
                 disabled={loading || !query.trim()}
-                className="w-full sm:w-auto bg-primary hover:bg-primary-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-8 tv:px-12 py-3 tv:py-4 rounded-lg font-semibold text-base tv:text-lg flex items-center justify-center gap-2 transition-all duration-300 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[56px] tv:min-h-[72px]"
+                className="inline-flex items-center justify-center gap-2 rounded-full ds-btn-accent px-4 tv:px-6 py-2 tv:py-3 text-sm tv:text-base font-semibold disabled:opacity-40 min-h-[44px] tv:min-h-[56px] shrink-0"
                 tabIndex={0}
                 data-focusable
               >
                 {loading ? (
-                  <span className="loading loading-spinner loading-sm tv:loading-md"></span>
+                  <Loader2 className="w-4 h-4 animate-spin" size={16} />
                 ) : (
-                  <>
-                    <SearchIcon className="w-5 h-5 tv:w-6 tv:h-6" size={24} />
-                    <span className="hidden sm:inline">{t('common.search')}</span>
-                  </>
+                  <SearchIcon className="w-4 h-4 tv:w-5 tv:h-5" size={16} />
                 )}
+                <span className="hidden sm:inline">{t('common.search')}</span>
               </button>
-              )}
-            </form>
-
-            {isTV && (
-              <TvOnScreenKeyboard
-                value={query}
-                onChange={setQuery}
-                onSearch={() => handleSearch()}
-                disabled={loading}
-              />
             )}
-
-            <div
-              role="tablist"
-              aria-label={t('search.filterAll')}
-              data-tv-page-action
-              className="flex items-center justify-center gap-2 tv:gap-3"
-            >
-              {([
-                { id: 'all' as const, label: t('search.filterAll') },
-                { id: 'movie' as const, label: t('search.filterMovies') },
-                { id: 'tv' as const, label: t('search.filterSeries') },
-              ]).map((tab) => (
-                <button
-                  key={tab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={type === tab.id}
-                  data-focusable
-                  tabIndex={0}
-                  onClick={() => setType(tab.id)}
-                  className={
-                    'rounded-full px-4 py-2 tv:px-6 tv:py-3 text-sm tv:text-lg font-medium min-h-[40px] tv:min-h-[52px] border focus:outline-none focus:ring-4 focus:ring-primary-600/60 ' +
-                    (type === tab.id
-                      ? 'bg-white text-black border-white'
-                      : 'bg-white/5 text-white/70 border-white/10 hover:bg-white/10 hover:text-white')
-                  }
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </div>
-
-
-
-          </div>
+          </form>
         </div>
-      {/* Affichage des résultats */}
+
+        {isTV && (
+          <div className="mt-4">
+            <TvOnScreenKeyboard
+              value={query}
+              onChange={setQuery}
+              onSearch={() => handleSearch()}
+              disabled={loading}
+            />
+          </div>
+        )}
+
+        <div
+          role="tablist"
+          aria-label={t('search.filterAll')}
+          data-tv-page-action
+          className="mt-3 flex flex-wrap gap-2"
+        >
+          {filterTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={type === tab.id}
+              data-focusable
+              tabIndex={0}
+              onClick={() => setType(tab.id)}
+              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 tv:px-5 tv:py-2.5 text-sm tv:text-base font-medium border transition-colors min-h-[36px] tv:min-h-[48px] ${
+                type === tab.id
+                  ? 'bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] border-transparent'
+                  : 'bg-[var(--ds-surface-elevated)] text-[var(--ds-text-secondary)] border-[var(--ds-border)] hover:border-[var(--ds-border-strong)]'
+              }`}
+            >
+              {tab.label}
+              {showResultCounts ? (
+                <span className="tabular-nums opacity-80">{tab.count}</span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+      </header>
+
       {error && (
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 tv:px-16 mb-6">
-          <div className="alert alert-error bg-primary-900/20 border border-primary-500 text-primary-300 glass-panel">
-            <span>{error}</span>
+        <div className="px-4 sm:px-8 lg:px-12 pt-4">
+          <div className="ds-box-error rounded-2xl px-4 py-3 text-sm text-[var(--ds-text-primary)]">
+            {error}
           </div>
         </div>
       )}
 
-      {/* Résultats organisés en carrousels */}
       {!loading && query && allResults.length > 0 && (
-        <div className="pb-8 tv:pb-12 w-full min-w-0 max-w-full overflow-x-hidden" data-search-results>
+        <div className="pt-4 sm:pt-6 pb-12 w-full min-w-0 max-w-full overflow-x-hidden" data-search-results>
           {libraryResults.length > 0 && (
-            <CarouselRow title={t('search.inLibrary')}>
+            <CarouselRow title={t('search.inLibrary')} autoScroll={false}>
               {libraryResults.map((result) => (
                 <div key={`lib-${result.id}`} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                   <SearchResultPoster result={result} onClick={onResultClick} />
@@ -1187,7 +1174,7 @@ export default function Search({ onResultClick }: SearchProps) {
             </CarouselRow>
           )}
           {catalogMovies.length > 0 && (
-            <CarouselRow title={t('search.moviesFound')}>
+            <CarouselRow title={t('search.moviesFound')} autoScroll={false}>
               {catalogMovies.map((result) => (
                 <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                   <SearchResultPoster result={result} onClick={onResultClick} />
@@ -1196,7 +1183,7 @@ export default function Search({ onResultClick }: SearchProps) {
             </CarouselRow>
           )}
           {catalogSeries.length > 0 && (
-            <CarouselRow title={t('search.seriesFound')}>
+            <CarouselRow title={t('search.seriesFound')} autoScroll={false}>
               {catalogSeries.map((result) => (
                 <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
                   <SearchResultPoster result={result} onClick={onResultClick} />
@@ -1207,41 +1194,46 @@ export default function Search({ onResultClick }: SearchProps) {
         </div>
       )}
 
-      {/* État de chargement : carte C411 avec LoadingCard */}
       {loading && (
-        <div className="flex flex-col items-center justify-start py-2 tv:py-4 px-4 w-full max-w-[42rem] mx-auto transition-all">
-          <LoadingCard
-            title={
-              searchPhase === 'local'
-                ? t('search.searchingLocal')
-                : searchPhase === 'tmdb'
-                  ? t('search.searchingTmdb')
-                  : t('search.searchingIndexers')
-            }
-            description={t('search.searchLiveSubtitle')}
-            showProgressBar={true}
-          >
+        <div className="px-4 sm:px-8 lg:px-12 py-8">
+          <div className="max-w-xl mx-auto rounded-2xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] p-5 tv:p-6">
+            <div className="flex items-start gap-3 mb-2">
+              <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--ds-border)] bg-[var(--ds-surface)] shrink-0">
+                <Loader2 className="h-4 w-4 animate-spin text-[var(--ds-accent-violet)]" size={16} />
+              </span>
+              <div className="min-w-0">
+                <h2 className="text-base tv:text-lg font-semibold text-[var(--ds-text-primary)]">
+                  {searchPhase === 'local'
+                    ? t('search.searchingLocal')
+                    : searchPhase === 'tmdb'
+                      ? t('search.searchingTmdb')
+                      : t('search.searchingIndexers')}
+                </h2>
+                <p className="text-sm text-[var(--ds-text-tertiary)] mt-0.5">
+                  {t('search.searchLiveSubtitle')}
+                </p>
+              </div>
+            </div>
             <SearchLiveProgressTimeline live={searchLive} t={t} />
-          </LoadingCard>
+          </div>
         </div>
       )}
 
-      {/* Aucun torrent trouvé mais résultats TMDB : proposer "Demander" */}
       {!loading && query && allResults.length === 0 && !error && tmdbFallbackResults.length > 0 && (
-        <div className="pb-8 tv:pb-12 container mx-auto px-4 sm:px-6 lg:px-8 tv:px-16 w-full min-w-0 max-w-full overflow-x-hidden" data-search-results>
-          <p className="text-gray-400 text-base tv:text-lg mb-4">
+        <div className="pt-4 sm:pt-6 pb-12 w-full min-w-0 max-w-full overflow-x-hidden" data-search-results>
+          <p className="px-4 sm:px-8 lg:px-12 text-sm tv:text-base text-[var(--ds-text-tertiary)] mb-4">
             {t('search.noTorrentsUseRequest')}
           </p>
           {type === 'all' ? (
             <>
               {sortedTmdbFallback.filter((r) => r.type === 'movie').length > 0 && (
-                <CarouselRow title={t('search.tmdbMoviesRequest')}>
+                <CarouselRow title={t('search.tmdbMoviesRequest')} autoScroll={false}>
                   {sortedTmdbFallback
                     .filter((r) => r.type === 'movie')
                     .map((result) => (
                       <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                        <SearchResultPoster 
-                          result={result} 
+                        <SearchResultPoster
+                          result={result}
                           onClick={onResultClick}
                         />
                       </div>
@@ -1249,13 +1241,13 @@ export default function Search({ onResultClick }: SearchProps) {
                 </CarouselRow>
               )}
               {sortedTmdbFallback.filter((r) => r.type === 'tv').length > 0 && (
-                <CarouselRow title={t('search.tmdbSeriesRequest')}>
+                <CarouselRow title={t('search.tmdbSeriesRequest')} autoScroll={false}>
                   {sortedTmdbFallback
                     .filter((r) => r.type === 'tv')
                     .map((result) => (
                       <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                        <SearchResultPoster 
-                          result={result} 
+                        <SearchResultPoster
+                          result={result}
                           onClick={onResultClick}
                         />
                       </div>
@@ -1264,22 +1256,22 @@ export default function Search({ onResultClick }: SearchProps) {
               )}
             </>
           ) : (
-            <CarouselRow title={t('search.tmdbRequestTitle')}>
+            <CarouselRow title={t('search.tmdbRequestTitle')} autoScroll={false}>
               {sortedTmdbFallback.map((result) => (
                 <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                  <SearchResultPoster 
-                    result={result} 
+                  <SearchResultPoster
+                    result={result}
                     onClick={onResultClick}
                   />
                 </div>
               ))}
             </CarouselRow>
           )}
-          <div className="mt-6 text-center">
+          <div className="mt-6 px-4 sm:px-8 lg:px-12">
             <button
               type="button"
               onClick={handleClear}
-              className="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 tv:px-8 tv:py-3 rounded-lg text-sm tv:text-base min-h-[44px] tv:min-h-[52px]"
+              className="inline-flex items-center rounded-full ds-btn-secondary px-4 py-2 tv:px-6 tv:py-3 text-sm tv:text-base font-semibold min-h-[44px] tv:min-h-[52px]"
               tabIndex={0}
               data-focusable
             >
@@ -1289,24 +1281,25 @@ export default function Search({ onResultClick }: SearchProps) {
         </div>
       )}
 
-      {/* État vide - aucun résultat (ni torrent ni TMDB) */}
       {!loading && query && allResults.length === 0 && !error && tmdbFallbackResults.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-20 tv:py-32 px-4">
-          <div className="text-center max-w-2xl tv:max-w-3xl">
-            <div className="text-6xl tv:text-8xl mb-4 tv:mb-6">🔍</div>
-            <h2 className="text-2xl tv:text-3xl font-bold text-white mb-4 tv:mb-6">
+        <div className="px-4 sm:px-8 lg:px-12 py-10 tv:py-16">
+          <div className="flex flex-col items-center justify-center py-16 sm:py-20 text-center rounded-2xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]">
+            <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 border border-[var(--ds-border)] bg-[var(--ds-surface)]">
+              <SearchIcon size={28} className="text-[var(--ds-text-tertiary)]" />
+            </div>
+            <h2 className="text-xl font-bold text-[var(--ds-text-primary)] mb-1">
               {t('search.noResults')}
             </h2>
-            <p className="text-gray-400 text-base tv:text-lg mb-6 tv:mb-8">
-              {t('search.noResultsFor', { 
+            <p className="text-[var(--ds-text-tertiary)] text-sm max-w-md mb-5">
+              {t('search.noResultsFor', {
                 type: type === 'all' ? t('search.content') : type === 'movie' ? t('common.film').toLowerCase() : t('common.serie').toLowerCase(),
-                query 
+                query,
               })}
             </p>
             <button
               type="button"
               onClick={handleClear}
-              className="bg-primary hover:bg-primary-700 text-white px-8 tv:px-12 py-3 tv:py-4 rounded-lg font-semibold text-base tv:text-lg transition-all duration-300 shadow-primary hover:shadow-primary-lg focus:outline-none focus:ring-4 focus:ring-primary-600 focus:ring-opacity-50 min-h-[48px] tv:min-h-[56px]"
+              className="inline-flex items-center gap-2 rounded-full ds-btn-accent px-4 py-2.5 text-sm font-semibold min-h-[44px]"
               tabIndex={0}
               data-focusable
             >
@@ -1316,26 +1309,41 @@ export default function Search({ onResultClick }: SearchProps) {
         </div>
       )}
 
-      {/* Historique de recherche cliquable (état initial, pas de query) */}
-      {!query && !loading && searchHistory.length > 0 && (
-        <div className="px-4 sm:px-8 tv:px-16 py-6">
-          <h3 className="text-sm tv:text-lg font-semibold text-gray-400 uppercase tracking-wider mb-3 tv:mb-4">
-            {t('search.recentSearches')}
-          </h3>
-          <div className="flex flex-wrap gap-2 tv:gap-3">
-            {searchHistory.map((term) => (
-              <button
-                key={term}
-                type="button"
-                data-focusable
-                onClick={() => handleSearch(term)}
-                className="px-4 py-2 tv:px-6 tv:py-3 rounded-full bg-gray-800/90 hover:bg-gray-700 border border-gray-600 hover:border-primary-500 text-gray-200 hover:text-white text-sm tv:text-lg min-h-[40px] tv:min-h-[52px] transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                tabIndex={0}
-              >
-                {term}
-              </button>
-            ))}
-          </div>
+      {!query && !loading && (
+        <div className="px-4 sm:px-8 lg:px-12 py-8 tv:py-10">
+          {searchHistory.length > 0 ? (
+            <>
+              <h3 className="text-sm tv:text-base font-semibold text-[var(--ds-text-secondary)] mb-3 tv:mb-4">
+                {t('search.recentSearches')}
+              </h3>
+              <div className="flex flex-wrap gap-2 tv:gap-3">
+                {searchHistory.map((term) => (
+                  <button
+                    key={term}
+                    type="button"
+                    data-focusable
+                    onClick={() => handleSearch(term)}
+                    className="px-3.5 py-1.5 tv:px-5 tv:py-2.5 rounded-full bg-[var(--ds-surface-elevated)] hover:border-[var(--ds-border-strong)] border border-[var(--ds-border)] text-[var(--ds-text-secondary)] hover:text-[var(--ds-text-primary)] text-sm tv:text-base min-h-[36px] tv:min-h-[48px] transition-colors"
+                    tabIndex={0}
+                  >
+                    {term}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 sm:py-20 text-center rounded-2xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]">
+              <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 border border-[var(--ds-border)] bg-[var(--ds-surface)]">
+                <SearchIcon size={28} className="text-[var(--ds-text-tertiary)]" />
+              </div>
+              <h2 className="text-xl font-bold text-[var(--ds-text-primary)] mb-1">
+                {t('search.startSearch')}
+              </h2>
+              <p className="text-[var(--ds-text-tertiary)] text-sm max-w-md">
+                {t('search.startSearchDescription')}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

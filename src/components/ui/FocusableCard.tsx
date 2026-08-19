@@ -46,6 +46,9 @@ export function FocusableCard({
 
     // Gestion du focus pour TV - assurer visibilité et z-index
     const handleFocus = () => {
+      if (typeof window !== 'undefined' && window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
+        return;
+      }
       if (element) {
         element.style.zIndex = '10';
       }
@@ -84,7 +87,7 @@ export function FocusableCard({
 
   if (href) {
     return (
-      <a href={href} {...commonProps}>
+      <a href={href} draggable={false} {...commonProps}>
         {children}
       </a>
     );

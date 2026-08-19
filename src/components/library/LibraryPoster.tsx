@@ -42,6 +42,7 @@ export function LibraryPoster({ item, onPlay, className, priorityLoad }: Library
   return (
     <div
       data-torrent-card
+      data-dark-context
       data-tv-item-key={tvBrowseItemKey({
         tmdbId: item.tmdb_id,
         type: item.category === 'SERIES' || item.tmdb_type === 'tv' || item.tmdb_type === 'series' ? 'tv' : 'movie',
@@ -60,7 +61,12 @@ export function LibraryPoster({ item, onPlay, className, priorityLoad }: Library
         onFocus={(e) => {
           setIsFocused(true);
           setIsHovered(true);
-          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'center' });
+          const coarse =
+            typeof window !== 'undefined' &&
+            window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+          if (!coarse) {
+            (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'center' });
+          }
         }}
         onBlur={() => {
           setIsFocused(false);

@@ -37,6 +37,8 @@ export function SettingsSubPageFrame({
       href={backHref}
       data-astro-prefetch
       class="sc-back"
+      data-focusable
+      tabIndex={0}
       aria-label={t('common.back')}
     >
       <ArrowLeft className="w-4 h-4" aria-hidden />
@@ -47,6 +49,8 @@ export function SettingsSubPageFrame({
       type="button"
       onClick={backOnClick}
       class="sc-back"
+      data-focusable
+      tabIndex={0}
       aria-label={t('common.back')}
     >
       <ArrowLeft className="w-4 h-4" aria-hidden />

@@ -222,7 +222,7 @@ export default function Navbar() {
           <div className="flex-shrink-0">
             <a
               href={user ? '/dashboard' : '/'}
-              className="flex items-center gap-2 sm:gap-3 group rounded-xl py-1 pr-2 focus:outline-none focus:ring-4 focus:ring-primary-600/50 focus:ring-offset-2 focus:ring-offset-black transition-opacity duration-200 hover:opacity-90"
+              className="flex items-center gap-2 sm:gap-3 group rounded-xl py-1 pr-2 focus:outline-none focus:ring-4 focus:ring-[var(--ds-accent-violet)]/50 focus:ring-offset-2 focus:ring-offset-[var(--page-bg)] transition-opacity duration-200 hover:opacity-90"
               tabIndex={isTvNav ? -1 : 0}
               data-focusable={isTvNav ? undefined : true}
               data-tv-nav-skip={isTvNav ? true : undefined}

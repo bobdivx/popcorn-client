@@ -271,8 +271,8 @@ export default function SettingsOverview() {
       {canAccess('settings.server' as any) && (
         <div className="mb-4 sm:mb-5">
           <div
-            className="sc-nav-card"
-            style="display:flex;flex-direction:column;gap:12px;padding:16px 20px;min-height:auto;"
+            className="sc-nav-card sc-nav-card--block"
+            style="padding:16px 20px;min-height:auto;"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
@@ -301,7 +301,7 @@ export default function SettingsOverview() {
                   <span className="ds-text-secondary mb-1">
                     {t('settingsMenu.overviewCard.ratioTotalDownloaded')}
                   </span>
-                  <span className="font-semibold text-white">
+                  <span className="font-semibold text-[var(--ds-text-primary)]">
                     {formatBytes(ratioStats.total_downloaded_bytes)}
                   </span>
                 </div>
@@ -309,7 +309,7 @@ export default function SettingsOverview() {
                   <span className="ds-text-secondary mb-1">
                     {t('settingsMenu.overviewCard.ratioTotalUploaded')}
                   </span>
-                  <span className="font-semibold text-white">
+                  <span className="font-semibold text-[var(--ds-text-primary)]">
                     {formatBytes(ratioStats.total_uploaded_bytes)}
                   </span>
                 </div>
@@ -320,7 +320,7 @@ export default function SettingsOverview() {
                       <span className="loading loading-spinner loading-xs text-[var(--ds-accent-yellow)]" aria-hidden />
                     )}
                   </span>
-                  <span className="font-semibold text-white">
+                  <span className="font-semibold text-[var(--ds-text-primary)]">
                     {c411Ratio?.ratio != null && Number.isFinite(c411Ratio.ratio)
                       ? c411Ratio.ratio.toFixed(2)
                       : '—'}
@@ -379,25 +379,22 @@ export default function SettingsOverview() {
               class="sc-nav-link"
             >
               <div class="sc-nav-card">
-                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
-                  <div class={`sc-nav-icon sc-nav-icon--${accentKey}`}>
-                    <Icon className="w-5 h-5" strokeWidth={1.8} aria-hidden />
-                  </div>
-                  <div class="sc-nav-chevron">
-                    <ChevronRight className="w-5 h-5 mt-0.5" aria-hidden />
-                  </div>
+                <div class={`sc-nav-icon sc-nav-icon--${accentKey}`}>
+                  <Icon className="w-5 h-5" strokeWidth={1.8} aria-hidden />
                 </div>
-                <div class="sc-nav-title">{t(item.titleKey)}</div>
-                {summary ? (
-                  <div class={`sc-status-badge sc-status-badge--${summary.variant ?? 'neutral'}`} aria-hidden>
-                    {isSyncCardInProgress && <span className="loading loading-spinner loading-xs mr-1" />}
-                    {summary.text}
-                  </div>
-                ) : (
-                  <div class="sc-nav-desc">{t('common.configure')}</div>
-                )}
-                <div class="sc-nav-footer" aria-hidden>
-                  <span class="sc-nav-open">{t('common.open')}</span>
+                <div class="sc-nav-copy">
+                  <div class="sc-nav-title">{t(item.titleKey)}</div>
+                  {summary ? (
+                    <div class={`sc-status-badge sc-status-badge--${summary.variant ?? 'neutral'}`}>
+                      {isSyncCardInProgress && <span className="loading loading-spinner loading-xs mr-1" />}
+                      {summary.text}
+                    </div>
+                  ) : (
+                    <div class="sc-nav-desc">{t('common.configure')}</div>
+                  )}
+                </div>
+                <div class="sc-nav-chevron">
+                  <ChevronRight className="w-5 h-5" aria-hidden />
                 </div>
               </div>
             </a>

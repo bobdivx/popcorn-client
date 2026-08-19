@@ -47,6 +47,7 @@ export function HeroSection({
   const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
   const trailerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const touchStartX = useRef<number>(0);
+  const touchStartY = useRef<number>(0);
   const heroRootRef = useRef<HTMLDivElement>(null);
 
   if (!items || items.length === 0) {
@@ -177,15 +178,19 @@ export function HeroSection({
   // Swipe tactile pour naviguer entre les slides (gauche/droite)
   const handleTouchStart = (e: TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
   };
   const handleTouchEnd = (e: TouchEvent) => {
     if (items.length <= 1) return;
     const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
     const deltaX = touchEndX - touchStartX.current;
-    if (deltaX < -MIN_SWIPE_DISTANCE) {
+    const deltaY = touchEndY - touchStartY.current;
+    if (Math.abs(deltaX) < MIN_SWIPE_DISTANCE || Math.abs(deltaX) < Math.abs(deltaY)) return;
+    if (deltaX < 0) {
       setHeroPaused(true);
       setCurrentIndex((prev) => (prev + 1) % items.length);
-    } else if (deltaX > MIN_SWIPE_DISTANCE) {
+    } else {
       setHeroPaused(true);
       setCurrentIndex((prev) => (prev - 1 + items.length) % items.length);
     }
@@ -212,12 +217,12 @@ export function HeroSection({
   return (
     <div
       ref={heroRootRef}
-      className={`hero-dashboard relative z-0 w-full mb-8 touch-pan-y ${
+      className={`hero-dashboard relative z-0 w-full mb-8 ${
         (isLargeHero && !isTV) ? 'px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16' : ''
       }`}
       data-dark-context
       style={{
-        touchAction: 'pan-y',
+        touchAction: 'pan-x pan-y',
       }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}

@@ -25,6 +25,7 @@ function getSubFromUrl(): string | null {
   if (typeof window === 'undefined') return null;
   const params = new URLSearchParams(window.location.search);
   const sub = params.get('sub');
+  if (sub === 'pack') return 'theme';
   return sub === 'language' || sub === 'theme' ? sub : null;
 }
 

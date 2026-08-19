@@ -11,7 +11,7 @@ const { title = 'Paramètres - Popcorn Client' } = Astro.props;
 ---
 
 <Layout title={title}>
-  <div class="ds-page settings-page flex w-full" data-tv-settings-container>
+  <div class="ds-page settings-page flex w-full" data-page="settings" data-tv-settings-container>
     <aside transition:persist="settings-sidebar" class="settings-sidebar-wrapper w-0 flex-shrink-0 md:w-72 xl:w-80 self-stretch">
       {/* idle : priorise le contenu principal, sidebar hydrate juste après */}
       <SettingsSidebar client:idle />
@@ -41,12 +41,34 @@ const { title = 'Paramètres - Popcorn Client' } = Astro.props;
     overflow: hidden;
   }
 
-  /* Fond de la page settings — adaptatif selon le thème */
+  /* Mobile : un seul scroll (la page), pas un nested overflow qui piège le doigt sur les cartes. */
+  @media (max-width: 767px) {
+    .app-main:has(.settings-page) {
+      display: block;
+      overflow: visible;
+      height: auto;
+    }
+    .settings-page {
+      display: block !important;
+      min-height: 0;
+      height: auto;
+      flex: none;
+    }
+    .settings-content-area {
+      overflow: visible !important;
+      max-height: none;
+    }
+  }
+
+  /* Fond de la page settings — adaptatif selon le thème / pack */
   .settings-page {
     background: #07070e;
   }
   [data-theme="light"] .settings-page {
     background: var(--ds-surface);
+  }
+  [data-ui-pack="tesla"] .settings-page {
+    background: #e6e6e8;
   }
 
   /* ── Animations de navigation settings ── */

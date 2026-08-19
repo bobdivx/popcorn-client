@@ -36,7 +36,7 @@ export function LoadingCard({
   className = '',
 }: LoadingCardProps) {
   const defaultIcon = (
-    <img src="/popcorn_logo.png" alt="" class="w-full h-full object-contain" style={{ filter: 'drop-shadow(0 0 10px rgba(168, 85, 247, 0.5))' }} />
+    <img src="/popcorn_logo.png" alt="" class="w-full h-full object-contain loading-icon-logo" />
   );
 
   return (

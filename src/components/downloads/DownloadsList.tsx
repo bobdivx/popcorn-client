@@ -1,16 +1,14 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'preact/hooks';
-import { Download, Upload, FileText as LogsIcon, Link2, HardDrive, Users, Clock } from 'lucide-preact';
+import { Download, Upload, FileText as LogsIcon, Link2, HardDrive, Users, Clock, Pause, Play } from 'lucide-preact';
 import { clientApi } from '../../lib/client/api';
 import type { ClientTorrentStats, TorrentLogEntry } from '../../lib/client/types';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { getDownloadMeta } from '../../lib/utils/download-meta-storage';
 import { formatBytes, formatSpeed } from '../../lib/utils/formatBytes';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
-import { DownloadCard } from './DownloadCard';
+import { DownloadRow } from './DownloadRow';
 import { DownloadDetailModal } from './DownloadDetailModal';
 import { Modal } from '../ui/Modal';
 import { ConfirmModal } from '../ui/ConfirmModal';
-import CarouselRow from '../torrents/CarouselRow';
 
 const REFRESH_INTERVAL = 4000;
 
@@ -163,6 +161,9 @@ export default function DownloadsList() {
   const [sessionLogsLines, setSessionLogsLines] = useState<string[]>([]);
   const sessionLogsAbortRef = useRef<AbortController | null>(null);
   const [sessionStats, setSessionStats] = useState<Record<string, unknown> | null>(null);
+  const [filter, setFilter] = useState<'all' | 'active' | 'paused' | 'ready'>('all');
+  const [actingHash, setActingHash] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const hasEnrichedRef = useRef(false);
 
@@ -350,10 +351,6 @@ export default function DownloadsList() {
     })();
   }, [initialHydrated, torrents.length]);
 
-  const moviesTorrents = useMemo(
-    () => sortTorrentsDeterministic(torrents.filter(t => tmdbTypeMap[t.info_hash.toLowerCase()] === 'movie')),
-    [torrents, tmdbTypeMap],
-  );
   const seriesTorrents = useMemo(
     () => sortTorrentsDeterministic(torrents.filter(t => tmdbTypeMap[t.info_hash.toLowerCase()] === 'tv')),
     [torrents, tmdbTypeMap],
@@ -384,48 +381,30 @@ export default function DownloadsList() {
       }
     });
 
-    const orderedGroups = Array.from(groups.values()).sort((a, b) => {
-      const prioDiff = getTorrentPriority(b.representative) - getTorrentPriority(a.representative);
-      if (prioDiff !== 0) return prioDiff;
-      const progressDiff = (b.representative.progress ?? 0) - (a.representative.progress ?? 0);
-      if (progressDiff !== 0) return progressDiff;
-      return a.index - b.index;
-    });
-    const groupedSeriesTorrents = orderedGroups.map(group => group.representative);
-    const representativeToGroupMap: Record<string, ClientTorrentStats[]> = {};
-    orderedGroups.forEach((group) => {
-      representativeToGroupMap[group.representative.info_hash] = [...group.torrents];
-    });
-    return { groupedSeriesTorrents, representativeToGroupMap };
+    const hashToGroupMap: Record<string, ClientTorrentStats[]> = {};
+    for (const group of groups.values()) {
+      for (const torrent of group.torrents) {
+        hashToGroupMap[torrent.info_hash] = [...group.torrents];
+      }
+    }
+    return { hashToGroupMap };
   }, [seriesTorrents, displayTitleMap]);
-  const groupedSeriesTorrents = groupedSeriesData.groupedSeriesTorrents;
-  const representativeToGroupMap = groupedSeriesData.representativeToGroupMap;
-  const otherTorrents = useMemo(
-    () =>
-      sortTorrentsDeterministic(
-        torrents.filter(t => {
-          const type = tmdbTypeMap[t.info_hash.toLowerCase()];
-          return type !== 'movie' && type !== 'tv';
-        }),
-      ),
-    [torrents, tmdbTypeMap],
-  );
+  const hashToGroupMap = groupedSeriesData.hashToGroupMap;
 
-  const downloadingNow = useMemo(
-    () => sortTorrentsDeterministic(torrents.filter(isInProgressTorrent)),
+  const sortedTorrents = useMemo(() => sortTorrentsDeterministic(torrents), [torrents]);
+  const filteredTorrents = useMemo(() => {
+    if (filter === 'active') return sortedTorrents.filter(isInProgressTorrent);
+    if (filter === 'paused') return sortedTorrents.filter((t) => t.state === 'paused' || t.state === 'error');
+    if (filter === 'ready') return sortedTorrents.filter(isReadyTorrent);
+    return sortedTorrents;
+  }, [sortedTorrents, filter]);
+  const pausableTorrents = useMemo(
+    () => torrents.filter((t) => t.state === 'downloading' || t.state === 'seeding' || t.state === 'queued'),
     [torrents],
   );
-  const readyMovies = useMemo(
-    () => moviesTorrents.filter(isReadyTorrent),
-    [moviesTorrents],
-  );
-  const readySeries = useMemo(
-    () => groupedSeriesTorrents.filter(isReadyTorrent),
-    [groupedSeriesTorrents],
-  );
-  const readyOthers = useMemo(
-    () => otherTorrents.filter(isReadyTorrent),
-    [otherTorrents],
+  const resumableTorrents = useMemo(
+    () => torrents.filter((t) => t.state === 'paused' || t.state === 'error'),
+    [torrents],
   );
 
   const handleOpenDetail = (
@@ -433,7 +412,7 @@ export default function DownloadsList() {
     p?: string | null,
     b?: string | null,
   ) => {
-    const group = representativeToGroupMap[tor.info_hash];
+    const group = hashToGroupMap[tor.info_hash];
     setSelectedRelatedTorrents(group && group.length > 0 ? group : [tor]);
     setSelectedTorrent(tor);
     setSelectedTorrentPoster(p ?? null);
@@ -442,6 +421,45 @@ export default function DownloadsList() {
   const handleCloseDetail = () => {
     setSelectedTorrent(null);
     setSelectedRelatedTorrents([]);
+  };
+
+  const handlePauseOne = async (hash: string) => {
+    setActingHash(hash);
+    try {
+      await clientApi.pauseTorrent(hash);
+      await loadTorrents();
+    } finally {
+      setActingHash(null);
+    }
+  };
+  const handleResumeOne = async (hash: string) => {
+    setActingHash(hash);
+    try {
+      await clientApi.resumeTorrent(hash);
+      await loadTorrents();
+    } finally {
+      setActingHash(null);
+    }
+  };
+  const handlePauseAll = async () => {
+    if (pausableTorrents.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await Promise.all(pausableTorrents.map((t) => clientApi.pauseTorrent(t.info_hash)));
+      await loadTorrents();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+  const handleResumeAll = async () => {
+    if (resumableTorrents.length === 0) return;
+    setBulkBusy(true);
+    try {
+      await Promise.all(resumableTorrents.map((t) => clientApi.resumeTorrent(t.info_hash)));
+      await loadTorrents();
+    } finally {
+      setBulkBusy(false);
+    }
   };
 
   const handleTmdbMetadataChanged = useCallback(
@@ -496,141 +514,173 @@ export default function DownloadsList() {
     try { setLogs(filterLogs(await clientApi.getTorrentLogs(h))); } catch { } finally { setLogsLoading(false); }
   };
 
-  const renderCarousel = (title: string, items: ClientTorrentStats[], initialFocus = false) => {
-    if (items.length === 0) return null;
-    return (
-      <CarouselRow title={`${title} (${items.length})`} autoScroll={false}>
-        {items.map((torrent, index) => (
-          <div
-            key={torrent.info_hash}
-            className="flex-shrink-0 w-[240px] sm:w-[320px] lg:w-[360px] tv:w-[400px]"
-            data-tv-initial-focus={initialFocus && index === 0 ? true : undefined}
-          >
-            <DownloadCard
-              torrent={torrent}
-              posterUrl={imageMap[torrent.info_hash.toLowerCase()]?.posterUrl}
-              backdropUrl={imageMap[torrent.info_hash.toLowerCase()]?.backdropUrl}
-              displayTitle={displayTitleMap[torrent.info_hash.toLowerCase()]}
-              onOpenDetail={handleOpenDetail}
-            />
-          </div>
-        ))}
-      </CarouselRow>
-    );
-  };
+  const filters = [
+    { id: 'all' as const, label: t('downloads.filterAll'), count: torrents.length },
+    { id: 'active' as const, label: t('downloads.filterActive'), count: torrents.filter(isInProgressTorrent).length },
+    { id: 'paused' as const, label: t('downloads.filterPaused'), count: torrents.filter((x) => x.state === 'paused' || x.state === 'error').length },
+    { id: 'ready' as const, label: t('downloads.filterReady'), count: torrents.filter(isReadyTorrent).length },
+  ];
 
   if (loading && torrents.length === 0) return <div className="flex-1 flex items-center justify-center min-h-[400px]"><HLSLoadingSpinner size="lg" text={t('downloads.loadingDownloads')} /></div>;
 
   return (
     <div className="flex flex-col w-full min-w-0 max-w-full" data-page="downloads">
-      <section
-        className="relative w-full overflow-hidden border-b border-white/10"
-        aria-label={t('settingsPages.librqbit.sessionStats')}
-      >
-        <div className="absolute inset-0 bg-gradient-to-br from-[var(--ds-accent-violet)]/20 via-black to-[var(--ds-accent-green)]/10" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(255,255,255,0.08),transparent_55%)]" />
-        <div className="relative px-4 sm:px-12 pt-8 sm:pt-12 pb-8 sm:pb-10">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-10 max-w-4xl">
-            <div className="rounded-2xl sm:rounded-3xl border border-white/10 bg-black/30 backdrop-blur-md p-5 sm:p-7">
-              <div className="flex items-center gap-2 text-[var(--ds-accent-violet)] mb-3">
-                <Download className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.5} size={24} />
-                <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider">
-                  {t('downloads.stats.downloadSpeed')}
-                </span>
-              </div>
-              <p className="text-3xl sm:text-5xl font-bold text-white tracking-tight tabular-nums">
-                {heroDownloadSpeed}
-              </p>
+      <header className="px-4 sm:px-8 lg:px-12 pt-4 sm:pt-6 pb-3 border-b border-[var(--ds-border)]" data-tv-list-header>
+        <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
+          <div className="min-w-0 lg:mr-auto">
+            <h1 className="text-xl sm:text-2xl font-bold text-[var(--ds-text-primary)] tracking-tight">
+              {t('downloads.title')}
+            </h1>
+            <p className="text-sm text-[var(--ds-text-tertiary)]">
+              {t('downloads.activeDownloads', { count: torrents.length, plural: torrents.length > 1 ? 's' : '' })}
+            </p>
+          </div>
+
+          <div
+            className="flex flex-wrap items-center gap-1.5"
+            aria-label={t('settingsPages.librqbit.sessionStats')}
+          >
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] px-2.5 py-1 text-xs text-[var(--ds-text-secondary)]">
+              <Download className="h-3.5 w-3.5 text-[var(--ds-accent-violet)]" size={14} />
+              <span className="font-semibold tabular-nums text-[var(--ds-text-primary)]">{heroDownloadSpeed}</span>
               {heroFetchedBytes != null && (
-                <p className="mt-2 text-sm text-white/40">
-                  {formatBytes(heroFetchedBytes)} {t('downloads.stats.totalDownloaded')}
-                </p>
+                <span className="text-[var(--ds-text-tertiary)]">· {formatBytes(heroFetchedBytes)}</span>
               )}
-            </div>
-            <div className="rounded-2xl sm:rounded-3xl border border-white/10 bg-black/30 backdrop-blur-md p-5 sm:p-7">
-              <div className="flex items-center gap-2 text-[var(--ds-accent-green)] mb-3">
-                <Upload className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={2.5} size={24} />
-                <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider">
-                  {t('downloads.stats.uploadSpeed')}
-                </span>
-              </div>
-              <p className="text-3xl sm:text-5xl font-bold text-white tracking-tight tabular-nums">
-                {heroUploadSpeed}
-              </p>
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] px-2.5 py-1 text-xs text-[var(--ds-text-secondary)]">
+              <Upload className="h-3.5 w-3.5 text-[var(--ds-accent-green)]" size={14} />
+              <span className="font-semibold tabular-nums text-[var(--ds-text-primary)]">{heroUploadSpeed}</span>
               {heroUploadedBytes != null && (
-                <p className="mt-2 text-sm text-white/40">
-                  {formatBytes(heroUploadedBytes)} {t('downloads.stats.totalUploaded')}
-                </p>
+                <span className="text-[var(--ds-text-tertiary)]">· {formatBytes(heroUploadedBytes)}</span>
               )}
-            </div>
+            </span>
+            {heroPeersLive != null && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] px-2.5 py-1 text-xs text-[var(--ds-text-secondary)]">
+                <Users className="h-3.5 w-3.5" size={14} />
+                {heroPeersLive} {t('downloads.stats.peers')}
+              </span>
+            )}
+            {heroUptimeSeconds != null && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] px-2.5 py-1 text-xs text-[var(--ds-text-secondary)]">
+                <Clock className="h-3.5 w-3.5" size={14} />
+                {formatUptime(heroUptimeSeconds)}
+              </span>
+            )}
           </div>
-          {(heroPeersLive != null || heroUptimeSeconds != null) && (
-            <div className="mt-5 flex flex-wrap items-center gap-3 sm:gap-4 text-sm text-white/50">
-              {heroPeersLive != null && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                  <Users className="w-4 h-4 text-white/40" size={16} />
-                  {heroPeersLive} {t('downloads.stats.peers')}
-                </span>
-              )}
-              {heroUptimeSeconds != null && (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
-                  <Clock className="w-4 h-4 text-white/40" size={16} />
-                  {t('downloads.sessionUptime')}: {formatUptime(heroUptimeSeconds)}
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      </section>
 
-      <div className="pt-4 sm:pt-8 pb-12 flex-1 safe-area-bottom w-full min-w-0 max-w-full">
-        <div className="px-4 sm:px-12 mb-6 sm:mb-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div>
-            <h1 className="text-3xl sm:text-5xl font-bold text-white mb-1 sm:mb-2 tracking-tight">{t('downloads.title')}</h1>
-            <p className="text-white/40 text-base sm:text-lg font-medium">{t('downloads.activeDownloads', { count: torrents.length, plural: torrents.length > 1 ? 's' : '' })}</p>
-          </div>
-          <div className="flex items-center gap-2 p-1.5 sm:p-2 bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl backdrop-blur-xl shrink-0">
-             <button
-               type="button"
-               onClick={() => setShowAddMagnetModal(true)}
-               data-focusable
-               tabIndex={0}
-               aria-label={t('downloads.addMagnetLink')}
-               title={t('downloads.addMagnetLink')}
-               className="min-w-11 min-h-11 w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors"
-             >
-               <Link2 size={24} />
-             </button>
-             <button
-               type="button"
-               onClick={() => setShowSessionLogsModal(true)}
-               data-focusable
-               tabIndex={0}
-               aria-label={t('downloads.logs') || 'Logs'}
-               title={t('downloads.logs') || 'Logs'}
-               className="min-w-11 min-h-11 w-11 h-11 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl hover:bg-white/10 flex items-center justify-center text-white/60 hover:text-white transition-colors"
-             >
-               <LogsIcon size={24} />
-             </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowAddMagnetModal(true)}
+              data-focusable
+              tabIndex={0}
+              className="inline-flex items-center gap-2 rounded-full ds-btn-accent px-3.5 py-2 text-sm font-semibold"
+            >
+              <Link2 className="h-4 w-4" size={16} />
+              {t('downloads.addMagnetLink')}
+            </button>
+            <button
+              type="button"
+              onClick={handlePauseAll}
+              data-focusable
+              tabIndex={0}
+              disabled={bulkBusy || pausableTorrents.length === 0}
+              className="inline-flex items-center gap-2 rounded-full ds-btn-secondary px-3.5 py-2 text-sm font-semibold disabled:opacity-40"
+            >
+              <Pause className="h-4 w-4" size={16} />
+              {t('downloads.pauseAll')}
+            </button>
+            <button
+              type="button"
+              onClick={handleResumeAll}
+              data-focusable
+              tabIndex={0}
+              disabled={bulkBusy || resumableTorrents.length === 0}
+              className="inline-flex items-center gap-2 rounded-full ds-btn-secondary px-3.5 py-2 text-sm font-semibold disabled:opacity-40"
+            >
+              <Play className="h-4 w-4" size={16} />
+              {t('downloads.resumeAll')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSessionLogsModal(true)}
+              data-focusable
+              tabIndex={0}
+              className="inline-flex items-center gap-2 rounded-full ds-btn-secondary px-3.5 py-2 text-sm font-semibold"
+            >
+              <LogsIcon className="h-4 w-4" size={16} />
+              {t('downloads.logs')}
+            </button>
           </div>
         </div>
 
+        {torrents.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2" role="tablist" aria-label={t('downloads.title')} data-tv-page-action>
+            {filters.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={filter === item.id}
+                data-focusable
+                tabIndex={0}
+                onClick={() => setFilter(item.id)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium border transition-colors ${
+                  filter === item.id
+                    ? 'bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] border-transparent'
+                    : 'bg-[var(--ds-surface-elevated)] text-[var(--ds-text-secondary)] border-[var(--ds-border)] hover:border-[var(--ds-border-strong)]'
+                }`}
+              >
+                {item.label}
+                <span className="tabular-nums opacity-80">{item.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </header>
+
+      <div className="pt-4 sm:pt-6 pb-12 flex-1 safe-area-bottom w-full min-w-0 max-w-full px-4 sm:px-8 lg:px-12">
         {torrents.length === 0 ? (
-          <div className="px-6 sm:px-12 mt-8 sm:mt-12 flex flex-col items-center justify-center py-20 sm:py-32 text-center bg-white/[0.02] border border-white/5 rounded-3xl sm:rounded-[3rem] mx-4 sm:mx-12 backdrop-blur-sm">
-            <div className="w-20 h-20 sm:w-24 sm:h-24 bg-white/5 rounded-full flex items-center justify-center mb-6 border border-white/10 shadow-inner">
-               <HardDrive size={32} className="text-white/20 sm:hidden" />
-               <HardDrive size={40} className="text-white/20 hidden sm:block" />
+          <div className="flex flex-col items-center justify-center py-16 sm:py-24 text-center rounded-2xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]">
+            <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 border border-[var(--ds-border)] bg-[var(--ds-surface)]">
+               <HardDrive size={28} className="text-[var(--ds-text-tertiary)]" />
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mb-2">{t('downloads.noActiveDownloads')}</h2>
-            <p className="text-white/30 text-base sm:text-lg max-w-md">{t('downloads.torrentsWillAppear')}</p>
+            <h2 className="text-xl font-bold text-[var(--ds-text-primary)] mb-1">{t('downloads.noActiveDownloads')}</h2>
+            <p className="text-[var(--ds-text-tertiary)] text-sm max-w-md mb-5">{t('downloads.torrentsWillAppear')}</p>
+            <button
+              type="button"
+              onClick={() => setShowAddMagnetModal(true)}
+              data-focusable
+              tabIndex={0}
+              className="inline-flex items-center gap-2 rounded-full ds-btn-accent px-4 py-2.5 text-sm font-semibold"
+            >
+              <Link2 className="h-4 w-4" size={16} />
+              {t('downloads.addMagnetLink')}
+            </button>
           </div>
+        ) : filteredTorrents.length === 0 ? (
+          <p className="text-sm text-[var(--ds-text-tertiary)] py-10 text-center">{t('downloads.noActiveDownloads')}</p>
         ) : (
-          <div className="w-full min-w-0 max-w-full">
-            {renderCarousel(t('downloads.downloadingNow'), downloadingNow, downloadingNow.length > 0)}
-            {renderCarousel(t('downloads.readyToWatch'), [...readyMovies, ...readySeries, ...readyOthers], downloadingNow.length === 0)}
-            {renderCarousel(t('nav.films'), moviesTorrents.filter((t) => !isInProgressTorrent(t) && !isReadyTorrent(t)))}
-            {renderCarousel(t('nav.series'), groupedSeriesTorrents.filter((t) => !isInProgressTorrent(t) && !isReadyTorrent(t)))}
-            {renderCarousel(t('library.others'), otherTorrents.filter((t) => !isInProgressTorrent(t) && !isReadyTorrent(t)))}
+          <div className="flex flex-col gap-2.5" data-tv-list>
+            {filteredTorrents.map((torrent, index) => (
+              <div
+                key={torrent.info_hash}
+                data-tv-list-item
+                data-tv-initial-focus={index === 0 ? true : undefined}
+              >
+                <DownloadRow
+                  torrent={torrent}
+                  posterUrl={imageMap[torrent.info_hash.toLowerCase()]?.posterUrl}
+                  backdropUrl={imageMap[torrent.info_hash.toLowerCase()]?.backdropUrl}
+                  displayTitle={displayTitleMap[torrent.info_hash.toLowerCase()]}
+                  busy={actingHash === torrent.info_hash || bulkBusy}
+                  onOpenDetail={handleOpenDetail}
+                  onPause={handlePauseOne}
+                  onResume={handleResumeOne}
+                  onRemove={(hash) => setPendingRemove({ hash, deleteFiles: true })}
+                />
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -645,14 +695,14 @@ export default function DownloadsList() {
           <textarea 
             value={magnetLink} 
             onChange={(e: any) => setMagnetLink(e.target.value)} 
-            className="w-full h-48 bg-black/40 border border-white/10 rounded-2xl p-6 text-white placeholder-white/10 focus:outline-none focus:border-[var(--ds-accent-violet)] transition-colors" 
+            className="w-full h-48 bg-[var(--ds-surface)] border border-[var(--ds-border)] rounded-2xl p-6 text-[var(--ds-text-primary)] placeholder:text-[var(--ds-text-tertiary)] focus:outline-none focus:border-[var(--ds-accent-violet)] transition-colors" 
             placeholder="magnet:?xt=urn:btih:..." 
             autoFocus
           />
           <div className="flex justify-end gap-4">
             <button 
               onClick={() => setShowAddMagnetModal(false)} 
-              className="px-10 py-4 rounded-2xl bg-white/5 hover:bg-white/10 text-white font-bold transition-colors"
+              className="px-10 py-4 rounded-2xl bg-[var(--ds-surface)] hover:bg-[var(--ds-surface-overlay)] text-[var(--ds-text-primary)] font-bold transition-colors border border-[var(--ds-border)]"
               data-focusable
             >
               Annuler
@@ -666,7 +716,7 @@ export default function DownloadsList() {
                   setShowAddMagnetModal(false); setMagnetLink(''); loadTorrents();
                 } catch(e) { } finally { setAddingTorrent(false); }
               }} 
-              className="px-10 py-4 rounded-2xl bg-[var(--ds-accent-violet)] text-white font-bold shadow-lg shadow-purple-500/20"
+              className="px-10 py-4 rounded-2xl bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] font-bold"
               disabled={addingTorrent}
               data-focusable
             >
@@ -683,7 +733,7 @@ export default function DownloadsList() {
         size="xl"
       >
         <div className="flex flex-col h-[60vh]">
-          <div className="flex-1 overflow-y-auto bg-black/40 rounded-3xl p-6 font-mono text-sm text-white/60 custom-scrollbar border border-white/5">
+          <div className="flex-1 overflow-y-auto bg-[var(--ds-surface)] rounded-3xl p-6 font-mono text-sm text-[var(--ds-text-secondary)] custom-scrollbar border border-[var(--ds-border)]">
             {logsLoading ? <div className="flex items-center justify-center h-full"><HLSLoadingSpinner size="md" /></div> : (
               logs.length > 0 ? logs.map((l, i) => (
                 <div key={i} className={`py-1 border-b border-white/5 last:border-0 ${l.level === 'ERROR' ? 'text-red-400' : l.level === 'WARN' ? 'text-amber-400' : ''}`}>
@@ -702,7 +752,7 @@ export default function DownloadsList() {
         size="xl"
       >
         <div className="flex flex-col h-[60vh]">
-          <div className="flex-1 overflow-y-auto bg-black/40 rounded-3xl p-6 font-mono text-sm text-white/40 custom-scrollbar border border-white/5 whitespace-pre-wrap">
+          <div className="flex-1 overflow-y-auto bg-[var(--ds-surface)] rounded-3xl p-6 font-mono text-sm text-[var(--ds-text-secondary)] custom-scrollbar border border-[var(--ds-border)] whitespace-pre-wrap">
             {sessionLogsLines.length > 0 ? sessionLogsLines.join('\n') : "En attente de logs..."}
           </div>
         </div>
