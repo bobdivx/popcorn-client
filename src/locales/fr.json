@@ -589,6 +589,21 @@
     "continueInBackground": "Continuer en arrière-plan",
     "showDebug": "Afficher debug",
     "hideDebug": "Masquer debug",
+    "hls": {
+      "serverPreparing": "Le serveur prépare la vidéo…",
+      "preparingRemux": "Empaquetage de la vidéo pour le lecteur (sans réencodage)…",
+      "preparingTranscode": "Conversion pour cet appareil (4K / HEVC : 20–40 s pour le 1er segment)…",
+      "playlistReady": "Playlist prête, remplissage du buffer du lecteur…",
+      "serverPipeline": "Serveur (HLS)",
+      "playerBuffer": "Buffer lecteur",
+      "segmentsReady": "{ready} / {expected} segments",
+      "openLogs": "Ouvrir les logs de la vidéo",
+      "scanLogsQr": "Scanner pour voir les logs sur le téléphone",
+      "ffmpegRunning": "FFmpeg en cours",
+      "ffmpegIdle": "FFmpeg arrêté",
+      "modeRemux": "Remux H.264",
+      "modeTranscode": "Transcodage"
+    },
 
     "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct.",
     "errorStream": "Impossible de lire la vidéo. Vérifiez la connexion au serveur.",

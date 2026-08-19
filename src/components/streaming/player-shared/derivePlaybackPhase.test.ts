@@ -106,6 +106,16 @@ describe('derivePlaybackPhase', () => {
     expect(d.phase).toBe('preparingPlayback');
   });
 
+  it('passe en buffering pendant la lecture', () => {
+    const d = derivePlaybackPhase({
+      playStatus: 'ready',
+      isBuffering: true,
+      isActiveSession: true,
+      torrentStats: { state: 'seeding', progress: 1, files_available: true, total_bytes: 100, downloaded_bytes: 100 },
+    });
+    expect(d.phase).toBe('buffering');
+  });
+
   it('passe en error', () => {
     expect(derivePlaybackPhase({ playStatus: 'error', errorMessage: 'boom' }).phase).toBe('error');
   });

@@ -1,6 +1,8 @@
 import { useState } from 'preact/hooks';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { formatBytes, formatSpeed, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
+import { generateQRCode } from '../../../../lib/utils/qrcode';
+import { pipelineHeadline, type PlaybackPipelineStatus } from '../../../../lib/streaming/playbackPipeline';
 import {
   PLAYBACK_PHASE_I18N_KEYS,
   derivePlaybackPhase,
@@ -58,6 +60,8 @@ export interface PlaybackStatusSurfaceProps {
   onClearLogs?: () => void;
   cancelLabel?: string;
   className?: string;
+  pipelineStatus?: PlaybackPipelineStatus | null;
+  debugLogsUrl?: string | null;
 }
 
 const STEP_KEYS = ['queue', 'metadata', 'peers', 'download'] as const;
@@ -116,6 +120,126 @@ function MediaPoster({
       <div className="absolute bottom-2 right-2 w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-black/55 border border-white/20 backdrop-blur-md flex items-center justify-center shadow-lg">
         <img src="/popcorn_logo.png" alt="" className="w-[70%] h-[70%] object-contain" />
       </div>
+    </div>
+  );
+}
+
+function PipelinePanel({
+  status,
+  debugUrl,
+  bufferedPercent,
+  t,
+}: {
+  status: PlaybackPipelineStatus | null;
+  debugUrl?: string | null;
+  bufferedPercent?: number | null;
+  t: (k: string, p?: Record<string, string | number>) => string;
+}) {
+  const [qr, setQr] = useState<string | null>(null);
+  const [qrOpen, setQrOpen] = useState(false);
+
+  const loadQr = async () => {
+    if (!debugUrl) return;
+    if (!qr) {
+      try {
+        setQr(await generateQRCode(debugUrl));
+      } catch {
+        /* ignore */
+      }
+    }
+    setQrOpen(true);
+  };
+
+  const serverPct =
+    status && status.expected_segments > 0
+      ? Math.min(100, Math.round((status.segment_count / status.expected_segments) * 1000) / 10)
+      : status?.playlist_ready
+        ? 8
+        : null;
+  const playerPct =
+    bufferedPercent != null && bufferedPercent > 0 && bufferedPercent < 100 ? bufferedPercent : null;
+
+  return (
+    <div className="w-full mb-5 space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-2.5 text-left">
+          <div className="text-[10px] uppercase tracking-[0.16em] text-white/40 font-semibold mb-1">
+            {t('playback.hls.serverPipeline')}
+          </div>
+          <div className="text-sm text-white/90 mb-1.5">
+            {pipelineHeadline(status, t)}
+          </div>
+          <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mb-1.5">
+            <div
+              className="h-full rounded-full bg-amber-400 transition-[width] duration-500"
+              style={{ width: `${serverPct ?? 12}%` }}
+            />
+          </div>
+          <div className="text-[11px] text-white/45">
+            {status
+              ? `${t('playback.hls.segmentsReady', {
+                  ready: status.segment_count,
+                  expected: status.expected_segments || '…',
+                })} · ${
+                  status.mode === 'remux'
+                    ? t('playback.hls.modeRemux')
+                    : t('playback.hls.modeTranscode')
+                } · ${
+                  status.ffmpeg_running ? t('playback.hls.ffmpegRunning') : t('playback.hls.ffmpegIdle')
+                }`
+              : t('playback.hls.serverPreparing')}
+          </div>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-2.5 text-left">
+          <div className="text-[10px] uppercase tracking-[0.16em] text-white/40 font-semibold mb-1">
+            {t('playback.hls.playerBuffer')}
+          </div>
+          <div className="text-sm text-white/90 mb-1.5">
+            {playerPct != null
+              ? t('playback.bufferingProgress', { percent: Math.round(playerPct) })
+              : t('playback.hls.playlistReady')}
+          </div>
+          <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-primary-400 transition-[width] duration-500"
+              style={{ width: `${playerPct ?? 4}%` }}
+            />
+          </div>
+        </div>
+      </div>
+      {debugUrl ? (
+        <div className="flex flex-col items-center gap-2">
+          <div className="flex flex-wrap justify-center gap-2">
+            <a
+              href={debugUrl}
+              target="_blank"
+              rel="noreferrer"
+              data-focusable
+              tabIndex={0}
+              className="px-3 py-1.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-xs text-white/80"
+            >
+              {t('playback.hls.openLogs')}
+            </a>
+            <button
+              type="button"
+              onClick={loadQr}
+              data-focusable
+              tabIndex={0}
+              className="px-3 py-1.5 rounded-xl border border-white/15 bg-white/5 hover:bg-white/10 text-xs text-white/80"
+            >
+              QR
+            </button>
+          </div>
+          {qrOpen && qr ? (
+            <div className="rounded-xl bg-white p-2">
+              <img src={qr} alt={t('playback.hls.scanLogsQr')} className="w-32 h-32" />
+              <p className="text-[10px] text-black/60 text-center mt-1 max-w-[8rem]">
+                {t('playback.hls.scanLogsQr')}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -248,6 +372,8 @@ export function PlaybackStatusSurface({
   onClearLogs,
   cancelLabel,
   className = '',
+  pipelineStatus = null,
+  debugLogsUrl = null,
 }: PlaybackStatusSurfaceProps) {
   const { t } = useI18n();
   const [confirmingCancel, setConfirmingCancel] = useState(false);
@@ -524,6 +650,16 @@ export function PlaybackStatusSurface({
                   </button>
                 ) : null}
               </div>
+              {debugLogsUrl || pipelineStatus ? (
+                <div className="mt-5 w-full">
+                  <PipelinePanel
+                    status={pipelineStatus ?? null}
+                    debugUrl={debugLogsUrl}
+                    bufferedPercent={bufferedPercent}
+                    t={t}
+                  />
+                </div>
+              ) : null}
             </div>
           ) : (
             <>
@@ -556,6 +692,17 @@ export function PlaybackStatusSurface({
               ) : (
                 <div className="mb-5" />
               )}
+
+              {derived.phase === 'preparingPlayback' ||
+              derived.phase === 'buffering' ||
+              pipelineStatus ? (
+                <PipelinePanel
+                  status={pipelineStatus ?? null}
+                  debugUrl={debugLogsUrl}
+                  bufferedPercent={bufferedPercent}
+                  t={t}
+                />
+              ) : null}
 
               {derived.showTorrentMetrics ? (
                 <div className="grid grid-cols-2 gap-2.5 mb-6">

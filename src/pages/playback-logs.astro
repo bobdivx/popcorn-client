@@ -1,0 +1,8 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PlaybackLogsPage from '../components/streaming/player-shared/components/PlaybackLogsPage';
+---
+
+<Layout title="Logs lecture - Popcornn">
+  <PlaybackLogsPage client:only="preact" />
+</Layout>

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'preact/hooks';
 import { useVideoControls } from '../player-shared/hooks/useVideoControls';
 import { useFullscreen, toggleFullscreen } from '../player-shared/hooks/useFullscreen';
-import { ErrorDisplay } from '../player-shared/components/ErrorDisplay';
+import { PlaybackStatusSurface } from '../player-shared/components/PlaybackStatusSurface';
 import { VideoControls } from '../player-shared/components/VideoControls';
 import type { HLSPlayerProps } from './types';
 import { useHlsPlayer } from './hooks/useHlsPlayer';
@@ -13,6 +13,8 @@ import { isTauri } from '../../../lib/utils/tauri';
 import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
 import { SkipIntroOverlay } from '../player-shared/components/SkipIntroOverlay';
 import PlayerBufferingOverlay from '../player-shared/components/PlayerBufferingOverlay';
+import { usePlaybackPipelineStatus } from '../player-shared/hooks/usePlaybackPipelineStatus';
+import { pipelineHeadline } from '../../../lib/streaming/playbackPipeline';
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
@@ -428,6 +430,14 @@ export default function HLSPlayer({
     isWaiting ||
     isSeekSettling ||
     (isSeeking && (bufferedPercent < 95 || pendingSeekPosition > 0));
+  const pipeline = usePlaybackPipelineStatus(
+    {
+      path: filePath,
+      infoHash,
+      baseUrl: baseUrlProp,
+    },
+    shouldShowBuffering || Boolean(error),
+  );
   /** En cas d'erreur, garder les contrôles visibles pour permettre d'appuyer sur Retour */
   const effectiveShowControls = showControls || !!displayError;
 
@@ -477,15 +487,26 @@ export default function HLSPlayer({
           </div>
         )}
         {displayError && (
-          <div class="absolute inset-0 z-10 flex items-center justify-center bg-black/90">
-            <ErrorDisplay error={displayError} />
-          </div>
+          <PlaybackStatusSurface
+            variant="player"
+            playStatus="error"
+            errorMessage={displayError}
+            title={torrentName || fileName}
+            posterUrl={posterUrl}
+            imageUrl={posterUrl}
+            isActiveSession
+            pipelineStatus={pipeline.status}
+            debugLogsUrl={pipeline.debugUrl}
+            onCancel={onClose}
+            onRetry={() => window.location.reload()}
+          />
         )}
         {shouldShowBuffering && (
           <PlayerBufferingOverlay
             title={torrentName || fileName}
             bufferedPercent={overlayBufferedPercent}
             detailMessage={
+              pipelineHeadline(pipeline.status, t) ||
               loadingStatusMessage ||
               (isLocalLibraryMedia && isLoading
                 ? t('playback.phase.preparingPlayback') || 'Préparation de la lecture…'
@@ -496,6 +517,8 @@ export default function HLSPlayer({
             imageUrl={posterUrl}
             onClose={onClose}
             closeLabel={t('playback.stopPlayback') || t('common.close')}
+            pipelineStatus={pipeline.status}
+            debugLogsUrl={pipeline.debugUrl}
           />
         )}
         <video

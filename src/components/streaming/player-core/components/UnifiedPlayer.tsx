@@ -6,6 +6,9 @@ import DirectVideoPlayer from '../../direct-player/DirectVideoPlayer';
 import PlayerLoadingOverlay, {
   type PlayerLoadingTorrentStats,
 } from '../../player-shared/components/PlayerLoadingOverlay';
+import { usePlaybackPipelineStatus } from '../../player-shared/hooks/usePlaybackPipelineStatus';
+import { pipelineHeadline } from '../../../../lib/streaming/playbackPipeline';
+import { useI18n } from '../../../../lib/i18n/useI18n';
 
 /**
  * Façade unique du lecteur (direct, HLS ou Lucie).
@@ -60,20 +63,35 @@ export default function UnifiedPlayer({
   onHlsLoadingChange,
   onProgress,
 }: UnifiedPlayerProps) {
+  const { t } = useI18n();
+  const pipeline = usePlaybackPipelineStatus(
+    {
+      path: hlsProps.filePath,
+      infoHash: hlsProps.infoHash,
+      baseUrl: hlsProps.baseUrl,
+    },
+    loading && !useDirectPlayer,
+  );
+  const pipelineMessage = pipeline.status
+    ? pipelineHeadline(pipeline.status, t)
+    : loadingMessage;
+
   return (
     <>
       {loading && (
         <PlayerLoadingOverlay
-          message={loadingMessage}
+          message={pipelineMessage}
           title={hlsProps.torrentName ?? hlsProps.fileName}
           loadingStep={loadingStep}
-          progressMessage={progressMessage}
+          progressMessage={progressMessage || pipelineMessage}
           torrentStats={torrentStats}
           posterUrl={hlsProps.posterUrl}
           imageUrl={hlsProps.posterUrl}
           onCancel={onClose}
           onAbortDownload={onAbortDownload}
           cancelLabel={cancelLabel ?? closeLabel}
+          pipelineStatus={pipeline.status}
+          debugLogsUrl={pipeline.debugUrl}
         />
       )}
 
