@@ -1106,7 +1106,7 @@ export function useHlsPlayer({
             // stream-torrent : plus de retries (torrent peut rester en "initializing" longtemps)
             const url = currentSrcRef.current;
             const isStreamTorrent = typeof url === 'string' && url.includes('/api/stream-torrent/');
-            const maxInitialRetries = isStreamTorrent ? 10 : 5;
+            const maxInitialRetries = isStreamTorrent ? 10 : 18;
             if (
               (statusCode === 503 || statusCode === 202) &&
               url &&
@@ -1115,10 +1115,12 @@ export function useHlsPlayer({
               hlsRef.current
             ) {
               initialLoad503RetryCountRef.current += 1;
-              setLoadingStatusMessage(t('playback.preparingStream'));
+              setLoadingStatusMessage(
+                t('playback.hls.preparingTranscode') || t('playback.preparingStream')
+              );
               const retryAfterHeader = data?.response?.headers?.['Retry-After'] ?? data?.response?.headers?.['retry-after'];
               const retryAfterSec = typeof retryAfterHeader === 'string' ? parseInt(retryAfterHeader, 10) : NaN;
-              const defaultDelays = [3000, 6000, 10000, 15000, 20000];
+              const defaultDelays = [2000, 2000, 3000, 3000, 4000, 4000, 5000, 5000, 6000, 6000, 8000, 8000, 10000, 10000, 12000, 15000, 15000, 20000];
               const streamTorrentDelays = [5000, 5000, 10000, 10000, 15000, 15000, 20000, 20000, 25000, 25000];
               const delays = isStreamTorrent ? streamTorrentDelays : defaultDelays;
               const defaultDelayMs = delays[initialLoad503RetryCountRef.current - 1] ?? (isStreamTorrent ? 25000 : 20000);

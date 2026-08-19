@@ -1,5 +1,6 @@
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { PlaybackStatusSurface } from './PlaybackStatusSurface';
+import type { PlaybackPipelineStatus } from '../../../../lib/streaming/playbackPipeline';
 import { derivePlaybackPhase } from '../derivePlaybackPhase';
 
 /** Stats torrent minimales pour affichage en temps réel dans l'overlay. */
@@ -30,6 +31,8 @@ interface PlayerLoadingOverlayProps {
   hasVideoFiles?: boolean;
   posterUrl?: string | null;
   imageUrl?: string | null;
+  pipelineStatus?: PlaybackPipelineStatus | null;
+  debugLogsUrl?: string | null;
 }
 
 export default function PlayerLoadingOverlay({
@@ -44,6 +47,8 @@ export default function PlayerLoadingOverlay({
   hasVideoFiles,
   posterUrl,
   imageUrl,
+  pipelineStatus = null,
+  debugLogsUrl = null,
 }: PlayerLoadingOverlayProps) {
   const { t } = useI18n();
   const derived = derivePlaybackPhase({
@@ -74,6 +79,8 @@ export default function PlayerLoadingOverlay({
       isHlsPreparing={isHlsPreparing || derived.isReallyComplete}
       hasVideoFiles={hasVideoFiles}
       isActiveSession
+      pipelineStatus={pipelineStatus}
+      debugLogsUrl={debugLogsUrl}
       onCancel={onCancel}
       onAbortDownload={onAbortDownload}
       cancelLabel={cancelLabel || t('common.cancel') || 'Annuler'}
