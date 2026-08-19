@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { getBackendUrl } from '../../../lib/backend-url';
+import { getBackendUrl } from '../../../../lib/backend-url';
 
 interface PlaybackLogsResponse {
   success?: boolean;
