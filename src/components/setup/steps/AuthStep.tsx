@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../../../lib/client/server-api';
 import { TokenManager } from '../../../lib/client/storage';
-import { getUserConfig } from '../../../lib/api/popcorn-web';
+import { getUserConfig, getOidcStatus } from '../../../lib/api/popcorn-web';
 import PocketIdButton from '../../PocketIdButton';
 import { PreferencesManager } from '../../../lib/client/storage';
 import type { UserConfig } from '../../../lib/api/popcorn-web';
@@ -64,6 +64,22 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
   const [registerPassword, setRegisterPassword] = useState('');
   const [registerConfirmPassword, setRegisterConfirmPassword] = useState('');
   const [ssoRequired, setSsoRequired] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!loginEmail.includes('@')) {
+      setSsoRequired(false);
+      return;
+    }
+    const handle = window.setTimeout(async () => {
+      const status = await getOidcStatus(loginEmail);
+      setSsoRequired(status.ssoRequired);
+      if (status.ssoRequired) {
+        setError(status.message || t('loginForm.sso.required'));
+      }
+    }, 400);
+    return () => window.clearTimeout(handle);
+  }, [loginEmail]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -305,6 +321,10 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
             />
           </div>
           <div class="auth-step-tv__divider">Ou</div>
+          <div style="margin-bottom:16px;">
+            <PocketIdButton emphasize />
+          </div>
+          <div class="auth-step-tv__divider">Ou</div>
           <button
             type="button"
             class="auth-step-tv__email-cta"
@@ -365,11 +385,12 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                     placeholder={t('wizard.auth.emailPlaceholder')}
                     value={loginEmail}
                     onInput={(e) => setLoginEmail((e.target as HTMLInputElement).value)}
-                    required
+                    required={!ssoRequired}
                     disabled={loading}
                     autocomplete="email"
                   />
                 </div>
+                {!ssoRequired && (
                 <div class="auth-step-tv__field">
                   <label class="wizard-label">{t('wizard.auth.password')}</label>
                   <input
@@ -378,11 +399,12 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                     placeholder={t('wizard.auth.passwordPlaceholder')}
                     value={loginPassword}
                     onInput={(e) => setLoginPassword((e.target as HTMLInputElement).value)}
-                    required={!ssoRequired}
-                    disabled={loading || ssoRequired}
+                    required
+                    disabled={loading}
                     autocomplete="current-password"
                   />
                 </div>
+                )}
                 {!ssoRequired && (
                 <button
                   ref={(el) => { buttonRefs.current[0] = el; }}
@@ -782,11 +804,12 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                       placeholder={t('wizard.auth.emailPlaceholder')}
                       value={loginEmail}
                       onInput={(e) => setLoginEmail((e.target as HTMLInputElement).value)}
-                      required
+                      required={!ssoRequired}
                       disabled={loading}
                       autocomplete="email"
                     />
                   </div>
+                  {!ssoRequired && (
                   <div style="margin-bottom:20px;">
                     <label class="wizard-label">{t('wizard.auth.password')}</label>
                     <input
@@ -795,11 +818,12 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                       placeholder={t('wizard.auth.passwordPlaceholder')}
                       value={loginPassword}
                       onInput={(e) => setLoginPassword((e.target as HTMLInputElement).value)}
-                    required={!ssoRequired}
-                    disabled={loading || ssoRequired}
+                    required
+                    disabled={loading}
                     autocomplete="current-password"
                   />
                 </div>
+                  )}
                 {!ssoRequired && (
                   <button
                     ref={(el) => { buttonRefs.current[0] = el; }}

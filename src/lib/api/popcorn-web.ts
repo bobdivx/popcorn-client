@@ -284,8 +284,9 @@ export async function loginCloud(email: string, password: string): Promise<{
       });
       
       // Créer une erreur avec le statut pour que la route puisse la gérer
-      const error = new Error(errorMessage) as Error & { status?: number };
+      const error = new Error(errorMessage) as Error & { status?: number; code?: string };
       error.status = res.status;
+      error.code = typeof errorData.error === 'string' ? errorData.error : undefined;
       throw error;
     }
 

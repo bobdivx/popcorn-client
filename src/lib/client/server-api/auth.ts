@@ -224,6 +224,11 @@ export const authMethods = {
           };
         }
       }
+
+      // Un compte cloud lié à Pocket ID doit primer sur l’erreur locale (mot de passe).
+      if (cloudResponse.error === 'SsoRequired') {
+        return cloudResponse;
+      }
       
       // Si le cloud échoue aussi, retourner l'erreur locale
       return res as ApiResponse<AuthResponse>;
@@ -281,6 +286,7 @@ export const authMethods = {
       // Log détaillé pour le diagnostic
       const errorMessage = e instanceof Error ? e.message : String(e);
       const errorName = e instanceof Error ? e.name : 'UnknownError';
+      const errorCode = (e as Error & { code?: string }).code;
       
       console.error('[AUTH] Erreur lors de la connexion cloud:', {
         error: e,
@@ -289,6 +295,14 @@ export const authMethods = {
         stack: e instanceof Error ? e.stack : undefined,
         errorString: JSON.stringify(e, Object.getOwnPropertyNames(e), 2),
       });
+
+      if (errorCode === 'SsoRequired' || errorMessage.includes('Pocket ID')) {
+        return {
+          success: false,
+          error: 'SsoRequired',
+          message: errorMessage || 'Ce compte se connecte avec Pocket ID',
+        };
+      }
       
       // Messages d'erreur plus clairs
       let userMessage = 'Erreur de connexion cloud';
