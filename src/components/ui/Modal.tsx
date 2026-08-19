@@ -110,8 +110,10 @@ export function Modal({
   useEffect(() => {
     if (isOpen) {
       previousActiveElementRef.current = document.activeElement as HTMLElement;
+      document.documentElement.setAttribute('data-modal-open', '');
       document.body.style.overflow = 'hidden';
     } else {
+      document.documentElement.removeAttribute('data-modal-open');
       document.body.style.overflow = '';
       // Restaurer le focus après fermeture
       if (previousActiveElementRef.current) {
@@ -122,6 +124,7 @@ export function Modal({
     }
 
     return () => {
+      document.documentElement.removeAttribute('data-modal-open');
       document.body.style.overflow = '';
     };
   }, [isOpen]);
@@ -163,9 +166,7 @@ export function Modal({
   const node = (
     <div
       ref={overlayRef}
-      className={`fixed inset-0 z-[9999] flex min-h-0 min-w-0 items-stretch sm:items-center justify-center overflow-hidden p-0 sm:p-4 tv:p-3 ${
-        isAnimating ? 'animate-fade-in' : ''
-      }`}
+      className={`ds-modal-overlay tv:p-3 ${isAnimating ? 'animate-fade-in' : ''}`}
       style={{ zIndex: 2147483647 }}
       role="dialog"
       aria-modal="true"
@@ -182,9 +183,7 @@ export function Modal({
       {/* Modal : style glass (C411) avec bordure violette + barre gradient */}
       <div
         ref={modalRef}
-        className={`relative z-10 w-full min-h-0 min-w-0 ${sizeClasses[size]} ds-modal-glass flex flex-col h-full max-h-full sm:h-auto sm:max-h-[calc(100vh-2rem)] tv:max-h-[calc(100vh-1.5rem)] tv:max-w-[calc(100vw-1.5rem)] ${
-          'scale-100 opacity-100'
-        } ${className}`}
+        className={`relative z-10 flex min-h-0 min-w-0 w-full max-w-full flex-col ${sizeClasses[size]} ds-modal-glass h-full max-h-full sm:h-auto sm:max-h-[min(100dvh,calc(100vh-2rem))] tv:max-h-[calc(100dvh-1.5rem)] tv:max-w-[calc(100vw-1.5rem)] ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Barre gradient en tête */}
@@ -219,17 +218,17 @@ export function Modal({
         )}
 
         {/* Content */}
-        <div className={`${noPadding ? '' : 'ds-card-section'} flex-1 min-h-0 overscroll-contain pt-0 ${scrollable ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+        <div className={`${noPadding ? '' : 'ds-card-section'} flex-1 min-h-0 min-w-0 overscroll-contain pt-0 overflow-x-hidden ${scrollable ? 'overflow-y-auto' : 'overflow-hidden'}`}>
           {children}
         </div>
       </div>
     </div>
   );
 
-  // Important: portal vers <body> pour éviter les stacking contexts
-  // (ex: header fixed / parents transform) qui peuvent passer au-dessus de la modal.
+  // Portal sur <html> (pas <body>) : le body est zoomé à 80% sur plusieurs pages
+  // (dashboard, downloads…). Un overlay `fixed` dans ce body est décalé / clippé.
   if (typeof document !== 'undefined') {
-    return createPortal(node, document.body);
+    return createPortal(node, document.documentElement);
   }
 
   return node;

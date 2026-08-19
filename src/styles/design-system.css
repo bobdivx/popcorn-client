@@ -299,6 +299,57 @@
   flex-shrink: 0;
 }
 
+/* Overlay : hors du body zoomé (portal sur <html>), couvre le vrai viewport */
+.ds-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  min-width: 0;
+  min-height: 0;
+  align-items: stretch;
+  justify-content: center;
+  overflow: hidden;
+  overscroll-behavior: none;
+  padding: 0;
+  box-sizing: border-box;
+}
+@supports (height: 100dvh) {
+  .ds-modal-overlay {
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+}
+@media (min-width: 640px) {
+  .ds-modal-overlay {
+    align-items: center;
+    padding: 1rem;
+  }
+}
+html[data-tv-platform="true"] .ds-modal-overlay {
+  align-items: center;
+  padding: 0.75rem;
+}
+
+html[data-modal-open],
+html[data-modal-open] body {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
+/* Popovers / toasts : tokens (lisible Tesla clair ET classic sombre) */
+.ds-popover,
+.ds-toast {
+  background: var(--ds-surface-elevated);
+  color: var(--ds-text-primary);
+  border: 1px solid var(--ds-border-strong);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+}
+
 /* Modal : suit le pack / thème (tokens), plus de fond sombre figé */
 .ds-modal-glass {
   background: var(--ds-surface-elevated);
@@ -310,6 +361,21 @@
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.28);
   overflow: hidden;
   min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Plein écran mobile : pas de coins / bordure (évite le cadre coupé) */
+@media (max-width: 639px) {
+  .ds-modal-glass {
+    border-radius: 0;
+    border-width: 0;
+    box-shadow: none;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+  }
 }
 
 /* ========== Carte chargement type C411 (glass + glow + barre gradient) ========== */

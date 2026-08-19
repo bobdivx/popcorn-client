@@ -32,12 +32,12 @@ interface DownloadDetailModalProps {
 }
 
 const StatCard = ({ icon: Icon, label, value, colorClass }: any) => (
-  <div className="bg-[var(--ds-surface)] border border-[var(--ds-border)] rounded-2xl p-4 sm:p-5 flex flex-col gap-1 group hover:bg-[var(--ds-surface-overlay)] transition-all">
-    <div className="flex items-center gap-2 text-[var(--ds-text-tertiary)] group-hover:text-[var(--ds-text-secondary)] transition-colors">
-      <Icon size={16} className={colorClass} />
-      <span className="text-xs font-semibold uppercase tracking-wider">{label}</span>
+  <div className="bg-[var(--ds-surface)] border border-[var(--ds-border)] rounded-2xl p-3 sm:p-5 flex flex-col gap-1 min-w-0 overflow-hidden group hover:bg-[var(--ds-surface-overlay)] transition-all">
+    <div className="flex items-center gap-1.5 sm:gap-2 text-[var(--ds-text-tertiary)] group-hover:text-[var(--ds-text-secondary)] transition-colors min-w-0">
+      <Icon size={16} className={`${colorClass} shrink-0`} />
+      <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide truncate">{label}</span>
     </div>
-    <div className="text-lg sm:text-2xl font-bold text-[var(--ds-text-primary)] tracking-tight">{value}</div>
+    <div className="text-base sm:text-2xl font-bold text-[var(--ds-text-primary)] tracking-tight truncate">{value}</div>
   </div>
 );
 
@@ -48,7 +48,7 @@ const ActionTile = ({ icon: Icon, label, onClick, className = "", danger = false
     tabIndex={0}
     {...rest}
     onClick={onClick}
-    className={`group flex flex-col items-center justify-center p-4 sm:p-6 min-h-[88px] rounded-2xl border transition-[opacity,transform,background-color,border-color] duration-200 gap-3 
+    className={`group flex min-w-0 flex-col items-center justify-center p-3 sm:p-6 min-h-[80px] sm:min-h-[88px] rounded-2xl border transition-[opacity,transform,background-color,border-color] duration-200 gap-2 sm:gap-3 
       ${danger 
         ? 'bg-red-500/10 border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40' 
         : 'bg-[var(--ds-surface)] border-[var(--ds-border)] hover:border-[var(--ds-border-strong)]'
@@ -255,17 +255,19 @@ export function DownloadDetailModal({
       noPadding={true}
       className="p-0 sm:p-0" // Reset standard padding to keep custom layout
     >
-      <div className="relative flex flex-col lg:h-full lg:overflow-hidden">
-        {/* Immersive backdrop background inside the modal */}
+      <div className="relative flex min-h-0 min-w-0 flex-col overflow-x-hidden h-full max-sm:overflow-hidden sm:h-auto lg:h-full lg:overflow-hidden">
+        {/* Immersive backdrop — clipped so blur/scale never creates extra scrollbars */}
         {backdropUrl && (
-          <div 
-            className="absolute inset-0 bg-cover bg-center opacity-30 blur-[60px] scale-110 pointer-events-none"
-            style={{ backgroundImage: `url(${backdropUrl})` }}
-          />
+          <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
+            <div
+              className="absolute inset-0 bg-cover bg-center opacity-30 blur-3xl scale-105"
+              style={{ backgroundImage: `url(${backdropUrl})` }}
+            />
+          </div>
         )}
 
         {/* Header bar */}
-        <div className="relative z-20 flex items-center justify-between px-4 sm:px-8 py-4 border-b border-[var(--ds-border)] bg-[var(--ds-surface)] flex-shrink-0">
+        <div className="relative z-20 flex min-w-0 items-center justify-between px-4 sm:px-8 py-4 border-b border-[var(--ds-border)] bg-[var(--ds-surface)] flex-shrink-0">
           <button
             onClick={onClose}
             className="flex items-center gap-2 text-[var(--ds-text-secondary)] hover:text-[var(--ds-text-primary)] transition-colors p-2 -ml-2 rounded-xl hover:bg-[var(--ds-surface-overlay)]"
@@ -276,13 +278,13 @@ export function DownloadDetailModal({
             <span className="font-semibold hidden sm:inline">{t('common.back')}</span>
           </button>
           <div className="flex items-center gap-3">
-             <TorrentStatusBadge state={activeTorrent.state} seedingActive={activeSeeding} className="scale-90 sm:scale-110" />
+             <TorrentStatusBadge state={activeTorrent.state} seedingActive={activeSeeding} className="scale-90 origin-right" />
           </div>
         </div>
 
-        <div className="relative z-10 flex flex-col lg:flex-row lg:flex-1 lg:min-h-0 lg:overflow-hidden">
+        <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto sm:overflow-visible lg:flex-row lg:overflow-hidden">
           {/* Left Sidebar - Poster & Basic Info */}
-          <div className="w-full flex-shrink-0 border-b border-[var(--ds-border)] bg-[var(--ds-surface)] p-4 sm:p-8 lg:w-96 lg:border-b-0 lg:border-r lg:overflow-y-auto tv:lg:w-[min(24rem,32vw)] custom-scrollbar">
+          <div className="w-full min-w-0 flex-shrink-0 border-b border-[var(--ds-border)] bg-[var(--ds-surface)] p-4 sm:p-8 lg:w-96 lg:border-b-0 lg:border-r lg:overflow-y-auto tv:lg:w-[min(24rem,32vw)] custom-scrollbar">
             <div className="relative mx-auto aspect-[2/3] w-full max-w-[min(100%,12rem)] sm:max-w-[min(100%,18rem)] overflow-hidden rounded-2xl shadow-2xl group tv:max-w-[min(100%,22rem)] lg:mx-0 lg:max-w-none">
               {posterUrl ? (
                 <img src={posterUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={headerTitle} />
@@ -333,8 +335,8 @@ export function DownloadDetailModal({
           </div>
 
           {/* Main Content - Stats & Actions */}
-          <div className="flex-1 p-4 sm:p-8 lg:overflow-y-auto custom-scrollbar">
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
+          <div className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-8 lg:overflow-y-auto custom-scrollbar">
+            <div className="mb-8 grid grid-cols-2 gap-2 sm:gap-4 lg:mb-10 lg:grid-cols-5">
               <StatCard icon={Download} label="Téléchargement" value={downSpeed} colorClass="text-[var(--ds-accent-violet)]" />
               <StatCard icon={Upload} label="Envoi" value={upSpeed} colorClass="text-[var(--ds-accent-green)]" />
               <StatCard
@@ -347,9 +349,9 @@ export function DownloadDetailModal({
               <StatCard icon={Clock} label="Temps restant" value={eta} colorClass="text-[var(--ds-accent-yellow)]" />
             </div>
 
-            <div className="mb-10">
+            <div className="mb-8 lg:mb-10">
               <h2 className="text-xs font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)] mb-4">Commandes</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-4">
                 <ActionTile
                   icon={Play}
                   label="Lire"
@@ -368,7 +370,7 @@ export function DownloadDetailModal({
             </div>
 
             {!isLocalStub && (
-              <div className="mb-10 bg-[var(--ds-surface)] rounded-3xl border border-[var(--ds-border)] p-6 space-y-4">
+              <div className="mb-8 space-y-4 rounded-2xl border border-[var(--ds-border)] bg-[var(--ds-surface)] p-4 sm:rounded-3xl sm:p-6 lg:mb-10">
                 <h2 className="text-xs font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)]">
                   {t('downloads.tmdb.sectionTitle')}
                 </h2>
@@ -409,7 +411,7 @@ export function DownloadDetailModal({
                     </select>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex min-w-0 flex-wrap gap-3">
                   <button
                     type="button"
                     onClick={handleTmdbApply}

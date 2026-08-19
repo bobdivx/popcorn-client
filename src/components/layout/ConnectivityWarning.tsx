@@ -3,6 +3,7 @@ import { AlertTriangle, Info, X } from 'lucide-preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { useI18n } from '../../lib/i18n/useI18n';
+import { isTVPlatform } from '../../lib/utils/device-detection';
 import {
   connectivityWarningFingerprint,
   readConnectivityDismissedFingerprint,
@@ -14,13 +15,20 @@ type Props = {
   /** Avatar (ou autre trigger) sur lequel afficher la pastille de notif. */
   children: ComponentChildren;
   className?: string;
+  accountHref?: string;
+  accountLabel?: string;
 };
 
 /**
  * Affiche une pastille de notification sur l'avatar du header
  * lorsqu'un problème de partage BitTorrent est détecté (plus de carte flottante).
  */
-export default function ConnectivityWarning({ children, className = '' }: Props) {
+export default function ConnectivityWarning({
+  children,
+  className = '',
+  accountHref = '/settings/account',
+  accountLabel,
+}: Props) {
   const { diagnostic, loading } = useSeedingHealth();
   const { t } = useI18n();
   const prevStatusRef = useRef<SeedingDiagnostic['status'] | undefined>();
@@ -29,6 +37,12 @@ export default function ConnectivityWarning({ children, className = '' }: Props)
   );
   const [menuOpen, setMenuOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [isTvNav, setIsTvNav] = useState(false);
+
+  useEffect(() => {
+    setIsTvNav(isTVPlatform());
+  }, []);
 
   const fingerprint =
     diagnostic && diagnostic.status !== 'ok' ? connectivityWarningFingerprint(diagnostic) : '';
@@ -77,6 +91,23 @@ export default function ConnectivityWarning({ children, className = '' }: Props)
     };
   }, [menuOpen]);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+    const first = menuRef.current?.querySelector<HTMLElement>('[data-focusable], a[href], button');
+    first?.focus();
+  }, [menuOpen]);
+
+  useEffect(() => {
+    const el = rootRef.current as (HTMLDivElement & { _tvBack?: () => void }) | null;
+    if (!el || !menuOpen) return;
+    el.setAttribute('data-tv-back-handler', '');
+    el._tvBack = () => setMenuOpen(false);
+    return () => {
+      el.removeAttribute('data-tv-back-handler');
+      delete el._tvBack;
+    };
+  }, [menuOpen]);
+
   const handleDismiss = () => {
     if (!fingerprint) return;
     setDismissedFingerprint(fingerprint);
@@ -91,63 +122,100 @@ export default function ConnectivityWarning({ children, className = '' }: Props)
     : t('connectivity.warningTitle');
   const detail =
     diagnostic?.warnings?.[0] || t('connectivity.defaultDetail');
+  const resolvedAccountLabel = accountLabel || t('nav.account');
+
+  const handleTriggerCapture = (event: MouseEvent) => {
+    if (!isTvNav || !hasIssue) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('[data-connectivity-menu], [data-connectivity-badge]')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    setMenuOpen((open) => !open);
+  };
 
   return (
-    <div ref={rootRef} className={`relative inline-flex ${className}`}>
+    <div
+      ref={rootRef}
+      className={`relative inline-flex ${className}`}
+      onClickCapture={handleTriggerCapture}
+    >
       {children}
       {hasIssue && (
         <>
           <button
             type="button"
+            data-connectivity-badge
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
               setMenuOpen((open) => !open);
             }}
-            className={`absolute -top-0.5 -right-0.5 z-10 flex h-4 min-w-4 items-center justify-center rounded-full ${badgeClass} text-[9px] font-bold text-white shadow-md ring-2 ring-[var(--ds-surface-elevated,#0a0a0a)] px-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-accent-violet)]`}
+            className={`absolute -top-0.5 -right-0.5 z-10 flex h-4 min-w-4 tv:h-7 tv:min-w-7 items-center justify-center rounded-full ${badgeClass} text-[9px] tv:text-xs font-bold text-[#fff] shadow-md ring-2 ring-[var(--ds-surface-elevated,#0a0a0a)] px-1 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-accent-violet)]`}
             aria-label={title}
             aria-expanded={menuOpen}
-            aria-haspopup="dialog"
+            aria-haspopup="menu"
             title={title}
             data-focusable
+            tabIndex={0}
           >
             {isError ? '!' : '1'}
           </button>
           {menuOpen && (
             <div
-              className="absolute top-full right-0 mt-2 w-72 max-w-[min(18rem,calc(100vw-2rem))] rounded-xl border border-white/15 bg-gray-900/95 shadow-xl backdrop-blur-xl p-3 z-[100] animate-in fade-in slide-in-from-top-2 duration-200"
-              role="dialog"
+              ref={menuRef}
+              data-connectivity-menu
+              className="ds-popover absolute top-full right-0 mt-2 w-72 max-w-[min(18rem,calc(100vw-2rem))] rounded-xl p-3 z-[100] animate-in fade-in slide-in-from-top-2 duration-200"
+              role="menu"
               aria-label={title}
             >
               <div className="flex items-start gap-2.5">
-                <div className={`shrink-0 mt-0.5 ${isError ? 'text-red-400' : 'text-amber-400'}`}>
+                <div className={`shrink-0 mt-0.5 ${isError ? 'text-red-500' : 'text-amber-500'}`}>
                   {isError ? <AlertTriangle size={18} /> : <Info size={18} />}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold text-white leading-tight">{title}</p>
-                  <p className="text-[11px] text-white/75 leading-snug mt-1">{detail}</p>
-                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2.5">
+                  <p className="text-xs font-bold text-[var(--ds-text-primary)] leading-tight">{title}</p>
+                  <p className="text-[11px] text-[var(--ds-text-secondary)] leading-snug mt-1">{detail}</p>
+                  <div className="flex flex-col gap-1 mt-2.5">
                     <a
                       href="/settings/uploads/seeding-diagnostic"
-                      className="inline-flex text-[11px] font-semibold text-[var(--ds-accent-violet)] hover:underline"
+                      className="inline-flex min-h-[44px] tv:min-h-[48px] items-center text-sm font-semibold text-[var(--ds-accent-violet)] hover:underline rounded-lg px-1"
                       onClick={() => setMenuOpen(false)}
+                      data-focusable
+                      tabIndex={0}
+                      role="menuitem"
                     >
                       {t('connectivity.openDiagnostic')}
                     </a>
                     <a
                       href="/settings/notifications"
-                      className="inline-flex text-[11px] font-semibold text-white/70 hover:text-white hover:underline"
+                      className="inline-flex min-h-[44px] tv:min-h-[48px] items-center text-sm font-semibold text-[var(--ds-text-secondary)] hover:text-[var(--ds-text-primary)] hover:underline rounded-lg px-1"
                       onClick={() => setMenuOpen(false)}
+                      data-focusable
+                      tabIndex={0}
+                      role="menuitem"
                     >
                       {t('connectivity.openSettings')}
+                    </a>
+                    <a
+                      href={accountHref}
+                      className="inline-flex min-h-[44px] tv:min-h-[48px] items-center text-sm font-semibold text-[var(--ds-text-secondary)] hover:text-[var(--ds-text-primary)] hover:underline rounded-lg px-1"
+                      onClick={() => setMenuOpen(false)}
+                      data-focusable
+                      tabIndex={0}
+                      role="menuitem"
+                    >
+                      {resolvedAccountLabel}
                     </a>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={handleDismiss}
-                  className="shrink-0 p-1.5 rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors"
+                  className="shrink-0 p-1.5 min-h-[44px] min-w-[44px] rounded-lg text-[var(--ds-text-tertiary)] hover:bg-[var(--ds-surface-overlay)] hover:text-[var(--ds-text-primary)] transition-colors"
                   aria-label={t('connectivity.dismiss')}
+                  data-focusable
+                  tabIndex={0}
+                  role="menuitem"
                 >
                   <X size={16} />
                 </button>
