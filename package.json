@@ -12,14 +12,14 @@
     "preview": "node scripts/popcorn-cli.js preview"
   },
   "dependencies": {
-    "@astrojs/preact": "^6.0.2",
+    "@astrojs/preact": "^6.0.3",
     "@astrojs/tailwind": "^6.0.2",
     "@libsql/client": "^0.14.0",
     "@tauri-apps/plugin-dialog": "^2.6.0",
     "@tauri-apps/plugin-http": "^2.5.6",
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@types/qrcode": "^1.5.6",
-    "astro": "^7.1.6",
+    "astro": "^7.2.3",
     "chart.js": "^4.5.1",
     "daisyui": "^4.12.10",
     "hls.js": "^1.6.15",
@@ -32,7 +32,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@astrojs/vercel": "^11.0.4",
+    "@astrojs/vercel": "^11.0.6",
     "@playwright/test": "^1.58.2",
     "@prefresh/core": "^1.5.10",
     "@prefresh/utils": "^1.2.1",

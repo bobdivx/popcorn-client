@@ -3202,7 +3202,7 @@ export default function MediaDetailPage({
         errorMessage={errorMessage}
         />
       )}
-    <div className="relative bg-page text-white animate-fade-in-up">
+    <div className="relative bg-page text-white animate-fade-in-up min-h-[100dvh]" data-dark-context>
       {/* Hero section : fond = bande-annonce (vidÃ©o) ou image selon Ã©tat */}
       <div className="fixed top-0 left-0 right-0 bottom-0 z-0 overflow-hidden">
         {isPlayingTrailer && trailerKey ? (
@@ -3263,7 +3263,7 @@ export default function MediaDetailPage({
       </div>
 
       {/* Contenu principal : en BA immersive, seul le héros est masqué — le carrousel épisodes reste utilisable (souris / TV). */}
-      <div className="relative z-10 transition-opacity duration-300" ref={tvBackHandlerRef} data-tv-back-handler>
+      <div className="relative z-10 transition-opacity duration-300 pb-16 sm:pb-24" ref={tvBackHandlerRef} data-tv-back-handler>
         <div
           ref={trailerImmersiveHiddenChromeRef}
           className={`${isPlayingTrailer && !trailerUiVisible ? 'opacity-0 pointer-events-none' : ''}`}

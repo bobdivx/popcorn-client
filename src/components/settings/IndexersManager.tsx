@@ -569,7 +569,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
               type="button"
               onClick={handleAddIndexer}
               disabled={loadingDefinitions}
-              class="text-left block min-w-0 rounded-[var(--ds-radius-lg)] overflow-hidden transition-all hover:scale-[1.01] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] disabled:opacity-50 focus-visible:overflow-visible"
+              class="text-left block min-w-0 rounded-[var(--ds-radius-lg)] overflow-hidden transition-all [@media(hover:hover)]:hover:scale-[1.01] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] disabled:opacity-50 focus-visible:overflow-visible"
               data-settings-card
             >
               <div class="sc-nav-card" style="height:100%;display:flex;flex-direction:column;min-height:120px">
@@ -609,7 +609,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
                   key={indexer.id}
                   type="button"
                   onClick={() => setDetailModalIndexerId(indexer.id)}
-                  class="text-left block min-w-0 rounded-[var(--ds-radius-lg)] overflow-hidden transition-all hover:scale-[1.01] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] focus-visible:overflow-visible"
+                  class="text-left block min-w-0 rounded-[var(--ds-radius-lg)] overflow-hidden transition-all [@media(hover:hover)]:hover:scale-[1.01] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] focus-visible:overflow-visible"
                   data-settings-card
                 >
                   <div class="sc-nav-card" style="height:100%;display:flex;flex-direction:column;min-height:120px">

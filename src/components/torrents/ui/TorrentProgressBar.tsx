@@ -37,11 +37,11 @@ export function TorrentProgressBar({
   if (variant === 'compact') {
     return (
       <div className={className}>
-        <div className="flex justify-between text-xs text-gray-400 mb-1">
+        <div className="flex justify-between text-xs text-[var(--ds-text-tertiary)] mb-1">
           <span>{statusLabel ?? t('downloads.progress') ?? 'Progression'}</span>
-          <span className="font-semibold text-white">{percent}%</span>
+          <span className="font-semibold text-[var(--ds-text-primary)]">{percent}%</span>
         </div>
-        <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+        <div className="w-full bg-[var(--ds-border)] rounded-full h-2 overflow-hidden">
           <div
             className={`${barColor} h-full rounded-full transition-all duration-500`}
             style={{ width: `${Math.min(100, percent)}%` }}
@@ -52,7 +52,7 @@ export function TorrentProgressBar({
           />
         </div>
         {totalBytes > 0 && (
-          <div className="flex justify-between text-xs text-gray-400 mt-1">
+          <div className="flex justify-between text-xs text-[var(--ds-text-tertiary)] mt-1">
             <span>{formatBytes(downloadedBytes)}</span>
             <span>{formatBytes(totalBytes)}</span>
           </div>
@@ -64,12 +64,12 @@ export function TorrentProgressBar({
   return (
     <div className={className}>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-white/90 font-medium">
+        <span className="text-[var(--ds-text-primary)] font-medium">
           {statusLabel ?? t('torrentStats.downloading') ?? 'Téléchargement en cours'}
         </span>
-        <span className="text-white/70 text-sm">{percent}%</span>
+        <span className="text-[var(--ds-text-secondary)] text-sm">{percent}%</span>
       </div>
-      <div className="w-full bg-white/10 rounded-full h-2 mb-2 overflow-hidden">
+      <div className="w-full bg-[var(--ds-border)] rounded-full h-2 mb-2 overflow-hidden">
         <div
           className={`${barColor} h-2 rounded-full transition-all duration-300`}
           style={{ width: `${Math.min(100, percent)}%` }}
@@ -80,7 +80,7 @@ export function TorrentProgressBar({
         />
       </div>
       {(downloadSpeed != null && downloadSpeed > 0) || (etaSeconds != null && etaSeconds > 0) ? (
-        <div className="text-white/60 text-sm">
+        <div className="text-[var(--ds-text-secondary)] text-sm">
           {downloadSpeed != null && downloadSpeed > 0 && (
             <span>
               {t('torrentStats.speed') ?? 'Vitesse'}: {((downloadSpeed / (1024 * 1024)).toFixed(1))} MB/s

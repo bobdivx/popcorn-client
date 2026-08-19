@@ -3,7 +3,9 @@ import { useI18n, LANGUAGE_NAMES, type SupportedLanguage } from '../../lib/i18n'
 import { PreferencesManager } from '../../lib/client/storage';
 import { TokenManager } from '../../lib/client/storage';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
-import { Globe, Moon, Sun, Monitor } from 'lucide-preact';
+import { Globe, Moon, Sun, Monitor, Palette } from 'lucide-preact';
+import { UI_PACKS, type UiPackId } from '../../lib/theme/packs';
+import { saveUiPack } from '../../lib/theme';
 
 type ThemeValue = 'light' | 'dark' | 'auto';
 
@@ -74,9 +76,18 @@ export default function UiPreferencesPanel({ section = 'all', embedded = false }
     window.setTimeout(() => setSaved(false), 1500);
   };
 
+  const handlePackChange = (id: UiPackId) => {
+    saveUiPack(id);
+    setPreferences(PreferencesManager.getPreferences());
+    setSaved(true);
+    window.setTimeout(() => setSaved(false), 1500);
+  };
+
   const currentTheme = (preferences.theme || 'auto') as ThemeValue;
+  const currentPack = (preferences.uiPack === 'classic' ? 'classic' : 'tesla') as UiPackId;
   const showLanguage = section === 'all' || section === 'language';
   const showTheme = section === 'all' || section === 'theme';
+  const lang = language === 'en' ? 'en' : 'fr';
 
   const languageBlock = (
     <>
@@ -92,6 +103,8 @@ export default function UiPreferencesPanel({ section = 'all', embedded = false }
                 ? 'border-[var(--ds-accent-violet)] bg-[var(--ds-accent-violet-muted)] text-[var(--ds-text-primary)]'
                 : 'border-[var(--ds-border)] text-[var(--ds-text-secondary)] hover:border-white/20 hover:bg-white/5'
             } ${languageSaving ? 'opacity-60 cursor-not-allowed' : ''} focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]`}
+            data-focusable
+            tabIndex={0}
             onClick={() => handleLanguageChange(lang)}
           >
             <span className="text-lg">{lang === 'fr' ? '🇫🇷' : '🇬🇧'}</span>
@@ -107,7 +120,7 @@ export default function UiPreferencesPanel({ section = 'all', embedded = false }
     </>
   );
 
-  const themeBlock = (
+  const themeModeBlock = (
     <>
       <p className="ds-text-secondary text-sm mb-4">{t('interfaceSettings.themeDescription')}</p>
       <div className="flex flex-wrap gap-2">
@@ -120,6 +133,8 @@ export default function UiPreferencesPanel({ section = 'all', embedded = false }
                 ? 'border-[var(--ds-accent-violet)] bg-[var(--ds-accent-violet-muted)] text-[var(--ds-text-primary)]'
                 : 'border-[var(--ds-border)] text-[var(--ds-text-secondary)] hover:border-white/20 hover:bg-white/5'
             }`}
+            data-focusable
+            tabIndex={0}
             onClick={() => handleThemeChange(theme)}
           >
             {theme === 'dark' && <Moon className="w-4 h-4" />}
@@ -130,6 +145,48 @@ export default function UiPreferencesPanel({ section = 'all', embedded = false }
         ))}
       </div>
     </>
+  );
+
+  const packBlock = (
+    <>
+      <p className="ds-text-secondary text-sm mb-4">{t('interfaceSettings.uiPackDescription')}</p>
+      <div className="flex flex-col gap-2">
+        {UI_PACKS.map((pack) => (
+          <button
+            key={pack.id}
+            type="button"
+            className={`flex items-start gap-3 px-4 py-3 rounded-[var(--ds-radius-sm)] border-2 text-left transition-all font-medium focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] ${
+              currentPack === pack.id
+                ? 'border-[var(--ds-accent-violet)] bg-[var(--ds-accent-violet-muted)] text-[var(--ds-text-primary)]'
+                : 'border-[var(--ds-border)] text-[var(--ds-text-secondary)] hover:border-white/20 hover:bg-white/5'
+            }`}
+            data-focusable
+            tabIndex={0}
+            onClick={() => handlePackChange(pack.id)}
+          >
+            <span
+              className="mt-1 w-3 h-3 rounded-full flex-shrink-0"
+              style={{ background: pack.swatch.accent }}
+              aria-hidden
+            />
+            <span className="min-w-0">
+              <span className="block">{pack.name[lang]}</span>
+              <span className="block text-xs font-normal opacity-80 mt-0.5">{pack.description[lang]}</span>
+              <span className="block text-xs font-normal ds-text-tertiary mt-1">
+                {pack.id === 'classic' ? t('interfaceSettings.uiPackClassicHint') : t('interfaceSettings.uiPackTeslaHint')}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </>
+  );
+
+  const themeBlock = (
+    <div className="space-y-8">
+      {packBlock}
+      {themeModeBlock}
+    </div>
   );
 
   if (embedded && (section === 'language' || section === 'theme')) {
@@ -172,7 +229,7 @@ export default function UiPreferencesPanel({ section = 'all', embedded = false }
         <div class="sc-frame">
           <div class="sc-frame-header">
             <div class="sc-frame-icon">
-              <Moon className="w-5 h-5" aria-hidden />
+              <Palette className="w-5 h-5" aria-hidden />
             </div>
             <div class="sc-frame-title">{t('interfaceSettings.theme')}</div>
           </div>

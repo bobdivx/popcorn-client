@@ -455,12 +455,16 @@
   },
   "interfaceSettings": {
     "theme": "Theme",
-    "themeDescription": "Choose the interface appearance (light, dark or automatic based on system)",
+    "themeDescription": "Light, dark or automatic based on the system",
     "themeOptions": {
       "dark": "Dark",
       "light": "Light",
       "auto": "System"
     },
+    "uiPack": "Visual language",
+    "uiPackDescription": "Every pack uses the same layout (phone, tablet, desktop). Tesla is the current theme. Popcornn keeps the previous dark violet skin.",
+    "uiPackClassicHint": "Previous theme (dark, violet, cards)",
+    "uiPackTeslaHint": "Current theme — Tesla-style settings",
     "autoplay": "Autoplay",
     "autoplayDescription": "Automatically start playing the next episodes",
     "skipIntro": "Skip intro",
@@ -1271,6 +1275,10 @@
     "adding": "Adding...",
     "pauseAll": "Pause all",
     "resumeAll": "Resume all",
+    "filterAll": "All",
+    "filterActive": "Active",
+    "filterPaused": "Paused",
+    "filterReady": "Ready",
     "removeAll": "Remove all",
     "removeWithFiles": "Remove with files",
     "confirmRemove": "Do you want to remove this torrent{withFiles}?",
@@ -1492,7 +1500,7 @@
     },
     "interface": {
       "languageDescription": "Application language",
-      "themeDescription": "Light, dark or system theme"
+      "themeDescription": "Tesla, Popcornn, and light / dark"
     },
     "server": {
       "title": "Server",

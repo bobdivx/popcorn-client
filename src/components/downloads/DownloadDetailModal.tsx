@@ -32,12 +32,12 @@ interface DownloadDetailModalProps {
 }
 
 const StatCard = ({ icon: Icon, label, value, colorClass }: any) => (
-  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 flex flex-col gap-1 backdrop-blur-sm group hover:bg-white/10 transition-all">
-    <div className="flex items-center gap-2 text-[var(--ds-text-tertiary)] group-hover:text-white/80 transition-colors">
+  <div className="bg-[var(--ds-surface)] border border-[var(--ds-border)] rounded-2xl p-4 sm:p-5 flex flex-col gap-1 group hover:bg-[var(--ds-surface-overlay)] transition-all">
+    <div className="flex items-center gap-2 text-[var(--ds-text-tertiary)] group-hover:text-[var(--ds-text-secondary)] transition-colors">
       <Icon size={16} className={colorClass} />
       <span className="text-xs font-semibold uppercase tracking-wider">{label}</span>
     </div>
-    <div className="text-lg sm:text-2xl font-bold text-white tracking-tight">{value}</div>
+    <div className="text-lg sm:text-2xl font-bold text-[var(--ds-text-primary)] tracking-tight">{value}</div>
   </div>
 );
 
@@ -51,13 +51,13 @@ const ActionTile = ({ icon: Icon, label, onClick, className = "", danger = false
     className={`group flex flex-col items-center justify-center p-4 sm:p-6 min-h-[88px] rounded-2xl border transition-[opacity,transform,background-color,border-color] duration-200 gap-3 
       ${danger 
         ? 'bg-red-500/10 border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40' 
-        : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+        : 'bg-[var(--ds-surface)] border-[var(--ds-border)] hover:border-[var(--ds-border-strong)]'
       } ${className}`}
   >
-    <div className={`p-3 rounded-full transition-transform group-hover:scale-110 ${danger ? 'bg-red-500/20 text-red-500' : 'bg-white/10 text-white'}`}>
+    <div className={`p-3 rounded-full transition-transform group-hover:scale-110 ${danger ? 'bg-red-500/20 text-red-500' : 'bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] border border-[var(--ds-border)]'}`}>
       <Icon size={24} />
     </div>
-    <span className={`text-sm font-bold tracking-wide ${danger ? 'text-red-400' : 'text-white/90'}`}>{label}</span>
+    <span className={`text-sm font-bold tracking-wide ${danger ? 'text-red-500' : 'text-[var(--ds-text-primary)]'}`}>{label}</span>
   </button>
 );
 
@@ -265,10 +265,10 @@ export function DownloadDetailModal({
         )}
 
         {/* Header bar */}
-        <div className="relative z-20 flex items-center justify-between px-4 sm:px-8 py-4 border-b border-white/5 bg-black/20 backdrop-blur-xl flex-shrink-0">
+        <div className="relative z-20 flex items-center justify-between px-4 sm:px-8 py-4 border-b border-[var(--ds-border)] bg-[var(--ds-surface)] flex-shrink-0">
           <button
             onClick={onClose}
-            className="flex items-center gap-2 text-white/60 hover:text-white transition-colors p-2 -ml-2 rounded-xl hover:bg-white/5"
+            className="flex items-center gap-2 text-[var(--ds-text-secondary)] hover:text-[var(--ds-text-primary)] transition-colors p-2 -ml-2 rounded-xl hover:bg-[var(--ds-surface-overlay)]"
             data-focusable
             aria-label="Fermer"
           >
@@ -282,33 +282,33 @@ export function DownloadDetailModal({
 
         <div className="relative z-10 flex flex-col lg:flex-row lg:flex-1 lg:min-h-0 lg:overflow-hidden">
           {/* Left Sidebar - Poster & Basic Info */}
-          <div className="w-full flex-shrink-0 border-b border-white/5 bg-white/[0.02] p-4 sm:p-8 lg:w-96 lg:border-b-0 lg:border-r lg:overflow-y-auto tv:lg:w-[min(24rem,32vw)] custom-scrollbar">
+          <div className="w-full flex-shrink-0 border-b border-[var(--ds-border)] bg-[var(--ds-surface)] p-4 sm:p-8 lg:w-96 lg:border-b-0 lg:border-r lg:overflow-y-auto tv:lg:w-[min(24rem,32vw)] custom-scrollbar">
             <div className="relative mx-auto aspect-[2/3] w-full max-w-[min(100%,12rem)] sm:max-w-[min(100%,18rem)] overflow-hidden rounded-2xl shadow-2xl group tv:max-w-[min(100%,22rem)] lg:mx-0 lg:max-w-none">
               {posterUrl ? (
                 <img src={posterUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={headerTitle} />
               ) : (
-                <div className="w-full h-full bg-neutral-800 flex items-center justify-center">
-                  <Film size={80} className="text-white/10" />
+                <div className="w-full h-full bg-[var(--ds-surface-elevated)] flex items-center justify-center">
+                  <Film size={80} className="text-[var(--ds-text-tertiary)]" />
                 </div>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             </div>
 
-            <h1 className="text-2xl font-bold text-white mt-6 mb-4 line-clamp-2 leading-tight">
+            <h1 className="text-2xl font-bold text-[var(--ds-text-primary)] mt-6 mb-4 line-clamp-2 leading-tight">
               {headerTitle}
             </h1>
             {modalTorrents.length > 1 && (
               <div className="mb-4">
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-white/40 mb-2">
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)] mb-2">
                   Épisode / Fichier ({modalTorrents.length})
                 </label>
                 <select
                   value={activeInfoHash}
                   onChange={(e) => setActiveInfoHash((e.target as HTMLSelectElement).value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[var(--ds-accent-violet)]"
+                  className="w-full bg-[var(--ds-surface-elevated)] border border-[var(--ds-border)] rounded-xl px-3 py-2 text-sm text-[var(--ds-text-primary)] focus:outline-none focus:border-[var(--ds-accent-violet)]"
                 >
                   {modalTorrents.map((item) => (
-                    <option key={item.info_hash} value={item.info_hash} className="bg-black">
+                    <option key={item.info_hash} value={item.info_hash}>
                       {item.name}
                     </option>
                   ))}
@@ -326,8 +326,8 @@ export function DownloadDetailModal({
               />
               
               <div className="flex items-center justify-between text-sm">
-                <span className="text-white/40 uppercase tracking-widest font-bold">Taille Totale</span>
-                <span className="text-white font-mono">{formatBytes(activeTorrent.total_bytes)}</span>
+                <span className="text-[var(--ds-text-tertiary)] uppercase tracking-widest font-bold">Taille Totale</span>
+                <span className="text-[var(--ds-text-primary)] font-mono">{formatBytes(activeTorrent.total_bytes)}</span>
               </div>
             </div>
           </div>
@@ -335,20 +335,20 @@ export function DownloadDetailModal({
           {/* Main Content - Stats & Actions */}
           <div className="flex-1 p-4 sm:p-8 lg:overflow-y-auto custom-scrollbar">
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
-              <StatCard icon={Download} label="Téléchargement" value={downSpeed} colorClass="text-blue-400" />
-              <StatCard icon={Upload} label="Envoi" value={upSpeed} colorClass="text-emerald-400" />
+              <StatCard icon={Download} label="Téléchargement" value={downSpeed} colorClass="text-[var(--ds-accent-violet)]" />
+              <StatCard icon={Upload} label="Envoi" value={upSpeed} colorClass="text-[var(--ds-accent-green)]" />
               <StatCard
                 icon={Sprout}
                 label="Partage"
                 value={sharingStatusLabel}
-                colorClass={activeTorrent.state === 'seeding' ? 'text-emerald-400' : 'text-white/40'}
+                colorClass={activeTorrent.state === 'seeding' ? 'text-[var(--ds-accent-green)]' : 'text-[var(--ds-text-tertiary)]'}
               />
-              <StatCard icon={Users} label="Pairs" value={peers} colorClass="text-purple-400" />
-              <StatCard icon={Clock} label="Temps restant" value={eta} colorClass="text-amber-400" />
+              <StatCard icon={Users} label="Pairs" value={peers} colorClass="text-[var(--ds-accent-violet)]" />
+              <StatCard icon={Clock} label="Temps restant" value={eta} colorClass="text-[var(--ds-accent-yellow)]" />
             </div>
 
             <div className="mb-10">
-              <h2 className="text-xs font-bold uppercase tracking-widest text-white/40 mb-4">Commandes</h2>
+              <h2 className="text-xs font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)] mb-4">Commandes</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 <ActionTile
                   icon={Play}
@@ -368,16 +368,16 @@ export function DownloadDetailModal({
             </div>
 
             {!isLocalStub && (
-              <div className="mb-10 bg-white/[0.03] rounded-3xl border border-white/5 p-6 space-y-4">
-                <h2 className="text-xs font-bold uppercase tracking-widest text-white/40">
+              <div className="mb-10 bg-[var(--ds-surface)] rounded-3xl border border-[var(--ds-border)] p-6 space-y-4">
+                <h2 className="text-xs font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)]">
                   {t('downloads.tmdb.sectionTitle')}
                 </h2>
-                <p className="text-sm text-white/50">{t('downloads.tmdb.hint')}</p>
-                <p className="text-xs text-white/35">{t('downloads.tmdb.inputHelp')}</p>
-                {tmdbError && <p className="text-sm text-red-400">{tmdbError}</p>}
+                <p className="text-sm text-[var(--ds-text-secondary)]">{t('downloads.tmdb.hint')}</p>
+                <p className="text-xs text-[var(--ds-text-tertiary)]">{t('downloads.tmdb.inputHelp')}</p>
+                {tmdbError && <p className="text-sm text-red-500">{tmdbError}</p>}
                 <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
                   <div className="flex-1 space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-white/30">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)]">
                       {t('downloads.tmdb.idLabel')}
                     </label>
                     <input
@@ -389,23 +389,23 @@ export function DownloadDetailModal({
                       onBlur={() => {
                         if (tmdbIdInput.trim()) normalizeTmdbInputField(tmdbIdInput);
                       }}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[var(--ds-accent-violet)]"
+                      className="w-full bg-[var(--ds-surface-elevated)] border border-[var(--ds-border)] rounded-xl px-4 py-2 text-sm text-[var(--ds-text-primary)] placeholder:text-[var(--ds-text-tertiary)] focus:outline-none focus:border-[var(--ds-accent-violet)]"
                       placeholder={t('downloads.tmdb.idPlaceholder')}
                       disabled={tmdbBusy}
                     />
                   </div>
                   <div className="sm:w-40 space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-white/30">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)]">
                       {t('downloads.tmdb.typeLabel')}
                     </label>
                     <select
                       value={tmdbTypeSel}
                       onChange={(e) => setTmdbTypeSel(((e.target as HTMLSelectElement).value === 'tv' ? 'tv' : 'movie'))}
-                      className="w-full bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[var(--ds-accent-violet)]"
+                      className="w-full bg-[var(--ds-surface-elevated)] border border-[var(--ds-border)] rounded-xl px-3 py-2 text-sm text-[var(--ds-text-primary)] focus:outline-none focus:border-[var(--ds-accent-violet)]"
                       disabled={tmdbBusy}
                     >
-                      <option value="movie" className="bg-black">{t('downloads.tmdb.typeMovie')}</option>
-                      <option value="tv" className="bg-black">{t('downloads.tmdb.typeTv')}</option>
+                      <option value="movie">{t('downloads.tmdb.typeMovie')}</option>
+                      <option value="tv">{t('downloads.tmdb.typeTv')}</option>
                     </select>
                   </div>
                 </div>
@@ -414,7 +414,7 @@ export function DownloadDetailModal({
                     type="button"
                     onClick={handleTmdbApply}
                     disabled={tmdbBusy}
-                    className="px-4 py-2 rounded-xl bg-[var(--ds-accent-violet)] text-white text-sm font-bold disabled:opacity-50"
+                    className="px-4 py-2 rounded-xl bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] text-sm font-bold disabled:opacity-50"
                     data-focusable
                   >
                     {tmdbBusy ? t('downloads.tmdb.busy') : t('downloads.tmdb.apply')}
@@ -423,7 +423,7 @@ export function DownloadDetailModal({
                     type="button"
                     onClick={handleTmdbRematch}
                     disabled={tmdbBusy}
-                    className="px-4 py-2 rounded-xl bg-white/10 border border-white/15 text-white text-sm font-semibold disabled:opacity-50"
+                    className="px-4 py-2 rounded-xl bg-[var(--ds-surface-elevated)] border border-[var(--ds-border)] text-[var(--ds-text-primary)] text-sm font-semibold disabled:opacity-50"
                     data-focusable
                   >
                     {t('downloads.tmdb.rematch')}
@@ -432,7 +432,7 @@ export function DownloadDetailModal({
                     type="button"
                     onClick={handleTmdbReset}
                     disabled={tmdbBusy}
-                    className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/25 text-red-300 text-sm font-semibold disabled:opacity-50"
+                    className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/25 text-red-600 text-sm font-semibold disabled:opacity-50"
                     data-focusable
                   >
                     {t('downloads.tmdb.reset')}
@@ -442,35 +442,35 @@ export function DownloadDetailModal({
             )}
 
             {/* Advanced Toggle */}
-            <div className="bg-white/[0.03] rounded-3xl border border-white/5 overflow-hidden">
+            <div className="bg-[var(--ds-surface)] rounded-3xl border border-[var(--ds-border)] overflow-hidden">
               <button 
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="w-full flex items-center justify-between p-6 hover:bg-white/5 transition-colors"
+                className="w-full flex items-center justify-between p-6 hover:bg-[var(--ds-surface-overlay)] transition-colors"
                 data-focusable
               >
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/5 rounded-xl text-white/60">
+                  <div className="p-2 bg-[var(--ds-surface-elevated)] rounded-xl text-[var(--ds-text-secondary)] border border-[var(--ds-border)]">
                     <Settings2 size={20} />
                   </div>
-                  <span className="font-bold text-white/80">Informations Techniques</span>
+                  <span className="font-bold text-[var(--ds-text-primary)]">Informations Techniques</span>
                 </div>
-                {showAdvanced ? <ChevronUp className="text-white/40" /> : <ChevronDown className="text-white/40" />}
+                {showAdvanced ? <ChevronUp className="text-[var(--ds-text-tertiary)]" /> : <ChevronDown className="text-[var(--ds-text-tertiary)]" />}
               </button>
 
               {showAdvanced && (
                 <div className="p-6 pt-0 space-y-8 animate-in slide-in-from-top-4 duration-300">
                   <div className="grid gap-6">
                     <div className="space-y-2">
-                       <label className="text-[10px] font-bold uppercase tracking-widest text-white/30">Lien du Torrent (Info Hash)</label>
-                       <div className="flex items-center gap-3 bg-black/40 p-3 rounded-xl border border-white/5">
-                         <span className="font-mono text-sm text-white/50 truncate flex-1">{activeTorrent.info_hash}</span>
-                         <button onClick={() => navigator.clipboard.writeText(activeTorrent.info_hash)} className="p-2 hover:bg-white/5 rounded-lg text-white/40 transition-colors" data-focusable><Copy size={16}/></button>
+                       <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)]">Lien du Torrent (Info Hash)</label>
+                       <div className="flex items-center gap-3 bg-[var(--ds-surface-elevated)] p-3 rounded-xl border border-[var(--ds-border)]">
+                         <span className="font-mono text-sm text-[var(--ds-text-secondary)] truncate flex-1">{activeTorrent.info_hash}</span>
+                         <button onClick={() => navigator.clipboard.writeText(activeTorrent.info_hash)} className="p-2 hover:bg-[var(--ds-surface-overlay)] rounded-lg text-[var(--ds-text-tertiary)] transition-colors" data-focusable><Copy size={16}/></button>
                        </div>
                     </div>
 
                     <div className="space-y-2">
-                       <label className="text-[10px] font-bold uppercase tracking-widest text-white/30">Chemin de Téléchargement</label>
-                       <div className="flex items-center gap-3 bg-black/40 p-3 rounded-xl border border-white/5 text-white/50 text-sm font-mono break-all capitalize">
+                       <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)]">Chemin de Téléchargement</label>
+                       <div className="flex items-center gap-3 bg-[var(--ds-surface-elevated)] p-3 rounded-xl border border-[var(--ds-border)] text-[var(--ds-text-secondary)] text-sm font-mono break-all capitalize">
                          <HardDrive size={16} className="shrink-0" />
                          {downloadPath || "Chemin inconnu"}
                        </div>
@@ -479,8 +479,8 @@ export function DownloadDetailModal({
 
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-white/30">Trackers Actifs</label>
-                      <span className="text-xs bg-white/5 px-2 py-1 rounded-full text-white/40">{trackers.length} actifs</span>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)]">Trackers Actifs</label>
+                      <span className="text-xs bg-[var(--ds-surface-elevated)] px-2 py-1 rounded-full text-[var(--ds-text-tertiary)]">{trackers.length} actifs</span>
                     </div>
                     <div className="flex gap-2">
                       <input 
@@ -488,12 +488,12 @@ export function DownloadDetailModal({
                         value={newTrackerUrl} 
                         onChange={(e: any) => setNewTrackerUrl(e.target.value)}
                         placeholder="Ajouter un tracker (URL)..."
-                        className="flex-1 bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm text-white placeholder-white/20 focus:outline-none focus:border-[var(--ds-accent-violet)]"
+                        className="flex-1 bg-[var(--ds-surface-elevated)] border border-[var(--ds-border)] rounded-xl px-4 py-2 text-sm text-[var(--ds-text-primary)] placeholder:text-[var(--ds-text-tertiary)] focus:outline-none focus:border-[var(--ds-accent-violet)]"
                       />
                       <button 
                         onClick={handleAddTracker}
                         disabled={addTrackerLoading}
-                        className="p-2 bg-[var(--ds-accent-violet)] rounded-xl text-white hover:opacity-90 disabled:opacity-50"
+                        className="p-2 bg-[var(--ds-accent-violet)] rounded-xl text-[var(--ds-text-on-accent)] hover:opacity-90 disabled:opacity-50"
                         data-focusable
                       >
                         <PlusCircle size={20} />
@@ -501,7 +501,7 @@ export function DownloadDetailModal({
                     </div>
                     <ul className="max-h-32 overflow-y-auto space-y-1 pr-2 custom-scrollbar">
                       {trackers.map((t, i) => (
-                        <li key={i} className="text-[10px] font-mono text-white/30 truncate py-1 border-b border-white/5 last:border-0">{t}</li>
+                        <li key={i} className="text-[10px] font-mono text-[var(--ds-text-tertiary)] truncate py-1 border-b border-[var(--ds-border)] last:border-0">{t}</li>
                       ))}
                     </ul>
                   </div>

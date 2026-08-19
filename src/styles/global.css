@@ -147,7 +147,8 @@ html[data-tv-platform] body {
     body:has(.app-main [data-page="series-library"]),
     body:has(.app-main [data-page="demandes"]),
     body:has(.app-main [data-page="search"]),
-    body:has(.app-main [data-page="downloads"]) {
+    body:has(.app-main [data-page="downloads"]),
+    body:has(.app-main [data-page="settings"]) {
       zoom: var(--app-visual-scale);
       /* Cible visuelle = viewport - scrollbar (zone visible) - scrollbar (gutter gauche
          pour symetriser visuellement). Largeur logique = visuelle * 1.25.
@@ -249,6 +250,20 @@ html[data-tv-platform="true"] .library-sync-btn {
   touch-action: pan-x pan-y;
   overflow-x: auto;
   overflow-y: hidden;
+}
+.carousel-container img,
+.carousel-container a,
+.carousel-container [data-torrent-card],
+.carousel-container .torrent-poster {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .carousel-container {
+    overflow-x: scroll;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* webOS : scroll horizontal piloté en JS (scrollLeft) — pas de scroll-behavior: smooth CSS qui double le coût */
@@ -1765,11 +1780,22 @@ button, a, input, select, textarea {
   backface-visibility: hidden; /* Optimise les animations 3D */
 }
 
-.card-tv:focus,
-.torrent-poster:focus,
-[data-torrent-card]:focus {
-  will-change: transform, opacity, box-shadow;
-  transform: translate3d(0, 0, 0) scale(1.2); /* Force l'accélération GPU avec translate3d */
+@media (hover: hover) and (pointer: fine) {
+  .card-tv:focus,
+  .torrent-poster:focus,
+  [data-torrent-card]:focus {
+    will-change: transform, opacity, box-shadow;
+    transform: translate3d(0, 0, 0) scale(1.2);
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  html:not([data-tv-platform="true"]) .card-tv,
+  html:not([data-tv-platform="true"]) .torrent-poster,
+  html:not([data-tv-platform="true"]) [data-torrent-card] {
+    contain: layout style;
+    will-change: auto;
+  }
 }
 
 /* Isolation des animations pour performance (sans paint sur focus pour ne pas couper l'outline) */
@@ -1958,6 +1984,15 @@ nav[data-tv-site-header] {
   html:not([data-tv-platform="true"]) [data-torrent-card] a {
     touch-action: pan-x pan-y;
   }
+  html:not([data-tv-platform="true"]) .grid:has(.tv-card-focused) [data-settings-card]:not(.tv-card-focused) {
+    opacity: 1 !important;
+  }
+  html:not([data-tv-platform="true"]) .torrent-poster:hover,
+  html:not([data-tv-platform="true"]) .torrent-poster:focus-within,
+  html:not([data-tv-platform="true"]) [data-torrent-card]:hover,
+  html:not([data-tv-platform="true"]) [data-torrent-card]:focus-within {
+    z-index: auto !important;
+  }
 }
 
 /* Cartes settings : la bordure épouse la forme de la carte (rayon 32px) */
@@ -2047,7 +2082,7 @@ textarea:focus-visible {
   }
 }
 
-/* Entrée en focus : transition courte puis halo blanc scintillant */
+/* Entrée en focus : transition courte (souris / télécommande, pas le tap mobile) */
 @keyframes tvFocusIn {
   from {
     transform: scale(1);
@@ -2056,8 +2091,10 @@ textarea:focus-visible {
     transform: scale(1.06);
   }
 }
-.tv-card-focused {
-  animation: tvFocusIn 0.2s ease-out forwards !important;
+@media (hover: hover) and (pointer: fine) {
+  html:not([data-tv-platform="true"]) .tv-card-focused {
+    animation: tvFocusIn 0.2s ease-out forwards !important;
+  }
 }
 
 form input:focus,

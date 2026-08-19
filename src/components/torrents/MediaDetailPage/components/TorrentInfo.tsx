@@ -53,9 +53,9 @@ function normalizeResolution(raw?: string): string {
 
 function qualityBadgeClass(_resolution: string, isSelected: boolean): string {
   if (isSelected) {
-    return 'glass-panel backdrop-blur-sm text-white border-violet-500/50 bg-violet-900/20';
+    return 'backdrop-blur-sm text-white border-violet-400/70 bg-black/55';
   }
-  return 'glass-panel backdrop-blur-sm text-white/70 border-white/15 hover:text-white hover:border-white/30';
+  return 'backdrop-blur-sm text-white/80 border-white/20 bg-black/40 hover:text-white hover:border-white/40';
 }
 
 export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeederWarning = true, isSeries = false, sources, allVariants, selectedVariantId, onSelectVariant }: TorrentInfoProps) {
@@ -246,8 +246,8 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
           {indexerName && (
             <div
               className={
-                'inline-flex flex-wrap items-center gap-2 px-4 py-2 bg-primary/20 border border-primary-600/30 text-primary-300 rounded-lg text-sm font-semibold glass-panel flex-shrink-0' +
-                (canDownloadTorrentFile ? ' cursor-pointer hover:bg-primary/30 transition-colors' : '')
+                'inline-flex flex-wrap items-center gap-2 px-4 py-2 bg-black/50 border border-white/20 text-white rounded-lg text-sm font-semibold flex-shrink-0' +
+                (canDownloadTorrentFile ? ' cursor-pointer hover:bg-black/65 hover:border-white/30 transition-colors' : '')
               }
               {...(canDownloadTorrentFile
                 ? {
@@ -270,21 +270,21 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />
               </svg>
-              <span>{language === 'fr' ? 'Indexer:' : 'Indexer:'}</span>
-              <span className="text-primary-200 font-bold">{indexerName}</span>
+              <span className="text-white/70">{language === 'fr' ? 'Indexer:' : 'Indexer:'}</span>
+              <span className="text-white font-bold">{indexerName}</span>
               {minimumRatio != null && (
                 <>
-                  <span className="text-primary-400/80" aria-hidden="true">·</span>
+                  <span className="text-white/50" aria-hidden="true">·</span>
                   <span title={language === 'fr' ? 'Ratio minimum requis par le tracker' : 'Minimum ratio required by tracker'}>
-                    {t('mediaDetail.minimumRatio')} <span className="text-primary-200 font-bold">{Number(minimumRatio) === Math.floor(Number(minimumRatio)) ? String(Math.floor(Number(minimumRatio))) : Number(minimumRatio).toFixed(1)}</span>
+                    {t('mediaDetail.minimumRatio')} <span className="text-white font-bold">{Number(minimumRatio) === Math.floor(Number(minimumRatio)) ? String(Math.floor(Number(minimumRatio))) : Number(minimumRatio).toFixed(1)}</span>
                   </span>
                 </>
               )}
               {trackerName && (
                 <>
-                  <span className="text-primary-400/80" aria-hidden="true">·</span>
+                  <span className="text-white/50" aria-hidden="true">·</span>
                   <span title={trackerName} className="truncate max-w-[160px]">
-                    {t('mediaDetail.tracker')}: <span className="text-primary-200 font-bold truncate" title={trackerName}>{trackerName}</span>
+                    {t('mediaDetail.tracker')}: <span className="text-white font-bold truncate" title={trackerName}>{trackerName}</span>
                   </span>
                 </>
               )}

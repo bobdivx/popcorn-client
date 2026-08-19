@@ -2,6 +2,14 @@ import { useEffect, useState } from 'preact/hooks';
 import { Check, Copy, Globe, Loader2, Tv } from 'lucide-preact';
 import { serverApi } from '../../lib/client/server-api';
 import { useI18n } from '../../lib/i18n/useI18n';
+import { SettingsCard } from './SettingsCard';
+
+const fieldClass =
+  'w-full min-h-[48px] px-3 rounded-xl bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] border border-[var(--ds-border)] font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]';
+const btnPrimary =
+  'inline-flex items-center justify-center gap-2 min-h-[48px] px-4 rounded-xl font-medium bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] disabled:opacity-50';
+const btnGhost =
+  'inline-flex items-center justify-center gap-2 min-h-[48px] px-4 rounded-xl font-medium bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] border border-[var(--ds-border)] disabled:opacity-50';
 
 export default function WebOSDeploymentPanel() {
   const { t } = useI18n();
@@ -108,37 +116,33 @@ export default function WebOSDeploymentPanel() {
 
   return (
     <div class="space-y-6">
-      <div class="rounded-xl border border-base-300/80 bg-base-200/40 p-4 sm:p-6">
-        <div class="flex items-start gap-3 mb-4">
-          <div class="rounded-lg bg-primary/15 p-2 text-primary">
-            <Globe class="h-6 w-6" aria-hidden />
-          </div>
-          <div>
-            <h2 class="text-lg font-semibold text-base-content">{t('settingsPages.webosDeployment.noInstallTitle')}</h2>
-            <p class="text-sm text-base-content/80 mt-1">{t('settingsPages.webosDeployment.noInstallIntro')}</p>
-          </div>
-        </div>
-
-        <ol class="list-decimal list-inside space-y-2 text-sm text-base-content/85 mb-6 pl-1">
+      <SettingsCard
+        icon={Globe}
+        title={t('settingsPages.webosDeployment.noInstallTitle')}
+        description={t('settingsPages.webosDeployment.noInstallIntro')}
+      >
+        <ol class="list-decimal list-inside space-y-2 text-sm text-[var(--ds-text-secondary)] mb-6 pl-1">
           <li>{t('settingsPages.webosDeployment.noInstallStep1')}</li>
           <li>{t('settingsPages.webosDeployment.noInstallStep2')}</li>
           <li>{t('settingsPages.webosDeployment.noInstallStep3')}</li>
         </ol>
 
-        <label class="form-control w-full">
-          <span class="label-text font-medium">{t('settingsPages.webosDeployment.clientUrlLabel')}</span>
+        <label class="block w-full">
+          <span class="block text-sm font-medium text-[var(--ds-text-primary)] mb-2">
+            {t('settingsPages.webosDeployment.clientUrlLabel')}
+          </span>
           <div class="flex flex-col sm:flex-row gap-2 sm:items-stretch max-w-3xl">
             <input
               type="text"
               readOnly
-              class="input input-bordered font-mono text-sm flex-1 min-h-[48px]"
+              class={fieldClass + ' flex-1'}
               value={clientUrl}
               aria-readonly
               data-tv-focusable
             />
             <button
               type="button"
-              class="btn btn-primary gap-2 min-h-[48px] sm:shrink-0"
+              class={btnPrimary + ' sm:shrink-0'}
               onClick={copyClientUrl}
               data-tv-focusable
             >
@@ -147,91 +151,91 @@ export default function WebOSDeploymentPanel() {
             </button>
           </div>
         </label>
-      </div>
+      </SettingsCard>
 
-      <details class="rounded-xl border border-base-300/80 bg-base-200/30 group open:bg-base-200/50">
-        <summary class="cursor-pointer list-none p-4 sm:px-6 sm:py-4 flex items-center gap-3 [&::-webkit-details-marker]:hidden">
-          <span class="rounded-lg bg-base-300/40 p-2 text-base-content/80">
-            <Tv class="h-5 w-5" aria-hidden />
+      <SettingsCard
+        icon={Tv}
+        title={t('settingsPages.webosDeployment.adminTitle')}
+        description={t('settingsPages.webosDeployment.adminIntro')}
+      >
+        <p class="text-sm text-[var(--ds-text-secondary)] mb-3">{t('settingsPages.webosDeployment.lead')}</p>
+        <p class="text-xs text-[var(--ds-text-tertiary)] mb-4">{t('settingsPages.webosDeployment.prereq')}</p>
+
+        <label class="block w-full max-w-md mb-4">
+          <span class="block text-sm font-medium text-[var(--ds-text-primary)] mb-2">
+            {t('settingsPages.webosDeployment.deviceLabel')}
           </span>
-          <span class="font-medium text-base-content">{t('settingsPages.webosDeployment.adminTitle')}</span>
-        </summary>
+          <input
+            type="text"
+            class={fieldClass}
+            value={device}
+            onInput={(e) => setDevice((e.target as HTMLInputElement).value)}
+            disabled={busy}
+            placeholder={t('settingsPages.webosDeployment.devicePlaceholder')}
+            autoComplete="off"
+            data-tv-focusable
+          />
+          <span class="block text-xs text-[var(--ds-text-tertiary)] mt-1.5">
+            {t('settingsPages.webosDeployment.deviceHelp')}
+          </span>
+        </label>
 
-        <div class="px-4 pb-4 sm:px-6 sm:pb-6 pt-0 border-t border-base-300/50 space-y-4">
-          <p class="text-sm text-base-content/80">{t('settingsPages.webosDeployment.adminIntro')}</p>
-          <p class="text-sm text-base-content/70">{t('settingsPages.webosDeployment.lead')}</p>
-          <p class="text-xs text-base-content/55">{t('settingsPages.webosDeployment.prereq')}</p>
-
-          <label class="form-control w-full max-w-md">
-            <span class="label-text font-medium">{t('settingsPages.webosDeployment.deviceLabel')}</span>
-            <input
-              type="text"
-              class="input input-bordered w-full"
-              value={device}
-              onInput={(e) => setDevice((e.target as HTMLInputElement).value)}
-              disabled={busy}
-              placeholder={t('settingsPages.webosDeployment.devicePlaceholder')}
-              autoComplete="off"
-              data-tv-focusable
-            />
-            <span class="label-text-alt text-base-content/50">{t('settingsPages.webosDeployment.deviceHelp')}</span>
-          </label>
-
-          <div class="flex flex-col sm:flex-row gap-3">
-            <button
-              type="button"
-              class="btn btn-outline btn-primary gap-2 min-h-[48px]"
-              disabled={busy}
-              onClick={runInstall}
-              data-tv-focusable
-            >
-              {installing ? <Loader2 class="h-5 w-5 animate-spin" /> : null}
-              {installing
-                ? t('settingsPages.webosDeployment.installing')
-                : t('settingsPages.webosDeployment.installSimple')}
-            </button>
-            <button
-              type="button"
-              class="btn btn-outline gap-2 min-h-[48px]"
-              disabled={busy}
-              onClick={runRelaunch}
-              data-tv-focusable
-            >
-              {relaunching ? <Loader2 class="h-5 w-5 animate-spin" /> : null}
-              {t('settingsPages.webosDeployment.relaunch')}
-            </button>
-          </div>
-
-          {status !== 'idle' && (
-            <div
-              role="status"
-              class={`rounded-lg px-4 py-3 text-sm whitespace-pre-wrap ${
-                status === 'ok' ? 'bg-success/15 text-success-content' : 'bg-error/15 text-error-content'
-              }`}
-            >
-              {message}
-            </div>
-          )}
-
-          {logs && (
-            <div>
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm"
-                onClick={() => setShowLogs(!showLogs)}
-                data-tv-focusable
-              >
-                {showLogs ? t('settingsPages.webosDeployment.hideLogs') : t('settingsPages.webosDeployment.showLogs')}
-              </button>
-              {showLogs && (
-                <pre class="mt-2 max-h-64 overflow-auto rounded-lg bg-base-300/50 p-3 text-xs font-mono whitespace-pre-wrap break-all">
-                  {logs}
-                </pre>
-              )}
-            </div>
-          )}
+        <div class="flex flex-col sm:flex-row gap-3">
+          <button
+            type="button"
+            class={btnPrimary}
+            disabled={busy}
+            onClick={runInstall}
+            data-tv-focusable
+          >
+            {installing ? <Loader2 class="h-5 w-5 animate-spin" /> : null}
+            {installing
+              ? t('settingsPages.webosDeployment.installing')
+              : t('settingsPages.webosDeployment.installSimple')}
+          </button>
+          <button
+            type="button"
+            class={btnGhost}
+            disabled={busy}
+            onClick={runRelaunch}
+            data-tv-focusable
+          >
+            {relaunching ? <Loader2 class="h-5 w-5 animate-spin" /> : null}
+            {t('settingsPages.webosDeployment.relaunch')}
+          </button>
         </div>
-      </details>
+
+        {status !== 'idle' && (
+          <div
+            role="status"
+            class={`mt-4 rounded-xl px-4 py-3 text-sm whitespace-pre-wrap ${
+              status === 'ok'
+                ? 'bg-[#dcfce7] text-[#14532d]'
+                : 'bg-[#fee2e2] text-[#991b1b]'
+            }`}
+          >
+            {message}
+          </div>
+        )}
+
+        {logs && (
+          <div class="mt-4">
+            <button
+              type="button"
+              class="text-sm font-medium text-[var(--ds-accent-violet)] hover:underline"
+              onClick={() => setShowLogs(!showLogs)}
+              data-tv-focusable
+            >
+              {showLogs ? t('settingsPages.webosDeployment.hideLogs') : t('settingsPages.webosDeployment.showLogs')}
+            </button>
+            {showLogs && (
+              <pre class="mt-2 max-h-64 overflow-auto rounded-xl bg-[var(--ds-surface)] text-[var(--ds-text-primary)] border border-[var(--ds-border)] p-3 text-xs font-mono whitespace-pre-wrap break-all">
+                {logs}
+              </pre>
+            )}
+          </div>
+        )}
+      </SettingsCard>
     </div>
   );
 }

@@ -7,6 +7,8 @@ import { clearAllBackendStorage } from '../backend-config.js';
 
 export interface UserPreferences {
   theme?: 'light' | 'dark' | 'auto';
+  /** Langage visuel (bibliothèque de packs). Défaut : classic (app actuelle). */
+  uiPack?: 'classic' | 'tesla';
   language?: string;
   autoplay?: boolean;
   quality?: 'auto' | '1080p' | '720p' | '480p';
@@ -92,6 +94,7 @@ export class PreferencesManager {
   static getPreferences(): UserPreferences {
     return LocalStorage.getItem<UserPreferences>(this.KEY) || {
       theme: 'auto',
+      uiPack: 'tesla',
       language: 'fr',
       autoplay: false,
       quality: 'auto',

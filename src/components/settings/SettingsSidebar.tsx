@@ -175,41 +175,11 @@ const SIDEBAR_CSS = `
     z-index: 0;
   }
 
-  /* Logo — carte Boost compacte */
-  .sn-logo {
-    display: flex; align-items: center; gap: 10px;
-    margin: 12px 10px 8px;
-    padding: 12px 12px;
-    border-radius: 14px;
-    border: 1px solid rgba(168, 85, 247, 0.22);
-    background: linear-gradient(180deg, rgba(76, 29, 149, 0.28) 0%, rgba(18, 20, 26, 0.55) 100%);
-    position: relative; z-index: 1;
-    flex-shrink: 0;
-    overflow: hidden;
-  }
-  .sn-logo::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, #c084fc, #a855f7, #7c3aed);
-    opacity: 0.85;
-  }
-  .sn-logo-icon {
-    width: 36px; height: 36px; border-radius: 10px;
-    background: rgba(124,58,237,0.18);
-    border: 1px solid rgba(124,58,237,0.35);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-  }
-  .sn-logo-title { color: #fff; font-weight: 700; font-size: 14px; line-height: 1.2; }
-  .sn-logo-sub { color: rgba(167,139,250,0.7); font-size: 11px; margin-top: 2px; }
-
   /* Liste */
   .sn-list {
     flex: 1;
     overflow-y: auto;
-    padding: 4px 8px 16px;
+    padding: 12px 8px 16px;
     position: relative; z-index: 1;
     min-height: 0;
     scrollbar-width: none;
@@ -309,10 +279,6 @@ const SIDEBAR_CSS = `
   html[data-tv-platform="true"] .sn-label {
     font-size: 16px;
   }
-  html[data-tv-platform="true"] .sn-logo {
-    margin: 16px 12px 12px;
-    padding: 14px 14px;
-  }
 
   /* TV & grande cible tactile */
   @media (hover: none) and (pointer: coarse) {
@@ -339,12 +305,6 @@ const SIDEBAR_CSS = `
   [data-theme="light"] .sn-sidebar::after {
     background: radial-gradient(circle, rgba(139,92,246,0.05) 0%, transparent 70%);
   }
-  [data-theme="light"] .sn-logo {
-    border-color: rgba(109, 40, 217, 0.16);
-    background: linear-gradient(180deg, rgba(109, 40, 217, 0.08) 0%, rgba(245, 242, 252, 0.95) 100%);
-  }
-  [data-theme="light"] .sn-logo-title { color: #0f0f11; }
-  [data-theme="light"] .sn-logo-sub { color: rgba(109,40,217,0.65); }
   [data-theme="light"] .sn-item:hover:not(.sn-item--active) {
     background: rgba(109, 40, 217, 0.06);
     border-color: rgba(109, 40, 217, 0.12);
@@ -366,6 +326,42 @@ const SIDEBAR_CSS = `
   [data-theme="light"] .sn-label--inactive { color: rgba(15,15,17,0.48); }
   [data-theme="light"] .sn-item:hover .sn-label--inactive { color: rgba(15,15,17,0.75); }
   [data-theme="light"] .sn-overlay { background: rgba(0,0,0,0.45); }
+
+  /* ── Pack Tesla ── */
+  html[data-ui-pack="tesla"] .sn-sidebar {
+    background: #e6e6e8;
+    border-right: 1px solid rgba(0, 0, 0, 0.08);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  html[data-ui-pack="tesla"] .sn-sidebar::before,
+  html[data-ui-pack="tesla"] .sn-sidebar::after { display: none; }
+  html[data-ui-pack="tesla"] .sn-item {
+    border: 0;
+    border-radius: 14px;
+  }
+  html[data-ui-pack="tesla"] .sn-item:hover:not(.sn-item--active) {
+    background: rgba(0, 0, 0, 0.04);
+    border-color: transparent;
+  }
+  html[data-ui-pack="tesla"] .sn-item--active {
+    background: #fff;
+    border-color: transparent;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  html[data-ui-pack="tesla"] .sn-icon--active,
+  html[data-ui-pack="tesla"] .sn-icon--inactive {
+    background: transparent;
+    color: #1c1c1c;
+  }
+  html[data-ui-pack="tesla"] .sn-item:hover .sn-icon--inactive {
+    background: transparent;
+    color: #1c1c1c;
+  }
+  html[data-ui-pack="tesla"] .sn-label--active,
+  html[data-ui-pack="tesla"] .sn-label--inactive { color: #1c1c1c; }
+  html[data-ui-pack="tesla"] .sn-dot { display: none; }
+  html[data-ui-pack="tesla"] .sn-overlay { background: rgba(0, 0, 0, 0.4); }
 `;
 
 export default function SettingsSidebar() {
@@ -432,28 +428,11 @@ export default function SettingsSidebar() {
           top-[calc(3.75rem+var(--safe-area-inset-top,0px))] sm:top-[calc(5rem+var(--safe-area-inset-top,0px))] md:top-auto md:bottom-auto md:h-full
           transform transition-transform duration-200 ease-out
           ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          ${sidebarOpen ? '' : 'max-md:pointer-events-none'}
         `}
         aria-label={t('settingsMenu.title')}
         data-tv-settings-nav
       >
-        {/* Logo */}
-        <div class="sn-logo">
-          <div class="sn-logo-icon">
-            <img
-              src="/popcorn_logo.png"
-              alt=""
-              style="width:20px;height:20px;object-fit:contain;"
-              loading="eager"
-              aria-hidden
-            />
-          </div>
-          <div>
-            <div class="sn-logo-title">Popcornn</div>
-            <div class="sn-logo-sub">{t('settingsMenu.title')}</div>
-          </div>
-        </div>
-
-        {/* Navigation */}
         <ul class="sn-list" role="list">
           {visibleItems.map((item) => {
             const Icon = item.icon;

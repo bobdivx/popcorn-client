@@ -100,6 +100,7 @@ export function ResumePoster({ item, onNavigate }: ResumePosterProps) {
   return (
     <div
       className="relative group cursor-pointer torrent-poster min-w-[140px] sm:min-w-[160px] md:min-w-[180px] lg:min-w-[280px] xl:min-w-[320px] tv:min-w-[400px]"
+      data-dark-context
       data-tv-item-key={contentItemKey(item)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}

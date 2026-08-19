@@ -182,7 +182,7 @@ export default function SettingsContent() {
 
   if (route.type === 'page') {
     return (
-      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-w-0">
         <div className="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6 sc-stack ds-card-animate">
           {route.page === 'server' && <LazyPageServer />}
           {route.page === 'account' && <LazyPageAccount />}
@@ -196,7 +196,7 @@ export default function SettingsContent() {
   if (!visibleCategory) return <SettingsOverview />;
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto overflow-x-hidden">
+    <div className="flex-1 flex flex-col min-w-0">
       <div className="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6 ds-card-animate">
         <h1 className="sc-page-title">{t(CATEGORY_LABELS[visibleCategory])}</h1>
         <p className="sc-page-subtitle">{t('settingsMenu.subtitle')}</p>
