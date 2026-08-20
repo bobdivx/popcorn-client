@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef, useMemo } from 'preact/hooks';
 import { isTVPlatform, isWebOSTV, stampTvPlatformHints } from '../../../../lib/utils/device-detection';
 import { useSeekStepAcceleration } from './useSeekStepAcceleration';
+import { toggleFullscreen } from './useFullscreen';
 
 const BACK_KEY_CODES = [27, 8, 461, 10009, 4, 166, 457];
 const BACK_KEYS = ['Escape', 'Backspace', 'Back', 'BrowserBack', 'GoBack', 'XF86Back'];
@@ -348,6 +349,8 @@ export function useTVPlayerNavigation({
   useEffect(() => {
     if (!isTV) return;
 
+    const triedFullscreenRef = { current: false };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
@@ -361,6 +364,13 @@ export function useTVPlayerNavigation({
         }
         return;
       }
+
+      if (!triedFullscreenRef.current) {
+        triedFullscreenRef.current = true;
+        const wrap = document.getElementById('video-player-wrapper');
+        if (wrap) toggleFullscreen(wrap).catch(() => {});
+      }
+      if (!showControlsRef.current) setShowControls(true);
 
       if (isBackKey(e)) {
         e.preventDefault();

@@ -1044,12 +1044,11 @@ export default function TVNavigationProvider() {
         return;
       }
 
-      // Ignorer si player vidéo actif (HLS, Lucie, wrapper unifié),
-      // sauf overlay buffer / chargement qui doit recevoir Retour.
+      // Lecteur ouvert (même sans focus-within : après overlay webOS le focus est perdu).
       if (
         !document.querySelector('[data-playback-overlay]') &&
         document.querySelector(
-          '.hls-player-container:focus-within, #lucie-player-container:focus-within, #video-player-wrapper:focus-within, [data-tv-player-active]:focus-within'
+          '#video-player-wrapper[data-tv-player-active], [data-tv-player-active], .hls-player-container:focus-within, #lucie-player-container:focus-within, #video-player-wrapper:focus-within, [data-tv-player-active]:focus-within'
         )
       ) {
         return;
