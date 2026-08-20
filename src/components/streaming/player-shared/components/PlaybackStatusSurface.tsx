@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { formatBytes, formatSpeed, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
 import { generateQRCode } from '../../../../lib/utils/qrcode';
@@ -25,6 +25,23 @@ export interface PlaybackStatusDebugLog {
   message?: string;
   timestamp?: number;
   [key: string]: unknown;
+}
+
+function isRemoteBackEvent(e: KeyboardEvent): boolean {
+  const key = e.key;
+  const code = e.keyCode ?? e.which;
+  return (
+    key === 'Escape' ||
+    key === 'Backspace' ||
+    key === 'Back' ||
+    key === 'BrowserBack' ||
+    key === 'GoBack' ||
+    code === 27 ||
+    code === 8 ||
+    code === 461 ||
+    code === 10009 ||
+    code === 4
+  );
 }
 
 function isSparseOrEmptyError(message: string | null | undefined): boolean {
@@ -377,6 +394,39 @@ export function PlaybackStatusSurface({
   /** Retour = quitter l’overlay sans supprimer ; Annuler = retirer le torrent. */
   const backAction = onContinueInBackground ?? (onAbortDownload ? onCancel : undefined);
   const abortAction = onAbortDownload ?? onCancel;
+  const remoteBackAction = variant === 'player' ? onCancel : backAction ?? onCancel;
+
+  useEffect(() => {
+    if (variant !== 'player' && variant !== 'fullscreen') return;
+    if (!remoteBackAction) return;
+
+    const closeFromRemote = () => {
+      if (confirmingCancel) {
+        setConfirmingCancel(false);
+        return;
+      }
+      remoteBackAction();
+    };
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!isRemoteBackEvent(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      closeFromRemote();
+    };
+    const onWebOSBack = (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeFromRemote();
+    };
+
+    window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('webosback', onWebOSBack);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener('webosback', onWebOSBack);
+    };
+  }, [variant, remoteBackAction, confirmingCancel]);
   const etaLabel =
     derived.etaSeconds != null && derived.etaSeconds > 0
       ? formatTimeRemaining(derived.etaSeconds)

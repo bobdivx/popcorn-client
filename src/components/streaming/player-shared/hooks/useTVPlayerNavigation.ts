@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useMemo } from 'preact/hooks';
 import { isTVPlatform, isWebOSTV, stampTvPlatformHints } from '../../../../lib/utils/device-detection';
 import { useSeekStepAcceleration } from './useSeekStepAcceleration';
 
-const BACK_KEY_CODES = [27, 8, 461, 4];
+const BACK_KEY_CODES = [27, 8, 461, 10009, 4];
 const BACK_KEYS = ['Escape', 'Backspace', 'Back', 'BrowserBack', 'GoBack'];
 
 /** Après arrêt des flèches : un seul seek vers la vignette / position preview. */
@@ -347,16 +347,25 @@ export function useTVPlayerNavigation({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-      if (!showControlsRef.current && isBackKey(e)) {
-        e.preventDefault();
-        e.stopPropagation();
-        setShowControls(true);
-        setFocusedControlIndex(isTV ? 1 : hasBack ? 1 : 0);
-        return;
-      }
       if (isBackKey(e)) {
         e.preventDefault();
         e.stopPropagation();
+        const overlay = document.querySelector('[data-playback-overlay]');
+        if (overlay) {
+          e.stopImmediatePropagation();
+          const closeBtn = overlay.querySelector<HTMLElement>('[data-close]');
+          if (closeBtn) {
+            closeBtn.click();
+            return;
+          }
+          handleBack();
+          return;
+        }
+        if (!showControlsRef.current) {
+          setShowControls(true);
+          setFocusedControlIndex(isTV ? 1 : hasBack ? 1 : 0);
+          return;
+        }
         handleBack();
         return;
       }
