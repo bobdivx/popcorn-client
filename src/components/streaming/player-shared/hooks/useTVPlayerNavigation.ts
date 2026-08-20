@@ -352,17 +352,18 @@ export function useTVPlayerNavigation({
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
       const overlay = document.querySelector('[data-playback-overlay]');
-      if (overlay && isBackKey(e)) {
-        e.preventDefault();
-        e.stopPropagation();
-        e.stopImmediatePropagation();
-        const closeBtn = overlay.querySelector<HTMLElement>('[data-close]');
-        if (closeBtn) closeBtn.click();
-        else handleBack();
+      if (overlay) {
+        if (isBackKey(e)) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          const closeBtn = overlay.querySelector<HTMLElement>('[data-close]');
+          if (closeBtn) closeBtn.click();
+          else handleBack();
+        }
+        // Laisser le D-pad à la modal (webOS : keyCode mappé dans TVNavigationProvider).
         return;
       }
-      // Overlay encore visible : ne pas avaler D-pad. webOS n’envoie souvent
-      // que keyCode, et la lecture derrière la modal doit rester pilotable.
 
       if (isBackKey(e)) {
         e.preventDefault();

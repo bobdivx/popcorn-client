@@ -13,6 +13,7 @@ import {
   getBufferAheadSeconds,
   getBufferedEndAround,
   getBufferedTimelinePercent,
+  hasMediaPlaybackStarted,
   isTimeInBuffered,
 } from '../utils/bufferMetrics';
 
@@ -141,10 +142,12 @@ export function useVideoControls({
     };
 
     const handlePause = () => {
+      // Un seek HLS/MSE émet souvent `pause` sans intention utilisateur.
+      if (video.seeking) return;
       // webOS émet pause pendant un rebuffer MSE sans vraiment arrêter l’image.
       if (isTVPlatform() || isWebOSTV()) {
         window.setTimeout(() => {
-          if (video.paused) {
+          if (video.paused && !video.seeking) {
             setIsPlaying(false);
             setShowControls(true);
           }
@@ -152,7 +155,6 @@ export function useVideoControls({
         return;
       }
       setIsPlaying(false);
-      if (video.seeking) return;
       clearControlsTimeout();
       setShowControls(true);
     };
@@ -198,6 +200,8 @@ export function useVideoControls({
         case 'arrowleft':
         case 'j':
           e.preventDefault();
+          setShowControls(true);
+          scheduleAutoHide();
           if (video.duration) {
             seekToTargetTime(Math.max(0, video.currentTime - 10));
           }
@@ -205,6 +209,8 @@ export function useVideoControls({
         case 'arrowright':
         case 'l':
           e.preventDefault();
+          setShowControls(true);
+          scheduleAutoHide();
           if (video.duration) {
             seekToTargetTime(Math.min(video.duration, video.currentTime + 10));
           }
@@ -280,6 +286,14 @@ export function useVideoControls({
     };
     video.addEventListener('playing', handlePlaying);
 
+    let tvPlayPoll: number | null = null;
+    const syncTvPlaying = () => {
+      if (hasMediaPlaybackStarted(video)) handlePlaying();
+    };
+    if (isTVPlatform() || isWebOSTV()) {
+      tvPlayPoll = window.setInterval(syncTvPlaying, 250);
+    }
+
     return () => {
       if (container && !(isTVPlatform() || isWebOSTV())) {
         container.removeEventListener('mousemove', handleMouseMove);
@@ -297,6 +311,7 @@ export function useVideoControls({
       video.removeEventListener('durationchange', handleDurationChange);
       video.removeEventListener('playing', handlePlaying);
       window.removeEventListener('keydown', handleKeyDown);
+      if (tvPlayPoll != null) window.clearInterval(tvPlayPoll);
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     };
   }, [videoRef, hlsLoaded, playerConfig, hlsDuration]);
@@ -325,11 +340,18 @@ export function useVideoControls({
         duration > 0 && isFinite(duration) ? duration : video.duration && isFinite(video.duration) ? video.duration : 0;
       if (!durationValue) return;
       const clamped = Math.max(0, Math.min(durationValue, targetTime));
+      const shouldResume = !video.paused && !userPausedRef.current;
+      const resumeIfNeeded = () => {
+        if (!shouldResume) return;
+        userPausedRef.current = false;
+        if (video.paused) video.play().catch(() => {});
+      };
       const buffered = video.buffered;
       const bufferedEnd = getBufferedEndAround(buffered, video.currentTime);
       if (!canUseSeekReload) {
         emitPlaybackStep('seek_native', { position: clamped });
         video.currentTime = clamped;
+        resumeIfNeeded();
         return;
       }
       if (reloadWithSeek && clamped > 0 && !isLoading) {
@@ -337,6 +359,7 @@ export function useVideoControls({
         if (isTimeInBuffered(buffered, clamped, SEEK_RELOAD_BUFFER_MARGIN_SEC)) {
           emitPlaybackStep('seek_native', { position: clamped });
           video.currentTime = clamped;
+          resumeIfNeeded();
           return;
         }
         const isBeyondBufferedWindow =
@@ -355,6 +378,7 @@ export function useVideoControls({
       if (isLoading) return;
       emitPlaybackStep('seek_native', { position: clamped });
       video.currentTime = clamped;
+      resumeIfNeeded();
     },
     [videoRef, duration, canUseSeekReload, reloadWithSeek, isLoading]
   );

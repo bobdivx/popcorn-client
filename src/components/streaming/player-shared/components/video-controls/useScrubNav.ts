@@ -19,6 +19,8 @@ export function useScrubNav(options: {
   showControls: boolean;
   tvScrubIndexExternal?: number;
   onSeekToTime?: (timeSeconds: number) => void;
+  /** Afficher les commandes (flèches avec chrome masqué). */
+  onRevealControls?: () => void;
 }) {
   const {
     scrubEnabled,
@@ -30,6 +32,7 @@ export function useScrubNav(options: {
     showControls,
     tvScrubIndexExternal,
     onSeekToTime,
+    onRevealControls,
   } = options;
 
   const [tvScrubIndexInternal, setTvScrubIndexInternal] = useState(0);
@@ -70,6 +73,17 @@ export function useScrubNav(options: {
   tvScrubInternalRef.current = tvScrubIndexInternal;
   const onSeekToTimeRef = useRef(onSeekToTime);
   onSeekToTimeRef.current = onSeekToTime;
+  const onRevealControlsRef = useRef(onRevealControls);
+  onRevealControlsRef.current = onRevealControls;
+  const showControlsRef = useRef(showControls);
+  showControlsRef.current = showControls;
+  const currentTimeRef = useRef(currentTime);
+  currentTimeRef.current = currentTime;
+  const durationRef = useRef(duration);
+  durationRef.current = duration;
+  const isBrowsingScrubRef = useRef(isBrowsingScrub);
+  isBrowsingScrubRef.current = isBrowsingScrub;
+  const skipStripHideTimeoutRef = useRef<number | null>(null);
   const userScrubbedRef = useRef(false);
   const isDraggingRef = useRef(false);
   isDraggingRef.current = isDraggingScrub;
@@ -145,7 +159,6 @@ export function useScrubNav(options: {
 
   useEffect(() => {
     if (isTV) return;
-    if (!showControls || !scrubEnabled) return;
     const onKeyDownCapture = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       const kc = (e as any).keyCode ?? (e as any).which;
@@ -178,20 +191,67 @@ export function useScrubNav(options: {
         keyNormalized === 'PageUp' ||
         keyNormalized === 'PageDown';
 
-      if (keyNormalized === 'Enter' || keyNormalized === ' ') {
+      // Espace = play/pause (jamais volé par le scrub).
+      if (keyNormalized === ' ') return;
+
+      if (keyNormalized === 'Enter') {
+        if (!showControlsRef.current || !isBrowsingScrubRef.current || !scrubEnabled) return;
         e.preventDefault();
         e.stopPropagation();
         const targetTime = timeForScrubIndexRef.current(tvScrubInternalRef.current);
         onSeekToTimeRef.current?.(targetTime);
+        userScrubbedRef.current = false;
+        setIsBrowsingScrub(false);
         return;
       }
 
       if (!isNavKey) return;
-      e.preventDefault();
-      e.stopPropagation();
+
+      const controlsVisible = showControlsRef.current;
       const st = scrubThumbnailsRef.current;
       const count = st?.count ?? 0;
-      if (count <= 0) return;
+      const effectiveDuration = scrubEffectiveDuration(durationRef.current, st);
+
+      // Chrome masqué : skip immédiat ±10 s (YouTube), même sans miniatures.
+      if (!controlsVisible) {
+        e.preventDefault();
+        e.stopPropagation();
+        const delta =
+          keyNormalized === 'ArrowLeft' || keyNormalized === 'PageDown' || keyNormalized === 'Home'
+            ? keyNormalized === 'Home'
+              ? -effectiveDuration
+              : keyNormalized === 'PageDown'
+                ? -60
+                : -10
+            : keyNormalized === 'End'
+              ? effectiveDuration
+              : keyNormalized === 'PageUp'
+                ? 60
+                : 10;
+        const dur = effectiveDuration > 0 ? effectiveDuration : durationRef.current;
+        if (!dur) return;
+        const next = Math.max(0, Math.min(dur, currentTimeRef.current + delta));
+        onRevealControlsRef.current?.();
+        if (scrubEnabled && st?.count) {
+          const pct = (next / dur) * 100;
+          const idx = scrubIndexFromTimelinePercent(pct, dur, st);
+          setTvScrubIndexInternal(idx);
+          setIsBrowsingScrub(true);
+          userScrubbedRef.current = false;
+          if (skipStripHideTimeoutRef.current != null) window.clearTimeout(skipStripHideTimeoutRef.current);
+          skipStripHideTimeoutRef.current = window.setTimeout(() => {
+            skipStripHideTimeoutRef.current = null;
+            setIsBrowsingScrub(false);
+          }, 1600);
+        }
+        onSeekToTimeRef.current?.(next);
+        return;
+      }
+
+      if (!scrubEnabled || count <= 0) return;
+
+      e.preventDefault();
+      e.stopPropagation();
       setIsBrowsingScrub(true);
       userScrubbedRef.current = true;
       setTvScrubIndexInternal((prev) => {
@@ -207,8 +267,14 @@ export function useScrubNav(options: {
       });
     };
     window.addEventListener('keydown', onKeyDownCapture, true);
-    return () => window.removeEventListener('keydown', onKeyDownCapture, true);
-  }, [isTV, showControls, scrubEnabled, scrubThumbnails?.count]);
+    return () => {
+      window.removeEventListener('keydown', onKeyDownCapture, true);
+      if (skipStripHideTimeoutRef.current != null) {
+        window.clearTimeout(skipStripHideTimeoutRef.current);
+        skipStripHideTimeoutRef.current = null;
+      }
+    };
+  }, [isTV, scrubEnabled]);
 
   useEffect(() => {
     if (isTV || isDraggingScrub) return;

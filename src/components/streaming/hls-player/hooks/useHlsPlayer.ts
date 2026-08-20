@@ -14,7 +14,7 @@ import { getOrCreateDeviceId } from '../../../../lib/utils/device-id';
 import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
 import { minBufferAfterSeekSec } from '../../player-core/policies/SeekPolicy';
 import { buildProxyUrl, normalizeStreamPath } from '../../player-core/utils/buildStreamUrl';
-import { getBufferAheadSeconds, hasMediaPlaybackStarted, minBufferBeforePlaySec } from '../../player-shared/utils/bufferMetrics';
+import { getEngineBufferAhead, hasMediaPlaybackStarted, minBufferBeforePlaySec } from '../../player-shared/utils/bufferMetrics';
 import { getNetworkPlaybackProfile } from '../../../../lib/streaming/networkPlaybackProfile';
 import { armHlsQualityLadder, pinHlsToLowestLevel } from '../../../../lib/streaming/hlsQualityLadder';
 import { isUhdQualityAttempt } from '../../../../lib/streaming/uhdPlaybackFallback';
@@ -120,6 +120,8 @@ export function useHlsPlayer({
   const apiDurationRef = useRef<number>(0);
   /** Seek à appliquer après le prochain chargement de manifest (reload avec seek=) */
   const pendingSeekRef = useRef<number>(0);
+  /** Reprendre la lecture après un reload seek si on était déjà en play. */
+  const resumePlaybackAfterSeekRef = useRef(false);
   const reloadWithSeekRef = useRef<((seekSeconds: number) => void) | null>(null);
   /** URL du dernier reloadWithSeek (pour retry si 503) */
   const seekLoadUrlRef = useRef<string | null>(null);
@@ -141,7 +143,7 @@ export function useHlsPlayer({
   const pauseUnregisterTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** webOS : lecture HLS native (sans MSE). Évite de réinit quand hls.js finit de charger. */
   const nativeTvActiveRef = useRef(false);
-  const nativeTvFailedRef = useRef(false);
+  const hlsJsFailedRef = useRef(false);
 
   /** Délai après lequel une vidéo en pause est désenregistrée (libère transcodage + cache serveur) */
   const PAUSE_UNREGISTER_DELAY_MS = 5 * 60 * 1000; // 5 min
@@ -182,15 +184,16 @@ export function useHlsPlayer({
   const playerConfig = usePlayerConfig();
   const tvRuntime =
     typeof window !== 'undefined' && (isWebOSTV() || isTVPlatform());
-  const playerRuntimeReady = tvRuntime || hlsLoaded;
+  // Même pipeline que le PC : attendre hls.js. Natif seulement si MSE indisponible.
+  const playerRuntimeReady = hlsLoaded || (tvRuntime && Boolean(loaderError));
 
   useEffect(() => {
-    if (loaderError) {
-      setError(loaderError);
-      setIsLoading(false);
-      onErrorRef.current?.(new Error(loaderError));
-    }
-  }, [loaderError]);
+    if (!loaderError) return;
+    if (tvRuntime) return;
+    setError(loaderError);
+    setIsLoading(false);
+    onErrorRef.current?.(new Error(loaderError));
+  }, [loaderError, tvRuntime]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -206,10 +209,6 @@ export function useHlsPlayer({
     video.addEventListener('playing', markReady);
     video.addEventListener('play', markReady);
     video.addEventListener('timeupdate', markReady);
-    video.addEventListener('loadeddata', markReady);
-    video.addEventListener('canplay', markReady);
-    video.addEventListener('canplaythrough', markReady);
-    video.addEventListener('progress', markReady);
     let rvfcHandle = 0;
     const rvfcVideo = video as HTMLVideoElement & {
       requestVideoFrameCallback?: (cb: () => void) => number;
@@ -223,10 +222,6 @@ export function useHlsPlayer({
       video.removeEventListener('playing', markReady);
       video.removeEventListener('play', markReady);
       video.removeEventListener('timeupdate', markReady);
-      video.removeEventListener('loadeddata', markReady);
-      video.removeEventListener('canplay', markReady);
-      video.removeEventListener('canplaythrough', markReady);
-      video.removeEventListener('progress', markReady);
       if (rvfcHandle && typeof rvfcVideo.cancelVideoFrameCallback === 'function') {
         rvfcVideo.cancelVideoFrameCallback(rvfcHandle);
       }
@@ -291,7 +286,7 @@ export function useHlsPlayer({
       hlsFileIdRef.current = null;
       activeVideoRegisteredRef.current = false;
       hasStartedPlayingRef.current = false;
-      nativeTvFailedRef.current = false;
+      hlsJsFailedRef.current = false;
       nativeTvActiveRef.current = false;
       setPlaybackStarted(false);
       setIsLoading(true);
@@ -446,10 +441,12 @@ export function useHlsPlayer({
             });
         }
 
-        // webOS / TV : lecteur média natif (pas MSE / hls.js). hls.js traite une
-        // playlist EVENT en « live » et saute à la fin — overlay bloquée.
+        // PC et TV : même pipeline hls.js / MSE. Le lecteur HLS natif webOS
+        // affiche l’image mais ne met pas à jour paused / buffered / play —
+        // la modal PC ne reçoit jamais les signaux. Natif = fallback MSE.
         const tvPlayback = isWebOSTV() || isTVPlatform();
-        if (tvPlayback && !nativeTvFailedRef.current) {
+        const mseSupported = Boolean(window.Hls?.isSupported?.());
+        if (tvPlayback && (!mseSupported || hlsJsFailedRef.current)) {
           nativeTvActiveRef.current = true;
           video.muted = true;
           video.playsInline = true;
@@ -473,22 +470,18 @@ export function useHlsPlayer({
             if (video.paused) video.play().catch(() => {});
           };
           const onNativeError = () => {
-            console.warn('[useHlsPlayer] HLS natif TV en échec, fallback hls.js');
+            console.warn('[useHlsPlayer] HLS natif TV en échec');
             nativeTvActiveRef.current = false;
-            nativeTvFailedRef.current = true;
             video.removeEventListener('playing', onPlaying);
             video.removeEventListener('timeupdate', onTimeUpdate);
             video.removeEventListener('canplay', onCanPlay);
             video.removeEventListener('loadeddata', onCanPlay);
             video.removeEventListener('progress', onTimeUpdate);
             video.removeEventListener('error', onNativeError);
-            try {
-              video.removeAttribute('src');
-              video.load();
-            } catch {
-              /* ignore */
-            }
-            void initializeVideo(true, false);
+            const msg = 'Lecture native TV impossible';
+            setError(msg);
+            setIsLoading(false);
+            onErrorRef.current?.(new Error(msg));
           };
           video.addEventListener('playing', onPlaying);
           video.addEventListener('timeupdate', onTimeUpdate);
@@ -631,13 +624,20 @@ export function useHlsPlayer({
         // En mode stream-torrent, pas de reload avec seek (librqbit gère le range), on met à jour currentTime.
         const reloadWithSeekRefCurrent = (seekSeconds: number) => {
           if (!hlsRef.current || !hlsRef.current.media) return;
+          resumePlaybackAfterSeekRef.current = !video.paused;
           if (useStreamTorrentUrl) {
             video.currentTime = seekSeconds;
+            if (resumePlaybackAfterSeekRef.current && video.paused) {
+              video.play().catch(() => {});
+            }
             return;
           }
           const seekUrl = buildHlsUrl(true, seekSeconds);
           if (currentSrcRef.current === seekUrl) {
             video.currentTime = seekSeconds;
+            if (resumePlaybackAfterSeekRef.current && video.paused) {
+              video.play().catch(() => {});
+            }
             return;
           }
           pendingSeekRef.current = seekSeconds;
@@ -899,10 +899,7 @@ export function useHlsPlayer({
           // Démarrer la lecture seulement quand on a assez de buffer (évite stall après ~4 s).
           // Doit être appelé APRÈS que la position sauvegardée soit appliquée, sinon on play() puis
           // un seek vers la position coupe le buffer et provoque une pause.
-          const MIN_BUFFER_BEFORE_PLAY =
-            isWebOSTV() || isTVPlatform()
-              ? 0
-              : minBufferBeforePlaySec(!!isRemoteStream);
+          const MIN_BUFFER_BEFORE_PLAY = minBufferBeforePlaySec(!!isRemoteStream);
           const MAX_WAIT_FOR_BUFFER_MS = isRemoteStream ? 60000 : 90000;
           const markPlaybackReady = () => {
             hasStartedPlayingRef.current = true;
@@ -910,24 +907,28 @@ export function useHlsPlayer({
             setLoadingStatusMessage(null);
             setIsLoading(false);
             onLoadingChangeRef.current?.(false);
+            resumePlaybackAfterSeekRef.current = false;
           };
           function startDelayedPlayWhenReady() {
             const canPlay =
-              canAutoPlayRef.current === undefined || canAutoPlayRef.current();
-            if (!video.paused || hasMediaPlaybackStarted(video)) {
+              canAutoPlayRef.current === undefined ||
+              canAutoPlayRef.current() ||
+              resumePlaybackAfterSeekRef.current;
+            if (!video.paused) {
               markPlaybackReady();
-              if (video.paused && canPlay) {
-                if (isWebOSTV() || isTVPlatform()) video.muted = true;
-                video.play().catch(() => {});
-              }
               return;
             }
             let intervalId: ReturnType<typeof setInterval> | null = null;
             const timeoutId = window.setTimeout(() => {
               if (intervalId !== null) clearInterval(intervalId);
               intervalId = null;
-              const ahead = getBufferAheadSeconds(video.buffered, video.currentTime || 0);
-              if (ahead >= 4 || tvPlayback || hasMediaPlaybackStarted(video)) {
+              const ahead = getEngineBufferAhead(
+                video.buffered,
+                video.currentTime || 0,
+                hls.mainForwardBufferInfo,
+              );
+              // Ne pas forcer play() avec un buffer vide (overlay qui clignote).
+              if (ahead >= 4) {
                 if (canPlay && video.paused) {
                   if (isWebOSTV() || isTVPlatform()) video.muted = true;
                   video.play().catch(() => {});
@@ -939,7 +940,11 @@ export function useHlsPlayer({
             const startCheck = () => {
               intervalId = window.setInterval(() => {
                 const pos = Number.isFinite(video.currentTime) ? video.currentTime : 0;
-                const bufAhead = getBufferAheadSeconds(video.buffered, pos);
+                const bufAhead = getEngineBufferAhead(
+                  video.buffered,
+                  pos,
+                  hls.mainForwardBufferInfo,
+                );
                   if (bufAhead >= MIN_BUFFER_BEFORE_PLAY) {
                     if (intervalId !== null) clearInterval(intervalId);
                     intervalId = null;
@@ -1067,7 +1072,11 @@ export function useHlsPlayer({
               const MAX_WAIT_MS = 25000;
               const tick = () => {
                 seekVerifyTimeoutRef.current = null;
-                const ahead = getBufferAheadSeconds(video.buffered, pendingSeek);
+                const ahead = getEngineBufferAhead(
+                  video.buffered,
+                  pendingSeek,
+                  hls.mainForwardBufferInfo,
+                );
                 if (ahead >= minAhead || Date.now() - startedAt >= MAX_WAIT_MS) {
                   finishSeekSettle();
                   return;
@@ -1167,13 +1176,6 @@ export function useHlsPlayer({
             // Utiliser la durée la plus grande entre celle du fragment, video.duration, et la valeur actuelle
             const finalDuration = Math.max(fragDuration, videoDuration);
             applyDurationCandidate(finalDuration);
-          }
-          if (tvPlayback) {
-            markPlaybackReady();
-            if (video.paused) {
-              video.muted = true;
-              video.play().catch(() => {});
-            }
           }
         });
 
@@ -1461,6 +1463,23 @@ export function useHlsPlayer({
             if (data.type === HlsErrorTypes?.MEDIA_ERROR) {
               if (handleHlsJsMediaError()) return;
               if (swallowFatalIfUhdFallback('media', hls)) return;
+              if (tvPlayback && !hlsJsFailedRef.current) {
+                console.warn('[useHlsPlayer] MSE TV en échec, fallback HLS natif');
+                hlsJsFailedRef.current = true;
+                try {
+                  hls.destroy();
+                } catch (_) {}
+                hlsRef.current = null;
+                try {
+                  video.removeAttribute('src');
+                  video.srcObject = null;
+                  video.load();
+                } catch {
+                  /* ignore */
+                }
+                void initializeVideo(true, false);
+                return;
+              }
               try {
                 hls.destroy();
               } catch (_) {}

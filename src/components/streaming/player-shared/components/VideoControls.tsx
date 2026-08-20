@@ -113,6 +113,8 @@ interface VideoControlsProps {
   tvScrubFocused?: boolean;
   /** Sur TV : l’utilisateur parcourt la timeline (flèches) — afficher le carrousel. */
   tvScrubBrowsing?: boolean;
+  /** Réafficher les commandes (flèches avec chrome masqué). */
+  onRevealControls?: () => void;
   bufferedPercent?: number;
 }
 
@@ -172,6 +174,7 @@ export function VideoControls({
   tvScrubIndexExternal,
   tvScrubFocused = false,
   tvScrubBrowsing = false,
+  onRevealControls,
   bufferedPercent = 0,
 }: VideoControlsProps) {
   const { t } = useI18n();
@@ -182,8 +185,11 @@ export function VideoControls({
   const [qualityMenuRect, setQualityMenuRect] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
-    if (!showControls) setIsHoveringTimeline(false);
-  }, [showControls]);
+    if (!showControls) {
+      setIsHoveringTimeline(false);
+      (progressBarRef as { current?: HTMLElement | null } | undefined)?.current?.blur?.();
+    }
+  }, [showControls, progressBarRef]);
 
   useEffect(() => {
     if (!onOpenQualityMenuRef) return;
@@ -284,6 +290,7 @@ export function VideoControls({
     showControls,
     tvScrubIndexExternal,
     onSeekToTime: commitSeekToTime,
+    onRevealControls,
   });
 
   /** Aperçu vignettes scrub (desktop/mobile) : temps / barre alignés sur la vignette tant qu’on n’a pas rejoint la tête de lecture. */
@@ -589,6 +596,7 @@ export function VideoControls({
               setFocusedOnProgress?.(false);
             }}
             onKeyDown={(e: KeyboardEvent) => {
+              if (!showControls) return;
               // Sur TV avec miniatures scrub, la navigation est gérée au niveau window (useTVPlayerNavigation).
               // Ne jamais intercepter ici, sinon on bloque la navigation du carousel.
               if (isTV && scrubEnabled) return;

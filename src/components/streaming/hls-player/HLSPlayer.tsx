@@ -27,7 +27,7 @@ import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
 import { useDebouncedVideoWaiting } from '../player-shared/hooks/useDebouncedVideoWaiting';
 import { formatTime } from '../player-shared/utils/formatTime';
 import { useEffectiveVideoFillMode } from '../player-shared/hooks/useEffectiveVideoFillMode';
-import { getBufferAheadSeconds, nextBufferingOverlayVisible, hasMediaPlaybackStarted } from '../player-shared/utils/bufferMetrics';
+import { nextBufferingOverlayVisible, getEngineBufferAhead, hasMediaPlaybackStarted } from '../player-shared/utils/bufferMetrics';
 
 export default function HLSPlayer({ 
   src, 
@@ -461,34 +461,37 @@ export default function HLSPlayer({
     video.addEventListener('playing', syncFromElement);
     video.addEventListener('play', syncFromElement);
     video.addEventListener('timeupdate', syncFromElement);
-    video.addEventListener('loadeddata', syncFromElement);
-    video.addEventListener('canplay', syncFromElement);
-    video.addEventListener('progress', syncFromElement);
     const id = window.setInterval(syncFromElement, 200);
     syncFromElement();
     return () => {
       video.removeEventListener('playing', syncFromElement);
       video.removeEventListener('play', syncFromElement);
       video.removeEventListener('timeupdate', syncFromElement);
-      video.removeEventListener('loadeddata', syncFromElement);
-      video.removeEventListener('canplay', syncFromElement);
-      video.removeEventListener('progress', syncFromElement);
       window.clearInterval(id);
     };
   }, [src, infoHash, filePath, hlsLoaded, onLoadingChange]);
 
   useEffect(() => {
-    const video = videoRef.current;
-    const ahead = getBufferAheadSeconds(video?.buffered, currentTime);
-    setBufferingOverlayVisible((visible) =>
-      nextBufferingOverlayVisible(visible, ahead, {
-        isLoading,
-        isWaiting,
-        isSeekSettling,
-        isPlaying: isPlaying || mediaVisiblyPlaying || playbackStarted,
-      }),
-    );
-  }, [isLoading, isWaiting, isSeekSettling, isPlaying, mediaVisiblyPlaying, currentTime, bufferedPercent, isSeeking]);
+    const tick = () => {
+      const video = videoRef.current;
+      const ahead = getEngineBufferAhead(
+        video?.buffered,
+        Number.isFinite(video?.currentTime) ? (video?.currentTime as number) : currentTime,
+        hlsRef.current?.mainForwardBufferInfo,
+      );
+      setBufferingOverlayVisible((visible) =>
+        nextBufferingOverlayVisible(visible, ahead, {
+          isLoading,
+          isWaiting,
+          isSeekSettling,
+          isPlaying: isPlaying || mediaVisiblyPlaying || playbackStarted,
+        }),
+      );
+    };
+    tick();
+    const id = window.setInterval(tick, 250);
+    return () => window.clearInterval(id);
+  }, [isLoading, isWaiting, isSeekSettling, isPlaying, mediaVisiblyPlaying, playbackStarted, currentTime, bufferedPercent, isSeeking]);
 
   // Overlay : buffer ahead uniquement. Pendant waiting/seek/loading, ne jamais
   // afficher 100 % (artefact ou cible atteinte alors que le décodeur attend encore).
@@ -502,17 +505,14 @@ export default function HLSPlayer({
         : null;
 
   const displayError = uhdFallbackMessage ? null : error;
-  // TV / webOS : masquer dès que le média a démarré (readyState / 1er fragment),
-  // sans exiger 8 s de video.buffered — sinon la modal reste et bloque la télécommande.
-  const playbackActive = playbackStarted || isPlaying || mediaVisiblyPlaying;
+  // Même hystérésis que le PC : overlay jusqu’au play réel ou buffer de démarrage.
+  const playbackActive = isPlaying || mediaVisiblyPlaying || playbackStarted;
   const shouldShowBuffering =
     !!uhdFallbackMessage ||
     (!playbackActive &&
-      (isSeekSettling ||
-        (isTV
-          ? isLoading || isWaiting
-          : bufferingOverlayVisible ||
-            (isSeeking && (bufferedPercent < 95 || pendingSeekPosition > 0)))));
+      (bufferingOverlayVisible ||
+        isSeekSettling ||
+        (isSeeking && (bufferedPercent < 95 || pendingSeekPosition > 0))));
   const liveTrace = usePlaybackLiveTrace(
     {
       path: filePath,
@@ -707,6 +707,7 @@ export default function HLSPlayer({
           onPlayPause={handlePlayPause}
           onSeek={baseHandleSeek}
           onSeekToTime={seekToTargetTime}
+          onRevealControls={revealControls}
           onVolumeChange={baseHandleVolumeChange}
           onToggleMute={toggleMute}
           onToggleFullscreen={handleToggleFullscreen}
