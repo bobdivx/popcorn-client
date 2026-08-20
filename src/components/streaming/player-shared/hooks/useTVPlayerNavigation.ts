@@ -365,6 +365,8 @@ export function useTVPlayerNavigation({
         return;
       }
 
+      e.stopPropagation();
+
       if (!triedFullscreenRef.current) {
         triedFullscreenRef.current = true;
         const wrap = document.getElementById('video-player-wrapper');

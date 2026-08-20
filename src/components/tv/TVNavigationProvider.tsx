@@ -11,6 +11,15 @@ import {
 const TV_MODAL_CLOSE_SELECTOR =
   '[data-close], [aria-label*="Fermer"], [aria-label*="Close"], [aria-label*="close"], [aria-label*="Retour"], [aria-label*="Back"], .close-button';
 
+function isPopcornnPlayerOpen(): boolean {
+  if (typeof document === 'undefined') return false;
+  if (document.documentElement.getAttribute('data-tv-player-open') === 'true') return true;
+  const wrap = document.getElementById('video-player-wrapper');
+  if (!wrap) return false;
+  const display = (wrap as HTMLElement).style.display;
+  return display !== 'none';
+}
+
 function isTvBackKey(e: KeyboardEvent): boolean {
   const key = e.key;
   const code = e.keyCode ?? e.which;
@@ -920,6 +929,9 @@ export default function TVNavigationProvider() {
 
     // Gestionnaire de touches
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Lecteur ouvert : ne pas focus le header (z-200) par-dessus la vidéo.
+      if (isPopcornnPlayerOpen()) return;
+
       const target = e.target as HTMLElement;
       
       // Détecter le bouton retour (webOS, Android TV, etc.)
@@ -1501,6 +1513,11 @@ export default function TVNavigationProvider() {
         html[data-webos="true"] [data-settings-card].tv-card-focused {
           animation: none !important;
         }
+        html[data-tv-player-open] [data-tv-site-header] {
+          visibility: hidden !important;
+          pointer-events: none !important;
+          opacity: 0 !important;
+        }
       ` + TV_PLATFORM_PERF_CSS + MOBILE_TOUCH_CSS;
     }
 
@@ -1510,6 +1527,7 @@ export default function TVNavigationProvider() {
 
     // Gestionnaire pour le bouton retour webOS (peut être envoyé via différents événements)
     const handleWebOSBack = (e: Event) => {
+      if (isPopcornnPlayerOpen()) return;
       const event = e as KeyboardEvent | CustomEvent;
       // Si c'est un KeyboardEvent Backspace et que le focus est dans un champ de saisie, ne pas faire retour
       if (event instanceof KeyboardEvent && (event.key === 'Backspace' || event.keyCode === 8)) {
