@@ -646,8 +646,8 @@ export function VideoPlayerWrapper({
             }),
       }}
     >
-      {/* Badges de qualité en haut à droite (mode non plein écran) */}
-      {!isFullscreen && (
+      {/* Badges codec : pas sur TV (le wrapper est toujours “fullscreen”, ça reste collé à l’écran). */}
+      {!isTvPlayback && !isFullscreen && (
         <div className="absolute top-4 right-4 z-10">
           <QualityBadges
             quality={quality}
@@ -657,9 +657,7 @@ export function VideoPlayerWrapper({
           />
         </div>
       )}
-      
-      {/* Badges de qualité en plein écran aussi */}
-      {isFullscreen && (
+      {!isTvPlayback && isFullscreen && (
         <div className="absolute top-4 right-4 z-20">
           <QualityBadges
             quality={quality}

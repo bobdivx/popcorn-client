@@ -37,7 +37,9 @@ export function useVideoControls({
   reloadWithSeek,
 }: UseVideoControlsProps) {
   const playerConfig = usePlayerConfig();
-  const [showControls, setShowControls] = useState(false);
+  const [showControls, setShowControls] = useState(
+    () => typeof window !== 'undefined' && (isTVPlatform() || isWebOSTV()),
+  );
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
