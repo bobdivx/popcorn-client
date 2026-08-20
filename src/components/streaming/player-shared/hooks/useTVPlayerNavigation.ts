@@ -2,11 +2,11 @@ import { useEffect, useState, useRef, useMemo } from 'preact/hooks';
 import { isTVPlatform, isWebOSTV, stampTvPlatformHints } from '../../../../lib/utils/device-detection';
 import { useSeekStepAcceleration } from './useSeekStepAcceleration';
 
-const BACK_KEY_CODES = [27, 8, 461, 10009, 4];
-const BACK_KEYS = ['Escape', 'Backspace', 'Back', 'BrowserBack', 'GoBack'];
+const BACK_KEY_CODES = [27, 8, 461, 10009, 4, 166, 457];
+const BACK_KEYS = ['Escape', 'Backspace', 'Back', 'BrowserBack', 'GoBack', 'XF86Back'];
 
 /** Après arrêt des flèches : un seul seek vers la vignette / position preview. */
-const SCRUB_SETTLE_MS = 1200;
+const SCRUB_SETTLE_MS = 2000;
 const PREVIEW_SETTLE_MS = 1000;
 /** webOS : hide plus rapide ; autres TV : 5s. */
 const CONTROLS_HIDE_MS_WEBOS = 3200;
@@ -357,11 +357,8 @@ export function useTVPlayerNavigation({
           e.preventDefault();
           e.stopPropagation();
           e.stopImmediatePropagation();
-          const closeBtn = overlay.querySelector<HTMLElement>('[data-close]');
-          if (closeBtn) closeBtn.click();
-          else handleBack();
+          handleBack();
         }
-        // Laisser le D-pad à la modal (webOS : keyCode mappé dans TVNavigationProvider).
         return;
       }
 
@@ -597,15 +594,8 @@ export function useTVPlayerNavigation({
     };
 
     const handleWebOSBack = (e: Event) => {
-      const overlay = document.querySelector('[data-playback-overlay]');
-      if (overlay) {
-        e.preventDefault();
-        e.stopPropagation();
-        const closeBtn = overlay.querySelector<HTMLElement>('[data-close]');
-        if (closeBtn) closeBtn.click();
-        else handleBack();
-        return;
-      }
+      e.preventDefault();
+      e.stopPropagation();
       handleBack();
     };
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -613,14 +603,21 @@ export function useTVPlayerNavigation({
       const key = e.key || (kc === 37 ? 'ArrowLeft' : kc === 39 ? 'ArrowRight' : '');
       if (key === 'ArrowLeft' || key === 'ArrowRight' || kc === 412 || kc === 417) recordKeyUp();
     };
+    const handlePopState = () => {
+      if (document.querySelector('[data-playback-overlay]')) handleBack();
+    };
 
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('webosback', handleWebOSBack);
+    document.addEventListener('webOSBackButton', handleWebOSBack);
+    window.addEventListener('popstate', handlePopState);
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('webosback', handleWebOSBack);
+      document.removeEventListener('webOSBackButton', handleWebOSBack);
+      window.removeEventListener('popstate', handlePopState);
     };
   }, [
     isTV,

@@ -24,7 +24,9 @@ function isTvBackKey(e: KeyboardEvent): boolean {
     code === 27 ||
     code === 461 ||
     code === 10009 ||
-    code === 4
+    code === 4 ||
+    code === 166 ||
+    code === 457
   );
 }
 
