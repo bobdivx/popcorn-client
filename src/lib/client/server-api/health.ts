@@ -4,6 +4,7 @@
 
 import type { ApiResponse, SetupStatus } from './types.js';
 import { PreferencesManager } from '../storage.js';
+import { resetGpuCapability, setGpuCapability } from '../../gpu-capability-store.js';
 
 /**
  * Réponse GET /api/client/storage
@@ -29,7 +30,7 @@ export const healthMethods = {
    * Vérifie la santé du serveur avec détails
    * Retourne des informations détaillées sur l'état de la connexion et la version
    */
-  async checkServerHealth(this: ServerApiClientAccess): Promise<ApiResponse<{ status: string; reachable: boolean; latency?: number; version?: string; build?: number; download_dir?: string; ffmpeg_available?: boolean; torrent_client_reachable?: boolean; librqbit_version?: string; flaresolverr_configured?: boolean }>> {
+  async checkServerHealth(this: ServerApiClientAccess): Promise<ApiResponse<{ status: string; reachable: boolean; latency?: number; version?: string; build?: number; download_dir?: string; ffmpeg_available?: boolean; torrent_client_reachable?: boolean; librqbit_version?: string; flaresolverr_configured?: boolean; encoding_hwaccel?: string | null; cuda_decode_available?: boolean; gpu_available?: boolean }>> {
     const startTime = Date.now();
     
     // Unifié : appel direct au backend Rust
@@ -53,6 +54,7 @@ export const healthMethods = {
         }
       }
       
+      resetGpuCapability();
       return {
         success: false,
         error: res.error,
@@ -67,6 +69,11 @@ export const healthMethods = {
     
     // Extraire la version et le build depuis la réponse du backend
     const backendData = res.data || {};
+    setGpuCapability({
+      gpu_available: backendData.gpu_available === true,
+      encoding_hwaccel: backendData.encoding_hwaccel ?? null,
+      cuda_decode_available: backendData.cuda_decode_available === true,
+    });
     
     return {
       success: true,
@@ -81,6 +88,9 @@ export const healthMethods = {
         torrent_client_reachable: backendData.torrent_client_reachable,
         librqbit_version: backendData.librqbit_version,
         flaresolverr_configured: backendData.flaresolverr_configured,
+        encoding_hwaccel: backendData.encoding_hwaccel ?? null,
+        cuda_decode_available: backendData.cuda_decode_available === true,
+        gpu_available: backendData.gpu_available === true,
       },
     };
   },

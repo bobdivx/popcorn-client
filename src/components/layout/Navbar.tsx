@@ -5,6 +5,7 @@ import { serverApi } from '../../lib/client/server-api';
 import { getLocalProfile, onProfileChanged } from '../../lib/client/profile';
 import Avatar from '../ui/Avatar';
 import BackendStatusBadge from './BackendStatusBadge';
+import GpuStatusBadge from './GpuStatusBadge';
 import { DsProgressRing } from '../ui/design-system';
 import { calculateSyncProgress } from '../../lib/utils/sync-progress';
 import {
@@ -304,6 +305,7 @@ export default function Navbar() {
                   </div>
                   <div className="border-t border-[var(--ds-border)] my-1" aria-hidden />
                   <BackendStatusBadge variant="inline" />
+                  <GpuStatusBadge variant="inline" />
                   <div className="border-t border-[var(--ds-border)] my-1" aria-hidden />
                   {tabs.map((tab, index) => {
                     const active = tab.match === 'exact' ? isActive(tab.href) : isActivePrefix(tab.href);
@@ -404,9 +406,10 @@ export default function Navbar() {
                   <Download className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 relative z-10" />
                 </a>
 
-                {/* Statut serveur — lg+ uniquement */}
-                <div className="hidden lg:flex items-center" aria-hidden="true" tabIndex={-1}>
+                {/* Statut serveur + GPU — lg+ uniquement */}
+                <div className="hidden lg:flex items-center gap-1.5" aria-hidden="true" tabIndex={-1}>
                   <BackendStatusBadge />
+                  <GpuStatusBadge />
                 </div>
 
                 {/* Paramètres (lg+) ou hamburger (< lg) */}

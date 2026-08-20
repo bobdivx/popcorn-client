@@ -544,6 +544,8 @@ export function createDemoServerApi(): Record<string, unknown> {
         system_memory_used_mb: number | null;
         gpu_available: boolean;
         hwaccels: string[];
+        encoding_hwaccel?: string | null;
+        cuda_decode_available?: boolean;
       }>
     > {
       return success({
@@ -553,6 +555,8 @@ export function createDemoServerApi(): Record<string, unknown> {
         system_memory_used_mb: 8192,
         gpu_available: false,
         hwaccels: [],
+        encoding_hwaccel: null,
+        cuda_decode_available: false,
       });
     },
 

@@ -205,6 +205,8 @@ export interface SystemResourcesResponse {
   system_memory_used_mb: number | null;
   gpu_available: boolean;
   hwaccels: string[];
+  encoding_hwaccel?: string | null;
+  cuda_decode_available?: boolean;
 }
 
 export interface ServerLogsResponse {

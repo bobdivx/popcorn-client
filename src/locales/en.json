@@ -138,7 +138,15 @@
     "versionClient": "Client",
     "startServer": "Start server",
     "stopServer": "Stop server",
-    "restartServer": "Restart server"
+    "restartServer": "Restart server",
+    "gpuBadgeLabel": "GPU",
+    "gpuBadgeNvenc": "GPU NVENC",
+    "gpuBadgeNvdec": "GPU NVDEC",
+    "gpuBadgeCpu": "CPU",
+    "gpuBadgeTitleNvenc": "NVIDIA GPU detected — NVDEC decode and NVENC encode",
+    "gpuBadgeTitleNvdec": "NVIDIA GPU detected — NVDEC decode, CPU encode (libx264)",
+    "gpuBadgeTitleCpu": "No usable GPU — CPU transcoding",
+    "gpuBadgeTitleGeneric": "Hardware acceleration: {accel}"
   },
   "blacklist": {
     "title": "Blacklist",
@@ -602,7 +610,16 @@
       "ffmpegRunning": "FFmpeg running",
       "ffmpegIdle": "FFmpeg idle",
       "modeRemux": "Remux H.264",
-      "modeTranscode": "Transcode"
+      "modeTranscode": "Transcode",
+      "gpuRemux": "Remux — GPU not needed",
+      "gpuTranscodeNvenc": "GPU transcode (NVENC)",
+      "gpuTranscodeNvdec": "GPU decode (NVDEC) · CPU encode",
+      "gpuTranscodeGeneric": "GPU transcode ({accel})",
+      "gpuTranscodeCpu": "CPU transcode",
+      "gpuWillUseNvenc": "GPU detected — NVENC will be used",
+      "gpuWillUseNvdec": "GPU detected — NVDEC will be used",
+      "gpuWillUseGeneric": "GPU detected — {accel} will be used",
+      "gpuWillUseCpu": "CPU transcode (no GPU)"
     },
     "streamingFallbackToHls": "Switched to HLS playback due to direct stream issue.",
     "errorStream": "Unable to play video. Check server connection.",
@@ -1485,6 +1502,11 @@
         "gpuAcceleration": "Hardware acceleration (FFmpeg)",
         "gpuAvailable": "Available",
         "gpuNotAvailable": "Not available",
+        "gpuDecode": "Decode",
+        "gpuDecodeNvdec": "NVDEC (GPU)",
+        "gpuDecodeCpu": "CPU",
+        "gpuEncode": "Encode",
+        "gpuEncodeCpu": "CPU (libx264)",
         "gpuNotAvailableHint": "In Docker: expose the GPU in the stack. On CasaOS, use the « Popcornn (VAAPI GPU) » (Intel/AMD) or « Popcornn (Nvidia GPU) » variant so acceleration is available.",
         "refresh": "Refresh",
         "unavailableOrOldBackend": "Unable to load resources. If your server has not been updated recently, this feature may be unavailable (endpoint /api/media/resources)."

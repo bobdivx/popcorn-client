@@ -222,6 +222,19 @@ export default function ResourceMonitorDev({ embedded = false }: ResourceMonitor
                   </span>
                 )}
               </div>
+              {(d.encoding_hwaccel !== undefined || d.cuda_decode_available !== undefined) && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {t('settingsMenu.maintenance.resources.gpuDecode')}:{' '}
+                  {d.cuda_decode_available
+                    ? t('settingsMenu.maintenance.resources.gpuDecodeNvdec')
+                    : t('settingsMenu.maintenance.resources.gpuDecodeCpu')}
+                  {' · '}
+                  {t('settingsMenu.maintenance.resources.gpuEncode')}:{' '}
+                  {d.encoding_hwaccel
+                    ? d.encoding_hwaccel
+                    : t('settingsMenu.maintenance.resources.gpuEncodeCpu')}
+                </p>
+              )}
               {!d.gpu_available && (
                 <p className="text-xs text-gray-500 mt-0.5" title={t('settingsMenu.maintenance.resources.gpuNotAvailableHint')}>
                   {t('settingsMenu.maintenance.resources.gpuNotAvailableHint')}

@@ -3,6 +3,7 @@ import { useI18n } from '../../../../lib/i18n/useI18n';
 import { formatBytes, formatSpeed, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
 import { generateQRCode } from '../../../../lib/utils/qrcode';
 import { pipelineHeadline, type PlaybackPipelineStatus } from '../../../../lib/streaming/playbackPipeline';
+import GpuPlaybackChip from './GpuPlaybackChip';
 import {
   PLAYBACK_PHASE_I18N_KEYS,
   derivePlaybackPhase,
@@ -105,7 +106,9 @@ function MediaPoster({
   return (
     <div
       className={`relative shrink-0 overflow-hidden rounded-2xl border border-white/15 shadow-[0_20px_50px_rgba(0,0,0,0.65)] bg-black/50 ${
-        compact ? 'w-24 aspect-[2/3]' : 'w-[8.25rem] sm:w-40 aspect-[2/3]'
+        compact
+          ? 'w-[4.25rem] xs:w-20 sm:w-24 landscape-compact:w-[4.5rem] aspect-[2/3]'
+          : 'w-[6.5rem] sm:w-40 short:w-[5.5rem] landscape-compact:w-20 aspect-[2/3]'
       }`}
     >
       <img
@@ -117,7 +120,7 @@ function MediaPoster({
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/15" />
       <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-2xl" />
       {/* Pastille logo Popcornn sur l’affiche */}
-      <div className="absolute bottom-2 right-2 w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-black/55 border border-white/20 backdrop-blur-md flex items-center justify-center shadow-lg">
+      <div className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 w-6 h-6 sm:w-9 sm:h-9 rounded-lg sm:rounded-xl bg-black/55 border border-white/20 backdrop-blur-md flex items-center justify-center shadow-lg">
         <img src="/popcorn_logo.png" alt="" className="w-[70%] h-[70%] object-contain" />
       </div>
     </div>
@@ -160,13 +163,16 @@ function PipelinePanel({
     bufferedPercent != null && bufferedPercent > 0 && bufferedPercent < 100 ? bufferedPercent : null;
 
   return (
-    <div className="w-full mb-5 space-y-3">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-2.5 text-left">
+    <div className="w-full min-w-0 mb-4 sm:mb-5 space-y-2.5 sm:space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 landscape-compact:grid-cols-2 gap-2 min-w-0">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-2.5 text-left min-w-0">
           <div className="text-[10px] uppercase tracking-[0.16em] text-white/40 font-semibold mb-1">
             {t('playback.hls.serverPipeline')}
           </div>
-          <div className="text-sm text-white/90 mb-1.5">
+          <div className="mb-1.5">
+            <GpuPlaybackChip pipeline={status} />
+          </div>
+          <div className="text-xs sm:text-sm text-white/90 mb-1.5 break-words line-clamp-3">
             {pipelineHeadline(status, t)}
           </div>
           <div className="h-1.5 rounded-full bg-white/10 overflow-hidden mb-1.5">
@@ -175,7 +181,7 @@ function PipelinePanel({
               style={{ width: `${serverPct ?? 12}%` }}
             />
           </div>
-          <div className="text-[11px] text-white/45">
+          <div className="text-[11px] text-white/45 break-words line-clamp-2">
             {status
               ? `${t('playback.hls.segmentsReady', {
                   ready: status.segment_count,
@@ -190,11 +196,11 @@ function PipelinePanel({
               : t('playback.hls.serverPreparing')}
           </div>
         </div>
-        <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-2.5 text-left">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-2.5 text-left min-w-0">
           <div className="text-[10px] uppercase tracking-[0.16em] text-white/40 font-semibold mb-1">
             {t('playback.hls.playerBuffer')}
           </div>
-          <div className="text-sm text-white/90 mb-1.5">
+          <div className="text-xs sm:text-sm text-white/90 mb-1.5 break-words line-clamp-2">
             {playerPct != null
               ? t('playback.bufferingProgress', { percent: Math.round(playerPct) })
               : t('playback.hls.playlistReady')}
@@ -246,7 +252,7 @@ function PipelinePanel({
 
 function MetricCell({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-2.5 backdrop-blur-md">
+    <div className="rounded-2xl border border-white/10 bg-white/[0.05] px-3 py-2.5 backdrop-blur-md min-w-0">
       <div className="text-[10px] uppercase tracking-[0.16em] text-white/40 font-semibold mb-0.5">
         {label}
       </div>
@@ -268,7 +274,7 @@ function ProgressRing({
   const offset = p != null ? c * (1 - p / 100) : c * 0.82;
 
   return (
-    <div className="relative w-[8.5rem] h-[8.5rem] sm:w-40 sm:h-40 mx-auto">
+    <div className="relative w-[5.75rem] h-[5.75rem] xs:w-[7rem] xs:h-[7rem] sm:w-40 sm:h-40 short:w-[5.5rem] short:h-[5.5rem] landscape-compact:w-[5.25rem] landscape-compact:h-[5.25rem] mx-auto shrink-0">
       <div className="absolute inset-2 rounded-full bg-primary-600/15 blur-xl animate-pulse" />
       <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 120 120">
         <circle cx="60" cy="60" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="5" />
@@ -290,15 +296,15 @@ function ProgressRing({
       )}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         {p != null ? (
-          <span className="text-3xl sm:text-4xl font-bold text-white tabular-nums tracking-tight leading-none">
+          <span className="text-2xl sm:text-4xl short:text-xl font-bold text-white tabular-nums tracking-tight leading-none">
             {Math.round(p)}
-            <span className="text-lg text-primary-300">%</span>
+            <span className="text-sm sm:text-lg text-primary-300">%</span>
           </span>
         ) : (
           <img
             src="/popcorn_logo.png"
             alt=""
-            className="w-11 h-11 object-contain opacity-90 drop-shadow-[0_0_10px_rgba(220,38,38,0.4)] animate-pulse"
+            className="w-8 h-8 sm:w-11 sm:h-11 short:w-7 short:h-7 object-contain opacity-90 drop-shadow-[0_0_10px_rgba(220,38,38,0.4)] animate-pulse"
           />
         )}
       </div>
@@ -314,7 +320,7 @@ function StepRail({
   t: (k: string, p?: Record<string, string | number>) => string;
 }) {
   return (
-    <div className="flex gap-2 w-full max-w-sm mx-auto mb-5">
+    <div className="flex gap-1.5 sm:gap-2 w-full max-w-sm mx-auto mb-4 sm:mb-5 min-w-0">
       {STEP_KEYS.map((key, i) => {
         const n = i + 1;
         const done = stepIndex > n;
@@ -524,19 +530,23 @@ export function PlaybackStatusSurface({
 
   const shell = (
     <div
-      className={`relative z-10 w-full ${isPlayer ? 'max-w-md' : 'max-w-xl'} mx-auto px-4 animate-[fade-in_0.4s_ease-out] ${className}`}
+      className={`relative z-10 w-full min-w-0 ${isPlayer ? 'max-w-md' : 'max-w-xl'} mx-auto px-2 xs:px-4 animate-[fade-in_0.4s_ease-out] ${className}`}
     >
-      {/* Brand Popcornn — signal hero */}
-      <div className="flex justify-center mb-5 sm:mb-6">
+      {/* Brand Popcornn — masqué quand la hauteur ne suffit pas */}
+      <div
+        className={`justify-center mb-3 sm:mb-6 short:!hidden landscape-compact:!hidden ${
+          isPlayer ? 'hidden sm:flex' : 'flex'
+        }`}
+      >
         <BrandMark size={isPlayer ? 'sm' : 'lg'} />
       </div>
 
-      <div className="glass-panel deep-glass rounded-[1.85rem] border border-white/12 shadow-[0_24px_80px_rgba(0,0,0,0.55)] overflow-hidden backdrop-blur-xl bg-black/40">
+      <div className="glass-panel deep-glass w-full rounded-[1.35rem] sm:rounded-[1.85rem] border border-white/12 shadow-[0_24px_80px_rgba(0,0,0,0.55)] overflow-hidden backdrop-blur-xl bg-black/40 flex flex-col min-w-0 landscape-compact:flex-row landscape-compact:items-stretch landscape-compact:max-h-[calc(100dvh-1.25rem)]">
         {/* Bandeau affiche + titre */}
-        <div className="relative px-5 sm:px-7 pt-5 sm:pt-6 pb-4 border-b border-white/8">
-          <div className="flex gap-4 sm:gap-5 items-end">
+        <div className="relative shrink-0 px-4 sm:px-7 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b border-white/8 landscape-compact:border-b-0 landscape-compact:border-r landscape-compact:w-[min(17rem,42%)] landscape-compact:flex landscape-compact:flex-col landscape-compact:justify-center">
+          <div className="flex gap-3 sm:gap-5 items-center sm:items-end landscape-compact:flex-col landscape-compact:items-start min-w-0">
             {showPoster ? (
-              <div className="relative -mb-8 sm:-mb-10 z-10">
+              <div className="relative z-10 shrink-0 sm:-mb-10 landscape-compact:!mb-0">
                 <MediaPoster src={artUrl!} title={title} compact={isPlayer} />
                 <img
                   src={artUrl!}
@@ -546,37 +556,44 @@ export function PlaybackStatusSurface({
                 />
               </div>
             ) : null}
-            <div className={`flex-1 min-w-0 pb-1 ${showPoster ? 'pt-1' : ''}`}>
+            <div className={`flex-1 min-w-0 ${showPoster ? 'sm:pb-1 sm:pt-1 landscape-compact:pb-0 landscape-compact:pt-0' : ''}`}>
               {title ? (
-                <h2 className="text-white text-xl sm:text-2xl font-semibold tracking-tight line-clamp-2 drop-shadow-md">
+                <h2 className="text-white text-base xs:text-lg sm:text-2xl font-semibold tracking-tight line-clamp-2 break-words drop-shadow-md">
                   {title}
                 </h2>
               ) : (
-                <h2 className="text-white/80 text-lg font-medium tracking-tight">Popcornn</h2>
+                <h2 className="text-white/80 text-base sm:text-lg font-medium tracking-tight">Popcornn</h2>
               )}
-              <p className="mt-1.5 text-xs sm:text-sm text-white/45 font-medium tracking-wide uppercase">
+              <p className="mt-1 text-[11px] sm:text-sm text-white/45 font-medium tracking-wide uppercase line-clamp-2">
                 {label || t('playback.loadingVideo')}
               </p>
+              <div className="mt-2">
+                <GpuPlaybackChip pipeline={pipelineStatus} />
+              </div>
             </div>
           </div>
         </div>
 
-        <div className={`px-5 sm:px-7 ${showPoster ? 'pt-10 sm:pt-12' : 'pt-5'} pb-6 sm:pb-7`}>
+        <div
+          className={`min-w-0 min-h-0 px-4 sm:px-7 ${
+            showPoster ? 'pt-4 sm:pt-12 landscape-compact:!pt-4' : 'pt-4 sm:pt-5'
+          } pb-4 sm:pb-7 landscape-compact:flex-1 landscape-compact:overflow-y-auto landscape-compact:overscroll-contain`}
+        >
           {showSteps ? <StepRail stepIndex={derived.stepIndex} t={t} /> : null}
 
           {isError ? (
             <div className="flex flex-col items-center text-center">
-              <div className="w-16 h-16 rounded-full border border-red-400/40 bg-red-500/15 flex items-center justify-center mb-4">
-                <span className="text-2xl text-red-300" aria-hidden>
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border border-red-400/40 bg-red-500/15 flex items-center justify-center mb-3 sm:mb-4">
+                <span className="text-xl sm:text-2xl text-red-300" aria-hidden>
                   ×
                 </span>
               </div>
-              <h3 className="text-white text-2xl font-bold mb-2">
+              <h3 className="text-white text-lg sm:text-2xl font-bold mb-2 px-1">
                 {sparseOrEmpty
                   ? t('playback.sparseOrEmptyTitle') || phaseLabel(t, 'error')
                   : phaseLabel(t, 'error')}
               </h3>
-              <p className="text-white/65 text-sm mb-6 max-w-md">
+              <p className="text-white/65 text-xs sm:text-sm mb-4 sm:mb-6 max-w-md break-words line-clamp-4 px-1">
                 {sparseOrEmpty
                   ? t('playback.sparseOrEmptyDetail') ||
                     errorMessage ||
@@ -683,14 +700,16 @@ export function PlaybackStatusSurface({
 
               <h3
                 key={derived.phase}
-                className="text-white text-2xl sm:text-[1.75rem] font-bold text-center tracking-tight mt-4 mb-1 animate-[fade-in_0.3s_ease-out]"
+                className="text-white text-lg sm:text-[1.75rem] font-bold text-center tracking-tight mt-3 sm:mt-4 mb-1 animate-[fade-in_0.3s_ease-out] short:hidden landscape-compact:hidden"
               >
                 {label}
               </h3>
               {progressMessage && progressMessage !== label ? (
-                <p className="text-white/50 text-sm text-center mb-5 font-light">{progressMessage}</p>
+                <p className="text-white/50 text-xs sm:text-sm text-center mb-4 sm:mb-5 font-light break-words line-clamp-3 px-1">
+                  {progressMessage}
+                </p>
               ) : (
-                <div className="mb-5" />
+                <div className="mb-3 sm:mb-5" />
               )}
 
               {derived.phase === 'preparingPlayback' ||
@@ -705,7 +724,7 @@ export function PlaybackStatusSurface({
               ) : null}
 
               {derived.showTorrentMetrics ? (
-                <div className="grid grid-cols-2 gap-2.5 mb-6">
+                <div className="grid grid-cols-2 gap-2 sm:gap-2.5 mb-4 sm:mb-6 min-w-0">
                   <MetricCell
                     label={t('playback.metric.downloaded')}
                     value={
@@ -895,7 +914,7 @@ export function PlaybackStatusSurface({
 
   if (variant === 'player') {
     return (
-      <div className="absolute inset-0 z-30 flex items-center justify-center overflow-hidden">
+      <div className="absolute inset-0 z-30 overflow-x-hidden overflow-y-auto overscroll-contain">
         {backdropUrl ? (
           <>
             <div
@@ -907,14 +926,16 @@ export function PlaybackStatusSurface({
         ) : (
           <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
         )}
-        {shell}
+        <div className="relative z-10 flex min-h-full w-full items-center justify-center pt-[max(0.5rem,var(--safe-area-inset-top))] pr-[max(0.5rem,var(--safe-area-inset-right))] pb-[max(0.5rem,var(--safe-area-inset-bottom))] pl-[max(0.5rem,var(--safe-area-inset-left))]">
+          {shell}
+        </div>
       </div>
     );
   }
 
   // fullscreen — affiche + logo en composition
   return (
-    <div className="player-progress-overlay fixed inset-0 z-50 flex items-center justify-center overflow-hidden">
+    <div className="player-progress-overlay fixed inset-0 z-50 overflow-x-hidden overflow-y-auto overscroll-contain">
       {backdropUrl ? (
         <>
           <div
@@ -941,7 +962,11 @@ export function PlaybackStatusSurface({
           aria-label={t('common.back') || 'Retour'}
           tabIndex={0}
           data-focusable
-          className="absolute top-4 left-4 z-40 inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors backdrop-blur-md"
+          className="fixed z-40 inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors backdrop-blur-md"
+          style={{
+            top: 'max(1rem, var(--safe-area-inset-top))',
+            left: 'max(1rem, var(--safe-area-inset-left))',
+          }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             <path d="M18 6 6 18" />
@@ -956,7 +981,11 @@ export function PlaybackStatusSurface({
           aria-label={t('common.cancel') || 'Annuler'}
           tabIndex={0}
           data-focusable
-          className="absolute top-4 left-4 z-40 inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors backdrop-blur-md"
+          className="fixed z-40 inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors backdrop-blur-md"
+          style={{
+            top: 'max(1rem, var(--safe-area-inset-top))',
+            left: 'max(1rem, var(--safe-area-inset-left))',
+          }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             <path d="M18 6 6 18" />
@@ -965,7 +994,9 @@ export function PlaybackStatusSurface({
         </button>
       ) : null}
 
-      {shell}
+      <div className="relative z-10 flex min-h-full w-full items-center justify-center pt-[max(0.5rem,var(--safe-area-inset-top))] pr-[max(0.5rem,var(--safe-area-inset-right))] pb-[max(0.5rem,var(--safe-area-inset-bottom))] pl-[max(0.5rem,var(--safe-area-inset-left))]">
+        {shell}
+      </div>
     </div>
   );
 }
