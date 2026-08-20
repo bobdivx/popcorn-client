@@ -20,7 +20,7 @@ import {
   shouldFallbackUhdPlayback,
   UHD_FALLBACK_HEIGHT,
 } from '../../../lib/streaming/uhdPlaybackFallback';
-import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
+import { emitPlaybackStep } from '../player-core/observability/playbackEvents';
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
