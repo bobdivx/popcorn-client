@@ -7,7 +7,7 @@ import '../styles/global.css';
   <head>
     <meta charset="UTF-8" />
     <script is:inline>
-      (function(){try{var s=localStorage.getItem('popcorn_client_user_preferences');var t='dark';if(s){var p=JSON.parse(s);t=p.theme||'auto';}if(t==='auto')t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t;}catch(e){}})();
+      (function(){try{var s=localStorage.getItem('popcorn_client_user_preferences');var t='dark';if(s){var p=JSON.parse(s);t=p.theme||'auto';}if(t==='auto'){var h=new Date().getHours();t=(h>=7&&h<20)?'light':'dark';}document.documentElement.dataset.theme=t;}catch(e){}})();
     </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Erreur serveur - Popcorn Torrent" />

@@ -3,6 +3,20 @@ import { DEFAULT_UI_PACK, isUiPackId, type UiPackId } from './packs';
 
 export { UI_PACKS, CLASSIC_PACK, TESLA_PACK, DEFAULT_UI_PACK, getUiPack, isUiPackId } from './packs';
 export type { UiPack, UiPackId } from './packs';
+export {
+  THEME_CHANGED_EVENT,
+  THEME_DAY_START_HOUR,
+  THEME_NIGHT_START_HOUR,
+  applyTheme,
+  cycleThemePreference,
+  isThemePreference,
+  msUntilNextThemeSwitch,
+  readThemePreference,
+  resolveTheme,
+  saveTheme,
+  themeFromTimeOfDay,
+} from './color-scheme';
+export type { ResolvedTheme, ThemePreference } from './color-scheme';
 
 export function readUiPack(): UiPackId {
   const fromPrefs = PreferencesManager.getPreferences().uiPack;

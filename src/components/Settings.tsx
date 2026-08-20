@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../lib/client/server-api';
 import { PreferencesManager } from '../lib/client/storage';
+import { saveTheme } from '../lib/theme';
 
 export default function Settings() {
   const [serverUrl, setServerUrl] = useState('');
@@ -105,10 +106,7 @@ export default function Settings() {
                 checked={preferences.theme !== 'light'}
                 onChange={(e) => {
                   const theme = (e.target as HTMLInputElement).checked ? 'dark' : 'light';
-                  PreferencesManager.updatePreferences({ theme });
-                  if (typeof document !== 'undefined') {
-                    document.documentElement.dataset.theme = theme;
-                  }
+                  saveTheme(theme);
                 }}
               />
             </label>

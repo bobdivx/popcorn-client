@@ -1,9 +1,9 @@
 /**
  * Packs visuels (classic | tesla).
- * Tesla s’applique à toute l’app (header + pages). Classic conserve le sombre violet.
+ * Tesla : accent bleu, clair et sombre. Classic : sombre violet historique.
  */
 
-html[data-ui-pack="tesla"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) {
   --page-bg: #e6e6e8;
   --bg-primary: #e6e6e8;
   --bg-glass: rgba(0, 0, 0, 0.045);
@@ -41,213 +41,213 @@ html[data-ui-pack="tesla"] {
   --erc: 98% 0.01 25;
 }
 
-html[data-ui-pack="tesla"] body {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) body {
   background: #e6e6e8;
   color: #1c1c1c;
 }
 
-html[data-ui-pack="tesla"] .bg-page,
-html[data-ui-pack="tesla"] .app-main .bg-black,
-html[data-ui-pack="tesla"] .min-h-screen.bg-black {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .bg-page,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .app-main .bg-black,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .min-h-screen.bg-black {
   background-color: #e6e6e8 !important;
   color: #1c1c1c;
 }
-html[data-ui-pack="tesla"] .bg-page-gradient {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .bg-page-gradient {
   background: #e6e6e8 !important;
 }
 
-html[data-ui-pack="tesla"] h1,
-html[data-ui-pack="tesla"] h2,
-html[data-ui-pack="tesla"] h3,
-html[data-ui-pack="tesla"] h4 {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) h1,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) h2,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) h3,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) h4 {
   color: #1c1c1c;
 }
 
-html[data-ui-pack="tesla"] [class*="text-white"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [class*="text-white"] {
   color: #1c1c1c;
 }
-html[data-ui-pack="tesla"] [class*="hover:text-white"]:hover {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [class*="hover:text-white"]:hover {
   color: #1c1c1c;
 }
-html[data-ui-pack="tesla"] [class*="text-gray-"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [class*="text-gray-"] {
   color: #52525b;
 }
-html[data-ui-pack="tesla"] [class*="text-primary-"],
-html[data-ui-pack="tesla"] [class*="text-purple-"],
-html[data-ui-pack="tesla"] [class*="text-violet-"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [class*="text-primary-"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [class*="text-purple-"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [class*="text-violet-"] {
   color: #2f58c4;
 }
-html[data-ui-pack="tesla"] [class*="border-white"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [class*="border-white"] {
   border-color: rgba(0, 0, 0, 0.12);
 }
-html[data-ui-pack="tesla"] [class*="bg-white/5"],
-html[data-ui-pack="tesla"] [class*="bg-white/10"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [class*="bg-white/5"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [class*="bg-white/10"] {
   background-color: rgba(0, 0, 0, 0.05);
 }
-html[data-ui-pack="tesla"] [class*="hover:bg-white"]:hover {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [class*="hover:bg-white"]:hover {
   background-color: rgba(0, 0, 0, 0.06);
 }
-html[data-ui-pack="tesla"] .bg-gray-900,
-html[data-ui-pack="tesla"] .bg-gray-800 {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .bg-gray-900,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .bg-gray-800 {
   background-color: #ffffff;
 }
-html[data-ui-pack="tesla"] .glass-panel,
-html[data-ui-pack="tesla"] .glass-panel-lg {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .glass-panel,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .glass-panel-lg {
   background-color: #ffffff;
   border-color: rgba(0, 0, 0, 0.1);
   color: #1c1c1c;
 }
-html[data-ui-pack="tesla"] .bg-base-100,
-html[data-ui-pack="tesla"] .bg-base-200,
-html[data-ui-pack="tesla"] [class*="bg-base-200"],
-html[data-ui-pack="tesla"] [class*="bg-base-300"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .bg-base-100,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .bg-base-200,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [class*="bg-base-200"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [class*="bg-base-300"] {
   background-color: #ffffff !important;
   color: #1c1c1c;
 }
-html[data-ui-pack="tesla"] [class*="text-base-content"],
-html[data-ui-pack="tesla"] .label-text {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [class*="text-base-content"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .label-text {
   color: #1c1c1c !important;
 }
-html[data-ui-pack="tesla"] [class*="border-base-"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [class*="border-base-"] {
   border-color: rgba(0, 0, 0, 0.12) !important;
 }
-html[data-ui-pack="tesla"] .btn-primary {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .btn-primary {
   background-color: #3b6ae1 !important;
   border-color: #3b6ae1 !important;
   color: #fff !important;
 }
-html[data-ui-pack="tesla"] .bg-primary-600,
-html[data-ui-pack="tesla"] .bg-primary-500 {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .bg-primary-600,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .bg-primary-500 {
   background-color: #3b6ae1 !important;
   color: #fff !important;
 }
 
 /* Image / lecture : texte clair conservé */
-html[data-ui-pack="tesla"] [data-dark-context],
-html[data-ui-pack="tesla"] [data-dark-context] h1,
-html[data-ui-pack="tesla"] [data-dark-context] h2,
-html[data-ui-pack="tesla"] [data-dark-context] h3 {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] h1,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] h2,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] h3 {
   color: #fff;
 }
-html[data-ui-pack="tesla"] [data-dark-context] [class*="text-white"],
-html[data-ui-pack="tesla"] [data-dark-context] [class*="text-gray-"],
-html[data-ui-pack="tesla"] .hero-dashboard [class*="text-white"],
-html[data-ui-pack="tesla"] .torrent-poster [class*="text-white"],
-html[data-ui-pack="tesla"] [data-page="player"] [class*="text-white"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] [class*="text-white"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] [class*="text-gray-"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .hero-dashboard [class*="text-white"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .torrent-poster [class*="text-white"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-page="player"] [class*="text-white"] {
   color: #fff !important;
 }
-html[data-ui-pack="tesla"] [data-dark-context] [class*="border-white"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] [class*="border-white"] {
   border-color: rgba(255, 255, 255, 0.22);
 }
-html[data-ui-pack="tesla"] [data-dark-context] .bg-gray-900 {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] .bg-gray-900 {
   background-color: #111 !important;
 }
-html[data-ui-pack="tesla"] [data-dark-context].bg-page,
-html[data-ui-pack="tesla"] [data-page="player"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context].bg-page,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-page="player"] {
   background-color: #000 !important;
   color: #fff !important;
 }
-html[data-ui-pack="tesla"] [data-dark-context] .glass-panel,
-html[data-ui-pack="tesla"] [data-dark-context] .glass-panel-lg {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] .glass-panel,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] .glass-panel-lg {
   background-color: rgba(0, 0, 0, 0.5) !important;
   border-color: rgba(255, 255, 255, 0.2) !important;
   color: #fff !important;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
-html[data-ui-pack="tesla"] [data-dark-context] [class*="text-primary-"],
-html[data-ui-pack="tesla"] [data-dark-context] [class*="text-purple-"],
-html[data-ui-pack="tesla"] [data-dark-context] [class*="text-violet-"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] [class*="text-primary-"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] [class*="text-purple-"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] [class*="text-violet-"] {
   color: #c4b5fd !important;
 }
 /* Fiche média / lecteur uniquement — pas le hero dashboard ni les posters
    (sinon une bande noire apparaît sous le header Tesla gris). */
-html[data-ui-pack="tesla"] .app-main:has([data-dark-context].bg-page),
-html[data-ui-pack="tesla"] .app-main:has([data-page="player"]) {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .app-main:has([data-dark-context].bg-page),
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .app-main:has([data-page="player"]) {
   background: #000 !important;
   padding-bottom: 0;
 }
 
 /* Header Tesla — même gris que la page */
-html[data-ui-pack="tesla"] nav.navbar-tv,
-html[data-ui-pack="tesla"] nav.navbar-tv.navbar-scrolled,
-html[data-ui-pack="tesla"] nav.navbar-scrolled {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav.navbar-tv,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav.navbar-tv.navbar-scrolled,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav.navbar-scrolled {
   background: #e6e6e8 !important;
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   box-shadow: none;
 }
-html[data-ui-pack="tesla"] nav .text-white,
-html[data-ui-pack="tesla"] nav [class*="text-white"],
-html[data-ui-pack="tesla"] nav span.font-extrabold {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .text-white,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav [class*="text-white"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav span.font-extrabold {
   color: #1c1c1c !important;
 }
-html[data-ui-pack="tesla"] nav .nav-tab {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .nav-tab {
   color: #52525b !important;
   background: transparent !important;
   box-shadow: none !important;
 }
-html[data-ui-pack="tesla"] nav .nav-tab:hover {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .nav-tab:hover {
   color: #1c1c1c !important;
   background: rgba(0, 0, 0, 0.05) !important;
 }
-html[data-ui-pack="tesla"] nav .nav-tab-active {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .nav-tab-active {
   color: #1c1c1c !important;
   background: #ffffff !important;
   font-weight: 650;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
-  border-radius: 10px;
+  border-radius: 9999px;
 }
-html[data-ui-pack="tesla"] .nav-status-cluster {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .nav-status-cluster {
   border-color: rgba(0, 0, 0, 0.1);
   background: #ffffff;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
-html[data-ui-pack="tesla"] .nav-status-cluster > * + * {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .nav-status-cluster > * + * {
   border-left-color: rgba(0, 0, 0, 0.08);
 }
-html[data-ui-pack="tesla"] nav .nav-tab-active::after {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .nav-tab-active::after {
   display: none !important;
 }
-html[data-ui-pack="tesla"] nav .gtv-icon-btn {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .gtv-icon-btn {
   color: #1c1c1c !important;
   background: #ffffff !important;
   border: 1px solid rgba(0, 0, 0, 0.08);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 }
-html[data-ui-pack="tesla"] nav .gtv-icon-btn:hover:not(:disabled) {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .gtv-icon-btn:hover:not(:disabled) {
   color: #1c1c1c !important;
   background: #f3f3f5 !important;
   transform: none;
 }
-html[data-ui-pack="tesla"] nav .gtv-icon-btn.bg-glass-active,
-html[data-ui-pack="tesla"] nav .gtv-icon-btn.bg-primary-600 {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .gtv-icon-btn.bg-glass-active,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .gtv-icon-btn.bg-primary-600 {
   background: #3b6ae1 !important;
   color: #fff !important;
   border-color: transparent;
 }
-html[data-ui-pack="tesla"] nav .gtv-pill-btn {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .gtv-pill-btn {
   color: #1c1c1c !important;
   background: #ffffff !important;
   border: 1px solid rgba(0, 0, 0, 0.1) !important;
 }
-html[data-ui-pack="tesla"] nav .gtv-pill-btn-primary,
-html[data-ui-pack="tesla"] nav .gtv-pill-btn.gtv-pill-btn-primary {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .gtv-pill-btn-primary,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .gtv-pill-btn.gtv-pill-btn-primary {
   background: #3b6ae1 !important;
   color: #fff !important;
   border-color: transparent !important;
 }
-html[data-ui-pack="tesla"] nav .tabular-nums {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .tabular-nums {
   color: #52525b !important;
 }
-html[data-ui-pack="tesla"] nav select {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav select {
   background: #ffffff !important;
   border-color: rgba(0, 0, 0, 0.12) !important;
   color: #1c1c1c !important;
 }
-html[data-ui-pack="tesla"] .dropdown-menu-mobile,
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .dropdown-menu-mobile,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .dropdown-menu-mobile {
   background: #ffffff !important;
   border: 1px solid rgba(0, 0, 0, 0.1) !important;
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.14) !important;
@@ -255,30 +255,30 @@ html[data-ui-pack="tesla"] nav .dropdown-menu-mobile {
   -webkit-backdrop-filter: none !important;
   color: #1c1c1c !important;
 }
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile,
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile a,
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile p,
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile span,
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile label,
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile [class*="text-white"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .dropdown-menu-mobile,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .dropdown-menu-mobile a,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .dropdown-menu-mobile p,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .dropdown-menu-mobile span,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .dropdown-menu-mobile label,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .dropdown-menu-mobile [class*="text-white"] {
   color: #1c1c1c !important;
 }
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile a.bg-primary-600,
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile a.bg-primary-600 span,
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile a.bg-primary-600 [class*="text-white"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .dropdown-menu-mobile a.bg-primary-600,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .dropdown-menu-mobile a.bg-primary-600 span,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .dropdown-menu-mobile a.bg-primary-600 [class*="text-white"] {
   background: #3b6ae1 !important;
   color: #fff !important;
 }
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile a:hover:not(.bg-primary-600),
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile [class*="hover:bg-white"]:hover {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .dropdown-menu-mobile a:hover:not(.bg-primary-600),
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .dropdown-menu-mobile [class*="hover:bg-white"]:hover {
   background: rgba(0, 0, 0, 0.05) !important;
 }
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile .border-t,
-html[data-ui-pack="tesla"] nav .dropdown-menu-mobile [class*="border-white"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .dropdown-menu-mobile .border-t,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) nav .dropdown-menu-mobile [class*="border-white"] {
   border-color: rgba(0, 0, 0, 0.1) !important;
 }
-html[data-ui-pack="tesla"] .ds-popover,
-html[data-ui-pack="tesla"] .ds-toast {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-popover,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-toast {
   background: #ffffff;
   border-color: rgba(0, 0, 0, 0.1);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.14);
@@ -286,10 +286,10 @@ html[data-ui-pack="tesla"] .ds-toast {
 }
 
 /* ── Modales Tesla ── */
-html[data-ui-pack="tesla"] [role="dialog"] > .bg-black\/80 {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) [role="dialog"] > .bg-black\/80 {
   background-color: rgba(0, 0, 0, 0.4) !important;
 }
-html[data-ui-pack="tesla"] .ds-modal-glass {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass {
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.1);
   backdrop-filter: none;
@@ -298,54 +298,54 @@ html[data-ui-pack="tesla"] .ds-modal-glass {
   color: #1c1c1c;
 }
 @media (max-width: 639px) {
-  html[data-ui-pack="tesla"] .ds-modal-glass {
+  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass {
     border: none;
     box-shadow: none;
     border-radius: 0;
   }
 }
-html[data-ui-pack="tesla"] .ds-modal-glass .ds-card-bar,
-html[data-ui-pack="tesla"] .ds-modal-glass .ds-card-bar-static {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass .ds-card-bar,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass .ds-card-bar-static {
   height: 3px;
   background: #3b6ae1;
   background-size: auto;
   animation: none;
 }
-html[data-ui-pack="tesla"] .ds-modal-glass [class*="bg-black"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass [class*="bg-black"] {
   background-color: #f4f4f5 !important;
 }
-html[data-ui-pack="tesla"] .ds-modal-glass [class*="bg-white/"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass [class*="bg-white/"] {
   background-color: rgba(0, 0, 0, 0.04);
 }
-html[data-ui-pack="tesla"] .ds-modal-glass [class*="hover:bg-white"]:hover {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass [class*="hover:bg-white"]:hover {
   background-color: rgba(0, 0, 0, 0.06);
 }
-html[data-ui-pack="tesla"] .ds-modal-glass input,
-html[data-ui-pack="tesla"] .ds-modal-glass select,
-html[data-ui-pack="tesla"] .ds-modal-glass textarea {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass input,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass select,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass textarea {
   background: #ffffff !important;
   color: #1c1c1c !important;
   border-color: rgba(0, 0, 0, 0.14) !important;
 }
-html[data-ui-pack="tesla"] .ds-modal-glass input::placeholder,
-html[data-ui-pack="tesla"] .ds-modal-glass textarea::placeholder {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass input::placeholder,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass textarea::placeholder {
   color: #71717a;
 }
-html[data-ui-pack="tesla"] .ds-modal-glass option {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass option {
   background: #ffffff;
   color: #1c1c1c;
 }
-html[data-ui-pack="tesla"] .ds-modal-glass [class*="bg-[var(--ds-accent"],
-html[data-ui-pack="tesla"] .ds-modal-glass .ds-btn-accent {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass [class*="bg-[var(--ds-accent"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass .ds-btn-accent {
   color: #ffffff !important;
 }
-html[data-ui-pack="tesla"] .ds-modal-glass .text-red-300,
-html[data-ui-pack="tesla"] .ds-modal-glass .text-red-400 {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass .text-red-300,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-modal-glass .text-red-400 {
   color: #b91c1c !important;
 }
 
-/* ── Réglages Tesla (Safety) : clair, même si le reste de l’app est sombre ── */
-html[data-ui-pack="tesla"] .settings-page {
+/* ── Réglages Tesla (Safety) : clair ── */
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page {
   --ds-surface: #e6e6e8;
   --ds-surface-elevated: #ffffff;
   --ds-surface-overlay: rgba(0, 0, 0, 0.12);
@@ -365,55 +365,55 @@ html[data-ui-pack="tesla"] .settings-page {
   color-scheme: light;
 }
 
-html[data-ui-pack="tesla"] .settings-page .ds-title-page,
-html[data-ui-pack="tesla"] .settings-page .sc-page-title {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .ds-title-page,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-page-title {
   color: #1c1c1c;
   font-weight: 650;
   letter-spacing: -0.03em;
 }
-html[data-ui-pack="tesla"] .settings-page .sc-page-subtitle,
-html[data-ui-pack="tesla"] .settings-page .ds-text-secondary {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-page-subtitle,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .ds-text-secondary {
   color: #6d6d6d;
 }
 
-html[data-ui-pack="tesla"] .settings-page [class*="text-white"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page [class*="text-white"] {
   color: #1c1c1c;
 }
-html[data-ui-pack="tesla"] .settings-page [class*="text-gray-"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page [class*="text-gray-"] {
   color: #52525b;
 }
-html[data-ui-pack="tesla"] .settings-page [class*="text-primary-"],
-html[data-ui-pack="tesla"] .settings-page [class*="text-purple-"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page [class*="text-primary-"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page [class*="text-purple-"] {
   color: #2f58c4;
 }
-html[data-ui-pack="tesla"] .settings-page [class*="text-green-"],
-html[data-ui-pack="tesla"] .settings-page [class*="text-emerald-"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page [class*="text-green-"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page [class*="text-emerald-"] {
   color: #15803d;
 }
-html[data-ui-pack="tesla"] .settings-page [class*="text-amber-"],
-html[data-ui-pack="tesla"] .settings-page [class*="text-yellow-"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page [class*="text-amber-"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page [class*="text-yellow-"] {
   color: #b45309;
 }
-html[data-ui-pack="tesla"] .settings-page [class*="text-red-"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page [class*="text-red-"] {
   color: #b91c1c;
 }
-html[data-ui-pack="tesla"] .settings-page [class*="border-white"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page [class*="border-white"] {
   border-color: rgba(0, 0, 0, 0.12);
 }
-html[data-ui-pack="tesla"] .settings-page [class*="bg-white/5"],
-html[data-ui-pack="tesla"] .settings-page [class*="bg-white/10"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page [class*="bg-white/5"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page [class*="bg-white/10"] {
   background-color: rgba(0, 0, 0, 0.05);
 }
-html[data-ui-pack="tesla"] .settings-page [class*="hover:bg-white"]:hover {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page [class*="hover:bg-white"]:hover {
   background-color: rgba(0, 0, 0, 0.06);
 }
-html[data-ui-pack="tesla"] .settings-page [class*="text-on-accent"],
-html[data-ui-pack="tesla"] .settings-page [class*="bg-[var(--ds-accent"] [class*="text-white"] {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page [class*="text-on-accent"],
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page [class*="bg-[var(--ds-accent"] [class*="text-white"] {
   color: #fff;
 }
 
 /* Badges lisibles sur fond clair */
-html[data-ui-pack="tesla"] .settings-page .sc-status-badge {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-status-badge {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -427,56 +427,56 @@ html[data-ui-pack="tesla"] .settings-page .sc-status-badge {
   line-height: 1.4;
   white-space: normal;
 }
-html[data-ui-pack="tesla"] .settings-page .sc-status-badge--success {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-status-badge--success {
   background: #dcfce7;
   color: #14532d;
 }
-html[data-ui-pack="tesla"] .settings-page .sc-status-badge--warning {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-status-badge--warning {
   background: #fef3c7;
   color: #92400e;
 }
-html[data-ui-pack="tesla"] .settings-page .sc-status-badge--error {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-status-badge--error {
   background: #fee2e2;
   color: #991b1b;
 }
-html[data-ui-pack="tesla"] .settings-page .sc-status-badge--neutral {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-status-badge--neutral {
   background: rgba(0, 0, 0, 0.06);
   color: #3f3f46;
 }
-html[data-ui-pack="tesla"] .settings-page .sc-nav-badge--subscription {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-badge--subscription {
   background: #fef3c7;
   color: #92400e;
 }
-html[data-ui-pack="tesla"] .settings-page .sc-nav-badge--warning {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-badge--warning {
   background: #fee2e2;
   color: #991b1b;
 }
-html[data-ui-pack="tesla"] .settings-page .sc-nav-badge--beta {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-badge--beta {
   background: #dbeafe;
   color: #1e40af;
 }
-html[data-ui-pack="tesla"] .settings-page .ds-status-badge--success {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .ds-status-badge--success {
   background: #dcfce7;
   color: #14532d;
 }
-html[data-ui-pack="tesla"] .settings-page .ds-status-badge--warning {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .ds-status-badge--warning {
   background: #fef3c7;
   color: #92400e;
 }
-html[data-ui-pack="tesla"] .settings-page .ds-status-badge--error {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .ds-status-badge--error {
   background: #fee2e2;
   color: #991b1b;
 }
-html[data-ui-pack="tesla"] .settings-page .ds-status-badge--neutral {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .ds-status-badge--neutral {
   background: rgba(0, 0, 0, 0.06);
   color: #3f3f46;
 }
-html[data-ui-pack="tesla"] .settings-page .loading {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .loading {
   color: #3b6ae1;
 }
 
 /* Cartes réglages : plus de glass violet, sections plates */
-html[data-ui-pack="tesla"] .settings-page .sc-frame {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame {
   background: transparent;
   border: 0;
   border-radius: 0;
@@ -485,14 +485,778 @@ html[data-ui-pack="tesla"] .settings-page .sc-frame {
   -webkit-backdrop-filter: none;
   contain: layout style;
 }
-html[data-ui-pack="tesla"] .settings-page .sc-frame::before {
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame::before {
   display: none;
 }
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame--amber,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame--nested {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame-header {
+  align-items: flex-start;
+  padding: 8px 0 4px;
+  border-bottom: 0;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame-title {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame-desc {
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: #6d6d6d;
+  margin-top: 6px;
+  max-width: 58%;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame-body {
+  padding: 8px 0 18px;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame-icon,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame-icon--amber {
+  background: #d2d2d6;
+  color: #1c1c1c;
+  box-shadow: none;
+  border-radius: 10px;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-stack {
+  gap: 8px;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame + .sc-frame {
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  margin-top: 10px;
+  padding-top: 18px;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-back {
+  color: #3b6ae1;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-back:hover {
+  color: #2f58c4;
+  background: rgba(59, 106, 225, 0.08);
+}
+
+/* Nav cards : rangées Tesla (icône | texte | chevron) */
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-card {
+  background: #ffffff;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  backdrop-filter: none;
+  min-height: 76px;
+  padding: 14px 16px;
+  transform: none;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "icon copy chevron";
+  align-items: center;
+  gap: 12px;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-card--block {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  min-height: 0;
+  grid-template-areas: none;
+  grid-template-columns: none;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-card::before,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-card::after {
+  display: none;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-link:hover .sc-nav-card,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-btn:hover .sc-nav-card {
+  background: #f3f3f5;
+  transform: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  border-color: transparent;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-icon,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-icon--violet,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-icon--green,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-icon--yellow,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-icon--red {
+  width: 36px;
+  height: 36px;
+  background: #ececee;
+  box-shadow: none;
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-copy {
+  min-width: 0;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-title {
+  margin-top: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1c1c1c;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-desc {
+  color: #52525b;
+  font-size: 13px;
+  -webkit-line-clamp: 3;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-open {
+  display: none;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-footer {
+  margin-top: 6px;
+  padding-top: 0;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-chevron {
+  color: #71717a;
+  align-self: center;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-link:hover .sc-nav-chevron,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-btn:hover .sc-nav-chevron {
+  color: #1c1c1c;
+  transform: none;
+}
+
+/* Boutons type Tesla (gros, gris) */
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame-body button:not(.sn-item):not(.sc-nav-btn):not(.sc-back),
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame-body a.btn,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page button.px-4 {
+  border-radius: 12px;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page input,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page select,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page textarea {
+  background: #fff;
+  color: #1c1c1c;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page input::placeholder,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page textarea::placeholder {
+  color: #71717a;
+}
+
+/* Interrupteur Tesla */
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .ds-switch {
+  position: relative;
+  display: inline-block;
+  width: 51px;
+  height: 31px;
+  flex-shrink: 0;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .ds-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .ds-switch-slider {
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  background: #c8c8cc;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .ds-switch-slider::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.18s ease;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .ds-switch input:checked + .ds-switch-slider {
+  background: #3b6ae1;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .ds-switch input:checked + .ds-switch-slider::after {
+  transform: translateX(20px);
+}
+
+/* Sidebar Tesla */
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-sidebar {
+  background: #e6e6e8;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-sidebar::before,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-sidebar::after {
+  display: none;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-item {
+  border: 0;
+  border-radius: 14px;
+  min-height: 46px;
+  padding: 10px 12px;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-item:hover:not(.sn-item--active) {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: transparent;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-item--active {
+  background: #fff;
+  border-color: transparent;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-icon--active,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-icon--inactive {
+  background: transparent;
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-item:hover .sn-icon--inactive {
+  background: transparent;
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-label {
+  font-size: 16px;
+  font-weight: 400;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-label--active,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-label--inactive {
+  color: #1c1c1c;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-dot {
+  display: none;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-overlay {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-mobile-menu-trigger-host button {
+  background: #fff;
+  color: #1c1c1c;
+  border-color: rgba(0, 0, 0, 0.1);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+/* Mobile / tablette : cartes pleine largeur, titres non coupés */
+@media (max-width: 767px) {
+  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame-desc {
+    max-width: 100%;
+  }
+  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-nav-card {
+    min-height: 64px;
+  }
+  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame-title {
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 1023px) and (min-width: 768px) {
+  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page .sc-frame-desc {
+    max-width: 72%;
+  }
+}
+
+/* ── Chargement Tesla : splash clair, accent bleu, sans carte C411 ── */
+@keyframes tesla-indeterminate {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(380%); }
+}
+
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) #popcorn-loading-fallback {
+  background: #e6e6e8 !important;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) #popcorn-loading-fallback .bg-page-gradient,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) #popcorn-loading-fallback .bg-page-grid,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) #popcorn-loading-fallback .bg-page-orbs {
+  display: none;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) #popcorn-loading-fallback .pl-boot-dots {
+  display: none;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) #popcorn-loading-fallback .ds-loader--block {
+  margin-bottom: 1rem;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) #popcorn-loading-fallback .ds-loader-logo {
+  filter: none;
+  opacity: 1;
+}
+
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-card-loading-glow,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-card-loading-bar {
+  display: none;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-card-loading {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  max-height: none;
+  overflow: visible;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-card-loading-content {
+  padding: 0;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-loading-title {
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  color: #1c1c1c !important;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-loading-description,
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-loading-description-subtle {
+  color: #6d6d6d;
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-progress-container {
+  height: 3px;
+  background: #d2d2d6;
+  max-width: 12rem;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-progress-bar {
+  inset: 0 auto 0 0;
+  width: 38%;
+  background: #3b6ae1;
+  background-size: auto;
+  animation: tesla-indeterminate 1.15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-progress-wave {
+  display: none;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-loading-info-box {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-loading-info-box-content {
+  color: #52525b;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .loading-icon-logo {
+  filter: none !important;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .pl-boot-hint {
+  color: #6d6d6d;
+}
+html[data-ui-pack="tesla"]:not([data-theme="dark"]) .pl-boot-error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+/* ── Tesla sombre : même langage visuel (accent bleu, surfaces plates), fond charbon ── */
+html[data-ui-pack="tesla"][data-theme="dark"] {
+  --page-bg: #111113;
+  --bg-primary: #111113;
+  --bg-glass: rgba(255, 255, 255, 0.06);
+  --bg-glass-hover: rgba(255, 255, 255, 0.1);
+  --bg-glass-active: rgba(255, 255, 255, 0.14);
+  --neon-violet: #3b6ae1;
+  --neon-violet-glow: rgba(59, 106, 225, 0.5);
+  --ds-surface: #111113;
+  --ds-surface-elevated: #1c1c1f;
+  --ds-surface-overlay: rgba(255, 255, 255, 0.08);
+  --ds-accent-violet: #3b6ae1;
+  --ds-accent-violet-muted: rgba(59, 106, 225, 0.2);
+  --ds-accent-green: #4ade80;
+  --ds-accent-yellow: #fbbf24;
+  --ds-accent-red: #f87171;
+  --ds-text-primary: #f4f4f5;
+  --ds-text-secondary: #a1a1aa;
+  --ds-text-tertiary: #71717a;
+  --ds-text-on-accent: #ffffff;
+  --ds-border: rgba(255, 255, 255, 0.1);
+  --ds-border-strong: rgba(255, 255, 255, 0.18);
+  color-scheme: dark;
+  --p: 49% 0.14 264;
+  --pc: 100% 0 0;
+  --b1: 12% 0.004 280;
+  --b2: 16% 0.004 280;
+  --b3: 20% 0.004 280;
+  --bc: 98% 0 0;
+  --n: 16% 0.004 280;
+  --nc: 98% 0 0;
+  --su: 65% 0.16 145;
+  --suc: 12% 0.02 145;
+  --er: 58% 0.2 27;
+  --erc: 98% 0.01 25;
+}
+
+html[data-ui-pack="tesla"][data-theme="dark"] body {
+  background: #111113;
+  color: #f4f4f5;
+}
+
+html[data-ui-pack="tesla"][data-theme="dark"] .bg-page,
+html[data-ui-pack="tesla"][data-theme="dark"] .app-main .bg-black,
+html[data-ui-pack="tesla"][data-theme="dark"] .min-h-screen.bg-black {
+  background-color: #111113 !important;
+  color: #f4f4f5;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .bg-page-gradient {
+  background: #111113 !important;
+}
+
+html[data-ui-pack="tesla"][data-theme="dark"] h1,
+html[data-ui-pack="tesla"][data-theme="dark"] h2,
+html[data-ui-pack="tesla"][data-theme="dark"] h3,
+html[data-ui-pack="tesla"][data-theme="dark"] h4 {
+  color: #f4f4f5;
+}
+
+html[data-ui-pack="tesla"][data-theme="dark"] [class*="text-primary-"],
+html[data-ui-pack="tesla"][data-theme="dark"] [class*="text-purple-"],
+html[data-ui-pack="tesla"][data-theme="dark"] [class*="text-violet-"] {
+  color: #7b9ef0;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .bg-gray-900,
+html[data-ui-pack="tesla"][data-theme="dark"] .bg-gray-800 {
+  background-color: #1c1c1f;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .glass-panel,
+html[data-ui-pack="tesla"][data-theme="dark"] .glass-panel-lg {
+  background-color: #1c1c1f;
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #f4f4f5;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .bg-base-100,
+html[data-ui-pack="tesla"][data-theme="dark"] .bg-base-200,
+html[data-ui-pack="tesla"][data-theme="dark"] [class*="bg-base-200"],
+html[data-ui-pack="tesla"][data-theme="dark"] [class*="bg-base-300"] {
+  background-color: #1c1c1f !important;
+  color: #f4f4f5;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] [class*="text-base-content"],
+html[data-ui-pack="tesla"][data-theme="dark"] .label-text {
+  color: #f4f4f5 !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] [class*="border-base-"] {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .btn-primary,
+html[data-ui-pack="tesla"][data-theme="dark"] .bg-primary-600,
+html[data-ui-pack="tesla"][data-theme="dark"] .bg-primary-500 {
+  background-color: #3b6ae1 !important;
+  border-color: #3b6ae1 !important;
+  color: #fff !important;
+}
+
+html[data-ui-pack="tesla"][data-theme="dark"] [data-dark-context],
+html[data-ui-pack="tesla"][data-theme="dark"] [data-page="player"] {
+  color: #fff;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] [data-dark-context].bg-page,
+html[data-ui-pack="tesla"][data-theme="dark"] [data-page="player"] {
+  background-color: #000 !important;
+  color: #fff !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .app-main:has([data-dark-context].bg-page),
+html[data-ui-pack="tesla"][data-theme="dark"] .app-main:has([data-page="player"]) {
+  background: #000 !important;
+  padding-bottom: 0;
+}
+
+html[data-ui-pack="tesla"][data-theme="dark"] nav.navbar-tv,
+html[data-ui-pack="tesla"][data-theme="dark"] nav.navbar-tv.navbar-scrolled,
+html[data-ui-pack="tesla"][data-theme="dark"] nav.navbar-scrolled {
+  background: #111113 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav .text-white,
+html[data-ui-pack="tesla"][data-theme="dark"] nav [class*="text-white"],
+html[data-ui-pack="tesla"][data-theme="dark"] nav span.font-extrabold {
+  color: #f4f4f5 !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav .nav-tab {
+  color: #a1a1aa !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav .nav-tab:hover {
+  color: #f4f4f5 !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav .nav-tab-active {
+  color: #f4f4f5 !important;
+  background: #1c1c1f !important;
+  font-weight: 650;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45) !important;
+  border-radius: 9999px;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav .nav-tab-active::after {
+  display: none !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .nav-status-cluster {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: #1c1c1f;
+  box-shadow: none;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .nav-status-cluster > * + * {
+  border-left-color: rgba(255, 255, 255, 0.08);
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav .gtv-icon-btn {
+  color: #f4f4f5 !important;
+  background: #1c1c1f !important;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav .gtv-icon-btn:hover:not(:disabled) {
+  color: #fff !important;
+  background: #27272a !important;
+  transform: none;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav .gtv-icon-btn.bg-glass-active,
+html[data-ui-pack="tesla"][data-theme="dark"] nav .gtv-icon-btn.bg-primary-600 {
+  background: #3b6ae1 !important;
+  color: #fff !important;
+  border-color: transparent;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav .gtv-pill-btn {
+  color: #f4f4f5 !important;
+  background: #1c1c1f !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav .gtv-pill-btn-primary,
+html[data-ui-pack="tesla"][data-theme="dark"] nav .gtv-pill-btn.gtv-pill-btn-primary {
+  background: #3b6ae1 !important;
+  color: #fff !important;
+  border-color: transparent !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav .tabular-nums {
+  color: #a1a1aa !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav select {
+  background: #1c1c1f !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  color: #f4f4f5 !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .dropdown-menu-mobile,
+html[data-ui-pack="tesla"][data-theme="dark"] nav .dropdown-menu-mobile {
+  background: #1c1c1f !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: #f4f4f5 !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav .dropdown-menu-mobile a,
+html[data-ui-pack="tesla"][data-theme="dark"] nav .dropdown-menu-mobile p,
+html[data-ui-pack="tesla"][data-theme="dark"] nav .dropdown-menu-mobile span,
+html[data-ui-pack="tesla"][data-theme="dark"] nav .dropdown-menu-mobile label {
+  color: #f4f4f5 !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav .dropdown-menu-mobile a.bg-primary-600,
+html[data-ui-pack="tesla"][data-theme="dark"] nav .dropdown-menu-mobile a.bg-primary-600 span {
+  background: #3b6ae1 !important;
+  color: #fff !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav .dropdown-menu-mobile a:hover:not(.bg-primary-600) {
+  background: rgba(255, 255, 255, 0.06) !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] nav .dropdown-menu-mobile .border-t {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .ds-popover,
+html[data-ui-pack="tesla"][data-theme="dark"] .ds-toast {
+  background: #1c1c1f;
+  border-color: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  color: #f4f4f5;
+}
+
+html[data-ui-pack="tesla"][data-theme="dark"] [role="dialog"] > .bg-black\/80 {
+  background-color: rgba(0, 0, 0, 0.65) !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .ds-modal-glass {
+  background: #1c1c1f;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55);
+  color: #f4f4f5;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .ds-modal-glass .ds-card-bar,
+html[data-ui-pack="tesla"][data-theme="dark"] .ds-modal-glass .ds-card-bar-static {
+  height: 3px;
+  background: #3b6ae1;
+  animation: none;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .ds-modal-glass input,
+html[data-ui-pack="tesla"][data-theme="dark"] .ds-modal-glass select,
+html[data-ui-pack="tesla"][data-theme="dark"] .ds-modal-glass textarea {
+  background: #111113 !important;
+  color: #f4f4f5 !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+}
+
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page {
+  --ds-surface: #111113;
+  --ds-surface-elevated: #1c1c1f;
+  --ds-surface-overlay: rgba(255, 255, 255, 0.08);
+  --ds-accent-violet: #3b6ae1;
+  --ds-accent-violet-muted: rgba(59, 106, 225, 0.2);
+  --ds-text-primary: #f4f4f5;
+  --ds-text-secondary: #a1a1aa;
+  --ds-text-tertiary: #71717a;
+  --ds-text-on-accent: #ffffff;
+  --ds-border: rgba(255, 255, 255, 0.1);
+  --ds-border-strong: rgba(255, 255, 255, 0.18);
+  background: #111113;
+  color: #f4f4f5;
+  color-scheme: dark;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .ds-title-page,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-page-title,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-frame-title {
+  color: #f4f4f5;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-page-subtitle,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .ds-text-secondary,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-frame-desc {
+  color: #a1a1aa;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-frame + .sc-frame {
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-frame-icon,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-frame-icon--amber {
+  background: #27272a;
+  color: #f4f4f5;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-back {
+  color: #7b9ef0;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-back:hover {
+  color: #a5bff5;
+  background: rgba(59, 106, 225, 0.16);
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-card {
+  background: #1c1c1f;
+  box-shadow: none;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-link:hover .sc-nav-card,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-btn:hover .sc-nav-card {
+  background: #27272a;
+  box-shadow: none;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-icon,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-icon--violet,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-icon--green,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-icon--yellow,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-icon--red {
+  background: #27272a;
+  color: #f4f4f5;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-title {
+  color: #f4f4f5;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-desc,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-chevron {
+  color: #a1a1aa;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-link:hover .sc-nav-chevron,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-btn:hover .sc-nav-chevron {
+  color: #f4f4f5;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page input,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page select,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page textarea {
+  background: #1c1c1f;
+  color: #f4f4f5;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .ds-switch-slider {
+  background: #3f3f46;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .ds-switch-slider::after {
+  background: #f4f4f5;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .ds-switch input:checked + .ds-switch-slider {
+  background: #3b6ae1;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-status-badge--success,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .ds-status-badge--success {
+  background: rgba(22, 101, 52, 0.35);
+  color: #bbf7d0;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-status-badge--warning,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .ds-status-badge--warning,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-badge--subscription {
+  background: rgba(146, 64, 14, 0.35);
+  color: #fde68a;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-status-badge--error,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .ds-status-badge--error,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-badge--warning {
+  background: rgba(153, 27, 27, 0.4);
+  color: #fecaca;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-status-badge--neutral,
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .ds-status-badge--neutral {
+  background: rgba(255, 255, 255, 0.08);
+  color: #d4d4d8;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .sc-nav-badge--beta {
+  background: rgba(30, 64, 175, 0.4);
+  color: #bfdbfe;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-page .loading {
+  color: #3b6ae1;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .settings-mobile-menu-trigger-host button {
+  background: #1c1c1f;
+  color: #f4f4f5;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+html[data-ui-pack="tesla"][data-theme="dark"] #popcorn-loading-fallback {
+  background: #111113 !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .ds-loading-title {
+  color: #f4f4f5 !important;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .ds-loading-description,
+html[data-ui-pack="tesla"][data-theme="dark"] .ds-loading-description-subtle,
+html[data-ui-pack="tesla"][data-theme="dark"] .pl-boot-hint {
+  color: #a1a1aa;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .ds-progress-container {
+  background: #27272a;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .ds-progress-bar {
+  background: #3b6ae1;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .ds-loading-info-box {
+  background: #1c1c1f;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .ds-loading-info-box-content {
+  color: #a1a1aa;
+}
+html[data-ui-pack="tesla"][data-theme="dark"] .pl-boot-error {
+  background: rgba(153, 27, 27, 0.35);
+  color: #fecaca;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+}
+
+/* Tesla : structure réglages partagée (indépendante du clair/sombre) */
+html[data-ui-pack="tesla"] .settings-page .sc-frame,
 html[data-ui-pack="tesla"] .settings-page .sc-frame--amber,
 html[data-ui-pack="tesla"] .settings-page .sc-frame--nested {
   background: transparent;
   border: 0;
+  border-radius: 0;
   box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-ui-pack="tesla"] .settings-page .sc-frame::before,
+html[data-ui-pack="tesla"] .settings-page .sc-nav-card::before,
+html[data-ui-pack="tesla"] .settings-page .sc-nav-card::after {
+  display: none;
 }
 html[data-ui-pack="tesla"] .settings-page .sc-frame-header {
   align-items: flex-start;
@@ -503,47 +1267,28 @@ html[data-ui-pack="tesla"] .settings-page .sc-frame-title {
   font-size: 22px;
   font-weight: 650;
   letter-spacing: -0.02em;
-  color: #1c1c1c;
 }
 html[data-ui-pack="tesla"] .settings-page .sc-frame-desc {
   font-size: 14.5px;
   line-height: 1.45;
-  color: #6d6d6d;
   margin-top: 6px;
   max-width: 58%;
 }
 html[data-ui-pack="tesla"] .settings-page .sc-frame-body {
   padding: 8px 0 18px;
 }
-html[data-ui-pack="tesla"] .settings-page .sc-frame-icon,
-html[data-ui-pack="tesla"] .settings-page .sc-frame-icon--amber {
-  background: #d2d2d6;
-  color: #1c1c1c;
-  box-shadow: none;
-  border-radius: 10px;
-}
 html[data-ui-pack="tesla"] .settings-page .sc-stack {
   gap: 8px;
 }
 html[data-ui-pack="tesla"] .settings-page .sc-frame + .sc-frame {
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
   margin-top: 10px;
   padding-top: 18px;
+  border-top-width: 1px;
+  border-top-style: solid;
 }
-html[data-ui-pack="tesla"] .settings-page .sc-back {
-  color: #3b6ae1;
-}
-html[data-ui-pack="tesla"] .settings-page .sc-back:hover {
-  color: #2f58c4;
-  background: rgba(59, 106, 225, 0.08);
-}
-
-/* Nav cards : rangées Tesla (icône | texte | chevron) */
 html[data-ui-pack="tesla"] .settings-page .sc-nav-card {
-  background: #ffffff;
   border: 0;
   border-radius: 14px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
   backdrop-filter: none;
   min-height: 76px;
   padding: 14px 16px;
@@ -562,17 +1307,6 @@ html[data-ui-pack="tesla"] .settings-page .sc-nav-card--block {
   grid-template-areas: none;
   grid-template-columns: none;
 }
-html[data-ui-pack="tesla"] .settings-page .sc-nav-card::before,
-html[data-ui-pack="tesla"] .settings-page .sc-nav-card::after {
-  display: none;
-}
-html[data-ui-pack="tesla"] .settings-page .sc-nav-link:hover .sc-nav-card,
-html[data-ui-pack="tesla"] .settings-page .sc-nav-btn:hover .sc-nav-card {
-  background: #f3f3f5;
-  transform: none;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-  border-color: transparent;
-}
 html[data-ui-pack="tesla"] .settings-page .sc-nav-icon,
 html[data-ui-pack="tesla"] .settings-page .sc-nav-icon--violet,
 html[data-ui-pack="tesla"] .settings-page .sc-nav-icon--green,
@@ -580,9 +1314,7 @@ html[data-ui-pack="tesla"] .settings-page .sc-nav-icon--yellow,
 html[data-ui-pack="tesla"] .settings-page .sc-nav-icon--red {
   width: 36px;
   height: 36px;
-  background: #ececee;
   box-shadow: none;
-  color: #1c1c1c;
 }
 html[data-ui-pack="tesla"] .settings-page .sc-nav-copy {
   min-width: 0;
@@ -591,52 +1323,20 @@ html[data-ui-pack="tesla"] .settings-page .sc-nav-title {
   margin-top: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #1c1c1c;
   white-space: normal;
   overflow: visible;
   text-overflow: unset;
 }
 html[data-ui-pack="tesla"] .settings-page .sc-nav-desc {
-  color: #52525b;
   font-size: 13px;
   -webkit-line-clamp: 3;
 }
 html[data-ui-pack="tesla"] .settings-page .sc-nav-open {
   display: none;
 }
-html[data-ui-pack="tesla"] .settings-page .sc-nav-footer {
-  margin-top: 6px;
-  padding-top: 0;
-}
 html[data-ui-pack="tesla"] .settings-page .sc-nav-chevron {
-  color: #71717a;
   align-self: center;
 }
-html[data-ui-pack="tesla"] .settings-page .sc-nav-link:hover .sc-nav-chevron,
-html[data-ui-pack="tesla"] .settings-page .sc-nav-btn:hover .sc-nav-chevron {
-  color: #1c1c1c;
-  transform: none;
-}
-
-/* Boutons type Tesla (gros, gris) */
-html[data-ui-pack="tesla"] .settings-page .sc-frame-body button:not(.sn-item):not(.sc-nav-btn):not(.sc-back),
-html[data-ui-pack="tesla"] .settings-page .sc-frame-body a.btn,
-html[data-ui-pack="tesla"] .settings-page button.px-4 {
-  border-radius: 12px;
-}
-html[data-ui-pack="tesla"] .settings-page input,
-html[data-ui-pack="tesla"] .settings-page select,
-html[data-ui-pack="tesla"] .settings-page textarea {
-  background: #fff;
-  color: #1c1c1c;
-  border-color: rgba(0, 0, 0, 0.12);
-}
-html[data-ui-pack="tesla"] .settings-page input::placeholder,
-html[data-ui-pack="tesla"] .settings-page textarea::placeholder {
-  color: #71717a;
-}
-
-/* Interrupteur Tesla */
 html[data-ui-pack="tesla"] .settings-page .ds-switch {
   position: relative;
   display: inline-block;
@@ -653,7 +1353,6 @@ html[data-ui-pack="tesla"] .settings-page .ds-switch-slider {
   position: absolute;
   inset: 0;
   border-radius: 16px;
-  background: #c8c8cc;
   cursor: pointer;
   transition: background 0.18s ease;
 }
@@ -665,27 +1364,11 @@ html[data-ui-pack="tesla"] .settings-page .ds-switch-slider::after {
   width: 27px;
   height: 27px;
   border-radius: 50%;
-  background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   transition: transform 0.18s ease;
 }
-html[data-ui-pack="tesla"] .settings-page .ds-switch input:checked + .ds-switch-slider {
-  background: #3b6ae1;
-}
 html[data-ui-pack="tesla"] .settings-page .ds-switch input:checked + .ds-switch-slider::after {
   transform: translateX(20px);
-}
-
-/* Sidebar Tesla */
-html[data-ui-pack="tesla"] .sn-sidebar {
-  background: #e6e6e8;
-  border-right: 1px solid rgba(0, 0, 0, 0.08);
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-html[data-ui-pack="tesla"] .sn-sidebar::before,
-html[data-ui-pack="tesla"] .sn-sidebar::after {
-  display: none;
 }
 html[data-ui-pack="tesla"] .sn-item {
   border: 0;
@@ -693,47 +1376,15 @@ html[data-ui-pack="tesla"] .sn-item {
   min-height: 46px;
   padding: 10px 12px;
 }
-html[data-ui-pack="tesla"] .sn-item:hover:not(.sn-item--active) {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: transparent;
-}
-html[data-ui-pack="tesla"] .sn-item--active {
-  background: #fff;
-  border-color: transparent;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-html[data-ui-pack="tesla"] .sn-icon--active,
-html[data-ui-pack="tesla"] .sn-icon--inactive {
-  background: transparent;
-  color: #1c1c1c;
-}
-html[data-ui-pack="tesla"] .sn-item:hover .sn-icon--inactive {
-  background: transparent;
-  color: #1c1c1c;
-}
 html[data-ui-pack="tesla"] .sn-label {
   font-size: 16px;
   font-weight: 400;
 }
-html[data-ui-pack="tesla"] .sn-label--active,
-html[data-ui-pack="tesla"] .sn-label--inactive {
-  color: #1c1c1c;
-}
-html[data-ui-pack="tesla"] .sn-dot {
+html[data-ui-pack="tesla"] .sn-dot,
+html[data-ui-pack="tesla"] .sn-sidebar::before,
+html[data-ui-pack="tesla"] .sn-sidebar::after {
   display: none;
 }
-html[data-ui-pack="tesla"] .sn-overlay {
-  background: rgba(0, 0, 0, 0.4);
-}
-
-html[data-ui-pack="tesla"] .settings-mobile-menu-trigger-host button {
-  background: #fff;
-  color: #1c1c1c;
-  border-color: rgba(0, 0, 0, 0.1);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
-}
-
-/* Mobile / tablette : cartes pleine largeur, titres non coupés */
 @media (max-width: 767px) {
   html[data-ui-pack="tesla"] .settings-page .sc-frame-desc {
     max-width: 100%;
@@ -745,100 +1396,8 @@ html[data-ui-pack="tesla"] .settings-mobile-menu-trigger-host button {
     font-size: 20px;
   }
 }
-
 @media (max-width: 1023px) and (min-width: 768px) {
   html[data-ui-pack="tesla"] .settings-page .sc-frame-desc {
     max-width: 72%;
   }
-}
-
-/* ── Chargement Tesla : splash clair, accent bleu, sans carte C411 ── */
-@keyframes tesla-indeterminate {
-  0% { transform: translateX(-120%); }
-  100% { transform: translateX(380%); }
-}
-
-html[data-ui-pack="tesla"] #popcorn-loading-fallback {
-  background: #e6e6e8 !important;
-}
-html[data-ui-pack="tesla"] #popcorn-loading-fallback .bg-page-gradient,
-html[data-ui-pack="tesla"] #popcorn-loading-fallback .bg-page-grid,
-html[data-ui-pack="tesla"] #popcorn-loading-fallback .bg-page-orbs {
-  display: none;
-}
-html[data-ui-pack="tesla"] #popcorn-loading-fallback .pl-boot-dots {
-  display: none;
-}
-html[data-ui-pack="tesla"] #popcorn-loading-fallback .ds-loader--block {
-  margin-bottom: 1rem;
-}
-html[data-ui-pack="tesla"] #popcorn-loading-fallback .ds-loader-logo {
-  filter: none;
-  opacity: 1;
-}
-
-html[data-ui-pack="tesla"] .ds-card-loading-glow,
-html[data-ui-pack="tesla"] .ds-card-loading-bar {
-  display: none;
-}
-html[data-ui-pack="tesla"] .ds-card-loading {
-  background: transparent;
-  border: 0;
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  max-height: none;
-  overflow: visible;
-}
-html[data-ui-pack="tesla"] .ds-card-loading-content {
-  padding: 0;
-}
-html[data-ui-pack="tesla"] .ds-loading-title {
-  background: none;
-  -webkit-background-clip: unset;
-  background-clip: unset;
-  color: #1c1c1c !important;
-  font-weight: 650;
-  letter-spacing: -0.03em;
-  font-size: 1.5rem;
-  margin-bottom: 0.5rem;
-}
-html[data-ui-pack="tesla"] .ds-loading-description,
-html[data-ui-pack="tesla"] .ds-loading-description-subtle {
-  color: #6d6d6d;
-  font-size: 0.95rem;
-  margin-bottom: 1.5rem;
-}
-html[data-ui-pack="tesla"] .ds-progress-container {
-  height: 3px;
-  background: #d2d2d6;
-  max-width: 12rem;
-}
-html[data-ui-pack="tesla"] .ds-progress-bar {
-  inset: 0 auto 0 0;
-  width: 38%;
-  background: #3b6ae1;
-  background-size: auto;
-  animation: tesla-indeterminate 1.15s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-}
-html[data-ui-pack="tesla"] .ds-progress-wave {
-  display: none;
-}
-html[data-ui-pack="tesla"] .ds-loading-info-box {
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-}
-html[data-ui-pack="tesla"] .ds-loading-info-box-content {
-  color: #52525b;
-}
-html[data-ui-pack="tesla"] .loading-icon-logo {
-  filter: none !important;
-}
-html[data-ui-pack="tesla"] .pl-boot-hint {
-  color: #6d6d6d;
-}
-html[data-ui-pack="tesla"] .pl-boot-error {
-  background: #fef2f2;
-  color: #991b1b;
-  border: 1px solid #fecaca;
 }

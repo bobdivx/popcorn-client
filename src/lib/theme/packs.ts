@@ -1,6 +1,6 @@
 /**
  * Bibliothèque de langages visuels (ui packs).
- * Le thème clair/sombre reste `theme` (light|dark|auto).
+ * Le thème clair/sombre reste `theme` (light|dark|auto = selon l’heure).
  * Un pack définit la peau : tokens, densité, contrôles.
  *
  * Tous les packs partagent le même layout (mobile <768, tablette 768–1023, PC ≥1024).
@@ -29,15 +29,15 @@ export const CLASSIC_PACK: UiPack = {
   swatch: { bg: '#121212', accent: '#a855f7', text: '#ffffff' },
 };
 
-/** Nouveau pack Tesla — clair, contrôles à droite. */
+/** Pack Tesla — accent bleu, clair et sombre. */
 export const TESLA_PACK: UiPack = {
   id: 'tesla',
   name: { fr: 'Tesla', en: 'Tesla' },
   description: {
-    fr: 'Thème actuel : clair dans les réglages, accent bleu.',
-    en: 'Current theme: light settings, blue accent.',
+    fr: 'Accent bleu, surfaces Tesla. Suit le thème clair ou sombre.',
+    en: 'Blue accent, Tesla surfaces. Follows light or dark theme.',
   },
-  swatch: { bg: '#e6e6e8', accent: '#3b6ae1', text: '#1c1c1c' },
+  swatch: { bg: '#111113', accent: '#3b6ae1', text: '#f4f4f5' },
 };
 
 export const UI_PACKS: readonly UiPack[] = [CLASSIC_PACK, TESLA_PACK];

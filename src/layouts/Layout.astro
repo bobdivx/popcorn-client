@@ -34,7 +34,10 @@ const isWebOS = import.meta.env.WEBOS === 'true';
             if (p.uiPack) document.documentElement.dataset.uiPack = p.uiPack;
             else document.documentElement.dataset.uiPack = 'tesla';
           }
-          if (t === 'auto') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          if (t === 'auto') {
+            var h = new Date().getHours();
+            t = (h >= 7 && h < 20) ? 'light' : 'dark';
+          }
           document.documentElement.dataset.theme = t;
         } catch(e) {}
       })();
@@ -74,8 +77,15 @@ const isWebOS = import.meta.env.WEBOS === 'true';
       });
     </script>
     <script is:inline>
-      /* ── Listeners persistants : sync multi-onglets · mode auto OS · View Transitions ── */
+      /* ── Listeners persistants : sync multi-onglets · auto selon l’heure · View Transitions ── */
       (function() {
+        var DAY_START = 7;
+        var NIGHT_START = 20;
+        var timer;
+        function resolveAuto() {
+          var h = new Date().getHours();
+          return (h >= DAY_START && h < NIGHT_START) ? 'light' : 'dark';
+        }
         function applyStoredTheme() {
           try {
             var s = localStorage.getItem('popcorn_client_user_preferences');
@@ -86,26 +96,51 @@ const isWebOS = import.meta.env.WEBOS === 'true';
               t = p.theme || 'auto';
               if (p.uiPack) pack = p.uiPack;
             }
-            if (t === 'auto') t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            if (t === 'auto') t = resolveAuto();
             document.documentElement.dataset.theme = t;
             document.documentElement.dataset.uiPack = pack;
           } catch(e) {}
         }
-        /* Synchronisation entre onglets */
+        function msUntilSwitch() {
+          var now = new Date();
+          var next = new Date(now.getTime());
+          var h = now.getHours();
+          if (h >= DAY_START && h < NIGHT_START) next.setHours(NIGHT_START, 0, 0, 0);
+          else if (h < DAY_START) next.setHours(DAY_START, 0, 0, 0);
+          else {
+            next.setDate(next.getDate() + 1);
+            next.setHours(DAY_START, 0, 0, 0);
+          }
+          return Math.max(1000, next.getTime() - now.getTime());
+        }
+        function scheduleAuto() {
+          if (timer) clearTimeout(timer);
+          var pref = 'auto';
+          try {
+            var s = localStorage.getItem('popcorn_client_user_preferences');
+            if (s) pref = JSON.parse(s).theme || 'auto';
+          } catch(e) {}
+          if (pref !== 'auto') return;
+          timer = setTimeout(function() {
+            applyStoredTheme();
+            try { window.dispatchEvent(new CustomEvent('popcorn-theme-changed')); } catch(e) {}
+            scheduleAuto();
+          }, msUntilSwitch());
+        }
         window.addEventListener('storage', function(e) {
-          if (e.key === 'popcorn_client_user_preferences') applyStoredTheme();
+          if (e.key === 'popcorn_client_user_preferences') {
+            applyStoredTheme();
+            scheduleAuto();
+          }
         });
-        /* Changement du thème système (mode auto uniquement) */
-        try {
-          window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function() {
-            try {
-              var s = localStorage.getItem('popcorn_client_user_preferences');
-              if (!s || (JSON.parse(s).theme || 'auto') === 'auto') applyStoredTheme();
-            } catch(e) {}
-          });
-        } catch(e) {}
-        /* Restaurer le thème après chaque View Transition Astro */
-        document.addEventListener('astro:after-swap', applyStoredTheme);
+        window.addEventListener('popcorn-theme-changed', function() {
+          scheduleAuto();
+        });
+        document.addEventListener('astro:after-swap', function() {
+          applyStoredTheme();
+          scheduleAuto();
+        });
+        scheduleAuto();
       })();
     </script>
     <!-- Google Fonts : désactivés sur webOS (file://) pour éviter blocage réseau et écran noir -->

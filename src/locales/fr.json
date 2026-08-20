@@ -464,16 +464,17 @@
   },
   "interfaceSettings": {
     "theme": "Thème",
-    "themeDescription": "Clair, sombre ou automatique selon le système",
+    "themeDescription": "Clair, sombre, ou automatique selon l’heure de la journée",
+    "themeAutoHint": "Clair de {dayStart} h à {nightStart} h, sombre le reste de la journée",
     "themeOptions": {
       "dark": "Sombre",
       "light": "Clair",
-      "auto": "Système"
+      "auto": "Automatique"
     },
     "uiPack": "Langage visuel",
     "uiPackDescription": "Chaque pack reprend le même agencement (mobile, tablette, PC). Tesla est le thème actuel. Popcornn conserve l’ancienne peau sombre violette.",
     "uiPackClassicHint": "Ancien thème (sombre, violet, cartes)",
-    "uiPackTeslaHint": "Thème actuel — réglages type Tesla",
+    "uiPackTeslaHint": "Accent bleu — clair et sombre",
     "autoplay": "Lecture automatique",
     "autoplayDescription": "Démarrer automatiquement la lecture des épisodes suivants",
     "skipIntro": "Passer le générique",
@@ -680,7 +681,11 @@
     "feedback": "Feedback",
     "sideNavigation": "Navigation latérale",
     "openSideNav": "Ouvrir la navigation latérale",
-    "language": "Langue"
+    "language": "Langue",
+    "theme": "Thème",
+    "themeLight": "Thème clair",
+    "themeDark": "Thème sombre",
+    "themeAuto": "Thème automatique (clair de {dayStart} h à {nightStart} h)"
   },
 
   "settings": {

@@ -20,6 +20,7 @@ import { TokenManager } from '../../lib/client/storage';
 import { loadSubscription } from '../../lib/subscription-store';
 import ConnectivityWarning from './ConnectivityWarning';
 import { isTVPlatform } from '../../lib/utils/device-detection';
+import ThemeToggle from './ThemeToggle';
 
 type NavTab = { label: string; href: string; match?: 'exact' | 'prefix'; icon?: ComponentType<{ className?: string }> };
 
@@ -358,6 +359,7 @@ export default function Navbar() {
                     <Download className="w-5 h-5 flex-shrink-0 opacity-80" />
                     <span>{t('nav.downloads')}</span>
                   </a>
+                  <ThemeToggle variant="menu" />
                   <a
                     href="/settings"
                     onClick={() => setMobileMenuOpen(false)}
@@ -417,6 +419,8 @@ export default function Navbar() {
                 >
                   <Download className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 relative z-10" />
                 </a>
+
+                <ThemeToggle />
 
                 {/* Paramètres (lg+) ou hamburger (< lg) */}
                 {useHamburger ? (
@@ -491,6 +495,7 @@ export default function Navbar() {
             ) : (
               /* ── Invité ── */
               <div className="flex items-center gap-2 sm:gap-3 relative" ref={guestMenuRef}>
+                <ThemeToggle />
                 {guestUseHamburger ? (
                   <>
                     <button
