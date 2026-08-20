@@ -425,6 +425,10 @@ export default function LuciePlayer({
             }
             e.preventDefault();
             e.stopPropagation();
+            if (isTV && !showControls) {
+              revealControls();
+              return;
+            }
             handlePlayPause();
           }}
         />

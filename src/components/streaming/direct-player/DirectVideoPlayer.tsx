@@ -330,6 +330,10 @@ export default function DirectVideoPlayer({
             if (target.closest('.pointer-events-auto')) return;
             e.preventDefault();
             e.stopPropagation();
+            if (isTV && !showControls) {
+              revealControls();
+              return;
+            }
             handlePlayPause();
           }}
         />

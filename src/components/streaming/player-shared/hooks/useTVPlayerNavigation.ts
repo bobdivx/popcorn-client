@@ -6,6 +6,19 @@ import { toggleFullscreen } from './useFullscreen';
 const BACK_KEY_CODES = [27, 8, 461, 10009, 4, 166, 457];
 const BACK_KEYS = ['Escape', 'Backspace', 'Back', 'BrowserBack', 'GoBack', 'XF86Back'];
 
+/** Overlay buffering réellement visible dans le lecteur — pas un reste ailleurs dans la page. */
+function visiblePlayerPlaybackOverlay(): HTMLElement | null {
+  const root =
+    document.getElementById('video-player-wrapper') ||
+    document.getElementById('hls-player-container');
+  const el = (root?.querySelector('[data-playback-overlay]') ?? null) as HTMLElement | null;
+  if (!el) return null;
+  if (!el.getClientRects().length) return null;
+  const cs = window.getComputedStyle(el);
+  if (cs.display === 'none' || cs.visibility === 'hidden') return null;
+  return el;
+}
+
 /** Après arrêt des flèches : un seul seek vers la vignette / position preview. */
 const SCRUB_SETTLE_MS = 2000;
 const PREVIEW_SETTLE_MS = 1000;
@@ -155,6 +168,7 @@ export function useTVPlayerNavigation({
   const scheduleControlsHide = () => {
     if (!isTV) return;
     clearControlsHideTimeout();
+    if (visiblePlayerPlaybackOverlay()) return;
     // En pause : garder les commandes visibles.
     if (isVideoPaused()) return;
     // Pendant un scrub/preview : réessayer bientôt au lieu de laisser l’UI collée.
@@ -172,7 +186,7 @@ export function useTVPlayerNavigation({
         scheduleControlsHide();
         return;
       }
-      // Pause réelle uniquement (DOM) — ne pas bloquer si isPlaying React a lag.
+      if (visiblePlayerPlaybackOverlay()) return;
       if (isVideoPaused()) return;
       setShowControls(false);
       setFocusedOnProgress(false);
@@ -354,14 +368,12 @@ export function useTVPlayerNavigation({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
-      const overlay = document.querySelector('[data-playback-overlay]');
-      if (overlay) {
-        if (isBackKey(e)) {
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-          handleBack();
-        }
+      const overlay = visiblePlayerPlaybackOverlay();
+      if (overlay && isBackKey(e)) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        handleBack();
         return;
       }
 
@@ -372,7 +384,7 @@ export function useTVPlayerNavigation({
         const wrap = document.getElementById('video-player-wrapper');
         if (wrap) toggleFullscreen(wrap).catch(() => {});
       }
-      if (!showControlsRef.current) setShowControls(true);
+      setShowControls(true);
 
       if (isBackKey(e)) {
         e.preventDefault();
@@ -650,11 +662,24 @@ export function useTVPlayerNavigation({
     progressBarRef,
   ]);
 
-  // Sur TV : dès l’ouverture, afficher puis programmer le masquage (même avec vignettes focus).
+  // Afficher les commandes une fois la modal partie (le timer de mount les masquait trop tôt).
   useEffect(() => {
     if (!isTV) return;
-    setShowControls(true);
-    scheduleControlsHide();
+    let revealed = false;
+    const tryReveal = () => {
+      if (visiblePlayerPlaybackOverlay()) {
+        revealed = false;
+        clearControlsHideTimeout();
+        return;
+      }
+      if (revealed) return;
+      revealed = true;
+      setShowControls(true);
+      scheduleControlsHide();
+    };
+    tryReveal();
+    const id = window.setInterval(tryReveal, 200);
+    return () => window.clearInterval(id);
   }, [isTV, setShowControls]);
 
   useEffect(() => {
@@ -673,12 +698,14 @@ export function useTVPlayerNavigation({
       clearControlsHideTimeout();
       return;
     }
+    if (visiblePlayerPlaybackOverlay()) {
+      clearControlsHideTimeout();
+      return;
+    }
     if (isVideoPaused()) {
       clearControlsHideTimeout();
       return;
     }
-    // Ne pas reset le timer à chaque render — sinon webOS ne masque jamais.
-    if (controlsTimeoutRef.current !== null) return;
     scheduleControlsHide();
   }, [isTV, showControls, isPlaying, setShowControls]);
 

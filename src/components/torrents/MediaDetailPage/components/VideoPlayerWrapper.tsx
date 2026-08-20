@@ -637,9 +637,13 @@ export function VideoPlayerWrapper({
       style={{
         ...(isFullscreen ? { width: '100vw', height: '100vh' } : {}),
         display: visible ? 'block' : 'none',
-        transform: 'translateZ(0)',
-        willChange: 'transform',
-        backfaceVisibility: 'hidden',
+        ...(isTvPlayback
+          ? {}
+          : {
+              transform: 'translateZ(0)',
+              willChange: 'transform',
+              backfaceVisibility: 'hidden' as const,
+            }),
       }}
     >
       {/* Badges de qualité en haut à droite (mode non plein écran) */}
