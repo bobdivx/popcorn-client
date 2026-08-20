@@ -4,6 +4,7 @@ import {
   getBufferAheadSeconds,
   getBufferedEndAround,
   getBufferedTimelinePercent,
+  getEngineBufferAhead,
   isTimeInBuffered,
   hasMediaPlaybackStarted,
   isVideoVisiblyPlaying,
@@ -57,7 +58,7 @@ describe('isVideoVisiblyPlaying', () => {
 });
 
 describe('hasMediaPlaybackStarted', () => {
-  it('accepte un readyState HAVE_CURRENT_DATA même si paused/currentTime sont coincés (webOS)', () => {
+  it('n’accepte pas un simple readyState HAVE_CURRENT_DATA (ce n’est pas encore du play)', () => {
     expect(
       hasMediaPlaybackStarted({
         paused: true,
@@ -66,7 +67,7 @@ describe('hasMediaPlaybackStarted', () => {
         videoWidth: 0,
         videoHeight: 0,
       } as HTMLVideoElement),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('accepte une frame décodée (videoWidth) sans TimeRanges', () => {
@@ -81,7 +82,7 @@ describe('hasMediaPlaybackStarted', () => {
     ).toBe(true);
   });
 
-  it('reste faux tant qu’aucune donnée média n’est là', () => {
+  it('reste faux tant qu’aucune image n’est décodée', () => {
     expect(
       hasMediaPlaybackStarted({
         paused: true,
@@ -91,6 +92,17 @@ describe('hasMediaPlaybackStarted', () => {
         videoHeight: 0,
       } as HTMLVideoElement),
     ).toBe(false);
+  });
+});
+
+describe('getEngineBufferAhead', () => {
+  it('prend le max entre TimeRanges et le buffer hls.js', () => {
+    expect(getEngineBufferAhead(ranges([[0, 3]]), 0, { len: 12, start: 0, end: 12 })).toBe(12);
+    expect(getEngineBufferAhead(ranges([[0, 10]]), 0, { len: 4 })).toBe(10);
+  });
+
+  it('utilise hls.js si video.buffered est vide', () => {
+    expect(getEngineBufferAhead(ranges([]), 0, { end: 8 })).toBe(8);
   });
 });
 

@@ -453,6 +453,7 @@ export default function LuciePlayer({
           onPlayPause={handlePlayPause}
           onSeek={baseHandleSeek}
           onSeekToTime={seekToTargetTime}
+          onRevealControls={revealControls}
           onVolumeChange={baseHandleVolumeChange}
           onToggleMute={toggleMute}
           onToggleFullscreen={handleToggleFullscreen}
