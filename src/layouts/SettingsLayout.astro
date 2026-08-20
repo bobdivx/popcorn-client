@@ -67,8 +67,11 @@ const { title = 'Paramètres - Popcorn Client' } = Astro.props;
   [data-theme="light"] .settings-page {
     background: var(--ds-surface);
   }
-  [data-ui-pack="tesla"] .settings-page {
+  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page {
     background: #e6e6e8;
+  }
+  html[data-ui-pack="tesla"][data-theme="dark"] .settings-page {
+    background: var(--ds-surface, #111113);
   }
 
   /* ── Animations de navigation settings ── */

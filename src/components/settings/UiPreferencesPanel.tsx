@@ -3,22 +3,19 @@ import { useI18n, LANGUAGE_NAMES, type SupportedLanguage } from '../../lib/i18n'
 import { PreferencesManager } from '../../lib/client/storage';
 import { TokenManager } from '../../lib/client/storage';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
-import { Globe, Moon, Sun, Monitor, Palette } from 'lucide-preact';
+import { Globe, Moon, Sun, Clock, Palette } from 'lucide-preact';
 import { UI_PACKS, type UiPackId } from '../../lib/theme/packs';
-import { saveUiPack } from '../../lib/theme';
+import {
+  THEME_CHANGED_EVENT,
+  THEME_DAY_START_HOUR,
+  THEME_NIGHT_START_HOUR,
+  applyTheme,
+  saveTheme,
+  saveUiPack,
+  type ThemePreference,
+} from '../../lib/theme';
 
-type ThemeValue = 'light' | 'dark' | 'auto';
-
-function applyTheme(theme: ThemeValue) {
-  if (typeof document === 'undefined') return;
-  const root = document.documentElement;
-  if (theme === 'auto') {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    root.dataset.theme = prefersDark ? 'dark' : 'light';
-  } else {
-    root.dataset.theme = theme;
-  }
-}
+type ThemeValue = ThemePreference;
 
 export type UiSection = 'language' | 'theme' | 'all';
 
@@ -40,15 +37,12 @@ export default function UiPreferencesPanel({ section = 'all', embedded = false }
     applyTheme(theme);
   }, [preferences.theme]);
 
-  // Écouter les changements de préférence système (mode auto)
+  // Mode auto : le passage 7 h / 20 h est géré par Layout.astro ; on resynchronise l’UI
   useEffect(() => {
-    const theme = (preferences.theme || 'auto') as ThemeValue;
-    if (theme !== 'auto') return;
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => applyTheme('auto');
-    mq.addEventListener('change', handler);
-    return () => mq.removeEventListener('change', handler);
-  }, [preferences.theme]);
+    const sync = () => setPreferences(PreferencesManager.getPreferences());
+    window.addEventListener(THEME_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(THEME_CHANGED_EVENT, sync);
+  }, []);
 
   const handleLanguageChange = async (newLang: SupportedLanguage) => {
     if (newLang === language) return;
@@ -69,9 +63,8 @@ export default function UiPreferencesPanel({ section = 'all', embedded = false }
   };
 
   const handleThemeChange = (theme: ThemeValue) => {
-    PreferencesManager.updatePreferences({ theme });
+    saveTheme(theme);
     setPreferences(PreferencesManager.getPreferences());
-    applyTheme(theme);
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1500);
   };
@@ -139,11 +132,17 @@ export default function UiPreferencesPanel({ section = 'all', embedded = false }
           >
             {theme === 'dark' && <Moon className="w-4 h-4" />}
             {theme === 'light' && <Sun className="w-4 h-4" />}
-            {theme === 'auto' && <Monitor className="w-4 h-4" />}
+            {theme === 'auto' && <Clock className="w-4 h-4" />}
             {t(`interfaceSettings.themeOptions.${theme}`)}
           </button>
         ))}
       </div>
+      <p className="ds-text-tertiary text-xs mt-3">
+        {t('interfaceSettings.themeAutoHint', {
+          dayStart: THEME_DAY_START_HOUR,
+          nightStart: THEME_NIGHT_START_HOUR,
+        })}
+      </p>
     </>
   );
 

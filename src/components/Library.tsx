@@ -67,6 +67,62 @@ function parseGenres(genres: string | null): string[] {
   return trimmed.split(',').map((g) => g.trim()).filter(Boolean);
 }
 
+/** Extrait une clé de série depuis le chemin (ex. "series/Nom Série/S01/..." → "Nom Série") pour grouper les épisodes locaux */
+function seriesKeyFromPath(path: string): string {
+  const normalized = path.replace(/\\/g, '/').toLowerCase();
+  const idx = normalized.indexOf('/series/');
+  if (idx === -1) return path;
+  const after = normalized.slice(idx + 8);
+  const nextSlash = after.indexOf('/');
+  return nextSlash === -1 ? after : after.slice(0, nextSlash);
+}
+
+/** Clé canonique pour déduplication fichier (même chemin = une seule entrée) */
+function itemDedupKey(item: LibraryMedia): string {
+  const path = (item.download_path || '').replace(/\\/g, '/').toLowerCase().trim();
+  if (path) return path;
+  return item.info_hash || item.slug || item.name || '';
+}
+
+/**
+ * Identité d'un titre bibliothèque : un même film/série (plusieurs qualités, copies locales, torrents)
+ * doit n'afficher qu'une carte.
+ */
+function mediaIdentityKey(item: LibraryMedia, kind: 'movie' | 'series' | 'any'): string {
+  if (item.tmdb_id != null) return `tmdb_${item.tmdb_id}`;
+  if (kind === 'series' || (kind === 'any' && isSeries(item))) {
+    return `path_${seriesKeyFromPath(item.download_path)}`;
+  }
+  const name = (item.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  if (name) return `name_${name}`;
+  return itemDedupKey(item);
+}
+
+function pickPreferredLibraryItem(list: LibraryMedia[]): LibraryMedia {
+  const withPoster = list.filter((i) => i.poster_url || i.hero_image_url);
+  const candidates = withPoster.length > 0 ? withPoster : list;
+  return [...candidates].sort((a, b) => {
+    const src = sourceSortOrder(getSourceType(a)) - sourceSortOrder(getSourceType(b));
+    if (src !== 0) return src;
+    if (a.exists !== b.exists) return a.exists ? -1 : 1;
+    return (b.file_size ?? 0) - (a.file_size ?? 0);
+  })[0];
+}
+
+function dedupeLibraryMedia(items: LibraryMedia[], kind: 'movie' | 'series' | 'any'): LibraryMedia[] {
+  const groups = new Map<string, LibraryMedia[]>();
+  const order: string[] = [];
+  for (const item of items) {
+    const key = mediaIdentityKey(item, kind);
+    if (!groups.has(key)) {
+      groups.set(key, []);
+      order.push(key);
+    }
+    groups.get(key)!.push(item);
+  }
+  return order.map((key) => pickPreferredLibraryItem(groups.get(key)!));
+}
+
 export interface LibraryMedia {
   info_hash: string;
   name: string;
@@ -350,23 +406,6 @@ export default function Library({
     }
   };
 
-  /** Extrait une clé de série depuis le chemin (ex. "series/Nom Série/S01/..." → "Nom Série") pour grouper les épisodes locaux */
-  const seriesKeyFromPath = (path: string): string => {
-    const normalized = path.replace(/\\/g, '/').toLowerCase();
-    const idx = normalized.indexOf('/series/');
-    if (idx === -1) return path;
-    const after = normalized.slice(idx + 8);
-    const nextSlash = after.indexOf('/');
-    return nextSlash === -1 ? after : after.slice(0, nextSlash);
-  };
-
-  /** Clé canonique pour déduplication (même fichier = une seule entrée) */
-  const itemDedupKey = (item: LibraryMedia): string => {
-    const path = (item.download_path || '').replace(/\\/g, '/').toLowerCase().trim();
-    if (path) return path;
-    return item.info_hash || item.slug || item.name || '';
-  };
-
   // Tous les items : bibliothèque locale + partagés par amis (dédoublonnés par chemin / info_hash)
   const allVisibleItems = useMemo(() => {
     const local = items.filter((item) => item.exists);
@@ -414,7 +453,7 @@ export default function Library({
     [allDownloadingItems, contentFilter]
   );
 
-  // Séparer films / séries (une carte par série, regroupement par tmdb_id ou chemin)
+  // Une carte par titre (tmdb_id) : plusieurs fichiers / qualités / copies locales du même film
   const { movies, series, others } = useMemo(() => {
     const moviesList: LibraryMedia[] = [];
     const seriesRaw: LibraryMedia[] = [];
@@ -430,21 +469,11 @@ export default function Library({
       }
     });
 
-    const seriesByKey = new Map<string, LibraryMedia[]>();
-    for (const item of seriesRaw) {
-      const key =
-        item.tmdb_id != null ? `tmdb_${item.tmdb_id}` : `path_${seriesKeyFromPath(item.download_path)}`;
-      const list = seriesByKey.get(key) ?? [];
-      list.push(item);
-      seriesByKey.set(key, list);
-    }
-    const seriesList: LibraryMedia[] = [];
-    seriesByKey.forEach((list) => {
-      const withPoster = list.find((i) => i.poster_url || i.hero_image_url);
-      seriesList.push(withPoster ?? list[0]);
-    });
-
-    return { movies: moviesList, series: seriesList, others: othersList };
+    return {
+      movies: dedupeLibraryMedia(moviesList, 'movie'),
+      series: dedupeLibraryMedia(seriesRaw, 'series'),
+      others: dedupeLibraryMedia(othersList, 'any'),
+    };
   }, [filteredVisible]);
 
   // Grouper par genre (premier genre du tableau) pour lignes par genre
@@ -476,7 +505,11 @@ export default function Library({
   const groupedItems = { movies, series, others };
 
   const popcornRecent = useMemo(
-    () => visibleItems.filter((item) => isPopconnDownloadedInfoHash(item.info_hash)).slice(0, 20),
+    () =>
+      dedupeLibraryMedia(
+        visibleItems.filter((item) => isPopconnDownloadedInfoHash(item.info_hash)),
+        'any'
+      ).slice(0, 20),
     [visibleItems]
   );
 

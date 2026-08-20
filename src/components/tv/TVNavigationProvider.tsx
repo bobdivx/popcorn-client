@@ -454,6 +454,25 @@ export default function TVNavigationProvider() {
         }
       }
 
+      // Header : gauche/droite = voisin DOM (onglets → recherche / téléchargements / réglages / avatar).
+      // Les onglets centrés peuvent chevaucher les icônes : le score spatial ne trouve alors
+      // plus aucun candidat à droite de « Demandes ».
+      if (
+        (direction === 'left' || direction === 'right') &&
+        current.closest(SITE_HEADER_SELECTOR)
+      ) {
+        const header = current.closest(SITE_HEADER_SELECTOR) as HTMLElement;
+        const full = getFocusableElements(header);
+        const idx = full.indexOf(current);
+        if (idx !== -1) {
+          const nextIdx = direction === 'left' ? idx - 1 : idx + 1;
+          if (nextIdx >= 0 && nextIdx < full.length) {
+            return full[nextIdx];
+          }
+        }
+        return null;
+      }
+
       // TV + carrousel : gauche/droite = voisin sur la même ligne (liste déjà ordonnée dans getFocusableElements)
       if (
         isTvDoc() &&

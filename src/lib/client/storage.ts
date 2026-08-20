@@ -6,6 +6,7 @@
 import { clearAllBackendStorage } from '../backend-config.js';
 
 export interface UserPreferences {
+  /** `auto` = clair de 7 h à 20 h, sombre le reste (heure locale). */
   theme?: 'light' | 'dark' | 'auto';
   /** Langage visuel (bibliothèque de packs). Défaut : classic (app actuelle). */
   uiPack?: 'classic' | 'tesla';

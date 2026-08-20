@@ -328,40 +328,66 @@ const SIDEBAR_CSS = `
   [data-theme="light"] .sn-overlay { background: rgba(0,0,0,0.45); }
 
   /* ── Pack Tesla ── */
-  html[data-ui-pack="tesla"] .sn-sidebar {
-    background: #e6e6e8;
-    border-right: 1px solid rgba(0, 0, 0, 0.08);
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
   html[data-ui-pack="tesla"] .sn-sidebar::before,
   html[data-ui-pack="tesla"] .sn-sidebar::after { display: none; }
   html[data-ui-pack="tesla"] .sn-item {
     border: 0;
     border-radius: 14px;
   }
-  html[data-ui-pack="tesla"] .sn-item:hover:not(.sn-item--active) {
+  html[data-ui-pack="tesla"] .sn-dot { display: none; }
+
+  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-sidebar {
+    background: #e6e6e8;
+    border-right: 1px solid rgba(0, 0, 0, 0.08);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-item:hover:not(.sn-item--active) {
     background: rgba(0, 0, 0, 0.04);
     border-color: transparent;
   }
-  html[data-ui-pack="tesla"] .sn-item--active {
+  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-item--active {
     background: #fff;
     border-color: transparent;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   }
-  html[data-ui-pack="tesla"] .sn-icon--active,
-  html[data-ui-pack="tesla"] .sn-icon--inactive {
+  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-icon--active,
+  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-icon--inactive {
     background: transparent;
     color: #1c1c1c;
   }
-  html[data-ui-pack="tesla"] .sn-item:hover .sn-icon--inactive {
+  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-item:hover .sn-icon--inactive {
     background: transparent;
     color: #1c1c1c;
   }
-  html[data-ui-pack="tesla"] .sn-label--active,
-  html[data-ui-pack="tesla"] .sn-label--inactive { color: #1c1c1c; }
-  html[data-ui-pack="tesla"] .sn-dot { display: none; }
-  html[data-ui-pack="tesla"] .sn-overlay { background: rgba(0, 0, 0, 0.4); }
+  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-label--active,
+  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-label--inactive { color: #1c1c1c; }
+  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .sn-overlay { background: rgba(0, 0, 0, 0.4); }
+
+  html[data-ui-pack="tesla"][data-theme="dark"] .sn-sidebar {
+    background: #111113;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  html[data-ui-pack="tesla"][data-theme="dark"] .sn-item:hover:not(.sn-item--active) {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: transparent;
+  }
+  html[data-ui-pack="tesla"][data-theme="dark"] .sn-item--active {
+    background: #1c1c1f;
+    border-color: transparent;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.45);
+  }
+  html[data-ui-pack="tesla"][data-theme="dark"] .sn-icon--active,
+  html[data-ui-pack="tesla"][data-theme="dark"] .sn-icon--inactive,
+  html[data-ui-pack="tesla"][data-theme="dark"] .sn-item:hover .sn-icon--inactive {
+    background: transparent;
+    color: #f4f4f5;
+  }
+  html[data-ui-pack="tesla"][data-theme="dark"] .sn-label--active,
+  html[data-ui-pack="tesla"][data-theme="dark"] .sn-label--inactive { color: #f4f4f5; }
+  html[data-ui-pack="tesla"][data-theme="dark"] .sn-overlay { background: rgba(0, 0, 0, 0.55); }
 `;
 
 export default function SettingsSidebar() {
