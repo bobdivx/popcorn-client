@@ -412,6 +412,7 @@ export function PlaybackStatusSurface({
       if (!isRemoteBackEvent(e)) return;
       e.preventDefault();
       e.stopPropagation();
+      e.stopImmediatePropagation();
       closeFromRemote();
     };
     const onWebOSBack = (e: Event) => {
@@ -762,6 +763,7 @@ export function PlaybackStatusSurface({
                           type="button"
                           onClick={() => setConfirmingCancel(false)}
                           data-focusable
+                          data-close
                           tabIndex={0}
                           className="px-5 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-sm"
                         >
@@ -788,6 +790,8 @@ export function PlaybackStatusSurface({
                           type="button"
                           onClick={backAction}
                           data-focusable
+                          data-close
+                          aria-label={t('common.close') || 'Fermer'}
                           tabIndex={0}
                           className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
                         >
@@ -868,6 +872,7 @@ export function PlaybackStatusSurface({
                           type="button"
                           onClick={() => setConfirmingCancel(false)}
                           data-focusable
+                          data-close
                           tabIndex={0}
                           className="px-5 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-sm"
                         >
@@ -894,6 +899,8 @@ export function PlaybackStatusSurface({
                           type="button"
                           onClick={onCancel}
                           data-focusable
+                          data-close
+                          aria-label={t('common.close') || 'Fermer'}
                           tabIndex={0}
                           className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
                         >
@@ -924,7 +931,13 @@ export function PlaybackStatusSurface({
 
   if (variant === 'player') {
     return (
-      <div className="absolute inset-0 z-30 overflow-hidden">
+      <div
+        className="absolute inset-0 z-30 overflow-hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title || t('playback.phase.buffering') || 'Lecture'}
+        data-playback-overlay
+      >
         {backdropUrl ? (
           <>
             <div
@@ -945,7 +958,13 @@ export function PlaybackStatusSurface({
 
   // fullscreen — affiche + logo en composition
   return (
-    <div className="player-progress-overlay fixed inset-0 z-50 overflow-x-hidden overflow-y-auto overscroll-contain">
+    <div
+      className="player-progress-overlay fixed inset-0 z-50 overflow-x-hidden overflow-y-auto overscroll-contain"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title || t('playback.phase.buffering') || 'Lecture'}
+      data-playback-overlay
+    >
       {backdropUrl ? (
         <>
           <div
@@ -969,9 +988,10 @@ export function PlaybackStatusSurface({
           type="button"
           onClick={backAction}
           title={t('common.back') || 'Retour'}
-          aria-label={t('common.back') || 'Retour'}
+          aria-label={t('common.close') || 'Fermer'}
           tabIndex={0}
           data-focusable
+          data-close
           className="fixed z-40 inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors backdrop-blur-md"
           style={{
             top: 'max(1rem, var(--safe-area-inset-top))',
