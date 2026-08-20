@@ -43,6 +43,12 @@ describe('nextBufferingOverlayVisible', () => {
     expect(nextBufferingOverlayVisible(true, 4, loading)).toBe(true);
   });
 
+  it('se masque si la lecture a déjà démarré (autoplay derrière la modal)', () => {
+    expect(
+      nextBufferingOverlayVisible(true, 3, { ...loading, isPlaying: true }),
+    ).toBe(false);
+  });
+
   it('ne se masque qu’au-dessus du seuil hide', () => {
     expect(nextBufferingOverlayVisible(true, 4, idle)).toBe(true);
     expect(nextBufferingOverlayVisible(true, 8, idle)).toBe(false);

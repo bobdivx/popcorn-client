@@ -600,9 +600,9 @@
     "hideDebug": "Hide debug",
     "hls": {
       "serverPreparing": "Server is preparing the video…",
-      "preparingRemux": "Packaging video for the player (no re-encode)…",
-      "preparingTranscode": "Converting video for this device (4K / HEVC can take 20–40s)…",
-      "playlistReady": "Playlist ready, filling player buffer…",
+      "preparingRemux": "Preparing the video…",
+      "preparingTranscode": "Converting for this device…",
+      "playlistReady": "Filling the player buffer…",
       "serverPipeline": "Server (HLS)",
       "playerBuffer": "Player buffer",
       "segmentsReady": "{ready} / {expected} segments",
@@ -620,7 +620,14 @@
       "gpuWillUseNvenc": "GPU detected — NVENC will be used",
       "gpuWillUseNvdec": "GPU detected — NVDEC will be used",
       "gpuWillUseGeneric": "GPU detected — {accel} will be used",
-      "gpuWillUseCpu": "CPU transcode (no GPU)"
+      "gpuWillUseCpu": "CPU transcode (no GPU)",
+      "liveTrace": "Playback log",
+      "etaPlayable": "Playable in {eta}",
+      "elapsed": "Time since start",
+      "stalls": "Buffers / stalls",
+      "bufferEvents": "buffers",
+      "network": "Device network",
+      "hlsBandwidth": "Estimated HLS bandwidth"
     },
     "streamingFallbackToHls": "Switched to HLS playback due to direct stream issue.",
     "errorStream": "Unable to play video. Check server connection.",

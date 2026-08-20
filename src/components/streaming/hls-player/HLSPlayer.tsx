@@ -13,8 +13,8 @@ import { isTauri } from '../../../lib/utils/tauri';
 import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
 import { SkipIntroOverlay } from '../player-shared/components/SkipIntroOverlay';
 import PlayerBufferingOverlay from '../player-shared/components/PlayerBufferingOverlay';
-import { usePlaybackPipelineStatus } from '../player-shared/hooks/usePlaybackPipelineStatus';
-import { pipelineHeadline } from '../../../lib/streaming/playbackPipeline';
+import { usePlaybackLiveTrace } from '../player-shared/hooks/usePlaybackLiveTrace';
+import { playbackDebugUrl, pipelineHeadline } from '../../../lib/streaming/playbackPipeline';
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
@@ -426,9 +426,10 @@ export default function HLSPlayer({
         isLoading,
         isWaiting,
         isSeekSettling,
+        isPlaying,
       }),
     );
-  }, [isLoading, isWaiting, isSeekSettling, currentTime, bufferedPercent, isSeeking]);
+  }, [isLoading, isWaiting, isSeekSettling, isPlaying, currentTime, bufferedPercent, isSeeking]);
 
   // Overlay : buffer ahead uniquement. Pendant waiting/seek/loading, ne jamais
   // afficher 100 % (artefact ou cible atteinte alors que le décodeur attend encore).
@@ -447,14 +448,23 @@ export default function HLSPlayer({
     bufferingOverlayVisible ||
     isSeekSettling ||
     (isSeeking && (bufferedPercent < 95 || pendingSeekPosition > 0));
-  const pipeline = usePlaybackPipelineStatus(
+  const liveTrace = usePlaybackLiveTrace(
     {
       path: filePath,
       infoHash,
       baseUrl: baseUrlProp,
     },
-    shouldShowBuffering || Boolean(error),
+    true,
+    videoRef,
+    hlsRef,
+    isRemoteStream,
   );
+  const pipelineDebugUrl = playbackDebugUrl({
+    path: filePath,
+    infoHash,
+    fileId: liveTrace.status?.file_id,
+    baseUrl: baseUrlProp,
+  });
   /** En cas d'erreur, garder les contrôles visibles pour permettre d'appuyer sur Retour */
   const effectiveShowControls = showControls || !!displayError;
 
@@ -512,8 +522,9 @@ export default function HLSPlayer({
             posterUrl={posterUrl}
             imageUrl={posterUrl}
             isActiveSession
-            pipelineStatus={pipeline.status}
-            debugLogsUrl={pipeline.debugUrl}
+            pipelineStatus={liveTrace.status}
+            debugLogsUrl={pipelineDebugUrl}
+            liveTrace={liveTrace}
             onCancel={onClose}
             onRetry={() => window.location.reload()}
           />
@@ -523,7 +534,7 @@ export default function HLSPlayer({
             title={torrentName || fileName}
             bufferedPercent={overlayBufferedPercent}
             detailMessage={
-              pipelineHeadline(pipeline.status, t) ||
+              pipelineHeadline(liveTrace.status, t) ||
               loadingStatusMessage ||
               (isLocalLibraryMedia && isLoading
                 ? t('playback.phase.preparingPlayback') || 'Préparation de la lecture…'
@@ -534,8 +545,9 @@ export default function HLSPlayer({
             imageUrl={posterUrl}
             onClose={onClose}
             closeLabel={t('playback.stopPlayback') || t('common.close')}
-            pipelineStatus={pipeline.status}
-            debugLogsUrl={pipeline.debugUrl}
+            pipelineStatus={liveTrace.status}
+            debugLogsUrl={pipelineDebugUrl}
+            liveTrace={liveTrace}
           />
         )}
         <video

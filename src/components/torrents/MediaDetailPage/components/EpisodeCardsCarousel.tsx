@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { ChevronLeft, ChevronRight, CircleCheck, Play, Download, CloudDownload, HardDrive } from 'lucide-preact';
 import { isTVPlatform } from '../../../../lib/utils/device-detection';
 import { PlaybackStatusSurface } from '../../../streaming/player-shared/components/PlaybackStatusSurface';
+import { DsLoader } from '../../../ui/DsLoader';
 import { computeReliableProgressPercent } from '../../../streaming/player-shared/derivePlaybackPhase';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 
@@ -157,13 +158,9 @@ export function EpisodeCardsCarousel({
                     <div className="absolute inset-0 z-20 overflow-hidden pointer-events-none">
                       <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" />
                       <div className="absolute inset-0 flex flex-col items-center justify-center p-4 gap-3">
-                        <div className="relative w-14 h-14">
-                          <div className="absolute inset-0 rounded-full border-2 border-white/10" />
-                          <div className="absolute inset-0 rounded-full border-2 border-primary-400 border-t-transparent animate-spin" />
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <CloudDownload className="w-6 h-6 text-primary-300" />
-                          </div>
-                        </div>
+                        <DsLoader size="md" withLogo={false}>
+                          <CloudDownload className="w-6 h-6 text-[var(--ds-accent-violet)]" />
+                        </DsLoader>
                         <PlaybackStatusSurface
                           variant="chip"
                           playStatus="downloading"

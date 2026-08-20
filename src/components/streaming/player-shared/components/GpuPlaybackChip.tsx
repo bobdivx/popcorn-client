@@ -61,8 +61,8 @@ export default function GpuPlaybackChip({
     <span
       className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
         isGpu
-          ? 'border-emerald-400/35 bg-emerald-500/15 text-emerald-200'
-          : 'border-amber-400/35 bg-amber-500/15 text-amber-200'
+          ? 'border-[var(--ds-accent-green)]/40 bg-[var(--ds-accent-green)]/15 text-[var(--ds-text-primary)]'
+          : 'border-[var(--ds-accent-yellow)]/40 bg-[var(--ds-accent-yellow)]/15 text-[var(--ds-text-primary)]'
       } ${className}`}
       title={label}
     >

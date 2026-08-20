@@ -23,6 +23,15 @@ export interface PlaybackPipelineStatus {
   encoding_hwaccel?: string | null;
   cuda_decode_available?: boolean;
   gpu_available?: boolean;
+  min_playable_segments?: number;
+  eta_playable_seconds?: number | null;
+  generation_elapsed_seconds?: number | null;
+}
+
+export interface PlaybackPipelineLogs {
+  file_id?: string | null;
+  needles: string[];
+  lines: string[];
 }
 
 export interface PlaybackPipelineQuery {
@@ -62,6 +71,39 @@ export async function fetchPlaybackStatus(
     });
     if (!res.ok) return null;
     const json = (await res.json()) as { success?: boolean; data?: PlaybackPipelineStatus };
+    return json.data ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function playbackLogsUrl(query: PlaybackPipelineQuery & { fileId?: string | null }): string {
+  const base = backendBase(query.baseUrl);
+  const params = new URLSearchParams();
+  if (query.fileId) params.set('file_id', query.fileId);
+  else if (query.path) params.set('path', query.path);
+  if (query.infoHash) params.set('info_hash', query.infoHash);
+  params.set('limit', '80');
+  return `${base}/api/local/playback/logs?${params.toString()}`;
+}
+
+export async function fetchPlaybackLogs(
+  query: PlaybackPipelineQuery,
+): Promise<PlaybackPipelineLogs | null> {
+  const base = backendBase(query.baseUrl);
+  if (!base) return null;
+  const params = new URLSearchParams();
+  if (query.fileId) params.set('file_id', query.fileId);
+  if (query.path) params.set('path', query.path.replace(/\/playlist\.m3u8$/i, ''));
+  if (query.infoHash) params.set('info_hash', query.infoHash);
+  params.set('limit', '80');
+  if (![...params.keys()].some((k) => k !== 'limit')) return null;
+  try {
+    const res = await fetch(`${base}/api/local/playback/logs?${params.toString()}`, {
+      credentials: 'include',
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { success?: boolean; data?: PlaybackPipelineLogs };
     return json.data ?? null;
   } catch {
     return null;

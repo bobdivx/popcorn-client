@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'preact/hooks';
-import { Info, Loader2 } from 'lucide-preact';
+import { Info } from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
 import { formatSize } from '../utils/formatSize';
 import { useI18n } from '../../../../lib/i18n/useI18n';
@@ -7,6 +7,7 @@ import { serverApi } from '../../../../lib/client/server-api';
 import { getLibraryDisplayConfig } from '../../../../lib/utils/library-display-config';
 import { buildExternalDownloadParams } from '../../../../lib/torrents/externalDownloadParams';
 import { Modal } from '../../../ui/Modal';
+import { DsLoader } from '../../../ui/DsLoader';
 
 type QualityVariant = {
   id: string;
@@ -501,7 +502,7 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
                 className="flex w-full min-w-0 flex-wrap items-center gap-2 rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] px-4 py-3 text-left text-sm font-semibold text-[var(--ds-text-primary)] transition-colors hover:bg-[var(--ds-surface-overlay)] disabled:cursor-default disabled:opacity-70"
               >
                 {isDownloadingTorrent ? (
-                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+                  <DsLoader size="xs" className="shrink-0" />
                 ) : (
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01" />

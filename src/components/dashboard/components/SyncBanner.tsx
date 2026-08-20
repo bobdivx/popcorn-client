@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { serverApi } from '../../../lib/client/server-api';
 import { calculateSyncProgress } from '../../../lib/utils/sync-progress';
 import { useI18n } from '../../../lib/i18n/useI18n';
+import { DsLoader } from '../../ui/DsLoader';
 
 interface SyncStatus {
   sync_in_progress: boolean;
@@ -81,20 +82,7 @@ export function SyncBanner() {
     <div className="bg-gradient-to-r from-blue-900/40 to-purple-900/40 border-b-2 border-blue-500/50 px-4 py-3 animate-fade-in">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-1">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5 text-blue-400 animate-spin flex-shrink-0"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
+          <DsLoader size="xs" className="text-blue-400 shrink-0" />
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">

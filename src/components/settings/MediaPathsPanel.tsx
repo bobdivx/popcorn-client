@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
-import { FolderOpen, Folder, Loader2 } from 'lucide-preact';
+import { FolderOpen, Folder } from 'lucide-preact';
 import { Modal } from '../ui/Modal';
+import { DsLoader } from '../ui/DsLoader';
 
 type MediaPathType = 'films' | 'series';
 
@@ -117,8 +118,7 @@ export default function MediaPathsPanel({ onBack }: MediaPathsPanelProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
-        <span className="ml-3 text-gray-400">{t('settingsMenu.mediaPathsPanel.loading')}</span>
+        <DsLoader size="md" className="ds-loader--inline" text={t('settingsMenu.mediaPathsPanel.loading')} />
       </div>
     );
   }
@@ -212,7 +212,7 @@ export default function MediaPathsPanel({ onBack }: MediaPathsPanelProps) {
           <div className="flex-1 overflow-y-auto p-2 min-h-[200px]">
             {browseLoading ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-primary-500" />
+                <DsLoader size="sm" />
               </div>
             ) : (
               <ul className="space-y-0.5">
@@ -267,7 +267,7 @@ export default function MediaPathsPanel({ onBack }: MediaPathsPanelProps) {
               className="btn btn-primary btn-sm ml-auto"
               data-autofocus
             >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {saving ? <DsLoader size="xs" /> : null}
               {t('settingsMenu.mediaPathsPanel.chooseFolder')}
             </button>
           </div>

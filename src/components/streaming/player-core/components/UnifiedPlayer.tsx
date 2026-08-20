@@ -1,3 +1,4 @@
+import { useRef } from 'preact/hooks';
 import HLSPlayer from '../../hls-player/HLSPlayer';
 import type { HLSPlayerProps } from '../../hls-player/types';
 import LuciePlayer from '../../lucie-player/LuciePlayer';
@@ -6,8 +7,8 @@ import DirectVideoPlayer from '../../direct-player/DirectVideoPlayer';
 import PlayerLoadingOverlay, {
   type PlayerLoadingTorrentStats,
 } from '../../player-shared/components/PlayerLoadingOverlay';
-import { usePlaybackPipelineStatus } from '../../player-shared/hooks/usePlaybackPipelineStatus';
-import { pipelineHeadline } from '../../../../lib/streaming/playbackPipeline';
+import { usePlaybackLiveTrace } from '../../player-shared/hooks/usePlaybackLiveTrace';
+import { playbackDebugUrl, pipelineHeadline } from '../../../../lib/streaming/playbackPipeline';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 
 /**
@@ -64,17 +65,28 @@ export default function UnifiedPlayer({
   onProgress,
 }: UnifiedPlayerProps) {
   const { t } = useI18n();
-  const pipeline = usePlaybackPipelineStatus(
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const hlsRef = useRef<{ bandwidthEstimate?: number } | null>(null);
+  const liveTrace = usePlaybackLiveTrace(
     {
       path: hlsProps.filePath,
       infoHash: hlsProps.infoHash,
       baseUrl: hlsProps.baseUrl,
     },
     loading && !useDirectPlayer,
+    videoRef,
+    hlsRef,
+    Boolean(hlsProps.isRemoteStream),
   );
-  const pipelineMessage = pipeline.status
-    ? pipelineHeadline(pipeline.status, t)
+  const pipelineMessage = liveTrace.status
+    ? pipelineHeadline(liveTrace.status, t)
     : loadingMessage;
+  const debugUrl = playbackDebugUrl({
+    path: hlsProps.filePath,
+    infoHash: hlsProps.infoHash,
+    fileId: liveTrace.status?.file_id,
+    baseUrl: hlsProps.baseUrl,
+  });
 
   return (
     <>
@@ -90,8 +102,9 @@ export default function UnifiedPlayer({
           onCancel={onClose}
           onAbortDownload={onAbortDownload}
           cancelLabel={cancelLabel ?? closeLabel}
-          pipelineStatus={pipeline.status}
-          debugLogsUrl={pipeline.debugUrl}
+          pipelineStatus={liveTrace.status}
+          debugLogsUrl={debugUrl}
+          liveTrace={liveTrace}
         />
       )}
 

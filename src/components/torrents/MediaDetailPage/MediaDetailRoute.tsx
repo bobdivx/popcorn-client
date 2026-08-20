@@ -12,6 +12,7 @@ import type {
   SeriesSeasonInfo,
 } from '../../../lib/client/server-api/media';
 import { episodeReleaseMatchesVariantName } from '../../../lib/utils/episodeReleaseMatch';
+import { DsLoader } from '../../ui/DsLoader';
 
 type Torrent = MediaDetailPageProps['torrent'];
 
@@ -2004,13 +2005,7 @@ export default function MediaDetailRoute() {
   if (loading) {
     return (
       <div className="min-h-[60vh] flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative w-16 h-16 mb-4 mx-auto">
-            <div className="absolute inset-0 border-4 border-primary-600/20 rounded-full"></div>
-            <div className="absolute inset-0 border-4 border-primary-600 border-t-transparent rounded-full animate-spin"></div>
-          </div>
-          <p className="text-white/80">Chargement...</p>
-        </div>
+        <DsLoader size="lg" text="Chargement..." />
       </div>
     );
   }

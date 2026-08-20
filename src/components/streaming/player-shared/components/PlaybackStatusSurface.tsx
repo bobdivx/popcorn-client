@@ -3,7 +3,12 @@ import { useI18n } from '../../../../lib/i18n/useI18n';
 import { formatBytes, formatSpeed, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
 import { generateQRCode } from '../../../../lib/utils/qrcode';
 import { pipelineHeadline, type PlaybackPipelineStatus } from '../../../../lib/streaming/playbackPipeline';
+import { formatEtaSeconds } from '../../../../lib/streaming/networkPlaybackProfile';
+import { PlaybackLiveTrace } from './PlaybackLiveTrace';
+import type { PlaybackLiveTraceState } from '../hooks/usePlaybackLiveTrace';
 import GpuPlaybackChip from './GpuPlaybackChip';
+import { DsLoader } from '../../../ui/DsLoader';
+import { DsProgressRing } from '../../../ui/DsProgressRing';
 import {
   PLAYBACK_PHASE_I18N_KEYS,
   derivePlaybackPhase,
@@ -63,6 +68,7 @@ export interface PlaybackStatusSurfaceProps {
   className?: string;
   pipelineStatus?: PlaybackPipelineStatus | null;
   debugLogsUrl?: string | null;
+  liveTrace?: PlaybackLiveTraceState | null;
 }
 
 const STEP_KEYS = ['queue', 'metadata', 'peers', 'download'] as const;
@@ -98,6 +104,24 @@ function MediaPoster({
       <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-xl" />
     </div>
   );
+}
+
+function pipelineUserDetail(
+  status: PlaybackPipelineStatus | null,
+  progressMessage: string | null | undefined,
+  phaseLabelText: string,
+  t: (k: string, p?: Record<string, string | number>) => string,
+): string | null {
+  const eta = status?.eta_playable_seconds;
+  if (eta != null && eta > 0) {
+    return t('playback.hls.etaPlayable', { eta: formatEtaSeconds(eta) });
+  }
+  const headline = pipelineHeadline(status, t);
+  const fromProgress =
+    progressMessage && progressMessage !== phaseLabelText ? progressMessage : null;
+  const detail = fromProgress || headline;
+  if (!detail || detail === phaseLabelText) return null;
+  return detail;
 }
 
 function PipelinePanel({
@@ -139,47 +163,40 @@ function PipelinePanel({
 
   return (
     <div className="w-full min-w-0 space-y-2">
-      <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 space-y-2">
-        <div>
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold">
-              {t('playback.hls.serverPipeline')}
-            </span>
-            <span className="text-[11px] text-white/55 tabular-nums truncate">
-              {status
-                ? t('playback.hls.segmentsReady', {
-                    ready: status.segment_count,
-                    expected: status.expected_segments || '…',
-                  })
-                : t('playback.hls.serverPreparing')}
-            </span>
+      <div className="rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]/40 px-3 py-2.5 space-y-3">
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-wider text-[var(--ds-text-tertiary)] font-semibold mb-1">
+            {t('playback.hls.serverPipeline')}
           </div>
-          <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+          <div className="text-[11px] text-[var(--ds-text-secondary)] tabular-nums mb-1.5 break-words">
+            {status
+              ? t('playback.hls.segmentsReady', {
+                  ready: status.segment_count,
+                  expected: status.expected_segments || '…',
+                })
+              : t('playback.hls.serverPreparing')}
+          </div>
+          <div className="h-1 rounded-full bg-[var(--ds-border)] overflow-hidden">
             <div
-              className="h-full rounded-full bg-amber-400 transition-[width] duration-500"
+              className="h-full rounded-full bg-[var(--ds-accent-yellow)] transition-[width] duration-500"
               style={{ width: `${serverPct ?? 10}%` }}
             />
           </div>
         </div>
-        <div>
-          <div className="flex items-center justify-between gap-2 mb-1">
-            <span className="text-[10px] uppercase tracking-wider text-white/40 font-semibold">
-              {t('playback.hls.playerBuffer')}
-            </span>
-            <span className="text-[11px] text-white/55 tabular-nums">
-              {playerPct != null
-                ? `${Math.round(playerPct)}%`
-                : t('playback.hls.playlistReady')}
-            </span>
+        <div className="min-w-0">
+          <div className="text-[10px] uppercase tracking-wider text-[var(--ds-text-tertiary)] font-semibold mb-1">
+            {t('playback.hls.playerBuffer')}
           </div>
-          <div className="h-1 rounded-full bg-white/10 overflow-hidden">
+          <div className="text-[11px] text-[var(--ds-text-secondary)] tabular-nums mb-1.5 break-words">
+            {playerPct != null ? `${Math.round(playerPct)}%` : t('playback.hls.playlistReady')}
+          </div>
+          <div className="h-1 rounded-full bg-[var(--ds-border)] overflow-hidden">
             <div
-              className="h-full rounded-full bg-primary-400 transition-[width] duration-500"
+              className="h-full rounded-full bg-[var(--ds-accent-violet)] transition-[width] duration-500"
               style={{ width: `${playerPct ?? 4}%` }}
             />
           </div>
         </div>
-        <p className="text-[11px] text-white/50 line-clamp-2">{pipelineHeadline(status, t)}</p>
       </div>
       {showDebug && debugUrl ? (
         <div className="flex flex-col items-center gap-2">
@@ -231,46 +248,35 @@ function ProgressRing({
   percent: number | null;
   spinning: boolean;
 }) {
-  const r = 52;
-  const c = 2 * Math.PI * r;
   const p = percent != null ? Math.max(0, Math.min(100, percent)) : null;
-  const offset = p != null ? c * (1 - p / 100) : c * 0.82;
+  const showSpin = spinning && p == null;
 
   return (
-    <div className="relative w-16 h-16 sm:w-24 sm:h-24 mx-auto shrink-0">
-      <div className="absolute inset-2 rounded-full bg-primary-600/15 blur-xl animate-pulse" />
-      <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 120 120">
-        <circle cx="60" cy="60" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="5" />
-        <circle
-          cx="60"
-          cy="60"
-          r={r}
-          fill="none"
-          stroke="currentColor"
-          className="text-primary-500 transition-[stroke-dashoffset] duration-700 ease-out"
-          strokeWidth="5"
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={offset}
-        />
-      </svg>
-      {spinning && (
-        <div className="absolute inset-[10px] rounded-full border-2 border-primary-400/25 border-t-primary-400 animate-spin" />
-      )}
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        {p != null ? (
-          <span className="text-lg sm:text-2xl font-bold text-white tabular-nums tracking-tight leading-none">
-            {Math.round(p)}
-            <span className="text-sm sm:text-lg text-primary-300">%</span>
-          </span>
+    <div className="ds-loader ds-loader--lg ds-loader--player" role="status" aria-busy="true">
+      <div className="ds-loader-mark">
+        {showSpin ? (
+          <>
+            <div className="ds-loader-track" />
+            <div className="ds-loader-spin" />
+          </>
         ) : (
-          <img
-            src="/popcorn_logo.png"
-            alt=""
-            className="w-6 h-6 sm:w-8 sm:h-8 object-contain opacity-90 drop-shadow-[0_0_10px_rgba(220,38,38,0.4)] animate-pulse"
+          <DsProgressRing
+            value={p ?? 0}
+            size={96}
+            strokeWidth={3.25}
+            aria-label={p != null ? `${Math.round(p)}%` : undefined}
           />
         )}
+        <div className="ds-loader-core">
+          <img src="/popcorn_logo.png" alt="" className="ds-loader-logo loading-icon-logo" />
+        </div>
       </div>
+      {p != null ? (
+        <p className="ds-loader-percent">
+          {Math.round(p)}
+          <span>%</span>
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -343,6 +349,7 @@ export function PlaybackStatusSurface({
   className = '',
   pipelineStatus = null,
   debugLogsUrl = null,
+  liveTrace = null,
 }: PlaybackStatusSurfaceProps) {
   const { t } = useI18n();
   const [confirmingCancel, setConfirmingCancel] = useState(false);
@@ -361,6 +368,7 @@ export function PlaybackStatusSurface({
   });
 
   const label = phaseLabel(t, derived.phase) || progressMessage || '';
+  const bufferDetail = pipelineUserDetail(pipelineStatus, progressMessage, label, t);
   const na = t('playback.metric.na') || '—';
   const speedLabel =
     derived.downloadSpeed != null && derived.downloadSpeed > 0
@@ -397,7 +405,7 @@ export function PlaybackStatusSurface({
         className={`inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 backdrop-blur-md px-2.5 py-1 text-[11px] font-semibold text-white/90 ${className}`}
         title={label}
       >
-        <img src="/popcorn_logo.png" alt="" className="w-3.5 h-3.5 object-contain opacity-90" />
+        <DsLoader size="xs" className="shrink-0" />
         {pct != null ? `${Math.round(pct)}%` : label}
       </span>
     );
@@ -437,6 +445,9 @@ export function PlaybackStatusSurface({
             </div>
           )}
           <div className="flex-1 min-w-0 px-3.5 py-3 flex items-center gap-3">
+            {(derived.phase === 'resolving' || derived.phase === 'findingPeers' || derived.phase === 'buffering') && (
+              <DsLoader size="xs" className="shrink-0" />
+            )}
             <div className="flex-1 min-w-0 space-y-1.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold uppercase tracking-wider text-white/55 truncate">
@@ -517,11 +528,11 @@ export function PlaybackStatusSurface({
               ) : (
                 <h2 className="text-white/80 text-sm font-medium tracking-tight">Popcornn</h2>
               )}
-              <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                <p className="text-[11px] text-white/50 font-medium tracking-wide uppercase line-clamp-1 min-w-0">
+              <div className="mt-1 flex flex-wrap items-center gap-1.5 min-w-0">
+                <p className="text-[11px] text-[var(--ds-text-tertiary)] font-medium tracking-wide uppercase min-w-0">
                   {label || t('playback.loadingVideo')}
                 </p>
-                <GpuPlaybackChip pipeline={pipelineStatus} />
+                {showDebug ? <GpuPlaybackChip pipeline={pipelineStatus} /> : null}
               </div>
             </div>
           </div>
@@ -616,13 +627,14 @@ export function PlaybackStatusSurface({
                   </button>
                 ) : null}
               </div>
-              {debugLogsUrl || pipelineStatus ? (
-                <div className="mt-5 w-full">
+              {showDebug && (debugLogsUrl || pipelineStatus || liveTrace) ? (
+                <div className="mt-5 w-full space-y-2">
+                  {liveTrace ? <PlaybackLiveTrace trace={liveTrace} /> : null}
                   <PipelinePanel
                     status={pipelineStatus ?? null}
                     debugUrl={debugLogsUrl}
                     bufferedPercent={bufferedPercent}
-                    showDebug={showDebug}
+                    showDebug
                     t={t}
                   />
                 </div>
@@ -630,46 +642,42 @@ export function PlaybackStatusSurface({
             </div>
           ) : (
             <>
-              {showSteps ||
-              !(
+              <div className="flex flex-col items-center text-center w-full py-2 sm:py-3">
+                <ProgressRing
+                  percent={
+                    isBuffering || derived.phase === 'buffering' || derived.phase === 'preparingPlayback'
+                      ? bufferedPercent != null && bufferedPercent > 0 && bufferedPercent < 100
+                        ? bufferedPercent
+                        : null
+                      : derived.progressPercent
+                  }
+                  spinning={
+                    derived.phase === 'resolving' ||
+                    derived.phase === 'findingPeers' ||
+                    derived.phase === 'preparingPlayback' ||
+                    derived.phase === 'buffering'
+                  }
+                />
+
+                {bufferDetail ? (
+                  <p className="text-[var(--ds-text-secondary)] text-sm mt-3 mb-1 font-normal break-words px-2 leading-snug max-w-[18rem]">
+                    {bufferDetail}
+                  </p>
+                ) : null}
+              </div>
+
+              {showDebug &&
+              (derived.phase === 'preparingPlayback' ||
                 derived.phase === 'buffering' ||
-                derived.phase === 'preparingPlayback' ||
-                pipelineStatus
-              ) ? (
-                <div className="mb-3">
-                  <ProgressRing
-                    percent={
-                      isBuffering || derived.phase === 'buffering' || derived.phase === 'preparingPlayback'
-                        ? bufferedPercent != null && bufferedPercent > 0 && bufferedPercent < 100
-                          ? bufferedPercent
-                          : null
-                        : derived.progressPercent
-                    }
-                    spinning={
-                      derived.phase === 'resolving' ||
-                      derived.phase === 'findingPeers' ||
-                      derived.phase === 'preparingPlayback' ||
-                      derived.phase === 'buffering'
-                    }
-                  />
-                </div>
-              ) : null}
-
-              {progressMessage && progressMessage !== label ? (
-                <p className="text-white/50 text-xs text-center mb-2 font-light break-words line-clamp-2 px-1">
-                  {progressMessage}
-                </p>
-              ) : null}
-
-              {derived.phase === 'preparingPlayback' ||
-              derived.phase === 'buffering' ||
-              pipelineStatus ? (
-                <div className="mb-3">
+                pipelineStatus ||
+                liveTrace) ? (
+                <div className="mb-3 space-y-2">
+                  {liveTrace ? <PlaybackLiveTrace trace={liveTrace} /> : null}
                   <PipelinePanel
                     status={pipelineStatus ?? null}
                     debugUrl={debugLogsUrl}
                     bufferedPercent={bufferedPercent}
-                    showDebug={showDebug}
+                    showDebug
                     t={t}
                   />
                 </div>

@@ -17,14 +17,14 @@ import {
   DsSettingsSectionCard,
   DsCard,
   DsCardSection,
-  LoadingIcon,
+  DsLoader,
   FullScreenLoadingOverlay,
 } from '../ui/design-system';
 import { Modal } from '../ui/Modal';
 import { useConfirmDialog } from '../ui/useConfirmDialog';
 import { DescriptionPreview } from '../upload/DescriptionPreview';
 import type { Chart } from 'chart.js';
-import { ArrowLeft, ArrowRight, Check, Loader2, Search, Upload, Film, Radar, Images, Activity } from 'lucide-preact';
+import { ArrowLeft, ArrowRight, Check, Search, Upload, Film, Radar, Images, Activity } from 'lucide-preact';
 
 let GlobalChart: any = null;
 async function getChart() {
@@ -333,9 +333,7 @@ function LoadingAssistantView({
       title={t('settings.uploadTrackerPanel.uploadAssistantTitle')}
       description={t('settings.uploadTrackerPanel.uploadAssistantDescription')}
       iconContent={
-        <LoadingIcon>
-          <Upload className="w-8 h-8 text-[var(--ds-accent-violet)]" strokeWidth={1.8} aria-hidden />
-        </LoadingIcon>
+        <Upload className="w-8 h-8 text-[var(--ds-accent-violet)]" strokeWidth={1.8} aria-hidden />
       }
     >
           <div className="w-full space-y-3 max-w-lg mx-auto mt-6">
@@ -345,7 +343,7 @@ function LoadingAssistantView({
               }`}
             >
               {loadingLibrary ? (
-                <Loader2 className="w-5 h-5 shrink-0 text-primary animate-spin" aria-hidden />
+                <DsLoader size="xs" className="shrink-0 text-primary" />
               ) : (
                 <Check className="w-5 h-5 shrink-0 text-success" aria-hidden />
               )}
@@ -355,7 +353,7 @@ function LoadingAssistantView({
             </div>
             {loadingConfig && (
               <div className="flex items-center justify-center gap-3 rounded-lg px-4 py-3 bg-primary/10">
-                <Loader2 className="w-5 h-5 shrink-0 text-primary animate-spin" aria-hidden />
+                <DsLoader size="xs" className="shrink-0 text-primary" />
                 <span className="text-sm sm:text-base text-base-content/90 break-words">
                   {t('settings.uploadTrackerPanel.loadingStepConfig')}
                 </span>
@@ -2118,7 +2116,7 @@ export default function UploadAssistantPanel() {
             {/* NFO et description : accessibles via boutons / modales */}
             {previewLoading && (
               <p className="text-sm text-base-content/70 mt-4 flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                <DsLoader size="xs" className="shrink-0" />
                 {t('settings.uploadTrackerPanel.previewLoading')}
               </p>
             )}
@@ -2147,7 +2145,7 @@ export default function UploadAssistantPanel() {
                   >
                     {uploading ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <DsLoader size="xs" />
                         {t('common.loading')}
                       </>
                     ) : (

@@ -15,6 +15,8 @@ import { emitPlaybackStep } from '../../player-core/observability/playbackEvents
 import { minBufferAfterSeekSec } from '../../player-core/policies/SeekPolicy';
 import { buildProxyUrl, normalizeStreamPath } from '../../player-core/utils/buildStreamUrl';
 import { getBufferAheadSeconds, minBufferBeforePlaySec } from '../../player-shared/utils/bufferMetrics';
+import { getNetworkPlaybackProfile } from '../../../../lib/streaming/networkPlaybackProfile';
+import { armHlsQualityLadder, pinHlsToLowestLevel } from '../../../../lib/streaming/hlsQualityLadder';
 
 interface UseHlsPlayerProps {
   src: string;
@@ -365,9 +367,9 @@ export function useHlsPlayer({
           throw new Error('HLS.js n\'est pas disponible ou n\'est pas supporté par ce navigateur');
         }
 
-        // Options HLS.js : VOD local = buffer large sans low-latency (évite les micro-coupures).
-        // Stream distant : lowLatencyMode pour TTFF.
-        const maxBufferLength = isRemoteStream ? 120 : 90;
+        // Options HLS.js : profil réseau (4G vs Wi‑Fi) + VOD local vs flux distant.
+        const net = getNetworkPlaybackProfile(isRemoteStream);
+        const maxBufferLength = net.maxBufferLength;
         const hls = new window.Hls({
           enableWorker: true,
           lowLatencyMode: Boolean(isRemoteStream),
@@ -385,12 +387,12 @@ export function useHlsPlayer({
           abrEwmaSlowLive: 9,
           abrEwmaFastVOD: 3,
           abrEwmaSlowVOD: 9,
-          abrBandWidthFactor: 0.8,
-          abrBandWidthUpFactor: 0.7,
+          abrBandWidthFactor: net.abrBandWidthFactor,
+          abrBandWidthUpFactor: Math.min(0.7, net.abrBandWidthFactor),
           abrMaxWithRealBitrate: true,
-          // Qualité adaptée au player et démarrage rapide
+          // Qualité adaptée au player et au débit ; 4G démarre au niveau le plus bas.
           capLevelToPlayerSize: true,
-          startLevel: -1,
+          startLevel: 0,
           // Timeouts : plus longs pour flux distant (latence réseau) et prévenir le drop massif
           fragLoadingTimeOut: isRemoteStream ? 90000 : 60000,
           manifestLoadingTimeOut: isRemoteStream ? 60000 : 45000,
@@ -418,6 +420,7 @@ export function useHlsPlayer({
           },
         });
         hlsRef.current = hls;
+        cleanupFunctions.push(armHlsQualityLadder(hls, video));
 
         // Changement de qualité (même fichier, autre max_height) : conserver la position
         if (
@@ -583,11 +586,22 @@ export function useHlsPlayer({
             });
           }
         };
+        const handlePlaying = () => {
+          handlePlay();
+          const ahead = getBufferAheadSeconds(video.buffered, video.currentTime || 0);
+          if (ahead < 1 && (video.currentTime || 0) < 0.2) return;
+          hasStartedPlayingRef.current = true;
+          setLoadingStatusMessage(null);
+          setIsLoading(false);
+          onLoadingChangeRef.current?.(false);
+        };
         video.addEventListener('pause', handlePause);
         video.addEventListener('play', handlePlay);
+        video.addEventListener('playing', handlePlaying);
         cleanupFunctions.push(() => {
           video.removeEventListener('pause', handlePause);
           video.removeEventListener('play', handlePlay);
+          video.removeEventListener('playing', handlePlaying);
           if (pauseUnregisterTimeoutRef.current !== null) {
             clearTimeout(pauseUnregisterTimeoutRef.current);
             pauseUnregisterTimeoutRef.current = null;
@@ -972,6 +986,24 @@ export function useHlsPlayer({
         hls.on(window.Hls.Events.ERROR, (event: any, data: any) => {
           const HlsErrorTypes = window.Hls.ErrorTypes;
           const statusCode = data?.response?.code;
+          const errLevel = typeof data?.level === 'number' ? data.level : data?.frag?.level;
+          if (
+            typeof errLevel === 'number' &&
+            errLevel > 0 &&
+            (data.details === 'levelLoadError' ||
+              data.details === 'fragLoadError' ||
+              data.details === 'fragLoadTimeOut') &&
+            pinHlsToLowestLevel(hls)
+          ) {
+            if (data.fatal) {
+              try {
+                hls.startLoad();
+              } catch (_) {
+                /* ignore */
+              }
+            }
+            return;
+          }
 
           // Jellyfin bindEventsToHlsPlayer: erreur réseau avec code >= 400 → destroy
           if (data.type === HlsErrorTypes?.NETWORK_ERROR && typeof statusCode === 'number' && statusCode >= 400) {
