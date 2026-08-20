@@ -9,6 +9,9 @@ import {
   scrubUrlForIndex,
 } from './scrubMath';
 
+/** Délai après la dernière flèche avant de seek vers la miniature sélectionnée. */
+const SCRUB_SETTLE_MS = 2000;
+
 export function useScrubNav(options: {
   scrubEnabled: boolean;
   scrubThumbnails: ScrubThumbnailsMeta | null;
@@ -83,7 +86,6 @@ export function useScrubNav(options: {
   durationRef.current = duration;
   const isBrowsingScrubRef = useRef(isBrowsingScrub);
   isBrowsingScrubRef.current = isBrowsingScrub;
-  const skipStripHideTimeoutRef = useRef<number | null>(null);
   const userScrubbedRef = useRef(false);
   const isDraggingRef = useRef(false);
   isDraggingRef.current = isDraggingScrub;
@@ -115,6 +117,7 @@ export function useScrubNav(options: {
     const wasOpen = prevShowControlsRef.current;
     prevShowControlsRef.current = showControls;
     if (wasOpen || !showControls || !scrubEnabled || isTV) return;
+    if (userScrubbedRef.current) return;
     const st = scrubThumbnailsRef.current;
     if (!st || !st.count) return;
     const effectiveDuration = scrubEffectiveDuration(duration, st);
@@ -144,7 +147,7 @@ export function useScrubNav(options: {
       prevPausedTimeRef.current = null;
       return;
     }
-    if (!scrubEnabled || isTV || !showControls || isDraggingRef.current) return;
+    if (!scrubEnabled || isTV || !showControls || isDraggingRef.current || userScrubbedRef.current) return;
     const st = scrubThumbnailsRef.current;
     if (!st?.count) return;
     const t = currentTime;
@@ -207,73 +210,37 @@ export function useScrubNav(options: {
 
       if (!isNavKey) return;
 
-      const controlsVisible = showControlsRef.current;
       const st = scrubThumbnailsRef.current;
       const count = st?.count ?? 0;
-      const effectiveDuration = scrubEffectiveDuration(durationRef.current, st);
-
-      // Chrome masqué : skip immédiat ±10 s (YouTube), même sans miniatures.
-      if (!controlsVisible) {
-        e.preventDefault();
-        e.stopPropagation();
-        const delta =
-          keyNormalized === 'ArrowLeft' || keyNormalized === 'PageDown' || keyNormalized === 'Home'
-            ? keyNormalized === 'Home'
-              ? -effectiveDuration
-              : keyNormalized === 'PageDown'
-                ? -60
-                : -10
-            : keyNormalized === 'End'
-              ? effectiveDuration
-              : keyNormalized === 'PageUp'
-                ? 60
-                : 10;
-        const dur = effectiveDuration > 0 ? effectiveDuration : durationRef.current;
-        if (!dur) return;
-        const next = Math.max(0, Math.min(dur, currentTimeRef.current + delta));
-        onRevealControlsRef.current?.();
-        if (scrubEnabled && st?.count) {
-          const pct = (next / dur) * 100;
-          const idx = scrubIndexFromTimelinePercent(pct, dur, st);
-          setTvScrubIndexInternal(idx);
-          setIsBrowsingScrub(true);
-          userScrubbedRef.current = false;
-          if (skipStripHideTimeoutRef.current != null) window.clearTimeout(skipStripHideTimeoutRef.current);
-          skipStripHideTimeoutRef.current = window.setTimeout(() => {
-            skipStripHideTimeoutRef.current = null;
-            setIsBrowsingScrub(false);
-          }, 1600);
-        }
-        onSeekToTimeRef.current?.(next);
-        return;
-      }
-
       if (!scrubEnabled || count <= 0) return;
 
       e.preventDefault();
       e.stopPropagation();
+      onRevealControlsRef.current?.();
+
+      const startFromPlayhead = !isBrowsingScrubRef.current;
+      const dur = scrubEffectiveDuration(durationRef.current, st);
+      const playheadIdx =
+        dur > 0
+          ? scrubIndexFromTimelinePercent((currentTimeRef.current / dur) * 100, dur, st)
+          : tvScrubInternalRef.current;
+
       setIsBrowsingScrub(true);
       userScrubbedRef.current = true;
       setTvScrubIndexInternal((prev) => {
-        let nextIdx = prev;
+        let nextIdx = startFromPlayhead ? playheadIdx : prev;
         const step = keyNormalized === 'PageUp' || keyNormalized === 'PageDown' ? 5 : 1;
         if (keyNormalized === 'ArrowLeft' || keyNormalized === 'PageDown')
-          nextIdx = Math.max(0, prev - step);
+          nextIdx = Math.max(0, nextIdx - step);
         if (keyNormalized === 'ArrowRight' || keyNormalized === 'PageUp')
-          nextIdx = Math.min(count - 1, prev + step);
+          nextIdx = Math.min(count - 1, nextIdx + step);
         if (keyNormalized === 'Home') nextIdx = 0;
         if (keyNormalized === 'End') nextIdx = count - 1;
         return nextIdx;
       });
     };
     window.addEventListener('keydown', onKeyDownCapture, true);
-    return () => {
-      window.removeEventListener('keydown', onKeyDownCapture, true);
-      if (skipStripHideTimeoutRef.current != null) {
-        window.clearTimeout(skipStripHideTimeoutRef.current);
-        skipStripHideTimeoutRef.current = null;
-      }
-    };
+    return () => window.removeEventListener('keydown', onKeyDownCapture, true);
   }, [isTV, scrubEnabled]);
 
   useEffect(() => {
@@ -285,7 +252,7 @@ export function useScrubNav(options: {
       onSeekToTimeRef.current?.(targetTime);
       userScrubbedRef.current = false;
       setIsBrowsingScrub(false);
-    }, 1400);
+    }, SCRUB_SETTLE_MS);
     return () => window.clearTimeout(id);
   }, [isTV, showControls, scrubEnabled, tvScrubIndexInternal, isDraggingScrub]);
 

@@ -93,6 +93,7 @@ export default function DirectVideoPlayer({
   const {
     showControls,
     setShowControls,
+    revealControls,
     isPlaying,
     currentTime,
     duration,
@@ -389,6 +390,7 @@ export default function DirectVideoPlayer({
           onPlayPause={handlePlayPause}
           onSeek={handleSeek}
           onSeekToTime={seekToTargetTime}
+          onRevealControls={revealControls}
           onVolumeChange={handleVolumeChange}
           onToggleMute={toggleMute}
           onToggleFullscreen={handleToggleFullscreen}

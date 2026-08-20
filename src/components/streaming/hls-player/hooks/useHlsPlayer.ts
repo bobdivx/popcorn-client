@@ -143,7 +143,7 @@ export function useHlsPlayer({
   const pauseUnregisterTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** webOS : lecture HLS native (sans MSE). Évite de réinit quand hls.js finit de charger. */
   const nativeTvActiveRef = useRef(false);
-  const hlsJsFailedRef = useRef(false);
+  const nativeTvFailedRef = useRef(false);
 
   /** Délai après lequel une vidéo en pause est désenregistrée (libère transcodage + cache serveur) */
   const PAUSE_UNREGISTER_DELAY_MS = 5 * 60 * 1000; // 5 min
@@ -184,8 +184,7 @@ export function useHlsPlayer({
   const playerConfig = usePlayerConfig();
   const tvRuntime =
     typeof window !== 'undefined' && (isWebOSTV() || isTVPlatform());
-  // Même pipeline que le PC : attendre hls.js. Natif seulement si MSE indisponible.
-  const playerRuntimeReady = hlsLoaded || (tvRuntime && Boolean(loaderError));
+  const playerRuntimeReady = tvRuntime || hlsLoaded;
 
   useEffect(() => {
     if (!loaderError) return;
@@ -286,7 +285,7 @@ export function useHlsPlayer({
       hlsFileIdRef.current = null;
       activeVideoRegisteredRef.current = false;
       hasStartedPlayingRef.current = false;
-      hlsJsFailedRef.current = false;
+      nativeTvFailedRef.current = false;
       nativeTvActiveRef.current = false;
       setPlaybackStarted(false);
       setIsLoading(true);
@@ -441,12 +440,10 @@ export function useHlsPlayer({
             });
         }
 
-        // PC et TV : même pipeline hls.js / MSE. Le lecteur HLS natif webOS
-        // affiche l’image mais ne met pas à jour paused / buffered / play —
-        // la modal PC ne reçoit jamais les signaux. Natif = fallback MSE.
+        // webOS : HLS natif en premier (le décodeur TV joue vraiment).
+        // hls.js / MSE ne lance souvent rien et laisse la modal coincée.
         const tvPlayback = isWebOSTV() || isTVPlatform();
-        const mseSupported = Boolean(window.Hls?.isSupported?.());
-        if (tvPlayback && (!mseSupported || hlsJsFailedRef.current)) {
+        if (tvPlayback && !nativeTvFailedRef.current) {
           nativeTvActiveRef.current = true;
           video.muted = true;
           video.playsInline = true;
@@ -459,29 +456,35 @@ export function useHlsPlayer({
             setIsLoading(false);
             onLoadingChangeRef.current?.(false);
           };
+          const nativeLooksStarted = () =>
+            hasMediaPlaybackStarted(video) || (video.readyState ?? 0) >= 2;
           const onPlaying = () => {
             markPlaybackReady();
           };
           const onTimeUpdate = () => {
-            if (hasMediaPlaybackStarted(video)) markPlaybackReady();
+            if (nativeLooksStarted()) markPlaybackReady();
           };
           const onCanPlay = () => {
             markPlaybackReady();
-            if (video.paused) video.play().catch(() => {});
+            void video.play().catch(() => {});
           };
           const onNativeError = () => {
-            console.warn('[useHlsPlayer] HLS natif TV en échec');
+            console.warn('[useHlsPlayer] HLS natif TV en échec, fallback hls.js');
             nativeTvActiveRef.current = false;
+            nativeTvFailedRef.current = true;
             video.removeEventListener('playing', onPlaying);
             video.removeEventListener('timeupdate', onTimeUpdate);
             video.removeEventListener('canplay', onCanPlay);
             video.removeEventListener('loadeddata', onCanPlay);
             video.removeEventListener('progress', onTimeUpdate);
             video.removeEventListener('error', onNativeError);
-            const msg = 'Lecture native TV impossible';
-            setError(msg);
-            setIsLoading(false);
-            onErrorRef.current?.(new Error(msg));
+            try {
+              video.removeAttribute('src');
+              video.load();
+            } catch {
+              /* ignore */
+            }
+            void initializeVideo(true, false);
           };
           video.addEventListener('playing', onPlaying);
           video.addEventListener('timeupdate', onTimeUpdate);
@@ -506,11 +509,23 @@ export function useHlsPlayer({
           } catch {
             /* ignore */
           }
-          window.setTimeout(() => {
-            if (video.paused && nativeTvActiveRef.current) {
-              video.play().catch(() => {});
+          const tryNativePlay = () => {
+            if (!nativeTvActiveRef.current) return;
+            const p = video.play();
+            if (p && typeof p.then === 'function') {
+              p.then(() => markPlaybackReady()).catch(() => {});
             }
-          }, 800);
+          };
+          tryNativePlay();
+          const playRetryId = window.setTimeout(tryNativePlay, 600);
+          // webOS : play() / paused / buffered mentent souvent alors que l’image tourne.
+          const overlayFailsafeId = window.setTimeout(() => {
+            if (nativeTvActiveRef.current) markPlaybackReady();
+          }, 2500);
+          cleanupFunctions.push(() => {
+            window.clearTimeout(playRetryId);
+            window.clearTimeout(overlayFailsafeId);
+          });
 
           reloadWithSeekRef.current = (seekSeconds: number) => {
             if (Number.isFinite(seekSeconds) && seekSeconds >= 0) {
@@ -1463,23 +1478,6 @@ export function useHlsPlayer({
             if (data.type === HlsErrorTypes?.MEDIA_ERROR) {
               if (handleHlsJsMediaError()) return;
               if (swallowFatalIfUhdFallback('media', hls)) return;
-              if (tvPlayback && !hlsJsFailedRef.current) {
-                console.warn('[useHlsPlayer] MSE TV en échec, fallback HLS natif');
-                hlsJsFailedRef.current = true;
-                try {
-                  hls.destroy();
-                } catch (_) {}
-                hlsRef.current = null;
-                try {
-                  video.removeAttribute('src');
-                  video.srcObject = null;
-                  video.load();
-                } catch {
-                  /* ignore */
-                }
-                void initializeVideo(true, false);
-                return;
-              }
               try {
                 hls.destroy();
               } catch (_) {}

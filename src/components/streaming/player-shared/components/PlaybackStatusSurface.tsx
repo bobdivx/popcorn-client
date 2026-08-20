@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { formatBytes, formatSpeed, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
 import { generateQRCode } from '../../../../lib/utils/qrcode';
@@ -36,11 +36,14 @@ function isRemoteBackEvent(e: KeyboardEvent): boolean {
     key === 'Back' ||
     key === 'BrowserBack' ||
     key === 'GoBack' ||
+    key === 'XF86Back' ||
     code === 27 ||
     code === 8 ||
     code === 461 ||
     code === 10009 ||
-    code === 4
+    code === 4 ||
+    code === 166 ||
+    code === 457
   );
 }
 
@@ -395,24 +398,33 @@ export function PlaybackStatusSurface({
   const backAction = onContinueInBackground ?? (onAbortDownload ? onCancel : undefined);
   const abortAction = onAbortDownload ?? onCancel;
   const remoteBackAction = variant === 'player' ? onCancel : backAction ?? onCancel;
+  const remoteBackRef = useRef(remoteBackAction);
+  remoteBackRef.current = remoteBackAction;
+  const confirmingCancelRef = useRef(confirmingCancel);
+  confirmingCancelRef.current = confirmingCancel;
 
   useEffect(() => {
     if (variant !== 'player' && variant !== 'fullscreen') return;
-    if (!remoteBackAction) return;
+    if (!remoteBackRef.current) return;
 
     const closeFromRemote = () => {
-      if (confirmingCancel) {
+      if (confirmingCancelRef.current) {
         setConfirmingCancel(false);
         return;
       }
-      remoteBackAction();
+      remoteBackRef.current?.();
     };
 
+    history.pushState({ popcornnPlaybackOverlay: true }, '');
+    let ignorePop = false;
+    const onPopState = () => {
+      if (ignorePop) return;
+      closeFromRemote();
+    };
     const onKeyDown = (e: KeyboardEvent) => {
       if (!isRemoteBackEvent(e)) return;
       e.preventDefault();
       e.stopPropagation();
-      e.stopImmediatePropagation();
       closeFromRemote();
     };
     const onWebOSBack = (e: Event) => {
@@ -423,11 +435,19 @@ export function PlaybackStatusSurface({
 
     window.addEventListener('keydown', onKeyDown, true);
     window.addEventListener('webosback', onWebOSBack);
+    document.addEventListener('webOSBackButton', onWebOSBack);
+    window.addEventListener('popstate', onPopState);
     return () => {
+      ignorePop = true;
       window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('webosback', onWebOSBack);
+      document.removeEventListener('webOSBackButton', onWebOSBack);
+      window.removeEventListener('popstate', onPopState);
+      if (history.state && (history.state as { popcornnPlaybackOverlay?: boolean }).popcornnPlaybackOverlay) {
+        history.back();
+      }
     };
-  }, [variant, remoteBackAction, confirmingCancel]);
+  }, [variant]);
 
   useEffect(() => {
     if (variant !== 'player' && variant !== 'fullscreen') return;
