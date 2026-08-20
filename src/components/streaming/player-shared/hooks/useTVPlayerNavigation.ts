@@ -589,7 +589,18 @@ export function useTVPlayerNavigation({
       }
     };
 
-    const handleWebOSBack = () => handleBack();
+    const handleWebOSBack = (e: Event) => {
+      const overlay = document.querySelector('[data-playback-overlay]');
+      if (overlay) {
+        e.preventDefault();
+        e.stopPropagation();
+        const closeBtn = overlay.querySelector<HTMLElement>('[data-close]');
+        if (closeBtn) closeBtn.click();
+        else handleBack();
+        return;
+      }
+      handleBack();
+    };
     const handleKeyUp = (e: KeyboardEvent) => {
       const kc = e.keyCode ?? e.which;
       const key = e.key || (kc === 37 ? 'ArrowLeft' : kc === 39 ? 'ArrowRight' : '');

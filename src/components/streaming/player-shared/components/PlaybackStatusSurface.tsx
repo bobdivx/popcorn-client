@@ -428,6 +428,7 @@ export function PlaybackStatusSurface({
       window.removeEventListener('webosback', onWebOSBack);
     };
   }, [variant, remoteBackAction, confirmingCancel]);
+
   const etaLabel =
     derived.etaSeconds != null && derived.etaSeconds > 0
       ? formatTimeRemaining(derived.etaSeconds)

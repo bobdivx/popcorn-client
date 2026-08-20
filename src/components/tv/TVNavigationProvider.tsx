@@ -8,6 +8,26 @@ import {
   saveTvBrowseRestoreFromElement,
 } from '../../lib/tv-browse-restore';
 
+const TV_MODAL_CLOSE_SELECTOR =
+  '[data-close], [aria-label*="Fermer"], [aria-label*="Close"], [aria-label*="close"], [aria-label*="Retour"], [aria-label*="Back"], .close-button';
+
+function isTvBackKey(e: KeyboardEvent): boolean {
+  const key = e.key;
+  const code = e.keyCode ?? e.which;
+  return (
+    key === 'Escape' ||
+    key === 'Backspace' ||
+    key === 'Back' ||
+    key === 'BrowserBack' ||
+    key === 'GoBack' ||
+    code === 8 ||
+    code === 27 ||
+    code === 461 ||
+    code === 10009 ||
+    code === 4
+  );
+}
+
 /**
  * Fournisseur de navigation TV global - Style Netflix
  * 
@@ -889,11 +909,7 @@ export default function TVNavigationProvider() {
       const target = e.target as HTMLElement;
       
       // Détecter le bouton retour (webOS, Android TV, etc.)
-      const isBackButton = e.key === 'Escape' || 
-                          e.key === 'Backspace' || 
-                          e.keyCode === 8 || // Backspace
-                          e.keyCode === 27 || // Escape
-                          (e.key === 'BrowserBack' || e.key === 'GoBack'); // Certains navigateurs TV
+      const isBackButton = isTvBackKey(e);
       
       // Vérifier si le focus est dans un champ éditable (saisie texte)
       const isEditableElement = (el: HTMLElement | null) =>
@@ -1009,8 +1025,10 @@ export default function TVNavigationProvider() {
         return;
       }
 
-      // Ignorer si player vidéo actif (HLS, Lucie, wrapper unifié)
+      // Ignorer si player vidéo actif (HLS, Lucie, wrapper unifié),
+      // sauf overlay buffer / chargement qui doit recevoir Retour.
       if (
+        !document.querySelector('[data-playback-overlay]') &&
         document.querySelector(
           '.hls-player-container:focus-within, #lucie-player-container:focus-within, #video-player-wrapper:focus-within, [data-tv-player-active]:focus-within'
         )
@@ -1054,7 +1072,10 @@ export default function TVNavigationProvider() {
 
       let handled = false;
 
-      switch (e.key) {
+      const keyForSwitch =
+        isBackButton && e.key !== 'Escape' && e.key !== 'Backspace' ? 'Escape' : e.key;
+
+      switch (keyForSwitch) {
         case 'ArrowLeft': {
           // Settings : gauche dans le contenu d'abord (grille, pastilles thème) ;
           // seulement s'il n'y a plus de voisin à gauche → menu latéral.
@@ -1137,7 +1158,7 @@ export default function TVNavigationProvider() {
         case 'Backspace':
           // Fermer modal si ouverte
           if (modal) {
-            const closeBtn = modal.querySelector('[aria-label*="Close"], [aria-label*="Fermer"], [aria-label*="close"], [data-close], .close-button, button[aria-label*="Close"], button[aria-label*="Fermer"]') as HTMLElement;
+            const closeBtn = modal.querySelector(TV_MODAL_CLOSE_SELECTOR) as HTMLElement;
             if (closeBtn) {
               closeBtn.click();
               handled = true;
@@ -1490,7 +1511,7 @@ export default function TVNavigationProvider() {
         }
       }
       // webOS peut envoyer un événement personnalisé ou un KeyboardEvent
-      if (event.type === 'webosback' || (event instanceof KeyboardEvent && (event.key === 'Backspace' || event.key === 'Escape'))) {
+      if (event.type === 'webosback' || (event instanceof KeyboardEvent && isTvBackKey(event))) {
         const modal = document.querySelector('[role="dialog"]:not([aria-hidden="true"])');
         if (modal) {
           const closeEvent = new CustomEvent('tv-back-button', { 
@@ -1501,7 +1522,7 @@ export default function TVNavigationProvider() {
           modal.dispatchEvent(closeEvent);
           if (!closeEvent.defaultPrevented) {
             // Si pas géré, essayer de fermer via le bouton de fermeture
-            const closeBtn = modal.querySelector('[aria-label*="Fermer"], [aria-label*="Close"], button[aria-label*="Fermer"]') as HTMLElement;
+            const closeBtn = modal.querySelector(TV_MODAL_CLOSE_SELECTOR) as HTMLElement;
             if (closeBtn) {
               closeBtn.click();
             }
