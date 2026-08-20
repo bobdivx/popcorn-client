@@ -1243,19 +1243,14 @@ export default function TVNavigationProvider() {
       }
     `;
 
-    /** TV : pas d’animations sur cartes / carrousels (surcharge des styles « Netflix » et des utilitaires Tailwind). */
+    /** TV : pas d’anim sur posters / carrousels (GPU). Loader, ds-enter et UI restent actifs. */
     const TV_PLATFORM_PERF_CSS = `
       html[data-tv-platform="true"] [data-carousel],
-      html[data-tv-platform="true"] [data-carousel] *,
+      html[data-tv-platform="true"] [data-carousel] *:not(.ds-loader-spin):not(.ds-progress-bar):not(.animate-spin),
       html[data-tv-platform="true"] .carousel-container,
-      html[data-tv-platform="true"] .carousel-container * {
+      html[data-tv-platform="true"] .carousel-container *:not(.ds-loader-spin):not(.ds-progress-bar):not(.animate-spin) {
         animation: none !important;
         transition: none !important;
-      }
-      html[data-tv-platform="true"] [class*="animate-"] {
-        animation: none !important;
-        opacity: 1 !important;
-        transform: none !important;
       }
       html[data-tv-platform="true"] [data-torrent-card],
       html[data-tv-platform="true"] .torrent-poster,
@@ -1290,22 +1285,6 @@ export default function TVNavigationProvider() {
       }
       html[data-tv-platform="true"] .grid:has(.tv-card-focused) [data-settings-card]:not(.tv-card-focused):not(:focus-within) {
         opacity: 1 !important;
-      }
-      html[data-tv-platform="true"] .tv-element-focused,
-      html[data-tv-platform="true"] a:focus-visible,
-      html[data-tv-platform="true"] button:focus-visible,
-      html[data-tv-platform="true"] input:focus-visible,
-      html[data-tv-platform="true"] select:focus-visible,
-      html[data-tv-platform="true"] textarea:focus-visible,
-      html[data-tv-platform="true"] [tabindex]:focus-visible {
-        animation: none !important;
-        box-shadow: none !important;
-      }
-      html[data-tv-platform="true"] a,
-      html[data-tv-platform="true"] button,
-      html[data-tv-platform="true"] input,
-      html[data-tv-platform="true"] [data-focusable] {
-        transition: none !important;
       }
     `;
 
@@ -1391,7 +1370,7 @@ export default function TVNavigationProvider() {
         transition: outline 0.15s ease-out, outline-offset 0.15s ease-out;
       }
 
-      /* webOS : GPU / CPU limités — pas d’animation infinie, zoom léger, transitions désactivées */
+      /* webOS : posters sans scale/transition coûteuse ; le loader et l’UI restent animés */
       html[data-webos="true"] [data-torrent-card],
       html[data-webos="true"] .torrent-poster,
       html[data-webos="true"] [data-settings-card],
@@ -1405,21 +1384,6 @@ export default function TVNavigationProvider() {
       html[data-webos="true"] .torrent-poster.tv-card-focused,
       html[data-webos="true"] [data-settings-card].tv-card-focused {
         animation: none !important;
-      }
-      html[data-webos="true"] .tv-element-focused,
-      html[data-webos="true"] a:focus-visible,
-      html[data-webos="true"] button:focus-visible,
-      html[data-webos="true"] input:focus-visible,
-      html[data-webos="true"] select:focus-visible,
-      html[data-webos="true"] textarea:focus-visible,
-      html[data-webos="true"] [tabindex]:focus-visible {
-        animation: none !important;
-      }
-      html[data-webos="true"] a,
-      html[data-webos="true"] button,
-      html[data-webos="true"] input,
-      html[data-webos="true"] [data-focusable] {
-        transition: none !important;
       }
     ` + TV_PLATFORM_PERF_CSS + MOBILE_TOUCH_CSS;
 
@@ -1497,21 +1461,6 @@ export default function TVNavigationProvider() {
         html[data-webos="true"] .torrent-poster.tv-card-focused,
         html[data-webos="true"] [data-settings-card].tv-card-focused {
           animation: none !important;
-        }
-        html[data-webos="true"] .tv-element-focused,
-        html[data-webos="true"] a:focus-visible,
-        html[data-webos="true"] button:focus-visible,
-        html[data-webos="true"] input:focus-visible,
-        html[data-webos="true"] select:focus-visible,
-        html[data-webos="true"] textarea:focus-visible,
-        html[data-webos="true"] [tabindex]:focus-visible {
-          animation: none !important;
-        }
-        html[data-webos="true"] a,
-        html[data-webos="true"] button,
-        html[data-webos="true"] input,
-        html[data-webos="true"] [data-focusable] {
-          transition: none !important;
         }
       ` + TV_PLATFORM_PERF_CSS + MOBILE_TOUCH_CSS;
     }

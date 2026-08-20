@@ -21,7 +21,7 @@ describe('formatEtaSeconds', () => {
 describe('getNetworkPlaybackProfile', () => {
   it('sans Network Information API : qualité auto', () => {
     vi.stubGlobal('navigator', {});
-    const p = getNetworkPlaybackProfile(false);
+    const p = getNetworkPlaybackProfile(false, { isTv: false });
     expect(p.effectiveType).toBe('unknown');
     expect(p.suggestedMaxHeight).toBeNull();
     expect(p.startLevel).toBe(-1);
@@ -31,7 +31,7 @@ describe('getNetworkPlaybackProfile', () => {
     vi.stubGlobal('navigator', {
       connection: { effectiveType: '4g', downlink: 4, saveData: false },
     });
-    const p = getNetworkPlaybackProfile(false);
+    const p = getNetworkPlaybackProfile(false, { isTv: false });
     expect(p.effectiveType).toBe('4g');
     expect(p.suggestedMaxHeight).toBe(720);
     expect(p.startLevel).toBe(0);
@@ -42,9 +42,19 @@ describe('getNetworkPlaybackProfile', () => {
     vi.stubGlobal('navigator', {
       connection: { type: 'wifi', effectiveType: '4g', downlink: 50, saveData: false },
     });
-    const p = getNetworkPlaybackProfile(false);
+    const p = getNetworkPlaybackProfile(false, { isTv: false });
     expect(p.effectiveType).toBe('wifi');
     expect(p.suggestedMaxHeight).toBeNull();
     expect(p.startLevel).toBe(-1);
+  });
+
+  it('TV / webOS : plafond 1080p même en Wi‑Fi', () => {
+    vi.stubGlobal('navigator', {
+      connection: { type: 'wifi', effectiveType: '4g', downlink: 50, saveData: false },
+    });
+    const p = getNetworkPlaybackProfile(false, { isTv: true });
+    expect(p.suggestedMaxHeight).toBe(1080);
+    expect(p.startLevel).toBe(0);
+    expect(p.maxBufferLength).toBeLessThanOrEqual(24);
   });
 });

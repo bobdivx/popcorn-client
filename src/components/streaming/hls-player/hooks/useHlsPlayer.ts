@@ -17,6 +17,7 @@ import { buildProxyUrl, normalizeStreamPath } from '../../player-core/utils/buil
 import { getBufferAheadSeconds, minBufferBeforePlaySec } from '../../player-shared/utils/bufferMetrics';
 import { getNetworkPlaybackProfile } from '../../../../lib/streaming/networkPlaybackProfile';
 import { armHlsQualityLadder, pinHlsToLowestLevel } from '../../../../lib/streaming/hlsQualityLadder';
+import { isTVPlatform, isWebOSTV } from '../../../../lib/utils/device-detection';
 
 interface UseHlsPlayerProps {
   src: string;
@@ -368,10 +369,12 @@ export function useHlsPlayer({
         }
 
         // Options HLS.js : profil réseau (4G vs Wi‑Fi) + VOD local vs flux distant.
-        const net = getNetworkPlaybackProfile(isRemoteStream);
+        const tvPlayback = isWebOSTV() || isTVPlatform();
+        const net = getNetworkPlaybackProfile(isRemoteStream, { isTv: tvPlayback });
         const maxBufferLength = net.maxBufferLength;
         const hls = new window.Hls({
-          enableWorker: true,
+          // webOS : les workers HLS.js plantent / ne postent jamais → overlay bloquée.
+          enableWorker: !tvPlayback,
           lowLatencyMode: Boolean(isRemoteStream),
           // Jellyfin-style: backBufferLength défini globalement dans useHlsLoader
           maxBufferLength,
@@ -710,7 +713,10 @@ export function useHlsPlayer({
           // Démarrer la lecture seulement quand on a assez de buffer (évite stall après ~4 s).
           // Doit être appelé APRÈS que la position sauvegardée soit appliquée, sinon on play() puis
           // un seek vers la position coupe le buffer et provoque une pause.
-          const MIN_BUFFER_BEFORE_PLAY = minBufferBeforePlaySec(!!isRemoteStream);
+          const MIN_BUFFER_BEFORE_PLAY =
+            isWebOSTV() || isTVPlatform()
+              ? 4
+              : minBufferBeforePlaySec(!!isRemoteStream);
           const MAX_WAIT_FOR_BUFFER_MS = isRemoteStream ? 60000 : 90000;
           const markPlaybackReady = () => {
             hasStartedPlayingRef.current = true;
@@ -732,7 +738,10 @@ export function useHlsPlayer({
               const ahead = getBufferAheadSeconds(video.buffered, video.currentTime || 0);
               // Ne pas forcer play() avec un buffer vide (overlay qui clignote).
               if (ahead >= 4) {
-                if (canPlay && video.paused) video.play().catch(() => {});
+                if (canPlay && video.paused) {
+                  if (isWebOSTV() || isTVPlatform()) video.muted = true;
+                  video.play().catch(() => {});
+                }
                 markPlaybackReady();
               }
             }, MAX_WAIT_FOR_BUFFER_MS);
@@ -745,7 +754,10 @@ export function useHlsPlayer({
                     if (intervalId !== null) clearInterval(intervalId);
                     intervalId = null;
                     clearTimeout(timeoutId);
-                    if (canPlay && video.paused) video.play().catch(() => {});
+                    if (canPlay && video.paused) {
+                      if (isWebOSTV() || isTVPlatform()) video.muted = true;
+                      video.play().catch(() => {});
+                    }
                     markPlaybackReady();
                   }
               }, 200);

@@ -6,6 +6,8 @@
  * Wi‑Fi / Ethernet local : buffer plus large, qualité auto.
  */
 
+import { isTVPlatform, isWebOSTV } from '../utils/device-detection';
+
 export type NetworkEffectiveType = 'slow-2g' | '2g' | '3g' | '4g' | 'wifi' | 'unknown';
 
 export interface NetworkPlaybackProfile {
@@ -54,11 +56,17 @@ function classify(conn: NavigatorConnection | null): NetworkEffectiveType {
   return 'unknown';
 }
 
-export function getNetworkPlaybackProfile(isRemoteStream = false): NetworkPlaybackProfile {
+export function getNetworkPlaybackProfile(
+  isRemoteStream = false,
+  opts?: { isTv?: boolean },
+): NetworkPlaybackProfile {
   const conn = readConnection();
   const saveData = Boolean(conn?.saveData);
   const effectiveType = classify(conn);
   const downlinkMbps = typeof conn?.downlink === 'number' && conn.downlink > 0 ? conn.downlink : null;
+  const isTv =
+    opts?.isTv ??
+    (typeof window !== 'undefined' && (isWebOSTV() || isTVPlatform()));
 
   let suggestedMaxHeight: number | null = null;
   let maxBufferLength = isRemoteStream ? 120 : 90;
@@ -95,6 +103,17 @@ export function getNetworkPlaybackProfile(isRemoteStream = false): NetworkPlayba
   if (isRemoteStream && suggestedMaxHeight != null) {
     suggestedMaxHeight = Math.min(suggestedMaxHeight, 720);
     maxBufferLength = Math.max(maxBufferLength, 40);
+  }
+
+  // webOS / Android TV : le 4K H.264 HLS (12 Mb/s, High@5.1) ne démarre pas —
+  // l’overlay reste sur « Le serveur prépare la vidéo ». Plafonner à 1080p.
+  if (isTv) {
+    suggestedMaxHeight =
+      suggestedMaxHeight == null ? 1080 : Math.min(suggestedMaxHeight, 1080);
+    startLevel = 0;
+    maxBufferLength = Math.min(maxBufferLength, 24);
+    abrBandWidthFactor = Math.min(abrBandWidthFactor, 0.7);
+    label = `${label} — TV 1080p`;
   }
 
   return {

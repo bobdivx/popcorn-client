@@ -21,7 +21,12 @@ import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
 import { useDebouncedVideoWaiting } from '../player-shared/hooks/useDebouncedVideoWaiting';
 import { formatTime } from '../player-shared/utils/formatTime';
 import { useEffectiveVideoFillMode } from '../player-shared/hooks/useEffectiveVideoFillMode';
-import { getBufferAheadSeconds, nextBufferingOverlayVisible } from '../player-shared/utils/bufferMetrics';
+import {
+  getBufferAheadSeconds,
+  nextBufferingOverlayVisible,
+  OVERLAY_HIDE_BUFFER_SEC,
+  OVERLAY_SHOW_BUFFER_SEC,
+} from '../player-shared/utils/bufferMetrics';
 
 export default function HLSPlayer({ 
   src, 
@@ -556,7 +561,7 @@ export default function HLSPlayer({
           playsInline
           preload="auto"
           autoplay={playerConfig.autoplay}
-          muted={playerConfig.muted}
+          muted={playerConfig.muted || isTV}
           poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect fill='%23000' width='1' height='1'/%3E%3C/svg%3E"
           style={{
             transform: playerConfig.hardwareAcceleration ? 'translateZ(0)' : 'none',

@@ -111,7 +111,7 @@ export async function fetchPlaybackLogs(
 }
 
 export function pipelineHeadline(status: PlaybackPipelineStatus | null, t: (k: string) => string): string {
-  if (!status) return t('playback.hls.serverPreparing');
+  if (!status) return '';
   if (status.phase === 'error' || status.last_error) {
     return status.last_error || t('playback.phase.error');
   }

@@ -20,6 +20,10 @@ function status(partial: Partial<PlaybackPipelineStatus>): PlaybackPipelineStatu
 }
 
 describe('pipelineHeadline', () => {
+  it('sans statut : pas de faux « serveur prépare » (laisse le fallback overlay)', () => {
+    expect(pipelineHeadline(null, t)).toBe('');
+  });
+
   it('distingue remux et transcode', () => {
     expect(pipelineHeadline(status({ mode: 'remux', phase: 'remuxing' }), t)).toBe(
       'playback.hls.preparingRemux',
