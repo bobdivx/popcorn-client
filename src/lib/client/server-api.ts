@@ -381,6 +381,8 @@ interface IServerApiClientPublic {
       system_memory_used_mb: number | null;
       gpu_available: boolean;
       hwaccels: string[];
+      encoding_hwaccel?: string | null;
+      cuda_decode_available?: boolean;
     }>
   >;
   getServerLogs(params?: { limit?: number }): Promise<ApiResponse<{ lines: string[] }>>;

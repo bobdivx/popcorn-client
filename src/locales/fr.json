@@ -138,7 +138,15 @@
     "versionClient": "Client",
     "startServer": "Démarrer le serveur",
     "stopServer": "Arrêter le serveur",
-    "restartServer": "Redémarrer le serveur"
+    "restartServer": "Redémarrer le serveur",
+    "gpuBadgeLabel": "GPU",
+    "gpuBadgeNvenc": "GPU NVENC",
+    "gpuBadgeNvdec": "GPU NVDEC",
+    "gpuBadgeCpu": "CPU",
+    "gpuBadgeTitleNvenc": "GPU NVIDIA détecté — décodage NVDEC et encodage NVENC",
+    "gpuBadgeTitleNvdec": "GPU NVIDIA détecté — décodage NVDEC, encodage CPU (libx264)",
+    "gpuBadgeTitleCpu": "Aucun GPU utilisable — transcodage CPU",
+    "gpuBadgeTitleGeneric": "Accélération matérielle : {accel}"
   },
   "blacklist": {
     "title": "Liste noire",
@@ -602,7 +610,16 @@
       "ffmpegRunning": "FFmpeg en cours",
       "ffmpegIdle": "FFmpeg arrêté",
       "modeRemux": "Remux H.264",
-      "modeTranscode": "Transcodage"
+      "modeTranscode": "Transcodage",
+      "gpuRemux": "Remux — GPU non requis",
+      "gpuTranscodeNvenc": "Transcodage GPU (NVENC)",
+      "gpuTranscodeNvdec": "Décodage GPU (NVDEC) · encodage CPU",
+      "gpuTranscodeGeneric": "Transcodage GPU ({accel})",
+      "gpuTranscodeCpu": "Transcodage CPU",
+      "gpuWillUseNvenc": "GPU détecté — NVENC sera utilisé",
+      "gpuWillUseNvdec": "GPU détecté — NVDEC sera utilisé",
+      "gpuWillUseGeneric": "GPU détecté — {accel} sera utilisé",
+      "gpuWillUseCpu": "Transcodage CPU (pas de GPU)"
     },
 
     "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct.",
@@ -1489,6 +1506,11 @@
         "gpuAcceleration": "Accélération matérielle (FFmpeg)",
         "gpuAvailable": "Disponible",
         "gpuNotAvailable": "Non disponible",
+        "gpuDecode": "Décodage",
+        "gpuDecodeNvdec": "NVDEC (GPU)",
+        "gpuDecodeCpu": "CPU",
+        "gpuEncode": "Encodage",
+        "gpuEncodeCpu": "CPU (libx264)",
         "gpuNotAvailableHint": "En Docker : monter le GPU dans le stack. l’image par défaut (FFmpeg sans GPU). Pour l’activer : variante « Popcornn (Nvidia GPU) » pour que l'accélération s'affiche. Variantes CasaOS : « Popcornn (VAAPI GPU) » ou « Popcornn (Nvidia GPU) ».",
         "refresh": "Actualiser",
         "unavailableOrOldBackend": "Impossible de charger les ressources. Si votre serveur n'a pas été mis à jour récemment, cette fonctionnalité peut être indisponible (endpoint /api/media/resources)."

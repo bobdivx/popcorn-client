@@ -5,6 +5,7 @@ import { getBackendUrl, getMyBackendUrl, hasBackendUrl } from '../../lib/backend
 import { getBackendConnectionStore, subscribeBackendConnectionStore } from '../../lib/backend-connection-store';
 import { serverApi } from '../../lib/client/server-api';
 import { checkDockerUpdates, type DockerUpdateCheckResult } from '../../lib/services/docker-update-checker';
+import { resetGpuCapability } from '../../lib/gpu-capability-store';
 
 /** True si l'URL backend courante est celle d'un ami (pas « mon serveur »). Ne pas health-check ni afficher d'erreur dans ce cas. */
 function isFriendBackend(): boolean {
@@ -102,6 +103,7 @@ export default function BackendStatusBadge({
       setStatus('unknown');
       setLastError(null);
       setBackendVersion(null);
+      resetGpuCapability();
       return;
     }
     const url = getBackendUrl()?.trim().replace(/\/$/, '');
@@ -134,6 +136,7 @@ export default function BackendStatusBadge({
 
     if (isFriendBackend()) {
       setStatus('unknown');
+      resetGpuCapability();
       const interval = setInterval(() => {
         if (isFriendBackend()) return;
         // Backend d'un ami : on ne force pas le store global, mais on peut vérifier périodiquement

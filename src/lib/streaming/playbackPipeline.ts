@@ -20,6 +20,9 @@ export interface PlaybackPipelineStatus {
   input_path?: string | null;
   last_error?: string | null;
   debug_path: string;
+  encoding_hwaccel?: string | null;
+  cuda_decode_available?: boolean;
+  gpu_available?: boolean;
 }
 
 export interface PlaybackPipelineQuery {
