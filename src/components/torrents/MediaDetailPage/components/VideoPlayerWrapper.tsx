@@ -178,6 +178,15 @@ export function VideoPlayerWrapper({
   const wrapperElementRef = useRef<HTMLDivElement>(null);
   const stopBufferRef = useRef<(() => void) | null>(null);
 
+  useEffect(() => {
+    if (!visible) {
+      document.documentElement.removeAttribute('data-tv-player-open');
+      return;
+    }
+    document.documentElement.setAttribute('data-tv-player-open', 'true');
+    return () => document.documentElement.removeAttribute('data-tv-player-open');
+  }, [visible]);
+
   /** Ferme le lecteur en arrêtant d'abord le buffer HLS/Lucie. */
   const handleClosePlayer = useCallback(() => {
     stopBufferRef.current?.();
@@ -513,7 +522,7 @@ export function VideoPlayerWrapper({
       <div 
         ref={wrapperElementRef}
         id="video-player-wrapper" 
-        className="fixed inset-0 z-50 bg-black w-full h-full flex flex-col items-center justify-center p-6"
+        className="fixed inset-0 z-[400] bg-black w-full h-full flex flex-col items-center justify-center p-6"
         style={{
           ...(isFullscreen ? { width: '100vw', height: '100vh' } : {}),
           display: visible ? 'flex' : 'none',
@@ -596,7 +605,7 @@ export function VideoPlayerWrapper({
       <div 
         ref={wrapperElementRef}
         id="video-player-wrapper" 
-        className="fixed inset-0 z-50 bg-black w-full h-full"
+        className="fixed inset-0 z-[400] bg-black w-full h-full"
         style={{
           ...(isFullscreen ? { width: '100vw', height: '100vh' } : {}),
           display: visible ? 'block' : 'none',
@@ -624,7 +633,7 @@ export function VideoPlayerWrapper({
       id="video-player-wrapper"
       data-tv-player-active={visible ? 'true' : undefined}
       tabIndex={-1}
-      className="fixed inset-0 z-50 bg-black w-full h-full"
+      className="fixed inset-0 z-[400] bg-black w-full h-full"
       style={{
         ...(isFullscreen ? { width: '100vw', height: '100vh' } : {}),
         display: visible ? 'block' : 'none',
