@@ -379,7 +379,7 @@ export function VideoPlayerWrapper({
         document.body.appendChild(backgroundVideo);
 
         const hls = new window.Hls({
-          enableWorker: true,
+          enableWorker: !(isTVPlatform() || isWebOSTV()),
           lowLatencyMode: false,
           backBufferLength: 10,
           maxBufferLength: 30,

@@ -17,6 +17,7 @@ import { buildProxyUrl, normalizeStreamPath } from '../../player-core/utils/buil
 import { getBufferAheadSeconds, minBufferBeforePlaySec } from '../../player-shared/utils/bufferMetrics';
 import { getNetworkPlaybackProfile } from '../../../../lib/streaming/networkPlaybackProfile';
 import { armHlsQualityLadder, pinHlsToLowestLevel } from '../../../../lib/streaming/hlsQualityLadder';
+import { isUhdQualityAttempt } from '../../../../lib/streaming/uhdPlaybackFallback';
 import { isTVPlatform, isWebOSTV } from '../../../../lib/utils/device-detection';
 
 interface UseHlsPlayerProps {
@@ -47,6 +48,8 @@ interface UseHlsPlayerProps {
   onTranscodingsEvicted?: (count: number) => void;
   /** Hauteur max en pixels pour le transcode (720, 480, 360). null/undefined = résolution source. */
   maxHeight?: number | null;
+  /** 4K / auto : le parent bascule en 1080p (retour true = ne pas afficher l’erreur). */
+  onUhdStartFailed?: (reason: 'media' | 'fatal') => boolean;
   /** Quand true, src est l'URL stream-torrent : utiliser src tel quel pour HLS. */
   useStreamTorrentUrl?: boolean;
 }
@@ -72,6 +75,7 @@ export function useHlsPlayer({
   streamBackendUrl,
   onTranscodingsEvicted,
   maxHeight,
+  onUhdStartFailed,
   useStreamTorrentUrl: useStreamTorrentUrlProp,
 }: UseHlsPlayerProps) {
   const { t } = useI18n();
@@ -98,6 +102,8 @@ export function useHlsPlayer({
   const fileIdPollTimeoutRef = useRef<number | null>(null);
   // Refs pour les callbacks et configs qui changent mais ne doivent pas déclencher de réinitialisation
   const onErrorRef = useRef(onError);
+  const onUhdStartFailedRef = useRef(onUhdStartFailed);
+  const maxHeightRef = useRef(maxHeight);
   const onLoadingChangeRef = useRef(onLoadingChange);
   const onTranscodingsEvictedRef = useRef(onTranscodingsEvicted);
   const canAutoPlayRef = useRef(canAutoPlay);
@@ -136,9 +142,25 @@ export function useHlsPlayer({
   /** Délai après lequel une vidéo en pause est désenregistrée (libère transcodage + cache serveur) */
   const PAUSE_UNREGISTER_DELAY_MS = 5 * 60 * 1000; // 5 min
 
+  const swallowFatalIfUhdFallback = (reason: 'media' | 'fatal', hlsInstance: { destroy?: () => void } | null): boolean => {
+    if (!isUhdQualityAttempt(maxHeightRef.current)) return false;
+    if (onUhdStartFailedRef.current?.(reason) !== true) return false;
+    setError(null);
+    setIsLoading(true);
+    try {
+      hlsInstance?.destroy?.();
+    } catch {
+      /* ignore */
+    }
+    hlsRef.current = null;
+    return true;
+  };
+
   // Mettre à jour les refs quand les props changent (sans déclencher de réinitialisation)
   useEffect(() => {
   onErrorRef.current = onError;
+  onUhdStartFailedRef.current = onUhdStartFailed;
+  maxHeightRef.current = maxHeight;
   onLoadingChangeRef.current = onLoadingChange;
   onTranscodingsEvictedRef.current = onTranscodingsEvicted;
   canAutoPlayRef.current = canAutoPlay;
@@ -150,7 +172,7 @@ export function useHlsPlayer({
     seriesEpisodeRef.current = seriesEpisode;
     variantIdRef.current = variantId;
     onDurationChangeRef.current = onDurationChange;
-  }, [onError, onLoadingChange, canAutoPlay, startFromBeginning, torrentId, tmdbId, tmdbType, seriesSeason, seriesEpisode, variantId, onDurationChange]);
+  }, [onError, onUhdStartFailed, maxHeight, onLoadingChange, canAutoPlay, startFromBeginning, torrentId, tmdbId, tmdbType, seriesSeason, seriesEpisode, variantId, onDurationChange]);
 
   const { hlsLoaded, error: loaderError } = useHlsLoader();
   const playerConfig = usePlayerConfig();
@@ -1253,6 +1275,7 @@ export function useHlsPlayer({
             // Jellyfin: MEDIA_ERROR → handleHlsJsMediaError (recover ou swap audio)
             if (data.type === HlsErrorTypes?.MEDIA_ERROR) {
               if (handleHlsJsMediaError()) return;
+              if (swallowFatalIfUhdFallback('media', hls)) return;
               try {
                 hls.destroy();
               } catch (_) {}
@@ -1362,6 +1385,7 @@ export function useHlsPlayer({
               }, retryDelay);
             } else {
               // Erreur fatale non-réseau ou trop de tentatives
+              if (!isNetworkError && swallowFatalIfUhdFallback('fatal', hls)) return;
               let errorMsg: string;
               
               if (retryCountRef.current >= maxRetries) {

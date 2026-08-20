@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'preact/hooks';
+import { useEffect, useState, useRef, useCallback } from 'preact/hooks';
 import { useVideoControls } from '../player-shared/hooks/useVideoControls';
 import { useFullscreen, toggleFullscreen } from '../player-shared/hooks/useFullscreen';
 import { PlaybackStatusSurface } from '../player-shared/components/PlaybackStatusSurface';
@@ -15,18 +15,19 @@ import { SkipIntroOverlay } from '../player-shared/components/SkipIntroOverlay';
 import PlayerBufferingOverlay from '../player-shared/components/PlayerBufferingOverlay';
 import { usePlaybackLiveTrace } from '../player-shared/hooks/usePlaybackLiveTrace';
 import { playbackDebugUrl, pipelineHeadline } from '../../../lib/streaming/playbackPipeline';
+import {
+  isUhdQualityAttempt,
+  shouldFallbackUhdPlayback,
+  UHD_FALLBACK_HEIGHT,
+} from '../../../lib/streaming/uhdPlaybackFallback';
+import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
 import { useDebouncedVideoWaiting } from '../player-shared/hooks/useDebouncedVideoWaiting';
 import { formatTime } from '../player-shared/utils/formatTime';
 import { useEffectiveVideoFillMode } from '../player-shared/hooks/useEffectiveVideoFillMode';
-import {
-  getBufferAheadSeconds,
-  nextBufferingOverlayVisible,
-  OVERLAY_HIDE_BUFFER_SEC,
-  OVERLAY_SHOW_BUFFER_SEC,
-} from '../player-shared/utils/bufferMetrics';
+import { getBufferAheadSeconds, nextBufferingOverlayVisible } from '../player-shared/utils/bufferMetrics';
 
 export default function HLSPlayer({ 
   src, 
@@ -78,6 +79,28 @@ export default function HLSPlayer({
   const hasAutoFullscreenedRef = useRef(false);
   const [hlsDuration, setHlsDuration] = useState<number | undefined>(undefined);
   const hlsDurationRef = useRef<number>(0);
+  const [uhdFallbackMessage, setUhdFallbackMessage] = useState<string | null>(null);
+  const uhdFallbackDoneRef = useRef(false);
+
+  useEffect(() => {
+    uhdFallbackDoneRef.current = false;
+    setUhdFallbackMessage(null);
+  }, [infoHash, filePath]);
+
+  const onUhdStartFailed = useCallback(
+    (reason: 'media' | 'fatal') => {
+      if (uhdFallbackDoneRef.current) return false;
+      if (!onQualityChange) return false;
+      if (!isUhdQualityAttempt(maxHeight)) return false;
+      uhdFallbackDoneRef.current = true;
+      setUhdFallbackMessage(t('playback.hls.uhdFallback1080'));
+      emitPlaybackStep('fallback_uhd_to_1080', { message: reason });
+      emitPlaybackStep('fallback_message_shown');
+      onQualityChange(UHD_FALLBACK_HEIGHT);
+      return true;
+    },
+    [maxHeight, onQualityChange, t],
+  );
   
   // Réinitialiser hlsDurationRef quand on change de vidéo
   useEffect(() => {
@@ -117,6 +140,7 @@ export default function HLSPlayer({
     isRemoteStream,
     streamBackendUrl,
     useStreamTorrentUrl: useStreamTorrentUrlProp,
+    onUhdStartFailed,
   });
 
   // Propager le message d'overlay (ex. « Préparation en cours » pendant retries 503)
@@ -447,9 +471,10 @@ export default function HLSPlayer({
         ? bufferedPercent
         : null;
 
-  const displayError = error;
+  const displayError = uhdFallbackMessage ? null : error;
   // Hystérésis : une seule overlay jusqu'au buffer de démarrage, pas de clignotement 4 s / 4 s.
   const shouldShowBuffering =
+    !!uhdFallbackMessage ||
     bufferingOverlayVisible ||
     isSeekSettling ||
     (isSeeking && (bufferedPercent < 95 || pendingSeekPosition > 0));
@@ -470,6 +495,41 @@ export default function HLSPlayer({
     fileId: liveTrace.status?.file_id,
     baseUrl: baseUrlProp,
   });
+
+  const isPlayingRef = useRef(isPlaying);
+  isPlayingRef.current = isPlaying;
+  const bufferedPercentRef = useRef(bufferedPercent);
+  bufferedPercentRef.current = bufferedPercent;
+  const playlistReadyRef = useRef(false);
+  playlistReadyRef.current =
+    Boolean(liveTrace.status?.playlist_ready) || (liveTrace.status?.segment_count ?? 0) > 0;
+  const maxHeightRef = useRef(maxHeight);
+  maxHeightRef.current = maxHeight;
+
+  useEffect(() => {
+    if (!onQualityChange || !isUhdQualityAttempt(maxHeight)) return;
+    const startedAt = Date.now();
+    const id = window.setInterval(() => {
+      if (
+        shouldFallbackUhdPlayback({
+          isUhdAttempt: isUhdQualityAttempt(maxHeightRef.current),
+          alreadyFellBack: uhdFallbackDoneRef.current,
+          hasStartedPlayback: isPlayingRef.current,
+          playlistOrBufferReady:
+            playlistReadyRef.current || (bufferedPercentRef.current ?? 0) > 0,
+          elapsedMs: Date.now() - startedAt,
+          fatalMediaError: false,
+        })
+      ) {
+        onUhdStartFailed('fatal');
+      }
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [infoHash, filePath, maxHeight, onQualityChange, onUhdStartFailed]);
+  useEffect(() => {
+    if (isPlaying) setUhdFallbackMessage(null);
+  }, [isPlaying]);
+
   /** En cas d'erreur, garder les contrôles visibles pour permettre d'appuyer sur Retour */
   const effectiveShowControls = showControls || !!displayError;
 
@@ -539,6 +599,7 @@ export default function HLSPlayer({
             title={torrentName || fileName}
             bufferedPercent={overlayBufferedPercent}
             detailMessage={
+              uhdFallbackMessage ||
               pipelineHeadline(liveTrace.status, t) ||
               loadingStatusMessage ||
               (isLocalLibraryMedia && isLoading

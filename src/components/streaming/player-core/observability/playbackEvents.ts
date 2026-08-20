@@ -14,6 +14,7 @@ export type PlaybackEventStep =
   | 'retry_503'
   | 'fallback_direct_to_hls'
   | 'fallback_lucie_to_hls'
+  | 'fallback_uhd_to_1080'
   | 'fallback_message_shown'
   | 'error';
 

@@ -628,7 +628,8 @@
       "stalls": "Buffers / stalls",
       "bufferEvents": "buffers",
       "network": "Réseau appareil",
-      "hlsBandwidth": "Débit HLS estimé"
+      "hlsBandwidth": "Débit HLS estimé",
+      "uhdFallback1080": "La 4K ne démarre pas sur cet appareil — passage en 1080p…"
     },
 
     "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct.",
