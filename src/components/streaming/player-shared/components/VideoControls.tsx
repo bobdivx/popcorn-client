@@ -356,9 +356,9 @@ export function VideoControls({
       : () => {};
 
   const chromeVisible = showControls || showQualityMenu;
-  /** Carrousel de miniatures : uniquement pendant un seek / scrub, pas tant que les commandes sont visibles. */
+  /** TV : le carrousel fait partie des commandes (comme le survol timeline sur PC). */
   const showScrubStrip =
-    (isTV && tvScrubBrowsing) ||
+    (isTV && chromeVisible && scrubEnabled) ||
     (!isTV && (isDraggingScrub || isHoveringTimeline || isBrowsingScrub));
 
   return (
@@ -388,7 +388,7 @@ export function VideoControls({
       */}
       {(chromeVisible || !isTV) && (
       <div
-        class={`video-controls-chrome absolute inset-0 flex flex-col overflow-hidden z-20 text-white transition-[opacity,transform] duration-200 ease-out ${
+        class={`video-controls-chrome absolute inset-0 flex flex-col overflow-hidden z-40 text-white ${
           chromeVisible
             ? 'opacity-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 translate-y-2 pointer-events-none'

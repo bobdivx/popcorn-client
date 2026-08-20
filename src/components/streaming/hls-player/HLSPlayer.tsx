@@ -390,7 +390,7 @@ export default function HLSPlayer({
     };
   }, [videoRef, hlsLoaded, playbackStarted, playerConfig.autoFullscreen]);
 
-  const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub } = useTVPlayerNavigation({
+  const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub, tvScrubBrowsing } = useTVPlayerNavigation({
     showControls,
     setShowControls,
     onPlayPause: handlePlayPause,
@@ -586,21 +586,24 @@ export default function HLSPlayer({
       style={{ 
         width: '100%', 
         height: '100%',
-        transform: 'translateZ(0)',
-        willChange: 'contents',
-        backfaceVisibility: 'hidden',
+        ...(isTV
+          ? {}
+          : {
+              transform: 'translateZ(0)',
+              willChange: 'contents',
+              backfaceVisibility: 'hidden',
+            }),
       }}
     >
       <div 
         class="relative flex-1 min-h-0 bg-black overflow-hidden" 
         style={{ 
-          width: '100%', 
+          width: '100%',
           height: '100%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transform: 'translateZ(0)',
-          willChange: 'transform',
+          ...(isTV ? {} : { transform: 'translateZ(0)', willChange: 'transform' }),
         }}
       >
         {transcodingsEvictedMessage && (
@@ -670,9 +673,9 @@ export default function HLSPlayer({
           muted={playerConfig.muted || isTV}
           poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect fill='%23000' width='1' height='1'/%3E%3C/svg%3E"
           style={{
-            transform: playerConfig.hardwareAcceleration ? 'translateZ(0)' : 'none',
+            transform: isTV ? 'none' : playerConfig.hardwareAcceleration ? 'translateZ(0)' : 'none',
             willChange: 'auto',
-            backfaceVisibility: playerConfig.hardwareAcceleration ? 'hidden' : 'visible',
+            backfaceVisibility: isTV ? 'visible' : playerConfig.hardwareAcceleration ? 'hidden' : 'visible',
             width: '100%',
             height: '100%',
             maxWidth: '100%',
@@ -689,6 +692,10 @@ export default function HLSPlayer({
             }
             e.preventDefault();
             e.stopPropagation();
+            if (isTV && !showControls) {
+              revealControls();
+              return;
+            }
             handlePlayPause();
           }}
         />
@@ -747,6 +754,7 @@ export default function HLSPlayer({
           scrubThumbnailsLoading={scrubThumbnailsLoading}
           tvScrubIndexExternal={isTV ? tvScrubIndex : undefined}
           tvScrubFocused={isTV ? focusedOnScrub : undefined}
+          tvScrubBrowsing={isTV ? tvScrubBrowsing : undefined}
           onPlayNextEpisode={
             nextEpisodeInfo && onPlayNextEpisode && (playerConfig.nextEpisodeButtonEnabled ?? true)
               ? onPlayNextEpisode
