@@ -11,6 +11,14 @@ export const BUFFER_AHEAD_TARGET_SEC = 20;
 export const MIN_BUFFER_AFTER_SEEK_SEC = 2.5;
 export const MIN_BUFFER_AFTER_SEEK_REMOTE_SEC = 4;
 
+/** Buffer ahead minimum avant le 1er `play()` (≈ 2–3 segments HLS de 4 s). */
+export const MIN_BUFFER_BEFORE_PLAY_SEC = 10;
+export const MIN_BUFFER_BEFORE_PLAY_REMOTE_SEC = 8;
+
+/** Hystérésis overlay : masquer seulement au-dessus, réafficher seulement en dessous. */
+export const OVERLAY_HIDE_BUFFER_SEC = 8;
+export const OVERLAY_SHOW_BUFFER_SEC = 2;
+
 /** Délais debounce overlay waiting (évite le clignotement). */
 export const WAITING_SHOW_DELAY_MS = 280;
 export const WAITING_HIDE_DELAY_MS = 420;
@@ -92,6 +100,28 @@ export function getBufferAheadPercent(
   if (!Number.isFinite(aheadSeconds) || aheadSeconds <= 0) return 0;
   if (!Number.isFinite(targetSeconds) || targetSeconds <= 0) return 0;
   return Math.max(0, Math.min(100, (aheadSeconds / targetSeconds) * 100));
+}
+
+export function minBufferBeforePlaySec(isRemoteStream: boolean): number {
+  return isRemoteStream ? MIN_BUFFER_BEFORE_PLAY_REMOTE_SEC : MIN_BUFFER_BEFORE_PLAY_SEC;
+}
+
+/**
+ * Hystérésis de l’overlay buffering : une seule modal jusqu’au buffer de démarrage,
+ * puis réaffichage seulement si le buffer retombe vraiment bas.
+ */
+export function nextBufferingOverlayVisible(
+  currentlyVisible: boolean,
+  bufferAheadSec: number,
+  opts: { isLoading: boolean; isWaiting: boolean; isSeekSettling: boolean },
+  hideSec: number = OVERLAY_HIDE_BUFFER_SEC,
+  showSec: number = OVERLAY_SHOW_BUFFER_SEC,
+): boolean {
+  if (opts.isLoading || opts.isSeekSettling) return true;
+  const ahead = Number.isFinite(bufferAheadSec) ? bufferAheadSec : 0;
+  if (ahead >= hideSec) return false;
+  if (opts.isWaiting && ahead <= showSec) return true;
+  return currentlyVisible;
 }
 
 /**
