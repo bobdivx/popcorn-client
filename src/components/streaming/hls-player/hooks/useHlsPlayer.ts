@@ -393,11 +393,18 @@ export function useHlsPlayer({
         // Options HLS.js : profil réseau (4G vs Wi‑Fi) + VOD local vs flux distant.
         const tvPlayback = isWebOSTV() || isTVPlatform();
         const net = getNetworkPlaybackProfile(isRemoteStream, { isTv: tvPlayback });
-        const maxBufferLength = net.maxBufferLength;
+        const maxBufferLength = tvPlayback ? Math.min(net.maxBufferLength, 16) : net.maxBufferLength;
         const hls = new window.Hls({
           // webOS : les workers HLS.js plantent / ne postent jamais → overlay bloquée.
           enableWorker: !tvPlayback,
-          lowLatencyMode: Boolean(isRemoteStream),
+          // Playlist EVENT sans ENDLIST = « live » pour hls.js. Un remux plus vite
+          // que le temps réel fait courir le lecteur vers le live edge (sauts de
+          // segments, MSE webOS qui lâche). Forcer le début à 0 s.
+          startPosition: tvPlayback ? 0 : -1,
+          liveSyncDurationCount: tvPlayback ? 8 : 3,
+          liveMaxLatencyDurationCount: Infinity,
+          maxLiveSyncPlaybackRate: 1,
+          lowLatencyMode: Boolean(isRemoteStream) && !tvPlayback,
           // Jellyfin-style: backBufferLength défini globalement dans useHlsLoader
           maxBufferLength,
           maxMaxBufferLength: maxBufferLength * 2,
@@ -793,7 +800,7 @@ export function useHlsPlayer({
 
           if (startFromBeginningRef.current) {
             setCurrentTimeIfNeeded(0);
-            if (playerConfig.skipIntroEnabled && playerConfig.introSkipSeconds > 0) {
+            if (playerConfig.skipIntroEnabled && playerConfig.introSkipSeconds > 0 && !tvPlayback) {
               setTimeout(() => {
                 const introEnd = Math.min(
                   playerConfig.introSkipSeconds,
@@ -802,6 +809,9 @@ export function useHlsPlayer({
                 if (introEnd > 0) setCurrentTimeIfNeeded(introEnd);
               }, 200);
             }
+            try {
+              if (tvPlayback) hls.startLoad(0);
+            } catch (_) {}
             startDelayedPlayWhenReady();
           } else if (torrentIdRef.current) {
             // Appliquer la position sauvegardée AVANT de lancer la vérification buffer → play
@@ -814,7 +824,14 @@ export function useHlsPlayer({
               playWhenReadyScheduled = true;
               setTimeout(startDelayedPlayWhenReady, 150);
             };
-            if (pendingSeekRef.current > 0) {
+            // webOS / TV : ne pas reprendre au milieu tant que le 1er play n’a pas
+            // marché (startLoad(resume) + playlist EVENT = chasse du live edge).
+            if (tvPlayback && pendingSeekRef.current <= 0) {
+              try {
+                hls.startLoad(0);
+              } catch (_) {}
+              startDelayedPlayWhenReady();
+            } else if (pendingSeekRef.current > 0) {
               // Position déjà définie (ex. changement de qualité) : l'appliquer puis lancer la lecture
               applyResumePosition(pendingSeekRef.current);
               schedulePlayWhenReady();
