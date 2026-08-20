@@ -27,7 +27,7 @@ import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
 import { useDebouncedVideoWaiting } from '../player-shared/hooks/useDebouncedVideoWaiting';
 import { formatTime } from '../player-shared/utils/formatTime';
 import { useEffectiveVideoFillMode } from '../player-shared/hooks/useEffectiveVideoFillMode';
-import { getBufferAheadSeconds, nextBufferingOverlayVisible, isVideoVisiblyPlaying } from '../player-shared/utils/bufferMetrics';
+import { getBufferAheadSeconds, nextBufferingOverlayVisible, hasMediaPlaybackStarted } from '../player-shared/utils/bufferMetrics';
 
 export default function HLSPlayer({ 
   src, 
@@ -108,7 +108,7 @@ export default function HLSPlayer({
     setHlsDuration(undefined);
   }, [infoHash, filePath]);
 
-  const { videoRef, hlsRef, isLoading, pendingSeekPosition, error, hlsLoaded, loadingStatusMessage, stopBuffer, reloadWithSeek } = useHlsPlayer({
+  const { videoRef, hlsRef, isLoading, playbackStarted, pendingSeekPosition, error, hlsLoaded, loadingStatusMessage, stopBuffer, reloadWithSeek } = useHlsPlayer({
     src,
     infoHash,
     maxHeight: maxHeight ?? undefined,
@@ -453,7 +453,7 @@ export default function HLSPlayer({
     const video = videoRef.current;
     if (!video) return;
     const syncFromElement = () => {
-      if (!isVideoVisiblyPlaying(video)) return;
+      if (!hasMediaPlaybackStarted(video)) return;
       setMediaVisiblyPlaying(true);
       setBufferingOverlayVisible(false);
       onLoadingChange?.(false);
@@ -461,12 +461,18 @@ export default function HLSPlayer({
     video.addEventListener('playing', syncFromElement);
     video.addEventListener('play', syncFromElement);
     video.addEventListener('timeupdate', syncFromElement);
+    video.addEventListener('loadeddata', syncFromElement);
+    video.addEventListener('canplay', syncFromElement);
+    video.addEventListener('progress', syncFromElement);
     const id = window.setInterval(syncFromElement, 200);
     syncFromElement();
     return () => {
       video.removeEventListener('playing', syncFromElement);
       video.removeEventListener('play', syncFromElement);
       video.removeEventListener('timeupdate', syncFromElement);
+      video.removeEventListener('loadeddata', syncFromElement);
+      video.removeEventListener('canplay', syncFromElement);
+      video.removeEventListener('progress', syncFromElement);
       window.clearInterval(id);
     };
   }, [src, infoHash, filePath, hlsLoaded, onLoadingChange]);
@@ -479,7 +485,7 @@ export default function HLSPlayer({
         isLoading,
         isWaiting,
         isSeekSettling,
-        isPlaying: isPlaying || mediaVisiblyPlaying,
+        isPlaying: isPlaying || mediaVisiblyPlaying || playbackStarted,
       }),
     );
   }, [isLoading, isWaiting, isSeekSettling, isPlaying, mediaVisiblyPlaying, currentTime, bufferedPercent, isSeeking]);
@@ -496,14 +502,17 @@ export default function HLSPlayer({
         : null;
 
   const displayError = uhdFallbackMessage ? null : error;
-  // Hystérésis : une seule overlay jusqu'au buffer de démarrage, pas de clignotement 4 s / 4 s.
-  const playbackActive = isPlaying || mediaVisiblyPlaying;
+  // TV / webOS : masquer dès que le média a démarré (readyState / 1er fragment),
+  // sans exiger 8 s de video.buffered — sinon la modal reste et bloque la télécommande.
+  const playbackActive = playbackStarted || isPlaying || mediaVisiblyPlaying;
   const shouldShowBuffering =
     !!uhdFallbackMessage ||
     (!playbackActive &&
-      (bufferingOverlayVisible ||
-        isSeekSettling ||
-        (isSeeking && (bufferedPercent < 95 || pendingSeekPosition > 0))));
+      (isSeekSettling ||
+        (isTV
+          ? isLoading || isWaiting
+          : bufferingOverlayVisible ||
+            (isSeeking && (bufferedPercent < 95 || pendingSeekPosition > 0)))));
   const liveTrace = usePlaybackLiveTrace(
     {
       path: filePath,

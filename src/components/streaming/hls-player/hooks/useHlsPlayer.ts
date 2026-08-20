@@ -14,7 +14,7 @@ import { getOrCreateDeviceId } from '../../../../lib/utils/device-id';
 import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
 import { minBufferAfterSeekSec } from '../../player-core/policies/SeekPolicy';
 import { buildProxyUrl, normalizeStreamPath } from '../../player-core/utils/buildStreamUrl';
-import { getBufferAheadSeconds, isVideoVisiblyPlaying, minBufferBeforePlaySec } from '../../player-shared/utils/bufferMetrics';
+import { getBufferAheadSeconds, hasMediaPlaybackStarted, minBufferBeforePlaySec } from '../../player-shared/utils/bufferMetrics';
 import { getNetworkPlaybackProfile } from '../../../../lib/streaming/networkPlaybackProfile';
 import { armHlsQualityLadder, pinHlsToLowestLevel } from '../../../../lib/streaming/hlsQualityLadder';
 import { isUhdQualityAttempt } from '../../../../lib/streaming/uhdPlaybackFallback';
@@ -82,6 +82,7 @@ export function useHlsPlayer({
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [playbackStarted, setPlaybackStarted] = useState(false);
   const [pendingSeekPosition, setPendingSeekPosition] = useState(0);
   const [error, setError] = useState<string | null>(null);
   /** Message d’overlay pendant les retries 503 (ex. « Préparation de la lecture en cours… ») */
@@ -195,8 +196,9 @@ export function useHlsPlayer({
     const video = videoRef.current;
     if (!video) return;
     const markReady = () => {
-      if (!isVideoVisiblyPlaying(video)) return;
+      if (!hasMediaPlaybackStarted(video)) return;
       hasStartedPlayingRef.current = true;
+      setPlaybackStarted(true);
       setLoadingStatusMessage(null);
       setIsLoading(false);
       onLoadingChangeRef.current?.(false);
@@ -204,11 +206,30 @@ export function useHlsPlayer({
     video.addEventListener('playing', markReady);
     video.addEventListener('play', markReady);
     video.addEventListener('timeupdate', markReady);
+    video.addEventListener('loadeddata', markReady);
+    video.addEventListener('canplay', markReady);
+    video.addEventListener('canplaythrough', markReady);
+    video.addEventListener('progress', markReady);
+    let rvfcHandle = 0;
+    const rvfcVideo = video as HTMLVideoElement & {
+      requestVideoFrameCallback?: (cb: () => void) => number;
+      cancelVideoFrameCallback?: (h: number) => void;
+    };
+    if (typeof rvfcVideo.requestVideoFrameCallback === 'function') {
+      rvfcHandle = rvfcVideo.requestVideoFrameCallback(() => markReady());
+    }
     const id = window.setInterval(markReady, 200);
     return () => {
       video.removeEventListener('playing', markReady);
       video.removeEventListener('play', markReady);
       video.removeEventListener('timeupdate', markReady);
+      video.removeEventListener('loadeddata', markReady);
+      video.removeEventListener('canplay', markReady);
+      video.removeEventListener('canplaythrough', markReady);
+      video.removeEventListener('progress', markReady);
+      if (rvfcHandle && typeof rvfcVideo.cancelVideoFrameCallback === 'function') {
+        rvfcVideo.cancelVideoFrameCallback(rvfcHandle);
+      }
       window.clearInterval(id);
     };
   }, [playerRuntimeReady, src, infoHash, filePath]);
@@ -272,6 +293,7 @@ export function useHlsPlayer({
       hasStartedPlayingRef.current = false;
       nativeTvFailedRef.current = false;
       nativeTvActiveRef.current = false;
+      setPlaybackStarted(false);
       setIsLoading(true);
     }
 
@@ -435,6 +457,7 @@ export function useHlsPlayer({
           video.setAttribute('webkit-playsinline', 'true');
           const markPlaybackReady = () => {
             hasStartedPlayingRef.current = true;
+            setPlaybackStarted(true);
             setLoadingStatusMessage(null);
             setIsLoading(false);
             onLoadingChangeRef.current?.(false);
@@ -443,16 +466,11 @@ export function useHlsPlayer({
             markPlaybackReady();
           };
           const onTimeUpdate = () => {
-            if (!video.paused && (video.currentTime || 0) > 0.3) {
-              markPlaybackReady();
-            }
+            if (hasMediaPlaybackStarted(video)) markPlaybackReady();
           };
           const onCanPlay = () => {
-            if (!video.paused) {
-              markPlaybackReady();
-              return;
-            }
-            video.play().catch(() => {});
+            markPlaybackReady();
+            if (video.paused) video.play().catch(() => {});
           };
           const onNativeError = () => {
             console.warn('[useHlsPlayer] HLS natif TV en échec, fallback hls.js');
@@ -461,6 +479,8 @@ export function useHlsPlayer({
             video.removeEventListener('playing', onPlaying);
             video.removeEventListener('timeupdate', onTimeUpdate);
             video.removeEventListener('canplay', onCanPlay);
+            video.removeEventListener('loadeddata', onCanPlay);
+            video.removeEventListener('progress', onTimeUpdate);
             video.removeEventListener('error', onNativeError);
             try {
               video.removeAttribute('src');
@@ -473,11 +493,15 @@ export function useHlsPlayer({
           video.addEventListener('playing', onPlaying);
           video.addEventListener('timeupdate', onTimeUpdate);
           video.addEventListener('canplay', onCanPlay);
+          video.addEventListener('loadeddata', onCanPlay);
+          video.addEventListener('progress', onTimeUpdate);
           video.addEventListener('error', onNativeError);
           cleanupFunctions.push(() => {
             video.removeEventListener('playing', onPlaying);
             video.removeEventListener('timeupdate', onTimeUpdate);
             video.removeEventListener('canplay', onCanPlay);
+            video.removeEventListener('loadeddata', onCanPlay);
+            video.removeEventListener('progress', onTimeUpdate);
             video.removeEventListener('error', onNativeError);
           });
           setLoadingStatusMessage(
@@ -755,6 +779,7 @@ export function useHlsPlayer({
         const handlePlaying = () => {
           handlePlay();
           hasStartedPlayingRef.current = true;
+          setPlaybackStarted(true);
           setLoadingStatusMessage(null);
           setIsLoading(false);
           onLoadingChangeRef.current?.(false);
@@ -876,11 +901,12 @@ export function useHlsPlayer({
           // un seek vers la position coupe le buffer et provoque une pause.
           const MIN_BUFFER_BEFORE_PLAY =
             isWebOSTV() || isTVPlatform()
-              ? 4
+              ? 0
               : minBufferBeforePlaySec(!!isRemoteStream);
           const MAX_WAIT_FOR_BUFFER_MS = isRemoteStream ? 60000 : 90000;
           const markPlaybackReady = () => {
             hasStartedPlayingRef.current = true;
+            setPlaybackStarted(true);
             setLoadingStatusMessage(null);
             setIsLoading(false);
             onLoadingChangeRef.current?.(false);
@@ -888,8 +914,12 @@ export function useHlsPlayer({
           function startDelayedPlayWhenReady() {
             const canPlay =
               canAutoPlayRef.current === undefined || canAutoPlayRef.current();
-            if (!video.paused) {
+            if (!video.paused || hasMediaPlaybackStarted(video)) {
               markPlaybackReady();
+              if (video.paused && canPlay) {
+                if (isWebOSTV() || isTVPlatform()) video.muted = true;
+                video.play().catch(() => {});
+              }
               return;
             }
             let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -897,8 +927,7 @@ export function useHlsPlayer({
               if (intervalId !== null) clearInterval(intervalId);
               intervalId = null;
               const ahead = getBufferAheadSeconds(video.buffered, video.currentTime || 0);
-              // Ne pas forcer play() avec un buffer vide (overlay qui clignote).
-              if (ahead >= 4) {
+              if (ahead >= 4 || tvPlayback || hasMediaPlaybackStarted(video)) {
                 if (canPlay && video.paused) {
                   if (isWebOSTV() || isTVPlatform()) video.muted = true;
                   video.play().catch(() => {});
@@ -1138,6 +1167,13 @@ export function useHlsPlayer({
             // Utiliser la durée la plus grande entre celle du fragment, video.duration, et la valeur actuelle
             const finalDuration = Math.max(fragDuration, videoDuration);
             applyDurationCandidate(finalDuration);
+          }
+          if (tvPlayback) {
+            markPlaybackReady();
+            if (video.paused) {
+              video.muted = true;
+              video.play().catch(() => {});
+            }
           }
         });
 
@@ -1861,6 +1897,7 @@ export function useHlsPlayer({
     videoRef,
     hlsRef,
     isLoading,
+    playbackStarted,
     pendingSeekPosition,
     error,
     hlsLoaded,

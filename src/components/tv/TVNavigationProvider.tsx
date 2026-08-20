@@ -28,6 +28,18 @@ function isTvBackKey(e: KeyboardEvent): boolean {
   );
 }
 
+/** webOS / Tizen : `e.key` est souvent vide, seul `keyCode` est renseigné. */
+function tvArrowKey(e: KeyboardEvent): 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown' | '' {
+  const key = e.key;
+  if (key === 'ArrowLeft' || key === 'ArrowRight' || key === 'ArrowUp' || key === 'ArrowDown') return key;
+  const code = e.keyCode ?? e.which;
+  if (code === 37 || code === 21) return 'ArrowLeft';
+  if (code === 39 || code === 22) return 'ArrowRight';
+  if (code === 38 || code === 19) return 'ArrowUp';
+  if (code === 40 || code === 20) return 'ArrowDown';
+  return '';
+}
+
 /**
  * Fournisseur de navigation TV global - Style Netflix
  * 
@@ -984,8 +996,9 @@ export default function TVNavigationProvider() {
           }
           return;
         }
-        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
-          const dir = e.key.replace('Arrow', '').toLowerCase() as 'up' | 'down' | 'left' | 'right';
+        const modalArrow = tvArrowKey(e);
+        if (modalArrow) {
+          const dir = modalArrow.replace('Arrow', '').toLowerCase() as 'up' | 'down' | 'left' | 'right';
           const handled = navigate(dir, modal);
           if (handled) {
             e.preventDefault();
@@ -1061,10 +1074,8 @@ export default function TVNavigationProvider() {
         }
       }
 
-      if (
-        isWebOS &&
-        (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown')
-      ) {
+      const arrowKey = tvArrowKey(e);
+      if (isWebOS && arrowKey) {
         const now = performance.now();
         if (e.repeat && now - lastWebosArrowAt < WEBOS_ARROW_REPEAT_MS) {
           e.preventDefault();
@@ -1077,7 +1088,9 @@ export default function TVNavigationProvider() {
       let handled = false;
 
       const keyForSwitch =
-        isBackButton && e.key !== 'Escape' && e.key !== 'Backspace' ? 'Escape' : e.key;
+        isBackButton && e.key !== 'Escape' && e.key !== 'Backspace'
+          ? 'Escape'
+          : e.key || arrowKey;
 
       switch (keyForSwitch) {
         case 'ArrowLeft': {

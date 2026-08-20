@@ -116,6 +116,21 @@ export function isVideoVisiblyPlaying(video: HTMLVideoElement | null | undefined
 }
 
 /**
+ * webOS / HLS natif : `paused`, `currentTime` et `buffered` restent souvent à 0
+ * alors que le décodeur affiche déjà une image. Ne pas exiger TimeRanges.
+ */
+export function hasMediaPlaybackStarted(video: HTMLVideoElement | null | undefined): boolean {
+  if (!video) return false;
+  if (isVideoVisiblyPlaying(video)) return true;
+  if ((video.readyState ?? 0) >= 2) return true;
+  if ((video.videoWidth || 0) > 0 && (video.videoHeight || 0) > 0) return true;
+  const decoded = (video as HTMLVideoElement & { webkitDecodedFrameCount?: number })
+    .webkitDecodedFrameCount;
+  if (typeof decoded === 'number' && decoded > 0) return true;
+  return false;
+}
+
+/**
  * Hystérésis de l’overlay buffering : une seule modal jusqu’au buffer de démarrage,
  * puis réaffichage seulement si le buffer retombe vraiment bas.
  */
