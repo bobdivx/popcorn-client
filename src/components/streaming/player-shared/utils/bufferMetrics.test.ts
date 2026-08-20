@@ -5,6 +5,7 @@ import {
   getBufferedEndAround,
   getBufferedTimelinePercent,
   isTimeInBuffered,
+  isVideoVisiblyPlaying,
   nextBufferingOverlayVisible,
   type TimeRangesLike,
 } from './bufferMetrics';
@@ -31,6 +32,26 @@ describe('getBufferAheadSeconds', () => {
     const ahead = getBufferAheadSeconds(ranges([[2700, 2708]]), 2700);
     expect(ahead).toBe(8);
     expect(getBufferAheadPercent(ahead, 20)).toBe(40);
+  });
+});
+
+describe('isVideoVisiblyPlaying', () => {
+  it('détecte paused=false même à t=0', () => {
+    expect(
+      isVideoVisiblyPlaying({ paused: false, currentTime: 0 } as HTMLVideoElement),
+    ).toBe(true);
+  });
+
+  it('détecte une tête qui a avancé même si paused est coincé à true (webOS)', () => {
+    expect(
+      isVideoVisiblyPlaying({ paused: true, currentTime: 1.2 } as HTMLVideoElement),
+    ).toBe(true);
+  });
+
+  it('reste faux au tout début', () => {
+    expect(
+      isVideoVisiblyPlaying({ paused: true, currentTime: 0 } as HTMLVideoElement),
+    ).toBe(false);
   });
 });
 

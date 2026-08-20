@@ -136,14 +136,22 @@ export function useVideoControls({
       }
       setIsPlaying(true);
       userPausedRef.current = false;
-      // Afficher brièvement les commandes puis auto-hide (desktop/mobile uniquement).
       setShowControls(true);
       scheduleAutoHide();
     };
 
     const handlePause = () => {
+      // webOS émet pause pendant un rebuffer MSE sans vraiment arrêter l’image.
+      if (isTVPlatform() || isWebOSTV()) {
+        window.setTimeout(() => {
+          if (video.paused) {
+            setIsPlaying(false);
+            setShowControls(true);
+          }
+        }, 500);
+        return;
+      }
       setIsPlaying(false);
-      // Pendant un seek HLS, le navigateur peut émettre pause/play : ne pas coller l’UI.
       if (video.seeking) return;
       clearControlsTimeout();
       setShowControls(true);
@@ -265,7 +273,12 @@ export function useVideoControls({
         v.volume = Math.max(0.5, playerConfig.volume);
       }
     };
-    video.addEventListener('playing', handlePlayingUnmuteTV);
+    const handlePlaying = () => {
+      setIsPlaying(true);
+      userPausedRef.current = false;
+      handlePlayingUnmuteTV();
+    };
+    video.addEventListener('playing', handlePlaying);
 
     return () => {
       if (container && !(isTVPlatform() || isWebOSTV())) {
@@ -282,7 +295,7 @@ export function useVideoControls({
       video.removeEventListener('volumechange', handleVolumeChange);
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('durationchange', handleDurationChange);
-      video.removeEventListener('playing', handlePlayingUnmuteTV);
+      video.removeEventListener('playing', handlePlaying);
       window.removeEventListener('keydown', handleKeyDown);
       if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     };
