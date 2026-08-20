@@ -6,6 +6,12 @@ export default {
       screens: {
         'xs': '475px',
         'tv': '1280px',
+        // Overlay lecteur : hauteur trop basse pour le layout « carte verticale ».
+        'short': { raw: '(max-height: 42rem)' },
+        'landscape-compact': { raw: '(orientation: landscape) and (max-height: 42rem)' },
+        // Variante dédiée : évite que Tailwind extraie `hover:hover` depuis
+        // `[@media(hover:hover)]`, ce qui génère du CSS daisyUI invalide (`:hovertr`).
+        'can-hover': { raw: '(hover: hover)' },
       },
       colors: {
         primary: {

@@ -288,8 +288,14 @@ export function VideoControls({
   const progressHeight = isTV ? 'h-3' : isMobile ? 'h-3.5' : isFullscreen ? 'h-3' : 'h-3 sm:h-2.5';
   const textSize = isTV ? 'text-xl' : isFullscreen ? 'text-lg' : 'text-xs sm:text-sm md:text-base';
   const titleSize = isTV ? 'text-4xl' : isFullscreen ? 'text-3xl md:text-4xl' : 'text-lg sm:text-2xl md:text-3xl';
-  const padding = isTV ? 'px-10 pt-10 pb-10' : isFullscreen ? 'px-8 pt-8 pb-8 md:px-12 md:pt-10 md:pb-10' : 'px-3 pt-3 pb-3 sm:px-6 sm:pt-6 sm:pb-6 md:px-8 md:pt-8 md:pb-8';
-  const gap = isTV ? 'gap-8' : isFullscreen ? 'gap-6' : 'gap-2 sm:gap-4 md:gap-5';
+  const padding = isTV
+    ? 'px-10 pt-10 pb-10'
+    : isFullscreen
+      ? 'px-8 pt-8 pb-8 md:px-12 md:pt-10 md:pb-10'
+      : isMobile
+        ? 'px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]'
+        : 'px-3 pt-3 pb-3 sm:px-6 sm:pt-6 sm:pb-6 md:px-8 md:pt-8 md:pb-8';
+  const gap = isTV ? 'gap-8' : isFullscreen ? 'gap-6' : isMobile ? 'gap-1.5' : 'gap-2 sm:gap-4 md:gap-5';
 
   // Indices de focus : back(0 si hasBack), play, [mute si !TV], [quality], [cast], fullscreen
   const playIndex = hasBackButton ? 1 : 0;
@@ -361,7 +367,7 @@ export function VideoControls({
       */}
       {(chromeVisible || !isTV) && (
       <div
-        class={`video-controls-chrome absolute inset-0 flex flex-col justify-between z-20 transition-[opacity,transform] duration-200 ease-out ${
+        class={`video-controls-chrome absolute inset-0 flex flex-col overflow-hidden z-20 text-white transition-[opacity,transform] duration-200 ease-out ${
           chromeVisible
             ? 'opacity-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 translate-y-2 pointer-events-none'
@@ -369,7 +375,7 @@ export function VideoControls({
         style={isTV && !chromeVisible ? { display: 'none', visibility: 'hidden' } : undefined}
         aria-hidden={!chromeVisible}
       >
-        <div class={`flex items-center justify-between ${padding.split(' ')[0]} ${padding.split(' ')[1]}`}>
+        <div class={`flex shrink-0 items-center justify-between ${padding.split(' ')[0]} ${padding.split(' ')[1]}`}>
           <div class="flex items-center gap-3 text-white drop-shadow-2xl min-w-0 flex-1">
             {/* Bouton retour */}
             {onClose && (
@@ -379,7 +385,7 @@ export function VideoControls({
                   e.stopPropagation();
                   onClose();
                 }} 
-                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-[opacity,transform,background-color] duration-200 active:scale-95 backdrop-blur-md border-2 border-white/20 focus:outline-none ${getFocusClass(0)}`}
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-[opacity,transform,background-color] duration-200 active:scale-95 backdrop-blur-md border-2 border-white/60 focus:outline-none ${getFocusClass(0)}`}
                 title={t('common.back')}
                 aria-label={t('common.back')}
               >
@@ -397,7 +403,7 @@ export function VideoControls({
               </div>
             )}
           </div>
-          {showLogo && (
+            {showLogo && !showPosterSynopsisPause && (
             logoUrl ? (
               <img 
                 src={logoUrl} 
@@ -407,7 +413,7 @@ export function VideoControls({
                     ? 'h-24 max-h-24 max-w-[min(92vw,32rem)]'
                     : isFullscreen
                       ? 'h-20 sm:h-24 md:h-28 max-h-28 max-w-[min(92vw,36rem)]'
-                      : 'h-14 sm:h-16 md:h-20 lg:h-24 max-h-24 sm:max-h-28 md:max-h-32 max-w-[min(92vw,32rem)]'
+                      : 'h-8 sm:h-16 md:h-20 lg:h-24 max-h-24 sm:max-h-28 md:max-h-32 max-w-[min(40vw,32rem)]'
                 }`}
               />
             ) : (
@@ -420,37 +426,37 @@ export function VideoControls({
           )}
         </div>
         {showPosterSynopsisPause && (
-          <div class="flex-1 min-h-0 w-full flex flex-col items-start justify-center px-3 sm:px-6 md:px-8 lg:px-12 py-2 overflow-y-auto pointer-events-none">
-            <div class="flex flex-col sm:flex-row items-start justify-start gap-4 sm:gap-8 max-w-5xl xl:max-w-6xl">
+          <div class="flex-1 min-h-0 max-h-[22%] sm:max-h-[32%] w-full flex flex-col items-start justify-center px-3 sm:px-6 md:px-8 lg:px-12 py-1 overflow-hidden pointer-events-none">
+            <div class="flex flex-row items-start justify-start gap-3 sm:gap-8 max-w-5xl xl:max-w-6xl min-h-0">
               {posterUrl && (
-                <div class="flex-shrink-0 w-24 h-36 sm:w-40 sm:h-56 md:w-48 md:h-72 lg:w-52 lg:h-[22rem] rounded-lg sm:rounded-xl overflow-hidden shadow-2xl ring-2 ring-white/20 max-h-[30vh] sm:max-h-[min(50vh,22rem)]">
+                <div class="flex-shrink-0 w-14 h-[5.25rem] sm:w-40 sm:h-56 md:w-48 md:h-72 lg:w-52 lg:h-[22rem] rounded-lg sm:rounded-xl overflow-hidden shadow-2xl ring-1 sm:ring-2 ring-white/20 max-h-[18vh] sm:max-h-[min(50vh,22rem)]">
                   <img src={posterUrl} alt="" class="w-full h-full object-cover" />
                 </div>
               )}
-              <div class="min-w-0 w-full sm:w-auto sm:max-w-md md:max-w-lg lg:max-w-xl flex flex-col gap-2 sm:gap-4 items-start text-left">
+              <div class="min-w-0 flex-1 sm:w-auto sm:max-w-md md:max-w-lg lg:max-w-xl flex flex-col gap-1 sm:gap-4 items-start text-left">
                 {(torrentName || releaseDate) && (
                   <div class="flex flex-col gap-1">
-                    <div class="flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4 flex-wrap justify-start">
+                    <div class="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-4 flex-wrap justify-start">
                       {torrentName && (
-                        <h2 class="text-xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight drop-shadow-2xl break-words">
+                        <h2 class="text-base sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight drop-shadow-2xl break-words line-clamp-2">
                           {torrentName}
                         </h2>
                       )}
                       {releaseDate && (
-                        <span class="inline-flex items-center justify-center px-2 py-1 sm:px-4 sm:py-2 bg-gray-800/90 backdrop-blur-md text-white/95 text-xs sm:text-lg font-semibold rounded-lg border border-white/30 shadow-lg">
+                        <span class="hidden sm:inline-flex items-center justify-center px-2 py-1 sm:px-4 sm:py-2 bg-gray-800/90 backdrop-blur-md text-white/95 text-xs sm:text-lg font-semibold rounded-lg border border-white/30 shadow-lg">
                           {new Date(releaseDate).getFullYear()}
                         </span>
                       )}
                     </div>
                     {seriesSubtitle && (
-                      <p class="text-sm sm:text-lg md:text-xl text-white/60 font-medium drop-shadow-lg">
+                      <p class="text-xs sm:text-lg md:text-xl text-white/60 font-medium drop-shadow-lg">
                         {seriesSubtitle}
                       </p>
                     )}
                   </div>
                 )}
                 {synopsis && (
-                  <p class="text-white/95 text-sm sm:text-base md:text-lg lg:text-xl leading-relaxed line-clamp-3 sm:line-clamp-5 md:line-clamp-6 drop-shadow-lg">
+                  <p class="hidden sm:block text-white/95 text-sm sm:text-base md:text-lg lg:text-xl leading-relaxed line-clamp-3 sm:line-clamp-5 md:line-clamp-6 drop-shadow-lg">
                     {synopsis}
                   </p>
                 )}
@@ -458,9 +464,9 @@ export function VideoControls({
             </div>
           </div>
         )}
-        <div class={padding}>
+        <div class={`mt-auto shrink-0 flex flex-col gap-2 ${padding}`}>
           {/* Colonne barre + carrousel de vignettes scrub (style Netflix : preview au drag, seek au relâchement) */}
-          <div class={`relative flex flex-col gap-2 mb-4 sm:mb-6 md:mb-8 ${isDraggingScrub ? 'z-30' : ''}`}>
+          <div class={`relative flex min-h-0 flex-col gap-2 ${isDraggingScrub ? 'z-30' : ''}`}>
           {/* Aperçu flottant Netflix pendant le drag */}
           {!isTV && isDraggingScrub && dragPreviewPercent != null && (
             <div
@@ -472,7 +478,7 @@ export function VideoControls({
                 <div
                   class={`relative overflow-hidden rounded-lg border-2 border-white shadow-2xl bg-black ${
                     isMobile
-                      ? 'w-[42vw] max-w-[11.5rem] aspect-video'
+                      ? 'w-[28vw] max-w-[7.5rem] aspect-video'
                       : 'w-44 sm:w-52 aspect-video'
                   }`}
                 >
@@ -669,7 +675,7 @@ export function VideoControls({
             )}
             {/* Curseur de position (tête de lecture) — glass, suit toujours currentTime */}
             <div
-              class={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${isTV ? 'w-6 h-6' : 'w-4 h-4'} rounded-full transition-[opacity,transform] opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/progress:opacity-100 [@media(hover:hover)]:group-focus-within/progress:opacity-100 bg-white/25 backdrop-blur-md border border-white/55 shadow-[0_0_12px_rgba(168,85,247,0.35),inset_0_1px_0_rgba(255,255,255,0.35)] ring-1 ring-purple-400/40`}
+              class={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${isTV ? 'w-6 h-6' : 'w-4 h-4'} rounded-full transition-[opacity,transform] opacity-100 can-hover:opacity-0 can-hover:group-hover/progress:opacity-100 can-hover:group-focus-within/progress:opacity-100 bg-white/25 backdrop-blur-md border border-white/55 shadow-[0_0_12px_rgba(168,85,247,0.35),inset_0_1px_0_rgba(255,255,255,0.35)] ring-1 ring-purple-400/40`}
               style={{ left: `${playheadPercent}%` }}
               aria-hidden
             />
@@ -694,7 +700,7 @@ export function VideoControls({
             nextThumbnailLabel={t('playback.scrubNextThumbnail')}
           />
           </div>
-          <div class={`flex items-center ${gap} relative z-30 overflow-x-auto min-w-0 scrollbar-visible`} data-tv-video-controls-row>
+          <div class={`flex items-center ${gap} relative z-30 min-w-0 shrink-0 rounded-2xl bg-black/50 px-2 py-1.5 ring-1 ring-white/25 ${isMobile ? 'overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden' : ''}`} data-tv-video-controls-row>
             {isTV ? (
               <>
                 <button
@@ -704,7 +710,7 @@ export function VideoControls({
                     e.stopPropagation();
                     onSeekTV?.('left', 10);
                   }}
-                  class={`flex flex-col items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border-2 border-white/20 focus:outline-none ${getFocusClass(tvSkipBackIndex)}`}
+                  class={`flex flex-col items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white backdrop-blur-md border-2 border-white/60 focus:outline-none ${getFocusClass(tvSkipBackIndex)}`}
                   title={t('playback.skipBack10')}
                   aria-label={t('playback.skipBack10')}
                 >
@@ -718,7 +724,7 @@ export function VideoControls({
                     e.stopPropagation();
                     onPlayPause();
                   }}
-                  class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border-2 border-white/20 focus:outline-none relative z-40 ${getFocusClass(playIndex)}`}
+                  class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white backdrop-blur-md border-2 border-white/60 focus:outline-none relative z-40 ${getFocusClass(playIndex)}`}
                   title={isPlaying ? t('playback.pauseLabel') : t('playback.playLabel')}
                   aria-label={isPlaying ? t('playback.pauseLabel') : t('playback.playLabel')}
                 >
@@ -731,7 +737,7 @@ export function VideoControls({
                     e.stopPropagation();
                     onSeekTV?.('right', 10);
                   }}
-                  class={`flex flex-col items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md border-2 border-white/20 focus:outline-none ${getFocusClass(tvSkipFwdIndex)}`}
+                  class={`flex flex-col items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white backdrop-blur-md border-2 border-white/60 focus:outline-none ${getFocusClass(tvSkipFwdIndex)}`}
                   title={t('playback.skipForward10')}
                   aria-label={t('playback.skipForward10')}
                 >
@@ -751,7 +757,7 @@ export function VideoControls({
                       e.stopPropagation();
                       onToggleSubtitleSelector();
                     }}
-                    class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 border-2 border-white/20 focus:outline-none ${getFocusClass(tvSubsIndex)} ${
+                    class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white border-2 border-white/60 focus:outline-none ${getFocusClass(tvSubsIndex)} ${
                       currentSubtitleTrack !== -1 ? 'bg-red-600/30 border-red-500/50' : ''
                     }`}
                     title={t('playback.audioAndSubtitles')}
@@ -769,7 +775,7 @@ export function VideoControls({
                 e.stopPropagation();
                 onPlayPause(); 
               }} 
-              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none relative z-40 ${getFocusClass(playIndex)}`}
+              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all backdrop-blur-md border-2 border-white/60 focus:outline-none relative z-40 ${getFocusClass(playIndex)}`}
             >
               {isPlaying ? <Pause class={`${iconSize} text-white`} /> : <Play class={`${iconSize} text-white ml-0.5`} />}
             </button>
@@ -781,7 +787,7 @@ export function VideoControls({
                   e.stopPropagation();
                   onRestart();
                 }} 
-                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all backdrop-blur-md border-2 border-white/20 focus:outline-none`}
+                class={`hidden sm:flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all backdrop-blur-md border-2 border-white/60 focus:outline-none`}
                 title={t('playback.restartFromBeginning')}
                 aria-label={t('playback.restartFromBeginning')}
               >
@@ -796,7 +802,7 @@ export function VideoControls({
                   e.stopPropagation();
                   onPlayNextEpisode();
                 }}
-                class={`flex items-center justify-center flex-shrink-0 gap-1.5 sm:gap-2 ${buttonSize} sm:!w-auto sm:!h-auto sm:!min-w-0 sm:px-3.5 sm:py-2.5 md:px-4 rounded-full bg-white/15 hover:bg-white/25 transition-all backdrop-blur-md border-2 border-white/25 focus:outline-none`}
+                class={`hidden sm:flex items-center justify-center flex-shrink-0 gap-1.5 sm:gap-2 ${buttonSize} sm:!w-auto sm:!h-auto sm:!min-w-0 sm:px-3.5 sm:py-2.5 md:px-4 rounded-full bg-white/35 hover:bg-white/55 text-white transition-all backdrop-blur-md border-2 border-white/60 focus:outline-none`}
                 title={t('playback.nextEpisode')}
                 aria-label={t('playback.nextEpisode')}
               >
@@ -811,12 +817,12 @@ export function VideoControls({
             <div class="flex items-center gap-2 group/volume flex-shrink-0">
               <button 
                 onClick={(e) => { e.stopPropagation(); onToggleMute(); }} 
-                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${getFocusClass(muteIndex)}`}
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all border-2 border-white/60 focus:outline-none ${getFocusClass(muteIndex)}`}
               >
                 {isMuted || volume === 0 ? <VolumeX class={`${iconSize} text-white`} /> : volume < 0.5 ? <Volume1 class={`${iconSize} text-white`} /> : <Volume2 class={`${iconSize} text-white`} />}
               </button>
               <div
-                class="flex items-center w-20 sm:w-24 h-3 sm:h-2 bg-white/30 rounded-full cursor-pointer opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/volume:opacity-100 [@media(hover:hover)]:group-focus-within/volume:opacity-100 transition-opacity"
+                class="hidden sm:flex items-center w-20 sm:w-24 h-3 sm:h-2 bg-white/30 rounded-full cursor-pointer opacity-100 can-hover:opacity-0 can-hover:group-hover/volume:opacity-100 can-hover:group-focus-within/volume:opacity-100 transition-opacity"
                 onClick={onVolumeChange}
                 role="slider"
                 aria-label={t('playback.volumeLabel') || 'Volume'}
@@ -828,10 +834,10 @@ export function VideoControls({
               </div>
             </div>
             )}
-            <div class={`flex items-center gap-2 text-white ${textSize} font-medium flex-shrink-0`}>
+            <div class={`flex items-center gap-1 sm:gap-2 text-white ${textSize} font-medium flex-shrink-0 tabular-nums`}>
               <span>{formatTime(isDraggingScrub || scrubPreviewActiveDesktop ? previewTime : currentTime)}</span>
-              <span class="text-white/50">/</span>
-              <span class="text-white/70">{formatTime(duration > 0 ? duration : (scrubThumbnails?.durationSeconds ?? 0))}</span>
+              <span class="hidden sm:inline text-white/50">/</span>
+              <span class="hidden sm:inline text-white/70">{formatTime(duration > 0 ? duration : (scrubThumbnails?.durationSeconds ?? 0))}</span>
             </div>
             <div class="flex-1 min-w-2" />
             {(audioTracks.length > 0 || subtitleTracks.length > 0) && onToggleSubtitleSelector && (
@@ -840,7 +846,7 @@ export function VideoControls({
                   e.stopPropagation();
                   onToggleSubtitleSelector();
                 }} 
-                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all border-2 border-white/60 focus:outline-none ${
                   currentSubtitleTrack !== -1 ? 'bg-red-600/30 border-red-500/50' : ''
                 }`}
                 title="Langues et sous-titres"
@@ -855,7 +861,7 @@ export function VideoControls({
                   e.stopPropagation();
                   onCastClick();
                 }}
-                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${getFocusClass(castIndex)} ${isCasting ? 'bg-purple-600/40 border-purple-400/50' : ''}`}
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all border-2 border-white/60 focus:outline-none ${getFocusClass(castIndex)} ${isCasting ? 'bg-purple-600/40 border-purple-400/50' : ''}`}
                 title={isCasting ? t('playback.casting') : t('playback.castToDevice')}
                 aria-label={isCasting ? t('playback.casting') : t('playback.castToDevice')}
               >
@@ -875,7 +881,7 @@ export function VideoControls({
                     e.stopPropagation();
                     setShowQualityMenu((v) => !v);
                   }}
-                  class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none min-w-[3rem] touch-manipulation ${getFocusClass(qualityIndex)}`}
+                  class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all border-2 border-white/60 focus:outline-none min-w-[3rem] touch-manipulation ${getFocusClass(qualityIndex)}`}
                   title={t('playback.quality')}
                   aria-label={t('playback.quality')}
                   aria-expanded={showQualityMenu}
@@ -973,7 +979,7 @@ export function VideoControls({
                 e.stopPropagation();
                 onToggleFullscreen();
               }} 
-              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20 focus:outline-none ${getFocusClass(fullscreenIndex)}`}
+              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all border-2 border-white/60 focus:outline-none ${getFocusClass(fullscreenIndex)}`}
             >
               {isFullscreen ? <Minimize class={`${iconSize} text-white`} /> : <Maximize class={`${iconSize} text-white`} />}
             </button>

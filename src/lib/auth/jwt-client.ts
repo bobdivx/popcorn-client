@@ -163,23 +163,14 @@ function getCryptoSubtle(): SubtleCrypto {
     }
   }
   
-  // Vérifier si on est dans Node.js (crypto.webcrypto.subtle disponible depuis Node.js 15+)
   if (typeof globalThis !== 'undefined') {
-    const nodeCrypto = (globalThis as any).crypto;
-    if (nodeCrypto && nodeCrypto.webcrypto && nodeCrypto.webcrypto.subtle) {
-      return nodeCrypto.webcrypto.subtle;
+    const webCrypto = globalThis.crypto as Crypto & { webcrypto?: { subtle?: SubtleCrypto } };
+    if (webCrypto?.subtle) {
+      return webCrypto.subtle;
     }
-  }
-  
-  // Essayer d'importer le module crypto de Node.js si disponible
-  try {
-    // @ts-ignore - Peut ne pas être disponible dans tous les environnements
-    const nodeCrypto = require('crypto');
-    if (nodeCrypto && nodeCrypto.webcrypto && nodeCrypto.webcrypto.subtle) {
-      return nodeCrypto.webcrypto.subtle;
+    if (webCrypto?.webcrypto?.subtle) {
+      return webCrypto.webcrypto.subtle;
     }
-  } catch {
-    // Module crypto non disponible, continuer
   }
   
   // Message d'erreur détaillé selon l'environnement

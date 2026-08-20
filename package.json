@@ -2,6 +2,9 @@
   "name": "popcorn-vercel",
   "version": "1.1.0",
   "type": "module",
+  "browserslist": [
+    "defaults"
+  ],
   "scripts": {
     "popcorn": "node scripts/popcorn-cli.js",
     "dev": "node scripts/popcorn-cli.js dev",

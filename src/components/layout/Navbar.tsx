@@ -219,11 +219,11 @@ export default function Navbar() {
         <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 tv:px-20">
         <div className="flex items-center h-14 sm:h-16 lg:h-18 tv:h-20 gap-3 sm:gap-4 lg:gap-6 tv:gap-8">
 
-          {/* ── GAUCHE : Marque ── */}
-          <div className="flex-shrink-0">
+          {/* ── GAUCHE : Marque + statut serveur/GPU ── */}
+          <div className="flex-shrink-0 flex items-center gap-3 lg:gap-4">
             <a
               href={user ? '/dashboard' : '/'}
-              className="flex items-center gap-2 sm:gap-3 group rounded-xl py-1 pr-2 focus:outline-none focus:ring-4 focus:ring-[var(--ds-accent-violet)]/50 focus:ring-offset-2 focus:ring-offset-[var(--page-bg)] transition-opacity duration-200 hover:opacity-90"
+              className="flex items-center gap-2 sm:gap-3 group rounded-xl py-1 pr-1 focus:outline-none focus:ring-4 focus:ring-[var(--ds-accent-violet)]/50 focus:ring-offset-2 focus:ring-offset-[var(--page-bg)] transition-opacity duration-200 hover:opacity-90"
               tabIndex={isTvNav ? -1 : 0}
               data-focusable={isTvNav ? undefined : true}
               data-tv-nav-skip={isTvNav ? true : undefined}
@@ -239,6 +239,15 @@ export default function Navbar() {
                 Popcornn
               </span>
             </a>
+            {user ? (
+              <div
+                className="hidden lg:flex items-center rounded-full nav-status-cluster"
+                aria-label={t('backend.statusCluster')}
+              >
+                <BackendStatusBadge variant="quiet" menuAlign="left" />
+                <GpuStatusBadge variant="quiet" />
+              </div>
+            ) : null}
           </div>
 
           {/* ── CENTRE : Navigation ── */}
@@ -304,8 +313,11 @@ export default function Navbar() {
                     </a>
                   </div>
                   <div className="border-t border-[var(--ds-border)] my-1" aria-hidden />
-                  <BackendStatusBadge variant="inline" />
-                  <GpuStatusBadge variant="inline" />
+                  <div className="rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface)]/40 mx-2 overflow-hidden">
+                    <BackendStatusBadge variant="inline" />
+                    <div className="border-t border-[var(--ds-border)]" aria-hidden />
+                    <GpuStatusBadge variant="inline" />
+                  </div>
                   <div className="border-t border-[var(--ds-border)] my-1" aria-hidden />
                   {tabs.map((tab, index) => {
                     const active = tab.match === 'exact' ? isActive(tab.href) : isActivePrefix(tab.href);
@@ -405,12 +417,6 @@ export default function Navbar() {
                 >
                   <Download className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 relative z-10" />
                 </a>
-
-                {/* Statut serveur + GPU — lg+ uniquement */}
-                <div className="hidden lg:flex items-center gap-1.5" aria-hidden="true" tabIndex={-1}>
-                  <BackendStatusBadge />
-                  <GpuStatusBadge />
-                </div>
 
                 {/* Paramètres (lg+) ou hamburger (< lg) */}
                 {useHamburger ? (

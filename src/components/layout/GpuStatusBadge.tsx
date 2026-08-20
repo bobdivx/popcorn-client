@@ -3,7 +3,7 @@ import { gpuKind } from '../../lib/gpu-capability-store';
 import { useI18n } from '../../lib/i18n/useI18n';
 
 type GpuStatusBadgeProps = {
-  variant?: 'standalone' | 'inline';
+  variant?: 'standalone' | 'inline' | 'quiet';
 };
 
 export default function GpuStatusBadge({ variant = 'standalone' }: GpuStatusBadgeProps) {
@@ -48,6 +48,22 @@ export default function GpuStatusBadge({ variant = 'standalone' }: GpuStatusBadg
     );
   }
 
+  if (variant === 'quiet') {
+    return (
+      <span
+        className="flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-white/80"
+        title={title}
+        aria-label={title}
+      >
+        <span
+          className={`w-1.5 h-1.5 rounded-full shrink-0 ${isGpu ? 'bg-emerald-400' : 'bg-amber-400'}`}
+          aria-hidden
+        />
+        {short}
+      </span>
+    );
+  }
+
   return (
     <span
       className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium ${
@@ -66,3 +82,4 @@ export default function GpuStatusBadge({ variant = 'standalone' }: GpuStatusBadg
     </span>
   );
 }
+

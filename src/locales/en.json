@@ -139,6 +139,7 @@
     "startServer": "Start server",
     "stopServer": "Stop server",
     "restartServer": "Restart server",
+    "statusCluster": "Server and GPU status",
     "gpuBadgeLabel": "GPU",
     "gpuBadgeNvenc": "GPU NVENC",
     "gpuBadgeNvdec": "GPU NVDEC",
