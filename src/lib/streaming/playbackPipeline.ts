@@ -115,12 +115,14 @@ export function pipelineHeadline(status: PlaybackPipelineStatus | null, t: (k: s
   if (status.phase === 'error' || status.last_error) {
     return status.last_error || t('playback.phase.error');
   }
+  // FFmpeg continue en arrière-plan (mode remux/transcode) même après le 1er
+  // segment : ne pas coller « Le serveur prépare la vidéo » pendant la lecture.
+  if (status.playlist_ready || status.segment_count > 0) return '';
   if (status.mode === 'remux' || status.phase === 'remuxing') {
     return t('playback.hls.preparingRemux');
   }
   if (status.mode === 'transcode' || status.phase === 'transcoding') {
     return t('playback.hls.preparingTranscode');
   }
-  if (status.playlist_ready) return t('playback.hls.playlistReady');
   return t('playback.hls.serverPreparing');
 }

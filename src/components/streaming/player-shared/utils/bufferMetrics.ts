@@ -124,9 +124,9 @@ export function nextBufferingOverlayVisible(
 ): boolean {
   if (opts.isSeekSettling) return true;
   const ahead = Number.isFinite(bufferAheadSec) ? bufferAheadSec : 0;
-  // Autoplay HLS : le média joue déjà derrière la modal (audio) alors que
-  // isLoading attend encore 8–10 s de buffer. Masquer dès que ça lit vraiment.
-  if (opts.isPlaying && ahead >= showSec) return false;
+  // webOS / HLS natif : `video.buffered` reste souvent vide alors que ça lit.
+  // Masquer dès que le média joue, sans exiger de TimeRanges.
+  if (opts.isPlaying) return false;
   if (opts.isLoading) return true;
   if (ahead >= hideSec) return false;
   if (opts.isWaiting && ahead <= showSec) return true;

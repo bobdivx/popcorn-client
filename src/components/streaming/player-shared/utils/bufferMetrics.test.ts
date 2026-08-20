@@ -49,6 +49,12 @@ describe('nextBufferingOverlayVisible', () => {
     ).toBe(false);
   });
 
+  it('se masque pendant la lecture même si buffered est vide (webOS)', () => {
+    expect(
+      nextBufferingOverlayVisible(true, 0, { ...loading, isPlaying: true }),
+    ).toBe(false);
+  });
+
   it('ne se masque qu’au-dessus du seuil hide', () => {
     expect(nextBufferingOverlayVisible(true, 4, idle)).toBe(true);
     expect(nextBufferingOverlayVisible(true, 8, idle)).toBe(false);

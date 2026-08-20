@@ -38,4 +38,13 @@ describe('pipelineHeadline', () => {
       'ffprobe failed',
     );
   });
+
+  it('ne reste pas sur « préparation » une fois la playlist servie', () => {
+    expect(
+      pipelineHeadline(
+        status({ mode: 'transcode', phase: 'transcoding', playlist_ready: true, segment_count: 12 }),
+        t,
+      ),
+    ).toBe('');
+  });
 });

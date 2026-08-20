@@ -138,6 +138,9 @@ export function useHlsPlayer({
   const initialLoad503RetryCountRef = useRef<number>(0);
   /** Timer : après une pause prolongée, désenregistrer la vidéo pour libérer les ressources côté serveur */
   const pauseUnregisterTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** webOS : lecture HLS native (sans MSE). Évite de réinit quand hls.js finit de charger. */
+  const nativeTvActiveRef = useRef(false);
+  const nativeTvFailedRef = useRef(false);
 
   /** Délai après lequel une vidéo en pause est désenregistrée (libère transcodage + cache serveur) */
   const PAUSE_UNREGISTER_DELAY_MS = 5 * 60 * 1000; // 5 min
@@ -176,6 +179,9 @@ export function useHlsPlayer({
 
   const { hlsLoaded, error: loaderError } = useHlsLoader();
   const playerConfig = usePlayerConfig();
+  const tvRuntime =
+    typeof window !== 'undefined' && (isWebOSTV() || isTVPlatform());
+  const playerRuntimeReady = tvRuntime || hlsLoaded;
 
   useEffect(() => {
     if (loaderError) {
@@ -187,7 +193,7 @@ export function useHlsPlayer({
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !hlsLoaded) return;
+    if (!video || !playerRuntimeReady) return;
 
     /** Mode stream-torrent (option payante) : utiliser src tel quel (proxy vers librqbit), ne pas reconstruire en local/stream. */
     const useStreamTorrentUrl = useStreamTorrentUrlProp === true || (typeof src === 'string' && src.includes('/api/stream-torrent/'));
@@ -223,7 +229,12 @@ export function useHlsPlayer({
     const hlsUrl = useStreamTorrentUrl ? src : buildHlsUrl(false);
     
     // Si l'URL est la même que la précédente, ne pas réinitialiser le player
-    if (currentSrcRef.current === hlsUrl && hlsRef.current && !filePathChanged && !infoHashChanged) {
+    if (
+      currentSrcRef.current === hlsUrl &&
+      (hlsRef.current || nativeTvActiveRef.current) &&
+      !filePathChanged &&
+      !infoHashChanged
+    ) {
       // L'URL est identique et le player existe déjà, ne rien faire
       return;
     }
@@ -237,6 +248,8 @@ export function useHlsPlayer({
       hlsFileIdRef.current = null;
       activeVideoRegisteredRef.current = false;
       hasStartedPlayingRef.current = false;
+      nativeTvFailedRef.current = false;
+      nativeTvActiveRef.current = false;
       setIsLoading(true);
     }
 
@@ -318,7 +331,11 @@ export function useHlsPlayer({
         void resolveAndRegisterFileId(effectiveHlsUrl);
 
         // Si l'URL est la même que celle déjà chargée, ne pas réinitialiser
-        if (!forceReload && currentSrcRef.current === effectiveHlsUrl && hlsRef.current) {
+        if (
+          !forceReload &&
+          currentSrcRef.current === effectiveHlsUrl &&
+          (hlsRef.current || nativeTvActiveRef.current)
+        ) {
           console.log('[useHlsPlayer] URL HLS identique, réutilisation du player existant:', effectiveHlsUrl);
           setIsLoading(false);
           return;
@@ -385,13 +402,108 @@ export function useHlsPlayer({
             });
         }
 
+        // webOS / TV : lecteur média natif (pas MSE / hls.js). hls.js traite une
+        // playlist EVENT en « live » et saute à la fin — overlay bloquée.
+        const tvPlayback = isWebOSTV() || isTVPlatform();
+        if (tvPlayback && !nativeTvFailedRef.current) {
+          nativeTvActiveRef.current = true;
+          video.muted = true;
+          video.playsInline = true;
+          video.setAttribute('playsinline', 'true');
+          video.setAttribute('webkit-playsinline', 'true');
+          const markPlaybackReady = () => {
+            hasStartedPlayingRef.current = true;
+            setLoadingStatusMessage(null);
+            setIsLoading(false);
+            onLoadingChangeRef.current?.(false);
+          };
+          const onPlaying = () => {
+            markPlaybackReady();
+          };
+          const onTimeUpdate = () => {
+            if (!video.paused && (video.currentTime || 0) > 0.3) {
+              markPlaybackReady();
+            }
+          };
+          const onCanPlay = () => {
+            if (!video.paused) {
+              markPlaybackReady();
+              return;
+            }
+            video.play().catch(() => {});
+          };
+          const onNativeError = () => {
+            console.warn('[useHlsPlayer] HLS natif TV en échec, fallback hls.js');
+            nativeTvActiveRef.current = false;
+            nativeTvFailedRef.current = true;
+            video.removeEventListener('playing', onPlaying);
+            video.removeEventListener('timeupdate', onTimeUpdate);
+            video.removeEventListener('canplay', onCanPlay);
+            video.removeEventListener('error', onNativeError);
+            try {
+              video.removeAttribute('src');
+              video.load();
+            } catch {
+              /* ignore */
+            }
+            void initializeVideo(true, false);
+          };
+          video.addEventListener('playing', onPlaying);
+          video.addEventListener('timeupdate', onTimeUpdate);
+          video.addEventListener('canplay', onCanPlay);
+          video.addEventListener('error', onNativeError);
+          cleanupFunctions.push(() => {
+            video.removeEventListener('playing', onPlaying);
+            video.removeEventListener('timeupdate', onTimeUpdate);
+            video.removeEventListener('canplay', onCanPlay);
+            video.removeEventListener('error', onNativeError);
+          });
+          setLoadingStatusMessage(
+            t('playback.phase.preparingPlayback') || 'Préparation de la lecture…',
+          );
+          video.src = effectiveHlsUrl;
+          try {
+            video.load();
+          } catch {
+            /* ignore */
+          }
+          window.setTimeout(() => {
+            if (video.paused && nativeTvActiveRef.current) {
+              video.play().catch(() => {});
+            }
+          }, 800);
+
+          reloadWithSeekRef.current = (seekSeconds: number) => {
+            if (Number.isFinite(seekSeconds) && seekSeconds >= 0) {
+              video.currentTime = seekSeconds;
+            }
+          };
+
+          const fullCleanup = () => {
+            nativeTvActiveRef.current = false;
+            reloadWithSeekRef.current = null;
+            void unregisterActiveVideo();
+            cleanupFunctions.forEach((cleanup) => cleanup());
+            video.pause();
+            video.removeAttribute('src');
+            try {
+              video.load();
+            } catch {
+              /* ignore */
+            }
+          };
+          fullCleanupRef.current = fullCleanup;
+          return fullCleanup;
+        }
+
+        nativeTvActiveRef.current = false;
+
         // Le backend génère toujours des playlists HLS, donc on utilise toujours HLS.js
         if (!window.Hls || !window.Hls.isSupported()) {
           throw new Error('HLS.js n\'est pas disponible ou n\'est pas supporté par ce navigateur');
         }
 
         // Options HLS.js : profil réseau (4G vs Wi‑Fi) + VOD local vs flux distant.
-        const tvPlayback = isWebOSTV() || isTVPlatform();
         const net = getNetworkPlaybackProfile(isRemoteStream, { isTv: tvPlayback });
         const maxBufferLength = tvPlayback ? Math.min(net.maxBufferLength, 16) : net.maxBufferLength;
         const hls = new window.Hls({
@@ -620,8 +732,6 @@ export function useHlsPlayer({
         };
         const handlePlaying = () => {
           handlePlay();
-          const ahead = getBufferAheadSeconds(video.buffered, video.currentTime || 0);
-          if (ahead < 1 && (video.currentTime || 0) < 0.2) return;
           hasStartedPlayingRef.current = true;
           setLoadingStatusMessage(null);
           setIsLoading(false);
@@ -1679,7 +1789,7 @@ export function useHlsPlayer({
     };
     // IMPORTANT: Utiliser des dépendances stabilisées pour éviter les réinitialisations multiples
     // maxHeight : changement de qualité → nouvelle URL ; src / useStreamTorrentUrlProp : mode stream-torrent
-  }, [hlsLoaded, src, infoHash, filePath, baseUrlProp, streamBackendUrl, maxHeight, useStreamTorrentUrlProp, seriesSeason, seriesEpisode, variantId]);
+  }, [playerRuntimeReady, src, infoHash, filePath, baseUrlProp, streamBackendUrl, maxHeight, useStreamTorrentUrlProp, seriesSeason, seriesEpisode, variantId]);
 
   // Fonction pour arrêter le buffer manuellement (utile lors de la fermeture).
   // Appelle le cleanup complet : pause vidéo + unregister backend (arrêt FFmpeg) + destroy HLS.
