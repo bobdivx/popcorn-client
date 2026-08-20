@@ -10,6 +10,7 @@
     "dev": "node scripts/popcorn-cli.js dev",
     "build": "node scripts/popcorn-cli.js build",
     "test": "node scripts/popcorn-cli.js test",
+    "test:playback": "node scripts/playback-smoke.mjs",
     "tauri": "tauri",
     "astro": "astro",
     "preview": "node scripts/popcorn-cli.js preview"

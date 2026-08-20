@@ -766,15 +766,13 @@ html[data-ui-pack="tesla"] #popcorn-loading-fallback .bg-page-grid,
 html[data-ui-pack="tesla"] #popcorn-loading-fallback .bg-page-orbs {
   display: none;
 }
-html[data-ui-pack="tesla"] #popcorn-loading-fallback .loading-icon-container,
 html[data-ui-pack="tesla"] #popcorn-loading-fallback .pl-boot-dots {
   display: none;
 }
-html[data-ui-pack="tesla"] #popcorn-loading-fallback .pl-boot-brand {
-  margin-bottom: 1.25rem;
+html[data-ui-pack="tesla"] #popcorn-loading-fallback .ds-loader--block {
+  margin-bottom: 1rem;
 }
-html[data-ui-pack="tesla"] #popcorn-loading-fallback .pl-boot-brand img {
-  height: 4.5rem;
+html[data-ui-pack="tesla"] #popcorn-loading-fallback .ds-loader-logo {
   filter: none;
   opacity: 1;
 }

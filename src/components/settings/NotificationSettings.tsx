@@ -18,6 +18,7 @@ import {
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
 import { useSeedingHealth, type SeedingDiagnostic } from '../../hooks/useSeedingHealth';
+import { DsLoader } from '../ui/DsLoader';
 import { useNativeNotifications } from '../../hooks/useNativeNotifications';
 import {
   connectivityWarningFingerprint,
@@ -230,7 +231,7 @@ export default function NotificationSettings() {
   if (loading) {
     return (
       <div className="flex items-center justify-center p-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+        <DsLoader size="md" />
       </div>
     );
   }
@@ -721,7 +722,7 @@ export default function NotificationSettings() {
           <button type="submit" disabled={saving} className="btn btn-primary btn-sm min-w-[100px]">
             {saving ? (
               <span className="flex items-center gap-2">
-                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                <DsLoader size="xs" className="text-white" />
                 {t('common.loading')}
               </span>
             ) : (

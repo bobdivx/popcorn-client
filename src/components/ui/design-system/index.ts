@@ -16,6 +16,8 @@ export { DsProgressRing } from '../DsProgressRing';
 export { DsBarChart } from '../DsBarChart';
 export type { DsBarChartItem } from '../DsBarChart';
 export { default as DsPageHeader } from '../DsPageHeader';
+export { DsLoader } from '../DsLoader';
+export type { DsLoaderProps, DsLoaderSize } from '../DsLoader';
 export { LoadingIcon } from '../LoadingIcon';
 export { LoadingCard } from '../LoadingCard';
 export type { LoadingCardProps } from '../LoadingCard';

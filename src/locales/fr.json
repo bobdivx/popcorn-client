@@ -600,9 +600,9 @@
     "hideDebug": "Masquer debug",
     "hls": {
       "serverPreparing": "Le serveur prépare la vidéo…",
-      "preparingRemux": "Empaquetage de la vidéo pour le lecteur (sans réencodage)…",
-      "preparingTranscode": "Conversion pour cet appareil (4K / HEVC : 20–40 s pour le 1er segment)…",
-      "playlistReady": "Playlist prête, remplissage du buffer du lecteur…",
+      "preparingRemux": "Préparation de la vidéo…",
+      "preparingTranscode": "Conversion pour cet appareil…",
+      "playlistReady": "Remplissage du buffer…",
       "serverPipeline": "Serveur (HLS)",
       "playerBuffer": "Buffer lecteur",
       "segmentsReady": "{ready} / {expected} segments",
@@ -620,7 +620,14 @@
       "gpuWillUseNvenc": "GPU détecté — NVENC sera utilisé",
       "gpuWillUseNvdec": "GPU détecté — NVDEC sera utilisé",
       "gpuWillUseGeneric": "GPU détecté — {accel} sera utilisé",
-      "gpuWillUseCpu": "Transcodage CPU (pas de GPU)"
+      "gpuWillUseCpu": "Transcodage CPU (pas de GPU)",
+      "liveTrace": "Journal lecture",
+      "etaPlayable": "Lecture dans {eta}",
+      "elapsed": "Depuis le lancement",
+      "stalls": "Buffers / stalls",
+      "bufferEvents": "buffers",
+      "network": "Réseau appareil",
+      "hlsBandwidth": "Débit HLS estimé"
     },
 
     "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct.",

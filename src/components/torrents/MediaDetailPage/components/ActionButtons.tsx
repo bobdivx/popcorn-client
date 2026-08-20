@@ -6,7 +6,6 @@ import {
   Link2,
   Check,
   Trash2,
-  Loader2,
   Radio,
   Bookmark,
   BookmarkCheck,
@@ -23,6 +22,7 @@ import {
 } from '../../../streaming/player-shared/derivePlaybackPhase';
 import { PlaybackStatusSurface } from '../../../streaming/player-shared/components/PlaybackStatusSurface';
 import { Modal } from '../../../ui/Modal';
+import { DsLoader } from '../../../ui/DsLoader';
 import { isTVPlatform } from '../../../../lib/utils/device-detection';
 
 interface ActionButtonsProps {
@@ -277,17 +277,17 @@ export function ActionButtons({
           >
             {downloadingToClient ? (
               <>
-                <Loader2 className="h-5 w-5 tv:h-7 tv:w-7 animate-spin shrink-0" size={20} />
+                <DsLoader size="xs" className="shrink-0" />
                 Ajout...
               </>
             ) : (isDownloading || hasActiveDownloadStats) && !onCancelDownload ? (
               <>
-                <Loader2 className="h-5 w-5 tv:h-7 tv:w-7 animate-spin shrink-0" size={20} />
+                <DsLoader size="xs" className="shrink-0" />
                 {showProgressInButton ? `${displayProgressPercent}%` : '0%'}
               </>
             ) : countdownRemaining !== null && countdownRemaining > 0 ? (
               <>
-                <Loader2 className="h-5 w-5 tv:h-7 tv:w-7 animate-spin shrink-0" size={20} />
+                <DsLoader size="xs" className="shrink-0" />
                 {countdownRemaining} s...
               </>
             ) : isPackEpisodeSelected ? (
@@ -393,7 +393,7 @@ export function ActionButtons({
             className={`gtv-icon-btn ds-focus-glow ds-active-glow tv:w-16 tv:h-16 disabled:opacity-50 ${watchLater.isFavorite ? 'text-violet-400 bg-violet-900/30' : ''}`}
           >
             {watchLater.loading ? (
-              <Loader2 className="h-5 w-5 tv:h-7 tv:w-7 animate-spin" size={20} />
+              <DsLoader size="xs" />
             ) : watchLater.isFavorite ? (
               <BookmarkCheck className="h-5 w-5 tv:h-7 tv:w-7" size={20} />
             ) : (
@@ -431,7 +431,7 @@ export function ActionButtons({
             title={isLocalTorrent ? t('mediaDetail.deleteLocalFile') : t('mediaDetail.deleteTorrent')}
           >
             {deletingMedia ? (
-              <Loader2 className="h-4 w-4 animate-spin shrink-0" size={16} />
+              <DsLoader size="xs" className="shrink-0" />
             ) : (
               <Trash2 className="h-4 w-4 shrink-0" size={16} />
             )}
@@ -554,7 +554,7 @@ export function ActionButtons({
                       onClick={() => void watchLater.onToggle()}
                     >
                       {watchLater.loading ? (
-                        <Loader2 className="h-5 w-5 tv:h-7 tv:w-7 animate-spin shrink-0" />
+                        <DsLoader size="xs" className="shrink-0" />
                       ) : watchLater.isFavorite ? (
                         <BookmarkCheck className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
                       ) : (
@@ -628,7 +628,7 @@ export function ActionButtons({
                       }}
                     >
                       {deletingMedia ? (
-                        <Loader2 className="h-5 w-5 tv:h-7 tv:w-7 animate-spin shrink-0" />
+                        <DsLoader size="xs" className="shrink-0" />
                       ) : (
                         <Trash2 className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
                       )}

@@ -4,6 +4,7 @@ import { FocusableCard } from '../../ui/FocusableCard';
 import { useI18n } from '../../../lib/i18n/useI18n';
 import { formatSpeed } from '../../../lib/utils/formatBytes';
 import { Download } from 'lucide-preact';
+import { DsLoader } from '../../ui/DsLoader';
 import { contentItemKey } from '../utils/browsePriority';
 
 interface ResumePosterProps {
@@ -148,19 +149,9 @@ export function ResumePoster({ item, onNavigate }: ResumePosterProps) {
               {/* Contenu de l'overlay */}
               <div className="absolute inset-0 flex flex-col items-center justify-center p-4">
                 {/* Anneau de progression ou icône pulsante */}
-                <div className="relative w-14 h-14 sm:w-16 sm:h-16 mb-3">
-                  <div className="absolute inset-0 rounded-full border-2 border-white/5" />
-                  <div 
-                    className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" 
-                    style={{ 
-                      animationDuration: '1s',
-                      maskImage: `conic-gradient(transparent 20%, black 100%)`
-                    }} 
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Download className="w-6 h-6 sm:w-7 sm:h-7 text-primary animate-pulse" />
-                  </div>
-                </div>
+                <DsLoader size="md" className="mb-3" withLogo={false}>
+                  <Download className="w-6 h-6 sm:w-7 sm:h-7 text-[var(--ds-accent-violet)]" />
+                </DsLoader>
 
                 <div className="text-center">
                   <div className="text-[10px] sm:text-xs font-bold text-white tracking-[0.2em] uppercase mb-1 drop-shadow-md opacity-80">

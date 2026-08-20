@@ -2,6 +2,7 @@ import { useI18n } from '../../../../lib/i18n/useI18n';
 import type { PlayerLoadingTorrentStats } from './PlayerLoadingOverlay';
 import { PlaybackStatusSurface } from './PlaybackStatusSurface';
 import type { PlaybackPipelineStatus } from '../../../../lib/streaming/playbackPipeline';
+import type { PlaybackLiveTraceState } from '../hooks/usePlaybackLiveTrace';
 
 export interface PlayerBufferingOverlayProps {
   title?: string | null;
@@ -17,6 +18,7 @@ export interface PlayerBufferingOverlayProps {
   imageUrl?: string | null;
   pipelineStatus?: PlaybackPipelineStatus | null;
   debugLogsUrl?: string | null;
+  liveTrace?: PlaybackLiveTraceState | null;
 }
 
 /**
@@ -34,6 +36,7 @@ export default function PlayerBufferingOverlay({
   imageUrl,
   pipelineStatus = null,
   debugLogsUrl = null,
+  liveTrace = null,
 }: PlayerBufferingOverlayProps) {
   const { t } = useI18n();
 
@@ -51,6 +54,7 @@ export default function PlayerBufferingOverlay({
       bufferedPercent={bufferedPercent}
       pipelineStatus={pipelineStatus}
       debugLogsUrl={debugLogsUrl}
+      liveTrace={liveTrace}
       onCancel={onClose}
       cancelLabel={closeLabel || t('common.close') || 'Fermer'}
     />

@@ -288,7 +288,11 @@ html[data-tv-platform="true"] .carousel-container {
 }
 
 /* TV : pas d’animation d’entrée sur les lignes de carrousel (classe ajoutée par IntersectionObserver hors TV) */
-html[data-tv-platform="true"] .animate-fade-in-up {
+html[data-tv-platform="true"] .animate-fade-in-up,
+html[data-tv-platform="true"] .ds-enter,
+html[data-tv-platform="true"] .ds-card-animate,
+html[data-tv-platform="true"] .ds-card-animate-stagger > *,
+html[data-tv-platform="true"] .ds-card-loading-wrapper {
   animation: none !important;
   opacity: 1 !important;
   transform: none !important;
@@ -313,6 +317,7 @@ html[data-tv-platform="true"] *::after {
 /* Exceptions TV : spinners, focus, overlays player */
 html[data-tv-platform="true"] .animate-spin,
 html[data-tv-platform="true"] [aria-busy="true"] .animate-spin,
+html[data-tv-platform="true"] .ds-loader-spin,
 html[data-tv-platform="true"] .ds-progress-bar,
 html[data-tv-platform="true"] .ds-progress-wave {
   animation: unset !important;
@@ -554,7 +559,7 @@ html[data-tv-platform="true"] [data-page="demandes"] [data-torrent-card].torrent
 @keyframes fade-in-down {
   from {
     opacity: 0;
-    transform: translateY(-20px);
+    transform: translateY(-10px);
   }
   to {
     opacity: 1;
@@ -565,7 +570,7 @@ html[data-tv-platform="true"] [data-page="demandes"] [data-torrent-card].torrent
 @keyframes fade-in-up {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -746,7 +751,7 @@ html[data-tv-platform="true"] [data-page="demandes"] [data-torrent-card].torrent
 @keyframes pageTransition {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;

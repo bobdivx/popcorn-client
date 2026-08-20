@@ -204,7 +204,7 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         errEl.style.display = 'block';
       };
     </script>
-    <!-- Indicateur de chargement immédiat (style C411 : fond enrichi + carte glass + icon-container) -->
+    <!-- Indicateur de chargement immédiat (DsLoader — même animation partout) -->
     <div id="popcorn-loading-fallback" class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-page overflow-hidden" aria-hidden="true">
       <div class="bg-page-gradient"></div>
       <div class="bg-page-grid"></div>
@@ -214,20 +214,18 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         <div class="loading-orb loading-orb-3"></div>
       </div>
       <div class="relative z-10 w-full max-w-[42rem] px-4 text-center">
-        <div class="pl-boot-brand animate-fade-in-down mb-8">
-          <img src="/popcorn_logo.png" alt="Popcorn" class="h-20 w-auto mx-auto opacity-90" />
-        </div>
         <div class="ds-card-loading-wrapper">
           <div class="ds-card-loading-glow"></div>
           <div class="ds-card-loading">
             <div class="ds-card-loading-bar"></div>
             <div class="ds-card-loading-content">
-              <div class="loading-icon-container">
-                <div class="loading-icon-ring-outer"></div>
-                <div class="loading-icon-ring-middle"></div>
-                <div class="loading-icon-glow"></div>
-                <div class="loading-icon-circle">
-                  <img src="/popcorn_logo.png" alt="" class="w-full h-full object-contain loading-icon-logo" />
+              <div class="ds-loader ds-loader--lg ds-loader--block" role="status" aria-busy="true">
+                <div class="ds-loader-mark">
+                  <div class="ds-loader-track"></div>
+                  <div class="ds-loader-spin"></div>
+                  <div class="ds-loader-core">
+                    <img src="/popcorn_logo.png" alt="" class="ds-loader-logo loading-icon-logo" />
+                  </div>
                 </div>
               </div>
               <h1 class="ds-loading-title">Chargement...</h1>
@@ -238,11 +236,6 @@ const isWebOS = import.meta.env.WEBOS === 'true';
               </div>
               <p id="popcorn-loading-hint" class="pl-boot-hint text-sm mt-2 max-w-xs text-center hidden" style="display: none;">Si rien ne s&#39;affiche, quittez et rouvrez l&#39;app.</p>
               <p id="popcorn-loading-error" class="pl-boot-error mt-3 max-w-lg text-center px-3 py-2 rounded text-sm font-medium hidden" style="display: none;"></p>
-              <div class="pl-boot-dots flex gap-1 mt-2 justify-center">
-                <span class="w-2 h-2 bg-primary rounded-full" style="animation: hls-bounce 1.4s infinite ease-in-out both; animation-delay: 0s"></span>
-                <span class="w-2 h-2 bg-primary rounded-full" style="animation: hls-bounce 1.4s infinite ease-in-out both; animation-delay: 0.2s"></span>
-                <span class="w-2 h-2 bg-primary rounded-full" style="animation: hls-bounce 1.4s infinite ease-in-out both; animation-delay: 0.4s"></span>
-              </div>
             </div>
           </div>
         </div>

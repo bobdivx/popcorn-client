@@ -124,6 +124,8 @@ const commands = {
     const target = args[1] || 'backend';
     if (target === 'backend') {
       run('node', ['scripts/smoke-backend.mjs', '--backend', 'http://127.0.0.1:3000']);
+    } else if (target === 'playback') {
+      run('node', ['scripts/playback-smoke.mjs', ...args.slice(2)]);
     } else if (target === 'android') {
       const isTV = args.includes('--tv');
       runPS('scripts/android-smoke-test.ps1', ['-Variant', isTV ? 'tv' : 'mobile', '-BackendUrl', 'http://127.0.0.1:3000']);
@@ -157,6 +159,8 @@ function printHelp() {
   \x1b[32msetup\x1b[0m            Configurer l'environnement Android
   \x1b[32mclean\x1b[0m            Nettoyer les artefacts de build
   \x1b[32mtest\x1b[0m             Lancer les tests unitaires
+  \x1b[32msmoke playback\x1b[0m   Smoke lecture HLS (backend + navigateur)
+  \x1b[32msmoke playback\x1b[0m   Smoke lecture HLS (backend + navigateur)
 
 \x1b[1mExemples :\x1b[0m
   npm run popcorn build android --tv

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'preact/hooks';
-import { Search as SearchIcon, X, Layers2, CloudDownload, HardDrive, FolderOpen, Film, Loader2, CheckCircle2, MinusCircle } from 'lucide-preact';
+import { Search as SearchIcon, X, Layers2, CloudDownload, HardDrive, FolderOpen, Film, CheckCircle2, MinusCircle } from 'lucide-preact';
 import { serverApi, type SearchResult } from '../lib/client/server-api';
 import { CacheManager } from '../lib/client/storage';
 import { FocusableCard } from './ui/FocusableCard';
@@ -8,6 +8,7 @@ import { useI18n } from '../lib/i18n/useI18n';
 import { isTVPlatform } from '../lib/utils/device-detection';
 import { tvBrowseItemKey } from '../lib/tv-browse-restore';
 import { TvOnScreenKeyboard } from './tv/TvOnScreenKeyboard';
+import { DsLoader } from './ui/DsLoader';
 
 const SEARCH_HISTORY_KEY = 'popcorn_search_history';
 const SEARCH_HISTORY_MAX = 10;
@@ -110,7 +111,7 @@ function SearchLiveProgressTimeline({
         ) : done ? (
           <CheckCircle2 className="w-4 h-4 text-emerald-500" strokeWidth={2.25} />
         ) : active ? (
-          <Loader2 className="w-4 h-4 text-[var(--ds-accent-violet)] animate-spin" strokeWidth={2.25} />
+          <DsLoader size="xs" className="text-[var(--ds-accent-violet)]" />
         ) : (
           <span className="inline-block w-4 h-4 rounded-full border border-[var(--ds-border-strong)]" />
         )}
@@ -1103,7 +1104,7 @@ export default function Search({ onResultClick }: SearchProps) {
                 data-focusable
               >
                 {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" size={16} />
+                  <DsLoader size="xs" />
                 ) : (
                   <SearchIcon className="w-4 h-4 tv:w-5 tv:h-5" size={16} />
                 )}
@@ -1199,7 +1200,7 @@ export default function Search({ onResultClick }: SearchProps) {
           <div className="max-w-xl mx-auto rounded-2xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] p-5 tv:p-6">
             <div className="flex items-start gap-3 mb-2">
               <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--ds-border)] bg-[var(--ds-surface)] shrink-0">
-                <Loader2 className="h-4 w-4 animate-spin text-[var(--ds-accent-violet)]" size={16} />
+                <DsLoader size="xs" className="text-[var(--ds-accent-violet)]" />
               </span>
               <div className="min-w-0">
                 <h2 className="text-base tv:text-lg font-semibold text-[var(--ds-text-primary)]">

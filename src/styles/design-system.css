@@ -52,6 +52,14 @@
   /* Boutons ronds (touch-friendly) */
   --ds-touch-target: 44px;
   --ds-touch-target-sm: 40px;
+
+  /* Motion — une courbe, une distance, des durées. Réutiliser partout. */
+  --ds-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ds-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ds-duration-fast: 180ms;
+  --ds-duration: 320ms;
+  --ds-duration-slow: 480ms;
+  --ds-enter-distance: 10px;
 }
 
 /* ── Thème clair ── */
@@ -382,7 +390,7 @@ html[data-modal-open] body {
 .ds-card-loading-wrapper {
   position: relative;
   opacity: 0;
-  animation: fade-in-up 0.6s ease-out 0.2s forwards;
+  animation: ds-enter var(--ds-duration-slow) var(--ds-ease) 80ms both;
 }
 
 .ds-card-loading-glow {
@@ -429,15 +437,11 @@ html[data-modal-open] body {
   }
 }
 @media (max-height: 800px) {
-  .loading-icon-container {
-    width: 5rem;
-    height: 5rem;
+  .ds-loader--block,
+  .ds-loader--lg.ds-loader--block {
+    --ds-loader-size: 4.5rem;
     margin-bottom: 1rem;
   }
-  .loading-icon-ring-outer, .loading-icon-ring-middle { display: none; }
-  .loading-icon-glow { width: 4.5rem; height: 4.5rem; inset: 0.25rem; }
-  .loading-icon-circle { width: 4.5rem; height: 4.5rem; }
-  .loading-icon-circle img, .loading-icon-circle svg { width: 2rem; height: 2rem; }
   
   .ds-loading-title {
     font-size: 1.5rem;
@@ -499,72 +503,144 @@ html[data-modal-open] body {
   flex-shrink: 0;
 }
 
-/* ========== Icon-container (anneaux + glow + cercle central) ========== */
-.loading-icon-container {
-  position: relative;
-  display: inline-flex;
+/* ========== Loader unique (arc conique + logo statique) ========== */
+.ds-loader {
+  --ds-loader-size: 5.5rem;
+  --ds-loader-stroke: 2.5px;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  margin-bottom: 2rem;
-  width: 8rem;
-  height: 8rem;
+  gap: 0.75rem;
+  width: max-content;
+  max-width: 100%;
+  margin-inline: auto;
+  color: var(--ds-accent-violet);
 }
 
-.loading-icon-ring-outer {
+.ds-loader--xs { --ds-loader-size: 1.25rem; --ds-loader-stroke: 2px; gap: 0; }
+.ds-loader--sm { --ds-loader-size: 1.75rem; --ds-loader-stroke: 2px; gap: 0.4rem; }
+.ds-loader--md { --ds-loader-size: 3.5rem; --ds-loader-stroke: 2.25px; }
+.ds-loader--lg { --ds-loader-size: 5.5rem; }
+.ds-loader--xl { --ds-loader-size: 7rem; --ds-loader-stroke: 3px; }
+.ds-loader--block { display: flex; margin-bottom: 2rem; width: 100%; }
+.ds-loader--inline { flex-direction: row; gap: 0.75rem; width: auto; }
+.ds-loader--player { --ds-loader-size: 5rem; width: 100%; }
+@media (min-width: 640px) {
+  .ds-loader--player { --ds-loader-size: 6rem; }
+}
+html[data-tv-platform="true"] .ds-loader--xs {
+  --ds-loader-size: 1.75rem;
+}
+
+.ds-loader-mark {
+  position: relative;
+  width: var(--ds-loader-size);
+  height: var(--ds-loader-size);
+  flex-shrink: 0;
+}
+
+.ds-loader-mark .ds-progress-ring {
   position: absolute;
   inset: 0;
-  width: 8rem;
-  height: 8rem;
-  border-radius: 50%;
-  border: 4px solid rgba(168, 85, 247, 0.2);
-  animation: spin-slow 8s linear infinite;
+  width: 100%;
+  height: 100%;
 }
 
-.loading-icon-ring-middle {
+.ds-loader-percent {
+  margin: 0;
+  color: var(--ds-text-primary);
+  font-size: 1.15rem;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+}
+.ds-loader-percent span {
+  color: var(--ds-accent-violet);
+  font-size: 0.8em;
+  font-weight: 600;
+}
+
+.ds-loader-track {
   position: absolute;
-  inset: 0.5rem;
-  width: 7rem;
-  height: 7rem;
+  inset: 0;
   border-radius: 50%;
-  border: 2px dashed rgba(168, 85, 247, 0.3);
-  animation: spin-slow 12s linear infinite reverse;
+  border: var(--ds-loader-stroke) solid currentColor;
+  opacity: 0.16;
 }
 
-.loading-icon-glow {
+.ds-loader-spin {
   position: absolute;
-  inset: 1rem;
-  width: 6rem;
-  height: 6rem;
+  inset: 0;
   border-radius: 50%;
-  background: linear-gradient(to bottom right, rgba(168, 85, 247, 0.2), rgba(147, 51, 234, 0.2));
-  animation: pulse 2s ease-in-out infinite;
+  background: conic-gradient(
+    from 200deg,
+    transparent 0%,
+    transparent 40%,
+    currentColor 100%
+  );
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--ds-loader-stroke)),
+    #000 calc(100% - var(--ds-loader-stroke))
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(100% - var(--ds-loader-stroke)),
+    #000 calc(100% - var(--ds-loader-stroke))
+  );
+  animation: ds-loader-rotate 0.9s linear infinite;
+  will-change: transform;
 }
 
-.loading-icon-circle {
-  position: relative;
+.ds-loader-core {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 6rem;
-  height: 6rem;
-  border-radius: 50%;
-  background: linear-gradient(to bottom right, rgba(168, 85, 247, 0.25), rgba(126, 34, 206, 0.25));
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  padding: 24%;
+  pointer-events: none;
 }
 
-.loading-icon-circle img,
-.loading-icon-circle svg {
-  width: 3rem;
-  height: 3rem;
-  color: var(--ds-accent-violet);
+.ds-loader--xs .ds-loader-core {
+  display: none;
+}
+.ds-loader--sm .ds-loader-core {
+  padding: 28%;
+}
+
+.ds-loader-core img,
+.ds-loader-core svg,
+.ds-loader-logo {
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-}
-.loading-icon-logo {
-  filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.5));
+  color: var(--ds-accent-violet);
 }
 
-.loading-icon-circle svg {
-  flex-shrink: 0;
+.ds-loader-logo,
+.loading-icon-logo {
+  filter: drop-shadow(0 0 8px rgba(209, 196, 233, 0.45));
+}
+
+.ds-loader-label {
+  margin: 0;
+  color: var(--ds-text-secondary);
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+
+.ds-loader--lg .ds-loader-label,
+.ds-loader--xl .ds-loader-label {
+  font-size: 1.05rem;
+}
+
+@keyframes ds-loader-rotate {
+  to { transform: rotate(360deg); }
 }
 
 /* Titre avec dégradé (carte chargement) */
@@ -969,11 +1045,11 @@ html[data-modal-open] body {
   border: none;
 }
 
-/* Animations d'entrée (cartes, listes) */
-@keyframes ds-fade-in-up {
+/* Animations d'entrée — une seule courbe, réutilisée partout */
+@keyframes ds-enter {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(var(--ds-enter-distance));
   }
   to {
     opacity: 1;
@@ -981,13 +1057,34 @@ html[data-modal-open] body {
   }
 }
 
-.ds-card-animate {
-  animation: ds-fade-in-up 0.35s ease-out forwards;
+@keyframes ds-enter-down {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--ds-enter-distance) * -1));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ds-enter,
+.ds-card-animate,
+.ds-animate-fade-in,
+.animate-fade-in,
+.animate-fade-in-up,
+.page-transition,
+.page-enter {
+  animation: ds-enter var(--ds-duration) var(--ds-ease) both;
+}
+
+.animate-fade-in-down {
+  animation: ds-enter-down var(--ds-duration) var(--ds-ease) both;
 }
 
 .ds-card-animate-stagger > * {
   opacity: 0;
-  animation: ds-fade-in-up 0.35s ease-out forwards;
+  animation: ds-enter var(--ds-duration) var(--ds-ease) both;
 }
 
 .ds-card-animate-stagger > *:nth-child(1) { animation-delay: 0.05s; }
@@ -1018,8 +1115,23 @@ html[data-modal-open] body {
 
 /* reduced-motion : ne pas laisser les cartes à opacity 0 quand l'animation est supprimée */
 @media (prefers-reduced-motion: reduce) {
-  .ds-card-animate-stagger > * {
+  .ds-card-animate-stagger > *,
+  .ds-enter,
+  .ds-card-animate,
+  .ds-animate-fade-in,
+  .ds-card-loading-wrapper,
+  .animate-fade-in,
+  .animate-fade-in-up,
+  .animate-fade-in-down,
+  .page-enter,
+  .page-transition {
     opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .ds-loader-spin {
+    animation: none;
+    background: conic-gradient(from 200deg, transparent 55%, currentColor 100%);
   }
 }
 
@@ -1045,7 +1157,7 @@ html[data-modal-open] body {
   font-size: 0.875rem;
   font-weight: 600;
   color: var(--ds-text-primary);
-  animation: ds-fade-in-up 0.3s ease-out;
+  animation: ds-enter var(--ds-duration) var(--ds-ease) both;
 }
 .sync-elapsed-banner__dot {
   width: 8px;

@@ -21,6 +21,7 @@ import { useStreamSource } from '../../../streaming/player-core/hooks/useStreamS
 import { buildProxyUrl, normalizeStreamPath } from '../../../streaming/player-core/utils/buildStreamUrl';
 import { canUseSeekReload as computeCanUseSeekReload } from '../../../streaming/player-core/utils/streamSourceUtils';
 import { emitPlaybackStep } from '../../../streaming/player-core/observability/playbackEvents';
+import { getNetworkPlaybackProfile } from '../../../../lib/streaming/networkPlaybackProfile';
 import { logVideoPlaybackError } from '../../../streaming/direct-player/mediaErrorDiagnostics';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { useLibraryScrubThumbnails } from './video-player-wrapper/useLibraryScrubThumbnails';
@@ -198,8 +199,10 @@ export function VideoPlayerWrapper({
     /\.(mp4|m4v|webm)(\?|$)/i.test(localFilePath);
   const effectiveDirectMode =
     (isDirectMode || isBrowserNativeLocal) && !forceHlsFallback;
-  /** Qualité stream HLS : hauteur max en pixels (720, 480, 360) ou null = source. Modifiable dans le player. */
-  const [streamQuality, setStreamQuality] = useState<number | null>(null);
+  /** Qualité stream HLS : hauteur max (720, 480, 360) ou null = source. 4G démarre en 720p. */
+  const [streamQuality, setStreamQuality] = useState<number | null>(
+    () => getNetworkPlaybackProfile().suggestedMaxHeight,
+  );
   const {
     streamUrl,
     hlsFilePath,
@@ -336,7 +339,7 @@ export function VideoPlayerWrapper({
   useEffect(() => {
     // Réinitialiser le fallback, la qualité et les retries stream-torrent quand on change de média/session de lecture.
     setForceHlsFallback(false);
-    setStreamQuality(null);
+    setStreamQuality(getNetworkPlaybackProfile().suggestedMaxHeight);
     setDirectStreamRetryCount(0);
     hasLoggedStartRef.current = false;
     lastLoggedErrorRef.current = null;

@@ -35,6 +35,7 @@ export function DsProgressRing({
       width={size}
       height={size}
       viewBox={`0 0 ${size} ${size}`}
+      preserveAspectRatio="xMidYMid meet"
       className={`ds-progress-ring ${className}`.trim()}
       role="progressbar"
       aria-valuenow={Math.round(clamped)}

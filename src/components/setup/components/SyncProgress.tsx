@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../../../lib/client/server-api';
 import { useI18n } from '../../../lib/i18n/useI18n';
+import { DsLoader } from '../../ui/DsLoader';
 
 interface SyncStatus {
   sync_in_progress: boolean;
@@ -149,9 +150,7 @@ export function SyncProgress({ compact = false, externalStatus }: SyncProgressPr
     if (compact) {
       return (
         <div className="sticky top-0 z-[100] px-4 py-3 bg-black/50 backdrop-blur-md border-b border-blue-500/40 flex items-center gap-2">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-400 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
+          <DsLoader size="xs" className="text-blue-400 shrink-0" />
           <span className="text-blue-400 text-sm">{t('syncProgress.starting')}</span>
         </div>
       );
@@ -160,9 +159,7 @@ export function SyncProgress({ compact = false, externalStatus }: SyncProgressPr
       <div className="space-y-6">
         <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-xl p-6 border-2 border-blue-500/50">
           <div className="flex items-center justify-center gap-3 mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            <DsLoader size="xs" className="text-blue-400 shrink-0" />
             <h3 className="text-lg font-semibold text-white">{t('syncProgress.starting')}</h3>
           </div>
           <p className="text-gray-400 text-sm text-center">
@@ -204,9 +201,7 @@ export function SyncProgress({ compact = false, externalStatus }: SyncProgressPr
   if (compact) {
     return (
       <div className="sticky top-0 z-[100] px-4 py-3 bg-black/50 backdrop-blur-md border-b border-blue-500/40 flex items-center gap-3">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-blue-400 animate-spin flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
+        <DsLoader size="xs" className="text-blue-400 shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex justify-between items-center gap-2 mb-1">
             <span className="text-blue-400 text-sm truncate">{t('syncProgress.inProgress')}</span>
@@ -232,9 +227,7 @@ export function SyncProgress({ compact = false, externalStatus }: SyncProgressPr
       <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 rounded-xl p-6 border-2 border-blue-500/50">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            <DsLoader size="xs" className="text-blue-400 shrink-0" />
             {isActuallySyncing ? t('syncProgress.inProgress') : t('syncProgress.pending')}
           </h3>
           {elapsedTime > 0 && (

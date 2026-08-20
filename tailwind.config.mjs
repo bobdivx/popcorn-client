@@ -32,7 +32,7 @@ export default {
         'fade-in-up': {
           '0%': {
             opacity: '0',
-            transform: 'translateY(20px)',
+            transform: 'translateY(10px)',
           },
           '100%': {
             opacity: '1',
@@ -133,10 +133,10 @@ export default {
         },
       },
       animation: {
-        'fade-in-up': 'fade-in-up 0.5s ease-out forwards',
-        'fade-in': 'fade-in 0.3s ease-out forwards',
-        'slide-in': 'slide-in 0.3s ease-out forwards',
-        'scale-in': 'scale-in 0.2s ease-out forwards',
+        'fade-in-up': 'fade-in-up 0.32s cubic-bezier(0.22, 1, 0.36, 1) both',
+        'fade-in': 'fade-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both',
+        'slide-in': 'slide-in 0.32s cubic-bezier(0.22, 1, 0.36, 1) both',
+        'scale-in': 'scale-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both',
         'glow': 'glow 2s ease-in-out infinite',
         'pulse-violet': 'pulse-violet 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'ripple': 'ripple 0.6s ease-out',
