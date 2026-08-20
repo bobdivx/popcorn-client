@@ -106,6 +106,15 @@ export function minBufferBeforePlaySec(isRemoteStream: boolean): number {
   return isRemoteStream ? MIN_BUFFER_BEFORE_PLAY_REMOTE_SEC : MIN_BUFFER_BEFORE_PLAY_SEC;
 }
 
+/** webOS : `play` / TimeRanges peuvent manquer alors que l’image avance. */
+export function isVideoVisiblyPlaying(video: HTMLVideoElement | null | undefined): boolean {
+  if (!video) return false;
+  const t = video.currentTime;
+  if (!Number.isFinite(t)) return false;
+  if (video.paused === false) return true;
+  return t > 0.4;
+}
+
 /**
  * Hystérésis de l’overlay buffering : une seule modal jusqu’au buffer de démarrage,
  * puis réaffichage seulement si le buffer retombe vraiment bas.

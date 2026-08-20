@@ -14,7 +14,7 @@ import { getOrCreateDeviceId } from '../../../../lib/utils/device-id';
 import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
 import { minBufferAfterSeekSec } from '../../player-core/policies/SeekPolicy';
 import { buildProxyUrl, normalizeStreamPath } from '../../player-core/utils/buildStreamUrl';
-import { getBufferAheadSeconds, minBufferBeforePlaySec } from '../../player-shared/utils/bufferMetrics';
+import { getBufferAheadSeconds, isVideoVisiblyPlaying, minBufferBeforePlaySec } from '../../player-shared/utils/bufferMetrics';
 import { getNetworkPlaybackProfile } from '../../../../lib/streaming/networkPlaybackProfile';
 import { armHlsQualityLadder, pinHlsToLowestLevel } from '../../../../lib/streaming/hlsQualityLadder';
 import { isUhdQualityAttempt } from '../../../../lib/streaming/uhdPlaybackFallback';
@@ -190,6 +190,28 @@ export function useHlsPlayer({
       onErrorRef.current?.(new Error(loaderError));
     }
   }, [loaderError]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const markReady = () => {
+      if (!isVideoVisiblyPlaying(video)) return;
+      hasStartedPlayingRef.current = true;
+      setLoadingStatusMessage(null);
+      setIsLoading(false);
+      onLoadingChangeRef.current?.(false);
+    };
+    video.addEventListener('playing', markReady);
+    video.addEventListener('play', markReady);
+    video.addEventListener('timeupdate', markReady);
+    const id = window.setInterval(markReady, 200);
+    return () => {
+      video.removeEventListener('playing', markReady);
+      video.removeEventListener('play', markReady);
+      video.removeEventListener('timeupdate', markReady);
+      window.clearInterval(id);
+    };
+  }, [playerRuntimeReady, src, infoHash, filePath]);
 
   useEffect(() => {
     const video = videoRef.current;

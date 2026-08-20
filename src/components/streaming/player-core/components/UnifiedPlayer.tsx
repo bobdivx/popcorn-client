@@ -90,7 +90,7 @@ export default function UnifiedPlayer({
 
   return (
     <>
-      {loading && (
+      {loading && !src && (
         <PlayerLoadingOverlay
           message={pipelineMessage}
           title={hlsProps.torrentName ?? hlsProps.fileName}
