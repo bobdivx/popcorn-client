@@ -78,6 +78,17 @@ body { color: #fff; }
   color: #1a1530;
 }
 
+/* Lecteur plein écran : toujours des commandes blanches, même en thème clair. */
+#video-player-wrapper,
+#video-player-wrapper .video-controls-chrome,
+#video-player-wrapper .video-controls-chrome button {
+  color: #fff;
+}
+#video-player-wrapper .video-controls-chrome svg {
+  color: #fff;
+  stroke: currentColor;
+}
+
 [data-theme="light"] .scrollbar-visible {
   scrollbar-color: rgba(0, 0, 0, 0.22) rgba(0, 0, 0, 0.06);
 }
@@ -1639,6 +1650,22 @@ html[data-tv-platform="true"] [data-page="demandes"] [data-torrent-card].torrent
   border-bottom: none;
 }
 
+/* Capsule statut serveur + GPU à gauche du header */
+.nav-status-cluster {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.07);
+}
+.nav-status-cluster > * + * {
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+[data-theme="light"] .nav-status-cluster {
+  border-color: rgba(26, 21, 48, 0.12);
+  background: rgba(255, 255, 255, 0.65);
+}
+[data-theme="light"] .nav-status-cluster > * + * {
+  border-left-color: rgba(26, 21, 48, 0.1);
+}
+
 /* Padding TV pour nav-tab */
 @media (min-width: 1280px) {
   .nav-tab {
@@ -2111,10 +2138,12 @@ form button[type="submit"]:focus-visible,
   outline: 2px solid var(--tv-focus-color) !important;
   outline-offset: -2px !important;
 }
-
+}
 
 /* ══════════════════════════════════════════════════════════════
    LIGHT MODE — Navbar : fond clair, texte/icônes sombres
+   (hors @layer utilities : Tailwind + lightningcss concatenaient
+   `a:hover` avec `hover:text-white` en pseudo-classe `:hovera`)
    ══════════════════════════════════════════════════════════════ */
 
 /* Fond de la nav en mode clair (non scrollé) */
@@ -2231,8 +2260,6 @@ form button[type="submit"]:focus-visible,
   color: #1a1530 !important;
 }
 
-/* Fermeture de la layer utilities (@layer utilities) */
-}
 /* --- Premium Animations for Overlays --- */
 @keyframes premium-shimmer {
   0% { transform: translateX(-100%); }

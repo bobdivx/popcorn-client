@@ -2,6 +2,7 @@ import { defineConfig } from 'astro/config';
 import preact from '@astrojs/preact';
 import tailwind from '@astrojs/tailwind';
 import { prefreshResolveFix, prefreshResolveAlias } from './scripts/vite/prefresh-resolve-fix.mjs';
+import { serveJsonVersion } from './scripts/vite/serve-json-version.mjs';
 
 /** Re-pré-bundle toutes les deps Vite au démarrage (lent) — utile si 504 Outdated Optimize Dep persiste après dev:clean. */
 const viteOptimizeForce = process.env.VITE_OPTIMIZE_FORCE === '1';
@@ -25,7 +26,7 @@ export default defineConfig({
     assets: '_assets',
   },
   vite: {
-    plugins: [prefreshResolveFix()],
+    plugins: [serveJsonVersion(), prefreshResolveFix()],
     resolve: {
       extensions: ['.ts', '.tsx', '.js', '.jsx', '.json'],
       alias: prefreshResolveAlias(),

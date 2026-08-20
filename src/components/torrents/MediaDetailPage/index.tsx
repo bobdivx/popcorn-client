@@ -55,6 +55,7 @@ import {
   looksLikeBencodedTorrent,
 } from '../../../lib/torrents/externalDownloadParams';
 import { useTmdbApiTitle } from './hooks/useTmdbApiTitle';
+import { isLocalMedia as isLocalMediaHash } from './actions/delete';
 
 /** Retourne l'Ã©pisode suivant (saison + id variante + titre) ou null. */
 function getNextEpisode(
@@ -874,8 +875,7 @@ export default function MediaDetailPage({
     continueInBackgroundRef.current = false;
 
     if (activeInfoHash) {
-      const { isLocalMedia } = await import('./actions/delete');
-      if (!isLocalMedia(activeInfoHash)) {
+      if (!isLocalMediaHash(activeInfoHash)) {
         try {
           const { clientApi } = await import('../../../lib/client/api');
           addDebugLog('info', 'Suppression du torrent en cours...', { infoHash: activeInfoHash });

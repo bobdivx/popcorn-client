@@ -58,7 +58,7 @@ export function ScrubThumbnailsStrip({
   if (!showControls) return null;
 
   const tileClass = isMobile
-    ? 'relative rounded-xl overflow-hidden bg-black/70 border flex-none w-[32vw] max-w-[10rem] min-w-[7.25rem] aspect-video'
+    ? 'relative rounded-lg overflow-hidden bg-black/70 border flex-none w-[22vw] max-w-[6.25rem] min-w-[4.75rem] aspect-video'
     : 'relative rounded-xl overflow-hidden bg-black/70 border flex-1 min-w-0 basis-0 max-w-[10.5rem] aspect-video';
 
   const showInitialSkeleton = scrubThumbnailsLoading && !scrubThumbnails;

@@ -23,10 +23,11 @@ type BackendStatus = 'ok' | 'error' | 'checking' | 'unknown';
 const DESKTOP_PLATFORMS = ['win32', 'linux', 'darwin'];
 
 type BackendStatusBadgeProps = {
-  variant?: 'standalone' | 'avatar' | 'inline';
+  variant?: 'standalone' | 'avatar' | 'inline' | 'quiet';
   accountHref?: string;
   accountLabel?: string;
   children?: preact.ComponentChildren;
+  menuAlign?: 'left' | 'right';
 };
 
 export default function BackendStatusBadge({
@@ -34,6 +35,7 @@ export default function BackendStatusBadge({
   accountHref,
   accountLabel,
   children,
+  menuAlign = 'right',
 }: BackendStatusBadgeProps) {
   const { t } = useI18n();
   const [showBadge, setShowBadge] = useState(true);
@@ -355,8 +357,8 @@ export default function BackendStatusBadge({
     ) : (
       <>
         <span
-          className={`w-2 h-2 rounded-full shrink-0 ${
-            isOk ? 'bg-green-300' : isError ? 'bg-red-300' : 'bg-white/70 animate-pulse'
+          className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+            isOk ? 'bg-emerald-400' : isError ? 'bg-red-400' : 'bg-white/70 animate-pulse'
           }`}
         />
         <span className="hidden sm:inline">
@@ -365,10 +367,13 @@ export default function BackendStatusBadge({
       </>
     );
 
+  const isQuiet = variant === 'quiet';
   const buttonClass =
     variant === 'avatar'
       ? 'rounded-full p-0 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#121212] cursor-pointer'
-      : `flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#121212] ${
+      : isQuiet
+        ? 'flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-medium text-white/80 hover:text-white hover:bg-white/10 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 rounded-full'
+        : `flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-[#121212] ${
           isOk
             ? 'bg-green-600/90 text-white hover:bg-green-500'
             : isError
@@ -392,7 +397,9 @@ export default function BackendStatusBadge({
 
       {menuOpen && (
         <div
-          className="ds-popover absolute top-full right-0 mt-2 min-w-[13rem] max-w-[18rem] w-56 rounded-xl py-2 z-[100]"
+          className={`ds-popover absolute top-full mt-2 min-w-[13rem] max-w-[18rem] w-56 rounded-xl py-2 z-[100] ${
+            menuAlign === 'left' ? 'left-0' : 'right-0'
+          }`}
           role="menu"
         >
           {variant === 'avatar' && accountHref && accountLabel && (

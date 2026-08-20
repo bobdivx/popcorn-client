@@ -1,32 +1,17 @@
-// Utiliser Web Crypto API pour compatibilité Tauri
-// Fallback sur crypto Node.js si disponible (routes API uniquement)
+function getCrypto(): Crypto | undefined {
+  return globalThis.crypto;
+}
 
 function getRandomBytes(size: number): Uint8Array {
-  // Utiliser Web Crypto API (compatible Tauri)
-  if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
-    const array = new Uint8Array(size);
-    window.crypto.getRandomValues(array);
+  const array = new Uint8Array(size);
+  const webCrypto = getCrypto();
+  if (webCrypto?.getRandomValues) {
+    webCrypto.getRandomValues(array);
     return array;
   }
-  
-  // Fallback sur crypto Node.js (routes API uniquement)
-  if (typeof process !== 'undefined' && process.versions?.node) {
-    try {
-      const crypto = require('crypto');
-      return crypto.randomBytes(size);
-    } catch {
-      // Si crypto n'est pas disponible, utiliser Math.random
-    }
-  }
-  
-  // Fallback ultime : générer des valeurs pseudo-aléatoires
-  const array = new Uint8Array(size);
-  if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.getRandomValues) {
-    globalThis.crypto.getRandomValues(array);
-  } else {
-    for (let i = 0; i < size; i++) {
-      array[i] = Math.floor(Math.random() * 256);
-    }
+
+  for (let i = 0; i < size; i++) {
+    array[i] = Math.floor(Math.random() * 256);
   }
   return array;
 }
@@ -46,11 +31,11 @@ export function generateInviteCode(): string {
 }
 
 export function randomUUID(): string {
-  if (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.randomUUID) {
-    return globalThis.crypto.randomUUID();
+  const webCrypto = getCrypto();
+  if (webCrypto?.randomUUID) {
+    return webCrypto.randomUUID();
   }
 
-  // Fallback v4 UUID generation
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = getRandomBytes(1)[0] % 16;
     const v = c === 'x' ? r : (r & 0x3) | 0x8;
