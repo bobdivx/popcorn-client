@@ -298,7 +298,7 @@ export default function LuciePlayer({
     };
   }, [videoRef, lucieLoaded, isFullscreen, playerConfig.autoFullscreen]);
 
-  const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub } = useTVPlayerNavigation({
+  const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub, tvScrubBrowsing } = useTVPlayerNavigation({
     showControls,
     setShowControls,
     onPlayPause: handlePlayPause,
@@ -478,6 +478,7 @@ export default function LuciePlayer({
           scrubThumbnailsLoading={scrubThumbnailsLoading}
           tvScrubIndexExternal={isTV ? tvScrubIndex : undefined}
           tvScrubFocused={isTV ? focusedOnScrub : undefined}
+          tvScrubBrowsing={isTV ? tvScrubBrowsing : undefined}
           onPlayNextEpisode={
             nextEpisodeInfo && onPlayNextEpisode && (playerConfig.nextEpisodeButtonEnabled ?? true)
               ? onPlayNextEpisode

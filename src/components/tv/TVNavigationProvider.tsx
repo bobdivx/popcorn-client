@@ -975,7 +975,16 @@ export default function TVNavigationProvider() {
       const modal = document.querySelector<HTMLElement>('[role="dialog"]:not([aria-hidden="true"])');
       if (modal && !isBackButton) {
         const focusInModal = modal.contains(document.activeElement);
-        if (focusInModal && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+        if (!focusInModal) {
+          const first = getInitialFocusElement(modal);
+          if (first) {
+            focusElement(first);
+            e.preventDefault();
+            e.stopPropagation();
+          }
+          return;
+        }
+        if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
           const dir = e.key.replace('Arrow', '').toLowerCase() as 'up' | 'down' | 'left' | 'right';
           const handled = navigate(dir, modal);
           if (handled) {
@@ -983,11 +992,6 @@ export default function TVNavigationProvider() {
             e.stopPropagation();
           }
           return;
-        }
-        if (focusInModal) {
-          // Enter, Space : laisser passer au switch ci-dessous
-        } else {
-          return; // Focus hors modal = ne pas naviguer dans la page
         }
       }
 

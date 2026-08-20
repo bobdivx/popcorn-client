@@ -429,6 +429,18 @@ export function PlaybackStatusSurface({
     };
   }, [variant, remoteBackAction, confirmingCancel]);
 
+  useEffect(() => {
+    if (variant !== 'player' && variant !== 'fullscreen') return;
+    const id = window.setTimeout(() => {
+      const overlay = document.querySelector('[data-playback-overlay]');
+      const target =
+        overlay?.querySelector<HTMLElement>('[data-autofocus]') ||
+        overlay?.querySelector<HTMLElement>('[data-close]');
+      target?.focus();
+    }, 50);
+    return () => window.clearTimeout(id);
+  }, [variant, confirmingCancel]);
+
   const etaLabel =
     derived.etaSeconds != null && derived.etaSeconds > 0
       ? formatTimeRemaining(derived.etaSeconds)
