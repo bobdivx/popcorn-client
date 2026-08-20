@@ -5,6 +5,7 @@ import {
   getBufferedEndAround,
   getBufferedTimelinePercent,
   isTimeInBuffered,
+  hasMediaPlaybackStarted,
   isVideoVisiblyPlaying,
   nextBufferingOverlayVisible,
   type TimeRangesLike,
@@ -51,6 +52,44 @@ describe('isVideoVisiblyPlaying', () => {
   it('reste faux au tout début', () => {
     expect(
       isVideoVisiblyPlaying({ paused: true, currentTime: 0 } as HTMLVideoElement),
+    ).toBe(false);
+  });
+});
+
+describe('hasMediaPlaybackStarted', () => {
+  it('accepte un readyState HAVE_CURRENT_DATA même si paused/currentTime sont coincés (webOS)', () => {
+    expect(
+      hasMediaPlaybackStarted({
+        paused: true,
+        currentTime: 0,
+        readyState: 2,
+        videoWidth: 0,
+        videoHeight: 0,
+      } as HTMLVideoElement),
+    ).toBe(true);
+  });
+
+  it('accepte une frame décodée (videoWidth) sans TimeRanges', () => {
+    expect(
+      hasMediaPlaybackStarted({
+        paused: true,
+        currentTime: 0,
+        readyState: 0,
+        videoWidth: 1920,
+        videoHeight: 1080,
+      } as HTMLVideoElement),
+    ).toBe(true);
+  });
+
+  it('reste faux tant qu’aucune donnée média n’est là', () => {
+    expect(
+      hasMediaPlaybackStarted({
+        paused: true,
+        currentTime: 0,
+        readyState: 0,
+        videoWidth: 0,
+        videoHeight: 0,
+      } as HTMLVideoElement),
     ).toBe(false);
   });
 });
