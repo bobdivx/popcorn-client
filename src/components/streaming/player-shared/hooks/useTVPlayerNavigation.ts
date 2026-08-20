@@ -110,12 +110,14 @@ export function useTVPlayerNavigation({
   const previewSeekTimeoutRef = useRef<number | null>(null);
   const controlsTimeoutRef = useRef<number | null>(null);
   const hasUserNavigatedScrubRef = useRef(false);
+  const [isBrowsingScrub, setIsBrowsingScrub] = useState(false);
   /** Position preview accumulée (sans scrub) — commit au settle. */
   const previewTargetTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!showControls) {
       hasUserNavigatedScrubRef.current = false;
+      setIsBrowsingScrub(false);
       previewTargetTimeRef.current = null;
       onSeekPreviewRef.current?.(null);
       if (previewSeekTimeoutRef.current != null) {
@@ -180,6 +182,7 @@ export function useTVPlayerNavigation({
   const commitScrubSeek = () => {
     const targetTime = timeForScrubIndex(tvScrubIndexRef.current);
     hasUserNavigatedScrubRef.current = false;
+    setIsBrowsingScrub(false);
     if (onScrubSeekRef.current) {
       onScrubSeekRef.current(targetTime);
     }
@@ -305,6 +308,7 @@ export function useTVPlayerNavigation({
     if (count <= 0) return;
     const step = scrubStepFromAcceleration(direction);
     hasUserNavigatedScrubRef.current = true;
+    setIsBrowsingScrub(true);
     setFocusedOnProgress(false);
     setFocusedOnScrub(true);
     setTvScrubIndex((prev) => {
@@ -347,20 +351,22 @@ export function useTVPlayerNavigation({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
+      const overlay = document.querySelector('[data-playback-overlay]');
+      if (overlay) {
+        if (isBackKey(e)) {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          const closeBtn = overlay.querySelector<HTMLElement>('[data-close]');
+          if (closeBtn) closeBtn.click();
+          else handleBack();
+        }
+        return;
+      }
+
       if (isBackKey(e)) {
         e.preventDefault();
         e.stopPropagation();
-        const overlay = document.querySelector('[data-playback-overlay]');
-        if (overlay) {
-          e.stopImmediatePropagation();
-          const closeBtn = overlay.querySelector<HTMLElement>('[data-close]');
-          if (closeBtn) {
-            closeBtn.click();
-            return;
-          }
-          handleBack();
-          return;
-        }
         if (!showControlsRef.current) {
           setShowControls(true);
           setFocusedControlIndex(isTV ? 1 : hasBack ? 1 : 0);
@@ -691,5 +697,6 @@ export function useTVPlayerNavigation({
     controlsCount: controls.length,
     tvScrubIndex,
     focusedOnScrub,
+    tvScrubBrowsing: isBrowsingScrub,
   };
 }

@@ -35,6 +35,8 @@ export function useScrubNav(options: {
   const [tvScrubIndexInternal, setTvScrubIndexInternal] = useState(0);
   /** Drag / scrub barre en cours : preview uniquement, pas de seek HLS. */
   const [isDraggingScrub, setIsDraggingScrub] = useState(false);
+  /** Flèches / swipe carrousel : l’utilisateur parcourt les vignettes (pas encore seek). */
+  const [isBrowsingScrub, setIsBrowsingScrub] = useState(false);
   /** Temps preview pendant un drag (avec ou sans vignettes). */
   const [dragPreviewTime, setDragPreviewTime] = useState<number | null>(null);
   const [dragPreviewPercent, setDragPreviewPercent] = useState<number | null>(null);
@@ -80,6 +82,20 @@ export function useScrubNav(options: {
       ? `${scrubThumbnails.mediaId}:${scrubThumbnails.count}:${scrubThumbnails.intervalSeconds ?? 'n'}`
       : '';
   const prevScrubMetaKeyRef = useRef('');
+
+  useEffect(() => {
+    if (!showControls) setIsBrowsingScrub(false);
+  }, [showControls]);
+
+  const resetScrubToPlayhead = useCallback(() => {
+    const st = scrubThumbnailsRef.current;
+    if (!st?.count) return;
+    const effectiveDuration = scrubEffectiveDuration(duration, st);
+    if (effectiveDuration <= 0) return;
+    const pct = (currentTime / effectiveDuration) * 100;
+    const idx = scrubIndexFromTimelinePercent(pct, effectiveDuration, st);
+    setTvScrubIndexInternal((prev) => (prev === idx ? prev : idx));
+  }, [duration, currentTime]);
 
   useEffect(() => {
     const wasOpen = prevShowControlsRef.current;
@@ -176,6 +192,8 @@ export function useScrubNav(options: {
       const st = scrubThumbnailsRef.current;
       const count = st?.count ?? 0;
       if (count <= 0) return;
+      setIsBrowsingScrub(true);
+      userScrubbedRef.current = true;
       setTvScrubIndexInternal((prev) => {
         let nextIdx = prev;
         const step = keyNormalized === 'PageUp' || keyNormalized === 'PageDown' ? 5 : 1;
@@ -185,7 +203,6 @@ export function useScrubNav(options: {
           nextIdx = Math.min(count - 1, prev + step);
         if (keyNormalized === 'Home') nextIdx = 0;
         if (keyNormalized === 'End') nextIdx = count - 1;
-        if (nextIdx !== prev) userScrubbedRef.current = true;
         return nextIdx;
       });
     };
@@ -201,6 +218,7 @@ export function useScrubNav(options: {
       const targetTime = timeForScrubIndexRef.current(tvScrubInternalRef.current);
       onSeekToTimeRef.current?.(targetTime);
       userScrubbedRef.current = false;
+      setIsBrowsingScrub(false);
     }, 1400);
     return () => window.clearTimeout(id);
   }, [isTV, showControls, scrubEnabled, tvScrubIndexInternal, isDraggingScrub]);
@@ -275,6 +293,7 @@ export function useScrubNav(options: {
       setDragPreviewTime(null);
       setDragPreviewPercent(null);
       userScrubbedRef.current = false;
+      setIsBrowsingScrub(false);
       if (target == null || !Number.isFinite(target)) return;
       const clamped = Math.max(0, Math.min(effectiveDuration || target, target));
       onSeekToTimeRef.current?.(clamped);
@@ -293,6 +312,7 @@ export function useScrubNav(options: {
     const total = st?.count ?? 0;
     if (total <= 0 || delta === 0) return;
     userScrubbedRef.current = true;
+    setIsBrowsingScrub(true);
     setTvScrubIndexInternal((prev) => Math.min(total - 1, Math.max(0, prev + delta)));
   };
 
@@ -361,5 +381,7 @@ export function useScrubNav(options: {
     cancelScrubDrag,
     previewTime,
     dragPreviewPercent,
+    isBrowsingScrub,
+    resetScrubToPlayhead,
   };
 }

@@ -111,6 +111,8 @@ interface VideoControlsProps {
   tvScrubIndexExternal?: number;
   /** Sur TV : la rangée de vignettes est-elle la zone de focus active ? */
   tvScrubFocused?: boolean;
+  /** Sur TV : l’utilisateur parcourt la timeline (flèches) — afficher le carrousel. */
+  tvScrubBrowsing?: boolean;
   bufferedPercent?: number;
 }
 
@@ -169,13 +171,19 @@ export function VideoControls({
   scrubThumbnailsLoading = false,
   tvScrubIndexExternal,
   tvScrubFocused = false,
+  tvScrubBrowsing = false,
   bufferedPercent = 0,
 }: VideoControlsProps) {
   const { t } = useI18n();
   const effectiveFillMode = videoFillMode ?? 'contain';
   const [showQualityMenu, setShowQualityMenu] = useState(false);
+  const [isHoveringTimeline, setIsHoveringTimeline] = useState(false);
   const qualityButtonRef = useRef<HTMLButtonElement>(null);
   const [qualityMenuRect, setQualityMenuRect] = useState<{ top: number; left: number } | null>(null);
+
+  useEffect(() => {
+    if (!showControls) setIsHoveringTimeline(false);
+  }, [showControls]);
 
   useEffect(() => {
     if (!onOpenQualityMenuRef) return;
@@ -264,6 +272,8 @@ export function VideoControls({
     cancelScrubDrag,
     previewTime,
     dragPreviewPercent,
+    isBrowsingScrub,
+    resetScrubToPlayhead,
   } = useScrubNav({
     scrubEnabled,
     scrubThumbnails: scrubThumbnails ?? null,
@@ -339,6 +349,10 @@ export function VideoControls({
       : () => {};
 
   const chromeVisible = showControls || showQualityMenu;
+  /** Carrousel de miniatures : uniquement pendant un seek / scrub, pas tant que les commandes sont visibles. */
+  const showScrubStrip =
+    (isTV && tvScrubBrowsing) ||
+    (!isTV && (isDraggingScrub || isHoveringTimeline || isBrowsingScrub));
 
   return (
     <>
@@ -465,8 +479,19 @@ export function VideoControls({
           </div>
         )}
         <div class={`mt-auto shrink-0 flex flex-col gap-2 ${padding}`}>
-          {/* Colonne barre + carrousel de vignettes scrub (style Netflix : preview au drag, seek au relâchement) */}
-          <div class={`relative flex min-h-0 flex-col gap-2 ${isDraggingScrub ? 'z-30' : ''}`}>
+          {/* Colonne barre + carrousel (visible seulement pendant un avance/recul) */}
+          <div
+            class={`relative flex min-h-0 flex-col gap-2 ${isDraggingScrub || showScrubStrip ? 'z-30' : ''}`}
+            onPointerEnter={(e: any) => {
+              if (isTV || isMobile || e.pointerType === 'touch') return;
+              setIsHoveringTimeline(true);
+            }}
+            onPointerLeave={(e: any) => {
+              if (e.pointerType === 'touch') return;
+              setIsHoveringTimeline(false);
+              if (!isDraggingScrub && !isBrowsingScrub) resetScrubToPlayhead();
+            }}
+          >
           {/* Aperçu flottant Netflix pendant le drag */}
           {!isTV && isDraggingScrub && dragPreviewPercent != null && (
             <div
@@ -685,7 +710,7 @@ export function VideoControls({
             scrubEnabled={scrubEnabled}
             scrubThumbnailsLoading={scrubThumbnailsLoading}
             scrubThumbnails={scrubThumbnails}
-            showControls={showControls}
+            showControls={showControls && showScrubStrip}
             isTV={isTV}
             isFullscreen={isFullscreen}
             isMobile={isMobile}
