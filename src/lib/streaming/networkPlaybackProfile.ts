@@ -105,15 +105,13 @@ export function getNetworkPlaybackProfile(
     maxBufferLength = Math.max(maxBufferLength, 40);
   }
 
-  // webOS / Android TV : le 4K H.264 HLS (12 Mb/s, High@5.1) ne démarre pas —
-  // l’overlay reste sur « Le serveur prépare la vidéo ». Plafonner à 1080p.
+  // TV : garder la 4K (Wi‑Fi), buffer plus court. Si le décodeur bloque,
+  // HLSPlayer bascule tout seul en 1080p avec un message dans la modal.
   if (isTv) {
-    suggestedMaxHeight =
-      suggestedMaxHeight == null ? 1080 : Math.min(suggestedMaxHeight, 1080);
     startLevel = 0;
     maxBufferLength = Math.min(maxBufferLength, 24);
     abrBandWidthFactor = Math.min(abrBandWidthFactor, 0.7);
-    label = `${label} — TV 1080p`;
+    label = `${label} — TV`;
   }
 
   return {

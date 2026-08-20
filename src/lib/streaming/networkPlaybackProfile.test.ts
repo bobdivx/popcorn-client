@@ -48,12 +48,12 @@ describe('getNetworkPlaybackProfile', () => {
     expect(p.startLevel).toBe(-1);
   });
 
-  it('TV / webOS : plafond 1080p même en Wi‑Fi', () => {
+  it('TV / webOS en Wi‑Fi : 4K autorisée, buffer court', () => {
     vi.stubGlobal('navigator', {
       connection: { type: 'wifi', effectiveType: '4g', downlink: 50, saveData: false },
     });
     const p = getNetworkPlaybackProfile(false, { isTv: true });
-    expect(p.suggestedMaxHeight).toBe(1080);
+    expect(p.suggestedMaxHeight).toBeNull();
     expect(p.startLevel).toBe(0);
     expect(p.maxBufferLength).toBeLessThanOrEqual(24);
   });

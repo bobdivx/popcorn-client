@@ -628,7 +628,8 @@
       "stalls": "Buffers / stalls",
       "bufferEvents": "buffers",
       "network": "Device network",
-      "hlsBandwidth": "Estimated HLS bandwidth"
+      "hlsBandwidth": "Estimated HLS bandwidth",
+      "uhdFallback1080": "4K isn’t starting on this device — switching to 1080p…"
     },
     "streamingFallbackToHls": "Switched to HLS playback due to direct stream issue.",
     "errorStream": "Unable to play video. Check server connection.",
