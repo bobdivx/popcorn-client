@@ -6,7 +6,7 @@ import type { TorrentFile } from '../hooks/useVideoFiles';
 import { isSparseOrEmptyMessage } from '../hooks/useVideoFiles';
 import { useFullscreen } from '../../../streaming/player-shared/hooks/useFullscreen';
 import { QualityBadges } from './QualityBadges';
-import { isMobileDevice } from '../../../../lib/utils/device-detection';
+import { isMobileDevice, isTVPlatform, isWebOSTV } from '../../../../lib/utils/device-detection';
 import IntroVideoWithHlsPreload from '../../../IntroVideoWithHlsPreload';
 import PrerollPlayer from '../../../streaming/hls-player/components/PrerollPlayer';
 import { getPublicAdsSettings, type AdsConfig } from '../../../../lib/api/popcorn-web';

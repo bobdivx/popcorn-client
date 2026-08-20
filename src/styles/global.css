@@ -287,40 +287,19 @@ html[data-tv-platform="true"] .carousel-container {
   scroll-behavior: auto !important;
 }
 
-/* TV : pas d’animation d’entrée sur les lignes de carrousel (classe ajoutée par IntersectionObserver hors TV) */
-html[data-tv-platform="true"] .animate-fade-in-up,
-html[data-tv-platform="true"] .ds-enter,
-html[data-tv-platform="true"] .ds-card-animate,
-html[data-tv-platform="true"] .ds-card-animate-stagger > *,
-html[data-tv-platform="true"] .ds-card-loading-wrapper {
+/* TV : pas d’entrée staggered sur les rangées de posters (coût GPU à chaque ligne) */
+html[data-tv-platform="true"] [data-carousel] .animate-fade-in-up,
+html[data-tv-platform="true"] [data-carousel] .ds-enter,
+html[data-tv-platform="true"] [data-carousel] .ds-card-animate,
+html[data-tv-platform="true"] [data-carousel] .ds-card-animate-stagger > *,
+html[data-tv-platform="true"] [data-carousel] .ds-card-loading-wrapper,
+html[data-tv-platform="true"] .carousel-container .animate-fade-in-up,
+html[data-tv-platform="true"] .carousel-container .ds-enter,
+html[data-tv-platform="true"] .carousel-container .ds-card-animate,
+html[data-tv-platform="true"] .carousel-container .ds-card-animate-stagger > * {
   animation: none !important;
   opacity: 1 !important;
   transform: none !important;
-}
-
-/* TV : utilitaires Tailwind animate-* / fade-in (arbitrary) — surcharge si ordre de bundles change */
-html[data-tv-platform="true"] [class*="animate-"],
-html[data-tv-platform="true"] [class*="fade-in"] {
-  animation: none !important;
-  opacity: 1 !important;
-  transform: none !important;
-}
-
-/* TV : désactiver animations et transitions sur toute l’app (perf, même logique que le mode dashboard) */
-html[data-tv-platform="true"] *,
-html[data-tv-platform="true"] *::before,
-html[data-tv-platform="true"] *::after {
-  animation: none !important;
-  transition: none !important;
-}
-
-/* Exceptions TV : spinners, focus, overlays player */
-html[data-tv-platform="true"] .animate-spin,
-html[data-tv-platform="true"] [aria-busy="true"] .animate-spin,
-html[data-tv-platform="true"] .ds-loader-spin,
-html[data-tv-platform="true"] .ds-progress-bar,
-html[data-tv-platform="true"] .ds-progress-wave {
-  animation: unset !important;
 }
 
 html[data-tv-platform="true"] .tv-card-focused,
@@ -1611,6 +1590,11 @@ html[data-tv-platform="true"] [data-page="demandes"] [data-torrent-card].torrent
   @apply inline-flex items-center justify-center gap-2 transition-all duration-300 focus:outline-none rounded-full px-5 lg:px-7 py-2 lg:py-3 text-white/70 bg-transparent font-medium;
   min-height: 44px;
   letter-spacing: 0.01em;
+  box-sizing: border-box;
+}
+.nav-tab svg {
+  display: block;
+  flex-shrink: 0;
 }
 
 /* Styles pour navigation mobile - amélioration de l'affichage sur petits écrans */
