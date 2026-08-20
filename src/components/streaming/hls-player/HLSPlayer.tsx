@@ -475,9 +475,10 @@ export default function HLSPlayer({
   // Hystérésis : une seule overlay jusqu'au buffer de démarrage, pas de clignotement 4 s / 4 s.
   const shouldShowBuffering =
     !!uhdFallbackMessage ||
-    bufferingOverlayVisible ||
-    isSeekSettling ||
-    (isSeeking && (bufferedPercent < 95 || pendingSeekPosition > 0));
+    (!isPlaying &&
+      (bufferingOverlayVisible ||
+        isSeekSettling ||
+        (isSeeking && (bufferedPercent < 95 || pendingSeekPosition > 0))));
   const liveTrace = usePlaybackLiveTrace(
     {
       path: filePath,

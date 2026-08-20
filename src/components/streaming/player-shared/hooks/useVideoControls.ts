@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'preact/hooks';
 import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
 import {
   SEEK_RELOAD_BUFFER_MARGIN_SEC,
@@ -58,11 +58,11 @@ export function useVideoControls({
     }
   }, [hlsDuration]);
 
-  useEffect(() => {
-    // App simple webOS (URL) : s’assurer que data-webos / data-tv-platform sont posés avant les listeners.
+  useLayoutEffect(() => {
+    // Après le commit : videoRef est peuplé. Ne pas attendre hls.js (TV / HLS natif).
     stampTvPlatformHints();
     const video = videoRef.current;
-    if (!video || !hlsLoaded) return;
+    if (!video) return;
 
     // Synchroniser l'état play/pause avec la vidéo (évite un bouton play fixe si la vidéo est déjà en lecture ou en pause)
     setIsPlaying(!video.paused);
@@ -253,11 +253,11 @@ export function useVideoControls({
     window.addEventListener('keydown', handleKeyDown);
 
     video.volume = playerConfig.volume;
-    video.muted = playerConfig.muted;
+    video.muted = isTVPlatform() || isWebOSTV() ? true : playerConfig.muted;
 
-    /** Android TV : au premier "playing", forcer le son (certains WebView démarrent en muted pour l’autoplay). */
+    /** TV / webOS : autoplay muted, puis son au premier "playing". */
     const handlePlayingUnmuteTV = () => {
-      if (!isTVPlatform() || hasTriedUnmuteOnTVRef.current) return;
+      if (!(isTVPlatform() || isWebOSTV()) || hasTriedUnmuteOnTVRef.current) return;
       hasTriedUnmuteOnTVRef.current = true;
       const v = videoRef.current;
       if (v) {
