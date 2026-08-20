@@ -8,7 +8,7 @@ import { useHlsPlayer } from './hooks/useHlsPlayer';
 import { useTVPlayerNavigation } from '../player-shared/hooks/useTVPlayerNavigation';
 import { useHlsTracks } from './hooks/useHlsTracks';
 import { usePlayerConfig } from '../player-shared/hooks/usePlayerConfig';
-import { shouldAutoFullscreen } from '../../../lib/utils/device-detection';
+import { shouldAutoFullscreen, isTVPlatform, isWebOSTV } from '../../../lib/utils/device-detection';
 import { isTauri } from '../../../lib/utils/tauri';
 import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
 import { SkipIntroOverlay } from '../player-shared/components/SkipIntroOverlay';
@@ -158,7 +158,9 @@ export default function HLSPlayer({
     }
   }, [stopBuffer, stopBufferRef]);
 
-  const isFullscreen = useFullscreen();
+  const apiFullscreen = useFullscreen();
+  const isTvPlayback = isTVPlatform() || isWebOSTV();
+  const isFullscreen = apiFullscreen || isTvPlayback;
   const isLocalLibraryMedia =
     typeof infoHash === 'string' && infoHash.startsWith('local_');
   
@@ -359,38 +361,34 @@ export default function HLSPlayer({
     onPlayNextEpisode?.();
   };
 
-  // Activer le plein écran automatiquement au démarrage (uniquement dans l'app Tauri : Android/webOS).
-  // En navigateur web, l'API fullscreen exige un "user gesture" : on ne tente pas pour éviter l'erreur.
-  // Le bouton plein écran reste utilisable partout (clic = user gesture).
+  // Plein écran TV : la WebView webOS (URL client.popcornn.app) n’est pas Tauri,
+  // et l’événement `play` arrive souvent avant hls.js. Ne pas exiger les deux.
   useEffect(() => {
     const video = videoRef.current;
-    if (!video || !hlsLoaded || hasAutoFullscreenedRef.current) return;
-    if (!isTauri()) return;
+    if (!video || hasAutoFullscreenedRef.current) return;
+    const tv = isTVPlatform() || isWebOSTV();
+    if (!isTauri() && !tv) return;
 
-    const handleFirstPlay = () => {
-      const wantAutoFullscreen = shouldAutoFullscreen() || playerConfig.autoFullscreen;
-      if (wantAutoFullscreen && !isFullscreen) {
-        const container = document.getElementById('video-player-wrapper') || containerRef.current;
-        if (container) {
-          hasAutoFullscreenedRef.current = true;
-          setTimeout(() => {
-            toggleFullscreen(container).catch((err) => {
-              const msg = err?.message ?? String(err);
-              if (!msg.includes('user gesture') && !msg.includes('Permissions check')) {
-                console.warn('Impossible d\'activer le plein écran automatique:', err);
-              }
-            });
-          }, 300);
-        }
-      }
+    const enter = () => {
+      if (hasAutoFullscreenedRef.current) return;
+      const wantAutoFullscreen = shouldAutoFullscreen() || playerConfig.autoFullscreen || tv;
+      if (!wantAutoFullscreen) return;
+      const container = document.getElementById('video-player-wrapper') || containerRef.current;
+      if (!container) return;
+      hasAutoFullscreenedRef.current = true;
+      toggleFullscreen(container).catch(() => {
+        /* webOS : l’API fullscreen échoue souvent ; le layout TV est déjà inset-0. */
+      });
     };
 
-    video.addEventListener('play', handleFirstPlay, { once: true });
-
+    video.addEventListener('play', enter, { once: true });
+    video.addEventListener('playing', enter, { once: true });
+    if (playbackStarted) enter();
     return () => {
-      video.removeEventListener('play', handleFirstPlay);
+      video.removeEventListener('play', enter);
+      video.removeEventListener('playing', enter);
     };
-  }, [videoRef, hlsLoaded, isFullscreen, playerConfig.autoFullscreen]);
+  }, [videoRef, hlsLoaded, playbackStarted, playerConfig.autoFullscreen]);
 
   const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub } = useTVPlayerNavigation({
     showControls,
@@ -412,6 +410,16 @@ export default function HLSPlayer({
     onScrubSeek: seekToTargetTime,
     onSeekPreview: handleSeekPreview,
   });
+
+  useEffect(() => {
+    if (!isTV || !playbackStarted) return;
+    setShowControls(true);
+    const wrap =
+      document.getElementById('video-player-wrapper') ||
+      containerRef.current ||
+      document.getElementById('hls-player-container');
+    wrap?.focus({ preventScroll: true });
+  }, [isTV, playbackStarted, setShowControls]);
 
   useTouchGestures({
     containerRef,
@@ -572,7 +580,9 @@ export default function HLSPlayer({
     <div 
       ref={containerRef}
       class="w-full h-full flex flex-col relative bg-black group" 
-      id="hls-player-container" 
+      id="hls-player-container"
+      data-tv-player-active="true"
+      tabIndex={-1} 
       style={{ 
         width: '100%', 
         height: '100%',

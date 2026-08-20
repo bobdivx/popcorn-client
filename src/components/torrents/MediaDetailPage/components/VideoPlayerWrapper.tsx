@@ -172,7 +172,9 @@ export function VideoPlayerWrapper({
   const hlsPreloadRef = useRef<any>(null);
   const preloadVideoRef = useRef<HTMLVideoElement | null>(null);
   const { hlsLoaded } = useHlsLoader();
-  const isFullscreen = useFullscreen();
+  const apiFullscreen = useFullscreen();
+  const isTvPlayback = isTVPlatform() || isWebOSTV();
+  const isFullscreen = apiFullscreen || isTvPlayback;
   const wrapperElementRef = useRef<HTMLDivElement>(null);
   const stopBufferRef = useRef<(() => void) | null>(null);
 
@@ -619,7 +621,9 @@ export function VideoPlayerWrapper({
   return (
     <div 
       ref={wrapperElementRef}
-      id="video-player-wrapper" 
+      id="video-player-wrapper"
+      data-tv-player-active={visible ? 'true' : undefined}
+      tabIndex={-1}
       className="fixed inset-0 z-50 bg-black w-full h-full"
       style={{
         ...(isFullscreen ? { width: '100vw', height: '100vh' } : {}),
