@@ -5,6 +5,7 @@ import {
   getBufferedEndAround,
   getBufferedTimelinePercent,
   isTimeInBuffered,
+  nextBufferingOverlayVisible,
   type TimeRangesLike,
 } from './bufferMetrics';
 
@@ -30,6 +31,26 @@ describe('getBufferAheadSeconds', () => {
     const ahead = getBufferAheadSeconds(ranges([[2700, 2708]]), 2700);
     expect(ahead).toBe(8);
     expect(getBufferAheadPercent(ahead, 20)).toBe(40);
+  });
+});
+
+describe('nextBufferingOverlayVisible', () => {
+  const loading = { isLoading: true, isWaiting: false, isSeekSettling: false };
+  const idle = { isLoading: false, isWaiting: false, isSeekSettling: false };
+  const waiting = { isLoading: false, isWaiting: true, isSeekSettling: false };
+
+  it('reste visible pendant le chargement même avec un peu de buffer', () => {
+    expect(nextBufferingOverlayVisible(true, 4, loading)).toBe(true);
+  });
+
+  it('ne se masque qu’au-dessus du seuil hide', () => {
+    expect(nextBufferingOverlayVisible(true, 4, idle)).toBe(true);
+    expect(nextBufferingOverlayVisible(true, 8, idle)).toBe(false);
+  });
+
+  it('ne revient que si waiting et buffer vraiment bas', () => {
+    expect(nextBufferingOverlayVisible(false, 5, waiting)).toBe(false);
+    expect(nextBufferingOverlayVisible(false, 1, waiting)).toBe(true);
   });
 });
 

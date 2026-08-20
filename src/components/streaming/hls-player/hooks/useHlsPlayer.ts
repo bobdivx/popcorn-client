@@ -14,7 +14,7 @@ import { getOrCreateDeviceId } from '../../../../lib/utils/device-id';
 import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
 import { minBufferAfterSeekSec } from '../../player-core/policies/SeekPolicy';
 import { buildProxyUrl, normalizeStreamPath } from '../../player-core/utils/buildStreamUrl';
-import { getBufferAheadSeconds } from '../../player-shared/utils/bufferMetrics';
+import { getBufferAheadSeconds, minBufferBeforePlaySec } from '../../player-shared/utils/bufferMetrics';
 
 interface UseHlsPlayerProps {
   src: string;
@@ -211,6 +211,8 @@ export function useHlsPlayer({
       apiDurationRef.current = 0;
       hlsFileIdRef.current = null;
       activeVideoRegisteredRef.current = false;
+      hasStartedPlayingRef.current = false;
+      setIsLoading(true);
     }
 
     const registerActiveVideo = async (fileId: string) => {
@@ -602,16 +604,16 @@ export function useHlsPlayer({
           retryCountRef.current = 0;
           seekLoadRetryCountRef.current = 0;
           initialLoad503RetryCountRef.current = 0;
-          setLoadingStatusMessage(null);
-          // Ne pas lever isLoading trop tôt pendant un seek reload : le manifest
-          // arrive avant que les fragments soient jouables → overlay qui clignote.
+          // Ne pas lever isLoading sur MANIFEST_PARSED : 1 segment (4 s) ferait
+          // disparaître l'overlay puis recaler tout de suite. On attend le buffer.
           const isSeekReload =
             pendingSeekRef.current > 0 || seekLoadUrlRef.current != null;
-          if (!isSeekReload) {
-            setIsLoading(false);
-            onLoadingChangeRef.current?.(false);
-          } else {
+          if (isSeekReload) {
             setLoadingStatusMessage('Préparation du seek…');
+          } else {
+            setLoadingStatusMessage(
+              t('playback.phase.preparingPlayback') || 'Préparation de la lecture…'
+            );
           }
           
           // Extraire la durée totale depuis la playlist HLS
@@ -691,38 +693,47 @@ export function useHlsPlayer({
             } catch (_) {}
           }
 
-          // Démarrer la lecture seulement quand on a assez de buffer (évite stall après ~3 s).
+          // Démarrer la lecture seulement quand on a assez de buffer (évite stall après ~4 s).
           // Doit être appelé APRÈS que la position sauvegardée soit appliquée, sinon on play() puis
           // un seek vers la position coupe le buffer et provoque une pause.
-          const MIN_BUFFER_BEFORE_PLAY_SEC = isRemoteStream ? 4 : 2.5;
-          const MAX_WAIT_FOR_BUFFER_MS = 20000;
+          const MIN_BUFFER_BEFORE_PLAY = minBufferBeforePlaySec(!!isRemoteStream);
+          const MAX_WAIT_FOR_BUFFER_MS = isRemoteStream ? 60000 : 90000;
+          const markPlaybackReady = () => {
+            hasStartedPlayingRef.current = true;
+            setLoadingStatusMessage(null);
+            setIsLoading(false);
+            onLoadingChangeRef.current?.(false);
+          };
           function startDelayedPlayWhenReady() {
-            if (!video.paused || (canAutoPlayRef.current !== undefined && !canAutoPlayRef.current())) return;
+            const canPlay =
+              canAutoPlayRef.current === undefined || canAutoPlayRef.current();
+            if (!video.paused) {
+              markPlaybackReady();
+              return;
+            }
             let intervalId: ReturnType<typeof setInterval> | null = null;
             const timeoutId = window.setTimeout(() => {
               if (intervalId !== null) clearInterval(intervalId);
               intervalId = null;
-              if (video.paused) video.play().catch(() => {});
+              const ahead = getBufferAheadSeconds(video.buffered, video.currentTime || 0);
+              // Ne pas forcer play() avec un buffer vide (overlay qui clignote).
+              if (ahead >= 4) {
+                if (canPlay && video.paused) video.play().catch(() => {});
+                markPlaybackReady();
+              }
             }, MAX_WAIT_FOR_BUFFER_MS);
             // Attendre que currentTime soit bien à jour (position sauvegardée) avant de mesurer le buffer
             const startCheck = () => {
               intervalId = window.setInterval(() => {
-                if (video.buffered.length > 0) {
-                  const pos = Number.isFinite(video.currentTime) ? video.currentTime : 0;
-                  let bufAhead = 0;
-                  for (let i = 0; i < video.buffered.length; i++) {
-                    if (video.buffered.start(i) <= pos && pos < video.buffered.end(i)) {
-                      bufAhead = video.buffered.end(i) - pos;
-                      break;
-                    }
-                  }
-                  if (bufAhead >= MIN_BUFFER_BEFORE_PLAY_SEC) {
+                const pos = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+                const bufAhead = getBufferAheadSeconds(video.buffered, pos);
+                  if (bufAhead >= MIN_BUFFER_BEFORE_PLAY) {
                     if (intervalId !== null) clearInterval(intervalId);
                     intervalId = null;
                     clearTimeout(timeoutId);
-                    if (video.paused) video.play().catch(() => {});
+                    if (canPlay && video.paused) video.play().catch(() => {});
+                    markPlaybackReady();
                   }
-                }
               }, 200);
             };
             startCheck();
@@ -1106,7 +1117,7 @@ export function useHlsPlayer({
             // stream-torrent : plus de retries (torrent peut rester en "initializing" longtemps)
             const url = currentSrcRef.current;
             const isStreamTorrent = typeof url === 'string' && url.includes('/api/stream-torrent/');
-            const maxInitialRetries = isStreamTorrent ? 10 : 18;
+            const maxInitialRetries = isStreamTorrent ? 10 : 30;
             if (
               (statusCode === 503 || statusCode === 202) &&
               url &&
@@ -1115,6 +1126,7 @@ export function useHlsPlayer({
               hlsRef.current
             ) {
               initialLoad503RetryCountRef.current += 1;
+              setIsLoading(true);
               setLoadingStatusMessage(
                 t('playback.hls.preparingTranscode') || t('playback.preparingStream')
               );

@@ -21,6 +21,7 @@ import { useTouchGestures } from '../player-shared/hooks/useTouchGestures';
 import { useDebouncedVideoWaiting } from '../player-shared/hooks/useDebouncedVideoWaiting';
 import { formatTime } from '../player-shared/utils/formatTime';
 import { useEffectiveVideoFillMode } from '../player-shared/hooks/useEffectiveVideoFillMode';
+import { getBufferAheadSeconds, nextBufferingOverlayVisible } from '../player-shared/utils/bufferMetrics';
 
 export default function HLSPlayer({ 
   src, 
@@ -411,6 +412,23 @@ export default function HLSPlayer({
   }, []);
 
   const isWaiting = useDebouncedVideoWaiting(videoRef, [src, hlsLoaded]);
+  const [bufferingOverlayVisible, setBufferingOverlayVisible] = useState(true);
+
+  useEffect(() => {
+    setBufferingOverlayVisible(true);
+  }, [src, infoHash, filePath]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    const ahead = getBufferAheadSeconds(video?.buffered, currentTime);
+    setBufferingOverlayVisible((visible) =>
+      nextBufferingOverlayVisible(visible, ahead, {
+        isLoading,
+        isWaiting,
+        isSeekSettling,
+      }),
+    );
+  }, [isLoading, isWaiting, isSeekSettling, currentTime, bufferedPercent, isSeeking]);
 
   // Overlay : buffer ahead uniquement. Pendant waiting/seek/loading, ne jamais
   // afficher 100 % (artefact ou cible atteinte alors que le décodeur attend encore).
@@ -424,10 +442,9 @@ export default function HLSPlayer({
         : null;
 
   const displayError = error;
-  // Garder l’overlay pendant seek settling même si le % affiche 100 (artefact timeline).
+  // Hystérésis : une seule overlay jusqu'au buffer de démarrage, pas de clignotement 4 s / 4 s.
   const shouldShowBuffering =
-    isLoading ||
-    isWaiting ||
+    bufferingOverlayVisible ||
     isSeekSettling ||
     (isSeeking && (bufferedPercent < 95 || pendingSeekPosition > 0));
   const pipeline = usePlaybackPipelineStatus(
