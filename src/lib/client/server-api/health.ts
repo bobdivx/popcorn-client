@@ -69,11 +69,17 @@ export const healthMethods = {
     
     // Extraire la version et le build depuis la réponse du backend
     const backendData = res.data || {};
-    setGpuCapability({
-      gpu_available: backendData.gpu_available === true,
-      encoding_hwaccel: backendData.encoding_hwaccel ?? null,
-      cuda_decode_available: backendData.cuda_decode_available === true,
-    });
+    const hasGpuFields =
+      backendData.gpu_available !== undefined ||
+      backendData.cuda_decode_available !== undefined ||
+      backendData.encoding_hwaccel !== undefined;
+    if (hasGpuFields) {
+      setGpuCapability({
+        gpu_available: backendData.gpu_available === true,
+        encoding_hwaccel: backendData.encoding_hwaccel ?? null,
+        cuda_decode_available: backendData.cuda_decode_available === true,
+      });
+    }
     
     return {
       success: true,
