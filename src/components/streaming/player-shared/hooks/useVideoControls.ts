@@ -249,17 +249,12 @@ export function useVideoControls({
       }
     };
 
-    if (container && !(isTVPlatform() || isWebOSTV())) {
+    if (container) {
       container.addEventListener('mousemove', handleMouseMove);
-      container.addEventListener('mouseleave', handleMouseLeave);
       container.addEventListener('touchstart', handleTouchStart, { passive: true });
-    }
-
-    const handleTvPointerReveal = () => {
-      setShowControls(true);
-    };
-    if (container && (isTVPlatform() || isWebOSTV())) {
-      container.addEventListener('pointerdown', handleTvPointerReveal);
+      if (!(isTVPlatform() || isWebOSTV())) {
+        container.addEventListener('mouseleave', handleMouseLeave);
+      }
     }
 
     video.addEventListener('timeupdate', handleTimeUpdate);
@@ -302,13 +297,10 @@ export function useVideoControls({
     }
 
     return () => {
-      if (container && !(isTVPlatform() || isWebOSTV())) {
+      if (container) {
         container.removeEventListener('mousemove', handleMouseMove);
         container.removeEventListener('mouseleave', handleMouseLeave);
         container.removeEventListener('touchstart', handleTouchStart);
-      }
-      if (container && (isTVPlatform() || isWebOSTV())) {
-        container.removeEventListener('pointerdown', handleTvPointerReveal);
       }
       video.removeEventListener('timeupdate', handleTimeUpdate);
       video.removeEventListener('progress', updateBuffered);

@@ -356,44 +356,31 @@ export function VideoControls({
       : () => {};
 
   const chromeVisible = showControls || showQualityMenu;
-  /** TV : le carrousel fait partie des commandes (comme le survol timeline sur PC). */
   const showScrubStrip =
     (isTV && chromeVisible && scrubEnabled) ||
     (!isTV && (isDraggingScrub || isHoveringTimeline || isBrowsingScrub));
 
   return (
     <>
-      {/* Gradient : sur TV, display:none (opacity-0 est peu fiable sur webOS WebKit). */}
-      {(chromeVisible || !isTV) && (
-        <div
-          class={`absolute inset-0 pointer-events-none ${chromeVisible ? 'opacity-100' : 'opacity-0'}`}
-          style={{
-            background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0.3) 50%, transparent 100%)',
-            ...(isTV && !chromeVisible ? { display: 'none' } : null),
-          }}
-          aria-hidden={!chromeVisible}
-        />
-      )}
-      {/* Assombrissement pause (sous les contrôles z-20) */}
+      <div
+        class={`absolute inset-0 pointer-events-none ${chromeVisible ? 'opacity-100' : 'opacity-0'}`}
+        style={{
+          background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0.3) 50%, transparent 100%)',
+        }}
+        aria-hidden={!chromeVisible}
+      />
       {showPausedChrome && (
         <div
           class="absolute inset-0 z-[19] pointer-events-none bg-gradient-to-b from-black/45 via-black/55 to-black/75 transition-opacity duration-300"
           aria-hidden="true"
         />
       )}
-      {/*
-        Chrome commandes :
-        - TV/webOS : ne pas rendre si masqué (opacity-0 laisse souvent les boutons visibles).
-        - Desktop/mobile : transition opacity.
-      */}
-      {(chromeVisible || !isTV) && (
       <div
         class={`video-controls-chrome absolute inset-0 flex flex-col overflow-hidden z-40 text-white ${
           chromeVisible
-            ? `opacity-100 translate-y-0 ${isTV ? 'pointer-events-none' : 'pointer-events-auto'}`
+            ? 'opacity-100 translate-y-0 pointer-events-auto'
             : 'opacity-0 translate-y-2 pointer-events-none'
         }`}
-        style={isTV && !chromeVisible ? { display: 'none', visibility: 'hidden' } : undefined}
         aria-hidden={!chromeVisible}
       >
         <div class={`flex shrink-0 items-center justify-between pointer-events-auto ${padding.split(' ')[0]} ${padding.split(' ')[1]}`}>
@@ -1021,7 +1008,6 @@ export function VideoControls({
           </div>
         </div>
       </div>
-      )}
       {showSubtitleSelector && (
         <SubtitleSelector
           audioTracks={audioTracks}
