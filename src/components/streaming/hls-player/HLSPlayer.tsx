@@ -674,7 +674,7 @@ export default function HLSPlayer({
           playsInline
           preload="auto"
           autoplay={playerConfig.autoplay}
-          muted={isMuted}
+          {...(isTV ? {} : { muted: isMuted })}
           poster="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect fill='%23000' width='1' height='1'/%3E%3C/svg%3E"
           style={{
             transform: isTV ? 'none' : playerConfig.hardwareAcceleration ? 'translateZ(0)' : 'none',
