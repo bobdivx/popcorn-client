@@ -26,6 +26,9 @@ const PREVIEW_SETTLE_MS = 1000;
 const CONTROLS_HIDE_MS_WEBOS = 3200;
 const CONTROLS_HIDE_MS_TV = 5000;
 
+/** Qualités du menu Paramètres TV (même liste que le chrome PC). */
+export const TV_QUALITY_VALUES: Array<number | null> = [null, 1080, 720, 480, 360];
+
 export interface SeekPreviewInfo {
   targetTime: number;
   direction: 'left' | 'right';
@@ -44,6 +47,11 @@ interface UseTVPlayerNavigationProps {
   onClose?: () => void;
   onOpenQualityMenu?: () => void;
   onToggleSubtitles?: () => void;
+  /** Qualité HLS : ouvre le sélecteur dans le dock TV. */
+  onSelectQuality?: (height: number | null) => void;
+  streamQuality?: number | null;
+  /** Zoom contain/cover. */
+  onToggleFillMode?: () => void;
   duration: number;
   currentTime: number;
   /** Si false, ne pas auto-masquer (pause). */
@@ -70,6 +78,9 @@ export function useTVPlayerNavigation({
   onClose,
   onOpenQualityMenu,
   onToggleSubtitles,
+  onSelectQuality,
+  streamQuality = null,
+  onToggleFillMode,
   progressBarRef,
   scrubThumbnails = null,
   onScrubSeek,
@@ -84,10 +95,18 @@ export function useTVPlayerNavigation({
   const [focusedControlIndex, setFocusedControlIndex] = useState(isTVPlatform() || isWebOSTV() ? 2 : 0);
   const [focusedOnProgress, setFocusedOnProgress] = useState(false);
   const [focusedOnScrub, setFocusedOnScrub] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsFocusIndex, setSettingsFocusIndex] = useState(0);
   const isTV = isTVPlatform() || isWebOSTV();
   void _onVolumeChange; // volume système TV — plus de volume in-app
   const focusedOnScrubRef = useRef(false);
   focusedOnScrubRef.current = focusedOnScrub;
+  const settingsOpenRef = useRef(false);
+  settingsOpenRef.current = settingsOpen;
+  const onSelectQualityRef = useRef(onSelectQuality);
+  onSelectQualityRef.current = onSelectQuality;
+  const streamQualityRef = useRef(streamQuality);
+  streamQualityRef.current = streamQuality;
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
   const videoRefInternal = useRef(videoRef?.current ?? null);
@@ -132,6 +151,7 @@ export function useTVPlayerNavigation({
     if (!showControls) {
       hasUserNavigatedScrubRef.current = false;
       setIsBrowsingScrub(false);
+      setSettingsOpen(false);
       previewTargetTimeRef.current = null;
       onSeekPreviewRef.current?.(null);
       if (previewSeekTimeoutRef.current != null) {
@@ -170,12 +190,14 @@ export function useTVPlayerNavigation({
     if (isVideoPaused()) return;
     if (visiblePlayerPlaybackOverlay()) return;
     if (isActivelyBrowsingTimeline()) return;
+    if (settingsOpenRef.current) return;
     const ms = isWebOSTV() ? CONTROLS_HIDE_MS_WEBOS : CONTROLS_HIDE_MS_TV;
     controlsTimeoutRef.current = window.setTimeout(() => {
       controlsTimeoutRef.current = null;
       if (isVideoPaused()) return;
       if (isActivelyBrowsingTimeline()) return;
       if (visiblePlayerPlaybackOverlay()) return;
+      if (settingsOpenRef.current) return;
       setShowControls(false);
       setFocusedOnProgress(false);
     }, ms);
@@ -266,6 +288,17 @@ export function useTVPlayerNavigation({
 
   const { getSeekStep, recordKeyDown, recordKeyUp } = useSeekStepAcceleration();
   const hasBack = !!onClose;
+  const toggleSettings = () => {
+    setFocusedOnScrub(false);
+    setSettingsOpen((open) => {
+      const next = !open;
+      if (next) {
+        const idx = TV_QUALITY_VALUES.findIndex((v) => v === streamQualityRef.current);
+        setSettingsFocusIndex(idx >= 0 ? idx : 0);
+      }
+      return next;
+    });
+  };
   const controls = useMemo(() => {
     if (isTV) {
       const c: { id: string; action: () => void }[] = [];
@@ -275,6 +308,13 @@ export function useTVPlayerNavigation({
         { id: 'playpause', action: onPlayPause },
         { id: 'skipforward', action: () => onSeek('right', 10) },
       );
+      if (onSelectQuality) {
+        c.push({
+          id: 'settings',
+          action: toggleSettings,
+        });
+      }
+      if (onToggleFillMode) c.push({ id: 'fillmode', action: onToggleFillMode });
       return c;
     }
     const c = [{ id: 'playpause', action: onPlayPause }];
@@ -283,7 +323,7 @@ export function useTVPlayerNavigation({
     c.push({ id: 'fullscreen', action: onToggleFullscreen });
     if (hasBack) c.unshift({ id: 'back', action: onClose! });
     return c;
-  }, [isTV, hasBack, onClose, onPlayPause, onToggleMute, onToggleFullscreen, onOpenQualityMenu, onToggleSubtitles, onSeek]);
+  }, [isTV, hasBack, onClose, onPlayPause, onToggleMute, onToggleFullscreen, onOpenQualityMenu, onToggleSubtitles, onSeek, onSelectQuality, onToggleFillMode]);
 
   const isBackKey = (e: KeyboardEvent) =>
     BACK_KEYS.includes(e.key) || BACK_KEY_CODES.includes(e.keyCode ?? e.which);
@@ -376,6 +416,11 @@ export function useTVPlayerNavigation({
       if (isBackKey(e)) {
         e.preventDefault();
         e.stopPropagation();
+        if (settingsOpenRef.current) {
+          setSettingsOpen(false);
+          resetControlsTimeout();
+          return;
+        }
         if (!showControlsRef.current) {
           setShowControls(true);
           resetControlsTimeout();
@@ -459,6 +504,24 @@ export function useTVPlayerNavigation({
         kc === 417 || kc === 22 || keyNormalized === 'ArrowRight';
       const isConfirm =
         kc === 23 || keyNormalized === 'Enter' || keyNormalized === ' ';
+
+      if (settingsOpenRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isLeft || keyNormalized === 'ArrowUp') {
+          setSettingsFocusIndex((i) => Math.max(0, i - 1));
+        } else if (isRight || keyNormalized === 'ArrowDown') {
+          setSettingsFocusIndex((i) => Math.min(TV_QUALITY_VALUES.length - 1, i + 1));
+        } else if (isConfirm) {
+          setSettingsFocusIndex((i) => {
+            onSelectQualityRef.current?.(TV_QUALITY_VALUES[i] ?? null);
+            return i;
+          });
+          setSettingsOpen(false);
+        }
+        resetControlsTimeout();
+        return;
+      }
 
       const onButtonRow =
         showControlsRef.current &&
@@ -550,53 +613,17 @@ export function useTVPlayerNavigation({
           break;
         case 'ArrowUp':
           e.preventDefault();
-          if (showControlsRef.current) {
-            if (scrubThumbnailsActiveRef.current) {
-              setFocusedOnProgress(false);
-              if (!focusedOnScrubRef.current) {
-                setFocusedOnScrub(true);
-                return;
-              }
-              setFocusedOnScrub(false);
-              setFocusedControlIndex(Math.max(0, focusedControlIndex - 1));
-              return;
-            }
-            if (!focusedOnProgress) {
-              if (focusedControlIndex === 0) {
-                setFocusedOnProgress(true);
-                progressBarRef?.current?.focus();
-              } else {
-                setFocusedControlIndex(focusedControlIndex - 1);
-              }
-            }
-            // Sur TV : pas de volume in-app (télécommande système).
+          if (showControlsRef.current && scrubThumbnailsActiveRef.current) {
+            setFocusedOnProgress(false);
+            setFocusedOnScrub(true);
           }
-          // Contrôles masqués : ne pas intercepter le volume système.
           break;
         case 'ArrowDown':
           e.preventDefault();
-          if (showControlsRef.current) {
-            if (scrubThumbnailsActiveRef.current) {
-              setFocusedOnProgress(false);
-              if (focusedOnScrubRef.current) {
-                setFocusedOnScrub(false);
-                setFocusedControlIndex((idx) =>
-                  Math.min(Math.max(0, idx), Math.max(0, controls.length - 1)),
-                );
-                return;
-              }
-              if (focusedControlIndex < controls.length - 1) {
-                setFocusedControlIndex(focusedControlIndex + 1);
-              }
-              return;
-            }
-            if (focusedOnProgress) {
-              setFocusedOnProgress(false);
-              setFocusedControlIndex(0);
-            } else if (focusedControlIndex < controls.length - 1) {
-              setFocusedControlIndex(focusedControlIndex + 1);
-            }
-            // Sur TV : pas de volume in-app.
+          if (showControlsRef.current && focusedOnScrubRef.current) {
+            setFocusedOnScrub(false);
+            const playIdx = controls.findIndex((c) => c.id === 'playpause');
+            setFocusedControlIndex(playIdx >= 0 ? playIdx : 0);
           }
           break;
         case 'm':
@@ -647,6 +674,8 @@ export function useTVPlayerNavigation({
     onToggleFullscreen,
     onClose,
     onToggleSubtitles,
+    onSelectQuality,
+    onToggleFillMode,
     setShowControls,
     getSeekStep,
     recordKeyDown,
@@ -721,8 +750,12 @@ export function useTVPlayerNavigation({
       clearControlsHideTimeout();
       return;
     }
+    if (settingsOpen) {
+      clearControlsHideTimeout();
+      return;
+    }
     scheduleControlsHide();
-  }, [isTV, showControls, isPlaying, setShowControls]);
+  }, [isTV, showControls, isPlaying, setShowControls, settingsOpen]);
 
   useEffect(() => {
     return () => {
@@ -751,5 +784,8 @@ export function useTVPlayerNavigation({
     tvScrubIndex,
     focusedOnScrub,
     tvScrubBrowsing: isBrowsingScrub,
+    settingsOpen,
+    settingsFocusIndex,
+    toggleSettings,
   };
 }

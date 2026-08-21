@@ -97,6 +97,14 @@ export function persistVideoFillMode(mode: 'contain' | 'cover'): void {
   }
 }
 
+/** Inverse contain ↔ cover (bouton zoom TV). */
+export function toggleVideoFillMode(): 'contain' | 'cover' {
+  const current = readConfigFromStorage().videoFillMode === 'contain' ? 'contain' : 'cover';
+  const next = current === 'cover' ? 'contain' : 'cover';
+  persistVideoFillMode(next);
+  return next;
+}
+
 export function usePlayerConfig(): PlayerConfig {
   const [config, setConfig] = useState<PlayerConfig>(readConfigFromStorage);
   useEffect(() => {

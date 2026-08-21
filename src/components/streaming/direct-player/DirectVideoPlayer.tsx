@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
 import { useVideoControls } from '../player-shared/hooks/useVideoControls';
 import { useFullscreen } from '../player-shared/hooks/useFullscreen';
 import { useTVPlayerNavigation } from '../player-shared/hooks/useTVPlayerNavigation';
-import { usePlayerConfig } from '../player-shared/hooks/usePlayerConfig';
+import { usePlayerConfig, toggleVideoFillMode } from '../player-shared/hooks/usePlayerConfig';
 import { VideoControls } from '../player-shared/components/VideoControls';
 import { TvPlayerDock } from '../player-shared/components/TvPlayerDock';
 import { useI18n } from '../../../lib/i18n';
@@ -201,6 +201,7 @@ export default function DirectVideoPlayer({
     onToggleMute: toggleMute,
     onToggleFullscreen: handleToggleFullscreen,
     onClose,
+    onToggleFillMode: toggleVideoFillMode,
     duration,
     currentTime,
     isPlaying,
@@ -426,9 +427,16 @@ export default function DirectVideoPlayer({
             currentTime={currentTime}
             duration={duration}
             focusedControlId={focusedControlId}
+            focusedOnScrub={focusedOnScrub}
+            tvScrubIndex={tvScrubIndex}
+            tvScrubBrowsing={tvScrubBrowsing}
+            scrubThumbnails={scrubThumbnails ?? null}
+            scrubThumbnailsLoading={scrubThumbnailsLoading}
+            videoFillMode={playerConfig.videoFillMode ?? 'cover'}
             onClose={onClose}
             onPlayPause={handlePlayPause}
             onSeekToTime={seekToTargetTime}
+            onToggleFillMode={toggleVideoFillMode}
           />
         )}
       </div>
