@@ -355,10 +355,15 @@ export function useVideoControls({
     (targetTime: number) => {
       const video = videoRef.current;
       if (!video) return;
-      const durationValue =
-        duration > 0 && isFinite(duration) ? duration : video.duration && isFinite(video.duration) ? video.duration : 0;
-      if (!durationValue) return;
-      const clamped = Math.max(0, Math.min(durationValue, targetTime));
+      const stateDuration =
+        duration > 0 && isFinite(duration) ? duration : 0;
+      const mediaDuration =
+        video.duration && isFinite(video.duration) && video.duration !== Infinity ? video.duration : 0;
+      const durationValue = Math.max(stateDuration, mediaDuration);
+      if (!durationValue && !reloadWithSeek) return;
+      const clamped = durationValue
+        ? Math.max(0, Math.min(durationValue, targetTime))
+        : Math.max(0, targetTime);
       const shouldResume = !video.paused && !userPausedRef.current;
       const resumeIfNeeded = () => {
         if (!shouldResume) return;
@@ -367,15 +372,15 @@ export function useVideoControls({
       };
       const buffered = video.buffered;
       const bufferedEnd = getBufferedEndAround(buffered, video.currentTime);
+      const beyondGeneratedPlaylist = mediaDuration > 0 && clamped > mediaDuration + 0.5;
       if (!canUseSeekReload) {
         emitPlaybackStep('seek_native', { position: clamped });
-        video.currentTime = clamped;
+        video.currentTime = Math.min(clamped, mediaDuration > 0 ? mediaDuration : clamped);
         resumeIfNeeded();
         return;
       }
       if (reloadWithSeek && clamped > 0 && !isLoading) {
-        // Seek natif si la cible est déjà dans une range bufferée (évite un reload FFmpeg inutile).
-        if (isTimeInBuffered(buffered, clamped, SEEK_RELOAD_BUFFER_MARGIN_SEC)) {
+        if (!beyondGeneratedPlaylist && isTimeInBuffered(buffered, clamped, SEEK_RELOAD_BUFFER_MARGIN_SEC)) {
           emitPlaybackStep('seek_native', { position: clamped });
           video.currentTime = clamped;
           resumeIfNeeded();
@@ -386,6 +391,7 @@ export function useVideoControls({
         const isLargeJump =
           Math.abs(clamped - video.currentTime) > SEEK_RELOAD_LARGE_JUMP_SEC;
         if (
+          beyondGeneratedPlaylist ||
           isLargeJump ||
           (bufferedEnd >= SEEK_RELOAD_MIN_BUFFERED_END_SEC && isBeyondBufferedWindow)
         ) {
