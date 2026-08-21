@@ -162,7 +162,7 @@ export function ScrubThumbnailsStrip({
               ? 'border-white ring-4 ring-white/95 scale-[1.04]'
               : 'border-white ring-2 ring-white/90 scale-[1.03]'
             : 'border-white/20'
-        } shadow-lg focus:outline-none focus:ring-2 focus:ring-white/80 transition-transform cursor-pointer hover:border-white/50
+        } shadow-lg focus:outline-none focus:ring-2 focus:ring-white/80 transition-transform cursor-pointer hover:border-white/50`}
         onClick={(e: Event) => {
           // Après un swipe, ignore le click fantôme.
           if (isMobile && Date.now() < suppressClickUntilRef.current) {
