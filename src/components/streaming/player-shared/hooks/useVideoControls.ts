@@ -13,7 +13,6 @@ import {
   getBufferAheadSeconds,
   getBufferedEndAround,
   getBufferedTimelinePercent,
-  hasMediaPlaybackStarted,
   isTimeInBuffered,
 } from '../utils/bufferMetrics';
 
@@ -284,15 +283,16 @@ export function useVideoControls({
       video.muted = playerConfig.muted;
     }
 
-    /** TV / webOS : autoplay muted, puis son au premier "playing". */
+    /** TV / webOS : autoplay muted, puis son une fois la lecture vraiment lancée.
+     *  Ne pas passer par setState/muted JSX : webOS coupe play() si l’attribut muted change. */
     const handlePlayingUnmuteTV = () => {
       if (!(isTVPlatform() || isWebOSTV())) return;
+      if (hasTriedUnmuteOnTVRef.current) return;
       const v = videoRef.current;
-      if (!v) return;
+      if (!v || v.paused) return;
       hasTriedUnmuteOnTVRef.current = true;
       v.muted = false;
       v.volume = Math.max(0.5, playerConfig.volume);
-      setIsMuted(false);
     };
     const handlePlaying = () => {
       setIsPlaying(true);
@@ -303,7 +303,7 @@ export function useVideoControls({
 
     let tvPlayPoll: number | null = null;
     const syncTvPlaying = () => {
-      if (hasMediaPlaybackStarted(video)) handlePlaying();
+      if (video.paused === false) handlePlaying();
     };
     if (isTVPlatform() || isWebOSTV()) {
       tvPlayPoll = window.setInterval(syncTvPlaying, 250);
@@ -342,7 +342,7 @@ export function useVideoControls({
       if (isTVPlatform() || isWebOSTV()) {
         video.muted = false;
         video.volume = Math.max(0.5, playerConfig.volume);
-        setIsMuted(false);
+        hasTriedUnmuteOnTVRef.current = true;
       }
       video.play().catch(() => setIsPlaying(false));
     } else {
