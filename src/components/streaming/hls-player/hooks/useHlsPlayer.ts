@@ -943,9 +943,11 @@ export function useHlsPlayer({
                 hls.mainForwardBufferInfo,
               );
               // Ne pas forcer play() avec un buffer vide (overlay qui clignote).
-              if (ahead >= 4) {
+                  if (ahead >= 4) {
                 if (canPlay && video.paused) {
-                  if (isWebOSTV() || isTVPlatform()) video.muted = true;
+                  if ((isWebOSTV() || isTVPlatform()) && !hasStartedPlayingRef.current) {
+                    video.muted = true;
+                  }
                   video.play().catch(() => {});
                 }
                 markPlaybackReady();
@@ -965,7 +967,9 @@ export function useHlsPlayer({
                     intervalId = null;
                     clearTimeout(timeoutId);
                     if (canPlay && video.paused) {
-                      if (isWebOSTV() || isTVPlatform()) video.muted = true;
+                      if ((isWebOSTV() || isTVPlatform()) && !hasStartedPlayingRef.current) {
+                        video.muted = true;
+                      }
                       video.play().catch(() => {});
                     }
                     markPlaybackReady();

@@ -46,7 +46,9 @@ export function useVideoControls({
   /** Fin du buffer le long de la timeline 0–100 (barre de progression). */
   const [bufferedTimelinePercent, setBufferedTimelinePercent] = useState(0);
   const [isSeeking, setIsSeeking] = useState(false);
-  const [isMuted, setIsMuted] = useState(playerConfig.muted);
+  const [isMuted, setIsMuted] = useState(() =>
+    isTVPlatform() || isWebOSTV() ? true : playerConfig.muted,
+  );
   const [volume, setVolume] = useState(playerConfig.volume);
   const controlsTimeoutRef = useRef<number | null>(null);
   const userPausedRef = useRef<boolean>(false);
@@ -274,17 +276,23 @@ export function useVideoControls({
     window.addEventListener('keydown', handleKeyDown);
 
     video.volume = playerConfig.volume;
-    video.muted = isTVPlatform() || isWebOSTV() ? true : playerConfig.muted;
+    // TV : muted seulement tant que l’autoplay n’a pas démarré. Ne pas re-muter
+    // à chaque re-run (duration / config), sinon le son disparaît pour de bon.
+    if (isTVPlatform() || isWebOSTV()) {
+      if (!hasTriedUnmuteOnTVRef.current) video.muted = true;
+    } else {
+      video.muted = playerConfig.muted;
+    }
 
     /** TV / webOS : autoplay muted, puis son au premier "playing". */
     const handlePlayingUnmuteTV = () => {
-      if (!(isTVPlatform() || isWebOSTV()) || hasTriedUnmuteOnTVRef.current) return;
-      hasTriedUnmuteOnTVRef.current = true;
+      if (!(isTVPlatform() || isWebOSTV())) return;
       const v = videoRef.current;
-      if (v) {
-        v.muted = false;
-        v.volume = Math.max(0.5, playerConfig.volume);
-      }
+      if (!v) return;
+      hasTriedUnmuteOnTVRef.current = true;
+      v.muted = false;
+      v.volume = Math.max(0.5, playerConfig.volume);
+      setIsMuted(false);
     };
     const handlePlaying = () => {
       setIsPlaying(true);
@@ -331,9 +339,10 @@ export function useVideoControls({
     if (!video) return;
     if (video.paused) {
       userPausedRef.current = false;
-      if (isTVPlatform()) {
+      if (isTVPlatform() || isWebOSTV()) {
         video.muted = false;
         video.volume = Math.max(0.5, playerConfig.volume);
+        setIsMuted(false);
       }
       video.play().catch(() => setIsPlaying(false));
     } else {
