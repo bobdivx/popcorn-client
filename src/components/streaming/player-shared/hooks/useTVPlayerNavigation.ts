@@ -166,32 +166,8 @@ export function useTVPlayerNavigation({
     previewTargetTimeRef.current != null;
 
   const scheduleControlsHide = () => {
-    if (!isTV) return;
+    // TV : afficher les commandes et les laisser. Le masquage auto (délai) viendra plus tard.
     clearControlsHideTimeout();
-    if (visiblePlayerPlaybackOverlay()) return;
-    // En pause : garder les commandes visibles.
-    if (isVideoPaused()) return;
-    // Pendant un scrub/preview : réessayer bientôt au lieu de laisser l’UI collée.
-    if (isActivelyBrowsingTimeline()) {
-      controlsTimeoutRef.current = window.setTimeout(() => {
-        controlsTimeoutRef.current = null;
-        scheduleControlsHide();
-      }, 400);
-      return;
-    }
-    const hideMs = isWebOSTV() ? CONTROLS_HIDE_MS_WEBOS : CONTROLS_HIDE_MS_TV;
-    controlsTimeoutRef.current = window.setTimeout(() => {
-      controlsTimeoutRef.current = null;
-      if (isActivelyBrowsingTimeline()) {
-        scheduleControlsHide();
-        return;
-      }
-      if (visiblePlayerPlaybackOverlay()) return;
-      if (isVideoPaused()) return;
-      setShowControls(false);
-      setFocusedOnProgress(false);
-      setFocusedOnScrub(false);
-    }, hideMs);
   };
 
   const commitScrubSeek = () => {

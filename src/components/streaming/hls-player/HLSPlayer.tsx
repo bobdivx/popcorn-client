@@ -755,6 +755,7 @@ export default function HLSPlayer({
           tvScrubIndexExternal={isTV ? tvScrubIndex : undefined}
           tvScrubFocused={isTV ? focusedOnScrub : undefined}
           tvScrubBrowsing={isTV ? tvScrubBrowsing : undefined}
+          tvPlaybackLive={isPlaying || playbackStarted || mediaVisiblyPlaying}
           onPlayNextEpisode={
             nextEpisodeInfo && onPlayNextEpisode && (playerConfig.nextEpisodeButtonEnabled ?? true)
               ? onPlayNextEpisode
