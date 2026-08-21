@@ -629,7 +629,11 @@
       "bufferEvents": "buffers",
       "network": "Réseau appareil",
       "hlsBandwidth": "Débit HLS estimé",
-      "uhdFallback1080": "La 4K ne démarre pas sur cet appareil — passage en 1080p…"
+      "uhdFallback1080": "La 4K ne démarre pas sur cet appareil — passage en 1080p…",
+      "warmingUp": "On prépare une lecture fluide",
+      "almostReady": "C’est presque prêt",
+      "optimizingPicture": "Optimisation de l’image",
+      "smoothingPlayback": "Lissage de la lecture"
     },
 
     "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct.",
