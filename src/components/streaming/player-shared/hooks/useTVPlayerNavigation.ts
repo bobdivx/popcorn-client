@@ -603,21 +603,16 @@ export function useTVPlayerNavigation({
       const key = e.key || (kc === 37 ? 'ArrowLeft' : kc === 39 ? 'ArrowRight' : '');
       if (key === 'ArrowLeft' || key === 'ArrowRight' || kc === 412 || kc === 417) recordKeyUp();
     };
-    const handlePopState = () => {
-      if (document.querySelector('[data-playback-overlay]')) handleBack();
-    };
 
     window.addEventListener('keydown', handleKeyDown, true);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('webosback', handleWebOSBack);
     document.addEventListener('webOSBackButton', handleWebOSBack);
-    window.addEventListener('popstate', handlePopState);
     return () => {
       window.removeEventListener('keydown', handleKeyDown, true);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('webosback', handleWebOSBack);
       document.removeEventListener('webOSBackButton', handleWebOSBack);
-      window.removeEventListener('popstate', handlePopState);
     };
   }, [
     isTV,
