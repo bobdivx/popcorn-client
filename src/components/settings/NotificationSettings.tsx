@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import {
   Bell,
   Hash,
@@ -17,15 +17,10 @@ import {
 } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
-import { useSeedingHealth, type SeedingDiagnostic } from '../../hooks/useSeedingHealth';
+import { useSeedingHealth } from '../../hooks/useSeedingHealth';
+import { useConnectivityAlert } from '../../hooks/useConnectivityAlert';
 import { DsLoader } from '../ui/DsLoader';
 import { useNativeNotifications } from '../../hooks/useNativeNotifications';
-import {
-  connectivityWarningFingerprint,
-  readConnectivityDismissedFingerprint,
-  writeConnectivityDismissedFingerprint,
-  clearConnectivityDismissedFingerprint,
-} from '../../lib/connectivity-warning';
 
 interface NotificationSettingsData {
   webhook_enabled: boolean;
@@ -67,7 +62,10 @@ export default function NotificationSettings() {
   const { t, language } = useI18n();
   const { diagnostic, loading: seedingLoading, refetch: refetchSeeding } = useSeedingHealth();
   const { permissionStatus, requestPermission, notifySuccess } = useNativeNotifications();
-  const prevStatusRef = useRef<SeedingDiagnostic['status'] | undefined>();
+  const { hasIssue: hasActiveAlert, hasHiddenAlert, dismiss, restore } = useConnectivityAlert(
+    diagnostic,
+    seedingLoading
+  );
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -80,40 +78,9 @@ export default function NotificationSettings() {
     email_enabled: false,
     system_enabled: true,
   });
-  const [dismissedFingerprint, setDismissedFingerprint] = useState<string | null>(() =>
-    readConnectivityDismissedFingerprint()
-  );
   const [history, setHistory] = useState<SentNotificationItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [nativeBusy, setNativeBusy] = useState(false);
-
-  const fingerprint =
-    diagnostic && diagnostic.status !== 'ok' ? connectivityWarningFingerprint(diagnostic) : '';
-
-  useEffect(() => {
-    if (!diagnostic) return;
-    const prevStatus = prevStatusRef.current;
-    prevStatusRef.current = diagnostic.status;
-
-    if (prevStatus === 'ok' && diagnostic.status !== 'ok') {
-      setDismissedFingerprint(null);
-      clearConnectivityDismissedFingerprint();
-      return;
-    }
-
-    if (!fingerprint) return;
-    const stored = readConnectivityDismissedFingerprint();
-    if (stored && stored !== fingerprint) {
-      setDismissedFingerprint(null);
-      clearConnectivityDismissedFingerprint();
-    }
-  }, [diagnostic?.status, fingerprint]);
-
-  const isDismissed = fingerprint !== '' && dismissedFingerprint === fingerprint;
-  const hasActiveAlert =
-    !seedingLoading && !!diagnostic && diagnostic.status !== 'ok' && !isDismissed;
-  const hasHiddenAlert =
-    !seedingLoading && !!diagnostic && diagnostic.status !== 'ok' && isDismissed;
 
   useEffect(() => {
     fetchSettings();
@@ -158,17 +125,6 @@ export default function NotificationSettings() {
     } finally {
       setHistoryLoading(false);
     }
-  };
-
-  const handleDismissAlert = () => {
-    if (!fingerprint) return;
-    setDismissedFingerprint(fingerprint);
-    writeConnectivityDismissedFingerprint(fingerprint);
-  };
-
-  const handleRestoreAlert = () => {
-    setDismissedFingerprint(null);
-    clearConnectivityDismissedFingerprint();
   };
 
   const handleNativeEnable = async () => {
@@ -270,7 +226,7 @@ export default function NotificationSettings() {
             <p className="text-sm ds-text-tertiary">{t('notificationSettings.noActiveAlerts')}</p>
           )}
 
-          {!seedingLoading && diagnostic?.status === 'ok' && (
+          {!seedingLoading && diagnostic && !hasActiveAlert && !hasHiddenAlert && (
             <div className="flex items-start gap-3 rounded-xl border border-green-500/20 bg-green-500/5 p-3">
               <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
               <div>
@@ -323,7 +279,7 @@ export default function NotificationSettings() {
                   </button>
                   <button
                     type="button"
-                    onClick={handleDismissAlert}
+                    onClick={dismiss}
                     className="btn btn-ghost btn-sm inline-flex items-center gap-1.5"
                   >
                     <X size={14} />
@@ -339,7 +295,7 @@ export default function NotificationSettings() {
               <p className="text-sm ds-text-secondary">
                 {t('notificationSettings.alertDismissedHint')}
               </p>
-              <button type="button" onClick={handleRestoreAlert} className="btn btn-ghost btn-sm shrink-0">
+              <button type="button" onClick={restore} className="btn btn-ghost btn-sm shrink-0">
                 {t('notificationSettings.restoreAlert')}
               </button>
             </div>
