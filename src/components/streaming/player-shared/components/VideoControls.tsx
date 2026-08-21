@@ -3,7 +3,7 @@ import { createPortal } from 'preact/compat';
 import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Minimize, Subtitles, ArrowLeft, RotateCcw, SkipForward, SkipBack, Settings } from 'lucide-preact';
 import { useI18n } from '../../../../lib/i18n';
 import { formatTime } from '../utils/formatTime';
-import { isMobileDevice, isTVPlatform, isWebOSTV } from '../../../../lib/utils/device-detection';
+import { isMobileDevice } from '../../../../lib/utils/device-detection';
 import { SubtitleSelector } from './SubtitleSelector';
 import type { ScrubThumbnailsMeta } from '../types/scrubThumbnails';
 import { useScrubNav } from './video-controls/useScrubNav';
@@ -116,8 +116,6 @@ interface VideoControlsProps {
   /** Réafficher les commandes (flèches avec chrome masqué). */
   onRevealControls?: () => void;
   bufferedPercent?: number;
-  /** TV : la lecture a réellement démarré (ne pas coller le chrome avant, sinon écran noir). */
-  tvPlaybackLive?: boolean;
 }
 
 export function VideoControls({
@@ -129,7 +127,7 @@ export function VideoControls({
   isMuted,
   volume,
   isFullscreen,
-  isTV: isTVProp = false,
+  isTV = false,
   focusedControlIndex = 0,
   focusedOnProgress = false,
   setFocusedOnProgress,
@@ -178,11 +176,8 @@ export function VideoControls({
   tvScrubBrowsing = false,
   onRevealControls,
   bufferedPercent = 0,
-  tvPlaybackLive,
 }: VideoControlsProps) {
   const { t } = useI18n();
-  const isTV = isTVProp || isTVPlatform() || isWebOSTV();
-  void tvPlaybackLive;
   const effectiveFillMode = videoFillMode ?? 'contain';
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [isHoveringTimeline, setIsHoveringTimeline] = useState(false);
@@ -360,25 +355,27 @@ export function VideoControls({
         }
       : () => {};
 
-  const chromeVisible = isTV || showControls || showQualityMenu;
+  const chromeVisible = showControls || showQualityMenu;
   /** TV : le carrousel fait partie des commandes (comme le survol timeline sur PC). */
   const showScrubStrip =
     (isTV && chromeVisible && scrubEnabled) ||
     (!isTV && (isDraggingScrub || isHoveringTimeline || isBrowsingScrub));
 
-  const tree = (
+  return (
     <>
-      {/* Gradient plein écran : PC seulement (webOS le traite comme un calque opaque). */}
-      {!isTV && (
+      {/* Gradient : sur TV, display:none (opacity-0 est peu fiable sur webOS WebKit). */}
+      {(chromeVisible || !isTV) && (
         <div
           class={`absolute inset-0 pointer-events-none ${chromeVisible ? 'opacity-100' : 'opacity-0'}`}
           style={{
             background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0.3) 50%, transparent 100%)',
+            ...(isTV && !chromeVisible ? { display: 'none' } : null),
           }}
           aria-hidden={!chromeVisible}
         />
       )}
-      {showPausedChrome && !isTV && (
+      {/* Assombrissement pause (sous les contrôles z-20) */}
+      {showPausedChrome && (
         <div
           class="absolute inset-0 z-[19] pointer-events-none bg-gradient-to-b from-black/45 via-black/55 to-black/75 transition-opacity duration-300"
           aria-hidden="true"
@@ -391,21 +388,15 @@ export function VideoControls({
       */}
       {(chromeVisible || !isTV) && (
       <div
-        class={
-          isTV
-            ? 'video-controls-chrome text-white'
-            : `video-controls-chrome absolute inset-0 flex flex-col overflow-hidden z-40 text-white ${
-                chromeVisible
-                  ? 'opacity-100 translate-y-0 pointer-events-auto'
-                  : 'opacity-0 translate-y-2 pointer-events-none'
-              }`
-        }
+        class={`video-controls-chrome absolute inset-0 flex flex-col overflow-hidden z-40 text-white ${
+          chromeVisible
+            ? `opacity-100 translate-y-0 ${isTV ? 'pointer-events-none' : 'pointer-events-auto'}`
+            : 'opacity-0 translate-y-2 pointer-events-none'
+        }`}
+        style={isTV && !chromeVisible ? { display: 'none', visibility: 'hidden' } : undefined}
         aria-hidden={!chromeVisible}
       >
-        <div
-          class={`flex shrink-0 items-center justify-between pointer-events-auto ${padding.split(' ')[0]} ${padding.split(' ')[1]}${isTV ? ' absolute top-0 left-0 right-0 z-[410]' : ''}`}
-          style={isTV ? { background: '#000' } : undefined}
-        >
+        <div class={`flex shrink-0 items-center justify-between pointer-events-auto ${padding.split(' ')[0]} ${padding.split(' ')[1]}`}>
           <div class="flex items-center gap-3 text-white drop-shadow-2xl min-w-0 flex-1">
             {/* Bouton retour */}
             {onClose && (
@@ -455,7 +446,7 @@ export function VideoControls({
             )
           )}
         </div>
-        {showPosterSynopsisPause && !isTV && (
+        {showPosterSynopsisPause && (
           <div class="flex-1 min-h-0 max-h-[22%] sm:max-h-[32%] w-full flex flex-col items-start justify-center px-3 sm:px-6 md:px-8 lg:px-12 py-1 overflow-hidden pointer-events-none">
             <div class="flex flex-row items-start justify-start gap-3 sm:gap-8 max-w-5xl xl:max-w-6xl min-h-0">
               {posterUrl && (
@@ -494,10 +485,7 @@ export function VideoControls({
             </div>
           </div>
         )}
-        <div
-          class={`${isTV ? 'absolute bottom-0 left-0 right-0 z-[410]' : 'mt-auto'} shrink-0 flex flex-col gap-2 pointer-events-auto ${padding}`}
-          style={isTV ? { background: '#000' } : undefined}
-        >
+        <div class={`mt-auto shrink-0 flex flex-col gap-2 pointer-events-auto ${padding}`}>
           {/* Colonne barre + carrousel (visible seulement pendant un avance/recul) */}
           <div
             class={`relative flex min-h-0 flex-col gap-2 ${isDraggingScrub || showScrubStrip ? 'z-30' : ''}`}
@@ -1050,10 +1038,4 @@ export function VideoControls({
       )}
     </>
   );
-
-  if (isTV && typeof document !== 'undefined') {
-    const host = document.getElementById('video-player-wrapper');
-    if (host) return createPortal(tree, host);
-  }
-  return tree;
 }

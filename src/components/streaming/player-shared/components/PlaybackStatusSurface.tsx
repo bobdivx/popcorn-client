@@ -443,8 +443,9 @@ export function PlaybackStatusSurface({
       window.removeEventListener('webosback', onWebOSBack);
       document.removeEventListener('webOSBackButton', onWebOSBack);
       window.removeEventListener('popstate', onPopState);
+      // replaceState : history.back() déclenchait popstate chez d’autres listeners et fermait le lecteur.
       if (history.state && (history.state as { popcornnPlaybackOverlay?: boolean }).popcornnPlaybackOverlay) {
-        history.back();
+        history.replaceState(null, '');
       }
     };
   }, [variant]);
