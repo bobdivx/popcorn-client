@@ -8,7 +8,7 @@ import type { HLSPlayerProps } from './types';
 import { useHlsPlayer } from './hooks/useHlsPlayer';
 import { useTVPlayerNavigation } from '../player-shared/hooks/useTVPlayerNavigation';
 import { useHlsTracks } from './hooks/useHlsTracks';
-import { usePlayerConfig } from '../player-shared/hooks/usePlayerConfig';
+import { usePlayerConfig, toggleVideoFillMode } from '../player-shared/hooks/usePlayerConfig';
 import { shouldAutoFullscreen, isTVPlatform, isWebOSTV } from '../../../lib/utils/device-detection';
 import { isTauri } from '../../../lib/utils/tauri';
 import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
@@ -391,7 +391,7 @@ export default function HLSPlayer({
     };
   }, [videoRef, hlsLoaded, playbackStarted, playerConfig.autoFullscreen]);
 
-  const { isTV, focusedControlIndex, focusedControlId, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub, tvScrubBrowsing } = useTVPlayerNavigation({
+  const { isTV, focusedControlIndex, focusedControlId, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub, tvScrubBrowsing, settingsOpen, settingsFocusIndex, toggleSettings } = useTVPlayerNavigation({
     showControls,
     setShowControls,
     onPlayPause: handlePlayPause,
@@ -402,6 +402,9 @@ export default function HLSPlayer({
     onClose,
     onOpenQualityMenu: onQualityChange != null ? () => openQualityMenuRef.current?.() : undefined,
     onToggleSubtitles: toggleSubtitleSelector,
+    onSelectQuality: onQualityChange,
+    streamQuality: streamQuality ?? null,
+    onToggleFillMode: toggleVideoFillMode,
     duration,
     currentTime,
     isPlaying,
@@ -782,9 +785,21 @@ export default function HLSPlayer({
             currentTime={currentTime}
             duration={duration}
             focusedControlId={focusedControlId}
+            focusedOnScrub={focusedOnScrub}
+            tvScrubIndex={tvScrubIndex}
+            tvScrubBrowsing={tvScrubBrowsing}
+            scrubThumbnails={scrubThumbnails ?? null}
+            scrubThumbnailsLoading={scrubThumbnailsLoading}
+            videoFillMode={playerConfig.videoFillMode ?? 'cover'}
+            streamQuality={streamQuality ?? null}
+            settingsOpen={settingsOpen}
+            settingsFocusIndex={settingsFocusIndex}
             onClose={onClose}
             onPlayPause={handlePlayPause}
             onSeekToTime={seekToTargetTime}
+            onToggleFillMode={toggleVideoFillMode}
+            onOpenSettings={onQualityChange ? toggleSettings : undefined}
+            onSelectQuality={onQualityChange}
           />
         )}
       </div>
