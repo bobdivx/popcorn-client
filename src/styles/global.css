@@ -350,6 +350,9 @@ html[data-tv-platform="true"] .player-progress-overlay .player-overlay-content {
 /* webOS : `animation: both` collait les commandes à opacity:0 (from) si l’anim ne joue pas. */
 html[data-tv-platform="true"] #video-player-wrapper .video-controls-chrome {
   animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+  visibility: visible !important;
 }
 
 /* Page Demandes : éviter que la bordure de focus soit coupée (conteneur + cartes) */
