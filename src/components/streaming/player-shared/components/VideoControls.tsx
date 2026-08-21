@@ -361,16 +361,12 @@ export function VideoControls({
     (isTV && chromeVisible && scrubEnabled) ||
     (!isTV && (isDraggingScrub || isHoveringTimeline || isBrowsingScrub));
 
-  const chromeLayerClass = isTV
-    ? 'fixed inset-0 z-[410]'
-    : 'absolute inset-0 z-40';
-
-  const tree = (
+  return (
     <>
       {/* Gradient : sur TV, display:none (opacity-0 est peu fiable sur webOS WebKit). */}
       {(chromeVisible || !isTV) && (
         <div
-          class={`${isTV ? 'fixed inset-0 z-[409]' : 'absolute inset-0'} pointer-events-none ${chromeVisible ? 'opacity-100' : 'opacity-0'}`}
+          class={`absolute inset-0 pointer-events-none ${chromeVisible ? 'opacity-100' : 'opacity-0'}`}
           style={{
             background: 'linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.6) 30%, rgba(0,0,0,0.3) 50%, transparent 100%)',
             ...(isTV && !chromeVisible ? { display: 'none' } : null),
@@ -392,15 +388,15 @@ export function VideoControls({
       */}
       {(chromeVisible || !isTV) && (
       <div
-        class={`video-controls-chrome ${chromeLayerClass} flex flex-col overflow-hidden text-white ${
+        class={`video-controls-chrome absolute inset-0 flex flex-col overflow-hidden z-40 text-white ${
           chromeVisible
-            ? 'opacity-100 translate-y-0 pointer-events-auto'
+            ? `opacity-100 translate-y-0 ${isTV ? 'pointer-events-none' : 'pointer-events-auto'}`
             : 'opacity-0 translate-y-2 pointer-events-none'
         }`}
         style={isTV && !chromeVisible ? { display: 'none', visibility: 'hidden' } : undefined}
         aria-hidden={!chromeVisible}
       >
-        <div class={`flex shrink-0 items-center justify-between ${padding.split(' ')[0]} ${padding.split(' ')[1]}`}>
+        <div class={`flex shrink-0 items-center justify-between pointer-events-auto ${padding.split(' ')[0]} ${padding.split(' ')[1]}`}>
           <div class="flex items-center gap-3 text-white drop-shadow-2xl min-w-0 flex-1">
             {/* Bouton retour */}
             {onClose && (
@@ -489,7 +485,7 @@ export function VideoControls({
             </div>
           </div>
         )}
-        <div class={`mt-auto shrink-0 flex flex-col gap-2 ${padding}`}>
+        <div class={`mt-auto shrink-0 flex flex-col gap-2 pointer-events-auto ${padding}`}>
           {/* Colonne barre + carrousel (visible seulement pendant un avance/recul) */}
           <div
             class={`relative flex min-h-0 flex-col gap-2 ${isDraggingScrub || showScrubStrip ? 'z-30' : ''}`}
@@ -1042,10 +1038,4 @@ export function VideoControls({
       )}
     </>
   );
-
-  if (isTV && typeof document !== 'undefined') {
-    const host = document.getElementById('video-player-wrapper');
-    if (host) return createPortal(tree, host);
-  }
-  return tree;
 }
