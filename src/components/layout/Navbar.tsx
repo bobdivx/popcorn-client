@@ -388,11 +388,11 @@ export default function Navbar() {
               <button
                 type="button"
                 onClick={() => { setDemoMode(false); window.location.href = '/'; }}
-                className="flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-amber-600/90 text-white hover:bg-amber-500 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-gray-900"
+                className="flex-shrink-0 px-2 py-1.5 rounded-lg text-xs font-medium bg-amber-600/90 text-white hover:bg-amber-500 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-gray-900 whitespace-nowrap"
                 title={t('demo.exitDemo')}
               >
-                <span className="hidden sm:inline">{t('demo.exitDemo')}</span>
-                <span className="sm:hidden">Demo</span>
+                <span className="hidden lg:inline">{t('demo.exitDemo')}</span>
+                <span className="lg:hidden">Démo</span>
               </button>
             )}
 

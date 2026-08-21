@@ -53,12 +53,24 @@ export function buildMediaDetailUrlFromContentItem(item: ContentItem, from = 'da
 }
 
 /**
- * URL canonique stricte: TMDB uniquement.
- * Si tmdbId/type manquent, on redirige vers la recherche pour éviter les fiches non canoniques.
+ * URL canonique stricte: TMDB d'abord, puis slug en fallback.
+ * Si tmdbId/type manquent et qu'il n'y a pas de slug, on redirige vers la recherche.
  */
 export function buildStrictTmdbDetailUrl(options: BuildMediaDetailUrlOptions): string {
   if (typeof options.tmdbId === 'number' && Number.isFinite(options.tmdbId) && isMediaType(options.type)) {
     return buildMediaDetailUrl(options);
+  }
+  // Fallback sur slug si disponible (mode démo)
+  const slug = (options.slug || '').trim();
+  if (slug) {
+    return buildMediaDetailUrl({
+      slug,
+      from: options.from,
+      title: options.title,
+      infoHash: options.infoHash,
+      streamBackendUrl: options.streamBackendUrl,
+      streamPath: options.streamPath,
+    });
   }
   const params = new URLSearchParams();
   if (options.title) params.set('q', options.title);
@@ -71,6 +83,7 @@ export function buildStrictTmdbDetailUrlFromContentItem(item: ContentItem, from 
   return buildStrictTmdbDetailUrl({
     tmdbId: item.tmdbId ?? null,
     type: item.type,
+    slug: item.id || null,
     from,
     title: item.title || item.tmdbTitle || null,
   });

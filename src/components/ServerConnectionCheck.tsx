@@ -49,6 +49,14 @@ export default function ServerConnectionCheck() {
     let cancelled = false;
 
     (async () => {
+      // En mode démo, pas besoin de check serveur - ne pas afficher l'overlay
+      const { isDemoMode } = await import('../lib/backend-config.js');
+      if (isDemoMode()) {
+        setIsVisible(false);
+        setStatus('connected');
+        return;
+      }
+
       // En Docker : charger /config.json (généré depuis PUBLIC_BACKEND_URL) avant toute logique
       const runtimeResult = await loadRuntimeConfig();
       if (cancelled) return;
