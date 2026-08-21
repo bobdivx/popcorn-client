@@ -116,6 +116,8 @@ interface VideoControlsProps {
   /** Réafficher les commandes (flèches avec chrome masqué). */
   onRevealControls?: () => void;
   bufferedPercent?: number;
+  /** TV : la lecture a réellement démarré (ne pas coller le chrome avant, sinon écran noir). */
+  tvPlaybackLive?: boolean;
 }
 
 export function VideoControls({
@@ -176,6 +178,7 @@ export function VideoControls({
   tvScrubBrowsing = false,
   onRevealControls,
   bufferedPercent = 0,
+  tvPlaybackLive,
 }: VideoControlsProps) {
   const { t } = useI18n();
   const effectiveFillMode = videoFillMode ?? 'contain';
@@ -355,13 +358,14 @@ export function VideoControls({
         }
       : () => {};
 
-  const chromeVisible = showControls || showQualityMenu;
+  const chromeVisible =
+    (showControls || showQualityMenu) && (!isTV || tvPlaybackLive !== false);
   /** TV : le carrousel fait partie des commandes (comme le survol timeline sur PC). */
   const showScrubStrip =
     (isTV && chromeVisible && scrubEnabled) ||
     (!isTV && (isDraggingScrub || isHoveringTimeline || isBrowsingScrub));
 
-  return (
+  const tree = (
     <>
       {/* Gradient : sur TV, display:none (opacity-0 est peu fiable sur webOS WebKit). */}
       {(chromeVisible || !isTV) && (
@@ -1038,4 +1042,15 @@ export function VideoControls({
       )}
     </>
   );
+
+  if (isTV && typeof document !== 'undefined') {
+    const host = document.getElementById('video-player-wrapper');
+    if (host) {
+      return createPortal(
+        <div class="absolute inset-0 z-[410] pointer-events-none">{tree}</div>,
+        host,
+      );
+    }
+  }
+  return tree;
 }
