@@ -391,7 +391,7 @@ export default function HLSPlayer({
     };
   }, [videoRef, hlsLoaded, playbackStarted, playerConfig.autoFullscreen]);
 
-  const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub, tvScrubBrowsing } = useTVPlayerNavigation({
+  const { isTV, focusedControlIndex, focusedControlId, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub, tvScrubBrowsing } = useTVPlayerNavigation({
     showControls,
     setShowControls,
     onPlayPause: handlePlayPause,
@@ -762,17 +762,6 @@ export default function HLSPlayer({
               : undefined
           }
         />
-        {isTV && (
-          <TvPlayerDock
-            show={isPlaying || playbackStarted || mediaVisiblyPlaying}
-            isPlaying={isPlaying}
-            currentTime={currentTime}
-            duration={duration}
-            onClose={onClose}
-            onPlayPause={handlePlayPause}
-            onSeekToTime={seekToTargetTime}
-          />
-        )}
         <div class="absolute inset-0 z-30 pointer-events-none">
           <SkipIntroOverlay
             onSkip={handleSkipIntro}
@@ -786,6 +775,18 @@ export default function HLSPlayer({
             chromeVisible={effectiveShowControls}
           />
         </div>
+        {isTV && (
+          <TvPlayerDock
+            show={showControls && (isPlaying || playbackStarted || mediaVisiblyPlaying)}
+            isPlaying={isPlaying}
+            currentTime={currentTime}
+            duration={duration}
+            focusedControlId={focusedControlId}
+            onClose={onClose}
+            onPlayPause={handlePlayPause}
+            onSeekToTime={seekToTargetTime}
+          />
+        )}
       </div>
     </div>
   );

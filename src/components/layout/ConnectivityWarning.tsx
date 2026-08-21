@@ -1,15 +1,10 @@
-import { useSeedingHealth, type SeedingDiagnostic } from '../../hooks/useSeedingHealth';
+import { useSeedingHealth } from '../../hooks/useSeedingHealth';
+import { useConnectivityAlert } from '../../hooks/useConnectivityAlert';
 import { AlertTriangle, Info, X } from 'lucide-preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { isTVPlatform } from '../../lib/utils/device-detection';
-import {
-  connectivityWarningFingerprint,
-  readConnectivityDismissedFingerprint,
-  writeConnectivityDismissedFingerprint,
-  clearConnectivityDismissedFingerprint,
-} from '../../lib/connectivity-warning';
 
 type Props = {
   /** Avatar (ou autre trigger) sur lequel afficher la pastille de notif. */
@@ -31,10 +26,7 @@ export default function ConnectivityWarning({
 }: Props) {
   const { diagnostic, loading } = useSeedingHealth();
   const { t } = useI18n();
-  const prevStatusRef = useRef<SeedingDiagnostic['status'] | undefined>();
-  const [dismissedFingerprint, setDismissedFingerprint] = useState<string | null>(() =>
-    readConnectivityDismissedFingerprint()
-  );
+  const { hasIssue, dismiss } = useConnectivityAlert(diagnostic, loading);
   const [menuOpen, setMenuOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -43,34 +35,6 @@ export default function ConnectivityWarning({
   useEffect(() => {
     setIsTvNav(isTVPlatform());
   }, []);
-
-  const fingerprint =
-    diagnostic && diagnostic.status !== 'ok' ? connectivityWarningFingerprint(diagnostic) : '';
-
-  useEffect(() => {
-    if (!diagnostic) return;
-
-    const prevStatus = prevStatusRef.current;
-    prevStatusRef.current = diagnostic.status;
-
-    if (prevStatus === 'ok' && diagnostic.status !== 'ok') {
-      setDismissedFingerprint(null);
-      clearConnectivityDismissedFingerprint();
-      return;
-    }
-
-    if (!fingerprint) return;
-
-    const stored = readConnectivityDismissedFingerprint();
-    if (stored && stored !== fingerprint) {
-      setDismissedFingerprint(null);
-      clearConnectivityDismissedFingerprint();
-    }
-  }, [diagnostic?.status, fingerprint]);
-
-  const isDismissed = fingerprint !== '' && dismissedFingerprint === fingerprint;
-  const hasIssue =
-    !loading && !!diagnostic && diagnostic.status !== 'ok' && !isDismissed;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -109,10 +73,8 @@ export default function ConnectivityWarning({
   }, [menuOpen]);
 
   const handleDismiss = () => {
-    if (!fingerprint) return;
-    setDismissedFingerprint(fingerprint);
+    dismiss();
     setMenuOpen(false);
-    writeConnectivityDismissedFingerprint(fingerprint);
   };
 
   const isError = diagnostic?.status === 'error';

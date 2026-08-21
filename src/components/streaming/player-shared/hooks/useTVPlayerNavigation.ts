@@ -81,7 +81,7 @@ export function useTVPlayerNavigation({
 }: UseTVPlayerNavigationProps) {
   // App simple (URL) : stamp avant isTVPlatform() pour désactiver la Magic Remote / activer le hide.
   stampTvPlatformHints();
-  const [focusedControlIndex, setFocusedControlIndex] = useState(isTVPlatform() || isWebOSTV() ? 1 : 0);
+  const [focusedControlIndex, setFocusedControlIndex] = useState(isTVPlatform() || isWebOSTV() ? 2 : 0);
   const [focusedOnProgress, setFocusedOnProgress] = useState(false);
   const [focusedOnScrub, setFocusedOnScrub] = useState(false);
   const isTV = isTVPlatform() || isWebOSTV();
@@ -166,8 +166,19 @@ export function useTVPlayerNavigation({
     previewTargetTimeRef.current != null;
 
   const scheduleControlsHide = () => {
-    // TV : afficher les commandes et les laisser. Le masquage auto (délai) viendra plus tard.
     clearControlsHideTimeout();
+    if (isVideoPaused()) return;
+    if (visiblePlayerPlaybackOverlay()) return;
+    if (isActivelyBrowsingTimeline()) return;
+    const ms = isWebOSTV() ? CONTROLS_HIDE_MS_WEBOS : CONTROLS_HIDE_MS_TV;
+    controlsTimeoutRef.current = window.setTimeout(() => {
+      controlsTimeoutRef.current = null;
+      if (isVideoPaused()) return;
+      if (isActivelyBrowsingTimeline()) return;
+      if (visiblePlayerPlaybackOverlay()) return;
+      setShowControls(false);
+      setFocusedOnProgress(false);
+    }, ms);
   };
 
   const commitScrubSeek = () => {
@@ -257,12 +268,13 @@ export function useTVPlayerNavigation({
   const hasBack = !!onClose;
   const controls = useMemo(() => {
     if (isTV) {
-      const c = [
+      const c: { id: string; action: () => void }[] = [];
+      if (onClose) c.push({ id: 'back', action: onClose });
+      c.push(
         { id: 'skipback', action: () => onSeek('left', 10) },
         { id: 'playpause', action: onPlayPause },
         { id: 'skipforward', action: () => onSeek('right', 10) },
-      ];
-      if (onToggleSubtitles) c.push({ id: 'subtitles', action: onToggleSubtitles });
+      );
       return c;
     }
     const c = [{ id: 'playpause', action: onPlayPause }];
@@ -360,19 +372,28 @@ export function useTVPlayerNavigation({
         const wrap = document.getElementById('video-player-wrapper');
         if (wrap) toggleFullscreen(wrap).catch(() => {});
       }
-      setShowControls(true);
 
       if (isBackKey(e)) {
         e.preventDefault();
         e.stopPropagation();
         if (!showControlsRef.current) {
           setShowControls(true);
-          setFocusedControlIndex(isTV ? 1 : hasBack ? 1 : 0);
+          resetControlsTimeout();
           return;
         }
         handleBack();
         return;
       }
+
+      // Première touche : afficher le dock, sans seek / play.
+      if (!showControlsRef.current) {
+        e.preventDefault();
+        setShowControls(true);
+        resetControlsTimeout();
+        return;
+      }
+
+      resetControlsTimeout();
 
       const kc = e.keyCode ?? e.which;
       const keyRaw = e.key || '';
@@ -633,6 +654,28 @@ export function useTVPlayerNavigation({
     progressBarRef,
   ]);
 
+  // Magic Remote : le pointeur n’envoie pas toujours de flèches. Révéler le dock
+  // seulement quand le curseur est en bas (évite le gyro webOS qui bloque le hide).
+  useEffect(() => {
+    if (!isTV) return;
+    let last = 0;
+    const revealFromPointer = (e: MouseEvent) => {
+      const h = window.innerHeight || 1;
+      if (e.clientY < h * 0.72) return;
+      const now = Date.now();
+      if (now - last < 250) return;
+      last = now;
+      if (!showControlsRef.current) setShowControls(true);
+      scheduleControlsHide();
+    };
+    window.addEventListener('mousemove', revealFromPointer, { passive: true });
+    window.addEventListener('pointermove', revealFromPointer, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', revealFromPointer);
+      window.removeEventListener('pointermove', revealFromPointer);
+    };
+  }, [isTV, setShowControls]);
+
   // Afficher les commandes une fois la modal partie (le timer de mount les masquait trop tôt).
   useEffect(() => {
     if (!isTV) return;
@@ -654,15 +697,16 @@ export function useTVPlayerNavigation({
   }, [isTV, setShowControls]);
 
   useEffect(() => {
-    if (!isTV || !showControls) return;
-    if (scrubThumbnailsActive) {
-      setFocusedOnProgress(false);
-      return;
-    }
-    setFocusedOnProgress(true);
-    const id = setTimeout(() => progressBarRef?.current?.focus(), 100);
-    return () => clearTimeout(id);
-  }, [isTV, showControls, scrubThumbnailsActive]);
+    if (!isTV) return;
+    const playIdx = controls.findIndex((c) => c.id === 'playpause');
+    if (playIdx >= 0) setFocusedControlIndex(playIdx);
+  }, [isTV, hasBack]);
+
+  useEffect(() => {
+    // TV dock : rester sur la rangée de boutons (gauche/droite = focus, pas seek).
+    if (!isTV) return;
+    setFocusedOnProgress(false);
+  }, [isTV, showControls]);
 
   useEffect(() => {
     if (!isTV || !showControls) {
@@ -699,6 +743,7 @@ export function useTVPlayerNavigation({
     isTV,
     focusedControlIndex,
     setFocusedControlIndex,
+    focusedControlId: controls[Math.min(focusedControlIndex, Math.max(0, controls.length - 1))]?.id ?? 'playpause',
     focusedOnProgress,
     setFocusedOnProgress,
     hasBack,

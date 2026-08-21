@@ -4,6 +4,7 @@ import { useFullscreen } from '../player-shared/hooks/useFullscreen';
 import { useTVPlayerNavigation } from '../player-shared/hooks/useTVPlayerNavigation';
 import { usePlayerConfig } from '../player-shared/hooks/usePlayerConfig';
 import { VideoControls } from '../player-shared/components/VideoControls';
+import { TvPlayerDock } from '../player-shared/components/TvPlayerDock';
 import { useI18n } from '../../../lib/i18n';
 import { useChromecast } from '../../../lib/chromecast/useChromecast';
 import type { PlayerLoadingTorrentStats } from '../player-shared/components/PlayerLoadingOverlay';
@@ -191,7 +192,7 @@ export default function DirectVideoPlayer({
     video.muted = newVolume === 0;
   };
 
-  const { isTV, focusedControlIndex, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub, tvScrubBrowsing } = useTVPlayerNavigation({
+  const { isTV, focusedControlIndex, focusedControlId, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub, tvScrubBrowsing } = useTVPlayerNavigation({
     showControls,
     setShowControls,
     onPlayPause: handlePlayPause,
@@ -256,9 +257,13 @@ export default function DirectVideoPlayer({
       style={{
         width: '100%',
         height: '100%',
-        transform: 'translateZ(0)',
-        willChange: 'contents',
-        backfaceVisibility: 'hidden',
+        ...(isTV
+          ? {}
+          : {
+              transform: 'translateZ(0)',
+              willChange: 'contents',
+              backfaceVisibility: 'hidden',
+            }),
       }}
     >
       <div
@@ -269,8 +274,7 @@ export default function DirectVideoPlayer({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          transform: 'translateZ(0)',
-          willChange: 'transform',
+          ...(isTV ? {} : { transform: 'translateZ(0)', willChange: 'transform' }),
         }}
       >
         {seekFeedback && (
@@ -377,7 +381,7 @@ export default function DirectVideoPlayer({
           synopsis={synopsis ?? undefined}
           releaseDate={releaseDate ?? undefined}
           torrentProgress={torrentProgress}
-          showControls={hasError ? true : effectiveShowControls}
+          showControls={isTV ? false : hasError ? true : effectiveShowControls}
           isPlaying={isPlaying}
           bufferedPercent={bufferedTimelinePercent}
           currentTime={currentTime}
@@ -415,6 +419,18 @@ export default function DirectVideoPlayer({
           tvScrubFocused={isTV ? focusedOnScrub : undefined}
           tvScrubBrowsing={isTV ? tvScrubBrowsing : undefined}
         />
+        {isTV && (
+          <TvPlayerDock
+            show={showControls && (isPlaying || loaded)}
+            isPlaying={isPlaying}
+            currentTime={currentTime}
+            duration={duration}
+            focusedControlId={focusedControlId}
+            onClose={onClose}
+            onPlayPause={handlePlayPause}
+            onSeekToTime={seekToTargetTime}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,13 +1,7 @@
 import { AlertTriangle, Info, X } from 'lucide-preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
-import { useSeedingHealth, type SeedingDiagnostic } from '../../hooks/useSeedingHealth';
+import { useSeedingHealth } from '../../hooks/useSeedingHealth';
+import { useConnectivityAlert } from '../../hooks/useConnectivityAlert';
 import { useI18n } from '../../lib/i18n/useI18n';
-import {
-  connectivityWarningFingerprint,
-  readConnectivityDismissedFingerprint,
-  writeConnectivityDismissedFingerprint,
-  clearConnectivityDismissedFingerprint,
-} from '../../lib/connectivity-warning';
 
 type Props = {
   /** Afficher le lien vers Paramètres → Notifications */
@@ -25,50 +19,13 @@ export default function ConnectivityAlertCard({
 }: Props) {
   const { diagnostic, loading } = useSeedingHealth();
   const { t } = useI18n();
-  const prevStatusRef = useRef<SeedingDiagnostic['status'] | undefined>();
-  const [dismissedFingerprint, setDismissedFingerprint] = useState<string | null>(() =>
-    readConnectivityDismissedFingerprint()
-  );
-
-  const fingerprint =
-    diagnostic && diagnostic.status !== 'ok' ? connectivityWarningFingerprint(diagnostic) : '';
-
-  useEffect(() => {
-    if (!diagnostic) return;
-
-    const prevStatus = prevStatusRef.current;
-    prevStatusRef.current = diagnostic.status;
-
-    if (prevStatus === 'ok' && diagnostic.status !== 'ok') {
-      setDismissedFingerprint(null);
-      clearConnectivityDismissedFingerprint();
-      return;
-    }
-
-    if (!fingerprint) return;
-
-    const stored = readConnectivityDismissedFingerprint();
-    if (stored && stored !== fingerprint) {
-      setDismissedFingerprint(null);
-      clearConnectivityDismissedFingerprint();
-    }
-  }, [diagnostic?.status, fingerprint]);
-
-  const isDismissed = fingerprint !== '' && dismissedFingerprint === fingerprint;
-  const hasIssue =
-    !loading && !!diagnostic && diagnostic.status !== 'ok' && !isDismissed;
+  const { hasIssue, dismiss } = useConnectivityAlert(diagnostic, loading);
 
   if (!hasIssue || !diagnostic) return null;
 
   const isError = diagnostic.status === 'error';
   const title = isError ? t('connectivity.errorTitle') : t('connectivity.warningTitle');
   const detail = diagnostic.warnings?.[0] || t('connectivity.defaultDetail');
-
-  const handleDismiss = () => {
-    if (!fingerprint) return;
-    setDismissedFingerprint(fingerprint);
-    writeConnectivityDismissedFingerprint(fingerprint);
-  };
 
   return (
     <section
@@ -82,7 +39,7 @@ export default function ConnectivityAlertCard({
     >
       <button
         type="button"
-        onClick={handleDismiss}
+        onClick={dismiss}
         className="absolute top-3 right-3 p-1.5 rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-colors"
         aria-label={t('connectivity.dismiss')}
       >
