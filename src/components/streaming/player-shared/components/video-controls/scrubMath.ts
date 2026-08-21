@@ -1,10 +1,24 @@
 import type { ScrubThumbnailsMeta } from '../../types/scrubThumbnails';
 
+/** Durée pour mapper les vignettes : la plus longue connue (film, meta, couverture réelle). */
 export function scrubEffectiveDuration(
   duration: number,
-  scrub: Pick<ScrubThumbnailsMeta, 'durationSeconds'> | null | undefined
+  scrub: Pick<ScrubThumbnailsMeta, 'durationSeconds' | 'count' | 'intervalSeconds'> | null | undefined,
 ): number {
-  return duration > 0 ? duration : (scrub?.durationSeconds ?? 0);
+  const video = Number.isFinite(duration) && duration > 0 ? duration : 0;
+  const meta =
+    scrub?.durationSeconds && Number.isFinite(scrub.durationSeconds) && scrub.durationSeconds > 0
+      ? scrub.durationSeconds
+      : 0;
+  const covered =
+    scrub &&
+    scrub.count > 0 &&
+    scrub.intervalSeconds != null &&
+    Number.isFinite(scrub.intervalSeconds) &&
+    scrub.intervalSeconds > 0
+      ? scrub.count * scrub.intervalSeconds
+      : 0;
+  return Math.max(video, meta, covered);
 }
 
 export function scrubBaseUrl(serverUrl: string, mediaId: string): string {
@@ -32,7 +46,9 @@ export function scrubTimeForIndex(
   const safe = Math.min(count - 1, Math.max(0, Math.floor(idx)));
   const interval = meta.intervalSeconds;
   if (interval != null && Number.isFinite(interval) && interval > 0) {
-    return Math.min(effectiveDuration, safe * interval);
+    const t = safe * interval;
+    if (effectiveDuration > 0) return Math.min(effectiveDuration, t);
+    return t;
   }
   if (count <= 0 || effectiveDuration <= 0) return 0;
   return ((safe + 0.5) / count) * effectiveDuration;

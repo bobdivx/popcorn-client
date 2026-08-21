@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useMemo } from 'preact/hooks';
 import { isTVPlatform, isWebOSTV, stampTvPlatformHints } from '../../../../lib/utils/device-detection';
 import { useSeekStepAcceleration } from './useSeekStepAcceleration';
 import { toggleFullscreen } from './useFullscreen';
+import { scrubEffectiveDuration, scrubTimeForIndex } from '../components/video-controls/scrubMath';
 
 const BACK_KEY_CODES = [27, 8, 461, 10009, 4, 166, 457];
 const BACK_KEYS = ['Escape', 'Backspace', 'Back', 'BrowserBack', 'GoBack', 'XF86Back'];
@@ -164,13 +165,9 @@ export function useTVPlayerNavigation({
   const timeForScrubIndex = (idx: number) => {
     const st = scrubThumbnailsRef.current;
     if (!st || !st.count) return 0;
-    const count = st.count;
-    const dur = (st.durationSeconds ?? 0) > 0 ? st.durationSeconds! : durationRef.current;
+    const dur = scrubEffectiveDuration(durationRef.current, st);
     if (!dur) return 0;
-    const safe = Math.min(count - 1, Math.max(0, Math.floor(idx)));
-    const interval = st.intervalSeconds;
-    if (interval && interval > 0) return Math.min(dur, safe * interval);
-    return ((safe + 0.5) / count) * dur;
+    return scrubTimeForIndex(idx, st, dur);
   };
 
   const clearControlsHideTimeout = () => {
@@ -250,7 +247,7 @@ export function useTVPlayerNavigation({
     if (!isTV || !scrubThumbnailsActive || !showControls) return;
     if (hasUserNavigatedScrubRef.current) return;
     const st = scrubThumbnails!;
-    const dur = (st.durationSeconds ?? 0) > 0 ? st.durationSeconds! : duration;
+    const dur = scrubEffectiveDuration(duration, st);
     if (!dur || !st.count) {
       setTvScrubIndex(0);
       return;

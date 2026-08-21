@@ -569,9 +569,57 @@ export function useHlsPlayer({
           });
 
           reloadWithSeekRef.current = (seekSeconds: number) => {
-            if (Number.isFinite(seekSeconds) && seekSeconds >= 0) {
-              video.currentTime = seekSeconds;
+            if (!Number.isFinite(seekSeconds) || seekSeconds < 0) return;
+            // Ne pas se limiter à video.currentTime : le HLS natif TV clamp à la
+            // durée déjà générée (~8:40) alors que les vignettes visent 14:00.
+            const seekUrl = useStreamTorrentUrl ? src : buildHlsUrl(true, seekSeconds);
+            pendingSeekRef.current = seekSeconds;
+            setPendingSeekPosition(seekSeconds);
+            setIsLoading(true);
+            const applySeek = () => {
+              video.removeEventListener('loadedmetadata', applySeek);
+              video.removeEventListener('canplay', applySeek);
+              const trySet = () => {
+                const dur = Number.isFinite(video.duration) ? video.duration : 0;
+                if (dur > 0 && seekSeconds > dur + 0.5) return false;
+                try {
+                  video.currentTime = seekSeconds;
+                } catch {
+                  /* ignore */
+                }
+                return true;
+              };
+              if (!trySet()) {
+                let n = 0;
+                const poll = window.setInterval(() => {
+                  n += 1;
+                  if (trySet() || n > 40) {
+                    window.clearInterval(poll);
+                    void video.play().catch(() => {});
+                    setIsLoading(false);
+                  }
+                }, 250);
+                return;
+              }
+              void video.play().catch(() => {});
+              setIsLoading(false);
+            };
+            video.addEventListener('loadedmetadata', applySeek);
+            video.addEventListener('canplay', applySeek);
+            if (video.src !== seekUrl) {
+              video.src = seekUrl;
+              try {
+                video.load();
+              } catch {
+                /* ignore */
+              }
+            } else {
+              applySeek();
             }
+            window.setTimeout(() => {
+              video.removeEventListener('loadedmetadata', applySeek);
+              video.removeEventListener('canplay', applySeek);
+            }, 20000);
           };
 
           const fullCleanup = () => {
