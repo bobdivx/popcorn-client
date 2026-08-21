@@ -19,6 +19,7 @@ export interface PlayerBufferingOverlayProps {
   pipelineStatus?: PlaybackPipelineStatus | null;
   debugLogsUrl?: string | null;
   liveTrace?: PlaybackLiveTraceState | null;
+  qualityTransition?: boolean;
 }
 
 /**
@@ -37,6 +38,7 @@ export default function PlayerBufferingOverlay({
   pipelineStatus = null,
   debugLogsUrl = null,
   liveTrace = null,
+  qualityTransition = false,
 }: PlayerBufferingOverlayProps) {
   const { t } = useI18n();
 
@@ -55,6 +57,7 @@ export default function PlayerBufferingOverlay({
       pipelineStatus={pipelineStatus}
       debugLogsUrl={debugLogsUrl}
       liveTrace={liveTrace}
+      qualityTransition={qualityTransition}
       onCancel={onClose}
       cancelLabel={closeLabel || t('common.close') || 'Fermer'}
     />

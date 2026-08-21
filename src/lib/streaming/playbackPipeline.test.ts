@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { pipelineHeadline, type PlaybackPipelineStatus } from './playbackPipeline';
+import { friendlyPlaybackHint, pipelineHeadline, type PlaybackPipelineStatus } from './playbackPipeline';
 
 const t = (k: string) => k;
 
@@ -18,6 +18,20 @@ function status(partial: Partial<PlaybackPipelineStatus>): PlaybackPipelineStatu
     ...partial,
   };
 }
+
+describe('friendlyPlaybackHint', () => {
+  it('qualité : pastille courte, pas le texte 4K brut', () => {
+    expect(friendlyPlaybackHint({ qualityTransition: true, t }).label).toBe(
+      'playback.hls.optimizingPicture',
+    );
+  });
+
+  it('ETA : message chaleureux, pas « lecture dans 23 s »', () => {
+    expect(
+      friendlyPlaybackHint({ etaPlayableSeconds: 23, t }).label,
+    ).toBe('playback.hls.warmingUp');
+  });
+});
 
 describe('pipelineHeadline', () => {
   it('sans statut : pas de faux « serveur prépare » (laisse le fallback overlay)', () => {

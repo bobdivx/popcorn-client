@@ -110,6 +110,32 @@ export async function fetchPlaybackLogs(
   }
 }
 
+export type PlaybackHintKind = 'warmup' | 'quality' | 'readying';
+
+/** Copy courte pour la pastille d’état — pas d’ETA brute ni de jargon qualité. */
+export function friendlyPlaybackHint(opts: {
+  qualityTransition?: boolean;
+  etaPlayableSeconds?: number | null;
+  isBuffering?: boolean;
+  playlistReady?: boolean;
+  t: (k: string) => string;
+}): { kind: PlaybackHintKind; label: string } | null {
+  if (opts.qualityTransition) {
+    return { kind: 'quality', label: opts.t('playback.hls.optimizingPicture') };
+  }
+  if (opts.isBuffering && opts.playlistReady) {
+    return { kind: 'readying', label: opts.t('playback.hls.smoothingPlayback') };
+  }
+  const eta = opts.etaPlayableSeconds;
+  if (eta != null && eta > 0) {
+    return { kind: 'warmup', label: opts.t('playback.hls.warmingUp') };
+  }
+  if (opts.isBuffering) {
+    return { kind: 'readying', label: opts.t('playback.hls.almostReady') };
+  }
+  return null;
+}
+
 export function pipelineHeadline(status: PlaybackPipelineStatus | null, t: (k: string) => string): string {
   if (!status) return '';
   if (status.phase === 'error' || status.last_error) {

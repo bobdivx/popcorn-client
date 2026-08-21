@@ -9,6 +9,7 @@ import {
   hasMediaPlaybackStarted,
   isVideoVisiblyPlaying,
   nextBufferingOverlayVisible,
+  canRevealPlayback,
   type TimeRangesLike,
 } from './bufferMetrics';
 
@@ -106,6 +107,19 @@ describe('getEngineBufferAhead', () => {
   });
 });
 
+describe('canRevealPlayback', () => {
+  it('attend un vrai buffer, pas un simple play()', () => {
+    expect(canRevealPlayback({ bufferAheadSec: 3, primedSeconds: 0.4, minBufferSec: 8 })).toBe(
+      false,
+    );
+    expect(canRevealPlayback({ bufferAheadSec: 8, primedSeconds: 0, minBufferSec: 8 })).toBe(true);
+  });
+
+  it('accepte un amorçage assez long si TimeRanges est vide (TV)', () => {
+    expect(canRevealPlayback({ bufferAheadSec: 0, primedSeconds: 8, minBufferSec: 8 })).toBe(true);
+  });
+});
+
 describe('nextBufferingOverlayVisible', () => {
   const loading = { isLoading: true, isWaiting: false, isSeekSettling: false };
   const idle = { isLoading: false, isWaiting: false, isSeekSettling: false };
@@ -115,15 +129,15 @@ describe('nextBufferingOverlayVisible', () => {
     expect(nextBufferingOverlayVisible(true, 4, loading)).toBe(true);
   });
 
-  it('se masque si la lecture a déjà démarré (autoplay derrière la modal)', () => {
+  it('reste visible pendant l’amorçage (play muted, isLoading)', () => {
     expect(
       nextBufferingOverlayVisible(true, 3, { ...loading, isPlaying: true }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it('se masque pendant la lecture même si buffered est vide (webOS)', () => {
+  it('se masque au moment du play réel (buffer prêt, isLoading false)', () => {
     expect(
-      nextBufferingOverlayVisible(true, 0, { ...loading, isPlaying: true }),
+      nextBufferingOverlayVisible(true, 8, { ...idle, isPlaying: true }),
     ).toBe(false);
   });
 

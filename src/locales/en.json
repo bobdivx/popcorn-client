@@ -629,7 +629,11 @@
       "bufferEvents": "buffers",
       "network": "Device network",
       "hlsBandwidth": "Estimated HLS bandwidth",
-      "uhdFallback1080": "4K isn’t starting on this device — switching to 1080p…"
+      "uhdFallback1080": "4K isn’t starting on this device — switching to 1080p…",
+      "warmingUp": "Getting a smooth start ready",
+      "almostReady": "Almost ready",
+      "optimizingPicture": "Optimizing the picture",
+      "smoothingPlayback": "Smoothing playback"
     },
     "streamingFallbackToHls": "Switched to HLS playback due to direct stream issue.",
     "errorStream": "Unable to play video. Check server connection.",

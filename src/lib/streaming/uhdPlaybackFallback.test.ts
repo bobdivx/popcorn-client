@@ -33,15 +33,28 @@ describe('shouldFallbackUhdPlayback', () => {
     expect(shouldFallbackUhdPlayback({ ...base, fatalMediaError: true })).toBe(true);
   });
 
-  it('lecture déjà démarrée : jamais', () => {
+  it('vraie lecture (tête >= 1 s) : jamais', () => {
     expect(
       shouldFallbackUhdPlayback({
         ...base,
         hasStartedPlayback: true,
+        currentTime: 1.2,
         fatalMediaError: true,
         elapsedMs: 90_000,
       }),
     ).toBe(false);
+  });
+
+  it('play() / 1re frame figée : bascule quand même', () => {
+    expect(
+      shouldFallbackUhdPlayback({
+        ...base,
+        hasStartedPlayback: true,
+        currentTime: 0,
+        playlistOrBufferReady: true,
+        elapsedMs: UHD_FALLBACK_AFTER_PLAYLIST_MS,
+      }),
+    ).toBe(true);
   });
 
   it('playlist prête sans playing : après le délai court', () => {

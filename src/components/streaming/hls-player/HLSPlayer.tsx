@@ -467,8 +467,6 @@ export default function HLSPlayer({
     const syncFromElement = () => {
       if (!hasMediaPlaybackStarted(video)) return;
       setMediaVisiblyPlaying(true);
-      setBufferingOverlayVisible(false);
-      onLoadingChange?.(false);
     };
     video.addEventListener('playing', syncFromElement);
     video.addEventListener('play', syncFromElement);
@@ -481,7 +479,7 @@ export default function HLSPlayer({
       video.removeEventListener('timeupdate', syncFromElement);
       window.clearInterval(id);
     };
-  }, [src, infoHash, filePath, hlsLoaded, onLoadingChange]);
+  }, [src, infoHash, filePath, hlsLoaded]);
 
   useEffect(() => {
     const tick = () => {
@@ -517,14 +515,13 @@ export default function HLSPlayer({
         : null;
 
   const displayError = uhdFallbackMessage ? null : error;
-  // Même hystérésis que le PC : overlay jusqu’au play réel ou buffer de démarrage.
   const playbackActive = isPlaying || mediaVisiblyPlaying || playbackStarted;
   const shouldShowBuffering =
     !!uhdFallbackMessage ||
+    (isLoading && !playbackStarted) ||
+    bufferingOverlayVisible ||
     (!playbackActive &&
-      (bufferingOverlayVisible ||
-        isSeekSettling ||
-        (isSeeking && (bufferedPercent < 95 || pendingSeekPosition > 0))));
+      (isSeekSettling || (isSeeking && (bufferedPercent < 95 || pendingSeekPosition > 0))));
   const liveTrace = usePlaybackLiveTrace(
     {
       path: filePath,
@@ -566,6 +563,7 @@ export default function HLSPlayer({
             playlistReadyRef.current || (bufferedPercentRef.current ?? 0) > 0,
           elapsedMs: Date.now() - startedAt,
           fatalMediaError: false,
+          currentTime: videoRef.current?.currentTime ?? 0,
         })
       ) {
         onUhdStartFailed('fatal');
@@ -574,8 +572,9 @@ export default function HLSPlayer({
     return () => window.clearInterval(id);
   }, [infoHash, filePath, maxHeight, onQualityChange, onUhdStartFailed]);
   useEffect(() => {
-    if (isPlaying) setUhdFallbackMessage(null);
-  }, [isPlaying]);
+    const t = videoRef.current?.currentTime ?? currentTime;
+    if (isPlaying && t >= 1) setUhdFallbackMessage(null);
+  }, [isPlaying, currentTime]);
 
   /** En cas d'erreur, garder les contrôles visibles pour permettre d'appuyer sur Retour */
   const effectiveShowControls = showControls || !!displayError;
@@ -651,12 +650,13 @@ export default function HLSPlayer({
             title={torrentName || fileName}
             bufferedPercent={overlayBufferedPercent}
             detailMessage={
-              uhdFallbackMessage ||
-              pipelineHeadline(liveTrace.status, t) ||
-              loadingStatusMessage ||
-              (isLocalLibraryMedia && isLoading
-                ? t('playback.phase.preparingPlayback') || 'Préparation de la lecture…'
-                : undefined)
+              uhdFallbackMessage
+                ? null
+                : pipelineHeadline(liveTrace.status, t) ||
+                  loadingStatusMessage ||
+                  (isLocalLibraryMedia && isLoading
+                    ? t('playback.phase.preparingPlayback') || 'Préparation de la lecture…'
+                    : undefined)
             }
             torrentStats={isLocalLibraryMedia ? null : torrentStats}
             posterUrl={posterUrl}
@@ -666,6 +666,7 @@ export default function HLSPlayer({
             pipelineStatus={liveTrace.status}
             debugLogsUrl={pipelineDebugUrl}
             liveTrace={liveTrace}
+            qualityTransition={!!uhdFallbackMessage}
           />
         )}
         <video
@@ -780,7 +781,11 @@ export default function HLSPlayer({
         </div>
         {isTV && (
           <TvPlayerDock
-            show={showControls && (isPlaying || playbackStarted || mediaVisiblyPlaying)}
+            show={
+              showControls &&
+              !shouldShowBuffering &&
+              (isPlaying || playbackStarted || mediaVisiblyPlaying)
+            }
             isPlaying={isPlaying}
             currentTime={currentTime}
             duration={duration}

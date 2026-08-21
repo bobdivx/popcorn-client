@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { formatBytes, formatSpeed, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
 import { generateQRCode } from '../../../../lib/utils/qrcode';
-import { pipelineHeadline, type PlaybackPipelineStatus } from '../../../../lib/streaming/playbackPipeline';
-import { formatEtaSeconds } from '../../../../lib/streaming/networkPlaybackProfile';
+import { friendlyPlaybackHint, pipelineHeadline, type PlaybackPipelineStatus } from '../../../../lib/streaming/playbackPipeline';
 import { PlaybackLiveTrace } from './PlaybackLiveTrace';
 import type { PlaybackLiveTraceState } from '../hooks/usePlaybackLiveTrace';
 import GpuPlaybackChip from './GpuPlaybackChip';
@@ -89,6 +88,8 @@ export interface PlaybackStatusSurfaceProps {
   pipelineStatus?: PlaybackPipelineStatus | null;
   debugLogsUrl?: string | null;
   liveTrace?: PlaybackLiveTraceState | null;
+  /** Transition qualité (ex. 4K → 1080p) : pastille animée, pas un pavé de texte. */
+  qualityTransition?: boolean;
 }
 
 const STEP_KEYS = ['queue', 'metadata', 'peers', 'download'] as const;
@@ -132,16 +133,32 @@ function pipelineUserDetail(
   phaseLabelText: string,
   t: (k: string, p?: Record<string, string | number>) => string,
 ): string | null {
-  const eta = status?.eta_playable_seconds;
-  if (eta != null && eta > 0) {
-    return t('playback.hls.etaPlayable', { eta: formatEtaSeconds(eta) });
-  }
+  // ETA brute (« Lecture dans 23 s ») → pastille animée, pas ce sous-titre.
   const headline = pipelineHeadline(status, t);
   const fromProgress =
     progressMessage && progressMessage !== phaseLabelText ? progressMessage : null;
   const detail = fromProgress || headline;
   if (!detail || detail === phaseLabelText) return null;
   return detail;
+}
+
+function StatusHintChip({
+  kind,
+  label,
+}: {
+  kind: 'warmup' | 'quality' | 'readying';
+  label: string;
+}) {
+  return (
+    <div
+      className={`playback-status-hint playback-status-hint--${kind}`}
+      role="status"
+      aria-live="polite"
+    >
+      <DsLoader size="xs" className="shrink-0" />
+      <span className="playback-status-hint-label">{label}</span>
+    </div>
+  );
 }
 
 function PipelinePanel({
@@ -370,6 +387,7 @@ export function PlaybackStatusSurface({
   pipelineStatus = null,
   debugLogsUrl = null,
   liveTrace = null,
+  qualityTransition = false,
 }: PlaybackStatusSurfaceProps) {
   const { t } = useI18n();
   const [confirmingCancel, setConfirmingCancel] = useState(false);
@@ -388,7 +406,14 @@ export function PlaybackStatusSurface({
   });
 
   const label = phaseLabel(t, derived.phase) || progressMessage || '';
-  const bufferDetail = pipelineUserDetail(pipelineStatus, progressMessage, label, t);
+  const hint = friendlyPlaybackHint({
+    qualityTransition,
+    etaPlayableSeconds: pipelineStatus?.eta_playable_seconds,
+    isBuffering: isBuffering || derived.phase === 'buffering' || derived.phase === 'preparingPlayback',
+    playlistReady: Boolean(pipelineStatus?.playlist_ready) || (pipelineStatus?.segment_count ?? 0) > 0,
+    t,
+  });
+  const bufferDetail = hint ? null : pipelineUserDetail(pipelineStatus, progressMessage, label, t);
   const na = t('playback.metric.na') || '—';
   const speedLabel =
     derived.downloadSpeed != null && derived.downloadSpeed > 0
@@ -744,7 +769,9 @@ export function PlaybackStatusSurface({
                   }
                 />
 
-                {bufferDetail ? (
+                {hint ? (
+                  <StatusHintChip kind={hint.kind} label={hint.label} />
+                ) : bufferDetail ? (
                   <p className="text-[var(--ds-text-secondary)] text-sm mt-3 mb-1 font-normal break-words px-2 leading-snug max-w-[18rem]">
                     {bufferDetail}
                   </p>

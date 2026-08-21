@@ -14,6 +14,8 @@ export const MIN_BUFFER_AFTER_SEEK_REMOTE_SEC = 4;
 /** Buffer ahead minimum avant le 1er `play()` (≈ 2–3 segments HLS de 4 s). */
 export const MIN_BUFFER_BEFORE_PLAY_SEC = 10;
 export const MIN_BUFFER_BEFORE_PLAY_REMOTE_SEC = 8;
+/** TV / HLS natif : un peu moins si TimeRanges est vide (on se base sur l’amorçage). */
+export const MIN_BUFFER_BEFORE_PLAY_TV_SEC = 8;
 
 /** Hystérésis overlay : masquer seulement au-dessus, réafficher seulement en dessous. */
 export const OVERLAY_HIDE_BUFFER_SEC = 8;
@@ -102,8 +104,23 @@ export function getBufferAheadPercent(
   return Math.max(0, Math.min(100, (aheadSeconds / targetSeconds) * 100));
 }
 
-export function minBufferBeforePlaySec(isRemoteStream: boolean): number {
+export function minBufferBeforePlaySec(isRemoteStream: boolean, isTv = false): number {
+  if (isTv) return MIN_BUFFER_BEFORE_PLAY_TV_SEC;
   return isRemoteStream ? MIN_BUFFER_BEFORE_PLAY_REMOTE_SEC : MIN_BUFFER_BEFORE_PLAY_SEC;
+}
+
+/** Assez de média pour retirer la modal et lancer play() au même instant. */
+export function canRevealPlayback(opts: {
+  bufferAheadSec: number;
+  primedSeconds?: number;
+  minBufferSec: number;
+}): boolean {
+  const min = opts.minBufferSec;
+  if (!Number.isFinite(min) || min <= 0) return false;
+  if ((opts.bufferAheadSec || 0) >= min) return true;
+  // HLS natif webOS : `buffered` reste souvent vide, mais le décodeur a déjà consommé N s.
+  if ((opts.primedSeconds || 0) >= min) return true;
+  return false;
 }
 
 /** webOS : `play` / TimeRanges peuvent manquer alors que l’image avance. */
@@ -153,8 +170,9 @@ export function getEngineBufferAhead(
 }
 
 /**
- * Hystérésis de l’overlay buffering : une seule modal jusqu’au buffer de démarrage,
- * puis réaffichage seulement si le buffer retombe vraiment bas.
+ * Hystérésis de l’overlay buffering : modal tant que le buffer de démarrage n’est
+ * pas prêt. `isLoading` reste true pendant l’amorçage (play muted / pause).
+ * Quand le hook lance play() et passe isLoading à false, la modal part en même temps.
  */
 export function nextBufferingOverlayVisible(
   currentlyVisible: boolean,
@@ -169,12 +187,10 @@ export function nextBufferingOverlayVisible(
   showSec: number = OVERLAY_SHOW_BUFFER_SEC,
 ): boolean {
   if (opts.isSeekSettling) return true;
-  const ahead = Number.isFinite(bufferAheadSec) ? bufferAheadSec : 0;
-  // webOS / HLS natif : `video.buffered` reste souvent vide alors que ça lit.
-  // Masquer dès que le média joue, sans exiger de TimeRanges.
-  if (opts.isPlaying) return false;
   if (opts.isLoading) return true;
+  const ahead = Number.isFinite(bufferAheadSec) ? bufferAheadSec : 0;
   if (ahead >= hideSec) return false;
+  if (opts.isPlaying) return false;
   if (opts.isWaiting && ahead <= showSec) return true;
   return currentlyVisible;
 }

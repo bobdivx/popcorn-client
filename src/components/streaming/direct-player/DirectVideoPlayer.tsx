@@ -422,7 +422,7 @@ export default function DirectVideoPlayer({
         />
         {isTV && (
           <TvPlayerDock
-            show={showControls && (isPlaying || loaded)}
+            show={showControls && !shouldShowBuffering && (isPlaying || loaded)}
             isPlaying={isPlaying}
             currentTime={currentTime}
             duration={duration}
