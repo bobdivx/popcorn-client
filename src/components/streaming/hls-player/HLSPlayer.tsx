@@ -3,6 +3,7 @@ import { useVideoControls } from '../player-shared/hooks/useVideoControls';
 import { useFullscreen, toggleFullscreen } from '../player-shared/hooks/useFullscreen';
 import { PlaybackStatusSurface } from '../player-shared/components/PlaybackStatusSurface';
 import { VideoControls } from '../player-shared/components/VideoControls';
+import { TvPlayerDock } from '../player-shared/components/TvPlayerDock';
 import type { HLSPlayerProps } from './types';
 import { useHlsPlayer } from './hooks/useHlsPlayer';
 import { useTVPlayerNavigation } from '../player-shared/hooks/useTVPlayerNavigation';
@@ -707,7 +708,7 @@ export default function HLSPlayer({
           releaseDate={releaseDate}
           seriesSeasonNum={seriesSeason}
           seriesEpisodeNum={seriesEpisode}
-          showControls={effectiveShowControls}
+          showControls={isTV ? false : effectiveShowControls}
           isPlaying={isPlaying}
           bufferedPercent={bufferedTimelinePercent}
           currentTime={currentTime}
@@ -761,6 +762,17 @@ export default function HLSPlayer({
               : undefined
           }
         />
+        {isTV && (
+          <TvPlayerDock
+            show={isPlaying || playbackStarted || mediaVisiblyPlaying}
+            isPlaying={isPlaying}
+            currentTime={currentTime}
+            duration={duration}
+            onClose={onClose}
+            onPlayPause={handlePlayPause}
+            onSeekToTime={seekToTargetTime}
+          />
+        )}
         <div class="absolute inset-0 z-30 pointer-events-none">
           <SkipIntroOverlay
             onSkip={handleSkipIntro}
