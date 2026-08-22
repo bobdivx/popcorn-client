@@ -23,11 +23,11 @@ Cet audit couvre l'interface utilisateur complète du client Popcorn, une applic
 
 ### Problèmes critiques identifiés
 
-- **P0 (Bloquants)** : 8 problèmes
-- **P1 (Majeurs)** : 14 problèmes
-- **P2 (Mineurs/Améliorations)** : 18 problèmes
+- **P0 (Bloquants)** : 12 problèmes (8 audit code + 4 test live)
+- **P1 (Majeurs)** : 21 problèmes (14 audit code + 7 test live)
+- **P2 (Mineurs/Améliorations)** : 21 problèmes (18 audit code + 3 test live)
 
-**Total : 40 findings**
+**Total : 54 findings** (40 audit code + 14 test live)
 
 ---
 
@@ -736,7 +736,7 @@ Ajouter un bouton toggle "Ordre croissant/décroissant" pour chaque saison.
 
 ## Conclusion
 
-L'application Popcorn Client présente une base solide avec un design system cohérent, une architecture multiplateforme aboutie et une internationalisation complète. Cependant, **8 problèmes P0** compromettent significativement l'expérience utilisateur, notamment autour de la gestion d'erreur, du feedback visuel et de l'accessibilité. Les **14 problèmes P1** et **18 problèmes P2** identifiés, bien que moins critiques, nuisent au polish général et à la compétitivité de l'application.
+L'application Popcorn Client présente une base solide avec un design system cohérent, une architecture multiplateforme aboutie et une internationalisation complète. Cependant, **12 problèmes P0** (dont 4 critiques découverts lors du test live) compromettent significativement l'expérience utilisateur, notamment autour de la gestion d'erreur, du feedback visuel et de l'accessibilité. Les **21 problèmes P1** et **21 problèmes P2** identifiés, bien que moins critiques, nuisent au polish général et à la compétitivité de l'application.
 
 ### Priorités d'action recommandées
 
@@ -769,4 +769,392 @@ L'effort total estimé pour atteindre un niveau de qualité production-ready est
 
 ---
 
-**Fin du rapport**
+## Parcours live (22 août 2026)
+
+**Session de test :** Mode démo sur https://client.popcornn.app  
+**Utilisateur :** `demo@popcorn.local`  
+**Version client :** v1.3.60  
+**Date/heure :** 22 août 2026, ~5h27 UTC
+
+Cette section documente les observations réalisées lors d'un parcours utilisateur complet sur l'application live, complétant l'audit statique du code. Les findings sont classés par sévérité et enrichissent les statistiques globales du rapport.
+
+---
+
+### P0 — Bugs bloquants découverts en live
+
+#### P0-9 : Overlay de chargement ne se démonte jamais (bug critique)
+**Pages affectées :** Toutes (dashboard, films, séries, downloads, settings, search, login, register)
+
+**Problème :**  
+L'overlay global "Chargement… / Préparation de l'application" (`#popcorn-loading-fallback`) reste visible de façon semi-transparente sur toutes les pages après le chargement initial. Il ne se cache jamais, créant un voile permanent sur tout le contenu.
+
+**Code concerné :**
+```astro
+<!-- Layout.astro ligne 243-278 -->
+<div id="popcorn-loading-fallback" class="fixed inset-0 z-[9999] ...">
+  <h1 class="ds-loading-title">Chargement...</h1>
+</div>
+```
+
+Le script de masquage (ligne 346-360) écoute `popcorn-app-ready` et `astro:page-load` mais ne se déclenche visiblement pas correctement.
+
+**Impact :**  
+**Le défaut live le plus dommageable.** Rend l'application quasiment inutilisable :
+- Overlay noir semi-transparent sur tout le contenu
+- Réduit la lisibilité à ~60%
+- Spinner de chargement visible en permanence
+- Donne l'impression que l'app n'a jamais fini de charger
+- Utilisateur pense que l'app est cassée ou en erreur
+
+**Recommandation urgente :**
+1. Vérifier que `window.dispatchEvent(new Event('popcorn-app-ready'))` est bien appelé dans tous les composants racine (Navbar, ServerConnectionCheck)
+2. Ajouter un timeout de sécurité : masquer l'overlay après 5s max si aucun événement reçu
+3. Ajouter des logs de debug pour tracer les événements de montage
+4. Test de régression obligatoire : vérifier que l'overlay disparaît sur toutes les routes
+
+---
+
+#### P0-10 : Hero CTAs pointent vers une recherche cassée
+**Page affectée :** `/dashboard` (hero section)
+
+**Problème :**  
+Les deux boutons d'action primaires du hero (carte "Sintel") :
+- Bouton "Lire" (lecture vidéo)
+- Bouton "Détails" (page de détail)
+
+...naviguent tous deux vers `/search?q=Sintel&type=movie&from=dashboard`, qui retourne **"Aucun résultat"**. Les deux boutons partagent la même destination incorrecte. Aucune lecture ni page de détail ne s'ouvre.
+
+**Flux attendu :**
+- "Lire" → `/player?id=...` ou `/torrents?...` puis player
+- "Détails" → `/torrents?tmdbId=10606&type=movie` (page de détail média)
+
+**Flux actuel :**
+- "Lire" → `/search?q=Sintel&type=movie&from=dashboard` → "Aucun résultat"
+- "Détails" → `/search?q=Sintel&type=movie&from=dashboard` → "Aucun résultat"
+
+**Impact :**  
+Fonction principale de l'app (lecture de contenu) complètement cassée depuis le hero du dashboard. Nouveau visiteur ne peut pas tester la lecture. Le contenu mis en avant n'est pas accessible.
+
+**Recommandation :**
+- Corriger le routage des CTAs hero pour pointer vers les bonnes URLs de détail/playback
+- Vérifier que le contenu hero existe réellement dans la base démo
+- Ajouter un fallback : si le contenu n'existe pas, masquer la carte hero plutôt que d'afficher des liens cassés
+
+---
+
+#### P0-11 : Recherche ne trouve pas le contenu affiché dans les rails
+**Pages affectées :** `/search`, `/dashboard`
+
+**Problème :**  
+Le dashboard affiche des rails de contenu (ex: carte "Sintel" dans le hero, "Films populaires"). Mais une recherche pour "Sintel" dans `/search` retourne **"Aucun résultat"**. Le contenu visible dans l'UI n'est pas indexé dans la recherche.
+
+**Test réalisé :**
+1. Dashboard affiche "Sintel" en hero
+2. Clic sur Search dans la navbar
+3. Recherche "Sintel"
+4. Résultat : "Aucun résultat pour Sintel"
+
+**Impact :**  
+Incohérence majeure : l'utilisateur voit du contenu mais ne peut pas le retrouver via la recherche. Donne l'impression que la recherche est cassée ou que le contenu n'existe pas vraiment.
+
+**Recommandation :**
+- Vérifier que le backend démo indexe bien les mêmes titres que ceux affichés dans les rails
+- Ajouter un endpoint `/search/validate` pour tester la cohérence catalogue/search
+- En démo, pré-remplir la search avec des exemples garantis de retourner des résultats
+
+---
+
+#### P0-12 : Page Settings complètement vide (body absent)
+**Page affectée :** `/settings`
+
+**Problème :**  
+La page `/settings` s'affiche avec uniquement le heading de la page, mais le body est complètement vide. La sidebar de navigation n'affiche qu'un seul item : "Vue d'ensemble". Toutes les autres sections de settings sont inaccessibles depuis l'interface.
+
+**Observation :**
+- `/settings` → page vide
+- Sidebar → seul "Vue d'ensemble" visible
+- Impossible d'accéder à Server, Account, Indexers, etc. depuis l'UI
+- Les URLs directes comme `/settings/server` fonctionnent si on les devine
+
+**Impact :**  
+Settings inaccessible via navigation normale. Utilisateur ne peut pas configurer l'app (serveur, compte, indexeurs, etc.) sans deviner les URLs. Bloque toute configuration initiale.
+
+**Recommandation :**
+- Vérifier le rendu du composant `SettingsContent` : pourquoi le body est vide ?
+- Vérifier que la liste des sections settings est bien chargée/affichée dans la sidebar
+- Ajouter un état de fallback : si aucune section n'est chargée, afficher un message d'erreur explicite
+- Test de régression : `/settings` doit afficher au minimum 5-6 items dans la sidebar
+
+---
+
+### P1 — Problèmes majeurs découverts en live
+
+#### P1-15 : Top-nav chevauche badge démo et pill serveur (1024-1280px)
+**Pages affectées :** Toutes les pages authentifiées
+
+**Problème :**  
+Entre 1024px et 1280px de largeur d'écran, les items de navigation top (Films, Séries, Demandes) chevauchent visuellement le badge orange "Quitter le mode démo" et la pill de statut "Serveur". Le texte du badge devient "Dema…de démo" (tronqué).
+
+**Observation visuelle :**
+```
+[Logo] [Films] [Séries] [Quitt...démo] [Serveur ●] [Search] [Avatar]
+              └──────── overlap ────────┘
+```
+
+**Impact :**  
+Navbar illisible sur les écrans laptop typiques (1024-1366px). Badge démo partiellement masqué. Utilisateur ne voit pas clairement qu'il est en mode démo.
+
+**Recommandation :**
+- Réduire le padding des tabs de navigation ou passer au hamburger dès 1024px au lieu de 1280px
+- Réduire la taille du texte du badge démo (text-sm → text-xs)
+- Tester sur MacBook Air 13" (1440x900) et Surface Go (1536x1024)
+
+---
+
+#### P1-16 : Images posters ne chargent jamais (rectangles navy vides)
+**Pages affectées :** `/dashboard`, `/films`, `/series`, `/demandes`, `/search`
+
+**Problème :**  
+Aucune image poster ne charge sur l'ensemble de l'application. Toutes les cartes de contenu affichent des rectangles navy/bleu foncé vides à la place des posters. La page `/demandes` utilise des placeholders génériques (icône film). Aucune image de fond de carte (backdrop) ne charge non plus.
+
+**Observation :**
+- Cartes dashboard hero : rectangle vide navy
+- Rails "Films populaires" : rectangles vides
+- Résultats de recherche : rectangles vides
+- Pas de spinner de chargement ni d'indication que l'image est en cours de fetch
+- Pas de fallback alt text visible
+
+**Impact :**  
+Expérience visuelle catastrophique. Impossible de distinguer visuellement les contenus. Application ressemble à une maquette wireframe non finie. Impact majeur sur l'engagement utilisateur (attractivité zéro).
+
+**Hypothèses :**
+- Backend démo ne sert pas les URLs d'images TMDB
+- CORS bloque les images TMDB (headers manquants)
+- URLs d'images malformées ou chemins incorrects
+- Aucun système de fallback vers placeholder SVG
+
+**Recommandation :**
+1. Vérifier que le backend démo retourne bien des URLs d'images valides (TMDB cdn)
+2. Ajouter un système de fallback : si l'image ne charge pas après 5s, afficher un SVG placeholder avec le titre du média
+3. Afficher un spinner subtil pendant le chargement initial
+4. Ajouter `alt={title}` sur toutes les images pour accessibilité
+5. Considérer un proxy backend pour les images TMDB si CORS pose problème
+
+---
+
+#### P1-17 : Modale "Ajouter magnet link" accepte submit vide sans validation
+**Page affectée :** `/downloads` (bouton "Ajouter magnet link")
+
+**Problème :**  
+La modale de saisie de lien magnet permet de cliquer sur "Ajouter" avec un champ vide. La modale se ferme silencieusement sans message d'erreur ni validation. Aucun feedback que l'action a échoué.
+
+**Flux observé :**
+1. Clic "Ajouter magnet link"
+2. Modale s'ouvre (champ vide)
+3. Clic direct sur "Ajouter"
+4. Modale se ferme instantanément
+5. Aucun toast, aucune erreur affichée
+
+**Impact :**  
+Utilisateur confus : est-ce que le lien a été ajouté ? L'action a-t-elle fonctionné ? Violation des principes de validation formulaire (P0-8).
+
+**Recommandation :**
+- Ajouter validation regex du format magnet: `magnet:?xt=urn:btih:[a-fA-F0-9]{40}`
+- Désactiver le bouton "Ajouter" tant que le champ est vide ou invalide
+- Afficher une erreur inline : "Lien magnet invalide"
+- Toast de confirmation après ajout réussi
+
+---
+
+#### P1-18 : Touche Escape dans modale Logs Session navigue vers /demandes
+**Page affectée :** `/settings/librqbit` (modale "Logs Session")
+
+**Problème :**  
+Lors de l'ouverture de la modale "Logs Session" depuis `/settings/librqbit`, appuyer sur Escape ferme la modale **et** navigue vers `/demandes` au lieu de simplement fermer la modale. Hotkey leak : Escape est intercepté par un autre composant.
+
+**Impact :**  
+Navigation inattendue. Utilisateur perd son contexte (quitte les settings). Confirme le finding P0-4 (focus trap manquant) : Escape n'est pas capturé correctement par la modale.
+
+**Recommandation :**
+- Implémenter un focus trap complet dans toutes les modales
+- Stopper la propagation de l'événement Escape dans le handler de fermeture modale
+- `e.stopPropagation()` + `e.preventDefault()` dans le `onKeyDown` de la modale
+
+---
+
+#### P1-19 : Langue client français uniquement, pas de switcher in-app
+**Pages affectées :** Toutes
+
+**Problème :**  
+L'application est entièrement en français sans possibilité de changer la langue depuis l'interface. Le site marketing `popcornn.app` sert du contenu anglais sur mobile UA, créant une incohérence. De plus, plusieurs tokens i18n restent en anglais dans le client :
+- "Ajouter magnet link" (bouton downloads)
+- "Logs Session" (modale librqbit)
+- "Register" (titre page inscription)
+
+**Observation :**
+- Navbar : pas de sélecteur de langue visible (uniquement pour invités sur login)
+- Une fois authentifié, impossible de changer de langue
+- Settings → pas de section "Langue" ou "Préférences d'interface"
+
+**Impact :**  
+Utilisateurs anglophones ne peuvent pas utiliser l'app confortablement. Incohérence avec le site marketing (FR/EN mixé). Tokens EN résiduels cassent l'expérience francophone.
+
+**Recommandation :**
+- Ajouter un sélecteur de langue dans Settings → UI Preferences
+- Afficher un mini-sélecteur (FR/EN) dans le footer ou la navbar user menu
+- Traduire tous les tokens EN restants : audit complet des fichiers `fr.json` et `en.json`
+- Harmoniser la langue entre `popcornn.app` (site) et `client.popcornn.app` (app)
+
+---
+
+#### P1-20 : Titres de page incohérents (branding confus)
+**Pages affectées :** Multiples
+
+**Problème :**  
+Les titres de pages (`<title>`) utilisent un branding incohérent :
+- Dashboard, Films, Séries : "Popcorn Client"
+- Login, Register : "Popcorn Vercel" (fuite du nom d'hébergement)
+- 404 : "Popcornn" (marque finale)
+
+**Observation :**
+```html
+<!-- /dashboard -->
+<title>Tableau de bord - Popcorn Client</title>
+
+<!-- /login -->
+<title>Connexion - Popcorn Vercel</title>
+
+<!-- /404 -->
+<title>404 - Page non trouvée - Popcornn</title>
+```
+
+**Impact :**  
+Confusion sur le nom de la marque. "Popcorn Vercel" révèle l'infrastructure d'hébergement (peu professionnel). Incohérence des onglets navigateur.
+
+**Recommandation :**
+- Standardiser tous les titres sur "Popcornn" (marque finale)
+- Pattern : `{Page Title} - Popcornn`
+- Remplacer "Popcorn Client" et "Popcorn Vercel" partout
+- Fichier à modifier : `src/layouts/Layout.astro` prop `title`
+
+---
+
+#### P1-21 : Arbre d'accessibilité retourne 0 références interactives
+**Pages affectées :** Toutes
+
+**Problème :**  
+Lors de l'inspection avec les DevTools d'accessibilité, l'arbre d'accessibilité (Accessibility Tree) du client retourne 0 références d'éléments interactifs sur les pages testées. Cela indique une sur-utilisation d'éléments custom/non-sémantiques (`<div>`, `<span>` avec handlers onClick) au lieu d'éléments natifs (`<button>`, `<a>`, `<input>`).
+
+**Impact :**  
+Lecteurs d'écran ne peuvent pas identifier les éléments interactifs. Navigation vocale impossible. Violation WCAG niveau A (le plus basique). Application complètement inaccessible aux utilisateurs non-voyants ou malvoyants.
+
+**Recommandation urgente :**
+1. Audit complet avec NVDA/JAWS/VoiceOver pour identifier tous les éléments non accessibles
+2. Remplacer tous les `<div onClick>` par des `<button>`
+3. Assurer que tous les liens ont `href` et sont des `<a>` vrais
+4. Ajouter `role`, `aria-label`, `aria-labelledby` sur les composants custom
+5. Test automatisé : ajouter axe-core ou Pa11y dans le pipeline CI pour détecter les violations
+
+---
+
+### P2 — Améliorations suggérées (découvertes live)
+
+#### P2-19 : Contraste gris-sur-noir insuffisant (sous-titres/métadonnées)
+**Pages affectées :** Toutes les cartes de contenu
+
+**Problème :**  
+Les textes secondaires (année, durée, sous-titres de cartes) utilisent un gris très clair sur fond presque noir, créant un ratio de contraste faible (~3:1). Difficile à lire, surtout sur écrans bas de gamme ou en lumière ambiante.
+
+**Recommandation :**  
+Augmenter le contraste des textes secondaires à 4.5:1 minimum (WCAG AA). Utiliser `--ds-text-secondary` avec une opacité de 0.75 au lieu de 0.65.
+
+---
+
+#### P2-20 : Boutons icône header sans tooltips (~40px)
+**Pages affectées :** Navbar, headers de pages
+
+**Problème :**  
+Les boutons icône only (Search, Downloads, Settings) font ~40px de côté sans aucun tooltip au survol. Utilisateur desktop ne sait pas quelle action le bouton déclenche avant de cliquer.
+
+**Recommandation :**  
+Ajouter `title="Recherche"` sur tous les boutons icône pour afficher un tooltip natif. Alternative : implémenter un système de tooltip custom design-system.
+
+---
+
+#### P2-21 : Drawer mobile translucide superposé au hero
+**Pages affectées :** Mobile (navbar hamburger)
+
+**Problème :**  
+Le menu hamburger mobile s'affiche avec un fond semi-transparent, laissant voir le contenu hero en dessous. Lisibilité réduite, notamment si le hero a des couleurs vives.
+
+**Recommandation :**  
+Ajouter un backdrop opaque noir/85% derrière le drawer mobile pour masquer le contenu de la page.
+
+---
+
+### Observations supplémentaires (non classées en findings)
+
+#### Wizard d'onboarding (profil non authentifié)
+**Observation positive :**  
+L'application affiche un wizard d'onboarding en 9 étapes pour les nouveaux utilisateurs non authentifiés :
+1. Connexion (login ou Quick Connect)
+2. Configuration serveur
+3. Choix de langue
+4. Bienvenue
+5. Configuration indexeurs
+6. Configuration TMDB
+7. Dossiers de téléchargement
+8. Synchronisation
+9. Terminé
+
+**Features observées :**
+- QR code pour pairing mobile
+- Code à 6 caractères pour connexion rapide
+- UX guidée pas à pas (bon point)
+
+**Recommandation :**  
+Conserver ce flow, mais s'assurer qu'il fonctionne correctement avec un vrai backend (pas testé en profondeur en démo).
+
+---
+
+#### Page /history retourne une 404 stylée
+La route `/history` retourne la page 404 custom avec animations (bon point : pas d'erreur serveur brute). Indiquer que cette feature est en développement.
+
+---
+
+#### Pas d'erreur 5xx observée
+Aucune erreur serveur 500/502/503 observée durant le test. Stabilité apparente de l'API démo (bon point).
+
+---
+
+#### Fonctionnalités non testables en démo
+Les fonctionnalités suivantes n'ont pas pu être testées en profondeur faute d'un backend complet avec compte réel :
+- Lecture vidéo (player HLS)
+- Téléchargement de torrents
+- Configuration indexeurs fonctionnelle
+- Synchronisation cloud
+- Gestion bibliothèque approfondie
+
+**Note :** Ces flows nécessitent un audit dédié avec un environnement de test complet.
+
+---
+
+### Synthèse du parcours live
+
+Le test live révèle **4 bugs P0 critiques** non détectables par audit statique du code :
+1. Overlay de chargement permanent (le plus grave)
+2. Hero CTAs cassées (recherche au lieu de playback/détail)
+3. Recherche incohérente avec le contenu affiché
+4. Page Settings vide et inaccessible
+
+Ces bugs rendent l'application **quasiment inutilisable** pour un nouveau visiteur :
+- Impossible de regarder du contenu (hero cassé)
+- Impossible de rechercher du contenu (search vide)
+- Impossible de configurer l'app (settings vide)
+- Impossible de lire l'interface (overlay permanent)
+
+**Priorité absolue :** Corriger ces 4 P0 live avant toute autre intervention. Sans ces corrections, l'application ne peut pas être déployée en production ni présentée à des utilisateurs finaux.
+
+---
+
+**Fin du parcours live**
