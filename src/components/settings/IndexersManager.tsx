@@ -888,6 +888,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
                     onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })}
                     required={effectiveDef?.requiresApiKey ?? false}
                     placeholder={field.placeholder || (effectiveDef?.requiresApiKey ? t('indexersManager.required') : t('indexersManager.optional'))}
+                    autoComplete="new-password"
                   />
                 </div>
               );
@@ -987,6 +988,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
               value={formData.apiKey}
               onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })}
               placeholder={t('indexersManager.optional')}
+              autoComplete="new-password"
             />
           </div>
             </>
