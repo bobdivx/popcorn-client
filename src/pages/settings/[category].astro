@@ -3,7 +3,7 @@ import SettingsLayout from '../../layouts/SettingsLayout.astro';
 import SettingsContent from '../../components/settings/SettingsContent';
 
 export function getStaticPaths() {
-  const validCategories = ['maintenance', 'playback', 'content', 'downloads', 'library', 'discovery'];
+  const validCategories = ['system', 'interface', 'maintenance', 'playback', 'content', 'downloads', 'library', 'discovery', 'account'];
   return validCategories.map((category) => ({ params: { category } }));
 }
 

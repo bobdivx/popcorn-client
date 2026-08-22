@@ -39,15 +39,12 @@ function mockContentItem(overrides: Partial<ContentItem> & { id: string; title: 
 }
 
 // Torrents gratuits WebTorrent (https://webtorrent.io/free-torrents) — Public Domain / Creative Commons
-// Affiches : Wikimedia Commons (CC BY 3.0 Blender Foundation)
+// Affiches : placeholder générique (évite les hotlink 400 de Wikimedia)
 const WEBTORRENT_POSTERS = {
-  bigBuckBunny:
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/300px-Big_buck_bunny_poster_big.jpg',
-  sintel: 'https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Sintel_poster.jpg/300px-Sintel_poster.jpg',
-  tearsOfSteel:
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/2/20/Tears_of_Steel_poster.jpg/300px-Tears_of_Steel_poster.jpg',
-  cosmosLaundromat:
-    'https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Blu-Ray_of_Cosmos_Laundromat_-_Blender.jpg/300px-Blu-Ray_of_Cosmos_Laundromat_-_Blender.jpg',
+  bigBuckBunny: '/media-generic.svg',
+  sintel: '/media-generic.svg',
+  tearsOfSteel: '/media-generic.svg',
+  cosmosLaundromat: '/media-generic.svg',
 } as const;
 
 /** Base URL du site popcorn-web (pour le média démo : Big Buck Bunny hébergé dans public/media). */
@@ -73,7 +70,7 @@ const MOCK_HERO: ContentItem = mockContentItem({
     "Court métrage d'animation open source (Blender Foundation, 2008). Un lapin géant se venge des bullies qui harcèlent les petits animaux. Domaine public.",
   rating: 7.5,
   releaseDate: '2008-04-10',
-  tmdbId: 0,
+  tmdbId: null,
   seeds: 100,
   peers: 50,
   quality: '1080p',
@@ -141,30 +138,17 @@ const MOCK_MOVIES: ContentItem[] = [
 
 const MOCK_SERIES: ContentItem[] = [
   mockContentItem({
-    id: 'sintel',
-    title: 'Sintel',
+    id: 'cosmos-laundromat',
+    title: 'Cosmos Laundromat',
     type: 'tv',
-    poster: WEBTORRENT_POSTERS.sintel,
-    backdrop: WEBTORRENT_POSTERS.sintel,
-    overview: "Court métrage Blender Foundation (2010). CC BY — WebTorrent.",
-    rating: 8.0,
-    releaseDate: '2010-09-27',
+    poster: WEBTORRENT_POSTERS.cosmosLaundromat,
+    backdrop: WEBTORRENT_POSTERS.cosmosLaundromat,
+    overview: "Court métrage Blender Institute (2015). CC BY — WebTorrent.",
+    rating: 7.8,
+    releaseDate: '2015-08-10',
     quality: '1080p',
-    seeds: 80,
-    peers: 20,
-  }),
-  mockContentItem({
-    id: 'tears-of-steel',
-    title: 'Tears of Steel',
-    type: 'tv',
-    poster: WEBTORRENT_POSTERS.tearsOfSteel,
-    backdrop: WEBTORRENT_POSTERS.tearsOfSteel,
-    overview: "Court métrage Blender Foundation (2012). CC BY — WebTorrent.",
-    rating: 7.2,
-    releaseDate: '2012-09-26',
-    quality: '1080p',
-    seeds: 60,
-    peers: 15,
+    seeds: 45,
+    peers: 10,
   }),
 ];
 
