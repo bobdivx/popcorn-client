@@ -178,7 +178,7 @@ export function Modal({
       }}
     >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+      <div className="absolute inset-0 z-0 bg-black/80 backdrop-blur-md" />
 
       {/* Modal : style glass (C411) avec bordure violette + barre gradient */}
       <div
