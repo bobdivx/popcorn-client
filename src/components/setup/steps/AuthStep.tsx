@@ -396,6 +396,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                   <input
                     class="wizard-input auth-step-tv__input"
                     type="password"
+                    autoComplete="current-password"
                     placeholder={t('wizard.auth.passwordPlaceholder')}
                     value={loginPassword}
                     onInput={(e) => setLoginPassword((e.target as HTMLInputElement).value)}
@@ -455,6 +456,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                   <input
                     class="wizard-input auth-step-tv__input"
                     type="password"
+                    autoComplete="new-password"
                     placeholder={t('wizard.auth.passwordMinLengthHint')}
                     value={registerPassword}
                     onInput={(e) => setRegisterPassword((e.target as HTMLInputElement).value)}
@@ -468,6 +470,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                   <input
                     class="wizard-input auth-step-tv__input"
                     type="password"
+                    autoComplete="new-password"
                     placeholder={t('wizard.auth.confirmPasswordPlaceholder')}
                     value={registerConfirmPassword}
                     onInput={(e) => setRegisterConfirmPassword((e.target as HTMLInputElement).value)}
@@ -815,6 +818,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                     <input
                       class="wizard-input"
                       type="password"
+                      autoComplete="current-password"
                       placeholder={t('wizard.auth.passwordPlaceholder')}
                       value={loginPassword}
                       onInput={(e) => setLoginPassword((e.target as HTMLInputElement).value)}
@@ -914,6 +918,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                   <input
                     class="wizard-input"
                     type="password"
+                    autoComplete="new-password"
                     placeholder={t('wizard.auth.passwordMinLengthHint')}
                     value={registerPassword}
                     onInput={(e) => setRegisterPassword((e.target as HTMLInputElement).value)}
@@ -927,6 +932,7 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
                   <input
                     class="wizard-input"
                     type="password"
+                    autoComplete="new-password"
                     placeholder={t('wizard.auth.confirmPasswordPlaceholder')}
                     value={registerConfirmPassword}
                     onInput={(e) => setRegisterConfirmPassword((e.target as HTMLInputElement).value)}
