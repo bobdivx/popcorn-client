@@ -2020,18 +2020,24 @@ html {
 }
 
 /* Tuiles browse : pas de scale TV au focus clavier / paysage.
-   Le hover souris (léger scale) reste autorisé hors expanded. */
+   Le hover souris (léger scale) reste autorisé hors expanded.
+   Anneau via box-shadow inset : outline est clipé par overflow-x du carrousel. */
 [data-browse-tile].tv-card-focused,
 [data-browse-tile] .tv-card-focused,
 [data-browse-tile][data-torrent-card].tv-card-focused,
 [data-browse-tile][data-focusable-card].tv-card-focused,
 [data-browse-slot] .tv-card-focused,
+[data-browse-slot]:focus-within [data-torrent-card],
+[data-browse-slot]:focus-within [data-focusable-card],
 [data-browse-slot][data-preview-expanded='true'] [data-torrent-card],
-[data-browse-slot][data-preview-expanded='true'] {
+[data-browse-slot][data-preview-expanded='true'] [data-focusable-card] {
   transform: none !important;
   animation: none !important;
   overflow: hidden !important;
   contain: none !important;
+  outline: none !important;
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.92) !important;
+  z-index: 2 !important;
 }
 [data-browse-slot][data-preview-expanded='true'] {
   z-index: 2 !important;
