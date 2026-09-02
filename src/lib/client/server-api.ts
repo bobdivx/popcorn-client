@@ -400,9 +400,36 @@ interface IServerApiClientPublic {
   getDashboardDataPhase2(
     language?: string,
     options?: object & { popularMovieIds?: string[]; popularSeriesIds?: string[] }
-  ): Promise<ApiResponse<{ recentAdditions: ContentItem[]; fastTorrents: ContentItem[] }>>;
+  ): Promise<
+    ApiResponse<{
+      recentAdditions: ContentItem[];
+      recentMovies: ContentItem[];
+      recentSeries: ContentItem[];
+      freshMovies: ContentItem[];
+      freshSeries: ContentItem[];
+      fastTorrents: ContentItem[];
+    }>
+  >;
   getFilmsData(): Promise<ApiResponse<FilmData[]>>;
   getSeriesData(): Promise<ApiResponse<SeriesData[]>>;
+  getFilmsDataPaginated(
+    page?: number,
+    limit?: number,
+    language?: string,
+    sort?: 'popular' | 'recent' | 'release_date',
+    minSeeds?: number,
+    mediaLanguages?: string[],
+    minQuality?: string
+  ): Promise<ApiResponse<FilmData[]>>;
+  getSeriesDataPaginated(
+    page?: number,
+    limit?: number,
+    language?: string,
+    sort?: 'popular' | 'recent' | 'release_date',
+    minSeeds?: number,
+    mediaLanguages?: string[],
+    minQuality?: string
+  ): Promise<ApiResponse<SeriesData[]>>;
 
   // Local Users methods
   createLocalUser(request: { cloud_account_id: string; email: string; password_hash: string; display_name?: string }): Promise<ApiResponse<{ id: string; cloud_account_id: string; email: string; display_name: string | null; is_active: boolean; email_verified: boolean; created_at: number; updated_at: number }>>;

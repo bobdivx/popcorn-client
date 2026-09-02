@@ -133,14 +133,13 @@ export default function Navbar() {
     return onProfileChanged(() => setProfile(getLocalProfile()));
   }, []);
 
-  // Breakpoint CSS déterministe : hamburger sous lg (1024px), onglets inline au-dessus
-  // Aucune mesure de débordement JS → pas de flash, pas de chevauchement possible
+  // Breakpoint : hamburger sous xl (1280px). Entre lg et xl, logo+badges+4 onglets+actions débordent.
   useEffect(() => {
     if (!user) {
       setUseHamburger(false);
       return;
     }
-    const mq = window.matchMedia('(max-width: 1023px)');
+    const mq = window.matchMedia('(max-width: 1279px)');
     const update = () => setUseHamburger(mq.matches);
     update();
     mq.addEventListener('change', update);
@@ -218,13 +217,13 @@ export default function Navbar() {
       }}
     >
         <div className="w-full px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 tv:px-20">
-        <div className="flex items-center h-14 sm:h-16 lg:h-18 tv:h-20 gap-3 sm:gap-4 lg:gap-6 tv:gap-8">
+        <div className="flex items-center h-14 sm:h-16 lg:h-18 tv:h-20 gap-2 sm:gap-3 lg:gap-4 xl:gap-6 tv:gap-8 min-w-0">
 
-          {/* ── GAUCHE : Marque + statut serveur/GPU ── */}
-          <div className="flex-shrink-0 flex items-center gap-3 lg:gap-4">
+          {/* ── GAUCHE : Marque + statut (statut seulement xl+) ── */}
+          <div className="flex-shrink-0 flex items-center gap-2 sm:gap-3 xl:gap-4 max-w-[42%] sm:max-w-none">
             <a
               href={user ? '/dashboard' : '/'}
-              className="flex items-center gap-2 sm:gap-3 group rounded-xl py-1 pr-1 focus:outline-none focus:ring-4 focus:ring-[var(--ds-accent-violet)]/50 focus:ring-offset-2 focus:ring-offset-[var(--page-bg)] transition-opacity duration-200 hover:opacity-90"
+              className="flex items-center gap-2 sm:gap-3 group rounded-xl py-1 pr-1 focus:outline-none focus:ring-4 focus:ring-[var(--ds-accent-violet)]/50 focus:ring-offset-2 focus:ring-offset-[var(--page-bg)] transition-opacity duration-200 hover:opacity-90 min-w-0"
               tabIndex={isTvNav ? -1 : 0}
               data-focusable={isTvNav ? undefined : true}
               data-tv-nav-skip={isTvNav ? true : undefined}
@@ -233,16 +232,16 @@ export default function Navbar() {
               <img
                 src="/popcorn_logo.png"
                 alt="Popcornn"
-                className="w-8 h-8 sm:w-9 sm:h-9 lg:w-11 lg:h-11 tv:w-12 tv:h-12 object-contain transition-transform duration-300 group-hover:scale-110 group-hover:drop-shadow-[0_0_10px_rgba(168,85,247,0.8)]"
+                className="w-8 h-8 sm:w-9 sm:h-9 lg:w-11 lg:h-11 tv:w-12 tv:h-12 object-contain flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:drop-shadow-[0_0_10px_rgba(168,85,247,0.8)]"
                 loading="eager"
               />
-              <span className="hidden sm:block font-extrabold text-white text-xl lg:text-2xl tv:text-3xl leading-none tracking-tight select-none">
+              <span className="hidden md:block font-extrabold text-white text-xl lg:text-2xl tv:text-3xl leading-none tracking-tight select-none truncate">
                 Popcornn
               </span>
             </a>
             {user ? (
               <div
-                className="hidden lg:flex items-center rounded-full nav-status-cluster"
+                className="hidden xl:flex items-center rounded-full nav-status-cluster flex-shrink-0"
                 aria-label={t('backend.statusCluster')}
               >
                 <BackendStatusBadge variant="quiet" menuAlign="left" />
@@ -251,11 +250,11 @@ export default function Navbar() {
             ) : null}
           </div>
 
-          {/* ── CENTRE : Navigation ── */}
-          <div className="flex-1 min-w-0 flex items-center justify-center">
+          {/* ── CENTRE : Navigation (ne doit jamais chevaucher gauche/droite) ── */}
+          <div className="flex-1 min-w-0 flex items-center justify-center overflow-hidden">
             {user && !useHamburger && (
-              <div className="nav-tabs-container" style={{ overflow: 'visible' }}>
-                <div className="flex items-center gap-1 lg:gap-2 tv:gap-3 nav-tabs-wrapper">
+              <div className="nav-tabs-container max-w-full min-w-0">
+                <div className="flex items-center justify-center gap-0.5 xl:gap-2 tv:gap-3 nav-tabs-wrapper max-w-full">
                   {tabs.map((tab) => {
                     const active = tab.match === 'exact' ? isActive(tab.href) : isActivePrefix(tab.href);
                     const TabIcon = tab.icon;
@@ -268,7 +267,9 @@ export default function Navbar() {
                         data-focusable
                         aria-current={active ? 'page' : undefined}
                       >
-                        {TabIcon && <TabIcon className="w-4 h-4 tv:w-5 tv:h-5 flex-shrink-0" />}
+                        {TabIcon && (
+                          <TabIcon className="hidden xl:block w-4 h-4 tv:w-5 tv:h-5 flex-shrink-0" />
+                        )}
                         <span>{tab.label}</span>
                       </a>
                     );
@@ -277,7 +278,7 @@ export default function Navbar() {
               </div>
             )}
 
-            {/* Dropdown hamburger — affiché sous lg (1024px) */}
+            {/* Dropdown hamburger — affiché sous xl (1280px) */}
             {user && useHamburger && mobileMenuOpen && (
               <div className="absolute top-full left-0 right-0 z-[210] dropdown-menu-mobile animate-slide-down mt-1 mx-3 sm:mx-4 rounded-xl">
                 <div className="px-2 py-3 space-y-1">
@@ -381,8 +382,8 @@ export default function Navbar() {
           </div>
 
           {/* ── DROITE : Actions ── */}
-          {/* Règle : Search toujours visible · Downloads/Status/Settings/Avatar/Clock → lg+ seulement · Hamburger → < lg */}
-          <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-3 tv:gap-4 flex-shrink-0">
+          {/* Search toujours · Downloads/Settings/Avatar → xl+ quand onglets inline · Hamburger → < xl */}
+          <div className="flex items-center gap-1 sm:gap-1.5 xl:gap-3 tv:gap-4 flex-shrink-0">
             {/* Mode démo */}
             {demoMode && (
               <button
@@ -391,8 +392,8 @@ export default function Navbar() {
                 className="flex-shrink-0 px-2 py-1.5 rounded-lg text-xs font-medium bg-amber-600/90 text-white hover:bg-amber-500 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-gray-900 whitespace-nowrap"
                 title={t('demo.exitDemo')}
               >
-                <span className="hidden lg:inline">{t('demo.exitDemo')}</span>
-                <span className="lg:hidden">Démo</span>
+                <span className="hidden xl:inline">{t('demo.exitDemo')}</span>
+                <span className="xl:hidden">Démo</span>
               </button>
             )}
 
@@ -409,10 +410,10 @@ export default function Navbar() {
                   <SearchIcon className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 relative z-10" />
                 </a>
 
-                {/* Téléchargements — lg+ uniquement (dans hamburger sinon) */}
+                {/* Téléchargements — xl+ (dans hamburger sinon) */}
                 <a
                   href="/downloads"
-                  className={`hidden lg:inline-flex gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative items-center justify-center transition-all duration-200 hover:scale-110 ${isActivePrefix('/downloads') ? 'bg-glass-active' : ''}`}
+                  className={`hidden xl:inline-flex gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative items-center justify-center transition-all duration-200 hover:scale-110 ${isActivePrefix('/downloads') ? 'bg-glass-active' : ''}`}
                   aria-label={t('nav.downloads')}
                   tabIndex={0}
                   data-focusable
@@ -422,7 +423,7 @@ export default function Navbar() {
 
                 <ThemeToggle />
 
-                {/* Paramètres (lg+) ou hamburger (< lg) */}
+                {/* Paramètres (xl+) ou hamburger (< xl) */}
                 {useHamburger ? (
                   <button
                     type="button"
@@ -462,15 +463,15 @@ export default function Navbar() {
                   </a>
                 )}
 
-                {/* Avatar — lg+ uniquement (dans hamburger sinon) ; pastille notif partage si besoin */}
+                {/* Avatar — xl+ (dans hamburger sinon) */}
                 <ConnectivityWarning
-                  className="hidden lg:inline-flex flex-shrink-0"
+                  className="hidden xl:inline-flex flex-shrink-0"
                   accountHref="/settings/account"
                   accountLabel={t('nav.account')}
                 >
                   <a
                     href="/settings/account"
-                    className="nav-avatar-btn rounded-full overflow-hidden transition-all duration-200 hover:scale-105 hover:ring-2 hover:ring-primary-500/70 hover:ring-offset-1 hover:ring-offset-[var(--ds-surface-elevated)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-accent-violet)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-surface-elevated)] active:scale-95 w-10 h-10 lg:w-11 lg:h-11 tv:w-12 tv:h-12 block"
+                    className="nav-avatar-btn rounded-full overflow-hidden transition-all duration-200 hover:scale-105 hover:ring-2 hover:ring-primary-500/70 hover:ring-offset-1 hover:ring-offset-[var(--ds-surface-elevated)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ds-accent-violet)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--ds-surface-elevated)] active:scale-95 w-10 h-10 xl:w-11 xl:h-11 tv:w-12 tv:h-12 block"
                     tabIndex={0}
                     data-focusable
                     aria-label={t('nav.account')}
@@ -485,8 +486,8 @@ export default function Navbar() {
                   </a>
                 </ConnectivityWarning>
 
-                {/* Horloge — lg+ */}
-                <div className="hidden lg:flex items-center pl-1 tv:pl-3">
+                {/* Horloge — xl+ */}
+                <div className="hidden xl:flex items-center pl-1 tv:pl-3">
                   <span className="text-white/80 font-semibold text-sm tv:text-xl tabular-nums tracking-tight">
                     {clock}
                   </span>

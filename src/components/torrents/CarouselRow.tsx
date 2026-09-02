@@ -1,4 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from 'preact/hooks';
+import { toChildArray } from 'preact';
 import { isTVPlatform } from '../../lib/utils/device-detection';
 
 interface CarouselRowProps {
@@ -67,60 +68,40 @@ export default function CarouselRow({
     return () => clearInterval(id);
   }, [autoScroll, autoScrollInterval, isTV, isCoarsePointer]);
 
-  // Animation au scroll avec Intersection Observer — sur TV : affichage immédiat (pas d’IO + pas de keyframes)
+  // Plus d'animation d'apparition (fade-in) : affichage immédiat, moins de bruit visuel.
   useEffect(() => {
-    if (isTV) {
-      if (containerRef.current) {
-        containerRef.current.classList.add('animate-fade-in-up');
-      }
-      return;
+    if (containerRef.current) {
+      containerRef.current.classList.add('opacity-100');
     }
-    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
-      if (containerRef.current) {
-        containerRef.current.classList.add('animate-fade-in-up');
-      }
-      return;
-    }
+  }, []);
 
-    const element = containerRef.current;
-    if (!element) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('animate-fade-in-up');
-            observer.unobserve(entry.target);
-          }
-        });
-      },
-      {
-        rootMargin: '0px 0px -50px 0px',
-        threshold: 0.1,
-      }
-    );
-
-    observer.observe(element);
-
-    return () => {
-      observer.disconnect();
-    };
-  }, [isTV]);
-
-  const childrenArray = Array.isArray(children) ? children : [children];
+  const childrenArray = toChildArray(children);
 
   return (
     <div 
       ref={containerRef}
-      className={`mb-8 sm:mb-10 md:mb-12 tv:mb-16 w-full min-w-0 max-w-full overflow-x-hidden ${className} ${isTV ? 'opacity-100' : 'opacity-0'}`}
+      className={`mb-10 sm:mb-12 md:mb-14 tv:mb-20 w-full min-w-0 max-w-full overflow-x-visible overflow-y-visible opacity-100 ${className}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="flex items-end mb-2 sm:mb-3 tv:mb-4 px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 tv-overscan-x gap-3">
-        <div className="min-w-0">
-          <h2 className="text-lg sm:text-xl md:text-2xl tv:text-3xl font-bold text-[var(--ds-text-primary)] truncate">{title}</h2>
+      <div className="flex items-center mb-3 sm:mb-4 tv:mb-6 px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 tv-overscan-x gap-2 group/row-title">
+        <div className="min-w-0 flex items-center gap-2">
+          <h2 className="text-[1.05rem] sm:text-xl md:text-[1.35rem] tv:text-3xl font-semibold tracking-tight text-white/90 group-hover/row-title:text-white truncate transition-colors duration-150">
+            {title}
+          </h2>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            className="h-4 w-4 sm:h-5 sm:w-5 tv:h-7 tv:w-7 text-white/0 group-hover/row-title:text-white/70 transition-colors duration-150 flex-shrink-0 translate-y-[1px]"
+            aria-hidden
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
           {subtitle ? (
-            <p className="text-xs sm:text-sm text-[var(--ds-text-tertiary)] mt-1 truncate">{subtitle}</p>
+            <p className="text-xs sm:text-sm text-white/45 mt-0 truncate hidden sm:block">{subtitle}</p>
           ) : null}
         </div>
         {!isTV && (isHovered || (scrollContainerRef.current?.scrollLeft || 0) > 0) && (
@@ -153,19 +134,23 @@ export default function CarouselRow({
       <div
         ref={scrollContainerRef}
         data-carousel
-        className={`flex w-full min-w-0 max-w-full gap-1 sm:gap-1.5 md:gap-2 lg:gap-4 xl:gap-6 tv:gap-8 overflow-x-auto overscroll-x-contain overflow-y-hidden scrollbar-hide px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 py-3 tv:py-4 carousel-container ${isTV || isCoarsePointer ? '' : 'scroll-smooth'}`}
+        data-browse-carousel
+        className={`flex w-full min-w-0 max-w-full items-start gap-4 sm:gap-5 md:gap-5 lg:gap-6 tv:gap-7 overflow-x-auto overscroll-x-contain overflow-y-visible scrollbar-hide px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 pt-1 pb-12 tv:pb-16 carousel-container`}
         style={{
           scrollbarWidth: 'none',
           msOverflowStyle: 'none',
-          scrollBehavior: isTV || isCoarsePointer ? 'auto' : 'smooth',
+          scrollBehavior: 'auto',
           touchAction: 'pan-x pan-y',
         }}
       >
-        {childrenArray.map((child, index) => (
-          <div key={index} className="flex-shrink-0 py-1 tv:py-2 overflow-visible">
-            {child}
-          </div>
-        ))}
+        {childrenArray}
+        {/* 100vw : même 2 cartes → assez de scroll pour coller le paysage à gauche */}
+        <div
+          data-browse-scroll-spacer
+          aria-hidden="true"
+          className="pointer-events-none invisible shrink-0"
+          style={{ flex: '0 0 auto', width: '100vw', minWidth: '100vw', height: 1 }}
+        />
       </div>
     </div>
   );

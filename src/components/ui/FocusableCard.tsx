@@ -10,6 +10,8 @@ interface FocusableCardProps {
   tabIndex?: number;
   /** Libellé pour la télécommande / lecteur d'écran (ex. titre du média) */
   ariaLabel?: string;
+  /** Désactive focus:scale (évite le chevauchement des tuiles browse). */
+  noScale?: boolean;
 }
 
 /**
@@ -24,6 +26,7 @@ export function FocusableCard({
   href,
   tabIndex = 0,
   ariaLabel,
+  noScale = false,
 }: FocusableCardProps) {
   const cardRef = useRef<HTMLDivElement | HTMLAnchorElement>(null);
 
@@ -46,6 +49,7 @@ export function FocusableCard({
 
     // Gestion du focus pour TV - assurer visibilité et z-index
     const handleFocus = () => {
+      if (noScale) return;
       if (typeof window !== 'undefined' && window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
         return;
       }
@@ -70,10 +74,11 @@ export function FocusableCard({
       element.removeEventListener('focus', handleFocus);
       element.removeEventListener('blur', handleBlur);
     };
-  }, [onClick, href]);
+  }, [onClick, href, noScale]);
 
   const isTV = typeof document !== 'undefined' && (document.body?.dataset?.tv === 'true' || navigator.userAgent.toLowerCase().includes('tv') || document.body?.classList.contains('tv-platform'));
-  const baseClasses = `group transition cursor-pointer ${isTV ? 'tv-card gtv-focusable focus:scale-105 outline-none' : 'focus:outline-none'} ${className}`;
+  const scaleClass = noScale ? 'outline-none' : (isTV ? 'tv-card gtv-focusable focus:scale-105 outline-none' : 'focus:outline-none');
+  const baseClasses = `group cursor-pointer ${scaleClass} ${className}`;
   const commonProps: any = {
     ref: cardRef as any,
     className: baseClasses,

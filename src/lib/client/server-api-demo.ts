@@ -209,8 +209,24 @@ export function createDemoServerApi(): Record<string, unknown> {
         fastTorrents: [],
       });
     },
-    async getDashboardDataPhase2(): Promise<ApiResponse<{ recentAdditions: ContentItem[]; fastTorrents: ContentItem[] }>> {
-      return success({ recentAdditions: [], fastTorrents: [] });
+    async getDashboardDataPhase2(): Promise<
+      ApiResponse<{
+        recentAdditions: ContentItem[];
+        recentMovies: ContentItem[];
+        recentSeries: ContentItem[];
+        freshMovies: ContentItem[];
+        freshSeries: ContentItem[];
+        fastTorrents: ContentItem[];
+      }>
+    > {
+      return success({
+        recentAdditions: [],
+        recentMovies: [],
+        recentSeries: [],
+        freshMovies: [],
+        freshSeries: [],
+        fastTorrents: [],
+      });
     },
     async getDashboardData(): Promise<ApiResponse<DashboardData>> {
       return success({

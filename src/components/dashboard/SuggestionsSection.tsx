@@ -154,7 +154,7 @@ export default function SuggestionsSection({ contextType = 'all' }: { contextTyp
       <>
         <CarouselRow title={t('dashboard.suggestionsMovies') || 'Films suggérés pour vous'} autoScroll={false}>
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+            <div key={i} className="flex-shrink-0 w-[180px] sm:w-[220px] md:w-[240px] lg:w-[260px] xl:w-[280px]">
               <div className="aspect-[2/3] rounded-lg bg-white/5 animate-pulse"></div>
               <div className="mt-2 h-4 w-3/4 bg-white/5 rounded animate-pulse"></div>
             </div>
@@ -162,7 +162,7 @@ export default function SuggestionsSection({ contextType = 'all' }: { contextTyp
         </CarouselRow>
         <CarouselRow title={t('dashboard.suggestionsSeries') || 'Séries suggérées pour vous'} autoScroll={false}>
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
+            <div key={i} className="flex-shrink-0 w-[180px] sm:w-[220px] md:w-[240px] lg:w-[260px] xl:w-[280px]">
               <div className="aspect-[2/3] rounded-lg bg-white/5 animate-pulse"></div>
               <div className="mt-2 h-4 w-3/4 bg-white/5 rounded animate-pulse"></div>
             </div>

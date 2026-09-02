@@ -8,19 +8,18 @@ import { useContentSignals } from './hooks/useContentSignals';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
 import SuggestionsSection from './SuggestionsSection';
-import { pickHeroItems, filterWatchNow, standaloneDownloads } from './utils/browsePriority';
-
-function getDashboardItemKey(item: ContentItem): string {
-  if (typeof item.tmdbId === 'number') return `${item.type}:${item.tmdbId}`;
-  if (item.id) return `id:${item.id}`;
-  if (item.infoHash) return `infoHash:${item.infoHash}`;
-  return `fallback:${item.title}:${item.type}`;
-}
+import {
+  pickFeaturedHero,
+  filterWatchNow,
+  standaloneDownloads,
+  excludeSeenItems,
+  contentItemKey,
+} from './utils/browsePriority';
 
 function dedupeDashboardItems(items: ContentItem[]): ContentItem[] {
   const seen = new Set<string>();
   return items.filter((item) => {
-    const key = getDashboardItemKey(item);
+    const key = contentItemKey(item);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -31,105 +30,171 @@ export default function Dashboard() {
   const { t } = useI18n();
   const { data, loading: dataLoading, error } = useDashboardData();
   const { activeDownloads, loading: downloadsLoading } = useActiveDownloads();
-  const { inProgress, seriesInProgress } = useResumeWatching();
+  const { resumeWatching, rewatchWatching } = useResumeWatching();
   const loading = dataLoading && downloadsLoading;
-  
+
   const popularMovies = data?.popularMovies ?? [];
   const popularSeries = data?.popularSeries ?? [];
   const recentMovies = data?.recentMovies ?? [];
   const recentSeries = data?.recentSeries ?? [];
+  const freshMovies = data?.freshMovies ?? [];
+  const freshSeries = data?.freshSeries ?? [];
+
   const allDashboardItems = useMemo(
-    () => dedupeDashboardItems([...recentMovies, ...recentSeries, ...popularMovies, ...popularSeries, ...activeDownloads]),
-    [popularMovies, popularSeries, recentMovies, recentSeries, activeDownloads]
+    () =>
+      dedupeDashboardItems([
+        ...recentMovies,
+        ...recentSeries,
+        ...freshMovies,
+        ...freshSeries,
+        ...popularMovies,
+        ...popularSeries,
+        ...activeDownloads,
+      ]),
+    [popularMovies, popularSeries, recentMovies, recentSeries, freshMovies, freshSeries, activeDownloads]
   );
-  // On utilise resumeWatching pour les signaux, mais on pourrait utiliser inProgress + seriesInProgress pour être plus large.
-  // Cependant, useContentSignals a besoin de la liste complète pour savoir quoi enrichir.
-  const { resumeWatching } = useResumeWatching();
+
   const { withSignals: allDashboardItemsWithSignals } = useContentSignals(allDashboardItems, resumeWatching);
 
-  const heroItems = useMemo(
-    () =>
-      pickHeroItems(
-        [...resumeWatching, ...filterWatchNow(allDashboardItemsWithSignals), ...activeDownloads],
-        allDashboardItemsWithSignals
-      ),
-    [allDashboardItemsWithSignals, resumeWatching, activeDownloads]
+  const seenItems = useMemo(
+    () => [...resumeWatching, ...rewatchWatching],
+    [resumeWatching, rewatchWatching]
   );
+
+  const heroItems = useMemo(() => {
+    const watchNow = excludeSeenItems(filterWatchNow(allDashboardItemsWithSignals), seenItems);
+    const newestUnwatched = excludeSeenItems(
+      [...recentMovies, ...recentSeries, ...freshMovies, ...freshSeries],
+      seenItems
+    );
+    return pickFeaturedHero(watchNow, newestUnwatched);
+  }, [allDashboardItemsWithSignals, seenItems, recentMovies, recentSeries, freshMovies, freshSeries]);
 
   const handleNavigate = (item: ContentItem) => {
     window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
   };
 
-  const sections = useMemo(
-    () => {
-      // 1. Enrichir ResumeWatching avec les infos de téléchargement
-      const enrichedResumeWatching = resumeWatching.map(item => {
-        const active = activeDownloads.find(ad => 
-          (ad.tmdbId != null && item.tmdbId != null && ad.tmdbId === item.tmdbId && ad.type === item.type) || 
+  const sections = useMemo(() => {
+    const enrichedResumeWatching = resumeWatching.map((item) => {
+      const active = activeDownloads.find(
+        (ad) =>
+          (ad.tmdbId != null && item.tmdbId != null && ad.tmdbId === item.tmdbId && ad.type === item.type) ||
           (ad.infoHash && item.infoHash && ad.infoHash === item.infoHash)
-        );
-        if (active) {
-          return {
-            ...item,
-            isDownloading: true,
-            downloadProgress: active.progress,
-            downloadSpeed: active.downloadSpeed
-          };
-        }
-        return item;
-      });
-
-      const watchNowItems = filterWatchNow(allDashboardItemsWithSignals);
-      const downloadingNow = standaloneDownloads(activeDownloads, resumeWatching);
-
-      const result = [];
-
-      if (enrichedResumeWatching.length > 0) {
-        result.push({
-          id: 'resume-watching',
-          title: t('dashboard.resumeWatching') || 'Reprendre la lecture',
-          items: enrichedResumeWatching,
-          kind: 'resume' as const,
-          priority: true,
-        });
-      }
-
-      if (downloadingNow.length > 0) {
-        result.push({
-          id: 'active-downloads',
-          title: t('dashboard.activeDownloads'),
-          items: downloadingNow,
-          priority: true,
-        });
-      }
-
-      if (watchNowItems.length > 0) {
-        result.push({
-          id: 'recently-downloaded',
-          title: t('dashboard.recentlyDownloaded'),
-          items: watchNowItems,
-          priority: true,
-        });
-      }
-
-      // Reste des sections classiques
-      result.push(
-        { id: 'recentMovies', title: t('nav.films'), items: allDashboardItemsWithSignals.filter((i) => recentMovies.some((r) => r.id === i.id)) },
-        { id: 'popularMovies', title: t('dashboard.popularMovies'), items: allDashboardItemsWithSignals.filter((i) => popularMovies.some((r) => r.id === i.id)) },
-        { id: 'recentSeries', title: t('nav.series'), items: allDashboardItemsWithSignals.filter((i) => recentSeries.some((r) => r.id === i.id)) },
-        { id: 'popularSeries', title: t('dashboard.popularSeries'), items: allDashboardItemsWithSignals.filter((i) => popularSeries.some((r) => r.id === i.id)) }
       );
+      if (active) {
+        return {
+          ...item,
+          isDownloading: true,
+          downloadProgress: active.progress,
+          downloadSpeed: active.downloadSpeed,
+        };
+      }
+      return item;
+    });
 
-      return result;
-    },
-    [allDashboardItemsWithSignals, activeDownloads, resumeWatching, popularMovies, popularSeries, recentMovies, recentSeries, t]
-  );
+    const watchNowItems = excludeSeenItems(filterWatchNow(allDashboardItemsWithSignals), seenItems);
+    const downloadingNow = standaloneDownloads(activeDownloads, resumeWatching);
+
+    const result = [];
+
+    if (enrichedResumeWatching.length > 0) {
+      result.push({
+        id: 'resume-watching',
+        title: t('dashboard.resumeWatching') || 'Reprendre la lecture',
+        items: enrichedResumeWatching,
+        kind: 'resume' as const,
+        priority: true,
+      });
+    }
+
+    if (rewatchWatching.length > 0) {
+      result.push({
+        id: 'rewatch-watching',
+        title: t('dashboard.rewatch'),
+        items: rewatchWatching,
+        kind: 'resume' as const,
+        priority: true,
+      });
+    }
+
+    if (downloadingNow.length > 0) {
+      result.push({
+        id: 'active-downloads',
+        title: t('dashboard.activeDownloads'),
+        items: downloadingNow,
+        priority: true,
+      });
+    }
+
+    if (watchNowItems.length > 0) {
+      result.push({
+        id: 'recently-downloaded',
+        title: t('dashboard.recentlyDownloaded'),
+        items: watchNowItems,
+        priority: true,
+      });
+    }
+
+    const freshMoviesWithSignals = allDashboardItemsWithSignals.filter((i) =>
+      freshMovies.some((r) => r.id === i.id)
+    );
+    const freshSeriesWithSignals = allDashboardItemsWithSignals.filter((i) =>
+      freshSeries.some((r) => r.id === i.id)
+    );
+
+    result.push(
+      {
+        id: 'recentMovies',
+        title: t('dashboard.newReleasesMovies'),
+        items: allDashboardItemsWithSignals.filter((i) => recentMovies.some((r) => r.id === i.id)),
+      },
+      {
+        id: 'freshMovies',
+        title: t('dashboard.freshlySyncedMovies'),
+        items: freshMoviesWithSignals,
+      },
+      {
+        id: 'popularMovies',
+        title: t('dashboard.popularMovies'),
+        items: allDashboardItemsWithSignals.filter((i) => popularMovies.some((r) => r.id === i.id)),
+      },
+      {
+        id: 'recentSeries',
+        title: t('dashboard.newReleasesSeries'),
+        items: allDashboardItemsWithSignals.filter((i) => recentSeries.some((r) => r.id === i.id)),
+      },
+      {
+        id: 'freshSeries',
+        title: t('dashboard.freshlySyncedSeries'),
+        items: freshSeriesWithSignals,
+      },
+      {
+        id: 'popularSeries',
+        title: t('dashboard.popularSeries'),
+        items: allDashboardItemsWithSignals.filter((i) => popularSeries.some((r) => r.id === i.id)),
+      }
+    );
+
+    return result;
+  }, [
+    allDashboardItemsWithSignals,
+    activeDownloads,
+    resumeWatching,
+    rewatchWatching,
+    seenItems,
+    popularMovies,
+    popularSeries,
+    recentMovies,
+    recentSeries,
+    freshMovies,
+    freshSeries,
+    t,
+  ]);
 
   return (
     <SimpleTmdbPage
       pageId="dashboard"
-      title={t('nav.dashboard')}
-      subtitle={t('dashboard.syncedSubtitle')}
+      title=""
       heroItems={heroItems}
       sections={sections}
       loading={loading}

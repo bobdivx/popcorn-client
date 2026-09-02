@@ -6,6 +6,7 @@
 
 import type { ContentItem } from './client/types';
 import { serverApi } from './client/server-api';
+import { REWATCH_PROGRESS_THRESHOLD } from './resumeProgress';
 
 /** Évènement émis quand la liste change pour forcer les vues à se rafraîchir. */
 export const RESUME_WATCHING_EVENT = 'resumeWatching:updated';
@@ -24,7 +25,7 @@ export interface ResumeEpisodeInfo {
 /**
  * Met à jour ou ajoute un média dans la liste "Reprendre / Revoir".
  * À appeler depuis le lecteur (ex. on timeupdate ou on unmount) avec la progression en % (0-100).
- * Si progress >= 99, le média apparaîtra dans la ligne "Revoir" ; sinon dans "Reprendre la lecture".
+ * Si progress >= seuil (générique), on enregistre 100 % → rangée "À revoir".
  *
  * @param item Métadonnées TMDB du média (titre, poster, type, tmdbId).
  * @param progressPercent Pourcentage 0-100.
@@ -38,6 +39,10 @@ export function updateResumeWatching(
   const id = item.id || (item.tmdbId != null ? String(item.tmdbId) : null);
   if (!id) return;
 
+  const clamped = Math.min(100, Math.max(0, progressPercent));
+  // Arrêt au générique (~90–95 %) = visionnage terminé.
+  const progress = clamped >= REWATCH_PROGRESS_THRESHOLD ? 100 : clamped;
+
   const now = Date.now();
   void serverApi.upsertResumeWatching({
     content_id: id,
@@ -45,7 +50,7 @@ export function updateResumeWatching(
     tmdb_type: item.type,
     title: item.title || '',
     poster: item.poster ?? null,
-    progress: Math.min(100, Math.max(0, progressPercent)),
+    progress,
     season: episodeInfo?.season ?? null,
     episode: episodeInfo?.episode ?? null,
     variant_id: episodeInfo?.variantId ?? null,

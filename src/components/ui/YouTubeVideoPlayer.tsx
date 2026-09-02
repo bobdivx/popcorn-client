@@ -163,7 +163,7 @@ export function YouTubeVideoPlayer({
             minWidth: '100vw',
             minHeight: '56.25vw',
             transform: 'translate(-50%, -50%)',
-            pointerEvents: 'auto',
+            pointerEvents: 'none',
           }}
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowFullScreen={false}
@@ -178,11 +178,11 @@ export function YouTubeVideoPlayer({
   }
 
   return (
-    <div className={`relative w-full h-full ${className}`} style={{ aspectRatio: '16/9' }}>
+    <div className={`relative w-full h-full ${className}`} style={className.includes('aspect-auto') ? undefined : { aspectRatio: '16/9' }}>
       <iframe
         ref={iframeRef}
         src={youtubeUrl}
-        className="absolute inset-0 w-full h-full"
+        className="absolute inset-0 w-full h-full pointer-events-none"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
         allowFullScreen
         loading="lazy"

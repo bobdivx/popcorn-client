@@ -7,10 +7,17 @@ import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
 import { useInfiniteFilms } from './hooks/useInfiniteFilms';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useContentSignals } from './hooks/useContentSignals';
+import { useFreshSynced } from './hooks/useFreshSynced';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
 import SuggestionsSection from './SuggestionsSection';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
-import { pickHeroItems, filterWatchNow, filterByMediaType, standaloneDownloads } from './utils/browsePriority';
+import {
+  pickFeaturedHero,
+  filterWatchNow,
+  filterByMediaType,
+  standaloneDownloads,
+  excludeSeenItems,
+} from './utils/browsePriority';
 
 const SECTION_LIMIT = 25;
 const MAX_GENRES = 12;
@@ -20,11 +27,13 @@ const VIEW_STORAGE_KEY = 'popcorn:films-view';
 export default function FilmsDashboard() {
   const { t } = useI18n();
   const { films, loading, error } = useInfiniteFilms();
-  const { resumeWatching } = useResumeWatching();
+  const { resumeWatching, rewatchWatching } = useResumeWatching();
   const { activeDownloads } = useActiveDownloads();
+  const freshSynced = useFreshSynced('films');
   const [view, setView] = useState<LibraryViewMode>('torrents');
   const { withSignals: filmsWithSignals } = useContentSignals(films, resumeWatching);
   const movieDownloads = useMemo(() => filterByMediaType(activeDownloads, 'movie'), [activeDownloads]);
+  const { withSignals: freshWithSignals } = useContentSignals(freshSynced, resumeWatching);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -39,13 +48,19 @@ export default function FilmsDashboard() {
     }
   };
 
+  const seenItems = useMemo(
+    () => [...resumeWatching, ...rewatchWatching].filter((item) => item.type === 'movie'),
+    [resumeWatching, rewatchWatching]
+  );
+
   const heroItems = useMemo(() => {
-    const resumeMovies = resumeWatching.filter((item) => item.type === 'movie');
-    return pickHeroItems(
-      [...resumeMovies, ...filterWatchNow(filmsWithSignals), ...movieDownloads],
-      filmsWithSignals
+    const watchNow = excludeSeenItems(filterWatchNow(filmsWithSignals), seenItems);
+    const newestUnwatched = excludeSeenItems(
+      [...filmsWithSignals.slice(0, SECTION_LIMIT), ...freshWithSignals],
+      seenItems
     );
-  }, [filmsWithSignals, resumeWatching, movieDownloads]);
+    return pickFeaturedHero(watchNow, newestUnwatched);
+  }, [filmsWithSignals, freshWithSignals, seenItems]);
 
   const handleNavigate = (item: ContentItem) => {
     window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
@@ -59,7 +74,8 @@ export default function FilmsDashboard() {
       .slice(0, SECTION_LIMIT);
 
     const resumeMovies = resumeWatching.filter((item) => item.type === 'movie');
-    const watchNow = filterWatchNow(filmsWithSignals);
+    const rewatchMovies = rewatchWatching.filter((item) => item.type === 'movie');
+    const watchNow = excludeSeenItems(filterWatchNow(filmsWithSignals), seenItems);
     const downloadingNow = standaloneDownloads(movieDownloads, resumeMovies);
 
     const genreMap = new Map<string, ContentItem[]>();
@@ -83,13 +99,15 @@ export default function FilmsDashboard() {
 
     return [
       { id: 'resume-films', title: t('dashboard.resumeWatching'), items: resumeMovies, kind: 'resume' as const, priority: true },
+      { id: 'rewatch-films', title: t('dashboard.rewatch'), items: rewatchMovies, kind: 'resume' as const, priority: true },
       { id: 'active-downloads-films', title: t('dashboard.activeDownloads'), items: downloadingNow, priority: true },
       { id: 'recently-downloaded-films', title: t('dashboard.recentlyDownloaded'), items: watchNow, priority: true },
       { id: 'recent-films', title: t('dashboard.newReleasesMovies'), items: newest },
+      { id: 'fresh-films', title: t('dashboard.freshlySyncedMovies'), items: freshWithSignals.slice(0, SECTION_LIMIT) },
       { id: 'popular-films', title: t('dashboard.popularMovies'), items: popular },
       ...genreSections,
     ];
-  }, [filmsWithSignals, resumeWatching, movieDownloads, t]);
+  }, [filmsWithSignals, freshWithSignals, resumeWatching, rewatchWatching, seenItems, movieDownloads, t]);
 
   const toggle = (
     <LibraryViewToggle mode={view} onChange={handleChangeView} contentType="movies" />
