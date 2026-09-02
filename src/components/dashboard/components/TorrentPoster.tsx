@@ -66,7 +66,7 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
       data-torrent-card
       data-dark-context
       data-tv-item-key={contentItemKey(item)}
-      className="relative group cursor-pointer torrent-poster min-w-[140px] sm:min-w-[160px] md:min-w-[180px] lg:min-w-[280px] xl:min-w-[320px] tv:min-w-[400px]"
+      className="relative group cursor-pointer torrent-poster min-w-[140px] sm:min-w-[160px] md:min-w-[180px] lg:min-w-[200px] xl:min-w-[220px] tv:min-w-[260px]"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -89,7 +89,7 @@ function TorrentPosterComponent({ item }: TorrentPosterProps) {
         }}
       >
         <div
-          className={`relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900/85 border border-white/10 shadow-lg rounded-xl focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-1 focus-within:ring-offset-black ${cardAnimationClasses}`}
+          className={`relative aspect-[2/3] overflow-hidden bg-gray-900/85 border border-white/10 shadow-lg rounded-xl focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-1 focus-within:ring-offset-black ${cardAnimationClasses}`}
         >
         {imageUrl ? (
           <img

@@ -56,9 +56,9 @@ export function LazyTorrentPoster({ item, rootMargin = '200px' }: LazyTorrentPos
     return (
       <div
         ref={containerRef}
-        className="relative min-w-[140px] sm:min-w-[160px] md:min-w-[180px] lg:min-w-[280px] xl:min-w-[320px] tv:min-w-[400px]"
+        className="relative min-w-[140px] sm:min-w-[160px] md:min-w-[180px] lg:min-w-[200px] xl:min-w-[220px] tv:min-w-[260px]"
       >
-        <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] rounded-xl border border-white/10 bg-[#141414] overflow-hidden shadow-lg">
+        <div className="relative aspect-[2/3] rounded-xl border border-white/10 bg-[#141414] overflow-hidden shadow-lg">
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[shimmer_2s_infinite_linear] w-[200%] -translate-x-full" />
         </div>
       </div>

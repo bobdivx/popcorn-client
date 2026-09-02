@@ -190,6 +190,14 @@ html[data-tv-platform] body {
   scroll-margin-bottom: max(6rem, calc(3rem + var(--safe-area-inset-bottom)));
 }
 
+/* Rangées browse : marge de scroll pour ne pas couper cartes + méta en bas */
+[data-browse-slot],
+[data-browse-row],
+[data-carousel]:has([data-browse-slot]) {
+  scroll-margin-top: clamp(4.5rem, 9vh, 7rem);
+  scroll-margin-bottom: max(5rem, calc(2.5rem + var(--safe-area-inset-bottom)));
+}
+
 /* Masquer la scrollbar mais garder le scroll */
 .scrollbar-hide {
   -ms-overflow-style: none;  /* IE et Edge */
@@ -213,6 +221,10 @@ html[data-tv-platform] body {
 html[data-tv-platform="true"] {
   --tv-overscan-x: max(5vw, 4.5rem);
   --tv-overscan-y: max(3.5vh, 1.75rem);
+  /* Densité browse : paysage ~55 % largeur ; JS affine via computeBrowseTileHeight */
+  --browse-tile-h: clamp(400px, 48vh, 560px);
+  --browse-portrait-w: calc(var(--browse-tile-h) * 2 / 3);
+  --browse-landscape-w: calc(var(--browse-tile-h) * 16 / 9);
 }
 html[data-tv-platform="true"] .app-main {
   padding-left: 0 !important;
@@ -261,6 +273,12 @@ html[data-tv-platform="true"] .library-sync-btn {
   touch-action: pan-x pan-y;
   overflow-x: auto;
   overflow-y: hidden;
+}
+/* Browse : padding bas déjà réservé pour méta ; ne pas clipper le focus ring */
+[data-carousel]:has([data-browse-slot]).carousel-container,
+.carousel-container:has([data-browse-slot]) {
+  overflow-y: visible;
+  padding-bottom: max(3.5rem, 4.5rem);
 }
 .carousel-container img,
 .carousel-container a,
@@ -1578,24 +1596,30 @@ html[data-tv-platform="true"] [data-page="demandes"] [data-torrent-card].torrent
   }
 }
 
-/* Conteneur des onglets - permettre l'overflow visible pour le ring */
+/* Conteneur des onglets — clip horizontal pour éviter le chevauchement gauche/droite */
 .nav-tabs-container {
-  overflow-y: visible !important;
-  /* Padding vertical suffisant pour le ring de 4px + offset */
+  overflow-x: hidden;
+  overflow-y: visible;
+  max-width: 100%;
   padding: 6px 0;
 }
 
 .nav-tabs-wrapper {
-  overflow-y: visible !important;
-  /* Padding horizontal pour éviter le clipping latéral du ring */
+  overflow-x: auto;
+  overflow-y: visible;
+  scrollbar-width: none;
   padding-left: 4px;
   padding-right: 4px;
+  max-width: 100%;
+}
+.nav-tabs-wrapper::-webkit-scrollbar {
+  display: none;
 }
 
 /* Styles pour navigation TV */
 .nav-tab {
-  @apply inline-flex items-center justify-center gap-2 transition-all duration-300 focus:outline-none rounded-full px-5 lg:px-7 py-2 lg:py-3 text-white/70 bg-transparent font-medium;
-  min-height: 44px;
+  @apply inline-flex items-center justify-center gap-1.5 xl:gap-2 transition-all duration-300 focus:outline-none rounded-full px-3 xl:px-5 tv:px-7 py-2 xl:py-2.5 tv:py-3 text-white/70 bg-transparent font-medium text-sm xl:text-base;
+  min-height: 40px;
   letter-spacing: 0.01em;
   box-sizing: border-box;
 }
@@ -1802,6 +1826,11 @@ button, a, input, select, textarea {
   transform: translateZ(0); /* Force l'accélération GPU */
   backface-visibility: hidden; /* Optimise les animations 3D */
 }
+[data-browse-tile][data-torrent-card],
+[data-browse-slot] [data-torrent-card] {
+  will-change: auto;
+  backface-visibility: visible;
+}
 
 @media (hover: hover) and (pointer: fine) {
   .card-tv:focus,
@@ -1809,6 +1838,12 @@ button, a, input, select, textarea {
   [data-torrent-card]:focus {
     will-change: transform, opacity, box-shadow;
     transform: translate3d(0, 0, 0) scale(1.2);
+  }
+  [data-browse-tile][data-torrent-card]:focus,
+  [data-browse-tile] .card-tv:focus,
+  [data-browse-slot] [data-torrent-card]:focus {
+    transform: none !important;
+    will-change: auto;
   }
 }
 
@@ -1984,6 +2019,24 @@ html {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45) !important;
 }
 
+/* Tuiles browse : pas de scale TV au focus clavier / paysage.
+   Le hover souris (léger scale) reste autorisé hors expanded. */
+[data-browse-tile].tv-card-focused,
+[data-browse-tile] .tv-card-focused,
+[data-browse-tile][data-torrent-card].tv-card-focused,
+[data-browse-tile][data-focusable-card].tv-card-focused,
+[data-browse-slot] .tv-card-focused,
+[data-browse-slot][data-preview-expanded='true'] [data-torrent-card],
+[data-browse-slot][data-preview-expanded='true'] {
+  transform: none !important;
+  animation: none !important;
+  overflow: hidden !important;
+  contain: none !important;
+}
+[data-browse-slot][data-preview-expanded='true'] {
+  z-index: 2 !important;
+}
+
 /* Navbar + menu mobile au-dessus des cartes (focus TV / hover z-40) */
 nav.navbar-tv,
 nav[data-tv-site-header] {
@@ -2083,6 +2136,13 @@ textarea:focus-visible {
   outline: none !important;
 }
 
+/* Browse : pas d’assombrissement des voisins ; filter libre pour le hover brightness */
+[data-carousel]:has([data-browse-slot]) [data-torrent-card],
+[data-carousel]:has([data-browse-slot]) .torrent-poster,
+[data-carousel]:has([data-browse-tile]) [data-torrent-card] {
+  opacity: 1 !important;
+}
+
 /* Cartes adjacentes : on conserve l'opacité pleine pour éviter l'effet de
    « clignotement » de toutes les cartes au défilement (la carte focus ressort
    suffisamment via outline + scale). */
@@ -2117,6 +2177,14 @@ textarea:focus-visible {
 @media (hover: hover) and (pointer: fine) {
   html:not([data-tv-platform="true"]) .tv-card-focused {
     animation: tvFocusIn 0.2s ease-out forwards !important;
+  }
+  /* Browse : l’anim scale(1.06) forwards écrasait transform:none → chevauchement. */
+  html:not([data-tv-platform="true"]) [data-browse-tile].tv-card-focused,
+  html:not([data-tv-platform="true"]) [data-browse-tile] .tv-card-focused,
+  html:not([data-tv-platform="true"]) [data-browse-tile][data-torrent-card].tv-card-focused,
+  html:not([data-tv-platform="true"]) [data-browse-slot] .tv-card-focused {
+    animation: none !important;
+    transform: none !important;
   }
 }
 

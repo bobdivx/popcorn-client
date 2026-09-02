@@ -21,6 +21,25 @@ export function pickHeroItems(preferred: ContentItem[], fallback: ContentItem[] 
   return out;
 }
 
+/**
+ * Hero catalogue : téléchargés non vus / prêts, puis sorties récentes non vues.
+ * N'inclut ni « Reprendre » ni « À revoir ».
+ */
+export function pickFeaturedHero(
+  watchNow: ContentItem[],
+  newestUnwatched: ContentItem[] = [],
+  limit = 5
+): ContentItem[] {
+  return pickHeroItems(watchNow, newestUnwatched, limit);
+}
+
+/** Retire les titres déjà en Reprendre / À revoir (ou toute liste « vu / en cours »). */
+export function excludeSeenItems(items: ContentItem[], seen: ContentItem[]): ContentItem[] {
+  if (seen.length === 0) return items;
+  const keys = new Set(seen.map(contentItemKey));
+  return items.filter((item) => !keys.has(contentItemKey(item)));
+}
+
 export function filterWatchNow(items: ContentItem[], limit = 25): ContentItem[] {
   return items
     .filter((item) => item.heroSignal?.downloadedUnseen || item.heroSignal?.requestDownloaded)

@@ -1277,9 +1277,21 @@ html[data-tv-platform="true"] .playback-status-hint-label {
   animation: ds-halo-pulse 2s ease-in-out infinite;
   transition: box-shadow 0.2s ease;
 }
+/* Browse : pas de halo blanc (blanchit toute la rangée) — outline géré par la tuile */
+[data-browse-tile][data-torrent-card]:focus-within,
+[data-browse-tile][data-torrent-card]:focus-visible,
+[data-browse-slot] [data-torrent-card]:focus-within,
+[data-browse-slot] [data-torrent-card]:focus-visible {
+  animation: none !important;
+  box-shadow: none !important;
+}
 [data-torrent-card]:active,
 .torrent-poster:active {
   box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4);
+}
+[data-browse-tile][data-torrent-card]:active,
+[data-browse-slot] [data-torrent-card]:active {
+  box-shadow: none !important;
 }
 
 /* Carte Sync en cours (Vue d'ensemble paramètres) — même halo blanc scintillant */

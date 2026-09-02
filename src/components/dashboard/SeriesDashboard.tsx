@@ -7,10 +7,17 @@ import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
 import { useInfiniteSeries } from './hooks/useInfiniteSeries';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useContentSignals } from './hooks/useContentSignals';
+import { useFreshSynced } from './hooks/useFreshSynced';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
 import SuggestionsSection from './SuggestionsSection';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
-import { pickHeroItems, filterWatchNow, filterByMediaType, standaloneDownloads } from './utils/browsePriority';
+import {
+  pickFeaturedHero,
+  filterWatchNow,
+  filterByMediaType,
+  standaloneDownloads,
+  excludeSeenItems,
+} from './utils/browsePriority';
 
 const SECTION_LIMIT = 25;
 const MAX_GENRES = 12;
@@ -20,11 +27,13 @@ const VIEW_STORAGE_KEY = 'popcorn:series-view';
 export default function SeriesDashboard() {
   const { t } = useI18n();
   const { series, loading, error } = useInfiniteSeries();
-  const { resumeWatching, waitingForNext } = useResumeWatching();
+  const { resumeWatching, waitingForNext, rewatchWatching } = useResumeWatching();
   const { activeDownloads } = useActiveDownloads();
+  const freshSynced = useFreshSynced('series');
   const [view, setView] = useState<LibraryViewMode>('torrents');
   const { withSignals: seriesWithSignals } = useContentSignals(series, resumeWatching);
   const seriesDownloads = useMemo(() => filterByMediaType(activeDownloads, 'tv'), [activeDownloads]);
+  const { withSignals: freshWithSignals } = useContentSignals(freshSynced, resumeWatching);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -39,13 +48,19 @@ export default function SeriesDashboard() {
     }
   };
 
+  const seenItems = useMemo(
+    () => [...resumeWatching, ...rewatchWatching].filter((item) => item.type === 'tv'),
+    [resumeWatching, rewatchWatching]
+  );
+
   const heroItems = useMemo(() => {
-    const resumeSeries = resumeWatching.filter((item) => item.type === 'tv');
-    return pickHeroItems(
-      [...resumeSeries, ...filterWatchNow(seriesWithSignals), ...seriesDownloads],
-      seriesWithSignals
+    const watchNow = excludeSeenItems(filterWatchNow(seriesWithSignals), seenItems);
+    const newestUnwatched = excludeSeenItems(
+      [...seriesWithSignals.slice(0, SECTION_LIMIT), ...freshWithSignals],
+      seenItems
     );
-  }, [seriesWithSignals, resumeWatching, seriesDownloads]);
+    return pickFeaturedHero(watchNow, newestUnwatched);
+  }, [seriesWithSignals, freshWithSignals, seenItems]);
 
   const handleNavigate = (item: ContentItem) => {
     window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
@@ -59,8 +74,9 @@ export default function SeriesDashboard() {
       .slice(0, SECTION_LIMIT);
 
     const resumeSeries = resumeWatching.filter((item) => item.type === 'tv');
+    const rewatchSeries = rewatchWatching.filter((item) => item.type === 'tv');
     const waitingSeries = waitingForNext.filter((item) => item.type === 'tv');
-    const watchNow = filterWatchNow(seriesWithSignals);
+    const watchNow = excludeSeenItems(filterWatchNow(seriesWithSignals), seenItems);
     const downloadingNow = standaloneDownloads(seriesDownloads, resumeSeries);
 
     const genreMap = new Map<string, ContentItem[]>();
@@ -84,6 +100,7 @@ export default function SeriesDashboard() {
 
     return [
       { id: 'resume-series', title: t('dashboard.resumeWatching'), items: resumeSeries, kind: 'resume' as const, priority: true },
+      { id: 'rewatch-series', title: t('dashboard.rewatch'), items: rewatchSeries, kind: 'resume' as const, priority: true },
       { id: 'active-downloads-series', title: t('dashboard.activeDownloads'), items: downloadingNow, priority: true },
       { id: 'recently-downloaded-series', title: t('dashboard.recentlyDownloaded'), items: watchNow, priority: true },
       {
@@ -98,10 +115,11 @@ export default function SeriesDashboard() {
         priority: true,
       },
       { id: 'recent-series', title: t('dashboard.newReleasesSeries'), items: newest },
+      { id: 'fresh-series', title: t('dashboard.freshlySyncedSeries'), items: freshWithSignals.slice(0, SECTION_LIMIT) },
       { id: 'popular-series', title: t('dashboard.popularSeries'), items: popular },
       ...genreSections,
     ];
-  }, [seriesWithSignals, resumeWatching, waitingForNext, seriesDownloads, t]);
+  }, [seriesWithSignals, freshWithSignals, resumeWatching, rewatchWatching, waitingForNext, seenItems, seriesDownloads, t]);
 
   const toggle = (
     <LibraryViewToggle mode={view} onChange={handleChangeView} contentType="series" />

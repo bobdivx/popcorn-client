@@ -114,6 +114,16 @@ function toContentItem(raw: any): ContentItem {
               : undefined;
 
   const fileSize = raw?.fileSize ?? raw?.file_size;
+  const trailerKeyRaw = raw?.trailerKey ?? raw?.trailer_key;
+  const trailerKey =
+    typeof trailerKeyRaw === 'string' && trailerKeyRaw.trim().length > 0 ? trailerKeyRaw.trim() : null;
+  const createdAtRaw = raw?.createdAt ?? raw?.created_at;
+  const createdAt =
+    typeof createdAtRaw === 'string' && createdAtRaw.trim()
+      ? createdAtRaw.trim()
+      : typeof createdAtRaw === 'number'
+        ? new Date(createdAtRaw * (createdAtRaw < 1e12 ? 1000 : 1)).toISOString()
+        : undefined;
 
   const item: ContentItem = {
     id,
@@ -134,6 +144,8 @@ function toContentItem(raw: any): ContentItem {
     codec,
     quality,
     fileSize: typeof fileSize === 'number' ? fileSize : undefined,
+    trailerKey,
+    ...(createdAt ? { createdAt } : {}),
     isCompletePack: detectCompletePackFromRaw(raw),
   };
 
@@ -218,7 +230,16 @@ export const dashboardMethods = {
     this: ServerApiClientDashboardAccess,
     language?: string,
     options?: DashboardOptions & { popularMovieIds?: string[]; popularSeriesIds?: string[] }
-  ): Promise<ApiResponse<{ recentAdditions: ContentItem[]; recentMovies: ContentItem[]; recentSeries: ContentItem[]; fastTorrents: ContentItem[] }>> {
+  ): Promise<
+    ApiResponse<{
+      recentAdditions: ContentItem[];
+      recentMovies: ContentItem[];
+      recentSeries: ContentItem[];
+      freshMovies: ContentItem[];
+      freshSeries: ContentItem[];
+      fastTorrents: ContentItem[];
+    }>
+  > {
     const minSeeds = options?.minSeeds ?? 0;
     const recentLimit = options?.recentLimit ?? 80;
     const mediaLanguages = options?.mediaLanguages ?? [];
@@ -230,15 +251,19 @@ export const dashboardMethods = {
     const qualParam = minQuality ? `&min_quality=${encodeURIComponent(minQuality)}` : '';
     const filterSuffix = `${langParam}${qualParam}`;
     try {
-      // Tri par date de sortie TMDB (release_date) = nouveautés
-      const [recentMoviesRes, recentSeriesRes, fastTorrentsRes] = await Promise.all([
+      // release_date = sorties TMDB ; recent = created_at indexeur (fraîchement syncés)
+      const [recentMoviesRes, recentSeriesRes, freshMoviesRes, freshSeriesRes, fastTorrentsRes] = await Promise.all([
         this.backendRequest<any[]>(`/api/torrents/list?category=films&sort=release_date&limit=${recentLimit}&page=1&skip_indexer=true&lang=${lang}&min_seeds=${minSeeds}${filterSuffix}`, { method: 'GET' }),
         this.backendRequest<any[]>(`/api/torrents/list?category=series&sort=release_date&limit=${recentLimit}&page=1&skip_indexer=true&lang=${lang}&min_seeds=${minSeeds}${filterSuffix}`, { method: 'GET' }),
+        this.backendRequest<any[]>(`/api/torrents/list?category=films&sort=recent&limit=${recentLimit}&page=1&skip_indexer=true&lang=${lang}&min_seeds=${minSeeds}${filterSuffix}`, { method: 'GET' }),
+        this.backendRequest<any[]>(`/api/torrents/list?category=series&sort=recent&limit=${recentLimit}&page=1&skip_indexer=true&lang=${lang}&min_seeds=${minSeeds}${filterSuffix}`, { method: 'GET' }),
         this.backendRequest<any[]>(`/api/torrents/fast?limit=40&min_seeds=1&lang=${lang}`, { method: 'GET' }),
       ]);
 
       const recentMovies = Array.isArray(recentMoviesRes.data) ? recentMoviesRes.data.map(toContentItem).filter((i) => i.id) : [];
       const recentSeries = Array.isArray(recentSeriesRes.data) ? recentSeriesRes.data.map(toContentItem).filter((i) => i.id) : [];
+      const freshMovies = Array.isArray(freshMoviesRes.data) ? freshMoviesRes.data.map(toContentItem).filter((i) => i.id) : [];
+      const freshSeries = Array.isArray(freshSeriesRes.data) ? freshSeriesRes.data.map(toContentItem).filter((i) => i.id) : [];
       const fastTorrents = Array.isArray(fastTorrentsRes.data) ? fastTorrentsRes.data.map(toContentItem).filter((i) => i.id) : [];
 
       const recentMoviesFiltered = recentMovies.filter((m) => !popularMovieIds.has(m.id)).slice(0, 40);
@@ -251,6 +276,8 @@ export const dashboardMethods = {
           recentAdditions,
           recentMovies: recentMovies.slice(0, 40),
           recentSeries: recentSeries.slice(0, 40),
+          freshMovies: freshMovies.slice(0, 40),
+          freshSeries: freshSeries.slice(0, 40),
           fastTorrents: fastTorrents.slice(0, 40),
         },
       };
@@ -259,7 +286,14 @@ export const dashboardMethods = {
         success: false,
         error: 'DashboardError',
         message: e instanceof Error ? e.message : 'Erreur lors du chargement des données secondaires',
-      } as ApiResponse<{ recentAdditions: ContentItem[]; recentMovies: ContentItem[]; recentSeries: ContentItem[]; fastTorrents: ContentItem[] }>;
+      } as ApiResponse<{
+        recentAdditions: ContentItem[];
+        recentMovies: ContentItem[];
+        recentSeries: ContentItem[];
+        freshMovies: ContentItem[];
+        freshSeries: ContentItem[];
+        fastTorrents: ContentItem[];
+      }>;
     }
   },
 
@@ -594,6 +628,12 @@ export const dashboardMethods = {
           peers: typeof raw?.leechCount === 'number' ? raw.leechCount : raw?.leech_count,
           fileSize: typeof raw?.fileSize === 'number' ? raw.fileSize : raw?.file_size,
           indexerName: pickIndexerName(raw),
+          trailerKey:
+            typeof raw?.trailerKey === 'string' && raw.trailerKey.trim()
+              ? raw.trailerKey.trim()
+              : typeof raw?.trailer_key === 'string' && raw.trailer_key.trim()
+                ? raw.trailer_key.trim()
+                : null,
         } satisfies FilmData;
       })
       .filter(Boolean) as FilmData[];
@@ -672,6 +712,12 @@ export const dashboardMethods = {
           peers: typeof raw?.leechCount === 'number' ? raw.leechCount : raw?.leech_count,
           fileSize: typeof raw?.fileSize === 'number' ? raw.fileSize : raw?.file_size,
           indexerName: pickIndexerName(raw),
+          trailerKey:
+            typeof raw?.trailerKey === 'string' && raw.trailerKey.trim()
+              ? raw.trailerKey.trim()
+              : typeof raw?.trailer_key === 'string' && raw.trailer_key.trim()
+                ? raw.trailer_key.trim()
+                : null,
         } satisfies SeriesData;
       })
       .filter(Boolean) as SeriesData[];

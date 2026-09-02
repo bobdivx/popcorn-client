@@ -79,6 +79,10 @@ export interface DashboardData {
   recentMovies?: ContentItem[];
   /** Nouveautés séries (tri par date de sortie) */
   recentSeries?: ContentItem[];
+  /** Fraîchement syncés films (tri created_at indexeur) */
+  freshMovies?: ContentItem[];
+  /** Fraîchement syncés séries (tri created_at indexeur) */
+  freshSeries?: ContentItem[];
   recentAdditions?: ContentItem[];
   /** Torrents les plus partagés (beaucoup de seeders) */
   fastTorrents?: ContentItem[];
@@ -117,7 +121,7 @@ export interface ContentItem {
   // Pour "Reprendre la lecture"
   progress?: number; // Pourcentage de progression (0-100)
   lastWatched?: string; // Date ISO
-  // Stats temps réel pour améliorations "Mieux que Netflix"
+  // Stats torrent (seeds / peers / qualité)
   seeds?: number; // Nombre de seeds du torrent
   peers?: number; // Nombre de peers du torrent
   /** Nom de l'indexer source (ex. YTS, EZTV) pour affichage sur la carte */
@@ -137,6 +141,10 @@ export interface ContentItem {
     fileSize?: number;
   }>; // Multi-sources : agrégation de plusieurs trackers
   trailerUrl?: string; // URL du trailer pour animation immersive
+  /** Clé YouTube de la bande-annonce (API list / media). */
+  trailerKey?: string | null;
+  /** Date d'ajout sur l'indexeur (ISO ou timestamp string). */
+  createdAt?: string;
   /** True quand le torrent semble être une saison/série complète (INTÉGRALE, COMPLETE, etc.). */
   isCompletePack?: boolean;
   /** Signaux UI optionnels pour le hero/cartes dashboard. */

@@ -44,6 +44,8 @@ export function useDashboardData() {
         recentAdditions: phase2.success && phase2.data ? phase2.data.recentAdditions : phase1.data.recentAdditions,
         recentMovies: phase2.success && phase2.data ? phase2.data.recentMovies : [],
         recentSeries: phase2.success && phase2.data ? phase2.data.recentSeries : [],
+        freshMovies: phase2.success && phase2.data ? phase2.data.freshMovies : [],
+        freshSeries: phase2.success && phase2.data ? phase2.data.freshSeries : [],
         fastTorrents: phase2.success && phase2.data ? phase2.data.fastTorrents : phase1.data.fastTorrents,
       };
       setData(merged);

@@ -100,7 +100,7 @@ export function ResumePoster({ item, onNavigate }: ResumePosterProps) {
 
   return (
     <div
-      className="relative group cursor-pointer torrent-poster min-w-[140px] sm:min-w-[160px] md:min-w-[180px] lg:min-w-[280px] xl:min-w-[320px] tv:min-w-[400px]"
+      className="relative group cursor-pointer torrent-poster min-w-[140px] sm:min-w-[160px] md:min-w-[180px] lg:min-w-[200px] xl:min-w-[220px] tv:min-w-[260px]"
       data-dark-context
       data-tv-item-key={contentItemKey(item)}
       onMouseEnter={() => setIsHovered(true)}
@@ -120,7 +120,7 @@ export function ResumePoster({ item, onNavigate }: ResumePosterProps) {
           setIsHovered(false);
         }}
       >
-        <div className={`relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] overflow-hidden bg-gray-900/85 border border-white/15 shadow-lg rounded-lg focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-1 focus-within:ring-offset-black transform-gpu transition-all duration-[400ms] ease-out hover:z-40 focus-within:z-40 will-change-transform group-hover:scale-[1.04] group-hover:shadow-[0_10px_40px_-10px_rgba(168,85,247,0.4)] group-hover:border-violet-400/50`}>
+        <div className={`relative aspect-[2/3] overflow-hidden bg-gray-900/85 border border-white/15 shadow-lg rounded-lg focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-1 focus-within:ring-offset-black transform-gpu transition-all duration-[400ms] ease-out hover:z-40 focus-within:z-40 will-change-transform group-hover:scale-[1.04] group-hover:shadow-[0_10px_40px_-10px_rgba(168,85,247,0.4)] group-hover:border-violet-400/50`}>
           {imageUrl ? (
             <img
               src={imageUrl}

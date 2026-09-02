@@ -1,14 +1,16 @@
 import { useState, useEffect, useMemo } from 'preact/hooks';
 import type { ContentItem } from '../../../lib/client/types';
 import { RESUME_WATCHING_EVENT } from '../../../lib/resumeWatchingStorage';
+import { isResumeFinished, REWATCH_PROGRESS_THRESHOLD } from '../../../lib/resumeProgress';
 import { serverApi } from '../../../lib/client/server-api';
 
-const REWATCH_PROGRESS_THRESHOLD = 99;
+export { REWATCH_PROGRESS_THRESHOLD, isResumeFinished } from '../../../lib/resumeProgress';
+
 const TMDB_CACHE_TTL_MS = 60 * 60 * 1000; // 1h
 
 /**
  * Statut calculé d'un item "Reprendre" :
- * - in_progress : épisode/film en cours (progress < 99%).
+ * - in_progress : épisode/film en cours (progress < seuil).
  * - new_episode_available : série finie sur l'épisode courant et un nouvel épisode est dispo TMDB.
  * - waiting_for_next : série finie, pas d'épisode dispo encore mais un est annoncé (date connue).
  * - finished : terminé sans suite (film ou série Ended sur le dernier épisode).
@@ -125,7 +127,7 @@ function computeTvStatus(
 } {
   const progress = item.progress ?? 0;
   // Épisode encore en cours -> on continue cet épisode-là.
-  if (progress < REWATCH_PROGRESS_THRESHOLD) {
+  if (!isResumeFinished(item)) {
     return { resumeStatus: 'in_progress' };
   }
   // Épisode terminé. Y a-t-il un suivant ?
@@ -238,7 +240,13 @@ export function useResumeWatching() {
         );
       } else {
         statusInfo = {
-          resumeStatus: progress >= REWATCH_PROGRESS_THRESHOLD ? 'finished' : 'in_progress',
+          resumeStatus: isResumeFinished({
+            progress,
+            positionSeconds,
+            durationSeconds,
+          })
+            ? 'finished'
+            : 'in_progress',
         };
       }
 
@@ -257,8 +265,8 @@ export function useResumeWatching() {
         // Toujours dans la rangée Reprendre (avec badge), mais aussi listé séparément.
         resume.push(enriched);
         waitingForNext.push(enriched);
-      } else if (enriched.resumeStatus === 'finished' && progress >= REWATCH_PROGRESS_THRESHOLD) {
-        // Film/série complètement terminé sans suite -> ligne "Revoir".
+      } else if (enriched.resumeStatus === 'finished') {
+        // Film/série complètement terminé (générique inclus) -> ligne "À revoir".
         rewatch.push(enriched);
       } else {
         // in_progress | new_episode_available -> Reprendre.

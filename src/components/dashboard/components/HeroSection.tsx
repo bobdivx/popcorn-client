@@ -7,6 +7,12 @@ import { YouTubeVideoPlayer } from '../../ui/YouTubeVideoPlayer';
 import { isTVPlatform } from '../../../lib/utils/device-detection';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../../lib/utils/media-detail-url';
 import { contentItemKey } from '../utils/browsePriority';
+import {
+  claimPreviewTrailer,
+  releasePreviewTrailer,
+  subscribePreviewTrailer,
+  getActivePreviewTrailer,
+} from '../utils/previewTrailerStore';
 
 interface HeroSectionProps {
   items: ContentItem[];
@@ -66,28 +72,57 @@ export function HeroSection({
     });
   }, [items]);
 
-  // Charger la bande annonce
+  // Charger la bande annonce + réserver le slot trailer unique
   useEffect(() => {
     if (!currentItem) return;
     const itemId = currentItem.id;
-    
-    if (trailerKeys[itemId] !== undefined) {
-      setIsPlayingTrailer(trailerKeys[itemId] !== null);
-      return;
-    }
+    const heroSlot = `hero:${contentItemKey(currentItem)}`;
+    const trailerKey =
+      typeof currentItem.trailerKey === 'string' && currentItem.trailerKey.trim().length > 0
+        ? currentItem.trailerKey.trim()
+        : null;
 
-    // Vérifier si le torrent a une clé de trailer
-    const trailerKey = (currentItem as any).trailerKey || (currentItem as any).trailer_key || null;
-    
-    if (trailerKey && typeof trailerKey === 'string' && trailerKey.trim().length > 0) {
-      setTrailerKeys((prev) => ({ ...prev, [itemId]: trailerKey }));
-      setIsPlayingTrailer(true);
+    setTrailerKeys((prev) => {
+      if (prev[itemId] === trailerKey) return prev;
+      return { ...prev, [itemId]: trailerKey };
+    });
+
+    if (trailerKey) {
+      claimPreviewTrailer(heroSlot);
+      setIsPlayingTrailer(getActivePreviewTrailer() === heroSlot);
       setIsLoadingTrailer((prev) => ({ ...prev, [itemId]: true }));
     } else {
-      setTrailerKeys((prev) => ({ ...prev, [itemId]: null }));
+      releasePreviewTrailer(heroSlot);
       setIsPlayingTrailer(false);
     }
-  }, [currentIndex, currentItem?.id, currentItem]);
+
+    return () => {
+      releasePreviewTrailer(heroSlot);
+    };
+  }, [currentIndex, currentItem?.id, currentItem?.trailerKey]);
+
+  // Pause hero si une carte preview monopolise le trailer ; reprendre à la libération
+  useEffect(() => {
+    if (!currentItem) return;
+    const heroSlot = `hero:${contentItemKey(currentItem)}`;
+    const hasTrailer =
+      typeof currentItem.trailerKey === 'string' && currentItem.trailerKey.trim().length > 0;
+
+    return subscribePreviewTrailer((activeId) => {
+      if (activeId === heroSlot) {
+        setIsPlayingTrailer(true);
+        return;
+      }
+      if (activeId?.startsWith('card:')) {
+        setIsPlayingTrailer(false);
+        return;
+      }
+      if (activeId == null && hasTrailer) {
+        claimPreviewTrailer(heroSlot);
+        setIsPlayingTrailer(true);
+      }
+    });
+  }, [currentItem?.id, currentItem?.trailerKey]);
 
   // Carousel automatique : défilement toutes les 6 secondes
   useEffect(() => {
@@ -218,7 +253,11 @@ export function HeroSection({
     <div
       ref={heroRootRef}
       className={`hero-dashboard relative z-0 w-full mb-8 ${
-        (isLargeHero && !isTV) ? 'px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16' : ''
+        (isLargeHero && !isTV)
+          ? 'px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 pt-3 sm:pt-4 md:pt-5 lg:pt-6'
+          : isLargeHero
+            ? 'pt-4 tv:pt-6'
+            : ''
       }`}
       data-dark-context
       style={{

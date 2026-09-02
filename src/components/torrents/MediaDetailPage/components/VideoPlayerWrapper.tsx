@@ -282,18 +282,18 @@ export function VideoPlayerWrapper({
         poster: posterUrl ?? undefined,
         tmdbId,
       };
-      // Pour les séries, on attache la saison/épisode/variantId et la position
-      // exacte pour permettre une reprise précise depuis la rangée "Reprendre".
-      const episodeInfo =
-        tmdbType === 'tv'
+      // Position/durée pour tous les types (seuil générique côté dashboard).
+      const episodeInfo = {
+        ...(tmdbType === 'tv'
           ? {
               ...(seriesSeasonNum != null ? { season: seriesSeasonNum } : {}),
               ...(seriesEpisodeNum != null ? { episode: seriesEpisodeNum } : {}),
               ...(torrentId ? { variantId: torrentId } : {}),
-              positionSeconds: currentTime,
-              durationSeconds: duration,
             }
-          : undefined;
+          : {}),
+        positionSeconds: currentTime,
+        durationSeconds: duration,
+      };
       updateResumeWatching(item, progressPercent, episodeInfo);
     },
     [
