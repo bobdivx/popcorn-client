@@ -1,6 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'preact/hooks';
 import { toChildArray } from 'preact';
 import { isTVPlatform } from '../../lib/utils/device-detection';
+import { ensureBrowseScrollSpacer } from '../page-model/browseCarouselAnchor';
 
 interface CarouselRowProps {
   title: string;
@@ -31,22 +32,17 @@ export default function CarouselRow({
   const scroll = useCallback((direction: 'left' | 'right') => {
     if (!scrollContainerRef.current) return;
     const scrollAmount = scrollContainerRef.current.clientWidth * 0.75;
-    
-    // Utiliser courbe de Bézier organique pour défilement fluide
+
     scrollContainerRef.current.scrollBy({
       left: direction === 'left' ? -scrollAmount : scrollAmount,
       behavior: isTV ? 'auto' : 'smooth',
     });
   }, [isTV]);
 
-  // Navigation et focus gérés par TVNavigationProvider global
-  // Ce carousel expose juste data-carousel pour que TVNavigationProvider puisse le détecter
-
   const [isHovered, setIsHovered] = useState(false);
   const isHoveredRef = useRef(false);
   isHoveredRef.current = isHovered;
 
-  // Défilement automatique — désactivé sur TV et mobile (le scroll JS combat le swipe doigt)
   useEffect(() => {
     if (!autoScroll || isTV || isCoarsePointer) return;
     const el = scrollContainerRef.current;
@@ -68,17 +64,26 @@ export default function CarouselRow({
     return () => clearInterval(id);
   }, [autoScroll, autoScrollInterval, isTV, isCoarsePointer]);
 
-  // Plus d'animation d'apparition (fade-in) : affichage immédiat, moins de bruit visuel.
   useEffect(() => {
     if (containerRef.current) {
       containerRef.current.classList.add('opacity-100');
     }
   }, []);
 
+  // Spacer ≥ viewport : ancre le paysage à gauche même avec 2–3 cartes (Reprenez / À revoir)
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const sync = () => ensureBrowseScrollSpacer(el);
+    sync();
+    window.addEventListener('resize', sync);
+    return () => window.removeEventListener('resize', sync);
+  }, [children]);
+
   const childrenArray = toChildArray(children);
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className={`mb-10 sm:mb-12 md:mb-14 tv:mb-20 w-full min-w-0 max-w-full overflow-x-visible overflow-y-visible opacity-100 ${className}`}
       onMouseEnter={() => setIsHovered(true)}
@@ -144,7 +149,6 @@ export default function CarouselRow({
         }}
       >
         {childrenArray}
-        {/* 100vw : même 2 cartes → assez de scroll pour coller le paysage à gauche */}
         <div
           data-browse-scroll-spacer
           aria-hidden="true"

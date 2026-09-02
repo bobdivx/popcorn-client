@@ -1,27 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ContentItem } from '../../lib/client/types';
 import { getDisplayTitle } from '../../lib/utils/title-display';
 import { isTVPlatform } from '../../lib/utils/device-detection';
-import { YouTubeVideoPlayer } from '../ui/YouTubeVideoPlayer';
 import { FocusableCard } from '../ui/FocusableCard';
-import {
-  claimPreviewTrailer,
-  releasePreviewTrailer,
-  subscribePreviewTrailer,
-} from '../dashboard/utils/previewTrailerStore';
 import { contentItemKey } from '../dashboard/utils/browsePriority';
-import {
-  ensureBrowseRowInView,
-  reanchorBrowseSlot,
-} from './browseCarouselAnchor';
+import { reanchorBrowseSlot } from './browseCarouselAnchor';
 import {
   ensureBrowseInputModalityTracking,
   isBrowseKeyboardFocus,
 } from './browseInputModality';
 
 export { reanchorBrowseSlot, ensureBrowseRowInView } from './browseCarouselAnchor';
-
-const TRAILER_DELAY_MS = 700;
 
 /**
  * Hauteur image — paysage focus ≈ 55 % de la largeur utile (réf. streaming TV).
@@ -83,8 +72,8 @@ interface TitlePreviewCardProps {
 
 /**
  * Tuile browse :
- * - souris : reste portrait (survol léger uniquement)
- * - flèches / télécommande : paysage ancré à gauche + trailer
+ * - souris : portrait + léger hover
+ * - flèches / télécommande : paysage ancré à gauche (pas de bande-annonce)
  */
 export function TitlePreviewCard({
   item,
@@ -93,19 +82,12 @@ export function TitlePreviewCard({
   metaLine,
   metaSubLine,
 }: TitlePreviewCardProps) {
-  const slotId = `card:${contentItemKey(item)}`;
   const tileH = useTileHeight();
   const slotRef = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState(false);
   /** Expand paysage : uniquement après focus clavier / télécommande. */
   const [remoteFocused, setRemoteFocused] = useState(false);
-  const [playTrailer, setPlayTrailer] = useState(false);
-  const delayRef = useRef<number | null>(null);
 
-  const trailerKey =
-    typeof item.trailerKey === 'string' && item.trailerKey.trim().length > 0
-      ? item.trailerKey.trim()
-      : null;
   const poster = item.poster || item.backdrop;
   const backdrop = item.backdrop || item.poster;
   const title = getDisplayTitle(item);
@@ -115,48 +97,12 @@ export function TitlePreviewCard({
     ensureBrowseInputModalityTracking();
   }, []);
 
-  const clearDelay = useCallback(() => {
-    if (delayRef.current != null) {
-      window.clearTimeout(delayRef.current);
-      delayRef.current = null;
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!expanded || !trailerKey) {
-      clearDelay();
-      setPlayTrailer(false);
-      releasePreviewTrailer(slotId);
-      return;
-    }
-    clearDelay();
-    delayRef.current = window.setTimeout(() => {
-      claimPreviewTrailer(slotId);
-      setPlayTrailer(true);
-    }, TRAILER_DELAY_MS);
-    return () => clearDelay();
-  }, [expanded, clearDelay, slotId, trailerKey]);
-
-  useEffect(() => {
-    return subscribePreviewTrailer((activeId) => {
-      if (activeId !== slotId) setPlayTrailer(false);
-    });
-  }, [slotId]);
-
-  useEffect(() => {
-    return () => {
-      clearDelay();
-      releasePreviewTrailer(slotId);
-    };
-  }, [clearDelay, slotId]);
-
   const tileW = expanded ? Math.round((tileH * 16) / 9) : Math.round((tileH * 2) / 3);
 
   useEffect(() => {
     const slot = slotRef.current;
     if (!slot) return;
     const onFocusIn = () => {
-      // Souris : pas d’expand. TV / flèches / télécommande : paysage.
       if (!isBrowseKeyboardFocus() && !isTVPlatform()) {
         setRemoteFocused(false);
         return;
@@ -168,7 +114,6 @@ export function TitlePreviewCard({
       if (next && slot.contains(next)) return;
       setRemoteFocused(false);
     };
-    // Si on appuie sur une flèche alors que la carte a déjà le focus (après un clic), expand
     const onKeyDown = (e: KeyboardEvent) => {
       if (
         e.key === 'ArrowLeft' ||
@@ -191,34 +136,13 @@ export function TitlePreviewCard({
     };
   }, []);
 
-  // Ancrage gauche uniquement en mode télécommande / flèches
+  // Ancrage gauche après expand (1 rAF — le layout paysage doit être painté)
   useEffect(() => {
     if (!expanded) return;
     const slot = slotRef.current;
     if (!slot) return;
-
-    const run = () => {
-      reanchorBrowseSlot(slot);
-      ensureBrowseRowInView(slot);
-    };
-    run();
-
-    const ro = new ResizeObserver(() => run());
-    ro.observe(slot);
-    const carousel = slot.closest('[data-carousel]');
-    if (carousel) ro.observe(carousel);
-
-    let raf2 = 0;
-    const raf1 = requestAnimationFrame(() => {
-      run();
-      raf2 = requestAnimationFrame(run);
-    });
-
-    return () => {
-      ro.disconnect();
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-    };
+    const id = requestAnimationFrame(() => reanchorBrowseSlot(slot));
+    return () => cancelAnimationFrame(id);
   }, [expanded, tileW]);
 
   if (!poster && !backdrop) return null;
@@ -242,51 +166,33 @@ export function TitlePreviewCard({
       data-browse-tile
       data-browse-slot
       data-preview-expanded={expanded ? 'true' : 'false'}
+      data-tv-item-key={contentItemKey(item)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       <FocusableCard
-        className="block w-full outline-none"
+        className={[
+          'block w-full outline-none relative overflow-hidden rounded-md bg-[#141414] transition-[transform,box-shadow,filter] duration-150 ease-out',
+          expanded
+            ? ''
+            : hovered
+              ? 'z-[2] scale-[1.04] shadow-[0_12px_28px_rgba(0,0,0,0.45)] brightness-110'
+              : 'shadow-none',
+        ].join(' ')}
+        style={{ width: '100%', height: tileH }}
         ariaLabel={title}
         noScale
+        asTorrentCard
         onClick={() => onNavigate(item)}
       >
-        <div
-          data-torrent-card
-          data-focusable-card
-          data-browse-tile
-          className={[
-            'relative overflow-hidden rounded-md bg-[#141414] transition-[transform,box-shadow,filter,outline-color] duration-200 ease-out',
-            expanded
-              ? 'outline outline-2 outline-white outline-offset-[-2px]'
-              : hovered
-                ? 'z-[2] scale-[1.04] outline outline-1 outline-white/70 outline-offset-[-1px] shadow-[0_12px_28px_rgba(0,0,0,0.45)] brightness-110'
-                : 'shadow-none',
-          ].join(' ')}
-          style={{ width: '100%', height: tileH }}
-        >
+        <div className="absolute inset-0" aria-hidden>
           <img
             src={(expanded ? backdrop : poster) || poster || ''}
             alt=""
             loading="lazy"
             decoding="async"
-            className={`absolute inset-0 h-full w-full object-cover ${
-              playTrailer && expanded ? 'opacity-0' : 'opacity-100'
-            }`}
+            className="absolute inset-0 h-full w-full object-cover"
           />
-
-          {playTrailer && expanded && trailerKey ? (
-            <div className="pointer-events-none absolute inset-0 overflow-hidden">
-              <YouTubeVideoPlayer
-                youtubeKey={trailerKey}
-                autoplay
-                muted
-                loop
-                controls={false}
-                className="!absolute inset-0 !h-full !w-full !aspect-auto"
-              />
-            </div>
-          ) : null}
 
           {progressPct > 0 ? (
             <div className="absolute inset-x-0 bottom-0 h-[3px] bg-white/25">
@@ -312,7 +218,7 @@ export function TitlePreviewCard({
             ) : null}
           </>
         ) : hovered ? (
-          <p className="truncate text-sm font-medium text-white/90 transition-opacity duration-200">
+          <p className="truncate text-sm font-medium text-white/90 transition-opacity duration-150">
             {metaLine || title}
           </p>
         ) : null}
