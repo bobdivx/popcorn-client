@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'preact/hooks';
-import { Info } from 'lucide-preact';
+import { Info, Trash2 } from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
 import { formatSize } from '../utils/formatSize';
 import { useI18n } from '../../../../lib/i18n/useI18n';
@@ -8,6 +8,7 @@ import { getLibraryDisplayConfig } from '../../../../lib/utils/library-display-c
 import { buildExternalDownloadParams } from '../../../../lib/torrents/externalDownloadParams';
 import { Modal } from '../../../ui/Modal';
 import { DsLoader } from '../../../ui/DsLoader';
+import { handleDeleteMedia, isLocalMedia } from '../actions/delete';
 
 type QualityVariant = {
   id: string;
@@ -38,6 +39,10 @@ interface TorrentInfoProps {
   allVariants?: QualityVariant[];
   selectedVariantId?: string | null;
   onSelectVariant?: (variant: QualityVariant) => void;
+  /** Fichier présent sur disque et/ou torrent dans le client → afficher « Supprimer ». */
+  canDelete?: boolean;
+  setIsAvailableLocally?: (value: boolean) => void;
+  addNotification?: (type: 'success' | 'error' | 'info', message: string) => void;
 }
 
 const QUALITY_ORDER: Record<string, number> = { Remux: 6, '4K': 5, '2160p': 5, UHD: 5, '1080p': 4, '720p': 3, '480p': 2 };
@@ -60,10 +65,26 @@ function qualityBadgeClass(_resolution: string, isSelected: boolean): string {
   return 'backdrop-blur-sm text-white/80 border-white/20 bg-black/40 hover:text-white hover:border-white/40';
 }
 
-export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeederWarning = true, isSeries = false, sources, allVariants, selectedVariantId, onSelectVariant }: TorrentInfoProps) {
+export function TorrentInfo({
+  torrent,
+  seedCount,
+  leechCount,
+  fileSize,
+  showSeederWarning = true,
+  isSeries = false,
+  sources,
+  allVariants,
+  selectedVariantId,
+  onSelectVariant,
+  canDelete = false,
+  setIsAvailableLocally,
+  addNotification,
+}: TorrentInfoProps) {
   const { language, t } = useI18n();
   const [isDownloadingTorrent, setIsDownloadingTorrent] = useState(false);
   const [showTechInfoModal, setShowTechInfoModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingMedia, setDeletingMedia] = useState(false);
   const [seederAlertVisible, setSeederAlertVisible] = useState(true);
   const [seederAlertFading, setSeederAlertFading] = useState(false);
 
@@ -139,7 +160,9 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
   const trackerName = (torrent as any).tracker ?? null;
   const infoHash = (torrent as any).infoHash || (torrent as any).info_hash || null;
   const filePath = !isSeries ? ((torrent as any).downloadPath as string | undefined) || null : null;
-  const showMovieTechInfo = !isSeries && !!(filePath || indexerName || minimumRatio != null || trackerName);
+  const showMovieTechInfo =
+    !isSeries &&
+    !!(filePath || indexerName || minimumRatio != null || trackerName || canDelete);
 
   const canDownloadTorrentFile = !!infoHash || !!(torrent as any)._externalLink;
 
@@ -225,6 +248,30 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
       }
     } finally {
       setIsDownloadingTorrent(false);
+    }
+  };
+
+  const deleteInfoHash =
+    (typeof infoHash === 'string' && infoHash.trim()) ||
+    (typeof torrent.infoHash === 'string' && torrent.infoHash.trim()) ||
+    '';
+  const showDeleteInTechModal = canDelete && !!deleteInfoHash && !!setIsAvailableLocally && !!addNotification;
+  const isLocalTorrent = isLocalMedia(deleteInfoHash) || !!(torrent as any).downloadPath;
+
+  const handleConfirmDelete = async () => {
+    if (!deleteInfoHash || !setIsAvailableLocally || !addNotification) return;
+    setDeletingMedia(true);
+    try {
+      await handleDeleteMedia(deleteInfoHash, {
+        torrent,
+        setIsAvailableLocally,
+        addNotification,
+        skipConfirm: true,
+      });
+      setShowDeleteConfirm(false);
+      setShowTechInfoModal(false);
+    } finally {
+      setDeletingMedia(false);
     }
   };
 
@@ -554,6 +601,71 @@ export function TorrentInfo({ torrent, seedCount, leechCount, fileSize, showSeed
                 )}
               </div>
             )}
+
+            {showDeleteInTechModal && (
+              <div className="border-t border-[var(--ds-border)] pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={deletingMedia}
+                  data-focusable
+                  tabIndex={0}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-500/40 bg-red-600/15 px-4 py-3 text-sm font-semibold text-red-300 transition-colors hover:bg-red-600/25 hover:text-red-200 disabled:opacity-50"
+                >
+                  {deletingMedia ? (
+                    <DsLoader size="xs" className="shrink-0" />
+                  ) : (
+                    <Trash2 className="h-4 w-4 shrink-0" aria-hidden />
+                  )}
+                  {isLocalTorrent
+                    ? t('mediaDetail.deleteLocalFile')
+                    : t('mediaDetail.deleteFromDiskAndClient')}
+                </button>
+                <p className="mt-2 text-xs text-[var(--ds-text-tertiary)]">
+                  {t('mediaDetail.deleteFromDiskAndClientHint')}
+                </p>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {showDeleteInTechModal && (
+        <Modal
+          isOpen={showDeleteConfirm}
+          onClose={() => !deletingMedia && setShowDeleteConfirm(false)}
+          title={t('downloads.confirmDeleteTorrentTitle')}
+          size="sm"
+        >
+          <p className="mb-6 text-[var(--ds-text-primary)]">
+            {t('downloads.confirmDeleteTorrentMessage')}
+          </p>
+          <div className="flex flex-wrap justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={deletingMedia}
+              className="rounded-lg border border-[var(--ds-border)] bg-[var(--ds-surface)] px-5 py-2.5 font-semibold text-[var(--ds-text-primary)] hover:bg-[var(--ds-surface-overlay)] focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
+              data-focusable
+            >
+              {t('common.cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={() => void handleConfirmDelete()}
+              disabled={deletingMedia}
+              className="rounded-lg bg-red-600 px-5 py-2.5 font-semibold text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 disabled:opacity-50"
+              data-focusable
+            >
+              {deletingMedia ? (
+                <>
+                  <DsLoader size="xs" className="mr-2 inline-block" />
+                  {t('downloads.removing')}
+                </>
+              ) : (
+                t('common.delete')
+              )}
+            </button>
           </div>
         </Modal>
       )}

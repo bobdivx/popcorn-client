@@ -491,6 +491,18 @@ async function downloadFromExternalIndexer(options: {
     );
   }
 
+  // Plusieurs clés API du même indexer : bascule automatique (ex. ratio bloqué → compte parallèle)
+  const keyFallback = response.headers.get('X-Popcorn-Key-Fallback') === 'true';
+  if (keyFallback) {
+    const fallbackName = response.headers.get('X-Popcorn-Key-Fallback-Name');
+    addNotification(
+      'info',
+      fallbackName
+        ? `Accès refusé avec la première clé (ratio / quota). Téléchargement relancé avec « ${fallbackName} ».`
+        : 'Accès refusé avec la première clé (ratio / quota). Téléchargement relancé avec une autre clé API du même indexer.',
+    );
+  }
+
   // Vérifier le content-type pour déterminer si c'est JSON ou un fichier .torrent
   const contentType = response.headers.get('content-type') || '';
   

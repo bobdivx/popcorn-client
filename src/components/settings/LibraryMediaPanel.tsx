@@ -536,7 +536,7 @@ export default function LibraryMediaPanel() {
                     type="button"
                     class="rounded border border-red-900 px-2 py-1 text-xs text-red-200 hover:bg-red-900/40 disabled:opacity-50"
                     disabled={integrityDeleting}
-                    onClick={() => handleDeleteCorrupted(integrityStatus.corrupted.map((c) => c.id), false)}
+                    onClick={() => handleDeleteCorrupted(integrityStatus.corrupted.map((c) => c.id), true)}
                   >
                     {t('settingsMenu.libraryMediaPanel.integrityDeleteAll')}
                   </button>

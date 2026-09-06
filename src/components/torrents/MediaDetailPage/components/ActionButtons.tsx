@@ -95,7 +95,7 @@ export function ActionButtons({
   isAvailableLocally,
   isStreamingThisTorrent = false,
   canStream,
-  isExternal,
+  isExternal: _isExternal,
   hasInfoHash,
   streamingTorrentActive = false,
   magnetCopied,
@@ -214,7 +214,7 @@ export function ActionButtons({
     torrent._externalMagnetUri ||
     (torrent._externalLink && torrent._externalLink.startsWith('magnet:'))
   );
-  const showDeleteBtn = (isAvailableLocally || isDownloadComplete) && hasInfoHash && !isExternal;
+  const showDeleteBtn = (isAvailableLocally || isDownloadComplete) && hasInfoHash;
   const hasMoreActions = !!(
     onDownloadAllEpisodes ||
     showWatchLaterBtn ||
@@ -375,7 +375,7 @@ export function ActionButtons({
         {!isTV && (
           <>
         {/* ── Séparateur ── */}
-        {(watchLater || (torrent._externalMagnetUri || (torrent._externalLink && torrent._externalLink.startsWith('magnet:'))) || ((isAvailableLocally || isDownloadComplete) && hasInfoHash && !isExternal)) && (
+        {(watchLater || (torrent._externalMagnetUri || (torrent._externalLink && torrent._externalLink.startsWith('magnet:'))) || showDeleteBtn) && (
           <div className="w-px h-7 bg-white/12 mx-0.5 self-center max-sm:hidden" aria-hidden />
         )}
 
