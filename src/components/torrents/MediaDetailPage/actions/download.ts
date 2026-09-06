@@ -225,7 +225,13 @@ async function downloadFromExternalIndexerOnce(options: {
 
   // Si on a déjà l'info_hash ET un lien HTTP indexer : tenter d'abord la DB locale (torrents.file_data).
   // Évite les 429 / rate limit sur l'indexer quand la sync ou un ajout antérieur a stocké le .torrent.
-  if (hasExternalHttpLink && torrent.infoHash?.trim()) {
+  // Exception : si un indexer est connu, snatch frais pour embarquer la passkey du compte actif (C411).
+  const extParamsEarly = buildExternalDownloadParams(torrent as any);
+  const canSnatchWithActiveKey = Boolean(
+    extParamsEarly.indexerId || extParamsEarly.indexerTypeId || extParamsEarly.indexerName
+  );
+
+  if (hasExternalHttpLink && torrent.infoHash?.trim() && !canSnatchWithActiveKey) {
     const localUrl = `${baseUrl}/api/torrents/${encodeURIComponent(torrent.infoHash.trim())}/download`;
     if (setPlayStatus) {
       setPlayStatus('adding');
@@ -267,7 +273,7 @@ async function downloadFromExternalIndexerOnce(options: {
     }
   }
 
-  // URL externe sans copie locale : proxy backend → indexer (peut être rate-limité, ex. C411 429).
+  // URL externe : proxy backend → indexer (snatch avec passkey active si indexerId connu).
   if (hasExternalHttpLink) {
     return await downloadFromExternalIndexer({
       torrent,
@@ -282,7 +288,21 @@ async function downloadFromExternalIndexerOnce(options: {
     });
   }
 
-  // Torrent externe sans URL HTTP : tenter la DB locale par infoHash (ex. torrents synchronisés)
+  // Torrent externe sans URL HTTP : tenter snatch indexer si possible, sinon DB locale
+  if (torrent.infoHash && canSnatchWithActiveKey) {
+    return await downloadFromExternalIndexer({
+      torrent,
+      baseUrl,
+      headers,
+      addNotification,
+      setPlayStatus,
+      pollTorrentProgress,
+      progressPollIntervalRef,
+      PROGRESS_POLL_INTERVAL_MS,
+      setTorrentStats,
+    });
+  }
+
   if (torrent.infoHash) {
     const downloadUrl = `${baseUrl}/api/torrents/${torrent.infoHash}/download`;
     if (setPlayStatus) {
@@ -415,19 +435,27 @@ async function downloadFromExternalIndexer(options: {
   } = options;
 
   if (!torrent._externalLink) {
-    throw new Error('Aucune URL externe disponible pour télécharger le fichier .torrent');
+    // Snatch Torznab possible sans URL page (indexerId + torrentId / infoHash).
+    const p = buildExternalDownloadParams(torrent as any);
+    if (!p.indexerId && !p.indexerTypeId && !p.indexerName) {
+      throw new Error('Aucune URL externe disponible pour télécharger le fichier .torrent');
+    }
   }
 
   const isRelativeLink =
-    !torrent._externalLink.startsWith('http://') && !torrent._externalLink.startsWith('https://');
+    !!torrent._externalLink &&
+    !torrent._externalLink.startsWith('http://') &&
+    !torrent._externalLink.startsWith('https://');
 
   // Construire l'URL de l'endpoint externe avec les paramètres nécessaires
   const externalUrl = new URL(`${baseUrl}/api/torrents/external/download`);
-  if (isRelativeLink) {
-    // Lien relatif (ex. HD-F Gazelle) : le backend résout base_url + relativeUrl via indexerId
-    externalUrl.searchParams.set('relativeUrl', torrent._externalLink);
-  } else {
-    externalUrl.searchParams.set('url', torrent._externalLink);
+  if (torrent._externalLink) {
+    if (isRelativeLink) {
+      // Lien relatif (ex. HD-F Gazelle) : le backend résout base_url + relativeUrl via indexerId
+      externalUrl.searchParams.set('relativeUrl', torrent._externalLink);
+    } else {
+      externalUrl.searchParams.set('url', torrent._externalLink);
+    }
   }
   externalUrl.searchParams.set('torrentName', torrent.name);
   const ihExt = torrent.infoHash?.trim() ?? '';
@@ -437,6 +465,10 @@ async function downloadFromExternalIndexer(options: {
 
   // Params indexer (C411 = infohash hex ; YGG = id numérique) — voir externalDownloadParams
   const extParams = buildExternalDownloadParams(torrent as any);
+  // force=1 seulement si snatch indexer possible (évite de casser un download URL-only)
+  if (extParams.indexerId || extParams.indexerTypeId || extParams.indexerName) {
+    externalUrl.searchParams.set('force', '1');
+  }
   if (extParams.indexerId) {
     externalUrl.searchParams.set('indexerId', extParams.indexerId);
   }
@@ -452,6 +484,10 @@ async function downloadFromExternalIndexer(options: {
     if (idMatch) {
       torrentIdFromVariant = idMatch[1];
     }
+  }
+  // C411 : torrentId = infoHash si pas d'id numérique
+  if (!torrentIdFromVariant && ihExt && /^[a-f0-9]{40}$/i.test(ihExt)) {
+    torrentIdFromVariant = ihExt.toLowerCase();
   }
   if (torrentIdFromVariant) {
     externalUrl.searchParams.set('torrentId', String(torrentIdFromVariant));
