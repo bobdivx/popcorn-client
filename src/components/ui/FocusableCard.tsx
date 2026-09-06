@@ -3,6 +3,7 @@ import { useRef, useEffect } from 'preact/hooks';
 interface FocusableCardProps {
   children: preact.ComponentChildren;
   className?: string;
+  style?: preact.JSX.CSSProperties;
   onClick?: (e: MouseEvent | KeyboardEvent) => void;
   onFocus?: (e: FocusEvent) => void;
   onBlur?: (e: FocusEvent) => void;
@@ -12,6 +13,8 @@ interface FocusableCardProps {
   ariaLabel?: string;
   /** Désactive focus:scale (évite le chevauchement des tuiles browse). */
   noScale?: boolean;
+  /** Marque l’élément focusable comme carte torrent (outline TV sur le wrapper). */
+  asTorrentCard?: boolean;
 }
 
 /**
@@ -19,7 +22,8 @@ interface FocusableCardProps {
  */
 export function FocusableCard({ 
   children, 
-  className = '', 
+  className = '',
+  style,
   onClick,
   onFocus,
   onBlur,
@@ -27,6 +31,7 @@ export function FocusableCard({
   tabIndex = 0,
   ariaLabel,
   noScale = false,
+  asTorrentCard = false,
 }: FocusableCardProps) {
   const cardRef = useRef<HTMLDivElement | HTMLAnchorElement>(null);
 
@@ -82,10 +87,14 @@ export function FocusableCard({
   const commonProps: any = {
     ref: cardRef as any,
     className: baseClasses,
+    style,
     tabIndex,
     role: href ? undefined : 'button',
     'aria-label': ariaLabel ?? (href ? undefined : 'Card cliquable'),
     'data-focusable': true,
+    ...(asTorrentCard
+      ? { 'data-torrent-card': true, 'data-focusable-card': true, 'data-browse-tile': true }
+      : {}),
     onFocus,
     onBlur,
   };

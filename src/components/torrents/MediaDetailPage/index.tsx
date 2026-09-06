@@ -3395,6 +3395,12 @@ export default function MediaDetailPage({
                 onSelectVariant={(variant) => {
                   setSelectedTorrent(variant);
                 }}
+                canDelete={
+                  Boolean(hasInfoHash) &&
+                  Boolean(isAvailableLocally || isDownloadComplete || !!(selectedTorrent || torrent).downloadPath)
+                }
+                setIsAvailableLocally={setIsAvailableLocally}
+                addNotification={addNotification}
               />
             )}
           </div>

@@ -658,20 +658,21 @@ export default function TVNavigationProvider() {
       return window.innerWidth * 0.08;
     };
 
-    // Carousel : on scroll pour que la carte focusée soit à la position d'ancrage (focus fixe, carousel qui bouge).
-    // Le scroll est instantané (behavior='auto') sur TOUTES les plateformes : le mode 'smooth'
-    // sur desktop produisait un effet de « glissé » de toutes les cartes à chaque
-    // changement de focus — perçu comme parasite par les utilisateurs (cf. UX roadmap Phase 3).
     // Browse : cibler [data-browse-slot] (largeur in-flow) plutôt que la carte interne.
     const resolveCarouselScrollTarget = (el: HTMLElement): HTMLElement => {
       return (el.closest('[data-browse-slot]') as HTMLElement) || el;
     };
 
-    const scrollCarouselToElement = (carousel: HTMLElement, el: HTMLElement) => {
+    /** Scroll carousel : 1 ancrage sync. Vertical uniquement si changement de rangée. */
+    const scrollCarouselToElement = (
+      carousel: HTMLElement,
+      el: HTMLElement,
+      opts?: { vertical?: boolean }
+    ) => {
       const target = resolveCarouselScrollTarget(el);
       if (target.hasAttribute('data-browse-slot')) {
         reanchorBrowseSlot(target);
-        ensureBrowseRowInView(target);
+        if (opts?.vertical) ensureBrowseRowInView(target);
         return;
       }
 
@@ -692,51 +693,29 @@ export default function TVNavigationProvider() {
       carousel.scrollLeft = newScrollLeft;
     };
 
-    /** Après élargissement paysage browse, recalculer l’ancre (layout change après focus). */
-    const scheduleBrowseReanchor = (carousel: HTMLElement, el: HTMLElement) => {
+    /** Après expand paysage : 1 rAF (L/R) ou 2 (changement de rangée). */
+    const scheduleBrowseReanchor = (
+      carousel: HTMLElement,
+      el: HTMLElement,
+      opts?: { vertical?: boolean }
+    ) => {
       const target = resolveCarouselScrollTarget(el);
       if (!target.hasAttribute('data-browse-slot')) {
-        // Rangée sans browse-slot : au moins assurer la visibilité verticale
-        requestAnimationFrame(() => {
-          const row = carousel.parentElement as HTMLElement | null;
-          if (!row) return;
-          const rect = row.getBoundingClientRect();
-          const navBottom =
-            document.querySelector('nav[data-tv-site-header], nav.navbar-tv, nav')?.getBoundingClientRect()
-              .bottom ?? 72;
-          const viewBottom = window.innerHeight - 20;
-          let dy = 0;
-          if (rect.bottom > viewBottom) dy = rect.bottom - viewBottom;
-          else if (rect.top < navBottom + 12) dy = rect.top - (navBottom + 12);
-          if (Math.abs(dy) < 2) return;
-          const main = document.querySelector('main.app-main') as HTMLElement | null;
-          if (main && main.scrollHeight > main.clientHeight + 10) main.scrollTop += dy;
-          else window.scrollBy(0, dy);
-        });
+        if (opts?.vertical) {
+          requestAnimationFrame(() => ensureBrowseRowInView(el));
+        }
         return;
       }
-      const ensureVertical = () => {
-        const row = (carousel.parentElement as HTMLElement | null) || carousel;
-        const rect = row.getBoundingClientRect();
-        const navBottom =
-          document.querySelector('nav[data-tv-site-header], nav.navbar-tv, nav')?.getBoundingClientRect()
-            .bottom ?? 72;
-        const viewBottom = window.innerHeight - 20;
-        let dy = 0;
-        if (rect.bottom > viewBottom) dy = rect.bottom - viewBottom;
-        else if (rect.top < navBottom + 12) dy = rect.top - (navBottom + 12);
-        if (Math.abs(dy) < 2) return;
-        const main = document.querySelector('main.app-main') as HTMLElement | null;
-        if (main && main.scrollHeight > main.clientHeight + 10) main.scrollTop += dy;
-        else window.scrollBy(0, dy);
-      };
       requestAnimationFrame(() => {
-        scrollCarouselToElement(carousel, target);
-        ensureVertical();
-        requestAnimationFrame(() => {
-          scrollCarouselToElement(carousel, target);
-          ensureVertical();
-        });
+        reanchorBrowseSlot(target);
+        if (opts?.vertical) {
+          ensureBrowseRowInView(target);
+          // 2e frame : largeur paysage React souvent prête ici (rangées courtes)
+          requestAnimationFrame(() => {
+            reanchorBrowseSlot(target);
+            ensureBrowseRowInView(target);
+          });
+        }
       });
     };
 
@@ -755,7 +734,21 @@ export default function TVNavigationProvider() {
             }
           : { behavior: scrollBehavior, block: 'center' as ScrollLogicalPosition, inline: 'center' as ScrollLogicalPosition };
       const targetToScroll = element.closest(CARD_SELECTOR) as HTMLElement || element;
-      const carousel = targetToScroll.closest(CAROUSEL_SELECTOR) as HTMLElement | null;
+      const carousel = targetToScroll.closest(CAROUSEL_SELECTOR) as HTMLElement | null
+        || element.closest(CAROUSEL_SELECTOR) as HTMLElement | null;
+      const prevCarousel = lastFocusedRef.current?.closest?.(CAROUSEL_SELECTOR) as HTMLElement | null;
+      const crossCarousel = !!(carousel && prevCarousel && carousel !== prevCarousel)
+        || !!(carousel && !prevCarousel);
+
+      const applyCarouselScroll = (cardOrEl: HTMLElement) => {
+        if (!carousel) {
+          cardOrEl.scrollIntoView(scrollOpts);
+          return;
+        }
+        // Horizontal immédiat ; vertical + re-ancre après paint (expand paysage)
+        scrollCarouselToElement(carousel, cardOrEl, { vertical: false });
+        scheduleBrowseReanchor(carousel, cardOrEl, { vertical: crossCarousel });
+      };
 
       // Si c'est une carte, privilégier un élément réellement focusable
       if (isCard(element)) {
@@ -763,10 +756,7 @@ export default function TVNavigationProvider() {
 
         if (element.matches(FOCUSABLE_SELECTOR)) {
           element.focus();
-          if (carousel) {
-            scrollCarouselToElement(carousel, card);
-            scheduleBrowseReanchor(carousel, card);
-          } else element.scrollIntoView(scrollOpts);
+          applyCarouselScroll(card);
           lastFocusedRef.current = element;
           return;
         }
@@ -774,10 +764,7 @@ export default function TVNavigationProvider() {
         const focusable = card.querySelector(FOCUSABLE_SELECTOR) as HTMLElement;
         if (focusable) {
           focusable.focus();
-          if (carousel) {
-            scrollCarouselToElement(carousel, card);
-            scheduleBrowseReanchor(carousel, card);
-          } else focusable.scrollIntoView(scrollOpts);
+          applyCarouselScroll(card);
           lastFocusedRef.current = focusable;
           return;
         }
@@ -786,31 +773,39 @@ export default function TVNavigationProvider() {
           card.setAttribute('tabindex', '0');
         }
         card.focus();
-        if (carousel) {
-          scrollCarouselToElement(carousel, card);
-          scheduleBrowseReanchor(carousel, card);
-        } else card.scrollIntoView(scrollOpts);
+        applyCarouselScroll(card);
         lastFocusedRef.current = card;
         return;
       }
 
       element.focus();
-      if (carousel) {
-        scrollCarouselToElement(carousel, targetToScroll);
-        scheduleBrowseReanchor(carousel, targetToScroll);
-      } else element.scrollIntoView(scrollOpts);
-
+      applyCarouselScroll(targetToScroll);
       lastFocusedRef.current = element;
     };
 
     // Appliquer l'effet visuel (retrait ciblé pour limiter la latence sur webOS)
+    const resolveFocusCard = (element: HTMLElement): HTMLElement | null => {
+      const slot = element.closest('[data-browse-slot]') as HTMLElement | null;
+      if (slot) {
+        return (
+          (slot.querySelector('[data-torrent-card], [data-focusable-card]') as HTMLElement) ||
+          (element.matches(CARD_SELECTOR) ? element : null) ||
+          slot
+        );
+      }
+      const up = element.closest(CARD_SELECTOR) as HTMLElement | null;
+      if (up) return up;
+      const down = element.querySelector?.(CARD_SELECTOR) as HTMLElement | null;
+      return down;
+    };
+
     const applyFocusEffect = (element: HTMLElement) => {
       const prev = lastEffectTargetRef.current;
       if (prev) {
         prev.classList.remove('tv-card-focused', 'tv-element-focused');
         lastEffectTargetRef.current = null;
       }
-      const card = element.closest(CARD_SELECTOR) as HTMLElement;
+      const card = resolveFocusCard(element);
       if (card) {
         card.classList.add('tv-card-focused');
         lastEffectTargetRef.current = card;
@@ -822,7 +817,7 @@ export default function TVNavigationProvider() {
 
     // Retirer l'effet visuel
     const removeFocusEffect = (element: HTMLElement) => {
-      const card = element.closest(CARD_SELECTOR) as HTMLElement;
+      const card = resolveFocusCard(element);
       if (card) card.classList.remove('tv-card-focused');
       element.classList.remove('tv-element-focused');
       if (lastEffectTargetRef.current === card || lastEffectTargetRef.current === element) {
@@ -1352,12 +1347,11 @@ export default function TVNavigationProvider() {
       const target = e.target as HTMLElement;
       const delay = isWebOS ? 0 : 10;
       setTimeout(() => {
-        const card = target.closest(CARD_SELECTOR) as HTMLElement;
-        if (card && !card.contains(document.activeElement)) {
-          removeFocusEffect(target);
-        } else if (!card && target !== document.activeElement) {
-          removeFocusEffect(target);
-        }
+        const card = resolveFocusCard(target);
+        const active = document.activeElement as HTMLElement | null;
+        if (card && active && (card === active || card.contains(active))) return;
+        if (target.closest('[data-browse-slot]')?.contains(active)) return;
+        removeFocusEffect(target);
       }, delay);
     };
 
@@ -1409,12 +1403,29 @@ export default function TVNavigationProvider() {
         outline-offset: -3px !important;
         box-shadow: none !important;
       }
+      /* Browse : anneau inset (outline clipé par overflow-x carousel) — après les resets box-shadow */
+      html[data-tv-platform="true"] [data-browse-slot]:focus-within [data-torrent-card],
+      html[data-tv-platform="true"] [data-browse-slot]:focus-within [data-focusable-card],
+      html[data-tv-platform="true"] [data-browse-slot] [data-torrent-card].tv-card-focused,
+      html[data-tv-platform="true"] [data-browse-tile][data-torrent-card].tv-card-focused,
+      html[data-tv-platform="true"] [data-browse-slot] .tv-card-focused {
+        outline: none !important;
+        box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.92) !important;
+        transform: none !important;
+        animation: none !important;
+      }
       html[data-tv-platform="true"] [data-torrent-card]:focus-visible,
       html[data-tv-platform="true"] [data-torrent-card]:focus-within,
       html[data-tv-platform="true"] .torrent-poster:focus-visible,
       html[data-tv-platform="true"] .torrent-poster:focus-within {
         animation: none !important;
         box-shadow: none !important;
+      }
+      html[data-tv-platform="true"] [data-browse-slot] [data-torrent-card]:focus-visible,
+      html[data-tv-platform="true"] [data-browse-slot] [data-torrent-card]:focus-within,
+      html[data-tv-platform="true"] [data-browse-slot] [data-focusable-card]:focus-visible,
+      html[data-tv-platform="true"] [data-browse-slot] [data-focusable-card]:focus-within {
+        box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.92) !important;
       }
       html[data-tv-platform="true"] [data-carousel]:has(.tv-card-focused) [data-torrent-card]:not(.tv-card-focused),
       html[data-tv-platform="true"] [data-carousel]:has(.tv-card-focused) .torrent-poster:not(.tv-card-focused) {
@@ -1454,21 +1465,28 @@ export default function TVNavigationProvider() {
       html:not([data-tv-platform="true"]) [data-browse-tile] .tv-card-focused,
       html:not([data-tv-platform="true"]) [data-browse-tile][data-torrent-card].tv-card-focused,
       html:not([data-tv-platform="true"]) [data-browse-tile] .torrent-poster.tv-card-focused,
-      html:not([data-tv-platform="true"]) [data-browse-slot] .tv-card-focused {
+      html:not([data-tv-platform="true"]) [data-browse-slot] .tv-card-focused,
+      html:not([data-tv-platform="true"]) [data-browse-slot]:focus-within [data-torrent-card],
+      html:not([data-tv-platform="true"]) [data-browse-slot]:focus-within [data-focusable-card] {
         transform: none !important;
         animation: none !important;
         z-index: 2 !important;
-        box-shadow: none !important;
         overflow: hidden !important;
+        outline: none !important;
+        box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.92) !important;
       }
       html[data-tv-platform="true"] [data-browse-tile].tv-card-focused,
       html[data-tv-platform="true"] [data-browse-tile] .tv-card-focused,
       html[data-tv-platform="true"] [data-browse-tile][data-torrent-card].tv-card-focused,
-      html[data-tv-platform="true"] [data-browse-slot] .tv-card-focused {
+      html[data-tv-platform="true"] [data-browse-slot] .tv-card-focused,
+      html[data-tv-platform="true"] [data-browse-slot]:focus-within [data-torrent-card],
+      html[data-tv-platform="true"] [data-browse-slot]:focus-within [data-focusable-card] {
         transform: none !important;
         animation: none !important;
         z-index: 2 !important;
         overflow: hidden !important;
+        outline: none !important;
+        box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.92) !important;
       }
       
       html:not([data-tv-platform="true"]) [data-torrent-card].tv-card-focused,
@@ -1548,9 +1566,13 @@ export default function TVNavigationProvider() {
       }
       html[data-webos="true"] [data-browse-tile].tv-card-focused,
       html[data-webos="true"] [data-browse-tile] .tv-card-focused,
-      html[data-webos="true"] [data-browse-slot] .tv-card-focused {
+      html[data-webos="true"] [data-browse-slot] .tv-card-focused,
+      html[data-webos="true"] [data-browse-slot]:focus-within [data-torrent-card],
+      html[data-webos="true"] [data-browse-slot]:focus-within [data-focusable-card] {
         transform: none !important;
         animation: none !important;
+        outline: none !important;
+        box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.92) !important;
       }
       html[data-webos="true"] [data-torrent-card].tv-card-focused,
       html[data-webos="true"] .torrent-poster.tv-card-focused,
