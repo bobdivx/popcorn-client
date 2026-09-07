@@ -279,7 +279,7 @@ export function TorrentInfo({
     <div className="space-y-4">
       {/* Info technique (chemin / indexer) en modal — films. Séries : bouton Info dossier dans ActionButtons. */}
       {(showMovieTechInfo || (isSeries && indexerName) || qualityGroups || currentQuality) && (
-        <div className="mb-4 flex flex-wrap items-center gap-3">
+        <div className="mb-2 flex flex-wrap items-center gap-3">
           {showMovieTechInfo && (
             <button
               type="button"
