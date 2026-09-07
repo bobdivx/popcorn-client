@@ -31,7 +31,19 @@ interface HeroSectionProps {
   size?: 'default' | 'large';
 }
 
-const MIN_SWIPE_DISTANCE = 50;
+function hasTrailer(item: ContentItem): boolean {
+  return typeof item.trailerKey === 'string' && item.trailerKey.trim().length > 0;
+}
+
+/** Un média par chargement de page (priorité aux titres avec bande-annonce). */
+function pickRandomIndex(items: ContentItem[]): number {
+  if (items.length <= 1) return 0;
+  const withTrailer = items
+    .map((item, i) => ({ item, i }))
+    .filter(({ item }) => hasTrailer(item));
+  const pool = withTrailer.length > 0 ? withTrailer : items.map((item, i) => ({ item, i }));
+  return pool[Math.floor(Math.random() * pool.length)].i;
+}
 
 export function HeroSection({
   items,
@@ -48,13 +60,7 @@ export function HeroSection({
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
   const [trailerKeys, setTrailerKeys] = useState<Record<string, string | null>>({});
   const [isPlayingTrailer, setIsPlayingTrailer] = useState(true);
-  const [isLoadingTrailer, setIsLoadingTrailer] = useState<Record<string, boolean>>({});
-  const [heroPaused, setHeroPaused] = useState(false);
-  const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
-  const trailerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const touchStartX = useRef<number>(0);
-  const touchStartY = useRef<number>(0);
-  const heroRootRef = useRef<HTMLDivElement>(null);
+  const pickedForKeysRef = useRef<string>('');
 
   if (!items || items.length === 0) {
     return null;
@@ -62,6 +68,16 @@ export function HeroSection({
 
   const validIndex = Math.min(currentIndex, items.length - 1);
   const currentItem = items[validIndex];
+
+  // Un média différent à chaque chargement (pas de carousel)
+  useEffect(() => {
+    if (!items.length) return;
+    const keys = items.map(contentItemKey).join('|');
+    if (keys === pickedForKeysRef.current) return;
+    pickedForKeysRef.current = keys;
+    setCurrentIndex(pickRandomIndex(items));
+    setIsPlayingTrailer(true);
+  }, [items]);
 
   // Charger les images
   useEffect(() => {
@@ -90,7 +106,6 @@ export function HeroSection({
     if (trailerKey) {
       claimPreviewTrailer(heroSlot);
       setIsPlayingTrailer(getActivePreviewTrailer() === heroSlot);
-      setIsLoadingTrailer((prev) => ({ ...prev, [itemId]: true }));
     } else {
       releasePreviewTrailer(heroSlot);
       setIsPlayingTrailer(false);
@@ -105,8 +120,7 @@ export function HeroSection({
   useEffect(() => {
     if (!currentItem) return;
     const heroSlot = `hero:${contentItemKey(currentItem)}`;
-    const hasTrailer =
-      typeof currentItem.trailerKey === 'string' && currentItem.trailerKey.trim().length > 0;
+    const itemHasTrailer = hasTrailer(currentItem);
 
     return subscribePreviewTrailer((activeId) => {
       if (activeId === heroSlot) {
@@ -117,72 +131,14 @@ export function HeroSection({
         setIsPlayingTrailer(false);
         return;
       }
-      if (activeId == null && hasTrailer) {
+      if (activeId == null && itemHasTrailer) {
         claimPreviewTrailer(heroSlot);
         setIsPlayingTrailer(true);
       }
     });
   }, [currentItem?.id, currentItem?.trailerKey]);
 
-  // Carousel automatique : défilement toutes les 6 secondes
-  useEffect(() => {
-    if (items.length <= 1 || heroPaused) return;
-
-    if (autoPlayRef.current) {
-      clearInterval(autoPlayRef.current);
-      autoPlayRef.current = null;
-    }
-
-    const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % items.length);
-    }, 6000);
-    autoPlayRef.current = interval;
-
-    return () => {
-      clearInterval(interval);
-      autoPlayRef.current = null;
-    };
-  }, [items.length, heroPaused]);
-
-  useEffect(() => {
-    const root = heroRootRef.current;
-    if (!root) return;
-    const onCycle = (e: Event) => {
-      const delta = (e as CustomEvent<{ delta?: number }>).detail?.delta ?? 1;
-      if (items.length <= 1) return;
-      setHeroPaused(true);
-      setCurrentIndex((prev) => (prev + delta + items.length) % items.length);
-    };
-    root.addEventListener('tv-hero-cycle', onCycle);
-    return () => root.removeEventListener('tv-hero-cycle', onCycle);
-  }, [items.length]);
-
-  useEffect(() => {
-    if (!heroPaused || !isTVPlatform()) return;
-    const btn = heroRootRef.current?.querySelector<HTMLElement>('[data-tv-hero-cycle]');
-    if (!btn) return;
-    requestAnimationFrame(() => {
-      try {
-        btn.focus({ preventScroll: true });
-      } catch {
-        btn.focus();
-      }
-    });
-  }, [currentIndex, heroPaused]);
-
-  useEffect(() => {
-    return () => {
-      if (autoPlayRef.current) {
-        clearInterval(autoPlayRef.current);
-      }
-      if (trailerTimeoutRef.current) {
-        clearTimeout(trailerTimeoutRef.current);
-      }
-    };
-  }, []);
-
   const getItemUrl = (item: ContentItem) => {
-    // Item Discover (id tmdb-xxx-type) → page discover
     if (item.id?.startsWith('tmdb-') && item.tmdbId) {
       return `/discover?tmdbId=${item.tmdbId}&type=${item.type}`;
     }
@@ -210,27 +166,6 @@ export function HeroSection({
     handlePlay();
   };
 
-  // Swipe tactile pour naviguer entre les slides (gauche/droite)
-  const handleTouchStart = (e: TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  };
-  const handleTouchEnd = (e: TouchEvent) => {
-    if (items.length <= 1) return;
-    const touchEndX = e.changedTouches[0].clientX;
-    const touchEndY = e.changedTouches[0].clientY;
-    const deltaX = touchEndX - touchStartX.current;
-    const deltaY = touchEndY - touchStartY.current;
-    if (Math.abs(deltaX) < MIN_SWIPE_DISTANCE || Math.abs(deltaX) < Math.abs(deltaY)) return;
-    if (deltaX < 0) {
-      setHeroPaused(true);
-      setCurrentIndex((prev) => (prev + 1) % items.length);
-    } else {
-      setHeroPaused(true);
-      setCurrentIndex((prev) => (prev - 1 + items.length) % items.length);
-    }
-  };
-
   if (!currentItem) {
     return null;
   }
@@ -244,14 +179,17 @@ export function HeroSection({
   const heroNewEpisodeLabel = t('dashboard.heroNewEpisode');
   const heroRequestDownloadedLabel = t('dashboard.heroRequestDownloaded');
   const heroDownloadedUnseenLabel = t('dashboard.heroDownloadedUnseen');
-  
-  // Sur TV, le hero doit être plus imposant (billboard)
-  const tvHeroHeight = isLargeHero ? 'max(70vh, 500px)' : 'clamp(320px, 50vh, 560px)';
-  const heroHeight = isTV ? tvHeroHeight : (isLargeHero ? 'clamp(340px, 52vh, 640px)' : 'clamp(320px, 50vh, 560px)');
+
+  // Hero plus imposant (billboard)
+  const tvHeroHeight = isLargeHero ? 'max(82vh, 560px)' : 'clamp(380px, 62vh, 680px)';
+  const heroHeight = isTV
+    ? tvHeroHeight
+    : isLargeHero
+      ? 'clamp(420px, 68vh, 780px)'
+      : 'clamp(380px, 60vh, 700px)';
 
   return (
     <div
-      ref={heroRootRef}
       className={`hero-dashboard relative z-0 w-full mb-8 ${
         (isLargeHero && !isTV)
           ? 'px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 pt-3 sm:pt-4 md:pt-5 lg:pt-6'
@@ -260,25 +198,33 @@ export function HeroSection({
             : ''
       }`}
       data-dark-context
-      style={{
-        touchAction: 'pan-x pan-y',
-      }}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
     >
       <div
         className={`relative w-full overflow-hidden ${isLargeHero && !isTV ? 'rounded-2xl border border-white/10' : ''}`}
         style={{ height: heroHeight }}
       >
+      <style>{`
+        @keyframes hero-slide-fade {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes ken-burns {
+          from { transform: scale(1); }
+          to { transform: scale(1.05); }
+        }
+        .hero-slide-enter {
+          animation: hero-slide-fade 0.6s ease-out forwards;
+        }
+      `}</style>
+
       {isLargeHero ? (
         <div className="relative h-full">
-          {/* ─── Couche fond : vidéo ou image ─── */}
           {isPlayingTrailer && currentTrailerKey ? (
             <div key={`trailer-${currentIndex}`} className="absolute inset-0 hero-slide-enter">
               <YouTubeVideoPlayer
                 youtubeKey={currentTrailerKey}
                 autoplay={true}
-                muted={true}
+                muted={false}
                 loop={false}
                 controls={false}
                 cover={true}
@@ -306,7 +252,6 @@ export function HeroSection({
             </div>
           )}
 
-          {/* ─── Contenu : deux zones (texte + barre d’actions) ─── */}
           <div
             key={`content-${currentIndex}`}
             className="absolute inset-0 z-10 flex flex-col pt-8"
@@ -387,7 +332,6 @@ export function HeroSection({
                     onClick={handlePrimaryAction}
                     data-focusable
                     data-tv-initial-focus
-                    data-tv-hero-cycle
                     data-tv-item-key={contentItemKey(currentItem)}
                     tabIndex={0}
                     disabled={primaryActionDisabled}
@@ -419,28 +363,12 @@ export function HeroSection({
         </div>
       ) : (
       <>
-      {/* Animation de fondu entre les slides */}
-      <style>{`
-        @keyframes hero-slide-fade {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes ken-burns {
-          from { transform: scale(1); }
-          to { transform: scale(1.05); }
-        }
-        .hero-slide-enter {
-          animation: hero-slide-fade 0.6s ease-out forwards;
-        }
-      `}</style>
-
-      {/* ─── Couche fond : vidéo ou image ─── */}
       {isPlayingTrailer && currentTrailerKey ? (
         <div key={`trailer-${currentIndex}`} className="absolute inset-0 hero-slide-enter">
           <YouTubeVideoPlayer
             youtubeKey={currentTrailerKey}
             autoplay={true}
-            muted={true}
+            muted={false}
             loop={false}
             controls={false}
             cover={true}
@@ -468,15 +396,12 @@ export function HeroSection({
         </div>
       )}
 
-      {/* ─── Contenu : deux zones (texte + barre d’actions) ─── */}
       <div
         key={`content-${currentIndex}`}
         className={`absolute inset-0 z-10 flex flex-col ${!noOverlap ? 'mt-8 sm:mt-20 md:mt-32' : ''}`}
       >
-        {/* Zone 1 : métadonnées, logo, titre, description — alignée en bas, au-dessus de la barre */}
         <div className="flex-1 min-h-0 flex flex-col justify-end px-4 sm:px-6 lg:px-16 tv:px-24 pb-3 overflow-hidden hero-slide-enter">
           <div className="max-w-2xl tv:max-w-3xl w-full flex flex-col gap-2 sm:gap-3">
-            {/* Ligne métadonnées */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-white/95">
               <span className="text-xs sm:text-sm font-semibold uppercase tracking-wide">
                 {currentItem.type === 'movie' ? t('common.film') : currentItem.type === 'tv' ? t('common.serie') : t('common.content')}
@@ -519,7 +444,6 @@ export function HeroSection({
               )}
             </div>
 
-            {/* Logo (si présent) */}
             {currentItem.logo && (
               <img
                 src={currentItem.logo}
@@ -529,7 +453,6 @@ export function HeroSection({
               />
             )}
 
-            {/* Titre */}
             <h1 className={`font-bold drop-shadow-2xl line-clamp-2 ${
               currentItem.logo
                 ? 'text-base sm:text-lg md:text-xl lg:text-2xl tv:text-3xl text-white/95'
@@ -538,7 +461,6 @@ export function HeroSection({
               {getDisplayTitle(currentItem) || currentItem.title || ''}
             </h1>
 
-            {/* Description (2 lignes max) */}
             {currentItem.overview && (
               <p className="text-xs sm:text-sm tv:text-base text-white/80 line-clamp-2 drop-shadow-lg max-w-xl">
                 {currentItem.overview}
@@ -547,7 +469,6 @@ export function HeroSection({
           </div>
         </div>
 
-        {/* Zone 2 : barre d’actions — hauteur fixe, toujours visible en bas */}
         <div className="flex-shrink-0 px-4 sm:px-6 lg:px-16 tv:px-24 py-3 sm:py-4 bg-gradient-to-t from-black/95 via-black/85 to-transparent backdrop-blur-[2px] hero-slide-enter">
           <div className="max-w-2xl tv:max-w-3xl w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className={`flex flex-col gap-2 sm:gap-3 ${isTV ? '' : 'xs:flex-row'}`}>
@@ -555,7 +476,6 @@ export function HeroSection({
                 onClick={handlePrimaryAction}
                 data-focusable
                 data-tv-initial-focus
-                data-tv-hero-cycle
                 data-tv-item-key={contentItemKey(currentItem)}
                 tabIndex={0}
                 disabled={primaryActionDisabled}
