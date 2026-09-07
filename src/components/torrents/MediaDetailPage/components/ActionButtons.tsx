@@ -226,8 +226,48 @@ export function ActionButtons({
   const moreActionClass =
     'w-full min-h-[56px] tv:min-h-[68px] inline-flex items-center gap-3 px-4 rounded-xl bg-white/10 border border-white/15 text-white text-left text-lg tv:text-xl font-medium focus:outline-none focus:ring-4 focus:ring-primary-600/70 disabled:opacity-40';
 
+  const showDownloadProgressCard =
+    !isStreamingThisTorrent &&
+    (showProgressNextToCancel || hasActiveDownloadStats) &&
+    !!torrentStats;
+
+  const showPrimaryActionRow =
+    ((!hidePrimaryPlayForTvSeries || !shouldShowPlayButton) &&
+      shouldShowButton &&
+      !(isDownloadInProgress && onCancelDownload && showProgressNextToCancel)) ||
+    (!isTV && !!onDownloadAllEpisodes) ||
+    showDownloadButtonAlongsidePlay ||
+    (isTV && hasMoreActions) ||
+    (isPackWithMultipleFiles &&
+      !(selectedPackEpisodePreviewIndex != null && (onDownloadSingleEpisode != null || (canStream && onPlaySingleEpisode != null))) &&
+      !shouldShowPlayButton);
+
+  const progressSurface = showDownloadProgressCard ? (
+    <PlaybackStatusSurface
+      variant="inline"
+      playStatus={
+        phaseDerived.phase === 'resolving'
+          ? 'adding'
+          : phaseDerived.phase === 'findingPeers' || phaseDerived.phase === 'downloading'
+            ? 'downloading'
+            : 'downloading'
+      }
+      torrentStats={torrentStats}
+      posterUrl={torrent.imageUrl ?? null}
+      imageUrl={torrent.heroImageUrl ?? torrent.imageUrl ?? null}
+      title={torrent.cleanTitle || torrent.name || null}
+      isActiveSession
+      onCancel={onCancelDownload}
+      cancelLabel={t('downloads.cancelDownload')}
+      className="w-full max-w-2xl"
+    />
+  ) : null;
+
   return (
-    <div className="mb-6 space-y-3">
+    <div className={`space-y-3 ${showDownloadProgressCard ? 'mb-3' : 'mb-6'}`}>
+      {/* Pendant un téléchargement : la carte domine, les icônes suivent (alignées avec Info / qualité). */}
+      {showDownloadProgressCard ? progressSurface : null}
+
       {/* ── Rangée principale ── */}
       <div className="flex flex-wrap gap-3 tv:gap-4 items-center overflow-visible">
 
@@ -374,8 +414,9 @@ export function ActionButtons({
         {/* ── Actions secondaires (desktop) ── */}
         {!isTV && (
           <>
-        {/* ── Séparateur ── */}
-        {(watchLater || (torrent._externalMagnetUri || (torrent._externalLink && torrent._externalLink.startsWith('magnet:'))) || showDeleteBtn) && (
+        {/* ── Séparateur (uniquement s’il y a une action primaire à côté) ── */}
+        {showPrimaryActionRow &&
+          (watchLater || (torrent._externalMagnetUri || (torrent._externalLink && torrent._externalLink.startsWith('magnet:'))) || showDeleteBtn) && (
           <div className="w-px h-7 bg-white/12 mx-0.5 self-center max-sm:hidden" aria-hidden />
         )}
 
@@ -484,30 +525,6 @@ export function ActionButtons({
           </>
         )}
       </div>
-
-      {/* Carte progression glass – même dérivation que l’overlay */}
-      {!isStreamingThisTorrent &&
-        (showProgressNextToCancel || hasActiveDownloadStats) &&
-        torrentStats && (
-          <PlaybackStatusSurface
-            variant="inline"
-            playStatus={
-              phaseDerived.phase === 'resolving'
-                ? 'adding'
-                : phaseDerived.phase === 'findingPeers' || phaseDerived.phase === 'downloading'
-                  ? 'downloading'
-                  : 'downloading'
-            }
-            torrentStats={torrentStats}
-            posterUrl={torrent.imageUrl ?? null}
-            imageUrl={torrent.heroImageUrl ?? torrent.imageUrl ?? null}
-            title={torrent.cleanTitle || torrent.name || null}
-            isActiveSession
-            onCancel={onCancelDownload}
-            cancelLabel={t('downloads.cancelDownload')}
-            className="min-w-[200px] max-w-[520px] w-full"
-          />
-        )}
 
       {isTV && (
         <Modal

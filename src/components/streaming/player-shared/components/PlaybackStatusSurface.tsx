@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { X } from 'lucide-preact';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { formatBytes, formatSpeed, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
 import { generateQRCode } from '../../../../lib/utils/qrcode';
@@ -532,6 +533,11 @@ export function PlaybackStatusSurface({
     ) {
       return null;
     }
+    const cancelText = cancelLabel || t('common.cancel') || 'Annuler';
+    const pct =
+      derived.progressPercent != null
+        ? Math.round(derived.progressPercent)
+        : null;
     return (
       <div
         className={`glass-panel rounded-2xl border border-white/10 overflow-hidden animate-[fade-in_0.25s_ease-out] ${className}`}
@@ -540,34 +546,36 @@ export function PlaybackStatusSurface({
       >
         <div className="flex items-stretch gap-0">
           {showPoster ? (
-            <div className="relative w-16 sm:w-20 shrink-0 overflow-hidden">
+            <div className="relative w-[4.25rem] sm:w-24 shrink-0 overflow-hidden self-stretch min-h-[5.5rem]">
               <img
                 src={artUrl!}
                 alt=""
                 className="absolute inset-0 w-full h-full object-cover"
                 onError={() => setPosterFailed(true)}
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/40" />
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-black/50" />
             </div>
           ) : (
             <div className="w-14 shrink-0 flex items-center justify-center border-r border-white/10 bg-black/30">
               <img src="/popcorn_logo.png" alt="" className="w-7 h-7 object-contain opacity-80" />
             </div>
           )}
-          <div className="flex-1 min-w-0 px-3.5 py-3 flex items-center gap-3">
-            {(derived.phase === 'resolving' || derived.phase === 'findingPeers' || derived.phase === 'buffering') && (
-              <DsLoader size="xs" className="shrink-0" />
-            )}
-            <div className="flex-1 min-w-0 space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-white/55 truncate">
+          <div className="flex-1 min-w-0 px-3.5 sm:px-4 py-3 sm:py-3.5 flex items-center gap-3">
+            <div className="flex-1 min-w-0 space-y-2">
+              <div className="flex items-center gap-2 min-w-0">
+                {(derived.phase === 'resolving' ||
+                  derived.phase === 'findingPeers' ||
+                  derived.phase === 'buffering') && (
+                  <DsLoader size="xs" className="shrink-0" />
+                )}
+                <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.14em] text-white/50 truncate">
                   {label}
                 </span>
-                <span className="text-lg font-bold tabular-nums text-white shrink-0">
-                  {derived.progressPercent != null ? `${Math.round(derived.progressPercent)}%` : na}
+                <span className="ml-auto text-xl sm:text-2xl font-bold tabular-nums text-white shrink-0 leading-none">
+                  {pct != null ? `${pct}%` : na}
                 </span>
               </div>
-              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                 <div
                   className="h-full rounded-full bg-primary-500 transition-[width] duration-500 ease-out"
                   style={{
@@ -575,15 +583,22 @@ export function PlaybackStatusSurface({
                   }}
                 />
               </div>
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-white/45">
+              <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1 text-xs sm:text-sm text-white/55">
                 {derived.downloadSpeed != null && derived.downloadSpeed > 0 ? (
-                  <span>{speedLabel}</span>
+                  <span className="font-semibold text-white/85 tabular-nums">{speedLabel}</span>
                 ) : null}
-                {derived.etaSeconds != null && derived.etaSeconds > 0 ? <span>{etaLabel}</span> : null}
+                {derived.etaSeconds != null && derived.etaSeconds > 0 ? (
+                  <span className="tabular-nums">{etaLabel}</span>
+                ) : null}
                 {derived.totalBytes != null && derived.totalBytes > 0 ? (
-                  <span>
-                    {downloadedLabel} / {totalLabel}
+                  <span className="tabular-nums">
+                    {downloadedLabel}
+                    <span className="text-white/35"> / </span>
+                    {totalLabel}
                   </span>
+                ) : null}
+                {derived.peersConnected != null ? (
+                  <span className="text-white/40 tabular-nums">{peersLabel} peers</span>
                 ) : null}
               </div>
             </div>
@@ -593,9 +608,11 @@ export function PlaybackStatusSurface({
                 onClick={onCancel}
                 data-focusable
                 tabIndex={0}
-                className="shrink-0 rounded-xl border border-white/15 bg-white/5 hover:bg-red-500/20 hover:border-red-400/40 px-3 py-2 text-sm text-white/80 transition-colors"
+                title={cancelText}
+                aria-label={cancelText}
+                className="gtv-icon-btn ds-focus-glow ds-active-glow shrink-0 self-center hover:bg-red-500/20 hover:border-red-400/40 hover:text-red-200"
               >
-                {cancelLabel || t('common.cancel') || 'Annuler'}
+                <X className="h-5 w-5" size={20} aria-hidden />
               </button>
             ) : null}
           </div>
