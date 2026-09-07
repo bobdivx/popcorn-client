@@ -52,6 +52,92 @@ function tvArrowKey(e: KeyboardEvent): 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 
   return '';
 }
 
+/** Nombre de colonnes d'une liste TV (grille CSS ou attribut). 1 = liste verticale. */
+function getListColumnCount(list: HTMLElement): number {
+  const attr = list.getAttribute('data-tv-list-cols');
+  if (attr) {
+    const n = parseInt(attr, 10);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  try {
+    const style = window.getComputedStyle(list);
+    if (style.display.includes('grid')) {
+      const cols = style.gridTemplateColumns.split(/\s+/).filter((s) => s && s !== 'none');
+      if (cols.length > 1) return cols.length;
+    }
+  } catch {
+    // ignore
+  }
+  return 1;
+}
+
+/** Focusables d'une ligne liste — sans scan viewport page entière. */
+function getListItemFocusables(item: HTMLElement): HTMLElement[] {
+  return Array.from(
+    item.querySelectorAll<HTMLElement>(
+      'a[href]:not([disabled]):not([aria-hidden="true"]):not([tabindex="-1"]), button:not([disabled]):not([aria-hidden="true"]):not([tabindex="-1"]), [tabindex]:not([tabindex="-1"]):not([aria-hidden="true"]), [data-focusable]:not([tabindex="-1"])'
+    )
+  ).filter((el) => {
+    if (el.closest('[data-tv-nav-skip]')) return false;
+    if (el.closest('[aria-hidden="true"]')) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  });
+}
+
+function pickListItemFocusable(item: HTMLElement, preferSlot: number): HTMLElement | null {
+  const primary = item.querySelector<HTMLElement>('[data-tv-list-primary]');
+  const focusables = getListItemFocusables(item);
+  if (preferSlot <= 0 && primary && (focusables.length === 0 || focusables.includes(primary))) {
+    return primary;
+  }
+  if (focusables.length === 0) return primary;
+  return focusables[Math.min(Math.max(0, preferSlot), focusables.length - 1)] ?? primary ?? focusables[0];
+}
+
+/**
+ * Navigation liste/grille TV (téléchargements, etc.).
+ * Grille : Bas/Haut = ±colonnes ; Gauche/Droite = ±1 dans la même rangée.
+ * Retourne undefined si le cas n'est pas géré (laisser le spatial).
+ */
+function resolveListNeighbor(
+  list: HTMLElement,
+  listItem: HTMLElement,
+  current: HTMLElement,
+  direction: 'up' | 'down' | 'left' | 'right'
+): HTMLElement | null | undefined {
+  const items = Array.from(list.querySelectorAll<HTMLElement>('[data-tv-list-item]'));
+  const itemIdx = items.indexOf(listItem);
+  if (itemIdx < 0) return undefined;
+
+  const cols = getListColumnCount(list);
+  const rowFocusables = getListItemFocusables(listItem);
+  const slot = Math.max(0, rowFocusables.indexOf(current));
+
+  if (direction === 'left' || direction === 'right') {
+    const nextSlot = direction === 'left' ? slot - 1 : slot + 1;
+    if (nextSlot >= 0 && nextSlot < rowFocusables.length) return rowFocusables[nextSlot];
+
+    const adj = direction === 'left' ? itemIdx - 1 : itemIdx + 1;
+    if (adj < 0 || adj >= items.length) return null;
+    if (cols > 1) {
+      const row = Math.floor(itemIdx / cols);
+      if (Math.floor(adj / cols) !== row) return null;
+    }
+    return pickListItemFocusable(items[adj], direction === 'left' ? 999 : 0);
+  }
+
+  const delta = cols > 1 ? cols : 1;
+  const nextItemIdx = direction === 'down' ? itemIdx + delta : itemIdx - delta;
+  if (nextItemIdx >= 0 && nextItemIdx < items.length) {
+    return pickListItemFocusable(items[nextItemIdx], slot);
+  }
+
+  // Première rangée + haut → laisser le chemin header (undefined)
+  if (direction === 'up' && itemIdx < cols) return undefined;
+  return null;
+}
+
 /**
  * Fournisseur de navigation TV global - Style Netflix
  * 
@@ -425,45 +511,32 @@ export default function TVNavigationProvider() {
         }
       }
 
-      // Liste verticale : haut/bas = même « colonne » de la ligne voisine ; gauche/droite = boutons de la ligne
+      // Liste verticale / grille : haut/bas/gauche/droite selon colonnes (évite Bas → droite en grid)
       const listItem = current.closest(LIST_ITEM_SELECTOR) as HTMLElement | null;
       const list = (listItem?.closest(LIST_SELECTOR) as HTMLElement | null) ?? (current.closest(LIST_SELECTOR) as HTMLElement | null);
-      if (listItem && (direction === 'left' || direction === 'right')) {
-        const rowEls = getFocusableElements(listItem);
-        const idx = rowEls.indexOf(current);
-        if (idx !== -1) {
-          const nextIdx = direction === 'left' ? idx - 1 : idx + 1;
-          if (nextIdx >= 0 && nextIdx < rowEls.length) return rowEls[nextIdx];
-        }
-        return null;
-      }
-      if (list && listItem && (direction === 'up' || direction === 'down')) {
-        const items = Array.from(list.querySelectorAll<HTMLElement>(LIST_ITEM_SELECTOR));
-        const itemIdx = items.indexOf(listItem);
-        const nextIdx = direction === 'up' ? itemIdx - 1 : itemIdx + 1;
-        if (nextIdx >= 0 && nextIdx < items.length) {
-          const nextItem = items[nextIdx];
-          const currentRow = getFocusableElements(listItem);
-          const nextRow = getFocusableElements(nextItem);
-          if (nextRow.length === 0) return null;
-          const slot = Math.max(0, currentRow.indexOf(current));
-          const primary = nextItem.querySelector<HTMLElement>('[data-tv-list-primary]');
-          if (slot <= 0 && primary && nextRow.includes(primary)) return primary;
-          return nextRow[Math.min(slot, nextRow.length - 1)] ?? primary ?? nextRow[0];
-        }
-        if (direction === 'up' && itemIdx === 0) {
-          const page = list.closest('[data-page]') ?? list.parentElement;
-          const header = page?.querySelector<HTMLElement>(LIST_HEADER_SELECTOR);
-          if (header) {
-            const inAction = header.querySelector<HTMLElement>(
-              '[data-tv-page-action] button:not([disabled]), [data-tv-page-action] [data-focusable]'
-            );
-            if (inAction) return inAction;
-            const headerEls = getFocusableElements(header);
-            if (headerEls.length > 0) return headerEls[headerEls.length - 1];
+      if (listItem && list) {
+        const neighbor = resolveListNeighbor(list, listItem, current, direction);
+        if (neighbor) return neighbor;
+        if (neighbor === null) return null;
+        // undefined = première rangée + haut → header
+        if (direction === 'up') {
+          const items = Array.from(list.querySelectorAll<HTMLElement>(LIST_ITEM_SELECTOR));
+          const itemIdx = items.indexOf(listItem);
+          const cols = getListColumnCount(list);
+          if (itemIdx >= 0 && itemIdx < cols) {
+            const page = list.closest('[data-page]') ?? list.parentElement;
+            const header = page?.querySelector<HTMLElement>(LIST_HEADER_SELECTOR);
+            if (header) {
+              const inAction = header.querySelector<HTMLElement>(
+                '[data-tv-page-action] button:not([disabled]), [data-tv-page-action] [data-focusable]'
+              );
+              if (inAction) return inAction;
+              const headerEls = getFocusableElements(header);
+              if (headerEls.length > 0) return headerEls[headerEls.length - 1];
+            }
           }
+          return null;
         }
-        return null;
       }
       const listHeader = current.closest(LIST_HEADER_SELECTOR) as HTMLElement | null;
       if (listHeader && direction === 'down') {
@@ -473,7 +546,7 @@ export default function TVNavigationProvider() {
         if (firstItem) {
           const primary = firstItem.querySelector<HTMLElement>('[data-tv-list-primary]');
           if (primary) return primary;
-          const firsts = getFocusableElements(firstItem);
+          const firsts = getListItemFocusables(firstItem);
           if (firsts[0]) return firsts[0];
         }
       }
@@ -637,12 +710,17 @@ export default function TVNavigationProvider() {
     const isInstantScroll = isWebOS || isTvDoc();
     const scrollBehavior: ScrollBehavior = isInstantScroll ? 'auto' : 'smooth';
 
-    /** webOS : limiter le débit des keydown en répétition (sinon la pile de travaux sature la télécommande). */
-    let lastWebosArrowAt = 0;
-    const WEBOS_ARROW_REPEAT_MS = 72;
+    /** webOS / TV : limiter le débit des keydown en répétition (sinon la pile de travaux sature la télécommande). */
+    let lastTvArrowAt = 0;
+    const TV_ARROW_REPEAT_MS = 70;
 
-    // webOS : navigation synchrone (rAF ajoutait une frame de délai + ne renvoyait pas le vrai résultat).
+    // Navigation synchrone ; throttle léger sur TV pour les répétitions de touche.
     const scheduleOrRunNavigate = (direction: 'up' | 'down' | 'left' | 'right', scope?: HTMLElement | null): boolean => {
+      if (isTvDoc() || isWebOSCheck()) {
+        const now = performance.now();
+        if (now - lastTvArrowAt < TV_ARROW_REPEAT_MS) return true;
+        lastTvArrowAt = now;
+      }
       return navigate(direction, scope);
     };
 
@@ -903,6 +981,68 @@ export default function TVNavigationProvider() {
     // Navigation dans une direction (scope optionnel = modal ou conteneur pour piège à focus, fromEl = élément de référence pour la recherche spatiale, ex. input qu'on quitte)
     const navigate = (direction: 'up' | 'down' | 'left' | 'right', scope?: HTMLElement | null, fromEl?: HTMLElement | null): boolean => {
       const activeElement = (fromEl ?? document.activeElement) as HTMLElement;
+
+      // Chemin rapide listes/grilles (téléchargements) : pas de scan page entière à chaque touche
+      if (
+        !scope &&
+        activeElement &&
+        activeElement !== document.body &&
+        activeElement.closest?.(LIST_ITEM_SELECTOR)
+      ) {
+        const listItem = activeElement.closest(LIST_ITEM_SELECTOR) as HTMLElement;
+        const list = listItem.closest(LIST_SELECTOR) as HTMLElement | null;
+        if (list) {
+          const neighbor = resolveListNeighbor(list, listItem, activeElement, direction);
+          if (neighbor) {
+            focusElement(neighbor);
+            return true;
+          }
+          if (direction === 'up') {
+            const items = Array.from(list.querySelectorAll<HTMLElement>(LIST_ITEM_SELECTOR));
+            const itemIdx = items.indexOf(listItem);
+            const cols = getListColumnCount(list);
+            if (itemIdx >= 0 && itemIdx < cols) {
+              const page = list.closest('[data-page]') ?? list.parentElement;
+              const header = page?.querySelector<HTMLElement>(LIST_HEADER_SELECTOR);
+              if (header) {
+                const inAction = header.querySelector<HTMLElement>(
+                  '[data-tv-page-action] button:not([disabled]), [data-tv-page-action] [data-focusable]'
+                );
+                const headerEls = inAction ? [inAction] : getFocusableElements(header);
+                const target = headerEls[headerEls.length - 1];
+                if (target) {
+                  focusElement(target);
+                  return true;
+                }
+              }
+            }
+          }
+          // Bord de liste : ne pas retomber sur le score spatial (lenteur + mauvais voisin)
+          return false;
+        }
+      }
+
+      if (
+        !scope &&
+        activeElement &&
+        activeElement !== document.body &&
+        activeElement.closest?.(LIST_HEADER_SELECTOR) &&
+        direction === 'down'
+      ) {
+        const listHeader = activeElement.closest(LIST_HEADER_SELECTOR) as HTMLElement;
+        const page = listHeader.closest('[data-page]') ?? listHeader.parentElement;
+        const listEl = page?.querySelector<HTMLElement>(LIST_SELECTOR);
+        const firstItem = listEl?.querySelector<HTMLElement>(LIST_ITEM_SELECTOR);
+        if (firstItem) {
+          const primary =
+            firstItem.querySelector<HTMLElement>('[data-tv-list-primary]') ||
+            getListItemFocusables(firstItem)[0];
+          if (primary) {
+            focusElement(primary);
+            return true;
+          }
+        }
+      }
 
       // Sur webOS / TV : en carousel, gauche/droite uniquement dans le carousel courant
       let effectiveScope = scope;

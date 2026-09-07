@@ -110,6 +110,7 @@ export function DownloadCard({
             : 'border-white/10 bg-white/[0.04] hover:border-white/20 hover:bg-white/[0.07]'
         }`}
         tabIndex={0}
+        listPrimary
         ariaLabel={displayTitle || torrent.name}
         onFocus={(e) => {
           setIsFocused(true);
@@ -207,8 +208,8 @@ export function DownloadCard({
               {canPause && onPause && (
                 <button
                   type="button"
-                  data-focusable
-                  tabIndex={0}
+                  tabIndex={-1}
+                  data-tv-nav-skip
                   disabled={busy}
                   aria-label={t('common.pause')}
                   className="inline-flex h-12 w-12 tv:h-16 tv:w-16 items-center justify-center rounded-full border border-white/25 bg-black/55 text-white hover:bg-[var(--ds-accent-violet)] disabled:opacity-40 ds-focus-glow"
@@ -223,8 +224,8 @@ export function DownloadCard({
               {canResume && onResume && (
                 <button
                   type="button"
-                  data-focusable
-                  tabIndex={0}
+                  tabIndex={-1}
+                  data-tv-nav-skip
                   disabled={busy}
                   aria-label={t('common.resume')}
                   className="inline-flex h-12 w-12 tv:h-16 tv:w-16 items-center justify-center rounded-full border border-white/25 bg-black/55 text-white hover:bg-[var(--ds-accent-green)] disabled:opacity-40 ds-focus-glow"

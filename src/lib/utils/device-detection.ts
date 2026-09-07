@@ -3,6 +3,53 @@
  */
 
 /**
+ * Détecte le navigateur embarqué Tesla (QtWebEngine / QtCarBrowser).
+ */
+export function isTeslaBrowser(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (document.documentElement.getAttribute('data-tesla-browser') === 'true') return true;
+    if (sessionStorage.getItem('popcorn_is_tesla') === '1') return true;
+  } catch {
+    // ignore
+  }
+  const ua = navigator.userAgent || '';
+  return /Tesla|QtCarBrowser|QtWebEngine/i.test(ua);
+}
+
+/**
+ * Mode lecteur voiture : navigateur Tesla, chemin `/car`, ou forçage `?car=1`.
+ */
+export function isCarPlayerMode(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (window.location.search.includes('car=1')) return true;
+    const path = (window.location.pathname || '').replace(/\/$/, '') || '/';
+    if (path === '/car' || path.startsWith('/car/')) return true;
+  } catch {
+    // ignore
+  }
+  return isTeslaBrowser();
+}
+
+/** Pose data-tesla-browser + sessionStorage quand un UA Tesla est détecté. */
+export function stampTeslaBrowserHints(): boolean {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return false;
+  const tesla = isTeslaBrowser() || isCarPlayerMode();
+  if (!tesla) return false;
+  try {
+    if (isTeslaBrowser()) {
+      document.documentElement.setAttribute('data-tesla-browser', 'true');
+      sessionStorage.setItem('popcorn_is_tesla', '1');
+    }
+    document.documentElement.setAttribute('data-car-player', 'true');
+  } catch {
+    // ignore
+  }
+  return true;
+}
+
+/**
  * Détecte si l'appareil est un appareil mobile
  */
 export function isMobileDevice(): boolean {

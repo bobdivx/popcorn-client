@@ -107,3 +107,49 @@ export function mergeReadyToWatch(
 
   return out;
 }
+
+/** Fenêtre « Derniers téléchargements » (1 semaine). */
+export const RECENT_DOWNLOAD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+export const RECENT_DOWNLOAD_LIMIT = 20;
+
+/**
+ * Médias téléchargés récemment (≤ maxAge), plus les téléchargements en cours.
+ * Tri : en cours d'abord, puis addedAt décroissant.
+ */
+export function filterRecentDownloads(
+  items: ContentItem[],
+  now = Date.now(),
+  maxAgeMs = RECENT_DOWNLOAD_MAX_AGE_MS,
+  limit = RECENT_DOWNLOAD_LIMIT
+): ContentItem[] {
+  const cutoffSec = Math.floor((now - maxAgeMs) / 1000);
+  return [...items]
+    .filter((item) => {
+      if (item.isDownloading) return true;
+      if (typeof item.addedAt !== 'number') return false;
+      return item.addedAt >= cutoffSec;
+    })
+    .sort((a, b) => {
+      const aDl = a.isDownloading ? 1 : 0;
+      const bDl = b.isDownloading ? 1 : 0;
+      if (aDl !== bDl) return bDl - aDl;
+      return (b.addedAt ?? 0) - (a.addedAt ?? 0);
+    })
+    .slice(0, limit);
+}
+
+/** Place les titres présents dans `recentKeys` en tête du carrousel (ordre relatif conservé). */
+export function promoteRecentFirst<T extends ContentItem>(items: T[], recentKeys: Set<string>): T[] {
+  if (recentKeys.size === 0 || items.length === 0) return items;
+  const recent: T[] = [];
+  const rest: T[] = [];
+  for (const item of items) {
+    if (recentKeys.has(contentItemKey(item))) recent.push(item);
+    else rest.push(item);
+  }
+  return [...recent, ...rest];
+}
+
+export function recentDownloadKeys(items: ContentItem[]): Set<string> {
+  return new Set(items.map(contentItemKey));
+}

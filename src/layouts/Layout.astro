@@ -68,6 +68,19 @@ const isWebOS = import.meta.env.WEBOS === 'true';
     {!isWebOS && <ClientRouter />}
     <WebOSBoot />
     <script is:inline>
+      /* Détection Tesla / QtCarBrowser dès le chargement (lecteur voiture). */
+      (function () {
+        try {
+          var ua = navigator.userAgent || '';
+          if (/Tesla|QtCarBrowser|QtWebEngine/i.test(ua)) {
+            document.documentElement.setAttribute('data-tesla-browser', 'true');
+            document.documentElement.setAttribute('data-car-player', 'true');
+            sessionStorage.setItem('popcorn_is_tesla', '1');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <script is:inline>
       /* Masquer le bandeau "Chargement" après chaque navigation (View Transitions remplace le body, donc ce script doit être dans le head pour survivre). */
       document.addEventListener('astro:after-swap', function() {
         requestAnimationFrame(function() {
