@@ -3,7 +3,6 @@ import { Search as SearchIcon, X, Layers2, CloudDownload, HardDrive, FolderOpen,
 import { serverApi, type SearchResult } from '../lib/client/server-api';
 import { CacheManager } from '../lib/client/storage';
 import { FocusableCard } from './ui/FocusableCard';
-import CarouselRow from './torrents/CarouselRow';
 import { useI18n } from '../lib/i18n/useI18n';
 import { isTVPlatform } from '../lib/utils/device-detection';
 import { tvBrowseItemKey } from '../lib/tv-browse-restore';
@@ -66,7 +65,27 @@ function initialSearchLiveProgress(): SearchLiveProgressState {
   };
 }
 
-/** Timeligne sous la carte de chargement : étapes locales → indexeurs → TMDB avec comptages réels après chaque requête */
+type SearchStepStatus = 'waiting' | 'active' | 'done' | 'skipped' | 'error';
+
+function searchStepStatusLabel(
+  status: SearchStepStatus,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string {
+  switch (status) {
+    case 'active':
+      return t('search.progressStatusActive');
+    case 'done':
+      return t('search.progressStatusDone');
+    case 'skipped':
+      return t('search.progressStatusSkipped');
+    case 'error':
+      return t('search.progressStatusError');
+    default:
+      return t('search.progressStatusWaiting');
+  }
+}
+
+/** Stepper de recherche : locale → indexeurs → TMDB, pensé pour TV (gros contrastes + barre). */
 function SearchLiveProgressTimeline({
   live,
   t,
@@ -77,108 +96,216 @@ function SearchLiveProgressTimeline({
   const formatCounts = (movies: number, series: number) =>
     t('search.progressCounts', { movies: String(movies), series: String(series) });
 
-  const Row = ({
-    label,
-    done,
-    active,
-    error,
-    skipped,
-    detail,
-    dim,
-  }: {
-    label: string;
-    done: boolean;
-    active: boolean;
-    error?: boolean;
-    skipped?: boolean;
-    detail?: string;
-    dim?: boolean;
-  }) => (
-    <li
-      className={`flex items-start gap-2.5 text-left rounded-lg px-2 py-1.5 -mx-2 ${
-        dim
-          ? 'text-[var(--ds-text-tertiary)] opacity-60'
-          : active
-            ? 'text-[var(--ds-text-primary)] bg-[var(--ds-surface)]'
-            : 'text-[var(--ds-text-secondary)]'
-      }`}
-    >
-      <span className="mt-0.5 shrink-0" aria-hidden>
-        {skipped ? (
-          <MinusCircle className="w-4 h-4 text-[var(--ds-text-tertiary)]" strokeWidth={2} />
-        ) : error ? (
-          <MinusCircle className="w-4 h-4 text-amber-500" strokeWidth={2} />
-        ) : done ? (
-          <CheckCircle2 className="w-4 h-4 text-emerald-500" strokeWidth={2.25} />
-        ) : active ? (
-          <DsLoader size="xs" className="text-[var(--ds-accent-violet)]" />
-        ) : (
-          <span className="inline-block w-4 h-4 rounded-full border border-[var(--ds-border-strong)]" />
-        )}
-      </span>
-      <span className="leading-snug flex-1 min-w-0">
-        <span className="font-semibold block text-[var(--ds-text-primary)]">{label}</span>
-        {detail ? <span className="text-xs text-[var(--ds-text-tertiary)] block mt-0.5">{detail}</span> : null}
-      </span>
-    </li>
-  );
-
   const localActive = !live.localSkipped && !live.localDone;
-  const localDetail =
-    live.localSkipped
-      ? t('search.progressLocalSkippedDetail')
-      : live.localDone
-        ? formatCounts(live.localMovies, live.localSeries)
-        : undefined;
+  const indexerActive = live.indexerRunning && !live.indexerDone && !live.indexerError;
+  const tmdbActive = live.tmdbRunning && !live.tmdbDone;
 
-  const indexerDetail = live.indexerError
-    ? t('search.progressIndexerErrorDetail')
+  const localStatus: SearchStepStatus = live.localSkipped
+    ? 'skipped'
+    : live.localDone
+      ? 'done'
+      : localActive
+        ? 'active'
+        : 'waiting';
+
+  const indexerStatus: SearchStepStatus = live.indexerError
+    ? 'error'
     : live.indexerDone
-      ? formatCounts(live.indexerMovies, live.indexerSeries)
-      : undefined;
+      ? 'done'
+      : indexerActive
+        ? 'active'
+        : 'waiting';
 
-  const tmdbDetail = live.tmdbSkipped
-    ? live.indexerError
-      ? t('search.progressTmdbSkippedIndexerFail')
-      : t('search.progressTmdbSkippedDetail')
-    : live.tmdbDone && !live.tmdbSkipped
-      ? live.tmdbMovies + live.tmdbSeries > 0
-        ? formatCounts(live.tmdbMovies, live.tmdbSeries)
-        : t('search.progressTmdbNoneDetail')
-      : undefined;
+  const tmdbStatus: SearchStepStatus = live.tmdbSkipped
+    ? 'skipped'
+    : live.tmdbDone
+      ? 'done'
+      : tmdbActive
+        ? 'active'
+        : 'waiting';
 
-  const indexerFinished = live.indexerDone || live.indexerError;
-  const tmdbWaitingBeforeIndexerFinishes = !indexerFinished;
+  const steps: Array<{
+    id: string;
+    index: number;
+    label: string;
+    status: SearchStepStatus;
+    detail?: string;
+    Icon: typeof HardDrive;
+  }> = [
+    {
+      id: 'local',
+      index: 1,
+      label: live.localSkipped ? t('search.progressLocalSkipped') : t('search.progressStepLocal'),
+      status: localStatus,
+      detail: live.localSkipped
+        ? t('search.progressLocalSkippedDetail')
+        : live.localDone
+          ? formatCounts(live.localMovies, live.localSeries)
+          : localActive
+            ? t('search.localSearchNote')
+            : undefined,
+      Icon: HardDrive,
+    },
+    {
+      id: 'indexer',
+      index: 2,
+      label: t('search.progressStepIndexer'),
+      status: indexerStatus,
+      detail: live.indexerError
+        ? t('search.progressIndexerErrorDetail')
+        : live.indexerDone
+          ? formatCounts(live.indexerMovies, live.indexerSeries)
+          : indexerActive
+            ? t('search.indexerSearchNote')
+            : undefined,
+      Icon: Layers2,
+    },
+    {
+      id: 'tmdb',
+      index: 3,
+      label: t('search.progressStepTmdb'),
+      status: tmdbStatus,
+      detail: live.tmdbSkipped
+        ? live.indexerError
+          ? t('search.progressTmdbSkippedIndexerFail')
+          : t('search.progressTmdbSkippedDetail')
+        : live.tmdbDone && !live.tmdbSkipped
+          ? live.tmdbMovies + live.tmdbSeries > 0
+            ? formatCounts(live.tmdbMovies, live.tmdbSeries)
+            : t('search.progressTmdbNoneDetail')
+          : tmdbActive
+            ? t('search.searchingTmdbShort')
+            : undefined,
+      Icon: Film,
+    },
+  ];
+
+  const currentStep =
+    steps.find((s) => s.status === 'active') ??
+    steps.find((s) => s.status === 'waiting') ??
+    steps[steps.length - 1];
+  const completedCount = steps.filter((s) => s.status === 'done' || s.status === 'skipped' || s.status === 'error').length;
+  const progressPct = Math.min(100, Math.round(((completedCount + (currentStep?.status === 'active' ? 0.45 : 0)) / steps.length) * 100));
 
   return (
-    <ul className="mt-2 space-y-1 text-sm" aria-live="polite" aria-label={t('search.progressAriaLabel')}>
-      <Row
-        label={
-          live.localSkipped
-            ? t('search.progressLocalSkipped')
-            : t('search.progressStepLocal')
-        }
-        active={Boolean(localActive)}
-        done={live.localDone || live.localSkipped}
-        skipped={live.localSkipped}
-        detail={localDetail}
-      />
-      <Row
-        label={t('search.progressStepIndexer')}
-        active={live.indexerRunning && !live.indexerDone && !live.indexerError}
-        done={live.indexerDone}
-        error={live.indexerError}
-        detail={indexerDetail}
-      />
-      <Row
-        label={t('search.progressStepTmdb')}
-        active={live.tmdbRunning}
-        done={live.tmdbDone && !live.tmdbSkipped}
-        skipped={live.tmdbSkipped}
-        detail={tmdbDetail}
-        dim={tmdbWaitingBeforeIndexerFinishes}
-      />
-    </ul>
+    <div className="mt-4 tv:mt-6 space-y-4 tv:space-y-6" aria-live="polite" aria-label={t('search.progressAriaLabel')}>
+      <div className="flex items-center justify-between gap-3 text-sm tv:text-lg text-[var(--ds-text-secondary)]">
+        <span className="font-semibold text-[var(--ds-text-primary)]">
+          {t('search.progressStepOf', { current: String(currentStep.index), total: String(steps.length) })}
+        </span>
+        <span className="tabular-nums font-medium">{progressPct}%</span>
+      </div>
+
+      <div
+        className="relative h-2 tv:h-3 rounded-full bg-[var(--ds-surface)] border border-[var(--ds-border)] overflow-hidden"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progressPct}
+      >
+        <div
+          className="absolute inset-y-0 left-0 rounded-full bg-[var(--ds-accent-violet)] transition-[width] duration-500 ease-out search-progress-fill"
+          style={{ width: `${Math.max(progressPct, 8)}%` }}
+        />
+      </div>
+
+      <ol className="grid gap-2.5 tv:gap-4">
+        {steps.map((step) => {
+          const { status, Icon } = step;
+          const isActive = status === 'active';
+          const isDone = status === 'done';
+          const isError = status === 'error';
+          const isSkipped = status === 'skipped';
+          const isWaiting = status === 'waiting';
+
+          return (
+            <li
+              key={step.id}
+              className={`relative flex items-center gap-3 tv:gap-5 rounded-2xl border px-3 py-3 tv:px-6 tv:py-5 transition-all duration-300 ${
+                isActive
+                  ? 'border-[var(--ds-accent-violet)]/70 bg-[var(--ds-accent-violet)]/10 shadow-[0_0_0_1px_rgba(139,92,246,0.25)] scale-[1.01] tv:scale-[1.02]'
+                  : isDone
+                    ? 'border-emerald-500/35 bg-emerald-500/5'
+                    : isError
+                      ? 'border-amber-500/40 bg-amber-500/5'
+                      : isSkipped
+                        ? 'border-[var(--ds-border)] bg-[var(--ds-surface)]/60 opacity-70'
+                        : 'border-[var(--ds-border)] bg-[var(--ds-surface)]/40 opacity-55'
+              }`}
+            >
+              <div
+                className={`relative shrink-0 flex items-center justify-center w-11 h-11 tv:w-16 tv:h-16 rounded-full border-2 transition-colors duration-300 ${
+                  isActive
+                    ? 'border-[var(--ds-accent-violet)] bg-[var(--ds-accent-violet)]/20 text-[var(--ds-accent-violet)]'
+                    : isDone
+                      ? 'border-emerald-500 bg-emerald-500/15 text-emerald-400'
+                      : isError
+                        ? 'border-amber-500 bg-amber-500/15 text-amber-400'
+                        : 'border-[var(--ds-border-strong)] bg-[var(--ds-surface-elevated)] text-[var(--ds-text-tertiary)]'
+                }`}
+                aria-hidden
+              >
+                {isActive ? (
+                  <DsLoader size="sm" className="text-[var(--ds-accent-violet)]" />
+                ) : isDone ? (
+                  <CheckCircle2 className="w-6 h-6 tv:w-8 tv:h-8 animate-fade-in" strokeWidth={2.25} />
+                ) : isError || isSkipped ? (
+                  <MinusCircle className="w-6 h-6 tv:w-8 tv:h-8" strokeWidth={2} />
+                ) : (
+                  <span className="text-base tv:text-2xl font-bold tabular-nums">{step.index}</span>
+                )}
+                {isActive ? (
+                  <span className="pointer-events-none absolute inset-0 rounded-full border-2 border-[var(--ds-accent-violet)]/50 animate-ping opacity-40" />
+                ) : null}
+              </div>
+
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2 tv:gap-3">
+                  <Icon
+                    className={`w-4 h-4 tv:w-6 tv:h-6 shrink-0 ${
+                      isActive
+                        ? 'text-[var(--ds-accent-violet)]'
+                        : isDone
+                          ? 'text-emerald-400'
+                          : 'text-[var(--ds-text-tertiary)]'
+                    }`}
+                    strokeWidth={2}
+                  />
+                  <span
+                    className={`font-semibold text-sm tv:text-2xl leading-snug ${
+                      isWaiting ? 'text-[var(--ds-text-secondary)]' : 'text-[var(--ds-text-primary)]'
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                  <span
+                    className={`ml-auto shrink-0 rounded-full px-2.5 py-0.5 tv:px-3.5 tv:py-1 text-[10px] tv:text-sm font-bold uppercase tracking-wide ${
+                      isActive
+                        ? 'bg-[var(--ds-accent-violet)]/20 text-[var(--ds-accent-violet)]'
+                        : isDone
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : isError
+                            ? 'bg-amber-500/20 text-amber-400'
+                            : 'bg-[var(--ds-surface-elevated)] text-[var(--ds-text-tertiary)]'
+                    }`}
+                  >
+                    {searchStepStatusLabel(status, t)}
+                  </span>
+                </div>
+                {step.detail ? (
+                  <p
+                    key={`${step.id}-${step.detail}`}
+                    className="mt-1 tv:mt-2 text-xs tv:text-lg text-[var(--ds-text-tertiary)] animate-fade-in"
+                  >
+                    {step.detail}
+                  </p>
+                ) : null}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
@@ -229,7 +356,7 @@ function SearchIndexerBadge({
     const display = raw.length > 22 ? `${raw.slice(0, 20)}…` : raw;
     return (
       <span
-        className="inline-block max-w-[10rem] sm:max-w-[11rem] px-2.5 py-1 rounded-full text-[10px] lg:text-[11px] tv:text-xs font-bold tracking-wide bg-black/50 border border-white/15 text-white/90 truncate shadow-md"
+        className="inline-block max-w-[10rem] sm:max-w-[11rem] px-2.5 py-1 tv:px-3.5 tv:py-1.5 rounded-full text-[10px] tv:text-sm font-bold tracking-wide bg-black/50 border border-white/15 text-white/95 truncate backdrop-blur-md"
         title={raw}
         aria-label={raw}
       >
@@ -242,7 +369,7 @@ function SearchIndexerBadge({
     const label = t('search.badgeLibrary');
     return (
       <span
-        className="inline-block max-w-[9rem] px-2.5 py-1 rounded-full text-[10px] lg:text-[11px] tv:text-xs font-bold tracking-wide bg-black/50 border border-white/15 text-white/90 truncate shadow-md"
+        className="inline-block max-w-[9rem] px-2.5 py-1 tv:px-3.5 tv:py-1.5 rounded-full text-[10px] tv:text-sm font-bold tracking-wide bg-black/50 border border-white/15 text-white/95 truncate backdrop-blur-md"
         title={t('search.badgeLibraryHint')}
         aria-label={label}
       >
@@ -255,7 +382,7 @@ function SearchIndexerBadge({
     const label = t('search.badgeSyncedDb');
     return (
       <span
-        className="inline-block max-w-[10rem] px-2.5 py-1 rounded-full text-[10px] lg:text-[11px] tv:text-xs font-bold tracking-wide bg-black/50 border border-white/15 text-white/90 truncate shadow-md"
+        className="inline-block max-w-[10rem] px-2.5 py-1 tv:px-3.5 tv:py-1.5 rounded-full text-[10px] tv:text-sm font-bold tracking-wide bg-black/50 border border-white/15 text-white/95 truncate backdrop-blur-md"
         title={label}
         aria-label={label}
       >
@@ -268,7 +395,7 @@ function SearchIndexerBadge({
     const label = t('search.badgeIndexer');
     return (
       <span
-        className="inline-block max-w-[10rem] px-2.5 py-1 rounded-full text-[10px] lg:text-[11px] tv:text-xs font-bold tracking-wide bg-black/50 border border-white/15 text-white/90 truncate shadow-md"
+        className="inline-block max-w-[10rem] px-2.5 py-1 tv:px-3.5 tv:py-1.5 rounded-full text-[10px] tv:text-sm font-bold tracking-wide bg-black/50 border border-white/15 text-white/95 truncate backdrop-blur-md"
         title={label}
         aria-label={label}
       >
@@ -366,7 +493,7 @@ function SearchResultAvailability({
 
   return (
     <div
-      className="pointer-events-none absolute bottom-2 left-2 right-2 z-20 flex flex-wrap gap-1.5 justify-end items-center"
+      className="pointer-events-none absolute left-3 right-3 bottom-3 tv:left-4 tv:right-4 tv:bottom-4 z-20 flex flex-wrap gap-1.5 justify-end items-center"
       role="group"
       aria-label={
         pills.length > 0 && showDownloadedBadge
@@ -381,19 +508,19 @@ function SearchResultAvailability({
           key={`${i}-${p.hint}`}
           title={p.hint}
           aria-label={p.hint}
-          className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 ${capsule(p.kind)}`}
+          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 tv:px-3 tv:py-1.5 backdrop-blur-md ${capsule(p.kind)}`}
         >
-          <p.Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-white shrink-0" strokeWidth={2.5} aria-hidden />
-          <span className="text-[10px] sm:text-xs font-bold tabular-nums leading-none text-white">{p.n}</span>
+          <p.Icon className="w-3.5 h-3.5 tv:w-4 tv:h-4 text-white shrink-0" strokeWidth={2.5} aria-hidden />
+          <span className="text-[10px] tv:text-sm font-bold tabular-nums leading-none text-white">{p.n}</span>
         </span>
       ))}
       {showDownloadedBadge ? (
         <span
-          className="inline-flex items-center justify-center p-1.5 lg:p-2 rounded-full bg-blue-500/80 border border-blue-400/50 shadow-lg shrink-0 animate-fade-in"
+          className="inline-flex items-center justify-center p-1.5 tv:p-2 rounded-full bg-blue-500/80 border border-blue-400/50 shadow-lg shrink-0 backdrop-blur-md"
           title={t('search.downloaded') || 'En bibliothèque'}
           aria-label={t('search.downloaded') || 'En bibliothèque'}
         >
-          <HardDrive className="w-4 h-4 lg:w-[18px] lg:h-[18px] text-white" strokeWidth={2.5} />
+          <HardDrive className="w-4 h-4 tv:w-[18px] tv:h-[18px] text-white" strokeWidth={2.5} />
         </span>
       ) : null}
     </div>
@@ -435,16 +562,14 @@ function getDetailUrl(result: SearchResult): string {
   return `/torrents?slug=${encodeURIComponent(result.id)}&from=search`;
 }
 
-/**
- * Composant pour afficher un résultat de recherche dans un style moderne
- */
+/** Carte résultat — même chrome / densite que DownloadCard (grille 16:9). */
 function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
   const { t } = useI18n();
   const [isHovered, setIsHovered] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(result.poster || null);
   const detailUrl = getDetailUrl(result);
-  const showOverlay = isHovered || isFocused;
+  const showChrome = isHovered || isFocused;
 
   useEffect(() => {
     if (result.poster && result.poster !== imageUrl) {
@@ -464,85 +589,125 @@ function SearchResultPoster({ result, onClick }: SearchResultPosterProps) {
     }
   };
 
-  const cardActive = isHovered || isFocused;
-
   return (
     <div
-      className="relative group torrent-poster min-w-[140px] sm:min-w-[160px] md:min-w-[180px] lg:min-w-[280px] xl:min-w-[320px] tv:min-w-[400px] cursor-pointer"
+      className="relative w-full max-w-full h-full torrent-poster cursor-pointer"
       data-tv-item-key={tvBrowseItemKey(result)}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <FocusableCard
         ariaLabel={result.title}
-        className={`w-full block text-left rounded-2xl overflow-hidden border transition duration-200 ${
-          cardActive
-            ? 'border-[var(--ds-accent-violet)] bg-[var(--ds-surface-elevated)]'
-            : 'border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] hover:border-[var(--ds-border-strong)]'
+        className={`group text-left rounded-2xl tv:rounded-3xl overflow-hidden border transition-[border-color,box-shadow,transform,background-color] duration-300 focus:outline-none w-full h-full block ${
+          showChrome
+            ? 'border-[var(--ds-accent-violet)]/55 bg-[var(--ds-accent-violet-muted)] shadow-[0_18px_48px_rgba(0,0,0,0.35)]'
+            : 'border-white/10 bg-white/[0.04] hover:border-white/20 hover:bg-white/[0.07]'
         }`}
         onClick={handleClick}
         href={onClick ? undefined : detailUrl}
         tabIndex={0}
         onFocus={(e) => {
           setIsFocused(true);
-          setIsHovered(true);
-          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'center' });
+          (e.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
         }}
-        onBlur={() => {
-          setIsFocused(false);
-          setIsHovered(false);
-        }}
+        onBlur={() => setIsFocused(false)}
       >
-        {/* Même principe que DownloadCard / EpisodeCardsCarousel : vignette 16:9 + bloc texte */}
-        <div className="relative aspect-video w-full overflow-hidden bg-[#111]">
+        <div className="relative aspect-video w-full overflow-hidden bg-black/40">
           {imageUrl ? (
             <img
               src={imageUrl}
               alt=""
-              className="absolute inset-0 w-full h-full object-cover z-0"
               loading="lazy"
               decoding="async"
+              className={`absolute inset-0 w-full h-full object-cover z-0 transition-transform duration-700 ease-out ${
+                showChrome ? 'scale-105' : 'scale-100'
+              }`}
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = 'none';
               }}
             />
           ) : (
-            <div className="absolute inset-0 z-0 flex flex-col items-center justify-center bg-gradient-to-br from-white/10 via-black/40 to-black/80">
-              <Film className="w-10 h-10 tv:w-12 tv:h-12 text-white/25 shrink-0" strokeWidth={1.75} aria-hidden />
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-white/10 via-black/50 to-black/90 z-0 p-2 text-white/25">
+              <Film className="w-10 h-10 tv:w-14 tv:h-14 mb-2 shrink-0" size={48} />
             </div>
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/25 to-transparent z-10 pointer-events-none" />
 
-          <div className="absolute left-3 top-3 z-20 flex flex-col gap-2 items-start">
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/35 to-black/10 z-10" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(59,106,225,0.18),transparent_55%)] z-10 pointer-events-none" />
+
+          <div className="absolute left-3 top-3 tv:left-4 tv:top-4 z-20 flex flex-wrap gap-1.5 items-start max-w-[70%]">
             <SearchIndexerBadge result={result} t={t} />
+            <span className="px-2.5 py-1 tv:px-3.5 tv:py-1.5 rounded-full text-[10px] tv:text-sm font-semibold tracking-wide bg-black/50 border border-white/12 text-white/85 backdrop-blur-md capitalize">
+              {result.type === 'movie' ? t('common.film') : t('common.serie')}
+            </span>
           </div>
 
-          <SearchResultAvailability result={result} t={t} showDownloadedBadge={result.isDownloaded === true} />
+          {!showChrome || !result.overview ? (
+            <SearchResultAvailability result={result} t={t} showDownloadedBadge={result.isDownloaded === true} />
+          ) : null}
 
-          {/* Survol : résumé uniquement (titre lisible sous la vignette comme épisodes / téléchargements) */}
-          {showOverlay && result.overview && (
-            <div className="absolute inset-0 z-[18] bg-gradient-to-b from-black/20 via-black/55 to-black/90 flex flex-col justify-end p-3 lg:p-4 tv:p-5 pointer-events-none transition-opacity">
-              <p className="text-xs lg:text-sm tv:text-base text-white/90 line-clamp-3 leading-snug">{result.overview}</p>
+          {showChrome && result.overview ? (
+            <div className="absolute inset-0 z-[18] bg-gradient-to-b from-black/10 via-black/45 to-black/85 flex flex-col justify-end p-3 tv:p-5 pointer-events-none">
+              <p className="text-xs tv:text-base text-white/90 line-clamp-3 leading-snug">{result.overview}</p>
             </div>
-          )}
+          ) : null}
         </div>
 
-        <div className="p-3 sm:p-4 tv:p-5 text-left">
-          <div className="text-base tv:text-lg font-semibold text-[var(--ds-text-primary)] truncate" title={result.title}>
+        <div className="p-3 sm:p-4 tv:p-5 relative z-10 text-left">
+          <div
+            className="text-sm sm:text-base tv:text-xl font-semibold text-white/95 line-clamp-2 leading-snug"
+            title={result.title}
+          >
             {result.title}
           </div>
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs sm:text-sm tv:text-base text-[var(--ds-text-tertiary)] mt-1">
-            {result.year ? (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] sm:text-xs tv:text-sm text-white/55 mt-2">
+            {result.year ? <span className="tabular-nums">{result.year}</span> : null}
+            {result.year ? <span className="w-1 h-1 rounded-full bg-white/25" /> : null}
+            <span className="capitalize">{result.type === 'movie' ? t('common.film') : t('common.serie')}</span>
+            {result.isDownloaded ? (
               <>
-                <span>{result.year}</span>
-                <span className="w-1 h-1 shrink-0 rounded-full bg-[var(--ds-border-strong)]" aria-hidden />
+                <span className="w-1 h-1 rounded-full bg-white/25" />
+                <span>{t('search.downloaded')}</span>
               </>
             ) : null}
-            <span className="capitalize">{result.type === 'movie' ? t('common.film') : t('common.serie')}</span>
           </div>
         </div>
       </FocusableCard>
     </div>
+  );
+}
+
+function SearchResultsSection({
+  title,
+  results,
+  onResultClick,
+  initialFocus = false,
+}: {
+  title: string;
+  results: SearchResult[];
+  onResultClick?: (result: SearchResult) => void;
+  initialFocus?: boolean;
+}) {
+  if (results.length === 0) return null;
+  return (
+    <section className="px-4 sm:px-8 lg:px-12 mb-8 tv:mb-10">
+      <h2 className="text-base sm:text-lg tv:text-2xl font-semibold text-white/90 mb-3 tv:mb-5">{title}</h2>
+      <div
+        className="dl-card-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 tv:grid-cols-3 gap-4 sm:gap-5 tv:gap-8"
+        data-tv-list
+      >
+        {results.map((result, index) => (
+          <div
+            key={result.id}
+            data-tv-list-item
+            data-tv-initial-focus={initialFocus && index === 0 ? true : undefined}
+            className="min-w-0"
+          >
+            <SearchResultPoster result={result} onClick={onResultClick} />
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -1028,37 +1193,71 @@ export default function Search({ onResultClick }: SearchProps) {
   ];
   const showResultCounts = Boolean(query && !loading && (allResults.length > 0 || tmdbFallbackResults.length > 0));
 
+  const phaseTitle =
+    searchPhase === 'local'
+      ? isTV
+        ? t('search.searchingLocalShort')
+        : t('search.searchingLocal')
+      : searchPhase === 'tmdb'
+        ? isTV
+          ? t('search.searchingTmdbShort')
+          : t('search.searchingTmdb')
+        : isTV
+          ? t('search.searchingIndexersShort')
+          : t('search.searchingIndexers');
+
+  const showIdleHome = !query && !loading;
+  const showResults = !loading && Boolean(query) && allResults.length > 0;
+  const showTmdbFallback =
+    !loading && Boolean(query) && allResults.length === 0 && !error && tmdbFallbackResults.length > 0;
+  const showNoResults =
+    !loading && Boolean(query) && allResults.length === 0 && !error && tmdbFallbackResults.length === 0;
+
   return (
-    <div className="flex flex-col min-h-screen w-full min-w-0 max-w-[100vw] overflow-x-hidden bg-[var(--ds-surface)] text-[var(--ds-text-primary)]" data-page="search">
-      <header className="px-4 sm:px-8 lg:px-12 pt-4 sm:pt-6 pb-3 border-b border-[var(--ds-border)]">
-        <div className="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-4">
-          <div className="min-w-0 lg:mr-auto">
-            <h1 className="text-xl sm:text-2xl tv:text-3xl font-bold text-[var(--ds-text-primary)] tracking-tight">
+    <div
+      className={`search-page flex flex-col w-full min-w-0 overflow-x-hidden bg-[var(--ds-surface)] text-[var(--ds-text-primary)] ${
+        showIdleHome || loading || showNoResults ? 'search-page--centered' : ''
+      }`}
+      data-page="search"
+    >
+      <div className="search-page__stage mx-auto w-full max-w-xl sm:max-w-2xl tv:max-w-3xl px-4 sm:px-6 flex flex-col items-center text-center">
+        <div className="w-full flex flex-col items-center gap-4 sm:gap-5 tv:gap-6">
+          <div className="min-w-0 w-full">
+            <h1 className="text-2xl sm:text-3xl tv:text-5xl font-bold text-[var(--ds-text-primary)] tracking-tight">
               {t('search.title')}
             </h1>
-            {!isTV && (
-              <p className="text-sm text-[var(--ds-text-tertiary)]">
+            {!isTV && showIdleHome && (
+              <p className="mt-1.5 text-sm sm:text-base text-[var(--ds-text-tertiary)]">
                 {t('search.subtitle')}
+              </p>
+            )}
+            {isTV && query.trim() && (
+              <p className="mt-2 text-base tv:text-2xl text-[var(--ds-text-secondary)] truncate px-2">
+                {loading
+                  ? t('search.searchingFor', { query: query.trim() })
+                  : query.trim()}
               </p>
             )}
           </div>
 
           <form
-            className="flex w-full lg:max-w-2xl xl:max-w-3xl gap-2"
+            className="w-full"
             onSubmit={(e) => {
               e.preventDefault();
               handleSearch();
             }}
           >
-            <div className="relative flex-1 min-w-0">
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 tv:pl-5 pointer-events-none z-10">
-                <SearchIcon className="w-4 h-4 tv:w-6 tv:h-6 text-[var(--ds-text-tertiary)]" size={18} />
+            <div className="relative w-full">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 tv:pl-6 pointer-events-none z-10">
+                <SearchIcon className="w-4 h-4 tv:w-7 tv:h-7 text-[var(--ds-text-tertiary)]" size={18} />
               </div>
               <input
                 ref={inputRef}
                 type="text"
                 placeholder={t('search.placeholder')}
-                className="w-full pl-10 tv:pl-14 pr-10 tv:pr-14 py-2.5 tv:py-3.5 rounded-full border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] placeholder:text-[var(--ds-text-tertiary)] focus:outline-none focus:border-[var(--ds-accent-violet)] focus:ring-2 focus:ring-[var(--ds-accent-violet)]/20 text-sm tv:text-lg min-h-[44px] tv:min-h-[56px] transition-colors"
+                className={`w-full pl-10 tv:pl-16 py-2.5 tv:py-4 rounded-full border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] placeholder:text-[var(--ds-text-tertiary)] focus:outline-none focus:border-[var(--ds-accent-violet)] focus:ring-2 focus:ring-[var(--ds-accent-violet)]/20 text-sm tv:text-2xl min-h-[48px] tv:min-h-[64px] transition-colors text-left ${
+                  isTV ? 'pr-10 tv:pr-14' : 'pr-[7.5rem] sm:pr-[9.5rem]'
+                }`}
                 value={query}
                 readOnly={isTV}
                 inputMode={isTV ? 'none' : undefined}
@@ -1082,269 +1281,233 @@ export default function Search({ onResultClick }: SearchProps) {
                 data-tv-initial-focus={isTV ? undefined : true}
                 autoComplete="off"
               />
-              {query && !isTV && (
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="absolute inset-y-0 right-0 flex items-center pr-3.5 tv:pr-5 text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-primary)] transition-colors focus:outline-none rounded-full"
-                  tabIndex={0}
-                  data-focusable
-                  aria-label={t('search.clearSearch')}
-                >
-                  <X className="w-4 h-4 tv:w-5 tv:h-5" size={18} />
-                </button>
+              {!isTV && (
+                <div className="absolute inset-y-0 right-1.5 flex items-center gap-1">
+                  {query ? (
+                    <button
+                      type="button"
+                      onClick={handleClear}
+                      className="inline-flex items-center justify-center w-9 h-9 rounded-full text-[var(--ds-text-tertiary)] hover:text-[var(--ds-text-primary)] hover:bg-white/5 transition-colors focus:outline-none"
+                      tabIndex={0}
+                      data-focusable
+                      aria-label={t('search.clearSearch')}
+                    >
+                      <X className="w-4 h-4" size={18} />
+                    </button>
+                  ) : null}
+                  <button
+                    type="submit"
+                    disabled={loading || !query.trim()}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-full ds-btn-accent px-3.5 sm:px-4 h-9 sm:h-10 text-sm font-semibold disabled:opacity-40 shrink-0"
+                    tabIndex={0}
+                    data-focusable
+                  >
+                    {loading ? (
+                      <DsLoader size="xs" />
+                    ) : (
+                      <SearchIcon className="w-4 h-4" size={16} />
+                    )}
+                    <span className="hidden sm:inline">{t('common.search')}</span>
+                  </button>
+                </div>
               )}
             </div>
-            {!isTV && (
+          </form>
+
+          {isTV && !loading && (
+            <div className="w-full">
+              <TvOnScreenKeyboard
+                value={query}
+                onChange={setQuery}
+                onSearch={() => handleSearch()}
+                disabled={loading}
+              />
+            </div>
+          )}
+
+          <div
+            role="tablist"
+            aria-label={t('search.filterAll')}
+            data-tv-page-action
+            className={`flex flex-wrap items-center justify-center gap-2 tv:gap-3 ${loading && isTV ? 'opacity-60' : ''}`}
+          >
+            {filterTabs.map((tab) => (
               <button
-                type="submit"
-                disabled={loading || !query.trim()}
-                className="inline-flex items-center justify-center gap-2 rounded-full ds-btn-accent px-4 tv:px-6 py-2 tv:py-3 text-sm tv:text-base font-semibold disabled:opacity-40 min-h-[44px] tv:min-h-[56px] shrink-0"
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={type === tab.id}
+                data-focusable
+                tabIndex={0}
+                onClick={() => setType(tab.id)}
+                className={`gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-1.5 tv:gap-2.5 rounded-full px-3.5 py-1.5 tv:px-6 tv:py-3 text-sm tv:text-xl font-medium border transition-colors min-h-[36px] tv:min-h-[56px] ${
+                  type === tab.id
+                    ? 'bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] border-transparent'
+                    : 'bg-[var(--ds-surface-elevated)] text-[var(--ds-text-secondary)] border-[var(--ds-border)] hover:border-[var(--ds-border-strong)]'
+                }`}
+              >
+                {tab.label}
+                {showResultCounts ? (
+                  <span className="tabular-nums opacity-80">{tab.count}</span>
+                ) : null}
+              </button>
+            ))}
+          </div>
+
+          {error && (
+            <div className="w-full ds-box-error rounded-2xl px-4 py-3 text-sm text-[var(--ds-text-primary)] text-center">
+              {error}
+            </div>
+          )}
+
+          {showIdleHome && (
+            searchHistory.length > 0 ? (
+              <div className="w-full pt-2 tv:pt-4">
+                <h3 className="text-sm tv:text-2xl font-semibold text-[var(--ds-text-secondary)] mb-3 tv:mb-5">
+                  {t('search.recentSearches')}
+                </h3>
+                <div className="flex flex-wrap justify-center gap-2 tv:gap-4">
+                  {searchHistory.map((term) => (
+                    <button
+                      key={term}
+                      type="button"
+                      data-focusable
+                      onClick={() => handleSearch(term)}
+                      className="gtv-pill-btn ds-focus-glow ds-active-glow px-3.5 py-1.5 tv:px-6 tv:py-3.5 rounded-full bg-[var(--ds-surface-elevated)] hover:border-[var(--ds-border-strong)] border border-[var(--ds-border)] text-[var(--ds-text-secondary)] hover:text-[var(--ds-text-primary)] text-sm tv:text-xl min-h-[36px] tv:min-h-[56px] transition-colors"
+                      tabIndex={0}
+                    >
+                      {term}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="w-full pt-3 sm:pt-4 flex flex-col items-center gap-3 tv:gap-4">
+                <div className="w-14 h-14 tv:w-20 tv:h-20 rounded-full flex items-center justify-center border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]">
+                  <SearchIcon size={28} className="text-[var(--ds-text-tertiary)] w-7 h-7 tv:w-10 tv:h-10" />
+                </div>
+                <h2 className="text-lg sm:text-xl tv:text-3xl font-semibold text-[var(--ds-text-primary)]">
+                  {t('search.startSearch')}
+                </h2>
+                <p className="text-[var(--ds-text-tertiary)] text-sm tv:text-xl max-w-md tv:max-w-2xl px-2">
+                  {isTV ? t('search.startSearchDescriptionTv') : t('search.startSearchDescription')}
+                </p>
+              </div>
+            )
+          )}
+
+          {showNoResults && (
+            <div className="w-full pt-3 sm:pt-4 flex flex-col items-center gap-3 tv:gap-4">
+              <div className="w-14 h-14 tv:w-20 tv:h-20 rounded-full flex items-center justify-center border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]">
+                <SearchIcon size={28} className="text-[var(--ds-text-tertiary)] w-7 h-7 tv:w-10 tv:h-10" />
+              </div>
+              <h2 className="text-lg sm:text-xl tv:text-3xl font-semibold text-[var(--ds-text-primary)]">
+                {t('search.noResults')}
+              </h2>
+              <p className="text-[var(--ds-text-tertiary)] text-sm tv:text-xl max-w-md tv:max-w-2xl px-2">
+                {t('search.noResultsFor', {
+                  type: type === 'all' ? t('search.content') : type === 'movie' ? t('common.film').toLowerCase() : t('common.serie').toLowerCase(),
+                  query,
+                })}
+              </p>
+              <button
+                type="button"
+                onClick={handleClear}
+                className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2 rounded-full ds-btn-accent px-4 py-2.5 tv:px-8 tv:py-4 text-sm tv:text-xl font-semibold min-h-[44px] tv:min-h-[64px] mt-1"
                 tabIndex={0}
                 data-focusable
               >
-                {loading ? (
-                  <DsLoader size="xs" />
-                ) : (
-                  <SearchIcon className="w-4 h-4 tv:w-5 tv:h-5" size={16} />
-                )}
-                <span className="hidden sm:inline">{t('common.search')}</span>
+                {t('search.newSearch')}
               </button>
-            )}
-          </form>
-        </div>
-
-        {isTV && (
-          <div className="mt-4">
-            <TvOnScreenKeyboard
-              value={query}
-              onChange={setQuery}
-              onSearch={() => handleSearch()}
-              disabled={loading}
-            />
-          </div>
-        )}
-
-        <div
-          role="tablist"
-          aria-label={t('search.filterAll')}
-          data-tv-page-action
-          className="mt-3 flex flex-wrap gap-2"
-        >
-          {filterTabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={type === tab.id}
-              data-focusable
-              tabIndex={0}
-              onClick={() => setType(tab.id)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 tv:px-5 tv:py-2.5 text-sm tv:text-base font-medium border transition-colors min-h-[36px] tv:min-h-[48px] ${
-                type === tab.id
-                  ? 'bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] border-transparent'
-                  : 'bg-[var(--ds-surface-elevated)] text-[var(--ds-text-secondary)] border-[var(--ds-border)] hover:border-[var(--ds-border-strong)]'
-              }`}
-            >
-              {tab.label}
-              {showResultCounts ? (
-                <span className="tabular-nums opacity-80">{tab.count}</span>
-              ) : null}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      {error && (
-        <div className="px-4 sm:px-8 lg:px-12 pt-4">
-          <div className="ds-box-error rounded-2xl px-4 py-3 text-sm text-[var(--ds-text-primary)]">
-            {error}
-          </div>
-        </div>
-      )}
-
-      {!loading && query && allResults.length > 0 && (
-        <div className="pt-4 sm:pt-6 pb-12 w-full min-w-0 max-w-full overflow-x-hidden" data-search-results>
-          {libraryResults.length > 0 && (
-            <CarouselRow title={t('search.inLibrary')} autoScroll={false}>
-              {libraryResults.map((result) => (
-                <div key={`lib-${result.id}`} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                  <SearchResultPoster result={result} onClick={onResultClick} />
-                </div>
-              ))}
-            </CarouselRow>
-          )}
-          {catalogMovies.length > 0 && (
-            <CarouselRow title={t('search.moviesFound')} autoScroll={false}>
-              {catalogMovies.map((result) => (
-                <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                  <SearchResultPoster result={result} onClick={onResultClick} />
-                </div>
-              ))}
-            </CarouselRow>
-          )}
-          {catalogSeries.length > 0 && (
-            <CarouselRow title={t('search.seriesFound')} autoScroll={false}>
-              {catalogSeries.map((result) => (
-                <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                  <SearchResultPoster result={result} onClick={onResultClick} />
-                </div>
-              ))}
-            </CarouselRow>
-          )}
-        </div>
-      )}
-
-      {loading && (
-        <div className="px-4 sm:px-8 lg:px-12 py-8">
-          <div className="max-w-xl mx-auto rounded-2xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] p-5 tv:p-6">
-            <div className="flex items-start gap-3 mb-2">
-              <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--ds-border)] bg-[var(--ds-surface)] shrink-0">
-                <DsLoader size="xs" className="text-[var(--ds-accent-violet)]" />
-              </span>
-              <div className="min-w-0">
-                <h2 className="text-base tv:text-lg font-semibold text-[var(--ds-text-primary)]">
-                  {searchPhase === 'local'
-                    ? t('search.searchingLocal')
-                    : searchPhase === 'tmdb'
-                      ? t('search.searchingTmdb')
-                      : t('search.searchingIndexers')}
-                </h2>
-                <p className="text-sm text-[var(--ds-text-tertiary)] mt-0.5">
-                  {t('search.searchLiveSubtitle')}
-                </p>
-              </div>
             </div>
-            <SearchLiveProgressTimeline live={searchLive} t={t} />
-          </div>
+          )}
+
+          {loading && (
+            <div className="w-full mt-1 rounded-2xl tv:rounded-3xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] p-5 tv:p-8 text-left animate-fade-in-up">
+              <div className="flex items-center gap-4 tv:gap-6">
+                <span className="inline-flex h-12 w-12 tv:h-16 tv:w-16 items-center justify-center rounded-full border border-[var(--ds-border)] bg-[var(--ds-surface)] shrink-0 text-[var(--ds-accent-violet)]">
+                  <DsLoader size={isTV ? 'md' : 'sm'} className="text-[var(--ds-accent-violet)]" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h2
+                    key={phaseTitle}
+                    className="text-base tv:text-2xl font-semibold text-[var(--ds-text-primary)] leading-snug animate-fade-in"
+                  >
+                    {phaseTitle}
+                  </h2>
+                  <p className="text-sm tv:text-lg text-[var(--ds-text-tertiary)] mt-1">
+                    {t('search.searchLiveSubtitle')}
+                  </p>
+                </div>
+              </div>
+              <SearchLiveProgressTimeline live={searchLive} t={t} />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {showResults && (
+        <div className="pt-4 sm:pt-6 pb-12 w-full min-w-0 max-w-full overflow-x-hidden border-t border-white/10" data-search-results>
+          <SearchResultsSection
+            title={t('search.inLibrary')}
+            results={libraryResults}
+            onResultClick={onResultClick}
+            initialFocus
+          />
+          <SearchResultsSection
+            title={t('search.moviesFound')}
+            results={catalogMovies}
+            onResultClick={onResultClick}
+            initialFocus={libraryResults.length === 0}
+          />
+          <SearchResultsSection
+            title={t('search.seriesFound')}
+            results={catalogSeries}
+            onResultClick={onResultClick}
+            initialFocus={libraryResults.length === 0 && catalogMovies.length === 0}
+          />
         </div>
       )}
 
-      {!loading && query && allResults.length === 0 && !error && tmdbFallbackResults.length > 0 && (
-        <div className="pt-4 sm:pt-6 pb-12 w-full min-w-0 max-w-full overflow-x-hidden" data-search-results>
-          <p className="px-4 sm:px-8 lg:px-12 text-sm tv:text-base text-[var(--ds-text-tertiary)] mb-4">
+      {showTmdbFallback && (
+        <div className="pt-4 sm:pt-6 pb-12 w-full min-w-0 max-w-full overflow-x-hidden border-t border-white/10" data-search-results>
+          <p className="px-4 sm:px-8 lg:px-12 text-sm tv:text-base text-white/55 mb-4 text-center">
             {t('search.noTorrentsUseRequest')}
           </p>
           {type === 'all' ? (
             <>
-              {sortedTmdbFallback.filter((r) => r.type === 'movie').length > 0 && (
-                <CarouselRow title={t('search.tmdbMoviesRequest')} autoScroll={false}>
-                  {sortedTmdbFallback
-                    .filter((r) => r.type === 'movie')
-                    .map((result) => (
-                      <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                        <SearchResultPoster
-                          result={result}
-                          onClick={onResultClick}
-                        />
-                      </div>
-                    ))}
-                </CarouselRow>
-              )}
-              {sortedTmdbFallback.filter((r) => r.type === 'tv').length > 0 && (
-                <CarouselRow title={t('search.tmdbSeriesRequest')} autoScroll={false}>
-                  {sortedTmdbFallback
-                    .filter((r) => r.type === 'tv')
-                    .map((result) => (
-                      <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                        <SearchResultPoster
-                          result={result}
-                          onClick={onResultClick}
-                        />
-                      </div>
-                    ))}
-                </CarouselRow>
-              )}
+              <SearchResultsSection
+                title={t('search.tmdbMoviesRequest')}
+                results={sortedTmdbFallback.filter((r) => r.type === 'movie')}
+                onResultClick={onResultClick}
+                initialFocus
+              />
+              <SearchResultsSection
+                title={t('search.tmdbSeriesRequest')}
+                results={sortedTmdbFallback.filter((r) => r.type === 'tv')}
+                onResultClick={onResultClick}
+                initialFocus={sortedTmdbFallback.every((r) => r.type !== 'movie')}
+              />
             </>
           ) : (
-            <CarouselRow title={t('search.tmdbRequestTitle')} autoScroll={false}>
-              {sortedTmdbFallback.map((result) => (
-                <div key={result.id} className="flex-shrink-0 w-[140px] sm:w-[160px] md:w-[180px] lg:w-[280px] xl:w-[320px] tv:w-[400px]">
-                  <SearchResultPoster
-                    result={result}
-                    onClick={onResultClick}
-                  />
-                </div>
-              ))}
-            </CarouselRow>
+            <SearchResultsSection
+              title={t('search.tmdbRequestTitle')}
+              results={sortedTmdbFallback}
+              onResultClick={onResultClick}
+              initialFocus
+            />
           )}
-          <div className="mt-6 px-4 sm:px-8 lg:px-12">
+          <div className="mt-6 px-4 sm:px-8 lg:px-12 flex justify-center">
             <button
               type="button"
               onClick={handleClear}
-              className="inline-flex items-center rounded-full ds-btn-secondary px-4 py-2 tv:px-6 tv:py-3 text-sm tv:text-base font-semibold min-h-[44px] tv:min-h-[52px]"
+              className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center rounded-full ds-btn-secondary px-4 py-2 tv:px-8 tv:py-4 text-sm tv:text-xl font-semibold min-h-[44px] tv:min-h-[64px]"
               tabIndex={0}
               data-focusable
             >
               {t('search.newSearch')}
             </button>
           </div>
-        </div>
-      )}
-
-      {!loading && query && allResults.length === 0 && !error && tmdbFallbackResults.length === 0 && (
-        <div className="px-4 sm:px-8 lg:px-12 py-10 tv:py-16">
-          <div className="flex flex-col items-center justify-center py-16 sm:py-20 text-center rounded-2xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]">
-            <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 border border-[var(--ds-border)] bg-[var(--ds-surface)]">
-              <SearchIcon size={28} className="text-[var(--ds-text-tertiary)]" />
-            </div>
-            <h2 className="text-xl font-bold text-[var(--ds-text-primary)] mb-1">
-              {t('search.noResults')}
-            </h2>
-            <p className="text-[var(--ds-text-tertiary)] text-sm max-w-md mb-5">
-              {t('search.noResultsFor', {
-                type: type === 'all' ? t('search.content') : type === 'movie' ? t('common.film').toLowerCase() : t('common.serie').toLowerCase(),
-                query,
-              })}
-            </p>
-            <button
-              type="button"
-              onClick={handleClear}
-              className="inline-flex items-center gap-2 rounded-full ds-btn-accent px-4 py-2.5 text-sm font-semibold min-h-[44px]"
-              tabIndex={0}
-              data-focusable
-            >
-              {t('search.newSearch')}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {!query && !loading && (
-        <div className="px-4 sm:px-8 lg:px-12 py-8 tv:py-10">
-          {searchHistory.length > 0 ? (
-            <>
-              <h3 className="text-sm tv:text-base font-semibold text-[var(--ds-text-secondary)] mb-3 tv:mb-4">
-                {t('search.recentSearches')}
-              </h3>
-              <div className="flex flex-wrap gap-2 tv:gap-3">
-                {searchHistory.map((term) => (
-                  <button
-                    key={term}
-                    type="button"
-                    data-focusable
-                    onClick={() => handleSearch(term)}
-                    className="px-3.5 py-1.5 tv:px-5 tv:py-2.5 rounded-full bg-[var(--ds-surface-elevated)] hover:border-[var(--ds-border-strong)] border border-[var(--ds-border)] text-[var(--ds-text-secondary)] hover:text-[var(--ds-text-primary)] text-sm tv:text-base min-h-[36px] tv:min-h-[48px] transition-colors"
-                    tabIndex={0}
-                  >
-                    {term}
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-16 sm:py-20 text-center rounded-2xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]">
-              <div className="w-14 h-14 rounded-full flex items-center justify-center mb-4 border border-[var(--ds-border)] bg-[var(--ds-surface)]">
-                <SearchIcon size={28} className="text-[var(--ds-text-tertiary)]" />
-              </div>
-              <h2 className="text-xl font-bold text-[var(--ds-text-primary)] mb-1">
-                {t('search.startSearch')}
-              </h2>
-              <p className="text-[var(--ds-text-tertiary)] text-sm max-w-md">
-                {t('search.startSearchDescription')}
-              </p>
-            </div>
-          )}
         </div>
       )}
     </div>

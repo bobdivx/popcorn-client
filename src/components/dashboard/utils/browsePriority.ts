@@ -63,3 +63,47 @@ export function matchesResume(download: ContentItem, resume: ContentItem): boole
 export function standaloneDownloads(activeDownloads: ContentItem[], resumeWatching: ContentItem[]): ContentItem[] {
   return activeDownloads.filter((ad) => !resumeWatching.some((rw) => matchesResume(ad, rw)));
 }
+
+/**
+ * Une seule file « Prêts à regarder » : téléchargements en cours d'abord
+ * (avec barre de progression), puis titres prêts, sans doublon TMDB/id.
+ */
+export function mergeReadyToWatch(
+  downloading: ContentItem[],
+  ready: ContentItem[],
+): ContentItem[] {
+  const seen = new Set<string>();
+  const out: ContentItem[] = [];
+
+  for (const dl of downloading) {
+    const key = contentItemKey(dl);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const match = ready.find((r) => contentItemKey(r) === key);
+    if (match) {
+      out.push({
+        ...match,
+        ...dl,
+        poster: dl.poster || match.poster,
+        backdrop: dl.backdrop || match.backdrop,
+        title: dl.title || match.title,
+        tmdbTitle: dl.tmdbTitle || match.tmdbTitle,
+        isDownloading: true,
+        progress: dl.progress,
+        downloadSpeed: dl.downloadSpeed ?? match.downloadSpeed,
+        heroSignal: match.heroSignal ?? dl.heroSignal,
+      });
+    } else {
+      out.push(dl);
+    }
+  }
+
+  for (const item of ready) {
+    const key = contentItemKey(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+
+  return out;
+}

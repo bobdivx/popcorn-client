@@ -12,6 +12,7 @@ import {
   pickFeaturedHero,
   filterWatchNow,
   standaloneDownloads,
+  mergeReadyToWatch,
   excludeSeenItems,
   contentItemKey,
 } from './utils/browsePriority';
@@ -94,6 +95,7 @@ export default function Dashboard() {
 
     const watchNowItems = excludeSeenItems(filterWatchNow(allDashboardItemsWithSignals), seenItems);
     const downloadingNow = standaloneDownloads(activeDownloads, resumeWatching);
+    const readyToWatch = mergeReadyToWatch(downloadingNow, watchNowItems);
 
     const result = [];
 
@@ -117,20 +119,11 @@ export default function Dashboard() {
       });
     }
 
-    if (downloadingNow.length > 0) {
-      result.push({
-        id: 'active-downloads',
-        title: t('dashboard.activeDownloads'),
-        items: downloadingNow,
-        priority: true,
-      });
-    }
-
-    if (watchNowItems.length > 0) {
+    if (readyToWatch.length > 0) {
       result.push({
         id: 'recently-downloaded',
         title: t('dashboard.recentlyDownloaded'),
-        items: watchNowItems,
+        items: readyToWatch,
         priority: true,
       });
     }
