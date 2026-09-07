@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { Car, Pause, Play, RotateCcw, SkipBack, SkipForward, X } from 'lucide-preact';
 import { stampTeslaBrowserHints } from '../../../lib/utils/device-detection';
-import { serverApi } from '../../../lib/client/server-api';
-import { buildStreamUrl } from '../player-core/utils/buildStreamUrl';
 import { useCarMediaSource } from './useCarMediaSource';
 import CarLibraryBrowser, { type CarLibraryPick } from './CarLibraryBrowser';
 import { attachCarStream } from './attachCarStream';
@@ -53,15 +51,15 @@ export default function CarPlayer() {
   const userPausedRef = useRef(false);
   const lastAdvanceAtRef = useRef(0);
   const hasMediaErrorRef = useRef(false);
-  const hlsFallbackTriedRef = useRef(false);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [driveMode, setDriveMode] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [prepStatus, setPrepStatus] = useState<string | null>(null);
   const [showControls, setShowControls] = useState(true);
-  const [playbackModeLabel, setPlaybackModeLabel] = useState('—');
+  const [playbackModeLabel, setPlaybackModeLabel] = useState('MP4');
 
   useEffect(() => {
     stampTeslaBrowserHints();
@@ -89,8 +87,8 @@ export default function CarPlayer() {
     setPickMeta(null);
     setDriveMode(false);
     setMediaError(null);
+    setPrepStatus(null);
     hasMediaErrorRef.current = false;
-    hlsFallbackTriedRef.current = false;
     userWantsPlayRef.current = false;
     userPausedRef.current = false;
   }, []);
@@ -102,70 +100,50 @@ export default function CarPlayer() {
     let destroyed = false;
     let destroyAttach: (() => void) | null = null;
     hasMediaErrorRef.current = false;
-    hlsFallbackTriedRef.current = false;
     setMediaError(null);
+    setPrepStatus(null);
     setDriveMode(false);
     userWantsPlayRef.current = false;
     userPausedRef.current = false;
-    setPlaybackModeLabel(source.mode === 'direct' ? 'Direct' : 'HLS');
+    setPlaybackModeLabel('MP4');
 
     const playWhenReady = () => {
       if (destroyed) return;
       userWantsPlayRef.current = true;
+      // En Drive, Tesla peut masquer la vidéo : lancer quand même pour garder l’audio
       void video.play().catch(() => undefined);
     };
 
-    const startAttach = async (url: string, mode: 'direct' | 'hls-native' | 'hls', label: string) => {
-      if (destroyAttach) {
-        destroyAttach();
-        destroyAttach = null;
-      }
-      setPlaybackModeLabel(label);
-      const result = await attachCarStream(video, url, mode, (message) => {
-        if (destroyed) return;
-        if (
-          mode === 'direct' &&
-          !hlsFallbackTriedRef.current &&
-          source &&
-          /Format non supporté|code 4|Passage HLS/i.test(message)
-        ) {
-          hlsFallbackTriedRef.current = true;
-          const baseUrl = serverApi.getServerUrl();
-          const hls = buildStreamUrl({
-            baseUrl,
-            infoHash: source.infoHash,
-            filePath: source.filePath,
-            fileName: source.fileName,
-            fileIndex: source.fileIndex,
-            isDirectMode: false,
-            isLucieMode: false,
-            maxHeight: 720,
-          });
-          setMediaError(null);
-          hasMediaErrorRef.current = false;
-          void startAttach(hls.streamUrl, 'hls', 'HLS (fallback)').then(playWhenReady);
-          return;
-        }
-        hasMediaErrorRef.current = true;
-        setDriveMode(false);
-        setMediaError(message);
-      });
+    void (async () => {
+      const result = await attachCarStream(
+        video,
+        source.streamUrl,
+        'direct',
+        (message) => {
+          if (destroyed) return;
+          hasMediaErrorRef.current = true;
+          setDriveMode(false);
+          setPrepStatus(null);
+          setMediaError(message);
+        },
+        (status) => {
+          if (destroyed) return;
+          setPrepStatus(status);
+        },
+      );
       if (destroyed) {
         result.destroy();
         return;
       }
       destroyAttach = result.destroy;
-    };
-
-    void startAttach(source.streamUrl, source.mode, source.mode === 'direct' ? 'Direct' : 'HLS').then(
-      playWhenReady,
-    );
+      playWhenReady();
+    })();
 
     return () => {
       destroyed = true;
       destroyAttach?.();
     };
-  }, [source?.streamUrl, source?.mode, source?.infoHash, source?.filePath, source?.fileName, source?.fileIndex]);
+  }, [source?.streamUrl]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -322,10 +300,13 @@ export default function CarPlayer() {
         >
           <span className="tesla-car-drive__badge">
             <Car className="w-5 h-5" />
-            Audio en conduite
+            Drive · MP4
           </span>
           <h1>{displayTitle}</h1>
-          <p>La vidéo est masquée par le véhicule. L’audio peut continuer — pilotez avec les commandes.</p>
+          <p>
+            En conduite, Tesla masque souvent l’image — l’audio MP4 continue. Utilisez Play / ±30&nbsp;s
+            ci‑dessous.
+          </p>
         </div>
       )}
 
@@ -344,6 +325,7 @@ export default function CarPlayer() {
 
       {(showControls || showDriveOverlay || mediaError) && (
         <div className="tesla-car-dock">
+          {prepStatus && !mediaError && <p className="tesla-car-dock__error" style={{ opacity: 0.85 }}>{prepStatus}</p>}
           {mediaError && <p className="tesla-car-dock__error">{mediaError}</p>}
 
           <div className="tesla-car-scrub">

@@ -1,80 +1,87 @@
 import type { RefObject } from 'preact';
 
-type HlsLike = {
-  loadSource: (url: string) => void;
-  attachMedia: (media: HTMLMediaElement) => void;
-  destroy: () => void;
-  on: (event: string, cb: (...args: unknown[]) => void) => void;
-};
-
-type HlsConstructor = {
-  isSupported: () => boolean;
-  Events: { ERROR: string };
-  DefaultConfig: Record<string, unknown>;
-  new (config?: Record<string, unknown>): HlsLike;
-};
-
-function applyCarHlsDefaults(HlsClass: HlsConstructor) {
-  HlsClass.DefaultConfig.lowLatencyMode = false;
-  HlsClass.DefaultConfig.backBufferLength = 90;
-  HlsClass.DefaultConfig.maxBufferLength = 60;
-}
-
-async function loadHlsClass(): Promise<HlsConstructor | null> {
-  if (typeof window === 'undefined') return null;
-  const existing = (window as unknown as { Hls?: HlsConstructor }).Hls;
-  if (existing) {
-    applyCarHlsDefaults(existing);
-    return existing;
-  }
-  try {
-    const { default: HlsClass } = await import('hls.js');
-    applyCarHlsDefaults(HlsClass as unknown as HlsConstructor);
-    (window as unknown as { Hls: HlsConstructor }).Hls = HlsClass as unknown as HlsConstructor;
-    return HlsClass as unknown as HlsConstructor;
-  } catch (e) {
-    console.error('[car-player] Impossible de charger hls.js', e);
-    return null;
-  }
-}
-
 export type CarAttachResult = {
   /** Appeler au unmount / changement de source */
   destroy: () => void;
 };
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 /**
- * Attache une source au `<video>` voiture :
- * - Direct MP4/WebM → `video.src`
- * - HLS → hls.js (MSE) en priorité, sinon HLS natif ; en cas d’échec natif → hls.js
+ * Attente que le serveur ait un MP4 prêt (remux MKV→MP4).
+ * En conduite Tesla, on a besoin d’un progressif video/mp4 stable — pas de HLS.
+ */
+async function waitUntilMp4Ready(
+  streamUrl: string,
+  signal: { cancelled: boolean },
+  onStatus?: (message: string) => void,
+): Promise<boolean> {
+  const maxAttempts = 90; // ~3 min (2 s)
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (signal.cancelled) return false;
+    try {
+      const res = await fetch(streamUrl, {
+        method: 'GET',
+        headers: { Range: 'bytes=0-1' },
+        cache: 'no-store',
+      });
+      if (signal.cancelled) return false;
+      // 200/206 = octets prêts ; 503 = remux en cours
+      if (res.status === 200 || res.status === 206) {
+        try {
+          await res.arrayBuffer();
+        } catch {
+          // ignore body drain
+        }
+        return true;
+      }
+      if (res.status === 503 || res.status === 202) {
+        onStatus?.(
+          attempt === 0
+            ? 'Préparation MP4 pour la conduite…'
+            : `Préparation MP4… (${attempt + 1})`,
+        );
+        await sleep(2000);
+        continue;
+      }
+      // Autres erreurs : laisser le <video> tenter quand même
+      return true;
+    } catch {
+      if (signal.cancelled) return false;
+      // CORS / réseau : après quelques essais, laisser <video> charger le MP4 directement
+      if (attempt >= 2) {
+        onStatus?.(null);
+        return true;
+      }
+      onStatus?.('Connexion au flux MP4…');
+      await sleep(2000);
+    }
+  }
+  return false;
+}
+
+/**
+ * Attache un flux progressif MP4 au `<video>` voiture (Tesla Drive).
  *
- * Nécessaire pour les MKV : le navigateur ne lit pas le MKV ; le serveur sert un m3u8
- * que Chromium Tesla ne gère souvent pas en natif (MEDIA_ERR_SRC_NOT_SUPPORTED = 4).
+ * En conduite, Tesla masque souvent la vidéo mais laisse l’audio — d’où un
+ * conteneur MP4 natif (Range) plutôt que HLS/MSE, trop fragile dans ce Chromium.
  */
 export async function attachCarStream(
   video: HTMLVideoElement,
   streamUrl: string,
-  mode: 'direct' | 'hls-native' | 'hls',
+  _mode: 'direct' | 'hls-native' | 'hls',
   onFatalError: (message: string) => void,
+  onStatus?: (message: string | null) => void,
 ): Promise<CarAttachResult> {
-  let hls: HlsLike | null = null;
-  let cancelled = false;
+  const signal = { cancelled: false };
   let nativeErrorHandler: (() => void) | null = null;
 
   const destroy = () => {
-    cancelled = true;
+    signal.cancelled = true;
     if (nativeErrorHandler) {
       video.removeEventListener('error', nativeErrorHandler);
       nativeErrorHandler = null;
     }
-    if (hls) {
-      try {
-        hls.destroy();
-      } catch {
-        // ignore
-      }
-      hls = null;
-    }
     try {
       video.removeAttribute('src');
       video.load();
@@ -83,81 +90,32 @@ export async function attachCarStream(
     }
   };
 
-  const attachWithHlsJs = async (): Promise<boolean> => {
-    const HlsClass = await loadHlsClass();
-    if (cancelled || !HlsClass) return false;
-    if (!HlsClass.isSupported()) return false;
+  const ready = await waitUntilMp4Ready(streamUrl, signal, (msg) => onStatus?.(msg));
+  if (signal.cancelled) return { destroy };
+  onStatus?.(null);
 
-    try {
-      video.removeAttribute('src');
-      video.load();
-    } catch {
-      // ignore
-    }
-
-    hls = new HlsClass({
-      enableWorker: true,
-      maxBufferLength: 45,
-      maxMaxBufferLength: 90,
-    });
-    hls.loadSource(streamUrl);
-    hls.attachMedia(video);
-    hls.on(HlsClass.Events.ERROR, (...args: unknown[]) => {
-      const data = args[1] as { fatal?: boolean; type?: string; details?: string } | undefined;
-      if (!data?.fatal) return;
-      console.error('[car-player] hls.js fatal', data);
-      onFatalError(
-        `Lecture HLS impossible (${data.details || data.type || 'erreur'}). Réessayez ou convertissez en MP4.`,
-      );
-    });
-    return true;
-  };
-
-  const attachNative = (): void => {
-    video.src = streamUrl;
-    video.load();
-  };
-
-  if (mode === 'direct') {
-    attachNative();
-    nativeErrorHandler = () => {
-      const code = video.error?.code;
-      // Direct échoué → souvent mauvais conteneur ; l’appelant peut relancer en HLS
-      if (code === 4) {
-        onFatalError('Format non supporté en direct (ex. MKV). Passage HLS…');
-      } else if (code) {
-        onFatalError(`Erreur média (code ${code})`);
-      }
-    };
-    video.addEventListener('error', nativeErrorHandler);
+  if (!ready) {
+    onFatalError('Préparation MP4 trop longue. Réessayez dans quelques minutes.');
     return { destroy };
   }
 
-  // HLS : préférer hls.js dès que MSE est dispo (Tesla / Chromium)
-  const usedHlsJs = await attachWithHlsJs();
-  if (cancelled) return { destroy };
-  if (usedHlsJs) return { destroy };
+  video.src = streamUrl;
+  video.load();
 
-  // Fallback natif (Safari / quelques WebKit)
-  attachNative();
   nativeErrorHandler = () => {
     const code = video.error?.code;
+    if (!code) return;
+    // MEDIA_ERR_SRC_NOT_SUPPORTED — conteneur/codec encore incompatible
     if (code === 4) {
-      void (async () => {
-        if (cancelled) return;
-        console.warn('[car-player] HLS natif échoué (code 4), nouvel essai hls.js');
-        const ok = await attachWithHlsJs();
-        if (!ok && !cancelled) {
-          onFatalError(
-            'Ce navigateur ne peut pas lire ce flux (MKV/HLS). Erreur 4 = format non supporté.',
-          );
-        } else if (ok && !cancelled) {
-          void video.play().catch(() => undefined);
-        }
-      })();
-      return;
+      onFatalError(
+        'Format non lisible en MP4 (codec HEVC/DTS ?). Convertissez en H.264/AAC pour Tesla Drive.',
+      );
+    } else if (code === 2) {
+      // Réseau : retry soft une fois (coupures Wi‑Fi voiture)
+      onFatalError('Erreur réseau pendant la lecture. Vérifiez la connexion et réessayez.');
+    } else {
+      onFatalError(`Erreur média (code ${code})`);
     }
-    if (code) onFatalError(`Erreur média (code ${code})`);
   };
   video.addEventListener('error', nativeErrorHandler);
 

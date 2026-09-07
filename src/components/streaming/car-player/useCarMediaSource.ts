@@ -3,7 +3,8 @@ import { serverApi } from '../../../lib/client/server-api';
 import { clientApi } from '../../../lib/client/api';
 import { buildStreamUrl } from '../player-core/utils/buildStreamUrl';
 
-export type CarStreamMode = 'direct' | 'hls-native';
+/** Voiture / Tesla : uniquement flux progressif MP4 (pas de HLS). */
+export type CarStreamMode = 'direct';
 
 export interface CarMediaSource {
   title: string;
@@ -15,10 +16,6 @@ export interface CarMediaSource {
   streamUrl: string;
   mode: CarStreamMode;
   slug: string;
-}
-
-function isNativeContainer(path: string): boolean {
-  return /\.(mp4|m4v|webm)(\?|$)/i.test(path);
 }
 
 function isVideoName(name: string): boolean {
@@ -69,7 +66,8 @@ function dedupeLibraryMediaPrefix(filePath: string): string {
 }
 
 /**
- * Résout slug → URL de stream (Direct MP4/WebM ou HLS natif). Pas de Lucie / MSE / hls.js.
+ * Résout slug → URL de stream progressif MP4 (`/api/local/stream/...`).
+ * Pas de HLS / Lucie / MSE — le Chromium Tesla lit mal le HLS (écran noir + son ou erreur).
  */
 function readCarQueryOverrides(): {
   path: string | null;
@@ -134,17 +132,14 @@ export function useCarMediaSource(slug: string | null) {
           const infoHash = overrides.infoHash || slug;
           const filePath = dedupeLibraryMediaPrefix(overrides.path);
           const fileName = filePath.split(/[/\\]/).pop() || 'video';
-          const preferDirect = isNativeContainer(filePath);
           const built = buildStreamUrl({
             baseUrl,
             infoHash,
             filePath,
             fileName,
             fileIndex: overrides.fileIndex,
-            isDirectMode: preferDirect,
+            isDirectMode: true,
             isLucieMode: false,
-            // Voiture : limiter la hauteur pour démarrer le remux HLS plus vite
-            maxHeight: preferDirect ? undefined : 720,
           });
           if (cancelled) return;
           setSource({
@@ -155,7 +150,7 @@ export function useCarMediaSource(slug: string | null) {
             fileName,
             fileIndex: overrides.fileIndex,
             streamUrl: built.streamUrl,
-            mode: preferDirect ? 'direct' : 'hls-native',
+            mode: 'direct',
             slug,
           });
           setLoading(false);
@@ -270,16 +265,14 @@ export function useCarMediaSource(slug: string | null) {
         }
 
         filePath = dedupeLibraryMediaPrefix(filePath);
-        const preferDirect = isNativeContainer(filePath);
         const built = buildStreamUrl({
           baseUrl,
           infoHash,
           filePath,
           fileName,
           fileIndex,
-          isDirectMode: preferDirect,
+          isDirectMode: true,
           isLucieMode: false,
-          maxHeight: preferDirect ? undefined : 720,
         });
 
         if (cancelled) return;
@@ -292,7 +285,7 @@ export function useCarMediaSource(slug: string | null) {
           fileName,
           fileIndex,
           streamUrl: built.streamUrl,
-          mode: preferDirect ? 'direct' : 'hls-native',
+          mode: 'direct',
           slug,
         });
       } catch (e) {
