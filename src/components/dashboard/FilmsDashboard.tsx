@@ -16,6 +16,7 @@ import {
   filterWatchNow,
   filterByMediaType,
   standaloneDownloads,
+  mergeReadyToWatch,
   excludeSeenItems,
 } from './utils/browsePriority';
 
@@ -77,6 +78,7 @@ export default function FilmsDashboard() {
     const rewatchMovies = rewatchWatching.filter((item) => item.type === 'movie');
     const watchNow = excludeSeenItems(filterWatchNow(filmsWithSignals), seenItems);
     const downloadingNow = standaloneDownloads(movieDownloads, resumeMovies);
+    const readyToWatch = mergeReadyToWatch(downloadingNow, watchNow);
 
     const genreMap = new Map<string, ContentItem[]>();
     for (const film of filmsWithSignals) {
@@ -100,8 +102,7 @@ export default function FilmsDashboard() {
     return [
       { id: 'resume-films', title: t('dashboard.resumeWatching'), items: resumeMovies, kind: 'resume' as const, priority: true },
       { id: 'rewatch-films', title: t('dashboard.rewatch'), items: rewatchMovies, kind: 'resume' as const, priority: true },
-      { id: 'active-downloads-films', title: t('dashboard.activeDownloads'), items: downloadingNow, priority: true },
-      { id: 'recently-downloaded-films', title: t('dashboard.recentlyDownloaded'), items: watchNow, priority: true },
+      { id: 'recently-downloaded-films', title: t('dashboard.recentlyDownloaded'), items: readyToWatch, priority: true },
       { id: 'recent-films', title: t('dashboard.newReleasesMovies'), items: newest },
       { id: 'fresh-films', title: t('dashboard.freshlySyncedMovies'), items: freshWithSignals.slice(0, SECTION_LIMIT) },
       { id: 'popular-films', title: t('dashboard.popularMovies'), items: popular },

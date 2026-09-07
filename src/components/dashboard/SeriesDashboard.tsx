@@ -16,6 +16,7 @@ import {
   filterWatchNow,
   filterByMediaType,
   standaloneDownloads,
+  mergeReadyToWatch,
   excludeSeenItems,
 } from './utils/browsePriority';
 
@@ -78,6 +79,7 @@ export default function SeriesDashboard() {
     const waitingSeries = waitingForNext.filter((item) => item.type === 'tv');
     const watchNow = excludeSeenItems(filterWatchNow(seriesWithSignals), seenItems);
     const downloadingNow = standaloneDownloads(seriesDownloads, resumeSeries);
+    const readyToWatch = mergeReadyToWatch(downloadingNow, watchNow);
 
     const genreMap = new Map<string, ContentItem[]>();
     for (const tv of seriesWithSignals) {
@@ -101,8 +103,7 @@ export default function SeriesDashboard() {
     return [
       { id: 'resume-series', title: t('dashboard.resumeWatching'), items: resumeSeries, kind: 'resume' as const, priority: true },
       { id: 'rewatch-series', title: t('dashboard.rewatch'), items: rewatchSeries, kind: 'resume' as const, priority: true },
-      { id: 'active-downloads-series', title: t('dashboard.activeDownloads'), items: downloadingNow, priority: true },
-      { id: 'recently-downloaded-series', title: t('dashboard.recentlyDownloaded'), items: watchNow, priority: true },
+      { id: 'recently-downloaded-series', title: t('dashboard.recentlyDownloaded'), items: readyToWatch, priority: true },
       {
         id: 'waiting-series',
         title: t('dashboard.waitingForNext'),

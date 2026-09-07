@@ -66,6 +66,8 @@ interface TitlePreviewCardProps {
   item: ContentItem;
   onNavigate: (item: ContentItem) => void;
   progress?: number;
+  /** Affiche la barre même à 0 % (téléchargement en cours). */
+  downloading?: boolean;
   metaLine?: string | null;
   metaSubLine?: string | null;
 }
@@ -79,6 +81,7 @@ export function TitlePreviewCard({
   item,
   onNavigate,
   progress,
+  downloading = false,
   metaLine,
   metaSubLine,
 }: TitlePreviewCardProps) {
@@ -148,10 +151,13 @@ export function TitlePreviewCard({
   if (!poster && !backdrop) return null;
 
   const progressPct = (() => {
-    if (typeof progress !== 'number' || progress <= 0) return 0;
-    const p = progress <= 1 ? progress * 100 : progress;
+    if (typeof progress !== 'number') return 0;
+    if (!downloading && progress <= 0) return 0;
+    // Téléchargements / ContentItem : déjà en 0–100. Fraction 0–1 seulement en legacy lecture.
+    const p = downloading || progress > 1 ? progress : progress * 100;
     return Math.min(100, Math.max(0, p));
   })();
+  const showProgressBar = downloading || progressPct > 0;
 
   return (
     <div
@@ -194,11 +200,21 @@ export function TitlePreviewCard({
             className="absolute inset-0 h-full w-full object-cover"
           />
 
-          {progressPct > 0 ? (
-            <div className="absolute inset-x-0 bottom-0 h-[3px] bg-white/25">
+          {showProgressBar ? (
+            <div
+              className={`absolute inset-x-0 bottom-0 ${downloading ? 'h-1.5 bg-black/55' : 'h-[3px] bg-white/25'}`}
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(progressPct)}
+            >
               <div
-                className="h-full bg-[var(--ds-accent-violet,#a855f7)]"
-                style={{ width: `${progressPct}%` }}
+                className={`h-full transition-[width] duration-500 ease-out ${
+                  downloading
+                    ? 'bg-[var(--ds-accent-violet,#a855f7)] shadow-[0_0_10px_rgba(168,85,247,0.45)]'
+                    : 'bg-[var(--ds-accent-violet,#a855f7)]'
+                }`}
+                style={{ width: `${Math.max(progressPct, downloading && progressPct === 0 ? 2 : 0)}%` }}
               />
             </div>
           ) : null}
@@ -218,9 +234,14 @@ export function TitlePreviewCard({
             ) : null}
           </>
         ) : hovered ? (
-          <p className="truncate text-sm font-medium text-white/90 transition-opacity duration-150">
-            {metaLine || title}
-          </p>
+          <>
+            <p className="truncate text-sm font-medium text-white/90 transition-opacity duration-150">
+              {metaLine || title}
+            </p>
+            {metaSubLine ? (
+              <p className="mt-0.5 truncate text-xs text-white/55">{metaSubLine}</p>
+            ) : null}
+          </>
         ) : null}
       </div>
     </div>

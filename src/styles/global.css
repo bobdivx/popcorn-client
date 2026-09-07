@@ -151,6 +151,11 @@ html[data-tv-platform] body {
 
 @supports (zoom: 1) {
   @media (min-width: 1024px) and (min-height: 500px) {
+    /*
+     * Densité visuelle 80% via zoom. Largeur logique = 100vw / scale pour remplir
+     * exactement le viewport après zoom — sans marge scrollbar asymétrique
+     * (sinon une « colonne » vide apparaît à droite, très visible sur /search).
+     */
     body:has(.app-main [data-page="dashboard"]),
     body:has(.app-main [data-page="films"]),
     body:has(.app-main [data-page="films-library"]),
@@ -161,20 +166,40 @@ html[data-tv-platform] body {
     body:has(.app-main [data-page="downloads"]),
     body:has(.app-main [data-page="settings"]) {
       zoom: var(--app-visual-scale);
-      /* Cible visuelle = viewport - scrollbar (zone visible) - scrollbar (gutter gauche
-         pour symetriser visuellement). Largeur logique = visuelle * 1.25.
-         Si pas de scrollbar (valeur = 0), on revient au comportement plein viewport. */
-      width: calc((100vw - 2 * var(--scrollbar-width-real)) * var(--app-visual-scale-inverse));
-      max-width: calc((100vw - 2 * var(--scrollbar-width-real)) * var(--app-visual-scale-inverse));
-      /* Decaler le body de scrollbar/2 logique a gauche (= scrollbar/2 visuel apres zoom)
-         pour le centrer dans la zone visible : la scrollbar reelle occupe le bord droit,
-         on laisse une marge equivalente a gauche -> hero card visuellement symetrique. */
-      margin-left: calc(var(--scrollbar-width-real) * var(--app-visual-scale-inverse));
+      width: calc(100vw * var(--app-visual-scale-inverse));
+      max-width: calc(100vw * var(--app-visual-scale-inverse));
+      margin-left: 0;
       margin-right: 0;
       min-height: calc(100vh * var(--app-visual-scale-inverse));
       overflow-x: hidden;
     }
   }
+}
+
+/* Page recherche : remplir <main> et centrer le bloc idle au milieu de l’écran */
+.app-main:has([data-page="search"]) {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh * var(--app-visual-scale-inverse, 1));
+  box-sizing: border-box;
+}
+
+[data-page="search"].search-page {
+  flex: 1 1 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+[data-page="search"].search-page--centered {
+  justify-content: center;
+  align-items: center;
+}
+
+[data-page="search"] .search-page__stage {
+  width: 100%;
+  margin-inline: auto;
 }
 
 /* Garde de scroll pour les cartes focusées : évite le rognage en haut/bas du viewport. */
@@ -381,6 +406,59 @@ html[data-tv-platform="true"] [data-page="demandes"] [data-torrent-card].torrent
   overflow: visible !important;
 }
 
+/* Page Downloads : densité 10-foot, overscan, focus lisible */
+html[data-tv-platform="true"] [data-page="downloads"] {
+  --dl-card-radius: 1.25rem;
+}
+html[data-tv-platform="true"] [data-page="downloads"] > header.tv-page-header {
+  padding-left: var(--tv-overscan-x);
+  padding-right: var(--tv-overscan-x);
+}
+html[data-tv-platform="true"] [data-page="downloads"] .dl-session-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: min(100%, 56rem);
+}
+html[data-tv-platform="true"] [data-page="downloads"] .dl-stat-tile {
+  min-height: 5.5rem;
+}
+html[data-tv-platform="true"] [data-page="downloads"] .dl-filters {
+  gap: 0.5rem;
+}
+html[data-tv-platform="true"] [data-page="downloads"] .dl-card-grid {
+  gap: 1.75rem;
+}
+html[data-tv-platform="true"] [data-page="downloads"] [data-download-card] {
+  scroll-margin-top: clamp(5rem, 12vh, 9rem);
+  scroll-margin-bottom: clamp(4rem, 10vh, 7rem);
+}
+html[data-tv-platform="true"] [data-page="downloads"] [data-download-card] .dl-card:focus,
+html[data-tv-platform="true"] [data-page="downloads"] [data-download-card] .dl-card:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.92);
+  outline-offset: 4px;
+  transform: scale(1.03);
+  z-index: 2;
+}
+html[data-tv-platform="true"] [data-page="downloads"] .dl-quick-actions {
+  display: none !important;
+}
+html[data-tv-platform="true"] [data-page="downloads"] .dl-row {
+  min-height: 6.5rem;
+  padding: 1rem 1.25rem;
+}
+
+/* Modal détail downloads — cibles focus TV plus larges */
+html[data-tv-platform="true"] [data-dl-detail] .dl-detail-stat {
+  min-height: 6rem;
+}
+html[data-tv-platform="true"] [data-dl-detail] .gtv-pill-btn {
+  min-height: 7rem;
+}
+html[data-tv-platform="true"] .dl-detail-modal [data-focusable]:focus,
+html[data-tv-platform="true"] .dl-detail-modal [data-focusable]:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.9);
+  outline-offset: 3px;
+}
+
 /* Scrollbar visible (barre latérale) */
 .scrollbar-visible {
   scrollbar-width: thin; /* Firefox */
@@ -557,6 +635,33 @@ html[data-tv-platform="true"] [data-page="demandes"] [data-torrent-card].torrent
 
 .animate-progress-wave {
   animation: progress-wave 2s ease-in-out infinite;
+}
+
+/* Barre de progression recherche (/search) — shimmer pendant l’étape active */
+.search-progress-fill {
+  background-image: linear-gradient(
+    90deg,
+    var(--ds-accent-violet) 0%,
+    color-mix(in srgb, var(--ds-accent-violet) 75%, white) 45%,
+    var(--ds-accent-violet) 100%
+  );
+  background-size: 200% 100%;
+  animation: search-progress-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes search-progress-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+html[data-tv-platform="true"] .search-progress-fill {
+  animation-duration: 2.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-progress-fill {
+    animation: none;
+  }
 }
 
 /* Entrées (logo / carte) */

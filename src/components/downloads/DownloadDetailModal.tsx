@@ -1,14 +1,27 @@
 import { useEffect, useState } from 'preact/hooks';
-import { 
-  ArrowLeft, Download, Upload, Sprout, Users, Play, Pause, 
-  Trash2, Info, Film, Clock, HardDrive, Copy, Pencil, 
-  PlusCircle, ExternalLink, Settings2, ChevronDown, ChevronUp,
-  FileText as LogsIcon
+import {
+  ArrowLeft,
+  Download,
+  Upload,
+  Sprout,
+  Users,
+  Play,
+  Pause,
+  Trash2,
+  Film,
+  Clock,
+  HardDrive,
+  Copy,
+  PlusCircle,
+  Settings2,
+  ChevronDown,
+  ChevronUp,
+  FileText as LogsIcon,
 } from 'lucide-preact';
 import type { ClientTorrentStats } from '../../lib/client/types';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { clientApi } from '../../lib/client/api';
-import { TorrentProgressBar, TorrentStatusBadge } from '../torrents/ui';
+import { TorrentStatusBadge } from '../torrents/ui';
 import { formatBytes, formatSpeed, formatETA } from '../../lib/utils/formatBytes';
 import { isTorrentActivelySeeding } from '../../lib/utils/torrentSeeding';
 import { parseTmdbUserInput } from '../../lib/utils/parseTmdbUserInput';
@@ -31,43 +44,88 @@ interface DownloadDetailModalProps {
   onTmdbMetadataChanged?: (infoHash: string) => Promise<void>;
 }
 
-const StatCard = ({ icon: Icon, label, value, colorClass }: any) => (
-  <div className="bg-[var(--ds-surface)] border border-[var(--ds-border)] rounded-2xl p-3 sm:p-5 flex flex-col gap-1 min-w-0 overflow-hidden group hover:bg-[var(--ds-surface-overlay)] transition-all">
-    <div className="flex items-center gap-1.5 sm:gap-2 text-[var(--ds-text-tertiary)] group-hover:text-[var(--ds-text-secondary)] transition-colors min-w-0">
-      <Icon size={16} className={`${colorClass} shrink-0`} />
-      <span className="text-[10px] sm:text-xs font-semibold uppercase tracking-wide truncate">{label}</span>
+const StatCard = ({
+  icon: Icon,
+  label,
+  value,
+  colorClass,
+}: {
+  icon: typeof Download;
+  label: string;
+  value: string | number;
+  colorClass: string;
+}) => (
+  <div className="dl-detail-stat rounded-2xl tv:rounded-3xl border border-white/10 bg-black/30 backdrop-blur-md px-3 py-3 sm:px-4 sm:py-4 tv:px-5 tv:py-5 flex flex-col gap-1.5 min-w-0 overflow-hidden transition-colors hover:border-white/20 hover:bg-black/40">
+    <div className="flex items-center gap-1.5 sm:gap-2 text-white/45 min-w-0">
+      <Icon size={16} className={`${colorClass} shrink-0 tv:w-5 tv:h-5`} />
+      <span className="text-[10px] sm:text-xs tv:text-sm font-semibold uppercase tracking-wider truncate">{label}</span>
     </div>
-    <div className="text-base sm:text-2xl font-bold text-[var(--ds-text-primary)] tracking-tight truncate">{value}</div>
+    <div className="text-base sm:text-xl tv:text-2xl font-bold text-white tracking-tight truncate tabular-nums">
+      {value}
+    </div>
   </div>
 );
 
-const ActionTile = ({ icon: Icon, label, onClick, className = "", danger = false, ...rest }: any) => (
+const ActionTile = ({
+  icon: Icon,
+  label,
+  onClick,
+  className = '',
+  danger = false,
+  primary = false,
+  ...rest
+}: {
+  icon: typeof Play;
+  label: string;
+  onClick: () => void;
+  className?: string;
+  danger?: boolean;
+  primary?: boolean;
+  [key: string]: unknown;
+}) => (
   <button
     type="button"
     data-focusable
     tabIndex={0}
     {...rest}
     onClick={onClick}
-    className={`group flex min-w-0 flex-col items-center justify-center p-3 sm:p-6 min-h-[80px] sm:min-h-[88px] rounded-2xl border transition-[opacity,transform,background-color,border-color] duration-200 gap-2 sm:gap-3 
-      ${danger 
-        ? 'bg-red-500/10 border-red-500/20 hover:bg-red-500/20 hover:border-red-500/40' 
-        : 'bg-[var(--ds-surface)] border-[var(--ds-border)] hover:border-[var(--ds-border-strong)]'
+    className={`gtv-pill-btn ds-focus-glow group flex min-w-0 flex-col items-center justify-center p-4 sm:p-5 tv:p-6 min-h-[88px] tv:min-h-[112px] rounded-2xl tv:rounded-3xl border transition-[opacity,transform,background-color,border-color] duration-200 gap-2.5 sm:gap-3
+      ${
+        danger
+          ? 'bg-red-500/10 border-red-500/25 hover:bg-red-500/20 hover:border-red-500/40'
+          : primary
+            ? 'bg-[var(--ds-accent-violet)]/20 border-[var(--ds-accent-violet)]/40 hover:bg-[var(--ds-accent-violet)]/30'
+            : 'bg-white/[0.04] border-white/12 hover:border-white/25 hover:bg-white/[0.08]'
       } ${className}`}
   >
-    <div className={`p-3 rounded-full transition-transform group-hover:scale-110 ${danger ? 'bg-red-500/20 text-red-500' : 'bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] border border-[var(--ds-border)]'}`}>
-      <Icon size={24} />
+    <div
+      className={`p-3 tv:p-4 rounded-full transition-transform group-hover:scale-110 ${
+        danger
+          ? 'bg-red-500/20 text-red-400'
+          : primary
+            ? 'bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)]'
+            : 'bg-black/35 text-white border border-white/12'
+      }`}
+    >
+      <Icon size={24} className="tv:w-7 tv:h-7" />
     </div>
-    <span className={`text-sm font-bold tracking-wide ${danger ? 'text-red-500' : 'text-[var(--ds-text-primary)]'}`}>{label}</span>
+    <span
+      className={`text-sm tv:text-lg font-bold tracking-wide ${
+        danger ? 'text-red-400' : 'text-white'
+      }`}
+    >
+      {label}
+    </span>
   </button>
 );
 
-export function DownloadDetailModal({ 
-  torrent, 
+export function DownloadDetailModal({
+  torrent,
   relatedTorrents,
-  onClose, 
-  onPause, 
-  onResume, 
-  onRemove, 
+  onClose,
+  onPause,
+  onResume,
+  onRemove,
   onShowLogs,
   posterUrl,
   backdropUrl,
@@ -78,7 +136,7 @@ export function DownloadDetailModal({
 }: DownloadDetailModalProps) {
   const { t } = useI18n();
   const [activeInfoHash, setActiveInfoHash] = useState<string>(torrent.info_hash);
-  
+
   const [statsV1, setStatsV1] = useState<Record<string, any> | null>(null);
   const [downloadPath, setDownloadPath] = useState<string | null>(null);
   const [trackers, setTrackers] = useState<string[]>([]);
@@ -90,7 +148,7 @@ export function DownloadDetailModal({
   const [tmdbBusy, setTmdbBusy] = useState(false);
   const [tmdbError, setTmdbError] = useState<string | null>(null);
   const modalTorrents = relatedTorrents && relatedTorrents.length > 0 ? relatedTorrents : [torrent];
-  const activeTorrent = modalTorrents.find(t => t.info_hash === activeInfoHash) || torrent;
+  const activeTorrent = modalTorrents.find((x) => x.info_hash === activeInfoHash) || torrent;
   const keyLower = activeTorrent.info_hash.toLowerCase();
   const isLocalStub = activeTorrent.info_hash.startsWith('local_');
   const headerTitle =
@@ -98,20 +156,19 @@ export function DownloadDetailModal({
       (typeof activeTorrent.tmdb_title === 'string' && activeTorrent.tmdb_title.trim()) ||
       activeTorrent.name) as string;
 
-  const getTorrentDetailUrl = (t: ClientTorrentStats): string => {
-    const key = t.info_hash.toLowerCase();
+  const getTorrentDetailUrl = (item: ClientTorrentStats): string => {
+    const key = item.info_hash.toLowerCase();
     const idFromMap = tmdbIdByHash?.[key];
-    const tmdbId = t.tmdb_id ?? idFromMap ?? null;
-    const tmdbTypeRaw = (t.tmdb_type || tmdbTypeByHash?.[key] || '').toString().toLowerCase();
+    const tmdbId = item.tmdb_id ?? idFromMap ?? null;
+    const tmdbTypeRaw = (item.tmdb_type || tmdbTypeByHash?.[key] || '').toString().toLowerCase();
     const tmdbType = tmdbTypeRaw === 'tv' || tmdbTypeRaw === 'movie' ? tmdbTypeRaw : null;
-    const title = (displayTitleByHash?.[key] || t.tmdb_title || t.name || '').trim();
+    const title = (displayTitleByHash?.[key] || item.tmdb_title || item.name || '').trim();
     return buildStrictTmdbDetailUrl({
       tmdbId: typeof tmdbId === 'number' && Number.isFinite(tmdbId) ? tmdbId : null,
       type: tmdbType,
       from: 'downloads',
       title: title || null,
-      // Sans infoHash, la fiche TMDB peut charger un stub local_* sans hash → lecture impossible.
-      infoHash: t.info_hash || null,
+      infoHash: item.info_hash || null,
     });
   };
 
@@ -119,7 +176,6 @@ export function DownloadDetailModal({
     setActiveInfoHash(torrent.info_hash);
   }, [torrent.info_hash]);
 
-  /** Préremplit ID / type : liste locale puis GET /torrents/:hash (hydraté TMDB côté serveur). */
   useEffect(() => {
     setTmdbError(null);
     if (isLocalStub) {
@@ -128,9 +184,7 @@ export function DownloadDetailModal({
     }
     const idFromMap = tmdbIdByHash?.[keyLower];
     const idSync = activeTorrent.tmdb_id ?? idFromMap;
-    setTmdbIdInput(
-      idSync != null && Number.isFinite(Number(idSync)) ? String(idSync) : '',
-    );
+    setTmdbIdInput(idSync != null && Number.isFinite(Number(idSync)) ? String(idSync) : '');
     setTmdbTypeSel(activeTorrent.tmdb_type === 'tv' ? 'tv' : 'movie');
 
     let cancelled = false;
@@ -157,25 +211,27 @@ export function DownloadDetailModal({
     isLocalStub,
   ]);
 
-  // Background stats polling
   useEffect(() => {
     const fetchStats = async () => {
       try {
         setStatsV1(await clientApi.getTorrentStatsV1(activeTorrent.info_hash));
-      } catch (e) {}
+      } catch {
+        /* ignore */
+      }
     };
     fetchStats();
     const interval = setInterval(fetchStats, 2000);
     return () => clearInterval(interval);
   }, [activeTorrent.info_hash]);
 
-  // Fetch path and trackers once
   useEffect(() => {
     (async () => {
       try {
         setDownloadPath(await clientApi.getTorrentDownloadPath(activeTorrent.info_hash));
         setTrackers(await clientApi.getTorrentTrackers(activeTorrent.info_hash));
-      } catch (e) {}
+      } catch {
+        /* ignore */
+      }
     })();
   }, [activeTorrent.info_hash]);
 
@@ -185,9 +241,14 @@ export function DownloadDetailModal({
   const eta = live?.time_remaining?.human_readable || formatETA(activeTorrent.eta_seconds);
   const peers = live?.snapshot?.peer_stats?.live ?? (activeTorrent.peers_connected || 0);
   const activeSeeding = isTorrentActivelySeeding(activeTorrent);
-  const sharingStatusLabel = activeTorrent.state === 'seeding'
-    ? (activeSeeding ? 'Partage actif' : 'Partage (idle)')
-    : 'Hors partage';
+  const sharingStatusLabel =
+    activeTorrent.state === 'seeding'
+      ? activeSeeding
+        ? 'Partage actif'
+        : 'Partage (idle)'
+      : 'Hors partage';
+  const progressPercent = Math.round((activeTorrent.progress ?? 0) * 1000) / 10;
+  const heroImage = backdropUrl || posterUrl;
 
   const handleAddTracker = async () => {
     if (!newTrackerUrl.trim()) return;
@@ -196,7 +257,11 @@ export function DownloadDetailModal({
       await clientApi.addTracker(activeTorrent.info_hash, newTrackerUrl.trim());
       setTrackers(await clientApi.getTorrentTrackers(activeTorrent.info_hash));
       setNewTrackerUrl('');
-    } catch (e) {} finally { setAddTrackerLoading(false); }
+    } catch {
+      /* ignore */
+    } finally {
+      setAddTrackerLoading(false);
+    }
   };
 
   const runTmdbAction = async (fn: () => Promise<void>) => {
@@ -247,263 +312,379 @@ export function DownloadDetailModal({
   };
 
   return (
-    <Modal 
-      isOpen={true} 
-      onClose={onClose} 
+    <Modal
+      isOpen={true}
+      onClose={onClose}
       size="full"
       scrollable={true}
       noPadding={true}
-      className="p-0 sm:p-0" // Reset standard padding to keep custom layout
+      className="p-0 sm:p-0 dl-detail-modal"
     >
-      <div className="relative flex min-h-0 min-w-0 flex-col overflow-x-hidden h-full max-sm:overflow-hidden sm:h-auto lg:h-full lg:overflow-hidden">
-        {/* Immersive backdrop — clipped so blur/scale never creates extra scrollbars */}
-        {backdropUrl && (
+      <div
+        className="relative flex min-h-0 min-w-0 flex-col overflow-x-hidden h-full max-sm:overflow-hidden sm:h-auto lg:h-full lg:overflow-hidden bg-[var(--ds-surface)]"
+        data-dl-detail
+      >
+        {heroImage && (
           <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden>
             <div
-              className="absolute inset-0 bg-cover bg-center opacity-30 blur-3xl scale-105"
-              style={{ backgroundImage: `url(${backdropUrl})` }}
+              className="absolute inset-0 bg-cover bg-center scale-110 opacity-40 blur-2xl"
+              style={{ backgroundImage: `url(${heroImage})` }}
             />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/55 via-[var(--ds-surface)]/85 to-[var(--ds-surface)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(59,106,225,0.18),transparent_50%)]" />
           </div>
         )}
 
-        {/* Header bar */}
-        <div className="relative z-20 flex min-w-0 items-center justify-between px-4 sm:px-8 py-4 border-b border-[var(--ds-border)] bg-[var(--ds-surface)] flex-shrink-0">
+        {/* Top bar */}
+        <div className="relative z-20 flex min-w-0 items-center justify-between gap-3 px-4 sm:px-8 tv:px-12 py-3 sm:py-4 border-b border-white/10 bg-black/25 backdrop-blur-md flex-shrink-0">
           <button
+            type="button"
             onClick={onClose}
-            className="flex items-center gap-2 text-[var(--ds-text-secondary)] hover:text-[var(--ds-text-primary)] transition-colors p-2 -ml-2 rounded-xl hover:bg-[var(--ds-surface-overlay)]"
+            className="gtv-pill-btn ds-focus-glow inline-flex items-center gap-2 text-white/75 hover:text-white transition-colors px-3 py-2 tv:px-5 tv:py-3 rounded-full border border-white/12 bg-black/30"
             data-focusable
             aria-label="Fermer"
           >
-            <ArrowLeft size={20} />
-            <span className="font-semibold hidden sm:inline">{t('common.back')}</span>
+            <ArrowLeft size={20} className="tv:w-6 tv:h-6" />
+            <span className="font-semibold hidden sm:inline tv:text-lg">{t('common.back')}</span>
           </button>
-          <div className="flex items-center gap-3">
-             <TorrentStatusBadge state={activeTorrent.state} seedingActive={activeSeeding} className="scale-90 origin-right" />
-          </div>
+          <TorrentStatusBadge
+            state={activeTorrent.state}
+            seedingActive={activeSeeding}
+            className="px-3 py-1.5 tv:px-4 tv:py-2 rounded-full text-xs tv:text-sm font-bold tracking-wide bg-black/45 border border-white/15 text-white/90 backdrop-blur-md"
+          />
         </div>
 
         <div className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-x-hidden overflow-y-auto sm:overflow-visible lg:flex-row lg:overflow-hidden">
-          {/* Left Sidebar - Poster & Basic Info */}
-          <div className="w-full min-w-0 flex-shrink-0 border-b border-[var(--ds-border)] bg-[var(--ds-surface)] p-4 sm:p-8 lg:w-96 lg:border-b-0 lg:border-r lg:overflow-y-auto tv:lg:w-[min(24rem,32vw)] custom-scrollbar">
-            <div className="relative mx-auto aspect-[2/3] w-full max-w-[min(100%,12rem)] sm:max-w-[min(100%,18rem)] overflow-hidden rounded-2xl shadow-2xl group tv:max-w-[min(100%,22rem)] lg:mx-0 lg:max-w-none">
+          {/* Left — hero media */}
+          <aside className="w-full min-w-0 flex-shrink-0 border-b border-white/10 lg:w-[min(22rem,34vw)] tv:lg:w-[min(26rem,32vw)] lg:border-b-0 lg:border-r lg:overflow-y-auto custom-scrollbar">
+            <div className="relative aspect-video lg:aspect-[2/3] w-full overflow-hidden bg-black/40">
               {posterUrl ? (
-                <img src={posterUrl} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt={headerTitle} />
+                <img
+                  src={posterUrl}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  alt={headerTitle}
+                />
+              ) : backdropUrl ? (
+                <img
+                  src={backdropUrl}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  alt=""
+                />
               ) : (
-                <div className="w-full h-full bg-[var(--ds-surface-elevated)] flex items-center justify-center">
-                  <Film size={80} className="text-[var(--ds-text-tertiary)]" />
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-white/10 via-black/50 to-black/90">
+                  <Film size={72} className="text-white/25" />
                 </div>
               )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent lg:from-black/80" />
+              <div className="absolute left-4 right-4 bottom-4 lg:left-5 lg:right-5 lg:bottom-5 z-10">
+                <div className="flex items-end justify-between gap-3 mb-2">
+                  <span className="text-2xl tv:text-4xl font-bold tabular-nums text-white drop-shadow-md">
+                    {progressPercent.toFixed(0)}%
+                  </span>
+                  <span className="text-xs tv:text-sm text-white/65 font-medium tabular-nums">
+                    {formatBytes(activeTorrent.total_bytes)}
+                  </span>
+                </div>
+                <div className="h-1.5 tv:h-2.5 w-full overflow-hidden rounded-full bg-white/15">
+                  <div
+                    className={`h-full rounded-full bg-gradient-to-r ${
+                      activeTorrent.state === 'downloading'
+                        ? 'from-[var(--ds-accent-violet)] to-sky-400'
+                        : 'from-[var(--ds-accent-green)] to-emerald-300'
+                    }`}
+                    style={{ width: `${Math.min(100, Math.max(0, progressPercent))}%` }}
+                  />
+                </div>
+              </div>
             </div>
 
-            <h1 className="text-2xl font-bold text-[var(--ds-text-primary)] mt-6 mb-4 line-clamp-2 leading-tight">
-              {headerTitle}
-            </h1>
-            {modalTorrents.length > 1 && (
-              <div className="mb-4">
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)] mb-2">
-                  Épisode / Fichier ({modalTorrents.length})
-                </label>
-                <select
-                  value={activeInfoHash}
-                  onChange={(e) => setActiveInfoHash((e.target as HTMLSelectElement).value)}
-                  className="w-full bg-[var(--ds-surface-elevated)] border border-[var(--ds-border)] rounded-xl px-3 py-2 text-sm text-[var(--ds-text-primary)] focus:outline-none focus:border-[var(--ds-accent-violet)]"
-                >
-                  {modalTorrents.map((item) => (
-                    <option key={item.info_hash} value={item.info_hash}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <div className="p-4 sm:p-6 tv:p-7 space-y-5">
+              <h1 className="text-xl sm:text-2xl tv:text-3xl font-bold text-white leading-tight line-clamp-3">
+                {headerTitle}
+              </h1>
 
-            <div className="space-y-6">
-              <TorrentProgressBar 
-                progress={activeTorrent.progress} 
-                downloadedBytes={activeTorrent.downloaded_bytes} 
-                totalBytes={activeTorrent.total_bytes} 
-                statusLabel="Progression"
-                progressColor={activeTorrent.state === 'downloading' ? 'blue' : 'green'}
+              {modalTorrents.length > 1 && (
+                <div>
+                  <label className="block text-[10px] tv:text-xs font-bold uppercase tracking-widest text-white/40 mb-2">
+                    Épisode / Fichier ({modalTorrents.length})
+                  </label>
+                  <select
+                    value={activeInfoHash}
+                    onChange={(e) => setActiveInfoHash((e.target as HTMLSelectElement).value)}
+                    data-focusable
+                    className="w-full bg-black/35 border border-white/12 rounded-xl tv:rounded-2xl px-3 py-2.5 tv:py-3.5 text-sm tv:text-base text-white focus:outline-none focus:border-[var(--ds-accent-violet)]"
+                  >
+                    {modalTorrents.map((item) => (
+                      <option key={item.info_hash} value={item.info_hash}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <p className="text-sm tv:text-base text-white/50 tabular-nums">
+                {formatBytes(activeTorrent.downloaded_bytes)}
+                {activeTorrent.total_bytes > 0
+                  ? ` / ${formatBytes(activeTorrent.total_bytes)}`
+                  : ''}
+              </p>
+            </div>
+          </aside>
+
+          {/* Right — stats & actions */}
+          <div className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-8 tv:p-10 lg:overflow-y-auto custom-scrollbar">
+            <div className="mb-7 grid grid-cols-2 gap-2.5 sm:gap-3 lg:mb-9 lg:grid-cols-5 tv:gap-4">
+              <StatCard
+                icon={Download}
+                label="Téléchargement"
+                value={downSpeed}
+                colorClass="text-[var(--ds-accent-violet)]"
               />
-              
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-[var(--ds-text-tertiary)] uppercase tracking-widest font-bold">Taille Totale</span>
-                <span className="text-[var(--ds-text-primary)] font-mono">{formatBytes(activeTorrent.total_bytes)}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Main Content - Stats & Actions */}
-          <div className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-8 lg:overflow-y-auto custom-scrollbar">
-            <div className="mb-8 grid grid-cols-2 gap-2 sm:gap-4 lg:mb-10 lg:grid-cols-5">
-              <StatCard icon={Download} label="Téléchargement" value={downSpeed} colorClass="text-[var(--ds-accent-violet)]" />
-              <StatCard icon={Upload} label="Envoi" value={upSpeed} colorClass="text-[var(--ds-accent-green)]" />
+              <StatCard
+                icon={Upload}
+                label="Envoi"
+                value={upSpeed}
+                colorClass="text-[var(--ds-accent-green)]"
+              />
               <StatCard
                 icon={Sprout}
                 label="Partage"
                 value={sharingStatusLabel}
-                colorClass={activeTorrent.state === 'seeding' ? 'text-[var(--ds-accent-green)]' : 'text-[var(--ds-text-tertiary)]'}
+                colorClass={
+                  activeTorrent.state === 'seeding'
+                    ? 'text-[var(--ds-accent-green)]'
+                    : 'text-white/40'
+                }
               />
-              <StatCard icon={Users} label="Pairs" value={peers} colorClass="text-[var(--ds-accent-violet)]" />
-              <StatCard icon={Clock} label="Temps restant" value={eta} colorClass="text-[var(--ds-accent-yellow)]" />
+              <StatCard
+                icon={Users}
+                label="Pairs"
+                value={peers}
+                colorClass="text-[var(--ds-accent-violet)]"
+              />
+              <StatCard
+                icon={Clock}
+                label="Temps restant"
+                value={eta}
+                colorClass="text-[var(--ds-accent-yellow)]"
+              />
             </div>
 
-            <div className="mb-8 lg:mb-10">
-              <h2 className="text-xs font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)] mb-4">Commandes</h2>
-              <div className="grid grid-cols-2 gap-2 sm:gap-4 md:grid-cols-4">
+            <div className="mb-7 lg:mb-9">
+              <h2 className="text-xs tv:text-sm font-bold uppercase tracking-widest text-white/40 mb-3 tv:mb-4">
+                Commandes
+              </h2>
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-4 tv:gap-4">
                 <ActionTile
                   icon={Play}
                   label="Lire"
+                  primary
                   data-focusable
                   data-autofocus
-                  onClick={() => (window.location.href = getTorrentDetailUrl(activeTorrent))}
+                  onClick={() => {
+                    window.location.href = getTorrentDetailUrl(activeTorrent);
+                  }}
                 />
-                {activeTorrent.state === 'paused' ? (
-                  <ActionTile icon={Play} label="Reprendre" onClick={() => onResume(activeTorrent.info_hash)} className="bg-emerald-500/10 border-emerald-500/20" />
+                {activeTorrent.state === 'paused' || activeTorrent.state === 'error' ? (
+                  <ActionTile
+                    icon={Play}
+                    label="Reprendre"
+                    onClick={() => onResume(activeTorrent.info_hash)}
+                    className="bg-emerald-500/10 border-emerald-500/25"
+                  />
                 ) : (
-                  <ActionTile icon={Pause} label="Pause" onClick={() => onPause(activeTorrent.info_hash)} />
+                  <ActionTile
+                    icon={Pause}
+                    label="Pause"
+                    onClick={() => onPause(activeTorrent.info_hash)}
+                  />
                 )}
-                <ActionTile icon={LogsIcon || Info} label="Logs" onClick={() => onShowLogs(activeTorrent.info_hash)} />
-                <ActionTile icon={Trash2} label="Supprimer" onClick={() => onRemove(activeTorrent.info_hash, false)} danger />
+                <ActionTile
+                  icon={LogsIcon}
+                  label="Logs"
+                  onClick={() => onShowLogs(activeTorrent.info_hash)}
+                />
+                <ActionTile
+                  icon={Trash2}
+                  label="Supprimer"
+                  onClick={() => onRemove(activeTorrent.info_hash, false)}
+                  danger
+                />
               </div>
             </div>
 
-            {!isLocalStub && (
-              <div className="mb-8 space-y-4 rounded-2xl border border-[var(--ds-border)] bg-[var(--ds-surface)] p-4 sm:rounded-3xl sm:p-6 lg:mb-10">
-                <h2 className="text-xs font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)]">
-                  {t('downloads.tmdb.sectionTitle')}
-                </h2>
-                <p className="text-sm text-[var(--ds-text-secondary)]">{t('downloads.tmdb.hint')}</p>
-                <p className="text-xs text-[var(--ds-text-tertiary)]">{t('downloads.tmdb.inputHelp')}</p>
-                {tmdbError && <p className="text-sm text-red-500">{tmdbError}</p>}
-                <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
-                  <div className="flex-1 space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)]">
-                      {t('downloads.tmdb.idLabel')}
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="text"
-                      autoComplete="off"
-                      value={tmdbIdInput}
-                      onChange={(e) => setTmdbIdInput((e.target as HTMLInputElement).value)}
-                      onBlur={() => {
-                        if (tmdbIdInput.trim()) normalizeTmdbInputField(tmdbIdInput);
-                      }}
-                      className="w-full bg-[var(--ds-surface-elevated)] border border-[var(--ds-border)] rounded-xl px-4 py-2 text-sm text-[var(--ds-text-primary)] placeholder:text-[var(--ds-text-tertiary)] focus:outline-none focus:border-[var(--ds-accent-violet)]"
-                      placeholder={t('downloads.tmdb.idPlaceholder')}
-                      disabled={tmdbBusy}
-                    />
-                  </div>
-                  <div className="sm:w-40 space-y-1">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)]">
-                      {t('downloads.tmdb.typeLabel')}
-                    </label>
-                    <select
-                      value={tmdbTypeSel}
-                      onChange={(e) => setTmdbTypeSel(((e.target as HTMLSelectElement).value === 'tv' ? 'tv' : 'movie'))}
-                      className="w-full bg-[var(--ds-surface-elevated)] border border-[var(--ds-border)] rounded-xl px-3 py-2 text-sm text-[var(--ds-text-primary)] focus:outline-none focus:border-[var(--ds-accent-violet)]"
-                      disabled={tmdbBusy}
-                    >
-                      <option value="movie">{t('downloads.tmdb.typeMovie')}</option>
-                      <option value="tv">{t('downloads.tmdb.typeTv')}</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="flex min-w-0 flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={handleTmdbApply}
-                    disabled={tmdbBusy}
-                    className="px-4 py-2 rounded-xl bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] text-sm font-bold disabled:opacity-50"
-                    data-focusable
-                  >
-                    {tmdbBusy ? t('downloads.tmdb.busy') : t('downloads.tmdb.apply')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleTmdbRematch}
-                    disabled={tmdbBusy}
-                    className="px-4 py-2 rounded-xl bg-[var(--ds-surface-elevated)] border border-[var(--ds-border)] text-[var(--ds-text-primary)] text-sm font-semibold disabled:opacity-50"
-                    data-focusable
-                  >
-                    {t('downloads.tmdb.rematch')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleTmdbReset}
-                    disabled={tmdbBusy}
-                    className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/25 text-red-600 text-sm font-semibold disabled:opacity-50"
-                    data-focusable
-                  >
-                    {t('downloads.tmdb.reset')}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Advanced Toggle */}
-            <div className="bg-[var(--ds-surface)] rounded-3xl border border-[var(--ds-border)] overflow-hidden">
-              <button 
+            <div className="rounded-2xl tv:rounded-3xl border border-white/10 bg-black/25 backdrop-blur-md overflow-hidden">
+              <button
+                type="button"
                 onClick={() => setShowAdvanced(!showAdvanced)}
-                className="w-full flex items-center justify-between p-6 hover:bg-[var(--ds-surface-overlay)] transition-colors"
+                className="w-full flex items-center justify-between p-5 sm:p-6 tv:p-7 hover:bg-white/[0.04] transition-colors ds-focus-glow"
                 data-focusable
               >
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-[var(--ds-surface-elevated)] rounded-xl text-[var(--ds-text-secondary)] border border-[var(--ds-border)]">
-                    <Settings2 size={20} />
+                <div className="flex items-center gap-3 tv:gap-4">
+                  <div className="p-2.5 tv:p-3.5 bg-black/40 rounded-xl tv:rounded-2xl text-white/70 border border-white/12">
+                    <Settings2 size={20} className="tv:w-6 tv:h-6" />
                   </div>
-                  <span className="font-bold text-[var(--ds-text-primary)]">Informations Techniques</span>
+                  <span className="font-bold text-white tv:text-xl">Informations techniques</span>
                 </div>
-                {showAdvanced ? <ChevronUp className="text-[var(--ds-text-tertiary)]" /> : <ChevronDown className="text-[var(--ds-text-tertiary)]" />}
+                {showAdvanced ? (
+                  <ChevronUp className="text-white/40 tv:w-7 tv:h-7" />
+                ) : (
+                  <ChevronDown className="text-white/40 tv:w-7 tv:h-7" />
+                )}
               </button>
 
               {showAdvanced && (
-                <div className="p-6 pt-0 space-y-8 animate-in slide-in-from-top-4 duration-300">
-                  <div className="grid gap-6">
+                <div className="px-5 sm:px-6 tv:px-7 pb-6 tv:pb-8 space-y-7 border-t border-white/8">
+                  {!isLocalStub && (
+                    <div className="pt-5 space-y-4">
+                      <h3 className="text-xs tv:text-sm font-bold uppercase tracking-widest text-white/40">
+                        {t('downloads.tmdb.sectionTitle')}
+                      </h3>
+                      <p className="text-sm tv:text-base text-white/60">{t('downloads.tmdb.hint')}</p>
+                      <p className="text-xs tv:text-sm text-white/40">{t('downloads.tmdb.inputHelp')}</p>
+                      {tmdbError && <p className="text-sm text-red-400">{tmdbError}</p>}
+                      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+                        <div className="flex-1 space-y-1.5">
+                          <label className="text-[10px] tv:text-xs font-bold uppercase tracking-widest text-white/40">
+                            {t('downloads.tmdb.idLabel')}
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="text"
+                            autoComplete="off"
+                            value={tmdbIdInput}
+                            onChange={(e) => setTmdbIdInput((e.target as HTMLInputElement).value)}
+                            onBlur={() => {
+                              if (tmdbIdInput.trim()) normalizeTmdbInputField(tmdbIdInput);
+                            }}
+                            className="w-full bg-black/35 border border-white/12 rounded-xl tv:rounded-2xl px-4 py-2.5 tv:py-3.5 text-sm tv:text-base text-white placeholder:text-white/30 focus:outline-none focus:border-[var(--ds-accent-violet)]"
+                            placeholder={t('downloads.tmdb.idPlaceholder')}
+                            disabled={tmdbBusy}
+                            data-focusable
+                          />
+                        </div>
+                        <div className="sm:w-44 space-y-1.5">
+                          <label className="text-[10px] tv:text-xs font-bold uppercase tracking-widest text-white/40">
+                            {t('downloads.tmdb.typeLabel')}
+                          </label>
+                          <select
+                            value={tmdbTypeSel}
+                            onChange={(e) =>
+                              setTmdbTypeSel(
+                                (e.target as HTMLSelectElement).value === 'tv' ? 'tv' : 'movie',
+                              )
+                            }
+                            className="w-full bg-black/35 border border-white/12 rounded-xl tv:rounded-2xl px-3 py-2.5 tv:py-3.5 text-sm tv:text-base text-white focus:outline-none focus:border-[var(--ds-accent-violet)]"
+                            disabled={tmdbBusy}
+                            data-focusable
+                          >
+                            <option value="movie">{t('downloads.tmdb.typeMovie')}</option>
+                            <option value="tv">{t('downloads.tmdb.typeTv')}</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex min-w-0 flex-wrap gap-2.5 tv:gap-3">
+                        <button
+                          type="button"
+                          onClick={handleTmdbApply}
+                          disabled={tmdbBusy}
+                          className="gtv-pill-btn ds-focus-glow px-4 py-2.5 tv:px-6 tv:py-3.5 rounded-full ds-btn-accent text-sm tv:text-base font-bold disabled:opacity-50"
+                          data-focusable
+                        >
+                          {tmdbBusy ? t('downloads.tmdb.busy') : t('downloads.tmdb.apply')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleTmdbRematch}
+                          disabled={tmdbBusy}
+                          className="gtv-pill-btn ds-focus-glow px-4 py-2.5 tv:px-6 tv:py-3.5 rounded-full ds-btn-secondary text-sm tv:text-base font-semibold disabled:opacity-50"
+                          data-focusable
+                        >
+                          {t('downloads.tmdb.rematch')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleTmdbReset}
+                          disabled={tmdbBusy}
+                          className="gtv-pill-btn ds-focus-glow px-4 py-2.5 tv:px-6 tv:py-3.5 rounded-full bg-red-500/10 border border-red-500/25 text-red-400 text-sm tv:text-base font-semibold disabled:opacity-50"
+                          data-focusable
+                        >
+                          {t('downloads.tmdb.reset')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className={`grid gap-5 ${isLocalStub ? 'pt-5' : ''}`}>
                     <div className="space-y-2">
-                       <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)]">Lien du Torrent (Info Hash)</label>
-                       <div className="flex items-center gap-3 bg-[var(--ds-surface-elevated)] p-3 rounded-xl border border-[var(--ds-border)]">
-                         <span className="font-mono text-sm text-[var(--ds-text-secondary)] truncate flex-1">{activeTorrent.info_hash}</span>
-                         <button onClick={() => navigator.clipboard.writeText(activeTorrent.info_hash)} className="p-2 hover:bg-[var(--ds-surface-overlay)] rounded-lg text-[var(--ds-text-tertiary)] transition-colors" data-focusable><Copy size={16}/></button>
-                       </div>
+                      <label className="text-[10px] tv:text-xs font-bold uppercase tracking-widest text-white/40">
+                        Lien du torrent (info hash)
+                      </label>
+                      <div className="flex items-center gap-3 bg-black/35 p-3 tv:p-4 rounded-xl tv:rounded-2xl border border-white/12">
+                        <span className="font-mono text-sm tv:text-base text-white/70 truncate flex-1">
+                          {activeTorrent.info_hash}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard.writeText(activeTorrent.info_hash)}
+                          className="p-2.5 tv:p-3.5 hover:bg-white/10 rounded-lg text-white/50 transition-colors ds-focus-glow"
+                          data-focusable
+                          aria-label="Copier"
+                        >
+                          <Copy size={16} className="tv:w-5 tv:h-5" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="space-y-2">
-                       <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)]">Chemin de Téléchargement</label>
-                       <div className="flex items-center gap-3 bg-[var(--ds-surface-elevated)] p-3 rounded-xl border border-[var(--ds-border)] text-[var(--ds-text-secondary)] text-sm font-mono break-all capitalize">
-                         <HardDrive size={16} className="shrink-0" />
-                         {downloadPath || "Chemin inconnu"}
-                       </div>
+                      <label className="text-[10px] tv:text-xs font-bold uppercase tracking-widest text-white/40">
+                        Chemin de téléchargement
+                      </label>
+                      <div className="flex items-center gap-3 bg-black/35 p-3 tv:p-4 rounded-xl tv:rounded-2xl border border-white/12 text-white/65 text-sm tv:text-base font-mono break-all">
+                        <HardDrive size={16} className="shrink-0 tv:w-5 tv:h-5" />
+                        {downloadPath || 'Chemin inconnu'}
+                      </div>
                     </div>
                   </div>
 
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--ds-text-tertiary)]">Trackers Actifs</label>
-                      <span className="text-xs bg-[var(--ds-surface-elevated)] px-2 py-1 rounded-full text-[var(--ds-text-tertiary)]">{trackers.length} actifs</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <label className="text-[10px] tv:text-xs font-bold uppercase tracking-widest text-white/40">
+                        Trackers actifs
+                      </label>
+                      <span className="text-xs tv:text-sm bg-black/35 px-2.5 py-1 rounded-full text-white/45 border border-white/10">
+                        {trackers.length} actifs
+                      </span>
                     </div>
                     <div className="flex gap-2">
-                      <input 
-                        type="text" 
-                        value={newTrackerUrl} 
+                      <input
+                        type="text"
+                        value={newTrackerUrl}
                         onChange={(e: any) => setNewTrackerUrl(e.target.value)}
                         placeholder="Ajouter un tracker (URL)..."
-                        className="flex-1 bg-[var(--ds-surface-elevated)] border border-[var(--ds-border)] rounded-xl px-4 py-2 text-sm text-[var(--ds-text-primary)] placeholder:text-[var(--ds-text-tertiary)] focus:outline-none focus:border-[var(--ds-accent-violet)]"
+                        className="flex-1 bg-black/35 border border-white/12 rounded-xl tv:rounded-2xl px-4 py-2.5 tv:py-3.5 text-sm tv:text-base text-white placeholder:text-white/30 focus:outline-none focus:border-[var(--ds-accent-violet)]"
+                        data-focusable
                       />
-                      <button 
+                      <button
+                        type="button"
                         onClick={handleAddTracker}
                         disabled={addTrackerLoading}
-                        className="p-2 bg-[var(--ds-accent-violet)] rounded-xl text-[var(--ds-text-on-accent)] hover:opacity-90 disabled:opacity-50"
+                        className="p-2.5 tv:p-3.5 bg-[var(--ds-accent-violet)] rounded-xl tv:rounded-2xl text-[var(--ds-text-on-accent)] hover:opacity-90 disabled:opacity-50 ds-focus-glow"
                         data-focusable
+                        aria-label="Ajouter tracker"
                       >
-                        <PlusCircle size={20} />
+                        <PlusCircle size={20} className="tv:w-6 tv:h-6" />
                       </button>
                     </div>
-                    <ul className="max-h-32 overflow-y-auto space-y-1 pr-2 custom-scrollbar">
-                      {trackers.map((t, i) => (
-                        <li key={i} className="text-[10px] font-mono text-[var(--ds-text-tertiary)] truncate py-1 border-b border-[var(--ds-border)] last:border-0">{t}</li>
+                    <ul className="max-h-36 overflow-y-auto space-y-1 pr-2 custom-scrollbar">
+                      {trackers.map((tracker, i) => (
+                        <li
+                          key={i}
+                          className="text-[10px] tv:text-xs font-mono text-white/40 truncate py-1.5 border-b border-white/8 last:border-0"
+                        >
+                          {tracker}
+                        </li>
                       ))}
                     </ul>
                   </div>

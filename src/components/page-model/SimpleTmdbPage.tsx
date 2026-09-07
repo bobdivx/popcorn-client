@@ -13,8 +13,12 @@ interface SimpleTmdbSection {
   id: string;
   title: string;
   items: ContentItem[];
-  /** Type d'affichage : 'resume' = barre de progression + méta sous la carte focus. */
-  kind?: 'standard' | 'resume';
+  /**
+   * Type d'affichage :
+   * - 'resume' = barre de progression lecture + méta sous la carte focus
+   * - 'downloads' = barre de progression téléchargement (média en cours)
+   */
+  kind?: 'standard' | 'resume' | 'downloads';
   /** Affiché avant les suggestions (reprendre, téléchargements, récemment téléchargés). */
   priority?: boolean;
 }
@@ -105,15 +109,42 @@ export function SimpleTmdbPage({
       <CarouselSection title={section.title}>
         {section.items.map((item) => {
           if (section.kind === 'resume') {
+            // Si le média est encore en téléchargement, prioriser la barre torrent
             const resume = item as EnrichedResumeItem;
+            const downloadPct =
+              resume.isDownloading && typeof resume.downloadProgress === 'number'
+                ? resume.downloadProgress
+                : resume.isDownloading && typeof resume.progress === 'number'
+                  ? resume.progress
+                  : undefined;
             return (
               <TitlePreviewCard
                 key={`${section.id}:${contentItemKey(item)}`}
                 item={item}
                 onNavigate={onNavigate}
-                progress={resume.progress}
+                progress={downloadPct ?? resume.progress}
+                downloading={Boolean(resume.isDownloading)}
                 metaLine={resumeMetaLine(resume)}
-                metaSubLine={resumeMetaSubLine(resume)}
+                metaSubLine={
+                  resume.isDownloading && typeof downloadPct === 'number'
+                    ? `${Math.round(downloadPct)}%`
+                    : resumeMetaSubLine(resume)
+                }
+              />
+            );
+          }
+          if (section.kind === 'downloads' || item.isDownloading) {
+            return (
+              <TitlePreviewCard
+                key={`${section.id}:${contentItemKey(item)}`}
+                item={item}
+                onNavigate={onNavigate}
+                progress={item.progress}
+                downloading
+                metaLine={getDisplayTitle(item)}
+                metaSubLine={
+                  typeof item.progress === 'number' ? `${Math.round(item.progress)}%` : null
+                }
               />
             );
           }

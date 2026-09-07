@@ -9,25 +9,31 @@ export function useActiveDownloads() {
   const loadActiveTorrents = useCallback(async () => {
     try {
       const torrents = await clientApi.listTorrentsEnriched();
-      const active = torrents.filter(t => 
-        t.state === 'downloading' || 
-        (t.state === 'queued' && t.progress < 100)
+      // ClientTorrentStats.progress est une fraction 0–1
+      const active = torrents.filter(
+        (t) =>
+          t.state === 'downloading' ||
+          (t.state === 'queued' && (t.progress ?? 0) < 1)
       );
 
-      const items: ContentItem[] = active.map(t => ({
-        id: t.slug || `torrent-${t.info_hash}`,
-        title: t.tmdb_title || t.name,
-        type: t.tmdb_type || 'movie',
-        poster: t.poster_url || undefined,
-        backdrop: t.hero_image_url || undefined,
-        progress: t.progress,
-        isDownloading: true,
-        infoHash: t.info_hash,
-        downloadSpeed: t.download_speed,
-        seeds: t.seeders,
-        peers: t.peers_connected,
-        tmdbId: t.tmdb_id
-      }));
+      const items: ContentItem[] = active.map((t) => {
+        const raw = typeof t.progress === 'number' ? t.progress : 0;
+        const progressPct = raw <= 1 ? raw * 100 : raw;
+        return {
+          id: t.slug || `torrent-${t.info_hash}`,
+          title: t.tmdb_title || t.name,
+          type: t.tmdb_type || 'movie',
+          poster: t.poster_url || undefined,
+          backdrop: t.hero_image_url || undefined,
+          progress: progressPct,
+          isDownloading: true,
+          infoHash: t.info_hash,
+          downloadSpeed: t.download_speed,
+          seeds: t.seeders,
+          peers: t.peers_connected,
+          tmdbId: t.tmdb_id,
+        };
+      });
 
       setActiveItems(items);
     } catch (e) {

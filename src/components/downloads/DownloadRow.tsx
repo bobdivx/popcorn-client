@@ -49,33 +49,58 @@ export function DownloadRow({
   });
   const percent = phaseDerived.progressPercent ?? Math.round((torrent.progress ?? 0) * 1000) / 10;
   const activeSeeding = isTorrentActivelySeeding(torrent);
+  const progressTone =
+    torrent.state === 'error'
+      ? 'bg-[var(--ds-accent-red)]'
+      : torrent.state === 'seeding' || torrent.state === 'completed'
+        ? 'bg-[var(--ds-accent-green)]'
+        : 'bg-[var(--ds-accent-violet)]';
 
   return (
-    <div className="dl-row flex items-stretch gap-3 sm:gap-4 rounded-2xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)] p-2.5 sm:p-3">
+    <div className="dl-row group relative flex items-stretch gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-2.5 overflow-hidden transition-colors hover:border-white/20 hover:bg-white/[0.07]">
+      {(backdropUrl || posterUrl) && (
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.14]"
+          style={{
+            backgroundImage: `url(${backdropUrl || posterUrl})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
+        />
+      )}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[var(--ds-surface)] via-[var(--ds-surface)]/90 to-transparent" />
+
       <button
         type="button"
-        className="flex min-w-0 flex-1 items-stretch gap-3 sm:gap-4 text-left rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]"
+        className="relative z-10 flex min-w-0 flex-1 items-stretch gap-3 text-left rounded-xl focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]"
         data-focusable
         data-tv-list-primary
         tabIndex={0}
         onClick={() => onOpenDetail(torrent, posterUrl, backdropUrl)}
         aria-label={`${title} — ${t('common.details')}`}
       >
-        <div className="relative h-[72px] w-[48px] sm:h-[84px] sm:w-[56px] shrink-0 overflow-hidden rounded-xl bg-[var(--ds-surface)]">
+        <div className="relative h-[76px] w-[52px] shrink-0 overflow-hidden rounded-xl bg-black/40 ring-1 ring-white/10">
           {posterUrl ? (
             <img src={posterUrl} alt="" loading="lazy" className="h-full w-full object-cover" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-[var(--ds-text-tertiary)]">
+            <div className="flex h-full w-full items-center justify-center text-white/30">
               <Film className="h-5 w-5" size={20} />
             </div>
           )}
+          <div className="absolute inset-x-0 bottom-0 h-1 bg-black/40">
+            <div
+              className={`h-full ${progressTone}`}
+              style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
+            />
+          </div>
         </div>
+
         <div className="min-w-0 flex-1 py-0.5">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <TorrentStatusBadge
               state={torrent.state}
               seedingActive={activeSeeding}
-              className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide border border-[var(--ds-border)] text-[var(--ds-text-secondary)]"
+              className="px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide border border-white/15 bg-black/35 text-white/85 backdrop-blur-sm"
             />
             {torrent.download_speed > 0 && (
               <span className="inline-flex items-center gap-1 text-[11px] font-semibold tabular-nums text-[var(--ds-accent-violet)]">
@@ -90,17 +115,17 @@ export function DownloadRow({
               </span>
             )}
           </div>
-          <p className="truncate text-sm sm:text-base font-semibold text-[var(--ds-text-primary)]" title={title}>
+          <p className="truncate text-sm font-semibold text-white/95" title={title}>
             {title}
           </p>
-          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--ds-border)]">
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full rounded-full bg-[var(--ds-accent-violet)]"
+              className={`h-full rounded-full ${progressTone}`}
               style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
             />
           </div>
-          <p className="mt-1 text-[11px] sm:text-xs text-[var(--ds-text-tertiary)] tabular-nums">
-            {percent.toFixed(1)}%
+          <p className="mt-1.5 text-[11px] text-white/50 tabular-nums">
+            <span className="font-semibold text-white/75">{percent.toFixed(0)}%</span>
             {torrent.total_bytes > 0
               ? ` · ${formatBytes(torrent.downloaded_bytes)} / ${formatBytes(torrent.total_bytes)}`
               : ''}
@@ -109,14 +134,14 @@ export function DownloadRow({
         </div>
       </button>
 
-      <div className="flex shrink-0 flex-col sm:flex-row items-center justify-center gap-1.5">
+      <div className="relative z-10 flex shrink-0 items-center gap-1.5">
         {canPause && (
           <button
             type="button"
             data-focusable
             tabIndex={0}
             disabled={busy}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--ds-border)] text-[var(--ds-text-secondary)] hover:bg-[var(--ds-surface)] disabled:opacity-50"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/12 bg-black/25 text-white/80 hover:bg-white/10 disabled:opacity-50"
             aria-label={t('common.pause')}
             title={t('common.pause')}
             onClick={() => onPause(torrent.info_hash)}
@@ -130,7 +155,7 @@ export function DownloadRow({
             data-focusable
             tabIndex={0}
             disabled={busy}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--ds-border)] text-[var(--ds-text-secondary)] hover:bg-[var(--ds-surface)] disabled:opacity-50"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/12 bg-black/25 text-white/80 hover:bg-white/10 disabled:opacity-50"
             aria-label={t('common.resume')}
             title={t('common.resume')}
             onClick={() => onResume(torrent.info_hash)}
@@ -143,7 +168,7 @@ export function DownloadRow({
           data-focusable
           tabIndex={0}
           disabled={busy}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--ds-border)] text-[var(--ds-accent-red)] hover:bg-[var(--ds-surface)] disabled:opacity-50"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/12 bg-black/25 text-[var(--ds-accent-red)] hover:bg-red-500/15 disabled:opacity-50"
           aria-label={t('common.delete')}
           title={t('common.delete')}
           onClick={() => onRemove(torrent.info_hash)}
@@ -154,7 +179,7 @@ export function DownloadRow({
           type="button"
           data-focusable
           tabIndex={0}
-          className="hidden sm:inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--ds-border)] text-[var(--ds-text-tertiary)] hover:bg-[var(--ds-surface)]"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-white/12 bg-black/25 text-white/45 hover:bg-white/10"
           aria-label={t('common.details')}
           title={t('common.details')}
           onClick={() => onOpenDetail(torrent, posterUrl, backdropUrl)}
