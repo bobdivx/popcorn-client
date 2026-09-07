@@ -151,7 +151,7 @@ export function useHlsPlayer({
   const nativeTvFailedRef = useRef(false);
 
   /** Délai après lequel une vidéo en pause est désenregistrée (libère transcodage + cache serveur) */
-  const PAUSE_UNREGISTER_DELAY_MS = 5 * 60 * 1000; // 5 min
+  const PAUSE_UNREGISTER_DELAY_MS = 60 * 1000; // 60 s
 
   const swallowFatalIfUhdFallback = (reason: 'media' | 'fatal', hlsInstance: { destroy?: () => void } | null): boolean => {
     if (!isUhdQualityAttempt(maxHeightRef.current)) return false;
@@ -311,7 +311,8 @@ export function useHlsPlayer({
 
     const unregisterActiveVideo = async () => {
       const fileId = hlsFileIdRef.current;
-      if (!fileId || !activeVideoRegisteredRef.current) return;
+      // Toujours POST si file_id connu (register peut avoir échoué / FFmpeg déjà lancé)
+      if (!fileId) return;
       activeVideoRegisteredRef.current = false;
       try {
         await fetch(`${baseUrl}/api/media/cache/unregister`, {
@@ -864,7 +865,7 @@ export function useHlsPlayer({
           if (pauseUnregisterTimeoutRef.current !== null) clearTimeout(pauseUnregisterTimeoutRef.current);
           pauseUnregisterTimeoutRef.current = window.setTimeout(() => {
             pauseUnregisterTimeoutRef.current = null;
-            activeVideoRegisteredRef.current = false;
+            // unregisterActiveVideo baisse le flag lui-même après avoir le file_id
             void unregisterActiveVideo();
           }, PAUSE_UNREGISTER_DELAY_MS);
         };
@@ -1851,7 +1852,7 @@ export function useHlsPlayer({
         const handleBeforeUnload = () => {
           savePositionAndStopBuffer();
           const fileId = hlsFileIdRef.current;
-          if (fileId && activeVideoRegisteredRef.current && typeof navigator.sendBeacon === 'function') {
+          if (fileId && typeof navigator.sendBeacon === 'function') {
             const url = `${baseUrl}/api/media/cache/unregister`;
             const sent = navigator.sendBeacon(
               url,
@@ -1989,9 +1990,9 @@ export function useHlsPlayer({
         console.warn('[useHlsPlayer] Erreur lors de l\'arrêt manuel du buffer:', e);
       }
     }
-    // Toujours tenter unregister au cas où (file_id peut exister sans HLS prêt)
+    // Toujours tenter unregister au cas où (file_id peut exister sans HLS prêt / register échoué)
     const fileId = hlsFileIdRef.current;
-    if (fileId && activeVideoRegisteredRef.current) {
+    if (fileId) {
       activeVideoRegisteredRef.current = false;
       const baseUrl = (baseUrlProp && baseUrlProp.trim()) || serverApi.getServerUrl();
       fetch(`${baseUrl}/api/media/cache/unregister`, {
