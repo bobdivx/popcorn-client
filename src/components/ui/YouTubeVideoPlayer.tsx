@@ -124,18 +124,36 @@ export function YouTubeVideoPlayer({
     ensureListening();
   }, [onEnded, loop, youtubeKey, isLoaded]);
 
+  // Autoplay avec son : démarrer mute (politique navigateur), puis unmute via l'API.
+  // Sans ça, muted=false + autoplay est souvent bloqué et la vidéo ne démarre pas.
+  const wantSound = autoplay && !muted;
+  useEffect(() => {
+    if (!wantSound || !isLoaded) return;
+    const unmute = () => {
+      postToPlayer({ event: 'command', func: 'unMute', args: [] });
+      postToPlayer({ event: 'command', func: 'setVolume', args: [100] });
+    };
+    const t1 = window.setTimeout(unmute, 400);
+    const t2 = window.setTimeout(unmute, 1200);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [wantSound, isLoaded, youtubeKey]);
+
   if (!youtubeKey) return null;
 
   const params = new URLSearchParams();
   if (autoplay) params.append('autoplay', '1');
-  if (muted) params.append('mute', '1');
+  // Autoplay sonore : mute initial obligatoire, puis unMute via postMessage
+  if (muted || wantSound) params.append('mute', '1');
   if (loop) {
     params.append('loop', '1');
     params.append('playlist', youtubeKey);
   }
   if (!controls) params.append('controls', '0');
-  // Toujours activer l'API JS si onEnded est fourni (nécessaire pour les postMessage)
-  if (onEnded) params.append('enablejsapi', '1');
+  // enablejsapi pour onEnded et pour unMute
+  if (onEnded || wantSound) params.append('enablejsapi', '1');
   params.append('rel', '0');
   params.append('modestbranding', '1');
   params.append('playsinline', '1');

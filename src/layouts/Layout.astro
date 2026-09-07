@@ -188,7 +188,8 @@ const isWebOS = import.meta.env.WEBOS === 'true';
       // Mesure la largeur reelle de la scrollbar verticale du viewport et l'expose comme
       // variable CSS --scrollbar-width-real. Vaut 0 si le viewport n'a pas de scrollbar
       // visible (overlay scrollbars OU contenu plus court que la fenetre).
-      // Permet de centrer le body (zoome a 0.8) symetriquement dans la zone visible.
+      // Utilisee par le zoom 80% (global.css) pour caler la largeur du body sur la
+      // zone visible (100vw - scrollbar), sans depassement ni colonne vide.
       (function() {
         var osScrollbarWidth = null;
         function getOsScrollbarWidth() {

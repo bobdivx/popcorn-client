@@ -152,9 +152,11 @@ html[data-tv-platform] body {
 @supports (zoom: 1) {
   @media (min-width: 1024px) and (min-height: 500px) {
     /*
-     * Densité visuelle 80% via zoom. Largeur logique = 100vw / scale pour remplir
-     * exactement le viewport après zoom — sans marge scrollbar asymétrique
-     * (sinon une « colonne » vide apparaît à droite, très visible sur /search).
+     * Densité visuelle 80% via zoom.
+     * Largeur logique = (viewport visible, hors scrollbar) / scale.
+     * 100vw seul déborde sous la scrollbar Windows (~17px coupés à droite) ;
+     * 100vw - 2×scrollbar + margin-left (ancien hack) laissait une colonne vide
+     * à gauche/droite (très visible sur /search). Une seule soustraction suffit.
      */
     body:has(.app-main [data-page="dashboard"]),
     body:has(.app-main [data-page="films"]),
@@ -166,8 +168,8 @@ html[data-tv-platform] body {
     body:has(.app-main [data-page="downloads"]),
     body:has(.app-main [data-page="settings"]) {
       zoom: var(--app-visual-scale);
-      width: calc(100vw * var(--app-visual-scale-inverse));
-      max-width: calc(100vw * var(--app-visual-scale-inverse));
+      width: calc((100vw - var(--scrollbar-width-real)) * var(--app-visual-scale-inverse));
+      max-width: calc((100vw - var(--scrollbar-width-real)) * var(--app-visual-scale-inverse));
       margin-left: 0;
       margin-right: 0;
       min-height: calc(100vh * var(--app-visual-scale-inverse));
