@@ -714,13 +714,8 @@ export default function TVNavigationProvider() {
     let lastTvArrowAt = 0;
     const TV_ARROW_REPEAT_MS = 70;
 
-    // Navigation synchrone ; throttle léger sur TV pour les répétitions de touche.
+    // Navigation synchrone (pas de throttle ici : déjà géré sur e.repeat dans handleKeyDown).
     const scheduleOrRunNavigate = (direction: 'up' | 'down' | 'left' | 'right', scope?: HTMLElement | null): boolean => {
-      if (isTvDoc() || isWebOSCheck()) {
-        const now = performance.now();
-        if (now - lastTvArrowAt < TV_ARROW_REPEAT_MS) return true;
-        lastTvArrowAt = now;
-      }
       return navigate(direction, scope);
     };
 
@@ -1309,14 +1304,14 @@ export default function TVNavigationProvider() {
       }
 
       const arrowKey = tvArrowKey(e);
-      if (isWebOS && arrowKey) {
+      if ((isWebOS || isTvDoc()) && arrowKey) {
         const now = performance.now();
-        if (e.repeat && now - lastWebosArrowAt < WEBOS_ARROW_REPEAT_MS) {
+        if (e.repeat && now - lastTvArrowAt < TV_ARROW_REPEAT_MS) {
           e.preventDefault();
           e.stopPropagation();
           return;
         }
-        lastWebosArrowAt = now;
+        lastTvArrowAt = now;
       }
 
       let handled = false;
