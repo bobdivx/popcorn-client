@@ -23,6 +23,7 @@ import { HeroHeader } from './components/HeroHeader';
 import { EpisodesArea } from './components/EpisodesArea';
 import { ActionsRow } from './components/ActionsRow';
 import { YouTubeVideoPlayer as VideoPlayer } from '../../ui/YouTubeVideoPlayer';
+import { redirectToCarPlayerIfNeeded } from '../../streaming/car-player/carPlaybackRedirect';
 import {
   getPlaybackPosition,
   getPlaybackPositionByMedia,
@@ -988,6 +989,17 @@ export default function MediaDetailPage({
   const handlePlaySingleEpisode = useCallback(
     async (fileIndex: number) => {
       const torrent = activeTorrent;
+      if (
+        redirectToCarPlayerIfNeeded({
+          slug: torrent.slug || torrent.id,
+          id: torrent.id,
+          infoHash: torrent.infoHash,
+          downloadPath: torrent.downloadPath,
+          fileIndex,
+        })
+      ) {
+        return;
+      }
       const magnet = (torrent as { _externalMagnetUri?: string })._externalMagnetUri ?? ((torrent as { _externalLink?: string })._externalLink?.startsWith('magnet:') ? (torrent as { _externalLink: string })._externalLink : null);
       const externalLink = (torrent as { _externalLink?: string })._externalLink && !(torrent as { _externalLink?: string })._externalLink?.startsWith('magnet:') ? (torrent as { _externalLink: string })._externalLink : null;
       setPlayStatus('adding');

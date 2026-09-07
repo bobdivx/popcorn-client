@@ -145,6 +145,8 @@ export interface ContentItem {
   trailerKey?: string | null;
   /** Date d'ajout sur l'indexeur (ISO ou timestamp string). */
   createdAt?: string;
+  /** Date d'ajout / mtime bibliothèque (unix seconds). */
+  addedAt?: number;
   /** True quand le torrent semble être une saison/série complète (INTÉGRALE, COMPLETE, etc.). */
   isCompletePack?: boolean;
   /** Signaux UI optionnels pour le hero/cartes dashboard. */

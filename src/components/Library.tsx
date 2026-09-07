@@ -155,6 +155,8 @@ export interface LibraryMedia {
   library_source_id?: string | null;
   /** Nom de la source de bibliothèque (pour badge externe). */
   library_source_label?: string | null;
+  /** Date d'ajout / mtime fichier (unix seconds). */
+  added_at?: number | null;
   /** En mode démo : URL directe du MP4 (hébergé sur popcorn-web). */
   demo_stream_url?: string;
   // Métadonnées côté client pour les médias partagés
@@ -504,14 +506,23 @@ export default function Library({
   const visibleItems = filteredVisible;
   const groupedItems = { movies, series, others };
 
-  const popcornRecent = useMemo(
-    () =>
-      dedupeLibraryMedia(
-        visibleItems.filter((item) => isPopconnDownloadedInfoHash(item.info_hash)),
-        'any'
-      ).slice(0, 20),
-    [visibleItems]
-  );
+  const popcornRecent = useMemo(() => {
+    const cutoffSec = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
+    const recent = visibleItems
+      .filter((item) => {
+        if (!isPopconnDownloadedInfoHash(item.info_hash)) return false;
+        if (!item.exists) return true; // en cours
+        if (typeof item.added_at !== 'number') return false;
+        return item.added_at >= cutoffSec;
+      })
+      .sort((a, b) => {
+        const aDl = !a.exists ? 1 : 0;
+        const bDl = !b.exists ? 1 : 0;
+        if (aDl !== bDl) return bDl - aDl;
+        return (b.added_at ?? 0) - (a.added_at ?? 0);
+      });
+    return dedupeLibraryMedia(recent, 'any').slice(0, 20);
+  }, [visibleItems]);
 
   const activeForPage = useMemo(
     () =>

@@ -1313,6 +1313,8 @@
     "indexerLabel": "Indexer",
     "downloadTorrentHint": "Download the .torrent file for this media",
     "moreActions": "More actions",
+    "carPlayer": "Car player (Tesla)",
+    "carPlayerShort": "Car",
     "downloadAllEpisodes": "Download all",
     "copyMagnet": "Copy magnet link",
     "magnetCopied": "Magnet link copied",

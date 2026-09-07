@@ -15,6 +15,8 @@ interface FocusableCardProps {
   noScale?: boolean;
   /** Marque l’élément focusable comme carte torrent (outline TV sur le wrapper). */
   asTorrentCard?: boolean;
+  /** Cible principale d'une ligne [data-tv-list-item] (téléchargements). */
+  listPrimary?: boolean;
 }
 
 /**
@@ -32,6 +34,7 @@ export function FocusableCard({
   ariaLabel,
   noScale = false,
   asTorrentCard = false,
+  listPrimary = false,
 }: FocusableCardProps) {
   const cardRef = useRef<HTMLDivElement | HTMLAnchorElement>(null);
 
@@ -92,6 +95,7 @@ export function FocusableCard({
     role: href ? undefined : 'button',
     'aria-label': ariaLabel ?? (href ? undefined : 'Card cliquable'),
     'data-focusable': true,
+    ...(listPrimary ? { 'data-tv-list-primary': true } : {}),
     ...(asTorrentCard
       ? { 'data-torrent-card': true, 'data-focusable-card': true, 'data-browse-tile': true }
       : {}),

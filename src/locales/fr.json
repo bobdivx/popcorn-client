@@ -1315,6 +1315,8 @@
     "indexerLabel": "Indexer",
     "downloadTorrentHint": "Télécharger le fichier .torrent pour ce média",
     "moreActions": "Plus d'actions",
+    "carPlayer": "Lecteur voiture (Tesla)",
+    "carPlayerShort": "Voiture",
     "downloadAllEpisodes": "Tout télécharger",
     "copyMagnet": "Copier le lien magnet",
     "magnetCopied": "Lien magnet copié",

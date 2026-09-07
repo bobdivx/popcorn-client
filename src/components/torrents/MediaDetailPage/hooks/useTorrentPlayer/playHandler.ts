@@ -8,6 +8,7 @@ import {
   shouldAvoidBareMagnetFallback,
 } from '../../../../../lib/torrents/externalDownloadParams';
 import { isTorrentReallyComplete } from '../../../../streaming/player-shared/derivePlaybackPhase';
+import { redirectToCarPlayerIfNeeded } from '../../../../streaming/car-player/carPlaybackRedirect';
 import { PROGRESS_POLL_INTERVAL_MS } from '../../utils/constants';
 import { resolveDownloadTypeHeader } from '../../utils/resolveDownloadTypeHeader';
 import type { PlayHandlerContext } from './types';
@@ -153,6 +154,27 @@ export function createHandlePlay(context: PlayHandlerContext) {
     const isPlayCancelled = () => playGenerationRef.current !== playGen;
 
     setErrorMessage(null);
+
+    // Navigateur voiture (Tesla) : lecteur `/car` dédié, pas l’overlay classique.
+    const torrentAny = torrent as {
+      slug?: string | null;
+      downloadPath?: string | null;
+      id: string;
+      infoHash: string | null;
+    };
+    if (
+      redirectToCarPlayerIfNeeded({
+        slug: torrentAny.slug || torrentAny.id,
+        id: torrentAny.id,
+        infoHash: torrentAny.infoHash,
+        downloadPath: torrentAny.downloadPath,
+        filePath: selectedFile?.path ?? null,
+        fileIndex: typeof selectedFile?.index === 'number' ? selectedFile.index : null,
+      })
+    ) {
+      return;
+    }
+
     setIsPlaying(true);
     setShowInfo(false);
     const streamingCache: { value: boolean | null } = { value: null };

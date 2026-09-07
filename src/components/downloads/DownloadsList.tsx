@@ -713,6 +713,7 @@ export default function DownloadsList() {
           <div
             className="dl-card-grid grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 tv:grid-cols-3 gap-4 sm:gap-5 tv:gap-8"
             data-tv-list
+            data-tv-list-layout="grid"
           >
             {filteredTorrents.map((torrent, index) => (
               <div
