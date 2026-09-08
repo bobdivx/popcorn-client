@@ -22,11 +22,59 @@ function isSeries(item: LibraryMedia): boolean {
 }
 
 function isMovie(item: LibraryMedia): boolean {
-  return item.category === 'FILMS' || item.tmdb_type === 'movie' || (!isSeries(item) && !!item.tmdb_id);
+  return item.category === 'FILMS' || item.category === 'FILM' || item.tmdb_type === 'movie' || (!isSeries(item) && !!item.tmdb_id);
 }
 
 function displayTitle(item: LibraryMedia): string {
   return (item.name || item.slug || item.info_hash || 'Sans titre').trim();
+}
+
+function normalizeTitleKey(name: string): string {
+  return name
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+/** Une carte par titre (comme Library) : épisodes / qualités ne multiplient pas les posters. */
+function mediaIdentityKey(item: LibraryMedia): string {
+  if (item.tmdb_id != null) {
+    // Même TMDB = une fiche, même si certains fichiers sont mal classés Film vs Série.
+    return `tmdb_${item.tmdb_id}`;
+  }
+  const name = normalizeTitleKey(displayTitle(item));
+  if (name) return `name_${name}`;
+  const path = (item.download_path || '').replace(/\\/g, '/').toLowerCase().trim();
+  if (path) return `path_${path}`;
+  return item.info_hash || item.slug || name || 'unknown';
+}
+
+function pickPreferredLibraryItem(list: LibraryMedia[]): LibraryMedia {
+  return [...list].sort((a, b) => {
+    // Préférer la fiche série si le même titre apparaît aussi en « Film » mal classé.
+    const seriesDelta = Number(isSeries(b)) - Number(isSeries(a));
+    if (seriesDelta !== 0) return seriesDelta;
+    const posterDelta = Number(!!(b.poster_url || b.hero_image_url)) - Number(!!(a.poster_url || a.hero_image_url));
+    if (posterDelta !== 0) return posterDelta;
+    if (a.exists !== b.exists) return a.exists ? -1 : 1;
+    return (b.file_size ?? 0) - (a.file_size ?? 0);
+  })[0];
+}
+
+function dedupeLibraryForCar(items: LibraryMedia[]): LibraryMedia[] {
+  const groups = new Map<string, LibraryMedia[]>();
+  const order: string[] = [];
+  for (const item of items) {
+    const key = mediaIdentityKey(item);
+    if (!groups.has(key)) {
+      groups.set(key, []);
+      order.push(key);
+    }
+    groups.get(key)!.push(item);
+  }
+  return order.map((key) => pickPreferredLibraryItem(groups.get(key)!));
 }
 
 function buildPick(item: LibraryMedia): CarLibraryPick | null {
@@ -86,7 +134,8 @@ export default function CarLibraryBrowser({ onSelect }: CarLibraryBrowserProps) 
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return items
+    const deduped = dedupeLibraryForCar(items);
+    return deduped
       .filter((item) => {
         if (tab === 'movie' && !isMovie(item)) return false;
         if (tab === 'tv' && !isSeries(item)) return false;
@@ -156,7 +205,7 @@ export default function CarLibraryBrowser({ onSelect }: CarLibraryBrowserProps) 
               const title = displayTitle(item);
               const series = isSeries(item);
               return (
-                <li key={`${item.info_hash}-${item.download_path || item.slug || title}`}>
+                <li key={mediaIdentityKey(item)}>
                   <button
                     type="button"
                     className="tesla-car-card"

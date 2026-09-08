@@ -7,7 +7,11 @@ export function contentItemKey(item: ContentItem): string {
   return `fallback:${item.title}:${item.type}`;
 }
 
-export function pickHeroItems(preferred: ContentItem[], fallback: ContentItem[] = [], limit = 5): ContentItem[] {
+/**
+ * Pool de candidats hero (le HeroSection n’en affiche qu’un, tiré au sort
+ * une fois par chargement de page — priorité aux titres avec trailer).
+ */
+export function pickHeroItems(preferred: ContentItem[], fallback: ContentItem[] = [], limit = 8): ContentItem[] {
   const seen = new Set<string>();
   const out: ContentItem[] = [];
   for (const item of [...preferred, ...fallback]) {
@@ -24,11 +28,12 @@ export function pickHeroItems(preferred: ContentItem[], fallback: ContentItem[] 
 /**
  * Hero catalogue : téléchargés non vus / prêts, puis sorties récentes non vues.
  * N'inclut ni « Reprendre » ni « À revoir ».
+ * Retourne un pool ; l’affichage reste un seul titre (choix aléatoire au mount).
  */
 export function pickFeaturedHero(
   watchNow: ContentItem[],
   newestUnwatched: ContentItem[] = [],
-  limit = 5
+  limit = 8
 ): ContentItem[] {
   return pickHeroItems(watchNow, newestUnwatched, limit);
 }

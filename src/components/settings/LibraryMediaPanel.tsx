@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
+import { clientApi } from '../../lib/client/api';
 import type { LibraryMediaEntry, LibrarySource, LibraryIntegrityItem, LibraryIntegrityStatus } from '../../lib/client/server-api/library';
 import { invalidateLibraryCache } from '../../lib/client/server-api/library';
 import { Film, FileX, FolderOpen, Pencil, RefreshCw, Trash2, Tv, CheckSquare, Square, X, ShieldAlert, ShieldCheck, Copy } from 'lucide-preact';
@@ -130,10 +131,10 @@ export default function LibraryMediaPanel() {
     const groups = findLibraryDuplicates(list, { clientTorrentHashes });
     setDuplicateGroups(groups);
     setSelectedDuplicateIds((prev) => {
-      const removable = new Set(suggestedDuplicateIdsToRemove(groups, clientTorrentHashes));
+      const valid = new Set(groups.flatMap((g) => g.items.map((i) => i.id)));
       const next = new Set<string>();
       for (const id of prev) {
-        if (removable.has(id)) next.add(id);
+        if (valid.has(id)) next.add(id);
       }
       return next;
     });
@@ -410,6 +411,7 @@ export default function LibraryMediaPanel() {
   const duplicateReasonLabel = (reason: DuplicateReason): string => {
     if (reason === 'path') return t('settingsMenu.libraryMediaPanel.duplicatesReasonPath');
     if (reason === 'info_hash') return t('settingsMenu.libraryMediaPanel.duplicatesReasonHash');
+    if (reason === 'tmdb_episode') return t('settingsMenu.libraryMediaPanel.duplicatesReasonEpisode');
     return t('settingsMenu.libraryMediaPanel.duplicatesReasonTmdb');
   };
 
@@ -459,24 +461,37 @@ export default function LibraryMediaPanel() {
     setSelectedDuplicateIds(new Set());
   };
 
-  const duplicateRemovableIds = useMemo(() => {
-    return new Set(suggestedDuplicateIdsToRemove(duplicateGroups, clientTorrentHashes));
-  }, [duplicateGroups, clientTorrentHashes]);
+  const duplicateSelectableIds = useMemo(() => {
+    // Tout est sélectionnable manuellement, y compris les médias du client torrent.
+    return new Set(duplicateGroups.flatMap((g) => g.items.map((i) => i.id)));
+  }, [duplicateGroups]);
+
+  const normalizeInfoHash = (hash: string | null | undefined): string | null => {
+    const h = (hash || '').trim().toLowerCase();
+    if (!h || h.startsWith('local_')) return null;
+    return h;
+  };
 
   const handleDeleteDuplicates = async (ids: string[], deleteFiles: boolean) => {
-    // Ne jamais supprimer une entrée encore présente dans le client torrent.
-    const safeIds = ids.filter((id) => {
-      const entry = list.find((m) => m.id === id);
-      return entry ? !isInTorrentClient(entry, clientTorrentHashes) : true;
-    });
-    if (safeIds.length === 0) return;
-    const confirmKey = deleteFiles
-      ? 'settingsMenu.libraryMediaPanel.duplicatesDeleteConfirmFiles'
-      : 'settingsMenu.libraryMediaPanel.duplicatesDeleteConfirmLibrary';
+    if (ids.length === 0) return;
+
+    const selectedEntries = ids
+      .map((id) => list.find((m) => m.id === id) || duplicateGroups.flatMap((g) => g.items).find((m) => m.id === id))
+      .filter((e): e is LibraryMediaEntry => !!e);
+
+    const clientCount = selectedEntries.filter((e) => isInTorrentClient(e, clientTorrentHashes)).length;
+    const confirmKey = clientCount > 0
+      ? deleteFiles
+        ? 'settingsMenu.libraryMediaPanel.duplicatesDeleteConfirmFilesWithTorrent'
+        : 'settingsMenu.libraryMediaPanel.duplicatesDeleteConfirmLibraryWithTorrent'
+      : deleteFiles
+        ? 'settingsMenu.libraryMediaPanel.duplicatesDeleteConfirmFiles'
+        : 'settingsMenu.libraryMediaPanel.duplicatesDeleteConfirmLibrary';
+
     if (
       !(await confirm({
         title: t('common.delete') || 'Supprimer',
-        message: t(confirmKey, { count: safeIds.length }),
+        message: t(confirmKey, { count: ids.length, torrents: clientCount }),
         danger: true,
         confirmLabel: t('common.delete') || 'Supprimer',
       }))
@@ -488,17 +503,52 @@ export default function LibraryMediaPanel() {
     setMessage(null);
     let removed = 0;
     let files = 0;
+    let torrentsRemoved = 0;
     const errors: string[] = [];
+    const removedHashes = new Set<string>();
 
     try {
-      for (const id of safeIds) {
+      for (const id of ids) {
+        const entry =
+          list.find((m) => m.id === id) ||
+          duplicateGroups.flatMap((g) => g.items).find((m) => m.id === id);
+        const hash = normalizeInfoHash(entry?.info_hash);
+
         try {
+          // Retirer du client torrent si présent (une seule fois par info_hash).
+          if (hash && clientTorrentHashes.has(hash) && !removedHashes.has(hash)) {
+            try {
+              await clientApi.removeTorrent(hash, deleteFiles);
+              removedHashes.add(hash);
+              torrentsRemoved += 1;
+              setClientTorrentHashes((prev) => {
+                const next = new Set(prev);
+                next.delete(hash);
+                return next;
+              });
+            } catch (e) {
+              errors.push(
+                `${entry?.file_name || hash}: torrent — ${e instanceof Error ? e.message : String(e)}`
+              );
+              // On continue quand même le retrait bibliothèque.
+            }
+          }
+
           const res = deleteFiles
             ? await serverApi.deleteLibraryMediaFile(id)
             : await serverApi.deleteLibraryMedia(id);
           if (res.success) {
             removed += 1;
             if (deleteFiles) files += 1;
+          } else if (deleteFiles && hash && removedHashes.has(hash)) {
+            // Fichier déjà retiré via removeTorrent(deleteFiles=true) : nettoyer l'entrée DB.
+            const fallback = await serverApi.deleteLibraryMedia(id);
+            if (fallback.success) {
+              removed += 1;
+              files += 1;
+            } else {
+              errors.push(res.error || fallback.error || id);
+            }
           } else {
             errors.push(res.error || id);
           }
@@ -513,6 +563,12 @@ export default function LibraryMediaPanel() {
       setDuplicatesScanned(false);
       setDuplicateGroups([]);
 
+      const successText = t('settingsMenu.libraryMediaPanel.duplicatesDeleteSuccess', {
+        removed,
+        files,
+        torrents: torrentsRemoved,
+      });
+
       if (errors.length > 0 && removed === 0) {
         setMessage({
           type: 'error',
@@ -523,8 +579,8 @@ export default function LibraryMediaPanel() {
           type: errors.length > 0 ? 'error' : 'success',
           text:
             errors.length > 0
-              ? `${t('settingsMenu.libraryMediaPanel.duplicatesDeleteSuccess', { removed, files })} · ${errors.slice(0, 3).join(' · ')}`
-              : t('settingsMenu.libraryMediaPanel.duplicatesDeleteSuccess', { removed, files }),
+              ? `${successText} · ${errors.slice(0, 3).join(' · ')}`
+              : successText,
         });
       }
     } finally {
@@ -850,20 +906,23 @@ export default function LibraryMediaPanel() {
                                 class={`border-b border-gray-800/80 align-top ${isKeep ? 'bg-green-950/20' : ''}`}
                               >
                                 <td class="px-2 py-2">
-                                  {!isKeep && !inClient && (
-                                    <button
-                                      type="button"
-                                      onClick={() => toggleDuplicateSelect(item.id)}
-                                      class="text-gray-400 hover:text-white"
-                                      disabled={!duplicateRemovableIds.has(item.id)}
-                                    >
-                                      {selectedDuplicateIds.has(item.id) ? (
-                                        <CheckSquare className="w-3.5 h-3.5 text-primary" />
-                                      ) : (
-                                        <Square className="w-3.5 h-3.5" />
-                                      )}
-                                    </button>
-                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleDuplicateSelect(item.id)}
+                                    class="text-gray-400 hover:text-white"
+                                    disabled={!duplicateSelectableIds.has(item.id)}
+                                    title={
+                                      inClient
+                                        ? t('settingsMenu.libraryMediaPanel.duplicatesForceSelectHint')
+                                        : undefined
+                                    }
+                                  >
+                                    {selectedDuplicateIds.has(item.id) ? (
+                                      <CheckSquare className="w-3.5 h-3.5 text-primary" />
+                                    ) : (
+                                      <Square className="w-3.5 h-3.5" />
+                                    )}
+                                  </button>
                                 </td>
                                 <td class="px-2 py-2 font-medium text-white">
                                   {item.tmdb_title || item.file_name}
