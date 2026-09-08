@@ -305,6 +305,9 @@ export function useTVPlayerNavigation({
         { id: 'playpause', action: onPlayPause },
         { id: 'skipforward', action: () => onSeek('right', 10) },
       );
+      if (onToggleSubtitles) {
+        c.push({ id: 'subtitles', action: onToggleSubtitles });
+      }
       if (onSelectQuality) {
         c.push({
           id: 'settings',
@@ -317,6 +320,7 @@ export function useTVPlayerNavigation({
     const c = [{ id: 'playpause', action: onPlayPause }];
     c.push({ id: 'mute', action: onToggleMute });
     if (onOpenQualityMenu) c.push({ id: 'quality', action: onOpenQualityMenu });
+    if (onToggleSubtitles) c.push({ id: 'subtitles', action: onToggleSubtitles });
     c.push({ id: 'fullscreen', action: onToggleFullscreen });
     if (hasBack) c.unshift({ id: 'back', action: onClose! });
     return c;

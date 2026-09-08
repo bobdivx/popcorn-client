@@ -1,5 +1,5 @@
 import { useEffect } from 'preact/hooks';
-import { ArrowLeft, Maximize2, Minimize2, Pause, Play, Settings, SkipBack, SkipForward } from 'lucide-preact';
+import { ArrowLeft, Maximize2, Minimize2, Pause, Play, Settings, SkipBack, SkipForward, Subtitles } from 'lucide-preact';
 import { formatTime } from '../utils/formatTime';
 import { useI18n } from '../../../../lib/i18n';
 import { serverApi } from '../../../../lib/client/server-api';
@@ -12,6 +12,13 @@ import {
   scrubUrlForIndex,
 } from './video-controls/scrubMath';
 import { TV_QUALITY_VALUES } from '../hooks/useTVPlayerNavigation';
+
+interface TvTrackOption {
+  id: number;
+  name: string;
+  lang?: string;
+  default?: boolean;
+}
 
 interface TvPlayerDockProps {
   show: boolean;
@@ -28,12 +35,16 @@ interface TvPlayerDockProps {
   streamQuality?: number | null;
   settingsOpen?: boolean;
   settingsFocusIndex?: number;
+  audioTracks?: TvTrackOption[];
+  subtitleTracks?: TvTrackOption[];
+  currentSubtitleTrack?: number;
   onClose?: () => void;
   onPlayPause: () => void;
   onSeekToTime: (timeSeconds: number) => void;
   onToggleFillMode?: () => void;
   onOpenSettings?: () => void;
   onSelectQuality?: (height: number | null) => void;
+  onToggleSubtitles?: () => void;
 }
 
 function dockBtnStyle(focused: boolean): Record<string, string | number> {
@@ -87,12 +98,16 @@ export function TvPlayerDock({
   streamQuality = null,
   settingsOpen = false,
   settingsFocusIndex = 0,
+  audioTracks = [],
+  subtitleTracks = [],
+  currentSubtitleTrack = -1,
   onClose,
   onPlayPause,
   onSeekToTime,
   onToggleFillMode,
   onOpenSettings,
   onSelectQuality,
+  onToggleSubtitles,
 }: TvPlayerDockProps) {
   const { t } = useI18n();
   const dur = Number.isFinite(duration) && duration > 0 ? duration : 0;
@@ -118,6 +133,8 @@ export function TvPlayerDock({
   };
   const timeForIndex = (idx: number) =>
     scrubThumbnails ? scrubTimeForIndex(idx, scrubThumbnails, effectiveDur) : 0;
+
+  const hasLanguageTracks = audioTracks.length > 0 || subtitleTracks.length > 0;
 
   useEffect(() => {
     if (!show || settingsOpen || focusedOnScrub) return;
@@ -220,19 +237,33 @@ export function TvPlayerDock({
         )}
       </div>
       {settingsOpen && onSelectQuality && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          {TV_QUALITY_VALUES.map((value, i) => (
-            <button
-              key={value ?? 'auto'}
-              type="button"
-              data-tv-dock-settings-opt={i}
-              onClick={activate(() => onSelectQuality(value))}
-              aria-label={qualityLabel(value)}
-              style={chipStyle(settingsFocusIndex === i, streamQuality === value)}
-            >
-              {qualityLabel(value)}
-            </button>
-          ))}
+        <div style={{ marginBottom: 14 }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'rgba(255,255,255,0.55)',
+              marginBottom: 8,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+            }}
+          >
+            {t('playback.quality')}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {TV_QUALITY_VALUES.map((value, i) => (
+              <button
+                key={value ?? 'auto'}
+                type="button"
+                data-tv-dock-settings-opt={i}
+                onClick={activate(() => onSelectQuality(value))}
+                aria-label={qualityLabel(value)}
+                style={chipStyle(settingsFocusIndex === i, streamQuality === value)}
+              >
+                {qualityLabel(value)}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -287,6 +318,25 @@ export function TvPlayerDock({
           {effectiveDur ? ` / ${formatTime(effectiveDur)}` : ''}
         </span>
         <span style={{ flex: 1 }} />
+        {hasLanguageTracks && onToggleSubtitles && (
+          <button
+            type="button"
+            data-tv-dock-btn="subtitles"
+            data-focusable
+            tabIndex={0}
+            onClick={activate(onToggleSubtitles)}
+            aria-label={t('playback.languagesAndSubtitles')}
+            title={t('playback.languagesAndSubtitles')}
+            style={{
+              ...dockBtnStyle(btnFocused('subtitles')),
+              ...(currentSubtitleTrack !== -1
+                ? { border: '2px solid #fff', background: btnFocused('subtitles') ? '#fff' : '#444' }
+                : null),
+            }}
+          >
+            <Subtitles class="w-6 h-6" />
+          </button>
+        )}
         {onOpenSettings && onSelectQuality && (
           <button
             type="button"
@@ -294,7 +344,7 @@ export function TvPlayerDock({
             data-focusable
             tabIndex={0}
             onClick={activate(onOpenSettings)}
-            aria-label={t('playback.quality')}
+            aria-label={t('playback.playerSettings')}
             style={dockBtnStyle(btnFocused('settings'))}
           >
             <Settings class="w-6 h-6" />

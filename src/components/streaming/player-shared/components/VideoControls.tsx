@@ -5,11 +5,11 @@ import { useI18n } from '../../../../lib/i18n';
 import { formatTime } from '../utils/formatTime';
 import { isMobileDevice } from '../../../../lib/utils/device-detection';
 import { SubtitleSelector } from './SubtitleSelector';
+import { PlayerSettingsMenu } from './PlayerSettingsMenu';
 import type { ScrubThumbnailsMeta } from '../types/scrubThumbnails';
 import { useScrubNav } from './video-controls/useScrubNav';
 import { ScrubThumbnailsStrip } from './video-controls/ScrubThumbnailsStrip';
 import { ScrubThumbnailImage } from './video-controls/ScrubThumbnailImage';
-import { persistVideoFillMode } from '../hooks/usePlayerConfig';
 
 interface AudioTrack {
   id: number;
@@ -178,7 +178,6 @@ export function VideoControls({
   bufferedPercent = 0,
 }: VideoControlsProps) {
   const { t } = useI18n();
-  const effectiveFillMode = videoFillMode ?? 'contain';
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [isHoveringTimeline, setIsHoveringTimeline] = useState(false);
   const qualityButtonRef = useRef<HTMLButtonElement>(null);
@@ -208,27 +207,12 @@ export function VideoControls({
     setQualityMenuRect({ top: rect.top, left: rect.left });
   }, [showQualityMenu]);
 
-  const qualityLabel =
-    streamQuality == null || streamQuality === 0
-      ? t('playback.qualityAuto')
-      : streamQuality === 1080
-        ? t('playback.quality1080')
-        : streamQuality === 720
-          ? t('playback.quality720')
-          : streamQuality === 480
-            ? t('playback.quality480')
-            : streamQuality === 360
-              ? t('playback.quality360')
-              : `${streamQuality}p`;
-
-  const qualityOptions: { value: number | null; labelKey: string }[] = [
-    { value: null, labelKey: 'playback.qualityAuto' },
-    { value: 1080, labelKey: 'playback.quality1080' },
-    { value: 720, labelKey: 'playback.quality720' },
-    { value: 480, labelKey: 'playback.quality480' },
-    { value: 360, labelKey: 'playback.quality360' },
-  ];
   const volumePercent = volume * 100;
+  const hasLanguageTracks = audioTracks.length > 0 || subtitleTracks.length > 0;
+  const showSettingsButton =
+    (showQualitySelector && !!onQualityChange) ||
+    videoFillMode !== undefined ||
+    (hasLanguageTracks && (!!onChangeAudioTrack || !!onChangeSubtitleTrack));
   const isMobile = !isTV && isMobileDevice();
 
   const scrubEnabled =
@@ -319,8 +303,7 @@ export function VideoControls({
   const muteIndex = isTV ? -1 : playIndex + 1;
   const afterPlay = isTV ? playIndex + 1 : muteIndex + 1;
   const qualityIndex = afterPlay;
-  const castIndex =
-    showQualitySelector && onQualityChange ? afterPlay + 1 : afterPlay;
+  const castIndex = showSettingsButton ? afterPlay + 1 : afterPlay;
   const fullscreenIndex =
     showCastButton && onCastClick ? castIndex + 1 : castIndex;
   const getFocusClass = (index: number) => {
@@ -743,7 +726,7 @@ export function VideoControls({
                     e.stopPropagation();
                     onSeekTV?.('left', 10);
                   }}
-                  class={`flex flex-col items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white backdrop-blur-md border-2 border-white/60 focus:outline-none ${getFocusClass(tvSkipBackIndex)}`}
+                  class={`flex flex-col items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white backdrop-blur-md border-2 border-white/60 focus:outline-none ${getFocusClass(playIndex)}`}
                   title={t('playback.skipBack10')}
                   aria-label={t('playback.skipBack10')}
                 >
@@ -770,7 +753,7 @@ export function VideoControls({
                     e.stopPropagation();
                     onSeekTV?.('right', 10);
                   }}
-                  class={`flex flex-col items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white backdrop-blur-md border-2 border-white/60 focus:outline-none ${getFocusClass(tvSkipFwdIndex)}`}
+                  class={`flex flex-col items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white backdrop-blur-md border-2 border-white/60 focus:outline-none ${getFocusClass(playIndex)}`}
                   title={t('playback.skipForward10')}
                   aria-label={t('playback.skipForward10')}
                 >
@@ -783,22 +766,6 @@ export function VideoControls({
                   <span class="text-white/70">{formatTime(duration > 0 ? duration : (scrubThumbnails?.durationSeconds ?? 0))}</span>
                 </div>
                 <div class="flex-1 min-w-2" />
-                {(audioTracks.length > 0 || subtitleTracks.length > 0) && onToggleSubtitleSelector && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleSubtitleSelector();
-                    }}
-                    class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white border-2 border-white/60 focus:outline-none ${getFocusClass(tvSubsIndex)} ${
-                      currentSubtitleTrack !== -1 ? 'bg-red-600/30 border-red-500/50' : ''
-                    }`}
-                    title={t('playback.audioAndSubtitles')}
-                    aria-label={t('playback.audioAndSubtitles')}
-                  >
-                    <Subtitles class={`${iconSize} text-white`} />
-                  </button>
-                )}
               </>
             ) : (
             <>
@@ -873,16 +840,18 @@ export function VideoControls({
               <span class="hidden sm:inline text-white/70">{formatTime(duration > 0 ? duration : (scrubThumbnails?.durationSeconds ?? 0))}</span>
             </div>
             <div class="flex-1 min-w-2" />
-            {(audioTracks.length > 0 || subtitleTracks.length > 0) && onToggleSubtitleSelector && (
-              <button 
+            {hasLanguageTracks && onToggleSubtitleSelector && (
+              <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation();
                   onToggleSubtitleSelector();
-                }} 
+                }}
                 class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all border-2 border-white/60 focus:outline-none ${
-                  currentSubtitleTrack !== -1 ? 'bg-red-600/30 border-red-500/50' : ''
+                  currentSubtitleTrack !== -1 ? 'bg-white/50 border-white' : ''
                 }`}
-                title="Langues et sous-titres"
+                title={t('playback.languagesAndSubtitles')}
+                aria-label={t('playback.languagesAndSubtitles')}
               >
                 <Subtitles class={`${iconSize} text-white`} />
               </button>
@@ -904,7 +873,7 @@ export function VideoControls({
                 </svg>
               </button>
             )}
-            {((showQualitySelector && onQualityChange) || videoFillMode !== undefined) && (
+            {showSettingsButton && (
               <div class="relative flex-shrink-0 z-40">
                 <button
                   ref={qualityButtonRef}
@@ -915,95 +884,32 @@ export function VideoControls({
                     setShowQualityMenu((v) => !v);
                   }}
                   class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all border-2 border-white/60 focus:outline-none min-w-[3rem] touch-manipulation ${getFocusClass(qualityIndex)}`}
-                  title={t('playback.quality')}
-                  aria-label={t('playback.quality')}
+                  title={t('playback.playerSettings')}
+                  aria-label={t('playback.playerSettings')}
                   aria-expanded={showQualityMenu}
                   aria-haspopup="true"
                 >
                   <Settings class={`${iconSize} text-white shrink-0`} />
                 </button>
-                {showQualityMenu && qualityMenuRect && typeof document !== 'undefined' &&
+                {showQualityMenu &&
+                  qualityMenuRect &&
+                  typeof document !== 'undefined' &&
                   createPortal(
-                    <>
-                      <div
-                        class="fixed inset-0 z-[9998]"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowQualityMenu(false);
-                        }}
-                        onPointerDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setShowQualityMenu(false);
-                        }}
-                        aria-hidden="true"
-                      />
-                      <div
-                        class="fixed z-[9999] py-2 rounded-lg bg-black/95 border border-white/20 shadow-xl min-w-[8rem]"
-                        role="menu"
-                        style={{
-                          bottom: `${window.innerHeight - qualityMenuRect.top + 8}px`,
-                          left: `${qualityMenuRect.left}px`,
-                        }}
-                      >
-                        {showQualitySelector && onQualityChange && (
-                          <>
-                            <div class="px-3 py-1.5 text-white/70 text-xs font-medium border-b border-white/10">
-                              {t('playback.quality')}
-                            </div>
-                            {qualityOptions.map((opt) => (
-                              <button
-                                key={opt.value ?? 'auto'}
-                                type="button"
-                                role="menuitem"
-                                class={`w-full text-left px-3 py-2 text-sm text-white hover:bg-white/10 transition-colors ${
-                                  (opt.value === streamQuality) || (opt.value == null && streamQuality == null) ? 'bg-white/15 font-medium' : ''
-                                }`}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onQualityChange(opt.value);
-                                  setShowQualityMenu(false);
-                                }}
-                              >
-                                {t(opt.labelKey as 'playback.qualityAuto')}
-                              </button>
-                            ))}
-                          </>
-                        )}
-                        {videoFillMode !== undefined && (
-                          <>
-                            <div class={`px-3 py-1.5 text-white/70 text-xs font-medium border-b border-white/10 ${showQualitySelector && onQualityChange ? 'mt-1' : ''}`}>
-                              {t('interfaceSettings.videoFillMode')}
-                            </div>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              class={`w-full text-left px-3 py-2 text-sm text-white hover:bg-white/10 transition-colors ${effectiveFillMode === 'contain' ? 'bg-white/15 font-medium' : ''}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                persistVideoFillMode('contain');
-                                setShowQualityMenu(false);
-                              }}
-                            >
-                              {t('interfaceSettings.videoFillModeContain')}
-                            </button>
-                            <button
-                              type="button"
-                              role="menuitem"
-                              class={`w-full text-left px-3 py-2 text-sm text-white hover:bg-white/10 transition-colors ${effectiveFillMode === 'cover' ? 'bg-white/15 font-medium' : ''}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                persistVideoFillMode('cover');
-                                setShowQualityMenu(false);
-                              }}
-                            >
-                              {t('interfaceSettings.videoFillModeCover')}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </>,
-                    document.body
+                    <PlayerSettingsMenu
+                      streamQuality={streamQuality}
+                      showQualitySelector={showQualitySelector}
+                      onQualityChange={onQualityChange}
+                      videoFillMode={videoFillMode}
+                      audioTracks={audioTracks}
+                      subtitleTracks={subtitleTracks}
+                      currentAudioTrack={currentAudioTrack}
+                      currentSubtitleTrack={currentSubtitleTrack}
+                      onChangeAudioTrack={onChangeAudioTrack}
+                      onChangeSubtitleTrack={onChangeSubtitleTrack}
+                      onClose={() => setShowQualityMenu(false)}
+                      anchor={qualityMenuRect}
+                    />,
+                    document.body,
                   )}
               </div>
             )}
