@@ -401,7 +401,8 @@ export default function HLSPlayer({
     onToggleFullscreen: handleToggleFullscreen,
     onClose,
     onOpenQualityMenu: onQualityChange != null ? () => openQualityMenuRef.current?.() : undefined,
-    onToggleSubtitles: toggleSubtitleSelector,
+    onToggleSubtitles:
+      audioTracks.length > 0 || subtitleTracks.length > 0 ? toggleSubtitleSelector : undefined,
     onSelectQuality: onQualityChange,
     streamQuality: streamQuality ?? null,
     onToggleFillMode: toggleVideoFillMode,
@@ -783,6 +784,7 @@ export default function HLSPlayer({
           <TvPlayerDock
             show={
               showControls &&
+              !showSubtitleSelector &&
               !shouldShowBuffering &&
               (isPlaying || playbackStarted || mediaVisiblyPlaying)
             }
@@ -799,12 +801,20 @@ export default function HLSPlayer({
             streamQuality={streamQuality ?? null}
             settingsOpen={settingsOpen}
             settingsFocusIndex={settingsFocusIndex}
+            audioTracks={audioTracks}
+            subtitleTracks={subtitleTracks}
+            currentSubtitleTrack={currentSubtitleTrack}
             onClose={onClose}
             onPlayPause={handlePlayPause}
             onSeekToTime={seekToTargetTime}
             onToggleFillMode={toggleVideoFillMode}
             onOpenSettings={onQualityChange ? toggleSettings : undefined}
             onSelectQuality={onQualityChange}
+            onToggleSubtitles={
+              audioTracks.length > 0 || subtitleTracks.length > 0
+                ? toggleSubtitleSelector
+                : undefined
+            }
           />
         )}
       </div>
