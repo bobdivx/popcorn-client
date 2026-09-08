@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'preact/hooks';
-import { WifiOff } from 'lucide-preact';
+import { WifiOff, AlertTriangle } from 'lucide-preact';
 import {
   getBackendConnectionStore,
   subscribeBackendConnectionStore,
@@ -10,9 +10,9 @@ import { getBackendUrl, getMyBackendUrl, getConfiguredBackendUrl } from '../../l
 import { useI18n } from '../../lib/i18n/useI18n';
 
 /**
- * Bannière affichée sous la navbar quand le backend est détecté hors ligne
- * (échecs API ConnectionError/Timeout ou health check). Bouton « Réessayer » pour relancer un check.
- * Masquée quand le backend actuel est un serveur d’ami (pas « mon serveur ») pour ne pas inquiéter l’utilisateur.
+ * Bannière sous la navbar :
+ * - offline : API backend injoignable
+ * - degraded : API up mais client torrent (librqbit) saturé/injoignable
  */
 export default function BackendOfflineBanner() {
   const { t } = useI18n();
@@ -30,11 +30,17 @@ export default function BackendOfflineBanner() {
     const isFriendBackend = myUrl != null && currentUrl !== myUrl;
     if (!isFriendBackend && state.status === 'offline') {
       document.body.dataset.backendOffline = 'true';
+      delete document.body.dataset.backendDegraded;
+    } else if (!isFriendBackend && state.status === 'degraded') {
+      document.body.dataset.backendDegraded = 'true';
+      delete document.body.dataset.backendOffline;
     } else {
       delete document.body.dataset.backendOffline;
+      delete document.body.dataset.backendDegraded;
     }
     return () => {
       delete document.body.dataset.backendOffline;
+      delete document.body.dataset.backendDegraded;
     };
   }, [state.status]);
 
@@ -49,13 +55,18 @@ export default function BackendOfflineBanner() {
   const currentUrl = typeof window !== 'undefined' ? getBackendUrl() : '';
   if (myUrl != null && currentUrl !== myUrl) return null;
 
-  if (state.status !== 'offline') return null;
+  if (state.status !== 'offline' && state.status !== 'degraded') return null;
 
   const configuredUrl = typeof window !== 'undefined' ? getConfiguredBackendUrl() : null;
+  const isDegraded = state.status === 'degraded';
 
   return (
     <div
-      className="fixed left-0 right-0 z-40 flex flex-wrap items-center justify-center gap-2 gap-y-1 px-4 py-2 text-sm font-medium bg-red-900/90 text-white border-b border-red-700/50"
+      className={`fixed left-0 right-0 z-40 flex flex-wrap items-center justify-center gap-2 gap-y-1 px-4 py-2 text-sm font-medium border-b ${
+        isDegraded
+          ? 'bg-amber-900/90 text-white border-amber-700/50'
+          : 'bg-red-900/90 text-white border-red-700/50'
+      }`}
       style={{
         paddingTop: 'calc(var(--safe-area-inset-top) + 0.5rem)',
         paddingBottom: '0.5rem',
@@ -64,9 +75,22 @@ export default function BackendOfflineBanner() {
       role="alert"
       aria-live="polite"
     >
-      <WifiOff className="w-4 h-4 flex-shrink-0" aria-hidden />
-      <span>{t('settingsMenu.overviewCard.serverOffline')}</span>
-      {configuredUrl && (
+      {isDegraded ? (
+        <AlertTriangle className="w-4 h-4 flex-shrink-0" aria-hidden />
+      ) : (
+        <WifiOff className="w-4 h-4 flex-shrink-0" aria-hidden />
+      )}
+      <span>
+        {isDegraded
+          ? t('settingsMenu.overviewCard.serverDegraded')
+          : t('settingsMenu.overviewCard.serverOffline')}
+      </span>
+      {isDegraded && state.lastError && (
+        <span className="text-white/80 truncate max-w-[16rem] sm:max-w-md" title={state.lastError}>
+          ({state.lastError})
+        </span>
+      )}
+      {!isDegraded && configuredUrl && (
         <span className="text-white/80 truncate max-w-[12rem] sm:max-w-none" title={configuredUrl}>
           ({configuredUrl.replace(/^https?:\/\//, '')})
         </span>

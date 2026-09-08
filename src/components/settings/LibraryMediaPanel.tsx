@@ -1,10 +1,17 @@
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { serverApi } from '../../lib/client/server-api';
 import type { LibraryMediaEntry, LibrarySource, LibraryIntegrityItem, LibraryIntegrityStatus } from '../../lib/client/server-api/library';
 import { invalidateLibraryCache } from '../../lib/client/server-api/library';
-import { Film, FileX, FolderOpen, Pencil, RefreshCw, Trash2, Tv, CheckSquare, Square, X, ShieldAlert, ShieldCheck } from 'lucide-preact';
+import { Film, FileX, FolderOpen, Pencil, RefreshCw, Trash2, Tv, CheckSquare, Square, X, ShieldAlert, ShieldCheck, Copy } from 'lucide-preact';
 import { useConfirmDialog } from '../ui/useConfirmDialog';
+import {
+  findLibraryDuplicates,
+  suggestedDuplicateIdsToRemove,
+  isInTorrentClient,
+  type LibraryDuplicateGroup,
+  type DuplicateReason,
+} from './libraryDuplicates';
 
 /** Valeur du filtre source : '' = toutes, 'local' = source locale, 'external' = toute externe, ou id de library_source */
 function matchSource(entry: LibraryMediaEntry, filterSource: string): boolean {
@@ -58,6 +65,13 @@ export default function LibraryMediaPanel() {
   const [selectedCorruptedIds, setSelectedCorruptedIds] = useState<Set<string>>(new Set());
   const integrityPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const [duplicatesScanned, setDuplicatesScanned] = useState(false);
+  const [duplicateGroups, setDuplicateGroups] = useState<LibraryDuplicateGroup[]>([]);
+  const [selectedDuplicateIds, setSelectedDuplicateIds] = useState<Set<string>>(new Set());
+  const [duplicatesDeleting, setDuplicatesDeleting] = useState(false);
+  const [duplicatesFinding, setDuplicatesFinding] = useState(false);
+  const [clientTorrentHashes, setClientTorrentHashes] = useState<Set<string>>(new Set());
+
   const stopIntegrityPolling = useCallback(() => {
     if (integrityPollRef.current) {
       clearInterval(integrityPollRef.current);
@@ -110,6 +124,20 @@ export default function LibraryMediaPanel() {
   useEffect(() => {
     loadMedia();
   }, [loadMedia]);
+
+  useEffect(() => {
+    if (!duplicatesScanned) return;
+    const groups = findLibraryDuplicates(list, { clientTorrentHashes });
+    setDuplicateGroups(groups);
+    setSelectedDuplicateIds((prev) => {
+      const removable = new Set(suggestedDuplicateIdsToRemove(groups, clientTorrentHashes));
+      const next = new Set<string>();
+      for (const id of prev) {
+        if (removable.has(id)) next.add(id);
+      }
+      return next;
+    });
+  }, [list, duplicatesScanned, clientTorrentHashes]);
 
   const handleStartEdit = (entry: LibraryMediaEntry) => {
     setEditingId(entry.id);
@@ -379,6 +407,131 @@ export default function LibraryMediaPanel() {
     }
   };
 
+  const duplicateReasonLabel = (reason: DuplicateReason): string => {
+    if (reason === 'path') return t('settingsMenu.libraryMediaPanel.duplicatesReasonPath');
+    if (reason === 'info_hash') return t('settingsMenu.libraryMediaPanel.duplicatesReasonHash');
+    return t('settingsMenu.libraryMediaPanel.duplicatesReasonTmdb');
+  };
+
+  const handleFindDuplicates = async () => {
+    setDuplicatesFinding(true);
+    setMessage(null);
+    try {
+      const hashes = new Set<string>();
+      try {
+        const torrentsRes = await serverApi.getClientTorrents();
+        if (torrentsRes.success && Array.isArray(torrentsRes.data)) {
+          for (const t of torrentsRes.data) {
+            const h = (t.info_hash || '').trim().toLowerCase();
+            if (h) hashes.add(h);
+          }
+        }
+      } catch {
+        // Sans liste client : on se base quand même sur info_hash local_media.
+      }
+      setClientTorrentHashes(hashes);
+      const groups = findLibraryDuplicates(list, { clientTorrentHashes: hashes });
+      setDuplicateGroups(groups);
+      setDuplicatesScanned(true);
+      setSelectedDuplicateIds(new Set(suggestedDuplicateIdsToRemove(groups, hashes)));
+      if (groups.length === 0) {
+        setMessage({ type: 'success', text: t('settingsMenu.libraryMediaPanel.duplicatesNone') });
+      }
+    } finally {
+      setDuplicatesFinding(false);
+    }
+  };
+
+  const toggleDuplicateSelect = (id: string) => {
+    setSelectedDuplicateIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const selectSuggestedDuplicates = () => {
+    setSelectedDuplicateIds(new Set(suggestedDuplicateIdsToRemove(duplicateGroups, clientTorrentHashes)));
+  };
+
+  const clearDuplicateSelection = () => {
+    setSelectedDuplicateIds(new Set());
+  };
+
+  const duplicateRemovableIds = useMemo(() => {
+    return new Set(suggestedDuplicateIdsToRemove(duplicateGroups, clientTorrentHashes));
+  }, [duplicateGroups, clientTorrentHashes]);
+
+  const handleDeleteDuplicates = async (ids: string[], deleteFiles: boolean) => {
+    // Ne jamais supprimer une entrée encore présente dans le client torrent.
+    const safeIds = ids.filter((id) => {
+      const entry = list.find((m) => m.id === id);
+      return entry ? !isInTorrentClient(entry, clientTorrentHashes) : true;
+    });
+    if (safeIds.length === 0) return;
+    const confirmKey = deleteFiles
+      ? 'settingsMenu.libraryMediaPanel.duplicatesDeleteConfirmFiles'
+      : 'settingsMenu.libraryMediaPanel.duplicatesDeleteConfirmLibrary';
+    if (
+      !(await confirm({
+        title: t('common.delete') || 'Supprimer',
+        message: t(confirmKey, { count: safeIds.length }),
+        danger: true,
+        confirmLabel: t('common.delete') || 'Supprimer',
+      }))
+    ) {
+      return;
+    }
+
+    setDuplicatesDeleting(true);
+    setMessage(null);
+    let removed = 0;
+    let files = 0;
+    const errors: string[] = [];
+
+    try {
+      for (const id of safeIds) {
+        try {
+          const res = deleteFiles
+            ? await serverApi.deleteLibraryMediaFile(id)
+            : await serverApi.deleteLibraryMedia(id);
+          if (res.success) {
+            removed += 1;
+            if (deleteFiles) files += 1;
+          } else {
+            errors.push(res.error || id);
+          }
+        } catch {
+          errors.push(id);
+        }
+      }
+
+      invalidateLibraryCache();
+      await loadMedia();
+      setSelectedDuplicateIds(new Set());
+      setDuplicatesScanned(false);
+      setDuplicateGroups([]);
+
+      if (errors.length > 0 && removed === 0) {
+        setMessage({
+          type: 'error',
+          text: t('settingsMenu.libraryMediaPanel.duplicatesDeleteError'),
+        });
+      } else {
+        setMessage({
+          type: errors.length > 0 ? 'error' : 'success',
+          text:
+            errors.length > 0
+              ? `${t('settingsMenu.libraryMediaPanel.duplicatesDeleteSuccess', { removed, files })} · ${errors.slice(0, 3).join(' · ')}`
+              : t('settingsMenu.libraryMediaPanel.duplicatesDeleteSuccess', { removed, files }),
+        });
+      }
+    } finally {
+      setDuplicatesDeleting(false);
+    }
+  };
+
   const filteredList = list.filter((m) => {
     const matchCat = !filterCategory || m.category === filterCategory;
     const matchSrc = matchSource(m, filterSource);
@@ -588,6 +741,163 @@ export default function LibraryMediaPanel() {
                     </table>
                   </div>
                 </div>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section class="rounded-lg border border-gray-700 bg-gray-800/40 p-4 space-y-3">
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h3 class="inline-flex items-center gap-2 text-sm font-semibold text-white">
+              <Copy className="w-4 h-4 text-primary" />
+              {t('settingsMenu.libraryMediaPanel.duplicatesTitle')}
+            </h3>
+            <p class="text-xs text-gray-400 mt-1 max-w-2xl">{t('settingsMenu.libraryMediaPanel.duplicatesIntro')}</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleFindDuplicates}
+            disabled={duplicatesFinding}
+            class="inline-flex items-center gap-2 rounded bg-violet-700/80 hover:bg-violet-700 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+          >
+            <Copy className={`w-4 h-4 ${duplicatesFinding ? 'animate-pulse' : ''}`} />
+            {duplicatesFinding
+              ? t('settingsMenu.libraryMediaPanel.duplicatesFinding')
+              : t('settingsMenu.libraryMediaPanel.duplicatesFind')}
+          </button>
+        </div>
+
+        {duplicatesScanned && (
+          <div class="space-y-2">
+            <p class="text-xs text-gray-300">
+              {t('settingsMenu.libraryMediaPanel.duplicatesReport', {
+                groups: duplicateGroups.length,
+                extras: suggestedDuplicateIdsToRemove(duplicateGroups, clientTorrentHashes).length,
+              })}
+            </p>
+
+            {duplicateGroups.length === 0 ? (
+              <p class="text-xs text-green-400">{t('settingsMenu.libraryMediaPanel.duplicatesNone')}</p>
+            ) : (
+              <div class="space-y-3">
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    class="rounded border border-gray-600 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700 disabled:opacity-50"
+                    disabled={duplicatesDeleting || selectedDuplicateIds.size === 0}
+                    onClick={() => handleDeleteDuplicates(Array.from(selectedDuplicateIds), false)}
+                  >
+                    {t('settingsMenu.libraryMediaPanel.duplicatesDeleteFromLibrary')}
+                    {selectedDuplicateIds.size > 0 ? ` (${selectedDuplicateIds.size})` : ''}
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded border border-red-800/80 px-2 py-1 text-xs text-red-300 hover:bg-red-900/30 disabled:opacity-50"
+                    disabled={duplicatesDeleting || selectedDuplicateIds.size === 0}
+                    onClick={() => handleDeleteDuplicates(Array.from(selectedDuplicateIds), true)}
+                  >
+                    {t('settingsMenu.libraryMediaPanel.duplicatesDeleteFiles')}
+                    {selectedDuplicateIds.size > 0 ? ` (${selectedDuplicateIds.size})` : ''}
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded border border-gray-600 px-2 py-1 text-xs text-gray-300 hover:bg-gray-700 disabled:opacity-50"
+                    disabled={duplicatesDeleting}
+                    onClick={selectSuggestedDuplicates}
+                  >
+                    {t('settingsMenu.libraryMediaPanel.duplicatesSelectSuggested')}
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded border border-gray-600 px-2 py-1 text-xs text-gray-400 hover:bg-gray-700 disabled:opacity-50"
+                    disabled={duplicatesDeleting || selectedDuplicateIds.size === 0}
+                    onClick={clearDuplicateSelection}
+                  >
+                    {t('settingsMenu.libraryMediaPanel.duplicatesClearSelection')}
+                  </button>
+                </div>
+
+                {duplicateGroups.map((group) => (
+                  <div key={group.id} class="rounded border border-violet-900/40 bg-violet-950/15 overflow-hidden">
+                    <div class="px-3 py-2 border-b border-gray-700/80 flex flex-wrap items-center gap-2 text-xs">
+                      <span class="font-medium text-violet-200">{duplicateReasonLabel(group.reason)}</span>
+                      <span class="text-gray-500">·</span>
+                      <span class="text-gray-400">
+                        {t('settingsMenu.libraryMediaPanel.duplicatesGroupCount', { count: group.items.length })}
+                      </span>
+                    </div>
+                    <div class="overflow-x-auto max-h-[28vh] overflow-y-auto">
+                      <table class="w-full text-xs text-left">
+                        <thead class="sticky top-0 bg-gray-900/95 text-gray-300 border-b border-gray-700">
+                          <tr>
+                            <th class="px-2 py-2 w-8"></th>
+                            <th class="px-2 py-2">{t('settingsMenu.libraryMediaPanel.colTitle')}</th>
+                            <th class="px-2 py-2">{t('settingsMenu.libraryMediaPanel.colPath')}</th>
+                            <th class="px-2 py-2">{t('settingsMenu.libraryMediaPanel.colSource')}</th>
+                            <th class="px-2 py-2">{t('settingsMenu.libraryMediaPanel.duplicatesColSize')}</th>
+                            <th class="px-2 py-2 w-20"></th>
+                          </tr>
+                        </thead>
+                        <tbody class="text-gray-300">
+                          {group.items.map((item) => {
+                            const isKeep = item.id === group.keepId;
+                            const inClient = isInTorrentClient(item, clientTorrentHashes);
+                            return (
+                              <tr
+                                key={item.id}
+                                class={`border-b border-gray-800/80 align-top ${isKeep ? 'bg-green-950/20' : ''}`}
+                              >
+                                <td class="px-2 py-2">
+                                  {!isKeep && !inClient && (
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleDuplicateSelect(item.id)}
+                                      class="text-gray-400 hover:text-white"
+                                      disabled={!duplicateRemovableIds.has(item.id)}
+                                    >
+                                      {selectedDuplicateIds.has(item.id) ? (
+                                        <CheckSquare className="w-3.5 h-3.5 text-primary" />
+                                      ) : (
+                                        <Square className="w-3.5 h-3.5" />
+                                      )}
+                                    </button>
+                                  )}
+                                </td>
+                                <td class="px-2 py-2 font-medium text-white">
+                                  {item.tmdb_title || item.file_name}
+                                  {item.tmdb_id != null && (
+                                    <span class="block text-[10px] text-gray-500 font-mono">TMDB: {item.tmdb_id}</span>
+                                  )}
+                                  {inClient && (
+                                    <span class="mt-0.5 inline-block text-[10px] text-sky-300">
+                                      {t('settingsMenu.libraryMediaPanel.duplicatesInClient')}
+                                    </span>
+                                  )}
+                                </td>
+                                <td class="px-2 py-2 text-gray-400 break-all">{item.file_path}</td>
+                                <td class="px-2 py-2 text-gray-400">{getSourceLabel(item, sources, t)}</td>
+                                <td class="px-2 py-2 text-gray-400 whitespace-nowrap">
+                                  {item.file_size != null
+                                    ? `${(item.file_size / (1024 * 1024)).toFixed(0)} Mo`
+                                    : '—'}
+                                </td>
+                                <td class="px-2 py-2 text-right">
+                                  {isKeep ? (
+                                    <span class="text-[10px] uppercase tracking-wide text-green-400 font-semibold">
+                                      {t('settingsMenu.libraryMediaPanel.duplicatesKeep')}
+                                    </span>
+                                  ) : null}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

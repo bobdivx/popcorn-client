@@ -386,7 +386,9 @@ export class ServerApiClientBase {
 
       const errorInfo = this.getErrorMessage(error, undefined, endpoint, url);
       const isOffline = errorInfo.code === 'ConnectionError' || errorInfo.code === 'Timeout';
-      if (isOffline) {
+      // Timeouts sur endpoints torrent/librqbit ≠ backend down (souvent librqbit saturé).
+      // Seuls les vrais problèmes de connectivité API (ou timeout health) marquent offline.
+      if (isOffline && this.shouldSignalConnectionFailure(endpoint, errorInfo.code)) {
         this.connectionFailureListeners.forEach((cb) => { try { cb(); } catch (_) { /* ignore */ } });
       }
       return { success: false, error: errorInfo.code, message: errorInfo.message };
@@ -462,9 +464,33 @@ export class ServerApiClientBase {
     if (endpoint.includes('/api/admin/deployment/webos/')) return 600000;
     if (endpoint.includes('/health') || endpoint.includes('/api/client/health')) {
       const isAndroid = typeof window !== 'undefined' && /Android/i.test(navigator.userAgent || '');
-      return isAndroid ? 10000 : 5000;
+      // Aligné sur le probe health serveur (~1.5s librqbit) + marge réseau.
+      return isAndroid ? 8000 : 4000;
     }
     return 15000;
+  }
+
+  /**
+   * Timeouts sur routes torrent/librqbit ne doivent pas faire basculer l'UI en « serveur hors ligne ».
+   * ConnectionError (refus / DNS / failed to fetch) reste un signal offline pour toutes les routes.
+   */
+  protected shouldSignalConnectionFailure(endpoint: string, errorCode: string): boolean {
+    if (errorCode === 'ConnectionError') return true;
+    if (errorCode !== 'Timeout') return false;
+    const ep = endpoint.toLowerCase();
+    if (ep.includes('/health') || ep.includes('/api/client/health')) return true;
+    if (
+      ep.includes('/torrents') ||
+      ep.includes('/librqbit') ||
+      ep.includes('/seeding') ||
+      ep.includes('/ratio') ||
+      ep.includes('/stream') ||
+      ep.includes('/hls') ||
+      ep.includes('/transcode')
+    ) {
+      return false;
+    }
+    return true;
   }
 
   addConnectionFailureListener(cb: ConnectionFailureListener): void { this.connectionFailureListeners.push(cb); }

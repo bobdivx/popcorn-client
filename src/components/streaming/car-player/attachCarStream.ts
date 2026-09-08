@@ -7,16 +7,26 @@ export type CarAttachResult = {
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+function inferCodecHintFromUrl(streamUrl: string): string | null {
+  const lower = streamUrl.toLowerCase();
+  const bits: string[] = [];
+  if (/hevc|x265|h\.?265|av1/.test(lower)) bits.push('HEVC');
+  if (/dts|truehd|atmos|flac|e-?ac-?3|ddp|\bac3\b/.test(lower)) bits.push('DTS/AC3');
+  return bits.length ? bits.join(' + ') : null;
+}
+
 /**
- * Attente que le serveur ait un MP4 prêt (remux MKV→MP4).
+ * Attente que le serveur ait un MP4 H.264/AAC prêt (remux / audio AAC / transcode).
  * En conduite Tesla, on a besoin d’un progressif video/mp4 stable — pas de HLS.
  */
 async function waitUntilMp4Ready(
   streamUrl: string,
   signal: { cancelled: boolean },
-  onStatus?: (message: string) => void,
+  onStatus?: (message: string | null) => void,
 ): Promise<boolean> {
-  const maxAttempts = 90; // ~3 min (2 s)
+  const codecHint = inferCodecHintFromUrl(streamUrl);
+  // DTS→AAC ou HEVC→H.264 peut prendre plus de 3 min sur gros fichiers
+  const maxAttempts = codecHint ? 180 : 120; // 6–4 min @ 2 s
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     if (signal.cancelled) return false;
     try {
@@ -26,7 +36,7 @@ async function waitUntilMp4Ready(
         cache: 'no-store',
       });
       if (signal.cancelled) return false;
-      // 200/206 = octets prêts ; 503 = remux en cours
+      // 200/206 = octets prêts ; 503 = remux/transcode en cours
       if (res.status === 200 || res.status === 206) {
         try {
           await res.arrayBuffer();
@@ -36,11 +46,10 @@ async function waitUntilMp4Ready(
         return true;
       }
       if (res.status === 503 || res.status === 202) {
-        onStatus?.(
-          attempt === 0
-            ? 'Préparation MP4 pour la conduite…'
-            : `Préparation MP4… (${attempt + 1})`,
-        );
+        const base = codecHint
+          ? `Conversion ${codecHint} → H.264/AAC pour Tesla…`
+          : 'Préparation MP4 H.264/AAC pour Tesla…';
+        onStatus?.(attempt === 0 ? base : `${base} (${attempt + 1})`);
         await sleep(2000);
         continue;
       }
@@ -107,8 +116,11 @@ export async function attachCarStream(
     if (!code) return;
     // MEDIA_ERR_SRC_NOT_SUPPORTED — conteneur/codec encore incompatible
     if (code === 4) {
+      const hint = inferCodecHintFromUrl(streamUrl);
       onFatalError(
-        'Format non lisible en MP4 (codec HEVC/DTS ?). Convertissez en H.264/AAC pour Tesla Drive.',
+        hint
+          ? `Format encore illisible (${hint}). Relancez après conversion serveur H.264/AAC, ou choisissez une version AAC.`
+          : 'Format non lisible en MP4. Le serveur doit servir H.264 + AAC pour Tesla.',
       );
     } else if (code === 2) {
       // Réseau : retry soft une fois (coupures Wi‑Fi voiture)

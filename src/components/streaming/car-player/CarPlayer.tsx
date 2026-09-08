@@ -4,6 +4,7 @@ import { stampTeslaBrowserHints } from '../../../lib/utils/device-detection';
 import { useCarMediaSource } from './useCarMediaSource';
 import CarLibraryBrowser, { type CarLibraryPick } from './CarLibraryBrowser';
 import { attachCarStream } from './attachCarStream';
+import { buildCarDriveUrls } from './buildCarDriveUrls';
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -41,16 +42,28 @@ function writeCarUrl(pick: CarLibraryPick | null) {
   }
 }
 
+/**
+ * Lecteur Tesla Theater.
+ * - Stationné : `<video>` MP4 H.264/AAC.
+ * - En conduite : Tesla force pause sur `<video>` → MJPEG (`<img>`) + MP3 (`<audio>`)
+ *   pour garder IMAGE + SON actifs.
+ */
 export default function CarPlayer() {
   const [slug, setSlug] = useState<string | null>(null);
   const [pickMeta, setPickMeta] = useState<{ title: string; posterUrl: string | null } | null>(null);
   const { source, loading, error } = useCarMediaSource(slug);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
   const userWantsPlayRef = useRef(false);
   const userPausedRef = useRef(false);
   const lastAdvanceAtRef = useRef(0);
   const hasMediaErrorRef = useRef(false);
+  const driveModeRef = useRef(false);
+  const driveAnchorRef = useRef(0); // position média au démarrage du flux drive
+  const driveStartedAtRef = useRef(0); // performance.now() au démarrage drive
+  const destroyVideoAttachRef = useRef<(() => void) | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -60,6 +73,12 @@ export default function CarPlayer() {
   const [prepStatus, setPrepStatus] = useState<string | null>(null);
   const [showControls, setShowControls] = useState(true);
   const [playbackModeLabel, setPlaybackModeLabel] = useState('MP4');
+  const [driveUrls, setDriveUrls] = useState<{ mjpegUrl: string; audioUrl: string } | null>(null);
+  const [driveSession, setDriveSession] = useState(0);
+
+  useEffect(() => {
+    driveModeRef.current = driveMode;
+  }, [driveMode]);
 
   useEffect(() => {
     stampTeslaBrowserHints();
@@ -69,6 +88,63 @@ export default function CarPlayer() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
+  const stopDriveStreams = useCallback(() => {
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+    }
+    const img = imgRef.current;
+    if (img) {
+      img.removeAttribute('src');
+    }
+    setDriveUrls(null);
+  }, []);
+
+  const startDriveAt = useCallback(
+    (atSeconds: number) => {
+      if (!source?.streamUrl || hasMediaErrorRef.current) return;
+      const seek = Math.max(0, atSeconds);
+      const urls = buildCarDriveUrls(source.streamUrl, seek);
+      driveAnchorRef.current = seek;
+      driveStartedAtRef.current = performance.now();
+      userPausedRef.current = false;
+      userWantsPlayRef.current = true;
+      setDriveMode(true);
+      setPlaybackModeLabel('Conduite · MJPEG+MP3');
+      setDriveUrls(urls);
+      setDriveSession((n) => n + 1);
+      setCurrentTime(seek);
+      setShowControls(true);
+
+      // Couper le <video> pour laisser Tesla tranquille
+      const video = videoRef.current;
+      if (video) {
+        video.pause();
+      }
+    },
+    [source?.streamUrl],
+  );
+
+  const exitDriveToVideo = useCallback(() => {
+    const resumeAt = currentTime;
+    stopDriveStreams();
+    setDriveMode(false);
+    setPlaybackModeLabel('MP4');
+    userPausedRef.current = false;
+    userWantsPlayRef.current = true;
+    const video = videoRef.current;
+    if (video) {
+      try {
+        video.currentTime = resumeAt;
+      } catch {
+        // ignore
+      }
+      void video.play().catch(() => undefined);
+    }
+  }, [currentTime, stopDriveStreams]);
+
   const openLibraryPick = useCallback((pick: CarLibraryPick) => {
     writeCarUrl(pick);
     setPickMeta({ title: pick.title, posterUrl: pick.posterUrl || null });
@@ -76,6 +152,9 @@ export default function CarPlayer() {
   }, []);
 
   const backToLibrary = useCallback(() => {
+    stopDriveStreams();
+    destroyVideoAttachRef.current?.();
+    destroyVideoAttachRef.current = null;
     const video = videoRef.current;
     if (video) {
       video.pause();
@@ -91,26 +170,27 @@ export default function CarPlayer() {
     hasMediaErrorRef.current = false;
     userWantsPlayRef.current = false;
     userPausedRef.current = false;
-  }, []);
+    setPlaybackModeLabel('MP4');
+  }, [stopDriveStreams]);
 
+  // Attache le flux MP4 (mode stationné)
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !source?.streamUrl) return;
 
     let destroyed = false;
-    let destroyAttach: (() => void) | null = null;
     hasMediaErrorRef.current = false;
     setMediaError(null);
     setPrepStatus(null);
     setDriveMode(false);
+    stopDriveStreams();
     userWantsPlayRef.current = false;
     userPausedRef.current = false;
     setPlaybackModeLabel('MP4');
 
     const playWhenReady = () => {
-      if (destroyed) return;
+      if (destroyed || driveModeRef.current) return;
       userWantsPlayRef.current = true;
-      // En Drive, Tesla peut masquer la vidéo : lancer quand même pour garder l’audio
       void video.play().catch(() => undefined);
     };
 
@@ -135,21 +215,24 @@ export default function CarPlayer() {
         result.destroy();
         return;
       }
-      destroyAttach = result.destroy;
+      destroyVideoAttachRef.current = result.destroy;
       playWhenReady();
     })();
 
     return () => {
       destroyed = true;
-      destroyAttach?.();
+      destroyVideoAttachRef.current?.();
+      destroyVideoAttachRef.current = null;
     };
-  }, [source?.streamUrl]);
+  }, [source?.streamUrl, stopDriveStreams]);
 
+  // Événements <video> + détection pause Tesla → bascule conduite
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     const onTime = () => {
+      if (driveModeRef.current) return;
       setCurrentTime(video.currentTime || 0);
       if (!video.paused && video.currentTime > 0.2) {
         lastAdvanceAtRef.current = Date.now();
@@ -157,25 +240,28 @@ export default function CarPlayer() {
     };
     const onMeta = () => setDuration(video.duration || 0);
     const onPlay = () => {
+      if (driveModeRef.current) return;
       setIsPlaying(true);
-      if (!userPausedRef.current) setDriveMode(false);
     };
     const onPlaying = () => {
+      if (driveModeRef.current) return;
       setIsPlaying(true);
       lastAdvanceAtRef.current = Date.now();
       hasMediaErrorRef.current = false;
     };
     const onPause = () => {
+      if (driveModeRef.current) return;
       setIsPlaying(false);
       if (hasMediaErrorRef.current || video.error) return;
+      // Tesla force pause en Drive alors que l’utilisateur veut lire → bascule MJPEG+audio
       if (userWantsPlayRef.current && !userPausedRef.current) {
-        setDriveMode(true);
+        startDriveAt(video.currentTime || 0);
       }
     };
     const onEnded = () => {
+      if (driveModeRef.current) return;
       setIsPlaying(false);
       userWantsPlayRef.current = false;
-      setDriveMode(false);
     };
 
     video.addEventListener('timeupdate', onTime);
@@ -187,14 +273,15 @@ export default function CarPlayer() {
     video.addEventListener('ended', onEnded);
 
     const interval = window.setInterval(() => {
+      if (driveModeRef.current) return;
       if (!userWantsPlayRef.current || userPausedRef.current || hasMediaErrorRef.current) return;
       if (video.error) return;
       if (video.paused) {
-        setDriveMode(true);
+        startDriveAt(video.currentTime || 0);
         return;
       }
       const stalled = Date.now() - lastAdvanceAtRef.current > 4000 && video.currentTime > 0.5;
-      if (stalled) setDriveMode(true);
+      if (stalled) startDriveAt(video.currentTime || 0);
     }, 1500);
 
     return () => {
@@ -207,43 +294,123 @@ export default function CarPlayer() {
       video.removeEventListener('ended', onEnded);
       window.clearInterval(interval);
     };
-  }, [source?.streamUrl]);
+  }, [source?.streamUrl, startDriveAt]);
+
+  // Branche audio + img en mode conduite
+  useEffect(() => {
+    if (!driveMode || !driveUrls) return;
+    const audio = audioRef.current;
+    const img = imgRef.current;
+    if (!audio || !img) return;
+
+    img.src = driveUrls.mjpegUrl;
+    audio.src = driveUrls.audioUrl;
+    audio.load();
+    void audio.play().catch(() => {
+      setMediaError('Touchez Play pour démarrer l’audio en conduite.');
+    });
+    setIsPlaying(true);
+
+    const onTime = () => {
+      // Audio stream redémarre à seek=0 relatif : position absolue = ancre + audio.currentTime
+      const abs = driveAnchorRef.current + (audio.currentTime || 0);
+      setCurrentTime(abs);
+      setIsPlaying(!audio.paused);
+    };
+    const onPlay = () => setIsPlaying(true);
+    const onPause = () => {
+      setIsPlaying(false);
+      // Ne pas rebasculer : on est déjà en conduite
+    };
+    const onEnded = () => {
+      setIsPlaying(false);
+      userWantsPlayRef.current = false;
+    };
+    const onError = () => {
+      setMediaError('Flux conduite (audio/MJPEG) indisponible. Vérifiez FFmpeg sur le serveur.');
+    };
+
+    audio.addEventListener('timeupdate', onTime);
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('playing', onPlay);
+    audio.addEventListener('pause', onPause);
+    audio.addEventListener('ended', onEnded);
+    audio.addEventListener('error', onError);
+
+    return () => {
+      audio.removeEventListener('timeupdate', onTime);
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('playing', onPlay);
+      audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('error', onError);
+    };
+  }, [driveMode, driveUrls, driveSession]);
 
   const togglePlay = useCallback(() => {
+    if (driveModeRef.current) {
+      const audio = audioRef.current;
+      if (!audio) return;
+      if (audio.paused) {
+        userPausedRef.current = false;
+        userWantsPlayRef.current = true;
+        void audio.play().catch(() => setMediaError('Lecture audio bloquée — touchez Play.'));
+      } else {
+        userPausedRef.current = true;
+        userWantsPlayRef.current = false;
+        audio.pause();
+      }
+      setShowControls(true);
+      return;
+    }
+
     const video = videoRef.current;
     if (!video) return;
     if (video.paused) {
       userPausedRef.current = false;
       userWantsPlayRef.current = true;
-      setDriveMode(false);
       void video.play().catch(() => setMediaError('Lecture bloquée — touchez Play à nouveau.'));
     } else {
       userPausedRef.current = true;
       userWantsPlayRef.current = false;
       video.pause();
-      setDriveMode(false);
     }
     setShowControls(true);
   }, []);
 
-  const seekBy = useCallback((delta: number) => {
-    const video = videoRef.current;
-    if (!video) return;
-    const next = Math.max(0, Math.min((video.duration || 0) || Infinity, (video.currentTime || 0) + delta));
-    video.currentTime = next;
-    setCurrentTime(next);
-    setShowControls(true);
-  }, []);
+  const seekBy = useCallback(
+    (delta: number) => {
+      const next = Math.max(0, Math.min(duration || Infinity, currentTime + delta));
+      if (driveModeRef.current) {
+        startDriveAt(next);
+        setShowControls(true);
+        return;
+      }
+      const video = videoRef.current;
+      if (!video) return;
+      video.currentTime = next;
+      setCurrentTime(next);
+      setShowControls(true);
+    },
+    [currentTime, duration, startDriveAt],
+  );
 
-  const onSeekBar = useCallback((e: Event) => {
-    const video = videoRef.current;
-    const input = e.currentTarget as HTMLInputElement;
-    if (!video) return;
-    const value = Number(input.value);
-    if (!Number.isFinite(value)) return;
-    video.currentTime = value;
-    setCurrentTime(value);
-  }, []);
+  const onSeekBar = useCallback(
+    (e: Event) => {
+      const input = e.currentTarget as HTMLInputElement;
+      const value = Number(input.value);
+      if (!Number.isFinite(value)) return;
+      if (driveModeRef.current) {
+        startDriveAt(value);
+        return;
+      }
+      const video = videoRef.current;
+      if (!video) return;
+      video.currentTime = value;
+      setCurrentTime(value);
+    },
+    [startDriveAt],
+  );
 
   if (!slug) {
     return <CarLibraryBrowser onSelect={openLibraryPick} />;
@@ -287,25 +454,25 @@ export default function CarPlayer() {
         controls={false}
       />
 
+      {/* Audio + MJPEG : actifs uniquement en conduite (Tesla ne bloque pas img/audio) */}
+      <audio ref={audioRef} className="tesla-car-drive-audio" preload="auto" />
       {showDriveOverlay && (
-        <div
-          className="tesla-car-drive"
-          style={
-            displayPoster
-              ? {
-                  backgroundImage: `linear-gradient(rgba(0,0,0,0.78), rgba(0,0,0,0.9)), url(${displayPoster})`,
-                }
-              : undefined
-          }
-        >
+        <img
+          ref={imgRef}
+          className="tesla-car-drive-mjpeg"
+          alt={displayTitle}
+          draggable={false}
+        />
+      )}
+
+      {showDriveOverlay && (
+        <div className="tesla-car-drive-chrome">
           <span className="tesla-car-drive__badge">
             <Car className="w-5 h-5" />
-            Drive · MP4
+            Conduite · vidéo + audio
           </span>
-          <h1>{displayTitle}</h1>
-          <p>
-            En conduite, Tesla masque souvent l’image — l’audio MP4 continue. Utilisez Play / ±30&nbsp;s
-            ci‑dessous.
+          <p className="tesla-car-drive-chrome__hint">
+            Image MJPEG + audio MP3 — pour garder la vidéo visible en roulant (Tesla coupe le lecteur natif).
           </p>
         </div>
       )}
@@ -325,7 +492,11 @@ export default function CarPlayer() {
 
       {(showControls || showDriveOverlay || mediaError) && (
         <div className="tesla-car-dock">
-          {prepStatus && !mediaError && <p className="tesla-car-dock__error" style={{ opacity: 0.85 }}>{prepStatus}</p>}
+          {prepStatus && !mediaError && (
+            <p className="tesla-car-dock__error" style={{ opacity: 0.85 }}>
+              {prepStatus}
+            </p>
+          )}
           {mediaError && <p className="tesla-car-dock__error">{mediaError}</p>}
 
           <div className="tesla-car-scrub">
@@ -366,34 +537,25 @@ export default function CarPlayer() {
               <span>+30</span>
             </button>
 
-            <button
-              type="button"
-              className="tesla-car-ctrl tesla-car-ctrl--ghost tesla-car-ctrl--drive"
-              onClick={() => {
-                if (hasMediaErrorRef.current) return;
-                userPausedRef.current = false;
-                userWantsPlayRef.current = true;
-                setDriveMode(true);
-              }}
-              title="Mode conduite"
-            >
-              <Car className="w-5 h-5" />
-              <span className="hidden sm:inline">Drive</span>
-            </button>
-
-            {showDriveOverlay && (
+            {!showDriveOverlay ? (
+              <button
+                type="button"
+                className="tesla-car-ctrl tesla-car-ctrl--ghost tesla-car-ctrl--drive"
+                onClick={() => startDriveAt(currentTime)}
+                title="Forcer vidéo + audio en conduite (MJPEG + MP3)"
+              >
+                <Car className="w-5 h-5" />
+                <span className="hidden sm:inline">Conduite</span>
+              </button>
+            ) : (
               <button
                 type="button"
                 className="tesla-car-ctrl tesla-car-ctrl--ghost"
-                onClick={() => {
-                  setDriveMode(false);
-                  userPausedRef.current = false;
-                  userWantsPlayRef.current = true;
-                  void videoRef.current?.play().catch(() => undefined);
-                }}
+                onClick={exitDriveToVideo}
+                title="Revenir au mode vidéo native (Parking)"
               >
                 <RotateCcw className="w-5 h-5" />
-                <span className="hidden sm:inline">Vidéo</span>
+                <span className="hidden sm:inline">Parking</span>
               </button>
             )}
           </div>

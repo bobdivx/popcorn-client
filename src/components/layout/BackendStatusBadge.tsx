@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { isTauri } from '../../lib/utils/tauri';
 import { getBackendUrl, getMyBackendUrl, hasBackendUrl } from '../../lib/backend-config';
-import { getBackendConnectionStore, subscribeBackendConnectionStore } from '../../lib/backend-connection-store';
+import { getBackendConnectionStore, subscribeBackendConnectionStore, setBackendConnectionDegraded, setBackendConnectionOnline, setBackendConnectionOffline } from '../../lib/backend-connection-store';
 import { serverApi } from '../../lib/client/server-api';
 import { checkDockerUpdates, type DockerUpdateCheckResult } from '../../lib/services/docker-update-checker';
 import { resetGpuCapability } from '../../lib/gpu-capability-store';
@@ -121,13 +121,28 @@ export default function BackendStatusBadge({
     try {
       const res = await serverApi.checkServerHealth();
       if (res.success && res.data) {
-        setStatus(res.data.reachable ? 'ok' : 'error');
+        const torrentOk = res.data.torrent_client_reachable !== false;
+        setStatus(res.data.reachable ? (torrentOk ? 'ok' : 'error') : 'error');
         setBackendVersion(res.data.version ?? null);
+        if (res.data.reachable && !torrentOk) {
+          const detail =
+            (res.data as { torrent_client_error?: string }).torrent_client_error
+              ?? t('settingsMenu.overviewCard.serverDegraded');
+          setLastError(detail);
+          setBackendConnectionDegraded(detail);
+        } else if (res.data.reachable) {
+          setLastError(null);
+          setBackendConnectionOnline();
+        } else {
+          setBackendConnectionOffline();
+        }
       } else {
         setStatus('error');
+        setBackendConnectionOffline((res as { message?: string }).message);
       }
     } catch {
       setStatus('error');
+      setBackendConnectionOffline();
     }
   };
 
@@ -156,6 +171,13 @@ export default function BackendStatusBadge({
           offlineConfirmTimerRef.current = null;
         }
         checkHealth({ silent: true });
+      } else if (storeState.status === 'degraded') {
+        if (offlineConfirmTimerRef.current != null) {
+          window.clearTimeout(offlineConfirmTimerRef.current);
+          offlineConfirmTimerRef.current = null;
+        }
+        setStatus('error');
+        setLastError(storeState.lastError);
       } else if (storeState.status === 'offline') {
         // Evite le clignotement: confirmer "offline" via un health-check court.
         if (offlineConfirmTimerRef.current != null) {

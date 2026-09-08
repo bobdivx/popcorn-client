@@ -2,12 +2,17 @@
  * Store unifié du statut de connexion au backend (serveur principal).
  * Une seule source de vérité : mise à jour par les échecs API (ConnectionError/Timeout)
  * et par les health checks explicites. Consommée par BackendOfflineBanner, BackendStatusBadge, etc.
+ *
+ * Distingue :
+ * - offline : API injoignable
+ * - degraded : API up, client torrent (librqbit) down/saturé
+ * - online : tout OK
  */
 
 import { serverApi } from './client/server-api';
 import { getBackendUrl, getMyBackendUrl } from './backend-config';
 
-export type BackendConnectionStatus = 'online' | 'offline' | 'checking';
+export type BackendConnectionStatus = 'online' | 'offline' | 'degraded' | 'checking';
 
 export interface BackendConnectionState {
   status: BackendConnectionStatus;
@@ -65,6 +70,8 @@ function registerConnectionFailureListener() {
     });
     serverApi.addConnectionSuccessListener(() => {
       if (isFriendBackend()) return;
+      // Une requête API réussie prouve que le backend HTTP est up.
+      // Ne pas effacer « degraded » ici : seul un health check (librqbit OK) le fait.
       if (state.status === 'offline') {
         setBackendConnectionOnline();
       }
@@ -88,6 +95,14 @@ export function subscribeBackendConnectionStore(listener: Listener): () => void 
 
 export function setBackendConnectionOffline(reason?: string): void {
   state.status = 'offline';
+  state.lastError = reason ?? null;
+  state.backendUrl = getBackendUrlSafe();
+  state.lastChecked = Date.now();
+  notify();
+}
+
+export function setBackendConnectionDegraded(reason?: string): void {
+  state.status = 'degraded';
   state.lastError = reason ?? null;
   state.backendUrl = getBackendUrlSafe();
   state.lastChecked = Date.now();
@@ -135,6 +150,13 @@ export async function checkBackendConnection(): Promise<boolean> {
   try {
     const res = await serverApi.checkServerHealth();
     if (res.success && res.data?.reachable !== false) {
+      if (res.data.torrent_client_reachable === false) {
+        setBackendConnectionDegraded(
+          (res.data as { torrent_client_error?: string }).torrent_client_error
+            ?? 'Client torrent (librqbit) injoignable'
+        );
+        return true; // API joignable
+      }
       setBackendConnectionOnline();
       return true;
     }
