@@ -11,6 +11,7 @@ interface HealthResult {
   download_dir?: string;
   ffmpeg_available?: boolean;
   torrent_client_reachable?: boolean;
+  torrent_client_error?: string;
   librqbit_version?: string;
 }
 
@@ -135,6 +136,11 @@ export default function DiagnosticsPanel() {
                   {result.torrent_client_reachable
                     ? t('settingsPages.diagnostics.ok')
                     : t('settingsPages.diagnostics.ko')}
+                  {!result.torrent_client_reachable && result.torrent_client_error && (
+                    <span className="block text-xs text-amber-300/90 mt-1 break-all">
+                      {result.torrent_client_error}
+                    </span>
+                  )}
                 </div>
               )}
               {result.librqbit_version && (

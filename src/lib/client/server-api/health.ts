@@ -30,7 +30,7 @@ export const healthMethods = {
    * Vérifie la santé du serveur avec détails
    * Retourne des informations détaillées sur l'état de la connexion et la version
    */
-  async checkServerHealth(this: ServerApiClientAccess): Promise<ApiResponse<{ status: string; reachable: boolean; latency?: number; version?: string; build?: number; download_dir?: string; ffmpeg_available?: boolean; torrent_client_reachable?: boolean; librqbit_version?: string; flaresolverr_configured?: boolean; encoding_hwaccel?: string | null; cuda_decode_available?: boolean; gpu_available?: boolean }>> {
+  async checkServerHealth(this: ServerApiClientAccess): Promise<ApiResponse<{ status: string; reachable: boolean; latency?: number; version?: string; build?: number; download_dir?: string; ffmpeg_available?: boolean; torrent_client_reachable?: boolean; torrent_client_error?: string; librqbit_version?: string; flaresolverr_configured?: boolean; encoding_hwaccel?: string | null; cuda_decode_available?: boolean; gpu_available?: boolean }>> {
     const startTime = Date.now();
     
     // Unifié : appel direct au backend Rust
@@ -84,7 +84,7 @@ export const healthMethods = {
     return {
       success: true,
       data: {
-        status: 'ok',
+        status: backendData.status === 'degraded' ? 'degraded' : 'ok',
         reachable: true,
         latency,
         version: backendData.version,
@@ -92,6 +92,7 @@ export const healthMethods = {
         download_dir: backendData.download_dir,
         ffmpeg_available: backendData.ffmpeg_available,
         torrent_client_reachable: backendData.torrent_client_reachable,
+        torrent_client_error: backendData.torrent_client_error,
         librqbit_version: backendData.librqbit_version,
         flaresolverr_configured: backendData.flaresolverr_configured,
         encoding_hwaccel: backendData.encoding_hwaccel ?? null,
