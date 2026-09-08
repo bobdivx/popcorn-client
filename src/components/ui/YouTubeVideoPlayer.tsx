@@ -9,6 +9,8 @@ interface YouTubeVideoPlayerProps {
   controls?: boolean;
   className?: string;
   onEnded?: () => void;
+  /** Appelé quand l’iframe a chargé (utile pour éviter un flash noir). */
+  onReady?: () => void;
   cover?: boolean;
 }
 
@@ -22,6 +24,7 @@ export function YouTubeVideoPlayer({
   className = '',
   cover = false,
   onEnded,
+  onReady,
 }: YouTubeVideoPlayerProps) {
   const [isLoaded, setIsLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -169,6 +172,7 @@ export function YouTubeVideoPlayer({
     onLoad: () => {
       setIsLoaded(true);
       ensureListening();
+      onReady?.();
     },
   };
 

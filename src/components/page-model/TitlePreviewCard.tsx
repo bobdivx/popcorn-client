@@ -1,8 +1,14 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import type { ContentItem } from '../../lib/client/types';
 import { getDisplayTitle } from '../../lib/utils/title-display';
 import { isTVPlatform } from '../../lib/utils/device-detection';
+import { YouTubeVideoPlayer } from '../ui/YouTubeVideoPlayer';
 import { FocusableCard } from '../ui/FocusableCard';
+import {
+  claimPreviewTrailer,
+  releasePreviewTrailer,
+  subscribePreviewTrailer,
+} from '../dashboard/utils/previewTrailerStore';
 import { contentItemKey } from '../dashboard/utils/browsePriority';
 import { reanchorBrowseSlot } from './browseCarouselAnchor';
 import {
@@ -11,6 +17,9 @@ import {
 } from './browseInputModality';
 
 export { reanchorBrowseSlot, ensureBrowseRowInView } from './browseCarouselAnchor';
+
+/** Délai avant lecture trailer : évite le chargement à chaque flèche. */
+const TRAILER_DELAY_MS = 2500;
 
 /**
  * Hauteur image — paysage focus ≈ 55 % de la largeur utile (réf. streaming TV).
@@ -75,7 +84,8 @@ interface TitlePreviewCardProps {
 /**
  * Tuile browse :
  * - souris : portrait + léger hover
- * - flèches / télécommande : paysage ancré à gauche (pas de bande-annonce)
+ * - flèches / télécommande : paysage ancré à gauche (même poster, pas de backdrop)
+ * - trailer : seulement après ~2,5 s sur la même carte
  */
 export function TitlePreviewCard({
   item,
@@ -85,20 +95,70 @@ export function TitlePreviewCard({
   metaLine,
   metaSubLine,
 }: TitlePreviewCardProps) {
+  const slotId = `card:${contentItemKey(item)}`;
   const tileH = useTileHeight();
   const slotRef = useRef<HTMLDivElement>(null);
+  const delayRef = useRef<number | null>(null);
   const [hovered, setHovered] = useState(false);
   /** Expand paysage : uniquement après focus clavier / télécommande. */
   const [remoteFocused, setRemoteFocused] = useState(false);
+  const [playTrailer, setPlayTrailer] = useState(false);
+  const [trailerReady, setTrailerReady] = useState(false);
 
+  const trailerKey =
+    typeof item.trailerKey === 'string' && item.trailerKey.trim().length > 0
+      ? item.trailerKey.trim()
+      : null;
+  // Une seule image (poster) : pas de swap backdrop au focus (= réseau / CPU inutiles).
   const poster = item.poster || item.backdrop;
-  const backdrop = item.backdrop || item.poster;
   const title = getDisplayTitle(item);
   const expanded = remoteFocused;
 
   useEffect(() => {
     ensureBrowseInputModalityTracking();
   }, []);
+
+  const clearDelay = useCallback(() => {
+    if (delayRef.current != null) {
+      window.clearTimeout(delayRef.current);
+      delayRef.current = null;
+    }
+  }, []);
+
+  // Trailer uniquement si l’utilisateur reste sur la carte
+  useEffect(() => {
+    if (!expanded || !trailerKey) {
+      clearDelay();
+      setPlayTrailer(false);
+      setTrailerReady(false);
+      releasePreviewTrailer(slotId);
+      return;
+    }
+    clearDelay();
+    setPlayTrailer(false);
+    setTrailerReady(false);
+    delayRef.current = window.setTimeout(() => {
+      claimPreviewTrailer(slotId);
+      setPlayTrailer(true);
+    }, TRAILER_DELAY_MS);
+    return () => clearDelay();
+  }, [expanded, clearDelay, slotId, trailerKey]);
+
+  useEffect(() => {
+    return subscribePreviewTrailer((activeId) => {
+      if (activeId !== slotId) {
+        setPlayTrailer(false);
+        setTrailerReady(false);
+      }
+    });
+  }, [slotId]);
+
+  useEffect(() => {
+    return () => {
+      clearDelay();
+      releasePreviewTrailer(slotId);
+    };
+  }, [clearDelay, slotId]);
 
   const tileW = expanded ? Math.round((tileH * 16) / 9) : Math.round((tileH * 2) / 3);
 
@@ -148,7 +208,7 @@ export function TitlePreviewCard({
     return () => cancelAnimationFrame(id);
   }, [expanded, tileW]);
 
-  if (!poster && !backdrop) return null;
+  if (!poster) return null;
 
   const progressPct = (() => {
     if (typeof progress !== 'number') return 0;
@@ -193,12 +253,31 @@ export function TitlePreviewCard({
       >
         <div className="absolute inset-0" aria-hidden>
           <img
-            src={(expanded ? backdrop : poster) || poster || ''}
+            src={poster}
             alt=""
             loading="lazy"
             decoding="async"
             className="absolute inset-0 h-full w-full object-cover"
           />
+
+          {playTrailer && expanded && trailerKey ? (
+            <div
+              className={`pointer-events-none absolute inset-0 overflow-hidden transition-opacity duration-300 ${
+                trailerReady ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              <YouTubeVideoPlayer
+                youtubeKey={trailerKey}
+                autoplay
+                muted
+                loop
+                controls={false}
+                cover
+                className="!absolute inset-0 !h-full !w-full !aspect-auto"
+                onReady={() => setTrailerReady(true)}
+              />
+            </div>
+          ) : null}
 
           {showProgressBar ? (
             <div

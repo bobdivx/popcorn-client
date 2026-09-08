@@ -104,13 +104,15 @@ export default function CarPlayer() {
 
   const startDriveAt = useCallback(
     (atSeconds: number) => {
-      if (!source?.streamUrl || hasMediaErrorRef.current) return;
+      if (!source?.streamUrl) return;
       const seek = Math.max(0, atSeconds);
       const urls = buildCarDriveUrls(source.streamUrl, seek);
       driveAnchorRef.current = seek;
       driveStartedAtRef.current = performance.now();
+      hasMediaErrorRef.current = false;
       userPausedRef.current = false;
       userWantsPlayRef.current = true;
+      setMediaError(null);
       setDriveMode(true);
       setPlaybackModeLabel('Conduite · MJPEG+MP3');
       setDriveUrls(urls);
@@ -129,21 +131,46 @@ export default function CarPlayer() {
 
   const exitDriveToVideo = useCallback(() => {
     const resumeAt = currentTime;
+    if (!source?.streamUrl) return;
+    const video = videoRef.current;
+    if (!video) return;
+
     stopDriveStreams();
     setDriveMode(false);
     setPlaybackModeLabel('MP4');
+    setPrepStatus('Préparation MP4…');
+    setMediaError(null);
+    hasMediaErrorRef.current = false;
     userPausedRef.current = false;
     userWantsPlayRef.current = true;
-    const video = videoRef.current;
-    if (video) {
+
+    void (async () => {
+      destroyVideoAttachRef.current?.();
+      const result = await attachCarStream(
+        video,
+        source.streamUrl,
+        'direct',
+        (message) => {
+          setPrepStatus(null);
+          setMediaError(message);
+          startDriveAt(resumeAt);
+        },
+        (status) => setPrepStatus(status),
+      );
+      destroyVideoAttachRef.current = result.destroy;
+      if (hasMediaErrorRef.current) return;
+      setPrepStatus(null);
       try {
         video.currentTime = resumeAt;
       } catch {
         // ignore
       }
-      void video.play().catch(() => undefined);
-    }
-  }, [currentTime, stopDriveStreams]);
+      void video.play().catch(() => {
+        setMediaError('Lecture MP4 bloquée — retour en conduite.');
+        startDriveAt(resumeAt);
+      });
+    })();
+  }, [currentTime, source?.streamUrl, startDriveAt, stopDriveStreams]);
 
   const openLibraryPick = useCallback((pick: CarLibraryPick) => {
     writeCarUrl(pick);
@@ -173,58 +200,28 @@ export default function CarPlayer() {
     setPlaybackModeLabel('MP4');
   }, [stopDriveStreams]);
 
-  // Attache le flux MP4 (mode stationné)
+  // Démarrer tout de suite en MJPEG+MP3 (évite l’attente remux MP4 qui bloque la lecture).
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video || !source?.streamUrl) return;
+    if (!source?.streamUrl) return;
 
-    let destroyed = false;
     hasMediaErrorRef.current = false;
     setMediaError(null);
     setPrepStatus(null);
-    setDriveMode(false);
-    stopDriveStreams();
-    userWantsPlayRef.current = false;
-    userPausedRef.current = false;
-    setPlaybackModeLabel('MP4');
+    setDuration(0);
+    setCurrentTime(0);
+    destroyVideoAttachRef.current?.();
+    destroyVideoAttachRef.current = null;
 
-    const playWhenReady = () => {
-      if (destroyed || driveModeRef.current) return;
-      userWantsPlayRef.current = true;
-      void video.play().catch(() => undefined);
-    };
-
-    void (async () => {
-      const result = await attachCarStream(
-        video,
-        source.streamUrl,
-        'direct',
-        (message) => {
-          if (destroyed) return;
-          hasMediaErrorRef.current = true;
-          setDriveMode(false);
-          setPrepStatus(null);
-          setMediaError(message);
-        },
-        (status) => {
-          if (destroyed) return;
-          setPrepStatus(status);
-        },
-      );
-      if (destroyed) {
-        result.destroy();
-        return;
-      }
-      destroyVideoAttachRef.current = result.destroy;
-      playWhenReady();
-    })();
+    const t = window.setTimeout(() => {
+      startDriveAt(0);
+    }, 50);
 
     return () => {
-      destroyed = true;
+      window.clearTimeout(t);
       destroyVideoAttachRef.current?.();
       destroyVideoAttachRef.current = null;
     };
-  }, [source?.streamUrl, stopDriveStreams]);
+  }, [source?.streamUrl, startDriveAt]);
 
   // Événements <video> + détection pause Tesla → bascule conduite
   useEffect(() => {
