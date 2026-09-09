@@ -828,12 +828,36 @@ async function enrichTorrentForPlayback(
   if (needsClientMatch) {
     try {
       const list = await clientApi.listTorrents();
-      if (hasRealHash) {
+      // Priorité : match TMDB (fiable après reboot / depuis dashboard).
+      const tmdbTarget = opts.tmdbId != null ? Number(opts.tmdbId) : null;
+      const byTmdb =
+        tmdbTarget != null && Number.isFinite(tmdbTarget)
+          ? list.find((item) => {
+              const id = Number((item as { tmdb_id?: number; tmdbId?: number }).tmdb_id ?? (item as { tmdbId?: number }).tmdbId);
+              return Number.isFinite(id) && id === tmdbTarget;
+            })
+          : undefined;
+
+      if (byTmdb?.info_hash) {
+        result = {
+          ...result,
+          infoHash: byTmdb.info_hash,
+          name: result.name || byTmdb.name,
+          clientState: byTmdb.state,
+          clientProgress: typeof byTmdb.progress === 'number' ? byTmdb.progress : undefined,
+        } as Torrent;
+      } else if (hasRealHash) {
         const byHash = list.find(
           (item) => (item.info_hash || '').toLowerCase() === currentHash.toLowerCase(),
         );
         if (byHash?.info_hash) {
-          result = { ...result, infoHash: byHash.info_hash, name: result.name || byHash.name };
+          result = {
+            ...result,
+            infoHash: byHash.info_hash,
+            name: result.name || byHash.name,
+            clientState: byHash.state,
+            clientProgress: typeof byHash.progress === 'number' ? byHash.progress : undefined,
+          } as Torrent;
         }
       } else {
         const hintNorm = normalizeTitleForMatch(opts.titleHint || result.name || '');
@@ -862,7 +886,9 @@ async function enrichTorrentForPlayback(
             ...result,
             infoHash: bestClient.info_hash,
             name: result.name || bestClient.name,
-          };
+            clientState: bestClient.state,
+            clientProgress: typeof bestClient.progress === 'number' ? bestClient.progress : undefined,
+          } as Torrent;
         }
       }
     } catch {
@@ -1993,6 +2019,34 @@ export default function MediaDetailRoute() {
     ? (getDownloadClientStats(pageTorrent.infoHash) as ClientTorrentStats | null)
     : null;
 
+  // Stats live (post-reboot checking) : préférer clientState de l'enrichissement à un cache localStorage stale.
+  const liveInitialStats: ClientTorrentStats | null | undefined = useMemo(() => {
+    const ih = pageTorrent?.infoHash;
+    if (!ih) return initialTorrentStats ?? undefined;
+    const state = pageTorrent?.clientState;
+    if (state === 'checking' || state === 'initializing' || state === 'seeding' || state === 'completed' || state === 'downloading') {
+      return {
+        info_hash: ih,
+        name: pageTorrent?.name || '',
+        state: state as ClientTorrentStats['state'],
+        progress: typeof pageTorrent?.clientProgress === 'number' ? pageTorrent.clientProgress : 0,
+        downloaded_bytes: 0,
+        uploaded_bytes: 0,
+        total_bytes: pageTorrent?.fileSize || 0,
+        download_speed: 0,
+        upload_speed: 0,
+        peers_connected: 0,
+        peers_total: 0,
+        seeders: 0,
+        leechers: 0,
+        eta_seconds: null,
+        files_available: state === 'seeding' || state === 'completed',
+        download_started: true,
+      };
+    }
+    return initialTorrentStats ?? undefined;
+  }, [pageTorrent, initialTorrentStats]);
+
   const backHref = useMemo(() => getBackHrefFromLocation(), []);
   const streamBackendUrl = useMemo(() => getStreamBackendUrlFromLocation(), []);
   const seriesIndexerRefreshTmdbId =
@@ -2057,7 +2111,7 @@ export default function MediaDetailRoute() {
       initialVariants={initialVariants.length > 0 ? initialVariants : undefined}
       seriesEpisodes={enrichedSeriesEpisodes ?? undefined}
       initialTorrentStats={
-        initialTorrentStats ? normalizeTorrentStats(initialTorrentStats as ClientTorrentStats) : undefined
+        liveInitialStats ? normalizeTorrentStats(liveInitialStats as ClientTorrentStats) : undefined
       }
       backHref={backHref ?? undefined}
       streamBackendUrl={streamBackendUrl ?? undefined}

@@ -369,8 +369,12 @@ export default function MediaDetailPage({
                                 (torrent.clientProgress !== undefined && torrent.clientProgress >= 0.95);
   // DÃ©tecter si c'est un mÃ©dia local (slug ou id commence par "local_")
   const isLocalMedia = torrent.id?.startsWith('local_') || torrent.slug?.startsWith('local_') || torrent.infoHash?.startsWith('local_');
-  // Pour les mÃ©dias locaux, ils sont toujours disponibles localement
-  const [isAvailableLocally, setIsAvailableLocally] = useState(isCompletedFromProps || isLocalMedia);
+  const hasDownloadPathFromProps = !!(torrent as { downloadPath?: string | null }).downloadPath;
+  // Pour les mÃ©dias locaux / chemin bibliothèque déjà résolu, disponibles immédiatement
+  // (y compris pendant checking post-reboot).
+  const [isAvailableLocally, setIsAvailableLocally] = useState(
+    isCompletedFromProps || isLocalMedia || hasDownloadPathFromProps,
+  );
   const [downloadingToClient, setDownloadingToClient] = useState(false);
   const [magnetCopied, setMagnetCopied] = useState(false);
   const [trailerKey, setTrailerKey] = useState<string | null>(torrent.trailerKey || null);
@@ -459,7 +463,9 @@ export default function MediaDetailPage({
   const [downloadingEpisodesMap, setDownloadingEpisodesMap] = useState<Record<string, number>>({});
 
   /** Chemin du fichier en bibliothÃ¨que (library ou findLocalMediaByTmdb), pour lecture sans torrent dans le client. */
-  const [libraryDownloadPath, setLibraryDownloadPath] = useState<string | null>(null);
+  const [libraryDownloadPath, setLibraryDownloadPath] = useState<string | null>(
+    () => (torrent as { downloadPath?: string | null }).downloadPath?.trim() || null,
+  );
 
   /** AprÃ¨s ajout d'un seul Ã©pisode (streaming), info_hash pour que le lecteur utilise ce torrent */
   const [addedTorrentInfoHash, setAddedTorrentInfoHash] = useState<string | null>(null);
@@ -850,6 +856,7 @@ export default function MediaDetailPage({
   }, [addNotification, allVariants, normalizeResolution]);
 
   // Langues des fichiers déjà présents sur disque (bibliothèque), pas des variantes indexeurs.
+  // Pendant checking post-reboot : marquer aussi disponible + chemin pour Lire (sans attendre 100%).
   useEffect(() => {
     const tmdbId = torrent.tmdbId ?? activeTorrent?.tmdbId ?? null;
     if (typeof tmdbId !== 'number' || !Number.isFinite(tmdbId) || tmdbId <= 0) {
@@ -868,7 +875,8 @@ export default function MediaDetailPage({
         if (cancelled) return;
         const onDisk = (Array.isArray(list) ? list : []).filter((m: any) => {
           const path = (m.file_path || m.downloadPath || '').toString().trim();
-          return path.length > 0;
+          const size = Number(m.file_size ?? m.fileSize ?? 0);
+          return path.length > 0 && (size > 0 || /\.(mkv|mp4|avi|webm|mov|m4v)$/i.test(path));
         });
         setLocalOnDiskMedias(
           onDisk.map((m: any) => ({
@@ -878,6 +886,14 @@ export default function MediaDetailPage({
             name: m.file_name || m.name || null,
           })),
         );
+        if (onDisk.length > 0) {
+          const best = onDisk[0] as { file_path?: string; downloadPath?: string; file_size?: number };
+          const path = (best.file_path || best.downloadPath || '').toString().trim();
+          if (path) {
+            setLibraryDownloadPath((prev) => prev || path);
+            setIsAvailableLocally(true);
+          }
+        }
       } catch {
         if (!cancelled) setLocalOnDiskMedias([]);
       }
@@ -885,7 +901,7 @@ export default function MediaDetailPage({
     return () => {
       cancelled = true;
     };
-  }, [torrent.tmdbId, torrent.tmdbType, torrent.category, activeTorrent?.tmdbId, activeTorrent?.tmdbType, isAvailableLocally]);
+  }, [torrent.tmdbId, torrent.tmdbType, torrent.category, activeTorrent?.tmdbId, activeTorrent?.tmdbType]);
 
   const handleRefreshSeriesFromIndexers = useCallback(async () => {
     if (seriesIndexerRefreshTmdbId == null || seriesIndexerRefreshBusy) return;
@@ -1296,9 +1312,26 @@ export default function MediaDetailPage({
               getTorrentFailCountRef.current = 0;
               setTorrentStats(fromList);
               const completed = fromList.state === 'completed' || fromList.state === 'seeding' || (fromList.progress ?? 0) >= 0.99;
+              const checking =
+                fromList.state === 'checking' ||
+                (typeof fromList.state === 'string' && fromList.state.toLowerCase() === 'initializing');
               if (completed) {
                 setIsAvailableLocally(true);
                 isAvailableInClient = true;
+              }
+              // Post-reboot : même à 0% pendant la vérif, tenter les fichiers (métadonnées + disque).
+              if ((completed || checking) && activeTorrent.infoHash) {
+                try {
+                  const videos = await loadVideoFiles(activeTorrent.infoHash);
+                  if (videos.length > 0) {
+                    setVideoFiles(videos);
+                    if (!selectedFile) setSelectedFile(videos[0]);
+                    setIsAvailableLocally(true);
+                    isAvailableInClient = true;
+                  }
+                } catch {
+                  /* library lookup ci-dessous */
+                }
               }
             } else {
               setTorrentStats(null);
@@ -1314,11 +1347,17 @@ export default function MediaDetailPage({
             markLocalMedia?: boolean;
           }) => {
             // Ne pas marquer « complété » si le client a ce torrent à 0% (fichiers sparses).
+            // Exception : pendant checking/initializing (post-reboot), progress_bytes reste à 0
+            // tant que la vérif n'a pas avancé — les fichiers sont déjà sur disque.
+            const listState = (fromList?.state ?? '').toLowerCase();
+            const isCheckingState =
+              listState === 'checking' || listState === 'initializing';
             const listProgress =
               typeof fromList?.progress === 'number' ? fromList.progress : null;
             const listDownloaded = fromList?.downloaded_bytes ?? 0;
             const torrentEmptyOnClient =
               !!fromList &&
+              !isCheckingState &&
               fromList.files_available !== true &&
               (listProgress == null || listProgress <= 0.001) &&
               listDownloaded <= 0 &&
@@ -1334,8 +1373,12 @@ export default function MediaDetailPage({
             setTorrentStats((prev) => {
               const prevState = (prev?.state ?? '').toLowerCase();
               const prevProgress = typeof prev?.progress === 'number' ? prev.progress : 0;
+              // Pendant la vérif, conserver l'état checking (pas un faux « completed »).
+              if (prevState === 'checking' || prevState === 'initializing' || isCheckingState) {
+                return prev ?? fromList ?? null;
+              }
               const looksStaleQueued =
-                (prevState === 'queued' || prevState === 'downloading' || prevState === 'checking') &&
+                (prevState === 'queued' || prevState === 'downloading') &&
                 prevProgress <= 0.001 &&
                 (prev?.downloaded_bytes ?? 0) === 0 &&
                 (prev?.download_speed ?? 0) === 0;
@@ -1536,7 +1579,10 @@ export default function MediaDetailPage({
         const isCompleted = activeTorrent.clientState === 'completed' || 
                             activeTorrent.clientState === 'seeding' || 
                             activeTorrent.clientProgress >= 0.95;
-        if (isCompleted && hasInfoHash && activeTorrent.infoHash) {
+        const isChecking =
+          activeTorrent.clientState === 'checking' ||
+          activeTorrent.clientState === 'initializing';
+        if ((isCompleted || isChecking) && hasInfoHash && activeTorrent.infoHash) {
           try {
             const videos = await loadVideoFiles(activeTorrent.infoHash);
             if (videos.length > 0) {
@@ -1544,17 +1590,19 @@ export default function MediaDetailPage({
               if (!selectedFile) {
                 setSelectedFile(videos[0]);
               }
-              // Si on a des fichiers vidéo, le média est localement disponible.
-              // Après reboot, il arrive que les stats du client restent bloquées en "queued 0%":
-              // on force alors un état "completed" pour éviter d'afficher la carte de téléchargement.
-              if (!streamingTorrentActive) setIsAvailableLocally(true);
+              // Fichiers présents = disponible localement (même en mode streaming / pendant checking).
+              setIsAvailableLocally(true);
               setTorrentStats((prev) => {
                 const prevState = (prev?.state ?? '').toLowerCase();
                 const prevProgress = typeof prev?.progress === 'number' ? prev.progress : 0;
                 const prevIsComplete = prevState === 'completed' || prevState === 'seeding' || prevProgress >= 0.99;
                 if (prevIsComplete) return prev;
+                // Garder checking visible ; ne pas forcer completed pendant la vérif.
+                if (prevState === 'checking' || prevState === 'initializing' || isChecking) {
+                  return prev;
+                }
                 const looksStaleQueued =
-                  (prevState === 'queued' || prevState === 'downloading' || prevState === 'checking') &&
+                  (prevState === 'queued' || prevState === 'downloading') &&
                   prevProgress <= 0.001 &&
                   (prev?.downloaded_bytes ?? 0) === 0 &&
                   (prev?.download_speed ?? 0) === 0;
