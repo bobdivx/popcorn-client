@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact';
-import { useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import {
   ArrowLeft,
   Check,
@@ -9,10 +9,12 @@ import {
   Minimize2,
   Settings,
   Subtitles,
+  X,
 } from 'lucide-preact';
 import { useI18n } from '../../../../lib/i18n';
 import { persistVideoFillMode } from '../hooks/usePlayerConfig';
 import { getLanguageName } from '../utils/languageName';
+import { isMobileDevice } from '../../../../lib/utils/device-detection';
 
 export interface PlayerTrackOption {
   id: number;
@@ -35,8 +37,7 @@ interface PlayerSettingsMenuProps {
   onChangeAudioTrack?: (trackId: number) => void;
   onChangeSubtitleTrack?: (trackId: number) => void;
   onClose: () => void;
-  /** Ancre bas-gauche du bouton Paramètres (position fixed). */
-  anchor: { top: number; left: number };
+  isTV?: boolean;
 }
 
 const QUALITY_OPTIONS: { value: number | null; labelKey: string }[] = [
@@ -59,6 +60,10 @@ function qualityLabel(
   return `${streamQuality}p`;
 }
 
+/**
+ * Menu paramètres unifié desktop / TV (panneau latéral).
+ * Mobile : feuille bas d’écran responsive.
+ */
 export function PlayerSettingsMenu({
   streamQuality = null,
   showQualitySelector = false,
@@ -71,20 +76,27 @@ export function PlayerSettingsMenu({
   onChangeAudioTrack,
   onChangeSubtitleTrack,
   onClose,
-  anchor,
+  isTV = false,
 }: PlayerSettingsMenuProps) {
   const { t } = useI18n();
   const [panel, setPanel] = useState<SettingsPanel>('root');
+  const [focusIndex, setFocusIndex] = useState(0);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const isMobile = !isTV && isMobileDevice();
   const effectiveFill = videoFillMode ?? 'contain';
-  const hasAudio = audioTracks.length > 0 && !!onChangeAudioTrack;
-  const showSubsSection = !!onChangeSubtitleTrack && subtitleTracks.length > 0;
+
   const hasQuality = showQualitySelector && !!onQualityChange;
   const hasFill = videoFillMode !== undefined;
+  const showAudio = !!onChangeAudioTrack;
+  const showSubs = !!onChangeSubtitleTrack;
 
-  const currentAudioLabel = (() => {
-    const track = audioTracks.find((a) => a.id === currentAudioTrack);
-    return track ? getLanguageName(track.lang, track.name) : t('playback.qualityAuto');
-  })();
+  const currentAudioLabel =
+    audioTracks.length === 0
+      ? t('playback.tracksUnavailable')
+      : (() => {
+          const track = audioTracks.find((a) => a.id === currentAudioTrack);
+          return track ? getLanguageName(track.lang, track.name) : t('playback.qualityAuto');
+        })();
 
   const currentSubLabel =
     currentSubtitleTrack === -1
@@ -110,6 +122,140 @@ export function PlayerSettingsMenu({
             ? t('interfaceSettings.videoFillMode')
             : t('playback.playerSettings');
 
+  const itemCount = useMemo(() => {
+    if (panel === 'root') {
+      return (
+        (hasQuality ? 1 : 0) +
+        (showAudio ? 1 : 0) +
+        (showSubs ? 1 : 0) +
+        (hasFill ? 1 : 0) +
+        1 // close
+      );
+    }
+    if (panel === 'quality') return QUALITY_OPTIONS.length;
+    if (panel === 'audio') return Math.max(1, audioTracks.length);
+    if (panel === 'subtitles') return 1 + subtitleTracks.length;
+    if (panel === 'fill') return 2;
+    return 1;
+  }, [panel, hasQuality, showAudio, showSubs, hasFill, audioTracks.length, subtitleTracks.length]);
+
+  const activateAt = (index: number) => {
+    if (panel === 'root') {
+      const actions: Array<() => void> = [];
+      if (hasQuality) actions.push(() => setPanel('quality'));
+      if (showAudio) actions.push(() => setPanel('audio'));
+      if (showSubs) actions.push(() => setPanel('subtitles'));
+      if (hasFill) actions.push(() => setPanel('fill'));
+      actions.push(onClose);
+      actions[index]?.();
+      return;
+    }
+    if (panel === 'quality' && onQualityChange) {
+      const opt = QUALITY_OPTIONS[index];
+      if (!opt) return;
+      onQualityChange(opt.value);
+      onClose();
+      return;
+    }
+    if (panel === 'audio' && onChangeAudioTrack) {
+      if (audioTracks.length === 0) {
+        setPanel('root');
+        return;
+      }
+      const track = audioTracks[index];
+      if (!track) return;
+      onChangeAudioTrack(track.id);
+      onClose();
+      return;
+    }
+    if (panel === 'subtitles' && onChangeSubtitleTrack) {
+      if (index === 0) {
+        onChangeSubtitleTrack(-1);
+        onClose();
+        return;
+      }
+      const track = subtitleTracks[index - 1];
+      if (!track) return;
+      onChangeSubtitleTrack(track.id);
+      onClose();
+      return;
+    }
+    if (panel === 'fill') {
+      persistVideoFillMode(index === 0 ? 'contain' : 'cover');
+      onClose();
+    }
+  };
+
+  useEffect(() => {
+    setFocusIndex(0);
+  }, [panel]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const kc = e.keyCode ?? e.which;
+      const key = e.key || '';
+      const isBack =
+        key === 'Escape' ||
+        key === 'Backspace' ||
+        key === 'Back' ||
+        key === 'BrowserBack' ||
+        kc === 27 ||
+        kc === 8 ||
+        kc === 461 ||
+        kc === 10009;
+      const isUp = key === 'ArrowUp' || kc === 38 || kc === 19;
+      const isDown = key === 'ArrowDown' || kc === 40 || kc === 20;
+      const isConfirm = key === 'Enter' || key === ' ' || kc === 13 || kc === 23 || kc === 66;
+
+      if (isBack) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (panel !== 'root') setPanel('root');
+        else onClose();
+        return;
+      }
+
+      if (isUp || isDown) {
+        e.preventDefault();
+        e.stopPropagation();
+        setFocusIndex((i) => {
+          if (itemCount <= 0) return 0;
+          if (isUp) return (i - 1 + itemCount) % itemCount;
+          return (i + 1) % itemCount;
+        });
+        return;
+      }
+
+      if (isConfirm) {
+        e.preventDefault();
+        e.stopPropagation();
+        activateAt(focusIndex);
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panel, focusIndex, itemCount, onClose]);
+
+  useEffect(() => {
+    const el = panelRef.current?.querySelector<HTMLElement>(
+      `[data-settings-focus="${focusIndex}"]`,
+    );
+    el?.focus({ preventScroll: true });
+    el?.scrollIntoView({ block: 'nearest' });
+  }, [focusIndex, panel]);
+
+  const pad = isMobile ? 'p-3' : isTV ? 'p-6' : 'p-5';
+  const titleCls = isMobile ? 'text-base' : isTV ? 'text-2xl' : 'text-xl';
+  const rowPad = isMobile ? 'px-3 py-3' : isTV ? 'px-5 py-4' : 'px-4 py-3.5';
+  const rowText = isMobile ? 'text-sm' : isTV ? 'text-xl' : 'text-base';
+  const rowSub = isMobile ? 'text-xs' : isTV ? 'text-base' : 'text-sm';
+  const iconCls = isMobile ? 'w-5 h-5' : isTV ? 'w-7 h-7' : 'w-5 h-5';
+  const btnRound = isMobile ? 'w-9 h-9' : isTV ? 'w-12 h-12' : 'w-10 h-10';
+
+  let focusCursor = 0;
+  const takeFocus = () => focusCursor++;
+
   const Row = ({
     icon,
     label,
@@ -120,24 +266,38 @@ export function PlayerSettingsMenu({
     label: string;
     value: string;
     onClick: () => void;
-  }) => (
-    <button
-      type="button"
-      role="menuitem"
-      class="w-full flex items-center gap-3 px-3.5 py-2.5 text-left text-white hover:bg-white/10 transition-colors"
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-    >
-      <span class="flex-shrink-0 text-white/80">{icon}</span>
-      <span class="flex-1 min-w-0">
-        <span class="block text-sm font-medium">{label}</span>
-        <span class="block text-xs text-white/55 truncate mt-0.5">{value}</span>
-      </span>
-      <ChevronRight class="w-4 h-4 text-white/40 flex-shrink-0" />
-    </button>
-  );
+  }) => {
+    const idx = takeFocus();
+    const focused = focusIndex === idx;
+    return (
+      <button
+        type="button"
+        role="menuitem"
+        data-settings-focus={idx}
+        tabIndex={focused ? 0 : -1}
+        class={`w-full flex items-center gap-3 ${rowPad} text-left transition-colors rounded-xl ${
+          focused ? 'bg-white text-black' : 'text-white hover:bg-white/10'
+        }`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+      >
+        <span class={`flex-shrink-0 ${focused ? 'text-black/70' : 'text-white/80'}`}>{icon}</span>
+        <span class="flex-1 min-w-0">
+          <span class={`block font-semibold ${rowText}`}>{label}</span>
+          <span
+            class={`block truncate mt-0.5 ${rowSub} ${focused ? 'text-black/55' : 'text-white/55'}`}
+          >
+            {value}
+          </span>
+        </span>
+        <ChevronRight
+          class={`${iconCls} flex-shrink-0 ${focused ? 'text-black/40' : 'text-white/35'}`}
+        />
+      </button>
+    );
+  };
 
   const OptionBtn = ({
     selected,
@@ -149,32 +309,52 @@ export function PlayerSettingsMenu({
     label: string;
     hint?: string;
     onClick: () => void;
-  }) => (
-    <button
-      type="button"
-      role="menuitem"
-      class={`w-full flex items-center gap-3 px-3.5 py-2.5 text-left text-sm transition-colors ${
-        selected ? 'bg-white/15 text-white font-medium' : 'text-white/90 hover:bg-white/10'
-      }`}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-    >
-      <span class="w-4 flex-shrink-0 flex justify-center">
-        {selected ? <Check class="w-4 h-4 text-white" /> : null}
-      </span>
-      <span class="flex-1 min-w-0">
-        {label}
-        {hint ? <span class="ml-1.5 text-xs text-white/50">{hint}</span> : null}
-      </span>
-    </button>
-  );
+  }) => {
+    const idx = takeFocus();
+    const focused = focusIndex === idx;
+    return (
+      <button
+        type="button"
+        role="menuitem"
+        data-settings-focus={idx}
+        tabIndex={focused ? 0 : -1}
+        class={`w-full flex items-center gap-3 ${rowPad} text-left rounded-xl transition-colors ${rowText} ${
+          focused
+            ? 'bg-white text-black font-semibold'
+            : selected
+              ? 'bg-white/15 text-white font-medium'
+              : 'text-white/90 hover:bg-white/10'
+        }`}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick();
+        }}
+      >
+        <span class="w-6 flex-shrink-0 flex justify-center">
+          {selected ? (
+            <Check class={`${iconCls} ${focused ? 'text-black' : 'text-white'}`} />
+          ) : null}
+        </span>
+        <span class="flex-1 min-w-0">
+          {label}
+          {hint ? (
+            <span class={`ml-1.5 ${rowSub} ${focused ? 'text-black/50' : 'text-white/50'}`}>
+              {hint}
+            </span>
+          ) : null}
+        </span>
+      </button>
+    );
+  };
+
+  const shellCls = isMobile
+    ? 'fixed inset-x-0 bottom-0 z-[9999] max-h-[85vh] rounded-t-2xl border border-white/15 border-b-0 bg-black/95 shadow-2xl backdrop-blur-md flex flex-col safe-area-pb'
+    : 'fixed z-[9999] top-0 right-0 h-full w-[min(28rem,92vw)] bg-black/95 border-l border-white/15 shadow-2xl backdrop-blur-md flex flex-col';
 
   return (
     <>
       <div
-        class="fixed inset-0 z-[9998]"
+        class="fixed inset-0 z-[9998] bg-black/55"
         onClick={(e) => {
           e.stopPropagation();
           onClose();
@@ -187,55 +367,84 @@ export function PlayerSettingsMenu({
         aria-hidden="true"
       />
       <div
-        class="fixed z-[9999] w-[min(18.5rem,calc(100vw-1.5rem))] rounded-xl bg-black/95 border border-white/20 shadow-2xl overflow-hidden backdrop-blur-md"
+        ref={panelRef}
+        class={shellCls}
         role="menu"
         aria-label={t('playback.playerSettings')}
-        style={{
-          bottom: `${typeof window !== 'undefined' ? window.innerHeight - anchor.top + 8 : 8}px`,
-          left: `${Math.max(8, Math.min(anchor.left, (typeof window !== 'undefined' ? window.innerWidth : 400) - 304))}px`,
-        }}
+        onClick={(e) => e.stopPropagation()}
       >
-        <div class="flex items-center gap-2 px-3.5 py-2.5 border-b border-white/10">
+        <div class={`flex items-center gap-3 ${pad} border-b border-white/10 shrink-0`}>
           {panel !== 'root' ? (
             <button
               type="button"
-              class="flex items-center justify-center w-8 h-8 rounded-full hover:bg-white/10 text-white transition-colors"
+              class={`flex items-center justify-center ${btnRound} rounded-full hover:bg-white/10 text-white transition-colors`}
               onClick={(e) => {
                 e.stopPropagation();
                 setPanel('root');
               }}
               aria-label={t('common.back')}
             >
-              <ArrowLeft class="w-4 h-4" />
+              <ArrowLeft class={iconCls} />
             </button>
           ) : (
-            <Settings class="w-4 h-4 text-white/70" />
+            <Settings class={`${iconCls} text-white/70`} />
           )}
-          <h3 class="text-sm font-semibold text-white tracking-wide">{panelTitle}</h3>
+          <h3 class={`flex-1 font-semibold text-white tracking-wide ${titleCls}`}>{panelTitle}</h3>
+          {panel === 'root' ? (
+            <button
+              type="button"
+              data-settings-focus={itemCount - 1}
+              tabIndex={focusIndex === itemCount - 1 ? 0 : -1}
+              class={`flex items-center justify-center ${btnRound} rounded-full transition-colors ${
+                focusIndex === itemCount - 1
+                  ? 'bg-white text-black'
+                  : 'hover:bg-white/10 text-white'
+              }`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              aria-label={t('common.close')}
+            >
+              <X class={iconCls} />
+            </button>
+          ) : (
+            <button
+              type="button"
+              class={`flex items-center justify-center ${btnRound} rounded-full hover:bg-white/10 text-white transition-colors`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onClose();
+              }}
+              aria-label={t('common.close')}
+            >
+              <X class={iconCls} />
+            </button>
+          )}
         </div>
 
-        <div class="py-1 max-h-[min(22rem,60vh)] overflow-y-auto">
+        <div class={`flex-1 overflow-y-auto ${pad} space-y-1.5 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]`}>
           {panel === 'root' && (
             <>
               {hasQuality && (
                 <Row
-                  icon={<Settings class="w-4 h-4" />}
+                  icon={<Settings class={iconCls} />}
                   label={t('playback.quality')}
                   value={qualityLabel(streamQuality, t)}
                   onClick={() => setPanel('quality')}
                 />
               )}
-              {hasAudio && (
+              {showAudio && (
                 <Row
-                  icon={<Languages class="w-4 h-4" />}
+                  icon={<Languages class={iconCls} />}
                   label={t('playback.audioTracks')}
                   value={currentAudioLabel}
                   onClick={() => setPanel('audio')}
                 />
               )}
-              {showSubsSection && (
+              {showSubs && (
                 <Row
-                  icon={<Subtitles class="w-4 h-4" />}
+                  icon={<Subtitles class={iconCls} />}
                   label={t('playback.subtitleTracks')}
                   value={currentSubLabel}
                   onClick={() => setPanel('subtitles')}
@@ -245,9 +454,9 @@ export function PlayerSettingsMenu({
                 <Row
                   icon={
                     effectiveFill === 'cover' ? (
-                      <Minimize2 class="w-4 h-4" />
+                      <Minimize2 class={iconCls} />
                     ) : (
-                      <Maximize2 class="w-4 h-4" />
+                      <Maximize2 class={iconCls} />
                     )
                   }
                   label={t('interfaceSettings.videoFillMode')}
@@ -264,7 +473,7 @@ export function PlayerSettingsMenu({
               <OptionBtn
                 key={opt.value ?? 'auto'}
                 selected={
-                  (opt.value === streamQuality) || (opt.value == null && streamQuality == null)
+                  opt.value === streamQuality || (opt.value == null && streamQuality == null)
                 }
                 label={t(opt.labelKey as 'playback.qualityAuto')}
                 onClick={() => {
@@ -274,22 +483,28 @@ export function PlayerSettingsMenu({
               />
             ))}
 
-          {panel === 'audio' &&
-            hasAudio &&
-            audioTracks.map((track) => (
-              <OptionBtn
-                key={track.id}
-                selected={currentAudioTrack === track.id}
-                label={getLanguageName(track.lang, track.name)}
-                hint={track.default ? `(${t('playback.trackDefault')})` : undefined}
-                onClick={() => {
-                  onChangeAudioTrack!(track.id);
-                  onClose();
-                }}
-              />
-            ))}
+          {panel === 'audio' && showAudio && (
+            <>
+              {audioTracks.length === 0 ? (
+                <p class={`px-2 py-4 text-white/60 ${rowText}`}>{t('playback.tracksUnavailable')}</p>
+              ) : (
+                audioTracks.map((track) => (
+                  <OptionBtn
+                    key={track.id}
+                    selected={currentAudioTrack === track.id}
+                    label={getLanguageName(track.lang, track.name)}
+                    hint={track.default ? `(${t('playback.trackDefault')})` : undefined}
+                    onClick={() => {
+                      onChangeAudioTrack!(track.id);
+                      onClose();
+                    }}
+                  />
+                ))
+              )}
+            </>
+          )}
 
-          {panel === 'subtitles' && showSubsSection && (
+          {panel === 'subtitles' && showSubs && (
             <>
               <OptionBtn
                 selected={currentSubtitleTrack === -1}
@@ -299,18 +514,22 @@ export function PlayerSettingsMenu({
                   onClose();
                 }}
               />
-              {subtitleTracks.map((track) => (
-                <OptionBtn
-                  key={track.id}
-                  selected={currentSubtitleTrack === track.id}
-                  label={getLanguageName(track.lang, track.name)}
-                  hint={track.default ? `(${t('playback.trackDefault')})` : undefined}
-                  onClick={() => {
-                    onChangeSubtitleTrack!(track.id);
-                    onClose();
-                  }}
-                />
-              ))}
+              {subtitleTracks.length === 0 ? (
+                <p class={`px-2 py-3 text-white/50 ${rowSub}`}>{t('playback.noSubtitleTracks')}</p>
+              ) : (
+                subtitleTracks.map((track) => (
+                  <OptionBtn
+                    key={track.id}
+                    selected={currentSubtitleTrack === track.id}
+                    label={getLanguageName(track.lang, track.name)}
+                    hint={track.default ? `(${t('playback.trackDefault')})` : undefined}
+                    onClick={() => {
+                      onChangeSubtitleTrack!(track.id);
+                      onClose();
+                    }}
+                  />
+                ))
+              )}
             </>
           )}
 

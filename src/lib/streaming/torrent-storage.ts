@@ -109,6 +109,36 @@ export async function getPlaybackPositionByMedia(
   return rec?.position ?? null;
 }
 
+/**
+ * Résout la position de reprise : torrentId d'abord, puis clé média TMDB.
+ * Évite de démarrer à 0 quand l'UI affiche « Reprendre » via la clé média
+ * alors que l'id torrent a changé (ex. local_…).
+ */
+export async function resolveResumePlaybackPosition(opts: {
+  torrentId?: string | null;
+  tmdbId?: number | null;
+  tmdbType?: string | null;
+  deviceId: string;
+  /** Position déjà connue (ex. query ?t= depuis le dashboard). */
+  preferredSeconds?: number | null;
+}): Promise<number | null> {
+  const preferred = opts.preferredSeconds;
+  if (typeof preferred === 'number' && Number.isFinite(preferred) && preferred > 0) {
+    return preferred;
+  }
+  if (opts.torrentId) {
+    const byTorrent = await getPlaybackPosition(opts.torrentId, opts.deviceId);
+    if (byTorrent != null && byTorrent > 0) return byTorrent;
+  }
+  const tid = opts.tmdbId;
+  const tty = opts.tmdbType;
+  if (typeof tid === 'number' && (tty === 'movie' || tty === 'tv')) {
+    const byMedia = await getPlaybackPositionByMedia(tid, tty, opts.deviceId);
+    if (byMedia != null && byMedia > 0) return byMedia;
+  }
+  return null;
+}
+
 export type SavePlaybackMediaExtras = {
   season?: number;
   episode?: number;

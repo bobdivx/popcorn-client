@@ -246,6 +246,10 @@ interface IServerApiClientPublic {
   scanLocalMedia(): Promise<ApiResponse<string>>;
   getLocalMediaTmdbGaps(sampleLimit?: number): Promise<ApiResponse<{ missing_tmdb_count: number; sample: Array<{ file_path: string; file_name: string }> }>>;
   findLocalMediaByInfoHash(infoHash: string): Promise<ApiResponse<any>>;
+  getLocalAudioStreams(opts: {
+    path?: string;
+    infoHash?: string;
+  }): Promise<ApiResponse<{ tracks: import('./server-api/local-media.js').LocalAudioStreamTrack[] }>>;
 
   // Connection status
   getCurrentUserId(): string | null;

@@ -269,7 +269,7 @@ export function TitlePreviewCard({
               <YouTubeVideoPlayer
                 youtubeKey={trailerKey}
                 autoplay
-                muted
+                muted={false}
                 loop
                 controls={false}
                 cover

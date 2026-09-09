@@ -549,6 +549,7 @@
     "nextEpisode": "Next episode",
     "chooseEpisode": "Episodes",
     "restartFromBeginning": "Restart from beginning",
+    "playFromStartLabel": "From the start",
     "positionSlider": "Video position",
     "seekToPosition": "Go to {time}",
     "scrubPreviousThumbnail": "Previous thumbnail",
@@ -564,6 +565,8 @@
     "subtitlesOff": "Off",
     "trackDefault": "Default",
     "languagesAndSubtitles": "Languages and subtitles",
+    "tracksUnavailable": "No tracks detected for this stream",
+    "noSubtitleTracks": "No subtitles in this stream",
     "playStreamingLabel": "Play in streaming (downloading)",
     "downloadFullSeason": "Download full season",
     "resumeLabel": "Resume",
@@ -1331,7 +1334,9 @@
     "seriesPathTitle": "Series path",
     "seriesPathLabel": "Series folder",
     "seedersShort": "seeders",
-    "leechersShort": "leechers"
+    "leechersShort": "leechers",
+    "torrentNetworkLabel": "Torrent network",
+    "peerStatsHint": "Seeders / leechers from the indexer (useful before downloading)."
   },
   "torrentStats": {
     "downloading": "Downloading",

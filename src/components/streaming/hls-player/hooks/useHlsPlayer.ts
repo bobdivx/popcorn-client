@@ -5,7 +5,7 @@ import { usePlayerConfig } from '../../player-shared/hooks/usePlayerConfig';
 import { clientApi } from '../../../../lib/client/api';
 import { serverApi } from '../../../../lib/client/server-api';
 import {
-  getPlaybackPosition,
+  resolveResumePlaybackPosition,
   savePlaybackPosition,
   savePlaybackPositionByMedia,
   markEpisodeWatched,
@@ -39,6 +39,8 @@ interface UseHlsPlayerProps {
   seriesEpisode?: number;
   variantId?: string;
   startFromBeginning: boolean;
+  /** Position explicite (ex. ?t= dashboard) — prioritaire sur le localStorage. */
+  initialSeekSeconds?: number | null;
   onError?: (error: Error) => void;
   onLoadingChange?: (loading: boolean) => void;
   canAutoPlay?: () => boolean;
@@ -53,6 +55,8 @@ interface UseHlsPlayerProps {
   onTranscodingsEvicted?: (count: number) => void;
   /** Hauteur max en pixels pour le transcode (720, 480, 360). null/undefined = résolution source. */
   maxHeight?: number | null;
+  /** Index piste audio source (0 = première). */
+  audioIndex?: number | null;
   /** 4K / auto : le parent bascule en 1080p (retour true = ne pas afficher l’erreur). */
   onUhdStartFailed?: (reason: 'media' | 'fatal') => boolean;
   /** Quand true, src est l'URL stream-torrent : utiliser src tel quel pour HLS. */
@@ -71,6 +75,7 @@ export function useHlsPlayer({
   seriesEpisode,
   variantId,
   startFromBeginning,
+  initialSeekSeconds = null,
   onError,
   onLoadingChange,
   canAutoPlay,
@@ -80,6 +85,7 @@ export function useHlsPlayer({
   streamBackendUrl,
   onTranscodingsEvicted,
   maxHeight,
+  audioIndex,
   onUhdStartFailed,
   useStreamTorrentUrl: useStreamTorrentUrlProp,
 }: UseHlsPlayerProps) {
@@ -114,6 +120,7 @@ export function useHlsPlayer({
   const onTranscodingsEvictedRef = useRef(onTranscodingsEvicted);
   const canAutoPlayRef = useRef(canAutoPlay);
   const startFromBeginningRef = useRef(startFromBeginning);
+  const initialSeekSecondsRef = useRef(initialSeekSeconds);
   const torrentIdRef = useRef(torrentId);
   const tmdbIdRef = useRef(tmdbId);
   const tmdbTypeRef = useRef(tmdbType);
@@ -169,13 +176,14 @@ export function useHlsPlayer({
 
   // Mettre à jour les refs quand les props changent (sans déclencher de réinitialisation)
   useEffect(() => {
-  onErrorRef.current = onError;
-  onUhdStartFailedRef.current = onUhdStartFailed;
-  maxHeightRef.current = maxHeight;
-  onLoadingChangeRef.current = onLoadingChange;
-  onTranscodingsEvictedRef.current = onTranscodingsEvicted;
-  canAutoPlayRef.current = canAutoPlay;
+    onErrorRef.current = onError;
+    onUhdStartFailedRef.current = onUhdStartFailed;
+    maxHeightRef.current = maxHeight;
+    onLoadingChangeRef.current = onLoadingChange;
+    onTranscodingsEvictedRef.current = onTranscodingsEvicted;
+    canAutoPlayRef.current = canAutoPlay;
     startFromBeginningRef.current = startFromBeginning;
+    initialSeekSecondsRef.current = initialSeekSeconds;
     torrentIdRef.current = torrentId;
     tmdbIdRef.current = tmdbId;
     tmdbTypeRef.current = tmdbType;
@@ -183,7 +191,7 @@ export function useHlsPlayer({
     seriesEpisodeRef.current = seriesEpisode;
     variantIdRef.current = variantId;
     onDurationChangeRef.current = onDurationChange;
-  }, [onError, onUhdStartFailed, maxHeight, onLoadingChange, canAutoPlay, startFromBeginning, torrentId, tmdbId, tmdbType, seriesSeason, seriesEpisode, variantId, onDurationChange]);
+  }, [onError, onUhdStartFailed, maxHeight, onLoadingChange, canAutoPlay, startFromBeginning, initialSeekSeconds, torrentId, tmdbId, tmdbType, seriesSeason, seriesEpisode, variantId, onDurationChange]);
 
   const { hlsLoaded, error: loaderError } = useHlsLoader();
   const playerConfig = usePlayerConfig();
@@ -260,6 +268,9 @@ export function useHlsPlayer({
       }
       if (maxHeight != null && maxHeight > 0) {
         params.max_height = String(maxHeight);
+      }
+      if (audioIndex != null && audioIndex > 0) {
+        params.audio_index = String(audioIndex);
       }
       if (useProxy && streamBackendUrl) {
         return buildProxyUrl(baseUrl, streamBackendUrl.trim(), path, params);
@@ -1091,7 +1102,12 @@ export function useHlsPlayer({
               if (tvPlayback) hls.startLoad(0);
             } catch (_) {}
             startDelayedPlayWhenReady();
-          } else if (torrentIdRef.current) {
+          } else if (
+            torrentIdRef.current ||
+            (typeof initialSeekSecondsRef.current === 'number' && initialSeekSecondsRef.current > 0) ||
+            (typeof tmdbIdRef.current === 'number' &&
+              (tmdbTypeRef.current === 'movie' || tmdbTypeRef.current === 'tv'))
+          ) {
             // Appliquer la position sauvegardée AVANT de lancer la vérification buffer → play
             // Ne PAS appeler getPlaybackPosition si pendingSeekRef > 0 : on est en plein reloadWithSeek,
             // la position explicite (seek utilisateur) doit primer sur la position sauvegardée.
@@ -1114,7 +1130,13 @@ export function useHlsPlayer({
               applyResumePosition(pendingSeekRef.current);
               schedulePlayWhenReady();
             } else {
-            getPlaybackPosition(torrentIdRef.current, deviceId).then(async (positionSeconds) => {
+            resolveResumePlaybackPosition({
+              torrentId: torrentIdRef.current,
+              tmdbId: tmdbIdRef.current,
+              tmdbType: tmdbTypeRef.current,
+              deviceId,
+              preferredSeconds: initialSeekSecondsRef.current,
+            }).then(async (positionSeconds) => {
               if (positionSeconds && positionSeconds > 0) {
                 const videoDuration = totalDuration > 0 ? totalDuration : (video.duration || 0);
                 if (videoDuration > 0) {
@@ -1961,7 +1983,7 @@ export function useHlsPlayer({
     };
     // IMPORTANT: Utiliser des dépendances stabilisées pour éviter les réinitialisations multiples
     // maxHeight : changement de qualité → nouvelle URL ; src / useStreamTorrentUrlProp : mode stream-torrent
-  }, [playerRuntimeReady, src, infoHash, filePath, baseUrlProp, streamBackendUrl, maxHeight, useStreamTorrentUrlProp, seriesSeason, seriesEpisode, variantId]);
+  }, [playerRuntimeReady, src, infoHash, filePath, baseUrlProp, streamBackendUrl, maxHeight, audioIndex, useStreamTorrentUrlProp, seriesSeason, seriesEpisode, variantId]);
 
   // Fonction pour arrêter le buffer manuellement (utile lors de la fermeture).
   // Appelle le cleanup complet : pause vidéo + unregister backend (arrêt FFmpeg) + destroy HLS.

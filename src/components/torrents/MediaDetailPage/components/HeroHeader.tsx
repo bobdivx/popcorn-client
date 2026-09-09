@@ -1,5 +1,4 @@
 import type { MediaDetailPageProps } from '../types';
-import { QualityBadges } from './QualityBadges';
 
 export function HeroHeader({
   torrent,
@@ -8,18 +7,20 @@ export function HeroHeader({
   torrent: MediaDetailPageProps['torrent'];
   /** Titre déjà résolu (TMDB API + champs torrent). */
   displayTitle: string;
+  /** @deprecated Langues affichées dans TorrentInfo avec la qualité (évite le doublon Multi). */
+  availableLanguages?: string[];
 }) {
   const title = displayTitle.trim() || torrent.name;
   const year = torrent.releaseDate ? new Date(torrent.releaseDate).getFullYear() : null;
 
   return (
     <div className="max-w-4xl">
-      <div className="mb-4 sm:mb-6">
+      <div className="mb-10 sm:mb-12 md:mb-14">
         {torrent.logoUrl && (
           <img
             src={torrent.logoUrl}
             alt=""
-            className="max-h-14 sm:max-h-16 md:max-h-20 lg:max-h-24 xl:max-h-28 w-auto object-contain object-left mb-3 sm:mb-4 drop-shadow-2xl"
+            className="max-h-14 sm:max-h-16 md:max-h-20 lg:max-h-24 xl:max-h-28 w-auto object-contain object-left mb-4 sm:mb-5 drop-shadow-2xl"
             style={{ maxWidth: 'min(24rem, 85vw)' }}
           />
         )}
@@ -39,17 +40,7 @@ export function HeroHeader({
             </span>
           )}
         </div>
-        {torrent.quality && (
-          <div className="mt-3 sm:mt-4">
-            <QualityBadges
-              quality={torrent.quality}
-              tmdbMatchSource={torrent.tmdbMatchSource ?? null}
-              tmdbMatchConfidence={torrent.tmdbMatchConfidence ?? null}
-            />
-          </div>
-        )}
       </div>
     </div>
   );
 }
-

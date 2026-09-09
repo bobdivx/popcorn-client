@@ -1,7 +1,13 @@
 import { useState, useMemo, useEffect } from 'preact/hooks';
-import { Info, Trash2 } from 'lucide-preact';
+import { Trash2, Share2, Star } from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
+import type { ClientTorrentStats } from '../../../../lib/client/types';
 import { formatSize } from '../utils/formatSize';
+import { formatSpeed } from '../../../../lib/utils/formatBytes';
+import {
+  mediaLanguageLabel,
+  variantMediaLanguage,
+} from '../utils/mediaLanguage';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { serverApi } from '../../../../lib/client/server-api';
 import { getLibraryDisplayConfig } from '../../../../lib/utils/library-display-config';
@@ -9,6 +15,8 @@ import { buildExternalDownloadParams } from '../../../../lib/torrents/externalDo
 import { Modal } from '../../../ui/Modal';
 import { DsLoader } from '../../../ui/DsLoader';
 import { handleDeleteMedia, isLocalMedia } from '../actions/delete';
+import { TorrentStatusBadge } from '../../ui/TorrentStatusBadge';
+import { isTorrentReallyComplete } from '../../../streaming/player-shared/derivePlaybackPhase';
 
 type QualityVariant = {
   id: string;
@@ -37,12 +45,23 @@ interface TorrentInfoProps {
     fileSize?: number;
   }>;
   allVariants?: QualityVariant[];
+  /** Langues des fichiers déjà sur disque (pas des variantes indexeurs). */
+  availableLanguages?: string[];
+  /** Variantes locales / téléchargées pour basculer de langue. */
+  onDiskVariants?: QualityVariant[];
   selectedVariantId?: string | null;
   onSelectVariant?: (variant: QualityVariant) => void;
   /** Fichier présent sur disque et/ou torrent dans le client → afficher « Supprimer ». */
   canDelete?: boolean;
+  /** Média déjà disponible localement (téléchargé). */
+  isAvailableLocally?: boolean;
+  /** Stats client (seeding / completed). */
+  torrentStats?: ClientTorrentStats | null;
   setIsAvailableLocally?: (value: boolean) => void;
   addNotification?: (type: 'success' | 'error' | 'info', message: string) => void;
+  /** Modal info technique pilotée depuis ActionButtons (favoris / supprimer / info). */
+  techInfoModalOpen?: boolean;
+  onTechInfoModalOpenChange?: (open: boolean) => void;
 }
 
 const QUALITY_ORDER: Record<string, number> = { Remux: 6, '4K': 5, '2160p': 5, UHD: 5, '1080p': 4, '720p': 3, '480p': 2 };
@@ -74,23 +93,35 @@ export function TorrentInfo({
   isSeries = false,
   sources,
   allVariants,
+  availableLanguages: availableLanguagesProp,
+  onDiskVariants,
   selectedVariantId,
   onSelectVariant,
   canDelete = false,
+  isAvailableLocally = false,
+  torrentStats = null,
   setIsAvailableLocally,
   addNotification,
+  techInfoModalOpen,
+  onTechInfoModalOpenChange,
 }: TorrentInfoProps) {
   const { language, t } = useI18n();
   const [isDownloadingTorrent, setIsDownloadingTorrent] = useState(false);
-  const [showTechInfoModal, setShowTechInfoModal] = useState(false);
+  const [internalTechInfoOpen, setInternalTechInfoOpen] = useState(false);
+  const showTechInfoModal = techInfoModalOpen ?? internalTechInfoOpen;
+  const setShowTechInfoModal = (open: boolean) => {
+    onTechInfoModalOpenChange?.(open);
+    if (techInfoModalOpen === undefined) setInternalTechInfoOpen(open);
+  };
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingMedia, setDeletingMedia] = useState(false);
   const [seederAlertVisible, setSeederAlertVisible] = useState(true);
   const [seederAlertFading, setSeederAlertFading] = useState(false);
 
   useEffect(() => {
+    // Seeders utiles seulement avant téléchargement
+    if (isAvailableLocally || canDelete) return;
     if (!showSeederWarning || seedCount >= 10) return;
-    // Rouge (0 seeders) : 8s, amber : 5s
     const delay = seedCount === 0 ? 8000 : 5000;
     const fadeTimer = window.setTimeout(() => setSeederAlertFading(true), delay);
     const hideTimer = window.setTimeout(() => setSeederAlertVisible(false), delay + 400);
@@ -98,13 +129,26 @@ export function TorrentInfo({
       window.clearTimeout(fadeTimer);
       window.clearTimeout(hideTimer);
     };
-  }, [showSeederWarning, seedCount]);
+  }, [showSeederWarning, seedCount, isAvailableLocally, canDelete]);
+
+  const isDownloaded =
+    isAvailableLocally ||
+    canDelete ||
+    isTorrentReallyComplete(torrentStats, { hasVideoFiles: isAvailableLocally });
+  const stateLower = typeof torrentStats?.state === 'string' ? torrentStats.state.toLowerCase() : '';
+  const isSeeding = stateLower === 'seeding';
+  const seedingActive =
+    isSeeding &&
+    ((torrentStats?.upload_speed ?? 0) > 0 || (torrentStats?.peers_connected ?? 0) > 0);
+  /** Seeders/leechers indexeurs : utiles pour choisir une source, pas une fois le fichier sur disque. */
+  const showIndexerPeerStats = !isDownloaded && !isSeries;
 
   // Qualité préférée depuis les paramètres utilisateur
   const preferredQuality = useMemo(() => getLibraryDisplayConfig().preferredQuality ?? '', []);
 
   // Qualité du torrent courant (fallback si pas de variants groupés)
   const currentQuality = normalizeResolution((torrent as any).quality?.resolution || (torrent as any).format);
+  const currentLanguage = variantMediaLanguage(torrent as any);
 
   // Grouper les variants par qualité normalisée
   const qualityGroups = useMemo(() => {
@@ -121,6 +165,22 @@ export function TorrentInfo({
     if (groups.size === 0) return null;
     return [...groups.entries()].sort(([a], [b]) => (QUALITY_ORDER[b] ?? 0) - (QUALITY_ORDER[a] ?? 0));
   }, [allVariants]);
+
+  const availableLanguages = availableLanguagesProp ?? [];
+
+  const selectLanguage = (lang: string) => {
+    const poolSource = onDiskVariants && onDiskVariants.length > 0 ? onDiskVariants : [];
+    if (!onSelectVariant || poolSource.length === 0) return;
+    const currentRes = currentQuality;
+    const candidates = poolSource.filter((v) => variantMediaLanguage(v) === lang);
+    if (candidates.length === 0) return;
+    const sameQuality = currentRes
+      ? candidates.filter((v) => normalizeResolution(v.quality?.resolution || v.format) === currentRes)
+      : [];
+    const pool = sameQuality.length > 0 ? sameQuality : candidates;
+    const best = [...pool].sort((a, b) => (b.seedCount ?? 0) - (a.seedCount ?? 0))[0];
+    if (best) onSelectVariant(best);
+  };
 
   // Utiliser le synopsis TMDB si disponible, sinon la description
   const description = torrent.synopsis || torrent.description;
@@ -276,29 +336,15 @@ export function TorrentInfo({
   };
 
   return (
-    <div className="space-y-4">
-      {/* Info technique (chemin / indexer) en modal — films. Séries : bouton Info dossier dans ActionButtons. */}
-      {(showMovieTechInfo || (isSeries && indexerName) || qualityGroups || currentQuality) && (
-        <div className="mb-2 flex flex-wrap items-center gap-3">
-          {showMovieTechInfo && (
-            <button
-              type="button"
-              onClick={() => setShowTechInfoModal(true)}
-              data-focusable
-              tabIndex={0}
-              title={t('mediaDetail.techInfoTitle')}
-              aria-label={t('mediaDetail.infoButton')}
-              className="gtv-icon-btn ds-focus-glow ds-active-glow tv:w-16 tv:h-16"
-            >
-              <Info className="h-5 w-5 tv:h-7 tv:w-7" aria-hidden />
-            </button>
-          )}
-
+    <div className="space-y-6 mt-2">
+      {/* Rangée badges : qualité + langues + statut partage */}
+      {((isSeries && indexerName) || qualityGroups || currentQuality || availableLanguages.length > 0 || isSeeding || (!isSeeding && isDownloaded && stateLower === 'completed' && !isSeries)) && (
+        <div className="flex flex-wrap items-center gap-3 sm:gap-3.5">
           {/* Carte indexer — séries uniquement (films : dans la modal Info) */}
           {isSeries && indexerName && (
             <div
               className={
-                'inline-flex flex-wrap items-center gap-2 px-4 py-2 bg-black/50 border border-white/20 text-white rounded-lg text-sm font-semibold flex-shrink-0' +
+                'inline-flex flex-wrap items-center gap-2 px-4 py-2 bg-black/50 border border-white/20 text-white rounded-full text-sm font-semibold flex-shrink-0' +
                 (canDownloadTorrentFile ? ' cursor-pointer hover:bg-black/65 hover:border-white/30 transition-colors' : '')
               }
               {...(canDownloadTorrentFile
@@ -342,7 +388,7 @@ export function TorrentInfo({
 
           {/* Sélecteur de qualité — boutons interactifs si plusieurs variantes, badge informatif sinon */}
           {qualityGroups && qualityGroups.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={language === 'fr' ? 'Choisir la qualité' : 'Choose quality'}>
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label={language === 'fr' ? 'Choisir la qualité' : 'Choose quality'}>
               {qualityGroups.map(([resolution, variants]) => {
                 const isSelected = variants.some((v) => v.id === selectedVariantId);
                 const isPreferred = !!preferredQuality && normalizeResolution(preferredQuality) === resolution;
@@ -377,12 +423,69 @@ export function TorrentInfo({
               {currentQuality}
             </span>
           ) : null}
+
+          {/* Langues disponibles */}
+          {availableLanguages.length > 0 && (
+            <div
+              className="flex flex-wrap items-center gap-2"
+              role="group"
+              aria-label={language === 'fr' ? 'Langues disponibles sur disque' : 'Languages available on disk'}
+            >
+              {availableLanguages.map((lang) => {
+                const isSelected = currentLanguage === lang;
+                const canSwitch =
+                  !!onSelectVariant &&
+                  availableLanguages.length > 1 &&
+                  (onDiskVariants?.some((v) => variantMediaLanguage(v) === lang) ?? false);
+                return (
+                  <button
+                    key={lang}
+                    type="button"
+                    onClick={() => canSwitch && selectLanguage(lang)}
+                    disabled={!canSwitch}
+                    className={`inline-flex items-center px-3 py-1.5 rounded-full border text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-1 focus:ring-offset-black/50 ${
+                      canSwitch ? 'cursor-pointer' : 'cursor-default'
+                    } ${qualityBadgeClass(lang, isSelected)}`}
+                    aria-pressed={isSelected}
+                    title={mediaLanguageLabel(lang)}
+                  >
+                    {mediaLanguageLabel(lang)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {!isSeries && isSeeding && (
+            <span
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold border ${
+                seedingActive
+                  ? 'border-emerald-400/50 bg-emerald-500/20 text-emerald-100'
+                  : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200/90'
+              }`}
+              role="status"
+              title={
+                seedingActive
+                  ? t('downloads.seedingBadgeActiveTitle')
+                  : t('downloads.seedingBadgeIdleTitle')
+              }
+            >
+              <Share2
+                className={`h-3.5 w-3.5 shrink-0 ${seedingActive ? 'motion-safe:animate-pulse' : ''}`}
+                aria-hidden
+              />
+              {seedingActive ? t('torrentStats.seeding') : t('downloads.states.seeding')}
+            </span>
+          )}
+          {!isSeries && !isSeeding && isDownloaded && stateLower === 'completed' && (
+            <TorrentStatusBadge state="completed" className="!px-3 !py-1.5 !text-xs" seedingActive={false} />
+          )}
         </div>
       )}
 
       {/* Ratio / Tracker sans indexer — séries uniquement (films : modal Info) */}
       {isSeries && !indexerName && (minimumRatio != null || trackerName) && (
-        <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/70">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-white/70">
           {minimumRatio != null && (
             <span title={language === 'fr' ? 'Ratio minimum requis par le tracker' : 'Minimum ratio required by tracker'}>
               {t('mediaDetail.minimumRatio')} <strong className="text-white/90">{Number(minimumRatio) === Math.floor(Number(minimumRatio)) ? String(Math.floor(Number(minimumRatio))) : Number(minimumRatio).toFixed(1)}</strong>
@@ -396,10 +499,10 @@ export function TorrentInfo({
         </div>
       )}
 
-      {/* Avertissement éphémère si peu de seeders (films uniquement) */}
-      {!isSeries && showSeederWarning && seedCount < 10 && seederAlertVisible && (
+      {/* Avertissement seeders — uniquement si pas encore téléchargé */}
+      {showIndexerPeerStats && showSeederWarning && seedCount < 10 && seederAlertVisible && (
         <div
-          className={`mb-4 p-3 rounded-lg flex items-start gap-3 transition-opacity duration-400 ${
+          className={`p-3 rounded-xl flex items-start gap-3 transition-opacity duration-400 ${
             seederAlertFading ? 'opacity-0' : 'opacity-100'
           } ${
             seedCount === 0
@@ -423,71 +526,85 @@ export function TorrentInfo({
         </div>
       )}
 
-      {/* Statistiques globales — films uniquement (séries : par carte épisode) */}
+      {/* Bloc film : faits média — seeders seulement si pas encore DL */}
       {!isSeries && (
-        <div className="flex flex-wrap gap-6 text-sm mb-4">
-          <div className="flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ${
-              seedCount >= 50 ? 'text-green-500'
-              : seedCount >= 10 ? 'text-green-500'
-              : seedCount >= 1 ? 'text-amber-500'
-              : 'text-red-500'
-            }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className={`font-semibold ${
-              seedCount >= 50 ? 'text-green-500'
-              : seedCount >= 10 ? 'text-green-500'
-              : seedCount >= 1 ? 'text-amber-500'
-              : 'text-red-500'
-            }`}>{seedCount}</span>
-            <span className="text-white/70">{language === 'fr' ? 'seeders' : 'seeders'}</span>
+        <div className="flex flex-col gap-5">
+          {showIndexerPeerStats && (
+            <div className="inline-flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+              <div className="inline-flex items-center gap-2">
+                <span
+                  className={`font-semibold tabular-nums ${
+                    seedCount >= 10 ? 'text-green-500' : seedCount >= 1 ? 'text-amber-500' : 'text-red-500'
+                  }`}
+                >
+                  {seedCount}
+                </span>
+                <span className="text-white/50">{t('mediaDetail.seedersShort')}</span>
+              </div>
+              <div className="inline-flex items-center gap-2">
+                <span className="text-yellow-500 font-semibold tabular-nums">{leechCount}</span>
+                <span className="text-white/50">{t('mediaDetail.leechersShort')}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
+            {torrent.voteAverage != null && torrent.voteAverage > 0 && (
+              <div className="inline-flex items-center gap-2">
+                <Star className="h-4 w-4 text-yellow-400 fill-yellow-400 shrink-0" aria-hidden />
+                <span className="text-yellow-400 font-semibold tabular-nums">
+                  {torrent.voteAverage.toFixed(1)}
+                </span>
+                <span className="text-white/45">/10</span>
+              </div>
+            )}
+            {fileSize > 0 && (
+              <span className="text-white/85 tabular-nums font-medium">{formatSize(fileSize)}</span>
+            )}
+            {torrent.runtime != null && torrent.runtime > 0 && (
+              <span className="text-white/85 font-medium">{formatRuntime(torrent.runtime)}</span>
+            )}
+            {torrent.releaseDate && (
+              <span className="text-white/70">{formatReleaseDate(torrent.releaseDate)}</span>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span className="text-yellow-500 font-semibold">{leechCount}</span>
-            <span className="text-white/70">{language === 'fr' ? 'leechers' : 'leechers'}</span>
-          </div>
-          <div className="text-white/70">
-            {formatSize(fileSize)}
-          </div>
-          {torrent.voteAverage && (
-            <div className="flex items-center gap-2">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-              </svg>
-              <span className="text-yellow-400 font-semibold">{torrent.voteAverage.toFixed(1)}</span>
-              <span className="text-white/70">/10</span>
+
+          {torrent.genres && torrent.genres.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2.5">
+              {torrent.genres.map((genre, index) => (
+                <span
+                  key={index}
+                  className="inline-flex items-center px-3 py-1 rounded-full border border-white/18 bg-black/35 text-xs font-medium text-white/85"
+                >
+                  {genre}
+                </span>
+              ))}
             </div>
           )}
         </div>
       )}
 
-      {/* Métadonnées TMDB */}
-      {(torrent.releaseDate || torrent.genres || torrent.runtime) && (
-        <div className="flex flex-wrap gap-4 text-sm text-white/80 mb-4">
-          {torrent.releaseDate && (
-            <div>
-              <span className="font-semibold text-white/90">Date de sortie:</span> {formatReleaseDate(torrent.releaseDate)}
-            </div>
-          )}
-          {torrent.runtime && (
-            <div>
-              <span className="font-semibold text-white/90">Durée:</span> {formatRuntime(torrent.runtime)}
-            </div>
-          )}
+      {/* Métadonnées TMDB — séries */}
+      {isSeries && (torrent.releaseDate || torrent.genres || torrent.runtime) && (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-white/75">
+            {torrent.releaseDate && (
+              <span className="text-white/90 font-medium">{formatReleaseDate(torrent.releaseDate)}</span>
+            )}
+            {torrent.runtime != null && torrent.runtime > 0 && (
+              <span className="text-white/90 font-medium">{formatRuntime(torrent.runtime)}</span>
+            )}
+          </div>
           {torrent.genres && torrent.genres.length > 0 && (
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-white/90">Genres:</span>
-              <div className="flex flex-wrap gap-2">
-                {torrent.genres.map((genre, index) => (
-                  <span key={index} className="badge badge-outline badge-sm">
-                    {genre}
-                  </span>
-                ))}
-              </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              {torrent.genres.map((genre, index) => (
+                <span
+                  key={index}
+                  className="inline-flex items-center px-3 py-1 rounded-full border border-white/18 bg-black/35 text-xs font-medium text-white/85"
+                >
+                  {genre}
+                </span>
+              ))}
             </div>
           )}
         </div>
@@ -495,8 +612,8 @@ export function TorrentInfo({
 
       {/* Synopsis/Description */}
       {description && (
-        <div className="mb-6">
-          <h3 className="text-xl font-semibold mb-2 text-white/90">Synopsis</h3>
+        <div className="pt-1">
+          <h3 className="text-xl font-semibold mb-3 text-white/90">Synopsis</h3>
           <p className="text-lg text-white/90 leading-relaxed max-w-3xl">
             {description}
           </p>
@@ -523,6 +640,47 @@ export function TorrentInfo({
           size="lg"
         >
           <div className="space-y-4 pt-2 min-w-0">
+            {(isSeeding || seedCount > 0 || leechCount > 0) && (
+              <div className="flex min-w-0 flex-col gap-3 rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface)] px-4 py-3 text-sm">
+                <span className="font-semibold text-[var(--ds-text-primary)]">
+                  {t('mediaDetail.torrentNetworkLabel')}
+                </span>
+                {isSeeding && (
+                  <div className="inline-flex items-center gap-2 text-[var(--ds-text-secondary)]">
+                    <Share2 className="h-4 w-4 text-emerald-400 shrink-0" aria-hidden />
+                    <span>
+                      {seedingActive
+                        ? t('torrentStats.seeding')
+                        : t('downloads.states.seeding')}
+                    </span>
+                    {(torrentStats?.upload_speed ?? 0) > 0 && (
+                      <span className="tabular-nums text-[var(--ds-text-tertiary)]">
+                        ↑ {formatSpeed(torrentStats!.upload_speed!)}
+                      </span>
+                    )}
+                    {(torrentStats?.peers_connected ?? 0) > 0 && (
+                      <span className="tabular-nums text-[var(--ds-text-tertiary)]">
+                        {t('downloads.stats.peers')}: {torrentStats!.peers_connected}
+                      </span>
+                    )}
+                  </div>
+                )}
+                <div className="flex flex-wrap gap-x-6 gap-y-2 text-[var(--ds-text-secondary)]">
+                  <span>
+                    <strong className="text-[var(--ds-text-primary)] tabular-nums">{seedCount}</strong>{' '}
+                    {t('mediaDetail.seedersShort')}
+                  </span>
+                  <span>
+                    <strong className="text-[var(--ds-text-primary)] tabular-nums">{leechCount}</strong>{' '}
+                    {t('mediaDetail.leechersShort')}
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--ds-text-tertiary)]">
+                  {t('mediaDetail.peerStatsHint')}
+                </p>
+              </div>
+            )}
+
             {filePath && (
               <div className="flex min-w-0 flex-col gap-1 rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface)] px-4 py-3 text-sm">
                 <span className="font-semibold text-[var(--ds-text-primary)]">

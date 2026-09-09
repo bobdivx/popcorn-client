@@ -124,14 +124,15 @@ export function YouTubeVideoPlayer({
   useEffect(() => {
     if (!wantSound || !isLoaded) return;
     const unmute = () => {
+      ensureListening();
       postToPlayer({ event: 'command', func: 'unMute', args: [] });
       postToPlayer({ event: 'command', func: 'setVolume', args: [100] });
     };
-    const t1 = window.setTimeout(unmute, 400);
-    const t2 = window.setTimeout(unmute, 1200);
+    // Plusieurs tentatives : l’API iframe n’accepte souvent unMute qu’après le ready réel.
+    const delays = [300, 800, 1600, 2800];
+    const timers = delays.map((ms) => window.setTimeout(unmute, ms));
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
+      for (const t of timers) clearTimeout(t);
     };
   }, [wantSound, isLoaded, youtubeKey]);
 
