@@ -62,28 +62,32 @@ export function DownloadCard({
     playStatus:
       torrent.state === 'queued'
         ? 'adding'
-        : torrent.state === 'downloading'
-          ? 'downloading'
-          : torrent.state === 'error'
-            ? 'error'
-            : torrent.state === 'completed' || torrent.state === 'seeding'
-              ? 'ready'
-              : 'idle',
+        : torrent.state === 'checking'
+          ? 'adding'
+          : torrent.state === 'downloading'
+            ? 'downloading'
+            : torrent.state === 'error'
+              ? 'error'
+              : torrent.state === 'completed' || torrent.state === 'seeding'
+                ? 'ready'
+                : 'idle',
     torrentStats: torrent,
     isActiveSession: true,
   });
   const reliablePercent = phaseDerived.progressPercent ?? Math.round((torrent.progress ?? 0) * 1000) / 10;
 
   const progressTone =
-    phaseDerived.phase === 'downloading' || phaseDerived.phase === 'findingPeers'
-      ? 'from-[var(--ds-accent-violet)] to-sky-400'
-      : phaseDerived.phase === 'ready' || torrent.state === 'seeding' || torrent.state === 'completed'
-        ? 'from-[var(--ds-accent-green)] to-emerald-300'
-        : torrent.state === 'error'
-          ? 'from-[var(--ds-accent-red)] to-rose-400'
-          : 'from-white/40 to-white/20';
+    phaseDerived.phase === 'checking'
+      ? 'from-sky-500 to-cyan-300'
+      : phaseDerived.phase === 'downloading' || phaseDerived.phase === 'findingPeers'
+        ? 'from-[var(--ds-accent-violet)] to-sky-400'
+        : phaseDerived.phase === 'ready' || torrent.state === 'seeding' || torrent.state === 'completed'
+          ? 'from-[var(--ds-accent-green)] to-emerald-300'
+          : torrent.state === 'error'
+            ? 'from-[var(--ds-accent-red)] to-rose-400'
+            : 'from-white/40 to-white/20';
 
-  const isActive = torrent.state === 'downloading' || torrent.state === 'seeding';
+  const isActive = torrent.state === 'downloading' || torrent.state === 'seeding' || torrent.state === 'checking';
   const showPulse = isActive && (torrent.download_speed > 0 || torrent.upload_speed > 0);
   const showChrome = isHovered || isFocused;
   /** Pause/resume au survol souris seulement (pas au focus TV). */
@@ -162,10 +166,12 @@ export function DownloadCard({
             {phaseLabel &&
             (phaseDerived.phase === 'findingPeers' ||
               phaseDerived.phase === 'resolving' ||
+              phaseDerived.phase === 'checking' ||
               phaseDerived.phase === 'downloading') ? (
               <span className="px-2.5 py-1 tv:px-3.5 tv:py-1.5 rounded-full text-[10px] tv:text-sm font-semibold tracking-wide bg-black/50 border border-white/12 text-white/85 backdrop-blur-md">
                 {phaseLabel}
-                {phaseDerived.phase === 'downloading' && reliablePercent != null
+                {(phaseDerived.phase === 'downloading' || phaseDerived.phase === 'checking') &&
+                reliablePercent != null
                   ? ` · ${Math.round(reliablePercent)}%`
                   : ''}
               </span>

@@ -144,6 +144,25 @@ export function createPollTorrentProgress(context: PollingContext) {
           await handleDownloadingState(infoHash, stats, progress, context);
         } else if (isTorrentReallyComplete(stats) || state === 'seeding' || state === 'completed') {
           await handleCompletedState(infoHash, stats, progress, context);
+        } else if (state === 'checking' || state === 'initializing') {
+          // Post-reboot : tenter la lecture locale pendant la vérification des pièces.
+          setProgressMessage('Vérification des fichiers…');
+          try {
+            const videos = await loadVideoFiles(infoHash);
+            if (videos.length > 0) {
+              setVideoFiles(videos);
+              setSelectedFile(videos[0]);
+              setIsAvailableLocally(true);
+              stopProgressPolling();
+              setPlayStatus('ready');
+              setProgressMessage('Fichiers prêts — vous pouvez lire');
+              addDebugLog('success', '✅ Fichiers disponibles pendant la vérification', {
+                files_count: videos.length,
+              });
+            }
+          } catch {
+            /* ignore, prochain poll */
+          }
         } else if (state === 'paused') {
           await handlePausedState(infoHash, context);
         } else if (state === 'error') {

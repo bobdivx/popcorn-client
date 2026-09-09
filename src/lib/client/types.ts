@@ -249,7 +249,7 @@ export interface User {
 export interface ClientTorrentStats {
   info_hash: string;
   name: string;
-  state: 'queued' | 'downloading' | 'seeding' | 'paused' | 'completed' | 'error';
+  state: 'queued' | 'checking' | 'downloading' | 'seeding' | 'paused' | 'completed' | 'error';
   downloaded_bytes: number;
   uploaded_bytes: number;
   total_bytes: number;

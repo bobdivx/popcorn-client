@@ -585,6 +585,7 @@
     "phase": {
       "idle": "",
       "resolving": "Connexion au torrent…",
+      "checking": "Vérification des fichiers…",
       "findingPeers": "Recherche de peers…",
       "downloading": "Téléchargement",
       "preparingPlayback": "Préparation de la lecture…",
@@ -1250,6 +1251,7 @@
   "torrents": {
     "state": {
       "downloading": "Téléchargement",
+      "checking": "Vérification",
       "seeding": "En partage",
       "paused": "En pause",
       "completed": "Terminé",
@@ -1393,6 +1395,7 @@
     "removing": "Suppression...",
     "states": {
       "queued": "En attente",
+      "checking": "Vérification",
       "downloading": "Téléchargement",
       "seeding": "Partage",
       "paused": "En pause",

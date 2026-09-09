@@ -134,7 +134,7 @@ export function ActionButtons({
     playStatus: downloadingToClient
       ? 'adding'
       : torrentStats
-        ? stateLower === 'queued'
+        ? stateLower === 'queued' || stateLower === 'checking'
           ? 'adding'
           : stateLower === 'downloading'
             ? 'downloading'
@@ -148,6 +148,7 @@ export function ActionButtons({
     phaseDerived.phase === 'downloading' ||
     phaseDerived.phase === 'findingPeers' ||
     phaseDerived.phase === 'resolving';
+  const isChecking = phaseDerived.phase === 'checking' || stateLower === 'checking';
   const isCompleted = isTorrentReallyComplete(torrentStats, { hasVideoFiles: isAvailableLocally });
   const progressPercent =
     phaseDerived.progressPercent != null ? Math.round(phaseDerived.progressPercent) : 0;
@@ -155,6 +156,7 @@ export function ActionButtons({
   // Après reboot : état queued/downloading à 0% sans activité → ne pas masquer Lire.
   const looksStaleQueuedZero =
     !!torrentStats &&
+    !isChecking &&
     (stateLower === 'queued' || stateLower === 'downloading') &&
     (phaseDerived.progressPercent ?? 0) <= 0.1 &&
     (torrentStats.downloaded_bytes ?? 0) === 0 &&
@@ -166,10 +168,15 @@ export function ActionButtons({
     !isDownloadComplete &&
     !isAvailableLocally &&
     !looksStaleQueuedZero &&
+    !isChecking &&
     phaseDerived.isActivelyDownloading;
 
   const isDownloadInProgress =
-    ((!!torrentStats && !isDownloadComplete && !isAvailableLocally && !looksStaleQueuedZero) ||
+    ((!!torrentStats &&
+      !isDownloadComplete &&
+      !isAvailableLocally &&
+      !looksStaleQueuedZero &&
+      !isChecking) ||
       downloadingToClient);
   const showProgressInButton = hasActiveDownloadStats;
   const displayProgressPercent = hasActiveDownloadStats ? progressPercent : 0;
@@ -186,12 +193,21 @@ export function ActionButtons({
     torrent.infoHash?.startsWith('local_') ||
     !!(torrent as any).downloadPath;
 
-  const shouldShowButton = !isAvailableLocally || isDownloadComplete || (isAvailableLocally && hasInfoHash) || isLocalTorrent || (streamingTorrentActive && canStream);
+  const shouldShowButton = !isAvailableLocally || isDownloadComplete || (isAvailableLocally && hasInfoHash) || isLocalTorrent || (streamingTorrentActive && canStream) || (isChecking && hasInfoHash);
   const shouldShowPlayButton =
     isLocalTorrent ||
     (isAvailableLocally && hasInfoHash) ||
     isDownloadComplete ||
+    (isChecking && hasInfoHash) ||
     (streamingTorrentActive && canStream);
+  // Pendant la vérif, on préfère « Lire » (fichiers sur disque) plutôt qu'une carte de progression.
+  const showCheckingStatus =
+    isChecking &&
+    !isDownloadComplete &&
+    !isAvailableLocally &&
+    !isStreamingThisTorrent &&
+    !!torrentStats &&
+    !shouldShowPlayButton;
   const isPlayStreamingMode = shouldShowPlayButton && streamingTorrentActive && canStream && !isAvailableLocally && !isDownloadComplete;
   const showDownloadButtonAlongsidePlay =
     streamingTorrentActive && canStream && shouldShowPlayButton &&
@@ -240,7 +256,7 @@ export function ActionButtons({
 
   const showDownloadProgressCard =
     !isStreamingThisTorrent &&
-    (showProgressNextToCancel || hasActiveDownloadStats) &&
+    (showProgressNextToCancel || hasActiveDownloadStats || showCheckingStatus) &&
     !!torrentStats;
 
   const showPrimaryActionRow =
@@ -258,7 +274,7 @@ export function ActionButtons({
     <PlaybackStatusSurface
       variant="inline"
       playStatus={
-        phaseDerived.phase === 'resolving'
+        phaseDerived.phase === 'resolving' || phaseDerived.phase === 'checking'
           ? 'adding'
           : phaseDerived.phase === 'findingPeers' || phaseDerived.phase === 'downloading'
             ? 'downloading'
@@ -269,7 +285,7 @@ export function ActionButtons({
       imageUrl={torrent.heroImageUrl ?? torrent.imageUrl ?? null}
       title={torrent.cleanTitle || torrent.name || null}
       isActiveSession
-      onCancel={onCancelDownload}
+      onCancel={showCheckingStatus ? undefined : onCancelDownload}
       cancelLabel={t('downloads.cancelDownload')}
       className="w-full max-w-2xl"
     />

@@ -13,6 +13,7 @@ export function useActiveDownloads() {
       const active = torrents.filter(
         (t) =>
           t.state === 'downloading' ||
+          t.state === 'checking' ||
           (t.state === 'queued' && (t.progress ?? 0) < 1)
       );
 

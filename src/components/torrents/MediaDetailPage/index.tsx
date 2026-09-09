@@ -655,36 +655,9 @@ export default function MediaDetailPage({
         libraryEpisodesPathMap[`${selectedEpisodeMeta.season}:${selectedEpisodeMeta.episode}`]),
   );
   const effectiveStreamingActive = (streamingTorrentActive ?? false) && !forceDownloadFallback;
-  // Stream-torrent uniquement si le média n'est PAS jouable en local.
-  // Ne pas utiliser `isPlaying` ici : dès le clic Lire, isPlaying=true basculait à tort
-  // vers stream-torrent même quand isAvailableLocally=true (fichier présent, sans path library).
-  const useStreamTorrentMode =
-    effectiveStreamingActive &&
-    !activeTorrent.infoHash?.startsWith('local_') &&
-    (Boolean(emptyOrSparse) || (!isAvailableLocally && !hasLibraryFilePath));
 
   // Log des paramètres streaming en console (visible dans l’onglet Console pour debug)
-  useEffect(() => {
-    const token = typeof TokenManager?.getCloudAccessToken === 'function' ? TokenManager.getCloudAccessToken() : null;
-    console.debug('[MediaDetail] Paramètres streaming', {
-      streamingTorrentActive: streamingTorrentActive ?? false,
-      effectiveStreamingActive,
-      forceDownloadFallback,
-      useStreamTorrentMode,
-      isAvailableLocally: Boolean(isAvailableLocally),
-      emptyOrSparse: Boolean(emptyOrSparse),
-      hasLibraryFilePath,
-      hasCloudToken: !!token,
-    });
-  }, [
-    streamingTorrentActive,
-    effectiveStreamingActive,
-    forceDownloadFallback,
-    isAvailableLocally,
-    useStreamTorrentMode,
-    emptyOrSparse,
-    hasLibraryFilePath,
-  ]);
+  // (useStreamTorrentMode calculé après useTorrentPlayer — voir plus bas)
 
   // Hook useTorrentPlayer (utilise le torrent actif = sÃ©lection saison/Ã©pisode)
   const effectiveTorrent = addedTorrentInfoHash ? { ...activeTorrent, infoHash: addedTorrentInfoHash } : activeTorrent;
@@ -725,6 +698,46 @@ export default function MediaDetailPage({
     setShowInfo,
     addDebugLog,
   });
+
+  // Pendant checking/initializing, librqbit refuse le stream → forcer HLS local.
+  const torrentIsChecking =
+    torrentStats?.state === 'checking' ||
+    initialTorrentStats?.state === 'checking' ||
+    activeTorrent.clientState === 'checking' ||
+    (typeof torrentStats?.state === 'string' &&
+      torrentStats.state.toLowerCase() === 'initializing');
+  // Stream-torrent uniquement si le média n'est PAS jouable en local.
+  // Ne pas utiliser `isPlaying` ici : dès le clic Lire, isPlaying=true basculait à tort
+  // vers stream-torrent même quand isAvailableLocally=true (fichier présent, sans path library).
+  const useStreamTorrentMode =
+    effectiveStreamingActive &&
+    !activeTorrent.infoHash?.startsWith('local_') &&
+    !torrentIsChecking &&
+    (Boolean(emptyOrSparse) || (!isAvailableLocally && !hasLibraryFilePath));
+
+  useEffect(() => {
+    const token = typeof TokenManager?.getCloudAccessToken === 'function' ? TokenManager.getCloudAccessToken() : null;
+    console.debug('[MediaDetail] Paramètres streaming', {
+      streamingTorrentActive: streamingTorrentActive ?? false,
+      effectiveStreamingActive,
+      forceDownloadFallback,
+      useStreamTorrentMode,
+      isAvailableLocally: Boolean(isAvailableLocally),
+      emptyOrSparse: Boolean(emptyOrSparse),
+      hasLibraryFilePath,
+      torrentIsChecking,
+      hasCloudToken: !!token,
+    });
+  }, [
+    streamingTorrentActive,
+    effectiveStreamingActive,
+    forceDownloadFallback,
+    isAvailableLocally,
+    useStreamTorrentMode,
+    emptyOrSparse,
+    hasLibraryFilePath,
+    torrentIsChecking,
+  ]);
 
   useEffect(() => {
     if (sparseErrorPendingRef.current) {
@@ -1151,7 +1164,15 @@ export default function MediaDetailPage({
     torrentStats.state === 'seeding' ||
     torrentStats.files_available === true
   );
-  const shouldShowPlayButton = isLocalTorrent || (isAvailableLocally && hasInfoHash) || isDownloadComplete;
+  const isTorrentChecking =
+    torrentStats?.state === 'checking' ||
+    (typeof torrentStats?.state === 'string' && torrentStats.state.toLowerCase() === 'initializing');
+  // Pendant la vérif post-reboot, autoriser Lire : les fichiers sont déjà sur disque.
+  const shouldShowPlayButton =
+    isLocalTorrent ||
+    (isAvailableLocally && hasInfoHash) ||
+    isDownloadComplete ||
+    (isTorrentChecking && hasInfoHash);
 
   // Garder une ref Ã  jour avec torrentStats pour Ã©viter d'Ã©craser un Ã©tat complÃ©tÃ© par une rÃ©ponse API invalide (unknown/0)
   useEffect(() => {
@@ -1160,13 +1181,16 @@ export default function MediaDetailPage({
       : null;
   }, [torrentStats]);
 
-  // Quand on arrive depuis la page TÃ©lÃ©chargements avec des stats (complÃ©tÃ©), prÃ©charger les fichiers vidÃ©o pour que Â« Lire Â» soit utilisable
+  // Quand on arrive depuis la page Téléchargements avec des stats (complété / vérif), prÃ©charger les fichiers vidÃ©o pour que Â« Lire Â» soit utilisable
   useEffect(() => {
     if (
       initialTorrentStats &&
       hasInfoHash &&
       activeTorrent.infoHash &&
-      (initialTorrentStats.state === 'completed' || initialTorrentStats.state === 'seeding' || initialTorrentStats.progress >= 0.99)
+      (initialTorrentStats.state === 'completed' ||
+        initialTorrentStats.state === 'seeding' ||
+        initialTorrentStats.state === 'checking' ||
+        initialTorrentStats.progress >= 0.99)
     ) {
       loadVideoFiles(activeTorrent.infoHash)
         .then((videos) => {
@@ -1185,7 +1209,13 @@ export default function MediaDetailPage({
   useEffect(() => {
     if (!hasInfoHash || !activeTorrent.infoHash) return;
     const stats = getDownloadClientStats(activeTorrent.infoHash);
-    if (stats && (stats.state === 'completed' || stats.state === 'seeding' || (stats.progress ?? 0) >= 0.99)) {
+    if (
+      stats &&
+      (stats.state === 'completed' ||
+        stats.state === 'seeding' ||
+        stats.state === 'checking' ||
+        (stats.progress ?? 0) >= 0.99)
+    ) {
       setTorrentStats(stats);
       loadVideoFiles(activeTorrent.infoHash!)
         .then((videos) => {
@@ -1305,7 +1335,7 @@ export default function MediaDetailPage({
               const prevState = (prev?.state ?? '').toLowerCase();
               const prevProgress = typeof prev?.progress === 'number' ? prev.progress : 0;
               const looksStaleQueued =
-                (prevState === 'queued' || prevState === 'downloading') &&
+                (prevState === 'queued' || prevState === 'downloading' || prevState === 'checking') &&
                 prevProgress <= 0.001 &&
                 (prev?.downloaded_bytes ?? 0) === 0 &&
                 (prev?.download_speed ?? 0) === 0;
@@ -1524,7 +1554,7 @@ export default function MediaDetailPage({
                 const prevIsComplete = prevState === 'completed' || prevState === 'seeding' || prevProgress >= 0.99;
                 if (prevIsComplete) return prev;
                 const looksStaleQueued =
-                  (prevState === 'queued' || prevState === 'downloading') &&
+                  (prevState === 'queued' || prevState === 'downloading' || prevState === 'checking') &&
                   prevProgress <= 0.001 &&
                   (prev?.downloaded_bytes ?? 0) === 0 &&
                   (prev?.download_speed ?? 0) === 0;
@@ -1713,7 +1743,11 @@ export default function MediaDetailPage({
         for (const t of allTorrents) {
           const isCompleted =
             t.state === 'completed' || t.state === 'seeding' || t.files_available === true;
-          const isDownloading = t.state === 'downloading' || t.state === 'queued' || (t.state === 'active' && (t.progress ?? 0) < 0.99);
+          const isDownloading =
+            t.state === 'downloading' ||
+            t.state === 'queued' ||
+            t.state === 'checking' ||
+            (t.state === 'active' && (t.progress ?? 0) < 0.99);
 
           if (t.name) {
             // Matching prioritaire: ID TMDB quand disponible.
