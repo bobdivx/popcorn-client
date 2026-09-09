@@ -73,7 +73,7 @@ export interface MediaDetailPageProps {
     /** Confiance du mapping TMDB (high, medium, low). */
     tmdbMatchConfidence?: string | null;
     // État du torrent depuis le backend Rust (si disponible)
-    clientState?: 'queued' | 'downloading' | 'seeding' | 'paused' | 'completed' | 'error';
+    clientState?: 'queued' | 'checking' | 'downloading' | 'seeding' | 'paused' | 'completed' | 'error';
     clientProgress?: number; // 0.0 à 1.0
     // Chemin du fichier local pour les médias locaux
     downloadPath?: string | null;

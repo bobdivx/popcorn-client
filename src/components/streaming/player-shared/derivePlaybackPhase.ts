@@ -6,6 +6,7 @@
 export type PlaybackPhase =
   | 'idle'
   | 'resolving'
+  | 'checking'
   | 'findingPeers'
   | 'downloading'
   | 'preparingPlayback'
@@ -74,6 +75,7 @@ export interface DerivedPlaybackPhase {
 export const PLAYBACK_PHASE_I18N_KEYS: Record<PlaybackPhase, string> = {
   idle: 'playback.phase.idle',
   resolving: 'playback.phase.resolving',
+  checking: 'playback.phase.checking',
   findingPeers: 'playback.phase.findingPeers',
   downloading: 'playback.phase.downloading',
   preparingPlayback: 'playback.phase.preparingPlayback',
@@ -160,6 +162,12 @@ export function derivePlaybackPhase(input: DerivePlaybackPhaseInput): DerivedPla
           : 'downloading';
   } else if (isReallyComplete) {
     phase = 'ready';
+  } else if ((state === 'checking' || state === 'initializing') && input.hasVideoFiles) {
+    // Fichiers déjà résolus côté UI : la vérif librqbit ne doit pas bloquer la lecture.
+    phase = 'ready';
+  } else if (state === 'checking' || state === 'initializing') {
+    // Post-reboot : librqbit vérifie les pièces déjà présentes — pas un nouveau téléchargement.
+    phase = 'checking';
   } else if (
     fromStatus === 'resolving' ||
     state === 'queued' ||
@@ -184,15 +192,17 @@ export function derivePlaybackPhase(input: DerivePlaybackPhaseInput): DerivedPla
     phase = 'idle';
   }
 
+  const isChecking = phase === 'checking' || state === 'checking' || state === 'initializing';
   const isActivelyDownloading =
     !isReallyComplete &&
+    !isChecking &&
     (phase === 'downloading' ||
       phase === 'findingPeers' ||
       speed > 0 ||
       (progressPercent != null && progressPercent > 0 && progressPercent < 99.5));
 
   const stepIndex =
-    phase === 'resolving'
+    phase === 'resolving' || phase === 'checking'
       ? totalBytes > 0
         ? 2
         : 1
@@ -211,10 +221,14 @@ export function derivePlaybackPhase(input: DerivePlaybackPhaseInput): DerivedPla
     phase === 'findingPeers' ||
     phase === 'preparingPlayback' ||
     phase === 'buffering' ||
-    phase === 'resolving';
+    phase === 'resolving' ||
+    phase === 'checking';
 
   const showTorrentMetrics =
-    (phase === 'downloading' || phase === 'findingPeers' || phase === 'preparingPlayback') &&
+    (phase === 'downloading' ||
+      phase === 'findingPeers' ||
+      phase === 'preparingPlayback' ||
+      phase === 'checking') &&
     stats != null &&
     (progressPercent != null || totalBytes > 0 || speed > 0 || peers > 0);
 

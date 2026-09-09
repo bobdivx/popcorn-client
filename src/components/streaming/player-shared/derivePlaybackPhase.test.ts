@@ -119,4 +119,41 @@ describe('derivePlaybackPhase', () => {
   it('passe en error', () => {
     expect(derivePlaybackPhase({ playStatus: 'error', errorMessage: 'boom' }).phase).toBe('error');
   });
+
+  it('mappe checking / initializing → checking (post-reboot, pas un re-DL)', () => {
+    const d = derivePlaybackPhase({
+      playStatus: 'idle',
+      torrentStats: {
+        state: 'checking',
+        progress: 0.42,
+        download_speed: 0,
+        peers_connected: 0,
+        total_bytes: 100,
+        downloaded_bytes: 42,
+      },
+      isActiveSession: true,
+    });
+    expect(d.phase).toBe('checking');
+    expect(d.isActivelyDownloading).toBe(false);
+    expect(d.progressPercent).toBe(42);
+
+    const d2 = derivePlaybackPhase({
+      torrentStats: { state: 'initializing', progress: 0.1, total_bytes: 100, downloaded_bytes: 10 },
+    });
+    expect(d2.phase).toBe('checking');
+  });
+
+  it('checking + fichiers UI → ready (lecture autorisée pendant la vérif)', () => {
+    const d = derivePlaybackPhase({
+      torrentStats: {
+        state: 'checking',
+        progress: 0.2,
+        total_bytes: 100,
+        downloaded_bytes: 20,
+      },
+      hasVideoFiles: true,
+    });
+    expect(d.phase).toBe('ready');
+    expect(d.isActivelyDownloading).toBe(false);
+  });
 });

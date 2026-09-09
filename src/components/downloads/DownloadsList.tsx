@@ -98,6 +98,7 @@ function cleanTitleForTmdb(title: string): string {
 }
 
 function getTorrentPriority(torrent: ClientTorrentStats): number {
+  if (torrent.state === 'checking') return 6;
   if (torrent.state === 'downloading') return 5;
   if (torrent.state === 'seeding') return 4;
   if (torrent.state === 'queued') return 3;
@@ -107,7 +108,7 @@ function getTorrentPriority(torrent: ClientTorrentStats): number {
 }
 
 function isInProgressTorrent(t: ClientTorrentStats): boolean {
-  return t.state === 'downloading' || t.state === 'queued';
+  return t.state === 'downloading' || t.state === 'queued' || t.state === 'checking';
 }
 
 function isReadyTorrent(t: ClientTorrentStats): boolean {

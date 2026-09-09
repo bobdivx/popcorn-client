@@ -13,6 +13,11 @@ import { PROGRESS_POLL_INTERVAL_MS } from '../../utils/constants';
 import { resolveDownloadTypeHeader } from '../../utils/resolveDownloadTypeHeader';
 import type { PlayHandlerContext } from './types';
 
+function isTorrentCheckingState(state: string | null | undefined): boolean {
+  const s = (state || '').toLowerCase();
+  return s === 'checking' || s === 'initializing';
+}
+
 /** En mode stream-torrent, attend que le flux soit prêt (déclencheur côté backend) avant d'ouvrir le lecteur. */
 async function waitForStreamReady(
   streamingTorrentActive: boolean,
@@ -223,12 +228,27 @@ export function createHandlePlay(context: PlayHandlerContext) {
           fileName: selectedFile.name
         });
       await markStreamingIfActive();
-      if (streamingTorrentActive && !getStreamingDownloadFull()) {
+      // Pendant checking, librqbit refuse stream-torrent / update_only_files → HLS local.
+      let useStreamReady = streamingTorrentActive && !isAvailableLocally;
+      if (useStreamReady && torrent.infoHash) {
+        try {
+          const quickStats = await clientApi.getTorrent(torrent.infoHash);
+          if (quickStats && isTorrentCheckingState(quickStats.state)) {
+            useStreamReady = false;
+            setIsAvailableLocally(true);
+            setTorrentStats(quickStats);
+            addDebugLog('info', '🔍 Vérification en cours — lecture locale (pas de stream-torrent)');
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+      if (useStreamReady && !getStreamingDownloadFull()) {
         const idx = selectedFile.index ?? 0;
         scheduleUpdateOnlyFilesWithRetry(torrent.infoHash, idx);
       }
       const ok = await waitForStreamReady(
-                streamingTorrentActive && !isAvailableLocally, torrent.infoHash, selectedFile,
+                useStreamReady, torrent.infoHash, selectedFile,
         setProgressMessage, setPlayStatus, setErrorMessage, addDebugLog
       );
       if (!ok || isPlayCancelled()) {
@@ -298,7 +318,8 @@ export function createHandlePlay(context: PlayHandlerContext) {
           });
           
           const isCompleted = isTorrentReallyComplete(stats) || stats.state === 'completed' || stats.state === 'seeding';
-          
+          const isChecking = isTorrentCheckingState(stats.state);
+
           // Sparse connu : ne pas rejouer le chemin bibliothèque (boucle 422). Stream-torrent ou re-téléchargement.
           if (emptyOrSparse && streamingTorrentActive) {
             addDebugLog('info', 'Fichier sparse — lecture via stream-torrent (torrent déjà présent)');
@@ -336,6 +357,61 @@ export function createHandlePlay(context: PlayHandlerContext) {
               setTorrentStats(stats);
               return;
             }
+          }
+
+          // Après reboot : librqbit vérifie les pièces — les fichiers sont déjà sur disque.
+          // Ne pas attendre la fin de la vérif ni passer par stream-torrent (indisponible en initializing).
+          if (isChecking && !emptyOrSparse) {
+            addDebugLog('info', '🔍 Torrent en vérification — lecture depuis le disque si possible…', {
+              state: stats.state,
+              progress: `${(stats.progress * 100).toFixed(1)}%`,
+            });
+            let videos: any[] = [];
+            for (let retryCount = 0; retryCount < 5 && videos.length === 0; retryCount++) {
+              videos = await loadVideoFiles(torrent.infoHash, retryCount);
+              if (videos.length > 0) break;
+              if (retryCount < 4) {
+                await new Promise((resolve) => setTimeout(resolve, 800));
+              }
+            }
+            if (videos.length > 0) {
+              addDebugLog('success', '✅ Fichiers trouvés pendant la vérification — lecture locale', {
+                files_count: videos.length,
+              });
+              setVideoFiles(videos);
+              setSelectedFile(videos[0]);
+              setIsAvailableLocally(true);
+              await markStreamingIfActive();
+              const okCheck = await waitForStreamReady(
+                false,
+                torrent.infoHash!,
+                videos[0],
+                setProgressMessage,
+                setPlayStatus,
+                setErrorMessage,
+                addDebugLog,
+              );
+              if (!okCheck || isPlayCancelled()) {
+                if (!isPlayCancelled()) setIsPlaying(false);
+                return;
+              }
+              setPlayStatus('ready');
+              setProgressMessage('Lancement de la lecture...');
+              setIsPlaying(true);
+              setShowInfo(false);
+              stopProgressPolling();
+              setTorrentStats(stats);
+              return;
+            }
+            addDebugLog('warning', '⚠️ Vérification en cours, fichiers pas encore listables — attente…');
+            setPlayStatus('downloading');
+            setProgressMessage('Vérification des fichiers…');
+            setTorrentStats(stats);
+            progressPollIntervalRef.current = window.setInterval(() => {
+              pollTorrentProgress(torrent.infoHash!);
+            }, PROGRESS_POLL_INTERVAL_MS);
+            pollTorrentProgress(torrent.infoHash);
+            return;
           }
 
           // Si le torrent est complété, essayer de charger les fichiers avec plusieurs tentatives
@@ -402,8 +478,8 @@ export function createHandlePlay(context: PlayHandlerContext) {
             }
           }
           
-          // Si le torrent est en cours de téléchargement, démarrer le polling
-          if (stats.state !== 'completed' && stats.progress < 0.95) {
+          // Si le torrent est en cours de téléchargement (pas une simple vérification post-reboot)
+          if (!isChecking && stats.state !== 'completed' && stats.progress < 0.95) {
             addDebugLog('info', '⏳ Torrent en cours de téléchargement, démarrage du polling...', {
               state: stats.state,
               progress: `${(stats.progress * 100).toFixed(1)}%`,
@@ -1073,8 +1149,53 @@ export function createHandlePlay(context: PlayHandlerContext) {
             }
           }
 
+          // Vérification post-reboot : lire depuis le disque sans attendre librqbit.
+          if (isTorrentCheckingState(stats.state) && !emptyOrSparse) {
+            addDebugLog('info', '🔍 Vérification en cours — tentative de lecture locale…');
+            const videosCheck = await loadVideoFiles(torrent.infoHash);
+            if (videosCheck.length > 0) {
+              setVideoFiles(videosCheck);
+              setSelectedFile(videosCheck[0]);
+              setIsAvailableLocally(true);
+              await markStreamingIfActive();
+              const okCheck2 = await waitForStreamReady(
+                false,
+                torrent.infoHash!,
+                videosCheck[0],
+                setProgressMessage,
+                setPlayStatus,
+                setErrorMessage,
+                addDebugLog,
+              );
+              if (!okCheck2) {
+                setIsPlaying(false);
+                return;
+              }
+              setPlayStatus('ready');
+              setProgressMessage('Lancement de la lecture...');
+              setIsPlaying(true);
+              setShowInfo(false);
+              stopProgressPolling();
+              return;
+            }
+            setPlayStatus('downloading');
+            setProgressMessage('Vérification des fichiers…');
+            if (!isPlaying) {
+              progressPollIntervalRef.current = window.setInterval(() => {
+                pollTorrentProgress(torrent.infoHash!);
+              }, PROGRESS_POLL_INTERVAL_MS);
+              pollTorrentProgress(torrent.infoHash);
+            }
+            return;
+          }
+
           // Si le torrent est en cours de téléchargement
-          if (stats.state !== 'completed' && stats.progress < 0.95 && !isPlaying) {
+          if (
+            !isTorrentCheckingState(stats.state) &&
+            stats.state !== 'completed' &&
+            stats.progress < 0.95 &&
+            !isPlaying
+          ) {
             setPlayStatus('downloading');
             setProgressMessage('Recherche de peers...');
 

@@ -37,13 +37,15 @@ export function DownloadRow({
     playStatus:
       torrent.state === 'queued'
         ? 'adding'
-        : torrent.state === 'downloading'
-          ? 'downloading'
-          : torrent.state === 'error'
-            ? 'error'
-            : torrent.state === 'completed' || torrent.state === 'seeding'
-              ? 'ready'
-              : 'idle',
+        : torrent.state === 'checking'
+          ? 'adding'
+          : torrent.state === 'downloading'
+            ? 'downloading'
+            : torrent.state === 'error'
+              ? 'error'
+              : torrent.state === 'completed' || torrent.state === 'seeding'
+                ? 'ready'
+                : 'idle',
     torrentStats: torrent,
     isActiveSession: true,
   });
@@ -54,7 +56,9 @@ export function DownloadRow({
       ? 'bg-[var(--ds-accent-red)]'
       : torrent.state === 'seeding' || torrent.state === 'completed'
         ? 'bg-[var(--ds-accent-green)]'
-        : 'bg-[var(--ds-accent-violet)]';
+        : torrent.state === 'checking'
+          ? 'bg-sky-500'
+          : 'bg-[var(--ds-accent-violet)]';
 
   return (
     <div className="dl-row group relative flex items-stretch gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-2.5 overflow-hidden transition-colors hover:border-white/20 hover:bg-white/[0.07]">

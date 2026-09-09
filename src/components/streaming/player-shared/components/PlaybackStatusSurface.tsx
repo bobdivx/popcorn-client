@@ -564,6 +564,7 @@ export function PlaybackStatusSurface({
             <div className="flex-1 min-w-0 space-y-2">
               <div className="flex items-center gap-2 min-w-0">
                 {(derived.phase === 'resolving' ||
+                  derived.phase === 'checking' ||
                   derived.phase === 'findingPeers' ||
                   derived.phase === 'buffering') && (
                   <DsLoader size="xs" className="shrink-0" />
@@ -626,6 +627,7 @@ export function PlaybackStatusSurface({
   const showSteps =
     !isError &&
     (derived.phase === 'resolving' ||
+      derived.phase === 'checking' ||
       derived.phase === 'findingPeers' ||
       derived.phase === 'downloading');
 
@@ -780,6 +782,7 @@ export function PlaybackStatusSurface({
                   }
                   spinning={
                     derived.phase === 'resolving' ||
+                    derived.phase === 'checking' ||
                     derived.phase === 'findingPeers' ||
                     derived.phase === 'preparingPlayback' ||
                     derived.phase === 'buffering'
