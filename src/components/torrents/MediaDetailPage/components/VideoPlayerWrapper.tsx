@@ -26,6 +26,10 @@ import { logVideoPlaybackError } from '../../../streaming/direct-player/mediaErr
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { useLibraryScrubThumbnails } from './video-player-wrapper/useLibraryScrubThumbnails';
 import { getLanguageName } from '../../../streaming/player-shared/utils/languageName';
+import {
+  pickPreferredAudioTrackId,
+  resolvePreferredAudioLanguage,
+} from '../../../streaming/player-shared/utils/pickPreferredAudioTrack';
 
 /** Info épisode suivant (série) pour le bouton « Épisode suivant » */
 export interface NextEpisodeInfo {
@@ -197,7 +201,7 @@ export function VideoPlayerWrapper({
     onClose();
   }, [onClose]);
   const isMobile = isMobileDevice();
-  const { t } = useI18n();
+  const { t, language: uxLanguage } = useI18n();
   const displayError = errorMessage || localPlayerError;
   const sparseOrEmpty = isSparseOrEmptyMessage(displayError);
   const playerConfig = usePlayerConfig();
@@ -250,6 +254,7 @@ export function VideoPlayerWrapper({
   });
 
   // Pistes audio du fichier source (ffprobe) — le HLS n'embarque qu'une seule piste.
+  // Par défaut : langue de l'UX Popcornn (ex. fr), sauf préférence lecteur explicite.
   useEffect(() => {
     if (!visible || effectiveDirectMode || useLucieForThisSource) {
       setSourceAudioTracks([]);
@@ -268,18 +273,22 @@ export function VideoPlayerWrapper({
         });
         if (cancelled) return;
         const tracks = res.success && res.data?.tracks ? res.data.tracks : [];
-        setSourceAudioTracks(
-          tracks.map((tr) => ({
-            id: tr.index,
-            name:
-              tr.title ||
-              getLanguageName(tr.language || undefined, undefined) ||
-              `Audio ${tr.index + 1}`,
-            lang: tr.language || undefined,
-            default: !!tr.default,
-          })),
+        const mapped = tracks.map((tr) => ({
+          id: tr.index,
+          name:
+            tr.title ||
+            getLanguageName(tr.language || undefined, undefined) ||
+            `Audio ${tr.index + 1}`,
+          lang: tr.language || undefined,
+          title: tr.title || undefined,
+          default: !!tr.default,
+        }));
+        setSourceAudioTracks(mapped);
+        const preferred = resolvePreferredAudioLanguage(
+          playerConfig.defaultAudioLanguage,
+          uxLanguage,
         );
-        setAudioIndex(0);
+        setAudioIndex(pickPreferredAudioTrackId(mapped, preferred));
       } catch {
         if (!cancelled) {
           setSourceAudioTracks([]);
@@ -298,6 +307,8 @@ export function VideoPlayerWrapper({
     hlsFilePath,
     selectedFile?.path,
     selectedFile?.name,
+    playerConfig.defaultAudioLanguage,
+    uxLanguage,
   ]);
 
   const loadingStepFromStatus = getLoadingStep(playStatus ?? '', progressMessage ?? '', torrentStats ?? null);

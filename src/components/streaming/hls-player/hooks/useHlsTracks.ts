@@ -1,5 +1,10 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { usePlayerConfig } from '../../player-shared/hooks/usePlayerConfig';
+import { i18nStore } from '../../../../lib/i18n/i18n-store';
+import {
+  audioTrackMatchesPreferred,
+  resolvePreferredAudioLanguage,
+} from '../../player-shared/utils/pickPreferredAudioTrack';
 
 interface AudioTrack {
   id: number;
@@ -84,9 +89,11 @@ export function useHlsTracks({ videoRef, hlsRef, hlsLoaded, src }: UseHlsTracksP
 
         if (!tracksInitializedRef.current) {
           let selectedTrack: AudioTrack | undefined;
-          if (playerConfig.defaultAudioLanguage && playerConfig.defaultAudioLanguage !== 'auto') {
-            selectedTrack = tracks.find((t) => t.lang === playerConfig.defaultAudioLanguage);
-          }
+          const preferred = resolvePreferredAudioLanguage(
+            playerConfig.defaultAudioLanguage,
+            i18nStore.getLanguage(),
+          );
+          selectedTrack = tracks.find((t) => audioTrackMatchesPreferred(t, preferred));
           if (!selectedTrack) {
             selectedTrack = tracks.find((t) => t.default) || tracks[0];
           }
