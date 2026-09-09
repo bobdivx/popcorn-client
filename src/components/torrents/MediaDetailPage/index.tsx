@@ -51,6 +51,7 @@ import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-conf
 import { getMediaDisplayTitle } from './utils/mediaDisplayTitle';
 import { resolveDownloadTypeHeader } from './utils/resolveDownloadTypeHeader';
 import { resolveSeriesFolderPath } from './utils/resolveSeriesFolderPath';
+import { collectAvailableMediaLanguages, mediaLanguageLabel, variantMediaLanguage } from './utils/mediaLanguage';
 import {
   buildExternalDownloadParams,
   looksLikeBencodedTorrent,
@@ -304,6 +305,15 @@ function SourceSelectModal({
                       {quality}
                     </span>
                   )}
+                  {(() => {
+                    const lang = variantMediaLanguage(variant);
+                    if (!lang) return null;
+                    return (
+                      <span className="px-3 py-1 tv:px-4 tv:py-2 bg-violet-500/25 text-violet-100 border border-violet-400/40 rounded-lg text-sm tv:text-base font-semibold">
+                        {mediaLanguageLabel(lang)}
+                      </span>
+                    );
+                  })()}
                   {codec && (
                     <span className="px-3 py-1 tv:px-4 tv:py-2 bg-white/10 text-white rounded-lg text-sm tv:text-base font-semibold">
                       {codec === 'x265' ? 'H.265' : codec === 'x264' ? 'H.264' : codec}
@@ -349,6 +359,7 @@ export default function MediaDetailPage({
   // Ã‰tats de base
   const [isPlaying, setIsPlaying] = useState(false);
   const [showInfo, setShowInfo] = useState(true);
+  const [movieTechInfoOpen, setMovieTechInfoOpen] = useState(false);
   /** Flag pour indiquer qu'on continue en arrière-plan (pour éviter que l'overlay se réaffiche). */
   const continueInBackgroundRef = useRef<boolean>(false);
   const [imageUrl, setImageUrl] = useState<string | null>(torrent.imageUrl || null);
@@ -411,6 +422,10 @@ export default function MediaDetailPage({
   // Ã‰tats pour les variantes (sÃ©ries : sÃ©lection par saison/Ã©pisode)
   const [allVariants, setAllVariants] = useState<any[]>([torrent]);
   const [selectedTorrent, setSelectedTorrent] = useState<any>(torrent);
+  /** Fichiers bibliothèque / disque pour ce TMDB (langues disponibles = ceux-là). */
+  const [localOnDiskMedias, setLocalOnDiskMedias] = useState<
+    Array<{ language?: string | null; file_name?: string; file_path?: string; name?: string }>
+  >([]);
   /** Saison / Ã©pisode sÃ©lectionnÃ©s (pour sÃ©ries) */
   const [selectedSeasonNum, setSelectedSeasonNum] = useState<number | null>(null);
   const [selectedEpisodeVariantId, setSelectedEpisodeVariantId] = useState<string | null>(null);
@@ -429,7 +444,11 @@ export default function MediaDetailPage({
   const [savedPlaybackPosition, setSavedPlaybackPosition] = useState<number | null>(null);
   /** Incrémenté à la fermeture du lecteur pour rafraîchir les pastilles « déjà vu » */
   const [watchedEpisodesRefresh, setWatchedEpisodesRefresh] = useState(0);
-  const [startFromBeginning, setStartFromBeginning] = useState(true);
+  /** Ref synchrone : setState est async — sans ça, « Reprendre » monte le player encore avec startFromBeginning=true. */
+  const startFromBeginningRef = useRef(true);
+  const setPlaybackStartMode = useCallback((fromBeginning: boolean) => {
+    startFromBeginningRef.current = fromBeginning;
+  }, []);
   /** Épisodes identifiés comme présents dans la bibliothèque (Set de "season:episode") */
   const [downloadedEpisodesSet, setDownloadedEpisodesSet] = useState<Set<string>>(new Set());
   /** Map "season:episode" -> "chemin du fichier" pour les épisodes téléchargés */
@@ -816,6 +835,44 @@ export default function MediaDetailPage({
     addNotification('success', `${variantsToDownload.length} source(s) ${target} ajoutée(s)`);
     setShowSourceModal(false);
   }, [addNotification, allVariants, normalizeResolution]);
+
+  // Langues des fichiers déjà présents sur disque (bibliothèque), pas des variantes indexeurs.
+  useEffect(() => {
+    const tmdbId = torrent.tmdbId ?? activeTorrent?.tmdbId ?? null;
+    if (typeof tmdbId !== 'number' || !Number.isFinite(tmdbId) || tmdbId <= 0) {
+      setLocalOnDiskMedias([]);
+      return;
+    }
+    let cancelled = false;
+    const tmdbType =
+      (activeTorrent?.tmdbType || torrent.tmdbType || (torrent.category === 'series' ? 'tv' : 'movie')) as
+        | 'movie'
+        | 'tv'
+        | string;
+    (async () => {
+      try {
+        const list = await clientApi.findLocalMediaByTmdb(tmdbId, tmdbType === 'tv' ? 'tv' : 'movie');
+        if (cancelled) return;
+        const onDisk = (Array.isArray(list) ? list : []).filter((m: any) => {
+          const path = (m.file_path || m.downloadPath || '').toString().trim();
+          return path.length > 0;
+        });
+        setLocalOnDiskMedias(
+          onDisk.map((m: any) => ({
+            language: m.language ?? null,
+            file_name: m.file_name ?? m.fileName ?? null,
+            file_path: m.file_path ?? m.downloadPath ?? null,
+            name: m.file_name || m.name || null,
+          })),
+        );
+      } catch {
+        if (!cancelled) setLocalOnDiskMedias([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [torrent.tmdbId, torrent.tmdbType, torrent.category, activeTorrent?.tmdbId, activeTorrent?.tmdbType, isAvailableLocally]);
 
   const handleRefreshSeriesFromIndexers = useCallback(async () => {
     if (seriesIndexerRefreshTmdbId == null || seriesIndexerRefreshBusy) return;
@@ -2376,8 +2433,8 @@ export default function MediaDetailPage({
     episodePlayIntentRef.current = null;
 
     void (async () => {
-      if (savedPlaybackPosition != null && savedPlaybackPosition > 0) setStartFromBeginning(false);
-      else setStartFromBeginning(true);
+      if (savedPlaybackPosition != null && savedPlaybackPosition > 0) setPlaybackStartMode(false);
+      else setPlaybackStartMode(true);
       const el = videoWrapperRef.current || (document.getElementById('video-player-wrapper') as HTMLDivElement);
       if (el && !document.fullscreenElement) {
         try {
@@ -2943,6 +3000,27 @@ export default function MediaDetailPage({
   const tmdbApiTitleDisplay = useTmdbApiTitle(displayTorrent?.tmdbId, displayTorrent?.tmdbType, language);
   const mediaTitleForHero = getMediaDisplayTitle(activeTorrent, tmdbApiTitleActive);
   const mediaTitleForPlayer = getMediaDisplayTitle(displayTorrent, tmdbApiTitleDisplay);
+  /** Variantes déjà téléchargées / présentes sur disque (pas les releases indexeurs). */
+  const onDiskVariants = useMemo(() => {
+    return (allVariants.length > 0 ? allVariants : [activeTorrent]).filter((v: any) => {
+      const path = (v.downloadPath || v.download_path || '').toString().trim();
+      if (path) return true;
+      const ih = (v.infoHash || v.info_hash || v.id || '').toString();
+      return ih.startsWith('local_');
+    });
+  }, [allVariants, activeTorrent]);
+  const availableMediaLanguages = useMemo(() => {
+    const fromLocalApi = localOnDiskMedias.map((m) => ({
+      language: m.language,
+      name: m.file_name || m.name || m.file_path,
+    }));
+    // Fallback : fichier courant si déjà local mais pas encore listé par l’API.
+    const fallback =
+      fromLocalApi.length === 0 && onDiskVariants.length === 0 && (libraryDownloadPath || activeTorrent.downloadPath)
+        ? [{ language: activeTorrent.language, name: activeTorrent.name || libraryDownloadPath || activeTorrent.downloadPath }]
+        : [];
+    return collectAvailableMediaLanguages([...fromLocalApi, ...onDiskVariants, ...fallback]);
+  }, [localOnDiskMedias, onDiskVariants, libraryDownloadPath, activeTorrent]);
 
   /** Toujours proposer si on a un TMDB série : le POST interroge les indexeurs activés sur le serveur. */
   const showSeriesIndexerRefresh =
@@ -3099,7 +3177,12 @@ export default function MediaDetailPage({
         tmdbType={displayTorrent.tmdbType}
         seriesSeasonNum={selectedEpisodeMeta?.season ?? null}
         seriesEpisodeNum={selectedEpisodeMeta?.episode ?? null}
-        startFromBeginning={isTransitioningToNext ? false : startFromBeginning}
+        startFromBeginning={isTransitioningToNext ? false : startFromBeginningRef.current}
+        initialSeekSeconds={
+          isTransitioningToNext || startFromBeginningRef.current
+            ? null
+            : savedPlaybackPosition
+        }
         isSeries={!!(seriesEpisodes?.seasons?.length)}
         nextEpisodeInfo={nextEpisodeInfo}
         onPlayNextEpisode={onPlayNextEpisode}
@@ -3188,7 +3271,12 @@ export default function MediaDetailPage({
         tmdbType={displayTorrent.tmdbType}
         seriesSeasonNum={selectedEpisodeMeta?.season ?? null}
         seriesEpisodeNum={selectedEpisodeMeta?.episode ?? null}
-        startFromBeginning={isTransitioningToNext ? false : startFromBeginning}
+        startFromBeginning={isTransitioningToNext ? false : startFromBeginningRef.current}
+        initialSeekSeconds={
+          isTransitioningToNext || startFromBeginningRef.current
+            ? null
+            : savedPlaybackPosition
+        }
         isSeries={!!(seriesEpisodes?.seasons?.length)}
         nextEpisodeInfo={nextEpisodeInfo}
         onPlayNextEpisode={onPlayNextEpisode}
@@ -3306,7 +3394,10 @@ export default function MediaDetailPage({
           )}
 
           <div className="max-w-6xl w-full mb-6 sm:mb-8 md:mb-10">
-            <HeroHeader torrent={activeTorrent} displayTitle={mediaTitleForHero} />
+            <HeroHeader
+              torrent={activeTorrent}
+              displayTitle={mediaTitleForHero}
+            />
 
             <ActionsRow backHref={backHref ?? '/dashboard'} isTV={isTV} backLinkRef={backLinkRef}>
               <MediaDetailActionButtons
@@ -3345,8 +3436,8 @@ export default function MediaDetailPage({
                 mediaDetailActionsRef.current = actions;
               }}
               onPlay={async () => {
-                if (savedPlaybackPosition && savedPlaybackPosition > 0) setStartFromBeginning(false);
-                else setStartFromBeginning(true);
+                if (savedPlaybackPosition && savedPlaybackPosition > 0) setPlaybackStartMode(false);
+                else setPlaybackStartMode(true);
                 const el = videoWrapperRef.current || (document.getElementById('video-player-wrapper') as HTMLDivElement);
                 if (el && !document.fullscreenElement) {
                   try { await el.requestFullscreen(); } catch (_) {}
@@ -3355,7 +3446,7 @@ export default function MediaDetailPage({
                 handlePlay();
               }}
               onPlayFromBeginning={async () => {
-                setStartFromBeginning(true);
+                setPlaybackStartMode(true);
                 const el = videoWrapperRef.current || (document.getElementById('video-player-wrapper') as HTMLDivElement);
                 if (el && !document.fullscreenElement) {
                   try { await el.requestFullscreen(); } catch (_) {}
@@ -3365,7 +3456,7 @@ export default function MediaDetailPage({
               }}
               onPlayAuto={async (bestTorrent) => {
                 setSelectedTorrent(bestTorrent);
-                setStartFromBeginning(true);
+                setPlaybackStartMode(true);
                 continueInBackgroundRef.current = false;
                 const el = videoWrapperRef.current || (document.getElementById('video-player-wrapper') as HTMLDivElement);
                 if (el && !document.fullscreenElement) {
@@ -3382,6 +3473,25 @@ export default function MediaDetailPage({
                   : undefined
               }
               seriesLibraryPath={seriesLibraryPath}
+              onOpenMovieTechInfo={
+                !isTvSeriesDetail &&
+                (() => {
+                  const t = selectedTorrent || torrent;
+                  const anyT = t as {
+                    downloadPath?: string | null;
+                    indexerName?: string;
+                    indexer_name?: string;
+                  };
+                  return !!(
+                    anyT.downloadPath ||
+                    anyT.indexerName ||
+                    anyT.indexer_name ||
+                    hasInfoHash
+                  );
+                })()
+                  ? () => setMovieTechInfoOpen(true)
+                  : undefined
+              }
             />
             </ActionsRow>
 
@@ -3403,6 +3513,8 @@ export default function MediaDetailPage({
                   fileSize: variant.fileSize,
                 })) : undefined}
                 allVariants={allVariants}
+                availableLanguages={availableMediaLanguages}
+                onDiskVariants={onDiskVariants}
                 selectedVariantId={(selectedTorrent || torrent).id}
                 onSelectVariant={(variant) => {
                   setSelectedTorrent(variant);
@@ -3411,8 +3523,12 @@ export default function MediaDetailPage({
                   Boolean(hasInfoHash) &&
                   Boolean(isAvailableLocally || isDownloadComplete || !!(selectedTorrent || torrent).downloadPath)
                 }
+                isAvailableLocally={Boolean(isAvailableLocally)}
+                torrentStats={torrentStats}
                 setIsAvailableLocally={setIsAvailableLocally}
                 addNotification={addNotification}
+                techInfoModalOpen={movieTechInfoOpen}
+                onTechInfoModalOpenChange={setMovieTechInfoOpen}
               />
             )}
           </div>

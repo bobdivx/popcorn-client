@@ -21,6 +21,8 @@ export interface HLSPlayerProps {
   seriesEpisode?: number;
   variantId?: string;
   startFromBeginning?: boolean;
+  /** Position explicite en secondes (ex. query ?t= depuis « Reprendre »). */
+  initialSeekSeconds?: number | null;
   /** Contexte série : afficher overlay « Passer le générique » pendant l'intro */
   isSeries?: boolean;
   /** Épisode suivant (série) : afficher bouton « Épisode suivant » peu avant la fin */
@@ -44,10 +46,21 @@ export interface HLSPlayerProps {
   stopBufferRef?: import('preact').RefObject<(() => void) | null>;
   /** Hauteur max en pixels pour le transcode (720, 480, 360). null = résolution source. */
   maxHeight?: number | null;
+  /** Index de piste audio source (0 = première). Redémarre le transcode HLS. */
+  audioIndex?: number | null;
   /** Qualité actuelle affichée (pour le sélecteur). */
   streamQuality?: number | null;
   /** Callback quand l'utilisateur change la qualité dans le player. */
   onQualityChange?: (height: number | null) => void;
+  /** Pistes audio du fichier source (ffprobe) — pas les pistes HLS. */
+  sourceAudioTracks?: Array<{
+    id: number;
+    name: string;
+    lang?: string;
+    default?: boolean;
+  }>;
+  /** Callback changement de piste audio source. */
+  onAudioIndexChange?: (index: number) => void;
   /** Quand true, src est l'URL stream-torrent (proxy librqbit) : utiliser src tel quel pour HLS, ne pas reconstruire en /api/local/stream. */
   useStreamTorrentUrl?: boolean;
   /** Appelé périodiquement et à la fermeture avec la progression (pour Reprendre / Revoir). */

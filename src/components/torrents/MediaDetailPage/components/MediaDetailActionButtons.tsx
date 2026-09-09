@@ -60,6 +60,8 @@ export interface MediaDetailActionButtonsProps {
   seriesIndexerRefresh?: { busy: boolean; onRefresh: () => void | Promise<void> };
   /** Dossier série pour le bouton Info. */
   seriesLibraryPath?: string | null;
+  /** Films : ouvrir la modal info technique. */
+  onOpenMovieTechInfo?: () => void;
 }
 
 /**
@@ -108,6 +110,7 @@ export function MediaDetailActionButtons({
   onActionsReady,
   seriesIndexerRefresh,
   seriesLibraryPath,
+  onOpenMovieTechInfo,
 }: MediaDetailActionButtonsProps) {
   const { t } = useI18n();
   const { streamingTorrentActive } = useSubscriptionMe();
@@ -194,6 +197,7 @@ export function MediaDetailActionButtons({
         }}
         seriesIndexerRefresh={seriesIndexerRefresh}
         seriesLibraryPath={seriesLibraryPath}
+        onOpenMovieTechInfo={onOpenMovieTechInfo}
       />
 
       {/* Modal de confirmation : supprimer le torrent du client et les fichiers du disque */}

@@ -1,9 +1,11 @@
 import { useEffect, useState, useRef, useCallback } from 'preact/hooks';
+import { createPortal } from 'preact/compat';
 import { useVideoControls } from '../player-shared/hooks/useVideoControls';
 import { useFullscreen, toggleFullscreen } from '../player-shared/hooks/useFullscreen';
 import { PlaybackStatusSurface } from '../player-shared/components/PlaybackStatusSurface';
 import { VideoControls } from '../player-shared/components/VideoControls';
 import { TvPlayerDock } from '../player-shared/components/TvPlayerDock';
+import { PlayerSettingsMenu } from '../player-shared/components/PlayerSettingsMenu';
 import type { HLSPlayerProps } from './types';
 import { useHlsPlayer } from './hooks/useHlsPlayer';
 import { useTVPlayerNavigation } from '../player-shared/hooks/useTVPlayerNavigation';
@@ -48,6 +50,7 @@ export default function HLSPlayer({
   seriesEpisode,
   variantId,
   startFromBeginning = false, 
+  initialSeekSeconds = null,
   isSeries = false,
   nextEpisodeInfo = null,
   onPlayNextEpisode,
@@ -64,6 +67,9 @@ export default function HLSPlayer({
   maxHeight,
   streamQuality,
   onQualityChange,
+  audioIndex = 0,
+  sourceAudioTracks = [],
+  onAudioIndexChange,
   useStreamTorrentUrl: useStreamTorrentUrlProp,
   onProgress,
   scrubThumbnails,
@@ -113,6 +119,7 @@ export default function HLSPlayer({
     src,
     infoHash,
     maxHeight: maxHeight ?? undefined,
+    audioIndex: audioIndex ?? 0,
     fileName,
     torrentId,
     filePath,
@@ -122,6 +129,7 @@ export default function HLSPlayer({
     seriesEpisode,
     variantId,
     startFromBeginning,
+    initialSeekSeconds,
     onError,
     onLoadingChange,
     canAutoPlay: () => canAutoPlayRef.current ? canAutoPlayRef.current() : true,
@@ -391,7 +399,7 @@ export default function HLSPlayer({
     };
   }, [videoRef, hlsLoaded, playbackStarted, playerConfig.autoFullscreen]);
 
-  const { isTV, focusedControlIndex, focusedControlId, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub, tvScrubBrowsing, settingsOpen, settingsFocusIndex, toggleSettings } = useTVPlayerNavigation({
+  const { isTV, focusedControlIndex, focusedControlId, focusedOnProgress, setFocusedOnProgress, hasBack, tvScrubIndex, focusedOnScrub, tvScrubBrowsing, settingsOpen, toggleSettings, closeSettings } = useTVPlayerNavigation({
     showControls,
     setShowControls,
     onPlayPause: handlePlayPause,
@@ -402,7 +410,9 @@ export default function HLSPlayer({
     onClose,
     onOpenQualityMenu: onQualityChange != null ? () => openQualityMenuRef.current?.() : undefined,
     onToggleSubtitles:
-      audioTracks.length > 0 || subtitleTracks.length > 0 ? toggleSubtitleSelector : undefined,
+      sourceAudioTracks.length > 0 || audioTracks.length > 0 || subtitleTracks.length > 0
+        ? toggleSubtitleSelector
+        : undefined,
     onSelectQuality: onQualityChange,
     streamQuality: streamQuality ?? null,
     onToggleFillMode: toggleVideoFillMode,
@@ -736,12 +746,18 @@ export default function HLSPlayer({
           onToggleFullscreen={handleToggleFullscreen}
           onSeekTV={handleSeekTV}
           onVolumeChangeTV={handleVolumeChangeTV}
-          audioTracks={audioTracks}
+          audioTracks={sourceAudioTracks.length > 0 ? sourceAudioTracks : audioTracks}
           subtitleTracks={subtitleTracks}
-          currentAudioTrack={currentAudioTrack}
+          currentAudioTrack={
+            sourceAudioTracks.length > 0 ? (audioIndex ?? 0) : currentAudioTrack
+          }
           currentSubtitleTrack={currentSubtitleTrack}
           showSubtitleSelector={showSubtitleSelector}
-          onChangeAudioTrack={changeAudioTrack}
+          onChangeAudioTrack={
+            sourceAudioTracks.length > 0 && onAudioIndexChange
+              ? (id) => onAudioIndexChange(id)
+              : changeAudioTrack
+          }
           onChangeSubtitleTrack={changeSubtitleTrack}
           onToggleSubtitleSelector={toggleSubtitleSelector}
           onCloseSubtitleSelector={() => setShowSubtitleSelector(false)}
@@ -785,6 +801,7 @@ export default function HLSPlayer({
             show={
               showControls &&
               !showSubtitleSelector &&
+              !settingsOpen &&
               !shouldShowBuffering &&
               (isPlaying || playbackStarted || mediaVisiblyPlaying)
             }
@@ -798,25 +815,50 @@ export default function HLSPlayer({
             scrubThumbnails={scrubThumbnails ?? null}
             scrubThumbnailsLoading={scrubThumbnailsLoading}
             videoFillMode={playerConfig.videoFillMode ?? 'cover'}
-            streamQuality={streamQuality ?? null}
             settingsOpen={settingsOpen}
-            settingsFocusIndex={settingsFocusIndex}
-            audioTracks={audioTracks}
+            audioTracks={sourceAudioTracks.length > 0 ? sourceAudioTracks : audioTracks}
             subtitleTracks={subtitleTracks}
             currentSubtitleTrack={currentSubtitleTrack}
             onClose={onClose}
             onPlayPause={handlePlayPause}
             onSeekToTime={seekToTargetTime}
             onToggleFillMode={toggleVideoFillMode}
-            onOpenSettings={onQualityChange ? toggleSettings : undefined}
-            onSelectQuality={onQualityChange}
+            onOpenSettings={toggleSettings}
             onToggleSubtitles={
-              audioTracks.length > 0 || subtitleTracks.length > 0
+              sourceAudioTracks.length > 0 ||
+              audioTracks.length > 0 ||
+              subtitleTracks.length > 0
                 ? toggleSubtitleSelector
                 : undefined
             }
           />
         )}
+        {isTV &&
+          settingsOpen &&
+          typeof document !== 'undefined' &&
+          createPortal(
+            <PlayerSettingsMenu
+              streamQuality={streamQuality ?? null}
+              showQualitySelector={onQualityChange != null}
+              onQualityChange={onQualityChange}
+              videoFillMode={playerConfig.videoFillMode ?? 'cover'}
+              audioTracks={sourceAudioTracks.length > 0 ? sourceAudioTracks : audioTracks}
+              subtitleTracks={subtitleTracks}
+              currentAudioTrack={
+                sourceAudioTracks.length > 0 ? (audioIndex ?? 0) : currentAudioTrack
+              }
+              currentSubtitleTrack={currentSubtitleTrack}
+              onChangeAudioTrack={
+                sourceAudioTracks.length > 0 && onAudioIndexChange
+                  ? (id) => onAudioIndexChange(id)
+                  : changeAudioTrack
+              }
+              onChangeSubtitleTrack={changeSubtitleTrack}
+              onClose={closeSettings}
+              isTV
+            />,
+            document.body,
+          )}
       </div>
     </div>
   );

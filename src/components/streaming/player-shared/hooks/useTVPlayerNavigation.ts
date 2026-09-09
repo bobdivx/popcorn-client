@@ -287,14 +287,10 @@ export function useTVPlayerNavigation({
   const hasBack = !!onClose;
   const toggleSettings = () => {
     setFocusedOnScrub(false);
-    setSettingsOpen((open) => {
-      const next = !open;
-      if (next) {
-        const idx = TV_QUALITY_VALUES.findIndex((v) => v === streamQualityRef.current);
-        setSettingsFocusIndex(idx >= 0 ? idx : 0);
-      }
-      return next;
-    });
+    setSettingsOpen((open) => !open);
+  };
+  const closeSettings = () => {
+    setSettingsOpen(false);
   };
   const controls = useMemo(() => {
     if (isTV) {
@@ -308,7 +304,7 @@ export function useTVPlayerNavigation({
       if (onToggleSubtitles) {
         c.push({ id: 'subtitles', action: onToggleSubtitles });
       }
-      if (onSelectQuality) {
+      if (onSelectQuality || onToggleFillMode || onToggleSubtitles) {
         c.push({
           id: 'settings',
           action: toggleSettings,
@@ -417,11 +413,8 @@ export function useTVPlayerNavigation({
       if (isBackKey(e)) {
         e.preventDefault();
         e.stopPropagation();
-        if (settingsOpenRef.current) {
-          setSettingsOpen(false);
-          resetControlsTimeout();
-          return;
-        }
+        // Overlay paramètres : géré par PlayerSettingsMenu (retour panneau / fermeture).
+        if (settingsOpenRef.current) return;
         if (!showControlsRef.current) {
           setShowControls(true);
           resetControlsTimeout();
@@ -506,21 +499,8 @@ export function useTVPlayerNavigation({
       const isConfirm =
         kc === 23 || keyNormalized === 'Enter' || keyNormalized === ' ';
 
+      // Menu paramètres overlay : ne pas consommer les touches (PlayerSettingsMenu en capture).
       if (settingsOpenRef.current) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (isLeft || keyNormalized === 'ArrowUp') {
-          setSettingsFocusIndex((i) => Math.max(0, i - 1));
-        } else if (isRight || keyNormalized === 'ArrowDown') {
-          setSettingsFocusIndex((i) => Math.min(TV_QUALITY_VALUES.length - 1, i + 1));
-        } else if (isConfirm) {
-          setSettingsFocusIndex((i) => {
-            onSelectQualityRef.current?.(TV_QUALITY_VALUES[i] ?? null);
-            return i;
-          });
-          setSettingsOpen(false);
-        }
-        resetControlsTimeout();
         return;
       }
 
@@ -788,5 +768,6 @@ export function useTVPlayerNavigation({
     settingsOpen,
     settingsFocusIndex,
     toggleSettings,
+    closeSettings,
   };
 }

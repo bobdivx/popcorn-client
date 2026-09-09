@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useLayoutEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
 import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Minimize, Subtitles, ArrowLeft, RotateCcw, SkipForward, SkipBack, Settings } from 'lucide-preact';
 import { useI18n } from '../../../../lib/i18n';
@@ -181,7 +181,6 @@ export function VideoControls({
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [isHoveringTimeline, setIsHoveringTimeline] = useState(false);
   const qualityButtonRef = useRef<HTMLButtonElement>(null);
-  const [qualityMenuRect, setQualityMenuRect] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     if (!showControls) {
@@ -198,21 +197,13 @@ export function VideoControls({
     };
   }, [onOpenQualityMenuRef]);
 
-  useLayoutEffect(() => {
-    if (!showQualityMenu || !qualityButtonRef.current) {
-      setQualityMenuRect(null);
-      return;
-    }
-    const rect = qualityButtonRef.current.getBoundingClientRect();
-    setQualityMenuRect({ top: rect.top, left: rect.left });
-  }, [showQualityMenu]);
-
   const volumePercent = volume * 100;
   const hasLanguageTracks = audioTracks.length > 0 || subtitleTracks.length > 0;
   const showSettingsButton =
     (showQualitySelector && !!onQualityChange) ||
     videoFillMode !== undefined ||
-    (hasLanguageTracks && (!!onChangeAudioTrack || !!onChangeSubtitleTrack));
+    !!onChangeAudioTrack ||
+    !!onChangeSubtitleTrack;
   const isMobile = !isTV && isMobileDevice();
 
   const scrubEnabled =
@@ -892,7 +883,6 @@ export function VideoControls({
                   <Settings class={`${iconSize} text-white shrink-0`} />
                 </button>
                 {showQualityMenu &&
-                  qualityMenuRect &&
                   typeof document !== 'undefined' &&
                   createPortal(
                     <PlayerSettingsMenu
@@ -907,7 +897,7 @@ export function VideoControls({
                       onChangeAudioTrack={onChangeAudioTrack}
                       onChangeSubtitleTrack={onChangeSubtitleTrack}
                       onClose={() => setShowQualityMenu(false)}
-                      anchor={qualityMenuRect}
+                      isTV={isTV}
                     />,
                     document.body,
                   )}

@@ -11,7 +11,6 @@ import {
   scrubTimeForIndex,
   scrubUrlForIndex,
 } from './video-controls/scrubMath';
-import { TV_QUALITY_VALUES } from '../hooks/useTVPlayerNavigation';
 
 interface TvTrackOption {
   id: number;
@@ -32,9 +31,7 @@ interface TvPlayerDockProps {
   scrubThumbnails?: ScrubThumbnailsMeta | null;
   scrubThumbnailsLoading?: boolean;
   videoFillMode?: 'contain' | 'cover';
-  streamQuality?: number | null;
   settingsOpen?: boolean;
-  settingsFocusIndex?: number;
   audioTracks?: TvTrackOption[];
   subtitleTracks?: TvTrackOption[];
   currentSubtitleTrack?: number;
@@ -43,7 +40,6 @@ interface TvPlayerDockProps {
   onSeekToTime: (timeSeconds: number) => void;
   onToggleFillMode?: () => void;
   onOpenSettings?: () => void;
-  onSelectQuality?: (height: number | null) => void;
   onToggleSubtitles?: () => void;
 }
 
@@ -59,22 +55,6 @@ function dockBtnStyle(focused: boolean): Record<string, string | number> {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    flexShrink: 0,
-  };
-}
-
-function chipStyle(focused: boolean, selected: boolean): Record<string, string | number> {
-  return {
-    minWidth: 72,
-    height: 40,
-    padding: '0 14px',
-    borderRadius: 999,
-    background: focused || selected ? '#fff' : '#222',
-    color: focused || selected ? '#000' : '#fff',
-    border: focused ? '3px solid #fff' : selected ? '2px solid #fff' : '2px solid rgba(255,255,255,0.4)',
-    boxShadow: focused ? '0 0 0 3px #000, 0 0 0 6px #fff' : 'none',
-    fontSize: 16,
-    fontWeight: 600,
     flexShrink: 0,
   };
 }
@@ -95,9 +75,7 @@ export function TvPlayerDock({
   scrubThumbnails = null,
   scrubThumbnailsLoading = false,
   videoFillMode = 'cover',
-  streamQuality = null,
   settingsOpen = false,
-  settingsFocusIndex = 0,
   audioTracks = [],
   subtitleTracks = [],
   currentSubtitleTrack = -1,
@@ -106,7 +84,6 @@ export function TvPlayerDock({
   onSeekToTime,
   onToggleFillMode,
   onOpenSettings,
-  onSelectQuality,
   onToggleSubtitles,
 }: TvPlayerDockProps) {
   const { t } = useI18n();
@@ -155,15 +132,6 @@ export function TvPlayerDock({
     e.preventDefault();
     e.stopPropagation();
     fn();
-  };
-
-  const qualityLabel = (value: number | null) => {
-    if (value == null) return t('playback.qualityAuto');
-    if (value === 1080) return t('playback.quality1080');
-    if (value === 720) return t('playback.quality720');
-    if (value === 480) return t('playback.quality480');
-    if (value === 360) return t('playback.quality360');
-    return `${value}p`;
   };
 
   const btnFocused = (id: string) => !focusedOnScrub && !settingsOpen && focusedControlId === id;
@@ -236,36 +204,6 @@ export function TvPlayerDock({
           />
         )}
       </div>
-      {settingsOpen && onSelectQuality && (
-        <div style={{ marginBottom: 14 }}>
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: 'rgba(255,255,255,0.55)',
-              marginBottom: 8,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {t('playback.quality')}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            {TV_QUALITY_VALUES.map((value, i) => (
-              <button
-                key={value ?? 'auto'}
-                type="button"
-                data-tv-dock-settings-opt={i}
-                onClick={activate(() => onSelectQuality(value))}
-                aria-label={qualityLabel(value)}
-                style={chipStyle(settingsFocusIndex === i, streamQuality === value)}
-              >
-                {qualityLabel(value)}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
         {onClose && (
           <button
@@ -337,7 +275,7 @@ export function TvPlayerDock({
             <Subtitles class="w-6 h-6" />
           </button>
         )}
-        {onOpenSettings && onSelectQuality && (
+        {onOpenSettings && (
           <button
             type="button"
             data-tv-dock-btn="settings"

@@ -25,6 +25,7 @@ import { getNetworkPlaybackProfile } from '../../../../lib/streaming/networkPlay
 import { logVideoPlaybackError } from '../../../streaming/direct-player/mediaErrorDiagnostics';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { useLibraryScrubThumbnails } from './video-player-wrapper/useLibraryScrubThumbnails';
+import { getLanguageName } from '../../../streaming/player-shared/utils/languageName';
 
 /** Info épisode suivant (série) pour le bouton « Épisode suivant » */
 export interface NextEpisodeInfo {
@@ -45,6 +46,8 @@ interface VideoPlayerWrapperProps {
   seriesSeasonNum?: number | null;
   seriesEpisodeNum?: number | null;
   startFromBeginning?: boolean;
+  /** Position de reprise explicite (query ?t= / localStorage média). */
+  initialSeekSeconds?: number | null;
   /** Contexte série : afficher « Passer le générique » et appliquer auto-skip si activé */
   isSeries?: boolean;
   /** Épisode suivant (série) : afficher bouton « Épisode suivant » peu avant la fin */
@@ -106,6 +109,7 @@ export function VideoPlayerWrapper({
   seriesSeasonNum,
   seriesEpisodeNum,
   startFromBeginning = false, 
+  initialSeekSeconds = null,
   isSeries = false,
   nextEpisodeInfo,
   onPlayNextEpisode,
@@ -210,10 +214,14 @@ export function VideoPlayerWrapper({
     /\.(mp4|m4v|webm)(\?|$)/i.test(localFilePath);
   const effectiveDirectMode =
     (isDirectMode || isBrowserNativeLocal) && !forceHlsFallback;
-  /** Qualité stream HLS : hauteur max (720, 480, 360) ou null = source. 4G démarre en 720p. */
+  /** Qualité stream HLS : hauteur max ou null = Auto (source). TV / Wi‑Fi → Auto ; 4G mobile → 720p. */
   const [streamQuality, setStreamQuality] = useState<number | null>(
-    () => getNetworkPlaybackProfile().suggestedMaxHeight,
+    () => getNetworkPlaybackProfile(false, { isTv: isTVPlatform() || isWebOSTV() }).suggestedMaxHeight,
   );
+  const [audioIndex, setAudioIndex] = useState(0);
+  const [sourceAudioTracks, setSourceAudioTracks] = useState<
+    Array<{ id: number; name: string; lang?: string; default?: boolean }>
+  >([]);
   const {
     streamUrl,
     hlsFilePath,
@@ -240,6 +248,57 @@ export function VideoPlayerWrapper({
     infoHash,
     hlsFilePath,
   });
+
+  // Pistes audio du fichier source (ffprobe) — le HLS n'embarque qu'une seule piste.
+  useEffect(() => {
+    if (!visible || effectiveDirectMode || useLucieForThisSource) {
+      setSourceAudioTracks([]);
+      setAudioIndex(0);
+      return;
+    }
+    const path = hlsFilePath && hlsFilePath !== 'direct'
+      ? hlsFilePath
+      : selectedFile?.path || selectedFile?.name || '';
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await serverApi.getLocalAudioStreams({
+          path: path || undefined,
+          infoHash: infoHash || undefined,
+        });
+        if (cancelled) return;
+        const tracks = res.success && res.data?.tracks ? res.data.tracks : [];
+        setSourceAudioTracks(
+          tracks.map((tr) => ({
+            id: tr.index,
+            name:
+              tr.title ||
+              getLanguageName(tr.language || undefined, undefined) ||
+              `Audio ${tr.index + 1}`,
+            lang: tr.language || undefined,
+            default: !!tr.default,
+          })),
+        );
+        setAudioIndex(0);
+      } catch {
+        if (!cancelled) {
+          setSourceAudioTracks([]);
+          setAudioIndex(0);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    visible,
+    effectiveDirectMode,
+    useLucieForThisSource,
+    infoHash,
+    hlsFilePath,
+    selectedFile?.path,
+    selectedFile?.name,
+  ]);
 
   const loadingStepFromStatus = getLoadingStep(playStatus ?? '', progressMessage ?? '', torrentStats ?? null);
   // Quand on attend le flux (isLoading sans étape précise), afficher l’étape 1 (en file d’attente), pas la 4
@@ -350,11 +409,13 @@ export function VideoPlayerWrapper({
   useEffect(() => {
     // Réinitialiser le fallback, la qualité et les retries stream-torrent quand on change de média/session de lecture.
     setForceHlsFallback(false);
-    setStreamQuality(getNetworkPlaybackProfile().suggestedMaxHeight);
+    setStreamQuality(
+      getNetworkPlaybackProfile(false, { isTv: isTvPlayback }).suggestedMaxHeight,
+    );
     setDirectStreamRetryCount(0);
     hasLoggedStartRef.current = false;
     lastLoggedErrorRef.current = null;
-  }, [infoHash, selectedFile?.path, directStreamUrl, visible]);
+  }, [infoHash, selectedFile?.path, directStreamUrl, visible, isTvPlayback]);
 
   useEffect(() => {
     let mounted = true;
@@ -827,6 +888,7 @@ export function VideoPlayerWrapper({
               seriesEpisode: seriesEpisodeNum ?? undefined,
               variantId: torrentId,
               startFromBeginning,
+              initialSeekSeconds,
               isSeries,
               nextEpisodeInfo,
               onPlayNextEpisode,
@@ -847,6 +909,9 @@ export function VideoPlayerWrapper({
               maxHeight: streamQuality,
               streamQuality,
               onQualityChange: setStreamQuality,
+              audioIndex,
+              sourceAudioTracks,
+              onAudioIndexChange: setAudioIndex,
               useStreamTorrentUrl: useStreamTorrentMode,
               scrubThumbnails,
               scrubThumbnailsLoading,
