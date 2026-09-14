@@ -150,9 +150,11 @@ function StatusHintChip({
   kind: 'warmup' | 'quality' | 'readying';
   label: string;
 }) {
+  const kindClass = kind === 'warmup' ? 'playback-status-hint--warmup' : kind === 'readying' ? 'playback-status-hint--readying' : 'playback-status-hint--quality';
+  
   return (
     <div
-      className={`playback-status-hint playback-status-hint--${kind}`}
+      className={`playback-status-hint ${kindClass}`}
       role="status"
       aria-live="polite"
     >
@@ -201,7 +203,7 @@ function PipelinePanel({
 
   return (
     <div className="w-full min-w-0 space-y-2">
-      <div className="rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]/40 px-3 py-2.5 space-y-3">
+      <div className="rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]/40 backdrop-blur-sm px-3 py-2.5 space-y-3 transition-all duration-300">
         <div className="min-w-0">
           <div className="text-[10px] uppercase tracking-wider text-[var(--ds-text-tertiary)] font-semibold mb-1">
             {t('playback.hls.serverPipeline')}
@@ -216,7 +218,7 @@ function PipelinePanel({
           </div>
           <div className="h-1 rounded-full bg-[var(--ds-border)] overflow-hidden">
             <div
-              className="h-full rounded-full bg-[var(--ds-accent-yellow)] transition-[width] duration-500"
+              className="h-full rounded-full bg-[var(--ds-accent-yellow)] transition-all duration-500 ease-out"
               style={{ width: `${serverPct ?? 10}%` }}
             />
           </div>
@@ -230,7 +232,7 @@ function PipelinePanel({
           </div>
           <div className="h-1 rounded-full bg-[var(--ds-border)] overflow-hidden">
             <div
-              className="h-full rounded-full bg-[var(--ds-accent-violet)] transition-[width] duration-500"
+              className="h-full rounded-full bg-[var(--ds-accent-violet)] transition-all duration-500 ease-out"
               style={{ width: `${playerPct ?? 4}%` }}
             />
           </div>
@@ -245,7 +247,7 @@ function PipelinePanel({
               rel="noreferrer"
               data-focusable
               tabIndex={0}
-              className="px-3 py-1.5 min-h-[44px] inline-flex items-center rounded-xl border border-white/15 bg-white/5 text-xs text-white/80"
+              className="px-3 py-1.5 min-h-[44px] inline-flex items-center rounded-xl border border-white/15 bg-white/5 text-xs text-white/80 hover:bg-white/10 transition-colors"
             >
               {t('playback.hls.openLogs')}
             </a>
@@ -254,7 +256,7 @@ function PipelinePanel({
               onClick={loadQr}
               data-focusable
               tabIndex={0}
-              className="px-3 py-1.5 min-h-[44px] rounded-xl border border-white/15 bg-white/5 text-xs text-white/80"
+              className="px-3 py-1.5 min-h-[44px] rounded-xl border border-white/15 bg-white/5 text-xs text-white/80 hover:bg-white/10 transition-colors"
             >
               QR
             </button>
@@ -327,7 +329,7 @@ function StepRail({
   t: (k: string, p?: Record<string, string | number>) => string;
 }) {
   return (
-    <div className="flex gap-1.5 w-full max-w-sm mx-auto mb-3 min-w-0">
+    <div className="flex gap-1.5 w-full max-w-sm mx-auto mb-3 min-w-0" role="progressbar" aria-valuenow={stepIndex} aria-valuemin={1} aria-valuemax={4}>
       {STEP_KEYS.map((key, i) => {
         const n = i + 1;
         const done = stepIndex > n;
@@ -335,15 +337,18 @@ function StepRail({
         return (
           <div key={key} className="flex-1 flex flex-col items-center gap-1.5">
             <div
-              className={`h-1 w-full rounded-full overflow-hidden transition-colors duration-500 ${
+              className={`h-1 w-full rounded-full overflow-hidden transition-all duration-500 ease-out ${
                 done ? 'bg-primary-500' : active ? 'bg-white/25' : 'bg-white/10'
               }`}
+              style={{
+                transform: active ? 'scaleY(1.2)' : 'scaleY(1)',
+              }}
             >
               {active ? <div className="h-full w-1/2 bg-primary-400 animate-shimmer" /> : null}
             </div>
             <span
-              className={`text-[9px] uppercase tracking-wider font-semibold transition-colors duration-300 ${
-                active ? 'text-primary-300' : done ? 'text-white/70' : 'text-white/25'
+              className={`text-[9px] uppercase tracking-wider font-semibold transition-all duration-300 ${
+                active ? 'text-primary-300 scale-105' : done ? 'text-white/70' : 'text-white/25'
               }`}
             >
               {t(`playback.step.${key}`)}
