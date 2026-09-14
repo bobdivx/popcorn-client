@@ -17,7 +17,7 @@ export default function TranscodeWarningBanner() {
   useEffect(() => {
     const checkStatus = async () => {
       try {
-        const res = await serverApi.getTranscodeJobs();
+        const res = await serverApi.getTranscodeStatus();
         if (res.success && res.data?.resources?.heavy_transcode_warning) {
           setShowWarning(true);
         } else {
