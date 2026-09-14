@@ -189,3 +189,9 @@ export function startDriveModeMonitoring(onModeChange: (mode: TeslaDriveMode) =>
     }
   };
 }
+
+/**
+ * Export pour CarProbe: permet de réutiliser la même logique de détection
+ * dans le probe complet pour cohérence.
+ */
+export { detectTeslaDriveMode as detectDriveModeForProbe };
