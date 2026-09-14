@@ -2,7 +2,30 @@
 
 **Date:** 2026-09-14  
 **Branche:** `cursor/tesla-car-smooth-playback-6ef6`  
-**Objectif:** Valider que les optimisations de qualité MJPEG/MP3 améliorent la fluidité en conduite **sans casser le workaround existant**.
+**Objectif:** Valider système complet de playback Tesla avec détection auto Park/Drive et moteurs multiples.
+
+---
+
+## Nouveautés de cette PR
+
+### 🆕 Détection Auto Park/Drive
+- Probe `<video>` pour détecter si Tesla bloque playback (Drive) ou non (Park)
+- Monitoring continu toutes les 10s
+- Cache 30s dans localStorage
+
+### 🆕 Moteurs Multiples
+- **MJPEG** (`<img>` + `<audio>`): Drive-safe, qualité optimisée (480p@12fps)
+- **Vidéo native** (`<video>` MP4): Park only, haute qualité (720p@24fps)
+
+### 🆕 Switcher Auto/Manuel
+- **Auto** (défaut): détection → choix optimal automatique
+- **Manuel**: force un moteur pour A/B testing
+- UI dans dock contrôles (bouton « Type »)
+
+### ✅ Optimisations Qualité (précédent)
+- Paramètres MJPEG: `max_height=480`, `max_fps=12`, `quality=3`
+- Paramètres audio: `bitrate=96k`
+- Bande passante réduite ~50-70%
 
 ---
 
@@ -20,9 +43,99 @@
 
 ---
 
-## Test 1: Baseline (Before)
+## Test 1: Détection Park/Drive (nouveau)
 
-**But:** Capturer le comportement actuel avant optimisations.
+**But:** Valider que le système détecte correctement le mode Tesla.
+
+### Steps
+
+1. **Desktop Chrome:**
+   ```bash
+   npm run dev
+   # Ouvrir http://localhost:4321/car?car=1
+   ```
+   - Mode détecté: « Unknown » ou « Park » (Chrome n'est pas Tesla)
+   - Moteur actif (Auto): « Vidéo native »
+
+2. **Tesla en Parking:**
+   - Ouvrir `/car` dans navigateur Tesla
+   - Sélectionner un média
+   - **Observer coin haut-gauche du menu Type:**
+     - « Mode Tesla: **Park** »
+     - Moteur actif: « **Vidéo native** » (badge ACTIF)
+   - Playback: `<video>` MP4 standard démarre
+
+3. **Tesla en Drive:**
+   - Mettre en Drive (D) — pied sur frein si garage
+   - **Attendre max 10-15 secondes** (re-détection)
+   - **Observer:**
+     - Badge change → « Mode Tesla: **Drive** »
+     - Moteur bascule → « **MJPEG + Audio** » (badge ACTIF)
+     - `<video>` disparaît, `<img>` MJPEG + `<audio>` MP3 démarrent
+   - **Vérifier Network tab:**
+     - Requête `.../car.mjpeg?...&max_height=480&max_fps=12&quality=3`
+     - Requête `.../car.audio?...&bitrate=96k`
+
+4. **Drive → Park (round-trip):**
+   - Remettre en Park (P)
+   - Attendre ~10s
+   - Badge → « Park », moteur → « Vidéo native »
+   - Playback rebascule vers `<video>` MP4
+
+**Critères de succès:**
+- ✅ Détection Park/Drive fonctionne dans ~10-15s max
+- ✅ Auto mode bascule automatiquement les moteurs
+- ✅ Pas d'erreur console, pas de playback freeze
+
+---
+
+## Test 2: Mode Manuel (A/B Testing)
+
+**But:** Valider que Mathieu peut forcer un moteur pour comparer.
+
+### Steps
+
+1. **Ouvrir switcher:**
+   - Cliquer bouton « Type » (engrenage) dans dock
+   - Menu popup apparaît
+
+2. **Toggle « Manuel »:**
+   - Cliquer bouton « Manuel » (top menu)
+   - Liste moteurs devient active (non-grisée)
+
+3. **Forcer MJPEG en Park:**
+   - Tesla en Park (P)
+   - Sélectionner moteur « MJPEG + Audio »
+   - Fermer menu
+   - **Observer:**
+     - Badge « ACTIF » sur MJPEG
+     - Playback: `<img>` + `<audio>` même en Park
+     - Qualité: 480p@12fps (pixelisée vs native)
+
+4. **Forcer Vidéo native en Drive:**
+   - Tesla en Drive (D)
+   - Ouvrir menu → Manuel → « Vidéo native »
+   - **Observer:**
+     - `<video>` tente de démarrer
+     - Tesla bloque immédiatement (pause forcé)
+     - Écran noir ou freeze
+   - **Confirme:** que MJPEG est nécessaire en Drive
+
+5. **Retour Auto:**
+   - Ouvrir menu → toggle « Auto »
+   - Système re-détecte → revient à MJPEG en Drive
+
+**Critères de succès:**
+- ✅ Mode Manuel override fonctionne
+- ✅ MJPEG fonctionne en Park (qualité dégradée mais watchable)
+- ✅ Vidéo native bloquée en Drive (confirme restriction Tesla)
+- ✅ Retour Auto restaure comportement optimal
+
+---
+
+## Test 3: Baseline vs After (qualité/fluidité)
+
+**But:** Comparer fluidité avant/après optimisations qualité.
 
 ### Steps
 
