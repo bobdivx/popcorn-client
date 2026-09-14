@@ -94,6 +94,15 @@ export type {
 
 export type { WebOSInstallSimpleResponse, WebOSRelaunchResponse } from './server-api/system.js';
 
+export type {
+  TranscodeJob,
+  AdminResourcesResponse,
+  TranscodeJobsResponse,
+  TranscodeStatusResponse,
+  KillTranscodeJobResponse,
+  SystemResourcesResponse,
+} from './server-api/system.js';
+
 class ServerApiClient extends ServerApiClientBase {
   /**
    * Définit l'URL du serveur (client Astro)

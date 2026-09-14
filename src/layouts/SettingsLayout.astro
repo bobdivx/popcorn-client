@@ -2,6 +2,7 @@
 import Layout from './Layout.astro';
 import SettingsSidebar from '../components/settings/SettingsSidebar';
 import SettingsMobileMenuTrigger from '../components/settings/SettingsMobileMenuTrigger';
+import TranscodeWarningBanner from '../components/settings/TranscodeWarningBanner';
 
 interface Props {
   title?: string;
@@ -11,6 +12,9 @@ const { title = 'Paramètres - Popcorn Client' } = Astro.props;
 ---
 
 <Layout title={title}>
+  <!-- Warning banner pour transcodages lourds -->
+  <TranscodeWarningBanner client:only="preact" />
+  
   <div class="ds-page settings-page flex w-full" data-page="settings" data-tv-settings-container>
     <aside transition:persist="settings-sidebar" class="settings-sidebar-wrapper w-0 flex-shrink-0 md:w-72 xl:w-80 self-stretch">
       {/* idle : priorise le contenu principal, sidebar hydrate juste après */}
