@@ -5,6 +5,10 @@ import { useCarMediaSource } from './useCarMediaSource';
 import CarLibraryBrowser, { type CarLibraryPick } from './CarLibraryBrowser';
 import { attachCarStream } from './attachCarStream';
 import { buildCarDriveUrls } from './buildCarDriveUrls';
+import CarPlaybackTypeSelector from './CarPlaybackTypeSelector';
+import type { CarPlaybackSettings, CarPlaybackType } from './carPlaybackTypes';
+import { getStoredPlaybackSettings, resolvePlaybackType, setStoredPlaybackSettings } from './carPlaybackTypes';
+import { detectDriveModeWithCache, startDriveModeMonitoring, type TeslaDriveMode } from './driveModeDetector';
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -47,11 +51,25 @@ function writeCarUrl(pick: CarLibraryPick | null) {
  * - Stationné : `<video>` MP4 H.264/AAC.
  * - En conduite : Tesla force pause sur `<video>` → MJPEG (`<img>`) + MP3 (`<audio>`)
  *   pour garder IMAGE + SON actifs.
+ * - Détection auto Park/Drive avec monitoring continu.
+ * - Sélecteur Auto/Manuel pour A/B testing.
  */
 export default function CarPlayer() {
   const [slug, setSlug] = useState<string | null>(null);
   const [pickMeta, setPickMeta] = useState<{ title: string; posterUrl: string | null } | null>(null);
   const { source, loading, error } = useCarMediaSource(slug);
+  
+  // Paramètres playback (Auto/Manuel + type manuel)
+  const [playbackSettings, setPlaybackSettings] = useState<CarPlaybackSettings>(() => getStoredPlaybackSettings());
+  
+  // Détection mode Tesla (Park/Drive/Unknown)
+  const [detectedMode, setDetectedMode] = useState<TeslaDriveMode>('unknown');
+  
+  // Type effectif calculé (Auto → résolu selon Drive/Park, Manuel → choix utilisateur)
+  const [effectiveType, setEffectiveType] = useState<CarPlaybackType>(() => {
+    const initial = getStoredPlaybackSettings();
+    return resolvePlaybackType(initial, null);
+  });
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -79,6 +97,49 @@ export default function CarPlayer() {
   useEffect(() => {
     driveModeRef.current = driveMode;
   }, [driveMode]);
+
+  // Détection initiale + monitoring continu du mode Tesla
+  useEffect(() => {
+    // Détection initiale avec cache
+    detectDriveModeWithCache().then((result) => {
+      setDetectedMode(result.mode);
+    });
+
+    // Monitoring continu (re-check toutes les 10s)
+    const stopMonitoring = startDriveModeMonitoring((mode) => {
+      setDetectedMode(mode);
+    });
+
+    return () => {
+      stopMonitoring();
+    };
+  }, []);
+
+  // Recalculer effectiveType quand settings ou detectedMode changent
+  useEffect(() => {
+    const isDrive = detectedMode === 'drive' ? true : detectedMode === 'park' ? false : null;
+    const resolved = resolvePlaybackType(playbackSettings, isDrive);
+    setEffectiveType(resolved);
+  }, [playbackSettings, detectedMode]);
+
+  // Appliquer effectiveType: si changement de moteur, basculer entre MJPEG et native-video
+  useEffect(() => {
+    if (!source?.streamUrl) return;
+    
+    if (effectiveType === 'mjpeg' && !driveMode) {
+      // Besoin de passer en MJPEG alors qu'on est en video native
+      startDriveAt(currentTime || 0);
+    } else if (effectiveType === 'native-video' && driveMode) {
+      // Besoin de passer en video native alors qu'on est en MJPEG
+      exitDriveToVideo();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveType, source?.streamUrl]);
+
+  const handleSettingsChange = useCallback((newSettings: CarPlaybackSettings) => {
+    setPlaybackSettings(newSettings);
+    setStoredPlaybackSettings(newSettings);
+  }, []);
 
   useEffect(() => {
     stampTeslaBrowserHints();
@@ -555,6 +616,13 @@ export default function CarPlayer() {
                 <span className="hidden sm:inline">Parking</span>
               </button>
             )}
+
+            <CarPlaybackTypeSelector
+              settings={playbackSettings}
+              effectiveType={effectiveType}
+              isDrive={detectedMode === 'drive' ? true : detectedMode === 'park' ? false : null}
+              onSettingsChange={handleSettingsChange}
+            />
           </div>
 
           {showDriveOverlay && (
