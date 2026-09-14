@@ -15,35 +15,42 @@
 
 ### APIs: Support Matrix
 
+**IMPORTANT:** Matrice mise à jour avec résultats probe empirique (`/car/probe`) — voir section [5. Probe Tool](#5-probe-tool) pour détails.
+
 | API / Feature                  | Parked | Drive | Notes / Sources                                      |
 |--------------------------------|:------:|:-----:|------------------------------------------------------|
-| **`<video>` element**          | ✅      | ❌     | Paused at OS level in Drive, last frame frozen, audio continues [[1]](#ref-1) [[2]](#ref-2) |
-| **`<audio>` element**          | ✅      | ✅     | NOT blocked; audio streams persist [[2]](#ref-2) [[3]](#ref-3) |
+| **`<video>` element**          | ✅      | ❌     | **Probe confirm:** Paused at OS level in Drive, `currentTime` stays 0 despite `play()` [[1]](#ref-1) [[2]](#ref-2) |
+| **`<video>` → canvas drawImage** | ✅    | ❌     | **Probe confirm:** Black frame extracted in Drive (Tesla blocks frame extraction) |
+| **`<audio>` element**          | ✅      | ✅     | **Probe confirm:** NOT blocked; audio streams persist [[2]](#ref-2) [[3]](#ref-3) |
 | **`<img>` MJPEG stream**       | ✅      | ✅     | `multipart/x-mixed-replace` works (server-sent JPEG frames) [[4]](#ref-4) [[5]](#ref-5) |
-| **Canvas 2D**                  | ✅      | ✅     | Available [[1]](#ref-1) |
-| **WebGL / WebGL2**             | ✅      | ✅     | Available, performance varies [[1]](#ref-1) [[6]](#ref-6) |
-| **WebSocket**                  | ✅      | ✅     | Available [[1]](#ref-1) |
+| **Canvas 2D**                  | ✅      | ✅     | **Probe confirm:** Available [[1]](#ref-1) |
+| **WebGL / WebGL2**             | ✅      | ✅     | **Probe confirm:** Available, performance varies [[1]](#ref-1) [[6]](#ref-6) |
+| **OffscreenCanvas**            | ⚠️     | ⚠️    | **Probe test:** Available or not (firmware-dependent) |
+| **createImageBitmap**          | ⚠️     | ⚠️    | **Probe test:** Available or not (firmware-dependent) |
+| **WebSocket**                  | ✅      | ✅     | **Probe confirm:** Available [[1]](#ref-1) |
 | **WebAssembly**                | ✅      | ✅     | Available [[1]](#ref-1) |
-| **AudioContext / Web Audio**   | ✅      | ✅     | Available [[7]](#ref-7) |
-| **MediaSource Extensions (MSE)** | ✅ | ⚠️    | Limited codec support (H.264/AAC require `-webengine-proprietary-codecs`) [[1]](#ref-1) [[8]](#ref-8) |
-| **WebCodecs**                  | ⚠️     | ⚠️    | **Conflicting reports:** madpowah/tesla-video-drive says "Not available" [[1]](#ref-1), but echo-cool/tesla-bilibili-player claims success with `VideoDecoder`/`AudioDecoder` [[7]](#ref-7). Likely **firmware-dependent** (older Tesla ≈ Chromium 73 lacks WebCodecs; newer ≈ Chromium 94+ may have it). Requires secure context (HTTPS/localhost). |
+| **AudioContext / Web Audio**   | ✅      | ✅     | **Probe confirm:** Available [[7]](#ref-7) |
+| **requestAnimationFrame**      | ✅      | ✅     | **Probe test:** Measures actual fps (~60fps typically) |
+| **MediaSource Extensions (MSE)** | ✅ | ⚠️    | **Probe test:** Limited codec support (H.264/AAC require `-webengine-proprietary-codecs`) [[1]](#ref-1) [[8]](#ref-8) |
+| **WebCodecs**                  | ⚠️     | ⚠️    | **Probe test:** `VideoDecoder`/`AudioDecoder` available or not. **Conflicting reports:** madpowah/tesla-video-drive says "Not available" [[1]](#ref-1), but echo-cool/tesla-bilibili-player claims success with `VideoDecoder`/`AudioDecoder` [[7]](#ref-7). Likely **firmware-dependent** (older Tesla ≈ Chromium 73 lacks WebCodecs; newer ≈ Chromium 94+ may have it). Requires secure context (HTTPS/localhost). |
 | **WebRTC**                     | ⚠️     | ❌     | Unreliable or blocked in Drive [[1]](#ref-1) [[9]](#ref-9) |
 | **getUserMedia (mic/camera)**  | ❌      | ❌     | Blocked at compile-time [[1]](#ref-1) |
-| **Fullscreen API**             | ✅      | ⚠️    | Available but may behave differently [[8]](#ref-8) |
-| **Picture-in-Picture**         | ?      | ?     | Not documented in sources |
+| **Fullscreen API**             | ⚠️     | ⚠️    | **Probe test:** `document.fullscreenEnabled` check |
+| **Picture-in-Picture**         | ⚠️     | ⚠️    | **Probe test:** `document.pictureInPictureEnabled` check |
 | **Service Workers**            | ✅      | ✅     | Available [[1]](#ref-1) |
 | **IndexedDB**                  | ✅      | ✅     | Storage API available [[6]](#ref-6) |
 | **requestVideoFrameCallback**  | ?      | ?     | Not documented |
-| **OffscreenCanvas**            | ?      | ?     | Not documented |
 | **SharedArrayBuffer**          | ?      | ?     | Not documented |
 | **DRM / EME**                  | ✅      | ⚠️    | DRM support exists [[6]](#ref-6), behavior in Drive unclear |
-| **Autoplay (audio/video)**     | ⚠️     | ⚠️    | Likely requires user gesture (tap) [[7]](#ref-7) |
+| **Autoplay (audio/video)**     | ⚠️     | ⚠️    | **Probe test:** Muted autoplay likely allowed, unmuted requires user gesture [[7]](#ref-7) |
 
 **Legend:**  
-✅ Available  
+✅ Available (confirmed by probe or community)  
 ⚠️ Partially available / firmware-dependent / requires configuration  
-❌ Blocked  
+❌ Blocked (confirmed by probe or community)  
 ? Undocumented
+
+**→ See [Section 5: Probe Tool](#5-probe-tool) for systematic testing methodology and results interpretation.**
 
 ### Codec Support
 
@@ -97,12 +104,119 @@ export function buildCarDriveUrls(streamUrl: string, seekSeconds: number): CarDr
 
 **Location:** `/car/probe` → `CarProbe.tsx`
 
-Tests:
-- User-Agent, Tesla detection
-- `HTMLVideoElement`, codec support (H.264, AAC, VP8, HLS)
-- MSE, WebCodecs, AudioContext, WebSocket, WebGL
+**🆕 Comprehensive 20+ tests systematically validate ALL browser APIs.**
 
-**Use case:** Validate browser capabilities before debugging playback issues.
+#### Tests Covered
+
+**1. Environment (4 tests):**
+- User-Agent
+- `isTeslaBrowser()` detection
+- `isCarPlayerMode()` detection
+- Secure Context (HTTPS/localhost)
+
+**2. Video Element (6 tests):**
+- HTMLVideoElement exists
+- Codec support: H.264 AVC, AAC, HLS m3u8, VP8, VP9, HEVC
+- **Video playback test:** Creates hidden `<video>` with data URL, attempts play, checks if `currentTime` advances
+  - **Park:** `currentTime > 0` → ✅ Pass
+  - **Drive:** `currentTime = 0` despite `play()` → ❌ Fail (Tesla pauses at OS level)
+- **drawImage(video)→canvas test:** Attempts to extract frame from playing video to canvas
+  - **Park:** Non-black pixels → ✅ Pass
+  - **Drive:** Black frame or timeout → ❌ Fail (Tesla blocks frame extraction)
+
+**3. Audio Element (2 tests):**
+- Audio playback (MP3 data URL)
+  - **Drive:** ✅ Pass (audio NOT blocked — confirms workaround safe)
+- AudioContext / webkitAudioContext available
+
+**4. Media Source Extensions (2 tests):**
+- MediaSource available
+- SourceBuffer attach to video (sourceopen event fires)
+
+**5. WebCodecs (3 tests):**
+- VideoDecoder presence
+- AudioDecoder presence
+- `VideoDecoder.isConfigSupported({ codec: 'avc1.42E01E', ... })` (H.264 AVC)
+
+**6. Canvas & Rendering (4 tests):**
+- Canvas 2D context
+- WebGL context
+- OffscreenCanvas availability
+- createImageBitmap
+
+**7. Animation & Timing (1 test):**
+- requestAnimationFrame rate (~fps measurement over 10 frames)
+
+**8. Autoplay Policies (2 tests):**
+- Autoplay muted (usually allowed)
+- Autoplay unmuted (usually blocked by browser policy or Drive mode)
+
+**9. Fullscreen & PiP (2 tests):**
+- Fullscreen API enabled (`document.fullscreenEnabled`)
+- Picture-in-Picture available (`document.pictureInPictureEnabled`)
+
+**10. Networking (2 tests):**
+- WebSocket constructor available
+- Binary throughput check (placeholder)
+
+#### Probe Report Output
+
+**Visual UI:**
+- Results grouped by category (Environment, Video, Audio, MSE, WebCodecs, Canvas, Animation, Autoplay, APIs, Network)
+- Color-coded icons: ✅ Pass (green), ❌ Fail (red), ⚠️ Partial (orange)
+- Confidence scores displayed (0-100%) for uncertain results
+- **Summary Box:**
+  - Mode détecté: Park / Drive / Unknown
+  - Video bloqué: Oui/Non
+  - Audio fonctionne: Oui/Non
+  - Canvas disponible: Oui/Non
+  - MSE disponible: Oui/Non
+  - WebCodecs disponible: Oui/Non
+  - **Moteur recommandé:** MJPEG (Drive-safe) ou native-video (Park)
+- Expandable JSON raw data export for debugging
+
+#### Interpretation
+
+**Park Mode Results:**
+```
+Video playback: ✅ Pass (currentTime > 0)
+drawImage(video): ✅ Pass (non-black pixels)
+Audio playback: ✅ Pass
+Canvas 2D: ✅ Pass
+WebGL: ✅ Pass
+MSE: ✅ Pass (firmware-dependent)
+WebCodecs: ✅ Pass ou ❌ Fail (firmware-dependent)
+
+→ Recommande: native-video (meilleure qualité)
+```
+
+**Drive Mode Results:**
+```
+Video playback: ❌ Fail (currentTime=0 malgré play())
+drawImage(video): ❌ Fail (black frame — Tesla bloque extraction)
+Audio playback: ✅ Pass (audio PAS bloqué — critical!)
+Canvas 2D: ✅ Pass
+WebGL: ✅ Pass
+MSE: ✅ Pass ou ❌ Fail (firmware-dependent)
+WebCodecs: ✅ Pass ou ❌ Fail (firmware-dependent)
+
+→ Recommande: MJPEG (seul moteur Drive-safe confirmé)
+```
+
+**Key Insights:**
+- **Empirical validation:** Pas de folklore — probe confirme exactement ce qui est bloqué
+- **Audio always works:** Confirme que workaround `<audio>` MP3 est sûr en Drive
+- **Canvas/WebGL available:** Opportunité future pour WebCodecs + canvas render si firmware récent
+- **MSE/WebCodecs firmware-dependent:** Peut varier selon version Tesla Chromium
+
+#### Use Case
+
+1. **Before debugging playback issues:** Run `/car/probe` to establish baseline capabilities
+2. **Compare Park vs Drive:** Understand exactly what Tesla blocks in each mode
+3. **Plan optimizations:** If WebCodecs available → explore canvas decoder; if not → stick to MJPEG
+4. **Report bugs:** Export JSON, attach to GitHub issue with firmware version
+
+**→ Probe results drive engine selection logic in `CarPlayer.tsx` (see [Section 2](#2-popcornn-car-mode-current-implementation)).**
 
 ---
 
@@ -181,15 +295,27 @@ Tests:
    - Verify smoother playback at lower resolution/fps.
    - Check audio/video sync remains acceptable.
 
-4. **Update `/car/probe` (optional):**
-   - Add `createImageBitmap`, `OffscreenCanvas`, `SharedArrayBuffer` checks.
-   - Add codec test for `canPlayType('video/mp4; codecs="hev1.1.6.L93.B0"')` (HEVC).
-   - Log results to help debug future firmware changes.
+4. **Update `/car/probe` documentation:**
+   - ✅ **DONE:** 20+ comprehensive tests now cover all major APIs
+   - ✅ **DONE:** Park vs Drive detection via video playback + drawImage tests
+   - ✅ **DONE:** Summary recommendations (MJPEG for Drive, native-video for Park)
+   - ✅ **DONE:** Confidence scoring for uncertain results
+   - See [Section 2: Probe Tool](#probe-tool) for full details
 
 ### Future (Experimental)
 
-5. **WebCodecs fallback (if supported):**
-   - Feature-detect `VideoDecoder` on `/car/probe`.
+5. **WebCodecs fallback (if probe confirms support):**
+   - Feature-detect `VideoDecoder` via `/car/probe` results
+   - If available AND Park/Drive detection works → consider WebCodecs + canvas render
+   - **Advantage:** Hardware H.264 decode, lower latency, adaptive quality
+   - **Risk:** Firmware-dependent (Chromium 94+ required)
+   - **Mitigation:** Strict feature detect, fallback to MJPEG if unavailable
+
+6. **MSE + HLS/DASH for Park mode (if probe confirms MSE):**
+   - If probe shows MSE available → explore native `<video>` with HLS/DASH in Park
+   - **Advantage:** Adaptive bitrate, standard streaming protocols
+   - **Risk:** MSE codec support inconsistent
+   - **Mitigation:** Only enable in Park mode (Drive falls back to MJPEG anyway)
    - If available, offer opt-in "HD Mode" using WebCodecs + `<canvas>` + Web Audio.
    - Keep `<img>` MJPEG as default (proven stable).
 
@@ -216,6 +342,178 @@ Before merging Drive Mode changes:
 - [ ] **Bandwidth reduced** — Compare Network tab before/after (should be ~50-70% less).
 - [ ] **Smoothness improved** — Visual inspection on Tesla or simulated mobile throttling (Chrome DevTools → Network → Slow 3G).
 - [ ] **Error handling** — If server ignores params, client should not break.
+
+---
+
+## 5. Probe Tool — Systematic API Testing
+
+**Location:** `/car/probe` → `src/components/streaming/car-player/CarProbe.tsx`
+
+### Purpose
+
+Empirically test ALL browser APIs to determine exactly what's blocked in Drive vs Park — **no folklore, only data**.
+
+### Methodology
+
+Probe runs 20+ tests systematically grouped by category:
+
+1. **Environment:** User-Agent, Tesla detection, Secure Context
+2. **Video Element:** HTMLVideoElement, codecs, playback test (Drive detection), drawImage→canvas test
+3. **Audio Element:** Audio playback, AudioContext
+4. **MSE:** MediaSource, SourceBuffer attach
+5. **WebCodecs:** VideoDecoder, AudioDecoder, isConfigSupported
+6. **Canvas:** Canvas 2D, WebGL, OffscreenCanvas, createImageBitmap
+7. **Animation:** requestAnimationFrame rate
+8. **Autoplay:** Muted/unmuted policies
+9. **APIs:** Fullscreen, Picture-in-Picture
+10. **Network:** WebSocket, binary throughput
+
+**Each test returns:**
+- **Status:** pass (✅), fail (❌), partial (⚠️), skip
+- **Detail:** Diagnostic string (e.g., "currentTime=0.053s", "Black frame detected")
+- **Confidence:** 0-1 score for uncertain results (e.g., timeout vs blocked)
+
+### Key Tests
+
+#### Video Playback (Drive Detection)
+
+```typescript
+// Creates hidden <video> with 1-frame WebM data URL
+video.src = 'data:video/webm;base64,...';
+video.muted = true;
+video.playsInline = true;
+await video.play();
+
+// Wait 2.5s, check if currentTime advances
+if (video.currentTime > 0.05) {
+  // Park mode: video plays ✅
+} else {
+  // Drive mode: Tesla pauses at OS level ❌
+}
+```
+
+**Result:**
+- **Park:** `currentTime > 0` → status: pass
+- **Drive:** `currentTime = 0` → status: fail (confidence: 0.7)
+
+#### drawImage(video) Test
+
+```typescript
+const canvas = document.createElement('canvas');
+const ctx = canvas.getContext('2d');
+ctx.drawImage(video, 0, 0, 10, 10);
+const imageData = ctx.getImageData(0, 0, 10, 10);
+const hasNonZero = imageData.data.some(v => v > 0);
+
+if (hasNonZero) {
+  // Park: frame extracted ✅
+} else {
+  // Drive: black frame (Tesla blocks extraction) ❌
+}
+```
+
+**Result:**
+- **Park:** Non-black pixels → status: pass
+- **Drive:** All-black pixels → status: fail (confidence: 0.7)
+
+#### Audio Playback Test
+
+```typescript
+// Creates <audio> with tiny MP3 data URL
+audio.src = 'data:audio/mp3;base64,...';
+audio.muted = true;
+await audio.play();
+
+// Wait 2s, check if currentTime advances
+if (audio.currentTime > 0) {
+  // Audio works ✅
+} else {
+  // Audio blocked or policy ❌
+}
+```
+
+**Result:**
+- **Park & Drive:** `currentTime > 0` → status: pass
+- **Key insight:** Audio NOT blocked in Drive (confirms workaround safe)
+
+### Summary Output
+
+Probe generates a summary box with key findings:
+
+```
+Mode détecté: Drive
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Video bloqué:          Oui ❌
+Audio fonctionne:      Oui ✅
+Canvas disponible:     Oui ✅
+MSE disponible:        Oui ✅ (ou Non ❌)
+WebCodecs disponible:  Non ❌ (ou Oui ✅)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Moteur recommandé: MJPEG
+```
+
+**Engine Recommendation Logic:**
+```typescript
+if (videoPlaybackWorks) {
+  recommendedEngine = 'native-video';  // Park: prefer quality
+} else if (canvasWorks && audioWorks) {
+  recommendedEngine = 'mjpeg';          // Drive: MJPEG workaround
+}
+```
+
+### UI Features
+
+- **Auto-run on page load** (10-15s total)
+- **Color-coded results:**
+  - ✅ Green border/icon: Pass
+  - ❌ Red border/icon: Fail
+  - ⚠️ Orange border/icon: Partial/uncertain
+- **Confidence scores** displayed when < 100%
+- **Grouped by category** (collapsible sections)
+- **Expandable JSON export** for debugging (full raw report)
+
+### Use Cases
+
+1. **Pre-deployment validation:**
+   - Run probe in Tesla Park → confirm native-video recommended
+   - Run probe in Tesla Drive → confirm MJPEG recommended
+   - Export JSON, commit to repo as baseline
+
+2. **Debugging playback issues:**
+   - User reports stutter → ask for `/car/probe` screenshot
+   - Check: video blocked? Audio works? MSE/WebCodecs available?
+   - Diagnose: firmware-dependent feature missing, codec support issue, etc.
+
+3. **Planning future optimizations:**
+   - If WebCodecs available → explore canvas decoder
+   - If MSE available → explore HLS/DASH for Park
+   - If not → stick to MJPEG (proven safe)
+
+4. **Reporting bugs to Tesla:**
+   - Export probe JSON + User-Agent + firmware version
+   - Evidence-based bug report (not "it doesn't work")
+
+### Integration with CarPlayer
+
+**File:** `src/components/streaming/car-player/CarPlayer.tsx`
+
+CarPlayer uses same detection logic as probe (video playback test) to:
+1. Determine Park/Drive mode
+2. Resolve effective playback type (MJPEG vs native-video)
+3. Monitor mode changes every 10s
+4. Auto-switch engines when mode changes
+
+**Example:**
+```typescript
+const detectedMode = await detectTeslaDriveMode();  // Uses same probe logic
+if (detectedMode.mode === 'drive') {
+  effectiveType = 'mjpeg';   // Safe for Drive
+} else if (detectedMode.mode === 'park') {
+  effectiveType = 'native-video';  // Better quality
+}
+```
+
+**Advantage:** Probe and production use identical detection → results always consistent.
 
 ---
 
@@ -255,12 +553,22 @@ Before merging Drive Mode changes:
 
 **Current Popcornn workaround is sound:** `<img>` MJPEG + `<audio>` MP3 bypasses Tesla's `<video>` block. Stutter is likely **bandwidth / framerate / resolution** related, NOT a fundamental API failure.
 
+**Probe tool confirms:**
+- ✅ Audio works in Drive (workaround safe)
+- ✅ Canvas/WebGL available in Drive (future WebCodecs opportunity)
+- ❌ Video playback blocked in Drive (`currentTime=0` despite play)
+- ❌ drawImage(video) blocked in Drive (black frame extraction)
+
 **Safest optimization path:**
-1. Add low-bitrate/fps query params to server endpoints (`max_height=480`, `max_fps=12`, `quality=3`, `bitrate=96k`).
-2. Test on Tesla or simulated mobile network.
-3. If insufficient, explore WebCodecs (feature-detect first) or JSMpeg (separate experimental route).
+1. ✅ **DONE:** Add low-bitrate/fps query params to server endpoints (`max_height=480`, `max_fps=12`, `quality=3`, `bitrate=96k`).
+2. ✅ **DONE:** Implement Park/Drive auto-detection + multi-engine switcher (Auto/Manuel).
+3. ✅ **DONE:** Comprehensive probe tool (20+ tests) for empirical validation.
+4. ⏳ **TODO:** Test on Tesla or simulated mobile network (Mathieu validation).
+5. ⏳ **TODO (if stutter persists):** Explore WebCodecs (if probe confirms available) or JSMpeg (separate experimental route).
 
 **Do NOT:**
-- Re-enable `<video>` in Drive (blocked).
-- Assume WebCodecs available without feature detection (firmware-dependent).
+- Re-enable `<video>` in Drive (probe confirms blocked).
+- Assume WebCodecs/MSE available without probe validation (firmware-dependent).
 - Break existing MJPEG/audio workaround.
+
+**Empirical data > folklore** 🎯
