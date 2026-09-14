@@ -4,6 +4,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { canAccess } from '../../lib/permissions';
 import { serverApi } from '../../lib/client/server-api';
 import ResourceMonitorDev from './ResourceMonitorDev';
+import TranscodeJobsMonitor from './TranscodeJobsMonitor';
 import { SettingsNavCard } from './SettingsNavCard';
 import { SettingsSubPageFrame } from './SettingsSubPageFrame';
 import { useConfirmDialog } from '../ui/useConfirmDialog';
@@ -13,7 +14,7 @@ const BASE_URL = '/settings/maintenance/';
 const MIN_MAX_TRANSCODINGS = 1;
 const MAX_MAX_TRANSCODINGS = 16;
 
-const MAINTENANCE_SUBS = ['forceCleanup', 'transcodingConfig', 'restartBackend', 'hardReset', 'repairApp', 'resources', 'logs', 'tmdbCoverage'] as const;
+const MAINTENANCE_SUBS = ['forceCleanup', 'transcodingConfig', 'restartBackend', 'hardReset', 'repairApp', 'resources', 'transcodeJobs', 'logs', 'tmdbCoverage'] as const;
 type MaintenanceSub = (typeof MAINTENANCE_SUBS)[number];
 
 function getSubFromUrl(): MaintenanceSub | null {
@@ -737,6 +738,7 @@ type MaintenanceItem = {
 const MAINTENANCE_ITEMS: MaintenanceItem[] = [
   { id: 'forceCleanup', titleKey: 'settingsMenu.maintenance.forceCleanup.title', descriptionKey: 'settingsMenu.maintenance.forceCleanup.description', icon: Wrench },
   { id: 'transcodingConfig', titleKey: 'settingsMenu.maintenance.transcodingConfig.title', descriptionKey: 'settingsMenu.maintenance.transcodingConfig.description', icon: Sliders },
+  { id: 'transcodeJobs', titleKey: 'settingsMenu.maintenance.transcodeJobs.title', descriptionKey: 'settingsMenu.maintenance.transcodeJobs.description', icon: Activity },
   { id: 'restartBackend', titleKey: 'settingsMenu.maintenance.restartBackend.title', descriptionKey: 'settingsMenu.maintenance.restartBackend.description', icon: Power },
   { id: 'hardReset', titleKey: 'versionInfo.hardResetTitle', descriptionKey: 'versionInfo.hardResetDescription', icon: Power },
   { id: 'repairApp', titleKey: 'settingsMenu.maintenance.repairApp.title', descriptionKey: 'settingsMenu.maintenance.repairApp.description', icon: ShieldAlert },
@@ -770,6 +772,7 @@ export default function MaintenanceSubMenuPanel() {
     const item = MAINTENANCE_ITEMS.find((i) => i.id === sub)!;
     if (sub === 'forceCleanup') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><ForceCleanupSection embedded /></SettingsSubPageFrame>;
     if (sub === 'transcodingConfig') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><TranscodingConfigSection embedded /></SettingsSubPageFrame>;
+    if (sub === 'transcodeJobs') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><TranscodeJobsMonitor embedded /></SettingsSubPageFrame>;
     if (sub === 'restartBackend') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><RestartBackendSection embedded /></SettingsSubPageFrame>;
     if (sub === 'hardReset') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><HardResetSection embedded /></SettingsSubPageFrame>;
     if (sub === 'repairApp') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><RepairAppSection embedded /></SettingsSubPageFrame>;
