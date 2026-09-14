@@ -196,6 +196,34 @@ export const systemMethods = {
       body,
     });
   },
+
+  /** Récupère la liste des jobs de transcodage actifs + snapshot ressources */
+  async getTranscodeJobs(
+    this: ServerApiClientSystemAccess
+  ): Promise<ApiResponse<TranscodeJobsResponse>> {
+    return this.backendRequest<TranscodeJobsResponse>('/api/admin/transcode/jobs', {
+      method: 'GET',
+    });
+  },
+
+  /** Kill un job de transcodage par ID */
+  async killTranscodeJob(
+    this: ServerApiClientSystemAccess,
+    jobId: string
+  ): Promise<ApiResponse<KillTranscodeJobResponse>> {
+    return this.backendRequest<KillTranscodeJobResponse>(`/api/admin/transcode/jobs/${encodeURIComponent(jobId)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /** Récupère le snapshot ressources système (alternative si besoin) */
+  async getAdminResources(
+    this: ServerApiClientSystemAccess
+  ): Promise<ApiResponse<AdminResourcesResponse>> {
+    return this.backendRequest<AdminResourcesResponse>('/api/admin/system/resources', {
+      method: 'GET',
+    });
+  },
 };
 
 export interface SystemResourcesResponse {
@@ -211,4 +239,39 @@ export interface SystemResourcesResponse {
 
 export interface ServerLogsResponse {
   lines: string[];
+}
+
+/** Job de transcodage actif */
+export interface TranscodeJob {
+  id: string;
+  file_name: string;
+  job_type: 'DirectPlay' | 'QuickTranscode' | 'FullTranscode';
+  encoder: string; // ex: 'libx264', 'h264_nvenc', 'h264_qsv'
+  started_at: string; // ISO timestamp
+  duration_seconds: number;
+  is_cpu_intensive?: boolean;
+}
+
+/** Snapshot des ressources système avec warning optionnel */
+export interface AdminResourcesResponse {
+  load_avg_1min?: number | null;
+  load_avg_5min?: number | null;
+  load_avg_15min?: number | null;
+  cpu_percent?: number | null;
+  memory_used_mb?: number | null;
+  memory_total_mb?: number | null;
+  gpu_available?: boolean;
+  heavy_transcode_warning?: boolean;
+}
+
+/** Liste des jobs de transcodage actifs */
+export interface TranscodeJobsResponse {
+  jobs: TranscodeJob[];
+  resources?: AdminResourcesResponse;
+}
+
+/** Réponse après kill d'un job */
+export interface KillTranscodeJobResponse {
+  success: boolean;
+  message: string;
 }
