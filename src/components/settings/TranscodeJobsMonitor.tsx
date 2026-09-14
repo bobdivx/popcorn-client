@@ -24,7 +24,8 @@ export default function TranscodeJobsMonitor({ embedded = false }: TranscodeJobs
   const fetchJobs = async (force = false) => {
     if (paused && !force) return;
     try {
-      const res = await serverApi.getTranscodeJobs();
+      // Utiliser getTranscodeStatus (endpoint préféré qui contient jobs + resources + warning)
+      const res = await serverApi.getTranscodeStatus();
       if (res.success && res.data) {
         setData(res.data);
         setError(null);

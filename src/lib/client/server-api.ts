@@ -98,6 +98,7 @@ export type {
   TranscodeJob,
   AdminResourcesResponse,
   TranscodeJobsResponse,
+  TranscodeStatusResponse,
   KillTranscodeJobResponse,
   SystemResourcesResponse,
 } from './server-api/system.js';

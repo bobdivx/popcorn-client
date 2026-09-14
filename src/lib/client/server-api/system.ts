@@ -197,13 +197,80 @@ export const systemMethods = {
     });
   },
 
-  /** Récupère la liste des jobs de transcodage actifs + snapshot ressources */
+  /** Récupère le status complet des transcodages (jobs + ressources + warning) - ENDPOINT PRÉFÉRÉ */
+  async getTranscodeStatus(
+    this: ServerApiClientSystemAccess
+  ): Promise<ApiResponse<TranscodeJobsResponse>> {
+    const rawRes = await this.backendRequest<TranscodeStatusResponse | RawTranscodeJob[]>(
+      '/api/admin/transcode/status',
+      { method: 'GET' }
+    );
+    
+    if (!rawRes.success || !rawRes.data) {
+      return rawRes as ApiResponse<TranscodeJobsResponse>;
+    }
+
+    // Cas 1: réponse serveur = array de jobs (ancien format /jobs)
+    if (Array.isArray(rawRes.data)) {
+      return {
+        success: true,
+        data: {
+          jobs: rawRes.data.map(normalizeTranscodeJob),
+        },
+      };
+    }
+
+    // Cas 2: réponse serveur = TranscodeStatusResponse
+    const status = rawRes.data;
+    const jobs = (status.jobs || []).map(normalizeTranscodeJob);
+    
+    let resources: AdminResourcesResponse | undefined;
+    if (status.system) {
+      resources = normalizeResources(status.system);
+      // Détecter warning via string warning ou heavy_transcode_warning
+      if (status.warning && status.warning.trim()) {
+        resources.heavy_transcode_warning = true;
+      }
+    }
+
+    return {
+      success: true,
+      data: { jobs, resources },
+    };
+  },
+
+  /** Récupère la liste des jobs de transcodage actifs + snapshot ressources (fallback) */
   async getTranscodeJobs(
     this: ServerApiClientSystemAccess
   ): Promise<ApiResponse<TranscodeJobsResponse>> {
-    return this.backendRequest<TranscodeJobsResponse>('/api/admin/transcode/jobs', {
-      method: 'GET',
-    });
+    const rawRes = await this.backendRequest<TranscodeJobsResponse | RawTranscodeJob[]>(
+      '/api/admin/transcode/jobs',
+      { method: 'GET' }
+    );
+
+    if (!rawRes.success || !rawRes.data) {
+      return rawRes as ApiResponse<TranscodeJobsResponse>;
+    }
+
+    // Cas 1: array de jobs bruts
+    if (Array.isArray(rawRes.data)) {
+      return {
+        success: true,
+        data: {
+          jobs: rawRes.data.map(normalizeTranscodeJob),
+        },
+      };
+    }
+
+    // Cas 2: déjà normalisé (client-friendly) mais re-normaliser pour sécurité
+    const existing = rawRes.data as TranscodeJobsResponse;
+    return {
+      success: true,
+      data: {
+        jobs: existing.jobs.map(j => normalizeTranscodeJob(j as any)),
+        resources: existing.resources ? normalizeResources(existing.resources as any) : undefined,
+      },
+    };
   },
 
   /** Kill un job de transcodage par ID */
@@ -216,13 +283,23 @@ export const systemMethods = {
     });
   },
 
-  /** Récupère le snapshot ressources système (alternative si besoin) */
+  /** Récupère le snapshot ressources système (optionnel, fallback si status unavailable) */
   async getAdminResources(
     this: ServerApiClientSystemAccess
   ): Promise<ApiResponse<AdminResourcesResponse>> {
-    return this.backendRequest<AdminResourcesResponse>('/api/admin/system/resources', {
-      method: 'GET',
-    });
+    const rawRes = await this.backendRequest<RawSystemResources>(
+      '/api/admin/system/resources',
+      { method: 'GET' }
+    );
+
+    if (!rawRes.success || !rawRes.data) {
+      return rawRes as ApiResponse<AdminResourcesResponse>;
+    }
+
+    return {
+      success: true,
+      data: normalizeResources(rawRes.data),
+    };
   },
 };
 
@@ -241,18 +318,49 @@ export interface ServerLogsResponse {
   lines: string[];
 }
 
-/** Job de transcodage actif */
+/** Job de transcodage actif - format serveur brut */
+interface RawTranscodeJob {
+  job_id?: string;
+  id?: string;
+  pid?: number;
+  file_name?: string;
+  job_type?: 'HLS' | 'MP4' | 'CAR' | 'DirectPlay' | 'QuickTranscode' | 'FullTranscode';
+  encoder?: string;
+  started_at?: string;
+  cpu_percent?: number;
+  memory_mb?: number;
+}
+
+/** Job de transcodage actif - format normalisé client */
 export interface TranscodeJob {
   id: string;
+  pid?: number;
   file_name: string;
-  job_type: 'DirectPlay' | 'QuickTranscode' | 'FullTranscode';
-  encoder: string; // ex: 'libx264', 'h264_nvenc', 'h264_qsv'
-  started_at: string; // ISO timestamp
+  job_type: 'HLS' | 'MP4' | 'CAR' | 'DirectPlay' | 'QuickTranscode' | 'FullTranscode';
+  encoder: string;
+  started_at: string;
   duration_seconds: number;
+  cpu_percent?: number;
+  memory_mb?: number;
   is_cpu_intensive?: boolean;
 }
 
-/** Snapshot des ressources système avec warning optionnel */
+/** Ressources système - format serveur brut */
+interface RawSystemResources {
+  load_average_1m?: number | null;
+  load_average_5m?: number | null;
+  load_average_15m?: number | null;
+  load_avg_1min?: number | null;
+  load_avg_5min?: number | null;
+  load_avg_15min?: number | null;
+  cpu_percent?: number | null;
+  memory_used_mb?: number | null;
+  memory_total_mb?: number | null;
+  gpu_available?: boolean;
+  heavy_transcode_warning?: boolean;
+}
+
+/** Snapshot des ressources système avec warning optionnel - format normalisé */
 export interface AdminResourcesResponse {
   load_avg_1min?: number | null;
   load_avg_5min?: number | null;
@@ -264,7 +372,17 @@ export interface AdminResourcesResponse {
   heavy_transcode_warning?: boolean;
 }
 
-/** Liste des jobs de transcodage actifs */
+/** Status complet des transcodages - réponse de /api/admin/transcode/status */
+export interface TranscodeStatusResponse {
+  active_jobs: number;
+  active_mp4_count?: number;
+  active_hls_count?: number;
+  jobs?: RawTranscodeJob[];
+  system?: RawSystemResources;
+  warning?: string | null;
+}
+
+/** Liste des jobs de transcodage actifs - réponse de /api/admin/transcode/jobs */
 export interface TranscodeJobsResponse {
   jobs: TranscodeJob[];
   resources?: AdminResourcesResponse;
@@ -274,4 +392,56 @@ export interface TranscodeJobsResponse {
 export interface KillTranscodeJobResponse {
   success: boolean;
   message: string;
+}
+
+/**
+ * Normalise un job brut du serveur en format client
+ */
+function normalizeTranscodeJob(raw: RawTranscodeJob): TranscodeJob {
+  const id = raw.id || raw.job_id || 'unknown';
+  const file_name = raw.file_name || id;
+  const job_type = raw.job_type || 'HLS';
+  const encoder = raw.encoder || 'unknown';
+  const started_at = raw.started_at || new Date().toISOString();
+  
+  // Calculer duration_seconds si started_at est disponible
+  let duration_seconds = 0;
+  try {
+    const start = new Date(started_at);
+    duration_seconds = Math.floor((Date.now() - start.getTime()) / 1000);
+  } catch {
+    duration_seconds = 0;
+  }
+
+  // CPU intensif si libx264 (CPU) ou cpu_percent élevé
+  const is_cpu_intensive = encoder.includes('libx264') || (raw.cpu_percent != null && raw.cpu_percent > 50);
+
+  return {
+    id,
+    pid: raw.pid,
+    file_name,
+    job_type,
+    encoder,
+    started_at,
+    duration_seconds,
+    cpu_percent: raw.cpu_percent,
+    memory_mb: raw.memory_mb,
+    is_cpu_intensive,
+  };
+}
+
+/**
+ * Normalise les ressources système du serveur en format client
+ */
+function normalizeResources(raw: RawSystemResources): AdminResourcesResponse {
+  return {
+    load_avg_1min: raw.load_avg_1min ?? raw.load_average_1m,
+    load_avg_5min: raw.load_avg_5min ?? raw.load_average_5m,
+    load_avg_15min: raw.load_avg_15min ?? raw.load_average_15m,
+    cpu_percent: raw.cpu_percent,
+    memory_used_mb: raw.memory_used_mb,
+    memory_total_mb: raw.memory_total_mb,
+    gpu_available: raw.gpu_available,
+    heavy_transcode_warning: raw.heavy_transcode_warning,
+  };
 }
