@@ -1584,6 +1584,42 @@
         "tipSyncInterval": "Augmenter l'intervalle de synchronisation (Paramètres > Sync) pour réduire la charge au repos.",
         "tipLibraryScan": "Réduire la fréquence du scan bibliothèque ou le désactiver (intervalle à 0) si inutile.",
         "tipStartupScan": "Le scan bibliothèque au démarrage est désactivé par défaut ; garder POPCORN_LIBRARY_SCAN_ON_STARTUP non défini."
+      },
+      "transcodeJobs": {
+        "title": "Transcodages actifs",
+        "description": "Surveillance et gestion des jobs FFmpeg/transcodage en cours",
+        "noJobs": "Aucun transcodage en cours",
+        "jobsCount": "{count} job(s) actif(s)",
+        "fileName": "Fichier",
+        "jobType": "Type",
+        "encoder": "Encodeur",
+        "duration": "Durée",
+        "started": "Démarré",
+        "killJob": "Arrêter",
+        "killJobConfirm": "Voulez-vous vraiment arrêter ce job de transcodage ?",
+        "killJobSuccess": "Job arrêté",
+        "killJobError": "Erreur lors de l'arrêt du job",
+        "loadError": "Impossible de charger les jobs",
+        "cpuIntensive": "CPU intensif",
+        "typeDirectPlay": "Lecture directe",
+        "typeQuickTranscode": "Transcodage rapide",
+        "typeFullTranscode": "Transcodage complet",
+        "typeHLS": "Streaming HLS",
+        "typeMP4": "Conversion MP4",
+        "typeCAR": "Mode voiture",
+        "refresh": "Actualiser",
+        "resourcesTitle": "Ressources système",
+        "loadAvg": "Charge moyenne",
+        "cpuUsage": "CPU",
+        "memoryUsage": "Mémoire",
+        "gpuStatus": "GPU"
+      },
+      "transcodeWarning": {
+        "title": "Transcodage lourd en cours",
+        "message": "Transcodage lourd en cours — la lecture peut être bloquée ou lente",
+        "details": "Un ou plusieurs transcodages CPU intensifs sont en cours. Les autres lectures peuvent être ralenties ou bloquées (erreur 503).",
+        "viewJobs": "Voir les jobs actifs",
+        "dismiss": "Masquer"
       }
     },
     "setup": {
