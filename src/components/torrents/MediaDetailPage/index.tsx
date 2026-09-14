@@ -15,7 +15,6 @@ import {
 import { findPackFileIndexForEpisode, usePackEpisodes } from './hooks/usePackEpisodes';
 import { useDebug } from './hooks/useDebug';
 import { useNotifications } from './hooks/useNotifications';
-import { EnhancedProgressOverlay } from './components/EnhancedProgressOverlay';
 import { VideoPlayerWrapper } from './components/VideoPlayerWrapper';
 import { MediaDetailActionButtons } from './components/MediaDetailActionButtons';
 import { TorrentInfo } from './components/TorrentInfo';
@@ -3155,99 +3154,10 @@ export default function MediaDetailPage({
   // Ref pour le wrapper vidéo
   const videoWrapperRef = useRef<HTMLDivElement | null>(null);
   
-  // Afficher l'overlay de progression UNIQUEMENT pour le streaming (bouton "Lire")
-  // Pas pour le téléchargement (bouton "Télécharger") - le statut sera affiché sur la page détail
-  // L'overlay ne doit s'afficher que si on a cliqué sur "Lire" ET que le torrent n'est pas encore prêt
-  // Si playStatus === 'ready' et qu'on a des fichiers, ne jamais afficher l'overlay (lecteur doit s'afficher)
-  const shouldShowOverlay =
-    !canShowVideoPlayer &&
-    playStatus !== 'idle' &&
-    playStatus !== 'ready' &&
-    !continueInBackgroundRef.current &&
-    isPlaying;
+  // Ne plus afficher l'overlay fullscreen - le loading se fait maintenant in-player via PlayerLoadingOverlay
+  // Le VideoPlayerWrapper gère l'affichage du loading overlay intégré
 
-  if (shouldShowOverlay) {
-    return (
-      <EnhancedProgressOverlay
-        playStatus={playStatus}
-        torrentStats={torrentStats}
-        progressMessage={progressMessage}
-        errorMessage={errorMessage}
-        imageUrl={
-          getHighQualityTmdbImageUrl(heroImageUrl || imageUrl) || heroImageUrl || imageUrl
-        }
-        posterUrl={getHighQualityTmdbImageUrl(imageUrl) || imageUrl}
-        showDebug={showDebug}
-        debugLogs={debugLogs}
-        title={mediaTitleForPlayer}
-        hasVideoFiles={videoFiles.length > 0}
-        isHlsPreparing={
-          playStatus === 'adding' ||
-          (Boolean(torrentStats && (torrentStats.state === 'completed' || torrentStats.state === 'seeding')) &&
-            !canShowVideoPlayer)
-        }
-        onCancel={handleAbortDownload}
-        onContinueInBackground={() => {
-          // Fermer l'overlay mais continuer le téléchargement en arrière-plan
-          // Ne pas arrêter le polling, juste masquer l'overlay
-          continueInBackgroundRef.current = true;
-          // Ne pas appeler stopProgressPolling() - on veut continuer à suivre la progression
-          // Le polling continue en arrière-plan pour suivre la progression
-          setPlayStatus('idle'); // Masquer l'overlay
-          // Garder torrentStats pour qu'on puisse voir la progression si on revient
-          // Ne pas réinitialiser torrentStats pour garder les stats actuelles
-          setProgressMessage('');
-          setErrorMessage(null);
-          addDebugLog('info', 'Téléchargement continué en arrière-plan', { 
-            hasPolling: !!progressPollIntervalRef.current,
-            torrentStats: torrentStats ? { progress: torrentStats.progress, state: torrentStats.state } : null
-          });
-          addNotification('info', 'Le téléchargement continue en arrière-plan');
-        }}
-        onRetry={() => {
-          // RÃ©initialiser le flag de continuation en arriÃ¨re-plan quand on rÃ©essaie
-          continueInBackgroundRef.current = false;
-          setPlayStatus('idle');
-          setErrorMessage(null);
-          setProgressMessage('');
-          handlePlay();
-        }}
-        onDeleteEmptyFiles={handleDeleteEmptyFiles}
-        onToggleDebug={() => setShowDebug(!showDebug)}
-        onCopyLogs={async () => {
-          try {
-            const logsText = debugLogs.map(log => {
-              const dataStr = log.data ? `\n  Data: ${JSON.stringify(log.data, null, 2)}` : '';
-              return `[${log.time}] [${log.type.toUpperCase()}] ${log.message}${dataStr}`;
-            }).join('\n\n');
-            await navigator.clipboard.writeText(logsText);
-            addDebugLog('success', 'âœ… Logs copiÃ©s dans le presse-papiers');
-          } catch (err) {
-            const textarea = document.createElement('textarea');
-            const logsText = debugLogs.map(log => {
-              const dataStr = log.data ? `\n  Data: ${JSON.stringify(log.data, null, 2)}` : '';
-              return `[${log.time}] [${log.type.toUpperCase()}] ${log.message}${dataStr}`;
-            }).join('\n\n');
-            textarea.value = logsText;
-            textarea.style.position = 'fixed';
-            textarea.style.opacity = '0';
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-            addDebugLog('success', 'âœ… Logs copiÃ©s dans le presse-papiers (fallback)');
-          }
-        }}
-        onClearLogs={() => {
-          clearDebugLogs();
-          addDebugLog('info', '=== Logs effacÃ©s ===');
-        }}
-      />
-    );
-  }
-
-  // Si on peut afficher le lecteur vidÃ©o, l'afficher (display* = Ã©pisode en cours ou prÃ©cÃ©dent pendant la transition)
-  if (canShowVideoPlayer && !shouldShowOverlay && displayInfoHash) {
+  if (canShowVideoPlayer && displayInfoHash) {
     return (
       <VideoPlayerWrapper
         key={`player-${displayInfoHash}-${displayFile?.path ?? displayFile?.name ?? ''}`}
@@ -3340,9 +3250,8 @@ export default function MediaDetailPage({
   // Page principale
   return (
     <>
-      {/* Ne rendre VideoPlayerWrapper QUE si on est en mode streaming (isPlaying = true) */}
-      {/* Pendant le téléchargement (isPlaying = false), ne pas rendre le composant pour éviter de déclencher le lecteur HLS */}
-      {displayInfoHash && !shouldShowOverlay && isPlaying && canShowVideoPlayer && (
+      {/* Afficher VideoPlayerWrapper dès isPlaying pour avoir le loading in-player */}
+      {displayInfoHash && isPlaying && canShowVideoPlayer && (
         <VideoPlayerWrapper
           key={`player-${displayInfoHash}-${displayFile?.path ?? displayFile?.name ?? ''}`}
           infoHash={displayInfoHash}

@@ -185,10 +185,9 @@
     "pageSubtitle": "Découvrez des films et séries à demander"
   },
   "languages": {
-  "fr": "Français",
-  "en": "English"
+    "fr": "Français",
+    "en": "English"
   },
-
   "wizard": {
     "language": {
       "title": "Choisissez votre langue",
@@ -586,10 +585,10 @@
       "idle": "",
       "resolving": "Connexion au torrent…",
       "checking": "Vérification des fichiers…",
-      "findingPeers": "Recherche de peers…",
-      "downloading": "Téléchargement",
-      "preparingPlayback": "Préparation de la lecture…",
-      "buffering": "Mise en buffer…",
+      "findingPeers": "Recherche de sources…",
+      "downloading": "Téléchargement en cours",
+      "preparingPlayback": "Préparation du lecteur…",
+      "buffering": "Chargement des segments vidéo…",
       "ready": "Prêt",
       "error": "Erreur"
     },
@@ -610,13 +609,13 @@
     "showDebug": "Afficher debug",
     "hideDebug": "Masquer debug",
     "hls": {
-      "serverPreparing": "Le serveur prépare la vidéo…",
-      "preparingRemux": "Préparation de la vidéo…",
-      "preparingTranscode": "Conversion pour cet appareil…",
-      "playlistReady": "Remplissage du buffer…",
-      "serverPipeline": "Serveur (HLS)",
-      "playerBuffer": "Buffer lecteur",
-      "segmentsReady": "{ready} / {expected} segments",
+      "serverPreparing": "Préparation du flux vidéo…",
+      "preparingRemux": "Préparation du conteneur vidéo…",
+      "preparingTranscode": "Optimisation pour votre appareil…",
+      "playlistReady": "Chargement initial…",
+      "serverPipeline": "Préparation serveur",
+      "playerBuffer": "Chargement lecteur",
+      "segmentsReady": "{ready} / {expected} segments prêts",
       "openLogs": "Ouvrir les logs de la vidéo",
       "scanLogsQr": "Scanner pour voir les logs sur le téléphone",
       "ffmpegRunning": "FFmpeg en cours",
@@ -633,19 +632,18 @@
       "gpuWillUseGeneric": "GPU détecté — {accel} sera utilisé",
       "gpuWillUseCpu": "Transcodage CPU (pas de GPU)",
       "liveTrace": "Journal lecture",
-      "etaPlayable": "Lecture dans {eta}",
+      "etaPlayable": "Démarrage dans {eta}",
       "elapsed": "Depuis le lancement",
       "stalls": "Buffers / stalls",
       "bufferEvents": "buffers",
       "network": "Réseau appareil",
       "hlsBandwidth": "Débit HLS estimé",
       "uhdFallback1080": "La 4K ne démarre pas sur cet appareil — passage en 1080p…",
-      "warmingUp": "On prépare une lecture fluide",
-      "almostReady": "C’est presque prêt",
-      "optimizingPicture": "Optimisation de l’image",
-      "smoothingPlayback": "Lissage de la lecture"
+      "warmingUp": "Préparation de la lecture fluide…",
+      "almostReady": "Presque prêt à démarrer…",
+      "optimizingPicture": "Optimisation de l'image…",
+      "smoothingPlayback": "Optimisation de la fluidité…"
     },
-
     "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct.",
     "errorStream": "Impossible de lire la vidéo. Vérifiez la connexion au serveur.",
     "errorStreamDetailAborted": "Chargement de la vidéo interrompu.",
@@ -702,7 +700,6 @@
     "themeDark": "Thème sombre",
     "themeAuto": "Thème automatique (clair de {dayStart} h à {nightStart} h)"
   },
-
   "settings": {
     "title": "Paramètres",
     "server": "Serveur",
