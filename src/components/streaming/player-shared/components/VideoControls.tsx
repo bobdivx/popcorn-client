@@ -398,8 +398,8 @@ export function VideoControls({
               </div>
             )}
           </div>
-            {showLogo && !showPosterSynopsisPause && (
-            logoUrl ? (
+            {showLogo && (
+            logoUrl && !showPosterSynopsisPause ? (
               <img 
                 src={logoUrl} 
                 alt="" 
@@ -460,6 +460,14 @@ export function VideoControls({
           </div>
         )}
         <div class={`mt-auto shrink-0 flex flex-col gap-2 pointer-events-auto ${padding}`}>
+          {/* Timecode mobile (au-dessus de la barre pour libérer l'espace horizontal) */}
+          {isMobile && !isTV && (
+            <div class={`flex items-center justify-between text-white ${textSize} font-medium tabular-nums px-1`}>
+              <span>{formatTime(isDraggingScrub || scrubPreviewActiveDesktop ? previewTime : currentTime)}</span>
+              <span class="text-white/50">/</span>
+              <span class="text-white/70">{formatTime(duration > 0 ? duration : (scrubThumbnails?.durationSeconds ?? 0))}</span>
+            </div>
+          )}
           {/* Colonne barre + carrousel (visible seulement pendant un avance/recul) */}
           <div
             class={`relative flex min-h-0 flex-col gap-2 ${isDraggingScrub || showScrubStrip ? 'z-30' : ''}`}
@@ -707,7 +715,7 @@ export function VideoControls({
             nextThumbnailLabel={t('playback.scrubNextThumbnail')}
           />
           </div>
-          <div class={`flex items-center ${gap} relative z-30 min-w-0 shrink-0 rounded-2xl bg-black/50 px-2 py-1.5 ring-1 ring-white/25 ${isMobile ? 'overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden' : ''}`} data-tv-video-controls-row>
+          <div class={`flex items-center ${gap} relative z-30 min-w-0 shrink-0 rounded-2xl bg-black/50 px-2 py-1.5 ring-1 ring-white/25 ${isMobile ? 'flex-wrap justify-center' : ''}`} data-tv-video-controls-row>
             {isTV ? (
               <>
                 <button
@@ -825,28 +833,15 @@ export function VideoControls({
               </div>
             </div>
             )}
-            <div class={`flex items-center gap-1 sm:gap-2 text-white ${textSize} font-medium flex-shrink-0 tabular-nums`}>
-              <span>{formatTime(isDraggingScrub || scrubPreviewActiveDesktop ? previewTime : currentTime)}</span>
-              <span class="hidden sm:inline text-white/50">/</span>
-              <span class="hidden sm:inline text-white/70">{formatTime(duration > 0 ? duration : (scrubThumbnails?.durationSeconds ?? 0))}</span>
-            </div>
-            <div class="flex-1 min-w-2" />
-            {hasLanguageTracks && onToggleSubtitleSelector && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleSubtitleSelector();
-                }}
-                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all border-2 border-white/60 focus:outline-none ${
-                  currentSubtitleTrack !== -1 ? 'bg-white/50 border-white' : ''
-                }`}
-                title={t('playback.languagesAndSubtitles')}
-                aria-label={t('playback.languagesAndSubtitles')}
-              >
-                <Subtitles class={`${iconSize} text-white`} />
-              </button>
+            {/* Timecode desktop seulement (mobile = au-dessus) */}
+            {!isMobile && !isTV && (
+              <div class={`flex items-center gap-1 sm:gap-2 text-white ${textSize} font-medium flex-shrink-0 tabular-nums`}>
+                <span>{formatTime(isDraggingScrub || scrubPreviewActiveDesktop ? previewTime : currentTime)}</span>
+                <span class="hidden sm:inline text-white/50">/</span>
+                <span class="hidden sm:inline text-white/70">{formatTime(duration > 0 ? duration : (scrubThumbnails?.durationSeconds ?? 0))}</span>
+              </div>
             )}
+            <div class={`flex-1 ${isMobile ? 'hidden' : 'min-w-2'}`} />
             {showCastButton && onCastClick && (
               <button
                 type="button"
