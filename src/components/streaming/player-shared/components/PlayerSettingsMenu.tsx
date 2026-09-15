@@ -279,9 +279,11 @@ export function PlayerSettingsMenu({
           focused ? 'bg-white text-black' : 'text-white hover:bg-white/10'
         }`}
         onClick={(e) => {
+          e.preventDefault();
           e.stopPropagation();
           onClick();
         }}
+        onPointerDown={(e) => e.stopPropagation()}
       >
         <span class={`flex-shrink-0 ${focused ? 'text-black/70' : 'text-white/80'}`}>{icon}</span>
         <span class="flex-1 min-w-0">
@@ -326,9 +328,11 @@ export function PlayerSettingsMenu({
               : 'text-white/90 hover:bg-white/10'
         }`}
         onClick={(e) => {
+          e.preventDefault();
           e.stopPropagation();
           onClick();
         }}
+        onPointerDown={(e) => e.stopPropagation()}
       >
         <span class="w-6 flex-shrink-0 flex justify-center">
           {selected ? (
@@ -360,9 +364,7 @@ export function PlayerSettingsMenu({
           onClose();
         }}
         onPointerDown={(e) => {
-          e.preventDefault();
           e.stopPropagation();
-          onClose();
         }}
         aria-hidden="true"
       />
@@ -372,6 +374,7 @@ export function PlayerSettingsMenu({
         role="menu"
         aria-label={t('playback.playerSettings')}
         onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
       >
         <div class={`flex items-center gap-3 ${pad} border-b border-white/10 shrink-0`}>
           {panel !== 'root' ? (
@@ -379,9 +382,11 @@ export function PlayerSettingsMenu({
               type="button"
               class={`flex items-center justify-center ${btnRound} rounded-full hover:bg-white/10 text-white transition-colors`}
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 setPanel('root');
               }}
+              onPointerDown={(e) => e.stopPropagation()}
               aria-label={t('common.back')}
             >
               <ArrowLeft class={iconCls} />
@@ -401,9 +406,11 @@ export function PlayerSettingsMenu({
                   : 'hover:bg-white/10 text-white'
               }`}
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 onClose();
               }}
+              onPointerDown={(e) => e.stopPropagation()}
               aria-label={t('common.close')}
             >
               <X class={iconCls} />
@@ -413,9 +420,11 @@ export function PlayerSettingsMenu({
               type="button"
               class={`flex items-center justify-center ${btnRound} rounded-full hover:bg-white/10 text-white transition-colors`}
               onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
                 onClose();
               }}
+              onPointerDown={(e) => e.stopPropagation()}
               aria-label={t('common.close')}
             >
               <X class={iconCls} />
