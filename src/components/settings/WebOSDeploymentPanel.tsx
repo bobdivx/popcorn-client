@@ -17,6 +17,8 @@ export default function WebOSDeploymentPanel() {
   const [copied, setCopied] = useState(false);
 
   const [device, setDevice] = useState('lgtv');
+  const [deviceIp, setDeviceIp] = useState('');
+  const [passphrase, setPassphrase] = useState('');
   const [installing, setInstalling] = useState(false);
   const [relaunching, setRelaunching] = useState(false);
   const [status, setStatus] = useState<'idle' | 'ok' | 'err'>('idle');
@@ -56,12 +58,24 @@ export default function WebOSDeploymentPanel() {
   };
 
   const runInstall = async () => {
+    const name = device.trim() || 'lgtv';
+    const ip = deviceIp.trim();
+    if (!ip) {
+      setStatus('err');
+      setMessage(t('settingsPages.webosDeployment.ipRequired'));
+      return;
+    }
+
     setInstalling(true);
     setStatus('idle');
     setMessage('');
     setLogs('');
     try {
-      const res = await serverApi.installWebOSSimple(device.trim() || undefined);
+      const res = await serverApi.installWebOSSimple({
+        device: name,
+        ip,
+        passphrase: passphrase.trim() || undefined,
+      });
       const payload = res.data;
       const combined =
         [payload?.logs, payload?.stderr].filter(Boolean).join('\n---\n') ||
@@ -161,24 +175,65 @@ export default function WebOSDeploymentPanel() {
         <p class="text-sm text-[var(--ds-text-secondary)] mb-3">{t('settingsPages.webosDeployment.lead')}</p>
         <p class="text-xs text-[var(--ds-text-tertiary)] mb-4">{t('settingsPages.webosDeployment.prereq')}</p>
 
-        <label class="block w-full max-w-md mb-4">
-          <span class="block text-sm font-medium text-[var(--ds-text-primary)] mb-2">
-            {t('settingsPages.webosDeployment.deviceLabel')}
-          </span>
-          <input
-            type="text"
-            class={fieldClass}
-            value={device}
-            onInput={(e) => setDevice((e.target as HTMLInputElement).value)}
-            disabled={busy}
-            placeholder={t('settingsPages.webosDeployment.devicePlaceholder')}
-            autoComplete="off"
-            data-tv-focusable
-          />
-          <span class="block text-xs text-[var(--ds-text-tertiary)] mt-1.5">
-            {t('settingsPages.webosDeployment.deviceHelp')}
-          </span>
-        </label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl mb-4">
+          <label class="block w-full">
+            <span class="block text-sm font-medium text-[var(--ds-text-primary)] mb-2">
+              {t('settingsPages.webosDeployment.deviceLabel')}
+            </span>
+            <input
+              type="text"
+              class={fieldClass}
+              value={device}
+              onInput={(e) => setDevice((e.target as HTMLInputElement).value)}
+              disabled={busy}
+              placeholder={t('settingsPages.webosDeployment.devicePlaceholder')}
+              autoComplete="off"
+              data-tv-focusable
+            />
+            <span class="block text-xs text-[var(--ds-text-tertiary)] mt-1.5">
+              {t('settingsPages.webosDeployment.deviceHelp')}
+            </span>
+          </label>
+
+          <label class="block w-full">
+            <span class="block text-sm font-medium text-[var(--ds-text-primary)] mb-2">
+              {t('settingsPages.webosDeployment.ipLabel')}
+            </span>
+            <input
+              type="text"
+              class={fieldClass}
+              value={deviceIp}
+              onInput={(e) => setDeviceIp((e.target as HTMLInputElement).value)}
+              disabled={busy}
+              placeholder={t('settingsPages.webosDeployment.ipPlaceholder')}
+              inputMode="decimal"
+              autoComplete="off"
+              data-tv-focusable
+            />
+            <span class="block text-xs text-[var(--ds-text-tertiary)] mt-1.5">
+              {t('settingsPages.webosDeployment.ipHelp')}
+            </span>
+          </label>
+
+          <label class="block w-full sm:col-span-2">
+            <span class="block text-sm font-medium text-[var(--ds-text-primary)] mb-2">
+              {t('settingsPages.webosDeployment.passphraseLabel')}
+            </span>
+            <input
+              type="text"
+              class={fieldClass + ' max-w-md'}
+              value={passphrase}
+              onInput={(e) => setPassphrase((e.target as HTMLInputElement).value)}
+              disabled={busy}
+              placeholder={t('settingsPages.webosDeployment.passphrasePlaceholder')}
+              autoComplete="off"
+              data-tv-focusable
+            />
+            <span class="block text-xs text-[var(--ds-text-tertiary)] mt-1.5">
+              {t('settingsPages.webosDeployment.passphraseHelp')}
+            </span>
+          </label>
+        </div>
 
         <div class="flex flex-col sm:flex-row gap-3">
           <button
