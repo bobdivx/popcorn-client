@@ -400,9 +400,9 @@ interface IServerApiClientPublic {
   >;
   getServerLogs(params?: { limit?: number }): Promise<ApiResponse<{ lines: string[] }>>;
   restartBackend(): Promise<ApiResponse<{ will_exit: boolean }>>;
-  installWebOSSimple(device?: string): Promise<
-    ApiResponse<import('./server-api/system.js').WebOSInstallSimpleResponse>
-  >;
+  installWebOSSimple(
+    opts?: string | { device?: string; ip?: string; passphrase?: string }
+  ): Promise<ApiResponse<import('./server-api/system.js').WebOSInstallSimpleResponse>>;
   relaunchWebOSApp(device?: string): Promise<
     ApiResponse<import('./server-api/system.js').WebOSRelaunchResponse>
   >;

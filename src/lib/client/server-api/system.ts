@@ -173,10 +173,20 @@ export const systemMethods = {
 
   async installWebOSSimple(
     this: ServerApiClientSystemAccess,
-    device?: string
+    opts?: string | { device?: string; ip?: string; passphrase?: string }
   ): Promise<ApiResponse<WebOSInstallSimpleResponse>> {
+    const params =
+      typeof opts === 'string'
+        ? { device: opts }
+        : {
+            device: opts?.device,
+            ip: opts?.ip,
+            passphrase: opts?.passphrase,
+          };
     const body = JSON.stringify({
-      device: device && device.trim() ? device.trim() : undefined,
+      device: params.device?.trim() || undefined,
+      ip: params.ip?.trim() || undefined,
+      passphrase: params.passphrase?.trim() || undefined,
     });
     return this.backendRequest<WebOSInstallSimpleResponse>(
       '/api/admin/deployment/webos/install-simple',
