@@ -149,12 +149,18 @@ const SIDEBAR_CSS = `
   .sn-sidebar {
     background: linear-gradient(180deg, rgba(14, 8, 21, 0.96) 0%, rgba(10, 8, 18, 0.98) 100%);
     border-right: 1px solid rgba(168, 85, 247, 0.14);
-    position: relative;
+    /* Mobile: fixed (drawer hors flux). Desktop: relative dans l'aside réservé. */
+    position: fixed;
     overflow: hidden;
     display: flex;
     flex-direction: column;
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
+  }
+  @media (min-width: 768px) {
+    .sn-sidebar {
+      position: relative;
+    }
   }
   .sn-sidebar::before {
     content: '';
