@@ -113,13 +113,14 @@ export function mergeReadyToWatch(
   return out;
 }
 
-/** Fenêtre « Derniers téléchargements » (1 semaine). */
-export const RECENT_DOWNLOAD_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-export const RECENT_DOWNLOAD_LIMIT = 20;
+/** Fenêtre « Derniers téléchargements » (2 semaines). */
+export const RECENT_DOWNLOAD_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+export const RECENT_DOWNLOAD_LIMIT = 40;
 
 /**
  * Médias téléchargés récemment (≤ maxAge), plus les téléchargements en cours.
  * Tri : en cours d'abord, puis addedAt décroissant.
+ * Sans `addedAt` : on garde les titres présents en bibliothèque (évite une file trop courte).
  */
 export function filterRecentDownloads(
   items: ContentItem[],
@@ -131,13 +132,16 @@ export function filterRecentDownloads(
   return [...items]
     .filter((item) => {
       if (item.isDownloading) return true;
-      if (typeof item.addedAt !== 'number') return false;
-      return item.addedAt >= cutoffSec;
+      if (typeof item.addedAt === 'number') return item.addedAt >= cutoffSec;
+      return item.availableInLibrary === true;
     })
     .sort((a, b) => {
       const aDl = a.isDownloading ? 1 : 0;
       const bDl = b.isDownloading ? 1 : 0;
       if (aDl !== bDl) return bDl - aDl;
+      const aHasDate = typeof a.addedAt === 'number' ? 1 : 0;
+      const bHasDate = typeof b.addedAt === 'number' ? 1 : 0;
+      if (aHasDate !== bHasDate) return bHasDate - aHasDate;
       return (b.addedAt ?? 0) - (a.addedAt ?? 0);
     })
     .slice(0, limit);
