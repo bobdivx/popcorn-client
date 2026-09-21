@@ -8,6 +8,7 @@ import { PageHeader } from './PageHeader';
 import { TitlePreviewCard } from './TitlePreviewCard';
 import { contentItemKey } from '../dashboard/utils/browsePriority';
 import type { EnrichedResumeItem } from '../dashboard/hooks/useResumeWatching';
+import BrowseRowReveal from '../motion/BrowseRowReveal';
 
 interface SimpleTmdbSection {
   id: string;
@@ -105,7 +106,7 @@ export function SimpleTmdbPage({
   const hasContent = visibleSections.length > 0;
 
   const renderSection = (section: SimpleTmdbSection) => (
-    <div key={section.id} data-browse-row>
+    <BrowseRowReveal key={section.id} rowId={section.id}>
       <CarouselSection title={section.title}>
         {section.items.map((item) => {
           if (section.kind === 'resume') {
@@ -157,7 +158,7 @@ export function SimpleTmdbPage({
           );
         })}
       </CarouselSection>
-    </div>
+    </BrowseRowReveal>
   );
 
   return (

@@ -3384,12 +3384,15 @@ export default function MediaDetailPage({
             </button>
           )}
 
-          <div className="max-w-6xl w-full mb-6 sm:mb-8 md:mb-10">
+          <div className="max-w-6xl w-full mb-6 sm:mb-8 md:mb-10 ds-stream-cascade">
+            <div data-stream-item>
             <HeroHeader
               torrent={activeTorrent}
               displayTitle={mediaTitleForHero}
             />
+            </div>
 
+            <div data-stream-item>
             <ActionsRow backHref={backHref ?? '/dashboard'} isTV={isTV} backLinkRef={backLinkRef}>
               <MediaDetailActionButtons
               torrent={selectedTorrent || torrent}
@@ -3485,6 +3488,7 @@ export default function MediaDetailPage({
               }
             />
             </ActionsRow>
+            </div>
 
             {/* Informations détaillées */}
             {showInfo && (

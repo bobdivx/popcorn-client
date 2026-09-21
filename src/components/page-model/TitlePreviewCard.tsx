@@ -300,21 +300,21 @@ export function TitlePreviewCard({
         </div>
       </FocusableCard>
 
-      <div className="mt-2 sm:mt-2.5 tv:mt-3 px-0.5" style={{ width: '100%', minHeight: '2.75rem' }}>
+      <div className="mt-2 sm:mt-2.5 tv:mt-3 px-0.5 transition-[opacity,transform] duration-300 ease-out" style={{ width: '100%', minHeight: '2.75rem' }}>
         {expanded ? (
           <>
-            <p className="truncate text-sm sm:text-base tv:text-xl font-semibold text-white">
+            <p className="truncate text-sm sm:text-base tv:text-xl font-semibold text-white animate-fade-in">
               {metaLine || title}
             </p>
             {metaSubLine ? (
-              <p className="mt-0.5 truncate text-xs sm:text-sm tv:text-base text-white/60">{metaSubLine}</p>
+              <p className="mt-0.5 truncate text-xs sm:text-sm tv:text-base text-white/60 animate-fade-in">{metaSubLine}</p>
             ) : item.rating != null ? (
-              <p className="mt-0.5 text-xs sm:text-sm tv:text-base text-white/60">★ {item.rating.toFixed(1)}</p>
+              <p className="mt-0.5 text-xs sm:text-sm tv:text-base text-white/60 animate-fade-in">★ {item.rating.toFixed(1)}</p>
             ) : null}
           </>
         ) : hovered ? (
           <>
-            <p className="truncate text-sm font-medium text-white/90 transition-opacity duration-150">
+            <p className="truncate text-sm font-medium text-white/90 transition-opacity duration-200">
               {metaLine || title}
             </p>
             {metaSubLine ? (
