@@ -57,9 +57,9 @@
   --ds-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --ds-ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ds-duration-fast: 180ms;
-  --ds-duration: 320ms;
-  --ds-duration-slow: 480ms;
-  --ds-enter-distance: 10px;
+  --ds-duration: 380ms;
+  --ds-duration-slow: 560ms;
+  --ds-enter-distance: 14px;
 }
 
 /* ── Thème clair ── */
