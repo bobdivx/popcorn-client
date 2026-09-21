@@ -222,7 +222,10 @@ export function HeroSection({
     ) : null;
 
   const metaBadges = (
-    <div className={`flex flex-wrap items-center gap-2 sm:gap-3 text-white/95 ${isTV && isLargeHero ? 'text-lg tv:text-xl' : ''}`}>
+    <div
+      data-stream-item
+      className={`flex flex-wrap items-center gap-2 sm:gap-3 text-white/95 ${isTV && isLargeHero ? 'text-lg tv:text-xl' : ''}`}
+    >
       <span className="text-xs sm:text-sm font-semibold uppercase tracking-wide">
         {currentItem.type === 'movie'
           ? t('common.film')
@@ -276,6 +279,7 @@ export function HeroSection({
     <>
       {currentItem.logo && (
         <img
+          data-stream-item
           src={currentItem.logo}
           alt=""
           className="max-h-7 sm:max-h-8 md:max-h-10 lg:max-h-12 w-auto object-contain object-left drop-shadow-2xl"
@@ -283,6 +287,7 @@ export function HeroSection({
         />
       )}
       <h1
+        data-stream-item
         className={`font-bold drop-shadow-2xl line-clamp-2 ${
           currentItem.logo
             ? 'text-base sm:text-lg md:text-xl lg:text-2xl tv:text-3xl text-white/95'
@@ -292,7 +297,7 @@ export function HeroSection({
         {getDisplayTitle(currentItem) || currentItem.title || ''}
       </h1>
       {currentItem.overview && (
-        <p className="text-xs sm:text-sm tv:text-base text-white/80 line-clamp-2 drop-shadow-lg max-w-xl">
+        <p data-stream-item className="text-xs sm:text-sm tv:text-base text-white/80 line-clamp-2 drop-shadow-lg max-w-xl">
           {currentItem.overview}
         </p>
       )}
@@ -376,7 +381,7 @@ export function HeroSection({
                 isTV ? 'px-12 tv:px-24' : 'px-4 sm:px-6 lg:px-16'
               }`}
             >
-              <div className="max-w-2xl tv:max-w-4xl w-full flex flex-col gap-2 sm:gap-4 tv:gap-6">
+              <div className="max-w-2xl tv:max-w-4xl w-full flex flex-col gap-2 sm:gap-4 tv:gap-6 ds-stream-cascade">
                 {metaBadges}
                 {titleBlock}
               </div>
@@ -398,7 +403,7 @@ export function HeroSection({
             }`}
           >
             <div className="flex-1 min-h-0 flex flex-col justify-end px-4 sm:px-6 lg:px-16 tv:px-24 pb-3 overflow-hidden">
-              <div className="max-w-2xl tv:max-w-3xl w-full flex flex-col gap-2 sm:gap-3">
+              <div className="max-w-2xl tv:max-w-3xl w-full flex flex-col gap-2 sm:gap-3 ds-stream-cascade">
                 {metaBadges}
                 {titleBlock}
               </div>

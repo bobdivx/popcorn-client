@@ -14,17 +14,18 @@ export function HeroHeader({
   const year = torrent.releaseDate ? new Date(torrent.releaseDate).getFullYear() : null;
 
   return (
-    <div className="max-w-4xl">
+    <div className="max-w-4xl ds-stream-cascade">
       <div className="mb-10 sm:mb-12 md:mb-14">
         {torrent.logoUrl && (
           <img
+            data-stream-item
             src={torrent.logoUrl}
             alt=""
             className="max-h-14 sm:max-h-16 md:max-h-20 lg:max-h-24 xl:max-h-28 w-auto object-contain object-left mb-4 sm:mb-5 drop-shadow-2xl"
             style={{ maxWidth: 'min(24rem, 85vw)' }}
           />
         )}
-        <div className="flex items-baseline gap-4 flex-wrap">
+        <div data-stream-item className="flex items-baseline gap-4 flex-wrap">
           <h1
             className={`font-bold leading-tight ${
               torrent.logoUrl
