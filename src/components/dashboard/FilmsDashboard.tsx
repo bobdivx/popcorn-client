@@ -18,7 +18,6 @@ import {
   mergeReadyToWatch,
   excludeSeenItems,
   promoteRecentFirst,
-  contentItemKey,
 } from './utils/browsePriority';
 
 const SECTION_LIMIT = 25;
@@ -63,19 +62,14 @@ export default function FilmsDashboard() {
     ).slice(0, SECTION_LIMIT);
 
     const resumeMovies = resumeWatching.filter((item) => item.type === 'movie');
-    const rewatchMovies = rewatchWatching.filter((item) => item.type === 'movie');
     const watchNow = excludeSeenItems(filterWatchNow(filmsWithSignals), seenItems);
     const downloadingNow = standaloneDownloads(movieDownloads, resumeMovies);
 
-    // Une section : actifs + prêts ≤7j (bibliothèque), sans doublon
-    const latestDownloads = mergeReadyToWatch(
-      downloadingNow,
-      excludeSeenItems(recentDownloads, seenItems)
+    // Actifs + bibliothèque récente + tous les « non vus » (pas seulement ≤ fenêtre)
+    const latestMerged = mergeReadyToWatch(
+      mergeReadyToWatch(downloadingNow, excludeSeenItems(recentDownloads, seenItems)),
+      watchNow
     );
-
-    // Enrichir avec signaux « prêts à regarder » encore dans la fenêtre récente
-    const readyRecent = watchNow.filter((item) => recentKeys.has(contentItemKey(item)));
-    const latestMerged = mergeReadyToWatch(latestDownloads, readyRecent);
 
     const genreMap = new Map<string, ContentItem[]>();
     for (const film of filmsWithSignals) {
@@ -97,14 +91,13 @@ export default function FilmsDashboard() {
       }));
 
     return [
-      { id: 'resume-films', title: t('dashboard.resumeWatching'), items: resumeMovies, kind: 'resume' as const, priority: true },
-      { id: 'rewatch-films', title: t('dashboard.rewatch'), items: rewatchMovies, kind: 'resume' as const, priority: true },
       {
         id: 'latest-downloads-films',
-        title: t('library.latestDownload'),
+        title: t('dashboard.recentlyDownloaded'),
         items: latestMerged,
         priority: true,
       },
+      { id: 'resume-films', title: t('dashboard.resumeWatching'), items: resumeMovies, kind: 'resume' as const, priority: true },
       {
         id: 'recent-films',
         title: t('dashboard.newReleasesMovies'),

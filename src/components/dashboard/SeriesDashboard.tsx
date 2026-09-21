@@ -18,7 +18,6 @@ import {
   mergeReadyToWatch,
   excludeSeenItems,
   promoteRecentFirst,
-  contentItemKey,
 } from './utils/browsePriority';
 
 const SECTION_LIMIT = 25;
@@ -63,17 +62,14 @@ export default function SeriesDashboard() {
     ).slice(0, SECTION_LIMIT);
 
     const resumeSeries = resumeWatching.filter((item) => item.type === 'tv');
-    const rewatchSeries = rewatchWatching.filter((item) => item.type === 'tv');
     const waitingSeries = waitingForNext.filter((item) => item.type === 'tv');
     const watchNow = excludeSeenItems(filterWatchNow(seriesWithSignals), seenItems);
     const downloadingNow = standaloneDownloads(seriesDownloads, resumeSeries);
 
-    const latestDownloads = mergeReadyToWatch(
-      downloadingNow,
-      excludeSeenItems(recentDownloads, seenItems)
+    const latestMerged = mergeReadyToWatch(
+      mergeReadyToWatch(downloadingNow, excludeSeenItems(recentDownloads, seenItems)),
+      watchNow
     );
-    const readyRecent = watchNow.filter((item) => recentKeys.has(contentItemKey(item)));
-    const latestMerged = mergeReadyToWatch(latestDownloads, readyRecent);
 
     const genreMap = new Map<string, ContentItem[]>();
     for (const tv of seriesWithSignals) {
@@ -95,14 +91,13 @@ export default function SeriesDashboard() {
       }));
 
     return [
-      { id: 'resume-series', title: t('dashboard.resumeWatching'), items: resumeSeries, kind: 'resume' as const, priority: true },
-      { id: 'rewatch-series', title: t('dashboard.rewatch'), items: rewatchSeries, kind: 'resume' as const, priority: true },
       {
         id: 'latest-downloads-series',
-        title: t('library.latestDownload'),
+        title: t('dashboard.recentlyDownloaded'),
         items: latestMerged,
         priority: true,
       },
+      { id: 'resume-series', title: t('dashboard.resumeWatching'), items: resumeSeries, kind: 'resume' as const, priority: true },
       {
         id: 'waiting-series',
         title: t('dashboard.waitingForNext'),

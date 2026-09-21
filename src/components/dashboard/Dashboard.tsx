@@ -6,6 +6,7 @@ import { useDashboardData } from './hooks/useDashboardData';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useContentSignals } from './hooks/useContentSignals';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
+import { useLibraryBrowse } from './hooks/useLibraryBrowse';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
 import SuggestionsSection from './SuggestionsSection';
 import {
@@ -32,6 +33,7 @@ export default function Dashboard() {
   const { data, loading: dataLoading, error } = useDashboardData();
   const { activeDownloads, loading: downloadsLoading } = useActiveDownloads();
   const { resumeWatching, rewatchWatching } = useResumeWatching();
+  const { recentDownloads } = useLibraryBrowse('all');
   const loading = dataLoading && downloadsLoading;
 
   const popularMovies = data?.popularMovies ?? [];
@@ -51,12 +53,23 @@ export default function Dashboard() {
         ...popularMovies,
         ...popularSeries,
         ...activeDownloads,
+        ...recentDownloads,
       ]),
-    [popularMovies, popularSeries, recentMovies, recentSeries, freshMovies, freshSeries, activeDownloads]
+    [
+      popularMovies,
+      popularSeries,
+      recentMovies,
+      recentSeries,
+      freshMovies,
+      freshSeries,
+      activeDownloads,
+      recentDownloads,
+    ]
   );
 
   const { withSignals: allDashboardItemsWithSignals } = useContentSignals(allDashboardItems, resumeWatching);
 
+  // Exclure Reprenez + contenus terminés (ex-À revoir) de « Prêts à regarder »
   const seenItems = useMemo(
     () => [...resumeWatching, ...rewatchWatching],
     [resumeWatching, rewatchWatching]
@@ -65,11 +78,19 @@ export default function Dashboard() {
   const heroItems = useMemo(() => {
     const watchNow = excludeSeenItems(filterWatchNow(allDashboardItemsWithSignals), seenItems);
     const newestUnwatched = excludeSeenItems(
-      [...recentMovies, ...recentSeries, ...freshMovies, ...freshSeries],
+      [...recentDownloads, ...recentMovies, ...recentSeries, ...freshMovies, ...freshSeries],
       seenItems
     );
     return pickFeaturedHero(watchNow, newestUnwatched);
-  }, [allDashboardItemsWithSignals, seenItems, recentMovies, recentSeries, freshMovies, freshSeries]);
+  }, [
+    allDashboardItemsWithSignals,
+    seenItems,
+    recentDownloads,
+    recentMovies,
+    recentSeries,
+    freshMovies,
+    freshSeries,
+  ]);
 
   const handleNavigate = (item: ContentItem) => {
     window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
@@ -95,9 +116,23 @@ export default function Dashboard() {
 
     const watchNowItems = excludeSeenItems(filterWatchNow(allDashboardItemsWithSignals), seenItems);
     const downloadingNow = standaloneDownloads(activeDownloads, resumeWatching);
-    const readyToWatch = mergeReadyToWatch(downloadingNow, watchNowItems);
+    // Bibliothèque récente + téléchargements actifs + signaux « non vus »
+    const readyToWatch = mergeReadyToWatch(
+      mergeReadyToWatch(downloadingNow, excludeSeenItems(recentDownloads, seenItems)),
+      watchNowItems
+    );
 
     const result = [];
+
+    // Prêts à regarder en premier (au-dessus de Reprenez)
+    if (readyToWatch.length > 0) {
+      result.push({
+        id: 'recently-downloaded',
+        title: t('dashboard.recentlyDownloaded'),
+        items: readyToWatch,
+        priority: true,
+      });
+    }
 
     if (enrichedResumeWatching.length > 0) {
       result.push({
@@ -105,25 +140,6 @@ export default function Dashboard() {
         title: t('dashboard.resumeWatching') || 'Reprendre la lecture',
         items: enrichedResumeWatching,
         kind: 'resume' as const,
-        priority: true,
-      });
-    }
-
-    if (rewatchWatching.length > 0) {
-      result.push({
-        id: 'rewatch-watching',
-        title: t('dashboard.rewatch'),
-        items: rewatchWatching,
-        kind: 'resume' as const,
-        priority: true,
-      });
-    }
-
-    if (readyToWatch.length > 0) {
-      result.push({
-        id: 'recently-downloaded',
-        title: t('dashboard.recentlyDownloaded'),
-        items: readyToWatch,
         priority: true,
       });
     }
@@ -174,6 +190,7 @@ export default function Dashboard() {
     activeDownloads,
     resumeWatching,
     rewatchWatching,
+    recentDownloads,
     seenItems,
     popularMovies,
     popularSeries,
