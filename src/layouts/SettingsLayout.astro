@@ -58,6 +58,12 @@ const { title = 'Paramètres - Popcorn Client' } = Astro.props;
       height: auto;
       flex: none;
     }
+    /* Aside réservé desktop : ne doit pas occuper de hauteur (drawer = fixed). */
+    .settings-sidebar-wrapper {
+      height: 0;
+      min-height: 0;
+      overflow: visible;
+    }
     .settings-content-area {
       overflow: visible !important;
       max-height: none;
