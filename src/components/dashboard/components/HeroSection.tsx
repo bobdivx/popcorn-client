@@ -350,15 +350,18 @@ export function HeroSection({
       >
         <style>{`
           @keyframes ken-burns {
-            from { transform: scale(1); }
-            to { transform: scale(1.05); }
+            from { transform: scale(1) translate3d(0, 0, 0); }
+            to { transform: scale(1.08) translate3d(-1.5%, -0.5%, 0); }
           }
           .hero-slide-enter {
-            animation: hero-content-fade 0.45s ease-out forwards;
+            animation: hero-content-fade 0.65s cubic-bezier(0.22, 1, 0.36, 1) forwards;
           }
           @keyframes hero-content-fade {
-            from { opacity: 0; }
-            to { opacity: 1; }
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .hero-slide-enter { animation: none; opacity: 1; transform: none; }
           }
         `}</style>
 
