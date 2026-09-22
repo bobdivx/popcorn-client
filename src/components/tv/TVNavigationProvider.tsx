@@ -52,6 +52,17 @@ function tvArrowKey(e: KeyboardEvent): 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 
   return '';
 }
 
+/** webOS / Android TV : OK et Entrée n’ont souvent que le keyCode (13, 23, 66). */
+function tvActivateKey(e: KeyboardEvent): 'Enter' | ' ' | '' {
+  const key = e.key;
+  if (key === 'Enter' || key === 'NumpadEnter' || key === 'OK' || key === 'Select') return 'Enter';
+  if (key === ' ') return ' ';
+  const code = e.keyCode ?? e.which;
+  if (code === 13 || code === 23 || code === 66 || code === 160) return 'Enter';
+  if (code === 32) return ' ';
+  return '';
+}
+
 /** Nombre de colonnes d'une liste TV (grille CSS ou attribut). 1 = liste verticale. */
 function getListColumnCount(list: HTMLElement): number {
   const attr = list.getAttribute('data-tv-list-cols');
@@ -323,6 +334,16 @@ export default function TVNavigationProvider() {
           const rb = rectForSort.get(b)!;
           return ra.left - rb.left || ra.top - rb.top;
         });
+      }
+
+      // Fiche média TV : haut/bas ne voit que Lecture, métadonnées et épisodes.
+      if (tv && !scope && !document.querySelector('[role="dialog"]:not([aria-hidden="true"])')) {
+        const detail = document.querySelector('[data-tv-media-detail]');
+        if (detail) {
+          return filtered.filter((el) =>
+            !!el.closest('[data-tv-site-header], [data-tv-zone], [data-tv-episode-row], [role="menu"]')
+          );
+        }
       }
       return filtered;
     };
@@ -712,7 +733,7 @@ export default function TVNavigationProvider() {
 
     /** webOS / TV : limiter le débit des keydown en répétition (sinon la pile de travaux sature la télécommande). */
     let lastTvArrowAt = 0;
-    const TV_ARROW_REPEAT_MS = 70;
+    const TV_ARROW_REPEAT_MS = 32;
 
     // Navigation synchrone (pas de throttle ici : déjà géré sur e.repeat dans handleKeyDown).
     const scheduleOrRunNavigate = (direction: 'up' | 'down' | 'left' | 'right', scope?: HTMLElement | null): boolean => {
@@ -779,16 +800,10 @@ export default function TVNavigationProvider() {
         }
         return;
       }
+      if (!opts?.vertical) return;
       requestAnimationFrame(() => {
         reanchorBrowseSlot(target);
-        if (opts?.vertical) {
-          ensureBrowseRowInView(target);
-          // 2e frame : largeur paysage React souvent prête ici (rangées courtes)
-          requestAnimationFrame(() => {
-            reanchorBrowseSlot(target);
-            ensureBrowseRowInView(target);
-          });
-        }
+        ensureBrowseRowInView(target);
       });
     };
 
@@ -973,6 +988,325 @@ export default function TVNavigationProvider() {
       return focusableElements[0];
     };
 
+    /**
+     * TV : haut/bas entre rangées browse sans mesurer toute la page.
+     * On ne regarde que la rangée voisine et on aligne par index de tuile.
+     */
+    type BrowseStep =
+      | { kind: 'target'; el: HTMLElement }
+      | { kind: 'header' }
+      | { kind: 'stop' }
+      | { kind: 'skip' };
+
+    const rowCarousel = (row: HTMLElement): HTMLElement => {
+      if (row.matches('[data-carousel], [data-browse-carousel]')) return row;
+      return row.querySelector<HTMLElement>('[data-browse-carousel], [data-carousel]') ?? row;
+    };
+
+    const rowItems = (row: HTMLElement): HTMLElement[] => {
+      const carousel = rowCarousel(row);
+      const slots = Array.from(carousel.querySelectorAll<HTMLElement>(':scope > [data-browse-slot]'));
+      if (slots.length > 0) return slots;
+      return Array.from(
+        carousel.querySelectorAll<HTMLElement>('[data-focusable], a[href], button:not([disabled])')
+      ).filter((el) => !el.closest('[data-browse-scroll-spacer]') && !el.closest('[aria-hidden="true"]'));
+    };
+
+    const focusOfRowItem = (item: HTMLElement): HTMLElement => {
+      if (!item.hasAttribute('data-browse-slot')) return item;
+      return (
+        item.querySelector<HTMLElement>('[data-focusable]') ||
+        item.querySelector<HTMLElement>('a[href], button:not([disabled])') ||
+        item
+      );
+    };
+
+    const indexInRow = (current: HTMLElement, row: HTMLElement): number => {
+      const items = rowItems(row);
+      const slot = current.closest('[data-browse-slot]') as HTMLElement | null;
+      if (slot) {
+        const slotIdx = items.indexOf(slot);
+        if (slotIdx >= 0) return slotIdx;
+      }
+      const direct = items.indexOf(current);
+      if (direct >= 0) return direct;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].contains(current)) return i;
+      }
+      return 0;
+    };
+
+    const collectBrowseRows = (): HTMLElement[] => {
+      const nodes = document.querySelectorAll<HTMLElement>('[data-browse-row], [data-browse-carousel], [data-carousel]');
+      const out: HTMLElement[] = [];
+      for (const el of nodes) {
+        if (el.closest('[data-tv-nav-skip], [role="dialog"], [data-tv-media-detail]')) continue;
+        if (!el.hasAttribute('data-browse-row') && el.closest('[data-browse-row]')) continue;
+        if (el.classList.contains('grid')) continue;
+        const carousel = rowCarousel(el);
+        if (!carousel.querySelector('[data-browse-slot], [data-focusable], a[href], button:not([disabled])')) continue;
+        out.push(el);
+      }
+      return out;
+    };
+
+    const browseRowOf = (el: HTMLElement): HTMLElement | null => {
+      const marked = el.closest('[data-browse-row]') as HTMLElement | null;
+      if (marked) return marked;
+      const carousel = el.closest('[data-browse-carousel], [data-carousel]') as HTMLElement | null;
+      if (!carousel || carousel.classList.contains('grid')) return null;
+      return carousel;
+    };
+
+    const pageActionFocusable = (action: HTMLElement): HTMLElement | null =>
+      action.querySelector<HTMLElement>('button:not([disabled]), a[href], [data-focusable]');
+
+    /** Action de page située strictement entre `from` et `toward` dans l'ordre du DOM. */
+    const pageActionBetween = (
+      from: HTMLElement,
+      toward: HTMLElement | null,
+      direction: 'up' | 'down'
+    ): HTMLElement | null => {
+      const actions = document.querySelectorAll<HTMLElement>('[data-tv-page-action]');
+      let bestAction: HTMLElement | null = null;
+      for (const action of actions) {
+        if (action.closest('[data-browse-row], [data-carousel]')) continue;
+        if (action.contains(from) || from.contains(action)) continue;
+        if (!pageActionFocusable(action)) continue;
+        if (direction === 'down') {
+          const afterFrom = !!(from.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING);
+          if (!afterFrom) continue;
+          if (toward && !(toward.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_PRECEDING)) continue;
+          if (!bestAction || (bestAction.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_PRECEDING)) {
+            bestAction = action;
+          }
+        } else {
+          const beforeFrom = !!(from.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_PRECEDING);
+          if (!beforeFrom) continue;
+          if (toward && !(toward.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
+          if (!bestAction || (bestAction.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING)) {
+            bestAction = action;
+          }
+        }
+      }
+      return bestAction ? pageActionFocusable(bestAction) : null;
+    };
+
+    const zoneFocusables = (root: HTMLElement): HTMLElement[] =>
+      Array.from(root.querySelectorAll<HTMLElement>('[data-focusable], a[href], button:not([disabled])')).filter(
+        (el) =>
+          el.getAttribute('tabindex') !== '-1' &&
+          !el.closest('[aria-hidden="true"]') &&
+          !el.closest('[data-tv-nav-skip]')
+      );
+
+    const closestHeaderFocusable = (current: HTMLElement): HTMLElement | null => {
+      const header = document.querySelector(SITE_HEADER_SELECTOR) as HTMLElement | null;
+      if (!header) return null;
+      const els = getFocusableElements(header);
+      if (els.length === 0) return null;
+      const rect = current.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      let best = els[0];
+      let bestDist = Infinity;
+      for (const el of els) {
+        const r = el.getBoundingClientRect();
+        const dist = Math.abs(r.left + r.width / 2 - x);
+        if (dist < bestDist) {
+          bestDist = dist;
+          best = el;
+        }
+      }
+      return best;
+    };
+
+    const collectMediaDetailStops = (detail: HTMLElement): HTMLElement[] => {
+      const stops: HTMLElement[] = [];
+      const play = detail.querySelector<HTMLElement>('[data-tv-zone="play"]');
+      if (play && zoneFocusables(play).length > 0) stops.push(play);
+      const meta = detail.querySelector<HTMLElement>('[data-tv-zone="meta"]');
+      if (meta && zoneFocusables(meta).length > 0) stops.push(meta);
+      detail.querySelectorAll<HTMLElement>('[data-tv-episode-row]').forEach((row) => {
+        const select = row.querySelector<HTMLElement>('select:not([disabled])');
+        if (select) stops.push(select);
+        const scroller = row.querySelector<HTMLElement>('[data-tv-episode-scroller]');
+        if (scroller && scroller.querySelector('[data-episode-card], [data-focusable], button')) stops.push(scroller);
+      });
+      return stops;
+    };
+
+    const focusMediaDetailStop = (stop: HTMLElement, from: HTMLElement): HTMLElement | null => {
+      if (stop.matches('[data-tv-episode-scroller]')) {
+        const cards = Array.from(stop.querySelectorAll<HTMLElement>('[data-episode-card]'));
+        if (cards.length === 0) return zoneFocusables(stop)[0] ?? null;
+        const fromCard = from.closest('[data-episode-card]') as HTMLElement | null;
+        const fromScroller = fromCard?.closest('[data-tv-episode-scroller]');
+        if (fromCard && fromScroller) {
+          const siblings = Array.from(fromScroller.querySelectorAll<HTMLElement>('[data-episode-card]'));
+          const idx = siblings.indexOf(fromCard);
+          if (idx >= 0) return cards[Math.min(idx, cards.length - 1)] ?? cards[0];
+        }
+        return cards[0];
+      }
+      if (stop.matches('select')) return stop;
+      const primary = stop.querySelector<HTMLElement>('[data-media-detail-primary-action]:not([disabled])');
+      if (primary) return primary;
+      return zoneFocusables(stop)[0] ?? null;
+    };
+
+    const resolveMediaDetailVertical = (
+      current: HTMLElement,
+      direction: 'up' | 'down',
+      detail: HTMLElement
+    ): BrowseStep => {
+      const stops = collectMediaDetailStops(detail);
+      if (stops.length === 0) return { kind: 'skip' };
+      const inHeader = !!current.closest(SITE_HEADER_SELECTOR);
+      if (inHeader) {
+        if (direction !== 'down') return { kind: 'skip' };
+        const el = focusMediaDetailStop(stops[0], current);
+        return el ? { kind: 'target', el } : { kind: 'skip' };
+      }
+      if (!detail.contains(current)) return { kind: 'skip' };
+
+      let idx = -1;
+      for (let i = stops.length - 1; i >= 0; i--) {
+        if (stops[i] === current || stops[i].contains(current)) {
+          idx = i;
+          break;
+        }
+      }
+      if (idx < 0) {
+        if (direction === 'down') {
+          const el = focusMediaDetailStop(stops[0], current);
+          return el ? { kind: 'target', el } : { kind: 'header' };
+        }
+        return { kind: 'header' };
+      }
+      const nextIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (nextIdx < 0) return { kind: 'header' };
+      if (nextIdx >= stops.length) return { kind: 'stop' };
+      const el = focusMediaDetailStop(stops[nextIdx], current);
+      return el ? { kind: 'target', el } : { kind: 'stop' };
+    };
+
+    const resolveTvBrowseVertical = (current: HTMLElement, direction: 'up' | 'down'): BrowseStep => {
+      if (!isTvDoc()) return { kind: 'skip' };
+      if (document.querySelector('[role="dialog"]:not([aria-hidden="true"])')) return { kind: 'skip' };
+      if (
+        current.closest(
+          '#video-player-wrapper, [data-tv-settings-nav], [data-tv-settings-content], [role="menu"], [data-tv-list]'
+        )
+      ) {
+        return { kind: 'skip' };
+      }
+
+      const mediaDetail = document.querySelector<HTMLElement>('[data-tv-media-detail]');
+      if (
+        mediaDetail &&
+        (mediaDetail.contains(current) ||
+          (direction === 'down' && !!current.closest(SITE_HEADER_SELECTOR)))
+      ) {
+        const step = resolveMediaDetailVertical(current, direction, mediaDetail);
+        if (step.kind !== 'skip') return step;
+      }
+
+      const rows = collectBrowseRows();
+      const inHeader = !!current.closest(SITE_HEADER_SELECTOR);
+      const inAction = current.closest('[data-tv-page-action]') as HTMLElement | null;
+      const row = browseRowOf(current);
+      const hero = current.closest('.hero-dashboard') as HTMLElement | null;
+
+      const firstRowAfter = (from: HTMLElement): HTMLElement | null =>
+        rows.find((r) => from.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING) ?? null;
+
+      if (hero) {
+        const heroEls = zoneFocusables(hero);
+        const hi = heroEls.findIndex((el) => el === current || el.contains(current));
+        if (hi >= 0) {
+          const nextIdx = direction === 'up' ? hi - 1 : hi + 1;
+          if (nextIdx >= 0 && nextIdx < heroEls.length) return { kind: 'target', el: heroEls[nextIdx] };
+        }
+        if (direction === 'up') return { kind: 'header' };
+        const next = firstRowAfter(current);
+        const action = pageActionBetween(current, next, 'down');
+        if (action) return { kind: 'target', el: action };
+        if (!next) return { kind: 'stop' };
+        const items = rowItems(next);
+        const el = items[0] ? focusOfRowItem(items[0]) : null;
+        return el ? { kind: 'target', el } : { kind: 'stop' };
+      }
+
+      if (inHeader && direction === 'down') {
+        const heroEl = document.querySelector<HTMLElement>('.hero-dashboard');
+        const first = rows[0] ?? null;
+        const heroBeforeRows =
+          !!heroEl && (!first || !!(heroEl.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING));
+        if (heroEl && heroBeforeRows) {
+          const beforeHero = pageActionBetween(current, heroEl, 'down');
+          if (beforeHero) return { kind: 'target', el: beforeHero };
+          const heroEls = zoneFocusables(heroEl);
+          if (heroEls[0]) return { kind: 'target', el: heroEls[0] };
+        }
+        const action = pageActionBetween(current, first, 'down');
+        if (action) return { kind: 'target', el: action };
+        if (!first) return { kind: 'skip' };
+        const items = rowItems(first);
+        const el = items[0] ? focusOfRowItem(items[0]) : null;
+        return el ? { kind: 'target', el } : { kind: 'skip' };
+      }
+      if (inHeader) return { kind: 'skip' };
+
+      if (inAction && !row) {
+        if (direction === 'down') {
+          const next = rows.find((r) => current.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING) ?? null;
+          if (!next) return { kind: 'stop' };
+          const items = rowItems(next);
+          const el = items[0] ? focusOfRowItem(items[0]) : null;
+          return el ? { kind: 'target', el } : { kind: 'stop' };
+        }
+        let prev: HTMLElement | null = null;
+        for (const r of rows) {
+          if (current.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_PRECEDING) prev = r;
+          else break;
+        }
+        if (!prev) return { kind: 'header' };
+        const items = rowItems(prev);
+        const el = items[0] ? focusOfRowItem(items[0]) : null;
+        return el ? { kind: 'target', el } : { kind: 'header' };
+      }
+
+      if (!row) return { kind: 'skip' };
+      const idx = rows.indexOf(row);
+      if (idx < 0) return { kind: 'skip' };
+
+      const neighbor = direction === 'up' ? rows[idx - 1] ?? null : rows[idx + 1] ?? null;
+      if (!neighbor && direction === 'up') {
+        const heroEl = document.querySelector<HTMLElement>('.hero-dashboard');
+        const heroBefore =
+          !!heroEl && !!(current.compareDocumentPosition(heroEl) & Node.DOCUMENT_POSITION_PRECEDING);
+        if (heroBefore && heroEl) {
+          const between = pageActionBetween(current, heroEl, 'up');
+          if (between) return { kind: 'target', el: between };
+          const heroEls = zoneFocusables(heroEl);
+          const last = heroEls[heroEls.length - 1];
+          if (last) return { kind: 'target', el: last };
+        }
+        const action = pageActionBetween(current, null, 'up');
+        if (action) return { kind: 'target', el: action };
+        return { kind: 'header' };
+      }
+      const action = neighbor ? pageActionBetween(current, neighbor, direction) : null;
+      if (action) return { kind: 'target', el: action };
+      if (!neighbor) return { kind: 'stop' };
+
+      const items = rowItems(neighbor);
+      if (items.length === 0) return { kind: 'skip' };
+      const at = Math.min(indexInRow(current, row), items.length - 1);
+      const el = focusOfRowItem(items[at]);
+      return el ? { kind: 'target', el } : { kind: 'skip' };
+    };
+
     // Navigation dans une direction (scope optionnel = modal ou conteneur pour piège à focus, fromEl = élément de référence pour la recherche spatiale, ex. input qu'on quitte)
     const navigate = (direction: 'up' | 'down' | 'left' | 'right', scope?: HTMLElement | null, fromEl?: HTMLElement | null): boolean => {
       const activeElement = (fromEl ?? document.activeElement) as HTMLElement;
@@ -1039,11 +1373,39 @@ export default function TVNavigationProvider() {
         }
       }
 
-      // Sur webOS / TV : en carousel, gauche/droite uniquement dans le carousel courant
+      // TV : haut/bas entre rangées — une seule rangée voisine, pas de scan de page
+      if (
+        !scope &&
+        activeElement &&
+        activeElement !== document.body &&
+        (direction === 'up' || direction === 'down')
+      ) {
+        const step = resolveTvBrowseVertical(activeElement, direction);
+        if (step.kind === 'target') {
+          focusElement(step.el);
+          return true;
+        }
+        if (step.kind === 'header') {
+          const target = closestHeaderFocusable(activeElement);
+          if (target) {
+            focusElement(target);
+            return true;
+          }
+          return true;
+        }
+        if (step.kind === 'stop') return true;
+      }
+
+      // Sur webOS / TV : gauche/droite uniquement dans le carousel ou la zone de la fiche
       let effectiveScope = scope;
       if (!effectiveScope && activeElement && (direction === 'left' || direction === 'right')) {
         const carousel = activeElement.closest(CAROUSEL_SELECTOR) as HTMLElement | null;
+        const detailZone =
+          isTvDoc() && activeElement.closest('[data-tv-media-detail]')
+            ? (activeElement.closest('[data-tv-zone], [data-tv-episode-scroller]') as HTMLElement | null)
+            : null;
         if (carousel) effectiveScope = carousel;
+        else if (detailZone) effectiveScope = detailZone;
       }
 
       // webOS : haut/bas depuis une carte torrent — le <main> suffit pour passer d’une ligne à l’autre
@@ -1088,6 +1450,14 @@ export default function TVNavigationProvider() {
       const nextElement = findClosestElement(activeElement, candidates, direction, focusableElements);
       if (nextElement) {
         focusElement(nextElement);
+        return true;
+      }
+
+      if (
+        isTvDoc() &&
+        activeElement?.closest?.('[data-tv-media-detail]') &&
+        (direction === 'left' || direction === 'right' || direction === 'up' || direction === 'down')
+      ) {
         return true;
       }
 
@@ -1319,7 +1689,7 @@ export default function TVNavigationProvider() {
       const keyForSwitch =
         isBackButton && e.key !== 'Escape' && e.key !== 'Backspace'
           ? 'Escape'
-          : e.key || arrowKey;
+          : arrowKey || tvActivateKey(e) || e.key;
 
       switch (keyForSwitch) {
         case 'ArrowLeft': {
@@ -1378,28 +1748,33 @@ export default function TVNavigationProvider() {
         case 'NumpadEnter':
         case 'OK':
         case 'Select':
-          // Laisser l'événement se propager naturellement pour les liens/boutons
+        case ' ': {
+          // Liens et boutons natifs s'activent tout seuls. Une carte (div) ne doit pas
+          // déclencher un bouton interne masqué (pause au survol).
           const active = document.activeElement as HTMLElement;
-          if (active && !['A', 'BUTTON', 'INPUT', 'SELECT'].includes(active.tagName)) {
-            // Chercher un lien ou bouton dans l'élément
-            const clickable = active.querySelector('a[href], button') as HTMLElement;
-            if (clickable) {
-              clickable.click();
-              handled = true;
-            }
+          if (!active || active === document.body) break;
+          const tag = active.tagName;
+          if (tag === 'A' || tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
+            break;
+          }
+          const activatesSelf =
+            active.getAttribute('role') === 'button' ||
+            active.hasAttribute('data-focusable') ||
+            active.hasAttribute('data-tv-list-primary');
+          if (activatesSelf) {
+            active.click();
+            handled = true;
+            break;
+          }
+          const clickable = active.querySelector<HTMLElement>(
+            'a[href]:not([tabindex="-1"]), button:not([disabled]):not([tabindex="-1"]):not([data-tv-nav-skip])'
+          );
+          if (clickable) {
+            clickable.click();
+            handled = true;
           }
           break;
-        case ' ':
-          // Espace sur un élément non-input
-          const activeEl = document.activeElement as HTMLElement;
-          if (activeEl && !['INPUT', 'TEXTAREA', 'BUTTON', 'SELECT'].includes(activeEl.tagName)) {
-            const btn = activeEl.querySelector('button, a[href]') as HTMLElement;
-            if (btn) {
-              btn.click();
-              handled = true;
-            }
-          }
-          break;
+        }
         case 'Escape':
         case 'Backspace':
           // Fermer modal si ouverte
@@ -1545,9 +1920,21 @@ export default function TVNavigationProvider() {
       html[data-tv-platform="true"] [data-browse-tile][data-torrent-card].tv-card-focused,
       html[data-tv-platform="true"] [data-browse-slot] .tv-card-focused {
         outline: none !important;
-        box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.92) !important;
+        box-shadow: none !important;
         transform: none !important;
         animation: none !important;
+      }
+      html[data-tv-platform="true"] [data-torrent-card].tv-card-focused::after,
+      html[data-tv-platform="true"] [data-focusable-card].tv-card-focused::after,
+      html[data-tv-platform="true"] [data-browse-slot]:focus-within > [data-torrent-card]::after,
+      html[data-tv-platform="true"] [data-browse-slot]:focus-within > [data-focusable-card]::after {
+        content: '' !important;
+        position: absolute !important;
+        inset: 0 !important;
+        border-radius: inherit !important;
+        pointer-events: none !important;
+        z-index: 8 !important;
+        box-shadow: inset 0 0 0 4px #fff, inset 0 0 0 8px rgba(124, 58, 237, 0.95) !important;
       }
       html[data-tv-platform="true"] [data-torrent-card]:focus-visible,
       html[data-tv-platform="true"] [data-torrent-card]:focus-within,
@@ -1621,7 +2008,15 @@ export default function TVNavigationProvider() {
         z-index: 2 !important;
         overflow: hidden !important;
         outline: none !important;
-        box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.92) !important;
+        box-shadow: none !important;
+      }
+      html[data-tv-platform="true"] button:focus:not([data-torrent-card]):not([data-focusable-card]),
+      html[data-tv-platform="true"] a:focus:not([data-torrent-card]):not([data-focusable-card]),
+      html[data-tv-platform="true"] [data-focusable]:focus:not([data-torrent-card]):not([data-focusable-card]),
+      html[data-tv-platform="true"] .tv-element-focused {
+        outline: 3px solid #fff !important;
+        outline-offset: -3px !important;
+        box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 7px rgba(124, 58, 237, 0.9) !important;
       }
       
       html:not([data-tv-platform="true"]) [data-torrent-card].tv-card-focused,

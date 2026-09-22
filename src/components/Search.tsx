@@ -839,6 +839,7 @@ export default function Search({ onResultClick }: SearchProps) {
   const [error, setError] = useState<string | null>(null);
   const [forceIndexerSearch] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>(() => getSearchHistory());
+  const [blockedKeys, setBlockedKeys] = useState<Set<string>>(() => new Set());
   const inputRef = useRef<HTMLInputElement>(null);
   const prevLoadingRef = useRef(false);
   const isTV = isTVPlatform();
@@ -850,19 +851,40 @@ export default function Search({ onResultClick }: SearchProps) {
     }
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    serverApi.listBlacklist({ limit: 500 }).then((res) => {
+      if (cancelled || !res.success || !res.data) return;
+      const keys = new Set(
+        res.data
+          .filter((item) => item.tmdb_id > 0)
+          .map((item) => `${item.tmdb_id}:${item.media_type === 'series' ? 'tv' : item.media_type}`)
+      );
+      setBlockedKeys(keys);
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Organiser les résultats par type (déclaré avant le useEffect qui en dépend)
   // Regrouper par TMDB ID pour éviter les doublons
   const groupedResults = useMemo(
-    () => groupAndRankSearchResults(results, query.trim()),
-    [results, query],
+    () =>
+      groupAndRankSearchResults(results, query.trim()).filter(
+        (r) => !r.tmdbId || !blockedKeys.has(`${r.tmdbId}:${r.type}`)
+      ),
+    [results, query, blockedKeys],
   );
 
   const sortedTmdbFallback = useMemo(
     () =>
-      [...tmdbFallbackResults].sort(
-        (a, b) => searchResultRank(b, query.trim()) - searchResultRank(a, query.trim()),
-      ),
-    [tmdbFallbackResults, query],
+      [...tmdbFallbackResults]
+        .filter((r) => !r.tmdbId || !blockedKeys.has(`${r.tmdbId}:${r.type}`))
+        .sort(
+          (a, b) => searchResultRank(b, query.trim()) - searchResultRank(a, query.trim()),
+        ),
+    [tmdbFallbackResults, query, blockedKeys],
   );
   const movies = groupedResults.filter(r => r.type === 'movie');
   const series = groupedResults.filter(r => r.type === 'tv');

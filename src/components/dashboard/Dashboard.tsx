@@ -116,20 +116,19 @@ export default function Dashboard() {
 
     const watchNowItems = excludeSeenItems(filterWatchNow(allDashboardItemsWithSignals), seenItems);
     const downloadingNow = standaloneDownloads(activeDownloads, resumeWatching);
-    // Bibliothèque récente + téléchargements actifs + signaux « non vus »
     const readyToWatch = mergeReadyToWatch(
-      mergeReadyToWatch(downloadingNow, excludeSeenItems(recentDownloads, seenItems)),
+      excludeSeenItems(recentDownloads, seenItems),
       watchNowItems
-    );
+    ).filter((item) => !downloadingNow.some((dl) => contentItemKey(dl) === contentItemKey(item)));
 
     const result = [];
 
-    // Prêts à regarder en premier (au-dessus de Reprenez)
-    if (readyToWatch.length > 0) {
+    if (downloadingNow.length > 0) {
       result.push({
-        id: 'recently-downloaded',
-        title: t('dashboard.recentlyDownloaded'),
-        items: readyToWatch,
+        id: 'active-downloads',
+        title: t('dashboard.activeDownloads'),
+        items: downloadingNow,
+        kind: 'downloads' as const,
         priority: true,
       });
     }
@@ -144,60 +143,22 @@ export default function Dashboard() {
       });
     }
 
-    const freshMoviesWithSignals = allDashboardItemsWithSignals.filter((i) =>
-      freshMovies.some((r) => r.id === i.id)
-    );
-    const freshSeriesWithSignals = allDashboardItemsWithSignals.filter((i) =>
-      freshSeries.some((r) => r.id === i.id)
-    );
-
-    result.push(
-      {
-        id: 'recentMovies',
-        title: t('dashboard.newReleasesMovies'),
-        items: allDashboardItemsWithSignals.filter((i) => recentMovies.some((r) => r.id === i.id)),
-      },
-      {
-        id: 'freshMovies',
-        title: t('dashboard.freshlySyncedMovies'),
-        items: freshMoviesWithSignals,
-      },
-      {
-        id: 'popularMovies',
-        title: t('dashboard.popularMovies'),
-        items: allDashboardItemsWithSignals.filter((i) => popularMovies.some((r) => r.id === i.id)),
-      },
-      {
-        id: 'recentSeries',
-        title: t('dashboard.newReleasesSeries'),
-        items: allDashboardItemsWithSignals.filter((i) => recentSeries.some((r) => r.id === i.id)),
-      },
-      {
-        id: 'freshSeries',
-        title: t('dashboard.freshlySyncedSeries'),
-        items: freshSeriesWithSignals,
-      },
-      {
-        id: 'popularSeries',
-        title: t('dashboard.popularSeries'),
-        items: allDashboardItemsWithSignals.filter((i) => popularSeries.some((r) => r.id === i.id)),
-      }
-    );
+    if (readyToWatch.length > 0) {
+      result.push({
+        id: 'recently-downloaded',
+        title: t('dashboard.recentlyDownloaded'),
+        items: readyToWatch,
+        priority: true,
+      });
+    }
 
     return result;
   }, [
     allDashboardItemsWithSignals,
     activeDownloads,
     resumeWatching,
-    rewatchWatching,
     recentDownloads,
     seenItems,
-    popularMovies,
-    popularSeries,
-    recentMovies,
-    recentSeries,
-    freshMovies,
-    freshSeries,
     t,
   ]);
 

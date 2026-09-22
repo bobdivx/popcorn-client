@@ -45,7 +45,18 @@ export function FocusableCard({
     // Gestion du clavier pour TV
     const handleKeyPress = (evt: Event) => {
       const e = evt as KeyboardEvent;
-      if (e.key === 'Enter' || e.key === 'NumpadEnter' || e.key === 'OK' || e.key === 'Select' || e.key === ' ') {
+      const code = e.keyCode ?? (e as KeyboardEvent & { which?: number }).which;
+      const activate =
+        e.key === 'Enter' ||
+        e.key === 'NumpadEnter' ||
+        e.key === 'OK' ||
+        e.key === 'Select' ||
+        e.key === ' ' ||
+        code === 13 ||
+        code === 23 ||
+        code === 66 ||
+        code === 32;
+      if (activate) {
         e.preventDefault();
         if (onClick) {
           onClick(e);

@@ -1,4 +1,4 @@
-import { useMemo } from 'preact/hooks';
+import { useMemo, useState } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import type { ContentItem } from '../../lib/client/types';
 import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
@@ -10,6 +10,8 @@ import { useLibraryBrowse } from './hooks/useLibraryBrowse';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
 import SuggestionsSection from './SuggestionsSection';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
+import { GenreChipBar } from '../page-model/GenreChipBar';
+import { translateGenre } from '../../lib/utils/genre-translation';
 import {
   pickFeaturedHero,
   filterWatchNow,
@@ -18,14 +20,15 @@ import {
   mergeReadyToWatch,
   excludeSeenItems,
   promoteRecentFirst,
+  itemInGenre,
+  topGenres,
 } from './utils/browsePriority';
 
 const SECTION_LIMIT = 25;
-const MAX_GENRES = 12;
-const MIN_SERIES_PER_GENRE = 4;
 
 export default function SeriesDashboard() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const { series, loading, error } = useInfiniteSeries();
   const { resumeWatching, waitingForNext, rewatchWatching } = useResumeWatching();
   const { activeDownloads } = useActiveDownloads();
@@ -50,7 +53,7 @@ export default function SeriesDashboard() {
   }, [seriesWithSignals, freshWithSignals, recentDownloads, seenItems]);
 
   const handleNavigate = (item: ContentItem) => {
-    window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
+    window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'series');
   };
 
   const sections = useMemo(() => {
@@ -71,74 +74,69 @@ export default function SeriesDashboard() {
       watchNow
     );
 
-    const genreMap = new Map<string, ContentItem[]>();
-    for (const tv of seriesWithSignals) {
-      if (!Array.isArray(tv.genres)) continue;
-      for (const genre of tv.genres) {
-        if (!genre) continue;
-        if (!genreMap.has(genre)) genreMap.set(genre, []);
-        genreMap.get(genre)!.push(tv);
-      }
-    }
-    const genreSections = Array.from(genreMap.entries())
-      .filter(([, items]) => items.length >= MIN_SERIES_PER_GENRE)
-      .sort((a, b) => b[1].length - a[1].length)
-      .slice(0, MAX_GENRES)
-      .map(([genre, items]) => ({
-        id: `genre-${genre}`,
-        title: t('dashboard.seriesGenre', { genre }),
-        items: promoteRecentFirst(items, recentKeys).slice(0, SECTION_LIMIT),
-      }));
-
-    return [
+    const lang = language === 'en' ? 'en' : 'fr';
+    const personal = [
       {
-        id: 'latest-downloads-series',
-        title: t('dashboard.recentlyDownloaded'),
-        items: latestMerged,
-        priority: true,
-      },
-      { id: 'resume-series', title: t('dashboard.resumeWatching'), items: resumeSeries, kind: 'resume' as const, priority: true },
-      {
-        id: 'waiting-series',
-        title: t('dashboard.waitingForNext'),
-        items: [...waitingSeries].sort((a, b) => {
-          const da = a.nextEpisodeAirDate ?? '';
-          const db = b.nextEpisodeAirDate ?? '';
-          return da.localeCompare(db);
-        }),
+        id: 'resume-series',
+        title: t('dashboard.resumeWatching'),
+        items: resumeSeries.filter((item) => itemInGenre(item, selectedGenre)),
         kind: 'resume' as const,
         priority: true,
       },
       {
-        id: 'recent-series',
-        title: t('dashboard.newReleasesSeries'),
-        items: newest,
+        id: 'waiting-series',
+        title: t('dashboard.waitingForNext'),
+        items: [...waitingSeries]
+          .filter((item) => itemInGenre(item, selectedGenre))
+          .sort((a, b) => (a.nextEpisodeAirDate ?? '').localeCompare(b.nextEpisodeAirDate ?? '')),
+        kind: 'resume' as const,
+        priority: true,
       },
       {
-        id: 'fresh-series',
-        title: t('dashboard.freshlySyncedSeries'),
-        items: promoteRecentFirst(freshWithSignals, recentKeys).slice(0, SECTION_LIMIT),
+        id: 'latest-downloads-series',
+        title: t('dashboard.recentlyDownloaded'),
+        items: latestMerged.filter((item) => itemInGenre(item, selectedGenre)),
+        priority: true,
       },
+    ];
+
+    if (selectedGenre) {
+      const inGenre = seriesWithSignals.filter((item) => itemInGenre(item, selectedGenre));
+      return [
+        ...personal,
+        {
+          id: `genre-${selectedGenre}`,
+          title: t('dashboard.seriesGenre', { genre: translateGenre(selectedGenre, lang) }),
+          items: promoteRecentFirst(inGenre, recentKeys).slice(0, 40),
+        },
+      ];
+    }
+
+    return [
+      ...personal,
+      { id: 'recent-series', title: t('dashboard.newReleasesSeries'), items: newest },
       { id: 'popular-series', title: t('dashboard.popularSeries'), items: popular },
-      ...genreSections,
     ];
   }, [
     seriesWithSignals,
-    freshWithSignals,
     resumeWatching,
-    rewatchWatching,
     waitingForNext,
     seenItems,
     seriesDownloads,
     recentDownloads,
     recentKeys,
+    selectedGenre,
+    language,
     t,
   ]);
+
+  const genres = useMemo(() => topGenres(seriesWithSignals), [seriesWithSignals]);
 
   return (
     <SimpleTmdbPage
       pageId="series"
-      title=""
+      title={t('nav.series')}
+      subtitle={t('dashboard.seriesSubtitle')}
       heroItems={heroItems}
       sections={sections}
       loading={loading}
@@ -147,7 +145,13 @@ export default function SeriesDashboard() {
       emptyTitle={t('sync.noSeriesSynced')}
       emptyDescription={t('sync.startSyncSeriesDescription')}
     >
-      <SuggestionsSection contextType="series" />
+      <GenreChipBar
+        genres={genres}
+        selectedGenre={selectedGenre}
+        onSelectGenre={setSelectedGenre}
+        language={language === 'en' ? 'en' : 'fr'}
+      />
+      {selectedGenre ? null : <SuggestionsSection contextType="series" />}
     </SimpleTmdbPage>
   );
 }

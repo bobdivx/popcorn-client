@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'preact/hooks';
-import { Sliders, ClipboardList, Ban } from 'lucide-preact';
+import { Sliders, ClipboardList, Ban, Users } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { canAccess } from '../../lib/permissions';
 import DiscoverSlidersManager from './DiscoverSlidersManager';
 import RequestsAdminManager from './RequestsAdminManager';
 import BlacklistManager from './BlacklistManager';
+import QuotaAdminPanel from './QuotaAdminPanel';
 import { SettingsNavCard } from './SettingsNavCard';
 import { SettingsSubPageFrame } from './SettingsSubPageFrame';
 
 const BASE_URL = '/settings?category=discovery';
 
-const DISCOVERY_SUBS = ['sliders', 'requests', 'blacklist'] as const;
+const DISCOVERY_SUBS = ['sliders', 'requests', 'blacklist', 'quotas'] as const;
 type DiscoverySub = (typeof DISCOVERY_SUBS)[number];
 
 function getSubFromUrl(): DiscoverySub | null {
@@ -31,6 +32,7 @@ const DISCOVERY_ITEMS: DiscoveryItem[] = [
   { id: 'sliders', titleKey: 'discover.sliders', descriptionKey: 'discover.description', icon: Sliders },
   { id: 'requests', titleKey: 'requestsAdmin.title', descriptionKey: 'requestsAdmin.description', icon: ClipboardList },
   { id: 'blacklist', titleKey: 'blacklist.title', descriptionKey: 'blacklist.description', icon: Ban },
+  { id: 'quotas', titleKey: 'quotas.title', descriptionKey: 'quotas.description', icon: Users },
 ];
 
 
@@ -75,6 +77,14 @@ export default function DiscoverySubMenuPanel() {
     return (
       <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}>
         <BlacklistManager />
+      </SettingsSubPageFrame>
+    );
+  }
+  if (sub === 'quotas') {
+    const item = DISCOVERY_ITEMS.find((i) => i.id === 'quotas')!;
+    return (
+      <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}>
+        <QuotaAdminPanel />
       </SettingsSubPageFrame>
     );
   }

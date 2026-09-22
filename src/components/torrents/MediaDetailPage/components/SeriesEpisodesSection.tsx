@@ -149,6 +149,7 @@ export function SeriesEpisodesSection({
           <section
             key={seasonNum}
             aria-labelledby={headingId}
+            data-tv-episode-row
             className="rounded-xl overflow-hidden bg-black/40 border border-white/10"
           >
             <div className="px-4 py-3 border-b border-white/10 bg-white/5">

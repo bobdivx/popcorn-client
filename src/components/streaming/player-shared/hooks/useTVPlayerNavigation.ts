@@ -424,16 +424,6 @@ export function useTVPlayerNavigation({
         return;
       }
 
-      // Première touche : afficher le dock, sans seek / play.
-      if (!showControlsRef.current) {
-        e.preventDefault();
-        setShowControls(true);
-        resetControlsTimeout();
-        return;
-      }
-
-      resetControlsTimeout();
-
       const kc = e.keyCode ?? e.which;
       const keyRaw = e.key || '';
       const key =
@@ -486,16 +476,48 @@ export function useTVPlayerNavigation({
 
       if (kc === 23) e.preventDefault();
 
-      if (kc === 415 || keyNormalized === 'MediaPlayPause') {
+      if (settingsOpenRef.current) return;
+
+      const isMediaPlay =
+        kc === 415 ||
+        keyNormalized === 'MediaPlayPause' ||
+        keyNormalized === 'MediaPlay' ||
+        keyNormalized === 'MediaPause';
+      const isMediaRewind = kc === 412 || keyNormalized === 'MediaRewind' || keyNormalized === 'MediaTrackPrevious';
+      const isMediaForward = kc === 417 || keyNormalized === 'MediaFastForward' || keyNormalized === 'MediaTrackNext';
+
+      if (isMediaPlay) {
         e.preventDefault();
+        if (!showControlsRef.current) setShowControls(true);
         onPlayPause();
+        resetControlsTimeout();
         return;
       }
 
-      const isLeft =
-        kc === 412 || kc === 21 || keyNormalized === 'ArrowLeft';
-      const isRight =
-        kc === 417 || kc === 22 || keyNormalized === 'ArrowRight';
+      if (isMediaRewind || isMediaForward) {
+        e.preventDefault();
+        if (!showControlsRef.current) setShowControls(true);
+        if (scrubThumbnailsActiveRef.current) {
+          navigateScrub(isMediaRewind ? 'left' : 'right');
+        } else {
+          navigatePreviewSeek(isMediaRewind ? 'left' : 'right');
+        }
+        resetControlsTimeout();
+        return;
+      }
+
+      // Première flèche : révéler le dock, sans déplacer la lecture.
+      if (!showControlsRef.current) {
+        e.preventDefault();
+        setShowControls(true);
+        resetControlsTimeout();
+        return;
+      }
+
+      resetControlsTimeout();
+
+      const isLeft = kc === 21 || keyNormalized === 'ArrowLeft';
+      const isRight = kc === 22 || keyNormalized === 'ArrowRight';
       const isConfirm =
         kc === 23 || keyNormalized === 'Enter' || keyNormalized === ' ';
 

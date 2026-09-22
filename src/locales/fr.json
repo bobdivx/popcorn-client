@@ -87,7 +87,9 @@
     "requested": "Déjà demandé",
     "available": "Disponible",
     "readyToWatch": "Prêtes à regarder",
-    "pendingRequests": "Demandes en cours"
+    "pendingRequests": "Demandes en cours",
+    "searchPlaceholder": "Rechercher un film ou une série à demander",
+    "results": "Résultats"
   },
   "requestsAdmin": {
     "title": "Gestion des demandes",
@@ -97,6 +99,25 @@
     "decline": "Refuser",
     "notes": "Notes",
     "noPendingRequests": "Aucune demande en attente"
+  },
+  "quotas": {
+    "title": "Quotas de demandes",
+    "description": "Limiter le nombre de films et de séries qu'un utilisateur peut demander.",
+    "hint": "Laissez un champ vide pour ne pas limiter. La période est en jours.",
+    "userId": "Identifiant utilisateur",
+    "userIdPlaceholder": "id de l'utilisateur",
+    "load": "Charger",
+    "movieLimit": "Films autorisés",
+    "movieDays": "Période films (jours)",
+    "tvLimit": "Séries autorisées",
+    "tvDays": "Période séries (jours)",
+    "unlimited": "Illimité",
+    "used": "Déjà demandé : {movies} film(s), {series} série(s)",
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "saved": "Quota enregistré",
+    "error": "Impossible de mettre à jour le quota",
+    "userRequired": "Indiquez l'identifiant utilisateur"
   },
   "feedback": {
     "requireCloud": "Connectez-vous avec un compte cloud pour envoyer un feedback.",
@@ -557,6 +578,7 @@
     "pauseLabel": "Pause",
     "skipBack10": "Reculer de 10 secondes",
     "skipForward10": "Avancer de 10 secondes",
+    "tvRemoteHint": "OK valide · flèches changent de bouton · haut ouvre la timeline · lecture, retour et avance agissent tout de suite",
     "audioAndSubtitles": "Audio et sous-titres",
     "playerSettings": "Paramètres du lecteur",
     "audioTracks": "Piste audio",
@@ -1154,6 +1176,8 @@
     "carouselIndicators": "Contenus du carousel",
     "goToContent": "Aller au contenu",
     "genresTitle": "Genres",
+    "filmsSubtitle": "Votre catalogue de films",
+    "seriesSubtitle": "Votre catalogue de séries",
     "genreAll": "Tous",
     "genreAllHint": "Tout afficher",
     "genreSelected": "Sélectionné",

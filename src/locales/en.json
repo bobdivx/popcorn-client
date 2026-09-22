@@ -87,7 +87,9 @@
     "requested": "Already requested",
     "available": "Available",
     "readyToWatch": "Ready to watch",
-    "pendingRequests": "Pending requests"
+    "pendingRequests": "Pending requests",
+    "searchPlaceholder": "Search a movie or series to request",
+    "results": "Results"
   },
   "requestsAdmin": {
     "title": "Manage requests",
@@ -97,6 +99,25 @@
     "decline": "Decline",
     "notes": "Notes",
     "noPendingRequests": "No pending requests"
+  },
+  "quotas": {
+    "title": "Request quotas",
+    "description": "Limit how many movies and series a user can request.",
+    "hint": "Leave a field empty for no limit. The period is in days.",
+    "userId": "User id",
+    "userIdPlaceholder": "user id",
+    "load": "Load",
+    "movieLimit": "Movies allowed",
+    "movieDays": "Movie period (days)",
+    "tvLimit": "Series allowed",
+    "tvDays": "Series period (days)",
+    "unlimited": "Unlimited",
+    "used": "Already requested: {movies} movie(s), {series} series",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Quota saved",
+    "error": "Could not update the quota",
+    "userRequired": "Enter a user id"
   },
   "feedback": {
     "requireCloud": "Sign in with a cloud account to send feedback.",
@@ -557,6 +578,7 @@
     "pauseLabel": "Pause",
     "skipBack10": "Skip back 10 seconds",
     "skipForward10": "Skip forward 10 seconds",
+    "tvRemoteHint": "OK confirms · arrows move between buttons · up opens the timeline · play, rewind and fast-forward act immediately",
     "audioAndSubtitles": "Audio and subtitles",
     "playerSettings": "Player settings",
     "audioTracks": "Audio track",
@@ -1154,6 +1176,8 @@
     "carouselIndicators": "Carousel content",
     "goToContent": "Go to content",
     "genresTitle": "Genres",
+    "filmsSubtitle": "Your movie catalog",
+    "seriesSubtitle": "Your series catalog",
     "genreAll": "All",
     "genreAllHint": "Show all",
     "genreSelected": "Selected",

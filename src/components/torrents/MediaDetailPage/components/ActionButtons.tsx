@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Info,
   MoreHorizontal,
+  Film,
 } from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
@@ -24,6 +25,8 @@ import { PlaybackStatusSurface } from '../../../streaming/player-shared/componen
 import { Modal } from '../../../ui/Modal';
 import { DsLoader } from '../../../ui/DsLoader';
 import { isTVPlatform } from '../../../../lib/utils/device-detection';
+import { MediaDetailBackLink } from './ActionsRow';
+import type { Ref } from 'preact';
 
 interface ActionButtonsProps {
   torrent: MediaDetailPageProps['torrent'];
@@ -67,6 +70,10 @@ interface ActionButtonsProps {
   seriesLibraryPath?: string | null;
   /** Films : ouvrir la modal info technique (chemin / indexer). */
   onOpenMovieTechInfo?: () => void;
+  /** TV : bande-annonce dans le menu Plus. */
+  onPlayTrailer?: () => void;
+  backHref?: string;
+  backLinkRef?: Ref<HTMLAnchorElement>;
 }
 
 function selectBestTorrent(variants: MediaDetailPageProps['torrent'][]): MediaDetailPageProps['torrent'] | null {
@@ -122,6 +129,9 @@ export function ActionButtons({
   seriesIndexerRefresh,
   seriesLibraryPath,
   onOpenMovieTechInfo,
+  onPlayTrailer,
+  backHref,
+  backLinkRef,
 }: ActionButtonsProps) {
   const { t } = useI18n();
   const isTV = isTVPlatform();
@@ -234,6 +244,7 @@ export function ActionButtons({
     (torrent._externalLink && torrent._externalLink.startsWith('magnet:'))
   );
   const showDeleteBtn = (isAvailableLocally || isDownloadComplete) && hasInfoHash;
+  const showPlayFromStart = !!(shouldShowPlayButton && hasSavedPosition && onPlayFromBeginning);
   const hasMoreActions = !!(
     onDownloadAllEpisodes ||
     showWatchLaterBtn ||
@@ -241,7 +252,10 @@ export function ActionButtons({
     showDeleteBtn ||
     seriesIndexerRefresh ||
     seriesLibraryPath ||
-    onOpenMovieTechInfo
+    onOpenMovieTechInfo ||
+    (isTV && showPlayFromStart) ||
+    (isTV && showDownloadButtonAlongsidePlay) ||
+    (isTV && onPlayTrailer)
   );
   const hasSecondaryIconActions = !!(
     showWatchLaterBtn ||
@@ -292,12 +306,23 @@ export function ActionButtons({
   ) : null;
 
   return (
-    <div className={`space-y-5 ${showDownloadProgressCard ? 'mb-4' : 'mb-8'}`}>
+    <div
+      className={`space-y-5 ${showDownloadProgressCard ? 'mb-4' : 'mb-8'}`}
+      data-tv-zone="play"
+      data-tv-page-action
+    >
       {/* Pendant un téléchargement : la carte domine, les icônes suivent (alignées avec Info / qualité). */}
       {showDownloadProgressCard ? progressSurface : null}
 
       {/* ── Rangée principale ── */}
       <div className="flex flex-wrap gap-4 tv:gap-5 items-center overflow-visible">
+        {!isTV && backHref ? (
+          <MediaDetailBackLink
+            backHref={backHref}
+            backLinkRef={backLinkRef}
+            label={t('common.back')}
+          />
+        ) : null}
 
         {/* Bouton Lire / Télécharger — gradient animé, rounded-full */}
         {(!hidePrimaryPlayForTvSeries || !shouldShowPlayButton) &&
@@ -386,9 +411,8 @@ export function ActionButtons({
         )}
 
         {/* Depuis le début — visible seulement s'il y a une position de reprise */}
-        {shouldShowPlayButton &&
-          hasSavedPosition &&
-          onPlayFromBeginning &&
+        {!isTV &&
+          showPlayFromStart &&
           !(isDownloadInProgress && onCancelDownload && showProgressNextToCancel) &&
           !hidePrimaryPlayForTvSeries && (
           <button
@@ -423,7 +447,7 @@ export function ActionButtons({
         )}
 
         {/* Télécharger à côté de Lire (streaming) — style glass pill */}
-        {showDownloadButtonAlongsidePlay && (
+        {showDownloadButtonAlongsidePlay && !isTV && (
           <button
             type="button"
             onClick={onDownload}
@@ -596,6 +620,54 @@ export function ActionButtons({
               };
               return (
                 <>
+                  {onPlayTrailer && (
+                    <button
+                      type="button"
+                      data-focusable
+                      data-autofocus={autofocus()}
+                      tabIndex={0}
+                      className={moreActionClass}
+                      onClick={() => {
+                        setShowMoreActions(false);
+                        onPlayTrailer();
+                      }}
+                    >
+                      <Film className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
+                      {t('ads.trailerPlay')}
+                    </button>
+                  )}
+                  {showPlayFromStart && onPlayFromBeginning && (
+                    <button
+                      type="button"
+                      data-focusable
+                      data-autofocus={autofocus()}
+                      tabIndex={0}
+                      className={moreActionClass}
+                      onClick={() => {
+                        setShowMoreActions(false);
+                        onPlayFromBeginning();
+                      }}
+                    >
+                      <RotateCw className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
+                      {t('playback.playFromStartLabel')}
+                    </button>
+                  )}
+                  {showDownloadButtonAlongsidePlay && (
+                    <button
+                      type="button"
+                      data-focusable
+                      data-autofocus={autofocus()}
+                      tabIndex={0}
+                      className={moreActionClass}
+                      onClick={() => {
+                        setShowMoreActions(false);
+                        onDownload();
+                      }}
+                    >
+                      <Download className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
+                      {isPackWithMultipleFiles ? t('playback.downloadFullSeason') : t('common.download')}
+                    </button>
+                  )}
                   {onDownloadAllEpisodes && (
                     <button
                       type="button"

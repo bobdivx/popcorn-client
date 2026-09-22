@@ -3293,7 +3293,7 @@ export default function MediaDetailPage({
         errorMessage={errorMessage}
         />
       )}
-    <div className="relative bg-page text-white animate-fade-in-up min-h-[100dvh]" data-dark-context>
+    <div className="relative bg-page text-white animate-fade-in-up min-h-[100dvh]" data-dark-context data-tv-media-detail>
       {/* Hero section : fond = bande-annonce (vidÃ©o) ou image selon Ã©tat */}
       <div className="fixed top-0 left-0 right-0 bottom-0 z-0 overflow-hidden">
         {isPlayingTrailer && trailerKey ? (
@@ -3369,8 +3369,9 @@ export default function MediaDetailPage({
               disabled={isLoadingTrailer}
               title={t('ads.trailerPlay')}
               aria-label={t('ads.trailerPlay')}
-              data-focusable
-              tabIndex={0}
+              data-focusable={isTV ? undefined : true}
+              data-tv-nav-skip={isTV ? true : undefined}
+              tabIndex={isTV ? -1 : 0}
               className="absolute top-4 right-3 sm:top-6 sm:right-4 md:right-6 lg:right-16 gtv-pill-btn ds-focus-glow ds-active-glow gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoadingTrailer ? (
@@ -3393,8 +3394,10 @@ export default function MediaDetailPage({
             </div>
 
             <div data-stream-item>
-            <ActionsRow backHref={backHref ?? '/dashboard'} isTV={isTV} backLinkRef={backLinkRef}>
+            <ActionsRow>
               <MediaDetailActionButtons
+              backHref={backHref ?? '/dashboard'}
+              backLinkRef={backLinkRef}
               torrent={selectedTorrent || torrent}
               activeTorrent={activeTorrent}
               allVariants={allVariants}
@@ -3467,6 +3470,9 @@ export default function MediaDetailPage({
                   : undefined
               }
               seriesLibraryPath={seriesLibraryPath}
+              onPlayTrailer={
+                trailerKey && !isPlayingTrailer ? () => setIsPlayingTrailer(true) : undefined
+              }
               onOpenMovieTechInfo={
                 !isTvSeriesDetail &&
                 (() => {
