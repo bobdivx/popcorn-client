@@ -38,7 +38,9 @@ interface SimpleTmdbPageProps {
   emptyDescription?: string;
   /** Bloc optionnel rendu à droite du titre (ex. bouton bascule Bibliothèque). */
   headerAction?: ComponentChildren;
-  /** Contenu optionnel injecté en haut de la page (ex. SuggestionsSection). */
+  /** Barre sous le titre (filtres de genre). */
+  toolbar?: ComponentChildren;
+  /** Contenu optionnel injecté entre les rangées perso et le catalogue. */
   children?: ComponentChildren;
 }
 
@@ -72,6 +74,7 @@ export function SimpleTmdbPage({
   emptyTitle,
   emptyDescription,
   headerAction,
+  toolbar,
   children,
 }: SimpleTmdbPageProps) {
   const showPageHeader = Boolean((title && title.trim()) || headerAction);
@@ -103,7 +106,7 @@ export function SimpleTmdbPage({
   const visibleSections = sections.filter((section) => section.items.length > 0);
   const prioritySections = visibleSections.filter((section) => section.priority);
   const restSections = visibleSections.filter((section) => !section.priority);
-  const hasContent = visibleSections.length > 0;
+  const hasContent = visibleSections.length > 0 || Boolean(children);
 
   const renderSection = (section: SimpleTmdbSection) => (
     <BrowseRowReveal key={section.id} rowId={section.id}>
@@ -170,6 +173,7 @@ export function SimpleTmdbPage({
       {showPageHeader ? (
         <PageHeader title={title || ''} subtitle={subtitle} headerAction={headerAction} />
       ) : null}
+      {toolbar}
       <div className={`pb-8 tv:pb-12 overflow-visible ${showPageHeader ? 'pt-2 tv:pt-4' : 'pt-1'}`}>
         {hasContent ? (
           <>
@@ -179,7 +183,6 @@ export function SimpleTmdbPage({
           </>
         ) : (
           <>
-            {children ? <div>{children}</div> : null}
             <section className="mx-4 sm:mx-6 lg:mx-16 tv:mx-24 rounded-2xl border border-white/10 bg-white/[0.03] px-6 py-12 text-center">
               <p className="text-lg font-semibold text-white">{emptyTitle}</p>
               {emptyDescription ? (

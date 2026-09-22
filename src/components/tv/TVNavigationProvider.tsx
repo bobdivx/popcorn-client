@@ -1298,7 +1298,19 @@ export default function TVNavigationProvider() {
       }
       const action = neighbor ? pageActionBetween(current, neighbor, direction) : null;
       if (action) return { kind: 'target', el: action };
-      if (!neighbor) return { kind: 'stop' };
+      if (!neighbor) {
+        if (direction === 'down') {
+          const lists = document.querySelectorAll<HTMLElement>('[data-tv-list]');
+          for (const list of lists) {
+            if (!(current.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING)) continue;
+            const first = list.querySelector<HTMLElement>(
+              '[data-tv-list-item] [data-focusable], [data-tv-list-item] button:not([disabled]), [data-tv-list-item] a[href]'
+            );
+            if (first) return { kind: 'target', el: first };
+          }
+        }
+        return { kind: 'stop' };
+      }
 
       const items = rowItems(neighbor);
       if (items.length === 0) return { kind: 'skip' };
@@ -1346,7 +1358,21 @@ export default function TVNavigationProvider() {
               }
             }
           }
-          // Bord de liste : ne pas retomber sur le score spatial (lenteur + mauvais voisin)
+          if (direction === 'up') {
+            const rows = collectBrowseRows().filter(
+              (row) => row.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING
+            );
+            const prev = rows[rows.length - 1];
+            if (prev) {
+              const items = rowItems(prev);
+              const slot = Math.max(0, Array.from(list.querySelectorAll(LIST_ITEM_SELECTOR)).indexOf(listItem));
+              const el = items.length > 0 ? focusOfRowItem(items[Math.min(slot, items.length - 1)]) : null;
+              if (el) {
+                focusElement(el);
+                return true;
+              }
+            }
+          }
           return false;
         }
       }
