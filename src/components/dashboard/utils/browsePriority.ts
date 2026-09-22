@@ -252,6 +252,20 @@ export function byPopularity(items: ContentItem[]): ContentItem[] {
   });
 }
 
+/** Première affiche trouvée pour chaque genre, une fois le catalogue connu. */
+export function postersByGenre(items: ContentItem[]): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const item of items) {
+    const img = item.poster || item.backdrop;
+    if (!img) continue;
+    for (const genre of item.genres ?? []) {
+      const key = genreKey(genre);
+      if (key && !map[key]) map[key] = img;
+    }
+  }
+  return map;
+}
+
 /** Genres présents, avec le nombre de titres uniques. */
 export function topGenres(items: ContentItem[]): GenreCount[] {
   const counts = new Map<string, number>();

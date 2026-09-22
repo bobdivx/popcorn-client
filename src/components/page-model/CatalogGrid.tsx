@@ -4,20 +4,16 @@ import { TitlePreviewCard } from './TitlePreviewCard';
 
 interface CatalogGridProps {
   title: string;
-  count: number;
   items: ContentItem[];
   onNavigate: (item: ContentItem) => void;
 }
 
 /** Grille catalogue : tous les titres d'un genre, navigable à la télécommande. */
-export function CatalogGrid({ title, count, items, onNavigate }: CatalogGridProps) {
+export function CatalogGrid({ title, items, onNavigate }: CatalogGridProps) {
   const { t } = useI18n();
   return (
     <section className="px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 mb-10">
-      <h2 className="mb-4 flex items-baseline gap-3 text-xl sm:text-2xl tv:text-3xl font-bold text-white">
-        {title}
-        <span className="text-base tv:text-xl font-semibold text-white/45">{count}</span>
-      </h2>
+      <h2 className="mb-4 text-xl sm:text-2xl tv:text-3xl font-bold text-white">{title}</h2>
       {items.length === 0 ? (
         <p className="py-8 text-white/55">{t('search.noResults')}</p>
       ) : (
