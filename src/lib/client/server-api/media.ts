@@ -79,6 +79,9 @@ export const mediaMethods = {
     // Ajouter le paramètre de langue pour TMDB
     queryParams.set('lang', toTmdbLanguage(params.lang));
     if (params.indexerId) queryParams.set('indexer_id', params.indexerId);
+    if (params.tmdbId != null && params.tmdbId > 0) queryParams.set('tmdb_id', String(params.tmdbId));
+    if (params.year != null && params.year > 0) queryParams.set('year', String(params.year));
+    if (params.altQ?.trim()) queryParams.set('alt_q', params.altQ.trim());
 
     const qp = queryParams.toString();
     return this.backendRequest<SearchResult[]>(`/api/indexers/search?${qp}`, { method: 'GET' });

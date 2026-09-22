@@ -85,7 +85,7 @@ function searchStepStatusLabel(
   }
 }
 
-/** Stepper de recherche : locale → indexeurs → TMDB, pensé pour TV (gros contrastes + barre). */
+/** Stepper : TMDB (choix du titre) → base par id → indexeurs ciblés. */
 function SearchLiveProgressTimeline({
   live,
   t,
@@ -96,9 +96,10 @@ function SearchLiveProgressTimeline({
   const formatCounts = (movies: number, series: number) =>
     t('search.progressCounts', { movies: String(movies), series: String(series) });
 
-  const localActive = !live.localSkipped && !live.localDone;
-  const indexerActive = live.indexerRunning && !live.indexerDone && !live.indexerError;
   const tmdbActive = live.tmdbRunning && !live.tmdbDone;
+  const localActive =
+    live.tmdbDone && !live.localSkipped && !live.localDone && !live.indexerRunning && !live.indexerDone;
+  const indexerActive = live.indexerRunning && !live.indexerDone && !live.indexerError;
 
   const localStatus: SearchStepStatus = live.localSkipped
     ? 'skipped'
@@ -133,36 +134,8 @@ function SearchLiveProgressTimeline({
     Icon: typeof HardDrive;
   }> = [
     {
-      id: 'local',
-      index: 1,
-      label: live.localSkipped ? t('search.progressLocalSkipped') : t('search.progressStepLocal'),
-      status: localStatus,
-      detail: live.localSkipped
-        ? t('search.progressLocalSkippedDetail')
-        : live.localDone
-          ? formatCounts(live.localMovies, live.localSeries)
-          : localActive
-            ? t('search.localSearchNote')
-            : undefined,
-      Icon: HardDrive,
-    },
-    {
-      id: 'indexer',
-      index: 2,
-      label: t('search.progressStepIndexer'),
-      status: indexerStatus,
-      detail: live.indexerError
-        ? t('search.progressIndexerErrorDetail')
-        : live.indexerDone
-          ? formatCounts(live.indexerMovies, live.indexerSeries)
-          : indexerActive
-            ? t('search.indexerSearchNote')
-            : undefined,
-      Icon: Layers2,
-    },
-    {
       id: 'tmdb',
-      index: 3,
+      index: 1,
       label: t('search.progressStepTmdb'),
       status: tmdbStatus,
       detail: live.tmdbSkipped
@@ -177,6 +150,34 @@ function SearchLiveProgressTimeline({
             ? t('search.searchingTmdbShort')
             : undefined,
       Icon: Film,
+    },
+    {
+      id: 'local',
+      index: 2,
+      label: live.localSkipped ? t('search.progressLocalSkipped') : t('search.progressStepLocal'),
+      status: localStatus,
+      detail: live.localSkipped
+        ? t('search.progressLocalSkippedDetail')
+        : live.localDone
+          ? formatCounts(live.localMovies, live.localSeries)
+          : localActive
+            ? t('search.localSearchNote')
+            : undefined,
+      Icon: HardDrive,
+    },
+    {
+      id: 'indexer',
+      index: 3,
+      label: t('search.progressStepIndexer'),
+      status: indexerStatus,
+      detail: live.indexerError
+        ? t('search.progressIndexerErrorDetail')
+        : live.indexerDone
+          ? formatCounts(live.indexerMovies, live.indexerSeries)
+          : indexerActive
+            ? t('search.indexerSearchNote')
+            : undefined,
+      Icon: Layers2,
     },
   ];
 
@@ -711,6 +712,134 @@ function SearchResultsSection({
   );
 }
 
+function mapTmdbRows(rows: Array<Record<string, unknown>>): SearchResult[] {
+  return rows
+    .map((r) => {
+      const tmdbId = Number(r.tmdbId ?? 0);
+      if (!Number.isFinite(tmdbId) || tmdbId <= 0) return null;
+      const title = String(r.title ?? '').trim();
+      if (!title) return null;
+      const type = ((r.type as string) === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv';
+      const posterRaw = typeof r.poster === 'string' ? r.poster : undefined;
+      const originalRaw = typeof r.originalTitle === 'string' ? r.originalTitle.trim() : '';
+      const originalTitle = originalRaw && originalRaw.toLowerCase() !== title.toLowerCase() ? originalRaw : undefined;
+      const year = typeof r.year === 'number' ? r.year : undefined;
+      return {
+        id: String(r.id ?? `tmdb-${tmdbId}-${type}`),
+        title,
+        type,
+        poster: posterRaw?.replace('/w185', '/w342'),
+        year,
+        overview: typeof r.overview === 'string' ? r.overview : undefined,
+        tmdbId,
+        originalTitle,
+      } satisfies SearchResult;
+    })
+    .filter((r): r is SearchResult => r != null);
+}
+
+function catalogHit(result: SearchResult): boolean {
+  return (
+    result.sourceSearch === 'library' ||
+    result.sourceSearch === 'sync' ||
+    result.sourceSearch === 'indexer' ||
+    result.isDownloaded === true ||
+    (result.variantCount ?? 0) > 0 ||
+    (result.episodesIndexerCount ?? 0) > 0 ||
+    (result.episodesLibraryCount ?? 0) > 0
+  );
+}
+
+function TmdbPickCard({
+  result,
+  onPick,
+}: {
+  result: SearchResult;
+  onPick: (result: SearchResult) => void;
+}) {
+  const { t } = useI18n();
+  const [imageUrl, setImageUrl] = useState<string | null>(result.poster || null);
+
+  useEffect(() => {
+    if (result.poster && result.poster !== imageUrl) setImageUrl(result.poster);
+  }, [result.poster]);
+
+  return (
+    <div
+      className="w-[132px] sm:w-[156px] tv:w-[200px] shrink-0"
+      data-tv-list-item
+      data-tv-item-key={tvBrowseItemKey(result)}
+    >
+      <FocusableCard
+        ariaLabel={result.title}
+        className="group text-left rounded-2xl tv:rounded-3xl overflow-hidden border border-white/10 bg-white/[0.04] hover:border-[var(--ds-accent-violet)]/55 focus:outline-none w-full block"
+        onClick={(e) => {
+          e.preventDefault();
+          onPick(result);
+        }}
+        tabIndex={0}
+      >
+        <div className="relative aspect-[2/3] w-full overflow-hidden bg-black/40">
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 w-full h-full object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-white/25">
+              <Film className="w-10 h-10 tv:w-14 tv:h-14" size={48} />
+            </div>
+          )}
+        </div>
+        <div className="p-2.5 tv:p-4 text-left">
+          <div className="text-sm tv:text-lg font-semibold text-white/95 line-clamp-2 leading-snug" title={result.title}>
+            {result.title}
+          </div>
+          <div className="mt-1 text-[11px] tv:text-sm text-white/55">
+            {result.year ? <span className="tabular-nums">{result.year}</span> : null}
+            {result.year ? <span> · </span> : null}
+            <span>{result.type === 'movie' ? t('common.film') : t('common.serie')}</span>
+          </div>
+        </div>
+      </FocusableCard>
+    </div>
+  );
+}
+
+function TmdbPickRow({
+  title,
+  results,
+  onPick,
+  initialFocus = false,
+}: {
+  title: string;
+  results: SearchResult[];
+  onPick: (result: SearchResult) => void;
+  initialFocus?: boolean;
+}) {
+  if (results.length === 0) return null;
+  return (
+    <section className="px-4 sm:px-8 lg:px-12 mb-8 tv:mb-10">
+      <h3 className="text-base sm:text-lg tv:text-2xl font-semibold text-white/90 mb-3 tv:mb-5 text-center sm:text-left">
+        {title}
+      </h3>
+      <div className="flex flex-wrap justify-center sm:justify-start gap-3 sm:gap-4 tv:gap-6" data-tv-list>
+        {results.map((result, index) => (
+          <div key={result.id} data-tv-initial-focus={initialFocus && index === 0 ? true : undefined}>
+            <TmdbPickCard result={result} onPick={onPick} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function normalizeForSearchMatch(s: string): string {
   return s
     .toLowerCase()
@@ -837,7 +966,6 @@ export default function Search({ onResultClick }: SearchProps) {
   const [searchPhase, setSearchPhase] = useState<SearchPhase>('idle');
   const [searchLive, setSearchLive] = useState<SearchLiveProgressState>(() => initialSearchLiveProgress());
   const [error, setError] = useState<string | null>(null);
-  const [forceIndexerSearch] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>(() => getSearchHistory());
   const [blockedKeys, setBlockedKeys] = useState<Set<string>>(() => new Set());
   const inputRef = useRef<HTMLInputElement>(null);
@@ -922,280 +1050,218 @@ export default function Search({ onResultClick }: SearchProps) {
     if (q && q.trim()) setQuery(q.trim());
   }, []);
 
-  const handleSearch = useCallback(async (termOverride?: string) => {
-    const searchTerm = (termOverride ?? query).trim();
-    if (!searchTerm) {
-      setResults([]);
+  const openResult = useCallback((result: SearchResult) => {
+    if (onResultClick) {
+      onResultClick(result);
       return;
     }
-    setQuery(searchTerm);
-    addSearchToHistory(searchTerm);
-    setSearchHistory(getSearchHistory());
+    window.location.href = getDetailUrl(result);
+  }, [onResultClick]);
 
-    const cacheKey = `search_${SEARCH_CACHE_VERSION}_${searchTerm}_${type}_${language}${forceIndexerSearch ? '_indexer' : ''}`;
-    const cached = CacheManager.get<SearchResult[]>(cacheKey);
-    if (cached) {
-      setResults(cached);
+  const resolveTmdbPick = useCallback(async (pick: SearchResult) => {
+    const tmdbId = pick.tmdbId;
+    if (tmdbId == null || tmdbId <= 0) {
+      openResult(pick);
       return;
     }
+
+    setLoading(true);
+    setError(null);
+    setResults([]);
+    setSearchPhase('local');
+    setSearchLive((prev) => ({
+      ...prev,
+      tmdbRunning: false,
+      tmdbDone: true,
+      tmdbSkipped: false,
+      localSkipped: false,
+      localDone: false,
+      indexerRunning: false,
+      indexerDone: false,
+      indexerError: false,
+    }));
+    await yieldToPaint();
+
+    const altQ = pick.originalTitle?.trim();
+    const baseParams = {
+      q: pick.title,
+      type: pick.type,
+      lang: language,
+      tmdbId,
+      year: pick.year,
+      altQ: altQ && altQ.toLowerCase() !== pick.title.toLowerCase() ? altQ : undefined,
+      user_id: serverApi.getCurrentUserId() || undefined,
+    };
 
     try {
-      setLoading(true);
-      setError(null);
-      setSearchLive(initialSearchLiveProgress());
-
-      const typeParam = undefined;
-
-      if (!serverApi.isAuthenticated()) {
-        setError(t('search.mustBeLoggedIn'));
-        setSearchPhase('idle');
-        setSearchLive(initialSearchLiveProgress());
-        setLoading(false);
-        return;
-      }
-
-      /** Recherche directe indexeurs (sans étape locale) */
-      if (forceIndexerSearch) {
-        setSearchPhase('indexer');
-        setSearchLive({
-          ...initialSearchLiveProgress(),
-          localSkipped: true,
-          indexerRunning: true,
-        });
-        await yieldToPaint();
-
-        const indexerRes = await serverApi.search({
-          q: searchTerm,
-          type: typeParam,
-          source: 'indexer',
-          lang: language,
-          user_id: serverApi.getCurrentUserId() || undefined,
-        });
-
-        const finalizeTmdbSkipped = () => {
-          setSearchLive((prev) => ({
-            ...prev,
-            tmdbSkipped: true,
-            tmdbDone: true,
-            tmdbMovies: 0,
-            tmdbSeries: 0,
-            tmdbRunning: false,
-          }));
-        };
-
-        if (!indexerRes.success) {
-          setError(indexerRes.message || t('search.indexerSearchError'));
-          setSearchLive((prev) => ({
-            ...prev,
-            indexerRunning: false,
-            indexerError: true,
-            indexerDone: false,
-          }));
-          finalizeTmdbSkipped();
-          setLoading(false);
-          setSearchPhase('idle');
-          return;
-        }
-
-        const indexerData = indexerRes.data ?? [];
-        const idxCounts = countMoviesSeries(indexerData);
+      const localRes = await serverApi.search({ ...baseParams, source: 'local' });
+      const localHit = (localRes.data ?? []).find((r) => r.tmdbId === tmdbId && catalogHit(r));
+      if (localRes.success && localHit) {
+        const counts = countMoviesSeries([localHit]);
         setSearchLive((prev) => ({
           ...prev,
+          localDone: true,
+          localMovies: counts.movies,
+          localSeries: counts.series,
           indexerRunning: false,
-          indexerDone: true,
-          indexerError: false,
-          indexerMovies: idxCounts.movies,
-          indexerSeries: idxCounts.series,
+          indexerDone: false,
         }));
-        setResults(indexerData);
-        CacheManager.set(cacheKey, indexerData, 60 * 60 * 1000);
-        setTmdbFallbackResults([]);
-        await yieldToPaint();
-
-        if (indexerData.length === 0 && searchTerm) {
-          setSearchPhase('tmdb');
-          setSearchLive((prev) => ({ ...prev, tmdbRunning: true }));
-          await yieldToPaint();
-
-          const tmdbLang = language === 'fr' ? 'fr-FR' : 'en-US';
-          const tmdbRes = await serverApi.searchTmdb({
-            q: searchTerm,
-            type: typeParam,
-            language: tmdbLang,
-            page: 1,
-          });
-
-          let mapped: SearchResult[] = [];
-          if (tmdbRes.success && tmdbRes.data && tmdbRes.data.length > 0) {
-            mapped = tmdbRes.data.map((r: Record<string, unknown>) => ({
-              id: String(r.id ?? `tmdb-${r.tmdbId}-${r.type}`),
-              title: String(r.title ?? ''),
-              type: ((r.type as string) === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv',
-              poster: r.poster as string | undefined,
-              year: r.year as number | undefined,
-              overview: r.overview as string | undefined,
-              tmdbId: Number(r.tmdbId ?? 0),
-            }));
-            setTmdbFallbackResults(mapped);
-          } else {
-            setTmdbFallbackResults([]);
-          }
-          const tm = countMoviesSeries(mapped);
-          setSearchLive((prev) => ({
-            ...prev,
-            tmdbRunning: false,
-            tmdbDone: true,
-            tmdbSkipped: false,
-            tmdbMovies: tm.movies,
-            tmdbSeries: tm.series,
-          }));
-        } else {
-          finalizeTmdbSkipped();
-        }
-        setLoading(false);
-        setSearchPhase('idle');
+        openResult(localHit);
         return;
       }
 
-      setSearchPhase('local');
-      await yieldToPaint();
-
-      const localRes = await serverApi.search({
-        q: searchTerm,
-        type: typeParam,
-        source: 'local',
-        lang: language,
-      });
-
-      if (!localRes.success) {
-        setError(localRes.message || 'Erreur lors de la recherche');
-        setSearchLive(initialSearchLiveProgress());
-        setLoading(false);
-        setSearchPhase('idle');
-        return;
-      }
-
-      const localData = localRes.data ?? [];
-      const localCounts = countMoviesSeries(localData);
+      setSearchPhase('indexer');
       setSearchLive((prev) => ({
         ...prev,
         localDone: true,
-        localMovies: localCounts.movies,
-        localSeries: localCounts.series,
+        localMovies: 0,
+        localSeries: 0,
         indexerRunning: true,
+        indexerDone: false,
+        indexerError: false,
       }));
-      if (localData.length > 0) {
-        setResults(localData);
-        setTmdbFallbackResults([]);
-      }
-
       await yieldToPaint();
 
-      const finalizeSkipTmdb = () => {
-        setSearchLive((prev) => ({
-          ...prev,
-          tmdbSkipped: true,
-          tmdbDone: true,
-          tmdbMovies: 0,
-          tmdbSeries: 0,
-          tmdbRunning: false,
-        }));
-      };
-
-      setSearchPhase('indexer');
-      await yieldToPaint();
-
-      const indexerRes = await serverApi.search({
-        q: searchTerm,
-        type: typeParam,
-        source: 'indexer',
-        lang: language,
-        user_id: serverApi.getCurrentUserId() || undefined,
-      });
-
+      const indexerRes = await serverApi.search({ ...baseParams, source: 'indexer' });
       if (!indexerRes.success) {
-        if (localData.length === 0) {
-          setError(indexerRes.message || 'Erreur lors de la recherche sur les indexeurs');
-        }
+        setError(indexerRes.message || t('search.indexerSearchError'));
         setSearchLive((prev) => ({
           ...prev,
           indexerRunning: false,
           indexerError: true,
           indexerDone: false,
-          indexerMovies: 0,
-          indexerSeries: 0,
         }));
-        finalizeSkipTmdb();
         setLoading(false);
         setSearchPhase('idle');
         return;
       }
 
-      const indexerData = indexerRes.data ?? [];
-      const idxCounts2 = countMoviesSeries(indexerData);
-      const combinedData = [...localData, ...indexerData];
-
+      const indexerHit = (indexerRes.data ?? []).find((r) => r.tmdbId === tmdbId && catalogHit(r));
+      const idxCounts = countMoviesSeries(indexerHit ? [indexerHit] : []);
       setSearchLive((prev) => ({
         ...prev,
         indexerRunning: false,
         indexerDone: true,
         indexerError: false,
-        indexerMovies: idxCounts2.movies,
-        indexerSeries: idxCounts2.series,
+        indexerMovies: idxCounts.movies,
+        indexerSeries: idxCounts.series,
       }));
 
-      setResults(combinedData);
-      CacheManager.set(cacheKey, combinedData, 60 * 60 * 1000);
+      if (indexerHit) {
+        openResult(indexerHit);
+        return;
+      }
+
+      window.location.href = withDiscoverTitleHint(
+        `/discover?tmdbId=${tmdbId}&type=${pick.type}`,
+        pick.title,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      setLoading(false);
+      setSearchPhase('idle');
+    }
+  }, [language, openResult, t]);
+
+  const handleSearch = useCallback(async (termOverride?: string) => {
+    const searchTerm = (termOverride ?? query).trim();
+    if (!searchTerm) {
+      setResults([]);
+      setTmdbFallbackResults([]);
+      return;
+    }
+    setQuery(searchTerm);
+    addSearchToHistory(searchTerm);
+    setSearchHistory(getSearchHistory());
+    setResults([]);
+    setError(null);
+
+    if (!serverApi.isAuthenticated()) {
+      setError(t('search.mustBeLoggedIn'));
+      setSearchPhase('idle');
+      setSearchLive(initialSearchLiveProgress());
+      setLoading(false);
+      return;
+    }
+
+    const typeParam = type === 'all' ? undefined : type;
+    const cacheKey = `tmdb_pick_${SEARCH_CACHE_VERSION}_${searchTerm}_${type}_${language}`;
+    const cached = CacheManager.get<SearchResult[]>(cacheKey);
+    if (cached && cached.length > 0) {
+      setTmdbFallbackResults(cached);
+      const counts = countMoviesSeries(cached);
+      setSearchLive({
+        ...initialSearchLiveProgress(),
+        tmdbDone: true,
+        tmdbMovies: counts.movies,
+        tmdbSeries: counts.series,
+      });
+      if (cached.length === 1) {
+        await resolveTmdbPick(cached[0]);
+      }
+      return;
+    }
+
+    let handedOff = false;
+    try {
+      setLoading(true);
+      setTmdbFallbackResults([]);
+      setSearchPhase('tmdb');
+      setSearchLive({
+        ...initialSearchLiveProgress(),
+        tmdbRunning: true,
+      });
       await yieldToPaint();
 
-      if (combinedData.length === 0 && searchTerm) {
-        setSearchPhase('tmdb');
-        setSearchLive((prev) => ({ ...prev, tmdbRunning: true }));
-        await yieldToPaint();
+      const tmdbLang = language === 'fr' ? 'fr-FR' : language === 'en' ? 'en-US' : language;
+      const tmdbRes = await serverApi.searchTmdb({
+        q: searchTerm,
+        type: typeParam,
+        language: tmdbLang,
+        page: 1,
+      });
 
-        const tmdbLang = language === 'fr' ? 'fr-FR' : 'en-US';
-        const tmdbRes = await serverApi.searchTmdb({
-          q: searchTerm,
-          type: typeParam,
-          language: tmdbLang,
-          page: 1,
-        });
-
-        let mapped2: SearchResult[] = [];
-        if (tmdbRes.success && tmdbRes.data && tmdbRes.data.length > 0) {
-          mapped2 = tmdbRes.data.map((r: Record<string, unknown>) => ({
-            id: String(r.id ?? `tmdb-${r.tmdbId}-${r.type}`),
-            title: String(r.title ?? ''),
-            type: ((r.type as string) === 'tv' ? 'tv' : 'movie') as 'movie' | 'tv',
-            poster: r.poster as string | undefined,
-            year: r.year as number | undefined,
-            overview: r.overview as string | undefined,
-            tmdbId: Number(r.tmdbId ?? 0),
-          }));
-          setTmdbFallbackResults(mapped2);
-        } else {
-          setTmdbFallbackResults([]);
-        }
-        const tm2 = countMoviesSeries(mapped2);
+      if (!tmdbRes.success) {
+        setError(tmdbRes.message || t('search.searchingTmdb'));
         setSearchLive((prev) => ({
           ...prev,
           tmdbRunning: false,
           tmdbDone: true,
-          tmdbSkipped: false,
-          tmdbMovies: tm2.movies,
-          tmdbSeries: tm2.series,
+          tmdbMovies: 0,
+          tmdbSeries: 0,
         }));
-      } else {
         setTmdbFallbackResults([]);
-        finalizeSkipTmdb();
+        return;
+      }
+
+      const mapped = mapTmdbRows((tmdbRes.data ?? []) as Array<Record<string, unknown>>);
+      const counts = countMoviesSeries(mapped);
+      setSearchLive((prev) => ({
+        ...prev,
+        tmdbRunning: false,
+        tmdbDone: true,
+        tmdbSkipped: false,
+        tmdbMovies: counts.movies,
+        tmdbSeries: counts.series,
+      }));
+      setTmdbFallbackResults(mapped);
+      if (mapped.length > 0) {
+        CacheManager.set(cacheKey, mapped, 30 * 60 * 1000);
+      }
+      if (mapped.length === 1) {
+        handedOff = true;
+        await resolveTmdbPick(mapped[0]);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      handedOff = false;
     } finally {
-      setLoading(false);
-      setSearchPhase('idle');
+      if (!handedOff) {
+        setLoading(false);
+        setSearchPhase('idle');
+      }
     }
-  }, [query, language, forceIndexerSearch, t]);
+  }, [query, type, language, resolveTmdbPick, t]);
 
   const handleClear = () => {
     setQuery('');
@@ -1208,12 +1274,15 @@ export default function Search({ onResultClick }: SearchProps) {
     }
   };
 
+  const pickMovies = sortedTmdbFallback.filter((r) => r.type === 'movie');
+  const pickSeries = sortedTmdbFallback.filter((r) => r.type === 'tv');
+  const picks = type === 'all' ? sortedTmdbFallback : type === 'movie' ? pickMovies : pickSeries;
   const filterTabs = [
-    { id: 'all' as const, label: t('search.filterAll'), count: groupedResults.length },
-    { id: 'movie' as const, label: t('search.filterMovies'), count: movies.length },
-    { id: 'tv' as const, label: t('search.filterSeries'), count: series.length },
+    { id: 'all' as const, label: t('search.filterAll'), count: sortedTmdbFallback.length },
+    { id: 'movie' as const, label: t('search.filterMovies'), count: pickMovies.length },
+    { id: 'tv' as const, label: t('search.filterSeries'), count: pickSeries.length },
   ];
-  const showResultCounts = Boolean(query && !loading && (allResults.length > 0 || tmdbFallbackResults.length > 0));
+  const showResultCounts = Boolean(query && !loading && picks.length > 0);
 
   const phaseTitle =
     searchPhase === 'local'
@@ -1230,10 +1299,9 @@ export default function Search({ onResultClick }: SearchProps) {
 
   const showIdleHome = !query && !loading;
   const showResults = !loading && Boolean(query) && allResults.length > 0;
-  const showTmdbFallback =
-    !loading && Boolean(query) && allResults.length === 0 && !error && tmdbFallbackResults.length > 0;
+  const showTmdbPicks = !loading && Boolean(query) && picks.length > 0;
   const showNoResults =
-    !loading && Boolean(query) && allResults.length === 0 && !error && tmdbFallbackResults.length === 0;
+    !loading && Boolean(query) && picks.length === 0 && allResults.length === 0 && !error;
 
   return (
     <div
@@ -1491,45 +1559,39 @@ export default function Search({ onResultClick }: SearchProps) {
         </div>
       )}
 
-      {showTmdbFallback && (
+      {showTmdbPicks && (
         <div className="pt-4 sm:pt-6 pb-12 w-full min-w-0 max-w-full overflow-x-hidden border-t border-white/10" data-search-results>
-          <p className="px-4 sm:px-8 lg:px-12 text-sm tv:text-base text-white/55 mb-4 text-center">
-            {t('search.noTorrentsUseRequest')}
-          </p>
-          {type === 'all' ? (
+          <div className="px-4 sm:px-8 lg:px-12 mb-5 text-center">
+            <h2 className="text-lg sm:text-xl tv:text-3xl font-semibold text-white/95">
+              {picks.length > 1 ? t('search.pickTitle') : picks[0]?.title}
+            </h2>
+            <p className="mt-1.5 text-sm tv:text-lg text-white/55 max-w-2xl mx-auto">
+              {t('search.pickTitleHint')}
+            </p>
+          </div>
+          {type === 'all' && picks.length > 1 ? (
             <>
-              <SearchResultsSection
-                title={t('search.tmdbMoviesRequest')}
-                results={sortedTmdbFallback.filter((r) => r.type === 'movie')}
-                onResultClick={onResultClick}
+              <TmdbPickRow
+                title={t('search.filterMovies')}
+                results={pickMovies}
+                onPick={(result) => { void resolveTmdbPick(result); }}
                 initialFocus
               />
-              <SearchResultsSection
-                title={t('search.tmdbSeriesRequest')}
-                results={sortedTmdbFallback.filter((r) => r.type === 'tv')}
-                onResultClick={onResultClick}
-                initialFocus={sortedTmdbFallback.every((r) => r.type !== 'movie')}
+              <TmdbPickRow
+                title={t('search.filterSeries')}
+                results={pickSeries}
+                onPick={(result) => { void resolveTmdbPick(result); }}
+                initialFocus={pickMovies.length === 0}
               />
             </>
           ) : (
-            <SearchResultsSection
-              title={t('search.tmdbRequestTitle')}
-              results={sortedTmdbFallback}
-              onResultClick={onResultClick}
+            <TmdbPickRow
+              title={type === 'tv' ? t('search.filterSeries') : t('search.filterMovies')}
+              results={picks}
+              onPick={(result) => { void resolveTmdbPick(result); }}
               initialFocus
             />
           )}
-          <div className="mt-6 px-4 sm:px-8 lg:px-12 flex justify-center">
-            <button
-              type="button"
-              onClick={handleClear}
-              className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center rounded-full ds-btn-secondary px-4 py-2 tv:px-8 tv:py-4 text-sm tv:text-xl font-semibold min-h-[44px] tv:min-h-[64px]"
-              tabIndex={0}
-              data-focusable
-            >
-              {t('search.newSearch')}
-            </button>
-          </div>
         </div>
       )}
     </div>
