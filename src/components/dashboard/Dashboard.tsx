@@ -8,7 +8,6 @@ import { useContentSignals } from './hooks/useContentSignals';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
 import { useLibraryBrowse } from './hooks/useLibraryBrowse';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
-import SuggestionsSection from './SuggestionsSection';
 import {
   pickFeaturedHero,
   filterWatchNow,
@@ -16,6 +15,8 @@ import {
   mergeReadyToWatch,
   excludeSeenItems,
   contentItemKey,
+  uniqueByMedia,
+  byReleaseDate,
 } from './utils/browsePriority';
 
 function dedupeDashboardItems(items: ContentItem[]): ContentItem[] {
@@ -152,6 +153,26 @@ export default function Dashboard() {
       });
     }
 
+    const cinemaRecent = byReleaseDate(uniqueByMedia([...recentMovies, ...recentSeries])).slice(0, 40);
+    if (cinemaRecent.length > 0) {
+      result.push({
+        id: 'cinema-recent',
+        title: t('dashboard.cinemaRecent'),
+        items: cinemaRecent,
+      });
+    }
+
+    const mostDownloaded = uniqueByMedia([...popularMovies, ...popularSeries])
+      .sort((a, b) => (b.seeds ?? 0) - (a.seeds ?? 0))
+      .slice(0, 40);
+    if (mostDownloaded.length > 0) {
+      result.push({
+        id: 'most-downloaded',
+        title: t('dashboard.mostDownloaded'),
+        items: mostDownloaded,
+      });
+    }
+
     return result;
   }, [
     allDashboardItemsWithSignals,
@@ -159,6 +180,10 @@ export default function Dashboard() {
     resumeWatching,
     recentDownloads,
     seenItems,
+    recentMovies,
+    recentSeries,
+    popularMovies,
+    popularSeries,
     t,
   ]);
 
@@ -173,8 +198,6 @@ export default function Dashboard() {
       onNavigate={handleNavigate}
       emptyTitle={t('sync.noTorrentsSynced')}
       emptyDescription={t('sync.startSyncAllDescription')}
-    >
-      <SuggestionsSection contextType="all" />
-    </SimpleTmdbPage>
+    />
   );
 }

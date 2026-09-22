@@ -1198,7 +1198,9 @@
     "recentlyDownloaded": "Prêts à regarder",
     "activeDownloads": "Téléchargements",
     "suggestionsMovies": "Parce que vous avez regardé",
-    "suggestionsSeries": "Séries pour vous"
+    "suggestionsSeries": "Séries pour vous",
+    "mostDownloaded": "Les plus téléchargés",
+    "cinemaRecent": "Sorties cinéma récentes"
   },
   "search": {
     "title": "Rechercher",

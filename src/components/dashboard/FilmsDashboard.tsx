@@ -8,9 +8,8 @@ import { useContentSignals } from './hooks/useContentSignals';
 import { useFreshSynced } from './hooks/useFreshSynced';
 import { useLibraryBrowse } from './hooks/useLibraryBrowse';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
-import SuggestionsSection from './SuggestionsSection';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
-import { GenreChipBar } from '../page-model/GenreChipBar';
+import { GenreCardsRow } from './components/GenreCardsRow';
 import { CatalogGrid } from '../page-model/CatalogGrid';
 import { translateGenre } from '../../lib/utils/genre-translation';
 import {
@@ -25,6 +24,7 @@ import {
   uniqueByMedia,
   byReleaseDate,
   byPopularity,
+  postersByGenre,
 } from './utils/browsePriority';
 
 const SECTION_LIMIT = 48;
@@ -33,7 +33,7 @@ const GENRE_CAP = 180;
 export default function FilmsDashboard() {
   const { t, language } = useI18n();
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
-  const { films, loading, error } = useInfiniteFilms();
+  const { films, loading, hasMore, error } = useInfiniteFilms();
   const { resumeWatching, rewatchWatching } = useResumeWatching();
   const { activeDownloads } = useActiveDownloads();
   const freshSynced = useFreshSynced('films');
@@ -61,7 +61,15 @@ export default function FilmsDashboard() {
   };
 
   const catalog = useMemo(() => uniqueByMedia(filmsWithSignals), [filmsWithSignals]);
-  const genres = useMemo(() => topGenres(catalog), [catalog]);
+  const catalogReady = !loading && !hasMore;
+  const genres = useMemo(
+    () => (catalogReady ? topGenres(catalog).map((genre) => genre.key) : []),
+    [catalog, catalogReady]
+  );
+  const genreBackgrounds = useMemo(
+    () => (catalogReady ? postersByGenre(catalog) : {}),
+    [catalog, catalogReady]
+  );
   const genreItems = useMemo(() => {
     if (!selectedGenre) return [];
     return byPopularity(catalog.filter((item) => itemInGenre(item, selectedGenre))).slice(0, GENRE_CAP);
@@ -119,25 +127,25 @@ export default function FilmsDashboard() {
       emptyTitle={t('sync.noFilmsSynced')}
       emptyDescription={t('sync.startSyncDescription')}
       toolbar={
-        <GenreChipBar
-          genres={genres}
-          total={catalog.length}
-          selectedGenre={selectedGenre}
-          onSelectGenre={setSelectedGenre}
-          language={lang}
-        />
+        genres.length > 0 ? (
+          <GenreCardsRow
+            genres={genres}
+            genreBackgrounds={genreBackgrounds}
+            allBackground={catalog.find((item) => item.poster || item.backdrop)?.poster || catalog[0]?.backdrop}
+            selectedGenre={selectedGenre}
+            onSelectGenre={setSelectedGenre}
+            language={lang}
+          />
+        ) : null
       }
     >
       {selectedGenre ? (
         <CatalogGrid
           title={t('dashboard.moviesGenre', { genre: translateGenre(selectedGenre, lang) })}
-          count={catalog.filter((item) => itemInGenre(item, selectedGenre)).length}
           items={genreItems}
           onNavigate={handleNavigate}
         />
-      ) : (
-        <SuggestionsSection contextType="movies" />
-      )}
+      ) : null}
     </SimpleTmdbPage>
   );
 }

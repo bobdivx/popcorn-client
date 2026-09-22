@@ -8,9 +8,8 @@ import { useContentSignals } from './hooks/useContentSignals';
 import { useFreshSynced } from './hooks/useFreshSynced';
 import { useLibraryBrowse } from './hooks/useLibraryBrowse';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
-import SuggestionsSection from './SuggestionsSection';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
-import { GenreChipBar } from '../page-model/GenreChipBar';
+import { GenreCardsRow } from './components/GenreCardsRow';
 import { CatalogGrid } from '../page-model/CatalogGrid';
 import { translateGenre } from '../../lib/utils/genre-translation';
 import {
@@ -25,6 +24,7 @@ import {
   uniqueByMedia,
   byReleaseDate,
   byPopularity,
+  postersByGenre,
 } from './utils/browsePriority';
 
 const SECTION_LIMIT = 48;
@@ -33,7 +33,7 @@ const GENRE_CAP = 180;
 export default function SeriesDashboard() {
   const { t, language } = useI18n();
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
-  const { series, loading, error } = useInfiniteSeries();
+  const { series, loading, hasMore, error } = useInfiniteSeries();
   const { resumeWatching, waitingForNext, rewatchWatching } = useResumeWatching();
   const { activeDownloads } = useActiveDownloads();
   const freshSynced = useFreshSynced('series');
@@ -61,7 +61,15 @@ export default function SeriesDashboard() {
   };
 
   const catalog = useMemo(() => uniqueByMedia(seriesWithSignals), [seriesWithSignals]);
-  const genres = useMemo(() => topGenres(catalog), [catalog]);
+  const catalogReady = !loading && !hasMore;
+  const genres = useMemo(
+    () => (catalogReady ? topGenres(catalog).map((genre) => genre.key) : []),
+    [catalog, catalogReady]
+  );
+  const genreBackgrounds = useMemo(
+    () => (catalogReady ? postersByGenre(catalog) : {}),
+    [catalog, catalogReady]
+  );
   const genreItems = useMemo(() => {
     if (!selectedGenre) return [];
     return byPopularity(catalog.filter((item) => itemInGenre(item, selectedGenre))).slice(0, GENRE_CAP);
@@ -117,25 +125,25 @@ export default function SeriesDashboard() {
       emptyTitle={t('sync.noSeriesSynced')}
       emptyDescription={t('sync.startSyncSeriesDescription')}
       toolbar={
-        <GenreChipBar
-          genres={genres}
-          total={catalog.length}
-          selectedGenre={selectedGenre}
-          onSelectGenre={setSelectedGenre}
-          language={language === 'en' ? 'en' : 'fr'}
-        />
+        genres.length > 0 ? (
+          <GenreCardsRow
+            genres={genres}
+            genreBackgrounds={genreBackgrounds}
+            allBackground={catalog.find((item) => item.poster || item.backdrop)?.poster || catalog[0]?.backdrop}
+            selectedGenre={selectedGenre}
+            onSelectGenre={setSelectedGenre}
+            language={language === 'en' ? 'en' : 'fr'}
+          />
+        ) : null
       }
     >
       {selectedGenre ? (
         <CatalogGrid
           title={t('dashboard.seriesGenre', { genre: translateGenre(selectedGenre, language === 'en' ? 'en' : 'fr') })}
-          count={catalog.filter((item) => itemInGenre(item, selectedGenre)).length}
           items={genreItems}
           onNavigate={handleNavigate}
         />
-      ) : (
-        <SuggestionsSection contextType="series" />
-      )}
+      ) : null}
     </SimpleTmdbPage>
   );
 }

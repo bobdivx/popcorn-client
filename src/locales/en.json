@@ -1198,7 +1198,9 @@
     "recentlyDownloaded": "Ready to watch",
     "activeDownloads": "Downloads",
     "suggestionsMovies": "Because you watched",
-    "suggestionsSeries": "Series for you"
+    "suggestionsSeries": "Series for you",
+    "mostDownloaded": "Most downloaded",
+    "cinemaRecent": "Recent theatrical releases"
   },
   "search": {
     "title": "Search",
