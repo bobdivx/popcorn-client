@@ -100,16 +100,22 @@ function getStreamingDownloadFull(): boolean {
   return false;
 }
 
-/** Appelle updateOnlyFiles dès que le torrent peut l'accepter, avec réessais en cas de 502/503/500 (librqbit « initializing »). */
+/** Dernière demande par torrent : un changement d'épisode annule les réessais de l'ancien fichier. */
+const latestOnlyFilesToken = new Map<string, number>();
+
+/** Appelle updateOnlyFiles tout de suite, puis réessaie seulement si le torrent est encore en initialisation. */
 export function scheduleUpdateOnlyFilesWithRetry(infoHash: string, fileIndex: number) {
-  // 503/500 « can't update initializing torrent » : délais plus longs au début pour éviter le spam console.
-  const delaysMs = [12000, 15000, 20000, 25000, 35000, 45000, 60000, 90000];
+  const token = (latestOnlyFilesToken.get(infoHash) ?? 0) + 1;
+  latestOnlyFilesToken.set(infoHash, token);
+  const delaysMs = [0, 1500, 3000, 6000, 12000, 20000, 30000, 45000];
   let attempt = 0;
   const run = () => {
+    if (latestOnlyFilesToken.get(infoHash) !== token) return;
     clientApi
       .updateOnlyFiles(infoHash, [fileIndex])
       .then(() => {})
       .catch((err) => {
+        if (latestOnlyFilesToken.get(infoHash) !== token) return;
         // Si le backend ne supporte pas cette route, ne pas réessayer (updateOnlyFiles renvoie silencieusement)
         // Seuls les codes 500/503 (torrent initializing) justifient un retry.
         const msg = err instanceof Error ? err.message : String(err);

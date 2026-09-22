@@ -162,3 +162,23 @@ export function promoteRecentFirst<T extends ContentItem>(items: T[], recentKeys
 export function recentDownloadKeys(items: ContentItem[]): Set<string> {
   return new Set(items.map(contentItemKey));
 }
+
+export function itemInGenre(item: ContentItem, genre: string | null): boolean {
+  if (!genre) return true;
+  return Array.isArray(item.genres) && item.genres.includes(genre);
+}
+
+/** Genres les plus présents, pour une barre de pastilles. */
+export function topGenres(items: ContentItem[], limit = 14): string[] {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    for (const genre of item.genres ?? []) {
+      if (!genre) continue;
+      counts.set(genre, (counts.get(genre) ?? 0) + 1);
+    }
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([genre]) => genre);
+}

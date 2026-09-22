@@ -254,6 +254,22 @@ export const requestsMethods = {
     return this.backendRequest<QuotaStats>(`/api/users/${encodeURIComponent(userId)}/quota`, { method: 'GET' });
   },
 
+  async updateUserQuota(
+    this: ServerApiClientAccess,
+    userId: string,
+    data: {
+      movie_quota_limit: number | null;
+      movie_quota_days: number | null;
+      tv_quota_limit: number | null;
+      tv_quota_days: number | null;
+    }
+  ): Promise<ApiResponse<QuotaStats>> {
+    return this.backendRequest<QuotaStats>(`/api/users/${encodeURIComponent(userId)}/quota`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+
   // Blacklist
   async listBlacklist(
     this: ServerApiClientAccess,

@@ -79,6 +79,9 @@ interface TitlePreviewCardProps {
   downloading?: boolean;
   metaLine?: string | null;
   metaSubLine?: string | null;
+  /** Pastille courte sur l'affiche (disponible, demandé, en attente). */
+  badge?: string | null;
+  badgeTone?: 'ok' | 'pending' | 'bad' | 'neutral';
 }
 
 /**
@@ -94,6 +97,8 @@ export function TitlePreviewCard({
   downloading = false,
   metaLine,
   metaSubLine,
+  badge,
+  badgeTone = 'neutral',
 }: TitlePreviewCardProps) {
   const slotId = `card:${contentItemKey(item)}`;
   const tileH = useTileHeight();
@@ -112,6 +117,7 @@ export function TitlePreviewCard({
   // Une seule image (poster) : pas de swap backdrop au focus (= réseau / CPU inutiles).
   const poster = item.poster || item.backdrop;
   const title = getDisplayTitle(item);
+  const tvLayout = isTVPlatform();
   const expanded = remoteFocused;
 
   useEffect(() => {
@@ -160,7 +166,8 @@ export function TitlePreviewCard({
     };
   }, [clearDelay, slotId]);
 
-  const tileW = expanded ? Math.round((tileH * 16) / 9) : Math.round((tileH * 2) / 3);
+  // TV : largeur fixe. Changer portrait → paysage à chaque flèche recalcule toute la rangée.
+  const tileW = tvLayout || expanded ? Math.round((tileH * 16) / 9) : Math.round((tileH * 2) / 3);
 
   useEffect(() => {
     const slot = slotRef.current;
@@ -238,7 +245,8 @@ export function TitlePreviewCard({
     >
       <FocusableCard
         className={[
-          'block w-full outline-none relative overflow-hidden rounded-md bg-[#141414] transition-[transform,box-shadow,filter] duration-150 ease-out',
+          'block w-full outline-none relative overflow-hidden rounded-md bg-[#141414]',
+          tvLayout ? '' : 'transition-[transform,box-shadow,filter] duration-150 ease-out',
           expanded
             ? ''
             : hovered
@@ -251,7 +259,23 @@ export function TitlePreviewCard({
         asTorrentCard
         onClick={() => onNavigate(item)}
       >
-        <div className="absolute inset-0" aria-hidden>
+          {badge ? (
+            <span
+              className={[
+                'absolute left-2 top-2 z-[3] rounded-full border px-2.5 py-1 text-[10px] tv:text-sm font-bold uppercase tracking-wide text-white',
+                badgeTone === 'ok'
+                  ? 'border-emerald-200/40 bg-emerald-600/90'
+                  : badgeTone === 'pending'
+                    ? 'border-amber-100/40 bg-amber-500/90'
+                    : badgeTone === 'bad'
+                      ? 'border-rose-200/40 bg-rose-600/90'
+                      : 'border-white/20 bg-black/70',
+              ].join(' ')}
+            >
+              {badge}
+            </span>
+          ) : null}
+          <div className="absolute inset-0" aria-hidden>
           <img
             src={poster}
             alt=""
@@ -300,16 +324,16 @@ export function TitlePreviewCard({
         </div>
       </FocusableCard>
 
-      <div className="mt-2 sm:mt-2.5 tv:mt-3 px-0.5 transition-[opacity,transform] duration-300 ease-out" style={{ width: '100%', minHeight: '2.75rem' }}>
-        {expanded ? (
+      <div className="mt-2 sm:mt-2.5 tv:mt-3 px-0.5" style={{ width: '100%', minHeight: '2.75rem' }}>
+        {expanded || tvLayout ? (
           <>
-            <p className="truncate text-sm sm:text-base tv:text-xl font-semibold text-white animate-fade-in">
+            <p className={`truncate text-sm sm:text-base tv:text-lg font-semibold ${expanded ? 'text-white' : 'text-white/75'}`}>
               {metaLine || title}
             </p>
             {metaSubLine ? (
-              <p className="mt-0.5 truncate text-xs sm:text-sm tv:text-base text-white/60 animate-fade-in">{metaSubLine}</p>
+              <p className="mt-0.5 truncate text-xs sm:text-sm tv:text-base text-white/60">{metaSubLine}</p>
             ) : item.rating != null ? (
-              <p className="mt-0.5 text-xs sm:text-sm tv:text-base text-white/60 animate-fade-in">★ {item.rating.toFixed(1)}</p>
+              <p className="mt-0.5 text-xs sm:text-sm tv:text-base text-white/60">★ {item.rating.toFixed(1)}</p>
             ) : null}
           </>
         ) : hovered ? (

@@ -249,6 +249,19 @@ export function DownloadDetailModal({
       : 'Hors partage';
   const progressPercent = Math.round((activeTorrent.progress ?? 0) * 1000) / 10;
   const heroImage = backdropUrl || posterUrl;
+  const stillTransferring =
+    activeTorrent.state === 'downloading' ||
+    activeTorrent.state === 'checking' ||
+    activeTorrent.state === 'queued' ||
+    (activeTorrent.download_speed ?? 0) > 0;
+  const isFinished =
+    !stillTransferring &&
+    (activeTorrent.state === 'completed' ||
+      activeTorrent.state === 'seeding' ||
+      (activeTorrent.progress ?? 0) >= 0.99);
+  const peerCount = Number(peers) || 0;
+  const showUploadChip = isFinished && (activeTorrent.upload_speed ?? 0) > 0;
+  const showPeerChip = isFinished && peerCount > 0;
 
   const handleAddTracker = async () => {
     if (!newTrackerUrl.trim()) return;
@@ -376,6 +389,22 @@ export function DownloadDetailModal({
                 </div>
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent lg:from-black/80" />
+              {(showUploadChip || showPeerChip) && (
+                <div className="absolute top-3 right-3 lg:top-4 lg:right-4 z-10 flex flex-col items-end gap-1.5">
+                  {showUploadChip && (
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/55 px-2.5 py-1 text-[11px] tv:text-sm font-semibold text-white backdrop-blur-sm tabular-nums">
+                      <Upload size={14} className="text-[var(--ds-accent-green)]" />
+                      {upSpeed}
+                    </div>
+                  )}
+                  {showPeerChip && (
+                    <div className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/55 px-2.5 py-1 text-[11px] tv:text-sm font-semibold text-white backdrop-blur-sm tabular-nums">
+                      <Users size={14} />
+                      {peerCount}
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="absolute left-4 right-4 bottom-4 lg:left-5 lg:right-5 lg:bottom-5 z-10">
                 <div className="flex items-end justify-between gap-3 mb-2">
                   <span className="text-2xl tv:text-4xl font-bold tabular-nums text-white drop-shadow-md">
@@ -423,17 +452,20 @@ export function DownloadDetailModal({
                 </div>
               )}
 
-              <p className="text-sm tv:text-base text-white/50 tabular-nums">
-                {formatBytes(activeTorrent.downloaded_bytes)}
-                {activeTorrent.total_bytes > 0
-                  ? ` / ${formatBytes(activeTorrent.total_bytes)}`
-                  : ''}
-              </p>
+              {!isFinished && (
+                <p className="text-sm tv:text-base text-white/50 tabular-nums">
+                  {formatBytes(activeTorrent.downloaded_bytes)}
+                  {activeTorrent.total_bytes > 0
+                    ? ` / ${formatBytes(activeTorrent.total_bytes)}`
+                    : ''}
+                </p>
+              )}
             </div>
           </aside>
 
           {/* Right — stats & actions */}
           <div className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-8 tv:p-10 lg:overflow-y-auto custom-scrollbar">
+            {!isFinished && (
             <div className="mb-7 grid grid-cols-2 gap-2.5 sm:gap-3 lg:mb-9 lg:grid-cols-5 tv:gap-4">
               <StatCard
                 icon={Download}
@@ -470,6 +502,7 @@ export function DownloadDetailModal({
                 colorClass="text-[var(--ds-accent-yellow)]"
               />
             </div>
+            )}
 
             <div className="mb-7 lg:mb-9">
               <h2 className="text-xs tv:text-sm font-bold uppercase tracking-widest text-white/40 mb-3 tv:mb-4">

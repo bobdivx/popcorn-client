@@ -62,6 +62,10 @@ export interface MediaDetailActionButtonsProps {
   seriesLibraryPath?: string | null;
   /** Films : ouvrir la modal info technique. */
   onOpenMovieTechInfo?: () => void;
+  /** TV : bande-annonce rangée dans Plus. */
+  onPlayTrailer?: () => void;
+  backHref?: string;
+  backLinkRef?: { current: HTMLAnchorElement | null };
 }
 
 /**
@@ -111,6 +115,9 @@ export function MediaDetailActionButtons({
   seriesIndexerRefresh,
   seriesLibraryPath,
   onOpenMovieTechInfo,
+  onPlayTrailer,
+  backHref,
+  backLinkRef,
 }: MediaDetailActionButtonsProps) {
   const { t } = useI18n();
   const { streamingTorrentActive } = useSubscriptionMe();
@@ -198,6 +205,9 @@ export function MediaDetailActionButtons({
         seriesIndexerRefresh={seriesIndexerRefresh}
         seriesLibraryPath={seriesLibraryPath}
         onOpenMovieTechInfo={onOpenMovieTechInfo}
+        onPlayTrailer={onPlayTrailer}
+        backHref={backHref}
+        backLinkRef={backLinkRef}
       />
 
       {/* Modal de confirmation : supprimer le torrent du client et les fichiers du disque */}

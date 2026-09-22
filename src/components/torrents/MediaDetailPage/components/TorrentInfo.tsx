@@ -339,7 +339,7 @@ export function TorrentInfo({
     <div className="space-y-6 mt-2">
       {/* Rangée badges : qualité + langues + statut partage */}
       {((isSeries && indexerName) || qualityGroups || currentQuality || availableLanguages.length > 0 || isSeeding || (!isSeeding && isDownloaded && stateLower === 'completed' && !isSeries)) && (
-        <div className="flex flex-wrap items-center gap-3 sm:gap-3.5">
+        <div className="flex flex-wrap items-center gap-3 sm:gap-3.5" data-tv-zone="meta">
           {/* Carte indexer — séries uniquement (films : dans la modal Info) */}
           {isSeries && indexerName && (
             <div

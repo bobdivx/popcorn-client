@@ -99,6 +99,8 @@ export function EpisodeCardsCarousel({
       <div
         ref={scrollerRef}
         role="list"
+        data-carousel
+        data-tv-episode-scroller
         className="w-full min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain scrollbar-hide px-4 sm:px-5 py-4 sm:py-5"
         style={{ scrollSnapType: 'x mandatory', touchAction: 'pan-x pan-y' }}
       >

@@ -1,4 +1,4 @@
-import { useMemo } from 'preact/hooks';
+import { useMemo, useState } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import type { ContentItem } from '../../lib/client/types';
 import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
@@ -10,6 +10,8 @@ import { useLibraryBrowse } from './hooks/useLibraryBrowse';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
 import SuggestionsSection from './SuggestionsSection';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
+import { GenreChipBar } from '../page-model/GenreChipBar';
+import { translateGenre } from '../../lib/utils/genre-translation';
 import {
   pickFeaturedHero,
   filterWatchNow,
@@ -18,14 +20,15 @@ import {
   mergeReadyToWatch,
   excludeSeenItems,
   promoteRecentFirst,
+  itemInGenre,
+  topGenres,
 } from './utils/browsePriority';
 
 const SECTION_LIMIT = 25;
-const MAX_GENRES = 12;
-const MIN_FILMS_PER_GENRE = 4;
 
 export default function FilmsDashboard() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const { films, loading, error } = useInfiniteFilms();
   const { resumeWatching, rewatchWatching } = useResumeWatching();
   const { activeDownloads } = useActiveDownloads();
@@ -50,7 +53,7 @@ export default function FilmsDashboard() {
   }, [filmsWithSignals, freshWithSignals, recentDownloads, seenItems]);
 
   const handleNavigate = (item: ContentItem) => {
-    window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
+    window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'films');
   };
 
   const sections = useMemo(() => {
@@ -71,62 +74,53 @@ export default function FilmsDashboard() {
       watchNow
     );
 
-    const genreMap = new Map<string, ContentItem[]>();
-    for (const film of filmsWithSignals) {
-      if (!Array.isArray(film.genres)) continue;
-      for (const genre of film.genres) {
-        if (!genre) continue;
-        if (!genreMap.has(genre)) genreMap.set(genre, []);
-        genreMap.get(genre)!.push(film);
-      }
-    }
-    const genreSections = Array.from(genreMap.entries())
-      .filter(([, items]) => items.length >= MIN_FILMS_PER_GENRE)
-      .sort((a, b) => b[1].length - a[1].length)
-      .slice(0, MAX_GENRES)
-      .map(([genre, items]) => ({
-        id: `genre-${genre}`,
-        title: t('dashboard.moviesGenre', { genre }),
-        items: promoteRecentFirst(items, recentKeys).slice(0, SECTION_LIMIT),
-      }));
-
-    return [
+    const personal = [
+      { id: 'resume-films', title: t('dashboard.resumeWatching'), items: resumeMovies.filter((item) => itemInGenre(item, selectedGenre)), kind: 'resume' as const, priority: true },
       {
         id: 'latest-downloads-films',
         title: t('dashboard.recentlyDownloaded'),
-        items: latestMerged,
+        items: latestMerged.filter((item) => itemInGenre(item, selectedGenre)),
         priority: true,
       },
-      { id: 'resume-films', title: t('dashboard.resumeWatching'), items: resumeMovies, kind: 'resume' as const, priority: true },
-      {
-        id: 'recent-films',
-        title: t('dashboard.newReleasesMovies'),
-        items: newest,
-      },
-      {
-        id: 'fresh-films',
-        title: t('dashboard.freshlySyncedMovies'),
-        items: promoteRecentFirst(freshWithSignals, recentKeys).slice(0, SECTION_LIMIT),
-      },
+    ];
+
+    if (selectedGenre) {
+      const lang = language === 'en' ? 'en' : 'fr';
+      const inGenre = filmsWithSignals.filter((item) => itemInGenre(item, selectedGenre));
+      return [
+        ...personal,
+        {
+          id: `genre-${selectedGenre}`,
+          title: t('dashboard.moviesGenre', { genre: translateGenre(selectedGenre, lang) }),
+          items: promoteRecentFirst(inGenre, recentKeys).slice(0, 40),
+        },
+      ];
+    }
+
+    return [
+      ...personal,
+      { id: 'recent-films', title: t('dashboard.newReleasesMovies'), items: newest },
       { id: 'popular-films', title: t('dashboard.popularMovies'), items: popular },
-      ...genreSections,
     ];
   }, [
     filmsWithSignals,
-    freshWithSignals,
     resumeWatching,
-    rewatchWatching,
     seenItems,
     movieDownloads,
     recentDownloads,
     recentKeys,
+    selectedGenre,
+    language,
     t,
   ]);
+
+  const genres = useMemo(() => topGenres(filmsWithSignals), [filmsWithSignals]);
 
   return (
     <SimpleTmdbPage
       pageId="films"
-      title=""
+      title={t('nav.films')}
+      subtitle={t('dashboard.filmsSubtitle')}
       heroItems={heroItems}
       sections={sections}
       loading={loading}
@@ -135,7 +129,13 @@ export default function FilmsDashboard() {
       emptyTitle={t('sync.noFilmsSynced')}
       emptyDescription={t('sync.startSyncDescription')}
     >
-      <SuggestionsSection contextType="movies" />
+      <GenreChipBar
+        genres={genres}
+        selectedGenre={selectedGenre}
+        onSelectGenre={setSelectedGenre}
+        language={language === 'en' ? 'en' : 'fr'}
+      />
+      {selectedGenre ? null : <SuggestionsSection contextType="movies" />}
     </SimpleTmdbPage>
   );
 }

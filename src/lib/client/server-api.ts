@@ -201,6 +201,14 @@ interface IServerApiClientPublic {
   createMediaRequest(data: { tmdb_id: number; media_type: string; season_numbers?: number[]; title?: string; poster_path?: string; backdrop_path?: string }): Promise<ApiResponse<import('./server-api/requests.js').MediaRequest>>;
   deleteMediaRequest(id: string): Promise<ApiResponse<unknown>>;
   updateRequestStatus(id: string, data: { status: string; notes?: string }): Promise<ApiResponse<import('./server-api/requests.js').MediaRequest>>;
+  getQuotaStats(userId: string): Promise<ApiResponse<import('./server-api/requests.js').QuotaStats>>;
+  updateUserQuota(userId: string, data: {
+    movie_quota_limit: number | null;
+    movie_quota_days: number | null;
+    tv_quota_limit: number | null;
+    tv_quota_days: number | null;
+  }): Promise<ApiResponse<import('./server-api/requests.js').QuotaStats>>;
+  listBlacklist(params?: { user_id?: string; limit?: number; offset?: number }): Promise<ApiResponse<import('./server-api/requests.js').BlacklistedItem[]>>;
   
   searchTmdb(params: { q: string; type?: 'movie' | 'tv' | 'all'; language?: string; page?: number }): Promise<ApiResponse<Array<{ id: string; title: string; type: string; poster?: string; year?: number; overview?: string; tmdbId: number }>>>;
 

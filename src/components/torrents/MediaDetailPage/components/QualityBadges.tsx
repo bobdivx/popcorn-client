@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
+import { isTVPlatform } from '../../../../lib/utils/device-detection';
 
 interface QualityBadgesProps {
   quality?: {
@@ -22,6 +23,10 @@ export function QualityBadges({ quality, align = 'left', tmdbMatchSource, tmdbMa
   const hoverTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
+    if (isTVPlatform()) {
+      setIsVisible(true);
+      return;
+    }
     const timer = setTimeout(() => setIsVisible(false), 5000);
     return () => {
       clearTimeout(timer);

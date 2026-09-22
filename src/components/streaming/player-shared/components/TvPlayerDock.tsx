@@ -45,17 +45,18 @@ interface TvPlayerDockProps {
 
 function dockBtnStyle(focused: boolean): Record<string, string | number> {
   return {
-    width: 52,
-    height: 52,
+    width: 72,
+    height: 72,
     borderRadius: 999,
-    background: focused ? '#fff' : '#222',
-    color: focused ? '#000' : '#fff',
-    border: focused ? '3px solid #fff' : '2px solid rgba(255,255,255,0.7)',
-    boxShadow: focused ? '0 0 0 3px #000, 0 0 0 6px #fff' : 'none',
+    background: focused ? '#7c3aed' : 'rgba(255,255,255,0.14)',
+    color: '#fff',
+    border: focused ? '3px solid #fff' : '2px solid transparent',
+    boxShadow: focused ? '0 0 0 4px rgba(124,58,237,0.55)' : 'none',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+    transform: focused ? 'scale(1.08)' : 'none',
   };
 }
 
@@ -144,8 +145,8 @@ export function TvPlayerDock({
         bottom: 0,
         left: 0,
         right: 0,
-        background: '#000',
-        padding: '10px 16px 16px',
+        background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.72) 55%, transparent 100%)',
+        padding: '28px 48px 28px',
         color: '#fff',
         zIndex: 410,
         pointerEvents: 'auto',
@@ -176,19 +177,20 @@ export function TvPlayerDock({
         aria-valuemin={0}
         aria-valuemax={Math.round(effectiveDur)}
         style={{
-          height: 8,
+          height: focusedOnScrub ? 14 : 10,
           borderRadius: 999,
-          background: 'rgba(255,255,255,0.3)',
-          margin: '10px 0 14px',
+          background: 'rgba(255,255,255,0.28)',
+          margin: '12px 0 18px',
           overflow: 'hidden',
           position: 'relative',
+          boxShadow: focusedOnScrub ? '0 0 0 3px rgba(255,255,255,0.85)' : 'none',
         }}
       >
         <div
           style={{
             width: `${pct}%`,
             height: '100%',
-            background: previewing ? '#c4b5fd' : '#fff',
+            background: '#a78bfa',
           }}
         />
         {previewing && (
@@ -204,7 +206,7 @@ export function TvPlayerDock({
           />
         )}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         {onClose && (
           <button
             type="button"
@@ -251,7 +253,7 @@ export function TvPlayerDock({
         >
           <SkipForward class="w-6 h-6" />
         </button>
-        <span style={{ fontSize: 18, fontVariantNumeric: 'tabular-nums', marginLeft: 4 }}>
+        <span style={{ fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums', marginLeft: 8, letterSpacing: '0.02em' }}>
           {formatTime(previewTime)}
           {effectiveDur ? ` / ${formatTime(effectiveDur)}` : ''}
         </span>
@@ -311,6 +313,9 @@ export function TvPlayerDock({
           </button>
         )}
       </div>
+      <p style={{ margin: '14px 0 0', fontSize: 16, lineHeight: 1.35, color: 'rgba(255,255,255,0.72)' }}>
+        {t('playback.tvRemoteHint')}
+      </p>
     </div>
   );
 }

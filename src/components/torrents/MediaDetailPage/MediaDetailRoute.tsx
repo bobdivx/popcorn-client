@@ -490,6 +490,9 @@ function getBackHrefFromLocation(): string | null {
   }
   const map: Record<string, string> = {
     dashboard: '/dashboard',
+    films: '/films',
+    series: '/series',
+    demandes: '/demandes',
     discover: '/discover',
     downloads: '/downloads',
     search: '/search',

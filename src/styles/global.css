@@ -350,7 +350,18 @@ html[data-tv-platform="true"] .carousel-container .ds-card-animate-stagger > * {
 html[data-tv-platform="true"] .tv-card-focused,
 html[data-tv-platform="true"] [data-focusable]:focus,
 html[data-tv-platform="true"] [data-focusable]:focus-visible {
-  transition: transform 160ms ease, box-shadow 160ms ease, opacity 160ms ease !important;
+  transition: none !important;
+}
+
+html[data-tv-platform="true"] [data-media-detail-primary-action] {
+  background: #6d28d9 !important;
+  border-color: transparent !important;
+  color: #fff !important;
+  min-height: 76px;
+  padding-left: 2.25rem !important;
+  padding-right: 2.25rem !important;
+  font-size: 1.35rem !important;
+  box-shadow: 0 10px 28px rgba(109, 40, 217, 0.4);
 }
 
 /*
@@ -1813,10 +1824,18 @@ html[data-tv-platform="true"] .search-progress-fill {
 
 .nav-tab:focus {
   @apply bg-glass-hover text-white;
-  outline: 2px solid rgba(255, 255, 255, 0.75);
-  outline-offset: -2px;
+  outline: 3px solid #fff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px rgba(124, 58, 237, 0.8);
   position: relative;
   z-index: 10;
+}
+
+html[data-tv-platform="true"] .nav-tab {
+  min-height: 64px;
+  font-size: 1.2rem !important;
+  padding-left: 1.5rem !important;
+  padding-right: 1.5rem !important;
 }
 
 .nav-tab:hover {
@@ -2096,10 +2115,10 @@ html {
 
 /* Focus = bordure de l'élément (inset), jamais un anneau extérieur */
 :root {
-  --tv-focus-color: rgba(255, 255, 255, 0.75);
-  --tv-focus-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
-  --tv-focus-outline: 2px solid rgba(255, 255, 255, 0.75);
-  --tv-focus-outline-offset: -2px;
+  --tv-focus-color: #c4b5fd;
+  --tv-focus-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+  --tv-focus-outline: 3px solid #fff;
+  --tv-focus-outline-offset: 3px;
 }
 
 /* Transitions pour tous les éléments focusables */
@@ -2117,13 +2136,13 @@ html {
    Le halo scintillant créait une sensation de glissement quand le focus se déplaçait
    rapidement à la télécommande ; on garde uniquement un focus statique lisible. */
 .tv-card-focused {
-  transform: scale(1.04) !important;
+  transform: scale(1.06) !important;
   z-index: 20 !important;
-  border-radius: 0.5rem !important;
+  border-radius: 0.75rem !important;
   overflow: visible !important;
-  outline: 3px solid rgba(255, 255, 255, 0.85) !important;
-  outline-offset: -3px !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45) !important;
+  outline: 3px solid #fff !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 6px rgba(124, 58, 237, 0.85), 0 12px 32px rgba(0, 0, 0, 0.45) !important;
 }
 
 /* Tuiles browse : pas de scale TV au focus clavier / paysage.
@@ -2143,8 +2162,22 @@ html {
   overflow: hidden !important;
   contain: none !important;
   outline: none !important;
-  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.92) !important;
+  box-shadow: none !important;
+  position: relative !important;
   z-index: 2 !important;
+}
+/* L’image en absolute couvre un box-shadow inset. L’anneau est un calque au-dessus. */
+[data-torrent-card].tv-card-focused::after,
+[data-focusable-card].tv-card-focused::after,
+[data-browse-slot]:focus-within > [data-torrent-card]::after,
+[data-browse-slot]:focus-within > [data-focusable-card]::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 8;
+  box-shadow: inset 0 0 0 4px #fff, inset 0 0 0 8px rgba(124, 58, 237, 0.95);
 }
 [data-browse-slot][data-preview-expanded='true'] {
   z-index: 2 !important;
@@ -2198,8 +2231,18 @@ nav[data-tv-site-header] {
 }
 
 .tv-element-focused {
-  outline: 2px solid var(--tv-focus-color) !important;
-  outline-offset: -2px !important;
+  outline: 3px solid #fff !important;
+  outline-offset: -3px !important;
+  box-shadow: inset 0 0 0 3px #fff !important;
+}
+/* Télécommande : le focus JS ne déclenche pas toujours :focus-visible. */
+html[data-tv-platform="true"] button:focus:not([data-torrent-card]):not([data-focusable-card]),
+html[data-tv-platform="true"] a:focus:not([data-torrent-card]):not([data-focusable-card]),
+html[data-tv-platform="true"] [data-focusable]:focus:not([data-torrent-card]):not([data-focusable-card]),
+html[data-tv-platform="true"] .tv-element-focused {
+  outline: 3px solid #fff !important;
+  outline-offset: -3px !important;
+  box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 7px rgba(124, 58, 237, 0.9) !important;
 }
 
 [data-focusable]:focus,
