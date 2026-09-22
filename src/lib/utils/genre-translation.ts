@@ -24,6 +24,9 @@ const genreMapping: Record<string, { fr: string; en: string }> = {
   'Western': { fr: 'Western', en: 'Western' },
 };
 
+/** Genres TMDB connus, dans un ordre stable. */
+export const CANONICAL_GENRES = Object.keys(genreMapping);
+
 /**
  * Traduit un genre selon la langue de l'interface
  */

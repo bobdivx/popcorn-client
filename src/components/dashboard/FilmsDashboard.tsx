@@ -9,8 +9,8 @@ import { useFreshSynced } from './hooks/useFreshSynced';
 import { useLibraryBrowse } from './hooks/useLibraryBrowse';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
-import { GenreCardsRow } from './components/GenreCardsRow';
 import { CatalogGrid } from '../page-model/CatalogGrid';
+import { GenreSidebar } from '../page-model/GenreSidebar';
 import { translateGenre } from '../../lib/utils/genre-translation';
 import {
   pickFeaturedHero,
@@ -20,11 +20,9 @@ import {
   mergeReadyToWatch,
   excludeSeenItems,
   itemInGenre,
-  topGenres,
   uniqueByMedia,
   byReleaseDate,
   byPopularity,
-  postersByGenre,
 } from './utils/browsePriority';
 
 const SECTION_LIMIT = 48;
@@ -33,7 +31,7 @@ const GENRE_CAP = 180;
 export default function FilmsDashboard() {
   const { t, language } = useI18n();
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
-  const { films, loading, hasMore, error } = useInfiniteFilms();
+  const { films, loading, error } = useInfiniteFilms();
   const { resumeWatching, rewatchWatching } = useResumeWatching();
   const { activeDownloads } = useActiveDownloads();
   const freshSynced = useFreshSynced('films');
@@ -61,15 +59,6 @@ export default function FilmsDashboard() {
   };
 
   const catalog = useMemo(() => uniqueByMedia(filmsWithSignals), [filmsWithSignals]);
-  const catalogReady = !loading && !hasMore;
-  const genres = useMemo(
-    () => (catalogReady ? topGenres(catalog).map((genre) => genre.key) : []),
-    [catalog, catalogReady]
-  );
-  const genreBackgrounds = useMemo(
-    () => (catalogReady ? postersByGenre(catalog) : {}),
-    [catalog, catalogReady]
-  );
   const genreItems = useMemo(() => {
     if (!selectedGenre) return [];
     return byPopularity(catalog.filter((item) => itemInGenre(item, selectedGenre))).slice(0, GENRE_CAP);
@@ -126,17 +115,12 @@ export default function FilmsDashboard() {
       onNavigate={handleNavigate}
       emptyTitle={t('sync.noFilmsSynced')}
       emptyDescription={t('sync.startSyncDescription')}
-      toolbar={
-        genres.length > 0 ? (
-          <GenreCardsRow
-            genres={genres}
-            genreBackgrounds={genreBackgrounds}
-            allBackground={catalog.find((item) => item.poster || item.backdrop)?.poster || catalog[0]?.backdrop}
-            selectedGenre={selectedGenre}
-            onSelectGenre={setSelectedGenre}
-            language={lang}
-          />
-        ) : null
+      headerAction={
+        <GenreSidebar
+          selectedGenre={selectedGenre}
+          onSelectGenre={setSelectedGenre}
+          language={lang}
+        />
       }
     >
       {selectedGenre ? (
