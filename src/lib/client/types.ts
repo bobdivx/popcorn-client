@@ -186,6 +186,12 @@ export interface SearchParams {
   lang?: string;
   /** Id d'indexer spécifique à interroger (sinon tous les indexers activés). */
   indexerId?: string;
+  /** Titre déjà choisi : la recherche base puis indexeur se fait par cet id TMDB. */
+  tmdbId?: number;
+  /** Année du titre TMDB, pour écarter les homonymes. */
+  year?: number;
+  /** Titre original TMDB, si différent du titre affiché. */
+  altQ?: string;
 }
 
 export interface SearchResult {
@@ -211,6 +217,8 @@ export interface SearchResult {
   indexerName?: string;
   /** Bibliothèque disque / sync base / résultat indexer. */
   sourceSearch?: 'library' | 'sync' | 'indexer';
+  /** Titre original TMDB quand il diffère du titre localisé. */
+  originalTitle?: string;
 }
 
 // ==================== STREAMING ====================
