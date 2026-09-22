@@ -163,22 +163,110 @@ export function recentDownloadKeys(items: ContentItem[]): Set<string> {
   return new Set(items.map(contentItemKey));
 }
 
-export function itemInGenre(item: ContentItem, genre: string | null): boolean {
-  if (!genre) return true;
-  return Array.isArray(item.genres) && item.genres.includes(genre);
+/** Clé stable (anglais TMDB) pour regrouper « Drame » et « Drama ». */
+export function genreKey(genre: string): string {
+  const raw = genre.trim().toLowerCase();
+  if (!raw) return '';
+  const table: Record<string, string> = {
+    action: 'Action',
+    adventure: 'Adventure',
+    aventure: 'Adventure',
+    animation: 'Animation',
+    comedy: 'Comedy',
+    comédie: 'Comedy',
+    comedie: 'Comedy',
+    crime: 'Crime',
+    documentary: 'Documentary',
+    documentaire: 'Documentary',
+    drama: 'Drama',
+    drame: 'Drama',
+    family: 'Family',
+    famille: 'Family',
+    fantasy: 'Fantasy',
+    fantastique: 'Fantasy',
+    history: 'History',
+    histoire: 'History',
+    horror: 'Horror',
+    horreur: 'Horror',
+    music: 'Music',
+    musique: 'Music',
+    mystery: 'Mystery',
+    mystère: 'Mystery',
+    mystere: 'Mystery',
+    romance: 'Romance',
+    'science fiction': 'Science Fiction',
+    'science-fiction': 'Science Fiction',
+    'tv movie': 'TV Movie',
+    téléfilm: 'TV Movie',
+    telefilm: 'TV Movie',
+    thriller: 'Thriller',
+    war: 'War',
+    guerre: 'War',
+    western: 'Western',
+  };
+  return table[raw] ?? genre.trim();
 }
 
-/** Genres les plus présents, pour une barre de pastilles. */
-export function topGenres(items: ContentItem[], limit = 14): string[] {
-  const counts = new Map<string, number>();
+export function itemInGenre(item: ContentItem, genre: string | null): boolean {
+  if (!genre) return true;
+  const want = genreKey(genre);
+  return (item.genres ?? []).some((g) => genreKey(g) === want);
+}
+
+export interface GenreCount {
+  key: string;
+  count: number;
+}
+
+/** Un titre par TMDB, pour ne pas remplir une rangée avec plusieurs qualités du même film. */
+export function uniqueByMedia(items: ContentItem[]): ContentItem[] {
+  const seen = new Set<string>();
+  const out: ContentItem[] = [];
   for (const item of items) {
+    const key = contentItemKey(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
+export function byReleaseDate(items: ContentItem[]): ContentItem[] {
+  return [...items].sort((a, b) => {
+    const da = Date.parse(a.releaseDate || a.firstAirDate || '') || 0;
+    const db = Date.parse(b.releaseDate || b.firstAirDate || '') || 0;
+    return db - da;
+  });
+}
+
+/** Note TMDB d'abord, seeders ensuite. Les titres sans note passent après. */
+export function byPopularity(items: ContentItem[]): ContentItem[] {
+  return [...items].sort((a, b) => {
+    const ra = a.rating ?? 0;
+    const rb = b.rating ?? 0;
+    const aRated = ra > 0 ? 1 : 0;
+    const bRated = rb > 0 ? 1 : 0;
+    if (aRated !== bRated) return bRated - aRated;
+    if (rb !== ra) return rb - ra;
+    return (b.seeds ?? 0) - (a.seeds ?? 0);
+  });
+}
+
+/** Genres présents, avec le nombre de titres uniques. */
+export function topGenres(items: ContentItem[]): GenreCount[] {
+  const counts = new Map<string, number>();
+  for (const item of uniqueByMedia(items)) {
+    const seen = new Set<string>();
     for (const genre of item.genres ?? []) {
-      if (!genre) continue;
-      counts.set(genre, (counts.get(genre) ?? 0) + 1);
+      const key = genreKey(genre);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      counts.set(key, (counts.get(key) ?? 0) + 1);
     }
   }
-  return [...counts.entries()]
+  const all = [...counts.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, limit)
-    .map(([genre]) => genre);
+    .map(([key, count]) => ({ key, count }));
+  if (all.length > 12) return all.filter((g) => g.count >= 4);
+  return all;
 }
