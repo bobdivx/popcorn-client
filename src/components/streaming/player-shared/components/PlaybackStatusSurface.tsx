@@ -534,6 +534,7 @@ export function PlaybackStatusSurface({
       (!derived.isActivelyDownloading &&
         derived.phase !== 'resolving' &&
         derived.phase !== 'findingPeers' &&
+        derived.phase !== 'checking' &&
         derived.phase !== 'error')
     ) {
       return null;

@@ -1332,7 +1332,9 @@ export default function MediaDetailPage({
                   /* library lookup ci-dessous */
                 }
               }
-            } else {
+            } else if (!progressPollIntervalRef?.current) {
+              // Ne pas effacer les stats optimistes juste après un clic Télécharger :
+              // listTorrents peut encore ne pas contenir le torrent.
               setTorrentStats(null);
             }
           } catch (_) {

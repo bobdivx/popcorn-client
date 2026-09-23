@@ -2,6 +2,7 @@ import { clientApi } from '../../../../../lib/client/api';
 import type { ClientTorrentStats } from '../../../../../lib/client/types';
 import { isTorrentReallyComplete } from '../../../../streaming/player-shared/derivePlaybackPhase';
 import { QUEUED_TIMEOUT_MS, QUEUED_LOG_INTERVAL_MS, QUEUED_RETRY_RESUME_MS } from '../../utils/constants';
+import { shouldKeepPreviousTorrentStats } from './torrentStatsMerge';
 import type { PollingContext } from './types';
 
 const TORRENT_NOT_FOUND_TIMEOUT_MS = 15_000;
@@ -57,17 +58,13 @@ export function createPollTorrentProgress(context: PollingContext) {
         // Reset du timer "not found" dès qu'on récupère des stats
         notFoundStartTimeRef.current = null;
 
-        // Ne pas écraser un état queued/downloading par une réponse API invalide (unknown, progress 0)
-        // pour éviter que la carte de stats disparaisse brièvement après un clic sur Télécharger
-        const apiSaysUnknownOrZero =
-          stats.state === 'unknown' || (Number(stats.progress) === 0 && stats.state !== 'completed' && stats.state !== 'seeding');
+        // Ne pas écraser l'affichage avec une réponse inutilisable (state unknown)
+        // ni avec un faux 0 % alors que le téléchargement a déjà avancé.
+        // Un downloading à 0 % (recherche de pairs) doit quand même mettre à jour la carte.
         const current = getCurrentTorrentStats?.() ?? null;
-        const hadInProgressState =
-          current && (current.state === 'queued' || current.state === 'downloading');
-        if (apiSaysUnknownOrZero && hadInProgressState) {
-          // Garder l'affichage "En cours", ne pas écraser ; le prochain poll mettra à jour avec les vraies stats
+        if (shouldKeepPreviousTorrentStats(stats, current)) {
+          // Garder l'affichage en cours ; le prochain poll mettra à jour avec les vraies stats
         } else {
-          // Mettre à jour les stats (utilisé pour afficher le statut de téléchargement sur la page détail)
           setTorrentStats(stats);
         }
 
