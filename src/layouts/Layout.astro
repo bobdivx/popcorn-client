@@ -5,6 +5,7 @@ import '../styles/ui-packs.css';
 import { ClientRouter } from 'astro:transitions';
 import ServerConnectionCheck from '../components/ServerConnectionCheck';
 import Navbar from '../components/layout/Navbar';
+import DemoExitBar from '../components/layout/DemoExitBar';
 import TVNavigationProvider from '../components/tv/TVNavigationProvider';
 import DebugPanel from '../components/debug/DebugPanel';
 import WebOSBoot from '../components/webos/WebOSBoot.astro';
@@ -21,6 +22,20 @@ const isWebOS = import.meta.env.WEBOS === 'true';
 <html lang="fr" id="html-root" data-theme="dark" data-ui-pack="tesla" class="overflow-x-hidden" data-webos={isWebOS ? 'true' : undefined} data-dev={import.meta.env.DEV ? 'true' : undefined}>
   <head>
     <meta charset="UTF-8" />
+    <script is:inline>
+      /* Sortie d'urgence du mode démo, avant le chargement de l'app. */
+      (function() {
+        try {
+          var q = new URLSearchParams(location.search);
+          if (q.get('exitDemo') === '1') {
+            localStorage.removeItem('popcorn_demo_mode');
+            try { sessionStorage.setItem('popcorn_demo_leaving', '1'); } catch (e) {}
+            try { localStorage.setItem('popcorn_intro_skipped', '1'); } catch (e2) {}
+            location.replace(location.origin + '/');
+          }
+        } catch (e) {}
+      })();
+    </script>
     <script is:inline>
       /* ── Anti-flash thème : doit s'exécuter AVANT toute CSS ── */
       (function() {
@@ -293,6 +308,7 @@ const isWebOS = import.meta.env.WEBOS === 'true';
     <TVNavigationProvider client:only="preact" />
     <ServerConnectionCheck client:only="preact" />
     <Navbar client:only="preact" />
+    <DemoExitBar client:only="preact" />
     <DebugPanel client:only="preact" />
     <!-- Main content -->
     <main class="app-main flex-1 w-full overflow-x-hidden safe-area-top" style="padding-top: calc(4rem + var(--safe-area-inset-top));">
@@ -314,6 +330,9 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         .app-main {
           padding-top: calc(5rem + var(--safe-area-inset-top)) !important;
         }
+      }
+      body:has([data-demo-exit-bar]) .app-main {
+        padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
       }
     </style>
     <script is:inline>
@@ -371,6 +390,29 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         try {
           if (sessionStorage.getItem('popcorn-has-loaded')) hide();
         } catch (e) {}
+        /* Si l'app ne monte pas, le bouton de sortie reste cliquable au-dessus du voile. */
+        setTimeout(function() {
+          try {
+            if (document.querySelector('[data-demo-exit-bar]')) return;
+            var path = location.pathname || '';
+            var demo = path === '/demo' || path.indexOf('/demo/') === 0 || localStorage.getItem('popcorn_demo_mode') === '1';
+            if (!demo || document.getElementById('popcorn-demo-exit-fallback')) return;
+            var lang = (document.documentElement.lang || 'fr').toLowerCase();
+            var btn = document.createElement('button');
+            btn.id = 'popcorn-demo-exit-fallback';
+            btn.type = 'button';
+            btn.setAttribute('data-demo-exit-bar', '');
+            btn.textContent = lang.indexOf('en') === 0 ? 'Exit demo mode' : 'Quitter le mode démo';
+            btn.style.cssText = 'position:fixed;z-index:10001;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));min-height:48px;border:0;border-radius:12px;background:#d97706;color:#fff;font:600 16px/1.2 system-ui,sans-serif;';
+            btn.onclick = function() {
+              try { localStorage.removeItem('popcorn_demo_mode'); } catch (e) {}
+              try { sessionStorage.setItem('popcorn_demo_leaving', '1'); } catch (e2) {}
+              try { localStorage.setItem('popcorn_intro_skipped', '1'); } catch (e3) {}
+              location.replace(location.origin + '/');
+            };
+            document.body.appendChild(btn);
+          } catch (e) {}
+        }, 1500);
         var isDev = document.documentElement.getAttribute('data-dev') === 'true';
         var hintDelay = isDev ? 15000 : 8000;
         var slowMsgDelay = isDev ? 20000 : 5000;
