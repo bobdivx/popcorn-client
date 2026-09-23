@@ -440,6 +440,7 @@ export default function IndexerDetailPanel({ indexer, visibleInLibrary, onVisibl
             </label>
             <input
               type="password"
+              autoComplete="new-password"
               className="input input-bordered bg-gray-800 border-gray-700 text-white w-full"
               value={duplicateApiKey}
               onInput={(e) => setDuplicateApiKey((e.target as HTMLInputElement).value)}
