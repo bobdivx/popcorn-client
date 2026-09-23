@@ -765,7 +765,7 @@ export function IndexersStep({
               return (
                 <div key={name} className="space-y-2">
                   <label className="block text-sm font-semibold text-white">{fieldLabel(field)}{effectiveDef?.requiresApiKey && <span className="text-red-400 ml-1">*</span>}</label>
-                  <input type="password" className={inputClass} value={formData.apiKey} onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })} required={effectiveDef?.requiresApiKey ?? false} placeholder={field.placeholder} />
+                  <input type="password" autoComplete="new-password" className={inputClass} value={formData.apiKey} onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })} required={effectiveDef?.requiresApiKey ?? false} placeholder={field.placeholder} />
                 </div>
               );
             }
@@ -844,7 +844,7 @@ export function IndexersStep({
           </div>
           <div className="space-y-2">
             <label className="block text-sm font-semibold text-white">{t('indexersManager.form.apiKey')}</label>
-            <input type="password" className={inputClass} value={formData.apiKey} onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })} placeholder={t('indexersManager.optional')} />
+            <input type="password" autoComplete="new-password" className={inputClass} value={formData.apiKey} onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })} placeholder={t('indexersManager.optional')} />
           </div>
             </>
           )}
