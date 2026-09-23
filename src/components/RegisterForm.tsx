@@ -125,6 +125,7 @@ export default function RegisterForm() {
           </label>
           <input
             type="password"
+            autoComplete="new-password"
             className="form-tv-input w-full bg-white/10 border border-white/20 text-white placeholder-gray-400 px-3 sm:px-4 py-2.5 sm:py-3 rounded text-sm sm:text-base focus:outline-none focus:border-white/40 transition-colors"
             value={formData.password}
             onInput={(e) => handleChange('password')(e)}
@@ -139,6 +140,7 @@ export default function RegisterForm() {
           </label>
           <input
             type="password"
+            autoComplete="new-password"
             className="form-tv-input w-full bg-white/10 border border-white/20 text-white placeholder-gray-400 px-3 sm:px-4 py-2.5 sm:py-3 rounded text-sm sm:text-base focus:outline-none focus:border-white/40 transition-colors"
             value={formData.confirmPassword}
             onInput={(e) => handleChange('confirmPassword')(e)}
