@@ -1,24 +1,11 @@
-import {
-  Monitor,
-  Palette,
-  LayoutGrid,
-  Globe,
-  UserCircle,
-  Play,
-  Library,
-  Wrench,
-} from 'lucide-preact';
 import SettingsOverview from './SettingsOverview';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { useState, useMemo, useEffect } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import type { ComponentType } from 'preact';
 import { canAccess } from '../../lib/permissions';
 import PermissionGuard from '../ui/PermissionGuard';
 import DsPageHeader from '../ui/DsPageHeader';
-import { LogOut } from 'lucide-preact';
-import { serverApi } from '../../lib/client/server-api';
-import { redirectTo } from '../../lib/utils/navigation.js';
-import { useConfirmDialog } from '../ui/useConfirmDialog';
+import { HubSkeleton } from './hub/HubTile';
 
 type CategoryId = 'system' | 'interface' | 'content' | 'downloads' | 'library' | 'discovery' | 'account' | 'playback' | 'maintenance';
 
@@ -182,12 +169,10 @@ export default function SettingsContent() {
 
   if (route.type === 'page') {
     return (
-      <div className="flex-1 flex flex-col min-w-0">
-        <div className="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6 sc-stack ds-card-animate">
-          {route.page === 'server' && <LazyPageServer />}
-          {route.page === 'account' && <LazyPageAccount />}
-          {route.page === 'ratio' && <LazyPageRatio />}
-        </div>
+      <div className="hub-page">
+        {route.page === 'server' && <LazyPageServer />}
+        {route.page === 'account' && <LazyPageAccount />}
+        {route.page === 'ratio' && <LazyPageRatio />}
       </div>
     );
   }
@@ -196,12 +181,12 @@ export default function SettingsContent() {
   if (!visibleCategory) return <SettingsOverview />;
 
   return (
-    <div className="flex-1 flex flex-col min-w-0">
-      <div className="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6 ds-card-animate">
-        <h1 className="sc-page-title ds-enter">{t(CATEGORY_LABELS[visibleCategory])}</h1>
-        <p className="sc-page-subtitle ds-enter" style={{ animationDelay: '80ms' }}>{t('settingsMenu.subtitle')}</p>
-        <LazyCategoryPanel category={visibleCategory} />
-      </div>
+    <div className="hub-page">
+      <header className="hub-header">
+        <h1 className="hub-title">{t(CATEGORY_LABELS[visibleCategory])}</h1>
+        <p className="hub-subtitle">{t('settingsMenu.subtitle')}</p>
+      </header>
+      <LazyCategoryPanel category={visibleCategory} />
     </div>
   );
 }
@@ -229,8 +214,6 @@ function LazyPageServer() {
 }
 
 function LazyPageAccount() {
-  const { t } = useI18n();
-  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [AccountSubMenuPanel, setAccountSubMenuPanel] = useState<ComponentType<{ baseUrl?: string }> | null>(
     () => panelCache.get('page:account') ?? null
   );
@@ -241,46 +224,11 @@ function LazyPageAccount() {
     });
     return () => { cancelled = true; };
   }, []);
-  const handleLogout = async () => {
-    if (
-      !(await confirm({
-        title: t('account.logout') || 'Déconnexion',
-        message: t('account.logoutConfirm'),
-        danger: true,
-        confirmLabel: t('account.logout') || 'Déconnexion',
-      }))
-    ) {
-      return;
-    }
-    try {
-      await serverApi.logout();
-    } catch (err) {
-      console.error('Erreur lors de la déconnexion:', err);
-    } finally {
-      redirectTo('/login');
-    }
-  };
   if (!AccountSubMenuPanel) return <SettingsRouteSkeleton />;
   return (
     <PermissionGuard permission="settings.account">
-      <div className="flex flex-col gap-4 sm:gap-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <DsPageHeader titleKey="settingsPages.account.title" subtitleKey="settingsPages.account.subtitle" />
-          <button
-            type="button"
-            onClick={handleLogout}
-            data-focusable
-            tabIndex={0}
-            className="ds-btn-danger btn btn-sm gap-2 px-4 py-2.5 font-semibold text-white min-h-11 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-red)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface-elevated)] flex-shrink-0"
-            aria-label={t('account.logout')}
-          >
-            <LogOut className="w-4 h-4" aria-hidden />
-            {t('account.logout')}
-          </button>
-        </div>
-        <AccountSubMenuPanel baseUrl="/settings/account" />
-        {confirmDialog}
-      </div>
+      <DsPageHeader titleKey="settingsPages.account.title" subtitleKey="settingsPages.account.subtitle" />
+      <AccountSubMenuPanel baseUrl="/settings/account/" />
     </PermissionGuard>
   );
 }
@@ -301,13 +249,7 @@ function LazyPageRatio() {
 }
 
 function SettingsRouteSkeleton() {
-  return (
-    <div className="sc-skeleton" aria-busy="true" aria-label="Chargement">
-      <div className="sc-skeleton-card sc-skeleton-card--lg" />
-      <div className="sc-skeleton-card" />
-      <div className="sc-skeleton-card" />
-    </div>
-  );
+  return <HubSkeleton count={6} />;
 }
 
 function LazyCategoryPanel({ category }: { category: CategoryId }) {

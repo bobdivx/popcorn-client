@@ -768,36 +768,36 @@ export default function MaintenanceSubMenuPanel() {
 
   if (!canAccess('settings.server' as any)) return null;
 
-  if (sub) {
-    const item = MAINTENANCE_ITEMS.find((i) => i.id === sub)!;
-    if (sub === 'forceCleanup') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><ForceCleanupSection embedded /></SettingsSubPageFrame>;
-    if (sub === 'transcodingConfig') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><TranscodingConfigSection embedded /></SettingsSubPageFrame>;
-    if (sub === 'transcodeJobs') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><TranscodeJobsMonitor embedded /></SettingsSubPageFrame>;
-    if (sub === 'restartBackend') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><RestartBackendSection embedded /></SettingsSubPageFrame>;
-    if (sub === 'hardReset') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><HardResetSection embedded /></SettingsSubPageFrame>;
-    if (sub === 'repairApp') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><RepairAppSection embedded /></SettingsSubPageFrame>;
-    if (sub === 'tmdbCoverage') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={'Couverture TMDB'} description={'Audit de fiabilité TMDB par indexer'}><TmdbCoverageSection embedded /></SettingsSubPageFrame>;
-    if (sub === 'resources') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><ResourceMonitorDev embedded /></SettingsSubPageFrame>;
-    if (sub === 'logs') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><ServerLogsSection embedded /></SettingsSubPageFrame>;
-  }
+  const detailItem = sub ? MAINTENANCE_ITEMS.find((i) => i.id === sub) : null;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
-      {MAINTENANCE_ITEMS.map((item) => (
+    <>
+      <div className="hub-grid" data-tv-list role="list">
+        {MAINTENANCE_ITEMS.map((item) => (
+          <SettingsNavCard
+            key={item.id}
+            href={`${BASE_URL}?sub=${item.id}`}
+            icon={item.icon}
+            title={item.id === 'tmdbCoverage' ? 'Couverture TMDB' : t(item.titleKey)}
+            description={item.id === 'tmdbCoverage' ? 'Audit de fiabilité TMDB par indexer' : t(item.descriptionKey)}
+          />
+        ))}
         <SettingsNavCard
-          key={item.id}
-          href={`${BASE_URL}?sub=${item.id}`}
-          icon={item.icon}
-          title={item.id === 'tmdbCoverage' ? 'Couverture TMDB' : t(item.titleKey)}
-          description={item.id === 'tmdbCoverage' ? 'Audit de fiabilité TMDB par indexer' : t(item.descriptionKey)}
+          href="/settings/server/"
+          icon={Server}
+          title={t('serverSettings.title')}
+          description={t('serverSettings.storageInfo')}
         />
-      ))}
-      <SettingsNavCard
-        href="/settings/server"
-        icon={Server}
-        title={t('serverSettings.title')}
-        description={t('serverSettings.storageInfo')}
-      />
-    </div>
+      </div>
+      {detailItem && sub === 'forceCleanup' && <SettingsSubPageFrame backHref={BASE_URL} icon={detailItem.icon} title={t(detailItem.titleKey)} description={t(detailItem.descriptionKey)}><ForceCleanupSection embedded /></SettingsSubPageFrame>}
+      {detailItem && sub === 'transcodingConfig' && <SettingsSubPageFrame backHref={BASE_URL} icon={detailItem.icon} title={t(detailItem.titleKey)} description={t(detailItem.descriptionKey)}><TranscodingConfigSection embedded /></SettingsSubPageFrame>}
+      {detailItem && sub === 'transcodeJobs' && <SettingsSubPageFrame backHref={BASE_URL} icon={detailItem.icon} title={t(detailItem.titleKey)} description={t(detailItem.descriptionKey)}><TranscodeJobsMonitor embedded /></SettingsSubPageFrame>}
+      {detailItem && sub === 'restartBackend' && <SettingsSubPageFrame backHref={BASE_URL} icon={detailItem.icon} title={t(detailItem.titleKey)} description={t(detailItem.descriptionKey)}><RestartBackendSection embedded /></SettingsSubPageFrame>}
+      {detailItem && sub === 'hardReset' && <SettingsSubPageFrame backHref={BASE_URL} icon={detailItem.icon} title={t(detailItem.titleKey)} description={t(detailItem.descriptionKey)}><HardResetSection embedded /></SettingsSubPageFrame>}
+      {detailItem && sub === 'repairApp' && <SettingsSubPageFrame backHref={BASE_URL} icon={detailItem.icon} title={t(detailItem.titleKey)} description={t(detailItem.descriptionKey)}><RepairAppSection embedded /></SettingsSubPageFrame>}
+      {detailItem && sub === 'tmdbCoverage' && <SettingsSubPageFrame backHref={BASE_URL} icon={detailItem.icon} title={'Couverture TMDB'} description={'Audit de fiabilité TMDB par indexer'}><TmdbCoverageSection embedded /></SettingsSubPageFrame>}
+      {detailItem && sub === 'resources' && <SettingsSubPageFrame backHref={BASE_URL} icon={detailItem.icon} title={t(detailItem.titleKey)} description={t(detailItem.descriptionKey)}><ResourceMonitorDev embedded /></SettingsSubPageFrame>}
+      {detailItem && sub === 'logs' && <SettingsSubPageFrame backHref={BASE_URL} icon={detailItem.icon} title={t(detailItem.titleKey)} description={t(detailItem.descriptionKey)}><ServerLogsSection embedded /></SettingsSubPageFrame>}
+    </>
   );
 }

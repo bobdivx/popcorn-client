@@ -1,6 +1,8 @@
-import { useMemo } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import type { ContentItem } from '../../lib/client/types';
+import { serverApi } from '../../lib/client/server-api';
+import { aiReady, useAiEnabled } from '../../lib/ai/prefs';
 import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
 import { useDashboardData } from './hooks/useDashboardData';
 import { useResumeWatching } from './hooks/useResumeWatching';
@@ -30,7 +32,8 @@ function dedupeDashboardItems(items: ContentItem[]): ContentItem[] {
 }
 
 export default function Dashboard() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const aiEnabled = useAiEnabled();
   const { data, loading: dataLoading, error } = useDashboardData();
   const { activeDownloads, loading: downloadsLoading } = useActiveDownloads();
   const { resumeWatching, rewatchWatching } = useResumeWatching();
@@ -97,6 +100,41 @@ export default function Dashboard() {
     window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
   };
 
+  const tonightPool = useMemo(
+    () => uniqueByMedia([...recentDownloads, ...recentMovies, ...recentSeries]).slice(0, 20),
+    [recentDownloads, recentMovies, recentSeries],
+  );
+  const [tonightItems, setTonightItems] = useState<ContentItem[]>([]);
+
+  useEffect(() => {
+    if (!aiEnabled || tonightPool.length === 0) {
+      setTonightItems([]);
+      return;
+    }
+    let cancelled = false;
+    aiReady().then(async (ready) => {
+      if (!ready || cancelled) return;
+      const res = await serverApi.aiTonight({
+        locale: language === 'en' ? 'en' : 'fr',
+        items: tonightPool.map((item) => ({
+          id: item.id,
+          title: item.tmdbTitle || item.title,
+          type: item.type,
+          seeds: item.seeds || 0,
+          in_library: true,
+        })),
+      });
+      if (cancelled || !res.success || !res.data?.ids?.length) return;
+      const picked = res.data.ids
+        .map((id) => tonightPool.find((item) => item.id === id))
+        .filter((item): item is ContentItem => !!item);
+      setTonightItems(picked);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [aiEnabled, language, tonightPool]);
+
   const sections = useMemo(() => {
     const enrichedResumeWatching = resumeWatching.map((item) => {
       const active = activeDownloads.find(
@@ -123,6 +161,15 @@ export default function Dashboard() {
     ).filter((item) => !downloadingNow.some((dl) => contentItemKey(dl) === contentItemKey(item)));
 
     const result = [];
+
+    if (tonightItems.length > 0) {
+      result.push({
+        id: 'tonight',
+        title: t('ai.tonightTitle'),
+        items: tonightItems,
+        priority: true,
+      });
+    }
 
     if (downloadingNow.length > 0) {
       result.push({
@@ -184,6 +231,7 @@ export default function Dashboard() {
     recentSeries,
     popularMovies,
     popularSeries,
+    tonightItems,
     t,
   ]);
 

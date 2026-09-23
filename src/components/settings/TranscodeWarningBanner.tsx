@@ -54,7 +54,7 @@ export default function TranscodeWarningBanner() {
               {t('settingsMenu.maintenance.transcodeWarning.details')}
             </p>
             <a
-              href="/settings?category=maintenance&sub=transcodeJobs"
+              href="/settings/maintenance/?sub=transcodeJobs"
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium transition-colors"
               data-focusable
               tabIndex={0}

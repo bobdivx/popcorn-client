@@ -25,7 +25,7 @@ import type { SubscriptionMe } from '../../lib/api/popcorn-web';
 import { SettingsNavCard } from './SettingsNavCard';
 import { SettingsSubPageFrame } from './SettingsSubPageFrame';
 
-const BASE_URL_DEFAULT = '/settings?category=account';
+const BASE_URL_DEFAULT = '/settings/account/';
 
 const ACCOUNT_SUBS = ['subscription', 'profile', 'info', 'devices', '2fa', 'quick-connect', 'local-users'] as const;
 type AccountSub = (typeof ACCOUNT_SUBS)[number];
@@ -120,23 +120,12 @@ export default function AccountSubMenuPanel({ baseUrl = BASE_URL_DEFAULT }: { ba
 
   const subParam = baseUrl.includes('?') ? '&sub=' : '?sub=';
 
-  if (sub) {
-    const item = ACCOUNT_ITEMS.find((i) => i.id === sub);
-    if (item && item.kind === 'sub') {
-      if (sub === 'subscription') return <SubPageFrame item={item} baseUrl={baseUrl}><SubscriptionStatusPanel /></SubPageFrame>;
-      if (sub === 'profile') return <SubPageFrame item={item} baseUrl={baseUrl}><AccountSettings section="profile" /></SubPageFrame>;
-      if (sub === 'info') return <SubPageFrame item={item} baseUrl={baseUrl}><AccountSettings section="info" /></SubPageFrame>;
-      if (sub === 'devices') return <SubPageFrame item={item} baseUrl={baseUrl}><AccountSettings section="devices" /></SubPageFrame>;
-      if (sub === '2fa') return <SubPageFrame item={item} baseUrl={baseUrl}><TwoFactorSettings /></SubPageFrame>;
-      if (sub === 'quick-connect') return <SubPageFrame item={item} baseUrl={baseUrl}><QuickConnectAuthorize /></SubPageFrame>;
-      if (sub === 'local-users') return <SubPageFrame item={item} baseUrl={baseUrl}><LocalUsersManager /></SubPageFrame>;
-    }
-  }
+  const subItem = sub ? ACCOUNT_ITEMS.find((i) => i.id === sub && i.kind === 'sub') : null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <ConnectivityAlertCard />
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
+      <div className="hub-grid" data-tv-list role="list">
       {visible.map((item) => {
         const href = item.kind === 'link' ? item.href : `${baseUrl}${subParam}${item.id}`;
         const isExternal = item.kind === 'link' && !!item.isExternal;
@@ -155,12 +144,12 @@ export default function AccountSubMenuPanel({ baseUrl = BASE_URL_DEFAULT }: { ba
                 : t('settingsMenu.subscription.cardNoPlan')
           : t(item.descriptionKey);
 
-        const rightSlot = isSubscriptionCard && (hasPlanActive || hasStreamingTorrent)
-          ? (
-            <span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:9999px;background:rgba(124,58,237,0.18);color:#a78bfa;flex-shrink:0;">
-              {hasPlanActive ? t('settingsMenu.overviewCard.accountLoggedIn') : t('settingsMenu.subscription.streamingTorrentOption')}
-            </span>
-          )
+        const status = isSubscriptionCard && subscriptionData !== undefined
+          ? subscriptionData === null
+            ? 'disabled' as const
+            : hasPlanActive || hasStreamingTorrent
+              ? 'connected' as const
+              : 'limited' as const
           : undefined;
 
         return (
@@ -171,11 +160,18 @@ export default function AccountSubMenuPanel({ baseUrl = BASE_URL_DEFAULT }: { ba
             title={t(item.titleKey)}
             description={desc}
             isExternal={isExternal}
-            rightSlot={rightSlot}
+            status={status}
           />
         );
       })}
       </div>
+      {subItem && sub === 'subscription' && <SubPageFrame item={subItem} baseUrl={baseUrl}><SubscriptionStatusPanel /></SubPageFrame>}
+      {subItem && sub === 'profile' && <SubPageFrame item={subItem} baseUrl={baseUrl}><AccountSettings section="profile" /></SubPageFrame>}
+      {subItem && sub === 'info' && <SubPageFrame item={subItem} baseUrl={baseUrl}><AccountSettings section="info" /></SubPageFrame>}
+      {subItem && sub === 'devices' && <SubPageFrame item={subItem} baseUrl={baseUrl}><AccountSettings section="devices" /></SubPageFrame>}
+      {subItem && sub === '2fa' && <SubPageFrame item={subItem} baseUrl={baseUrl}><TwoFactorSettings /></SubPageFrame>}
+      {subItem && sub === 'quick-connect' && <SubPageFrame item={subItem} baseUrl={baseUrl}><QuickConnectAuthorize /></SubPageFrame>}
+      {subItem && sub === 'local-users' && <SubPageFrame item={subItem} baseUrl={baseUrl}><LocalUsersManager /></SubPageFrame>}
     </div>
   );
 }

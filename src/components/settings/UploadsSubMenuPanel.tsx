@@ -93,7 +93,7 @@ export default function UploadsSubMenuPanel() {
   });
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
+    <div className="hub-grid" data-tv-list role="list">
       {visible.map((item) => (
         <SettingsNavCard
           key={item.id}

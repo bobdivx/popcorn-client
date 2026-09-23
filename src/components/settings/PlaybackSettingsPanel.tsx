@@ -3,13 +3,13 @@ import { useI18n } from '../../lib/i18n';
 import { PreferencesManager, TokenManager } from '../../lib/client/storage';
 import { saveUserConfigMerge } from '../../lib/api/popcorn-web';
 import { serverApi } from '../../lib/client/server-api';
-import { SkipForward, ListVideo, Play, Download, HardDrive, Gauge } from 'lucide-preact';
+import { SkipForward, ListVideo, Play, Download, HardDrive, Gauge, Sparkles } from 'lucide-preact';
 import { SettingsNavCard } from './SettingsNavCard';
 import { SettingsSubPageFrame } from './SettingsSubPageFrame';
 import { DEFAULT_PLAYER_CONFIG, type PlayerConfig } from '../streaming/hls-player/hooks/usePlayerConfig';
 import { useSubscriptionMe } from '../torrents/MediaDetailPage/hooks/useSubscriptionMe';
 
-const BASE_URL = '/settings?category=playback';
+const BASE_URL = '/settings/playback/';
 
 const PLAYBACK_SUBS = ['autoplay', 'skipIntro', 'streamingDownloadFull', 'streamingRetention', 'streamingMode', 'nextEpisodeButton'] as const;
 type PlaybackSub = (typeof PLAYBACK_SUBS)[number];
@@ -245,9 +245,17 @@ export default function PlaybackSettingsPanel() {
     />
   );
 
-  if (sub && playbackItems.some((i) => i.id === sub)) {
-    const item = playbackItems.find((i) => i.id === sub)!;
-    const backAndFrame = (
+  const aiCard = (
+    <SettingsNavCard
+      href="/settings/ai"
+      icon={Sparkles}
+      title={t('ai.cardTitle')}
+      description={t('ai.cardDescription')}
+    />
+  );
+
+  const item = sub && playbackItems.some((i) => i.id === sub) ? playbackItems.find((i) => i.id === sub)! : null;
+  const backAndFrame = item ? (
       <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}>
         <div>
             {saved && <div className="ds-status-badge ds-status-badge--success w-fit mb-4" role="status">{t('common.success')}</div>}
@@ -331,18 +339,17 @@ export default function PlaybackSettingsPanel() {
             )}
           </div>
       </SettingsSubPageFrame>
-    );
-    return <div className="flex-1 py-4 px-4 sm:px-6 overflow-y-auto scrollbar-visible">{backAndFrame}</div>;
-  }
+    ) : null;
 
   return (
-    <div className="flex-1 py-4 px-4 sm:px-6 overflow-y-auto scrollbar-visible">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
+    <>
+      <div className="hub-grid" data-tv-list role="list">
         {qualityCard}
+        {aiCard}
         {playbackItems.map((item) => (
           <SettingsNavCard
             key={item.id}
-            href={`${BASE_URL}&sub=${item.id}`}
+            href={`${BASE_URL}?sub=${item.id}`}
             icon={item.icon}
             title={t(item.titleKey)}
             description={t(item.cardDescriptionKey ?? item.descriptionKey)}
@@ -350,6 +357,7 @@ export default function PlaybackSettingsPanel() {
           />
         ))}
       </div>
-    </div>
+      {backAndFrame}
+    </>
   );
 }

@@ -7,14 +7,14 @@ import { CookieWizardModal } from './CookieWizardModal';
 import IndexerDetailPanel from './IndexerDetailPanel';
 import { Modal } from '../ui/Modal';
 import { useConfirmDialog } from '../ui/useConfirmDialog';
-import { Plus, ChevronRight, Search } from 'lucide-preact';
-import { getIndexerDefinitionsWithBackendFallback, getUserConfig, type IndexerDefinition } from '../../lib/api/popcorn-web';
+import { HubAddTile, HubTile, HubSkeleton } from './hub/HubTile';
+import { HubModal } from './hub/HubModal';
+import { getIndexerDefinitionsWithBackendFallback, getUserConfig, saveUserConfigMerge, type IndexerDefinition } from '../../lib/api/popcorn-web';
 import {
   filterAndSortIndexerDefinitions,
   getUniqueLanguagesAndCountries,
 } from '../../lib/utils/indexer-definitions-filter';
 import { useI18n } from '../../lib/i18n/useI18n';
-import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
 import { syncIndexersToCloud } from '../../lib/utils/cloud-sync';
 import { normalizeCookieInput } from '../../lib/utils/cookie-format';
 
@@ -186,6 +186,30 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
     } finally {
       setLoading(false);
     }
+  };
+
+  const setLibraryVisible = async (indexerId: string, visible: boolean) => {
+    let next: string[] | null;
+    if (visible) {
+      if (visibleInLibraryIds === null) {
+        next = null;
+      } else {
+        const nextList = visibleInLibraryIds.includes(indexerId) ? visibleInLibraryIds : [...visibleInLibraryIds, indexerId];
+        next = nextList.length === indexers.length ? null : nextList;
+      }
+    } else if (visibleInLibraryIds === null) {
+      next = indexers.filter((i) => i.id !== indexerId).map((i) => i.id);
+    } else {
+      next = visibleInLibraryIds.filter((id) => id !== indexerId);
+    }
+    setVisibleInLibraryIds(next);
+    const config = await getUserConfig();
+    const currentSync = config?.syncSettings ?? {};
+    const stored = next === null || next.length === 0 ? null : next;
+    await saveUserConfigMerge({
+      syncSettings: { ...currentSync, visibleIndexerIds: stored },
+    });
+    await serverApi.updateSyncSettings({ visible_indexer_ids: stored });
   };
 
   const handleSubmit = async (e: Event) => {
@@ -541,56 +565,23 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
   const showAddModeSpinner = initialModeAdd && !showForm && !showDefinitionSelector;
 
   if (loading || showAddModeSpinner) {
-    return (
-      <div class="flex justify-center items-center min-h-[400px]">
-        <HLSLoadingSpinner size="lg" />
-      </div>
-    );
+    return <HubSkeleton count={6} />;
   }
 
   return (
     <div class="space-y-6">
-      {error && (
-        <div class="ds-status-badge ds-status-badge--error w-full max-w-xl" role="alert">
-          {error}
-        </div>
-      )}
+          {error && (
+            <div class="hub-alert" role="alert">{error}</div>
+          )}
       {successMessage && (
         <div class="ds-status-badge ds-status-badge--success w-fit" role="status">
           {successMessage}
         </div>
       )}
 
-      {!showForm && !showDefinitionSelector ? (
-        <>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger">
-            {/* Carte Ajouter un indexer */}
-            <button
-              type="button"
-              onClick={handleAddIndexer}
-              disabled={loadingDefinitions}
-              class="text-left block min-w-0 rounded-[var(--ds-radius-lg)] overflow-hidden transition-all can-hover:hover:scale-[1.01] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] disabled:opacity-50 focus-visible:overflow-visible"
-              data-settings-card
-            >
-              <div class="sc-nav-card" style="height:100%;display:flex;flex-direction:column;min-height:120px">
-                <div class="flex items-start justify-between gap-3">
-                  <div class="sc-nav-icon sc-nav-icon--violet">
-                    <Plus class="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.8} aria-hidden />
-                  </div>
-                  <span class="sc-nav-chevron" aria-hidden>›</span>
-                </div>
-                <div class="sc-nav-title" style="margin-top:0.75rem">{t('indexersManager.addIndexer')}</div>
-                <div class="sc-nav-desc" style="margin-top:0.75rem">{t('settingsMenu.indexersConfigured.description')}</div>
-                <span class="mt-auto pt-4 text-xs font-medium text-[var(--ds-accent-violet)] flex items-center gap-1" aria-hidden>
-                  {t('common.open')}
-                </span>
-              </div>
-            </button>
-
-            {/* Cartes indexers : compactes, clic = ouvrir la modal de configuration */}
+      <>
+          <div class="hub-grid" data-tv-list role="list">
             {indexers.map((indexer) => {
-              const ratio = undefined;
-              const truncatedUrl = indexer.baseUrl.length > 45 ? indexer.baseUrl.slice(0, 42) + '…' : indexer.baseUrl;
               const isVisibleInLibrary =
                 visibleInLibraryIds === null || (Array.isArray(visibleInLibraryIds) && visibleInLibraryIds.includes(indexer.id));
               let skipSync = false;
@@ -603,87 +594,45 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
                   skipSync = false;
                 }
               }
-              const isC411 = (indexer.indexerTypeId || '').toLowerCase() === 'c411';
+              let faviconUrl: string | undefined;
+              try {
+                faviconUrl = `${new URL(indexer.baseUrl).origin}/favicon.ico`;
+              } catch {
+                faviconUrl = undefined;
+              }
+              const status = !indexer.isEnabled ? 'disabled' : (!isVisibleInLibrary || skipSync) ? 'limited' : 'connected';
+              const statusLabel = status === 'connected'
+                ? t('settingsMenu.hub.connected')
+                : status === 'limited'
+                  ? t('settingsMenu.hub.limited')
+                  : t('settingsMenu.hub.disabled');
+              const meta = indexer.indexerTypeId || undefined;
               return (
-                <button
+                <HubTile
                   key={indexer.id}
-                  type="button"
+                  title={indexer.name}
+                  initial={indexer.name}
+                  faviconUrl={faviconUrl}
+                  status={status}
+                  statusLabel={statusLabel}
+                  meta={meta}
                   onClick={() => setDetailModalIndexerId(indexer.id)}
-                  class="text-left block min-w-0 rounded-[var(--ds-radius-lg)] overflow-hidden transition-all can-hover:hover:scale-[1.01] hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] focus-visible:overflow-visible"
-                  data-settings-card
-                >
-                  <div class="sc-nav-card" style="height:100%;display:flex;flex-direction:column;min-height:120px">
-                    <div class="flex items-start justify-between gap-3">
-                      <div class="sc-nav-icon sc-nav-icon--violet">
-                        <Search class="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.8} aria-hidden />
-                      </div>
-                      <span class="sc-nav-chevron" aria-hidden>›</span>
-                    </div>
-                    <div class="sc-nav-title" style="margin-top:0.75rem">{indexer.name}</div>
-                    <code class="text-xs ds-text-tertiary mt-1 truncate block" title={indexer.baseUrl}>
-                      {truncatedUrl}
-                    </code>
-                    <div class="flex flex-wrap gap-2 mt-3">
-                      {indexer.isEnabled ? (
-                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-green-900/30 border border-green-600 text-green-300">
-                          {t('indexerCard.active')}
-                        </span>
-                      ) : (
-                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-gray-700 border border-gray-600 text-gray-300">
-                          {t('indexerCard.inactive')}
-                        </span>
-                      )}
-                      {indexer.isDefault && (
-                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-blue-900/30 border border-blue-600 text-blue-300">
-                          {t('indexerCard.default')}
-                        </span>
-                      )}
-                      {isC411 && (skipSync ? (
-                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-amber-900/30 border border-amber-600 text-amber-300" title={t('indexerCard.downloadAccountHint')}>
-                          {t('indexerCard.downloadAccount')}
-                        </span>
-                      ) : (
-                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-cyan-900/30 border border-cyan-600 text-cyan-300" title={t('indexerCard.syncAccountHint')}>
-                          {t('indexerCard.syncAccount')}
-                        </span>
-                      ))}
-                      <span class="px-2 py-0.5 rounded text-xs ds-text-tertiary">
-                        {t('indexerCard.priority')}: {indexer.priority}
-                      </span>
-                      <span class="px-2 py-0.5 rounded text-xs ds-text-tertiary">
-                        {t('indexerCard.ratio')}: {ratio != null && Number.isFinite(ratio) ? ratio.toFixed(2) : t('indexerCard.ratioNotAvailable')}
-                      </span>
-                      {isVisibleInLibrary ? (
-                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-emerald-900/30 border border-emerald-600 text-emerald-300" title={t('settingsMenu.libraryIndexerPanel.hint')}>
-                          {t('indexerCard.libraryVisible')}
-                        </span>
-                      ) : (
-                        <span class="px-2 py-0.5 rounded text-xs font-medium bg-amber-900/30 border border-amber-600 text-amber-300" title={t('settingsMenu.libraryIndexerPanel.hint')}>
-                          {t('indexerCard.libraryHidden')}
-                        </span>
-                      )}
-                    </div>
-                    <span class="mt-auto pt-4 text-xs font-medium text-[var(--ds-accent-violet)] flex items-center gap-1" aria-hidden>
-                      {t('common.open')}
-                    </span>
-                  </div>
-                </button>
+                />
               );
             })}
-            {indexers.length === 0 && (
-              <div class="sc-frame" style="min-height:120px;display:flex;align-items:center;justify-content:center;text-align:center">
-                <div class="sc-frame-body">
-                  <p class="ds-text-secondary text-sm">{t('indexersManager.noIndexers')}</p>
-                  <p class="ds-text-tertiary text-xs mt-2">{t('indexersManager.addIndexer')}</p>
-                </div>
-              </div>
-            )}
+            <HubAddTile label={t('settingsMenu.hub.add')} onClick={handleAddIndexer} />
           </div>
+          {indexers.length === 0 && (
+            <p class="hub-empty">{t('settingsMenu.hub.empty')}</p>
+          )}
 
           {/* Modal configuration / détail d'un indexer */}
           {detailModalIndexerId && (() => {
             const indexer = indexers.find((i) => i.id === detailModalIndexerId);
             if (!indexer) return null;
+            const visibleInLibrary =
+              visibleInLibraryIds === null ||
+              (Array.isArray(visibleInLibraryIds) && visibleInLibraryIds.includes(indexer.id));
             return (
               <Modal
                 isOpen={true}
@@ -693,6 +642,8 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
               >
                 <IndexerDetailPanel
                   indexer={indexer}
+                  visibleInLibrary={visibleInLibrary}
+                  onVisibleInLibraryChange={(visible) => setLibraryVisible(indexer.id, visible)}
                   onBack={() => setDetailModalIndexerId(null)}
                   onEditClose={() => {
                     setDetailModalIndexerId(null);
@@ -708,7 +659,17 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
             );
           })()}
         </>
-      ) : showDefinitionSelector ? (
+      {(showDefinitionSelector || showForm) && (
+        <HubModal
+          open
+          size="xl"
+          title={showDefinitionSelector ? t('indexersManager.selectIndexer') : (editingIndexer ? editingIndexer.name : t('indexersManager.addIndexer'))}
+          onClose={() => {
+            setShowDefinitionSelector(false);
+            setShowForm(false);
+          }}
+        >
+          {showDefinitionSelector ? (
         <div class="space-y-4">
           <div class="mb-6">
             <h2 class="ds-title-section text-[var(--ds-text-primary)]">{t('indexersManager.selectIndexer')}</h2>
@@ -1104,6 +1065,8 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
             </button>
           </div>
         </form>
+          )}
+        </HubModal>
       )}
 
       {/* Modale de test d'indexer : retour visuel en cours + résultats au fur et à mesure */}

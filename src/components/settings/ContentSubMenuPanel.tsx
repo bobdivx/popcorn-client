@@ -137,39 +137,15 @@ export default function ContentSubMenuPanel() {
   );
 
   const goBackToContentGrid = () => {
-    window.history.pushState(window.history.state ?? {}, '', CONTENT_BASE);
+    window.history.replaceState(window.history.state ?? {}, '', CONTENT_BASE);
     setSub(null);
   };
 
-  if (sub === 'tmdb') {
-    const item = CONTENT_ITEMS.find((i) => i.id === 'tmdb')!;
-    return (
-      <SettingsSubPageFrame backOnClick={goBackToContentGrid} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}>
-        <TmdbConfig embedded />
-      </SettingsSubPageFrame>
-    );
-  }
-
-  if (sub === 'sync') {
-    const item = CONTENT_ITEMS.find((i) => i.id === 'sync')!;
-    return (
-      <SettingsSubPageFrame backOnClick={goBackToContentGrid} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}>
-        <TorrentSyncManager />
-      </SettingsSubPageFrame>
-    );
-  }
-
-  if (sub === 'bulk-torrent-zip') {
-    const item = CONTENT_ITEMS.find((i) => i.id === 'bulk-torrent-zip')!;
-    return (
-      <SettingsSubPageFrame backOnClick={goBackToContentGrid} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}>
-        <LazyContentBulkTorrentZipPanel />
-      </SettingsSubPageFrame>
-    );
-  }
+  const detailItem = CONTENT_ITEMS.find((i) => i.id === sub);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
+    <>
+    <div className="hub-grid" data-tv-list role="list">
       {visible.map((item) => (
         <SettingsNavCard
           key={item.id}
@@ -192,5 +168,13 @@ export default function ContentSubMenuPanel() {
         />
       ))}
     </div>
+    {detailItem && (sub === 'tmdb' || sub === 'sync' || sub === 'bulk-torrent-zip') && (
+      <SettingsSubPageFrame backOnClick={goBackToContentGrid} icon={detailItem.icon} title={t(detailItem.titleKey)} description={t(detailItem.descriptionKey)}>
+        {sub === 'tmdb' && <TmdbConfig embedded />}
+        {sub === 'sync' && <TorrentSyncManager />}
+        {sub === 'bulk-torrent-zip' && <LazyContentBulkTorrentZipPanel />}
+      </SettingsSubPageFrame>
+    )}
+    </>
   );
 }
