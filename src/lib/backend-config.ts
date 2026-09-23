@@ -148,6 +148,26 @@ export function setDemoMode(enabled: boolean): void {
 }
 
 /**
+ * Quitte le mode démo et revient à l'accueil réel (compte / configuration).
+ * Efface le flag tout de suite : sur /demo le chemin seul suffit à rester en démo.
+ */
+export function exitDemoMode(): void {
+  if (typeof window === 'undefined') return;
+  setDemoMode(false);
+  try {
+    sessionStorage.setItem('popcorn_demo_leaving', '1');
+    localStorage.setItem('popcorn_intro_skipped', '1');
+  } catch {
+    // ignore
+  }
+  const url = new URL(window.location.href);
+  url.pathname = '/';
+  url.search = '';
+  url.hash = '';
+  window.location.replace(url.toString());
+}
+
+/**
  * Récupère l'URL du backend
  * 
  * Côté client: lit depuis localStorage, puis env, puis défaut
