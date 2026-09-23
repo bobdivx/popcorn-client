@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import {
   Play,
   RotateCw,
@@ -137,6 +137,18 @@ export function ActionButtons({
   const isTV = isTVPlatform();
   const [showSeriesPathModal, setShowSeriesPathModal] = useState(false);
   const [showMoreActions, setShowMoreActions] = useState(false);
+  // Reste vrai après le clic, jusqu'à la fin ou l'annulation. Sinon la carte
+  // disparaît dès que downloadingToClient repasse à false (torrent encore à 0 %).
+  const [downloadSession, setDownloadSession] = useState(false);
+  useEffect(() => {
+    if (downloadingToClient) {
+      setDownloadSession(true);
+      return;
+    }
+    const state = (torrentStats?.state || '').toLowerCase();
+    const finished = state === 'completed' || state === 'seeding' || isAvailableLocally;
+    if (!torrentStats || finished) setDownloadSession(false);
+  }, [downloadingToClient, torrentStats, isAvailableLocally]);
   const hasSavedPosition = savedPlaybackPosition !== null && savedPlaybackPosition !== undefined && savedPlaybackPosition > 0;
 
   const stateLower = typeof torrentStats?.state === 'string' ? torrentStats.state.toLowerCase() : '';
@@ -173,19 +185,30 @@ export function ActionButtons({
     (torrentStats.download_speed ?? 0) === 0 &&
     (torrentStats.peers_connected ?? 0) === 0;
 
+  // Clic « Télécharger » : afficher la carte tout de suite (queued / 0 pair / 0 %),
+  // sans attendre le premier octet. looksStaleQueuedZero ne s'applique qu'au
+  // rechargement de page (torrent déjà en file, sans activité).
+  const userJustStartedDownload =
+    downloadingToClient || (downloadSession && !!torrentStats);
+  const hideAsStaleQueued = looksStaleQueuedZero && !userJustStartedDownload;
+
   const hasActiveDownloadStats =
     !!torrentStats &&
     !isDownloadComplete &&
     !isAvailableLocally &&
-    !looksStaleQueuedZero &&
+    !hideAsStaleQueued &&
     !isChecking &&
-    phaseDerived.isActivelyDownloading;
+    (phaseDerived.isActivelyDownloading ||
+      (userJustStartedDownload &&
+        (phaseDerived.phase === 'resolving' ||
+          phaseDerived.phase === 'findingPeers' ||
+          phaseDerived.phase === 'downloading')));
 
   const isDownloadInProgress =
     ((!!torrentStats &&
       !isDownloadComplete &&
       !isAvailableLocally &&
-      !looksStaleQueuedZero &&
+      !hideAsStaleQueued &&
       !isChecking) ||
       downloadingToClient);
   const showProgressInButton = hasActiveDownloadStats;
@@ -268,15 +291,24 @@ export function ActionButtons({
   const moreActionClass =
     'w-full min-h-[56px] tv:min-h-[68px] inline-flex items-center gap-3 px-4 rounded-xl bg-white/10 border border-white/15 text-white text-left text-lg tv:text-xl font-medium focus:outline-none focus:ring-4 focus:ring-primary-600/70 disabled:opacity-40';
 
-  const showDownloadProgressCard =
+  const showFreshDownloadCard =
     !isStreamingThisTorrent &&
-    (showProgressNextToCancel || hasActiveDownloadStats || showCheckingStatus) &&
-    !!torrentStats;
+    !isDownloadComplete &&
+    !isAvailableLocally &&
+    userJustStartedDownload;
+  const showDownloadProgressCard =
+    showFreshDownloadCard ||
+    (!isStreamingThisTorrent &&
+      (showProgressNextToCancel || hasActiveDownloadStats || showCheckingStatus) &&
+      !!torrentStats);
+  const hidePrimaryForDownloadCard =
+    showFreshDownloadCard ||
+    (isDownloadInProgress && !!onCancelDownload && showProgressNextToCancel);
 
   const showPrimaryActionRow =
     ((!hidePrimaryPlayForTvSeries || !shouldShowPlayButton) &&
       shouldShowButton &&
-      !(isDownloadInProgress && onCancelDownload && showProgressNextToCancel)) ||
+      !hidePrimaryForDownloadCard) ||
     (!isTV && !!onDownloadAllEpisodes) ||
     showDownloadButtonAlongsidePlay ||
     (isTV && hasMoreActions) ||
@@ -327,7 +359,7 @@ export function ActionButtons({
         {/* Bouton Lire / Télécharger — gradient animé, rounded-full */}
         {(!hidePrimaryPlayForTvSeries || !shouldShowPlayButton) &&
           shouldShowButton &&
-          !(isDownloadInProgress && onCancelDownload && showProgressNextToCancel) && (
+          !hidePrimaryForDownloadCard && (
           <button
             onClick={() => {
               // Override pack : Play/Download portent sur l'épisode sélectionné (only_files).
@@ -413,7 +445,7 @@ export function ActionButtons({
         {/* Depuis le début — visible seulement s'il y a une position de reprise */}
         {!isTV &&
           showPlayFromStart &&
-          !(isDownloadInProgress && onCancelDownload && showProgressNextToCancel) &&
+          !hidePrimaryForDownloadCard &&
           !hidePrimaryPlayForTvSeries && (
           <button
             type="button"
