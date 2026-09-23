@@ -7,6 +7,7 @@ import TorrentCardsShadowLoader from '../ui/TorrentCardsShadowLoader';
 import { CarouselSection } from '../page-model/CarouselSection';
 import { PageContainer } from '../page-model/PageContainer';
 import { PageHeader } from '../page-model/PageHeader';
+import { RequestAssist } from '../ai/RequestAssist';
 import { PosterCard } from '../page-model/PosterCard';
 import { pickHeroItems } from '../dashboard/utils/browsePriority';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
@@ -286,6 +287,13 @@ export default function DemandesPage() {
       <PageHeader title={t('nav.demandes')} subtitle={t('discover.pageSubtitle')} />
 
       <div className="px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 pb-2">
+        <RequestAssist
+          onCreated={() => {
+            serverApi.listMediaRequests({ limit: 50 }).then((res) => {
+              if (res.success && res.data) setMyRequests(res.data);
+            });
+          }}
+        />
         <label className="block">
           <span className="sr-only">{t('requests.searchPlaceholder')}</span>
           <input

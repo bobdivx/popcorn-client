@@ -8,6 +8,8 @@ import { isTVPlatform } from '../lib/utils/device-detection';
 import { tvBrowseItemKey } from '../lib/tv-browse-restore';
 import { TvOnScreenKeyboard } from './tv/TvOnScreenKeyboard';
 import { DsLoader } from './ui/DsLoader';
+import { SearchAssist } from './ai/SearchAssist';
+import { isAiEnabled } from '../lib/ai/prefs';
 
 const SEARCH_HISTORY_KEY = 'popcorn_search_history';
 const SEARCH_HISTORY_MAX = 10;
@@ -966,6 +968,7 @@ export default function Search({ onResultClick }: SearchProps) {
   const [searchPhase, setSearchPhase] = useState<SearchPhase>('idle');
   const [searchLive, setSearchLive] = useState<SearchLiveProgressState>(() => initialSearchLiveProgress());
   const [error, setError] = useState<string | null>(null);
+  const [aiSummary, setAiSummary] = useState('');
   const [searchHistory, setSearchHistory] = useState<string[]>(() => getSearchHistory());
   const [blockedKeys, setBlockedKeys] = useState<Set<string>>(() => new Set());
   const inputRef = useRef<HTMLInputElement>(null);
@@ -1164,11 +1167,32 @@ export default function Search({ onResultClick }: SearchProps) {
   }, [language, openResult, t]);
 
   const handleSearch = useCallback(async (termOverride?: string) => {
-    const searchTerm = (termOverride ?? query).trim();
+    let searchTerm = (termOverride ?? query).trim();
+    let activeType = type;
     if (!searchTerm) {
       setResults([]);
       setTmdbFallbackResults([]);
+      setAiSummary('');
       return;
+    }
+    if (isAiEnabled()) {
+      const interpreted = await serverApi.aiSearch({
+        locale: language === 'en' ? 'en' : 'fr',
+        query: searchTerm,
+      });
+      if (interpreted.success && interpreted.data?.rewritten && interpreted.data.query.trim()) {
+        searchTerm = interpreted.data.query.trim();
+        setAiSummary(interpreted.data.summary || '');
+        const kind = interpreted.data.media_type;
+        if (kind === 'movie' || kind === 'tv') {
+          activeType = kind;
+          setType(kind);
+        }
+      } else {
+        setAiSummary('');
+      }
+    } else {
+      setAiSummary('');
     }
     setQuery(searchTerm);
     addSearchToHistory(searchTerm);
@@ -1184,8 +1208,8 @@ export default function Search({ onResultClick }: SearchProps) {
       return;
     }
 
-    const typeParam = type === 'all' ? undefined : type;
-    const cacheKey = `tmdb_pick_${SEARCH_CACHE_VERSION}_${searchTerm}_${type}_${language}`;
+    const typeParam = activeType === 'all' ? undefined : activeType;
+    const cacheKey = `tmdb_pick_${SEARCH_CACHE_VERSION}_${searchTerm}_${activeType}_${language}`;
     const cached = CacheManager.get<SearchResult[]>(cacheKey);
     if (cached && cached.length > 0) {
       setTmdbFallbackResults(cached);
@@ -1329,6 +1353,15 @@ export default function Search({ onResultClick }: SearchProps) {
               </p>
             )}
           </div>
+
+          <SearchAssist
+            summary={aiSummary}
+            onPick={(phrase) => {
+              const next = [query, phrase].filter(Boolean).join(' ').trim();
+              setQuery(next);
+              void handleSearch(next);
+            }}
+          />
 
           <form
             className="w-full"

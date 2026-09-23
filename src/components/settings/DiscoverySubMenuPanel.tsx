@@ -9,7 +9,7 @@ import QuotaAdminPanel from './QuotaAdminPanel';
 import { SettingsNavCard } from './SettingsNavCard';
 import { SettingsSubPageFrame } from './SettingsSubPageFrame';
 
-const BASE_URL = '/settings?category=discovery';
+const BASE_URL = '/settings/discovery/';
 
 const DISCOVERY_SUBS = ['sliders', 'requests', 'blacklist', 'quotas'] as const;
 type DiscoverySub = (typeof DISCOVERY_SUBS)[number];
@@ -56,50 +56,29 @@ export default function DiscoverySubMenuPanel() {
 
   if (!canAccess('settings.server' as any)) return null;
 
-  if (sub === 'sliders') {
-    const item = DISCOVERY_ITEMS.find((i) => i.id === 'sliders')!;
-    return (
-      <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}>
-        <DiscoverSlidersManager />
-      </SettingsSubPageFrame>
-    );
-  }
-  if (sub === 'requests') {
-    const item = DISCOVERY_ITEMS.find((i) => i.id === 'requests')!;
-    return (
-      <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}>
-        <RequestsAdminManager />
-      </SettingsSubPageFrame>
-    );
-  }
-  if (sub === 'blacklist') {
-    const item = DISCOVERY_ITEMS.find((i) => i.id === 'blacklist')!;
-    return (
-      <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}>
-        <BlacklistManager />
-      </SettingsSubPageFrame>
-    );
-  }
-  if (sub === 'quotas') {
-    const item = DISCOVERY_ITEMS.find((i) => i.id === 'quotas')!;
-    return (
-      <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}>
-        <QuotaAdminPanel />
-      </SettingsSubPageFrame>
-    );
-  }
+  const detailItem = DISCOVERY_ITEMS.find((i) => i.id === sub);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
-      {DISCOVERY_ITEMS.map((item) => (
-        <SettingsNavCard
-          key={item.id}
-          href={`${BASE_URL}&sub=${item.id}`}
-          icon={item.icon}
-          title={t(item.titleKey)}
-          description={t(item.descriptionKey)}
-        />
-      ))}
-    </div>
+    <>
+      <div className="hub-grid" data-tv-list role="list">
+        {DISCOVERY_ITEMS.map((item) => (
+          <SettingsNavCard
+            key={item.id}
+            href={`${BASE_URL}?sub=${item.id}`}
+            icon={item.icon}
+            title={t(item.titleKey)}
+            description={t(item.descriptionKey)}
+          />
+        ))}
+      </div>
+      {detailItem && (
+        <SettingsSubPageFrame backHref={BASE_URL} icon={detailItem.icon} title={t(detailItem.titleKey)} description={t(detailItem.descriptionKey)}>
+          {sub === 'sliders' && <DiscoverSlidersManager />}
+          {sub === 'requests' && <RequestsAdminManager />}
+          {sub === 'blacklist' && <BlacklistManager />}
+          {sub === 'quotas' && <QuotaAdminPanel />}
+        </SettingsSubPageFrame>
+      )}
+    </>
   );
 }

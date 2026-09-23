@@ -462,6 +462,7 @@ export class ServerApiClientBase {
     if (endpoint.includes('/api/library/integrity/delete')) return 120000;
     if (endpoint.includes('/api/library/uploader/generate-screenshots')) return 120000;
     if (endpoint.includes('/api/admin/deployment/webos/')) return 600000;
+    if (endpoint.includes('/api/client/ai/')) return 4000;
     if (endpoint.includes('/health') || endpoint.includes('/api/client/health')) {
       const isAndroid = typeof window !== 'undefined' && /Android/i.test(navigator.userAgent || '');
       // Aligné sur le probe health serveur (~1.5s librqbit) + marge réseau.

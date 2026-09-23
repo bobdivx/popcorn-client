@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { ArrowRight, ChevronLeft } from 'lucide-preact';
 import type { ComponentType } from 'preact';
+import { HubModal } from './hub/HubModal';
+import { HubTile } from './hub/HubTile';
 
 export interface SubMenuItem {
   id: string;
@@ -10,7 +11,7 @@ export interface SubMenuItem {
   title?: string;
   descriptionKey: string;
   description?: string;
-  icon: ComponentType<{ className?: string }>;
+  icon: ComponentType<any>;
   permission?: string;
   href?: string;
   hrefFn?: () => string;
@@ -27,12 +28,11 @@ interface SubMenuPanelProps {
   onParentBack?: () => void;
 }
 
-export default function SubMenuPanel({ items, visibleItems, onParentBack }: SubMenuPanelProps) {
+export default function SubMenuPanel({ visibleItems, onParentBack }: SubMenuPanelProps) {
   const { t } = useI18n();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Permettre à la télécommande (Escape/Back) de revenir dans les sous-menus
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -46,109 +46,63 @@ export default function SubMenuPanel({ items, visibleItems, onParentBack }: SubM
   }, [selectedId]);
 
   const selectedItem = selectedId ? visibleItems.find((i) => i.id === selectedId) : null;
-
-  if (selectedItem?.inlineContent) {
-    const ContentComponent = selectedItem.inlineContent!;
-    const isNested = selectedItem.nestedSubMenu === true;
-    const showBackButton = !isNested;
-    const handleParentBack = () => setSelectedId(null);
-
-    return (
-      <div ref={containerRef} className="flex-1 flex flex-col py-4 px-4 sm:px-6 overflow-hidden">
-        {showBackButton && (
-          <button
-            type="button"
-            onClick={handleParentBack}
-            data-focusable
-            tabIndex={0}
-            className="flex items-center gap-2 ds-text-secondary hover:text-[var(--ds-text-primary)] mb-4 text-sm font-medium tv:min-h-[48px] tv:py-2 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] rounded-lg"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            {t('common.back')}
-          </button>
-        )}
-        <div className="flex-1 overflow-y-auto scrollbar-visible">
-          {isNested ? (
-            <ContentComponent onParentBack={handleParentBack} />
-          ) : (
-            <ContentComponent onBack={handleParentBack} />
-          )}
-        </div>
-      </div>
-    );
-  }
+  const ContentComponent = selectedItem?.inlineContent;
 
   return (
-    <div ref={containerRef} className="flex-1 py-4 px-4 sm:px-6 overflow-y-auto scrollbar-visible">
+    <div ref={containerRef}>
       {onParentBack && (
-        <button
-          type="button"
-          onClick={onParentBack}
-          data-focusable
-          tabIndex={0}
-          className="flex items-center gap-2 ds-text-secondary hover:text-[var(--ds-text-primary)] mb-4 text-sm font-medium tv:min-h-[48px] tv:py-2 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] rounded-lg"
-        >
-          <ChevronLeft className="w-4 h-4" />
-          {t('common.back')}
-        </button>
+        <div class="hub-back-row" data-tv-list-header>
+          <button type="button" onClick={onParentBack} data-focusable data-tv-page-action tabIndex={0} class="hub-back">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+            {t('common.back')}
+          </button>
+        </div>
       )}
-      <ul className="space-y-0.5" role="list">
+      <div class="hub-grid" data-tv-list role="list">
         {visibleItems.map((item) => {
-          const Icon = item.icon;
           const href = item.hrefFn ? item.hrefFn() : item.href;
-          const isLink = !!href;
-          const externalProps = item.isExternal
-            ? { target: '_blank' as const, rel: 'noopener noreferrer' }
-            : {};
-          if (isLink) {
+          const title = item.title ?? t(item.titleKey);
+          const hint = item.description ?? t(item.descriptionKey);
+          if (href) {
             return (
-              <li key={item.id}>
-                <a
-                  href={href}
-                  {...externalProps}
-                  data-focusable
-                  class="sc-list-item"
-                  tabIndex={0}
-                >
-                  <div className="sc-list-icon">
-                    <Icon className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0 overflow-hidden">
-                    <span className="sc-list-text-title block truncate">{item.title ?? t(item.titleKey)}</span>
-                    <span className="sc-list-text-desc block truncate">
-                      {item.description ?? t(item.descriptionKey)}
-                    </span>
-                  </div>
-                  <ArrowRight className="sc-list-arrow w-4 h-4" />
-                </a>
-              </li>
+              <HubTile
+                key={item.id}
+                href={href}
+                isExternal={item.isExternal}
+                icon={item.icon}
+                title={title}
+                hint={hint}
+              />
             );
           }
-
           return (
-            <li key={item.id}>
-              <button
-                type="button"
-                onClick={() => setSelectedId(item.id)}
-                data-focusable
-                class="sc-list-item"
-                tabIndex={0}
-              >
-                <div className="sc-list-icon">
-                  <Icon className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0 overflow-hidden">
-                  <span className="sc-list-text-title block truncate">{item.title ?? t(item.titleKey)}</span>
-                  <span className="sc-list-text-desc block truncate">
-                    {item.description ?? t(item.descriptionKey)}
-                  </span>
-                </div>
-                <ArrowRight className="sc-list-arrow w-4 h-4" />
-              </button>
-            </li>
+            <HubTile
+              key={item.id}
+              icon={item.icon}
+              title={title}
+              hint={hint}
+              onClick={() => setSelectedId(item.id)}
+            />
           );
         })}
-      </ul>
+      </div>
+      {selectedItem && ContentComponent && (
+        <HubModal
+          open
+          title={selectedItem.title ?? t(selectedItem.titleKey)}
+          description={selectedItem.description ?? t(selectedItem.descriptionKey)}
+          onClose={() => setSelectedId(null)}
+          size="xl"
+        >
+          {selectedItem.nestedSubMenu ? (
+            <ContentComponent onParentBack={() => setSelectedId(null)} />
+          ) : (
+            <ContentComponent onBack={() => setSelectedId(null)} />
+          )}
+        </HubModal>
+      )}
     </div>
   );
 }

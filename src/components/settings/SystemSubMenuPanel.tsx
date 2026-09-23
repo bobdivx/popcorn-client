@@ -14,7 +14,7 @@ import { SettingsSubPageFrame } from './SettingsSubPageFrame';
 import { Bell, Settings, Package, Activity, HardDrive } from 'lucide-preact';
 import { useConfirmDialog } from '../ui/useConfirmDialog';
 
-const BASE_URL = '/settings?category=system';
+const BASE_URL = '/settings/system/';
 
 const SYSTEM_SUBS = ['setup', 'hard-reset', 'versions', 'storage', 'diagnostics', 'notifications'] as const;
 type SystemSub = (typeof SYSTEM_SUBS)[number];
@@ -128,7 +128,7 @@ type SystemItem = {
 
 const SYSTEM_ITEMS: SystemItem[] = [
   { id: 'setup', titleKey: 'settingsMenu.setup.title', descriptionKey: 'settingsMenu.setup.description', icon: Settings },
-  { id: 'notifications', titleKey: 'notificationSettings.title', descriptionKey: 'notificationSettings.description', icon: Bell },
+  { id: 'notifications', titleKey: 'settings.notificationSettings.title', descriptionKey: 'settings.notificationSettings.description', icon: Bell },
   { id: 'hard-reset', titleKey: 'versionInfo.hardResetTitle', descriptionKey: 'versionInfo.hardResetDescription', icon: Settings },
   { id: 'versions', titleKey: 'settingsMenu.versions.title', descriptionKey: 'settingsMenu.versions.description', icon: Package },
   { id: 'storage', titleKey: 'settingsMenu.storage.title', descriptionKey: 'settingsMenu.storage.description', icon: HardDrive },
@@ -156,27 +156,30 @@ export default function SystemSubMenuPanel() {
 
   if (!canAccess('settings.server' as any)) return null;
 
-  if (sub) {
-    const item = SYSTEM_ITEMS.find((i) => i.id === sub)!;
-    if (sub === 'setup') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><SetupSection embedded /></SettingsSubPageFrame>;
-    if (sub === 'notifications') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><NotificationSettings /></SettingsSubPageFrame>;
-    if (sub === 'hard-reset') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><HardResetSection embedded /></SettingsSubPageFrame>;
-    if (sub === 'versions') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><VersionInfo /></SettingsSubPageFrame>;
-    if (sub === 'storage') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><StoragePanel /></SettingsSubPageFrame>;
-    if (sub === 'diagnostics') return <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}><DiagnosticsPanel /></SettingsSubPageFrame>;
+  if (sub === 'notifications') {
+    return <NotificationSettings />;
   }
 
+  const detailItem = sub ? SYSTEM_ITEMS.find((i) => i.id === sub) : null;
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
-      {SYSTEM_ITEMS.map((item) => (
-        <SettingsNavCard
-          key={item.id}
-          href={`${BASE_URL}&sub=${item.id}`}
-          icon={item.icon}
-          title={t(item.titleKey)}
-          description={t(item.descriptionKey)}
-        />
-      ))}
-    </div>
+    <>
+      <div className="hub-grid" data-tv-list role="list">
+        {SYSTEM_ITEMS.map((item) => (
+          <SettingsNavCard
+            key={item.id}
+            href={`${BASE_URL}?sub=${item.id}`}
+            icon={item.icon}
+            title={t(item.titleKey)}
+            description={t(item.descriptionKey)}
+          />
+        ))}
+      </div>
+      {detailItem && sub === 'setup' && <SettingsSubPageFrame backHref={BASE_URL} icon={detailItem.icon} title={t(detailItem.titleKey)} description={t(detailItem.descriptionKey)}><SetupSection embedded /></SettingsSubPageFrame>}
+      {detailItem && sub === 'hard-reset' && <SettingsSubPageFrame backHref={BASE_URL} icon={detailItem.icon} title={t(detailItem.titleKey)} description={t(detailItem.descriptionKey)}><HardResetSection embedded /></SettingsSubPageFrame>}
+      {detailItem && sub === 'versions' && <SettingsSubPageFrame backHref={BASE_URL} icon={detailItem.icon} title={t(detailItem.titleKey)} description={t(detailItem.descriptionKey)}><VersionInfo /></SettingsSubPageFrame>}
+      {detailItem && sub === 'storage' && <SettingsSubPageFrame backHref={BASE_URL} icon={detailItem.icon} title={t(detailItem.titleKey)} description={t(detailItem.descriptionKey)}><StoragePanel /></SettingsSubPageFrame>}
+      {detailItem && sub === 'diagnostics' && <SettingsSubPageFrame backHref={BASE_URL} icon={detailItem.icon} title={t(detailItem.titleKey)} description={t(detailItem.descriptionKey)}><DiagnosticsPanel /></SettingsSubPageFrame>}
+    </>
   );
 }

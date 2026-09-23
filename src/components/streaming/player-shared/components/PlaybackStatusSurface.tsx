@@ -4,6 +4,7 @@ import { useI18n } from '../../../../lib/i18n/useI18n';
 import { formatBytes, formatSpeed, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
 import { generateQRCode } from '../../../../lib/utils/qrcode';
 import { friendlyPlaybackHint, pipelineHeadline, type PlaybackPipelineStatus } from '../../../../lib/streaming/playbackPipeline';
+import { DiagnoseAssist } from '../../../ai/DiagnoseAssist';
 import { PlaybackLiveTrace } from './PlaybackLiveTrace';
 import type { PlaybackLiveTraceState } from '../hooks/usePlaybackLiveTrace';
 import GpuPlaybackChip from './GpuPlaybackChip';
@@ -696,6 +697,7 @@ export function PlaybackStatusSurface({
                     t('playback.errorStream')
                   : errorMessage || progressMessage || t('playback.errorStream')}
               </p>
+              <DiagnoseAssist message={errorMessage} />
               {sparseOrEmpty && onDeleteEmptyFiles && confirmingDeleteEmpty ? (
                 <div className="w-full rounded-2xl border border-white/15 bg-black/45 px-4 py-3 text-center space-y-3 mb-4">
                   <p className="text-sm text-white/85">

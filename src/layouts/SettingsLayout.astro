@@ -1,8 +1,8 @@
 ---
 import Layout from './Layout.astro';
-import SettingsSidebar from '../components/settings/SettingsSidebar';
-import SettingsMobileMenuTrigger from '../components/settings/SettingsMobileMenuTrigger';
 import TranscodeWarningBanner from '../components/settings/TranscodeWarningBanner';
+import SettingsHubBack from '../components/settings/SettingsHubBack';
+import '../styles/settings-hub.css';
 
 interface Props {
   title?: string;
@@ -16,20 +16,13 @@ const { title = 'Paramètres - Popcorn Client' } = Astro.props;
   <TranscodeWarningBanner client:only="preact" />
   
   <div class="ds-page settings-page flex w-full" data-page="settings" data-tv-settings-container>
-    <aside transition:persist="settings-sidebar" class="settings-sidebar-wrapper w-0 flex-shrink-0 md:w-72 xl:w-80 self-stretch">
-      {/* idle : priorise le contenu principal, sidebar hydrate juste après */}
-      <SettingsSidebar client:idle />
-    </aside>
     <div
-      class="settings-content-area flex-1 min-w-0 min-h-0 overflow-x-hidden overflow-y-auto pl-[max(0.75rem,env(safe-area-inset-left,0px))] pr-3 sm:px-6 md:px-6 pb-[env(safe-area-inset-bottom,0px)]"
+      class="settings-content-area flex-1 min-w-0 min-h-0 overflow-x-hidden overflow-y-auto pt-4"
       transition:name="settings-content"
       data-tv-settings-content
     >
-      <div class="md:hidden h-14 shrink-0" aria-hidden />
+      <SettingsHubBack client:load />
       <slot />
-    </div>
-    <div class="settings-mobile-menu-trigger-host md:hidden">
-      <SettingsMobileMenuTrigger client:idle />
     </div>
   </div>
 </Layout>
@@ -39,49 +32,28 @@ const { title = 'Paramètres - Popcorn Client' } = Astro.props;
    * Rend <main> un conteneur flex avec overflow:hidden pour que settings-page
    * puisse utiliser flex:1 et remplir exactement la hauteur visible (viewport - navbar).
    */
+  /* Un seul scroll : la page. Un conteneur interne en overflow:hidden coupait le bas. */
   .app-main:has(.settings-page) {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    display: block;
+    overflow: visible;
+    height: auto;
   }
-
-  /* Mobile : un seul scroll (la page), pas un nested overflow qui piège le doigt sur les cartes. */
-  @media (max-width: 767px) {
-    .app-main:has(.settings-page) {
-      display: block;
-      overflow: visible;
-      height: auto;
-    }
-    .settings-page {
-      display: block !important;
-      min-height: 0;
-      height: auto;
-      flex: none;
-    }
-    /* Aside réservé desktop : ne doit pas occuper de hauteur (drawer = fixed). */
-    .settings-sidebar-wrapper {
-      height: 0;
-      min-height: 0;
-      overflow: visible;
-    }
-    .settings-content-area {
-      overflow: visible !important;
-      max-height: none;
-    }
-  }
-
-  /* Fond de la page settings — adaptatif selon le thème / pack */
   .settings-page {
-    background: #07070e;
+    display: block !important;
+    height: auto !important;
+    flex: none !important;
+    overflow: visible !important;
   }
-  [data-theme="light"] .settings-page {
-    background: var(--ds-surface);
+  .settings-content-area {
+    overflow: visible !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    padding-bottom: max(6rem, calc(4rem + env(safe-area-inset-bottom, 0px))) !important;
   }
-  html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-page {
-    background: #e6e6e8;
-  }
-  html[data-ui-pack="tesla"][data-theme="dark"] .settings-page {
-    background: var(--ds-surface, #111113);
+
+  .settings-page {
+    background: var(--page-bg);
   }
 
   /* ── Animations de navigation settings ── */

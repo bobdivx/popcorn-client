@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import {
   Bell,
   Hash,
@@ -21,6 +21,9 @@ import { useSeedingHealth } from '../../hooks/useSeedingHealth';
 import { useConnectivityAlert } from '../../hooks/useConnectivityAlert';
 import { DsLoader } from '../ui/DsLoader';
 import { useNativeNotifications } from '../../hooks/useNativeNotifications';
+import { HubTile } from './hub/HubTile';
+
+type NotifyPanel = 'alerts' | 'native' | 'history' | 'system' | 'slack' | 'discord' | 'telegram' | 'webhook' | 'email';
 
 interface NotificationSettingsData {
   webhook_enabled: boolean;
@@ -81,6 +84,19 @@ export default function NotificationSettings() {
   const [history, setHistory] = useState<SentNotificationItem[]>([]);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [nativeBusy, setNativeBusy] = useState(false);
+  const [panel, setPanel] = useState<NotifyPanel | null>(null);
+  const detailRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    const el = detailRef.current as (HTMLFormElement & { _tvBack?: () => void }) | null;
+    if (!el || !panel) return;
+    el.setAttribute('data-tv-back-handler', '');
+    el._tvBack = () => setPanel(null);
+    return () => {
+      el.removeAttribute('data-tv-back-handler');
+      delete el._tvBack;
+    };
+  }, [panel]);
 
   useEffect(() => {
     fetchSettings();
@@ -133,16 +149,16 @@ export default function NotificationSettings() {
     try {
       const granted = await requestPermission();
       if (granted) {
-        setMessage({ type: 'success', text: t('notificationSettings.nativeGranted') });
+        setMessage({ type: 'success', text: t('settings.notificationSettings.nativeGranted') });
         await notifySuccess(
-          t('notificationSettings.nativeTestTitle'),
-          t('notificationSettings.nativeTestBody')
+          t('settings.notificationSettings.nativeTestTitle'),
+          t('settings.notificationSettings.nativeTestBody')
         );
       } else {
-        setMessage({ type: 'error', text: t('notificationSettings.nativeDenied') });
+        setMessage({ type: 'error', text: t('settings.notificationSettings.nativeDenied') });
       }
     } catch {
-      setMessage({ type: 'error', text: t('notificationSettings.nativeDenied') });
+      setMessage({ type: 'error', text: t('settings.notificationSettings.nativeDenied') });
     } finally {
       setNativeBusy(false);
     }
@@ -155,7 +171,7 @@ export default function NotificationSettings() {
     try {
       const res = await serverApi.updateNotificationSettings(settings as any);
       if (res.success) {
-        setMessage({ type: 'success', text: t('notificationSettings.saveSuccess') });
+        setMessage({ type: 'success', text: t('settings.notificationSettings.saveSuccess') });
       } else {
         setMessage({ type: 'error', text: res.message || t('errors.generic') });
       }
@@ -177,12 +193,12 @@ export default function NotificationSettings() {
 
   const nativeStatusLabel =
     permissionStatus === 'granted'
-      ? t('notificationSettings.nativeStatusGranted')
+      ? t('settings.notificationSettings.nativeStatusGranted')
       : permissionStatus === 'denied'
-        ? t('notificationSettings.nativeStatusDenied')
+        ? t('settings.notificationSettings.nativeStatusDenied')
         : permissionStatus === 'pending'
           ? t('common.loading')
-          : t('notificationSettings.nativeStatusUnknown');
+          : t('settings.notificationSettings.nativeStatusUnknown');
 
   if (loading) {
     return (
@@ -198,9 +214,42 @@ export default function NotificationSettings() {
     : t('connectivity.warningTitle');
   const alertDetail = diagnostic?.warnings?.[0] || t('connectivity.defaultDetail');
 
+  const connected = t('settingsMenu.hub.connected');
+  const limited = t('settingsMenu.hub.limited');
+  const disabled = t('settingsMenu.hub.disabled');
+  const flag = (on: boolean) => (on ? 'connected' : 'disabled') as 'connected' | 'disabled';
+  const flagLabel = (on: boolean) => (on ? connected : disabled);
+
+  if (!panel) {
+    return (
+      <div class="hub-grid" data-tv-list role="list">
+        <HubTile icon={Bell} title={t('settings.notificationSettings.activeAlertsTitle')} hint={t('settings.notificationSettings.activeAlertsDescription')} status={hasActiveAlert ? 'limited' : 'connected'} statusLabel={hasActiveAlert ? limited : connected} onClick={() => setPanel('alerts')} />
+        <HubTile icon={Smartphone} title={t('settings.notificationSettings.nativeTitle')} hint={t('settings.notificationSettings.nativeDescription')} status={permissionStatus === 'granted' ? 'connected' : permissionStatus === 'denied' ? 'disabled' : 'limited'} statusLabel={nativeStatusLabel} onClick={() => setPanel('native')} />
+        <HubTile icon={History} title={t('settings.notificationSettings.historyTitle')} hint={t('settings.notificationSettings.historyDescription')} onClick={() => setPanel('history')} />
+        <HubTile icon={Hash} title={t('settings.notificationSettings.systemTitle')} hint={t('settings.notificationSettings.systemEnabled')} status={flag(settings.system_enabled)} statusLabel={flagLabel(settings.system_enabled)} onClick={() => setPanel('system')} />
+        <HubTile icon={MessageSquare} title={t('settings.notificationSettings.slackTitle')} status={flag(settings.slack_enabled)} statusLabel={flagLabel(settings.slack_enabled)} onClick={() => setPanel('slack')} />
+        <HubTile icon={Globe} title={t('settings.notificationSettings.discordTitle')} status={flag(settings.discord_enabled)} statusLabel={flagLabel(settings.discord_enabled)} onClick={() => setPanel('discord')} />
+        <HubTile icon={Send} title={t('settings.notificationSettings.telegramTitle')} status={flag(settings.telegram_enabled)} statusLabel={flagLabel(settings.telegram_enabled)} onClick={() => setPanel('telegram')} />
+        <HubTile icon={Globe} title={t('settings.notificationSettings.webhookTitle')} status={flag(settings.webhook_enabled)} statusLabel={flagLabel(settings.webhook_enabled)} onClick={() => setPanel('webhook')} />
+        <HubTile icon={Mail} title={t('settings.notificationSettings.emailTitle')} status={flag(settings.email_enabled)} statusLabel={flagLabel(settings.email_enabled)} onClick={() => setPanel('email')} />
+      </div>
+    );
+  }
+
+  const savable = panel === 'system' || panel === 'slack' || panel === 'discord' || panel === 'telegram' || panel === 'webhook' || panel === 'email';
+
   return (
-    <form onSubmit={handleSave} className="space-y-6">
+    <form ref={detailRef} onSubmit={handleSave} className="space-y-6">
+      <div class="hub-back-row">
+        <button type="button" class="hub-back" data-focusable data-tv-page-action tabIndex={0} onClick={() => setPanel(null)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 18l-6-6 6-6" />
+          </svg>
+          {t('common.back')}
+        </button>
+      </div>
       <div className="flex flex-col gap-6">
+        {panel === 'alerts' && (<>
         {/* Active alerts (same as avatar badge) */}
         <section className="sc-frame">
           <div className="sc-frame-body space-y-4">
@@ -210,10 +259,10 @@ export default function NotificationSettings() {
             </div>
             <div>
               <h3 className="text-lg font-semibold text-white">
-                {t('notificationSettings.activeAlertsTitle')}
+                {t('settings.notificationSettings.activeAlertsTitle')}
               </h3>
               <p className="text-sm ds-text-secondary">
-                {t('notificationSettings.activeAlertsDescription')}
+                {t('settings.notificationSettings.activeAlertsDescription')}
               </p>
             </div>
           </div>
@@ -223,7 +272,7 @@ export default function NotificationSettings() {
           )}
 
           {!seedingLoading && !diagnostic && (
-            <p className="text-sm ds-text-tertiary">{t('notificationSettings.noActiveAlerts')}</p>
+            <p className="text-sm ds-text-tertiary">{t('settings.notificationSettings.noActiveAlerts')}</p>
           )}
 
           {!seedingLoading && diagnostic && !hasActiveAlert && !hasHiddenAlert && (
@@ -231,10 +280,10 @@ export default function NotificationSettings() {
               <CheckCircle2 className="w-5 h-5 text-green-400 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm font-medium text-white">
-                  {t('notificationSettings.seedingOkTitle')}
+                  {t('settings.notificationSettings.seedingOkTitle')}
                 </p>
                 <p className="text-xs ds-text-secondary mt-1">
-                  {t('notificationSettings.seedingOkDetail', {
+                  {t('settings.notificationSettings.seedingOkDetail', {
                     count: String(diagnostic.total_seeding ?? 0),
                   })}
                 </p>
@@ -275,7 +324,7 @@ export default function NotificationSettings() {
                     onClick={() => refetchSeeding()}
                     className="btn btn-ghost btn-sm"
                   >
-                    {t('notificationSettings.refreshAlert')}
+                    {t('settings.notificationSettings.refreshAlert')}
                   </button>
                   <button
                     type="button"
@@ -293,16 +342,18 @@ export default function NotificationSettings() {
           {hasHiddenAlert && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
               <p className="text-sm ds-text-secondary">
-                {t('notificationSettings.alertDismissedHint')}
+                {t('settings.notificationSettings.alertDismissedHint')}
               </p>
               <button type="button" onClick={restore} className="btn btn-ghost btn-sm shrink-0">
-                {t('notificationSettings.restoreAlert')}
+                {t('settings.notificationSettings.restoreAlert')}
               </button>
             </div>
           )}
           </div>
         </section>
+        </>)}
 
+        {panel === 'native' && (<>
         {/* Native / device notifications */}
         <section className="sc-frame">
           <div className="sc-frame-body space-y-4">
@@ -313,10 +364,10 @@ export default function NotificationSettings() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-white">
-                  {t('notificationSettings.nativeTitle')}
+                  {t('settings.notificationSettings.nativeTitle')}
                 </h3>
                 <p className="text-sm ds-text-secondary">
-                  {t('notificationSettings.nativeDescription')}
+                  {t('settings.notificationSettings.nativeDescription')}
                 </p>
               </div>
             </div>
@@ -324,7 +375,7 @@ export default function NotificationSettings() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 p-3">
             <div>
               <p className="text-sm text-white font-medium">
-                {t('notificationSettings.nativeStatusLabel')}
+                {t('settings.notificationSettings.nativeStatusLabel')}
               </p>
               <p className="text-xs ds-text-secondary mt-0.5">{nativeStatusLabel}</p>
             </div>
@@ -337,7 +388,7 @@ export default function NotificationSettings() {
               >
                 {nativeBusy || permissionStatus === 'pending'
                   ? t('common.loading')
-                  : t('notificationSettings.nativeEnable')}
+                  : t('settings.notificationSettings.nativeEnable')}
               </button>
             )}
             {permissionStatus === 'granted' && (
@@ -347,10 +398,10 @@ export default function NotificationSettings() {
                   setNativeBusy(true);
                   try {
                     await notifySuccess(
-                      t('notificationSettings.nativeTestTitle'),
-                      t('notificationSettings.nativeTestBody')
+                      t('settings.notificationSettings.nativeTestTitle'),
+                      t('settings.notificationSettings.nativeTestBody')
                     );
-                    setMessage({ type: 'success', text: t('notificationSettings.nativeTestSent') });
+                    setMessage({ type: 'success', text: t('settings.notificationSettings.nativeTestSent') });
                   } finally {
                     setNativeBusy(false);
                   }
@@ -358,13 +409,15 @@ export default function NotificationSettings() {
                 disabled={nativeBusy}
                 className="btn btn-ghost btn-sm shrink-0"
               >
-                {t('notificationSettings.nativeSendTest')}
+                {t('settings.notificationSettings.nativeSendTest')}
               </button>
             )}
           </div>
           </div>
         </section>
+        </>)}
 
+        {panel === 'history' && (<>
         {/* History */}
         <section className="sc-frame">
           <div className="sc-frame-body space-y-4">
@@ -375,10 +428,10 @@ export default function NotificationSettings() {
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-white">
-                  {t('notificationSettings.historyTitle')}
+                  {t('settings.notificationSettings.historyTitle')}
                 </h3>
                 <p className="text-sm ds-text-secondary">
-                  {t('notificationSettings.historyDescription')}
+                  {t('settings.notificationSettings.historyDescription')}
                 </p>
               </div>
             </div>
@@ -388,7 +441,7 @@ export default function NotificationSettings() {
               disabled={historyLoading}
               className="btn btn-ghost btn-sm shrink-0"
             >
-              {t('notificationSettings.refreshAlert')}
+              {t('settings.notificationSettings.refreshAlert')}
             </button>
           </div>
 
@@ -396,7 +449,7 @@ export default function NotificationSettings() {
             <p className="text-sm ds-text-tertiary">{t('common.loading')}</p>
           )}
           {!historyLoading && history.length === 0 && (
-            <p className="text-sm ds-text-tertiary">{t('notificationSettings.historyEmpty')}</p>
+            <p className="text-sm ds-text-tertiary">{t('settings.notificationSettings.historyEmpty')}</p>
           )}
           {!historyLoading && history.length > 0 && (
             <ul className="divide-y divide-white/5 rounded-xl border border-white/10 overflow-hidden">
@@ -406,7 +459,7 @@ export default function NotificationSettings() {
                   className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 px-3 py-2.5 bg-white/[0.02]"
                 >
                   <span className="text-sm text-white">
-                    {t('notificationSettings.historyEpisode', {
+                    {t('settings.notificationSettings.historyEpisode', {
                       tmdb: String(item.tmdb_id),
                       season: String(item.season_number),
                       episode: String(item.episode_number),
@@ -421,7 +474,9 @@ export default function NotificationSettings() {
           )}
           </div>
         </section>
+        </>)}
 
+        {panel === 'system' && (<>
         {/* System Logs */}
         <section className="sc-frame">
           <div className="sc-frame-body space-y-4">
@@ -431,7 +486,7 @@ export default function NotificationSettings() {
                 <Hash className="w-5 h-5 text-primary-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">{t('notificationSettings.systemTitle')}</h3>
+                <h3 className="text-lg font-semibold text-white">{t('settings.notificationSettings.systemTitle')}</h3>
               </div>
             </div>
             <label className="ds-switch">
@@ -445,7 +500,9 @@ export default function NotificationSettings() {
           </div>
           </div>
         </section>
+        </>)}
 
+        {panel === 'slack' && (<>
         {/* Slack */}
         <section className="sc-frame">
           <div className="sc-frame-body space-y-4">
@@ -455,7 +512,7 @@ export default function NotificationSettings() {
                 <MessageSquare className="w-5 h-5 text-purple-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">{t('notificationSettings.slackTitle')}</h3>
+                <h3 className="text-lg font-semibold text-white">{t('settings.notificationSettings.slackTitle')}</h3>
               </div>
             </div>
             <label className="ds-switch">
@@ -470,7 +527,7 @@ export default function NotificationSettings() {
           {settings.slack_enabled && (
             <div className="ds-animate-fade-in space-y-3 pt-2">
               <div className="space-y-1">
-                <label className="text-sm ds-text-secondary">{t('notificationSettings.slackWebhookUrl')}</label>
+                <label className="text-sm ds-text-secondary">{t('settings.notificationSettings.slackWebhookUrl')}</label>
                 <input
                   type="password"
                   autoComplete="new-password"
@@ -479,13 +536,15 @@ export default function NotificationSettings() {
                   placeholder="https://hooks.slack.com/services/..."
                   className="ds-input w-full"
                 />
-                <p className="text-xs ds-text-tertiary">{t('notificationSettings.slackWebhookUrlHint')}</p>
+                <p className="text-xs ds-text-tertiary">{t('settings.notificationSettings.slackWebhookUrlHint')}</p>
               </div>
             </div>
           )}
           </div>
         </section>
+        </>)}
 
+        {panel === 'discord' && (<>
         {/* Discord */}
         <section className="sc-frame">
           <div className="sc-frame-body space-y-4">
@@ -495,7 +554,7 @@ export default function NotificationSettings() {
                 <Globe className="w-5 h-5 text-indigo-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">{t('notificationSettings.discordTitle')}</h3>
+                <h3 className="text-lg font-semibold text-white">{t('settings.notificationSettings.discordTitle')}</h3>
               </div>
             </div>
             <label className="ds-switch">
@@ -510,7 +569,7 @@ export default function NotificationSettings() {
           {settings.discord_enabled && (
             <div className="ds-animate-fade-in space-y-3 pt-2">
               <div className="space-y-1">
-                <label className="text-sm ds-text-secondary">{t('notificationSettings.discordWebhookUrl')}</label>
+                <label className="text-sm ds-text-secondary">{t('settings.notificationSettings.discordWebhookUrl')}</label>
                 <input
                   type="password"
                   autoComplete="new-password"
@@ -519,13 +578,15 @@ export default function NotificationSettings() {
                   placeholder="https://discord.com/api/webhooks/..."
                   className="ds-input w-full"
                 />
-                <p className="text-xs ds-text-tertiary">{t('notificationSettings.discordWebhookUrlHint')}</p>
+                <p className="text-xs ds-text-tertiary">{t('settings.notificationSettings.discordWebhookUrlHint')}</p>
               </div>
             </div>
           )}
           </div>
         </section>
+        </>)}
 
+        {panel === 'telegram' && (<>
         {/* Telegram */}
         <section className="sc-frame">
           <div className="sc-frame-body space-y-4">
@@ -535,7 +596,7 @@ export default function NotificationSettings() {
                 <Send className="w-5 h-5 text-blue-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">{t('notificationSettings.telegramTitle')}</h3>
+                <h3 className="text-lg font-semibold text-white">{t('settings.notificationSettings.telegramTitle')}</h3>
               </div>
             </div>
             <label className="ds-switch">
@@ -551,7 +612,7 @@ export default function NotificationSettings() {
             <div className="ds-animate-fade-in space-y-3 pt-2">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-sm ds-text-secondary">{t('notificationSettings.telegramBotToken')}</label>
+                  <label className="text-sm ds-text-secondary">{t('settings.notificationSettings.telegramBotToken')}</label>
                   <input
                     type="password"
                     autoComplete="new-password"
@@ -562,7 +623,7 @@ export default function NotificationSettings() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-sm ds-text-secondary">{t('notificationSettings.telegramChatId')}</label>
+                  <label className="text-sm ds-text-secondary">{t('settings.notificationSettings.telegramChatId')}</label>
                   <input
                     type="text"
                     value={settings.telegram_chat_id || ''}
@@ -572,12 +633,14 @@ export default function NotificationSettings() {
                   />
                 </div>
               </div>
-              <p className="text-xs ds-text-tertiary">{t('notificationSettings.telegramHint')}</p>
+              <p className="text-xs ds-text-tertiary">{t('settings.notificationSettings.telegramHint')}</p>
             </div>
           )}
           </div>
         </section>
+        </>)}
 
+        {panel === 'webhook' && (<>
         {/* Webhook */}
         <section className="sc-frame">
           <div className="sc-frame-body space-y-4">
@@ -587,7 +650,7 @@ export default function NotificationSettings() {
                 <Globe className="w-5 h-5 text-green-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">{t('notificationSettings.webhookTitle')}</h3>
+                <h3 className="text-lg font-semibold text-white">{t('settings.notificationSettings.webhookTitle')}</h3>
               </div>
             </div>
             <label className="ds-switch">
@@ -602,7 +665,7 @@ export default function NotificationSettings() {
           {settings.webhook_enabled && (
             <div className="ds-animate-fade-in space-y-3 pt-2">
               <div className="space-y-1">
-                <label className="text-sm ds-text-secondary">{t('notificationSettings.webhookUrl')}</label>
+                <label className="text-sm ds-text-secondary">{t('settings.notificationSettings.webhookUrl')}</label>
                 <input
                   type="password"
                   autoComplete="new-password"
@@ -611,13 +674,15 @@ export default function NotificationSettings() {
                   placeholder="https://votre-site.com/api/callback"
                   className="ds-input w-full"
                 />
-                <p className="text-xs ds-text-tertiary">{t('notificationSettings.webhookUrlHint')}</p>
+                <p className="text-xs ds-text-tertiary">{t('settings.notificationSettings.webhookUrlHint')}</p>
               </div>
             </div>
           )}
           </div>
         </section>
+        </>)}
 
+        {panel === 'email' && (<>
         {/* Email */}
         <section className="sc-frame">
           <div className="sc-frame-body space-y-4">
@@ -627,7 +692,7 @@ export default function NotificationSettings() {
                 <Mail className="w-5 h-5 text-orange-400" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-white">{t('notificationSettings.emailTitle')}</h3>
+                <h3 className="text-lg font-semibold text-white">{t('settings.notificationSettings.emailTitle')}</h3>
               </div>
             </div>
             <label className="ds-switch">
@@ -642,7 +707,7 @@ export default function NotificationSettings() {
           {settings.email_enabled && (
             <div className="ds-animate-fade-in space-y-3 pt-2">
               <div className="space-y-1">
-                <label className="text-sm ds-text-secondary">{t('notificationSettings.emailAddress')}</label>
+                <label className="text-sm ds-text-secondary">{t('settings.notificationSettings.emailAddress')}</label>
                 <input
                   type="email"
                   value={settings.email_address || ''}
@@ -650,15 +715,16 @@ export default function NotificationSettings() {
                   placeholder="votre@email.com"
                   className="ds-input w-full"
                 />
-                <p className="text-xs ds-text-tertiary">{t('notificationSettings.emailHint')}</p>
+                <p className="text-xs ds-text-tertiary">{t('settings.notificationSettings.emailHint')}</p>
               </div>
             </div>
           )}
           </div>
         </section>
+        </>)}
       </div>
 
-      <div className="sticky bottom-0 bg-[var(--ds-surface-glass)] backdrop-blur-md p-4 flex items-center justify-between border-t border-white/5 -mx-4 sm:rounded-b-2xl">
+      {savable && <div className="sticky bottom-0 bg-[var(--ds-surface-glass)] backdrop-blur-md p-4 flex items-center justify-between border-t border-white/5 -mx-4 sm:rounded-b-2xl">
         {message && (
           <div
             className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium animate-in fade-in slide-in-from-bottom-2 ${
@@ -689,7 +755,7 @@ export default function NotificationSettings() {
             )}
           </button>
         </div>
-      </div>
+      </div>}
     </form>
   );
 }

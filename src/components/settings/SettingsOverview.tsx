@@ -1,406 +1,163 @@
-import { Monitor, UserCircle, RefreshCw, Search, Smartphone, ChevronRight, Upload, Server } from 'lucide-preact';
+import {
+  Monitor,
+  UserCircle,
+  Upload,
+  Wrench,
+  Tv,
+  Palette,
+  Play,
+  LayoutGrid,
+  Download,
+  Library,
+  Globe,
+  Settings,
+} from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { useMemo, useState, useEffect } from 'preact/hooks';
 import { canAccess } from '../../lib/permissions';
 import { serverApi } from '../../lib/client/server-api';
 import { TokenManager } from '../../lib/client/storage';
-import { getSyncStatusStore, subscribeSyncStatusStore, refreshSyncStatusStore } from '../../lib/sync-status-store';
-import { getBackendUrl, isBackendUrlSameAsClientUrl } from '../../lib/backend-config';
-import { getCloudDevices } from '../../lib/api/popcorn-web';
 import { getCachedSubscription, loadSubscription } from '../../lib/subscription-store';
-import { formatBytes } from '../../lib/utils/formatBytes';
+import { isBackendUrlSameAsClientUrl, getBackendUrl } from '../../lib/backend-config';
+import { HubGrid, HubTile, type HubStatus } from './hub/HubTile';
 
-type StatusVariant = 'success' | 'warning' | 'error' | 'neutral';
-
-type OverviewItem = {
+type TileDef = {
   id: string;
   titleKey: string;
+  hintKey: string;
   href: string;
   icon: typeof Monitor;
   permission?: string;
   permissions?: string[];
-  accent?: 'violet' | 'green' | 'yellow';
 };
 
-type RatioOverviewStats = {
-  total_uploaded_bytes: number;
-  total_downloaded_bytes: number;
-  ratio: number;
-  torrent_count: number;
-  seeding_count: number;
-};
-
-// Sync en premier, puis server, account, devices, indexers, connexion rapide
-const OVERVIEW_ITEMS: OverviewItem[] = [
-  { id: 'sync', titleKey: 'settingsPages.sync.title', href: '/settings/sync', icon: RefreshCw, permission: 'settings.sync', accent: 'yellow' },
-  { id: 'server', titleKey: 'settingsPages.server.title', href: '/settings/server', icon: Monitor, permission: 'settings.server', accent: 'violet' },
-  { id: 'account', titleKey: 'settingsPages.account.title', href: '/settings/account', icon: UserCircle, permission: 'settings.account', accent: 'green' },
-  { id: 'devices', titleKey: 'account.devices.title', href: '/settings/account?sub=devices', icon: Smartphone, permission: 'settings.account', accent: 'green' },
-  { id: 'indexers', titleKey: 'settingsPages.indexers.title', href: '/settings/indexers', icon: Search, permission: 'settings.indexers', accent: 'violet' },
-  { id: 'quick-connect', titleKey: 'account.quickConnect.title', href: '/settings/account', icon: Smartphone, permission: 'settings.account', accent: 'violet' },
+const TILES: TileDef[] = [
+  { id: 'server', titleKey: 'settingsMenu.category.system', hintKey: 'settingsMenu.hub.hint.server', href: '/settings/server/', icon: Monitor, permission: 'settings.server' },
+  { id: 'system-tools', titleKey: 'settingsMenu.hub.systemTools', hintKey: 'settingsMenu.hub.hint.systemTools', href: '/settings/system/', icon: Settings, permission: 'settings.server' },
+  { id: 'uploads', titleKey: 'settingsPages.uploads.title', hintKey: 'settingsMenu.hub.hint.uploads', href: '/settings/uploads/', icon: Upload, permission: 'settings.indexers' },
+  { id: 'maintenance', titleKey: 'settingsMenu.category.maintenance', hintKey: 'settingsMenu.hub.hint.maintenance', href: '/settings/maintenance/', icon: Wrench, permission: 'settings.server' },
+  { id: 'webos', titleKey: 'settingsMenu.webosDeployment', hintKey: 'settingsMenu.hub.hint.webos', href: '/settings/webos-deployment/', icon: Tv, permission: 'settings.server' },
+  { id: 'interface', titleKey: 'settingsMenu.category.interface', hintKey: 'settingsMenu.hub.hint.interface', href: '/settings/ui-preferences/', icon: Palette, permission: 'settings.ui_preferences' },
+  { id: 'playback', titleKey: 'settingsMenu.category.playback', hintKey: 'settingsMenu.hub.hint.playback', href: '/settings/playback/', icon: Play, permission: 'settings.ui_preferences' },
+  { id: 'content', titleKey: 'settingsMenu.category.content', hintKey: 'settingsMenu.hub.hint.content', href: '/settings/content/', icon: LayoutGrid, permissions: ['settings.indexers', 'settings.sync', 'settings.server'] },
+  { id: 'downloads', titleKey: 'settingsMenu.category.downloads', hintKey: 'settingsMenu.hub.hint.downloads', href: '/settings/downloads/', icon: Download, permission: 'settings.server' },
+  { id: 'library', titleKey: 'settingsMenu.category.library', hintKey: 'settingsMenu.hub.hint.library', href: '/settings/library/', icon: Library, permissions: ['settings.server', 'settings.friends'] },
+  { id: 'discovery', titleKey: 'settingsMenu.category.discovery', hintKey: 'settingsMenu.hub.hint.discovery', href: '/settings/discovery/', icon: Globe, permission: 'settings.server' },
+  { id: 'account', titleKey: 'settingsMenu.category.account', hintKey: 'settingsMenu.hub.hint.account', href: '/settings/account/', icon: UserCircle, permission: 'settings.account' },
 ];
 
-function isVisible(item: OverviewItem): boolean {
+function isVisible(item: TileDef): boolean {
   if (item.permission) return canAccess(item.permission as any);
   if (item.permissions?.length) return item.permissions.some((p) => canAccess(p as any));
   return true;
 }
 
-function formatSyncDate(timestamp: number): string {
-  const date = new Date(timestamp * 1000);
-  const now = Date.now();
-  const diffMs = now - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  const diffH = Math.floor(diffMs / 3600000);
-  const diffD = Math.floor(diffMs / 86400000);
-  if (diffMin < 1) return '< 1 min';
-  if (diffMin < 60) return `${diffMin} min`;
-  if (diffH < 24) return `${diffH} h`;
-  if (diffD < 7) return `${diffD} j`;
-  return date.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
 export default function SettingsOverview() {
   const { t } = useI18n();
-  const visibleItems = useMemo(() => OVERVIEW_ITEMS.filter(isVisible), []);
-  const [summaries, setSummaries] = useState<Record<string, { text: string; variant?: StatusVariant }>>({});
-  const [syncInProgress, setSyncInProgress] = useState(false);
-  const [ratioStats, setRatioStats] = useState<RatioOverviewStats | null>(null);
-  const [ratioLoading, setRatioLoading] = useState(false);
-  const [c411Ratio, setC411Ratio] = useState<{ uploaded_bytes?: number | null; downloaded_bytes?: number | null; ratio?: number | null } | null>(null);
-  const [c411Loading, setC411Loading] = useState(false);
-
-  useEffect(() => {
-    if (canAccess('settings.sync' as any)) {
-      refreshSyncStatusStore();
-    }
-  }, []);
+  const visibleItems = useMemo(() => TILES.filter(isVisible), []);
+  const [serverStatus, setServerStatus] = useState<HubStatus | null>(null);
+  const [serverMeta, setServerMeta] = useState<string | undefined>();
+  const [accountStatus, setAccountStatus] = useState<HubStatus | null>(null);
+  const [accountMeta, setAccountMeta] = useState<string | undefined>();
 
   useEffect(() => {
     if (!canAccess('settings.server' as any)) return;
     let cancelled = false;
-    const loadC411Ratio = async () => {
-      setC411Loading(true);
-      try {
-        const res = await (serverApi as any).getTrackerRatio();
-        if (!cancelled && res?.success && res.data) {
-          setC411Ratio(res.data);
+    const sameOrigin = (() => {
+      const url = getBackendUrl();
+      return !!url && isBackendUrlSameAsClientUrl(url);
+    })();
+    serverApi.checkServerHealth()
+      .then((res) => {
+        if (cancelled) return;
+        const reachable = res.success && (res.data as { reachable?: boolean } | undefined)?.reachable;
+        if (!reachable) {
+          setServerStatus('disabled');
+          setServerMeta(t('settingsMenu.overviewCard.serverOffline'));
+        } else if (sameOrigin) {
+          setServerStatus('limited');
+          setServerMeta(t('settingsMenu.overviewCard.sameOriginBackendTitle'));
+        } else {
+          setServerStatus('connected');
+          setServerMeta(t('settingsMenu.overviewCard.serverConnected'));
         }
-      } catch {
+      })
+      .catch(() => {
         if (!cancelled) {
-          setC411Ratio(null);
+          setServerStatus('disabled');
+          setServerMeta(t('settingsMenu.overviewCard.serverOffline'));
         }
-      } finally {
-        if (!cancelled) {
-          setC411Loading(false);
-        }
-      }
-    };
-    loadC411Ratio();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!canAccess('settings.sync' as any)) return undefined;
-    const unsub = subscribeSyncStatusStore((store) => {
-      const d = store.status;
-      if (!d) return;
-      setSyncInProgress(Boolean(d.sync_in_progress));
-      const indexerCount = d.stats_by_indexer ? Object.keys(d.stats_by_indexer).length : 0;
-      const suffix = indexerCount > 0 ? ' · ' + t('settingsMenu.overviewCard.syncIndexersCount', { count: indexerCount }) : '';
-      let sync: { text: string; variant?: StatusVariant };
-      if (d.sync_in_progress) {
-        sync = { text: t('settingsMenu.overviewCard.syncInProgress') + suffix, variant: 'warning' };
-      } else if (d.last_sync_date) {
-        sync = { text: t('settingsMenu.overviewCard.syncLastDate', { date: formatSyncDate(d.last_sync_date) }) + suffix, variant: 'success' };
-      } else {
-        sync = indexerCount > 0
-          ? { text: t('settingsMenu.overviewCard.syncOk') + ' · ' + t('settingsMenu.overviewCard.syncIndexersCount', { count: indexerCount }), variant: 'success' }
-          : { text: t('settingsMenu.overviewCard.syncNoData'), variant: 'neutral' };
-      }
-      setSummaries((prev) => ({ ...prev, sync }));
-    });
-    return unsub;
+      });
+    return () => { cancelled = true; };
   }, [t]);
 
   useEffect(() => {
-    if (!canAccess('settings.server' as any)) return;
+    if (!canAccess('settings.account' as any)) return;
     let cancelled = false;
-    const loadRatioStats = async () => {
-      setRatioLoading(true);
+    const run = async () => {
       try {
-        const res = await serverApi.getRatioStats();
-        if (!cancelled && res?.success && res.data) {
-          const { total_uploaded_bytes, total_downloaded_bytes, ratio, torrent_count, seeding_count } = res.data as any;
-          setRatioStats({
-            total_uploaded_bytes: total_uploaded_bytes ?? 0,
-            total_downloaded_bytes: total_downloaded_bytes ?? 0,
-            ratio: typeof ratio === 'number' ? ratio : 0,
-            torrent_count: torrent_count ?? 0,
-            seeding_count: seeding_count ?? 0,
-          });
+        const loggedIn = typeof TokenManager.getCloudAccessToken === 'function' && !!TokenManager.getCloudAccessToken();
+        if (!loggedIn) {
+          if (!cancelled) {
+            setAccountStatus('disabled');
+            setAccountMeta(t('settingsMenu.overviewCard.accountNotLoggedIn'));
+          }
+          return;
+        }
+        const cached = getCachedSubscription();
+        const sub = cached !== null ? cached : await loadSubscription().catch(() => null);
+        if (cancelled) return;
+        if (sub?.subscription?.status === 'active') {
+          const plan = sub.subscription.planName || sub.subscription.planSlug || '';
+          setAccountStatus('connected');
+          setAccountMeta(t('settingsMenu.subscription.cardActivePlan', { plan }));
+        } else if (sub?.streamingTorrent === true) {
+          setAccountStatus('connected');
+          setAccountMeta(t('settingsMenu.subscription.cardActivePlan', { plan: t('settingsMenu.subscription.streamingTorrentOption') }));
+        } else {
+          setAccountStatus('limited');
+          setAccountMeta(t('settingsMenu.subscription.cardNoPlan'));
         }
       } catch {
-        if (!cancelled) {
-          setRatioStats(null);
-        }
-      } finally {
-        if (!cancelled) {
-          setRatioLoading(false);
-        }
+        if (!cancelled) setAccountStatus('disabled');
       }
     };
-    loadRatioStats();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    const load = async () => {
-      const next: Record<string, { text: string; variant?: StatusVariant }> = {};
-
-      if (canAccess('settings.sync' as any)) {
-        const d = getSyncStatusStore().status;
-        setSyncInProgress(Boolean(d?.sync_in_progress));
-        if (d) {
-          const indexerCount = d.stats_by_indexer ? Object.keys(d.stats_by_indexer).length : 0;
-          const suffix = indexerCount > 0 ? ' · ' + t('settingsMenu.overviewCard.syncIndexersCount', { count: indexerCount }) : '';
-          if (d.sync_in_progress) {
-            next.sync = { text: t('settingsMenu.overviewCard.syncInProgress') + suffix, variant: 'warning' };
-          } else if (d.last_sync_date) {
-            next.sync = { text: t('settingsMenu.overviewCard.syncLastDate', { date: formatSyncDate(d.last_sync_date) }) + suffix, variant: 'success' };
-          } else {
-            next.sync = indexerCount > 0
-              ? { text: t('settingsMenu.overviewCard.syncOk') + ' · ' + t('settingsMenu.overviewCard.syncIndexersCount', { count: indexerCount }), variant: 'success' }
-              : { text: t('settingsMenu.overviewCard.syncNoData'), variant: 'neutral' };
-          }
-        }
-      }
-
-      if (canAccess('settings.server' as any)) {
-        try {
-          const res = await serverApi.checkServerHealth();
-          if (res.success && res.data) {
-            const reachable = (res.data as { reachable?: boolean }).reachable;
-            next.server = reachable
-              ? { text: t('settingsMenu.overviewCard.serverConnected'), variant: 'success' }
-              : { text: t('settingsMenu.overviewCard.serverOffline'), variant: 'error' };
-          }
-        } catch {
-          next.server = { text: t('settingsMenu.overviewCard.serverOffline'), variant: 'error' };
-        }
-      }
-
-      if (canAccess('settings.account' as any)) {
-        try {
-          const loggedIn = typeof TokenManager.getCloudAccessToken === 'function' && !!TokenManager.getCloudAccessToken();
-
-          if (loggedIn) {
-            const cached = getCachedSubscription();
-            const sub = cached !== null ? cached : await loadSubscription().catch(() => null);
-            if (sub?.subscription?.status === 'active') {
-              const planLabel = sub.subscription.planName || sub.subscription.planSlug || '';
-              next.account = {
-                text: t('settingsMenu.subscription.cardActivePlan', { plan: planLabel }),
-                variant: 'success',
-              };
-            } else if (sub?.streamingTorrent === true) {
-              next.account = {
-                text: t('settingsMenu.subscription.cardActivePlan', { plan: t('settingsMenu.subscription.streamingTorrentOption') }),
-                variant: 'success',
-              };
-            } else {
-              next.account = { text: t('settingsMenu.subscription.cardNoPlan'), variant: 'warning' };
-            }
-
-            const devices = await getCloudDevices().catch(() => null);
-            if (devices && devices.length > 0) {
-              const activeDevices = devices.filter((d) => !d.revokedAt);
-              const count = activeDevices.length;
-              const lastSeenTs = Math.max(
-                0,
-                ...activeDevices
-                  .map((d) => d.lastSeenAt || d.createdAt || 0)
-              );
-              const lastSeenDate = lastSeenTs ? new Date(lastSeenTs).toLocaleString() : '';
-              const text = lastSeenTs
-                ? t('settingsMenu.overviewCard.devicesSummaryWithLast', { count, date: lastSeenDate })
-                : t('settingsMenu.overviewCard.devicesSummary', { count });
-              next.devices = { text, variant: 'success' };
-            } else {
-              next.devices = { text: t('settingsMenu.overviewCard.devicesNone'), variant: 'neutral' };
-            }
-          } else {
-            next.account = { text: t('settingsMenu.overviewCard.accountNotLoggedIn'), variant: 'neutral' };
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      if (canAccess('settings.indexers' as any)) {
-        try {
-          const res = await serverApi.getIndexers();
-          if (res.success && Array.isArray(res.data)) {
-            next.indexers = { text: t('settingsMenu.overviewCard.indexersCount', { count: res.data.length }), variant: 'neutral' };
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      setSummaries((prev) => ({ ...prev, ...next }));
-    };
-    load();
+    run();
+    return () => { cancelled = true; };
   }, [t]);
-
-  const showSameOriginBackendCard = useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    const url = getBackendUrl();
-    return !!url && isBackendUrlSameAsClientUrl(url);
-  }, []);
 
   return (
-    <div class="ds-container max-w-5xl py-4 sm:py-6 px-3 sm:px-6 ds-card-animate">
-      <h1 class="sc-page-title">{t('settingsMenu.overview')}</h1>
-      <p class="sc-page-subtitle">{t('settingsMenu.subtitle')}</p>
-
-      {canAccess('settings.server' as any) && (
-        <div className="mb-4 sm:mb-5">
-          <div
-            className="sc-nav-card sc-nav-card--block"
-            style="padding:16px 20px;min-height:auto;"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="sc-nav-icon sc-nav-icon--yellow flex-shrink-0">
-                  <Upload className="w-5 h-5" strokeWidth={1.8} aria-hidden />
-                </div>
-                <div className="min-w-0">
-                  <div className="sc-nav-title" style="margin-top:0;">
-                    {t('settingsMenu.overviewCard.ratioStatsTitle')}
-                  </div>
-                  <div className="sc-nav-desc">
-                    {t('settingsMenu.overviewCard.ratioStatsSubtitle')}
-                  </div>
-                </div>
-              </div>
-              {ratioLoading && (
-                <div className="flex items-center justify-center h-6 flex-shrink-0" aria-hidden>
-                  <span className="loading loading-spinner loading-xs text-[var(--ds-accent-yellow)]" />
-                </div>
-              )}
-            </div>
-
-            {ratioStats ? (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-1 text-sm">
-                <div className="flex flex-col">
-                  <span className="ds-text-secondary mb-1">
-                    {t('settingsMenu.overviewCard.ratioTotalDownloaded')}
-                  </span>
-                  <span className="font-semibold text-[var(--ds-text-primary)]">
-                    {formatBytes(ratioStats.total_downloaded_bytes)}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="ds-text-secondary mb-1">
-                    {t('settingsMenu.overviewCard.ratioTotalUploaded')}
-                  </span>
-                  <span className="font-semibold text-[var(--ds-text-primary)]">
-                    {formatBytes(ratioStats.total_uploaded_bytes)}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="ds-text-secondary mb-1 flex items-center gap-2">
-                    {t('settingsMenu.overviewCard.ratioTrackerColumnLabel')}
-                    {c411Loading && (
-                      <span className="loading loading-spinner loading-xs text-[var(--ds-accent-yellow)]" aria-hidden />
-                    )}
-                  </span>
-                  <span className="font-semibold text-[var(--ds-text-primary)]">
-                    {c411Ratio?.ratio != null && Number.isFinite(c411Ratio.ratio)
-                      ? c411Ratio.ratio.toFixed(2)
-                      : '—'}
-                  </span>
-                  <span className="ds-text-secondary mt-1">
-                    {t('settingsMenu.overviewCard.ratioSeedingCount', { count: ratioStats.seeding_count })}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="mt-1 text-sm ds-text-secondary">
-                {ratioLoading ? t('common.loading') : t('common.noData')}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {showSameOriginBackendCard && canAccess('settings.server' as any) && (
-        <a
-          href="/settings/server"
-          data-astro-prefetch
-          data-settings-card
-          class="sc-nav-link"
-          style="display:block;margin-bottom:20px;"
-        >
-          <div class="sc-nav-card" style="flex-direction:row;align-items:center;gap:16px;border-left:3px solid rgba(234,179,8,0.5);min-height:auto;padding:16px 20px;">
-            <div class="sc-nav-icon sc-nav-icon--yellow" style="flex-shrink:0;">
-              <Server className="w-5 h-5" strokeWidth={1.8} aria-hidden />
-            </div>
-            <div style="flex:1;min-width:0;">
-              <div class="sc-nav-title" style="margin-top:0;">{t('settingsMenu.overviewCard.sameOriginBackendTitle')}</div>
-              <div class="sc-nav-desc" style="overflow:visible;-webkit-line-clamp:unset;">{t('settingsMenu.overviewCard.sameOriginBackendDescription')}</div>
-              <div class="sc-nav-open" style="margin-top:6px;padding-top:0;">{t('settingsMenu.overviewCard.sameOriginBackendAction')}</div>
-            </div>
-            <div class="sc-nav-chevron">
-              <ChevronRight className="w-5 h-5" aria-hidden />
-            </div>
-          </div>
-        </a>
-      )}
-
-      <div className="sc-overview-grid ds-card-animate-stagger" role="list">
+    <div class="hub-page">
+      <header class="hub-header">
+        <h1 class="hub-title">{t('settingsMenu.title')}</h1>
+        <p class="hub-subtitle">{t('settingsMenu.subtitle')}</p>
+      </header>
+      <HubGrid>
         {visibleItems.map((item) => {
-          const Icon = item.icon;
-          const summary = summaries[item.id];
-          const isSyncCardInProgress = item.id === 'sync' && syncInProgress;
-          const accentKey = item.accent ?? 'violet';
+          const status = item.id === 'server' ? serverStatus ?? undefined : item.id === 'account' ? accountStatus ?? undefined : undefined;
+          const meta = item.id === 'server' ? serverMeta : item.id === 'account' ? accountMeta : undefined;
           return (
-            <a
+            <HubTile
               key={item.id}
               href={item.href}
-              data-astro-prefetch
-              data-settings-card
-              data-focusable
-              class="sc-nav-link"
-            >
-              <div class="sc-nav-card">
-                <div class={`sc-nav-icon sc-nav-icon--${accentKey}`}>
-                  <Icon className="w-5 h-5" strokeWidth={1.8} aria-hidden />
-                </div>
-                <div class="sc-nav-copy">
-                  <div class="sc-nav-title">{t(item.titleKey)}</div>
-                  {summary ? (
-                    <div class={`sc-status-badge sc-status-badge--${summary.variant ?? 'neutral'}`}>
-                      {isSyncCardInProgress && <span className="loading loading-spinner loading-xs mr-1" />}
-                      {summary.text}
-                    </div>
-                  ) : (
-                    <div class="sc-nav-desc">{t('common.configure')}</div>
-                  )}
-                </div>
-                <div class="sc-nav-chevron">
-                  <ChevronRight className="w-5 h-5" aria-hidden />
-                </div>
-              </div>
-            </a>
+              icon={item.icon}
+              title={t(item.titleKey)}
+              hint={status ? undefined : t(item.hintKey)}
+              meta={meta}
+              status={status ?? undefined}
+              statusLabel={
+                status === 'connected'
+                  ? t('settingsMenu.hub.connected')
+                  : status === 'limited'
+                    ? t('settingsMenu.hub.limited')
+                    : status === 'disabled'
+                      ? t('settingsMenu.hub.disabled')
+                      : undefined
+              }
+            />
           );
         })}
-      </div>
+      </HubGrid>
     </div>
   );
 }
