@@ -110,10 +110,15 @@ export function setBackendConnectionDegraded(reason?: string): void {
 }
 
 export function setBackendConnectionOnline(): void {
+  const alreadyOnline = state.status === 'online' && state.lastError == null;
   state.status = 'online';
   state.lastError = null;
   state.backendUrl = getBackendUrlSafe();
   state.lastChecked = Date.now();
+  // Déjà en ligne : ne pas re-notifier. Le badge relance un health check à chaque
+  // notification « online », et ce check rappelle setBackendConnectionOnline.
+  // En mode démo le health check est synchrone : la boucle fige la page.
+  if (alreadyOnline) return;
   notify();
 }
 
