@@ -32,10 +32,33 @@ const isWebOS = import.meta.env.WEBOS === 'true';
             try { sessionStorage.setItem('popcorn_demo_leaving', '1'); } catch (e) {}
             try { localStorage.setItem('popcorn_intro_skipped', '1'); } catch (e2) {}
             location.replace(location.origin + '/');
+            return;
           }
+          var path = location.pathname || '';
+          var demo = path === '/demo' || path.indexOf('/demo/') === 0 || localStorage.getItem('popcorn_demo_mode') === '1';
+          if (demo) document.documentElement.setAttribute('data-show-demo-exit', '1');
         } catch (e) {}
       })();
     </script>
+    <style is:inline>
+      #popcorn-demo-exit-static { display: none; }
+      html[data-show-demo-exit] #popcorn-demo-exit-static {
+        display: flex;
+        position: fixed;
+        z-index: 10002;
+        left: 12px;
+        right: 12px;
+        bottom: max(12px, env(safe-area-inset-bottom));
+        min-height: 48px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        background: #d97706;
+        color: #fff;
+        font: 600 16px/1.2 system-ui, sans-serif;
+        text-decoration: none;
+      }
+    </style>
     <script is:inline>
       /* ── Anti-flash thème : doit s'exécuter AVANT toute CSS ── */
       (function() {
@@ -176,7 +199,10 @@ const isWebOS = import.meta.env.WEBOS === 'true';
       <>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+        <noscript>
+          <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet" />
+        </noscript>
       </>
     )}
   </head>
@@ -305,6 +331,7 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         </div>
       </div>
     </div>
+    <a id="popcorn-demo-exit-static" href="/?exitDemo=1">Quitter le mode démo</a>
     <TVNavigationProvider client:only="preact" />
     <ServerConnectionCheck client:only="preact" />
     <Navbar client:only="preact" />
