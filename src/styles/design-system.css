@@ -1,91 +1,193 @@
 /**
- * Design System — Tokens et utilitaires réutilisables
- * Appliquer partout (Sync, Settings, etc.) pour une UX cohérente type dashboard pro.
- * Référence : expérience type Education / Learning Dashboard (navigation claire, cartes, switches).
+ * Design System — tokens et utilitaires.
+ *
+ * Deux couches (ai-design-vault, adapté) :
+ *   1. --raw-*  littéraux (hex, px, ms). Uniquement ici, dans :root.
+ *       Jamais dans un composant, jamais surchargé par un thème.
+ *   2. --ds-*   rôle (surface, accent, texte…). Seule couche thèmeable.
+ *       [data-theme="light"] ne réassigne que des --ds-*.
+ * Les noms --ds-* publics ne changent pas.
+ * Motion : docs/MOTION.md — ne pas supprimer les @keyframes TV / loaders.
  */
 
 :root {
-  /* Surfaces */
-  --ds-surface: #1C1C1E;
-  --ds-surface-elevated: #2C2C2E;
-  --ds-surface-overlay: rgba(0, 0, 0, 0.4);
+  /* ── Tier 1 · primitives ── */
+  --raw-color-white: #ffffff;
+  --raw-color-ink-950: #1C1C1E;
+  --raw-color-ink-900: #1a1530;
+  --raw-color-ink-800: #2C2C2E;
+  --raw-color-paper: #ede9f5;
+  --raw-color-paper-elevated: #f5f2fc;
+  --raw-color-paper-bright: #faf8ff;
+  --raw-color-paper-soft: #f0ecf8;
+  --raw-color-paper-sunken: #deded9;
+  --raw-color-paper-placeholder: #d8d8e8;
 
-  /* Accents (couleurs de cartes / CTAs) */
-  --ds-accent-violet: #D1C4E9;
-  --ds-accent-violet-muted: rgba(209, 196, 233, 0.25);
-  --ds-accent-green: #C8E6C9;
-  --ds-accent-yellow: #FFF9C4;
-  --ds-accent-red: #ef4444;
-  --ds-accent-red-muted: rgba(239, 68, 68, 0.2);
+  --raw-color-violet-200: #D1C4E9;
+  --raw-color-violet-700: #6d28d9;
+  --raw-color-green-200: #C8E6C9;
+  --raw-color-green-400: #81c784;
+  --raw-color-green-700: #15803d;
+  --raw-color-yellow-100: #FFF9C4;
+  --raw-color-amber-700: #a16207;
+  --raw-color-amber-800: #b45309;
+  --raw-color-red-500: #ef4444;
+  --raw-color-red-600: #dc2626;
 
-  /* Texte */
-  --ds-text-primary: #ffffff;
-  --ds-text-secondary: rgba(255, 255, 255, 0.65);
-  --ds-text-tertiary: rgba(255, 255, 255, 0.45);
-  --ds-text-on-accent: #1C1C1E;
+  --raw-color-brand-200: #e9d5ff;
+  --raw-color-brand-300: #c4b5fd;
+  --raw-color-brand-400: #c084fc;
+  --raw-color-brand-450: #a78bfa;
+  --raw-color-brand-500: #a855f7;
+  --raw-color-brand-600: #9333ea;
+  --raw-color-brand-700: #7c3aed;
+  --raw-color-brand-800: #6d28d9;
+  --raw-color-success-300: #86efac;
+  --raw-color-warning-200: #fde68a;
+  --raw-color-warning-300: #fcd34d;
+  --raw-color-warning-400: #d4c84a;
+  --raw-color-warning-500: #fbbf24;
+  --raw-color-warning-600: #f59e0b;
+  --raw-color-warning-700: #d97706;
+  --raw-color-danger-300: #fca5a5;
+  --raw-color-danger-800: #991b1b;
+  --raw-color-danger-900: #7f1d1d;
+  --raw-color-slate-800: #1e293b;
 
-  /* Bordures */
-  --ds-border: rgba(255, 255, 255, 0.1);
-  --ds-border-strong: rgba(255, 255, 255, 0.2);
+  --raw-alpha-black-40: rgba(0, 0, 0, 0.4);
+  --raw-alpha-violet-200-25: rgba(209, 196, 233, 0.25);
+  --raw-alpha-red-20: rgba(239, 68, 68, 0.2);
+  --raw-alpha-white-65: rgba(255, 255, 255, 0.65);
+  --raw-alpha-white-45: rgba(255, 255, 255, 0.45);
+  --raw-alpha-white-10: rgba(255, 255, 255, 0.1);
+  --raw-alpha-white-20: rgba(255, 255, 255, 0.2);
+  --raw-alpha-ink-12: rgba(26, 21, 48, 0.12);
+  --raw-alpha-ink-60: rgba(26, 21, 48, 0.60);
+  --raw-alpha-ink-40: rgba(26, 21, 48, 0.40);
+  --raw-alpha-violet-10: rgba(109, 40, 217, 0.10);
+  --raw-alpha-red-09: rgba(220, 38, 38, 0.09);
+  --raw-alpha-violet-09: rgba(109, 40, 217, 0.09);
+  --raw-alpha-violet-17: rgba(109, 40, 217, 0.17);
 
-  /* Rayons (cohérents sur toute l’app) */
-  --ds-radius-sm: 12px;
-  --ds-radius-md: 20px;
-  --ds-radius-lg: 32px;
-  --ds-radius-full: 9999px;
+  --raw-radius-sm: 12px;
+  --raw-radius-md: 20px;
+  --raw-radius-lg: 32px;
+  --raw-radius-full: 9999px;
+  --raw-space-1: 4px;
+  --raw-space-2: 8px;
+  --raw-space-3: 12px;
+  --raw-space-4: 16px;
+  --raw-space-5: 20px;
+  --raw-space-6: 24px;
+  --raw-space-8: 32px;
+  --raw-icon-sm: 18px;
+  --raw-icon-md: 20px;
+  --raw-icon-lg: 24px;
+  --raw-icon-stroke: 1.5;
+  --raw-touch: 44px;
+  --raw-touch-sm: 40px;
+  --raw-ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --raw-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --raw-duration-fast: 180ms;
+  --raw-duration: 380ms;
+  --raw-duration-slow: 560ms;
+  --raw-enter-distance: 14px;
 
-  /* Espacements (grille 4px) */
-  --ds-space-1: 4px;
-  --ds-space-2: 8px;
-  --ds-space-3: 12px;
-  --ds-space-4: 16px;
-  --ds-space-5: 20px;
-  --ds-space-6: 24px;
-  --ds-space-8: 32px;
+  /* ── Tier 2 · sémantique (thème sombre par défaut) ── */
+  --ds-surface: var(--raw-color-ink-950);
+  --ds-surface-elevated: var(--raw-color-ink-800);
+  --ds-surface-overlay: var(--raw-alpha-black-40);
+  --ds-surface-sunken: var(--raw-color-paper-sunken);
+  --ds-surface-placeholder: var(--raw-color-paper-placeholder);
 
-  /* Icônes */
-  --ds-icon-size-sm: 18px;
-  --ds-icon-size-md: 20px;
-  --ds-icon-size-lg: 24px;
-  --ds-icon-stroke: 1.5;
+  --ds-accent-violet: var(--raw-color-violet-200);
+  --ds-accent-violet-muted: var(--raw-alpha-violet-200-25);
+  --ds-accent-green: var(--raw-color-green-200);
+  --ds-accent-yellow: var(--raw-color-yellow-100);
+  --ds-accent-red: var(--raw-color-red-500);
+  --ds-accent-red-muted: var(--raw-alpha-red-20);
 
-  /* Boutons ronds (touch-friendly) */
-  --ds-touch-target: 44px;
-  --ds-touch-target-sm: 40px;
+  --ds-text-primary: var(--raw-color-white);
+  --ds-text-secondary: var(--raw-alpha-white-65);
+  --ds-text-tertiary: var(--raw-alpha-white-45);
+  --ds-text-on-accent: var(--raw-color-ink-950);
+  --ds-text-on-media: var(--raw-color-white);
 
-  /* Motion — une courbe, une distance, des durées. Réutiliser partout. */
-  --ds-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --ds-ease-in: cubic-bezier(0.4, 0, 1, 1);
-  --ds-duration-fast: 180ms;
-  --ds-duration: 380ms;
-  --ds-duration-slow: 560ms;
-  --ds-enter-distance: 14px;
+  --ds-border: var(--raw-alpha-white-10);
+  --ds-border-strong: var(--raw-alpha-white-20);
+
+  --ds-brand-title-from: var(--raw-color-brand-200);
+  --ds-brand-fg: var(--raw-color-brand-300);
+  --ds-brand-soft: var(--raw-color-brand-400);
+  --ds-brand-fg-strong: var(--raw-color-brand-450);
+  --ds-brand: var(--raw-color-brand-500);
+  --ds-brand-deep: var(--raw-color-brand-600);
+  --ds-brand-strong: var(--raw-color-brand-700);
+  --ds-status-success-fg: var(--raw-color-success-300);
+  --ds-status-success-fg-soft: var(--raw-color-green-400);
+  --ds-status-warning-fg: var(--raw-color-warning-200);
+  --ds-status-warning-fg-icon: var(--raw-color-warning-300);
+  --ds-status-warning-fg-strong: var(--raw-color-warning-400);
+  --ds-status-warning-fg-deep: var(--raw-color-amber-800);
+  --ds-status-error-fg: var(--raw-color-danger-300);
+  --ds-progress-track: var(--raw-color-slate-800);
+
+  --ds-gradient-brand: linear-gradient(to right, var(--raw-color-brand-400), var(--raw-color-brand-500), var(--raw-color-brand-400));
+  --ds-gradient-brand-progress: linear-gradient(to right, var(--raw-color-brand-500), var(--raw-color-brand-600), var(--raw-color-brand-500));
+  --ds-gradient-brand-bar: linear-gradient(90deg, transparent 0%, var(--raw-color-brand-400) 20%, var(--raw-color-brand-500) 50%, var(--raw-color-brand-700) 80%, transparent 100%);
+  --ds-gradient-brand-bar-frame: linear-gradient(90deg, transparent 0%, var(--raw-color-brand-400) 18%, var(--raw-color-brand-500) 50%, var(--raw-color-brand-700) 82%, transparent 100%);
+  --ds-gradient-amber-bar: linear-gradient(90deg, transparent 0%, var(--raw-color-warning-500) 20%, var(--raw-color-warning-600) 50%, var(--raw-color-warning-700) 80%, transparent 100%);
+  --ds-gradient-play: linear-gradient(135deg, var(--raw-color-brand-700), var(--raw-color-brand-800));
+  --ds-gradient-sync: linear-gradient(90deg, var(--raw-color-brand-700), var(--raw-color-brand-450));
+  --ds-gradient-error: linear-gradient(135deg, var(--raw-color-danger-900) 0%, var(--raw-color-danger-800) 100%);
+  --ds-gradient-title: linear-gradient(to right, var(--raw-color-brand-200), var(--raw-color-brand-400), var(--raw-color-brand-400));
+  --ds-gradient-nav-hover: linear-gradient(180deg, var(--raw-color-paper-bright) 0%, var(--raw-color-paper-soft) 100%);
+
+  --ds-radius-sm: var(--raw-radius-sm);
+  --ds-radius-md: var(--raw-radius-md);
+  --ds-radius-lg: var(--raw-radius-lg);
+  --ds-radius-full: var(--raw-radius-full);
+  --ds-space-1: var(--raw-space-1);
+  --ds-space-2: var(--raw-space-2);
+  --ds-space-3: var(--raw-space-3);
+  --ds-space-4: var(--raw-space-4);
+  --ds-space-5: var(--raw-space-5);
+  --ds-space-6: var(--raw-space-6);
+  --ds-space-8: var(--raw-space-8);
+  --ds-icon-size-sm: var(--raw-icon-sm);
+  --ds-icon-size-md: var(--raw-icon-md);
+  --ds-icon-size-lg: var(--raw-icon-lg);
+  --ds-icon-stroke: var(--raw-icon-stroke);
+  --ds-touch-target: var(--raw-touch);
+  --ds-touch-target-sm: var(--raw-touch-sm);
+  --ds-ease: var(--raw-ease-out);
+  --ds-ease-in: var(--raw-ease-in);
+  --ds-duration-fast: var(--raw-duration-fast);
+  --ds-duration: var(--raw-duration);
+  --ds-duration-slow: var(--raw-duration-slow);
+  --ds-enter-distance: var(--raw-enter-distance);
 }
 
-/* ── Thème clair ── */
+/* ── Thème clair : on ne surcharge que le sens, jamais --raw-* ── */
 [data-theme="light"] {
-  /* Surfaces — ton lavande chaud, aucun blanc pur */
-  --ds-surface: #ede9f5;
-  --ds-surface-elevated: #f5f2fc;
-  --ds-surface-overlay: rgba(26, 21, 48, 0.12);
+  --ds-surface: var(--raw-color-paper);
+  --ds-surface-elevated: var(--raw-color-paper-elevated);
+  --ds-surface-overlay: var(--raw-alpha-ink-12);
 
-  /* Accents — violet légèrement plus doux en light */
-  --ds-accent-violet: #6d28d9;
-  --ds-accent-violet-muted: rgba(109, 40, 217, 0.10);
-  --ds-accent-green: #15803d;
-  --ds-accent-yellow: #a16207;
-  --ds-accent-red: #dc2626;
-  --ds-accent-red-muted: rgba(220, 38, 38, 0.09);
+  --ds-accent-violet: var(--raw-color-violet-700);
+  --ds-accent-violet-muted: var(--raw-alpha-violet-10);
+  --ds-accent-green: var(--raw-color-green-700);
+  --ds-accent-yellow: var(--raw-color-amber-700);
+  --ds-accent-red: var(--raw-color-red-600);
+  --ds-accent-red-muted: var(--raw-alpha-red-09);
 
-  /* Texte — violet-gris foncé, plus doux que le noir pur */
-  --ds-text-primary: #1a1530;
-  --ds-text-secondary: rgba(26, 21, 48, 0.60);
-  --ds-text-tertiary: rgba(26, 21, 48, 0.40);
-  --ds-text-on-accent: #ffffff;
+  --ds-text-primary: var(--raw-color-ink-900);
+  --ds-text-secondary: var(--raw-alpha-ink-60);
+  --ds-text-tertiary: var(--raw-alpha-ink-40);
+  --ds-text-on-accent: var(--raw-color-white);
 
-  /* Bordures — légère teinte violette */
-  --ds-border: rgba(109, 40, 217, 0.09);
-  --ds-border-strong: rgba(109, 40, 217, 0.17);
+  --ds-border: var(--raw-alpha-violet-09);
+  --ds-border-strong: var(--raw-alpha-violet-17);
 }
 
 /* Cartes DS en mode clair */
@@ -113,7 +215,7 @@
 }
 [data-theme="light"] .ds-nav-tab[aria-selected="true"] {
   background-color: var(--ds-accent-violet);
-  color: #ffffff;
+  color: var(--ds-text-on-accent);
 }
 
 /* sc-frame (cartes settings) en mode clair */
@@ -160,7 +262,7 @@
 [data-theme="light"] .sc-nav-btn:hover .sc-nav-card {
   background:
     linear-gradient(165deg, rgba(109, 40, 217, 0.12) 0%, transparent 42%),
-    linear-gradient(180deg, #faf8ff 0%, #f0ecf8 100%);
+    var(--ds-gradient-nav-hover);
   border-color: rgba(109, 40, 217, 0.24);
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 10px 28px rgba(109, 40, 217, 0.1);
 }
@@ -215,15 +317,15 @@
 /* Badges statut en mode clair */
 [data-theme="light"] .ds-status-badge--success {
   background-color: rgba(22, 163, 74, 0.12);
-  color: #15803d;
+  color: var(--ds-accent-green);
 }
 [data-theme="light"] .ds-status-badge--warning {
   background-color: rgba(217, 119, 6, 0.12);
-  color: #b45309;
+  color: var(--ds-status-warning-fg-deep);
 }
 [data-theme="light"] .ds-status-badge--error {
   background-color: rgba(220, 38, 38, 0.1);
-  color: #dc2626;
+  color: var(--ds-accent-red);
 }
 [data-theme="light"] .ds-status-badge--neutral {
   background-color: rgba(109, 40, 217, 0.08);
@@ -296,14 +398,14 @@
 /* Barre gradient en tête de carte (optionnel, style C411) */
 .ds-card-bar {
   height: 4px;
-  background: linear-gradient(to right, #c084fc, #a855f7, #c084fc);
+  background: var(--ds-gradient-brand);
   background-size: 200% 100%;
   animation: gradient-x 3s ease infinite;
 }
 
 .ds-card-bar-static {
   height: 4px;
-  background: linear-gradient(to right, #c084fc, #a855f7, #c084fc);
+  background: var(--ds-gradient-brand);
   flex-shrink: 0;
 }
 
@@ -419,7 +521,7 @@ html[data-modal-open] body {
 
 .ds-card-loading-bar {
   height: 4px;
-  background: linear-gradient(to right, #c084fc, #a855f7, #c084fc);
+  background: var(--ds-gradient-brand);
   background-size: 200% 100%;
   animation: gradient-x 3s ease infinite;
   flex-shrink: 0;
@@ -456,7 +558,7 @@ html[data-modal-open] body {
 .ds-progress-container {
   position: relative;
   height: 0.5rem;
-  background: #1e293b;
+  background: var(--ds-progress-track);
   border-radius: 9999px;
   overflow: hidden;
   max-width: 20rem;
@@ -467,7 +569,7 @@ html[data-modal-open] body {
 .ds-progress-bar {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to right, #a855f7, #9333ea, #a855f7);
+  background: var(--ds-gradient-brand-progress);
   background-size: 200% 100%;
   animation: gradient-x 3s ease infinite;
 }
@@ -722,7 +824,7 @@ html[data-tv-platform="true"] .playback-status-hint-label {
   font-weight: 700;
   letter-spacing: -0.025em;
   margin-bottom: 1rem;
-  background: linear-gradient(to right, #e9d5ff, #c084fc, #c084fc);
+  background: var(--ds-gradient-title);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -1328,6 +1430,7 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
   line-height: 1.2;
 }
 /* Norme design : halo blanc scintillant (bouton Paramètres, focus, clic) */
+/* Exception motion (TV / sync) : voir docs/MOTION.md — ne pas remplacer par un spring. */
 @keyframes ds-halo-pulse {
   0%, 100% { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); }
   50% { box-shadow: 0 4px 20px rgba(255, 255, 255, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.4); }
@@ -1438,11 +1541,11 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
 
 .ds-status-badge--success {
   background-color: rgba(200, 230, 201, 0.3);
-  color: #81c784;
+  color: var(--ds-status-success-fg-soft);
 }
 .ds-status-badge--warning {
   background-color: rgba(255, 249, 196, 0.35);
-  color: #d4c84a;
+  color: var(--ds-status-warning-fg-strong);
 }
 .ds-status-badge--error {
   background-color: var(--ds-accent-red-muted);
@@ -1513,7 +1616,7 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
 
 /* Carte indexer en erreur (sync) */
 .sync-card-error {
-  background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);
+  background: var(--ds-gradient-error);
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1616,7 +1719,7 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent 0%, #c084fc 20%, #a855f7 50%, #7c3aed 80%, transparent 100%);
+  background: var(--ds-gradient-brand-bar);
   opacity: 0.9;
   transition: opacity 0.2s ease;
   pointer-events: none;
@@ -1667,22 +1770,22 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
 }
 .sc-nav-icon--violet {
   background: linear-gradient(145deg, rgba(124, 58, 237, 0.28), rgba(124, 58, 237, 0.1));
-  color: #c4b5fd;
+  color: var(--ds-brand-fg);
   box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.2) inset;
 }
 .sc-nav-icon--green  {
   background: linear-gradient(145deg, rgba(34, 197, 94, 0.22), rgba(34, 197, 94, 0.08));
-  color: #86efac;
+  color: var(--ds-status-success-fg);
   box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.18) inset;
 }
 .sc-nav-icon--yellow {
   background: linear-gradient(145deg, rgba(234, 179, 8, 0.22), rgba(234, 179, 8, 0.08));
-  color: #fde68a;
+  color: var(--ds-status-warning-fg);
   box-shadow: 0 0 0 1px rgba(234, 179, 8, 0.18) inset;
 }
 .sc-nav-icon--red    {
   background: linear-gradient(145deg, rgba(239, 68, 68, 0.22), rgba(239, 68, 68, 0.08));
-  color: #fca5a5;
+  color: var(--ds-status-error-fg);
   box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.18) inset;
 }
 .sc-nav-link:hover .sc-nav-icon--violet,
@@ -1752,7 +1855,7 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
   transition: color 0.18s ease;
 }
 .sc-nav-link:hover .sc-nav-open,
-.sc-nav-btn:hover .sc-nav-open { color: #a78bfa; }
+.sc-nav-btn:hover .sc-nav-open { color: var(--ds-brand-fg-strong); }
 
 /* Badges */
 .sc-nav-badge {
@@ -1793,7 +1896,7 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
   cursor: pointer;
   background: none; border: none;
 }
-.sc-back:hover { color: #a78bfa; background: rgba(124, 58, 237, 0.08); }
+.sc-back:hover { color: var(--ds-brand-fg-strong); background: rgba(124, 58, 237, 0.08); }
 .sc-back:focus-visible {
   outline: 2px solid rgba(255, 255, 255, 0.75);
   outline-offset: -2px;
@@ -1828,7 +1931,7 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
   position: absolute;
   top: 0; left: 0; right: 0;
   height: 2px;
-  background: linear-gradient(90deg, transparent 0%, #c084fc 18%, #a855f7 50%, #7c3aed 82%, transparent 100%);
+  background: var(--ds-gradient-brand-bar-frame);
   opacity: 0.95;
   pointer-events: none;
   z-index: 1;
@@ -1845,7 +1948,7 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
     0 0 0 1px rgba(245, 158, 11, 0.05);
 }
 .sc-frame--amber::before {
-  background: linear-gradient(90deg, transparent 0%, #fbbf24 20%, #f59e0b 50%, #d97706 80%, transparent 100%);
+  background: var(--ds-gradient-amber-bar);
 }
 /* Carte imbriquée (étapes, blocs internes) */
 .sc-frame--nested {
@@ -1878,13 +1981,13 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
   background: linear-gradient(145deg, rgba(124, 58, 237, 0.28), rgba(124, 58, 237, 0.1));
-  color: #c4b5fd;
+  color: var(--ds-brand-fg);
   box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.18) inset;
 }
 .sc-frame--amber .sc-frame-icon,
 .sc-frame-icon--amber {
   background: linear-gradient(145deg, rgba(245, 158, 11, 0.28), rgba(245, 158, 11, 0.1));
-  color: #fcd34d;
+  color: var(--ds-status-warning-fg-icon);
   box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.2) inset;
 }
 .sc-frame-title {
@@ -1990,7 +2093,7 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
   background: rgba(124, 58, 237, 0.1); color: rgba(167, 139, 250, 0.8);
   transition: background 0.15s ease;
 }
-.sc-list-item:hover .sc-list-icon { background: rgba(124, 58, 237, 0.18); color: #a78bfa; }
+.sc-list-item:hover .sc-list-icon { background: rgba(124, 58, 237, 0.18); color: var(--ds-brand-fg-strong); }
 .sc-list-text-title { font-size: 13.5px; font-weight: 500; color: rgba(255,255,255,0.85); }
 .sc-list-text-desc  { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 1px; }
 .sc-list-arrow {
@@ -2047,8 +2150,8 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
   overflow: hidden; min-width: 0;
 }
 .sync-banner span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
-.sync-banner--error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); color: #fca5a5; }
-.sync-banner--success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.2); color: #86efac; }
+.sync-banner--error { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.25); color: var(--ds-status-error-fg); }
+.sync-banner--success { background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.2); color: var(--ds-status-success-fg); }
 
 /* ── Hero Card ── */
 .sync-hero { transition: box-shadow 0.4s ease, border-color 0.4s ease; overflow: hidden; min-width: 0; }
@@ -2070,11 +2173,11 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
 /* Inline feedback */
 .sync-inline-error {
   display: inline-flex; align-items: center; gap: 0.3rem;
-  font-size: 11px; color: #fca5a5; max-width: 160px; overflow: hidden;
+  font-size: 11px; color: var(--ds-status-error-fg); max-width: 160px; overflow: hidden;
 }
 .sync-inline-error span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sync-inline-error button { background: none; border: none; cursor: pointer; color: inherit; opacity: 0.6; flex-shrink: 0; padding: 0 2px; }
-.sync-inline-success { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: rgba(34,197,94,0.15); color: #86efac; flex-shrink: 0; }
+.sync-inline-success { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: rgba(34,197,94,0.15); color: var(--ds-status-success-fg); flex-shrink: 0; }
 
 /* Méta total */
 .sync-meta-total {
@@ -2093,7 +2196,7 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
   max-width: 100%; overflow: hidden;
 }
 .sync-status-badge--live {
-  background: rgba(139,92,246,0.12); color: #c4b5fd;
+  background: rgba(139,92,246,0.12); color: var(--ds-brand-fg);
   border-color: rgba(139,92,246,0.3);
   animation: sync-badge-glow 2.5s ease-in-out infinite;
 }
@@ -2132,8 +2235,8 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
 .sync-btn-play {
   display: inline-flex; align-items: center; gap: 0.4rem;
   padding: 0 0.9rem; height: 34px; border-radius: 9px; border: none; cursor: pointer;
-  background: linear-gradient(135deg, #7c3aed, #6d28d9);
-  color: #fff; font-weight: 600; font-size: 12.5px;
+  background: var(--ds-gradient-play);
+  color: var(--ds-text-on-media); font-weight: 600; font-size: 12.5px;
   transition: all 0.18s ease; white-space: nowrap; flex-shrink: 0;
   box-shadow: 0 2px 10px rgba(124,58,237,0.28);
 }
@@ -2146,7 +2249,7 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
 .sync-btn-stop {
   display: inline-flex; align-items: center; gap: 0.4rem;
   padding: 0 0.85rem; height: 34px; border-radius: 9px; cursor: pointer;
-  background: rgba(239,68,68,0.1); color: #fca5a5; font-weight: 600; font-size: 12.5px;
+  background: rgba(239,68,68,0.1); color: var(--ds-status-error-fg); font-weight: 600; font-size: 12.5px;
   border: 1px solid rgba(239,68,68,0.2); transition: all 0.15s ease; white-space: nowrap; flex-shrink: 0;
 }
 .sync-btn-stop:hover:not(:disabled) { background: rgba(239,68,68,0.18); border-color: rgba(239,68,68,0.35); }
@@ -2189,7 +2292,7 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
 }
 .sync-progress-fill {
   height: 100%; border-radius: 999px;
-  background: linear-gradient(90deg, #7c3aed, #a78bfa);
+  background: var(--ds-gradient-sync);
   transition: width 0.6s cubic-bezier(0.4,0,0.2,1);
 }
 .sync-progress-fill--pulse { animation: sync-fill-pulse 1.8s ease-in-out infinite; }
@@ -2395,7 +2498,7 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
 .sync-btn-danger {
   display: inline-flex; align-items: center; gap: 0.5rem;
   padding: 0.6rem 1rem; border-radius: 10px; border: none; cursor: pointer;
-  background: rgba(239,68,68,0.1); color: #fca5a5;
+  background: rgba(239,68,68,0.1); color: var(--ds-status-error-fg);
   border: 1px solid rgba(239,68,68,0.2); font-size: 13px; font-weight: 500;
   transition: all 0.15s ease;
 }
@@ -2518,13 +2621,13 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
    Les éléments portant data-dark-context gardent leurs couleurs sombres.    */
 [data-dark-context],
 [data-dark-context] * {
-  --ds-text-primary: #ffffff;
-  --ds-text-secondary: rgba(255,255,255,0.65);
+  --ds-text-primary: var(--ds-text-on-media);
+  --ds-text-secondary: var(--raw-alpha-white-65);
 }
 
 /* ── Couleur de texte body par défaut ── */
 [data-theme="light"] body {
-  color: #1a1530;
+  color: var(--ds-text-primary);
 }
 
 /* ── Titres h1 / h2 / h3 non media (PageHeader, CarouselRow, etc.) ── */
@@ -2539,7 +2642,7 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
 [data-dark-context] h2,
 [data-dark-context] h3,
 [data-dark-context] h4 {
-  color: #fff;
+  color: var(--ds-text-on-media);
 }
 
 /* ── Textes secondaires hardcodés ── */
@@ -2563,10 +2666,10 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
 
 /* ── Fonds de cartes hardcodés gris foncé ── */
 [data-theme="light"] .bg-gray-900 {
-  background-color: #ede9f5 !important;
+  background-color: var(--ds-surface) !important;
 }
 [data-theme="light"] .bg-gray-800 {
-  background-color: #deded9 !important;
+  background-color: var(--ds-surface-sunken) !important;
 }
 [data-theme="light"] .border-gray-700 {
   border-color: rgba(0,0,0,0.1) !important;
@@ -2637,7 +2740,7 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
 /* ── Placeholders posters (bg-gradient de gray) ── */
 [data-theme="light"] .bg-gradient-to-br.from-gray-800.to-gray-900 {
   background-image: none !important;
-  background-color: #d8d8e8 !important;
+  background-color: var(--ds-surface-placeholder) !important;
 }
 
 /* ── Toggle switch pill (FilmsDashboard / SeriesDashboard) ── */
@@ -2692,3 +2795,27 @@ html:not([data-tv-platform="true"]) [data-browse-slot]:hover [data-torrent-card]
 [data-theme="light"] .bg-black\/80 {
   background-color: rgba(0,0,0,0.35) !important;
 }
+
+/* Boucles décoratives : prefers-reduced-motion saute à l'état repos.
+   Le spinner (.ds-loader-spin) garde un arc statique, plus haut dans le fichier.
+   Ne pas supprimer les @keyframes : TV et sync en ont besoin. docs/MOTION.md */
+@media (prefers-reduced-motion: reduce) {
+  .ds-card-bar,
+  .ds-card-loading-bar,
+  .ds-card-loading-glow,
+  .ds-progress-bar,
+  .ds-progress-wave,
+  .ds-loading-info-box svg,
+  .ds-sync-active-pulse,
+  .sync-elapsed-banner__dot,
+  .sync-elapsed-banner__time,
+  .overview-card--sync-in-progress .ds-card::before,
+  .overview-card-icon--syncing,
+  .playback-status-hint--quality,
+  .sync-status-badge--live,
+  .sync-pulse-dot,
+  .sync-progress-fill--pulse {
+    animation: none;
+  }
+}
+
