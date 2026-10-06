@@ -7,26 +7,31 @@
  * l'horloge fixe prend le relais tant que l'audio ne joue pas.
  *
  * Activation : /car?render=canvas (mémorisé) ou bouton « Rendu » dans la barre ; retour : ?render=img.
- * Pour en faire le défaut : passer CAR_RENDER_DEFAULT à 'canvas'.
+ * ?render=auto (défaut) : choix automatique à partir de l'empreinte des capacités prise EN Drive
+ * (carCapabilities.ts → recommendCarDrive) ; sans relevé Drive valable → <img>. Repli <img> si le canvas échoue.
  */
 
-export type CarRenderEngine = 'img' | 'canvas';
+export type CarRenderEngine = 'img' | 'canvas' | 'auto';
 
-/** Moteur par défaut en Drive. Basculer à 'canvas' quand le labo aura désigné le gagnant. */
-export const CAR_RENDER_DEFAULT: CarRenderEngine = 'img';
+/** Moteur par défaut en Drive : 'auto' = <img> tant qu'aucun relevé Drive ne valide le canvas. */
+export const CAR_RENDER_DEFAULT: CarRenderEngine = 'auto';
 
 const STORAGE_KEY = 'popcorn_car_render_engine';
+
+function isEngine(v: unknown): v is CarRenderEngine {
+  return v === 'canvas' || v === 'img' || v === 'auto';
+}
 
 export function readCarRenderEngine(): CarRenderEngine {
   if (typeof window === 'undefined') return CAR_RENDER_DEFAULT;
   try {
     const p = new URLSearchParams(window.location.search).get('render');
-    if (p === 'canvas' || p === 'img') {
+    if (isEngine(p)) {
       localStorage.setItem(STORAGE_KEY, p);
       return p;
     }
     const s = localStorage.getItem(STORAGE_KEY);
-    if (s === 'canvas' || s === 'img') return s;
+    if (isEngine(s)) return s;
   } catch {
     // ignore
   }
