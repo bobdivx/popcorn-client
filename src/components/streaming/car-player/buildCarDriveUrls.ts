@@ -29,7 +29,8 @@ export function getCarDriveQualityProfile(): CarDriveQualityProfile {
   return {
     maxHeight: 480,
     maxFps: 12,
-    quality: 3,
+    // FFmpeg -q:v (2=meilleur … 31=pire). 3 donnait ~35 Ko/image (≈3,5 Mb/s) : trop lourd en LTE.
+    quality: 8,
     audioBitrate: '96k',
   };
 }
