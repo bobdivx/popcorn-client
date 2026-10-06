@@ -17,29 +17,24 @@ export interface CarDriveQualityProfile {
 }
 
 /**
- * Profil qualité optimisé pour Tesla en conduite sur réseau mobile.
- * Priorité: **fluidité > qualité** (réseau instable, CPU/GPU limité, safety first).
- * 
- * Valeurs choisies:
- * - 480p @ 12fps : compromis lisibilité / bande passante (~500-800 kbps MJPEG)
- * - quality=3 : compression MJPEG moyenne (trade-off taille/artifacts)
- * - 96kbps audio : voix claire, musique acceptable, ~1/3 du bitrate standard
+ * Profils Drive (fluidité > qualité). Mesures (oct. 2026, flux réel via Cloudflare) :
+ * 480p q8 ≈ 27,8 Ko/image ≈ 2,7 Mb/s à 12 i/s (trop lourd en LTE) ; 360p q11 ≈ 14,2 Ko ≈ 1,4 Mb/s ;
+ * 288p q12 ≈ 0,7 Mb/s. Défaut allégé : 360p/12/q11.
  */
-export type CarDrivePreset = 'standard' | 'lite';
+export type CarDrivePreset = 'standard' | 'lite' | 'plus';
 
 export function getCarDriveQualityProfile(preset: CarDrivePreset = 'standard'): CarDriveQualityProfile {
-  if (preset === 'lite') {
-    // Choisi automatiquement (empreinte capacités) : appareil/réseau faible → 360p 10 i/s
-    return { maxHeight: 360, maxFps: 10, quality: 10, audioBitrate: '64k' };
-  }
-  return {
-    maxHeight: 480,
-    maxFps: 12,
-    // FFmpeg -q:v (2=meilleur … 31=pire). 3 donnait ~35 Ko/image (≈3,5 Mb/s) : trop lourd en LTE.
-    quality: 8,
-    audioBitrate: '96k',
-  };
+  if (preset === 'lite') return { maxHeight: 288, maxFps: 10, quality: 12, audioBitrate: '64k' };
+  if (preset === 'plus') return { maxHeight: 480, maxFps: 12, quality: 8, audioBitrate: '96k' };
+  // FFmpeg -q:v (2=meilleur … 31=pire)
+  return { maxHeight: 360, maxFps: 12, quality: 11, audioBitrate: '96k' };
 }
+
+export const CAR_DRIVE_PRESET_LABELS: Record<CarDrivePreset, string> = {
+  lite: 'Léger · 288p 10 i/s',
+  standard: 'Standard · 360p 12 i/s',
+  plus: 'Plus · 480p 12 i/s',
+};
 
 /**
  * Construit les URLs MJPEG + audio optimisées pour conduite Tesla.
@@ -56,7 +51,13 @@ export function getCarDriveQualityProfile(preset: CarDrivePreset = 'standard'): 
  * 
  * Si le serveur ignore ces params, comportement inchangé (fallback gracieux).
  */
-export function buildCarDriveUrls(streamUrl: string, seekSeconds: number, preset: CarDrivePreset = 'standard'): CarDriveUrls {
+export function buildCarDriveUrls(
+  streamUrl: string,
+  seekSeconds: number,
+  preset: CarDrivePreset = 'standard',
+  /** Session télémétrie (corrélation serveur : stream-stats `tag`). */
+  sid?: string,
+): CarDriveUrls {
   const seek = Math.max(0, Number.isFinite(seekSeconds) ? seekSeconds : 0);
   const profile = getCarDriveQualityProfile(preset);
   
@@ -77,6 +78,7 @@ export function buildCarDriveUrls(streamUrl: string, seekSeconds: number, preset
   mjpeg.searchParams.set('max_height', String(profile.maxHeight));
   mjpeg.searchParams.set('max_fps', String(profile.maxFps));
   mjpeg.searchParams.set('quality', String(profile.quality));
+  if (sid) mjpeg.searchParams.set('sid', sid);
 
   const audio = new URL(url.toString());
   audio.pathname = `${pathname}/car.audio`;

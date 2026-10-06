@@ -161,7 +161,7 @@ export default function CarCapabilitiesPanel({ mode, onClose }: { mode: TeslaDri
         </div>
       </div>
       <div className="car-lab__caps-reco">
-        <b>Choix auto Drive (/car, rendu « auto »)</b> : moteur <b>{reco.engine === 'canvas' ? 'canvas' : '<img>'}</b> · preset{' '}
+        <b>Choix auto Drive (/car, rendu « auto »)</b> : moteur <b>{reco.engine === 'img' ? '<img>' : reco.engine}</b> · preset{' '}
         <b>{reco.preset === 'lite' ? 'léger 360p/10 i/s' : 'standard 480p/12 i/s'}</b> · base : relevé {reco.basis}
         <ul>
           {reco.reasons.map((r) => (

@@ -3,12 +3,14 @@
  * Compare instantanément moteurs de rendu / qualité / buffer pour isoler les saccades en Drive.
  * Isolé : n'importe rien du lecteur desktop/TV (seulement bibliothèque + résolution de source voiture).
  */
-import type { ComponentChildren } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import CarLibraryBrowser, { type CarLibraryPick } from '../streaming/car-player/CarLibraryBrowser';
 import { useCarMediaSource } from '../streaming/car-player/useCarMediaSource';
 import { detectTeslaDriveMode, startDriveModeMonitoring, type TeslaDriveMode } from '../streaming/car-player/driveModeDetector';
 import { noteDriveModeForCapabilities } from '../streaming/car-player/carCapabilities';
+import { PlaybackTelemetry } from '../streaming/car-player/carTelemetry';
+import CarStatsStrip from '../streaming/car-player/CarStatsStrip';
+import CarCategoryBar, { useAutoHide, type BarCategory, type BarOption } from '../streaming/car-player/CarCategoryBar';
 import CarCapabilitiesPanel from './CarCapabilitiesPanel';
 import {
   ENGINES,
@@ -84,23 +86,6 @@ function readStartTime(): number {
   }
 }
 
-function Toggle(props: { active: boolean; disabled?: boolean; onClick: () => void; children: ComponentChildren; title?: string }) {
-  return (
-    <button
-      type="button"
-      title={props.title}
-      disabled={props.disabled}
-      className={`car-lab__btn${props.active ? ' is-active' : ''}${props.disabled ? ' is-disabled' : ''}`}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (!props.disabled) props.onClick();
-      }}
-    >
-      {props.children}
-    </button>
-  );
-}
-
 export default function CarLab() {
   const [slug, setSlug] = useState<string | null>(null);
   const [cfg, setCfg] = useState<LabConfig>(() => loadConfig());
@@ -108,7 +93,6 @@ export default function CarLab() {
   const [stats, setStats] = useState<LabStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
-  const [panel, setPanel] = useState(true);
   const [drive, setDrive] = useState<TeslaDriveMode | 'testing'>('unknown');
   const [session, setSession] = useState(0);
   const [lastPick, setLastPick] = useState<LabPick | null>(null);
@@ -127,6 +111,9 @@ export default function CarLab() {
   const goodSecondsRef = useRef(0);
 
   const { source, loading, error: sourceError } = useCarMediaSource(slug);
+  const { visible: barVisible, poke: pokeBar, hide: hideBar, setPinned: setBarPinned } = useAutoHide(5000, !!slug && !paused);
+  const telemetryRef = useRef<PlaybackTelemetry | null>(null);
+  const teleCtxRef = useRef({ engine: '', preset: '', route: '', drive: 'unknown' as TeslaDriveMode | 'testing', extra: {} as Record<string, unknown> });
   const effectiveUrl = source?.streamUrl ? routeStreamUrl(source.streamUrl, cfg.route) : null;
 
   useEffect(() => {
@@ -169,6 +156,26 @@ export default function CarLab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Télémétrie de lecture : échantillon / 10 s pendant la lecture → POST /api/car/telemetry
+  useEffect(() => {
+    if (!slug) return;
+    const t = new PlaybackTelemetry(() => ({
+      page: '/car/lab',
+      engine: teleCtxRef.current.engine,
+      mode: teleCtxRef.current.drive,
+      preset: teleCtxRef.current.preset,
+      route: teleCtxRef.current.route,
+      position: posRef.current,
+      extra: teleCtxRef.current.extra,
+    }));
+    telemetryRef.current = t;
+    t.start();
+    return () => {
+      t.stop();
+      telemetryRef.current = null;
+    };
+  }, [slug]);
+
   // (Re)démarre le moteur à la position courante à chaque changement de mode
   useEffect(() => {
     const host = hostRef.current;
@@ -187,10 +194,31 @@ export default function CarLab() {
       onStats: (s) => {
         posRef.current = s.position;
         setStats(s);
+        if (s.state !== 'unavailable' && s.state !== 'idle') {
+          telemetryRef.current?.push({
+            state: s.state,
+            fpsShown: s.fpsPainted,
+            fpsReceived: s.engine === 'img' || s.engine === 'native' ? null : s.fpsReceived,
+            targetFps: s.targetFps,
+            dropped: s.dropped,
+            late: s.late,
+            stalls: s.stalls,
+            paintJitterMs: s.paintJitterMs,
+            arrivalJitterMs: s.arrivalJitterMs,
+            kbps: s.kbps,
+            bufferFrames: s.bufferFrames,
+            bufferMs: s.bufferMs,
+            decodeMs: s.decodeMs,
+            paintMs: s.paintMs,
+            avSyncMs: s.avSyncMs,
+            frameSize: s.frameSize,
+          });
+        }
       },
       onError: (m) => setError(m),
     });
     playerRef.current = player;
+    telemetryRef.current?.resetTotals();
     badSecondsRef.current = 0;
     goodSecondsRef.current = 0;
     player.start();
@@ -320,13 +348,13 @@ export default function CarLab() {
     if (!el) return;
     try {
       if (document.fullscreenElement) void document.exitFullscreen();
-      else if (el.requestFullscreen) void el.requestFullscreen().catch(() => setPanel(false));
+      else if (el.requestFullscreen) void el.requestFullscreen().catch(() => hideBar());
       else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
-      else setPanel(false);
+      else hideBar();
     } catch {
-      setPanel(false);
+      hideBar();
     }
-  }, []);
+  }, [hideBar]);
 
   const copyLink = useCallback(() => {
     try {
@@ -366,68 +394,197 @@ export default function CarLab() {
   }
 
   const preset = QUALITY_PRESETS[effQuality];
-  const driveLabel = drive === 'testing' ? 'test…' : drive === 'drive' ? 'DRIVE' : drive === 'park' ? 'PARK' : 'inconnu';
+  const driveLabel = drive === 'testing' ? 'test…' : drive === 'drive' ? 'DRIVE' : drive === 'park' ? 'PARK' : '?';
   const isMjpeg = engineInfo(cfg.engine).mjpeg;
+  const eng = engineInfo(cfg.engine);
+  teleCtxRef.current = {
+    engine: cfg.engine,
+    preset: `${effQuality} ${preset.maxHeight}p/${preset.fps}/q${preset.q}`,
+    route: cfg.route,
+    drive,
+    extra: { buffer: cfg.buffer, pace: cfg.pace, clock: cfg.clock, adaptive: cfg.adaptive, audioOn: cfg.audio, subs: cfg.subs },
+  };
+
+  const opt = (id: string, label: string, active: boolean, hint?: string, disabled?: boolean): BarOption => ({ id, label, active, hint, disabled });
+  const categories: BarCategory[] = [
+    {
+      id: 'engine',
+      label: 'Moteur',
+      value: eng.short,
+      options: ENGINES.map((e) => {
+        const av = engineAvailability(e.id);
+        return opt(e.id, e.label, cfg.engine === e.id, av.ok ? e.description : `Indisponible : ${av.reason}`, !av.ok);
+      }),
+      onSelect: (id) => updateCfg({ engine: id as LabConfig['engine'] }),
+    },
+    {
+      id: 'quality',
+      label: 'Qualité',
+      value: `${preset.maxHeight}p ${preset.fps} i/s${cfg.adaptive && effQuality !== cfg.quality ? ' (adapt.)' : ''}`,
+      disabled: !isMjpeg,
+      options: QUALITY_ORDER.map((q) => {
+        const p = QUALITY_PRESETS[q];
+        return opt(q, `${p.label} · ${p.maxHeight}p ${p.fps} i/s`, cfg.quality === q, `q${p.q} · audio ${p.audioBitrate} · ${p.approx}`);
+      }),
+      onSelect: (id) => updateCfg({ quality: id as LabQuality }),
+    },
+    {
+      id: 'rate',
+      label: 'Débit',
+      value: `${cfg.adaptive ? 'Adaptatif' : 'Fixe'} · ${cfg.pace === 'burst' ? 'Rafale' : 'T. réel'}`,
+      disabled: !isMjpeg,
+      closeOnSelect: false,
+      options: [
+        opt('adaptive', 'Adaptatif', cfg.adaptive, 'descend si < 80 % des images reçues pendant 4 s, remonte après 30 s'),
+        opt('fixed', 'Fixe', !cfg.adaptive, 'qualité choisie, sans adaptation'),
+        opt('realtime', 'Serveur temps réel', cfg.pace === 'realtime', 'FFmpeg -re (cadence serveur)'),
+        opt('burst', 'Serveur rafale + buffer', cfg.pace === 'burst', 'FFmpeg sans -re, régulé par le client (backpressure)', cfg.engine === 'img' || cfg.engine === 'worker'),
+      ],
+      onSelect: (id) => {
+        if (id === 'adaptive' || id === 'fixed') updateCfg({ adaptive: id === 'adaptive' });
+        else updateCfg({ pace: id as LabConfig['pace'] });
+      },
+    },
+    {
+      id: 'buffer',
+      label: 'Buffer',
+      value: `${cfg.buffer === 'cautious' ? 'Prudent' : 'Agressif'} · ${cfg.clock === 'audio' ? 'audio' : 'fixe'}`,
+      disabled: !isMjpeg,
+      closeOnSelect: false,
+      options: [
+        opt('aggressive', 'Agressif · ~0,3 s', cfg.buffer === 'aggressive', 'latence mini, sensible au jitter'),
+        opt('cautious', 'Prudent · ~3 s', cfg.buffer === 'cautious', 'absorbe le jitter réseau'),
+        opt('audio', 'Horloge calée audio', cfg.clock === 'audio', 'image choisie selon audio.currentTime'),
+        opt('fixed', 'Horloge fixe', cfg.clock === 'fixed', 'cadence fixe, pas de calage audio'),
+      ],
+      onSelect: (id) => {
+        if (id === 'aggressive' || id === 'cautious') updateCfg({ buffer: id });
+        else updateCfg({ clock: id as LabConfig['clock'] });
+      },
+    },
+    {
+      id: 'route',
+      label: 'Flux',
+      value: cfg.route === 'proxy' ? 'Proxy client' : 'Direct',
+      options: [
+        opt('direct', 'Direct serveur', cfg.route === 'direct', 'URL serveur configurée (Cloudflare → Traefik → serveur), CORS'),
+        opt('proxy', 'Via proxy client', cfg.route === 'proxy', `même origine ${PROXY_PREFIX}/… → nginx client → serveur (Docker interne)`),
+      ],
+      onSelect: (id) => updateCfg({ route: id as LabConfig['route'] }),
+    },
+    {
+      id: 'av',
+      label: 'Son / ST',
+      value: `${cfg.audio ? 'Son' : 'Muet'} · ${cfg.subs ? (subTrack != null ? `ST #${subTrack}` : 'ST') : 'sans ST'}`,
+      closeOnSelect: false,
+      options: [
+        opt('audio', cfg.audio ? 'Son ON (toucher pour couper)' : 'Son OFF (toucher pour activer)', cfg.audio),
+        opt('unlock', '🔊 Débloquer le son', false, 'si l’autoplay a bloqué l’audio'),
+        opt('subs', cfg.subs ? 'Sous-titres ON' : 'Sous-titres OFF', cfg.subs, cfg.subs ? subInfo : 'pistes texte du fichier, en overlay'),
+        ...(cfg.subs
+          ? (subTracks || []).map((t) =>
+              opt(`track-${t.index}`, `${(t.language || `#${t.index}`).toUpperCase()}${t.title ? ` · ${t.title.slice(0, 24)}` : ''}`, subTrack === t.index, `${t.codec} · piste #${t.index}`),
+            )
+          : []),
+      ],
+      onSelect: (id) => {
+        if (id === 'audio') updateCfg({ audio: !cfg.audio });
+        else if (id === 'unlock') playerRef.current?.resumeAudio();
+        else if (id === 'subs') updateCfg({ subs: !cfg.subs });
+        else if (id.startsWith('track-')) {
+          const idx = Number(id.slice(6));
+          setSubTrack(idx);
+          try {
+            localStorage.setItem(SUB_TRACK_KEY, String(idx));
+          } catch {
+            // ignore
+          }
+        }
+      },
+    },
+    {
+      id: 'display',
+      label: 'Affichage',
+      value: driveLabel,
+      options: [
+        opt('fullscreen', '⛶ Plein écran', false),
+        opt('hide', 'Masquer la barre', false, 'un tap sur l’image la réaffiche'),
+        opt('drive', 'Re-tester Drive', drive === 'testing', `mode actuel : ${driveLabel}`),
+        opt('link', 'Copier le lien (position + réglages)', false),
+        opt('library', '← Bibliothèque', false),
+        opt('theater', '← Theater (/car)', false),
+      ],
+      onSelect: (id) => {
+        if (id === 'fullscreen') goFullscreen();
+        else if (id === 'hide') hideBar();
+        else if (id === 'drive') runDriveTest();
+        else if (id === 'link') copyLink();
+        else if (id === 'library') back();
+        else if (id === 'theater') window.location.href = '/car';
+      },
+    },
+    {
+      id: 'stats',
+      label: 'Stats',
+      value: cfg.stats ? 'Bande ON' : 'Masquées',
+      options: [opt('on', 'Bande de stats en haut', cfg.stats), opt('off', 'Masquer', !cfg.stats)],
+      onSelect: (id) => updateCfg({ stats: id === 'on' }),
+    },
+    { id: 'caps', label: 'Capacités', value: 'Relevé', onClick: () => setCapsOpen(true) },
+  ];
 
   return (
-    <div ref={rootRef} className="car-lab" onClick={() => setPanel(true)}>
+    <div
+      ref={rootRef}
+      className={`car-lab${cfg.stats ? ' car-lab--strip' : ''}`}
+      onClick={() => pokeBar()}
+    >
       <div ref={hostRef} className="car-lab__host" />
+
+      {cfg.stats && (
+        <CarStatsStrip
+          stats={
+            stats
+              ? {
+                  state: stats.state,
+                  fpsShown: stats.fpsPainted,
+                  targetFps: stats.targetFps,
+                  fpsReceived: isMjpeg && cfg.engine !== 'img' ? stats.fpsReceived : null,
+                  dropped: stats.dropped,
+                  late: stats.late,
+                  stalls: stats.stalls,
+                  kbps: isMjpeg && cfg.engine !== 'img' ? stats.kbps : null,
+                  bufferMs: stats.bufferMs,
+                  decodeMs: isMjpeg && cfg.engine !== 'img' ? stats.decodeMs : null,
+                  paintMs: stats.paintMs,
+                  avSyncMs: stats.avSyncMs,
+                  paintJitterMs: stats.paintJitterMs,
+                  arrivalJitterMs: stats.arrivalJitterMs,
+                  frameSize: stats.frameSize,
+                }
+              : null
+          }
+          tags={[eng.short, `${preset.maxHeight}p`, cfg.route === 'proxy' ? 'proxy' : 'direct', driveLabel]}
+          details={[
+            ['Audio :', stats?.audioState ?? '—'],
+            ['Note :', stats?.note || '—'],
+            ['Télémétrie :', telemetryRef.current ? `${telemetryRef.current.sent} envoi(s)${telemetryRef.current.lastError ? ` · ${telemetryRef.current.lastError}` : ''}` : '—'],
+          ]}
+          onHide={() => updateCfg({ stats: false })}
+        />
+      )}
 
       {loading && <div className="car-lab__center">Préparation de la source…</div>}
       {sourceError && <div className="car-lab__center is-warn">{sourceError}</div>}
       {paused && <div className="car-lab__center">⏸ Pause — {fmt(posRef.current)}</div>}
       {stats?.state === 'unavailable' && (
         <div className="car-lab__center is-warn">
-          {engineInfo(cfg.engine).label} : indisponible — {stats.note}
+          {eng.label} : indisponible — {stats.note}
         </div>
       )}
 
       {cfg.subs && subText && <div className="car-lab__subs">{subText}</div>}
       {capsOpen && <CarCapabilitiesPanel mode={drive} onClose={() => setCapsOpen(false)} />}
-
-      {cfg.stats && stats && (
-        <div className="car-lab__stats" onClick={(e) => e.stopPropagation()}>
-          <div>
-            <b>{engineInfo(cfg.engine).short}</b> · {preset.label}
-            {cfg.adaptive && effQuality !== cfg.quality ? ' (adapt.)' : ''} · {preset.maxHeight}p/{preset.fps}fps/q{preset.q}
-          </div>
-          <div>
-            Mode voiture : <b className={drive === 'drive' ? 'is-warn' : ''}>{driveLabel}</b> · état : {stats.state}
-          </div>
-          <div>
-            Flux : <b>{cfg.route === 'proxy' ? `proxy client (${PROXY_PREFIX})` : 'direct serveur'}</b>
-            {cfg.subs ? ` · ST ${subTrack != null ? `#${subTrack}` : 'aucun'}` : ''}
-          </div>
-          <div>
-            FPS affiché <b>{stats.fpsPainted}</b>/{stats.targetFps} · reçu {stats.fpsReceived}
-          </div>
-          <div>
-            Jetées {stats.dropped} · en retard {stats.late} · coupures {stats.stalls}
-          </div>
-          <div>
-            Jitter affichage {stats.paintJitterMs} ms · arrivée {stats.arrivalJitterMs} ms
-          </div>
-          <div>
-            Débit {(stats.kbps / 1000).toFixed(2)} Mb/s · buffer {stats.bufferFrames} img / {stats.bufferMs} ms
-          </div>
-          <div>
-            Décodage {stats.decodeMs} ms · peinture {stats.paintMs} ms · {stats.frameSize}
-          </div>
-          <div>
-            Audio {stats.audioState}
-            {stats.avSyncMs != null && (
-              <>
-                {' '}· A/V{' '}
-                <b className={Math.abs(stats.avSyncMs) > 250 ? 'is-warn' : 'is-ok'}>
-                  {stats.avSyncMs > 0 ? '+' : ''}
-                  {stats.avSyncMs} ms
-                </b>
-              </>
-            )}
-          </div>
-          {stats.note && <div className="car-lab__muted">{stats.note}</div>}
-        </div>
-      )}
 
       {error && (
         <div className="car-lab__error" onClick={(e) => e.stopPropagation()}>
@@ -438,172 +595,30 @@ export default function CarLab() {
         </div>
       )}
 
-      {panel ? (
-        <div className="car-lab__panel" onClick={(e) => e.stopPropagation()}>
-          <div className="car-lab__row car-lab__row--transport">
-            <button type="button" className="car-lab__btn" onClick={back}>
-              ← Bibliothèque
-            </button>
-            <button type="button" className="car-lab__btn" onClick={() => seekBy(-30)}>
-              −30
-            </button>
-            <button type="button" className="car-lab__btn car-lab__btn--big" onClick={togglePause}>
-              {paused ? '▶' : '⏸'}
-            </button>
-            <button type="button" className="car-lab__btn" onClick={() => seekBy(30)}>
-              +30
-            </button>
-            <button type="button" className="car-lab__btn" onClick={() => playerRef.current?.resumeAudio()}>
-              🔊 Débloquer son
-            </button>
-            <span className="car-lab__time">
-              {fmt(stats?.position ?? posRef.current)} · {title || source?.title || ''}
-            </span>
-          </div>
-
-          <div className="car-lab__row">
-            <span className="car-lab__label">Moteur</span>
-            {ENGINES.map((e) => {
-              const av = engineAvailability(e.id);
-              return (
-                <Toggle
-                  key={e.id}
-                  active={cfg.engine === e.id}
-                  disabled={!av.ok}
-                  title={av.ok ? e.description : `Indisponible : ${av.reason}`}
-                  onClick={() => updateCfg({ engine: e.id })}
-                >
-                  {e.short}
-                  {!av.ok && <small> indispo</small>}
-                </Toggle>
-              );
-            })}
-          </div>
-
-          <div className="car-lab__row">
-            <span className="car-lab__label">Qualité</span>
-            {QUALITY_ORDER.map((q) => (
-              <Toggle key={q} active={cfg.quality === q} disabled={!isMjpeg} onClick={() => updateCfg({ quality: q })}>
-                {QUALITY_PRESETS[q].label}
-                <small> {QUALITY_PRESETS[q].maxHeight}p·{QUALITY_PRESETS[q].fps}fps</small>
-              </Toggle>
-            ))}
-            <Toggle active={cfg.adaptive} disabled={!isMjpeg} onClick={() => updateCfg({ adaptive: !cfg.adaptive })}>
-              {cfg.adaptive ? 'Adaptatif' : 'Fixe'}
-            </Toggle>
-          </div>
-
-          <div className="car-lab__row">
-            <span className="car-lab__label">Buffer</span>
-            <Toggle active={cfg.buffer === 'aggressive'} disabled={!isMjpeg} onClick={() => updateCfg({ buffer: 'aggressive' })}>
-              Agressif <small>~0,3 s</small>
-            </Toggle>
-            <Toggle active={cfg.buffer === 'cautious'} disabled={!isMjpeg} onClick={() => updateCfg({ buffer: 'cautious' })}>
-              Prudent <small>~3 s</small>
-            </Toggle>
-            <span className="car-lab__label">Serveur</span>
-            <Toggle active={cfg.pace === 'realtime'} disabled={!isMjpeg} onClick={() => updateCfg({ pace: 'realtime' })}>
-              Temps réel
-            </Toggle>
-            <Toggle
-              active={cfg.pace === 'burst'}
-              disabled={!isMjpeg || cfg.engine === 'img'}
-              title="FFmpeg sans -re, régulé par le client (backpressure)"
-              onClick={() => updateCfg({ pace: 'burst' })}
-            >
-              Rafale+buffer
-            </Toggle>
-          </div>
-
-          <div className="car-lab__row">
-            <span className="car-lab__label">Horloge</span>
-            <Toggle active={cfg.clock === 'audio'} disabled={!isMjpeg} onClick={() => updateCfg({ clock: 'audio' })}>
-              Calée audio
-            </Toggle>
-            <Toggle active={cfg.clock === 'fixed'} disabled={!isMjpeg} onClick={() => updateCfg({ clock: 'fixed' })}>
-              Fixe
-            </Toggle>
-            <Toggle active={cfg.audio} onClick={() => updateCfg({ audio: !cfg.audio })}>
-              {cfg.audio ? 'Son ON' : 'Son OFF'}
-            </Toggle>
-            <Toggle active={cfg.stats} onClick={() => updateCfg({ stats: !cfg.stats })}>
-              Stats
-            </Toggle>
-            <button type="button" className="car-lab__btn" onClick={goFullscreen}>
-              ⛶ Plein écran
-            </button>
-            <button type="button" className="car-lab__btn" onClick={() => setPanel(false)}>
-              Masquer
-            </button>
-            <button type="button" className="car-lab__btn" onClick={runDriveTest}>
-              Re-tester Drive
-            </button>
-            <button type="button" className="car-lab__btn" onClick={copyLink}>
-              Lien
-            </button>
-            <button type="button" className="car-lab__btn" onClick={() => setCapsOpen(true)}>
-              Capacités
-            </button>
-          </div>
-          <div className="car-lab__row">
-            <span className="car-lab__label">Flux</span>
-            <Toggle
-              active={cfg.route === 'direct'}
-              title="URL du serveur configuré (ex. popcornn-server.jeser.app, via Cloudflare), requêtes cross-origin (CORS)"
-              onClick={() => updateCfg({ route: 'direct' })}
-            >
-              Direct serveur
-            </Toggle>
-            <Toggle
-              active={cfg.route === 'proxy'}
-              title="Même origine que la page (client…/srv/…) → nginx du conteneur client → conteneur serveur (réseau Docker interne). Pas de CORS."
-              onClick={() => updateCfg({ route: 'proxy' })}
-            >
-              Via proxy client
-            </Toggle>
-            <span className="car-lab__label">Sous-titres</span>
-            <Toggle active={cfg.subs} onClick={() => updateCfg({ subs: !cfg.subs })}>
-              {cfg.subs ? 'ST ON' : 'ST OFF'}
-            </Toggle>
-            {cfg.subs &&
-              (subTracks || []).map((t) => (
-                <Toggle
-                  key={t.index}
-                  active={subTrack === t.index}
-                  title={`${t.codec} · piste #${t.index}`}
-                  onClick={() => {
-                    setSubTrack(t.index);
-                    try {
-                      localStorage.setItem(SUB_TRACK_KEY, String(t.index));
-                    } catch {
-                      // ignore
-                    }
-                  }}
-                >
-                  {(t.language || `#${t.index}`).toUpperCase()}
-                  {t.title && <small> {t.title.slice(0, 18)}</small>}
-                </Toggle>
-              ))}
-            {cfg.subs && subInfo && <span className="car-lab__muted">{subInfo}</span>}
-          </div>
-          <p className="car-lab__muted car-lab__desc">
-            {engineInfo(cfg.engine).description}{' '}
-            {cfg.route === 'proxy'
-              ? 'Flux via proxy : client.popcornn.app/srv/… → nginx client → serveur (Docker interne).'
-              : 'Flux direct : URL du serveur configuré (Cloudflare → Traefik → serveur).'}
-          </p>
+      {barVisible && (
+        <div className="car-lab__bar">
+          <CarCategoryBar
+            categories={categories}
+            onOpenChange={setBarPinned}
+            onActivity={pokeBar}
+            leading={
+              <>
+                <button type="button" className="car-ui-bar__btn" onClick={() => seekBy(-30)} aria-label="Reculer 30 s">
+                  −30
+                </button>
+                <button type="button" className="car-ui-bar__btn car-ui-bar__btn--play" onClick={togglePause} aria-label={paused ? 'Lecture' : 'Pause'}>
+                  {paused ? '▶' : '⏸'}
+                </button>
+                <button type="button" className="car-ui-bar__btn" onClick={() => seekBy(30)} aria-label="Avancer 30 s">
+                  +30
+                </button>
+                <span className="car-ui-bar__time">
+                  {fmt(stats?.position ?? posRef.current)} · {title || source?.title || ''}
+                </span>
+              </>
+            }
+          />
         </div>
-      ) : (
-        <button
-          type="button"
-          className="car-lab__btn car-lab__show"
-          onClick={(e) => {
-            e.stopPropagation();
-            setPanel(true);
-          }}
-        >
-          Réglages
-        </button>
       )}
     </div>
   );

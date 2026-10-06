@@ -33,7 +33,7 @@ export interface CapsRecord {
 
 export interface CarAutoTuning {
   /** Moteur Drive recommandé pour /car */
-  engine: 'img' | 'canvas';
+  engine: 'img' | 'canvas' | 'worker';
   /** Preset qualité Drive recommandé */
   preset: 'standard' | 'lite';
   /** Relevé utilisé */
@@ -847,8 +847,17 @@ function num(v: unknown): number | null {
 /** Recommandation Drive à partir d'un relevé (de préférence pris EN Drive). */
 export function recommendCarDrive(rec?: CapsRecord | null): CarAutoTuning {
   const reasons: string[] = [];
-  if (!rec) return { engine: 'img', preset: 'standard', basis: 'none', workerOffscreen: false, reasons: ['aucun relevé'] };
-  const basis = rec.mode === 'drive' ? 'drive' : 'park';
+  if (!rec || rec.mode !== 'drive') {
+    // Pas encore de relevé pris EN Drive : canvas (le moins mauvais constaté en Drive), repli <img> si le canvas échoue
+    return {
+      engine: 'canvas',
+      preset: 'standard',
+      basis: rec ? 'park' : 'none',
+      workerOffscreen: false,
+      reasons: [rec ? 'relevé Park seulement → canvas (défaut Drive)' : 'aucun relevé → canvas (défaut Drive)', 'repli <img> si le canvas échoue'],
+    };
+  }
+  const basis = 'drive' as const;
   const apis = rec.apis as any;
   const perf = rec.perf as any;
   const env = rec.env as any;
@@ -857,16 +866,20 @@ export function recommendCarDrive(rec?: CapsRecord | null): CarAutoTuning {
   const fps = num(perf?.raf?.fps);
   const workerOffscreen = !!(apis?.worker?.offscreenCanvas && apis?.worker?.ctx2d && apis?.worker?.createImageBitmap);
 
-  let engine: 'img' | 'canvas' = 'img';
-  if (basis !== 'drive') reasons.push('pas encore de relevé pris en Drive → <img>');
-  else if (!fetchOk) reasons.push('fetch streaming KO en Drive → <img>');
-  else if (decode == null) reasons.push('createImageBitmap KO en Drive → <img>');
-  else if (decode > 30) reasons.push(`décodage JPEG lent (${decode} ms) → <img>`);
-  else if (fps != null && fps < 24) reasons.push(`rAF bridé (${fps} i/s) → <img>`);
-  else {
-    engine = 'canvas';
-    reasons.push(`Drive OK : fetch streaming, décodage ${decode} ms, rAF ${fps ?? '?'} i/s → canvas (jitter buffer + horloge audio)`);
+  let engine: 'img' | 'canvas' | 'worker' = 'canvas';
+  if (!fetchOk) {
+    engine = 'img';
+    reasons.push('fetch streaming KO en Drive → <img>');
+  } else if (decode == null) {
+    engine = 'img';
+    reasons.push('createImageBitmap KO en Drive → <img>');
+  } else if (workerOffscreen) {
+    engine = 'worker';
+    reasons.push(`Drive : Worker + OffscreenCanvas validés, décodage ${decode} ms → worker (hors thread principal)`);
+  } else {
+    reasons.push(`Drive : fetch streaming OK, décodage ${decode} ms, rAF ${fps ?? '?'} i/s → canvas`);
   }
+  if (engine !== 'img') reasons.push('repli worker → canvas → <img> en cas d’échec');
 
   let preset: 'standard' | 'lite' = 'standard';
   const mem = num(env?.deviceMemory);
@@ -887,7 +900,6 @@ export function recommendCarDrive(rec?: CapsRecord | null): CarAutoTuning {
     preset = 'lite';
     reasons.push(`réseau ${eff || 'saveData'} → preset léger`);
   }
-  if (workerOffscreen) reasons.push('Worker + OffscreenCanvas 2D disponibles (moteur hors thread possible)');
   return { engine, preset, basis, workerOffscreen, reasons };
 }
 
