@@ -4,7 +4,8 @@ import { stampTeslaBrowserHints } from '../../../lib/utils/device-detection';
 import { useCarMediaSource } from './useCarMediaSource';
 import CarLibraryBrowser, { type CarLibraryPick } from './CarLibraryBrowser';
 import { attachCarStream } from './attachCarStream';
-import { buildCarDriveUrls } from './buildCarDriveUrls';
+import { buildCarDriveUrls, getCarDriveQualityProfile } from './buildCarDriveUrls';
+import { CarCanvasRenderer, readCarRenderEngine, writeCarRenderEngine, type CarRenderEngine } from './carCanvasRenderer';
 import CarPlaybackTypeSelector from './CarPlaybackTypeSelector';
 import type { CarPlaybackSettings, CarPlaybackType } from './carPlaybackTypes';
 import { getStoredPlaybackSettings, resolvePlaybackType, setStoredPlaybackSettings } from './carPlaybackTypes';
@@ -74,6 +75,10 @@ export default function CarPlayer() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRendererRef = useRef<CarCanvasRenderer | null>(null);
+  const [renderEngine, setRenderEngine] = useState<CarRenderEngine>(() => readCarRenderEngine());
+  const canvasActive = renderEngine === 'canvas' && CarCanvasRenderer.isSupported();
   const userWantsPlayRef = useRef(false);
   const userPausedRef = useRef(false);
   const lastAdvanceAtRef = useRef(0);
@@ -160,6 +165,8 @@ export default function CarPlayer() {
     if (img) {
       img.removeAttribute('src');
     }
+    canvasRendererRef.current?.stop();
+    canvasRendererRef.current = null;
     setDriveUrls(null);
   }, []);
 
@@ -358,10 +365,26 @@ export default function CarPlayer() {
   useEffect(() => {
     if (!driveMode || !driveUrls) return;
     const audio = audioRef.current;
-    const img = imgRef.current;
-    if (!audio || !img) return;
-
-    img.src = driveUrls.mjpegUrl;
+    if (!audio) return;
+    if (canvasActive) {
+      // Moteur canvas optionnel : jitter buffer + cadence calée sur l'horloge audio
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      canvasRendererRef.current?.stop();
+      const renderer = new CarCanvasRenderer({
+        canvas,
+        url: driveUrls.mjpegUrl,
+        audio,
+        fps: getCarDriveQualityProfile().maxFps,
+        onError: (m) => setMediaError(m),
+      });
+      canvasRendererRef.current = renderer;
+      renderer.start();
+    } else {
+      const img = imgRef.current;
+      if (!img) return;
+      img.src = driveUrls.mjpegUrl;
+    }
     audio.src = driveUrls.audioUrl;
     audio.load();
     void audio.play().catch(() => {
@@ -396,6 +419,8 @@ export default function CarPlayer() {
     audio.addEventListener('error', onError);
 
     return () => {
+      canvasRendererRef.current?.stop();
+      canvasRendererRef.current = null;
       audio.removeEventListener('timeupdate', onTime);
       audio.removeEventListener('play', onPlay);
       audio.removeEventListener('playing', onPlay);
@@ -514,13 +539,16 @@ export default function CarPlayer() {
 
       {/* Audio + MJPEG : actifs uniquement en conduite (Tesla ne bloque pas img/audio) */}
       <audio ref={audioRef} className="tesla-car-drive-audio" preload="auto" />
-      {showDriveOverlay && (
+      {showDriveOverlay && !canvasActive && (
         <img
           ref={imgRef}
           className="tesla-car-drive-mjpeg"
           alt={displayTitle}
           draggable={false}
         />
+      )}
+      {showDriveOverlay && canvasActive && (
+        <canvas ref={canvasRef} className="tesla-car-drive-mjpeg" aria-label={displayTitle} />
       )}
 
       {showDriveOverlay && (
@@ -616,6 +644,20 @@ export default function CarPlayer() {
                 <span className="hidden sm:inline">Parking</span>
               </button>
             )}
+
+            <button
+              type="button"
+              className="tesla-car-ctrl tesla-car-ctrl--ghost"
+              onClick={() => {
+                const next: CarRenderEngine = renderEngine === 'canvas' ? 'img' : 'canvas';
+                writeCarRenderEngine(next);
+                setRenderEngine(next);
+                if (driveModeRef.current) startDriveAt(currentTime);
+              }}
+              title="Moteur d'affichage en conduite (canvas = expérimental : buffer + calage audio)"
+            >
+              <span>{renderEngine === 'canvas' ? 'Rendu canvas' : 'Rendu image'}</span>
+            </button>
 
             <CarPlaybackTypeSelector
               settings={playbackSettings}

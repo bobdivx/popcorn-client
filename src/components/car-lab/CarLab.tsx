@@ -12,7 +12,10 @@ import {
   ENGINES,
   QUALITY_ORDER,
   QUALITY_PRESETS,
+  PROXY_PREFIX,
+  buildSubsUrls,
   engineInfo,
+  routeStreamUrl,
   loadConfig,
   loadLastPick,
   saveConfig,
@@ -22,6 +25,21 @@ import {
   type LabQuality,
 } from './labConfig';
 import { LabPlayer, engineAvailability, type LabStats } from './labPlayer';
+import { SubtitleStream, fetchSubTracks, type SubTrack } from './labSubtitles';
+
+const SUB_TRACK_KEY = 'popcorn_car_lab_sub_track_v1';
+
+function pickDefaultTrack(tracks: SubTrack[]): number | null {
+  if (!tracks.length) return null;
+  try {
+    const saved = Number(localStorage.getItem(SUB_TRACK_KEY));
+    if (tracks.some((t) => t.index === saved)) return saved;
+  } catch {
+    // ignore
+  }
+  const fr = tracks.find((t) => /^(fr|fre|fra)/i.test(t.language) && !/forc/i.test(t.title));
+  return (fr || tracks[0]).index;
+}
 
 function fmt(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -93,6 +111,10 @@ export default function CarLab() {
   const [session, setSession] = useState(0);
   const [lastPick, setLastPick] = useState<LabPick | null>(null);
   const [title, setTitle] = useState<string>('');
+  const [subTracks, setSubTracks] = useState<SubTrack[] | null>(null);
+  const [subInfo, setSubInfo] = useState<string>('');
+  const [subTrack, setSubTrack] = useState<number | null>(null);
+  const [subText, setSubText] = useState<string>('');
 
   const hostRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -102,6 +124,7 @@ export default function CarLab() {
   const goodSecondsRef = useRef(0);
 
   const { source, loading, error: sourceError } = useCarMediaSource(slug);
+  const effectiveUrl = source?.streamUrl ? routeStreamUrl(source.streamUrl, cfg.route) : null;
 
   useEffect(() => {
     setSlug(readSlug());
@@ -140,11 +163,11 @@ export default function CarLab() {
   // (Re)démarre le moteur à la position courante à chaque changement de mode
   useEffect(() => {
     const host = hostRef.current;
-    if (!host || !source?.streamUrl || paused) return;
+    if (!host || !effectiveUrl || paused) return;
     setError(null);
     const player = new LabPlayer({
       host,
-      streamUrl: source.streamUrl,
+      streamUrl: effectiveUrl,
       seek: posRef.current,
       engine: cfg.engine,
       preset: QUALITY_PRESETS[effQuality],
@@ -167,7 +190,52 @@ export default function CarLab() {
       player.stop();
       if (playerRef.current === player) playerRef.current = null;
     };
-  }, [source?.streamUrl, cfg.engine, cfg.buffer, cfg.pace, cfg.clock, cfg.audio, effQuality, paused, session]);
+  }, [effectiveUrl, cfg.engine, cfg.buffer, cfg.pace, cfg.clock, cfg.audio, effQuality, paused, session]);
+
+  // Pistes sous-titres (ffprobe serveur) — chargées seulement si les sous-titres sont activés
+  useEffect(() => {
+    if (!cfg.subs || !effectiveUrl) return;
+    const ac = new AbortController();
+    setSubInfo('recherche des pistes…');
+    fetchSubTracks(buildSubsUrls(effectiveUrl, 0, null).listUrl, ac.signal)
+      .then(({ tracks, imageOnly }) => {
+        setSubTracks(tracks);
+        setSubTrack((cur) => (cur != null && tracks.some((t) => t.index === cur) ? cur : pickDefaultTrack(tracks)));
+        setSubInfo(
+          tracks.length
+            ? `${tracks.length} piste(s) texte${imageOnly ? ` · ${imageOnly} image (PGS/VobSub) ignorée(s)` : ''}`
+            : imageOnly
+              ? `${imageOnly} piste(s) image (PGS/VobSub) seulement — non affichables`
+              : 'aucune piste de sous-titres dans ce fichier',
+        );
+      })
+      .catch((e) => {
+        if (ac.signal.aborted) return;
+        setSubTracks([]);
+        setSubInfo(`pistes indisponibles (${e instanceof Error ? e.message : String(e)}) — serveur pas encore à jour ?`);
+      });
+    return () => ac.abort();
+  }, [cfg.subs, source?.streamUrl, cfg.route]);
+
+  // Flux WebVTT progressif depuis la position courante, affiché en overlay (indépendant du moteur vidéo)
+  useEffect(() => {
+    setSubText('');
+    if (!cfg.subs || subTrack == null || !effectiveUrl || paused) return;
+    const base = playerRef.current?.getPosition() ?? posRef.current;
+    const { vttUrl } = buildSubsUrls(effectiveUrl, base, subTrack);
+    if (!vttUrl) return;
+    const stream = new SubtitleStream(vttUrl);
+    stream.start();
+    const timer = window.setInterval(() => {
+      const pos = playerRef.current?.getPosition() ?? posRef.current;
+      setSubText(stream.textAt(pos - base));
+      if (stream.error) setSubInfo(stream.error);
+    }, 200);
+    return () => {
+      window.clearInterval(timer);
+      stream.stop();
+    };
+  }, [cfg.subs, subTrack, effectiveUrl, paused, session]);
 
   // Débit adaptatif : descend si on ne reçoit pas assez d'images, remonte après 30 s stables
   useEffect(() => {
@@ -301,6 +369,8 @@ export default function CarLab() {
         </div>
       )}
 
+      {cfg.subs && subText && <div className="car-lab__subs">{subText}</div>}
+
       {cfg.stats && stats && (
         <div className="car-lab__stats" onClick={(e) => e.stopPropagation()}>
           <div>
@@ -309,6 +379,10 @@ export default function CarLab() {
           </div>
           <div>
             Mode voiture : <b className={drive === 'drive' ? 'is-warn' : ''}>{driveLabel}</b> · état : {stats.state}
+          </div>
+          <div>
+            Flux : <b>{cfg.route === 'proxy' ? `proxy client (${PROXY_PREFIX})` : 'direct serveur'}</b>
+            {cfg.subs ? ` · ST ${subTrack != null ? `#${subTrack}` : 'aucun'}` : ''}
           </div>
           <div>
             FPS affiché <b>{stats.fpsPainted}</b>/{stats.targetFps} · reçu {stats.fpsReceived}
@@ -454,7 +528,53 @@ export default function CarLab() {
               Lien
             </button>
           </div>
-          <p className="car-lab__muted car-lab__desc">{engineInfo(cfg.engine).description}</p>
+          <div className="car-lab__row">
+            <span className="car-lab__label">Flux</span>
+            <Toggle
+              active={cfg.route === 'direct'}
+              title="URL du serveur configuré (ex. popcornn-server.jeser.app, via Cloudflare), requêtes cross-origin (CORS)"
+              onClick={() => updateCfg({ route: 'direct' })}
+            >
+              Direct serveur
+            </Toggle>
+            <Toggle
+              active={cfg.route === 'proxy'}
+              title="Même origine que la page (client…/srv/…) → nginx du conteneur client → conteneur serveur (réseau Docker interne). Pas de CORS."
+              onClick={() => updateCfg({ route: 'proxy' })}
+            >
+              Via proxy client
+            </Toggle>
+            <span className="car-lab__label">Sous-titres</span>
+            <Toggle active={cfg.subs} onClick={() => updateCfg({ subs: !cfg.subs })}>
+              {cfg.subs ? 'ST ON' : 'ST OFF'}
+            </Toggle>
+            {cfg.subs &&
+              (subTracks || []).map((t) => (
+                <Toggle
+                  key={t.index}
+                  active={subTrack === t.index}
+                  title={`${t.codec} · piste #${t.index}`}
+                  onClick={() => {
+                    setSubTrack(t.index);
+                    try {
+                      localStorage.setItem(SUB_TRACK_KEY, String(t.index));
+                    } catch {
+                      // ignore
+                    }
+                  }}
+                >
+                  {(t.language || `#${t.index}`).toUpperCase()}
+                  {t.title && <small> {t.title.slice(0, 18)}</small>}
+                </Toggle>
+              ))}
+            {cfg.subs && subInfo && <span className="car-lab__muted">{subInfo}</span>}
+          </div>
+          <p className="car-lab__muted car-lab__desc">
+            {engineInfo(cfg.engine).description}{' '}
+            {cfg.route === 'proxy'
+              ? 'Flux via proxy : client.popcornn.app/srv/… → nginx client → serveur (Docker interne).'
+              : 'Flux direct : URL du serveur configuré (Cloudflare → Traefik → serveur).'}
+          </p>
         </div>
       ) : (
         <button

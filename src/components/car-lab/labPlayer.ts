@@ -464,7 +464,7 @@ export class LabPlayer {
         dec.close();
         this.recordTimes(t0, t1);
       } else if (engine === 'canvas-img') {
-        const url = URL.createObjectURL(new Blob([frame.data], { type: 'image/jpeg' }));
+        const url = URL.createObjectURL(new Blob([frame.data as BlobPart], { type: 'image/jpeg' }));
         const img = new Image();
         img.src = url;
         try {
@@ -478,7 +478,7 @@ export class LabPlayer {
         this.ctx2d?.drawImage(img, 0, 0);
         this.recordTimes(t0, t1);
       } else {
-        const bmp = await createImageBitmap(new Blob([frame.data], { type: 'image/jpeg' }));
+        const bmp = await createImageBitmap(new Blob([frame.data as BlobPart], { type: 'image/jpeg' }));
         const t1 = performance.now();
         this.ensureSize(bmp.width, bmp.height);
         if (engine === 'webgl') this.drawGl(bmp);

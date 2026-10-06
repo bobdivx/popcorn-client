@@ -21,3 +21,22 @@
 .car-lab__desc { margin: 2px 0 0; }
 .car-lab .is-warn { color: #ffb020; }
 .car-lab .is-ok { color: #4ade80; }
+
+.car-lab__subs {
+  position: absolute;
+  left: 50%;
+  bottom: 12%;
+  transform: translateX(-50%);
+  max-width: 86%;
+  z-index: 6;
+  padding: 0.3em 0.7em;
+  border-radius: 0.35em;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+  font-size: clamp(20px, 2.6vw, 34px);
+  line-height: 1.3;
+  text-align: center;
+  white-space: pre-line;
+  text-shadow: 0 1px 3px #000;
+  pointer-events: none;
+}
