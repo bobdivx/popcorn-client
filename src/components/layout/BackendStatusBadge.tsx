@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { isTauri } from '../../lib/utils/tauri';
 import { getBackendUrl, getMyBackendUrl, hasBackendUrl } from '../../lib/backend-config';
-import { getBackendConnectionStore, subscribeBackendConnectionStore } from '../../lib/backend-connection-store';
+import { getBackendConnectionStore, subscribeBackendConnectionStore, setBackendConnectionDegraded, setBackendConnectionOnline, setBackendConnectionOffline } from '../../lib/backend-connection-store';
 import { serverApi } from '../../lib/client/server-api';
 import { checkDockerUpdates, type DockerUpdateCheckResult } from '../../lib/services/docker-update-checker';
 import { resetGpuCapability } from '../../lib/gpu-capability-store';
@@ -49,6 +49,7 @@ export default function BackendStatusBadge({
   const [lastError, setLastError] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const offlineConfirmTimerRef = useRef<number | null>(null);
+  const healthInFlightRef = useRef(false);
 
   // Charger la version client depuis VERSION.json (public/)
   useEffect(() => {
@@ -99,35 +100,54 @@ export default function BackendStatusBadge({
   }, []);
 
   const checkHealth = async (options?: { silent?: boolean }) => {
+    if (healthInFlightRef.current) return;
+    healthInFlightRef.current = true;
     const silent = options?.silent === true;
-    if (isFriendBackend()) {
-      // Backend d'un ami : ne jamais provoquer d'erreur ni de health check (séparation fiable).
-      setStatus('unknown');
+    try {
+      if (isFriendBackend()) {
+        // Backend d'un ami : ne jamais provoquer d'erreur ni de health check (séparation fiable).
+        setStatus('unknown');
+        setLastError(null);
+        setBackendVersion(null);
+        resetGpuCapability();
+        return;
+      }
+      const url = getBackendUrl()?.trim().replace(/\/$/, '');
+      if (!url || !url.startsWith('http')) {
+        setStatus('unknown');
+        return;
+      }
+      if (!silent) {
+        setStatus('checking');
+      }
       setLastError(null);
       setBackendVersion(null);
-      resetGpuCapability();
-      return;
-    }
-    const url = getBackendUrl()?.trim().replace(/\/$/, '');
-    if (!url || !url.startsWith('http')) {
-      setStatus('unknown');
-      return;
-    }
-    if (!silent) {
-      setStatus('checking');
-    }
-    setLastError(null);
-    setBackendVersion(null);
-    try {
       const res = await serverApi.checkServerHealth();
       if (res.success && res.data) {
-        setStatus(res.data.reachable ? 'ok' : 'error');
+        const torrentOk = res.data.torrent_client_reachable !== false;
+        setStatus(res.data.reachable ? (torrentOk ? 'ok' : 'error') : 'error');
         setBackendVersion(res.data.version ?? null);
+        if (res.data.reachable && !torrentOk) {
+          const detail =
+            (res.data as { torrent_client_error?: string }).torrent_client_error
+              ?? t('settingsMenu.overviewCard.serverDegraded');
+          setLastError(detail);
+          setBackendConnectionDegraded(detail);
+        } else if (res.data.reachable) {
+          setLastError(null);
+          setBackendConnectionOnline();
+        } else {
+          setBackendConnectionOffline();
+        }
       } else {
         setStatus('error');
+        setBackendConnectionOffline((res as { message?: string }).message);
       }
     } catch {
       setStatus('error');
+      setBackendConnectionOffline();
+    } finally {
+      healthInFlightRef.current = false;
     }
   };
 
@@ -148,14 +168,26 @@ export default function BackendStatusBadge({
       return () => clearInterval(interval);
     }
 
-    // S'abonner au store : quand il repasse en "online" (après une requête réussie), rafraîchir le badge.
+    // S'abonner au store : seulement au passage vers "online" (après une requête réussie).
+    // Ne pas relancer un check tant que le statut reste online : checkHealth rappelle
+    // setBackendConnectionOnline et reboucle (instantané en mode démo).
+    const prevStatusRef = { current: initialStore.status };
     const unsub = subscribeBackendConnectionStore((storeState) => {
-      if (storeState.status === 'online') {
+      const becameOnline = storeState.status === 'online' && prevStatusRef.current !== 'online';
+      prevStatusRef.current = storeState.status;
+      if (becameOnline) {
         if (offlineConfirmTimerRef.current != null) {
           window.clearTimeout(offlineConfirmTimerRef.current);
           offlineConfirmTimerRef.current = null;
         }
         checkHealth({ silent: true });
+      } else if (storeState.status === 'degraded') {
+        if (offlineConfirmTimerRef.current != null) {
+          window.clearTimeout(offlineConfirmTimerRef.current);
+          offlineConfirmTimerRef.current = null;
+        }
+        setStatus('error');
+        setLastError(storeState.lastError);
       } else if (storeState.status === 'offline') {
         // Evite le clignotement: confirmer "offline" via un health-check court.
         if (offlineConfirmTimerRef.current != null) {

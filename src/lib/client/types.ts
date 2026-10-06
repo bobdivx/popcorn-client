@@ -145,6 +145,8 @@ export interface ContentItem {
   trailerKey?: string | null;
   /** Date d'ajout sur l'indexeur (ISO ou timestamp string). */
   createdAt?: string;
+  /** Date d'ajout / mtime bibliothèque (unix seconds). */
+  addedAt?: number;
   /** True quand le torrent semble être une saison/série complète (INTÉGRALE, COMPLETE, etc.). */
   isCompletePack?: boolean;
   /** Signaux UI optionnels pour le hero/cartes dashboard. */
@@ -184,6 +186,12 @@ export interface SearchParams {
   lang?: string;
   /** Id d'indexer spécifique à interroger (sinon tous les indexers activés). */
   indexerId?: string;
+  /** Titre déjà choisi : la recherche base puis indexeur se fait par cet id TMDB. */
+  tmdbId?: number;
+  /** Année du titre TMDB, pour écarter les homonymes. */
+  year?: number;
+  /** Titre original TMDB, si différent du titre affiché. */
+  altQ?: string;
 }
 
 export interface SearchResult {
@@ -209,6 +217,8 @@ export interface SearchResult {
   indexerName?: string;
   /** Bibliothèque disque / sync base / résultat indexer. */
   sourceSearch?: 'library' | 'sync' | 'indexer';
+  /** Titre original TMDB quand il diffère du titre localisé. */
+  originalTitle?: string;
 }
 
 // ==================== STREAMING ====================
@@ -247,7 +257,7 @@ export interface User {
 export interface ClientTorrentStats {
   info_hash: string;
   name: string;
-  state: 'queued' | 'downloading' | 'seeding' | 'paused' | 'completed' | 'error';
+  state: 'queued' | 'checking' | 'downloading' | 'seeding' | 'paused' | 'completed' | 'error';
   downloaded_bytes: number;
   uploaded_bytes: number;
   total_bytes: number;

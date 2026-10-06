@@ -9,7 +9,7 @@ import { getPopcornWebBaseUrl, getUserConfig } from '../../lib/api/popcorn-web';
 import PocketIdSettings from './PocketIdSettings';
 import { MessageCircle, Users, BookOpen, ArrowRight, LogOut, CloudDownload } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
-import { isDemoMode, setDemoMode } from '../../lib/backend-config';
+import { exitDemoMode, isDemoMode } from '../../lib/backend-config';
 import { TokenManager } from '../../lib/client/storage';
 import { serverApi } from '../../lib/client/server-api';
 import { runAllFromCloud } from '../../lib/sync/index.js';
@@ -90,8 +90,7 @@ export default function AccountPanel() {
   };
 
   const handleExitDemo = () => {
-    setDemoMode(false);
-    window.location.href = '/'; // Rechargement pour sortir du proxy démo
+    exitDemoMode();
   };
 
   return (

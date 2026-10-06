@@ -1,19 +1,24 @@
-import { useMemo } from 'preact/hooks';
+import { useEffect, useMemo, useState } from 'preact/hooks';
 import { useI18n } from '../../lib/i18n/useI18n';
 import type { ContentItem } from '../../lib/client/types';
+import { serverApi } from '../../lib/client/server-api';
+import { aiReady, useAiEnabled } from '../../lib/ai/prefs';
 import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
 import { useDashboardData } from './hooks/useDashboardData';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useContentSignals } from './hooks/useContentSignals';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
+import { useLibraryBrowse } from './hooks/useLibraryBrowse';
 import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
-import SuggestionsSection from './SuggestionsSection';
 import {
   pickFeaturedHero,
   filterWatchNow,
   standaloneDownloads,
+  mergeReadyToWatch,
   excludeSeenItems,
   contentItemKey,
+  uniqueByMedia,
+  byReleaseDate,
 } from './utils/browsePriority';
 
 function dedupeDashboardItems(items: ContentItem[]): ContentItem[] {
@@ -27,10 +32,12 @@ function dedupeDashboardItems(items: ContentItem[]): ContentItem[] {
 }
 
 export default function Dashboard() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const aiEnabled = useAiEnabled();
   const { data, loading: dataLoading, error } = useDashboardData();
   const { activeDownloads, loading: downloadsLoading } = useActiveDownloads();
   const { resumeWatching, rewatchWatching } = useResumeWatching();
+  const { recentDownloads } = useLibraryBrowse('all');
   const loading = dataLoading && downloadsLoading;
 
   const popularMovies = data?.popularMovies ?? [];
@@ -50,12 +57,23 @@ export default function Dashboard() {
         ...popularMovies,
         ...popularSeries,
         ...activeDownloads,
+        ...recentDownloads,
       ]),
-    [popularMovies, popularSeries, recentMovies, recentSeries, freshMovies, freshSeries, activeDownloads]
+    [
+      popularMovies,
+      popularSeries,
+      recentMovies,
+      recentSeries,
+      freshMovies,
+      freshSeries,
+      activeDownloads,
+      recentDownloads,
+    ]
   );
 
   const { withSignals: allDashboardItemsWithSignals } = useContentSignals(allDashboardItems, resumeWatching);
 
+  // Exclure Reprenez + contenus terminés (ex-À revoir) de « Prêts à regarder »
   const seenItems = useMemo(
     () => [...resumeWatching, ...rewatchWatching],
     [resumeWatching, rewatchWatching]
@@ -64,15 +82,58 @@ export default function Dashboard() {
   const heroItems = useMemo(() => {
     const watchNow = excludeSeenItems(filterWatchNow(allDashboardItemsWithSignals), seenItems);
     const newestUnwatched = excludeSeenItems(
-      [...recentMovies, ...recentSeries, ...freshMovies, ...freshSeries],
+      [...recentDownloads, ...recentMovies, ...recentSeries, ...freshMovies, ...freshSeries],
       seenItems
     );
     return pickFeaturedHero(watchNow, newestUnwatched);
-  }, [allDashboardItemsWithSignals, seenItems, recentMovies, recentSeries, freshMovies, freshSeries]);
+  }, [
+    allDashboardItemsWithSignals,
+    seenItems,
+    recentDownloads,
+    recentMovies,
+    recentSeries,
+    freshMovies,
+    freshSeries,
+  ]);
 
   const handleNavigate = (item: ContentItem) => {
     window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
   };
+
+  const tonightPool = useMemo(
+    () => uniqueByMedia([...recentDownloads, ...recentMovies, ...recentSeries]).slice(0, 20),
+    [recentDownloads, recentMovies, recentSeries],
+  );
+  const [tonightItems, setTonightItems] = useState<ContentItem[]>([]);
+
+  useEffect(() => {
+    if (!aiEnabled || tonightPool.length === 0) {
+      setTonightItems([]);
+      return;
+    }
+    let cancelled = false;
+    aiReady().then(async (ready) => {
+      if (!ready || cancelled) return;
+      const res = await serverApi.aiTonight({
+        locale: language === 'en' ? 'en' : 'fr',
+        items: tonightPool.map((item) => ({
+          id: item.id,
+          title: item.tmdbTitle || item.title,
+          type: item.type,
+          seeds: item.seeds || 0,
+          in_library: true,
+        })),
+      });
+      if (cancelled || !res.success || !res.data?.ids?.length) return;
+      const picked = res.data.ids
+        .map((id) => tonightPool.find((item) => item.id === id))
+        .filter((item): item is ContentItem => !!item);
+      setTonightItems(picked);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [aiEnabled, language, tonightPool]);
 
   const sections = useMemo(() => {
     const enrichedResumeWatching = resumeWatching.map((item) => {
@@ -94,8 +155,31 @@ export default function Dashboard() {
 
     const watchNowItems = excludeSeenItems(filterWatchNow(allDashboardItemsWithSignals), seenItems);
     const downloadingNow = standaloneDownloads(activeDownloads, resumeWatching);
+    const readyToWatch = mergeReadyToWatch(
+      excludeSeenItems(recentDownloads, seenItems),
+      watchNowItems
+    ).filter((item) => !downloadingNow.some((dl) => contentItemKey(dl) === contentItemKey(item)));
 
     const result = [];
+
+    if (tonightItems.length > 0) {
+      result.push({
+        id: 'tonight',
+        title: t('ai.tonightTitle'),
+        items: tonightItems,
+        priority: true,
+      });
+    }
+
+    if (downloadingNow.length > 0) {
+      result.push({
+        id: 'active-downloads',
+        title: t('dashboard.activeDownloads'),
+        items: downloadingNow,
+        kind: 'downloads' as const,
+        priority: true,
+      });
+    }
 
     if (enrichedResumeWatching.length > 0) {
       result.push({
@@ -107,87 +191,47 @@ export default function Dashboard() {
       });
     }
 
-    if (rewatchWatching.length > 0) {
-      result.push({
-        id: 'rewatch-watching',
-        title: t('dashboard.rewatch'),
-        items: rewatchWatching,
-        kind: 'resume' as const,
-        priority: true,
-      });
-    }
-
-    if (downloadingNow.length > 0) {
-      result.push({
-        id: 'active-downloads',
-        title: t('dashboard.activeDownloads'),
-        items: downloadingNow,
-        priority: true,
-      });
-    }
-
-    if (watchNowItems.length > 0) {
+    if (readyToWatch.length > 0) {
       result.push({
         id: 'recently-downloaded',
         title: t('dashboard.recentlyDownloaded'),
-        items: watchNowItems,
+        items: readyToWatch,
         priority: true,
       });
     }
 
-    const freshMoviesWithSignals = allDashboardItemsWithSignals.filter((i) =>
-      freshMovies.some((r) => r.id === i.id)
-    );
-    const freshSeriesWithSignals = allDashboardItemsWithSignals.filter((i) =>
-      freshSeries.some((r) => r.id === i.id)
-    );
+    const cinemaRecent = byReleaseDate(uniqueByMedia([...recentMovies, ...recentSeries])).slice(0, 40);
+    if (cinemaRecent.length > 0) {
+      result.push({
+        id: 'cinema-recent',
+        title: t('dashboard.cinemaRecent'),
+        items: cinemaRecent,
+      });
+    }
 
-    result.push(
-      {
-        id: 'recentMovies',
-        title: t('dashboard.newReleasesMovies'),
-        items: allDashboardItemsWithSignals.filter((i) => recentMovies.some((r) => r.id === i.id)),
-      },
-      {
-        id: 'freshMovies',
-        title: t('dashboard.freshlySyncedMovies'),
-        items: freshMoviesWithSignals,
-      },
-      {
-        id: 'popularMovies',
-        title: t('dashboard.popularMovies'),
-        items: allDashboardItemsWithSignals.filter((i) => popularMovies.some((r) => r.id === i.id)),
-      },
-      {
-        id: 'recentSeries',
-        title: t('dashboard.newReleasesSeries'),
-        items: allDashboardItemsWithSignals.filter((i) => recentSeries.some((r) => r.id === i.id)),
-      },
-      {
-        id: 'freshSeries',
-        title: t('dashboard.freshlySyncedSeries'),
-        items: freshSeriesWithSignals,
-      },
-      {
-        id: 'popularSeries',
-        title: t('dashboard.popularSeries'),
-        items: allDashboardItemsWithSignals.filter((i) => popularSeries.some((r) => r.id === i.id)),
-      }
-    );
+    const mostDownloaded = uniqueByMedia([...popularMovies, ...popularSeries])
+      .sort((a, b) => (b.seeds ?? 0) - (a.seeds ?? 0))
+      .slice(0, 40);
+    if (mostDownloaded.length > 0) {
+      result.push({
+        id: 'most-downloaded',
+        title: t('dashboard.mostDownloaded'),
+        items: mostDownloaded,
+      });
+    }
 
     return result;
   }, [
     allDashboardItemsWithSignals,
     activeDownloads,
     resumeWatching,
-    rewatchWatching,
+    recentDownloads,
     seenItems,
-    popularMovies,
-    popularSeries,
     recentMovies,
     recentSeries,
-    freshMovies,
-    freshSeries,
+    popularMovies,
+    popularSeries,
+    tonightItems,
     t,
   ]);
 
@@ -202,8 +246,6 @@ export default function Dashboard() {
       onNavigate={handleNavigate}
       emptyTitle={t('sync.noTorrentsSynced')}
       emptyDescription={t('sync.startSyncAllDescription')}
-    >
-      <SuggestionsSection contextType="all" />
-    </SimpleTmdbPage>
+    />
   );
 }

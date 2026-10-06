@@ -26,12 +26,15 @@ interface IndexerDetailPanelProps {
   indexer: Indexer;
   onDeleted?: () => void;
   onEditClose?: () => void;
+  /** Affiché dans la bibliothèque (films/séries). null = non géré par cet écran. */
+  visibleInLibrary?: boolean;
+  onVisibleInLibraryChange?: (visible: boolean) => Promise<void> | void;
   onBack?: () => void;
   /** Après mise à jour de la config indexer (ex. préférences ZIP) */
   onIndexerUpdated?: () => void;
 }
 
-export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, onBack, onIndexerUpdated }: IndexerDetailPanelProps) {
+export default function IndexerDetailPanel({ indexer, visibleInLibrary, onVisibleInLibraryChange, onDeleted, onEditClose, onBack, onIndexerUpdated }: IndexerDetailPanelProps) {
   const { t } = useI18n();
   const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const [showEdit, setShowEdit] = useState(false);
@@ -49,6 +52,9 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
   const [duplicating, setDuplicating] = useState(false);
   const [duplicateError, setDuplicateError] = useState<string | null>(null);
   const [duplicateSuccess, setDuplicateSuccess] = useState<string | null>(null);
+
+  const [librarySaving, setLibrarySaving] = useState(false);
+  const [libraryMessage, setLibraryMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   const skipSync = useMemo(() => indexerHasSkipSync(indexer.configJson), [indexer.configJson]);
   const canDuplicateAccount = (indexer.indexerTypeId || '').toLowerCase() === 'c411';
@@ -74,6 +80,20 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
     if (!Number.isFinite(n) || n < 0) return null;
     return n;
   }, [extraConfig]);
+
+  const handleLibraryVisible = async (visible: boolean) => {
+    if (!onVisibleInLibraryChange) return;
+    setLibrarySaving(true);
+    setLibraryMessage(null);
+    try {
+      await onVisibleInLibraryChange(visible);
+      setLibraryMessage({ ok: true, text: t('settingsMenu.libraryIndexerPanel.saved') });
+    } catch {
+      setLibraryMessage({ ok: false, text: t('settingsMenu.libraryIndexerPanel.saveError') });
+    } finally {
+      setLibrarySaving(false);
+    }
+  };
 
   const handleEdit = () => setShowEdit(true);
   const handleEditClose = () => {
@@ -354,6 +374,28 @@ export default function IndexerDetailPanel({ indexer, onDeleted, onEditClose, on
               <p className="ds-text-secondary text-xs">ID</p>
               <p className="font-mono text-xs text-white break-all">{indexer.id}</p>
             </div>
+            {onVisibleInLibraryChange && (
+              <label class="flex items-center justify-between gap-4 sm:col-span-3 pt-2 border-t border-[var(--ds-border-subtle)]">
+                <span class="min-w-0">
+                  <span class="block text-sm text-white">{t('settingsMenu.libraryIndexerPanel.showInLibrary')}</span>
+                  <span class="block text-xs ds-text-secondary mt-0.5">{t('settingsMenu.libraryIndexerPanel.hint')}</span>
+                  {libraryMessage && (
+                    <span class={`block text-xs mt-1 ${libraryMessage.ok ? 'text-emerald-300' : 'text-red-300'}`}>
+                      {libraryMessage.text}
+                    </span>
+                  )}
+                </span>
+                <input
+                  type="checkbox"
+                  class="toggle toggle-primary"
+                  checked={visibleInLibrary !== false}
+                  disabled={librarySaving}
+                  data-focusable
+                  aria-label={t('settingsMenu.libraryIndexerPanel.showInLibrary')}
+                  onChange={(e) => handleLibraryVisible((e.target as HTMLInputElement).checked)}
+                />
+              </label>
+            )}
           </div>
         )}
 

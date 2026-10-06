@@ -118,31 +118,29 @@ export default function DownloadsSubMenuPanel() {
     return true;
   });
 
-  if (sub === 'librqbit') {
-    const item = items.find((i) => i.id === 'librqbit')!;
-    return (
-      <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}>
-        <LibRbitSettings />
-      </SettingsSubPageFrame>
-    );
-  }
-
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
-      {visible.map((item) => {
-        const href = item.kind === 'link' ? item.href : `${BASE_URL}?sub=${(item as { sub: string }).sub}`;
-        const isExternal = item.kind === 'link' && !!item.isExternal;
-        return (
-          <SettingsNavCard
-            key={item.id}
-            href={href}
-            icon={item.icon}
-            title={t(item.titleKey)}
-            description={t(item.descriptionKey)}
-            isExternal={isExternal}
-          />
-        );
-      })}
-    </div>
+    <>
+      <div className="hub-grid" data-tv-list role="list">
+        {visible.map((item) => {
+          const href = item.kind === 'link' ? item.href : `${BASE_URL}?sub=${(item as { sub: string }).sub}`;
+          const isExternal = item.kind === 'link' && !!item.isExternal;
+          return (
+            <SettingsNavCard
+              key={item.id}
+              href={href}
+              icon={item.icon}
+              title={t(item.titleKey)}
+              description={t(item.descriptionKey)}
+              isExternal={isExternal}
+            />
+          );
+        })}
+      </div>
+      {sub === 'librqbit' && (
+        <SettingsSubPageFrame backHref={BASE_URL} icon={HardDrive} title={t('settingsMenu.librqbit.title')} description={t('settingsMenu.librqbit.description')}>
+          <LibRbitSettings />
+        </SettingsSubPageFrame>
+      )}
+    </>
   );
 }

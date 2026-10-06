@@ -4,6 +4,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import CarouselRow from '../torrents/CarouselRow';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { PosterCard } from '../page-model/PosterCard';
+import BrowseRowReveal from '../motion/BrowseRowReveal';
 
 const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p/w500';
 
@@ -179,18 +180,22 @@ export default function SuggestionsSection({ contextType = 'all' }: { contextTyp
   return (
     <div>
       {suggestedMovies.length > 0 && (
-        <CarouselRow title={t('dashboard.suggestionsMovies') || 'Films suggérés pour vous'} autoScroll={false}>
-          {suggestedMovies.map((item) => (
-            <PosterCard key={item.id} item={item} onNavigate={handleItemClick} />
-          ))}
-        </CarouselRow>
+        <BrowseRowReveal rowId="suggestions-movies">
+          <CarouselRow title={t('dashboard.suggestionsMovies') || 'Films suggérés pour vous'} autoScroll={false}>
+            {suggestedMovies.map((item) => (
+              <PosterCard key={item.id} item={item} onNavigate={handleItemClick} />
+            ))}
+          </CarouselRow>
+        </BrowseRowReveal>
       )}
       {suggestedTv.length > 0 && (
-        <CarouselRow title={t('dashboard.suggestionsSeries') || 'Séries suggérées pour vous'} autoScroll={false}>
-          {suggestedTv.map((item) => (
-            <PosterCard key={item.id} item={item} onNavigate={handleItemClick} />
-          ))}
-        </CarouselRow>
+        <BrowseRowReveal rowId="suggestions-series">
+          <CarouselRow title={t('dashboard.suggestionsSeries') || 'Séries suggérées pour vous'} autoScroll={false}>
+            {suggestedTv.map((item) => (
+              <PosterCard key={item.id} item={item} onNavigate={handleItemClick} />
+            ))}
+          </CarouselRow>
+        </BrowseRowReveal>
       )}
     </div>
   );

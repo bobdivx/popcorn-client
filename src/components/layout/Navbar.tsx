@@ -15,7 +15,7 @@ import {
 } from '../../lib/sync-status-store';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { LANGUAGE_NAMES, type SupportedLanguage } from '../../lib/i18n';
-import { isDemoMode, setDemoMode } from '../../lib/backend-config';
+import { exitDemoMode, isDemoMode } from '../../lib/backend-config';
 import { TokenManager } from '../../lib/client/storage';
 import { loadSubscription } from '../../lib/subscription-store';
 import ConnectivityWarning from './ConnectivityWarning';
@@ -321,6 +321,17 @@ export default function Navbar() {
                     <GpuStatusBadge variant="inline" />
                   </div>
                   <div className="border-t border-[var(--ds-border)] my-1" aria-hidden />
+                  {demoMode && (
+                    <button
+                      type="button"
+                      onClick={() => { setMobileMenuOpen(false); exitDemoMode(); }}
+                      className="flex w-full items-center gap-3 px-4 py-3.5 rounded-lg bg-amber-600 text-white font-semibold"
+                      tabIndex={0}
+                      data-focusable
+                    >
+                      <span>{t('demo.exitDemo')}</span>
+                    </button>
+                  )}
                   {tabs.map((tab, index) => {
                     const active = tab.match === 'exact' ? isActive(tab.href) : isActivePrefix(tab.href);
                     const TabIcon = tab.icon;
@@ -388,12 +399,11 @@ export default function Navbar() {
             {demoMode && (
               <button
                 type="button"
-                onClick={() => { setDemoMode(false); window.location.href = '/'; }}
-                className="flex-shrink-0 px-2 py-1.5 rounded-lg text-xs font-medium bg-amber-600/90 text-white hover:bg-amber-500 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-gray-900 whitespace-nowrap"
+                onClick={() => exitDemoMode()}
+                className="hidden xl:inline-flex flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-amber-600/90 text-white hover:bg-amber-500 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-400 focus:ring-offset-2 focus:ring-offset-gray-900 whitespace-nowrap"
                 title={t('demo.exitDemo')}
               >
-                <span className="hidden xl:inline">{t('demo.exitDemo')}</span>
-                <span className="xl:hidden">Démo</span>
+                {t('demo.exitDemo')}
               </button>
             )}
 

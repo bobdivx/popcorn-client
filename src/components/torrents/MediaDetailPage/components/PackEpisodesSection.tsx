@@ -115,6 +115,7 @@ export function PackEpisodesSection({
       aria-label={t('mediaDetail.episodes')}
       className="rounded-2xl overflow-hidden bg-gradient-to-b from-white/10 to-black/30 border border-white/10 backdrop-blur-sm"
       data-pack-episodes
+      data-tv-episode-row
     >
       <div className="px-5 py-4 border-b border-white/10 bg-black/20 flex items-start sm:items-center justify-between gap-4">
         <div className="min-w-0">

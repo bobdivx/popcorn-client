@@ -1,5 +1,5 @@
 import { useEffect } from 'preact/hooks';
-import { ArrowLeft, Maximize2, Minimize2, Pause, Play, Settings, SkipBack, SkipForward } from 'lucide-preact';
+import { ArrowLeft, Maximize2, Minimize2, Pause, Play, Settings, SkipBack, SkipForward, Subtitles } from 'lucide-preact';
 import { formatTime } from '../utils/formatTime';
 import { useI18n } from '../../../../lib/i18n';
 import { serverApi } from '../../../../lib/client/server-api';
@@ -11,7 +11,13 @@ import {
   scrubTimeForIndex,
   scrubUrlForIndex,
 } from './video-controls/scrubMath';
-import { TV_QUALITY_VALUES } from '../hooks/useTVPlayerNavigation';
+
+interface TvTrackOption {
+  id: number;
+  name: string;
+  lang?: string;
+  default?: boolean;
+}
 
 interface TvPlayerDockProps {
   show: boolean;
@@ -25,46 +31,32 @@ interface TvPlayerDockProps {
   scrubThumbnails?: ScrubThumbnailsMeta | null;
   scrubThumbnailsLoading?: boolean;
   videoFillMode?: 'contain' | 'cover';
-  streamQuality?: number | null;
   settingsOpen?: boolean;
-  settingsFocusIndex?: number;
+  audioTracks?: TvTrackOption[];
+  subtitleTracks?: TvTrackOption[];
+  currentSubtitleTrack?: number;
   onClose?: () => void;
   onPlayPause: () => void;
   onSeekToTime: (timeSeconds: number) => void;
   onToggleFillMode?: () => void;
   onOpenSettings?: () => void;
-  onSelectQuality?: (height: number | null) => void;
+  onToggleSubtitles?: () => void;
 }
 
 function dockBtnStyle(focused: boolean): Record<string, string | number> {
   return {
-    width: 52,
-    height: 52,
+    width: 72,
+    height: 72,
     borderRadius: 999,
-    background: focused ? '#fff' : '#222',
-    color: focused ? '#000' : '#fff',
-    border: focused ? '3px solid #fff' : '2px solid rgba(255,255,255,0.7)',
-    boxShadow: focused ? '0 0 0 3px #000, 0 0 0 6px #fff' : 'none',
+    background: focused ? '#7c3aed' : 'rgba(255,255,255,0.14)',
+    color: '#fff',
+    border: focused ? '3px solid #fff' : '2px solid transparent',
+    boxShadow: focused ? '0 0 0 4px rgba(124,58,237,0.55)' : 'none',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-  };
-}
-
-function chipStyle(focused: boolean, selected: boolean): Record<string, string | number> {
-  return {
-    minWidth: 72,
-    height: 40,
-    padding: '0 14px',
-    borderRadius: 999,
-    background: focused || selected ? '#fff' : '#222',
-    color: focused || selected ? '#000' : '#fff',
-    border: focused ? '3px solid #fff' : selected ? '2px solid #fff' : '2px solid rgba(255,255,255,0.4)',
-    boxShadow: focused ? '0 0 0 3px #000, 0 0 0 6px #fff' : 'none',
-    fontSize: 16,
-    fontWeight: 600,
-    flexShrink: 0,
+    transform: focused ? 'scale(1.08)' : 'none',
   };
 }
 
@@ -84,15 +76,16 @@ export function TvPlayerDock({
   scrubThumbnails = null,
   scrubThumbnailsLoading = false,
   videoFillMode = 'cover',
-  streamQuality = null,
   settingsOpen = false,
-  settingsFocusIndex = 0,
+  audioTracks = [],
+  subtitleTracks = [],
+  currentSubtitleTrack = -1,
   onClose,
   onPlayPause,
   onSeekToTime,
   onToggleFillMode,
   onOpenSettings,
-  onSelectQuality,
+  onToggleSubtitles,
 }: TvPlayerDockProps) {
   const { t } = useI18n();
   const dur = Number.isFinite(duration) && duration > 0 ? duration : 0;
@@ -119,6 +112,8 @@ export function TvPlayerDock({
   const timeForIndex = (idx: number) =>
     scrubThumbnails ? scrubTimeForIndex(idx, scrubThumbnails, effectiveDur) : 0;
 
+  const hasLanguageTracks = audioTracks.length > 0 || subtitleTracks.length > 0;
+
   useEffect(() => {
     if (!show || settingsOpen || focusedOnScrub) return;
     const el = document.querySelector<HTMLElement>(
@@ -140,15 +135,6 @@ export function TvPlayerDock({
     fn();
   };
 
-  const qualityLabel = (value: number | null) => {
-    if (value == null) return t('playback.qualityAuto');
-    if (value === 1080) return t('playback.quality1080');
-    if (value === 720) return t('playback.quality720');
-    if (value === 480) return t('playback.quality480');
-    if (value === 360) return t('playback.quality360');
-    return `${value}p`;
-  };
-
   const btnFocused = (id: string) => !focusedOnScrub && !settingsOpen && focusedControlId === id;
 
   return (
@@ -159,8 +145,8 @@ export function TvPlayerDock({
         bottom: 0,
         left: 0,
         right: 0,
-        background: '#000',
-        padding: '10px 16px 16px',
+        background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.72) 55%, transparent 100%)',
+        padding: '28px 48px 28px',
         color: '#fff',
         zIndex: 410,
         pointerEvents: 'auto',
@@ -191,19 +177,20 @@ export function TvPlayerDock({
         aria-valuemin={0}
         aria-valuemax={Math.round(effectiveDur)}
         style={{
-          height: 8,
+          height: focusedOnScrub ? 14 : 10,
           borderRadius: 999,
-          background: 'rgba(255,255,255,0.3)',
-          margin: '10px 0 14px',
+          background: 'rgba(255,255,255,0.28)',
+          margin: '12px 0 18px',
           overflow: 'hidden',
           position: 'relative',
+          boxShadow: focusedOnScrub ? '0 0 0 3px rgba(255,255,255,0.85)' : 'none',
         }}
       >
         <div
           style={{
             width: `${pct}%`,
             height: '100%',
-            background: previewing ? '#c4b5fd' : '#fff',
+            background: '#a78bfa',
           }}
         />
         {previewing && (
@@ -219,23 +206,7 @@ export function TvPlayerDock({
           />
         )}
       </div>
-      {settingsOpen && onSelectQuality && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          {TV_QUALITY_VALUES.map((value, i) => (
-            <button
-              key={value ?? 'auto'}
-              type="button"
-              data-tv-dock-settings-opt={i}
-              onClick={activate(() => onSelectQuality(value))}
-              aria-label={qualityLabel(value)}
-              style={chipStyle(settingsFocusIndex === i, streamQuality === value)}
-            >
-              {qualityLabel(value)}
-            </button>
-          ))}
-        </div>
-      )}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
         {onClose && (
           <button
             type="button"
@@ -282,19 +253,38 @@ export function TvPlayerDock({
         >
           <SkipForward class="w-6 h-6" />
         </button>
-        <span style={{ fontSize: 18, fontVariantNumeric: 'tabular-nums', marginLeft: 4 }}>
+        <span style={{ fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums', marginLeft: 8, letterSpacing: '0.02em' }}>
           {formatTime(previewTime)}
           {effectiveDur ? ` / ${formatTime(effectiveDur)}` : ''}
         </span>
         <span style={{ flex: 1 }} />
-        {onOpenSettings && onSelectQuality && (
+        {hasLanguageTracks && onToggleSubtitles && (
+          <button
+            type="button"
+            data-tv-dock-btn="subtitles"
+            data-focusable
+            tabIndex={0}
+            onClick={activate(onToggleSubtitles)}
+            aria-label={t('playback.languagesAndSubtitles')}
+            title={t('playback.languagesAndSubtitles')}
+            style={{
+              ...dockBtnStyle(btnFocused('subtitles')),
+              ...(currentSubtitleTrack !== -1
+                ? { border: '2px solid #fff', background: btnFocused('subtitles') ? '#fff' : '#444' }
+                : null),
+            }}
+          >
+            <Subtitles class="w-6 h-6" />
+          </button>
+        )}
+        {onOpenSettings && (
           <button
             type="button"
             data-tv-dock-btn="settings"
             data-focusable
             tabIndex={0}
             onClick={activate(onOpenSettings)}
-            aria-label={t('playback.quality')}
+            aria-label={t('playback.playerSettings')}
             style={dockBtnStyle(btnFocused('settings'))}
           >
             <Settings class="w-6 h-6" />
@@ -323,6 +313,9 @@ export function TvPlayerDock({
           </button>
         )}
       </div>
+      <p style={{ margin: '14px 0 0', fontSize: 16, lineHeight: 1.35, color: 'rgba(255,255,255,0.72)' }}>
+        {t('playback.tvRemoteHint')}
+      </p>
     </div>
   );
 }

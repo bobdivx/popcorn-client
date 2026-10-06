@@ -68,7 +68,7 @@ export function GenreCardsRow({
 
           <div
             ref={scrollerRef}
-            className="w-full min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar py-1 px-1"
+            className="flex w-full min-w-0 gap-4 overflow-x-auto overflow-y-hidden overscroll-x-contain no-scrollbar py-1 px-1"
             style={{
               scrollSnapType: 'x mandatory',
               scrollbarWidth: 'none',
@@ -76,11 +76,12 @@ export function GenreCardsRow({
               touchAction: 'pan-x pan-y',
             }}
             data-carousel
+            data-browse-carousel
           >
-            <div className="flex gap-4">
               <button
                 type="button"
                 data-focusable
+                data-browse-slot
                 data-genre-card
                 tabIndex={0}
                 onClick={() => onSelectGenre(null)}
@@ -121,6 +122,7 @@ export function GenreCardsRow({
                     key={genre}
                     type="button"
                     data-focusable
+                    data-browse-slot
                     data-genre-card
                     tabIndex={0}
                     onClick={() => onSelectGenre(genre)}
@@ -156,7 +158,6 @@ export function GenreCardsRow({
                   </button>
                 );
               })}
-            </div>
           </div>
         </div>
       </div>

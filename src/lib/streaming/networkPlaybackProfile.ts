@@ -105,13 +105,28 @@ export function getNetworkPlaybackProfile(
     maxBufferLength = Math.max(maxBufferLength, 40);
   }
 
-  // TV : garder la 4K (Wi‑Fi), buffer plus court. Si le décodeur bloque,
-  // HLSPlayer bascule tout seul en 1080p avec un message dans la modal.
+  // TV : beaucoup de WebViews annoncent effectiveType=4g même en Wi‑Fi/Ethernet.
+  // Ne pas plafonner à 720p : Auto (null) pour garder la 4K source.
+  // Vrai réseau lent (2g/3g/saveData) : on garde le plafond bas.
+  // Si le décodeur bloque, HLSPlayer bascule en 1080p avec un message.
   if (isTv) {
+    const trustCellularCap =
+      saveData ||
+      effectiveType === 'slow-2g' ||
+      effectiveType === '2g' ||
+      effectiveType === '3g';
+    if (!trustCellularCap) {
+      suggestedMaxHeight = null;
+      label =
+        effectiveType === 'wifi'
+          ? 'Wi‑Fi / Ethernet — qualité auto — TV'
+          : 'TV — qualité auto (4G navigateur ignoré)';
+    } else {
+      label = `${label} — TV`;
+    }
     startLevel = 0;
     maxBufferLength = Math.min(maxBufferLength, 24);
     abrBandWidthFactor = Math.min(abrBandWidthFactor, 0.7);
-    label = `${label} — TV`;
   }
 
   return {

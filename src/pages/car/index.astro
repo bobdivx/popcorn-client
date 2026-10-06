@@ -1,0 +1,30 @@
+---
+import '../../styles/global.css';
+import '../../styles/car-tesla.css';
+import CarPlayer from '../../components/streaming/car-player/CarPlayer';
+---
+
+<!doctype html>
+<html lang="fr" data-theme="dark" data-ui-pack="tesla" data-car-player="true" class="overflow-x-hidden">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="Lecteur Popcornn optimisé navigateur voiture (Tesla)" />
+    <title>Theater - Popcornn</title>
+    <script is:inline>
+      (function () {
+        try {
+          var ua = navigator.userAgent || '';
+          if (/Tesla|QtCarBrowser|QtWebEngine/i.test(ua)) {
+            document.documentElement.setAttribute('data-tesla-browser', 'true');
+            sessionStorage.setItem('popcorn_is_tesla', '1');
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body class="tesla-car-root m-0 overflow-hidden">
+    <CarPlayer client:only="preact" />
+  </body>
+</html>

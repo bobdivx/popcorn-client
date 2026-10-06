@@ -35,6 +35,21 @@ export interface TorrentFile {
   index?: number; // Index dans le torrent pour créer l'URL blob
 }
 
+/** Sample, bande-annonce, extras : à écarter quand on choisit le fichier à lire. */
+export function isAuxiliaryVideo(nameOrPath: string): boolean {
+  const n = nameOrPath.replace(/\\/g, '/').toLowerCase();
+  return /(^|[\/._\-\s])(sample|trailer|extras?|featurettes?|proof)([\/._\-\s]|$)/.test(n);
+}
+
+function playableVideos(files: TorrentFile[]): TorrentFile[] {
+  const main = files.filter((f) => !isAuxiliaryVideo(`${f.path} ${f.name}`));
+  return main.length > 0 ? main : files;
+}
+
+function largestVideo(files: TorrentFile[]): TorrentFile {
+  return files.reduce((prev, current) => (current.size > prev.size ? current : prev));
+}
+
 /** Corrige les chemins bibliothèque avec préfixe media/ dupliqué (media/media/series/…). */
 function dedupeLibraryMediaPrefix(filePath: string): string {
   let normalized = filePath.replace(/\\/g, '/');
@@ -475,22 +490,15 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
                 )
             );
 
+          const pool = playableVideos(files);
           // Chercher le fichier qui correspond le mieux au nom du torrent
-          const matchingFile = files.find((f) => {
+          const matchingFile = pool.find((f) => {
             const fileNameLower = f.name.toLowerCase();
             const matchingWords = torrentWords.filter((word) => fileNameLower.includes(word));
             return matchingWords.length >= 2;
           });
 
-          if (matchingFile) {
-            files = [matchingFile];
-          } else {
-            // Sinon, prendre le plus gros fichier vidéo
-            const largestFile = files.reduce((prev, current) =>
-              current.size > prev.size ? current : prev
-            );
-            files = [largestFile];
-          }
+          files = [matchingFile ?? largestVideo(pool)];
         }
 
         console.log('[useVideoFiles] Fichiers vidéo filtrés:', {
@@ -516,7 +524,8 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
               new RegExp(`\\D0?${episode}\\.\\b`, 'i') 
             ];
 
-            const matchByPattern = files.find(f => patterns.some(p => p.test(f.path)));
+            const episodePool = playableVideos(files);
+            const matchByPattern = episodePool.find(f => patterns.some(p => p.test(f.path)));
             if (matchByPattern) {
               console.log('[useVideoFiles] ✅ Matching SxxExx trouvé:', matchByPattern.path);
               setSelectedFile(matchByPattern);
@@ -539,17 +548,18 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
                 )
             );
 
+          const pool = playableVideos(files);
           const matchingFile =
-            files.find((v) => {
+            pool.find((v) => {
               const fileNameLower = v.name.toLowerCase();
               const matchingWords = torrentWords.filter((word) => fileNameLower.includes(word));
               return matchingWords.length >= 2;
             }) ||
-            files.find((v) => {
+            pool.find((v) => {
               const fileNameLower = v.name.toLowerCase();
               return torrentWords.some((word) => fileNameLower.includes(word));
             }) ||
-            files[0];
+            largestVideo(pool);
 
           setSelectedFile(matchingFile);
         }

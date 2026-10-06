@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import {
   Play,
   RotateCw,
@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Info,
   MoreHorizontal,
+  Film,
 } from 'lucide-preact';
 import type { MediaDetailPageProps } from '../types';
 import type { ClientTorrentStats } from '../../../../lib/client/types';
@@ -24,6 +25,8 @@ import { PlaybackStatusSurface } from '../../../streaming/player-shared/componen
 import { Modal } from '../../../ui/Modal';
 import { DsLoader } from '../../../ui/DsLoader';
 import { isTVPlatform } from '../../../../lib/utils/device-detection';
+import { MediaDetailBackLink } from './ActionsRow';
+import type { Ref } from 'preact';
 
 interface ActionButtonsProps {
   torrent: MediaDetailPageProps['torrent'];
@@ -65,6 +68,12 @@ interface ActionButtonsProps {
   };
   /** Dossier série (bibliothèque) — bouton Info + modal. */
   seriesLibraryPath?: string | null;
+  /** Films : ouvrir la modal info technique (chemin / indexer). */
+  onOpenMovieTechInfo?: () => void;
+  /** TV : bande-annonce dans le menu Plus. */
+  onPlayTrailer?: () => void;
+  backHref?: string;
+  backLinkRef?: Ref<HTMLAnchorElement>;
 }
 
 function selectBestTorrent(variants: MediaDetailPageProps['torrent'][]): MediaDetailPageProps['torrent'] | null {
@@ -119,11 +128,27 @@ export function ActionButtons({
   watchLater,
   seriesIndexerRefresh,
   seriesLibraryPath,
+  onOpenMovieTechInfo,
+  onPlayTrailer,
+  backHref,
+  backLinkRef,
 }: ActionButtonsProps) {
   const { t } = useI18n();
   const isTV = isTVPlatform();
   const [showSeriesPathModal, setShowSeriesPathModal] = useState(false);
   const [showMoreActions, setShowMoreActions] = useState(false);
+  // Reste vrai après le clic, jusqu'à la fin ou l'annulation. Sinon la carte
+  // disparaît dès que downloadingToClient repasse à false (torrent encore à 0 %).
+  const [downloadSession, setDownloadSession] = useState(false);
+  useEffect(() => {
+    if (downloadingToClient) {
+      setDownloadSession(true);
+      return;
+    }
+    const state = (torrentStats?.state || '').toLowerCase();
+    const finished = state === 'completed' || state === 'seeding' || isAvailableLocally;
+    if (!torrentStats || finished) setDownloadSession(false);
+  }, [downloadingToClient, torrentStats, isAvailableLocally]);
   const hasSavedPosition = savedPlaybackPosition !== null && savedPlaybackPosition !== undefined && savedPlaybackPosition > 0;
 
   const stateLower = typeof torrentStats?.state === 'string' ? torrentStats.state.toLowerCase() : '';
@@ -131,7 +156,7 @@ export function ActionButtons({
     playStatus: downloadingToClient
       ? 'adding'
       : torrentStats
-        ? stateLower === 'queued'
+        ? stateLower === 'queued' || stateLower === 'checking'
           ? 'adding'
           : stateLower === 'downloading'
             ? 'downloading'
@@ -145,6 +170,7 @@ export function ActionButtons({
     phaseDerived.phase === 'downloading' ||
     phaseDerived.phase === 'findingPeers' ||
     phaseDerived.phase === 'resolving';
+  const isChecking = phaseDerived.phase === 'checking' || stateLower === 'checking';
   const isCompleted = isTorrentReallyComplete(torrentStats, { hasVideoFiles: isAvailableLocally });
   const progressPercent =
     phaseDerived.progressPercent != null ? Math.round(phaseDerived.progressPercent) : 0;
@@ -152,21 +178,38 @@ export function ActionButtons({
   // Après reboot : état queued/downloading à 0% sans activité → ne pas masquer Lire.
   const looksStaleQueuedZero =
     !!torrentStats &&
+    !isChecking &&
     (stateLower === 'queued' || stateLower === 'downloading') &&
     (phaseDerived.progressPercent ?? 0) <= 0.1 &&
     (torrentStats.downloaded_bytes ?? 0) === 0 &&
     (torrentStats.download_speed ?? 0) === 0 &&
     (torrentStats.peers_connected ?? 0) === 0;
 
+  // Clic « Télécharger » : afficher la carte tout de suite (queued / 0 pair / 0 %),
+  // sans attendre le premier octet. looksStaleQueuedZero ne s'applique qu'au
+  // rechargement de page (torrent déjà en file, sans activité).
+  const userJustStartedDownload =
+    downloadingToClient || (downloadSession && !!torrentStats);
+  const hideAsStaleQueued = looksStaleQueuedZero && !userJustStartedDownload;
+
   const hasActiveDownloadStats =
     !!torrentStats &&
     !isDownloadComplete &&
     !isAvailableLocally &&
-    !looksStaleQueuedZero &&
-    phaseDerived.isActivelyDownloading;
+    !hideAsStaleQueued &&
+    !isChecking &&
+    (phaseDerived.isActivelyDownloading ||
+      (userJustStartedDownload &&
+        (phaseDerived.phase === 'resolving' ||
+          phaseDerived.phase === 'findingPeers' ||
+          phaseDerived.phase === 'downloading')));
 
   const isDownloadInProgress =
-    ((!!torrentStats && !isDownloadComplete && !isAvailableLocally && !looksStaleQueuedZero) ||
+    ((!!torrentStats &&
+      !isDownloadComplete &&
+      !isAvailableLocally &&
+      !hideAsStaleQueued &&
+      !isChecking) ||
       downloadingToClient);
   const showProgressInButton = hasActiveDownloadStats;
   const displayProgressPercent = hasActiveDownloadStats ? progressPercent : 0;
@@ -183,12 +226,21 @@ export function ActionButtons({
     torrent.infoHash?.startsWith('local_') ||
     !!(torrent as any).downloadPath;
 
-  const shouldShowButton = !isAvailableLocally || isDownloadComplete || (isAvailableLocally && hasInfoHash) || isLocalTorrent || (streamingTorrentActive && canStream);
+  const shouldShowButton = !isAvailableLocally || isDownloadComplete || (isAvailableLocally && hasInfoHash) || isLocalTorrent || (streamingTorrentActive && canStream) || (isChecking && hasInfoHash);
   const shouldShowPlayButton =
     isLocalTorrent ||
     (isAvailableLocally && hasInfoHash) ||
     isDownloadComplete ||
+    (isChecking && hasInfoHash) ||
     (streamingTorrentActive && canStream);
+  // Pendant la vérif, on préfère « Lire » (fichiers sur disque) plutôt qu'une carte de progression.
+  const showCheckingStatus =
+    isChecking &&
+    !isDownloadComplete &&
+    !isAvailableLocally &&
+    !isStreamingThisTorrent &&
+    !!torrentStats &&
+    !shouldShowPlayButton;
   const isPlayStreamingMode = shouldShowPlayButton && streamingTorrentActive && canStream && !isAvailableLocally && !isDownloadComplete;
   const showDownloadButtonAlongsidePlay =
     streamingTorrentActive && canStream && shouldShowPlayButton &&
@@ -215,26 +267,99 @@ export function ActionButtons({
     (torrent._externalLink && torrent._externalLink.startsWith('magnet:'))
   );
   const showDeleteBtn = (isAvailableLocally || isDownloadComplete) && hasInfoHash;
+  const showPlayFromStart = !!(shouldShowPlayButton && hasSavedPosition && onPlayFromBeginning);
   const hasMoreActions = !!(
     onDownloadAllEpisodes ||
     showWatchLaterBtn ||
     showMagnetBtn ||
     showDeleteBtn ||
     seriesIndexerRefresh ||
-    seriesLibraryPath
+    seriesLibraryPath ||
+    onOpenMovieTechInfo ||
+    (isTV && showPlayFromStart) ||
+    (isTV && showDownloadButtonAlongsidePlay) ||
+    (isTV && onPlayTrailer)
+  );
+  const hasSecondaryIconActions = !!(
+    showWatchLaterBtn ||
+    showMagnetBtn ||
+    showDeleteBtn ||
+    seriesIndexerRefresh ||
+    seriesLibraryPath ||
+    onOpenMovieTechInfo
   );
   const moreActionClass =
     'w-full min-h-[56px] tv:min-h-[68px] inline-flex items-center gap-3 px-4 rounded-xl bg-white/10 border border-white/15 text-white text-left text-lg tv:text-xl font-medium focus:outline-none focus:ring-4 focus:ring-primary-600/70 disabled:opacity-40';
 
+  const showFreshDownloadCard =
+    !isStreamingThisTorrent &&
+    !isDownloadComplete &&
+    !isAvailableLocally &&
+    userJustStartedDownload;
+  const showDownloadProgressCard =
+    showFreshDownloadCard ||
+    (!isStreamingThisTorrent &&
+      (showProgressNextToCancel || hasActiveDownloadStats || showCheckingStatus) &&
+      !!torrentStats);
+  const hidePrimaryForDownloadCard =
+    showFreshDownloadCard ||
+    (isDownloadInProgress && !!onCancelDownload && showProgressNextToCancel);
+
+  const showPrimaryActionRow =
+    ((!hidePrimaryPlayForTvSeries || !shouldShowPlayButton) &&
+      shouldShowButton &&
+      !hidePrimaryForDownloadCard) ||
+    (!isTV && !!onDownloadAllEpisodes) ||
+    showDownloadButtonAlongsidePlay ||
+    (isTV && hasMoreActions) ||
+    (isPackWithMultipleFiles &&
+      !(selectedPackEpisodePreviewIndex != null && (onDownloadSingleEpisode != null || (canStream && onPlaySingleEpisode != null))) &&
+      !shouldShowPlayButton);
+
+  const progressSurface = showDownloadProgressCard ? (
+    <PlaybackStatusSurface
+      variant="inline"
+      playStatus={
+        phaseDerived.phase === 'resolving' || phaseDerived.phase === 'checking'
+          ? 'adding'
+          : phaseDerived.phase === 'findingPeers' || phaseDerived.phase === 'downloading'
+            ? 'downloading'
+            : 'downloading'
+      }
+      torrentStats={torrentStats}
+      posterUrl={torrent.imageUrl ?? null}
+      imageUrl={torrent.heroImageUrl ?? torrent.imageUrl ?? null}
+      title={torrent.cleanTitle || torrent.name || null}
+      isActiveSession
+      onCancel={showCheckingStatus ? undefined : onCancelDownload}
+      cancelLabel={t('downloads.cancelDownload')}
+      className="w-full max-w-2xl"
+    />
+  ) : null;
+
   return (
-    <div className="mb-6 space-y-3">
+    <div
+      className={`space-y-5 ${showDownloadProgressCard ? 'mb-4' : 'mb-8'}`}
+      data-tv-zone="play"
+      data-tv-page-action
+    >
+      {/* Pendant un téléchargement : la carte domine, les icônes suivent (alignées avec Info / qualité). */}
+      {showDownloadProgressCard ? progressSurface : null}
+
       {/* ── Rangée principale ── */}
-      <div className="flex flex-wrap gap-3 tv:gap-4 items-center overflow-visible">
+      <div className="flex flex-wrap gap-4 tv:gap-5 items-center overflow-visible">
+        {!isTV && backHref ? (
+          <MediaDetailBackLink
+            backHref={backHref}
+            backLinkRef={backLinkRef}
+            label={t('common.back')}
+          />
+        ) : null}
 
         {/* Bouton Lire / Télécharger — gradient animé, rounded-full */}
         {(!hidePrimaryPlayForTvSeries || !shouldShowPlayButton) &&
           shouldShowButton &&
-          !(isDownloadInProgress && onCancelDownload && showProgressNextToCancel) && (
+          !hidePrimaryForDownloadCard && (
           <button
             onClick={() => {
               // Override pack : Play/Download portent sur l'épisode sélectionné (only_files).
@@ -317,6 +442,27 @@ export function ActionButtons({
           </button>
         )}
 
+        {/* Depuis le début — visible seulement s'il y a une position de reprise */}
+        {!isTV &&
+          showPlayFromStart &&
+          !hidePrimaryForDownloadCard &&
+          !hidePrimaryPlayForTvSeries && (
+          <button
+            type="button"
+            onClick={() => onPlayFromBeginning()}
+            disabled={countdownRemaining !== null && countdownRemaining > 0}
+            title={t('playback.playFromStartLabel')}
+            aria-label={t('playback.playFromStartLabel')}
+            data-focusable
+            data-media-detail-action="play-from-start"
+            tabIndex={0}
+            className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 font-semibold text-base min-w-0 tv:text-xl tv:px-8 tv:py-4 tv:min-h-[68px] border border-white/20 hover:border-white/35 hover:bg-white/10 transition-[opacity,transform,background-color,border-color] duration-200 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RotateCw className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" size={20} />
+            <span className="hidden sm:inline">{t('playback.playFromStartLabel')}</span>
+          </button>
+        )}
+
         {/* Tout télécharger (Series) — desktop ; TV : menu Plus */}
         {!isTV && onDownloadAllEpisodes && (
           <button
@@ -333,7 +479,7 @@ export function ActionButtons({
         )}
 
         {/* Télécharger à côté de Lire (streaming) — style glass pill */}
-        {showDownloadButtonAlongsidePlay && (
+        {showDownloadButtonAlongsidePlay && !isTV && (
           <button
             type="button"
             onClick={onDownload}
@@ -371,15 +517,15 @@ export function ActionButtons({
           </button>
         )}
 
-        {/* ── Actions secondaires (desktop) ── */}
+        {/* ── Actions secondaires regroupées : liste / supprimer / info ── */}
         {!isTV && (
           <>
-        {/* ── Séparateur ── */}
-        {(watchLater || (torrent._externalMagnetUri || (torrent._externalLink && torrent._externalLink.startsWith('magnet:'))) || showDeleteBtn) && (
-          <div className="w-px h-7 bg-white/12 mx-0.5 self-center max-sm:hidden" aria-hidden />
+        {showPrimaryActionRow && hasSecondaryIconActions && (
+          <div className="w-px h-9 bg-white/15 mx-2 self-center max-sm:hidden" aria-hidden />
         )}
 
-        {/* À regarder plus tard — icône ronde */}
+        <div className="inline-flex items-center gap-3">
+        {/* À regarder plus tard */}
         {showWatchLaterBtn && watchLater && (
           <button
             type="button"
@@ -402,7 +548,44 @@ export function ActionButtons({
           </button>
         )}
 
-        {/* Magnet — icône ronde */}
+        {/* Supprimer */}
+        {showDeleteBtn && (
+          <button
+            onClick={onDeleteMedia}
+            disabled={deletingMedia}
+            data-focusable
+            tabIndex={0}
+            className="gtv-icon-btn ds-focus-glow ds-active-glow tv:w-16 tv:h-16 text-white/55 hover:text-red-400 disabled:opacity-40"
+            title={isLocalTorrent ? t('mediaDetail.deleteLocalFile') : t('mediaDetail.deleteTorrent')}
+            aria-label={isLocalTorrent ? t('mediaDetail.deleteLocalFile') : t('mediaDetail.deleteTorrent')}
+          >
+            {deletingMedia ? (
+              <DsLoader size="xs" />
+            ) : (
+              <Trash2 className="h-5 w-5 tv:h-7 tv:w-7" size={20} />
+            )}
+          </button>
+        )}
+
+        {/* Info — film (tech) ou série (chemin dossier) */}
+        {(onOpenMovieTechInfo || seriesLibraryPath) && (
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenMovieTechInfo) onOpenMovieTechInfo();
+              else setShowSeriesPathModal(true);
+            }}
+            data-focusable
+            tabIndex={0}
+            title={onOpenMovieTechInfo ? t('mediaDetail.techInfoTitle') : t('mediaDetail.seriesPathTitle')}
+            aria-label={t('mediaDetail.infoButton')}
+            className="gtv-icon-btn ds-focus-glow ds-active-glow tv:w-16 tv:h-16"
+          >
+            <Info className="h-5 w-5 tv:h-7 tv:w-7" aria-hidden />
+          </button>
+        )}
+
+        {/* Magnet */}
         {showMagnetBtn && (
           <button
             onClick={onCopyMagnet}
@@ -420,26 +603,7 @@ export function ActionButtons({
           </button>
         )}
 
-        {/* Supprimer — danger discret */}
-        {showDeleteBtn && (
-          <button
-            onClick={onDeleteMedia}
-            disabled={deletingMedia}
-            data-focusable
-            tabIndex={0}
-            className="gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2 text-white/45 hover:text-red-400 text-sm font-medium disabled:opacity-40"
-            title={isLocalTorrent ? t('mediaDetail.deleteLocalFile') : t('mediaDetail.deleteTorrent')}
-          >
-            {deletingMedia ? (
-              <DsLoader size="xs" className="shrink-0" />
-            ) : (
-              <Trash2 className="h-4 w-4 shrink-0" size={16} />
-            )}
-            {t('common.delete')}
-          </button>
-        )}
-
-        {/* Nouveaux épisodes (indexeurs) — icône seule */}
+        {/* Nouveaux épisodes (indexeurs) */}
         {seriesIndexerRefresh && (
           <button
             type="button"
@@ -466,48 +630,10 @@ export function ActionButtons({
             />
           </button>
         )}
-
-        {/* Info — chemin dossier série (icône seule) */}
-        {seriesLibraryPath && (
-          <button
-            type="button"
-            onClick={() => setShowSeriesPathModal(true)}
-            data-focusable
-            tabIndex={0}
-            title={t('mediaDetail.seriesPathTitle')}
-            aria-label={t('mediaDetail.infoButton')}
-            className="gtv-icon-btn ds-focus-glow ds-active-glow tv:w-16 tv:h-16"
-          >
-            <Info className="h-5 w-5 tv:h-7 tv:w-7" aria-hidden />
-          </button>
-        )}
+        </div>
           </>
         )}
       </div>
-
-      {/* Carte progression glass – même dérivation que l’overlay */}
-      {!isStreamingThisTorrent &&
-        (showProgressNextToCancel || hasActiveDownloadStats) &&
-        torrentStats && (
-          <PlaybackStatusSurface
-            variant="inline"
-            playStatus={
-              phaseDerived.phase === 'resolving'
-                ? 'adding'
-                : phaseDerived.phase === 'findingPeers' || phaseDerived.phase === 'downloading'
-                  ? 'downloading'
-                  : 'downloading'
-            }
-            torrentStats={torrentStats}
-            posterUrl={torrent.imageUrl ?? null}
-            imageUrl={torrent.heroImageUrl ?? torrent.imageUrl ?? null}
-            title={torrent.cleanTitle || torrent.name || null}
-            isActiveSession
-            onCancel={onCancelDownload}
-            cancelLabel={t('downloads.cancelDownload')}
-            className="min-w-[200px] max-w-[520px] w-full"
-          />
-        )}
 
       {isTV && (
         <Modal
@@ -526,6 +652,54 @@ export function ActionButtons({
               };
               return (
                 <>
+                  {onPlayTrailer && (
+                    <button
+                      type="button"
+                      data-focusable
+                      data-autofocus={autofocus()}
+                      tabIndex={0}
+                      className={moreActionClass}
+                      onClick={() => {
+                        setShowMoreActions(false);
+                        onPlayTrailer();
+                      }}
+                    >
+                      <Film className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
+                      {t('ads.trailerPlay')}
+                    </button>
+                  )}
+                  {showPlayFromStart && onPlayFromBeginning && (
+                    <button
+                      type="button"
+                      data-focusable
+                      data-autofocus={autofocus()}
+                      tabIndex={0}
+                      className={moreActionClass}
+                      onClick={() => {
+                        setShowMoreActions(false);
+                        onPlayFromBeginning();
+                      }}
+                    >
+                      <RotateCw className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
+                      {t('playback.playFromStartLabel')}
+                    </button>
+                  )}
+                  {showDownloadButtonAlongsidePlay && (
+                    <button
+                      type="button"
+                      data-focusable
+                      data-autofocus={autofocus()}
+                      tabIndex={0}
+                      className={moreActionClass}
+                      onClick={() => {
+                        setShowMoreActions(false);
+                        onDownload();
+                      }}
+                    >
+                      <Download className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
+                      {isPackWithMultipleFiles ? t('playback.downloadFullSeason') : t('common.download')}
+                    </button>
+                  )}
                   {onDownloadAllEpisodes && (
                     <button
                       type="button"
@@ -563,6 +737,44 @@ export function ActionButtons({
                       {watchLater.isFavorite ? t('playback.watchLaterRemove') : t('playback.watchLaterAdd')}
                     </button>
                   )}
+                  {showDeleteBtn && (
+                    <button
+                      type="button"
+                      data-focusable
+                      data-autofocus={autofocus()}
+                      tabIndex={0}
+                      disabled={deletingMedia}
+                      className={`${moreActionClass} text-red-300 border-red-400/30`}
+                      onClick={() => {
+                        setShowMoreActions(false);
+                        onDeleteMedia();
+                      }}
+                    >
+                      {deletingMedia ? (
+                        <DsLoader size="xs" className="shrink-0" />
+                      ) : (
+                        <Trash2 className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
+                      )}
+                      {isLocalTorrent ? t('mediaDetail.deleteLocalFile') : t('mediaDetail.deleteTorrent')}
+                    </button>
+                  )}
+                  {(onOpenMovieTechInfo || seriesLibraryPath) && (
+                    <button
+                      type="button"
+                      data-focusable
+                      data-autofocus={autofocus()}
+                      tabIndex={0}
+                      className={moreActionClass}
+                      onClick={() => {
+                        setShowMoreActions(false);
+                        if (onOpenMovieTechInfo) onOpenMovieTechInfo();
+                        else setShowSeriesPathModal(true);
+                      }}
+                    >
+                      <Info className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
+                      {onOpenMovieTechInfo ? t('mediaDetail.techInfoTitle') : t('mediaDetail.seriesPathTitle')}
+                    </button>
+                  )}
                   {showMagnetBtn && (
                     <button
                       type="button"
@@ -596,43 +808,6 @@ export function ActionButtons({
                       {seriesIndexerRefresh.busy
                         ? t('mediaDetail.refreshEpisodesBusy')
                         : t('mediaDetail.refreshEpisodesFromIndexers')}
-                    </button>
-                  )}
-                  {seriesLibraryPath && (
-                    <button
-                      type="button"
-                      data-focusable
-                      data-autofocus={autofocus()}
-                      tabIndex={0}
-                      className={moreActionClass}
-                      onClick={() => {
-                        setShowMoreActions(false);
-                        setShowSeriesPathModal(true);
-                      }}
-                    >
-                      <Info className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
-                      {t('mediaDetail.seriesPathTitle')}
-                    </button>
-                  )}
-                  {showDeleteBtn && (
-                    <button
-                      type="button"
-                      data-focusable
-                      data-autofocus={autofocus()}
-                      tabIndex={0}
-                      disabled={deletingMedia}
-                      className={`${moreActionClass} text-red-300 border-red-400/30`}
-                      onClick={() => {
-                        setShowMoreActions(false);
-                        onDeleteMedia();
-                      }}
-                    >
-                      {deletingMedia ? (
-                        <DsLoader size="xs" className="shrink-0" />
-                      ) : (
-                        <Trash2 className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" />
-                      )}
-                      {isLocalTorrent ? t('mediaDetail.deleteLocalFile') : t('mediaDetail.deleteTorrent')}
                     </button>
                   )}
                 </>

@@ -1,8 +1,14 @@
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import type { ContentItem } from '../../lib/client/types';
 import { getDisplayTitle } from '../../lib/utils/title-display';
 import { isTVPlatform } from '../../lib/utils/device-detection';
+import { YouTubeVideoPlayer } from '../ui/YouTubeVideoPlayer';
 import { FocusableCard } from '../ui/FocusableCard';
+import {
+  claimPreviewTrailer,
+  releasePreviewTrailer,
+  subscribePreviewTrailer,
+} from '../dashboard/utils/previewTrailerStore';
 import { contentItemKey } from '../dashboard/utils/browsePriority';
 import { reanchorBrowseSlot } from './browseCarouselAnchor';
 import {
@@ -11,6 +17,9 @@ import {
 } from './browseInputModality';
 
 export { reanchorBrowseSlot, ensureBrowseRowInView } from './browseCarouselAnchor';
+
+/** Délai avant lecture trailer : évite le chargement à chaque flèche. */
+const TRAILER_DELAY_MS = 2500;
 
 /**
  * Hauteur image — paysage focus ≈ 55 % de la largeur utile (réf. streaming TV).
@@ -66,38 +75,99 @@ interface TitlePreviewCardProps {
   item: ContentItem;
   onNavigate: (item: ContentItem) => void;
   progress?: number;
+  /** Affiche la barre même à 0 % (téléchargement en cours). */
+  downloading?: boolean;
   metaLine?: string | null;
   metaSubLine?: string | null;
+  /** Pastille courte sur l'affiche (disponible, demandé, en attente). */
+  badge?: string | null;
+  badgeTone?: 'ok' | 'pending' | 'bad' | 'neutral';
 }
 
 /**
  * Tuile browse :
  * - souris : portrait + léger hover
- * - flèches / télécommande : paysage ancré à gauche (pas de bande-annonce)
+ * - flèches / télécommande : paysage ancré à gauche (même poster, pas de backdrop)
+ * - trailer : seulement après ~2,5 s sur la même carte
  */
 export function TitlePreviewCard({
   item,
   onNavigate,
   progress,
+  downloading = false,
   metaLine,
   metaSubLine,
+  badge,
+  badgeTone = 'neutral',
 }: TitlePreviewCardProps) {
+  const slotId = `card:${contentItemKey(item)}`;
   const tileH = useTileHeight();
   const slotRef = useRef<HTMLDivElement>(null);
+  const delayRef = useRef<number | null>(null);
   const [hovered, setHovered] = useState(false);
   /** Expand paysage : uniquement après focus clavier / télécommande. */
   const [remoteFocused, setRemoteFocused] = useState(false);
+  const [playTrailer, setPlayTrailer] = useState(false);
+  const [trailerReady, setTrailerReady] = useState(false);
 
+  const trailerKey =
+    typeof item.trailerKey === 'string' && item.trailerKey.trim().length > 0
+      ? item.trailerKey.trim()
+      : null;
+  // Une seule image (poster) : pas de swap backdrop au focus (= réseau / CPU inutiles).
   const poster = item.poster || item.backdrop;
-  const backdrop = item.backdrop || item.poster;
   const title = getDisplayTitle(item);
+  const tvLayout = isTVPlatform();
   const expanded = remoteFocused;
 
   useEffect(() => {
     ensureBrowseInputModalityTracking();
   }, []);
 
-  const tileW = expanded ? Math.round((tileH * 16) / 9) : Math.round((tileH * 2) / 3);
+  const clearDelay = useCallback(() => {
+    if (delayRef.current != null) {
+      window.clearTimeout(delayRef.current);
+      delayRef.current = null;
+    }
+  }, []);
+
+  // Trailer uniquement si l’utilisateur reste sur la carte
+  useEffect(() => {
+    if (!expanded || !trailerKey) {
+      clearDelay();
+      setPlayTrailer(false);
+      setTrailerReady(false);
+      releasePreviewTrailer(slotId);
+      return;
+    }
+    clearDelay();
+    setPlayTrailer(false);
+    setTrailerReady(false);
+    delayRef.current = window.setTimeout(() => {
+      claimPreviewTrailer(slotId);
+      setPlayTrailer(true);
+    }, TRAILER_DELAY_MS);
+    return () => clearDelay();
+  }, [expanded, clearDelay, slotId, trailerKey]);
+
+  useEffect(() => {
+    return subscribePreviewTrailer((activeId) => {
+      if (activeId !== slotId) {
+        setPlayTrailer(false);
+        setTrailerReady(false);
+      }
+    });
+  }, [slotId]);
+
+  useEffect(() => {
+    return () => {
+      clearDelay();
+      releasePreviewTrailer(slotId);
+    };
+  }, [clearDelay, slotId]);
+
+  // TV : largeur fixe. Changer portrait → paysage à chaque flèche recalcule toute la rangée.
+  const tileW = tvLayout || expanded ? Math.round((tileH * 16) / 9) : Math.round((tileH * 2) / 3);
 
   useEffect(() => {
     const slot = slotRef.current;
@@ -145,13 +215,16 @@ export function TitlePreviewCard({
     return () => cancelAnimationFrame(id);
   }, [expanded, tileW]);
 
-  if (!poster && !backdrop) return null;
+  if (!poster) return null;
 
   const progressPct = (() => {
-    if (typeof progress !== 'number' || progress <= 0) return 0;
-    const p = progress <= 1 ? progress * 100 : progress;
+    if (typeof progress !== 'number') return 0;
+    if (!downloading && progress <= 0) return 0;
+    // Téléchargements / ContentItem : déjà en 0–100. Fraction 0–1 seulement en legacy lecture.
+    const p = downloading || progress > 1 ? progress : progress * 100;
     return Math.min(100, Math.max(0, p));
   })();
+  const showProgressBar = downloading || progressPct > 0;
 
   return (
     <div
@@ -172,7 +245,8 @@ export function TitlePreviewCard({
     >
       <FocusableCard
         className={[
-          'block w-full outline-none relative overflow-hidden rounded-md bg-[#141414] transition-[transform,box-shadow,filter] duration-150 ease-out',
+          'block w-full outline-none relative overflow-hidden rounded-md bg-[#141414]',
+          tvLayout ? '' : 'transition-[transform,box-shadow,filter] duration-150 ease-out',
           expanded
             ? ''
             : hovered
@@ -185,20 +259,65 @@ export function TitlePreviewCard({
         asTorrentCard
         onClick={() => onNavigate(item)}
       >
-        <div className="absolute inset-0" aria-hidden>
+          {badge ? (
+            <span
+              className={[
+                'absolute left-2 top-2 z-[3] rounded-full border px-2.5 py-1 text-[10px] tv:text-sm font-bold uppercase tracking-wide text-white',
+                badgeTone === 'ok'
+                  ? 'border-emerald-200/40 bg-emerald-600/90'
+                  : badgeTone === 'pending'
+                    ? 'border-amber-100/40 bg-amber-500/90'
+                    : badgeTone === 'bad'
+                      ? 'border-rose-200/40 bg-rose-600/90'
+                      : 'border-white/20 bg-black/70',
+              ].join(' ')}
+            >
+              {badge}
+            </span>
+          ) : null}
+          <div className="absolute inset-0" aria-hidden>
           <img
-            src={(expanded ? backdrop : poster) || poster || ''}
+            src={poster}
             alt=""
             loading="lazy"
             decoding="async"
             className="absolute inset-0 h-full w-full object-cover"
           />
 
-          {progressPct > 0 ? (
-            <div className="absolute inset-x-0 bottom-0 h-[3px] bg-white/25">
+          {playTrailer && expanded && trailerKey ? (
+            <div
+              className={`pointer-events-none absolute inset-0 overflow-hidden transition-opacity duration-300 ${
+                trailerReady ? 'opacity-100' : 'opacity-0'
+              }`}
+            >
+              <YouTubeVideoPlayer
+                youtubeKey={trailerKey}
+                autoplay
+                muted={false}
+                loop
+                controls={false}
+                cover
+                className="!absolute inset-0 !h-full !w-full !aspect-auto"
+                onReady={() => setTrailerReady(true)}
+              />
+            </div>
+          ) : null}
+
+          {showProgressBar ? (
+            <div
+              className={`absolute inset-x-0 bottom-0 ${downloading ? 'h-1.5 bg-black/55' : 'h-[3px] bg-white/25'}`}
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={Math.round(progressPct)}
+            >
               <div
-                className="h-full bg-[var(--ds-accent-violet,#a855f7)]"
-                style={{ width: `${progressPct}%` }}
+                className={`h-full transition-[width] duration-500 ease-out ${
+                  downloading
+                    ? 'bg-[var(--ds-accent-violet,#a855f7)] shadow-[0_0_10px_rgba(168,85,247,0.45)]'
+                    : 'bg-[var(--ds-accent-violet,#a855f7)]'
+                }`}
+                style={{ width: `${Math.max(progressPct, downloading && progressPct === 0 ? 2 : 0)}%` }}
               />
             </div>
           ) : null}
@@ -206,9 +325,9 @@ export function TitlePreviewCard({
       </FocusableCard>
 
       <div className="mt-2 sm:mt-2.5 tv:mt-3 px-0.5" style={{ width: '100%', minHeight: '2.75rem' }}>
-        {expanded ? (
+        {expanded || tvLayout ? (
           <>
-            <p className="truncate text-sm sm:text-base tv:text-xl font-semibold text-white">
+            <p className={`truncate text-sm sm:text-base tv:text-lg font-semibold ${expanded ? 'text-white' : 'text-white/75'}`}>
               {metaLine || title}
             </p>
             {metaSubLine ? (
@@ -218,9 +337,14 @@ export function TitlePreviewCard({
             ) : null}
           </>
         ) : hovered ? (
-          <p className="truncate text-sm font-medium text-white/90 transition-opacity duration-150">
-            {metaLine || title}
-          </p>
+          <>
+            <p className="truncate text-sm font-medium text-white/90 transition-opacity duration-200">
+              {metaLine || title}
+            </p>
+            {metaSubLine ? (
+              <p className="mt-0.5 truncate text-xs text-white/55">{metaSubLine}</p>
+            ) : null}
+          </>
         ) : null}
       </div>
     </div>

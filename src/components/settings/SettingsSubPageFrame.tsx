@@ -1,74 +1,32 @@
 import type { ComponentChildren } from 'preact';
 import type { LucideIcon } from 'lucide-preact';
-import { ArrowLeft } from 'lucide-preact';
-import { useI18n } from '../../lib/i18n/useI18n';
-import { SettingsCard, type SettingsCardAccent } from './SettingsCard';
+import { HubModal, closeSettingsSub } from './hub/HubModal';
 
 interface SettingsSubPageFrameProps {
-  /** URL du bouton "retour" (navigation via <a href>) */
   backHref?: string;
-  /** Handler du bouton "retour" (navigation via état local) */
   backOnClick?: () => void;
-  icon: LucideIcon;
+  icon?: LucideIcon;
   title: string;
   description?: string;
   children: ComponentChildren;
-  /** Accent de la carte (violet par défaut, amber pour CTA) */
-  accent?: SettingsCardAccent;
+  accent?: string;
 }
 
 /**
- * Frame standard pour les sous-pages des paramètres.
- * Carte Boost / C411 via SettingsCard.
+ * Détail d’un réglage : modale au-dessus de la grille.
+ * `icon` et `accent` restent acceptés pour les appelants existants.
  */
 export function SettingsSubPageFrame({
   backHref,
   backOnClick,
-  icon,
   title,
   description,
   children,
-  accent = 'violet',
 }: SettingsSubPageFrameProps) {
-  const { t } = useI18n();
-
-  const backEl = backHref ? (
-    <a
-      href={backHref}
-      data-astro-prefetch
-      class="sc-back"
-      data-focusable
-      tabIndex={0}
-      aria-label={t('common.back')}
-    >
-      <ArrowLeft className="w-4 h-4" aria-hidden />
-      <span>{t('common.back')}</span>
-    </a>
-  ) : (
-    <button
-      type="button"
-      onClick={backOnClick}
-      class="sc-back"
-      data-focusable
-      tabIndex={0}
-      aria-label={t('common.back')}
-    >
-      <ArrowLeft className="w-4 h-4" aria-hidden />
-      <span>{t('common.back')}</span>
-    </button>
-  );
-
+  const close = () => closeSettingsSub(backHref, backOnClick);
   return (
-    <div class="sc-frame-wrap">
-      {backEl}
-      <SettingsCard
-        accent={accent}
-        icon={icon}
-        title={title}
-        description={description}
-      >
-        {children}
-      </SettingsCard>
-    </div>
+    <HubModal open title={title} description={description} onClose={close} size="xl">
+      {children}
+    </HubModal>
   );
 }

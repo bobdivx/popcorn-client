@@ -6,7 +6,7 @@ import UiPreferencesPanel from './UiPreferencesPanel';
 import { SettingsNavCard } from './SettingsNavCard';
 import { SettingsSubPageFrame } from './SettingsSubPageFrame';
 
-const BASE_URL = '/settings/ui-preferences';
+const BASE_URL = '/settings/ui-preferences/';
 
 type InterfaceItem = {
   id: string;
@@ -49,35 +49,32 @@ export default function InterfaceSubMenuPanel() {
 
   if (!canAccess('settings.ui_preferences' as any)) return null;
 
-  if (sub === 'language') {
-    const item = INTERFACE_ITEMS.find((i) => i.id === 'language')!;
-    return (
-      <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}>
-        <UiPreferencesPanel section="language" embedded />
-      </SettingsSubPageFrame>
-    );
-  }
-
-  if (sub === 'theme') {
-    const item = INTERFACE_ITEMS.find((i) => i.id === 'theme')!;
-    return (
-      <SettingsSubPageFrame backHref={BASE_URL} icon={item.icon} title={t(item.titleKey)} description={t(item.descriptionKey)}>
-        <UiPreferencesPanel section="theme" embedded />
-      </SettingsSubPageFrame>
-    );
-  }
+  const languageItem = INTERFACE_ITEMS.find((i) => i.id === 'language')!;
+  const themeItem = INTERFACE_ITEMS.find((i) => i.id === 'theme')!;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
-      {INTERFACE_ITEMS.map((item) => (
-        <SettingsNavCard
-          key={item.id}
-          href={`${BASE_URL}?sub=${item.sub}`}
-          icon={item.icon}
-          title={t(item.titleKey)}
-          description={t(item.descriptionKey)}
-        />
-      ))}
-    </div>
+    <>
+      <div className="hub-grid" data-tv-list role="list">
+        {INTERFACE_ITEMS.map((item) => (
+          <SettingsNavCard
+            key={item.id}
+            href={`${BASE_URL}?sub=${item.sub}`}
+            icon={item.icon}
+            title={t(item.titleKey)}
+            description={t(item.descriptionKey)}
+          />
+        ))}
+      </div>
+      {sub === 'language' && (
+        <SettingsSubPageFrame backHref={BASE_URL} icon={languageItem.icon} title={t(languageItem.titleKey)} description={t(languageItem.descriptionKey)}>
+          <UiPreferencesPanel section="language" embedded />
+        </SettingsSubPageFrame>
+      )}
+      {sub === 'theme' && (
+        <SettingsSubPageFrame backHref={BASE_URL} icon={themeItem.icon} title={t(themeItem.titleKey)} description={t(themeItem.descriptionKey)}>
+          <UiPreferencesPanel section="theme" embedded />
+        </SettingsSubPageFrame>
+      )}
+    </>
   );
 }

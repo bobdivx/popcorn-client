@@ -57,4 +57,23 @@ describe('getNetworkPlaybackProfile', () => {
     expect(p.startLevel).toBe(0);
     expect(p.maxBufferLength).toBeLessThanOrEqual(24);
   });
+
+  it('TV avec effectiveType=4g sans type wifi : Auto (pas de plafond 720p)', () => {
+    vi.stubGlobal('navigator', {
+      connection: { effectiveType: '4g', downlink: 8, saveData: false },
+    });
+    const p = getNetworkPlaybackProfile(false, { isTv: true });
+    expect(p.effectiveType).toBe('4g');
+    expect(p.suggestedMaxHeight).toBeNull();
+    expect(p.startLevel).toBe(0);
+    expect(p.maxBufferLength).toBeLessThanOrEqual(24);
+  });
+
+  it('TV en 3G réel : garde le plafond bas', () => {
+    vi.stubGlobal('navigator', {
+      connection: { effectiveType: '3g', downlink: 1, saveData: false },
+    });
+    const p = getNetworkPlaybackProfile(false, { isTv: true });
+    expect(p.suggestedMaxHeight).toBe(480);
+  });
 });

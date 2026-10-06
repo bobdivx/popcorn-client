@@ -89,7 +89,7 @@ export default function CarouselRow({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      <div className="flex items-center mb-3 sm:mb-4 tv:mb-6 px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 tv-overscan-x gap-2 group/row-title">
+      <div className="flex items-center mb-3 sm:mb-4 tv:mb-6 px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 tv-overscan-x gap-2 group/row-title ds-row-title-enter">
         <div className="min-w-0 flex items-center gap-2">
           <h2 className="text-[1.05rem] sm:text-xl md:text-[1.35rem] tv:text-3xl font-semibold tracking-tight text-white/90 group-hover/row-title:text-white truncate transition-colors duration-150">
             {title}

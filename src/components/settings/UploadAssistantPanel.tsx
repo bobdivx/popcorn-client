@@ -11,6 +11,7 @@ import type {
   UploaderPreviewResponse,
 } from '../../lib/client/server-api/upload-tracker';
 import { useI18n } from '../../lib/i18n/useI18n';
+import { UploadAiHint } from '../ai/UploadAiHint';
 import {
   DsBarChart,
   DsMetricCard,
@@ -2059,6 +2060,10 @@ export default function UploadAssistantPanel() {
             <div class="sc-frame">
               <div class="sc-frame-header"><div class="sc-frame-title">{t('settings.uploadTrackerPanel.wizardSummaryPlan')}</div></div>
               <div class="sc-frame-body">
+                <UploadAiHint
+                  fileName={mediaList.find((media) => media.id === selectedMediaIds[0])?.file_name}
+                  title={mediaList.find((media) => media.id === selectedMediaIds[0])?.tmdb_title}
+                />
                 <div className="max-h-52 overflow-auto rounded-lg border border-base-300 divide-y divide-base-300">
                   {selectedMediaIds.map((id) => {
                     const media = mediaList.find((m) => m.id === id);

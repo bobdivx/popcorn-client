@@ -346,6 +346,8 @@ export interface LibraryMediaEntry {
   poster_url: string | null;
   hero_image_url: string | null;
   library_source_id: string | null;
+  /** Hash torrent associé (si présent) — utile pour détecter les doublons */
+  info_hash?: string | null;
 }
 
 export interface LibraryIntegrityItem {
