@@ -201,7 +201,30 @@ async function collectMedia(errors: Record<string, string>): Promise<Record<stri
   // <video> qui avance réellement (même sonde que la détection Park/Drive)
   media.videoProbe = await check(errors, 'videoProbe', async () => {
     const r = await detectTeslaDriveMode();
-    return { mode: r.mode, confidence: r.confidence, reason: r.reason ?? null };
+    return {
+      mode: r.mode,
+      confidence: r.confidence,
+      reason: r.reason ?? null,
+      modeSource: r.modeSource ?? 'auto',
+      probe: r.probe
+        ? {
+            advanced: r.probe.advanced,
+            paused: r.probe.paused,
+            readyState: r.probe.readyState,
+            error: r.probe.error,
+            durationTried: r.probe.durationTried,
+            timeDelta: r.probe.timeDelta,
+            timeupdates: r.probe.timeupdates,
+            rvfcFired: r.probe.rvfcFired,
+            framePainted: r.probe.framePainted,
+            playRejected: r.probe.playRejected,
+            forcedPause: r.probe.forcedPause,
+            asset: r.probe.asset,
+            width: r.probe.width,
+            height: r.probe.height,
+          }
+        : null,
+    };
   }, 6000);
 
   const v = document.createElement('video');
