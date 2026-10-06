@@ -1,4 +1,4 @@
-import { Film, FolderOpen, FolderPlus, LayoutGrid, List, Users } from 'lucide-preact';
+import { Film, FolderOpen, FolderPlus, LayoutGrid, Users } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { canAccess } from '../../lib/permissions';
 import { SettingsNavCard } from './SettingsNavCard';
@@ -46,14 +46,6 @@ const LIBRARY_LINK_ITEMS: LibraryLinkItem[] = [
     permission: undefined,
   },
   {
-    id: 'library-indexer',
-    titleKey: 'settingsMenu.libraryIndexer.title',
-    descriptionKey: 'settingsMenu.libraryIndexer.description',
-    icon: List,
-    href: '/settings/library-indexer',
-    permission: 'settings.server',
-  },
-  {
     id: 'friends',
     titleKey: 'settingsMenu.friends.title',
     descriptionKey: 'settingsMenu.friends.description',
@@ -73,7 +65,7 @@ export default function LibrarySubMenuPanel() {
   if (visible.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-5 ds-card-animate-stagger" role="list">
+    <div className="hub-grid" data-tv-list role="list">
       {visible.map((item) => (
         <SettingsNavCard
           key={item.id}

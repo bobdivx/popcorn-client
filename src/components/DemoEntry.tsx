@@ -12,6 +12,16 @@ export default function DemoEntry() {
   const { t } = useI18n();
 
   useEffect(() => {
+    try {
+      if (sessionStorage.getItem('popcorn_demo_leaving') === '1') {
+        sessionStorage.removeItem('popcorn_demo_leaving');
+        setDemoMode(false);
+        window.location.replace(`${window.location.origin}/`);
+        return;
+      }
+    } catch {
+      // ignore
+    }
     setDemoMode(true);
     redirectTo('/dashboard');
   }, []);

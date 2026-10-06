@@ -13,6 +13,7 @@ export interface TorrentStatusBadgeProps {
 
 const stateColors: Record<ClientTorrentStats['state'], string> = {
   queued: 'bg-[var(--ds-surface-elevated)] text-[var(--ds-text-secondary)]',
+  checking: 'bg-sky-600/90 text-white',
   downloading: 'bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)]',
   seeding: 'bg-[var(--ds-accent-green)] text-[var(--ds-text-on-accent)]',
   paused: 'bg-[var(--ds-accent-yellow)] text-[var(--ds-text-on-accent)]',

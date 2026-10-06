@@ -287,14 +287,10 @@ export function useTVPlayerNavigation({
   const hasBack = !!onClose;
   const toggleSettings = () => {
     setFocusedOnScrub(false);
-    setSettingsOpen((open) => {
-      const next = !open;
-      if (next) {
-        const idx = TV_QUALITY_VALUES.findIndex((v) => v === streamQualityRef.current);
-        setSettingsFocusIndex(idx >= 0 ? idx : 0);
-      }
-      return next;
-    });
+    setSettingsOpen((open) => !open);
+  };
+  const closeSettings = () => {
+    setSettingsOpen(false);
   };
   const controls = useMemo(() => {
     if (isTV) {
@@ -305,7 +301,10 @@ export function useTVPlayerNavigation({
         { id: 'playpause', action: onPlayPause },
         { id: 'skipforward', action: () => onSeek('right', 10) },
       );
-      if (onSelectQuality) {
+      if (onToggleSubtitles) {
+        c.push({ id: 'subtitles', action: onToggleSubtitles });
+      }
+      if (onSelectQuality || onToggleFillMode || onToggleSubtitles) {
         c.push({
           id: 'settings',
           action: toggleSettings,
@@ -317,6 +316,7 @@ export function useTVPlayerNavigation({
     const c = [{ id: 'playpause', action: onPlayPause }];
     c.push({ id: 'mute', action: onToggleMute });
     if (onOpenQualityMenu) c.push({ id: 'quality', action: onOpenQualityMenu });
+    if (onToggleSubtitles) c.push({ id: 'subtitles', action: onToggleSubtitles });
     c.push({ id: 'fullscreen', action: onToggleFullscreen });
     if (hasBack) c.unshift({ id: 'back', action: onClose! });
     return c;
@@ -413,11 +413,8 @@ export function useTVPlayerNavigation({
       if (isBackKey(e)) {
         e.preventDefault();
         e.stopPropagation();
-        if (settingsOpenRef.current) {
-          setSettingsOpen(false);
-          resetControlsTimeout();
-          return;
-        }
+        // Overlay paramètres : géré par PlayerSettingsMenu (retour panneau / fermeture).
+        if (settingsOpenRef.current) return;
         if (!showControlsRef.current) {
           setShowControls(true);
           resetControlsTimeout();
@@ -426,16 +423,6 @@ export function useTVPlayerNavigation({
         handleBack();
         return;
       }
-
-      // Première touche : afficher le dock, sans seek / play.
-      if (!showControlsRef.current) {
-        e.preventDefault();
-        setShowControls(true);
-        resetControlsTimeout();
-        return;
-      }
-
-      resetControlsTimeout();
 
       const kc = e.keyCode ?? e.which;
       const keyRaw = e.key || '';
@@ -489,34 +476,53 @@ export function useTVPlayerNavigation({
 
       if (kc === 23) e.preventDefault();
 
-      if (kc === 415 || keyNormalized === 'MediaPlayPause') {
+      if (settingsOpenRef.current) return;
+
+      const isMediaPlay =
+        kc === 415 ||
+        keyNormalized === 'MediaPlayPause' ||
+        keyNormalized === 'MediaPlay' ||
+        keyNormalized === 'MediaPause';
+      const isMediaRewind = kc === 412 || keyNormalized === 'MediaRewind' || keyNormalized === 'MediaTrackPrevious';
+      const isMediaForward = kc === 417 || keyNormalized === 'MediaFastForward' || keyNormalized === 'MediaTrackNext';
+
+      if (isMediaPlay) {
         e.preventDefault();
+        if (!showControlsRef.current) setShowControls(true);
         onPlayPause();
+        resetControlsTimeout();
         return;
       }
 
-      const isLeft =
-        kc === 412 || kc === 21 || keyNormalized === 'ArrowLeft';
-      const isRight =
-        kc === 417 || kc === 22 || keyNormalized === 'ArrowRight';
+      if (isMediaRewind || isMediaForward) {
+        e.preventDefault();
+        if (!showControlsRef.current) setShowControls(true);
+        if (scrubThumbnailsActiveRef.current) {
+          navigateScrub(isMediaRewind ? 'left' : 'right');
+        } else {
+          navigatePreviewSeek(isMediaRewind ? 'left' : 'right');
+        }
+        resetControlsTimeout();
+        return;
+      }
+
+      // Première flèche : révéler le dock, sans déplacer la lecture.
+      if (!showControlsRef.current) {
+        e.preventDefault();
+        setShowControls(true);
+        resetControlsTimeout();
+        return;
+      }
+
+      resetControlsTimeout();
+
+      const isLeft = kc === 21 || keyNormalized === 'ArrowLeft';
+      const isRight = kc === 22 || keyNormalized === 'ArrowRight';
       const isConfirm =
         kc === 23 || keyNormalized === 'Enter' || keyNormalized === ' ';
 
+      // Menu paramètres overlay : ne pas consommer les touches (PlayerSettingsMenu en capture).
       if (settingsOpenRef.current) {
-        e.preventDefault();
-        e.stopPropagation();
-        if (isLeft || keyNormalized === 'ArrowUp') {
-          setSettingsFocusIndex((i) => Math.max(0, i - 1));
-        } else if (isRight || keyNormalized === 'ArrowDown') {
-          setSettingsFocusIndex((i) => Math.min(TV_QUALITY_VALUES.length - 1, i + 1));
-        } else if (isConfirm) {
-          setSettingsFocusIndex((i) => {
-            onSelectQualityRef.current?.(TV_QUALITY_VALUES[i] ?? null);
-            return i;
-          });
-          setSettingsOpen(false);
-        }
-        resetControlsTimeout();
         return;
       }
 
@@ -784,5 +790,6 @@ export function useTVPlayerNavigation({
     settingsOpen,
     settingsFocusIndex,
     toggleSettings,
+    closeSettings,
   };
 }

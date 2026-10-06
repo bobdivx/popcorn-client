@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { X } from 'lucide-preact';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { formatBytes, formatSpeed, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
 import { generateQRCode } from '../../../../lib/utils/qrcode';
 import { friendlyPlaybackHint, pipelineHeadline, type PlaybackPipelineStatus } from '../../../../lib/streaming/playbackPipeline';
+import { DiagnoseAssist } from '../../../ai/DiagnoseAssist';
 import { PlaybackLiveTrace } from './PlaybackLiveTrace';
 import type { PlaybackLiveTraceState } from '../hooks/usePlaybackLiveTrace';
 import GpuPlaybackChip from './GpuPlaybackChip';
@@ -149,9 +151,11 @@ function StatusHintChip({
   kind: 'warmup' | 'quality' | 'readying';
   label: string;
 }) {
+  const kindClass = kind === 'warmup' ? 'playback-status-hint--warmup' : kind === 'readying' ? 'playback-status-hint--readying' : 'playback-status-hint--quality';
+  
   return (
     <div
-      className={`playback-status-hint playback-status-hint--${kind}`}
+      className={`playback-status-hint ${kindClass}`}
       role="status"
       aria-live="polite"
     >
@@ -200,7 +204,7 @@ function PipelinePanel({
 
   return (
     <div className="w-full min-w-0 space-y-2">
-      <div className="rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]/40 px-3 py-2.5 space-y-3">
+      <div className="rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface-elevated)]/40 backdrop-blur-sm px-3 py-2.5 space-y-3 transition-all duration-300">
         <div className="min-w-0">
           <div className="text-[10px] uppercase tracking-wider text-[var(--ds-text-tertiary)] font-semibold mb-1">
             {t('playback.hls.serverPipeline')}
@@ -215,7 +219,7 @@ function PipelinePanel({
           </div>
           <div className="h-1 rounded-full bg-[var(--ds-border)] overflow-hidden">
             <div
-              className="h-full rounded-full bg-[var(--ds-accent-yellow)] transition-[width] duration-500"
+              className="h-full rounded-full bg-[var(--ds-accent-yellow)] transition-all duration-500 ease-out"
               style={{ width: `${serverPct ?? 10}%` }}
             />
           </div>
@@ -229,7 +233,7 @@ function PipelinePanel({
           </div>
           <div className="h-1 rounded-full bg-[var(--ds-border)] overflow-hidden">
             <div
-              className="h-full rounded-full bg-[var(--ds-accent-violet)] transition-[width] duration-500"
+              className="h-full rounded-full bg-[var(--ds-accent-violet)] transition-all duration-500 ease-out"
               style={{ width: `${playerPct ?? 4}%` }}
             />
           </div>
@@ -244,7 +248,7 @@ function PipelinePanel({
               rel="noreferrer"
               data-focusable
               tabIndex={0}
-              className="px-3 py-1.5 min-h-[44px] inline-flex items-center rounded-xl border border-white/15 bg-white/5 text-xs text-white/80"
+              className="px-3 py-1.5 min-h-[44px] inline-flex items-center rounded-xl border border-white/15 bg-white/5 text-xs text-white/80 hover:bg-white/10 transition-colors"
             >
               {t('playback.hls.openLogs')}
             </a>
@@ -253,7 +257,7 @@ function PipelinePanel({
               onClick={loadQr}
               data-focusable
               tabIndex={0}
-              className="px-3 py-1.5 min-h-[44px] rounded-xl border border-white/15 bg-white/5 text-xs text-white/80"
+              className="px-3 py-1.5 min-h-[44px] rounded-xl border border-white/15 bg-white/5 text-xs text-white/80 hover:bg-white/10 transition-colors"
             >
               QR
             </button>
@@ -326,7 +330,7 @@ function StepRail({
   t: (k: string, p?: Record<string, string | number>) => string;
 }) {
   return (
-    <div className="flex gap-1.5 w-full max-w-sm mx-auto mb-3 min-w-0">
+    <div className="flex gap-1.5 w-full max-w-sm mx-auto mb-3 min-w-0" role="progressbar" aria-valuenow={stepIndex} aria-valuemin={1} aria-valuemax={4}>
       {STEP_KEYS.map((key, i) => {
         const n = i + 1;
         const done = stepIndex > n;
@@ -334,15 +338,18 @@ function StepRail({
         return (
           <div key={key} className="flex-1 flex flex-col items-center gap-1.5">
             <div
-              className={`h-1 w-full rounded-full overflow-hidden transition-colors duration-500 ${
+              className={`h-1 w-full rounded-full overflow-hidden transition-all duration-500 ease-out ${
                 done ? 'bg-primary-500' : active ? 'bg-white/25' : 'bg-white/10'
               }`}
+              style={{
+                transform: active ? 'scaleY(1.2)' : 'scaleY(1)',
+              }}
             >
               {active ? <div className="h-full w-1/2 bg-primary-400 animate-shimmer" /> : null}
             </div>
             <span
-              className={`text-[9px] uppercase tracking-wider font-semibold transition-colors duration-300 ${
-                active ? 'text-primary-300' : done ? 'text-white/70' : 'text-white/25'
+              className={`text-[9px] uppercase tracking-wider font-semibold transition-all duration-300 ${
+                active ? 'text-primary-300 scale-105' : done ? 'text-white/70' : 'text-white/25'
               }`}
             >
               {t(`playback.step.${key}`)}
@@ -528,10 +535,16 @@ export function PlaybackStatusSurface({
       (!derived.isActivelyDownloading &&
         derived.phase !== 'resolving' &&
         derived.phase !== 'findingPeers' &&
+        derived.phase !== 'checking' &&
         derived.phase !== 'error')
     ) {
       return null;
     }
+    const cancelText = cancelLabel || t('common.cancel') || 'Annuler';
+    const pct =
+      derived.progressPercent != null
+        ? Math.round(derived.progressPercent)
+        : null;
     return (
       <div
         className={`glass-panel rounded-2xl border border-white/10 overflow-hidden animate-[fade-in_0.25s_ease-out] ${className}`}
@@ -540,34 +553,37 @@ export function PlaybackStatusSurface({
       >
         <div className="flex items-stretch gap-0">
           {showPoster ? (
-            <div className="relative w-16 sm:w-20 shrink-0 overflow-hidden">
+            <div className="relative w-[4.25rem] sm:w-24 shrink-0 overflow-hidden self-stretch min-h-[5.5rem]">
               <img
                 src={artUrl!}
                 alt=""
                 className="absolute inset-0 w-full h-full object-cover"
                 onError={() => setPosterFailed(true)}
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/40" />
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-black/50" />
             </div>
           ) : (
             <div className="w-14 shrink-0 flex items-center justify-center border-r border-white/10 bg-black/30">
               <img src="/popcorn_logo.png" alt="" className="w-7 h-7 object-contain opacity-80" />
             </div>
           )}
-          <div className="flex-1 min-w-0 px-3.5 py-3 flex items-center gap-3">
-            {(derived.phase === 'resolving' || derived.phase === 'findingPeers' || derived.phase === 'buffering') && (
-              <DsLoader size="xs" className="shrink-0" />
-            )}
-            <div className="flex-1 min-w-0 space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-white/55 truncate">
+          <div className="flex-1 min-w-0 px-3.5 sm:px-4 py-3 sm:py-3.5 flex items-center gap-3">
+            <div className="flex-1 min-w-0 space-y-2">
+              <div className="flex items-center gap-2 min-w-0">
+                {(derived.phase === 'resolving' ||
+                  derived.phase === 'checking' ||
+                  derived.phase === 'findingPeers' ||
+                  derived.phase === 'buffering') && (
+                  <DsLoader size="xs" className="shrink-0" />
+                )}
+                <span className="text-[11px] sm:text-xs font-semibold uppercase tracking-[0.14em] text-white/50 truncate">
                   {label}
                 </span>
-                <span className="text-lg font-bold tabular-nums text-white shrink-0">
-                  {derived.progressPercent != null ? `${Math.round(derived.progressPercent)}%` : na}
+                <span className="ml-auto text-xl sm:text-2xl font-bold tabular-nums text-white shrink-0 leading-none">
+                  {pct != null ? `${pct}%` : na}
                 </span>
               </div>
-              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+              <div className="h-2 rounded-full bg-white/10 overflow-hidden">
                 <div
                   className="h-full rounded-full bg-primary-500 transition-[width] duration-500 ease-out"
                   style={{
@@ -575,15 +591,22 @@ export function PlaybackStatusSurface({
                   }}
                 />
               </div>
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-white/45">
+              <div className="flex flex-wrap items-center gap-x-3 sm:gap-x-4 gap-y-1 text-xs sm:text-sm text-white/55">
                 {derived.downloadSpeed != null && derived.downloadSpeed > 0 ? (
-                  <span>{speedLabel}</span>
+                  <span className="font-semibold text-white/85 tabular-nums">{speedLabel}</span>
                 ) : null}
-                {derived.etaSeconds != null && derived.etaSeconds > 0 ? <span>{etaLabel}</span> : null}
+                {derived.etaSeconds != null && derived.etaSeconds > 0 ? (
+                  <span className="tabular-nums">{etaLabel}</span>
+                ) : null}
                 {derived.totalBytes != null && derived.totalBytes > 0 ? (
-                  <span>
-                    {downloadedLabel} / {totalLabel}
+                  <span className="tabular-nums">
+                    {downloadedLabel}
+                    <span className="text-white/35"> / </span>
+                    {totalLabel}
                   </span>
+                ) : null}
+                {derived.peersConnected != null ? (
+                  <span className="text-white/40 tabular-nums">{peersLabel} peers</span>
                 ) : null}
               </div>
             </div>
@@ -593,9 +616,11 @@ export function PlaybackStatusSurface({
                 onClick={onCancel}
                 data-focusable
                 tabIndex={0}
-                className="shrink-0 rounded-xl border border-white/15 bg-white/5 hover:bg-red-500/20 hover:border-red-400/40 px-3 py-2 text-sm text-white/80 transition-colors"
+                title={cancelText}
+                aria-label={cancelText}
+                className="gtv-icon-btn ds-focus-glow ds-active-glow shrink-0 self-center hover:bg-red-500/20 hover:border-red-400/40 hover:text-red-200"
               >
-                {cancelLabel || t('common.cancel') || 'Annuler'}
+                <X className="h-5 w-5" size={20} aria-hidden />
               </button>
             ) : null}
           </div>
@@ -609,6 +634,7 @@ export function PlaybackStatusSurface({
   const showSteps =
     !isError &&
     (derived.phase === 'resolving' ||
+      derived.phase === 'checking' ||
       derived.phase === 'findingPeers' ||
       derived.phase === 'downloading');
 
@@ -671,6 +697,7 @@ export function PlaybackStatusSurface({
                     t('playback.errorStream')
                   : errorMessage || progressMessage || t('playback.errorStream')}
               </p>
+              <DiagnoseAssist message={errorMessage} />
               {sparseOrEmpty && onDeleteEmptyFiles && confirmingDeleteEmpty ? (
                 <div className="w-full rounded-2xl border border-white/15 bg-black/45 px-4 py-3 text-center space-y-3 mb-4">
                   <p className="text-sm text-white/85">
@@ -763,6 +790,7 @@ export function PlaybackStatusSurface({
                   }
                   spinning={
                     derived.phase === 'resolving' ||
+                    derived.phase === 'checking' ||
                     derived.phase === 'findingPeers' ||
                     derived.phase === 'preparingPlayback' ||
                     derived.phase === 'buffering'

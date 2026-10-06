@@ -22,7 +22,7 @@ env:
 jobs:
   cleanup:
     name: Delete old artifacts
-    runs-on: self-hosted
+    runs-on: [self-hosted, linux, x64, devforge]
     permissions:
       actions: write
     steps:

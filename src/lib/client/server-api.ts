@@ -68,6 +68,7 @@ import { localUsersMethods } from './server-api/local-users.js';
 import { friendsMethods } from './server-api/friends.js';
 import { requestsMethods } from './server-api/requests.js';
 import { systemMethods } from './server-api/system.js';
+import { aiMethods } from './server-api/ai.js';
 
 // Ré-exporter les types pour compatibilité
 export type {
@@ -93,6 +94,15 @@ export type {
 } from './server-api/base.js';
 
 export type { WebOSInstallSimpleResponse, WebOSRelaunchResponse } from './server-api/system.js';
+
+export type {
+  TranscodeJob,
+  AdminResourcesResponse,
+  TranscodeJobsResponse,
+  TranscodeStatusResponse,
+  KillTranscodeJobResponse,
+  SystemResourcesResponse,
+} from './server-api/system.js';
 
 class ServerApiClient extends ServerApiClientBase {
   /**
@@ -192,6 +202,14 @@ interface IServerApiClientPublic {
   createMediaRequest(data: { tmdb_id: number; media_type: string; season_numbers?: number[]; title?: string; poster_path?: string; backdrop_path?: string }): Promise<ApiResponse<import('./server-api/requests.js').MediaRequest>>;
   deleteMediaRequest(id: string): Promise<ApiResponse<unknown>>;
   updateRequestStatus(id: string, data: { status: string; notes?: string }): Promise<ApiResponse<import('./server-api/requests.js').MediaRequest>>;
+  getQuotaStats(userId: string): Promise<ApiResponse<import('./server-api/requests.js').QuotaStats>>;
+  updateUserQuota(userId: string, data: {
+    movie_quota_limit: number | null;
+    movie_quota_days: number | null;
+    tv_quota_limit: number | null;
+    tv_quota_days: number | null;
+  }): Promise<ApiResponse<import('./server-api/requests.js').QuotaStats>>;
+  listBlacklist(params?: { user_id?: string; limit?: number; offset?: number }): Promise<ApiResponse<import('./server-api/requests.js').BlacklistedItem[]>>;
   
   searchTmdb(params: { q: string; type?: 'movie' | 'tv' | 'all'; language?: string; page?: number }): Promise<ApiResponse<Array<{ id: string; title: string; type: string; poster?: string; year?: number; overview?: string; tmdbId: number }>>>;
 
@@ -246,6 +264,10 @@ interface IServerApiClientPublic {
   scanLocalMedia(): Promise<ApiResponse<string>>;
   getLocalMediaTmdbGaps(sampleLimit?: number): Promise<ApiResponse<{ missing_tmdb_count: number; sample: Array<{ file_path: string; file_name: string }> }>>;
   findLocalMediaByInfoHash(infoHash: string): Promise<ApiResponse<any>>;
+  getLocalAudioStreams(opts: {
+    path?: string;
+    infoHash?: string;
+  }): Promise<ApiResponse<{ tracks: import('./server-api/local-media.js').LocalAudioStreamTrack[] }>>;
 
   // Connection status
   getCurrentUserId(): string | null;
@@ -254,6 +276,44 @@ interface IServerApiClientPublic {
 
   // Health methods
   checkServerHealth(): Promise<ApiResponse<{ status: string }>>;
+  aiHealth(): Promise<ApiResponse<import('./server-api/ai.js').AiHealth>>;
+  aiRelease(body: {
+    locale: string;
+    preferred_quality?: string;
+    languages?: string[];
+    variants: import('./server-api/ai.js').AiReleaseVariant[];
+  }): Promise<ApiResponse<{ id?: string | null; summary: string; source: string }>>;
+  aiTmdbMatch(body: {
+    locale: string;
+    query: string;
+    current_tmdb_id?: number | null;
+    candidates: Array<{ id: number; type?: string; title: string; year?: string | null }>;
+  }): Promise<ApiResponse<{ summary: string; choices: import('./server-api/ai.js').AiTmdbChoice[]; source: string }>>;
+  aiSearch(body: { locale: string; query: string }): Promise<ApiResponse<{ rewritten: boolean; query: string; media_type?: string | null; summary: string; source: string }>>;
+  aiTonight(body: {
+    locale: string;
+    items: Array<{ id: string; title: string; type?: string; seeds?: number; in_library?: boolean }>;
+  }): Promise<ApiResponse<{ ids: string[]; summary: string; source: string }>>;
+  aiParseRequest(body: { locale: string; text: string; media_type?: string; language?: string; season?: number }): Promise<ApiResponse<{
+    title_query: string;
+    media_type: string;
+    season?: number | null;
+    language?: string | null;
+    summary: string;
+    source: string;
+  }>>;
+  aiUpload(body: { locale: string; file_name?: string; title?: string }): Promise<ApiResponse<{
+    category: string;
+    language: string;
+    quality: string;
+    description: string;
+    summary: string;
+    source: string;
+  }>>;
+  aiDiagnose(body: { locale: string; message?: string }): Promise<ApiResponse<{ action: string; summary: string; source: string }>>;
+  aiGetSettings(): Promise<ApiResponse<{ has_key: boolean; masked_key?: string | null; model: string }>>;
+  aiSaveSettings(body: { api_key?: string; model?: string }): Promise<ApiResponse<{ has_key: boolean; masked_key?: string | null; model: string }>>;
+  aiClearSettings(): Promise<ApiResponse<{ has_key: boolean; masked_key?: string | null; model: string }>>;
   getSetupStatus(): Promise<ApiResponse<SetupStatus>>;
   getStorageStats(): Promise<ApiResponse<{ used_bytes: number; total_bytes?: number; available_bytes?: number; storage_retention_days?: number }>>;
   patchStorageRetention(storageRetentionDays: number | null): Promise<ApiResponse<{ used_bytes: number; total_bytes?: number; available_bytes?: number; storage_retention_days?: number }>>;
@@ -387,9 +447,9 @@ interface IServerApiClientPublic {
   >;
   getServerLogs(params?: { limit?: number }): Promise<ApiResponse<{ lines: string[] }>>;
   restartBackend(): Promise<ApiResponse<{ will_exit: boolean }>>;
-  installWebOSSimple(device?: string): Promise<
-    ApiResponse<import('./server-api/system.js').WebOSInstallSimpleResponse>
-  >;
+  installWebOSSimple(
+    opts?: string | { device?: string; ip?: string; passphrase?: string }
+  ): Promise<ApiResponse<import('./server-api/system.js').WebOSInstallSimpleResponse>>;
   relaunchWebOSApp(device?: string): Promise<
     ApiResponse<import('./server-api/system.js').WebOSRelaunchResponse>
   >;
@@ -487,7 +547,8 @@ Object.assign(ServerApiClient.prototype,
   localUsersMethods,
   friendsMethods,
   requestsMethods,
-  systemMethods
+  systemMethods,
+  aiMethods
 );
 
 // Instance réelle (utilisée quand isDemoMode() est false)
