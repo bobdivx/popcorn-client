@@ -7,7 +7,9 @@ import type { ComponentChildren } from 'preact';
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import CarLibraryBrowser, { type CarLibraryPick } from '../streaming/car-player/CarLibraryBrowser';
 import { useCarMediaSource } from '../streaming/car-player/useCarMediaSource';
-import { detectTeslaDriveMode, type TeslaDriveMode } from '../streaming/car-player/driveModeDetector';
+import { detectTeslaDriveMode, startDriveModeMonitoring, type TeslaDriveMode } from '../streaming/car-player/driveModeDetector';
+import { noteDriveModeForCapabilities } from '../streaming/car-player/carCapabilities';
+import CarCapabilitiesPanel from './CarCapabilitiesPanel';
 import {
   ENGINES,
   QUALITY_ORDER,
@@ -115,6 +117,7 @@ export default function CarLab() {
   const [subInfo, setSubInfo] = useState<string>('');
   const [subTrack, setSubTrack] = useState<number | null>(null);
   const [subText, setSubText] = useState<string>('');
+  const [capsOpen, setCapsOpen] = useState(false);
 
   const hostRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -145,6 +148,12 @@ export default function CarLab() {
   useEffect(() => {
     runDriveTest();
   }, [runDriveTest]);
+
+  // Suivi Park↔Drive (même sonde) + empreinte capacités auto au chargement et à chaque transition
+  useEffect(() => startDriveModeMonitoring((m) => setDrive(m)), []);
+  useEffect(() => {
+    if (drive !== 'testing') noteDriveModeForCapabilities('/car/lab', drive);
+  }, [drive]);
 
   const updateCfg = useCallback((patch: Partial<LabConfig>) => {
     setCfg((prev) => {
@@ -343,11 +352,15 @@ export default function CarLab() {
               {lastPick.position ? ` · ${fmt(lastPick.position)}` : ''}
             </button>
           )}
+          <button type="button" className="car-lab__btn" onClick={() => setCapsOpen(true)}>
+            Capacités
+          </button>
           <a className="car-lab__btn" href="/car">
             ← Theater
           </a>
         </div>
         <CarLibraryBrowser onSelect={pickMedia} />
+        {capsOpen && <CarCapabilitiesPanel mode={drive} onClose={() => setCapsOpen(false)} />}
       </div>
     );
   }
@@ -370,6 +383,7 @@ export default function CarLab() {
       )}
 
       {cfg.subs && subText && <div className="car-lab__subs">{subText}</div>}
+      {capsOpen && <CarCapabilitiesPanel mode={drive} onClose={() => setCapsOpen(false)} />}
 
       {cfg.stats && stats && (
         <div className="car-lab__stats" onClick={(e) => e.stopPropagation()}>
@@ -526,6 +540,9 @@ export default function CarLab() {
             </button>
             <button type="button" className="car-lab__btn" onClick={copyLink}>
               Lien
+            </button>
+            <button type="button" className="car-lab__btn" onClick={() => setCapsOpen(true)}>
+              Capacités
             </button>
           </div>
           <div className="car-lab__row">

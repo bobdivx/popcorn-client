@@ -25,7 +25,13 @@ export interface CarDriveQualityProfile {
  * - quality=3 : compression MJPEG moyenne (trade-off taille/artifacts)
  * - 96kbps audio : voix claire, musique acceptable, ~1/3 du bitrate standard
  */
-export function getCarDriveQualityProfile(): CarDriveQualityProfile {
+export type CarDrivePreset = 'standard' | 'lite';
+
+export function getCarDriveQualityProfile(preset: CarDrivePreset = 'standard'): CarDriveQualityProfile {
+  if (preset === 'lite') {
+    // Choisi automatiquement (empreinte capacités) : appareil/réseau faible → 360p 10 i/s
+    return { maxHeight: 360, maxFps: 10, quality: 10, audioBitrate: '64k' };
+  }
   return {
     maxHeight: 480,
     maxFps: 12,
@@ -50,9 +56,9 @@ export function getCarDriveQualityProfile(): CarDriveQualityProfile {
  * 
  * Si le serveur ignore ces params, comportement inchangé (fallback gracieux).
  */
-export function buildCarDriveUrls(streamUrl: string, seekSeconds: number): CarDriveUrls {
+export function buildCarDriveUrls(streamUrl: string, seekSeconds: number, preset: CarDrivePreset = 'standard'): CarDriveUrls {
   const seek = Math.max(0, Number.isFinite(seekSeconds) ? seekSeconds : 0);
-  const profile = getCarDriveQualityProfile();
+  const profile = getCarDriveQualityProfile(preset);
   
   let url: URL;
   try {

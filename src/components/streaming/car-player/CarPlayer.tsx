@@ -5,6 +5,7 @@ import { useCarMediaSource } from './useCarMediaSource';
 import CarLibraryBrowser, { type CarLibraryPick } from './CarLibraryBrowser';
 import { attachCarStream } from './attachCarStream';
 import { buildCarDriveUrls, getCarDriveQualityProfile } from './buildCarDriveUrls';
+import { getCarAutoTuning, noteDriveModeForCapabilities, onCapabilitiesReported, type CarAutoTuning } from './carCapabilities';
 import { CarCanvasRenderer, readCarRenderEngine, writeCarRenderEngine, type CarRenderEngine } from './carCanvasRenderer';
 import CarPlaybackTypeSelector from './CarPlaybackTypeSelector';
 import type { CarPlaybackSettings, CarPlaybackType } from './carPlaybackTypes';
@@ -78,7 +79,20 @@ export default function CarPlayer() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasRendererRef = useRef<CarCanvasRenderer | null>(null);
   const [renderEngine, setRenderEngine] = useState<CarRenderEngine>(() => readCarRenderEngine());
-  const canvasActive = renderEngine === 'canvas' && CarCanvasRenderer.isSupported();
+  // Choix auto moteur/preset Drive à partir de l'empreinte des capacités (relevé pris en Drive)
+  const [autoTuning, setAutoTuning] = useState<CarAutoTuning>(() => getCarAutoTuning());
+  const wantedEngine: 'img' | 'canvas' = renderEngine === 'auto' ? autoTuning.engine : renderEngine;
+  const renderEngineRef = useRef(renderEngine);
+  renderEngineRef.current = renderEngine;
+  const wantedEngineRef = useRef(wantedEngine);
+  wantedEngineRef.current = wantedEngine;
+  const autoTuningRef = useRef(autoTuning);
+  autoTuningRef.current = autoTuning;
+  const canvasFailedRef = useRef(false);
+  const driveFpsRef = useRef(getCarDriveQualityProfile().maxFps);
+  // Moteur figé pour la session Drive en cours (pas de bascule img/canvas en plein flux)
+  const [activeEngine, setActiveEngine] = useState<'img' | 'canvas'>('img');
+  const canvasActive = activeEngine === 'canvas';
   const userWantsPlayRef = useRef(false);
   const userPausedRef = useRef(false);
   const lastAdvanceAtRef = useRef(0);
@@ -119,6 +133,13 @@ export default function CarPlayer() {
       stopMonitoring();
     };
   }, []);
+
+  // Empreinte capacités : au chargement puis à chaque transition Park↔Drive (auto, sans impact lecture)
+  useEffect(() => {
+    noteDriveModeForCapabilities('/car', detectedMode);
+  }, [detectedMode]);
+
+  useEffect(() => onCapabilitiesReported(() => setAutoTuning(getCarAutoTuning())), []);
 
   // Recalculer effectiveType quand settings ou detectedMode changent
   useEffect(() => {
@@ -174,7 +195,14 @@ export default function CarPlayer() {
     (atSeconds: number) => {
       if (!source?.streamUrl) return;
       const seek = Math.max(0, atSeconds);
-      const urls = buildCarDriveUrls(source.streamUrl, seek);
+      const preset = autoTuningRef.current.preset;
+      const urls = buildCarDriveUrls(source.streamUrl, seek, preset);
+      driveFpsRef.current = getCarDriveQualityProfile(preset).maxFps;
+      const useCanvas =
+        wantedEngineRef.current === 'canvas' &&
+        CarCanvasRenderer.isSupported() &&
+        !(renderEngineRef.current === 'auto' && canvasFailedRef.current);
+      setActiveEngine(useCanvas ? 'canvas' : 'img');
       driveAnchorRef.current = seek;
       driveStartedAtRef.current = performance.now();
       hasMediaErrorRef.current = false;
@@ -375,8 +403,17 @@ export default function CarPlayer() {
         canvas,
         url: driveUrls.mjpegUrl,
         audio,
-        fps: getCarDriveQualityProfile().maxFps,
-        onError: (m) => setMediaError(m),
+        fps: driveFpsRef.current,
+        onError: (m) => {
+          // En auto : repli <img> immédiat (une fois par chargement de page)
+          if (renderEngineRef.current === 'auto' && !canvasFailedRef.current) {
+            canvasFailedRef.current = true;
+            console.warn('[car] moteur canvas KO → repli <img>', m);
+            startDriveAt(driveAnchorRef.current + (audio.currentTime || 0));
+            return;
+          }
+          setMediaError(m);
+        },
       });
       canvasRendererRef.current = renderer;
       renderer.start();
@@ -649,14 +686,20 @@ export default function CarPlayer() {
               type="button"
               className="tesla-car-ctrl tesla-car-ctrl--ghost"
               onClick={() => {
-                const next: CarRenderEngine = renderEngine === 'canvas' ? 'img' : 'canvas';
+                const next: CarRenderEngine = renderEngine === 'img' ? 'canvas' : renderEngine === 'canvas' ? 'auto' : 'img';
                 writeCarRenderEngine(next);
                 setRenderEngine(next);
                 if (driveModeRef.current) startDriveAt(currentTime);
               }}
-              title="Moteur d'affichage en conduite (canvas = expérimental : buffer + calage audio)"
+              title={`Moteur d'affichage en conduite (image → canvas → auto). Auto : ${autoTuning.reasons.join(' · ')}`}
             >
-              <span>{renderEngine === 'canvas' ? 'Rendu canvas' : 'Rendu image'}</span>
+              <span>
+                {renderEngine === 'auto'
+                  ? `Rendu auto (${(driveMode ? activeEngine : wantedEngine) === 'canvas' ? 'canvas' : 'image'})`
+                  : renderEngine === 'canvas'
+                    ? 'Rendu canvas'
+                    : 'Rendu image'}
+              </span>
             </button>
 
             <CarPlaybackTypeSelector
