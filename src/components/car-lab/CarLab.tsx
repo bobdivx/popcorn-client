@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import CarLibraryBrowser, { type CarLibraryPick } from '../streaming/car-player/CarLibraryBrowser';
 import { useCarMediaSource } from '../streaming/car-player/useCarMediaSource';
-import { detectTeslaDriveMode, startDriveModeMonitoring, type TeslaDriveMode } from '../streaming/car-player/driveModeDetector';
+import { applyModeOverride, detectTeslaDriveMode, getModeOverride, startDriveModeMonitoring, type ModeOverride, type ModeSource, type TeslaDriveMode } from '../streaming/car-player/driveModeDetector';
 import { noteDriveModeForCapabilities } from '../streaming/car-player/carCapabilities';
 import { PlaybackTelemetry } from '../streaming/car-player/carTelemetry';
 import CarStatsStrip from '../streaming/car-player/CarStatsStrip';
@@ -94,6 +94,8 @@ export default function CarLab() {
   const [error, setError] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const [drive, setDrive] = useState<TeslaDriveMode | 'testing'>('unknown');
+  const [modeSource, setModeSource] = useState<ModeSource>('auto');
+  const [modeOverride, setModeOverrideState] = useState<ModeOverride>(() => getModeOverride());
   const [session, setSession] = useState(0);
   const [lastPick, setLastPick] = useState<LabPick | null>(null);
   const [title, setTitle] = useState<string>('');
@@ -113,7 +115,7 @@ export default function CarLab() {
   const { source, loading, error: sourceError } = useCarMediaSource(slug);
   const { visible: barVisible, poke: pokeBar, hide: hideBar, setPinned: setBarPinned } = useAutoHide(5000, !!slug && !paused);
   const telemetryRef = useRef<PlaybackTelemetry | null>(null);
-  const teleCtxRef = useRef({ engine: '', preset: '', route: '', drive: 'unknown' as TeslaDriveMode | 'testing', extra: {} as Record<string, unknown> });
+  const teleCtxRef = useRef({ engine: '', preset: '', route: '', drive: 'unknown' as TeslaDriveMode | 'testing', modeSource: 'auto' as ModeSource, extra: {} as Record<string, unknown> });
   const effectiveUrl = source?.streamUrl ? routeStreamUrl(source.streamUrl, cfg.route) : null;
 
   useEffect(() => {
@@ -128,8 +130,18 @@ export default function CarLab() {
   const runDriveTest = useCallback(() => {
     setDrive('testing');
     void detectTeslaDriveMode()
-      .then((r) => setDrive(r.mode))
+      .then((r) => {
+        setDrive(r.mode);
+        if (r.modeSource) setModeSource(r.modeSource);
+      })
       .catch(() => setDrive('unknown'));
+  }, []);
+
+  const forceMode = useCallback((override: ModeOverride) => {
+    const r = applyModeOverride(override);
+    setModeOverrideState(override);
+    setDrive(r.mode);
+    setModeSource(r.modeSource || (override === 'auto' ? 'auto' : 'manual'));
   }, []);
 
   useEffect(() => {
@@ -137,7 +149,11 @@ export default function CarLab() {
   }, [runDriveTest]);
 
   // Suivi Park↔Drive (même sonde) + empreinte capacités auto au chargement et à chaque transition
-  useEffect(() => startDriveModeMonitoring((m) => setDrive(m)), []);
+  useEffect(() => startDriveModeMonitoring((m, r) => {
+    setDrive(m);
+    if (r.modeSource) setModeSource(r.modeSource);
+    setModeOverrideState(getModeOverride());
+  }), []);
   useEffect(() => {
     if (drive !== 'testing') noteDriveModeForCapabilities('/car/lab', drive);
   }, [drive]);
@@ -163,6 +179,7 @@ export default function CarLab() {
       page: '/car/lab',
       engine: teleCtxRef.current.engine,
       mode: teleCtxRef.current.drive,
+      modeSource: teleCtxRef.current.modeSource,
       preset: teleCtxRef.current.preset,
       route: teleCtxRef.current.route,
       position: posRef.current,
@@ -380,6 +397,15 @@ export default function CarLab() {
               {lastPick.position ? ` · ${fmt(lastPick.position)}` : ''}
             </button>
           )}
+          <button type="button" className={`car-lab__btn${modeOverride === 'park' ? ' is-active' : ''}`} onClick={() => forceMode('park')}>
+            PARK
+          </button>
+          <button type="button" className={`car-lab__btn${modeOverride === 'drive' ? ' is-active' : ''}`} onClick={() => forceMode('drive')}>
+            DRIVE
+          </button>
+          <button type="button" className={`car-lab__btn${modeOverride === 'auto' ? ' is-active' : ''}`} onClick={() => forceMode('auto')}>
+            AUTO
+          </button>
           <button type="button" className="car-lab__btn" onClick={() => setCapsOpen(true)}>
             Capacités
           </button>
@@ -395,6 +421,7 @@ export default function CarLab() {
 
   const preset = QUALITY_PRESETS[effQuality];
   const driveLabel = drive === 'testing' ? 'test…' : drive === 'drive' ? 'DRIVE' : drive === 'park' ? 'PARK' : '?';
+  const modeLabel = modeOverride !== 'auto' ? `${driveLabel}·manuel` : driveLabel;
   const isMjpeg = engineInfo(cfg.engine).mjpeg;
   const eng = engineInfo(cfg.engine);
   teleCtxRef.current = {
@@ -402,7 +429,8 @@ export default function CarLab() {
     preset: `${effQuality} ${preset.maxHeight}p/${preset.fps}/q${preset.q}`,
     route: cfg.route,
     drive,
-    extra: { buffer: cfg.buffer, pace: cfg.pace, clock: cfg.clock, adaptive: cfg.adaptive, audioOn: cfg.audio, subs: cfg.subs },
+    modeSource,
+    extra: { buffer: cfg.buffer, pace: cfg.pace, clock: cfg.clock, adaptive: cfg.adaptive, audioOn: cfg.audio, subs: cfg.subs, modeSource, modeOverride },
   };
 
   const opt = (id: string, label: string, active: boolean, hint?: string, disabled?: boolean): BarOption => ({ id, label, active, hint, disabled });
@@ -503,13 +531,31 @@ export default function CarLab() {
       },
     },
     {
+      id: 'mode',
+      label: 'Mode',
+      value: modeLabel,
+      tone: drive === 'drive' ? 'bad' : drive === 'park' ? 'ok' : 'warn',
+      closeOnSelect: false,
+      options: [
+        opt('force-park', '🅿️ PARK', modeOverride === 'park', 'force Stationné (télémétrie mode:park, modeSource:manual)'),
+        opt('force-drive', '🚗 DRIVE', modeOverride === 'drive', 'force Conduite (télémétrie mode:drive, modeSource:manual)'),
+        opt('force-auto', '↺ AUTO', modeOverride === 'auto', 'détection auto Park/Drive'),
+        opt('retest', 'Re-tester auto', drive === 'testing', `dernier : ${driveLabel} · ${modeSource}`),
+      ],
+      onSelect: (id) => {
+        if (id === 'force-park') forceMode('park');
+        else if (id === 'force-drive') forceMode('drive');
+        else if (id === 'force-auto') forceMode('auto');
+        else if (id === 'retest') runDriveTest();
+      },
+    },
+    {
       id: 'display',
       label: 'Affichage',
-      value: driveLabel,
+      value: '…',
       options: [
         opt('fullscreen', '⛶ Plein écran', false),
         opt('hide', 'Masquer la barre', false, 'un tap sur l’image la réaffiche'),
-        opt('drive', 'Re-tester Drive', drive === 'testing', `mode actuel : ${driveLabel}`),
         opt('link', 'Copier le lien (position + réglages)', false),
         opt('library', '← Bibliothèque', false),
         opt('theater', '← Theater (/car)', false),
@@ -517,7 +563,6 @@ export default function CarLab() {
       onSelect: (id) => {
         if (id === 'fullscreen') goFullscreen();
         else if (id === 'hide') hideBar();
-        else if (id === 'drive') runDriveTest();
         else if (id === 'link') copyLink();
         else if (id === 'library') back();
         else if (id === 'theater') window.location.href = '/car';
@@ -564,7 +609,7 @@ export default function CarLab() {
                 }
               : null
           }
-          tags={[eng.short, `${preset.maxHeight}p`, cfg.route === 'proxy' ? 'proxy' : 'direct', driveLabel]}
+          tags={[eng.short, `${preset.maxHeight}p`, cfg.route === 'proxy' ? 'proxy' : 'direct', modeLabel]}
           details={[
             ['Audio :', stats?.audioState ?? '—'],
             ['Note :', stats?.note || '—'],
