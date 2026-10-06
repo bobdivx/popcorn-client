@@ -21,7 +21,7 @@ import CarCategoryBar, { useAutoHide, type BarCategory } from './CarCategoryBar'
 import CarPlaybackTypeSelector from './CarPlaybackTypeSelector';
 import type { CarPlaybackSettings, CarPlaybackType } from './carPlaybackTypes';
 import { getStoredPlaybackSettings, resolvePlaybackType, setStoredPlaybackSettings } from './carPlaybackTypes';
-import { detectDriveModeWithCache, startDriveModeMonitoring, type TeslaDriveMode } from './driveModeDetector';
+import { applyModeOverride, detectDriveModeWithCache, getModeOverride, startDriveModeMonitoring, type ModeOverride, type ModeSource, type TeslaDriveMode } from './driveModeDetector';
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -101,6 +101,9 @@ export default function CarPlayer() {
   
   // Détection mode Tesla (Park/Drive/Unknown)
   const [detectedMode, setDetectedMode] = useState<TeslaDriveMode>('unknown');
+  const [modeSource, setModeSource] = useState<ModeSource>('auto');
+  const [modeOverride, setModeOverrideState] = useState<ModeOverride>(() => getModeOverride());
+  const modeSourceRef = useRef<ModeSource>('auto');
   
   // Type effectif calculé (Auto → résolu selon Drive/Park, Manuel → choix utilisateur)
   const [effectiveType, setEffectiveType] = useState<CarPlaybackType>(() => {
@@ -171,11 +174,20 @@ export default function CarPlayer() {
     // Détection initiale avec cache
     detectDriveModeWithCache().then((result) => {
       setDetectedMode(result.mode);
+      if (result.modeSource) {
+        setModeSource(result.modeSource);
+        modeSourceRef.current = result.modeSource;
+      }
+      setModeOverrideState(getModeOverride());
     });
 
-    // Monitoring continu (re-check toutes les 10s)
-    const stopMonitoring = startDriveModeMonitoring((mode) => {
+    const stopMonitoring = startDriveModeMonitoring((mode, result) => {
       setDetectedMode(mode);
+      if (result.modeSource) {
+        setModeSource(result.modeSource);
+        modeSourceRef.current = result.modeSource;
+      }
+      setModeOverrideState(getModeOverride());
     });
 
     return () => {
@@ -198,10 +210,11 @@ export default function CarPlayer() {
       page: '/car',
       engine: telemetryCtxRef.current.engine,
       mode: detectedModeRef.current,
+      modeSource: modeSourceRef.current,
       preset: telemetryCtxRef.current.preset,
       route: 'direct',
       position: telemetryCtxRef.current.position,
-      extra: { renderChoice: renderEngineRef.current, qualityChoice: qualityChoiceRef.current },
+      extra: { renderChoice: renderEngineRef.current, qualityChoice: qualityChoiceRef.current, modeSource: modeSourceRef.current, modeOverride: getModeOverride() },
     }));
     telemetryRef.current = t;
     t.start();
@@ -702,7 +715,39 @@ export default function CarPlayer() {
   const autoPresetLabel = CAR_DRIVE_PRESET_LABELS[autoTuning.preset];
   const shownEngine: CarConcreteEngine = driveMode ? activeEngine : wantedEngine;
   const workerOk = CarWorkerRenderer.isSupported();
+  const forceMode = (override: ModeOverride) => {
+    const r = applyModeOverride(override);
+    setModeOverrideState(override);
+    setDetectedMode(r.mode);
+    const src = r.modeSource || (override === 'auto' ? 'auto' : 'manual');
+    setModeSource(src);
+    modeSourceRef.current = src;
+    detectedModeRef.current = r.mode;
+  };
+
+  const modeLabel =
+    modeOverride !== 'auto'
+      ? (detectedMode === 'drive' ? 'DRIVE·manuel' : detectedMode === 'park' ? 'PARK·manuel' : '?·manuel')
+      : detectedMode === 'drive'
+        ? 'DRIVE'
+        : detectedMode === 'park'
+          ? 'PARK'
+          : '?';
+
   const barCategories: BarCategory[] = [
+    {
+      id: 'mode',
+      label: 'Mode',
+      value: modeLabel,
+      tone: detectedMode === 'drive' ? 'bad' : detectedMode === 'park' ? 'ok' : 'warn',
+      closeOnSelect: false,
+      options: [
+        { id: 'park', label: '🅿️ PARK', hint: 'force Stationné — télémétrie mode:park modeSource:manual', active: modeOverride === 'park' },
+        { id: 'drive', label: '🚗 DRIVE', hint: 'force Conduite — télémétrie mode:drive modeSource:manual', active: modeOverride === 'drive' },
+        { id: 'auto', label: '↺ AUTO', hint: 'détection auto (?mode=auto)', active: modeOverride === 'auto' },
+      ],
+      onSelect: (id) => forceMode(id as ModeOverride),
+    },
     {
       id: 'engine',
       label: 'Moteur',
@@ -789,7 +834,7 @@ export default function CarPlayer() {
           tags={[
             driveMode ? ENGINE_LABEL[activeEngine] : 'Vidéo',
             driveMode ? `${getCarDriveQualityProfile(presetRef.current).maxHeight}p` : 'MP4',
-            detectedMode === 'drive' ? 'DRIVE' : detectedMode === 'park' ? 'PARK' : '?',
+            modeLabel,
           ]}
           details={[
             ['Auto :', autoTuning.reasons.join(' · ')],
