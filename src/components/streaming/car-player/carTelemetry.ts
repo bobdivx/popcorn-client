@@ -33,6 +33,7 @@ export interface TelemetryContext {
   page: '/car' | '/car/lab';
   engine: string;
   mode: TeslaDriveMode | 'testing';
+  modeSource?: string;
   preset: string;
   route: string;
   position: number;
@@ -181,6 +182,7 @@ export class PlaybackTelemetry {
       page: ctx.page,
       engine: ctx.engine,
       mode: ctx.mode,
+      modeSource: ctx.modeSource || (ctx.extra && (ctx.extra as any).modeSource) || 'auto',
       preset: ctx.preset,
       route: ctx.route,
       position: Math.round(ctx.position * 10) / 10,
