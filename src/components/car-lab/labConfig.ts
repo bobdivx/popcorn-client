@@ -19,6 +19,7 @@ export type LabQuality = 'low' | 'medium' | 'high';
 export type LabBuffer = 'aggressive' | 'cautious';
 export type LabPace = 'realtime' | 'burst';
 export type LabClock = 'audio' | 'fixed';
+export type LabRoute = 'direct' | 'proxy';
 
 export interface LabConfig {
   engine: LabEngine;
@@ -29,6 +30,10 @@ export interface LabConfig {
   clock: LabClock;
   audio: boolean;
   stats: boolean;
+  /** Sous-titres texte (piste du média) dessinés en overlay */
+  subs: boolean;
+  /** direct = URL serveur ; proxy = même origine que le client (/srv → nginx client → conteneur serveur) */
+  route: LabRoute;
 }
 
 export interface QualityPreset {
@@ -93,6 +98,8 @@ export const DEFAULT_CONFIG: LabConfig = {
   clock: 'audio',
   audio: true,
   stats: true,
+  subs: false,
+  route: 'direct',
 };
 
 const STORAGE_KEY = 'popcorn_car_lab_config_v1';
@@ -107,6 +114,7 @@ function sanitize(raw: Partial<Record<keyof LabConfig, unknown>>): Partial<LabCo
   if (raw.buffer === 'aggressive' || raw.buffer === 'cautious') out.buffer = raw.buffer;
   if (raw.pace === 'realtime' || raw.pace === 'burst') out.pace = raw.pace;
   if (raw.clock === 'audio' || raw.clock === 'fixed') out.clock = raw.clock;
+  if (raw.route === 'direct' || raw.route === 'proxy') out.route = raw.route;
   const bool = (v: unknown): boolean | undefined =>
     v === true || v === '1' || v === 'true' ? true : v === false || v === '0' || v === 'false' ? false : undefined;
   const a = bool(raw.adaptive);
@@ -115,6 +123,8 @@ function sanitize(raw: Partial<Record<keyof LabConfig, unknown>>): Partial<LabCo
   if (au !== undefined) out.audio = au;
   const st = bool(raw.stats);
   if (st !== undefined) out.stats = st;
+  const sb = bool(raw.subs);
+  if (sb !== undefined) out.subs = sb;
   return out;
 }
 
@@ -127,6 +137,8 @@ const URL_KEYS: Array<[keyof LabConfig, string]> = [
   ['clock', 'clock'],
   ['audio', 'audio'],
   ['stats', 'stats'],
+  ['subs', 'subs'],
+  ['route', 'route'],
 ];
 
 export function loadConfig(): LabConfig {
@@ -232,4 +244,42 @@ export function buildLabUrls(
   audio.searchParams.set('_lab', String(Date.now()));
 
   return { mjpegUrl: mjpeg.toString(), audioUrl: audio.toString() };
+}
+
+/** Préfixe du proxy même-origine (docker/nginx.conf du client : /srv/ → http://server:3000/). */
+export const PROXY_PREFIX = '/srv';
+
+/**
+ * direct : URL telle que fournie par le client (serveur configuré, ex. popcornn-server.jeser.app via Cloudflare) ;
+ * proxy  : même chemin servi par l'origine du client (client.popcornn.app/srv/…) → nginx du conteneur client
+ *          → conteneur serveur sur le réseau Docker interne (pas de CORS/preflight, autre chemin Cloudflare/Traefik).
+ */
+export function routeStreamUrl(streamUrl: string, route: LabRoute): string {
+  if (route !== 'proxy') return streamUrl;
+  try {
+    const u = new URL(streamUrl, window.location.origin);
+    if (u.origin === window.location.origin && u.pathname.startsWith(`${PROXY_PREFIX}/`)) return u.toString();
+    return `${window.location.origin}${PROXY_PREFIX}${u.pathname}${u.search}`;
+  } catch {
+    return streamUrl;
+  }
+}
+
+/** Base « …/car » pour car.subs.json / car.subs.vtt (même résolution de fichier que car.mjpeg). */
+export function buildSubsUrls(streamUrl: string, seekSeconds: number, track: number | null): { listUrl: string; vttUrl: string | null } {
+  const url = new URL(streamUrl, window.location.origin);
+  let pathname = url.pathname.replace(/\/car\.(mjpeg|audio|subs\.json|subs\.vtt)$/i, '');
+  if (pathname.endsWith('/')) pathname = pathname.slice(0, -1);
+  const list = new URL(url.toString());
+  list.pathname = `${pathname}/car.subs.json`;
+  let vttUrl: string | null = null;
+  if (track != null) {
+    const v = new URL(url.toString());
+    v.pathname = `${pathname}/car.subs.vtt`;
+    v.searchParams.set('track', String(track));
+    v.searchParams.set('seek', Math.max(0, seekSeconds).toFixed(3));
+    v.searchParams.set('_lab', String(Date.now()));
+    vttUrl = v.toString();
+  }
+  return { listUrl: list.toString(), vttUrl };
 }
