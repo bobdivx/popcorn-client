@@ -51,3 +51,8 @@
 .car-lab__caps-table th { position: sticky; top: -14px; background: #111; }
 .car-lab__caps-table tr.is-diff td { background: rgba(255,176,32,.14); color: #ffd27a; }
 .car-lab__caps-recent { margin-top: 10px; }
+
+/* Bande de stats haute (24 px) : la surface vidéo commence en dessous — rien n'est recouvert */
+.car-lab--strip .car-lab__host { top: 24px; }
+.car-lab--strip .car-lab__error { top: 34px; }
+.car-lab__bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 50; background: linear-gradient(transparent, rgba(0,0,0,.85) 30%); padding-top: 18px; }

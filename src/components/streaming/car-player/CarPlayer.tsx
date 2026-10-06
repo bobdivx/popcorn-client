@@ -4,9 +4,20 @@ import { stampTeslaBrowserHints } from '../../../lib/utils/device-detection';
 import { useCarMediaSource } from './useCarMediaSource';
 import CarLibraryBrowser, { type CarLibraryPick } from './CarLibraryBrowser';
 import { attachCarStream } from './attachCarStream';
-import { buildCarDriveUrls, getCarDriveQualityProfile } from './buildCarDriveUrls';
-import { getCarAutoTuning, noteDriveModeForCapabilities, onCapabilitiesReported, type CarAutoTuning } from './carCapabilities';
-import { CarCanvasRenderer, readCarRenderEngine, writeCarRenderEngine, type CarRenderEngine } from './carCanvasRenderer';
+import { buildCarDriveUrls, CAR_DRIVE_PRESET_LABELS, getCarDriveQualityProfile, type CarDrivePreset } from './buildCarDriveUrls';
+import { getCapsSession, getCarAutoTuning, noteDriveModeForCapabilities, onCapabilitiesReported, type CarAutoTuning } from './carCapabilities';
+import {
+  CarCanvasRenderer,
+  readCarRenderEngine,
+  writeCarRenderEngine,
+  type CarConcreteEngine,
+  type CarRenderEngine,
+} from './carCanvasRenderer';
+import { CarWorkerRenderer } from './carWorkerRenderer';
+import type { FrameCoreStats } from './carFrameCore';
+import { PlaybackTelemetry, type PlaybackSecond } from './carTelemetry';
+import CarStatsStrip, { type StripStats } from './CarStatsStrip';
+import CarCategoryBar, { useAutoHide, type BarCategory } from './CarCategoryBar';
 import CarPlaybackTypeSelector from './CarPlaybackTypeSelector';
 import type { CarPlaybackSettings, CarPlaybackType } from './carPlaybackTypes';
 import { getStoredPlaybackSettings, resolvePlaybackType, setStoredPlaybackSettings } from './carPlaybackTypes';
@@ -21,6 +32,30 @@ function formatTime(seconds: number): string {
   const ss = String(s).padStart(2, '0');
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
+
+type CarQualityChoice = 'auto' | CarDrivePreset;
+const QUALITY_KEY = 'popcorn_car_drive_quality';
+const STRIP_KEY = 'popcorn_car_stats_strip';
+
+function readQualityChoice(): CarQualityChoice {
+  try {
+    const v = localStorage.getItem(QUALITY_KEY);
+    if (v === 'auto' || v === 'standard' || v === 'lite' || v === 'plus') return v;
+  } catch {
+    // ignore
+  }
+  return 'auto';
+}
+
+function readStripOn(): boolean {
+  try {
+    return localStorage.getItem(STRIP_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+const ENGINE_LABEL: Record<CarConcreteEngine, string> = { canvas: 'Canvas', worker: 'Worker', img: 'Image' };
 
 function readSlugFromLocation(): string | null {
   try {
@@ -77,11 +112,20 @@ export default function CarPlayer() {
   const audioRef = useRef<HTMLAudioElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const canvasRendererRef = useRef<CarCanvasRenderer | null>(null);
+  const canvasRendererRef = useRef<{ stop(): void; takeStats(): FrameCoreStats | null } | null>(null);
+  const [qualityChoice, setQualityChoice] = useState<CarQualityChoice>(() => readQualityChoice());
+  const qualityChoiceRef = useRef(qualityChoice);
+  qualityChoiceRef.current = qualityChoice;
+  const [stripOn, setStripOn] = useState<boolean>(() => readStripOn());
+  const [engineStats, setEngineStats] = useState<FrameCoreStats | null>(null);
+  const [videoStats, setVideoStats] = useState<StripStats | null>(null);
+  const telemetryRef = useRef<PlaybackTelemetry | null>(null);
+  const detectedModeRef = useRef<TeslaDriveMode>('unknown');
+  const presetRef = useRef<CarDrivePreset>('standard');
   const [renderEngine, setRenderEngine] = useState<CarRenderEngine>(() => readCarRenderEngine());
   // Choix auto moteur/preset Drive à partir de l'empreinte des capacités (relevé pris en Drive)
   const [autoTuning, setAutoTuning] = useState<CarAutoTuning>(() => getCarAutoTuning());
-  const wantedEngine: 'img' | 'canvas' = renderEngine === 'auto' ? autoTuning.engine : renderEngine;
+  const wantedEngine: CarConcreteEngine = renderEngine === 'auto' ? autoTuning.engine : renderEngine;
   const renderEngineRef = useRef(renderEngine);
   renderEngineRef.current = renderEngine;
   const wantedEngineRef = useRef(wantedEngine);
@@ -89,10 +133,13 @@ export default function CarPlayer() {
   const autoTuningRef = useRef(autoTuning);
   autoTuningRef.current = autoTuning;
   const canvasFailedRef = useRef(false);
+  const workerFailedRef = useRef(false);
   const driveFpsRef = useRef(getCarDriveQualityProfile().maxFps);
   // Moteur figé pour la session Drive en cours (pas de bascule img/canvas en plein flux)
-  const [activeEngine, setActiveEngine] = useState<'img' | 'canvas'>('img');
-  const canvasActive = activeEngine === 'canvas';
+  const [activeEngine, setActiveEngine] = useState<CarConcreteEngine>('canvas');
+  const activeEngineRef = useRef<CarConcreteEngine>('canvas');
+  activeEngineRef.current = activeEngine;
+  const canvasActive = activeEngine !== 'img';
   const userWantsPlayRef = useRef(false);
   const userPausedRef = useRef(false);
   const lastAdvanceAtRef = useRef(0);
@@ -112,6 +159,8 @@ export default function CarPlayer() {
   const [playbackModeLabel, setPlaybackModeLabel] = useState('MP4');
   const [driveUrls, setDriveUrls] = useState<{ mjpegUrl: string; audioUrl: string } | null>(null);
   const [driveSession, setDriveSession] = useState(0);
+  // Barre de contrôle : masquage auto après 6 s d'inactivité pendant la lecture, tap pour réafficher
+  const { visible: controlsVisible, poke: pokeControls, setPinned: setControlsPinned } = useAutoHide(6000, isPlaying && !mediaError);
 
   useEffect(() => {
     driveModeRef.current = driveMode;
@@ -136,10 +185,31 @@ export default function CarPlayer() {
 
   // Empreinte capacités : au chargement puis à chaque transition Park↔Drive (auto, sans impact lecture)
   useEffect(() => {
+    detectedModeRef.current = detectedMode;
     noteDriveModeForCapabilities('/car', detectedMode);
   }, [detectedMode]);
 
   useEffect(() => onCapabilitiesReported(() => setAutoTuning(getCarAutoTuning())), []);
+
+  // Télémétrie de lecture (échantillon / 10 s pendant la lecture, Park et Drive)
+  const telemetryCtxRef = useRef({ engine: 'video', preset: 'mp4', position: 0 });
+  useEffect(() => {
+    const t = new PlaybackTelemetry(() => ({
+      page: '/car',
+      engine: telemetryCtxRef.current.engine,
+      mode: detectedModeRef.current,
+      preset: telemetryCtxRef.current.preset,
+      route: 'direct',
+      position: telemetryCtxRef.current.position,
+      extra: { renderChoice: renderEngineRef.current, qualityChoice: qualityChoiceRef.current },
+    }));
+    telemetryRef.current = t;
+    t.start();
+    return () => {
+      t.stop();
+      telemetryRef.current = null;
+    };
+  }, []);
 
   // Recalculer effectiveType quand settings ou detectedMode changent
   useEffect(() => {
@@ -195,14 +265,18 @@ export default function CarPlayer() {
     (atSeconds: number) => {
       if (!source?.streamUrl) return;
       const seek = Math.max(0, atSeconds);
-      const preset = autoTuningRef.current.preset;
-      const urls = buildCarDriveUrls(source.streamUrl, seek, preset);
+      const qc = qualityChoiceRef.current;
+      const preset: CarDrivePreset = qc === 'auto' ? autoTuningRef.current.preset : qc;
+      presetRef.current = preset;
+      const urls = buildCarDriveUrls(source.streamUrl, seek, preset, getCapsSession());
       driveFpsRef.current = getCarDriveQualityProfile(preset).maxFps;
-      const useCanvas =
-        wantedEngineRef.current === 'canvas' &&
-        CarCanvasRenderer.isSupported() &&
-        !(renderEngineRef.current === 'auto' && canvasFailedRef.current);
-      setActiveEngine(useCanvas ? 'canvas' : 'img');
+      // Chaîne de repli (auto) : worker → canvas → <img>
+      const auto = renderEngineRef.current === 'auto';
+      let engine: CarConcreteEngine = wantedEngineRef.current;
+      if (engine === 'worker' && (!CarWorkerRenderer.isSupported() || (auto && workerFailedRef.current))) engine = 'canvas';
+      if (engine === 'canvas' && (!CarCanvasRenderer.isSupported() || (auto && canvasFailedRef.current))) engine = 'img';
+      setActiveEngine(engine);
+      setEngineStats(null);
       driveAnchorRef.current = seek;
       driveStartedAtRef.current = performance.now();
       hasMediaErrorRef.current = false;
@@ -394,27 +468,27 @@ export default function CarPlayer() {
     if (!driveMode || !driveUrls) return;
     const audio = audioRef.current;
     if (!audio) return;
-    if (canvasActive) {
-      // Moteur canvas optionnel : jitter buffer + cadence calée sur l'horloge audio
+    const engineNow = activeEngine;
+    if (engineNow !== 'img') {
+      // Moteurs canvas / worker : jitter buffer + cadence calée sur l'horloge audio, images en retard jetées
       const canvas = canvasRef.current;
       if (!canvas) return;
       canvasRendererRef.current?.stop();
-      const renderer = new CarCanvasRenderer({
-        canvas,
-        url: driveUrls.mjpegUrl,
-        audio,
-        fps: driveFpsRef.current,
-        onError: (m) => {
-          // En auto : repli <img> immédiat (une fois par chargement de page)
-          if (renderEngineRef.current === 'auto' && !canvasFailedRef.current) {
-            canvasFailedRef.current = true;
-            console.warn('[car] moteur canvas KO → repli <img>', m);
+      const onEngineError = (m: string) => {
+        // En auto : repli immédiat worker → canvas → <img> (une fois par chargement de page)
+        if (renderEngineRef.current === 'auto') {
+          const failedRef = engineNow === 'worker' ? workerFailedRef : canvasFailedRef;
+          if (!failedRef.current) {
+            failedRef.current = true;
+            console.warn(`[car] moteur ${engineNow} KO → repli`, m);
             startDriveAt(driveAnchorRef.current + (audio.currentTime || 0));
             return;
           }
-          setMediaError(m);
-        },
-      });
+        }
+        setMediaError(m);
+      };
+      const opts = { canvas, url: driveUrls.mjpegUrl, audio, fps: driveFpsRef.current, onError: onEngineError };
+      const renderer = engineNow === 'worker' ? new CarWorkerRenderer(opts) : new CarCanvasRenderer(opts);
       canvasRendererRef.current = renderer;
       renderer.start();
     } else {
@@ -448,6 +522,22 @@ export default function CarPlayer() {
       setMediaError('Flux conduite (audio/MJPEG) indisponible. Vérifiez FFmpeg sur le serveur.');
     };
 
+    // Stats moteur 1 s → bande de stats + télémétrie
+    telemetryRef.current?.resetTotals();
+    const statsTimer = window.setInterval(() => {
+      const st = canvasRendererRef.current?.takeStats() ?? null;
+      setEngineStats(st);
+      if (st) {
+        telemetryRef.current?.push(st as PlaybackSecond);
+      } else if (!audio.paused) {
+        // <img> natif : pas d'accès aux images, on trace quand même l'état (rAF, long tasks, mode…)
+        telemetryRef.current?.push({
+          state: 'playing', fpsShown: null, fpsReceived: null, targetFps: driveFpsRef.current, dropped: 0, late: 0, stalls: 0,
+          paintJitterMs: null, arrivalJitterMs: null, kbps: null, bufferFrames: null, bufferMs: null, decodeMs: null, paintMs: null, avSyncMs: null,
+        });
+      }
+    }, 1000);
+
     audio.addEventListener('timeupdate', onTime);
     audio.addEventListener('play', onPlay);
     audio.addEventListener('playing', onPlay);
@@ -456,6 +546,7 @@ export default function CarPlayer() {
     audio.addEventListener('error', onError);
 
     return () => {
+      window.clearInterval(statsTimer);
       canvasRendererRef.current?.stop();
       canvasRendererRef.current = null;
       audio.removeEventListener('timeupdate', onTime);
@@ -466,6 +557,42 @@ export default function CarPlayer() {
       audio.removeEventListener('error', onError);
     };
   }, [driveMode, driveUrls, driveSession]);
+
+  // Park (<video> natif) : stats 1 s via getVideoPlaybackQuality → bande + télémétrie
+  useEffect(() => {
+    if (driveMode) {
+      setVideoStats(null);
+      return;
+    }
+    let lastTotal = -1;
+    const timer = window.setInterval(() => {
+      const v = videoRef.current;
+      if (!v || v.paused || v.readyState < 1) return;
+      const q = typeof v.getVideoPlaybackQuality === 'function' ? v.getVideoPlaybackQuality() : null;
+      const total = q ? q.totalVideoFrames : 0;
+      const fps = lastTotal >= 0 && q ? Math.max(0, total - lastTotal) : null;
+      lastTotal = total;
+      let bufferMs: number | null = null;
+      try {
+        for (let i = 0; i < v.buffered.length; i++) {
+          if (v.buffered.start(i) <= v.currentTime && v.buffered.end(i) >= v.currentTime) {
+            bufferMs = Math.round((v.buffered.end(i) - v.currentTime) * 1000);
+          }
+        }
+      } catch {
+        // ignore
+      }
+      const state = v.readyState >= 3 ? 'playing' : 'buffering';
+      const dropped = q ? q.droppedVideoFrames : 0;
+      setVideoStats({ state, fpsShown: fps, dropped, bufferMs, frameSize: v.videoWidth ? `${v.videoWidth}×${v.videoHeight}` : '—' });
+      telemetryRef.current?.push({
+        state, fpsShown: fps, fpsReceived: null, targetFps: 0, dropped, late: 0, stalls: 0, paintJitterMs: null, arrivalJitterMs: null,
+        kbps: null, bufferFrames: null, bufferMs, decodeMs: null, paintMs: null, avSyncMs: null,
+        frameSize: v.videoWidth ? `${v.videoWidth}×${v.videoHeight}` : undefined,
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [driveMode]);
 
   const togglePlay = useCallback(() => {
     if (driveModeRef.current) {
@@ -558,13 +685,126 @@ export default function CarPlayer() {
     );
   }
 
+  telemetryCtxRef.current = {
+    engine: driveMode ? activeEngine : 'video',
+    preset: driveMode ? presetRef.current : 'mp4',
+    position: currentTime,
+  };
   const progressMax = duration > 0 ? duration : 0;
   const showDriveOverlay = driveMode && !mediaError;
   const displayTitle = pickMeta?.title || source.title;
   const displayPoster = pickMeta?.posterUrl || source.posterUrl;
+  const dockVisible = controlsVisible || !!mediaError || !isPlaying;
+
+  const restartDrive = () => {
+    if (driveModeRef.current) startDriveAt(currentTime);
+  };
+  const autoPresetLabel = CAR_DRIVE_PRESET_LABELS[autoTuning.preset];
+  const shownEngine: CarConcreteEngine = driveMode ? activeEngine : wantedEngine;
+  const workerOk = CarWorkerRenderer.isSupported();
+  const barCategories: BarCategory[] = [
+    {
+      id: 'engine',
+      label: 'Moteur',
+      value: renderEngine === 'auto' ? `Auto · ${ENGINE_LABEL[shownEngine]}` : ENGINE_LABEL[renderEngine],
+      options: [
+        { id: 'auto', label: `Auto → ${ENGINE_LABEL[autoTuning.engine]}`, hint: autoTuning.reasons.slice(0, 2).join(' · '), active: renderEngine === 'auto' },
+        { id: 'canvas', label: 'Canvas', hint: 'jitter buffer + horloge audio (thread principal)', active: renderEngine === 'canvas' },
+        {
+          id: 'worker',
+          label: 'Worker',
+          hint: workerOk ? 'décodage + dessin hors thread (OffscreenCanvas)' : 'indisponible sur ce navigateur',
+          active: renderEngine === 'worker',
+          disabled: !workerOk,
+        },
+        { id: 'img', label: 'Image <img>', hint: 'MJPEG natif, aucune régulation', active: renderEngine === 'img' },
+      ],
+      onSelect: (id) => {
+        const next = id as CarRenderEngine;
+        writeCarRenderEngine(next);
+        canvasFailedRef.current = false;
+        workerFailedRef.current = false;
+        renderEngineRef.current = next;
+        wantedEngineRef.current = next === 'auto' ? autoTuning.engine : next;
+        setRenderEngine(next);
+        restartDrive();
+      },
+    },
+    {
+      id: 'quality',
+      label: 'Qualité',
+      value: qualityChoice === 'auto' ? `Auto · ${getCarDriveQualityProfile(autoTuning.preset).maxHeight}p` : `${getCarDriveQualityProfile(qualityChoice).maxHeight}p`,
+      options: [
+        { id: 'auto', label: 'Auto', hint: autoPresetLabel, active: qualityChoice === 'auto' },
+        { id: 'lite', label: CAR_DRIVE_PRESET_LABELS.lite, hint: '≈0,7 Mb/s', active: qualityChoice === 'lite' },
+        { id: 'standard', label: CAR_DRIVE_PRESET_LABELS.standard, hint: '≈1,4 Mb/s (défaut)', active: qualityChoice === 'standard' },
+        { id: 'plus', label: CAR_DRIVE_PRESET_LABELS.plus, hint: '≈2,7 Mb/s', active: qualityChoice === 'plus' },
+      ],
+      onSelect: (id) => {
+        const next = id as CarQualityChoice;
+        try {
+          localStorage.setItem(QUALITY_KEY, next);
+        } catch {
+          // ignore
+        }
+        qualityChoiceRef.current = next;
+        setQualityChoice(next);
+        restartDrive();
+      },
+    },
+    {
+      id: 'stats',
+      label: 'Stats',
+      value: stripOn ? 'Bande ON' : 'Masquées',
+      options: [
+        { id: 'on', label: 'Bande de stats en haut', active: stripOn },
+        { id: 'off', label: 'Masquer', active: !stripOn },
+      ],
+      onSelect: (id) => {
+        const on = id === 'on';
+        try {
+          localStorage.setItem(STRIP_KEY, on ? '1' : '0');
+        } catch {
+          // ignore
+        }
+        setStripOn(on);
+      },
+    },
+  ];
+  const stripStats: StripStats | null = driveMode
+    ? engineStats ?? (activeEngine === 'img' ? { state: isPlaying ? '<img> natif (sans stats image)' : 'pause' } : null)
+    : videoStats;
 
   return (
-    <div className="tesla-car-root tesla-car-player" onClick={() => setShowControls(true)}>
+    <div
+      className={`tesla-car-root tesla-car-player${stripOn ? ' has-strip' : ''}`}
+      onClick={() => {
+        setShowControls(true);
+        pokeControls();
+      }}
+    >
+      {stripOn && (
+        <CarStatsStrip
+          stats={stripStats}
+          tags={[
+            driveMode ? ENGINE_LABEL[activeEngine] : 'Vidéo',
+            driveMode ? `${getCarDriveQualityProfile(presetRef.current).maxHeight}p` : 'MP4',
+            detectedMode === 'drive' ? 'DRIVE' : detectedMode === 'park' ? 'PARK' : '?',
+          ]}
+          details={[
+            ['Auto :', autoTuning.reasons.join(' · ')],
+            ['Télémétrie :', telemetryRef.current ? `${telemetryRef.current.sent} envoi(s)${telemetryRef.current.lastError ? ` · ${telemetryRef.current.lastError}` : ''}` : '—'],
+          ]}
+          onHide={() => {
+            try {
+              localStorage.setItem(STRIP_KEY, '0');
+            } catch {
+              // ignore
+            }
+            setStripOn(false);
+          }}
+        />
+      )}
       <video
         ref={videoRef}
         className={`tesla-car-player__video${showDriveOverlay ? ' is-hidden' : ''}`}
@@ -585,10 +825,15 @@ export default function CarPlayer() {
         />
       )}
       {showDriveOverlay && canvasActive && (
-        <canvas ref={canvasRef} className="tesla-car-drive-mjpeg" aria-label={displayTitle} />
+        <canvas
+          key={activeEngine === 'worker' ? `w${driveSession}` : 'c'}
+          ref={canvasRef}
+          className="tesla-car-drive-mjpeg"
+          aria-label={displayTitle}
+        />
       )}
 
-      {showDriveOverlay && (
+      {showDriveOverlay && dockVisible && !stripOn && (
         <div className="tesla-car-drive-chrome">
           <span className="tesla-car-drive__badge">
             <Car className="w-5 h-5" />
@@ -613,8 +858,8 @@ export default function CarPlayer() {
         </div>
       )}
 
-      {(showControls || showDriveOverlay || mediaError) && (
-        <div className="tesla-car-dock">
+      {(showControls || showDriveOverlay || mediaError) && dockVisible && (
+        <div className="tesla-car-dock" onClick={(e) => { e.stopPropagation(); pokeControls(); }}>
           {prepStatus && !mediaError && (
             <p className="tesla-car-dock__error" style={{ opacity: 0.85 }}>
               {prepStatus}
@@ -682,26 +927,6 @@ export default function CarPlayer() {
               </button>
             )}
 
-            <button
-              type="button"
-              className="tesla-car-ctrl tesla-car-ctrl--ghost"
-              onClick={() => {
-                const next: CarRenderEngine = renderEngine === 'img' ? 'canvas' : renderEngine === 'canvas' ? 'auto' : 'img';
-                writeCarRenderEngine(next);
-                setRenderEngine(next);
-                if (driveModeRef.current) startDriveAt(currentTime);
-              }}
-              title={`Moteur d'affichage en conduite (image → canvas → auto). Auto : ${autoTuning.reasons.join(' · ')}`}
-            >
-              <span>
-                {renderEngine === 'auto'
-                  ? `Rendu auto (${(driveMode ? activeEngine : wantedEngine) === 'canvas' ? 'canvas' : 'image'})`
-                  : renderEngine === 'canvas'
-                    ? 'Rendu canvas'
-                    : 'Rendu image'}
-              </span>
-            </button>
-
             <CarPlaybackTypeSelector
               settings={playbackSettings}
               effectiveType={effectiveType}
@@ -709,6 +934,8 @@ export default function CarPlayer() {
               onSettingsChange={handleSettingsChange}
             />
           </div>
+
+          <CarCategoryBar categories={barCategories} onOpenChange={setControlsPinned} onActivity={pokeControls} />
 
           {showDriveOverlay && (
             <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'center' }}>

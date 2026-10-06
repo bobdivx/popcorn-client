@@ -1,25 +1,30 @@
 /**
- * Moteur d'affichage Drive « canvas » pour /car (OPTIONNEL, pas par défaut).
+ * Moteurs d'affichage Drive pour /car.
  *
- * fetch(car.mjpeg) en streaming → découpe JPEG → jitter buffer → createImageBitmap → canvas 2D,
- * cadence pilotée par requestAnimationFrame et calée sur l'horloge de l'<audio> car.audio
- * (image n = audio.currentTime × fps). Les images en retard sont jetées (jamais de file qui dérive),
- * l'horloge fixe prend le relais tant que l'audio ne joue pas.
+ * - « canvas » : fetch(car.mjpeg) en streaming → jitter buffer → createImageBitmap → canvas 2D (thread principal),
+ *   cadence rAF calée sur l'horloge de l'<audio> car.audio, images en retard jetées (carFrameCore.ts).
+ * - « worker » : même pipeline dans un Worker + OffscreenCanvas (carWorkerRenderer.ts).
+ * - « img » : <img src=multipart> natif (aucune régulation).
+ * - « auto » (défaut) : choisi par carCapabilities.recommendCarDrive — sans relevé Drive → canvas ;
+ *   worker seulement si un relevé pris EN Drive le valide ; repli worker → canvas → <img> en cas d'échec.
  *
- * Activation : /car?render=canvas (mémorisé) ou bouton « Rendu » dans la barre ; retour : ?render=img.
- * ?render=auto (défaut) : choix automatique à partir de l'empreinte des capacités prise EN Drive
- * (carCapabilities.ts → recommendCarDrive) ; sans relevé Drive valable → <img>. Repli <img> si le canvas échoue.
+ * Forcer : /car?render=canvas|worker|img|auto (mémorisé) ou menu « Moteur » de la barre.
  */
+import { MjpegFrameCore, type FrameCoreStats } from './carFrameCore';
 
-export type CarRenderEngine = 'img' | 'canvas' | 'auto';
+export type CarRenderEngine = 'img' | 'canvas' | 'worker' | 'auto';
+export type CarConcreteEngine = 'img' | 'canvas' | 'worker';
 
-/** Moteur par défaut en Drive : 'auto' = <img> tant qu'aucun relevé Drive ne valide le canvas. */
+/** Moteur par défaut en Drive. */
 export const CAR_RENDER_DEFAULT: CarRenderEngine = 'auto';
+
+/** Plafond du backing store (pas d'upscale DPR ; le CSS met à l'échelle). */
+export const CAR_MAX_BACKING = { width: 1280, height: 720 };
 
 const STORAGE_KEY = 'popcorn_car_render_engine';
 
 function isEngine(v: unknown): v is CarRenderEngine {
-  return v === 'canvas' || v === 'img' || v === 'auto';
+  return v === 'canvas' || v === 'img' || v === 'auto' || v === 'worker';
 }
 
 export function readCarRenderEngine(): CarRenderEngine {
@@ -46,61 +51,6 @@ export function writeCarRenderEngine(engine: CarRenderEngine): void {
   }
 }
 
-/** Découpe un flux multipart MJPEG en JPEG (SOI FFD8 … EOI FFD9). */
-class JpegSplitter {
-  private buf = new Uint8Array(512 * 1024);
-  private len = 0;
-
-  push(chunk: Uint8Array, emit: (jpeg: Uint8Array) => void): void {
-    if (this.len + chunk.length > this.buf.length) {
-      let cap = this.buf.length;
-      while (cap < this.len + chunk.length) cap *= 2;
-      const nb = new Uint8Array(cap);
-      nb.set(this.buf.subarray(0, this.len));
-      this.buf = nb;
-    }
-    this.buf.set(chunk, this.len);
-    this.len += chunk.length;
-    const b = this.buf;
-    let consumed = 0;
-    for (;;) {
-      let soi = -1;
-      for (let i = consumed; i + 1 < this.len; i++) {
-        if (b[i] === 0xff && b[i + 1] === 0xd8) {
-          soi = i;
-          break;
-        }
-      }
-      if (soi < 0) {
-        consumed = Math.max(consumed, this.len - 1);
-        break;
-      }
-      let eoi = -1;
-      for (let i = soi + 2; i + 1 < this.len; i++) {
-        if (b[i] === 0xff && b[i + 1] === 0xd9) {
-          eoi = i;
-          break;
-        }
-      }
-      if (eoi < 0) {
-        consumed = soi;
-        break;
-      }
-      emit(b.slice(soi, eoi + 2));
-      consumed = eoi + 2;
-    }
-    if (consumed > 0) {
-      b.copyWithin(0, consumed, this.len);
-      this.len -= consumed;
-    }
-  }
-}
-
-interface QueuedFrame {
-  index: number;
-  data: Uint8Array;
-}
-
 export interface CarCanvasRendererOptions {
   canvas: HTMLCanvasElement;
   url: string;
@@ -111,6 +61,7 @@ export interface CarCanvasRendererOptions {
   bufferSeconds?: number;
   /** Secondes à pré-remplir avant la 1re image (défaut 0,5 s). */
   prebufferSeconds?: number;
+  useAudioClock?: boolean;
   onError?: (message: string) => void;
 }
 
@@ -129,139 +80,47 @@ export class CarCanvasRenderer {
   }
 
   private o: CarCanvasRendererOptions;
-  private ctx: CanvasRenderingContext2D | null = null;
-  private abort: AbortController | null = null;
-  private stopped = false;
-  private raf = 0;
-  private queue: QueuedFrame[] = [];
-  private received = 0;
-  private lastPainted = -1;
-  private started = false;
-  private clockStart = 0;
-  private clockOffset = 0;
-  private busy = false;
+  private core: MjpegFrameCore | null = null;
 
   constructor(opts: CarCanvasRendererOptions) {
     this.o = opts;
   }
 
-  private get fps(): number {
-    return Math.max(1, this.o.fps || 12);
-  }
-
-  private get maxQueue(): number {
-    return Math.max(4, Math.round(this.fps * (this.o.bufferSeconds ?? 2)));
-  }
-
-  private get prebuffer(): number {
-    return Math.max(1, Math.round(this.fps * (this.o.prebufferSeconds ?? 0.5)));
-  }
-
   start(): void {
-    this.ctx = this.o.canvas.getContext('2d', { alpha: false }) as CanvasRenderingContext2D | null;
-    if (!this.ctx) {
+    const ctx = this.o.canvas.getContext('2d', { alpha: false }) as CanvasRenderingContext2D | null;
+    if (!ctx) {
       this.o.onError?.('Canvas 2D indisponible.');
       return;
     }
-    void this.read();
-    this.raf = requestAnimationFrame(this.tick);
+    const a = this.o.audio;
+    this.core = new MjpegFrameCore({
+      url: this.o.url,
+      fps: this.o.fps,
+      bufferSeconds: this.o.bufferSeconds ?? 2,
+      prebufferSeconds: this.o.prebufferSeconds ?? 0.5,
+      maxWidth: CAR_MAX_BACKING.width,
+      maxHeight: CAR_MAX_BACKING.height,
+      ctx,
+      audioClock: () =>
+        this.o.useAudioClock !== false && a && !a.paused && a.currentTime > 0 && a.readyState >= 2 ? a.currentTime : null,
+      schedule: (cb) => requestAnimationFrame(cb),
+      cancel: (h) => cancelAnimationFrame(h),
+      now: () => performance.now(),
+      onError: (m) => this.o.onError?.(m),
+    });
+    this.core.start();
+  }
+
+  takeStats(): FrameCoreStats | null {
+    return this.core ? this.core.takeStats() : null;
+  }
+
+  get paintedSeconds(): number {
+    return this.core?.paintedSeconds ?? 0;
   }
 
   stop(): void {
-    this.stopped = true;
-    cancelAnimationFrame(this.raf);
-    try {
-      this.abort?.abort();
-    } catch {
-      // ignore
-    }
-    this.queue = [];
-  }
-
-  private async read(): Promise<void> {
-    this.abort = new AbortController();
-    let res: Response;
-    try {
-      res = await fetch(this.o.url, { signal: this.abort.signal, cache: 'no-store', credentials: 'omit' });
-    } catch (e) {
-      if (!this.stopped) this.o.onError?.(`Flux vidéo injoignable : ${e instanceof Error ? e.message : String(e)}`);
-      return;
-    }
-    if (!res.ok || !res.body) {
-      if (!this.stopped) this.o.onError?.(`Flux vidéo HTTP ${res.status}`);
-      return;
-    }
-    const reader = res.body.getReader();
-    const splitter = new JpegSplitter();
-    try {
-      for (;;) {
-        if (this.stopped) break;
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!value) continue;
-        splitter.push(value, (jpeg) => {
-          this.queue.push({ index: this.received++, data: jpeg });
-          while (this.queue.length > this.maxQueue) this.queue.shift();
-        });
-      }
-    } catch (e) {
-      if (!this.stopped && !(e instanceof DOMException && e.name === 'AbortError')) {
-        this.o.onError?.(`Flux vidéo interrompu : ${e instanceof Error ? e.message : String(e)}`);
-      }
-    }
-  }
-
-  private wanted(now: number): number {
-    const a = this.o.audio;
-    if (a && !a.paused && a.currentTime > 0 && a.readyState >= 2) {
-      return Math.floor(a.currentTime * this.fps);
-    }
-    return this.clockOffset + Math.floor(((now - this.clockStart) / 1000) * this.fps);
-  }
-
-  private tick = (now: number): void => {
-    if (this.stopped) return;
-    this.raf = requestAnimationFrame(this.tick);
-    if (this.busy) return;
-    if (!this.started) {
-      if (this.queue.length < this.prebuffer) return;
-      this.started = true;
-      this.clockStart = now;
-      this.clockOffset = this.queue[0].index;
-    }
-    if (this.queue.length === 0) {
-      const a = this.o.audio;
-      if (!a || a.paused) {
-        this.clockStart = now;
-        this.clockOffset = this.lastPainted + 1;
-      }
-      return;
-    }
-    const want = this.wanted(now);
-    if (this.queue[0].index > want) return;
-    let pick: QueuedFrame | undefined;
-    while (this.queue.length && this.queue[0].index <= want) pick = this.queue.shift();
-    if (pick) void this.paint(pick);
-  };
-
-  private async paint(frame: QueuedFrame): Promise<void> {
-    this.busy = true;
-    try {
-      const bmp = await createImageBitmap(new Blob([frame.data as BlobPart], { type: 'image/jpeg' }));
-      if (!this.stopped && this.ctx) {
-        const c = this.o.canvas;
-        if (c.width !== bmp.width || c.height !== bmp.height) {
-          c.width = bmp.width;
-          c.height = bmp.height;
-        }
-        this.ctx.drawImage(bmp, 0, 0);
-      }
-      bmp.close();
-      this.lastPainted = frame.index;
-    } catch {
-      // image corrompue : on passe
-    } finally {
-      this.busy = false;
-    }
+    this.core?.stop();
+    this.core = null;
   }
 }

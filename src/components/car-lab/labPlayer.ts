@@ -4,6 +4,12 @@
  */
 import type { LabBuffer, LabClock, LabEngine, LabPace, QualityPreset } from './labConfig';
 import { buildLabUrls } from './labConfig';
+import { getCapsSession } from '../streaming/car-player/carCapabilities';
+import { CarWorkerRenderer } from '../streaming/car-player/carWorkerRenderer';
+
+/** Plafond du backing store (pas d'upscale DPR ; le CSS met à l'échelle). */
+const MAX_W = 1280;
+const MAX_H = 720;
 
 export interface LabStats {
   engine: LabEngine;
@@ -76,6 +82,8 @@ export function engineAvailability(engine: LabEngine): Availability {
       if (!hasFetchStreaming()) return { ok: false, reason: 'fetch streaming indisponible' };
       if (typeof w.createImageBitmap !== 'function') return { ok: false, reason: 'createImageBitmap indisponible' };
       return { ok: true };
+    case 'worker':
+      return CarWorkerRenderer.isSupported() ? { ok: true } : { ok: false, reason: 'Worker / OffscreenCanvas indisponible' };
     case 'canvas-img':
       return hasFetchStreaming() ? { ok: true } : { ok: false, reason: 'fetch streaming indisponible' };
     case 'webgl':
@@ -180,6 +188,7 @@ export class LabPlayer {
   private glTex: WebGLTexture | null = null;
   private raf = 0;
   private statsTimer = 0;
+  private worker: CarWorkerRenderer | null = null;
 
   private queue: QueuedFrame[] = [];
   private queueWaiters: Array<() => void> = [];
@@ -224,6 +233,7 @@ export class LabPlayer {
       return seek + this.audioEl.currentTime;
     }
     if (engine === 'video-canvas' && this.videoEl) return this.videoEl.currentTime || seek;
+    if (this.worker) return seek + this.worker.paintedSeconds;
     if (this.lastPaintedIndex >= 0) return seek + this.lastPaintedIndex / this.fps;
     return seek;
   }
@@ -239,7 +249,13 @@ export class LabPlayer {
     this.o.host.innerHTML = '';
     this.state = 'connecting';
     const { engine } = this.o;
-    const urls = buildLabUrls(this.o.streamUrl, this.o.seek, this.o.preset, engine === 'img' ? 'realtime' : this.o.pace);
+    const urls = buildLabUrls(
+      this.o.streamUrl,
+      this.o.seek,
+      this.o.preset,
+      engine === 'img' || engine === 'worker' ? 'realtime' : this.o.pace,
+      getCapsSession(),
+    );
 
     if (this.o.audio && engine !== 'native') {
       const a = document.createElement('audio');
@@ -275,6 +291,28 @@ export class LabPlayer {
       this.note = 'Stats limitées : <img> natif (pas d’accès aux images)';
     } else if (engine === 'native' || engine === 'video-canvas') {
       this.startVideo(engine);
+    } else if (engine === 'worker') {
+      this.canvas = document.createElement('canvas');
+      this.canvas.className = 'car-lab__surface';
+      this.o.host.appendChild(this.canvas);
+      const cautious = this.o.buffer === 'cautious';
+      this.worker = new CarWorkerRenderer({
+        canvas: this.canvas,
+        url: urls.mjpegUrl,
+        audio: this.audioEl,
+        fps: this.fps,
+        bufferSeconds: cautious ? 3 : 0.35,
+        prebufferSeconds: cautious ? 0.75 : 0.1,
+        maxWidth: MAX_W,
+        maxHeight: MAX_H,
+        useAudioClock: this.o.clock === 'audio' && this.o.audio,
+        onError: (m) => {
+          if (!this.stopped) this.o.onError(m);
+        },
+      });
+      this.worker.start();
+      this.state = 'connecting';
+      this.note = 'pace forcé temps réel (pas de backpressure dans le worker)';
     } else {
       this.canvas = document.createElement('canvas');
       this.canvas.className = 'car-lab__surface';
@@ -297,6 +335,8 @@ export class LabPlayer {
     }
     cancelAnimationFrame(this.raf);
     window.clearInterval(this.statsTimer);
+    this.worker?.stop();
+    this.worker = null;
     this.queueWaiters.splice(0).forEach((r) => r());
     this.queue = [];
     for (const m of [this.audioEl, this.videoEl]) {
@@ -458,8 +498,8 @@ export class LabPlayer {
         const dec = new Dec({ data: frame.data, type: 'image/jpeg' });
         const { image } = await dec.decode();
         const t1 = performance.now();
-        this.ensureSize(image.displayWidth, image.displayHeight);
-        this.ctx2d?.drawImage(image as unknown as CanvasImageSource, 0, 0);
+        const d = this.ensureSize(image.displayWidth, image.displayHeight);
+        this.ctx2d?.drawImage(image as unknown as CanvasImageSource, 0, 0, d.w, d.h);
         image.close();
         dec.close();
         this.recordTimes(t0, t1);
@@ -474,15 +514,15 @@ export class LabPlayer {
           URL.revokeObjectURL(url);
         }
         const t1 = performance.now();
-        this.ensureSize(img.naturalWidth, img.naturalHeight);
-        this.ctx2d?.drawImage(img, 0, 0);
+        const d = this.ensureSize(img.naturalWidth, img.naturalHeight);
+        this.ctx2d?.drawImage(img, 0, 0, d.w, d.h);
         this.recordTimes(t0, t1);
       } else {
         const bmp = await createImageBitmap(new Blob([frame.data as BlobPart], { type: 'image/jpeg' }));
         const t1 = performance.now();
-        this.ensureSize(bmp.width, bmp.height);
+        const d = this.ensureSize(bmp.width, bmp.height);
         if (engine === 'webgl') this.drawGl(bmp);
-        else this.ctx2d?.drawImage(bmp, 0, 0);
+        else this.ctx2d?.drawImage(bmp, 0, 0, d.w, d.h);
         bmp.close();
         this.recordTimes(t0, t1);
       }
@@ -503,15 +543,20 @@ export class LabPlayer {
     this.winPaint.push(performance.now() - t1);
   }
 
-  private ensureSize(w: number, h: number): void {
+  /** Dimensionne le backing store (plafonné MAX_W×MAX_H, jamais d'upscale DPR) ; renvoie la taille de dessin. */
+  private ensureSize(w: number, h: number): { w: number; h: number } {
     const c = this.canvas;
-    if (!c || !w || !h) return;
-    if (c.width !== w || c.height !== h) {
-      c.width = w;
-      c.height = h;
-      this.frameSize = `${w}×${h}`;
-      if (this.gl) this.gl.viewport(0, 0, w, h);
+    if (!c || !w || !h) return { w, h };
+    const s = Math.min(1, MAX_W / w, MAX_H / h);
+    const cw = Math.round(w * s);
+    const ch = Math.round(h * s);
+    if (c.width !== cw || c.height !== ch) {
+      c.width = cw;
+      c.height = ch;
+      this.frameSize = s < 1 ? `${w}×${h}→${cw}×${ch}` : `${w}×${h}`;
+      if (this.gl) this.gl.viewport(0, 0, cw, ch);
     }
+    return { w: cw, h: ch };
   }
 
   private initGl(): void {
@@ -597,8 +642,8 @@ export class LabPlayer {
         if (v.readyState < 2 || v.currentTime === this.lastVideoTime) return;
         this.lastVideoTime = v.currentTime;
         const t0 = performance.now();
-        this.ensureSize(v.videoWidth, v.videoHeight);
-        this.ctx2d?.drawImage(v, 0, 0);
+        const d = this.ensureSize(v.videoWidth, v.videoHeight);
+        this.ctx2d?.drawImage(v, 0, 0, d.w, d.h);
         this.winPaint.push(performance.now() - t0);
         this.winPainted++;
         this.paintTimes.push(now);
@@ -615,6 +660,34 @@ export class LabPlayer {
   // ---------- stats ----------
 
   private emitStats(): void {
+    if (this.worker) {
+      const w = this.worker.takeStats();
+      const a = this.audioEl;
+      if (w) this.state = w.state === 'ended' ? 'playing' : w.state;
+      this.o.onStats({
+        engine: this.o.engine,
+        state: this.state,
+        position: this.getPosition(),
+        fpsPainted: w?.fpsShown ?? 0,
+        fpsReceived: w?.fpsReceived ?? 0,
+        targetFps: this.fps,
+        dropped: w?.dropped ?? 0,
+        late: w?.late ?? 0,
+        stalls: w?.stalls ?? 0,
+        paintJitterMs: w?.paintJitterMs ?? 0,
+        arrivalJitterMs: w?.arrivalJitterMs ?? 0,
+        kbps: w?.kbps ?? 0,
+        bufferFrames: w?.bufferFrames ?? 0,
+        bufferMs: w?.bufferMs ?? 0,
+        decodeMs: w?.decodeMs ?? 0,
+        paintMs: w?.paintMs ?? 0,
+        avSyncMs: w?.avSyncMs ?? null,
+        frameSize: w?.frameSize ?? '—',
+        audioState: !this.o.audio ? 'coupé' : a ? (a.paused ? 'pause' : a.readyState >= 3 ? 'lecture' : 'chargement') : '—',
+        note: `${this.note}${this.worker.workerRaf === false ? ' · worker sans rAF (setTimeout)' : ''}`,
+      });
+      return;
+    }
     const intervals: number[] = [];
     for (let i = 1; i < this.paintTimes.length; i++) intervals.push(this.paintTimes[i] - this.paintTimes[i - 1]);
     const arrivals: number[] = [];

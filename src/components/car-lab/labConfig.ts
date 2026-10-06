@@ -7,6 +7,7 @@
 export type LabEngine =
   | 'img'
   | 'canvas-bitmap'
+  | 'worker'
   | 'canvas-img'
   | 'webgl'
   | 'webcodecs'
@@ -48,9 +49,10 @@ export interface QualityPreset {
 }
 
 export const QUALITY_PRESETS: Record<LabQuality, QualityPreset> = {
-  low: { label: 'Basse', maxHeight: 360, fps: 10, q: 12, audioBitrate: '64k', approx: '≈0,8 Mb/s' },
-  medium: { label: 'Moyenne', maxHeight: 480, fps: 12, q: 8, audioBitrate: '96k', approx: '≈2 Mb/s' },
-  high: { label: 'Haute', maxHeight: 720, fps: 15, q: 5, audioBitrate: '128k', approx: '≈6 Mb/s' },
+  // Mesuré (flux réel via Cloudflare) : 288p q12 ≈ 0,7 Mb/s · 360p q11 ≈ 14 Ko/img ≈ 1,4 Mb/s · 480p q8 ≈ 28 Ko/img ≈ 2,7 Mb/s
+  low: { label: 'Basse', maxHeight: 288, fps: 10, q: 12, audioBitrate: '64k', approx: '≈0,7 Mb/s' },
+  medium: { label: 'Moyenne', maxHeight: 360, fps: 12, q: 11, audioBitrate: '96k', approx: '≈1,4 Mb/s' },
+  high: { label: 'Haute', maxHeight: 480, fps: 12, q: 8, audioBitrate: '96k', approx: '≈2,7 Mb/s' },
 };
 
 export const QUALITY_ORDER: LabQuality[] = ['low', 'medium', 'high'];
@@ -67,6 +69,8 @@ export interface EngineInfo {
 export const ENGINES: EngineInfo[] = [
   { id: 'canvas-bitmap', label: 'Canvas · ImageBitmap', short: 'Canvas', mjpeg: true,
     description: 'fetch MJPEG → createImageBitmap → canvas 2D, cadence pilotée (rAF + horloge audio), images en retard jetées.' },
+  { id: 'worker', label: 'Worker · OffscreenCanvas', short: 'Worker', mjpeg: true,
+    description: 'fetch + découpe + createImageBitmap + dessin dans un Worker (OffscreenCanvas) : thread principal libre, même pacing que Canvas.' },
   { id: 'webgl', label: 'WebGL texture', short: 'WebGL', mjpeg: true,
     description: 'fetch MJPEG → ImageBitmap → texture WebGL (GPU).' },
   { id: 'webcodecs', label: 'WebCodecs → canvas', short: 'WebCodecs', mjpeg: true,
@@ -217,6 +221,8 @@ export function buildLabUrls(
   seekSeconds: number,
   preset: QualityPreset,
   pace: LabPace,
+  /** Session télémétrie (corrélation serveur /api/car/stream-stats) */
+  sid?: string,
 ): { mjpegUrl: string; audioUrl: string } {
   const seek = Math.max(0, Number.isFinite(seekSeconds) ? seekSeconds : 0);
   let url: URL;
@@ -236,6 +242,7 @@ export function buildLabUrls(
   mjpeg.searchParams.set('quality', String(preset.q));
   mjpeg.searchParams.set('pace', pace === 'burst' ? 'burst' : '1');
   mjpeg.searchParams.set('_lab', String(Date.now()));
+  if (sid) mjpeg.searchParams.set('sid', sid);
 
   const audio = new URL(url.toString());
   audio.pathname = `${pathname}/car.audio`;
