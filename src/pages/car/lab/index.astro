@@ -1,0 +1,21 @@
+---
+// PROVISOIRE — Labo lecture Tesla (comparaison moteurs / qualité / buffer). Supprimer avec src/components/car-lab.
+import '../../../styles/global.css';
+import '../../../styles/car-tesla.css';
+import '../../../components/car-lab/car-lab.css';
+import CarLab from '../../../components/car-lab/CarLab';
+---
+
+<!doctype html>
+<html lang="fr" data-theme="dark" data-ui-pack="tesla" data-car-player="true" class="overflow-x-hidden">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="robots" content="noindex" />
+    <title>Labo Theater - Popcornn</title>
+  </head>
+  <body class="tesla-car-root m-0">
+    <CarLab client:only="preact" />
+  </body>
+</html>
