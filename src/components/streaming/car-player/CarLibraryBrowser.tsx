@@ -154,9 +154,14 @@ export default function CarLibraryBrowser({ onSelect }: CarLibraryBrowserProps) 
             <p className="tesla-car-lib__eyebrow">Popcornn</p>
             <h1 className="tesla-car-lib__title">Theater</h1>
           </div>
-          <a href="/car/probe" className="tesla-car-link-quiet">
-            Diagnostic
-          </a>
+          <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+            <a href="/car/lab" className="tesla-car-link-quiet">
+              Labo lecture
+            </a>
+            <a href="/car/probe" className="tesla-car-link-quiet">
+              Diagnostic
+            </a>
+          </div>
         </div>
 
         <div className="tesla-car-lib__search">
