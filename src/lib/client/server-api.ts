@@ -195,6 +195,11 @@ interface IServerApiClientPublic {
     vote_count_gte?: number;
   }): Promise<ApiResponse<{ results: any[]; page: number; total_pages: number }>>;
 
+  discoverHighlights(
+    list: string,
+    params?: { page?: number; language?: string; region?: string }
+  ): Promise<ApiResponse<{ results: any[]; page?: number; total_pages?: number }>>;
+
   getTmdbMovieDetail(tmdbId: number, language?: string): Promise<ApiResponse<any>>;
   getTmdbTvDetail(tmdbId: number, language?: string): Promise<ApiResponse<any>>;
   
