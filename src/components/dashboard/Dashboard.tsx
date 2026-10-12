@@ -9,7 +9,14 @@ import { useResumeWatching } from './hooks/useResumeWatching';
 import { useContentSignals } from './hooks/useContentSignals';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
 import { useLibraryBrowse } from './hooks/useLibraryBrowse';
-import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
+import { useTmdbHighlights } from './hooks/useTmdbHighlights';
+import {
+  buildAvailabilityIndex,
+  buildSuggestionUrl,
+  highlightTitles,
+  linkAvailability,
+  recentAvailable,
+} from './utils/highlights';
 import {
   pickFeaturedHero,
   filterWatchNow,
@@ -18,7 +25,6 @@ import {
   excludeSeenItems,
   contentItemKey,
   uniqueByMedia,
-  byReleaseDate,
 } from './utils/browsePriority';
 
 function dedupeDashboardItems(items: ContentItem[]): ContentItem[] {
@@ -31,6 +37,17 @@ function dedupeDashboardItems(items: ContentItem[]): ContentItem[] {
   });
 }
 
+/** Alterne films / séries pour une rangée « tendances » mixte. */
+function interleave<T>(a: T[], b: T[]): T[] {
+  const out: T[] = [];
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i++) {
+    if (i < a.length) out.push(a[i]);
+    if (i < b.length) out.push(b[i]);
+  }
+  return out;
+}
+
 export default function Dashboard() {
   const { t, language } = useI18n();
   const aiEnabled = useAiEnabled();
@@ -39,6 +56,8 @@ export default function Dashboard() {
   const { resumeWatching, rewatchWatching } = useResumeWatching();
   const { recentDownloads } = useLibraryBrowse('all');
   const loading = dataLoading && downloadsLoading;
+  const highlights = useTmdbHighlights(['now_playing', 'trending_movie', 'trending_tv', 'on_the_air']);
+  const titles = useMemo(() => highlightTitles(language), [language]);
 
   const popularMovies = data?.popularMovies ?? [];
   const popularSeries = data?.popularSeries ?? [];
@@ -79,10 +98,32 @@ export default function Dashboard() {
     [resumeWatching, rewatchWatching]
   );
 
+  /** tmdb → torrent / média local, pour relier les suggestions TMDB à ce qui est disponible. */
+  const availabilityIndex = useMemo(
+    () =>
+      buildAvailabilityIndex(
+        recentDownloads,
+        popularMovies,
+        popularSeries,
+        recentMovies,
+        recentSeries,
+        freshMovies,
+        freshSeries
+      ),
+    [recentDownloads, popularMovies, popularSeries, recentMovies, recentSeries, freshMovies, freshSeries]
+  );
+
   const heroItems = useMemo(() => {
     const watchNow = excludeSeenItems(filterWatchNow(allDashboardItemsWithSignals), seenItems);
+    // Hero : prêts à regarder, puis nouveautés disponibles récentes, puis sorties / tendances TMDB.
+    // (Les torrents « fraîchement syncés » ne servent plus : ce sont souvent de vieux films.)
     const newestUnwatched = excludeSeenItems(
-      [...recentDownloads, ...recentMovies, ...recentSeries, ...freshMovies, ...freshSeries],
+      [
+        ...recentDownloads,
+        ...recentAvailable([...popularMovies, ...popularSeries, ...recentMovies, ...recentSeries], 12),
+        ...linkAvailability(highlights.now_playing ?? [], availabilityIndex).slice(0, 6),
+        ...linkAvailability(highlights.trending_movie ?? [], availabilityIndex).slice(0, 6),
+      ],
       seenItems
     );
     return pickFeaturedHero(watchNow, newestUnwatched);
@@ -92,12 +133,14 @@ export default function Dashboard() {
     recentDownloads,
     recentMovies,
     recentSeries,
-    freshMovies,
-    freshSeries,
+    popularMovies,
+    popularSeries,
+    highlights,
+    availabilityIndex,
   ]);
 
   const handleNavigate = (item: ContentItem) => {
-    window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
+    window.location.href = buildSuggestionUrl(item, 'dashboard');
   };
 
   const tonightPool = useMemo(
@@ -200,11 +243,34 @@ export default function Dashboard() {
       });
     }
 
-    const cinemaRecent = byReleaseDate(uniqueByMedia([...recentMovies, ...recentSeries])).slice(0, 40);
+    // Rangées « du moment » : TMDB (région FR), reliées aux torrents / à la bibliothèque.
+    const nowPlaying = linkAvailability(highlights.now_playing ?? [], availabilityIndex).slice(0, 40);
+    if (nowPlaying.length > 0) {
+      result.push({ id: 'now-playing', title: titles.nowPlaying, items: nowPlaying });
+    }
+
+    const trendingWeek = linkAvailability(
+      interleave(highlights.trending_movie ?? [], highlights.trending_tv ?? []),
+      availabilityIndex
+    ).slice(0, 40);
+    if (trendingWeek.length > 0) {
+      result.push({ id: 'trending-week', title: titles.trendingWeek, items: trendingWeek });
+    }
+
+    const onTheAir = linkAvailability(highlights.on_the_air ?? [], availabilityIndex).slice(0, 40);
+    if (onTheAir.length > 0) {
+      result.push({ id: 'on-the-air', title: titles.onTheAir, items: onTheAir });
+    }
+
+    // Torrents disponibles réellement récents (≤ 12 mois), classés par seeders.
+    const cinemaRecent = recentAvailable(
+      uniqueByMedia([...popularMovies, ...popularSeries, ...recentMovies, ...recentSeries]),
+      40
+    );
     if (cinemaRecent.length > 0) {
       result.push({
         id: 'cinema-recent',
-        title: t('dashboard.cinemaRecent'),
+        title: titles.recentAvailable,
         items: cinemaRecent,
       });
     }
@@ -232,6 +298,9 @@ export default function Dashboard() {
     popularMovies,
     popularSeries,
     tonightItems,
+    highlights,
+    availabilityIndex,
+    titles,
     t,
   ]);
 

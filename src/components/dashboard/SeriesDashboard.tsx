@@ -5,10 +5,16 @@ import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
 import { useInfiniteSeries } from './hooks/useInfiniteSeries';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useContentSignals } from './hooks/useContentSignals';
-import { useFreshSynced } from './hooks/useFreshSynced';
 import { useLibraryBrowse } from './hooks/useLibraryBrowse';
-import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
+import { useTmdbHighlights } from './hooks/useTmdbHighlights';
+import {
+  buildAvailabilityIndex,
+  buildSuggestionUrl,
+  highlightTitles,
+  linkAvailability,
+  recentAvailable,
+} from './utils/highlights';
 import { CatalogGrid } from '../page-model/CatalogGrid';
 import { GenreSidebar } from '../page-model/GenreSidebar';
 import { translateGenre } from '../../lib/utils/genre-translation';
@@ -21,7 +27,6 @@ import {
   excludeSeenItems,
   itemInGenre,
   uniqueByMedia,
-  byReleaseDate,
   byPopularity,
 } from './utils/browsePriority';
 
@@ -32,30 +37,40 @@ export default function SeriesDashboard() {
   const { t, language } = useI18n();
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const { series, loading, error } = useInfiniteSeries();
+  const highlights = useTmdbHighlights(['on_the_air', 'trending_tv']);
+  const titles = useMemo(() => highlightTitles(language), [language]);
   const { resumeWatching, waitingForNext, rewatchWatching } = useResumeWatching();
   const { activeDownloads } = useActiveDownloads();
-  const freshSynced = useFreshSynced('series');
   const { recentDownloads } = useLibraryBrowse('series');
   const { withSignals: seriesWithSignals } = useContentSignals(series, resumeWatching);
   const seriesDownloads = useMemo(() => filterByMediaType(activeDownloads, 'tv'), [activeDownloads]);
-  const { withSignals: freshWithSignals } = useContentSignals(freshSynced, resumeWatching);
 
   const seenItems = useMemo(
     () => [...resumeWatching, ...rewatchWatching].filter((item) => item.type === 'tv'),
     [resumeWatching, rewatchWatching]
   );
 
+  /** tmdb → torrent / média local (relie les suggestions TMDB à ce qui est disponible). */
+  const availabilityIndex = useMemo(
+    () => buildAvailabilityIndex(recentDownloads, seriesWithSignals),
+    [recentDownloads, seriesWithSignals]
+  );
+
   const heroItems = useMemo(() => {
     const watchNow = excludeSeenItems(filterWatchNow(seriesWithSignals), seenItems);
     const newestUnwatched = excludeSeenItems(
-      [...recentDownloads, ...seriesWithSignals.slice(0, SECTION_LIMIT), ...freshWithSignals],
+      [
+        ...recentDownloads,
+        ...recentAvailable(seriesWithSignals, 12),
+        ...linkAvailability(highlights.on_the_air ?? [], availabilityIndex).slice(0, 8),
+      ],
       seenItems
     );
     return pickFeaturedHero(watchNow, newestUnwatched);
-  }, [seriesWithSignals, freshWithSignals, recentDownloads, seenItems]);
+  }, [seriesWithSignals, highlights, availabilityIndex, recentDownloads, seenItems]);
 
   const handleNavigate = (item: ContentItem) => {
-    window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'series');
+    window.location.href = buildSuggestionUrl(item, 'series');
   };
 
   const catalog = useMemo(() => uniqueByMedia(seriesWithSignals), [seriesWithSignals]);
@@ -86,7 +101,10 @@ export default function SeriesDashboard() {
 
     return [
       ...personal,
-      { id: 'recent-series', title: t('dashboard.newReleasesSeries'), items: byReleaseDate(catalog).slice(0, SECTION_LIMIT) },
+      // TMDB « du moment » relié aux torrents disponibles, puis torrents récents (≤ 12 mois).
+      { id: 'on-the-air-series', title: titles.onTheAir, items: linkAvailability(highlights.on_the_air ?? [], availabilityIndex).slice(0, SECTION_LIMIT) },
+      { id: 'trending-series', title: titles.trendingSeries, items: linkAvailability(highlights.trending_tv ?? [], availabilityIndex).slice(0, SECTION_LIMIT) },
+      { id: 'recent-series', title: titles.recentAvailable, items: recentAvailable(catalog, SECTION_LIMIT) },
       { id: 'popular-series', title: t('dashboard.popularSeries'), items: byPopularity(catalog).slice(0, SECTION_LIMIT) },
     ];
   }, [
@@ -98,6 +116,9 @@ export default function SeriesDashboard() {
     recentDownloads,
     catalog,
     selectedGenre,
+    highlights,
+    availabilityIndex,
+    titles,
     t,
   ]);
 
