@@ -350,6 +350,22 @@ export const requestsMethods = {
     return this.backendRequest<any>(`/api/discover/movies${query ? '?' + query : ''}`, { method: 'GET', headers });
   },
 
+  /** Listes TMDB « du moment » (trending, now_playing, on_the_air…) — cache serveur 6 h. */
+  async discoverHighlights(
+    this: ServerApiClientAccess,
+    list: string,
+    params?: { page?: number; language?: string; region?: string }
+  ): Promise<ApiResponse<{ results: any[]; page?: number; total_pages?: number }>> {
+    const q = new URLSearchParams();
+    q.set('list', list);
+    if (params?.page) q.set('page', String(params.page));
+    if (params?.language) q.set('language', params.language);
+    if (params?.region) q.set('region', params.region);
+    const userId = this.getCurrentUserId?.() ?? null;
+    const headers: HeadersInit = userId ? { 'X-User-ID': userId } : {};
+    return this.backendRequest<any>(`/api/discover/highlights?${q.toString()}`, { method: 'GET', headers });
+  },
+
   async getTmdbMovieDetail(
     this: ServerApiClientAccess,
     tmdbId: number,

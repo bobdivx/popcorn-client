@@ -5,10 +5,16 @@ import { SimpleTmdbPage } from '../page-model/SimpleTmdbPage';
 import { useInfiniteFilms } from './hooks/useInfiniteFilms';
 import { useResumeWatching } from './hooks/useResumeWatching';
 import { useContentSignals } from './hooks/useContentSignals';
-import { useFreshSynced } from './hooks/useFreshSynced';
 import { useLibraryBrowse } from './hooks/useLibraryBrowse';
-import { buildStrictTmdbDetailUrlFromContentItem } from '../../lib/utils/media-detail-url';
 import { useActiveDownloads } from './hooks/useActiveDownloads';
+import { useTmdbHighlights } from './hooks/useTmdbHighlights';
+import {
+  buildAvailabilityIndex,
+  buildSuggestionUrl,
+  highlightTitles,
+  linkAvailability,
+  recentAvailable,
+} from './utils/highlights';
 import { CatalogGrid } from '../page-model/CatalogGrid';
 import { GenreSidebar } from '../page-model/GenreSidebar';
 import { translateGenre } from '../../lib/utils/genre-translation';
@@ -21,7 +27,6 @@ import {
   excludeSeenItems,
   itemInGenre,
   uniqueByMedia,
-  byReleaseDate,
   byPopularity,
 } from './utils/browsePriority';
 
@@ -32,30 +37,40 @@ export default function FilmsDashboard() {
   const { t, language } = useI18n();
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const { films, loading, error } = useInfiniteFilms();
+  const highlights = useTmdbHighlights(['now_playing', 'upcoming', 'trending_movie']);
+  const titles = useMemo(() => highlightTitles(language), [language]);
   const { resumeWatching, rewatchWatching } = useResumeWatching();
   const { activeDownloads } = useActiveDownloads();
-  const freshSynced = useFreshSynced('films');
   const { recentDownloads } = useLibraryBrowse('movies');
   const { withSignals: filmsWithSignals } = useContentSignals(films, resumeWatching);
   const movieDownloads = useMemo(() => filterByMediaType(activeDownloads, 'movie'), [activeDownloads]);
-  const { withSignals: freshWithSignals } = useContentSignals(freshSynced, resumeWatching);
 
   const seenItems = useMemo(
     () => [...resumeWatching, ...rewatchWatching].filter((item) => item.type === 'movie'),
     [resumeWatching, rewatchWatching]
   );
 
+  /** tmdb → torrent / média local (relie les suggestions TMDB à ce qui est disponible). */
+  const availabilityIndex = useMemo(
+    () => buildAvailabilityIndex(recentDownloads, filmsWithSignals),
+    [recentDownloads, filmsWithSignals]
+  );
+
   const heroItems = useMemo(() => {
     const watchNow = excludeSeenItems(filterWatchNow(filmsWithSignals), seenItems);
     const newestUnwatched = excludeSeenItems(
-      [...recentDownloads, ...filmsWithSignals.slice(0, SECTION_LIMIT), ...freshWithSignals],
+      [
+        ...recentDownloads,
+        ...recentAvailable(filmsWithSignals, 12),
+        ...linkAvailability(highlights.now_playing ?? [], availabilityIndex).slice(0, 8),
+      ],
       seenItems
     );
     return pickFeaturedHero(watchNow, newestUnwatched);
-  }, [filmsWithSignals, freshWithSignals, recentDownloads, seenItems]);
+  }, [filmsWithSignals, highlights, availabilityIndex, recentDownloads, seenItems]);
 
   const handleNavigate = (item: ContentItem) => {
-    window.location.href = buildStrictTmdbDetailUrlFromContentItem(item, 'films');
+    window.location.href = buildSuggestionUrl(item, 'films');
   };
 
   const catalog = useMemo(() => uniqueByMedia(filmsWithSignals), [filmsWithSignals]);
@@ -87,7 +102,11 @@ export default function FilmsDashboard() {
 
     return [
       ...personal,
-      { id: 'recent-films', title: t('dashboard.newReleasesMovies'), items: byReleaseDate(catalog).slice(0, SECTION_LIMIT) },
+      // TMDB « du moment » (région FR) relié aux torrents disponibles, puis torrents récents (≤ 12 mois).
+      { id: 'now-playing-films', title: titles.nowPlaying, items: linkAvailability(highlights.now_playing ?? [], availabilityIndex).slice(0, SECTION_LIMIT) },
+      { id: 'trending-films', title: titles.trendingMovies, items: linkAvailability(highlights.trending_movie ?? [], availabilityIndex).slice(0, SECTION_LIMIT) },
+      { id: 'recent-films', title: titles.recentAvailable, items: recentAvailable(catalog, SECTION_LIMIT) },
+      { id: 'upcoming-films', title: titles.upcoming, items: linkAvailability(highlights.upcoming ?? [], availabilityIndex).slice(0, SECTION_LIMIT) },
       { id: 'popular-films', title: t('dashboard.popularMovies'), items: byPopularity(catalog).slice(0, SECTION_LIMIT) },
     ];
   }, [
@@ -98,6 +117,9 @@ export default function FilmsDashboard() {
     recentDownloads,
     catalog,
     selectedGenre,
+    highlights,
+    availabilityIndex,
+    titles,
     t,
   ]);
 
