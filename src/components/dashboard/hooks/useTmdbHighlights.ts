@@ -12,6 +12,11 @@ import {
 /** Le serveur met déjà en cache 6 h ; ici on évite juste de refaire les appels à chaque page. */
 const CACHE_TTL_MS = 30 * 60 * 1000;
 const PAGES = [1, 2];
+/** TMDB on_the_air est dominé par de vieux feuilletons : on parcourt plus de pages avant filtrage. */
+const PAGES_BY_LIST: Partial<Record<HighlightList, number[]>> = {
+  on_the_air: [1, 2, 3, 4, 5],
+  airing_today: [1, 2, 3],
+};
 
 const cache = new Map<string, { at: number; items: SuggestionItem[] }>();
 const inflight = new Map<string, Promise<SuggestionItem[]>>();
@@ -67,7 +72,8 @@ async function loadList(list: HighlightList, lang: string, region: string): Prom
   const pending = inflight.get(key);
   if (pending) return pending;
   const p = (async () => {
-    const pages = await Promise.all(PAGES.map((page) => fetchPage(list, lang, region, page)));
+    const pageNums = PAGES_BY_LIST[list] ?? PAGES;
+    const pages = await Promise.all(pageNums.map((page) => fetchPage(list, lang, region, page)));
     const seen = new Set<string>();
     const items: SuggestionItem[] = [];
     const now = Date.now();
