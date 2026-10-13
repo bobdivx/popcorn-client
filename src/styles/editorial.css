@@ -298,3 +298,29 @@ html[data-editorial] .btn-primary {
 .ed-detail-head .ed-title { text-align: left; font-size: clamp(1.6rem, 4.4vw, 3.4rem); -webkit-line-clamp: 3; }
 .ed-detail-head .ed-rule { display: block; width: 4rem; height: 1px; background: var(--ed-accent); margin: 1.4rem 0 0; }
 .ed-detail-head .ed-logo { max-height: 6rem; width: auto; object-fit: contain; object-position: left; margin-bottom: 1.2rem; }
+
+/* Fiche média : le fond (image / bande-annonce) occupe la zone hero, plein cadre sous la nav.
+   Le conteneur parent garde un transform (animate-fade-in-up), ce qui faisait de `position: fixed`
+   un positionnement relatif à toute la page : l'image s'étirait sur toute la hauteur et
+   se retrouvait derrière la description. On l'ancre explicitement sur la zone hero. */
+html[data-editorial] [data-tv-media-detail] > .fixed.z-0 {
+  position: absolute !important;
+  top: calc(-4rem - var(--safe-area-inset-top, 0px)) !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: auto !important;
+  height: max(100svh, 620px);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 100%);
+}
+html[data-editorial] [data-tv-media-detail] > .fixed.z-0 > div[style*='background-image'] {
+  background-position: center 25% !important;
+}
+@media (min-width: 768px) {
+  html[data-editorial] [data-tv-media-detail] > .relative.z-10 > div > div:first-child {
+    min-height: calc(100svh - 4rem - var(--safe-area-inset-top, 0px));
+  }
+}
+@media (max-width: 767px) {
+  html[data-editorial] [data-tv-media-detail] > .fixed.z-0 { height: max(78svh, 520px); }
+}
