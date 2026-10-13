@@ -1,3 +1,5 @@
+import { useState } from 'preact/hooks';
+import { isTVPlatform } from '../../../../lib/utils/device-detection';
 import type { MediaDetailPageProps } from '../types';
 
 export function HeroHeader({
@@ -12,6 +14,18 @@ export function HeroHeader({
 }) {
   const title = displayTitle.trim() || torrent.name;
   const year = torrent.releaseDate ? new Date(torrent.releaseDate).getFullYear() : null;
+
+  const [isTV] = useState(() => isTVPlatform());
+  if (!isTV) {
+    return (
+      <div className="ed-detail-head ds-stream-cascade mb-10 sm:mb-12">
+        {torrent.logoUrl && <img data-stream-item src={torrent.logoUrl} alt="" className="ed-logo drop-shadow-2xl" style={{ maxWidth: 'min(22rem, 80vw)' }} />}
+        {year != null && <p data-stream-item className="ed-kicker">{year}</p>}
+        <h1 data-stream-item className="ed-title">{title}</h1>
+        <span data-stream-item className="ed-rule" aria-hidden />
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-4xl ds-stream-cascade">
