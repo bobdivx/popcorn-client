@@ -883,6 +883,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
                   </label>
                   <input
                     type="password"
+                    autoComplete="new-password"
                     class="input input-bordered bg-gray-800 border-gray-700 text-white"
                     value={formData.apiKey}
                     onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })}
@@ -912,6 +913,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
                 </label>
                 <input
                   type={isPassword ? 'password' : 'text'}
+                  autoComplete={isPassword ? 'new-password' : 'off'}
                   class="input input-bordered bg-gray-800 border-gray-700 text-white"
                   value={formData.extraConfig?.[name] ?? ''}
                   onInput={(e) => {
@@ -983,6 +985,7 @@ export default function IndexersManager({ editIndexer, onEditClose, initialModeA
             </label>
             <input
               type="password"
+              autoComplete="new-password"
               class="input input-bordered bg-gray-800 border-gray-700 text-white"
               value={formData.apiKey}
               onInput={(e) => setFormData({ ...formData, apiKey: (e.target as HTMLInputElement).value })}
