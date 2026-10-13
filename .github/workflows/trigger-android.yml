@@ -7,6 +7,7 @@ on:
 jobs:
   trigger-android:
     runs-on: [self-hosted, linux, x64, devforge]
+    timeout-minutes: 90
     steps:
       - name: Send android-build event to popcorn-tauri (mobile)
         uses: peter-evans/repository-dispatch@v3

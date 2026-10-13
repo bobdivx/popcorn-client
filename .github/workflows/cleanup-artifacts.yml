@@ -23,6 +23,7 @@ jobs:
   cleanup:
     name: Delete old artifacts
     runs-on: [self-hosted, linux, x64, devforge]
+    timeout-minutes: 90
     permissions:
       actions: write
     steps:
