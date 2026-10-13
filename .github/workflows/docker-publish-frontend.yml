@@ -26,6 +26,7 @@ jobs:
   promote-on-main:
     name: Promote dev → production (no build)
     runs-on: [self-hosted, linux, x64, devforge]
+    timeout-minutes: 90
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
     permissions:
       contents: write
@@ -115,6 +116,7 @@ jobs:
 
   build-and-push:
     runs-on: [self-hosted, linux, x64, devforge]
+    timeout-minutes: 90
     # Ne construire que sur dev et tags ; sur main on fait seulement promote (job promote-on-main)
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master')
     permissions:
