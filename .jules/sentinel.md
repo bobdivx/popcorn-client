@@ -10,3 +10,7 @@
 **Vulnerability:** Weak PRNG `Math.random()` was used for generating IDs and UUIDs across multiple files (`src/lib/client/server-api/indexers.ts`, `src/api-routes-backup/v1/setup/indexers.ts`, `src/lib/utils/device-id.ts`, `src/components/torrents/MediaDetailPage/hooks/useNotifications.ts`).
 **Learning:** `Math.random()` is not cryptographically secure and shouldn't be used for IDs, especially not for indexer setups and device IDs. Moreover, calling `globalThis.crypto.randomUUID()` directly fails on HTTP non-localhost sites since it requires a Secure Context.
 **Prevention:** Always use the Web Crypto API (`crypto.getRandomValues()` or `crypto.randomUUID()`) through a centralized utility like `src/lib/utils/uuid.ts` that provides safe fallbacks for unsupported environments and non-secure contexts.
+## 2026-08-16 - Add autoComplete=new-password to API Key input fields
+**Vulnerability:** The password manager browser autofill could unknowingly fill and submit user's login passwords or prompt the user to wrongly save API keys as a login credential into their browser's built-in keychain manager. This would allow an inadvertent disclosure of keys or modification of user passwords.
+**Learning:** Browsers and password managers aggressively attempt to populate fields of type "password". They often ignore `autocomplete="off"` for password fields.
+**Prevention:** It is required to explicitly set `autoComplete="new-password"` on any `type="password"` fields that are intended to be API Keys or generic secret tokens rather than an actual account login password.
