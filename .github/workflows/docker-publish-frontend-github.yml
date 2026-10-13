@@ -26,6 +26,7 @@ jobs:
   check-runners:
     name: Self-hosted doivent être offline
     runs-on: [self-hosted, linux, x64, devforge]
+    timeout-minutes: 90
     permissions:
       actions: read
     steps:
@@ -60,6 +61,7 @@ jobs:
     name: Build and Publish Frontend
     needs: check-runners
     runs-on: [self-hosted, linux, x64, devforge]
+    timeout-minutes: 90
     permissions:
       contents: write
       packages: write
