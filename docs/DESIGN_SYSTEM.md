@@ -5,8 +5,10 @@ Système de design unifié pour une UX type **dashboard professionnel** (navigat
 ## Fichiers
 
 - **Tokens & utilitaires CSS** : `src/styles/design-system.css`
-  - Variables `--ds-*` (surfaces, accents, texte, radius, espacements)
+  - Primitives `--raw-*` : seuls littéraux (hex, px, ms), dans `:root`, jamais thèmeables
+  - Sémantique `--ds-*` : surfaces, accents, texte, radius, espacements, dégradés de marque. Le thème clair ne surcharge que cette couche
   - Classes `.ds-card`, `.ds-card-section`, `.ds-nav-tabs`, `.ds-nav-tab`, `.ds-icon-btn`, `.ds-page`, `.ds-container`, `.ds-title-*`, `.ds-text-secondary`
+- **Motion** : `docs/MOTION.md` (transitions + `motion` ; keyframes réservés au loader, au focus TV et à la sync)
 - **Composants Preact** : `src/components/ui/design-system/index.ts`
   - `DsCard` / `DsCardSection` — cartes avec variante `elevated` | `accent`
   - `DsNavTabs` — onglets type switch (label + contenu par onglet)
@@ -28,7 +30,7 @@ Système de design unifié pour une UX type **dashboard professionnel** (navigat
 
 - Importer `design-system.css` (déjà fait dans `Layout.astro`).
 - Utiliser les composants depuis `../ui/design-system` ou `../../components/ui/design-system`.
-- Remplacer couleurs en dur par `var(--ds-surface)`, `var(--ds-accent-violet)`, etc.
+- Remplacer couleurs en dur par `var(--ds-surface)`, `var(--ds-accent-violet)`, `var(--ds-brand)`, etc. Un hex nouveau passe d’abord par `--raw-*` dans `:root`, puis par un `--ds-*`. Pas de `--raw-*` dans un composant.
 - Utiliser `DsCard` pour les blocs, `DsNavTabs` pour les vues à onglets (ex. Settings par catégorie).
 - **Animations** : `.ds-card-animate` (fade-in + translateY), `.ds-card-animate-stagger` sur un conteneur pour décaler l’entrée des enfants (grille de cartes). **Norme design — halo blanc scintillant** : keyframes `ds-halo-pulse` (box-shadow blanc qui pulse en 2s). Utilisé par : `.ds-sync-active-pulse` (sync en cours : icône Paramètres, carte Vue d’ensemble), **focus** (`.ds-focus-glow:focus-visible` = même animation), **clic** (`.ds-active-glow:active` = même halo + scale 0.98). Tous les boutons header, `.sync-toolbar__btn`, `.ds-icon-btn`, cartes torrent utilisent cette norme. `DsProgressRing` pour l’anneau de progression (navbar).
 

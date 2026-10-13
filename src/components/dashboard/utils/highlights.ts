@@ -80,7 +80,10 @@ export function keepHighlight(list: HighlightList, item: RawTmdbItem, now = Date
       return votes >= 20 || pop >= 50;
     case 'on_the_air':
     case 'airing_today':
-      return votes >= 20 && pop >= 10;
+      // Séries lancées il y a ≤ 4 ans : évite les feuilletons sans fin (Simpsons, NCIS…) en tête.
+      return (
+        Number.isFinite(age) && age <= 1460 && ((votes >= 20 && pop >= 10) || (age <= 180 && pop >= 15))
+      );
     default:
       return true;
   }
