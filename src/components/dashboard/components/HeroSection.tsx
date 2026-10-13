@@ -65,7 +65,7 @@ function useSingleHeroItem(items: ContentItem[]): ContentItem | null {
   return picked;
 }
 
-export function HeroSection({
+function LegacyHeroSection({
   items,
   onPlay,
   primaryButtonLabel,
@@ -418,4 +418,189 @@ export function HeroSection({
       </div>
     </div>
   );
+}
+
+/* ───────────────────────── Editorial hero (web / mobile, hors TV) ───────────────────────── */
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+function EditorialHeroSection({
+  items,
+  primaryButtonLabel,
+  primaryButtonIcon,
+  onPrimaryAction,
+  primaryActionDisabled = false,
+  size = 'default',
+}: HeroSectionProps) {
+  const { t } = useI18n();
+  const slides = useRef<ContentItem[]>([]);
+  // Fige la sélection (max 5) dès le premier rendu, suit l'enrichissement des mêmes titres.
+  if (slides.current.length === 0 && items.length > 0) {
+    const withImg = items.filter((i) => i.backdrop || i.poster);
+    slides.current = (withImg.length ? withImg : items).slice(0, 5);
+  }
+  const keys = slides.current.map(contentItemKey);
+  const list = keys
+    .map((k) => items.find((i) => contentItemKey(i) === k) ?? slides.current.find((i) => contentItemKey(i) === k))
+    .filter(Boolean) as ContentItem[];
+  const [index, setIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [trailerOpen, setTrailerOpen] = useState(false);
+  const count = list.length;
+
+  useEffect(() => {
+    if (count < 2 || paused || trailerOpen) return;
+    const id = setInterval(() => setIndex((i) => (i + 1) % count), 9000);
+    return () => clearInterval(id);
+  }, [count, paused, trailerOpen]);
+
+  useEffect(() => {
+    if (!trailerOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setTrailerOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [trailerOpen]);
+
+  if (!count) return null;
+  const current = list[Math.min(index, count - 1)];
+  const go = (d: number) => {
+    setTrailerOpen(false);
+    setIndex((i) => (i + d + count) % count);
+  };
+
+  const getItemUrl = (item: ContentItem) =>
+    item.id?.startsWith('tmdb-') && item.tmdbId
+      ? `/discover?tmdbId=${item.tmdbId}&type=${item.type}`
+      : buildStrictTmdbDetailUrlFromContentItem(item, 'dashboard');
+
+  const handlePrimary = async () => {
+    if (primaryActionDisabled) return;
+    if (onPrimaryAction) return void (await onPrimaryAction(current));
+    window.location.href = getItemUrl(current);
+  };
+
+  const trailerKey =
+    typeof current.trailerKey === 'string' && current.trailerKey.trim() ? current.trailerKey.trim() : null;
+  const year = current.year ?? (current.releaseDate ? String(current.releaseDate).slice(0, 4) : null);
+  const kindLabel =
+    current.type === 'movie' ? t('common.film') : current.type === 'tv' ? t('common.serie') : t('common.content');
+  const kicker = [kindLabel, year].filter(Boolean).join(' · ');
+  const subtitle = (current.genres && current.genres.length ? current.genres.slice(0, 2).join(' / ') : '') ||
+    (current.rating != null ? `★ ${Number(current.rating).toFixed(1)}` : '');
+  const signal = current.heroSignal;
+  const signalLabel = signal?.newEpisode
+    ? t('dashboard.heroNewEpisode')
+    : signal?.requestDownloaded
+      ? t('dashboard.heroRequestDownloaded')
+      : signal?.downloadedUnseen
+        ? t('dashboard.heroDownloadedUnseen')
+        : null;
+  const title = getDisplayTitle(current) || current.title || '';
+
+  return (
+    <section
+      className={`ed-hero ${size === 'large' ? 'ed-hero--large' : ''}`}
+      data-dark-context
+      data-editorial-hero
+      data-hero-item-key={contentItemKey(current)}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      aria-roledescription="carousel"
+    >
+      {list.map((item, i) => {
+        const raw = item.backdrop || item.poster;
+        const url = getHighQualityTmdbImageUrl(raw) ?? raw;
+        return (
+          <div
+            key={contentItemKey(item)}
+            className={`ed-hero__bg ${i === index ? 'is-active' : ''}`}
+            style={{ backgroundImage: url ? `url(${url})` : 'none' }}
+            aria-hidden
+          />
+        );
+      })}
+      <div className="ed-hero__shade" aria-hidden />
+      {trailerOpen && trailerKey && (
+        <div className="ed-hero__trailer">
+          <YouTubeVideoPlayer youtubeKey={trailerKey} autoplay muted={false} loop={false} controls cover className="w-full h-full" onEnded={() => setTrailerOpen(false)} />
+          <button type="button" className="ed-hero__close" onClick={() => setTrailerOpen(false)} aria-label="Fermer" data-focusable>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2"><path d="M6 6l12 12M18 6L6 18" /></svg>
+          </button>
+        </div>
+      )}
+      <div className="ed-grid-lines" aria-hidden><span /><span /><span /><span /></div>
+
+      <div key={contentItemKey(current)} className="ed-hero__inner ed-fade">
+        <header className="ed-hero__head">
+          <p className="ed-kicker">{kicker}</p>
+          <h1 className="ed-title">{title}</h1>
+        </header>
+
+        <div className="ed-hero__left">
+          <div className="ed-number" aria-hidden>
+            <span>{pad2(index + 1)}</span>
+          </div>
+          {subtitle && <p className="ed-subtitle">{subtitle}</p>}
+          {signalLabel && <p className="ed-signal">{signalLabel}</p>}
+          {current.overview && <p className="ed-synopsis">{current.overview}</p>}
+          <div className="ed-hero__ctas">
+            <button
+              type="button"
+              className="ed-cta"
+              onClick={handlePrimary}
+              disabled={primaryActionDisabled}
+              aria-busy={primaryActionDisabled}
+              data-focusable
+            >
+              {primaryButtonIcon}
+              <span>{primaryButtonLabel ?? 'Regarder'}</span>
+            </button>
+            <a href={getItemUrl(current)} className="ed-link" data-focusable>
+              {t('common.details')}
+            </a>
+          </div>
+        </div>
+
+        {trailerKey && !trailerOpen && (
+          <button type="button" className="ed-play" onClick={() => setTrailerOpen(true)} data-focusable>
+            <span className="ed-play__ring">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 7.5v9l7.5-4.5z" /></svg>
+            </span>
+            <span className="ed-play__label">Bande-annonce</span>
+          </button>
+        )}
+      </div>
+
+      {count > 1 && (
+        <div className="ed-pager">
+          <span className="ed-pager__num">{pad2(index + 1)}</span>
+          <span className="ed-pager__track">
+            {list.map((_, i) => (
+              <button
+                key={i}
+                type="button"
+                className={`ed-pager__seg ${i === index ? 'is-active' : ''} ${i < index ? 'is-past' : ''}`}
+                onClick={() => setIndex(i)}
+                aria-label={`${pad2(i + 1)} / ${pad2(count)}`}
+              />
+            ))}
+          </span>
+          <span className="ed-pager__num ed-pager__num--dim">{pad2(count)}</span>
+          <button type="button" className="ed-arrow" onClick={() => go(-1)} aria-label="Précédent" data-focusable>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3"><path d="M15 5l-7 7 7 7" /></svg>
+          </button>
+          <button type="button" className="ed-arrow" onClick={() => go(1)} aria-label="Suivant" data-focusable>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3"><path d="M9 5l7 7-7 7" /></svg>
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+/** Hero : design éditorial sur web/mobile ; rendu historique conservé sur TV / webOS. */
+export function HeroSection(props: HeroSectionProps) {
+  const [isTV] = useState(() => isTVPlatform());
+  if (isTV) return <LegacyHeroSection {...props} />;
+  return <EditorialHeroSection {...props} />;
 }
