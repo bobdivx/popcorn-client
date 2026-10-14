@@ -713,7 +713,9 @@
       "warmingUp": "Préparation de la lecture fluide…",
       "almostReady": "Presque prêt à démarrer…",
       "optimizingPicture": "Optimisation de l'image…",
-      "smoothingPlayback": "Optimisation de la fluidité…"
+      "smoothingPlayback": "Optimisation de la fluidité…",
+      "serverPrepareFailed": "Le serveur n'a pas pu préparer la vidéo.",
+      "startTimeout": "La lecture ne démarre pas (plus de 90 s). Réessayez ou choisissez une autre qualité."
     },
     "streamingFallbackToHls": "Passage en lecture HLS après un problème de flux direct.",
     "errorStream": "Impossible de lire la vidéo. Vérifiez la connexion au serveur.",
