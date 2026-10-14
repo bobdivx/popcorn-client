@@ -271,7 +271,20 @@ export function createHandlePlay(context: PlayHandlerContext) {
     }
 
     // PRIORITÉ 0.5: Média disponible en bibliothèque (fichier sur disque, torrent peut être absent du client) — charger depuis le chemin library puis lancer
-    if (!emptyOrSparse && isAvailableLocally && hasInfoHash && torrent.infoHash) {
+    // Ne pas traiter comme « local » sans chemin bibliothèque réel ni média local_* (évite faux positifs → 404 / lecture cassée).
+    const hasLibraryPath = !!(
+      (typeof torrent.downloadPath === 'string' && torrent.downloadPath.trim()) ||
+      (typeof (torrent as { filePath?: string | null }).filePath === 'string' &&
+        String((torrent as { filePath?: string | null }).filePath).trim())
+    );
+    const isLocalHash = !!(torrent.infoHash && torrent.infoHash.startsWith('local_'));
+    if (
+      !emptyOrSparse &&
+      isAvailableLocally &&
+      hasInfoHash &&
+      torrent.infoHash &&
+      (hasLibraryPath || isLocalHash)
+    ) {
       addDebugLog('info', '📚 Média disponible localement, chargement des fichiers depuis la bibliothèque...');
       const libraryVideos = await loadVideoFiles(torrent.infoHash);
       if (libraryVideos.length > 0) {
@@ -301,6 +314,12 @@ export function createHandlePlay(context: PlayHandlerContext) {
       addDebugLog(
         'warning',
         'Bibliothèque marquée locale mais aucun fichier chargé — bascule téléchargement/stream'
+      );
+      setIsAvailableLocally(false);
+    } else if (isAvailableLocally && !hasLibraryPath && !isLocalHash) {
+      addDebugLog(
+        'info',
+        'isAvailableLocally sans chemin bibliothèque — bascule add/get torrent (pas de faux local)'
       );
       setIsAvailableLocally(false);
     }
