@@ -666,6 +666,79 @@ html[data-webos='true'][data-editorial] .ed-hero__close { background: rgba(0, 0,
 .ed-card-img.object-contain { z-index: 1; }
 html[data-tv-platform] .ed-card-img-fallback-bg { filter: none; transform: none; opacity: 0.3; }
 
+/* Tuiles browse : méta intégrée sur l’affiche (lisible, typo éditoriale) */
+.ed-browse-card__caption {
+  padding: 0;
+}
+.ed-browse-card__shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to top,
+    rgba(8, 9, 12, 0.96) 0%,
+    rgba(8, 9, 12, 0.72) 42%,
+    rgba(8, 9, 12, 0.2) 78%,
+    transparent 100%
+  );
+}
+.ed-browse-card__copy {
+  padding: 2.25rem 0.7rem 0.65rem;
+}
+.ed-browse-card__caption--with-progress .ed-browse-card__copy {
+  padding-bottom: 0.85rem;
+}
+.ed-browse-card__title {
+  margin: 0;
+  font-family: var(--ed-font-display);
+  font-weight: 500;
+  font-size: 0.82rem;
+  letter-spacing: 0.03em;
+  line-height: 1.25;
+  color: var(--ed-ink);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.75);
+}
+.ed-browse-card__sub {
+  margin: 0.2rem 0 0;
+  font-family: var(--ed-font-body);
+  font-weight: 400;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  color: var(--ed-ink-dim);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+@media (min-width: 640px) {
+  .ed-browse-card__copy { padding: 2.5rem 0.85rem 0.75rem; }
+  .ed-browse-card__title { font-size: 0.92rem; }
+  .ed-browse-card__sub { font-size: 0.74rem; }
+}
+html[data-tv-platform] .ed-browse-card__copy {
+  padding: 2.75rem 1rem 0.9rem;
+}
+html[data-tv-platform] .ed-browse-card__caption--with-progress .ed-browse-card__copy {
+  padding-bottom: 1.05rem;
+}
+html[data-tv-platform] .ed-browse-card__title { font-size: 1.05rem; }
+html[data-tv-platform] .ed-browse-card__sub { font-size: 0.85rem; }
+
+/* Focus browse : anneau corail (plus de violet) */
+html[data-editorial] {
+  --tv-focus-color: var(--ed-accent);
+}
+html[data-editorial][data-tv-platform] [data-browse-slot]:focus-within > [data-torrent-card]::after,
+html[data-editorial][data-tv-platform] [data-browse-slot]:focus-within > [data-focusable-card]::after,
+html[data-editorial][data-tv-platform] [data-torrent-card].tv-card-focused::after,
+html[data-editorial][data-tv-platform] [data-focusable-card].tv-card-focused::after {
+  box-shadow:
+    inset 0 0 0 3px #fff,
+    inset 0 0 0 7px var(--ed-accent) !important;
+}
+html[data-editorial]:not([data-tv-platform]) [data-browse-slot]:focus-within [data-torrent-card],
+html[data-editorial]:not([data-tv-platform]) [data-browse-slot]:focus-within [data-focusable-card],
+html[data-editorial]:not([data-tv-platform]) [data-browse-tile][data-torrent-card].tv-card-focused {
+  box-shadow: inset 0 0 0 3px var(--ed-accent) !important;
+}
+
 /* ==========================================================================
    Fluidité TV / webOS (natif + lite) : uniquement transform / opacity,
    pas de flou, pas d'ombres portées, pas de transitions sur les cartes,
