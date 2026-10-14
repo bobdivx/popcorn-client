@@ -173,7 +173,7 @@ export const systemMethods = {
 
   async installWebOSSimple(
     this: ServerApiClientSystemAccess,
-    opts?: string | { device?: string; ip?: string; passphrase?: string }
+    opts?: string | { device?: string; ip?: string; passphrase?: string; package?: 'simple' | 'native' }
   ): Promise<ApiResponse<WebOSInstallSimpleResponse>> {
     const params =
       typeof opts === 'string'
@@ -182,11 +182,13 @@ export const systemMethods = {
             device: opts?.device,
             ip: opts?.ip,
             passphrase: opts?.passphrase,
+            package: opts?.package,
           };
     const body = JSON.stringify({
       device: params.device?.trim() || undefined,
       ip: params.ip?.trim() || undefined,
       passphrase: params.passphrase?.trim() || undefined,
+      package: 'package' in params && params.package === 'native' ? 'native' : undefined,
     });
     return this.backendRequest<WebOSInstallSimpleResponse>(
       '/api/admin/deployment/webos/install-simple',
@@ -196,10 +198,12 @@ export const systemMethods = {
 
   async relaunchWebOSApp(
     this: ServerApiClientSystemAccess,
-    device?: string
+    device?: string,
+    pkg?: 'simple' | 'native'
   ): Promise<ApiResponse<WebOSRelaunchResponse>> {
     const body = JSON.stringify({
       device: device && device.trim() ? device.trim() : undefined,
+      package: pkg === 'native' ? 'native' : undefined,
     });
     return this.backendRequest<WebOSRelaunchResponse>('/api/admin/deployment/webos/relaunch', {
       method: 'POST',

@@ -21,6 +21,9 @@ export default function WebOSDeploymentPanel() {
   const [passphrase, setPassphrase] = useState('');
   const [installing, setInstalling] = useState(false);
   const [relaunching, setRelaunching] = useState(false);
+  /** Paquet choisi : relancer cible l'app correspondante (lite ou native). */
+  const [pkg, setPkg] = useState<'simple' | 'native'>('simple');
+  const [installingPkg, setInstallingPkg] = useState<'simple' | 'native' | null>(null);
   const [status, setStatus] = useState<'idle' | 'ok' | 'err'>('idle');
   const [message, setMessage] = useState('');
   const [logs, setLogs] = useState('');
@@ -57,7 +60,7 @@ export default function WebOSDeploymentPanel() {
     }
   };
 
-  const runInstall = async () => {
+  const runInstall = async (choice: 'simple' | 'native' = 'simple') => {
     const name = device.trim() || 'lgtv';
     const ip = deviceIp.trim();
     if (!ip) {
@@ -66,6 +69,8 @@ export default function WebOSDeploymentPanel() {
       return;
     }
 
+    setPkg(choice);
+    setInstallingPkg(choice);
     setInstalling(true);
     setStatus('idle');
     setMessage('');
@@ -75,6 +80,7 @@ export default function WebOSDeploymentPanel() {
         device: name,
         ip,
         passphrase: passphrase.trim() || undefined,
+        package: choice,
       });
       const payload = res.data;
       const combined =
@@ -99,6 +105,7 @@ export default function WebOSDeploymentPanel() {
       setMessage(e instanceof Error ? e.message : String(e));
     } finally {
       setInstalling(false);
+      setInstallingPkg(null);
     }
   };
 
@@ -108,7 +115,7 @@ export default function WebOSDeploymentPanel() {
     setMessage('');
     setLogs('');
     try {
-      const res = await serverApi.relaunchWebOSApp(device.trim() || undefined);
+      const res = await serverApi.relaunchWebOSApp(device.trim() || undefined, pkg);
       const payload = res.data;
       setLogs(payload?.logs || '');
       if (res.success && payload?.success) {
@@ -240,13 +247,24 @@ export default function WebOSDeploymentPanel() {
             type="button"
             class={btnPrimary}
             disabled={busy}
-            onClick={runInstall}
+            onClick={() => runInstall('simple')}
             data-tv-focusable
           >
-            {installing ? <Loader2 class="h-5 w-5 animate-spin" /> : null}
-            {installing
+            {installingPkg === 'simple' ? <Loader2 class="h-5 w-5 animate-spin" /> : null}
+            {installingPkg === 'simple'
               ? t('settingsPages.webosDeployment.installing')
               : t('settingsPages.webosDeployment.installSimple')}
+          </button>
+          <button
+            type="button"
+            class={btnPrimary}
+            disabled={busy}
+            onClick={() => runInstall('native')}
+            data-tv-focusable
+            title="com.popcorn.client.webos.native — UI embarquée (beta), n'écrase pas l'app simple"
+          >
+            {installingPkg === 'native' ? <Loader2 class="h-5 w-5 animate-spin" /> : null}
+            {installingPkg === 'native' ? t('settingsPages.webosDeployment.installing') : 'Installer (native)'}
           </button>
           <button
             type="button"
@@ -257,7 +275,19 @@ export default function WebOSDeploymentPanel() {
           >
             {relaunching ? <Loader2 class="h-5 w-5 animate-spin" /> : null}
             {t('settingsPages.webosDeployment.relaunch')}
+            {pkg === 'native' ? ' (native)' : ''}
           </button>
+          <select
+            class={fieldClass + ' sm:w-auto'}
+            value={pkg}
+            disabled={busy}
+            onChange={(e) => setPkg((e.target as HTMLSelectElement).value === 'native' ? 'native' : 'simple')}
+            aria-label="Application ciblée par Relancer"
+            data-tv-focusable
+          >
+            <option value="simple">com.popcorn.client.webos (simple)</option>
+            <option value="native">com.popcorn.client.webos.native (native)</option>
+          </select>
         </div>
 
         {status !== 'idle' && (
