@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { episodeReleaseMatchesVariantName } from './episodeReleaseMatch';
+import {
+  episodeReleaseMatchesTmdbEpisode,
+  episodeReleaseMatchesVariantName,
+} from './episodeReleaseMatch';
 
 /** Aligné sur les cas indexeur / page détail série (The Testaments, etc.) */
 describe('episodeReleaseMatchesVariantName', () => {
@@ -11,5 +14,15 @@ describe('episodeReleaseMatchesVariantName', () => {
 
   it('matche 1x05 (FR)', () => {
     expect(episodeReleaseMatchesVariantName(1, 5, 'Show.Name.1x05.MULTi.1080p.x264')).toBe(true);
+  });
+
+  it('matche S02E01 sur TMDB S01E25 (saison continue)', () => {
+    const name = 'Les.Carnets.De.L.Apothicaire.S02E01.MULTI.1080p';
+    expect(
+      episodeReleaseMatchesTmdbEpisode(1, 25, name, {
+        continuous: true,
+        courStarts: [1, 25, 49],
+      }),
+    ).toBe(true);
   });
 });
