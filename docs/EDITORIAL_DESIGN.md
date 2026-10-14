@@ -30,7 +30,7 @@ Sous `html[data-editorial]`, `--ds-accent-violet` est mappé vers `--ed-accent` 
 - Pas de cards décoratives ; cards seulement pour une interaction réelle.
 - Hero full-bleed (`.ed-hero`) ; pas d’image hero en carte flottante.
 - Rangées catalogue : `.ed-row` + `.ed-row-title` (compteur 01 / 02…).
-- Loader unique : `.ed-loader` / `DsLoader` (trait corail).
+- Loader unique : `.ed-loader` / `DsLoader` — pages (`lg`/`xl`) = marque Popcornn + titre + trait corail (identique à `#popcorn-loading-fallback`) ; `xs`/`sm` = anneau fin.
 - Motion : fondus courts (`.ed-fade`) ; voir aussi [`MOTION.md`](./MOTION.md). Sur TV / webOS, blur et ombres coûteux sont coupés.
 
 ## Patterns UI
