@@ -453,9 +453,9 @@ interface IServerApiClientPublic {
   getServerLogs(params?: { limit?: number }): Promise<ApiResponse<{ lines: string[] }>>;
   restartBackend(): Promise<ApiResponse<{ will_exit: boolean }>>;
   installWebOSSimple(
-    opts?: string | { device?: string; ip?: string; passphrase?: string }
+    opts?: string | { device?: string; ip?: string; passphrase?: string; package?: 'simple' | 'native' }
   ): Promise<ApiResponse<import('./server-api/system.js').WebOSInstallSimpleResponse>>;
-  relaunchWebOSApp(device?: string): Promise<
+  relaunchWebOSApp(device?: string, pkg?: 'simple' | 'native'): Promise<
     ApiResponse<import('./server-api/system.js').WebOSRelaunchResponse>
   >;
 
