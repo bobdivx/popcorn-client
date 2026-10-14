@@ -400,13 +400,13 @@ export default function IndexRedirect() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-base-100">
-        <div className="text-center max-w-md mx-4">
+      <div className="flex justify-center items-center min-h-screen bg-[var(--ed-bg,#0c0d10)]">
+        <div className="text-center max-w-lg mx-4">
           <HLSLoadingSpinner size="lg" text={message} />
           {message.includes('réessai') && (
-            <div className="mt-4 w-full bg-gray-700 rounded-full h-2">
-              <div 
-                className="bg-primary h-2 rounded-full transition-all duration-300"
+            <div className="mt-6 w-full max-w-xs mx-auto bg-white/10 rounded-full h-px overflow-hidden">
+              <div
+                className="h-px bg-[var(--ed-accent,#f2545b)] transition-all duration-300"
                 style={{ width: `${Math.min(100, attemptRef.current * 10)}%` }}
               ></div>
             </div>

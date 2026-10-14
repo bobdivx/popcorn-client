@@ -150,12 +150,14 @@ export function SeriesEpisodesSection({
             key={seasonNum}
             aria-labelledby={headingId}
             data-tv-episode-row
-            className="rounded-xl overflow-hidden bg-black/40 border border-white/10"
+            className="ed-season-block rounded-xl overflow-hidden bg-black/40 border border-white/10"
           >
-            <div className="px-4 py-3 border-b border-white/10 bg-white/5">
-              <h3 id={headingId} className="text-base font-semibold text-white">
+            <div className="ed-season-block__head px-4 py-3 border-b border-white/10 bg-white/5">
+              <h3 id={headingId} className="ed-season-block__title text-base font-semibold text-white">
                 {t('mediaDetail.seasonNumber', { number: seasonNum })}
-                <span className="ml-2 text-sm font-normal text-white/60">({episodeCount})</span>
+                <span className="ed-season-block__count ml-2 text-sm font-normal text-white/60">
+                  ({episodeCount})
+                </span>
               </h3>
             </div>
             <EpisodeCardsCarousel

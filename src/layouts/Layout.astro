@@ -120,13 +120,36 @@ const isWebOS = import.meta.env.WEBOS === 'true';
       })();
     </script>
     <script is:inline>
-      /* Masquer le bandeau "Chargement" après chaque navigation (View Transitions remplace le body, donc ce script doit être dans le head pour survivre). */
-      document.addEventListener('astro:after-swap', function() {
-        requestAnimationFrame(function() {
-          var el = document.getElementById('popcorn-loading-fallback');
-          if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 0.15s'; setTimeout(function() { el.style.display = 'none'; }, 150); }
+      /* Splash éditorial POPCORNN/CHARGEMENT : afficher pendant les navigations View Transitions
+         (script dans le head pour survivre au swap du body). */
+      (function () {
+        function el() { return document.getElementById('popcorn-loading-fallback'); }
+        function show() {
+          var n = el();
+          if (!n) return;
+          n.style.display = '';
+          n.style.opacity = '1';
+          n.style.transition = '';
+        }
+        function hide() {
+          var n = el();
+          if (!n || n.style.display === 'none') return;
+          n.style.opacity = '0';
+          n.style.transition = 'opacity 0.15s ease';
+          setTimeout(function () {
+            if (n.style.opacity === '0') n.style.display = 'none';
+          }, 150);
+        }
+        document.addEventListener('astro:before-preparation', show);
+        document.addEventListener('astro:after-swap', show);
+        /* page-load : léger délai pour laisser les îlots Preact peindre ; popcorn-app-ready masque dès que l’app est prête. */
+        document.addEventListener('astro:page-load', function () {
+          setTimeout(hide, 120);
         });
-      });
+        window.addEventListener('popcorn-app-ready', hide);
+        window.__popcornShowPageLoader = show;
+        window.__popcornHidePageLoader = hide;
+      })();
     </script>
     <script is:inline>
       /* ── Listeners persistants : sync multi-onglets · auto selon l’heure · View Transitions ── */
@@ -308,9 +331,10 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         errEl.style.display = 'block';
       };
     </script>
-    <!-- Indicateur de chargement immédiat — même écran que le lanceur webOS natif (style éditorial) -->
-    <div id="popcorn-loading-fallback" class="fixed inset-0 z-[9999] overflow-hidden" aria-hidden="true" style="background:#0c0d10;color:#f4f1ec">
+    <!-- Indicateur de chargement immédiat — même composition que DsLoader page (éditorial) -->
+    <div id="popcorn-loading-fallback" class="fixed inset-0 z-[9999] overflow-hidden" aria-hidden="true" transition:persist="popcorn-loading-fallback" style="background:#0c0d10;color:#f4f1ec">
       <style>
+        /* Inline critique avant editorial.css — même langage que .ed-loader--page */
         #popcorn-loading-fallback .plb{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;text-align:center;padding:0 1.5rem}
         #popcorn-loading-fallback .plb-k{letter-spacing:.42em;text-transform:uppercase;font-size:clamp(12px,1.15vw,22px);opacity:.6;font-family:'Jost',sans-serif;font-weight:300}
         #popcorn-loading-fallback .plb-t{letter-spacing:.32em;text-transform:uppercase;font-size:clamp(28px,3.4vw,64px);font-weight:300;font-family:'Josefin Sans','Jost',sans-serif;margin:0}
@@ -401,19 +425,18 @@ const isWebOS = import.meta.env.WEBOS === 'true';
           }
         }, true);
         function hide() {
+          if (window.__popcornHidePageLoader) {
+            window.__popcornHidePageLoader();
+            return;
+          }
           if (!fallback) return;
           fallback.style.opacity = '0';
           fallback.style.transition = 'opacity 0.15s ease';
           setTimeout(function() { fallback.style.display = 'none'; }, 150);
         }
-        window.addEventListener('popcorn-app-ready', hide, { once: true });
-        window.addEventListener('astro:page-load', function onLoad() {
-          hide();
-          try { sessionStorage.setItem('popcorn-has-loaded', '1'); } catch (e) {}
-        }, { once: true });
-        try {
-          if (sessionStorage.getItem('popcorn-has-loaded')) hide();
-        } catch (e) {}
+        /* Ne plus court-circuiter via sessionStorage : le splash doit rester
+           visible à chaque chargement / navigation jusqu'à ready. */
+        window.addEventListener('popcorn-app-ready', hide);
         /* Si l'app ne monte pas, le bouton de sortie reste cliquable au-dessus du voile. */
         setTimeout(function() {
           try {

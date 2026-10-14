@@ -9,7 +9,6 @@ import { PlaybackLiveTrace } from './PlaybackLiveTrace';
 import type { PlaybackLiveTraceState } from '../hooks/usePlaybackLiveTrace';
 import GpuPlaybackChip from './GpuPlaybackChip';
 import { DsLoader } from '../../../ui/DsLoader';
-import { DsProgressRing } from '../../../ui/DsProgressRing';
 import {
   PLAYBACK_PHASE_I18N_KEYS,
   derivePlaybackPhase,
@@ -94,39 +93,9 @@ export interface PlaybackStatusSurfaceProps {
   qualityTransition?: boolean;
 }
 
-const STEP_KEYS = ['queue', 'metadata', 'peers', 'download'] as const;
-
 function phaseLabel(t: (k: string) => string, phase: PlaybackPhase): string {
   const key = PLAYBACK_PHASE_I18N_KEYS[phase];
   return t(key) || '';
-}
-
-function MediaPoster({
-  src,
-  title,
-  compact,
-}: {
-  src: string;
-  title?: string | null;
-  compact?: boolean;
-}) {
-  return (
-    <div
-      className={`relative shrink-0 overflow-hidden rounded-xl border border-white/15 shadow-lg bg-black/50 ${
-        compact
-          ? 'w-12 h-[4.5rem] sm:w-16 sm:h-24'
-          : 'w-14 h-[5.25rem] sm:w-[5.5rem] sm:h-[8.25rem]'
-      }`}
-    >
-      <img
-        src={src}
-        alt={title || ''}
-        className="absolute inset-0 w-full h-full object-cover"
-        loading="eager"
-      />
-      <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-xl" />
-    </div>
-  );
 }
 
 function pipelineUserDetail(
@@ -144,23 +113,59 @@ function pipelineUserDetail(
   return detail;
 }
 
-function StatusHintChip({
-  kind,
-  label,
+/** Piste corail éditoriale — même langage que #popcorn-loading-fallback, réactive aux phases. */
+function EditorialPhaseLine({
+  phase,
+  percent,
+  stepIndex,
 }: {
-  kind: 'warmup' | 'quality' | 'readying';
-  label: string;
+  phase: PlaybackPhase;
+  percent: number | null;
+  stepIndex: number;
 }) {
-  const kindClass = kind === 'warmup' ? 'playback-status-hint--warmup' : kind === 'readying' ? 'playback-status-hint--readying' : 'playback-status-hint--quality';
-  
+  const p = percent != null && Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : null;
+  const determinate =
+    p != null &&
+    (phase === 'downloading' ||
+      phase === 'buffering' ||
+      phase === 'preparingPlayback' ||
+      phase === 'ready' ||
+      phase === 'checking');
+  const mode =
+    determinate
+      ? 'fill'
+      : phase === 'findingPeers'
+        ? 'seek'
+        : phase === 'checking' || phase === 'resolving'
+          ? 'pulse'
+          : 'run';
+
   return (
     <div
-      className={`playback-status-hint ${kindClass}`}
-      role="status"
-      aria-live="polite"
+      className={`ed-playback-track ed-playback-track--${mode}`}
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={determinate && p != null ? Math.round(p) : undefined}
+      aria-busy={!determinate || (p != null && p < 100)}
     >
-      <DsLoader size="xs" className="shrink-0" />
-      <span className="playback-status-hint-label">{label}</span>
+      <div className="ed-playback-track__rail">
+        <div
+          className="ed-playback-track__fill"
+          style={determinate && p != null ? { width: `${p}%` } : undefined}
+        />
+      </div>
+      <div className="ed-playback-track__steps" aria-hidden="true">
+        {[1, 2, 3, 4].map((n) => (
+          <span
+            key={n}
+            className={`ed-playback-track__step${stepIndex >= n ? ' is-on' : ''}${stepIndex === n ? ' is-active' : ''}`}
+          />
+        ))}
+      </div>
+      {determinate && p != null ? (
+        <span className="ed-playback-track__pct">{Math.round(p)}%</span>
+      ) : null}
     </div>
   );
 }
@@ -273,98 +278,10 @@ function PipelinePanel({
   );
 }
 
-function MetricCell({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-1.5 min-w-0">
-      <div className="text-[9px] uppercase tracking-wider text-white/40 font-semibold">{label}</div>
-      <div className="text-xs sm:text-sm font-semibold text-white tabular-nums truncate">{value}</div>
-    </div>
-  );
-}
-
-function ProgressRing({
-  percent,
-  spinning,
-}: {
-  percent: number | null;
-  spinning: boolean;
-}) {
-  const p = percent != null ? Math.max(0, Math.min(100, percent)) : null;
-  const showSpin = spinning && p == null;
-
-  return (
-    <div className="ds-loader ds-loader--lg ds-loader--player" role="status" aria-busy="true">
-      <div className="ds-loader-mark">
-        {showSpin ? (
-          <>
-            <div className="ds-loader-track" />
-            <div className="ds-loader-spin" />
-          </>
-        ) : (
-          <DsProgressRing
-            value={p ?? 0}
-            size={96}
-            strokeWidth={3.25}
-            aria-label={p != null ? `${Math.round(p)}%` : undefined}
-          />
-        )}
-        <div className="ds-loader-core">
-          <img src="/popcorn_logo.png" alt="" className="ds-loader-logo loading-icon-logo" />
-        </div>
-      </div>
-      {p != null ? (
-        <p className="ds-loader-percent">
-          {Math.round(p)}
-          <span>%</span>
-        </p>
-      ) : null}
-    </div>
-  );
-}
-
-function StepRail({
-  stepIndex,
-  t,
-}: {
-  stepIndex: number;
-  t: (k: string, p?: Record<string, string | number>) => string;
-}) {
-  return (
-    <div className="flex gap-1.5 w-full max-w-sm mx-auto mb-3 min-w-0" role="progressbar" aria-valuenow={stepIndex} aria-valuemin={1} aria-valuemax={4}>
-      {STEP_KEYS.map((key, i) => {
-        const n = i + 1;
-        const done = stepIndex > n;
-        const active = stepIndex === n;
-        return (
-          <div key={key} className="flex-1 flex flex-col items-center gap-1.5">
-            <div
-              className={`h-1 w-full rounded-full overflow-hidden transition-all duration-500 ease-out ${
-                done ? 'bg-primary-500' : active ? 'bg-white/25' : 'bg-white/10'
-              }`}
-              style={{
-                transform: active ? 'scaleY(1.2)' : 'scaleY(1)',
-              }}
-            >
-              {active ? <div className="h-full w-1/2 bg-primary-400 animate-shimmer" /> : null}
-            </div>
-            <span
-              className={`text-[9px] uppercase tracking-wider font-semibold transition-all duration-300 ${
-                active ? 'text-primary-300 scale-105' : done ? 'text-white/70' : 'text-white/25'
-              }`}
-            >
-              {t(`playback.step.${key}`)}
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 /**
  * Surface unique d'état lecture/téléchargement.
  * Variantes: fullscreen | player | inline | chip
- * Sous html[data-editorial] : panneau éditorial (voir editorial.css).
+ * Player/fullscreen : splash éditorial (marque + titre + piste d'états).
  */
 export function PlaybackStatusSurface({
   variant,
@@ -632,65 +549,48 @@ export function PlaybackStatusSurface({
 
   const isPlayer = variant === 'player';
   const isError = derived.phase === 'error';
-  const showSteps =
-    !isError &&
-    (derived.phase === 'resolving' ||
-      derived.phase === 'checking' ||
-      derived.phase === 'findingPeers' ||
-      derived.phase === 'downloading');
+  const trackPercent =
+    isBuffering || derived.phase === 'buffering' || derived.phase === 'preparingPlayback'
+      ? bufferedPercent != null && bufferedPercent > 0 && bufferedPercent < 100
+        ? bufferedPercent
+        : derived.progressPercent
+      : derived.progressPercent;
+  const statusText =
+    hint?.label ||
+    bufferDetail ||
+    label ||
+    t('playback.loadingVideo') ||
+    'Chargement…';
+  const metricsLine = derived.showTorrentMetrics
+    ? [
+        trackPercent != null ? `${Math.round(trackPercent)}%` : null,
+        derived.downloadSpeed != null && derived.downloadSpeed > 0 ? speedLabel : null,
+        derived.peersConnected != null ? peersLabel : null,
+        derived.etaSeconds != null && derived.etaSeconds > 0 ? etaLabel : null,
+      ]
+        .filter(Boolean)
+        .join('  ·  ')
+    : '';
 
   const shell = (
     <div
-      className={`relative z-10 w-full min-w-0 ${isPlayer ? 'max-w-md' : 'max-w-lg'} mx-auto px-2 animate-[fade-in_0.35s_ease-out] ${className}`}
+      className={`relative z-10 w-full min-w-0 ${isPlayer ? 'max-w-lg' : 'max-w-xl'} mx-auto px-4 animate-[fade-in_0.35s_ease-out] ${className}`}
     >
-      <div className="ed-playback-panel glass-panel deep-glass w-full rounded-2xl border border-white/12 shadow-[0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden backdrop-blur-xl bg-black/50 flex flex-col min-w-0 max-h-[calc(100dvh-1rem)]">
-        <div className="relative shrink-0 px-3 sm:px-5 pt-3 sm:pt-4 pb-2.5 border-b border-white/8">
-          <div className="flex gap-3 items-center min-w-0">
-            {showPoster ? (
-              <div className="relative z-10 shrink-0">
-                <MediaPoster src={artUrl!} title={title} compact />
-                <img
-                  src={artUrl!}
-                  alt=""
-                  className="hidden"
-                  onError={() => setPosterFailed(true)}
-                />
-              </div>
-            ) : null}
-            <div className="flex-1 min-w-0">
-              {title ? (
-                <h2 className="text-white text-sm sm:text-lg font-semibold tracking-tight line-clamp-2 break-words">
-                  {title}
-                </h2>
-              ) : (
-                <h2 className="text-white/80 text-sm font-medium tracking-tight">Popcornn</h2>
-              )}
-              <div className="mt-1 flex flex-wrap items-center gap-1.5 min-w-0">
-                <p className="text-[11px] text-[var(--ds-text-tertiary)] font-medium tracking-wide uppercase min-w-0">
-                  {label || t('playback.loadingVideo')}
-                </p>
-                {showDebug ? <GpuPlaybackChip pipeline={pipelineStatus} /> : null}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="min-w-0 min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 sm:px-5 pt-3 pb-3">
-          {showSteps ? <StepRail stepIndex={derived.stepIndex} t={t} /> : null}
-
+      <div className="ed-playback-splash flex flex-col items-center text-center min-w-0 max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain">
           {isError ? (
-            <div className="flex flex-col items-center text-center">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full border border-red-400/40 bg-red-500/15 flex items-center justify-center mb-3 sm:mb-4">
-                <span className="text-xl sm:text-2xl text-red-300" aria-hidden>
-                  ×
-                </span>
-              </div>
-              <h3 className="text-white text-lg sm:text-2xl font-bold mb-2 px-1">
+            <div className="ed-playback-splash__error flex flex-col items-center text-center w-full">
+              <div className="ed-playback-splash__brand">Popcornn</div>
+              <h2 className="ed-playback-splash__title">
                 {sparseOrEmpty
                   ? t('playback.sparseOrEmptyTitle') || phaseLabel(t, 'error')
                   : phaseLabel(t, 'error')}
-              </h3>
-              <p className="text-white/65 text-xs sm:text-sm mb-4 sm:mb-6 max-w-md break-words line-clamp-4 px-1">
+              </h2>
+              <div className="ed-playback-track ed-playback-track--error" aria-hidden="true">
+                <div className="ed-playback-track__rail">
+                  <div className="ed-playback-track__fill" style={{ width: '100%' }} />
+                </div>
+              </div>
+              <p className="ed-playback-splash__status ed-playback-splash__status--error">
                 {sparseOrEmpty
                   ? t('playback.sparseOrEmptyDetail') ||
                     errorMessage ||
@@ -700,7 +600,7 @@ export function PlaybackStatusSurface({
               </p>
               <DiagnoseAssist message={errorMessage} />
               {sparseOrEmpty && onDeleteEmptyFiles && confirmingDeleteEmpty ? (
-                <div className="w-full rounded-2xl border border-white/15 bg-black/45 px-4 py-3 text-center space-y-3 mb-4">
+                <div className="w-full max-w-sm border border-white/15 bg-black/45 px-4 py-3 text-center space-y-3 mb-4 mt-4">
                   <p className="text-sm text-white/85">
                     {t('playback.sparseOrEmptyConfirm') ||
                       'Supprimer les fichiers vides du disque ?'}
@@ -711,7 +611,7 @@ export function PlaybackStatusSurface({
                       onClick={() => setConfirmingDeleteEmpty(false)}
                       data-focusable
                       tabIndex={0}
-                      className="px-5 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-sm"
+                      className="ed-playback-btn-ghost px-5 py-2 text-white text-sm"
                     >
                       {t('common.back') || 'Retour'}
                     </button>
@@ -723,21 +623,21 @@ export function PlaybackStatusSurface({
                       }}
                       data-focusable
                       tabIndex={0}
-                      className="px-5 py-2 rounded-xl bg-red-600/85 hover:bg-red-600 text-white text-sm"
+                      className="ed-playback-btn px-5 py-2 text-white text-sm"
                     >
                       {t('common.confirm') || 'Confirmer'}
                     </button>
                   </div>
                 </div>
               ) : null}
-              <div className="flex flex-wrap justify-center gap-3">
+              <div className="flex flex-wrap justify-center gap-3 mt-4">
                 {sparseOrEmpty && onDeleteEmptyFiles && !confirmingDeleteEmpty ? (
                   <button
                     type="button"
                     onClick={() => setConfirmingDeleteEmpty(true)}
                     data-focusable
                     tabIndex={0}
-                    className="px-6 py-2.5 rounded-xl bg-red-600/85 hover:bg-red-600 text-white font-medium transition-colors"
+                    className="ed-playback-btn px-6 py-2.5 text-white font-medium transition-colors"
                   >
                     {t('playback.sparseOrEmptyDelete') || 'Supprimer les fichiers vides'}
                   </button>
@@ -748,7 +648,7 @@ export function PlaybackStatusSurface({
                     onClick={onCancel}
                     data-focusable
                     tabIndex={0}
-                    className="px-6 py-2.5 rounded-xl border border-white/20 bg-white/10 hover:bg-white/15 text-white font-medium transition-colors"
+                    className="ed-playback-btn-ghost px-6 py-2.5 text-white font-medium transition-colors"
                   >
                     {t('common.back') || 'Retour'}
                   </button>
@@ -759,7 +659,7 @@ export function PlaybackStatusSurface({
                     onClick={onRetry}
                     data-focusable
                     tabIndex={0}
-                    className="ed-playback-btn px-6 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
+                    className="ed-playback-btn px-6 py-2.5 text-white font-medium transition-colors"
                   >
                     {t('common.retry') || 'Réessayer'}
                   </button>
@@ -780,39 +680,41 @@ export function PlaybackStatusSurface({
             </div>
           ) : (
             <>
-              <div className="flex flex-col items-center text-center w-full py-2 sm:py-3">
-                <ProgressRing
-                  percent={
-                    isBuffering || derived.phase === 'buffering' || derived.phase === 'preparingPlayback'
-                      ? bufferedPercent != null && bufferedPercent > 0 && bufferedPercent < 100
-                        ? bufferedPercent
-                        : null
-                      : derived.progressPercent
-                  }
-                  spinning={
-                    derived.phase === 'resolving' ||
-                    derived.phase === 'checking' ||
-                    derived.phase === 'findingPeers' ||
-                    derived.phase === 'preparingPlayback' ||
-                    derived.phase === 'buffering'
-                  }
-                />
-
-                {hint ? (
-                  <StatusHintChip kind={hint.kind} label={hint.label} />
-                ) : bufferDetail ? (
-                  <p className="text-[var(--ds-text-secondary)] text-sm mt-3 mb-1 font-normal break-words px-2 leading-snug max-w-[18rem]">
-                    {bufferDetail}
-                  </p>
-                ) : null}
-              </div>
+              <div className="ed-playback-splash__brand">Popcornn</div>
+              {title ? (
+                <p className="ed-playback-splash__media">{title}</p>
+              ) : null}
+              <h1 className="ed-playback-splash__title">
+                {t('playback.displayTitle') || 'Chargement'}
+              </h1>
+              <EditorialPhaseLine
+                phase={derived.phase}
+                percent={trackPercent}
+                stepIndex={derived.stepIndex}
+              />
+              <p
+                key={statusText}
+                className="ed-playback-splash__status"
+                role="status"
+                aria-live="polite"
+              >
+                {statusText}
+              </p>
+              {showDebug ? (
+                <div className="mt-2">
+                  <GpuPlaybackChip pipeline={pipelineStatus} />
+                </div>
+              ) : null}
+              {metricsLine ? (
+                <p className="ed-playback-splash__metrics">{metricsLine}</p>
+              ) : null}
 
               {showDebug &&
               (derived.phase === 'preparingPlayback' ||
                 derived.phase === 'buffering' ||
                 pipelineStatus ||
                 liveTrace) ? (
-                <div className="mb-3 space-y-2">
+                <div className="mb-3 mt-3 w-full max-w-md space-y-2">
                   {liveTrace ? <PlaybackLiveTrace trace={liveTrace} /> : null}
                   <PipelinePanel
                     status={pipelineStatus ?? null}
@@ -821,22 +723,6 @@ export function PlaybackStatusSurface({
                     showDebug
                     t={t}
                   />
-                </div>
-              ) : null}
-
-              {derived.showTorrentMetrics ? (
-                <div className="grid grid-cols-2 gap-1.5 sm:gap-2 mb-3 min-w-0">
-                  <MetricCell
-                    label={t('playback.metric.downloaded')}
-                    value={
-                      derived.totalBytes != null && derived.totalBytes > 0
-                        ? `${downloadedLabel} / ${totalLabel}`
-                        : downloadedLabel
-                    }
-                  />
-                  <MetricCell label={t('playback.metric.eta')} value={etaLabel} />
-                  <MetricCell label={t('playback.metric.speed')} value={speedLabel} />
-                  <MetricCell label={t('playback.metric.peers')} value={peersLabel} />
                 </div>
               ) : null}
 
@@ -881,9 +767,10 @@ export function PlaybackStatusSurface({
                           onClick={backAction}
                           data-focusable
                           data-close
+                          data-autofocus
                           aria-label={t('common.close') || 'Fermer'}
                           tabIndex={0}
-                          className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
+                          className="ed-playback-btn px-6 py-2.5 min-h-[44px] text-white font-medium transition-colors"
                         >
                           {t('common.back') || 'Retour'}
                         </button>
@@ -894,7 +781,7 @@ export function PlaybackStatusSurface({
                           onClick={() => setConfirmingCancel(true)}
                           data-focusable
                           tabIndex={0}
-                          className="px-4 py-2.5 min-h-[44px] rounded-xl border border-white/20 bg-white/10 hover:bg-white/15 text-white font-medium transition-colors"
+                          className="ed-playback-btn-ghost px-6 py-2.5 min-h-[44px] text-white font-medium transition-colors"
                         >
                           {cancelLabel || t('common.cancel') || 'Annuler'}
                         </button>
@@ -950,9 +837,9 @@ export function PlaybackStatusSurface({
               ) : null}
 
               {isPlayer && (onCancel || onAbortDownload) ? (
-                <div className="flex flex-col items-center gap-3 mt-3">
+                <div className="flex flex-col items-center gap-3 mt-5">
                   {confirmingCancel && onAbortDownload ? (
-                    <div className="w-full rounded-2xl border border-white/15 bg-black/45 px-4 py-3 text-center space-y-3">
+                    <div className="w-full max-w-sm border border-white/15 bg-black/45 px-4 py-3 text-center space-y-3">
                       <p className="text-sm text-white/85">
                         {t('mediaDetail.cancelDownloadConfirm') ||
                           'Annuler et supprimer le téléchargement ?'}
@@ -964,7 +851,7 @@ export function PlaybackStatusSurface({
                           data-focusable
                           data-close
                           tabIndex={0}
-                          className="px-5 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-sm"
+                          className="ed-playback-btn-ghost px-5 py-2 text-white text-sm"
                         >
                           {t('common.back') || 'Retour'}
                         </button>
@@ -976,7 +863,7 @@ export function PlaybackStatusSurface({
                           }}
                           data-focusable
                           tabIndex={0}
-                          className="px-5 py-2 rounded-xl bg-red-600/85 hover:bg-red-600 text-white text-sm"
+                          className="ed-playback-btn px-5 py-2 text-white text-sm"
                         >
                           {t('common.confirm') || 'Confirmer'}
                         </button>
@@ -990,9 +877,10 @@ export function PlaybackStatusSurface({
                           onClick={onCancel}
                           data-focusable
                           data-close
+                          data-autofocus
                           aria-label={t('common.close') || 'Fermer'}
                           tabIndex={0}
-                          className="ed-playback-btn px-4 py-2.5 min-h-[44px] rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
+                          className="ed-playback-btn px-6 py-2.5 min-h-[44px] text-white font-medium transition-colors"
                         >
                           {t('common.back') || 'Retour'}
                         </button>
@@ -1003,7 +891,7 @@ export function PlaybackStatusSurface({
                           onClick={() => setConfirmingCancel(true)}
                           data-focusable
                           tabIndex={0}
-                          className="ed-playback-btn-ghost px-4 py-2.5 min-h-[44px] rounded-xl border border-white/20 bg-white/10 hover:bg-white/15 text-white font-medium transition-colors"
+                          className="ed-playback-btn-ghost px-6 py-2.5 min-h-[44px] text-white font-medium transition-colors"
                         >
                           {cancelLabel || t('common.cancel') || 'Annuler'}
                         </button>
@@ -1014,7 +902,6 @@ export function PlaybackStatusSurface({
               ) : null}
             </>
           )}
-        </div>
       </div>
     </div>
   );
@@ -1031,13 +918,13 @@ export function PlaybackStatusSurface({
         {backdropUrl ? (
           <>
             <div
-              className="absolute inset-0 bg-cover bg-center scale-110 blur-2xl opacity-40"
+              className="ed-playback-splash__backdrop absolute inset-0 bg-cover bg-center scale-105 opacity-30"
               style={{ backgroundImage: `url(${backdropUrl})` }}
             />
-            <div className="absolute inset-0 bg-black/65 backdrop-blur-md" />
+            <div className="absolute inset-0 bg-[var(--ed-bg,#0c0d10)]/88" />
           </>
         ) : (
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" />
+          <div className="absolute inset-0 bg-[var(--ed-bg,#0c0d10)]/92" />
         )}
         <div className="relative z-10 flex h-full w-full items-center justify-center p-[max(0.5rem,var(--safe-area-inset-top))] pb-[max(0.75rem,var(--safe-area-inset-bottom))] pl-[max(0.5rem,var(--safe-area-inset-left))] pr-[max(0.5rem,var(--safe-area-inset-right))]">
           {shell}
@@ -1046,7 +933,7 @@ export function PlaybackStatusSurface({
     );
   }
 
-  // fullscreen — affiche + logo en composition
+  // fullscreen — même composition splash que le chargement des pages
   return (
     <div
       className="player-progress-overlay fixed inset-0 z-50 overflow-x-hidden overflow-y-auto overscroll-contain"
@@ -1058,20 +945,14 @@ export function PlaybackStatusSurface({
       {backdropUrl ? (
         <>
           <div
-            className="absolute inset-0 bg-cover bg-center scale-110 blur-3xl opacity-45 transition-opacity duration-700"
+            className="ed-playback-splash__backdrop absolute inset-0 bg-cover bg-center scale-105 opacity-25"
             style={{ backgroundImage: `url(${backdropUrl})` }}
           />
-          <div
-            className="absolute inset-0 bg-cover bg-center opacity-20"
-            style={{ backgroundImage: `url(${backdropUrl})` }}
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/70 to-black" />
+          <div className="absolute inset-0 bg-[var(--ed-bg,#0c0d10)]/90" />
         </>
       ) : (
-        <div className="absolute inset-0 bg-black" />
+        <div className="absolute inset-0 bg-[var(--ed-bg,#0c0d10)]" />
       )}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.12)_0%,transparent_55%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.8)_100%)]" />
 
       {backAction && !confirmingCancel ? (
         <button
