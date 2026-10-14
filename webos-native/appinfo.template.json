@@ -5,12 +5,13 @@
   "type": "web",
   "main": "index.html",
   "title": "Popcornn Native",
-  "appDescription": "Popcornn — UI embarquée (beta)",
+  "appDescription": "Popcornn \u2014 UI embarqu\u00e9e (beta)",
   "icon": "icon.png",
   "largeIcon": "icon-large.png",
   "bgColor": "#0c0d10",
   "resolution": "1920x1080",
   "disableBackHistoryAPI": true,
   "handlesRelaunch": false,
-  "transparent": false
+  "transparent": false,
+  "requiredACG": []
 }
