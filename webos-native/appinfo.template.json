@@ -1,0 +1,16 @@
+{
+  "id": "com.popcorn.client.webos.native",
+  "version": "0.0.0",
+  "vendor": "Popcornn",
+  "type": "web",
+  "main": "index.html",
+  "title": "Popcornn Native",
+  "appDescription": "Popcornn — UI embarquée (beta)",
+  "icon": "icon.png",
+  "largeIcon": "icon-large.png",
+  "bgColor": "#0c0d10",
+  "resolution": "1920x1080",
+  "disableBackHistoryAPI": true,
+  "handlesRelaunch": false,
+  "transparent": false
+}
