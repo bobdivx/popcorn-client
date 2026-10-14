@@ -639,8 +639,8 @@ export default function Library({
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-black">
-        <HLSLoadingSpinner size="lg" />
+      <div className="flex justify-center items-center min-h-screen bg-[var(--ed-bg,#0c0d10)]">
+        <HLSLoadingSpinner size="lg" text="Chargement" />
       </div>
     );
   }

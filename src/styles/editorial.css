@@ -578,7 +578,7 @@ html[data-editorial] .ds-modal-glass button:focus-visible {
 }
 
 /* ==========================================================================
-   Loader unique (DsLoader) — même langage que l'écran de démarrage
+   Loader unique (DsLoader) — même langage que l'écran de démarrage (#popcorn-loading-fallback)
    ========================================================================== */
 .ed-loader { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.1rem; color: var(--ed-ink, #f4f1ec); }
 .ed-loader__line { position: relative; width: 7.5rem; height: 1px; background: rgba(242, 84, 91, 0.3); overflow: hidden; }
@@ -588,6 +588,27 @@ html[data-editorial] .ds-modal-glass button:focus-visible {
 .ed-loader__label { margin: 0; font-family: var(--ed-font-body, 'Jost', sans-serif); font-weight: 300; font-size: 0.75rem; letter-spacing: 0.32em; text-transform: uppercase; color: rgba(244, 241, 236, 0.7); text-align: center; }
 html[data-tv-platform] .ed-loader__label { font-size: 1rem; }
 .ed-loader__core { opacity: 0.85; }
+/* Composition page (= splash #popcorn-loading-fallback .plb) */
+.ed-loader--page { gap: 1.75rem; text-align: center; padding: 0 1.5rem; }
+.ed-loader--page .ed-loader__brand {
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  font-size: clamp(12px, 1.15vw, 22px);
+  opacity: 0.6;
+  font-family: var(--ed-font-body, 'Jost', sans-serif);
+  font-weight: 300;
+}
+.ed-loader--page .ed-loader__title {
+  margin: 0;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  font-size: clamp(28px, 3.4vw, 64px);
+  font-weight: 300;
+  font-family: var(--ed-font-display, 'Josefin Sans', 'Jost', sans-serif);
+  color: var(--ed-ink, #f4f1ec);
+}
+.ed-loader--page .ed-loader__line { width: 7.5rem; }
+.ed-loader--page.ed-loader--xl .ed-loader__line { width: 10rem; }
 .ed-spinner { display: inline-block; border-radius: 999px; border: 1px solid rgba(242, 84, 91, 0.3); border-top-color: var(--ed-accent, #f2545b); animation: ed-spin 0.8s linear infinite; vertical-align: middle; }
 .ed-spinner--xs { width: 0.9rem; height: 0.9rem; }
 .ed-spinner--sm { width: 1.4rem; height: 1.4rem; }
