@@ -1,313 +1,280 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Popcornn WebOS - UX Scenario Document</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+        body { font-family: Arial, Helvetica, sans-serif; margin: 40px; line-height: 1.6; color: #222; }
         h1 { color: #E50914; border-bottom: 2px solid #E50914; padding-bottom: 10px; }
-        h2 { color: #333; margin-top: 30px; }
-        h3 { color: #666; }
-        .section { margin: 20px 0; padding: 15px; background: #f9f9f9; border-left: 4px solid #E50914; }
-        .important { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 20px 0; }
-        .test-account { background: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 20px 0; }
-        table { border-collapse: collapse; width: 100%; margin: 20px 0; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: left; }
+        h2 { color: #333; margin-top: 36px; border-bottom: 1px solid #ddd; padding-bottom: 6px; }
+        h3 { color: #555; margin-top: 22px; }
+        .section { margin: 16px 0; padding: 14px; background: #f9f9f9; border-left: 4px solid #E50914; }
+        .important { background: #fff8e6; border-left: 4px solid #e6a700; padding: 14px; margin: 16px 0; }
+        .test-account { background: #eef9f0; border-left: 4px solid #28a745; padding: 14px; margin: 16px 0; }
+        table { border-collapse: collapse; width: 100%; margin: 16px 0; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; vertical-align: top; }
         th { background: #E50914; color: white; }
-        .step { background: #e9ecef; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .step { background: #f3f4f6; padding: 12px; margin: 10px 0; }
         .note { font-style: italic; color: #666; }
+        code { background: #eee; padding: 1px 4px; }
+        ol.criteria { margin: 8px 0 0 20px; }
     </style>
 </head>
 <body>
 
-<h1>Popcornn WebOS TV Application - UX Scenario Document</h1>
+<h1>Popcornn WebOS TV Application — UX Scenario Document</h1>
 
-<p><strong>Application Name:</strong> Popcornn<br>
+<p>
+<strong>Application Name:</strong> Popcornn<br>
 <strong>Application ID:</strong> com.popcorn.client.webos<br>
-<strong>Version:</strong> 1.2.65<br>
-<strong>Document Date:</strong> October 2026</p>
+<strong>Package / App Version:</strong> 1.2.65<br>
+<strong>Category:</strong> Entertainment<br>
+<strong>Document Version:</strong> 1.3<br>
+<strong>Document Date:</strong> 14 October 2026<br>
+<strong>Platform:</strong> LG webOS Smart TV (1920×1080)
+</p>
 
-<h2>Document Purpose and Scope</h2>
+<h2>0. Document Purpose and Scope</h2>
 <div class="section">
-<p>This UX Scenario Document describes in detail all user flows, screens, and test scenarios for the Popcornn application on LG webOS TV. It is intended for the LG QA team to perform functional and user-experience testing. Each scenario includes clear steps, expected results, and acceptance criteria.</p>
+<p>This document is the official UX Scenario for LG Seller Lounge QA. It describes how Popcornn works on LG webOS TV, how to test it with the Magic Remote / D-pad, expected results, and acceptance criteria for each scenario.</p>
+<p><strong>Scope:</strong> Launch, first-time setup, login, home browsing, search, detail, playback, settings, logout, exit, and error handling.</p>
+<p><strong>Out of scope:</strong> Server-side administration of the Popcornn backend (except using the provided QA test account).</p>
 </div>
 
-<hr>
-
 <h2>1. Application Overview</h2>
-
 <div class="section">
-<p>Popcornn is a lightweight media client application that connects to a personal Popcornn media server. The application allows users to:</p>
+<p>Popcornn is a media client for LG webOS TV. It connects to a Popcornn backend server and allows the user to:</p>
 <ul>
-    <li>Browse and discover movies and TV shows from their personal media library</li>
-    <li>Search content across configured indexers</li>
-    <li>Manage and monitor torrent downloads remotely</li>
-    <li>Stream media content to their LG TV</li>
+    <li>Browse movies and TV series from a personal media library / discovery catalog</li>
+    <li>Search content</li>
+    <li>Open title details and start video playback on the TV</li>
+    <li>Manage basic client settings (language, server URL, account)</li>
 </ul>
-<p><strong>Important:</strong> This application requires a connection to a Popcornn backend server. The app acts as a thin client - all media management runs on the user's personal server.</p>
+<p><strong>Important for QA:</strong> A preconfigured backend and test account are provided below. No seller-owned private server setup is required for pretest / functional QA.</p>
 </div>
 
 <h2>1.1 Summary of Test Scenarios</h2>
 <table>
-    <tr><th>#</th><th>Scenario</th><th>Priority</th><th>Key Steps</th></tr>
-    <tr><td>1</td><td>Application Launch</td><td>P1</td><td>Launch from Content Store, verify main UI loads</td></tr>
-    <tr><td>2</td><td>First-time Setup</td><td>P1</td><td>Language, server URL, terms of service</td></tr>
-    <tr><td>3</td><td>Authentication</td><td>P1</td><td>Login with test credentials</td></tr>
-    <tr><td>4</td><td>Home Navigation</td><td>P1</td><td>Navigate sections with remote, view content</td></tr>
-    <tr><td>5</td><td>Search</td><td>P1</td><td>Open search, enter query, view results</td></tr>
-    <tr><td>6</td><td>Content Playback</td><td>P1</td><td>Select title, play, use playback controls</td></tr>
-    <tr><td>7</td><td>Settings</td><td>P2</td><td>Access settings, change options, logout</td></tr>
-    <tr><td>8</td><td>Error Handling</td><td>P2</td><td>Network error, invalid credentials, server unreachable</td></tr>
+    <tr><th>#</th><th>Scenario</th><th>Priority</th><th>Pass criteria (summary)</th></tr>
+    <tr><td>1</td><td>Cold launch from Content Store / Launcher</td><td>P1</td><td>App opens without crash; UI visible within ~15s on normal network</td></tr>
+    <tr><td>2</td><td>First-time setup wizard</td><td>P1</td><td>Language + server URL + terms can be completed with remote only</td></tr>
+    <tr><td>3</td><td>Login with QA credentials</td><td>P1</td><td>Successful login lands on home; invalid password shows error</td></tr>
+    <tr><td>4</td><td>Home navigation (rows + side menu)</td><td>P1</td><td>Focus moves with arrows; OK opens detail; Back returns</td></tr>
+    <tr><td>5</td><td>Search</td><td>P1</td><td>Query returns results or empty-state message; no freeze</td></tr>
+    <tr><td>6</td><td>Playback</td><td>P1</td><td>Video starts; Play/Pause/Seek/Back work</td></tr>
+    <tr><td>7</td><td>Settings + logout</td><td>P2</td><td>Settings reachable; logout returns to login</td></tr>
+    <tr><td>8</td><td>Error / edge cases</td><td>P2</td><td>Network/login/empty states show clear messages; no crash</td></tr>
+    <tr><td>9</td><td>Exit application</td><td>P1</td><td>Back from root / Home exits or confirms exit per webOS behavior</td></tr>
 </table>
 
-<h2>2. Test Account Information</h2>
-
+<h2>2. Test Account Information (for LG QA)</h2>
 <div class="test-account">
-<h3>🔐 Test Credentials for LG QA Team</h3>
 <table>
     <tr><th>Field</th><th>Value</th></tr>
-    <tr><td><strong>Email</strong></td><td>lg-test@popcorn-app.com</td></tr>
-    <tr><td><strong>Password</strong></td><td>LGTest2026!Secure</td></tr>
-    <tr><td><strong>Server URL</strong></td><td>https://popcorn-vercel.vercel.app</td></tr>
+    <tr><td>Email</td><td><code>lg-test@popcorn-app.com</code></td></tr>
+    <tr><td>Password</td><td><code>LGTest2026!Secure</code></td></tr>
+    <tr><td>Server URL (default for store build)</td><td><code>https://popcorn-vercel.vercel.app</code></td></tr>
 </table>
-<p class="note">Note: This test account has been pre-configured with sample media content for testing purposes.</p>
+<p class="note">This account is preloaded with sample catalog content suitable for browsing and playback checks. Internet access on the TV is required.</p>
 </div>
 
-<h2>3. User Flow - Step by Step</h2>
-
-<h3>3.1 Application Launch</h3>
-<div class="step">
-<strong>Step 1:</strong> Launch the Popcornn application from the LG Content Store<br>
-<strong>Expected Result:</strong> The application loads and displays the main interface (hosted on Vercel)
-</div>
-
-<h3>3.2 Initial Configuration (First Launch Only)</h3>
-<div class="step">
-<strong>Step 2:</strong> On first launch, the user is presented with a setup wizard<br>
-<strong>Actions:</strong>
+<h2>3. Preconditions</h2>
+<div class="section">
 <ol>
-    <li>Select interface language (English or French)</li>
-    <li>Enter server URL or use default (https://popcorn-vercel.vercel.app)</li>
-    <li>Accept terms of service</li>
+    <li>LG webOS TV (or webOS Cloud Test Lab) with network online.</li>
+    <li>Popcornn IPK / store build installed (app id <code>com.popcorn.client.webos</code>).</li>
+    <li>Magic Remote or standard D-pad remote available.</li>
+    <li>For first launch tests: clear app data / fresh install if available; otherwise use Logout then reconfigure.</li>
 </ol>
-</div>
-
-<h3>3.3 Authentication</h3>
-<div class="step">
-<strong>Step 3:</strong> Login screen is displayed<br>
-<strong>Actions:</strong>
-<ol>
-    <li>Enter email: <code>lg-test@popcorn-app.com</code></li>
-    <li>Enter password: <code>LGTest2026!Secure</code></li>
-    <li>Press "Sign in" button</li>
-</ol>
-<strong>Expected Result:</strong> User is authenticated and redirected to the home screen
-</div>
-
-<h3>3.4 Home Screen Navigation</h3>
-<div class="step">
-<strong>Step 4:</strong> Home screen displays media content<br>
-<strong>Navigation:</strong>
-<ul>
-    <li>Use <strong>Arrow keys</strong> (Up/Down/Left/Right) to navigate between items</li>
-    <li>Press <strong>OK/Enter</strong> to select an item</li>
-    <li>Press <strong>Back</strong> to return to previous screen</li>
-</ul>
-<strong>Available sections:</strong>
-<ul>
-    <li>Continue Watching (resume previous content)</li>
-    <li>Popular Movies</li>
-    <li>Popular Series</li>
-    <li>Recent Additions</li>
-</ul>
-</div>
-
-<h3>3.5 Search Function</h3>
-<div class="step">
-<strong>Step 5:</strong> Access search from the navigation menu<br>
-<strong>Actions:</strong>
-<ol>
-    <li>Navigate to "Search" in the side menu</li>
-    <li>Use on-screen keyboard to enter search query</li>
-    <li>Results display movies and series matching the query</li>
-</ol>
-</div>
-
-<h3>3.6 Content Playback</h3>
-<div class="step">
-<strong>Step 6:</strong> Select and play content<br>
-<strong>Actions:</strong>
-<ol>
-    <li>Navigate to a movie or episode</li>
-    <li>Press OK to view details</li>
-    <li>Select "Play" to start streaming</li>
-</ol>
-<strong>Playback Controls:</strong>
-<ul>
-    <li><strong>Play/Pause:</strong> OK button or Play/Pause key</li>
-    <li><strong>Rewind/Fast Forward:</strong> Left/Right arrows</li>
-    <li><strong>Stop:</strong> Back button</li>
-</ul>
-</div>
-
-<h3>3.7 Settings</h3>
-<div class="step">
-<strong>Step 7:</strong> Access settings from the navigation menu<br>
-<strong>Available options:</strong>
-<ul>
-    <li>Server Configuration</li>
-    <li>Account Settings</li>
-    <li>Language Preferences</li>
-    <li>Logout</li>
-</ul>
 </div>
 
 <h2>4. Remote Control Mapping</h2>
-
 <table>
-    <tr><th>Remote Button</th><th>Function</th></tr>
-    <tr><td>Arrow Keys (Up/Down/Left/Right)</td><td>Navigate between UI elements</td></tr>
-    <tr><td>OK / Enter</td><td>Select / Confirm / Play-Pause</td></tr>
-    <tr><td>Back</td><td>Go back / Exit current screen</td></tr>
-    <tr><td>Home</td><td>Exit application</td></tr>
-    <tr><td>Play/Pause</td><td>Toggle playback</td></tr>
-    <tr><td>Stop</td><td>Stop playback</td></tr>
-    <tr><td>Rewind/Fast Forward</td><td>Seek backward/forward</td></tr>
+    <tr><th>Remote control</th><th>Application behavior</th></tr>
+    <tr><td>↑ ↓ ← →</td><td>Move focus between focusable UI elements (menu, posters, buttons, fields)</td></tr>
+    <tr><td>OK / Enter / Center</td><td>Activate focused item; Play/Pause while in player when controls are shown</td></tr>
+    <tr><td>Back</td><td>Close overlay / go to previous screen; from player: hide controls then exit player; from root: exit app (or exit confirm)</td></tr>
+    <tr><td>Home (webOS)</td><td>Leave application to TV Home / Launcher</td></tr>
+    <tr><td>Play / Pause / FF / REW (if present)</td><td>Control playback when media is playing</td></tr>
+    <tr><td>Red / Green / Yellow / Blue</td><td>Not required for core flows (reserved / unused unless labeled on screen)</td></tr>
 </table>
 
-<h2>5. Technical Requirements</h2>
+<h2>5. Step-by-step User Flows</h2>
 
-<div class="section">
-<ul>
-    <li><strong>Network:</strong> Internet connection required</li>
-    <li><strong>Resolution:</strong> 1920x1080 (Full HD)</li>
-    <li><strong>Type:</strong> Web application</li>
-    <li><strong>Backend:</strong> Hosted on Vercel (https://popcorn-vercel.vercel.app)</li>
-</ul>
-</div>
-
-<h2>6. In-App Purchases</h2>
-
-<div class="important">
-<strong>⚠️ No In-App Purchases</strong><br>
-This application does not contain any in-app purchase functionality. The application is completely free to use.
-</div>
-
-<h2>7. Advertisements</h2>
-
-<div class="important">
-<strong>⚠️ No Advertisements</strong><br>
-This application does not display any advertisements.
-</div>
-
-<h2>8. Detailed Screen Descriptions</h2>
-
-<h3>8.1 Splash / Loading Screen</h3>
+<h3>5.1 Scenario 1 — Application Launch</h3>
 <div class="step">
-<strong>Visual:</strong> Popcornn logo and/or loading indicator on screen.<br>
-<strong>Expected:</strong> Screen appears briefly while the app loads the web content from the server.<br>
-<strong>Duration:</strong> Typically 2–5 seconds depending on network.
-</div>
-
-<h3>8.2 Setup Wizard (First Launch)</h3>
-<div class="step">
-<strong>Visual:</strong> Step-by-step wizard with language selector, server URL field, and terms of service checkbox.<br>
-<strong>Expected:</strong> User can select language (English/French), enter or keep default server URL, and accept terms.<br>
-<strong>Navigation:</strong> Arrow keys to move, OK to confirm each step.
-</div>
-
-<h3>8.3 Login Screen</h3>
-<div class="step">
-<strong>Visual:</strong> Email and password fields, "Sign in" button.<br>
-<strong>Expected:</strong> User can enter credentials and submit. Error message appears if credentials are invalid.<br>
-<strong>Focus:</strong> Default focus on email field; Tab/Arrow keys move between fields.
-</div>
-
-<h3>8.4 Home Screen</h3>
-<div class="step">
-<strong>Visual:</strong> Side navigation (Home, Search, Settings, etc.) and main content area with horizontal rows (Continue Watching, Popular Movies, Popular Series, Recent Additions).<br>
-<strong>Expected:</strong> Content loads from server. User can move focus with arrow keys and select items with OK.<br>
-<strong>Empty state:</strong> If no content, appropriate message is displayed.
-</div>
-
-<h3>8.5 Search Screen</h3>
-<div class="step">
-<strong>Visual:</strong> On-screen keyboard and search input; results grid below.<br>
-<strong>Expected:</strong> User types query; results update as they type or after confirmation. Selecting a result opens detail view.
-</div>
-
-<h3>8.6 Content Detail Screen</h3>
-<div class="step">
-<strong>Visual:</strong> Poster, title, description, "Play" button, possibly episode list for series.<br>
-<strong>Expected:</strong> User can start playback with Play or navigate to episodes.
-</div>
-
-<h3>8.7 Video Playback Screen</h3>
-<div class="step">
-<strong>Visual:</strong> Full-screen video with optional on-screen controls (play/pause, seek, back).<br>
-<strong>Expected:</strong> Video plays; remote controls (OK, arrows, Back) work as described in section 4.
-</div>
-
-<h2>9. Error Handling and Edge Cases</h2>
-
-<h3>9.1 Network Unavailable</h3>
-<div class="step">
-<strong>Trigger:</strong> Device has no internet or server is unreachable.<br>
-<strong>Expected Result:</strong> Application displays a clear error message (e.g. "Unable to connect" or "Check your network") and optionally a retry option. No crash.<br>
-<strong>QA Check:</strong> Disconnect network, launch or refresh app; verify message and retry behavior.
-</div>
-
-<h3>9.2 Invalid Login Credentials</h3>
-<div class="step">
-<strong>Trigger:</strong> User enters wrong email or password.<br>
-<strong>Expected Result:</strong> Error message such as "Invalid email or password" is shown; user remains on login screen and can correct input.<br>
-<strong>QA Check:</strong> Use wrong password with test account; verify message and focus.
-</div>
-
-<h3>9.3 Session Expired</h3>
-<div class="step">
-<strong>Trigger:</strong> User session has expired on the server.<br>
-<strong>Expected Result:</strong> User is redirected to login screen or prompted to sign in again. No undefined behavior.<br>
-<strong>QA Check:</strong> If testable, expire session and perform an action; verify redirect.
-</div>
-
-<h3>9.4 Empty Content</h3>
-<div class="step">
-<strong>Trigger:</strong> User has no movies/series or search returns no results.<br>
-<strong>Expected Result:</strong> Empty state message (e.g. "No content" or "No results") instead of blank screen or error.<br>
-<strong>QA Check:</strong> Use account with no library or search for "xyznonexistent"; verify message.
-</div>
-
-<h3>9.5 Back Button Behavior</h3>
-<div class="step">
-<strong>Trigger:</strong> User presses Back repeatedly from various screens.<br>
-<strong>Expected Result:</strong> Navigation goes back (detail → list → home) and eventually exits app or shows exit confirmation, per webOS guidelines. No crash.<br>
-<strong>QA Check:</strong> From playback, detail, search, and home; verify consistent back behavior.
-</div>
-
-<h2>10. Notes for QA Team</h2>
-
-<div class="test-account">
-<h3>📋 Important Notes</h3>
+<strong>Steps:</strong>
 <ol>
-    <li>The application loads content from an external server (Vercel). Please ensure the test device has internet connectivity.</li>
-    <li>The test account provided above has been pre-configured with sample content.</li>
-    <li>All navigation is optimized for TV remote control - no mouse or touch input required.</li>
-    <li>The application supports both English and French languages.</li>
-    <li>If you encounter any connection issues, please verify the server URL is set to: <code>https://popcorn-vercel.vercel.app</code></li>
-    <li>For defect resolution, providing a short proof video or screenshots of the issue is helpful.</li>
+    <li>From LG Content Store or TV Launcher, focus <strong>Popcornn</strong> and press OK.</li>
+    <li>Wait for splash / loading indicator.</li>
+    <li>Observe the first interactive screen (setup wizard on first run, otherwise home or login).</li>
+</ol>
+<strong>Expected results:</strong>
+<ul>
+    <li>No black screen freeze longer than ~15 seconds on a normal connection.</li>
+    <li>No crash / forced close.</li>
+    <li>Visible brand mark Popcornn on loading / first screen.</li>
+</ul>
+<strong>Acceptance criteria:</strong>
+<ol class="criteria">
+    <li>App process starts and renders UI.</li>
+    <li>Remote focus is visible on a focusable element.</li>
 </ol>
 </div>
 
-<h2>11. Contact Information</h2>
+<h3>5.2 Scenario 2 — First-time Setup</h3>
+<div class="step">
+<strong>Steps:</strong>
+<ol>
+    <li>On first launch, complete the setup wizard.</li>
+    <li>Select language (English or French) with arrows + OK.</li>
+    <li>Confirm or enter Server URL: <code>https://popcorn-vercel.vercel.app</code>.</li>
+    <li>Accept terms / disclaimer if shown.</li>
+    <li>Continue to Login.</li>
+</ol>
+<strong>Expected results:</strong> Each wizard step is reachable with remote only; user can proceed and go back within the wizard.
+<strong>Acceptance criteria:</strong> Wizard completes without keyboard/mouse; invalid URL shows an error if connection test is offered.
+</div>
 
+<h3>5.3 Scenario 3 — Authentication</h3>
+<div class="step">
+<strong>Happy path:</strong>
+<ol>
+    <li>On Login, enter email <code>lg-test@popcorn-app.com</code>.</li>
+    <li>Enter password <code>LGTest2026!Secure</code>.</li>
+    <li>Focus Sign in and press OK.</li>
+</ol>
+<strong>Expected:</strong> User reaches Home / Discover content screen.
+<p><strong>Negative path:</strong> Enter a wrong password → error message; stay on login; no crash.</p>
+</div>
+
+<h3>5.4 Scenario 4 — Home Navigation</h3>
+<div class="step">
+<strong>Steps:</strong>
+<ol>
+    <li>From Home, move focus across side navigation (Home / Search / Settings / etc.).</li>
+    <li>Move focus across horizontal content rows (Continue Watching, Popular Movies, Popular Series, Recent).</li>
+    <li>Press OK on a poster to open detail.</li>
+    <li>Press Back to return to the row / home.</li>
+</ol>
+<strong>Expected:</strong> Focus ring always visible; content loads or shows empty state; Back does not exit until user is at root.
+</div>
+
+<h3>5.5 Scenario 5 — Search</h3>
+<div class="step">
+<strong>Steps:</strong>
+<ol>
+    <li>Open Search from the menu.</li>
+    <li>Enter a common title query using the on-screen keyboard (example: <code>love</code> or <code>star</code>).</li>
+    <li>Review results grid; open one result with OK.</li>
+    <li>Search a nonsense string (example: <code>xyznonexistent123</code>) and verify empty state.</li>
+</ol>
+<strong>Expected:</strong> Results or “no results” message; no endless spinner without message.
+</div>
+
+<h3>5.6 Scenario 6 — Content Detail and Playback</h3>
+<div class="step">
+<strong>Steps:</strong>
+<ol>
+    <li>Open any available title detail (poster → OK).</li>
+    <li>Focus <strong>Play</strong> (or equivalent) and press OK.</li>
+    <li>During playback: OK toggles play/pause (or shows controls then toggles).</li>
+    <li>Left/Right seek when controls are visible (if supported for the stream).</li>
+    <li>Press Back: first press may show/hide controls; further Back exits player to detail/list.</li>
+</ol>
+<strong>Expected:</strong> Video or clear playback status; audio if stream has audio; return path via Back works.
+</div>
+
+<h3>5.7 Scenario 7 — Settings and Logout</h3>
+<div class="step">
+<strong>Steps:</strong>
+<ol>
+    <li>Open Settings from navigation.</li>
+    <li>Verify at least: server / account / language related entries are visible or reachable.</li>
+    <li>Perform Logout.</li>
+</ol>
+<strong>Expected:</strong> User returns to login (or setup) and must authenticate again to browse library content.
+</div>
+
+<h3>5.8 Scenario 8 — Error Handling</h3>
+<div class="step">
+<table>
+    <tr><th>Case</th><th>How to trigger</th><th>Expected</th></tr>
+    <tr><td>Network unavailable</td><td>Disable network then launch / refresh</td><td>Clear connection error + optional retry; no crash</td></tr>
+    <tr><td>Invalid credentials</td><td>Wrong password on login</td><td>Inline/error message; remain on login</td></tr>
+    <tr><td>Empty library / empty search</td><td>Account empty or nonsense query</td><td>Empty-state text, not blank UI</td></tr>
+    <tr><td>Server unreachable</td><td>Wrong server URL in setup</td><td>Connection failure message</td></tr>
+</table>
+</div>
+
+<h3>5.9 Scenario 9 — Exit Application</h3>
+<div class="step">
+<strong>Steps:</strong> From Home root, press Back repeatedly and/or press Home.
+<strong>Expected:</strong> App closes to TV launcher, or shows an exit confirmation then closes. No hang.
+</div>
+
+<h2>6. Detailed Screen Descriptions</h2>
+
+<h3>6.1 Splash / Loading</h3>
+<div class="step">Popcornn logo / loading animation. Temporary screen while HTML assets and session bootstrap.</div>
+
+<h3>6.2 Setup Wizard</h3>
+<div class="step">Language selector; server URL field; terms acceptance; Continue / Back actions. Fully remote operable.</div>
+
+<h3>6.3 Login</h3>
+<div class="step">Email field, password field, Sign in button. Default focus on email. Error region for failed auth.</div>
+
+<h3>6.4 Home / Discover</h3>
+<div class="step">Side menu + horizontal rows of posters. Focusable posters and menu items. Optional hero / featured area.</div>
+
+<h3>6.5 Search</h3>
+<div class="step">Search field / OSK, results grid, empty state.</div>
+
+<h3>6.6 Detail</h3>
+<div class="step">Poster/backdrop, title, synopsis, Play CTA; for series, season/episode list when applicable.</div>
+
+<h3>6.7 Player</h3>
+<div class="step">Full-screen video surface; transport controls (play/pause/seek); Back exits player hierarchy as in Scenario 6.</div>
+
+<h3>6.8 Settings</h3>
+<div class="step">List/panels for server, account, language/preferences, logout.</div>
+
+<h2>7. Commercial / Policy Notes (Pretest)</h2>
+<div class="important">
+<ul>
+    <li><strong>In-app purchases:</strong> None. App is free; no paid unlocks.</li>
+    <li><strong>Advertisements:</strong> None inside the TV client.</li>
+    <li><strong>Age rating:</strong> Follow the rating declared in Seller Lounge (entertainment media client; no gambling).</li>
+    <li><strong>Languages in app UI:</strong> English and French (remote selectable).</li>
+    <li><strong>Store listing language (Russia):</strong> Russian descriptions are provided in Seller Lounge localization (separate from in-app UI).</li>
+</ul>
+</div>
+
+<h2>8. Technical Notes</h2>
 <div class="section">
-<p>For any questions or issues during testing, please contact:</p>
-<p><strong>Developer Support:</strong> support@popcorn-app.com</p>
+<ul>
+    <li><strong>App type:</strong> web app packaged as IPK (<code>type: web</code>)</li>
+    <li><strong>Resolution:</strong> 1920×1080</li>
+    <li><strong>Network:</strong> Required</li>
+    <li><strong>Default QA backend:</strong> <code>https://popcorn-vercel.vercel.app</code></li>
+    <li><strong>Icon / tile color for store assets:</strong> solid <code>#D1C4E9</code> (no transparency)</li>
+</ul>
+</div>
+
+<h2>9. QA Evidence Tips</h2>
+<div class="section">
+<p>When filing or resolving defects, short proof video (launch → login → play → back) and screenshots of focus states are helpful.</p>
+<p>For icon defects: verify Seller Lounge App Icon 400×400 and IPK <code>icon.png</code> / <code>icon-large.png</code> use opaque RGB background matching tile color <code>#D1C4E9</code>.</p>
+</div>
+
+<h2>10. Contact</h2>
+<div class="section">
+<p><strong>Developer support:</strong> support@popcorn-app.com</p>
+<p><strong>Seller Lounge app title to display:</strong> Popcornn</p>
 </div>
 
 <hr>
-<p style="text-align: center; color: #999;">Popcornn WebOS Application - UX Scenario Document v1.2 (October 2026)</p>
+<p style="text-align:center;color:#888;">Popcornn WebOS — UX Scenario Document v1.3 (14 October 2026) — addresses QA2026100724103</p>
 
 </body>
 </html>
