@@ -398,7 +398,7 @@ export function ActionButtons({
               isPackEpisodeSelected ? primaryPackMode : shouldShowPlayButton ? 'play' : 'download'
             }
             tabIndex={0}
-            className="gtv-pill-btn ds-focus-glow ds-active-glow ds-sync-active-pulse inline-flex items-center gap-2.5 font-bold text-base min-w-[9.5rem] tv:text-2xl tv:px-10 tv:py-5 tv:min-h-[68px] disabled:opacity-50 disabled:cursor-not-allowed border border-violet-500/40 hover:border-violet-400/60 hover:bg-violet-900/20 transition-[opacity,transform,background-color,border-color] duration-200 active:scale-[0.97]"
+            className="gtv-pill-btn ed-media-primary ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 font-bold text-base min-w-[9.5rem] tv:text-2xl tv:px-10 tv:py-5 tv:min-h-[68px] disabled:opacity-50 disabled:cursor-not-allowed border border-[var(--ed-accent,#f2545b)]/50 hover:border-[var(--ed-accent,#f2545b)] hover:bg-[var(--ed-accent,#f2545b)]/15 transition-[opacity,transform,background-color,border-color] duration-200 active:scale-[0.97]"
           >
             {downloadingToClient ? (
               <>
@@ -536,7 +536,7 @@ export function ActionButtons({
             title={watchLater.isFavorite ? t('playback.watchLaterRemove') : t('playback.watchLaterAdd')}
             aria-label={watchLater.isFavorite ? t('playback.watchLaterRemove') : t('playback.watchLaterAdd')}
             aria-pressed={watchLater.isFavorite}
-            className={`gtv-icon-btn ds-focus-glow ds-active-glow tv:w-16 tv:h-16 disabled:opacity-50 ${watchLater.isFavorite ? 'text-violet-400 bg-violet-900/30' : ''}`}
+            className={`gtv-icon-btn ds-focus-glow ds-active-glow tv:w-16 tv:h-16 disabled:opacity-50 ${watchLater.isFavorite ? 'text-[var(--ed-accent,#f2545b)] bg-[var(--ed-accent,#f2545b)]/15' : ''}`}
           >
             {watchLater.loading ? (
               <DsLoader size="xs" />

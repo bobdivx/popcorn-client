@@ -180,13 +180,12 @@ export function Modal({
       {/* Backdrop */}
       <div className="absolute inset-0 z-0 bg-black/80 backdrop-blur-md" />
 
-      {/* Modal : style glass (C411) avec bordure violette + barre gradient */}
+      {/* Modal : DS glass par défaut ; éditorial via html[data-editorial] (editorial.css) */}
       <div
         ref={modalRef}
-        className={`relative z-10 flex min-h-0 min-w-0 w-full max-w-full flex-col ${sizeClasses[size]} ds-modal-glass h-full max-h-full sm:h-auto sm:max-h-[min(100dvh,calc(100vh-2rem))] tv:max-h-[calc(100dvh-1.5rem)] tv:max-w-[calc(100vw-1.5rem)] ${className}`}
+        className={`relative z-10 flex min-h-0 min-w-0 w-full max-w-full flex-col ${sizeClasses[size]} ds-modal-glass ed-modal h-full max-h-full sm:h-auto sm:max-h-[min(100dvh,calc(100vh-2rem))] tv:max-h-[calc(100dvh-1.5rem)] tv:max-w-[calc(100vw-1.5rem)] ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Barre gradient en tête */}
         <div className="ds-card-bar flex-shrink-0" aria-hidden />
         {/* Header */}
         {title && (

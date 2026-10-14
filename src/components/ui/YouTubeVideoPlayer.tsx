@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { isTVPlatform } from '../../lib/utils/device-detection';
+import { isTVPlatform, isWebOSTV } from '../../lib/utils/device-detection';
 
 interface YouTubeVideoPlayerProps {
   youtubeKey: string;
@@ -29,9 +29,11 @@ export function YouTubeVideoPlayer({
   const [isLoaded, setIsLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const isTv = typeof window !== 'undefined' && isTVPlatform();
-  /** webOS (app packagée) : l'autoplay avec son est autorisé — bandes-annonces sonores. */
+  /** webOS (IPK / native / UA) : autoplay avec son autorisé — bandes-annonces sonores. */
   const isWebOS =
-    typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
+    (typeof document !== 'undefined' &&
+      document.documentElement.getAttribute('data-webos') === 'true') ||
+    (typeof window !== 'undefined' && isWebOSTV());
 
   useEffect(() => {
     setIsLoaded(true);
@@ -128,23 +130,33 @@ export function YouTubeVideoPlayer({
     if (!wantSound || !isLoaded) return;
     const unmute = () => {
       ensureListening();
+      postToPlayer({ event: 'command', func: 'playVideo', args: [] });
       postToPlayer({ event: 'command', func: 'unMute', args: [] });
       postToPlayer({ event: 'command', func: 'setVolume', args: [100] });
+      // Filet webOS : certains builds ignorent unMute sans mute=0 côté commande.
+      if (isWebOS) {
+        postToPlayer(JSON.stringify({ event: 'command', func: 'unMute', args: [] }));
+        postToPlayer(JSON.stringify({ event: 'command', func: 'setVolume', args: [100] }));
+      }
     };
     // Plusieurs tentatives : l’API iframe n’accepte souvent unMute qu’après le ready réel.
-    const delays = [300, 800, 1600, 2800];
+    const delays = isWebOS ? [200, 500, 1000, 1800, 3200, 5000] : [300, 800, 1600, 2800];
     const timers = delays.map((ms) => window.setTimeout(unmute, ms));
     return () => {
       for (const t of timers) clearTimeout(t);
     };
-  }, [wantSound, isLoaded, youtubeKey]);
+  }, [wantSound, isLoaded, youtubeKey, isWebOS]);
 
   if (!youtubeKey) return null;
 
   const params = new URLSearchParams();
   if (autoplay) params.append('autoplay', '1');
-  // Web : démarrage mute puis unMute (politique autoplay). webOS : son direct. Autres TV : mute.
-  if (muted || (wantSound && !isWebOS) || (isTv && !isWebOS)) params.append('mute', '1');
+  // Web : démarrage mute puis unMute (politique autoplay). webOS : mute=0 explicite. Autres TV : mute.
+  if (muted || (wantSound && !isWebOS) || (isTv && !isWebOS)) {
+    params.append('mute', '1');
+  } else if (isWebOS && wantSound) {
+    params.append('mute', '0');
+  }
   if (loop) {
     params.append('loop', '1');
     params.append('playlist', youtubeKey);

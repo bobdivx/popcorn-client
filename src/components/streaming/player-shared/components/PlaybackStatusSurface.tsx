@@ -362,8 +362,9 @@ function StepRail({
 }
 
 /**
- * Surface unique d'état lecture/téléchargement (glass).
+ * Surface unique d'état lecture/téléchargement.
  * Variantes: fullscreen | player | inline | chip
+ * Sous html[data-editorial] : panneau éditorial (voir editorial.css).
  */
 export function PlaybackStatusSurface({
   variant,
@@ -519,7 +520,7 @@ export function PlaybackStatusSurface({
     const pct = derived.progressPercent;
     return (
       <span
-        className={`inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 backdrop-blur-md px-2.5 py-1 text-[11px] font-semibold text-white/90 ${className}`}
+        className={`ed-playback-chip inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/45 backdrop-blur-md px-2.5 py-1 text-[11px] font-semibold text-white/90 ${className}`}
         title={label}
       >
         <DsLoader size="xs" className="shrink-0" />
@@ -547,7 +548,7 @@ export function PlaybackStatusSurface({
         : null;
     return (
       <div
-        className={`glass-panel rounded-2xl border border-white/10 overflow-hidden animate-[fade-in_0.25s_ease-out] ${className}`}
+        className={`ed-playback-inline glass-panel rounded-2xl border border-white/10 overflow-hidden animate-[fade-in_0.25s_ease-out] ${className}`}
         role="status"
         aria-live="polite"
       >
@@ -583,7 +584,7 @@ export function PlaybackStatusSurface({
                   {pct != null ? `${pct}%` : na}
                 </span>
               </div>
-              <div className="h-2 rounded-full bg-white/10 overflow-hidden">
+              <div className="ed-playback-progress h-2 rounded-full bg-white/10 overflow-hidden">
                 <div
                   className="h-full rounded-full bg-primary-500 transition-[width] duration-500 ease-out"
                   style={{
@@ -642,7 +643,7 @@ export function PlaybackStatusSurface({
     <div
       className={`relative z-10 w-full min-w-0 ${isPlayer ? 'max-w-md' : 'max-w-lg'} mx-auto px-2 animate-[fade-in_0.35s_ease-out] ${className}`}
     >
-      <div className="glass-panel deep-glass w-full rounded-2xl border border-white/12 shadow-[0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden backdrop-blur-xl bg-black/50 flex flex-col min-w-0 max-h-[calc(100dvh-1rem)]">
+      <div className="ed-playback-panel glass-panel deep-glass w-full rounded-2xl border border-white/12 shadow-[0_16px_48px_rgba(0,0,0,0.5)] overflow-hidden backdrop-blur-xl bg-black/50 flex flex-col min-w-0 max-h-[calc(100dvh-1rem)]">
         <div className="relative shrink-0 px-3 sm:px-5 pt-3 sm:pt-4 pb-2.5 border-b border-white/8">
           <div className="flex gap-3 items-center min-w-0">
             {showPoster ? (
@@ -758,7 +759,7 @@ export function PlaybackStatusSurface({
                     onClick={onRetry}
                     data-focusable
                     tabIndex={0}
-                    className="px-6 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
+                    className="ed-playback-btn px-6 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
                   >
                     {t('common.retry') || 'Réessayer'}
                   </button>
@@ -991,7 +992,7 @@ export function PlaybackStatusSurface({
                           data-close
                           aria-label={t('common.close') || 'Fermer'}
                           tabIndex={0}
-                          className="px-4 py-2.5 min-h-[44px] rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
+                          className="ed-playback-btn px-4 py-2.5 min-h-[44px] rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors"
                         >
                           {t('common.back') || 'Retour'}
                         </button>
@@ -1002,7 +1003,7 @@ export function PlaybackStatusSurface({
                           onClick={() => setConfirmingCancel(true)}
                           data-focusable
                           tabIndex={0}
-                          className="px-4 py-2.5 min-h-[44px] rounded-xl border border-white/20 bg-white/10 hover:bg-white/15 text-white font-medium transition-colors"
+                          className="ed-playback-btn-ghost px-4 py-2.5 min-h-[44px] rounded-xl border border-white/20 bg-white/10 hover:bg-white/15 text-white font-medium transition-colors"
                         >
                           {cancelLabel || t('common.cancel') || 'Annuler'}
                         </button>
