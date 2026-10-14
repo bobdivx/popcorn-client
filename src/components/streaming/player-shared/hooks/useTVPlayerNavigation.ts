@@ -139,6 +139,8 @@ export function useTVPlayerNavigation({
   showControlsRef.current = showControls;
   const scrubThumbnailsActiveRef = useRef(scrubThumbnailsActive);
   scrubThumbnailsActiveRef.current = scrubThumbnailsActive;
+  /** Back depuis overlay lecture : ne plus révéler les commandes pendant la fermeture. */
+  const closingSessionRef = useRef(false);
 
   const scrubAutoSeekTimeoutRef = useRef<number | null>(null);
   const previewSeekTimeoutRef = useRef<number | null>(null);
@@ -326,6 +328,10 @@ export function useTVPlayerNavigation({
     BACK_KEYS.includes(e.key) || BACK_KEY_CODES.includes(e.keyCode ?? e.which);
 
   const handleBack = () => {
+    // Fermeture session (overlay ou dock) : bloquer le reveal des commandes.
+    closingSessionRef.current = true;
+    clearControlsHideTimeout();
+    setShowControls(false);
     if (onClose) onClose();
     else onToggleFullscreen();
   };
@@ -398,6 +404,10 @@ export function useTVPlayerNavigation({
         e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
+        // Uniquement fermer la session — pas de reveal dock.
+        closingSessionRef.current = true;
+        clearControlsHideTimeout();
+        setShowControls(false);
         handleBack();
         return;
       }
@@ -647,6 +657,11 @@ export function useTVPlayerNavigation({
     const handleWebOSBack = (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
+      if (visiblePlayerPlaybackOverlay()) {
+        closingSessionRef.current = true;
+        clearControlsHideTimeout();
+        setShowControls(false);
+      }
       handleBack();
     };
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -709,10 +724,16 @@ export function useTVPlayerNavigation({
   }, [isTV, setShowControls]);
 
   // Afficher les commandes une fois la modal partie (le timer de mount les masquait trop tôt).
+  // Ne pas révéler si Back a demandé la fermeture de la session (évite flash des commandes).
   useEffect(() => {
     if (!isTV) return;
+    closingSessionRef.current = false;
     let revealed = false;
     const tryReveal = () => {
+      if (closingSessionRef.current) {
+        clearControlsHideTimeout();
+        return;
+      }
       if (visiblePlayerPlaybackOverlay()) {
         revealed = false;
         clearControlsHideTimeout();
@@ -724,7 +745,9 @@ export function useTVPlayerNavigation({
       scheduleControlsHide();
     };
     tryReveal();
-    const id = window.setInterval(tryReveal, 200);
+    // webOS : poll moins agressif (moins de work main-thread pendant focus/navigation).
+    const pollMs = isWebOSTV() ? 450 : 200;
+    const id = window.setInterval(tryReveal, pollMs);
     return () => window.clearInterval(id);
   }, [isTV, setShowControls]);
 
