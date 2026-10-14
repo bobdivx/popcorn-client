@@ -1,0 +1,6 @@
+{
+  "name": "com.popcorn.client.webos.native.service",
+  "version": "1.0.0",
+  "description": "Serveur HTTP local qui sert l'UI Popcornn embarquée",
+  "main": "index.js"
+}
