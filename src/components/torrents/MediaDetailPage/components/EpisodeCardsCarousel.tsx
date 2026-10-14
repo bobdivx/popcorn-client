@@ -124,14 +124,14 @@ export function EpisodeCardsCarousel({
                 tabIndex={0}
                 aria-disabled={!interactive}
                 title={interactive ? undefined : 'Aucune source pour cet épisode'}
-                className={`group text-left rounded-2xl border transition-[opacity,transform,border-color,background-color,box-shadow] duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-black/40 shrink-0 w-[280px] sm:w-[320px] cursor-pointer ${
+                className={`ed-ep-card group text-left rounded-2xl border transition-[opacity,transform,border-color,background-color,box-shadow] duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--ed-accent,#f2545b)] focus:ring-offset-2 focus:ring-offset-black/40 shrink-0 w-[280px] sm:w-[320px] cursor-pointer ${
                   it.canResume
-                    ? 'border-amber-400/55 bg-amber-500/10 ring-1 ring-amber-400/35 shadow-[0_0_24px_-8px_rgba(251,191,36,0.45)]'
+                    ? 'is-resume border-amber-400/55 bg-amber-500/10 ring-1 ring-amber-400/35'
                     : it.isSelected
-                      ? 'border-primary-500/60 bg-primary-500/15 ring-1 ring-primary-500/30'
+                      ? 'is-selected border-[var(--ed-accent,#f2545b)]/65 bg-[var(--ed-accent,#f2545b)]/12 ring-1 ring-[var(--ed-accent,#f2545b)]/30'
                       : interactive
                         ? 'border-white/10 bg-white/5 hover:bg-white/10'
-                        : 'border-white/5 bg-white/[0.03] opacity-55 hover:opacity-80'
+                        : 'is-unavailable border-white/5 bg-white/[0.03] opacity-55 hover:opacity-80'
                 }`}
                 style={{ scrollSnapAlign: 'start' }}
                 aria-current={it.isSelected ? 'true' : undefined}
@@ -161,7 +161,7 @@ export function EpisodeCardsCarousel({
                       <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" />
                       <div className="absolute inset-0 flex flex-col items-center justify-center p-4 gap-3">
                         <DsLoader size="md" withLogo={false}>
-                          <CloudDownload className="w-6 h-6 text-[var(--ds-accent-violet)]" />
+                          <CloudDownload className="w-6 h-6 text-[var(--ed-accent,#f2545b)]" />
                         </DsLoader>
                         <PlaybackStatusSurface
                           variant="chip"
@@ -184,7 +184,7 @@ export function EpisodeCardsCarousel({
                       </div>
                       <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
                         <div
-                          className="h-full bg-primary-500 transition-[width] duration-500 ease-out"
+                          className="h-full bg-[var(--ed-accent,#f2545b)] transition-[width] duration-500 ease-out"
                           style={{
                             width: `${
                               computeReliableProgressPercent({
@@ -200,8 +200,8 @@ export function EpisodeCardsCarousel({
                     </div>
                   )}
 
-                  <div className="absolute left-3 top-3 flex items-center gap-2 z-10">
-                    <span className="px-2.5 py-1 rounded-full text-xs font-bold tracking-wide bg-black/50 border border-white/15 text-white/90">
+                  <div className="ed-ep-card__badges absolute left-3 top-3 flex items-center gap-2 z-10">
+                    <span className="ed-ep-card__ep">
                       {typeof it.episodeNumber === 'number'
                         ? `ÉPISODE ${it.episodeNumber}`
                         : `${it.episodeNumber}`}
@@ -235,12 +235,12 @@ export function EpisodeCardsCarousel({
 
                   {(showPlay || showDownloadHint) && (
                     <div
-                      className={`absolute right-3 bottom-3 w-11 h-11 rounded-full flex items-center justify-center border transition-[opacity,transform,background-color] duration-200 ${
+                      className={`ed-ep-card__action absolute right-3 bottom-3 w-11 h-11 rounded-full flex items-center justify-center border transition-[opacity,transform,background-color] duration-200 ${
                         it.canResume
                           ? 'border-amber-300/60 bg-amber-500/85 text-white'
                           : it.isSelected
-                            ? 'border-primary-400/50 bg-primary-500/80 text-white'
-                            : 'border-white/15 bg-black/40 text-white/90 group-hover:bg-primary-500/80 group-hover:border-primary-500/40'
+                            ? 'border-[var(--ed-accent,#f2545b)]/50 bg-[var(--ed-accent,#f2545b)]/80 text-white'
+                            : 'border-white/15 bg-black/40 text-white/90 group-hover:bg-[var(--ed-accent,#f2545b)]/80 group-hover:border-[var(--ed-accent,#f2545b)]/40'
                       }`}
                     >
                       {showPlay ? (
@@ -265,32 +265,32 @@ export function EpisodeCardsCarousel({
                   ) : null}
                 </div>
 
-                <div className="p-3 sm:p-4">
-                  <div className="text-base font-semibold text-white truncate">{it.title}</div>
+                <div className="ed-ep-card__body p-3 sm:p-4">
+                  <div className="ed-ep-card__title text-base font-semibold text-white truncate">{it.title}</div>
                   {it.subtitle ? (
-                    <div className="text-xs sm:text-sm text-white/60 line-clamp-2 mt-1">
+                    <div className="ed-ep-card__subtitle text-xs sm:text-sm text-white/60 line-clamp-2 mt-1">
                       {it.subtitle}
                     </div>
                   ) : null}
                   {typeof it.seedCount === 'number' || typeof it.leechCount === 'number' ? (
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px] sm:text-xs text-white/55">
+                    <div className="ed-ep-card__meta flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px] sm:text-xs text-white/55">
                       {typeof it.seedCount === 'number' ? (
                         <span
                           className={
                             it.seedCount >= 10
-                              ? 'text-green-400/90'
+                              ? 'text-emerald-400/90'
                               : it.seedCount >= 1
                                 ? 'text-amber-400/90'
                                 : 'text-white/45'
                           }
                         >
-                          <span className="font-semibold">{it.seedCount}</span>{' '}
+                          <span className="font-semibold tabular-nums">{it.seedCount}</span>{' '}
                           {t('mediaDetail.seedersShort')}
                         </span>
                       ) : null}
                       {typeof it.leechCount === 'number' ? (
                         <span>
-                          <span className="font-semibold text-yellow-400/80">{it.leechCount}</span>{' '}
+                          <span className="font-semibold tabular-nums text-yellow-400/80">{it.leechCount}</span>{' '}
                           {t('mediaDetail.leechersShort')}
                         </span>
                       ) : null}
