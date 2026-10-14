@@ -1,0 +1,7 @@
+{
+  "id": "com.popcorn.client.webos.native.service",
+  "description": "Popcornn Native local UI server",
+  "services": [
+    { "name": "com.popcorn.client.webos.native.service", "description": "Popcornn Native local UI server" }
+  ]
+}
