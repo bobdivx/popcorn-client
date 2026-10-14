@@ -11,7 +11,13 @@ import type {
   SeriesEpisodeInfo,
   SeriesSeasonInfo,
 } from '../../../lib/client/server-api/media';
-import { episodeReleaseMatchesVariantName } from '../../../lib/utils/episodeReleaseMatch';
+import { episodeReleaseMatchesTmdbEpisode } from '../../../lib/utils/episodeReleaseMatch';
+import {
+  inferCourStartsFromAirDates,
+  inferCourStartsFromSceneVariants,
+  isContinuousTmdbSeasonLayout,
+  scenePackMatchesTmdbEpisode,
+} from '../../../lib/utils/tmdbSceneSeasonMap';
 import { DsLoader } from '../../ui/DsLoader';
 
 type Torrent = MediaDetailPageProps['torrent'];
@@ -119,12 +125,14 @@ async function buildSeriesEpisodesFromTmdbDiscover(
       : [];
     const episodes: SeriesEpisodeInfo[] = [];
     for (const ep of rawEps) {
-      const e = ep as { episode_number?: number; name?: string };
+      const e = ep as { episode_number?: number; name?: string; air_date?: string | null };
       if (typeof e.episode_number !== 'number') continue;
       if (e.episode_number < 0) continue;
       if (seasonNum > 0 && e.episode_number === 0) continue;
       const epNum = e.episode_number;
       const epName = (typeof e.name === 'string' && e.name.trim()) || `Épisode ${epNum}`;
+      const airDate =
+        typeof e.air_date === 'string' && e.air_date.trim() ? e.air_date.trim() : null;
       episodes.push({
         season: seasonNum,
         episode: epNum,
@@ -135,6 +143,7 @@ async function buildSeriesEpisodesFromTmdbDiscover(
         seed_count: 0,
         leech_count: 0,
         is_from_multi_torrent: false,
+        air_date: airDate,
       });
     }
     if (episodes.length) seasonsOut.push({ season: seasonNum, episodes });
@@ -1905,6 +1914,22 @@ export default function MediaDetailRoute() {
       return candidates.slice().sort((a, b) => rankVariant(b) - rankVariant(a))[0] ?? null;
     };
 
+    const seasonNums = seriesEpisodes.seasons.map((s) => s.season);
+    const continuous = isContinuousTmdbSeasonLayout(seasonNums);
+    const s1 = seriesEpisodes.seasons.find((s) => s.season === 1);
+    const variantNames = initialVariants.map((v) => v.name || v.cleanTitle || '');
+    let courStarts =
+      continuous && s1
+        ? inferCourStartsFromAirDates(
+            (s1.episodes ?? []).map((e) => ({ episode: e.episode, airDate: e.air_date })),
+          )
+        : null;
+    if (continuous && (!courStarts || courStarts.length <= 1)) {
+      courStarts =
+        inferCourStartsFromSceneVariants(s1?.episodes?.length ?? 0, variantNames) ?? courStarts;
+    }
+    const matchOpts = { continuous, courStarts };
+
     const newSeasons = seriesEpisodes.seasons.map((season) => {
       const seasonNum = season.season;
       const newEpisodes = season.episodes.map((ep) => {
@@ -1918,18 +1943,25 @@ export default function MediaDetailRoute() {
 
         for (const variant of initialVariants) {
           const name = variant.name || variant.cleanTitle || '';
-          if (episodeReleaseMatchesVariantName(seasonNum, epNum, name)) {
+          if (episodeReleaseMatchesTmdbEpisode(seasonNum, epNum, name, matchOpts)) {
             epMatches.push(variant);
             continue;
           }
-          const nameUp = name.toUpperCase();
-          const seasonRegex = new RegExp(`S${seasonNum.toString().padStart(2, '0')}\\b`, 'i');
-          const isPack =
-            seasonRegex.test(nameUp) &&
-            (nameUp.includes('COMPLETE') ||
-              nameUp.includes('INTEGRALE') ||
-              !/\bE\d{1,2}\b/i.test(nameUp));
-          if (isPack) packMatches.push(variant);
+          if (scenePackMatchesTmdbEpisode(seasonNum, epNum, name, matchOpts)) {
+            packMatches.push(variant);
+            continue;
+          }
+          // Fallback historique : pack Sxx sans remap (séries TMDB multi-saisons classiques)
+          if (!continuous) {
+            const nameUp = name.toUpperCase();
+            const seasonRegex = new RegExp(`S${seasonNum.toString().padStart(2, '0')}\\b`, 'i');
+            const isPack =
+              seasonRegex.test(nameUp) &&
+              (nameUp.includes('COMPLETE') ||
+                nameUp.includes('INTEGRALE') ||
+                !/\bE\d{1,2}\b/i.test(nameUp));
+            if (isPack) packMatches.push(variant);
+          }
         }
 
         const bestVariant = pickBest(epMatches) ?? pickBest(packMatches);

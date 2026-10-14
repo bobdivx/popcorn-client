@@ -1,3 +1,9 @@
+import {
+  type CourStarts,
+  scenePackMatchesTmdbEpisode,
+  tmdbAbsoluteToScene,
+} from './tmdbSceneSeasonMap';
+
 /**
  * True si le nom de release contient le couple saison / épisode attendu.
  * Couvre S01E05, S1E5, S01.E05 et le style très courant sur les indexeurs **1x05** (saison 1, ép. 5).
@@ -23,4 +29,48 @@ export function episodeReleaseMatchesVariantName(
   }
 
   return false;
+}
+
+export type EpisodeReleaseMatchOptions = {
+  /** TMDB n’a qu’une saison réelle (1) alors que les indexeurs publient S02, S03… */
+  continuous?: boolean;
+  /** Débuts de cour en numérotation absolue TMDB (ex. [1, 25, 49]). */
+  courStarts?: CourStarts | null;
+};
+
+/**
+ * Match épisode TMDB ↔ nom de release, y compris remap anime saison continue
+ * (TMDB S01E25 ↔ Les.Carnets….S02E01…).
+ */
+export function episodeReleaseMatchesTmdbEpisode(
+  tmdbSeason: number,
+  tmdbEpisode: number,
+  rawName: string,
+  opts?: EpisodeReleaseMatchOptions,
+): boolean {
+  if (episodeReleaseMatchesVariantName(tmdbSeason, tmdbEpisode, rawName)) return true;
+
+  if (
+    opts?.continuous &&
+    tmdbSeason === 1 &&
+    tmdbEpisode > 0 &&
+    opts.courStarts &&
+    opts.courStarts.length > 1
+  ) {
+    const scene = tmdbAbsoluteToScene(tmdbEpisode, opts.courStarts);
+    if (episodeReleaseMatchesVariantName(scene.season, scene.episode, rawName)) return true;
+  }
+
+  return false;
+}
+
+/** Match épisode ou pack saison (S02 COMPLETE) pour une case TMDB. */
+export function torrentReleaseMatchesTmdbEpisode(
+  tmdbSeason: number,
+  tmdbEpisode: number,
+  rawName: string,
+  opts?: EpisodeReleaseMatchOptions,
+): boolean {
+  if (episodeReleaseMatchesTmdbEpisode(tmdbSeason, tmdbEpisode, rawName, opts)) return true;
+  return scenePackMatchesTmdbEpisode(tmdbSeason, tmdbEpisode, rawName, opts);
 }
