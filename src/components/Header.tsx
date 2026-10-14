@@ -36,8 +36,8 @@ export default function Header() {
     >
       <div className="container mx-auto px-4 flex justify-between items-center gap-3 min-h-[44px]">
         <a href={getPathHref('/')} className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0 flex-shrink">
-          <img src={getPathHref('/popcorn_logo.png')} alt="Popcorn" className="w-8 h-8 flex-shrink-0" />
-          <span className="text-xl font-bold truncate hidden sm:inline">Popcorn Vercel</span>
+          <img src={getPathHref('/popcorn_logo.png')} alt="Popcornn" className="w-8 h-8 flex-shrink-0" />
+          <span className="text-xl font-bold truncate hidden sm:inline">Popcornn</span>
         </a>
         
         {/* Menu desktop */}
