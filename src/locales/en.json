@@ -713,7 +713,9 @@
       "warmingUp": "Preparing smooth playback…",
       "almostReady": "Almost ready to start…",
       "optimizingPicture": "Optimizing image quality…",
-      "smoothingPlayback": "Optimizing smoothness…"
+      "smoothingPlayback": "Optimizing smoothness…",
+      "serverPrepareFailed": "The server could not prepare the video.",
+      "startTimeout": "Playback did not start (over 90 s). Try again or pick another quality."
     },
     "streamingFallbackToHls": "Switched to HLS playback due to direct stream issue.",
     "errorStream": "Unable to play video. Check server connection.",
