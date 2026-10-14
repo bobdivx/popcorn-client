@@ -1,0 +1,95 @@
+# Build de l'app webOS NATIVE (UI embarquée dans l'IPK) — séparée de l'app lite com.popcorn.client.webos.
+# Produit com.popcorn.client.webos.native_<version>_all.ipk : artefact + pre-release "webos-native-v<version>".
+name: WebOS Native Build (IPK)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [dev]
+    paths:
+      - 'webos-native/**'
+      - '.github/workflows/webos-native.yml'
+
+concurrency:
+  group: webos-native
+  cancel-in-progress: true
+
+jobs:
+  build-native-ipk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+    env:
+      APP_ID: com.popcorn.client.webos.native
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Version
+        id: v
+        run: |
+          VERSION=$(jq -r '.client.version' VERSION.json)
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Version: ${VERSION}"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build UI (Astro, thème éditorial, détection TV au runtime)
+        run: |
+          npx astro build
+          test -f dist/index.html
+
+      - name: Assemble webOS package (app + service)
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y >/dev/null && sudo apt-get install -y imagemagick >/dev/null
+          rm -rf pkg out && mkdir -p pkg/app pkg/service out
+          # App (lanceur file://)
+          cp webos-native/launcher/index.html pkg/app/index.html
+          jq --arg v "${{ steps.v.outputs.version }}" '.version = $v' webos-native/appinfo.template.json > pkg/app/appinfo.json
+          SRC=public/popcorn_logo_512x512.png
+          convert -size 80x80 xc:'#0c0d10' \( "$SRC" -resize 70x70 \) -gravity center -composite pkg/app/icon.png
+          convert -size 130x130 xc:'#0c0d10' \( "$SRC" -resize 118x118 \) -gravity center -composite pkg/app/icon-large.png
+          # Service (serveur HTTP local) + UI bundlée
+          cp webos-native/service/index.js webos-native/service/package.json webos-native/service/services.json pkg/service/
+          cp -r dist pkg/service/www
+          # Allègement : vidéos d'intro / captures store inutiles dans l'IPK
+          rm -rf pkg/service/www/playstore-screenshots
+          cat pkg/app/appinfo.json
+          du -sh pkg/app pkg/service
+
+      - name: ares-package
+        run: |
+          set -euo pipefail
+          npm install -g @webos-tools/cli >/dev/null
+          ares-package pkg/app pkg/service -o out --no-minify
+          ls -la out
+          IPK=$(ls out/*.ipk | head -n1)
+          test -n "$IPK"
+          echo "IPK=$IPK" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: popcornn-webos-native-ipk
+          path: out/*.ipk
+          retention-days: 90
+
+      - name: Pre-release GitHub (séparée de la lite)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="webos-native-v${{ steps.v.outputs.version }}"
+          NOTES="Popcornn Native (beta) — app webOS ${APP_ID}, UI embarquée (serveur local 127.0.0.1:18687). Ne remplace pas com.popcorn.client.webos. Commit ${GITHUB_SHA}. Installation : ares-install -d <tv> $(basename "$IPK")"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$IPK" --clobber
+          else
+            gh release create "$TAG" "$IPK" --target "${GITHUB_SHA}" --prerelease --title "Popcornn Native webOS ${{ steps.v.outputs.version }} (beta)" --notes "$NOTES"
+          fi
+          echo "Asset: https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/$(basename "$IPK")"
