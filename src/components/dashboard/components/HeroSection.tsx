@@ -446,19 +446,33 @@ function EditorialHeroSection({
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
   const [trailerOpen, setTrailerOpen] = useState(false);
+  const [focusWithin, setFocusWithin] = useState(false);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const isTV = isTVPlatform();
   const count = list.length;
 
   useEffect(() => {
-    if (count < 2 || paused || trailerOpen) return;
+    if (count < 2 || paused || focusWithin || trailerOpen) return;
     const id = setInterval(() => setIndex((i) => (i + 1) % count), 9000);
     return () => clearInterval(id);
-  }, [count, paused, trailerOpen]);
+  }, [count, paused, focusWithin, trailerOpen]);
 
   useEffect(() => {
     if (!trailerOpen) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setTrailerOpen(false);
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    const onKey = (e: KeyboardEvent) => {
+      // Échap (web) / Retour télécommande (webOS 461, Android TV GoBack)
+      if (e.key === 'Escape' || e.key === 'GoBack' || e.key === 'BrowserBack' || e.keyCode === 461) {
+        e.preventDefault();
+        e.stopPropagation();
+        setTrailerOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    const t0 = setTimeout(() => closeRef.current?.focus(), 50);
+    return () => {
+      clearTimeout(t0);
+      window.removeEventListener('keydown', onKey, true);
+    };
   }, [trailerOpen]);
 
   if (!count) return null;
@@ -499,12 +513,17 @@ function EditorialHeroSection({
 
   return (
     <section
-      className={`ed-hero ${size === 'large' ? 'ed-hero--large' : ''}`}
+      className={`ed-hero ${size === 'large' ? 'ed-hero--large' : ''} ${isTV ? 'ed-hero--tv' : ''}`}
       data-dark-context
       data-editorial-hero
       data-hero-item-key={contentItemKey(current)}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setFocusWithin(true)}
+      onBlurCapture={(e: FocusEvent) => {
+        const next = e.relatedTarget as Node | null;
+        if (!next || !(e.currentTarget as HTMLElement).contains(next)) setFocusWithin(false);
+      }}
       aria-roledescription="carousel"
     >
       {list.map((item, i) => {
@@ -523,26 +542,28 @@ function EditorialHeroSection({
       {trailerOpen && trailerKey && (
         <div className="ed-hero__trailer">
           <YouTubeVideoPlayer youtubeKey={trailerKey} autoplay muted={false} loop={false} controls cover className="w-full h-full" onEnded={() => setTrailerOpen(false)} />
-          <button type="button" className="ed-hero__close" onClick={() => setTrailerOpen(false)} aria-label="Fermer" data-focusable>
+          <button ref={closeRef} type="button" tabIndex={0} className="ed-hero__close" onClick={() => setTrailerOpen(false)} aria-label="Fermer" data-focusable>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>
         </div>
       )}
       <div className="ed-grid-lines" aria-hidden><span /><span /><span /><span /></div>
 
-      <div key={contentItemKey(current)} className="ed-hero__inner ed-fade">
-        <header className="ed-hero__head">
+      <div className="ed-hero__inner">
+        <header key={`h-${contentItemKey(current)}`} className="ed-hero__head ed-fade">
           <p className="ed-kicker">{kicker}</p>
           <h1 className="ed-title">{title}</h1>
         </header>
 
         <div className="ed-hero__left">
-          <div className="ed-number" aria-hidden>
-            <span>{pad2(index + 1)}</span>
+          <div key={`c-${contentItemKey(current)}`} className="ed-fade">
+            <div className="ed-number" aria-hidden>
+              <span>{pad2(index + 1)}</span>
+            </div>
+            {subtitle && <p className="ed-subtitle">{subtitle}</p>}
+            {signalLabel && <p className="ed-signal">{signalLabel}</p>}
+            {current.overview && <p className="ed-synopsis">{current.overview}</p>}
           </div>
-          {subtitle && <p className="ed-subtitle">{subtitle}</p>}
-          {signalLabel && <p className="ed-signal">{signalLabel}</p>}
-          {current.overview && <p className="ed-synopsis">{current.overview}</p>}
           <div className="ed-hero__ctas">
             <button
               type="button"
@@ -550,19 +571,22 @@ function EditorialHeroSection({
               onClick={handlePrimary}
               disabled={primaryActionDisabled}
               aria-busy={primaryActionDisabled}
+              tabIndex={0}
               data-focusable
+              data-tv-initial-focus
+              data-tv-item-key={contentItemKey(current)}
             >
               {primaryButtonIcon}
               <span>{primaryButtonLabel ?? 'Regarder'}</span>
             </button>
-            <a href={getItemUrl(current)} className="ed-link" data-focusable>
+            <a href={getItemUrl(current)} className="ed-link" tabIndex={0} data-focusable>
               {t('common.details')}
             </a>
           </div>
         </div>
 
         {trailerKey && !trailerOpen && (
-          <button type="button" className="ed-play" onClick={() => setTrailerOpen(true)} data-focusable>
+          <button type="button" className="ed-play" tabIndex={0} onClick={() => setTrailerOpen(true)} data-focusable>
             <span className="ed-play__ring">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 7.5v9l7.5-4.5z" /></svg>
             </span>
@@ -581,15 +605,16 @@ function EditorialHeroSection({
                 type="button"
                 className={`ed-pager__seg ${i === index ? 'is-active' : ''} ${i < index ? 'is-past' : ''}`}
                 onClick={() => setIndex(i)}
+                tabIndex={-1}
                 aria-label={`${pad2(i + 1)} / ${pad2(count)}`}
               />
             ))}
           </span>
           <span className="ed-pager__num ed-pager__num--dim">{pad2(count)}</span>
-          <button type="button" className="ed-arrow" onClick={() => go(-1)} aria-label="Précédent" data-focusable>
+          <button type="button" className="ed-arrow" onClick={() => go(-1)} aria-label="Précédent" tabIndex={0} data-focusable>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3"><path d="M15 5l-7 7 7 7" /></svg>
           </button>
-          <button type="button" className="ed-arrow" onClick={() => go(1)} aria-label="Suivant" data-focusable>
+          <button type="button" className="ed-arrow" onClick={() => go(1)} aria-label="Suivant" tabIndex={0} data-focusable>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3"><path d="M9 5l7 7-7 7" /></svg>
           </button>
         </div>
@@ -598,9 +623,10 @@ function EditorialHeroSection({
   );
 }
 
-/** Hero : design éditorial sur web/mobile ; rendu historique conservé sur TV / webOS. */
+/** Hero éditorial partout (web, mobile, TV/webOS). L'ancien rendu reste disponible en secours. */
 export function HeroSection(props: HeroSectionProps) {
-  const [isTV] = useState(() => isTVPlatform());
-  if (isTV) return <LegacyHeroSection {...props} />;
   return <EditorialHeroSection {...props} />;
 }
+
+/** @internal ancien hero (conservé pour retour arrière rapide). */
+export const __LegacyHeroSection = LegacyHeroSection;
