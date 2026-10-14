@@ -59,6 +59,9 @@ jobs:
           # Service (serveur HTTP local) + UI bundlée
           cp webos-native/service/index.js webos-native/service/package.json webos-native/service/services.json pkg/service/
           cp -r dist pkg/service/www
+          # Mesure de fluidité (inactive sauf lancement avec {"perf":1})
+          cp webos-native/perf.js pkg/service/www/__perf.js
+          find pkg/service/www -name '*.html' -exec sed -i 's#</head>#<script src="/__perf.js"></script></head>#' {} +
           # Allègement : vidéos d'intro / captures store inutiles dans l'IPK
           rm -rf pkg/service/www/playstore-screenshots
           cat pkg/app/appinfo.json

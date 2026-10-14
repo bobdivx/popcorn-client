@@ -39,7 +39,7 @@ export default function IntroVideoWithHlsPreload({
   useEffect(() => {
     const skipTimer = setTimeout(() => {
       setShowSkip(true);
-    }, 2000);
+    }, 300);
 
     const video = videoRef.current;
     if (video) {
@@ -190,19 +190,58 @@ export default function IntroVideoWithHlsPreload({
     onEnded();
   }, [onEnded]);
 
-  // Vidéo absente, codec webOS, ou /intro.mp4 inaccessible : éviter écran infini
+  /** webOS / TV : pas d'intro (lecture vidéo locale peu fiable, et OK télécommande bloquait sur « Passer »). */
+  const skipIntroEntirely =
+    typeof document !== 'undefined' &&
+    (document.documentElement.getAttribute('data-webos') === 'true' ||
+      document.documentElement.getAttribute('data-tv-platform') === 'true');
+
   useEffect(() => {
-    const maxWaitMs = 18000;
+    if (skipIntroEntirely) completeIntro();
+  }, [skipIntroEntirely, completeIntro]);
+
+  // Garde-fous : jamais bloqué sur l'intro.
+  // - pas de lecture effective en 6 s → on passe ;
+  // - sinon, fin forcée à durée + 2 s (si `ended` ne se déclenche pas).
+  useEffect(() => {
     const t = window.setTimeout(() => {
       const v = videoRef.current;
       if (introFinishedRef.current) return;
-      if (v && !v.ended && v.readyState < 2) {
-        console.warn('[IntroVideoWithHlsPreload] Timeout / pas de données vidéo, passage automatique');
+      if (!v || v.paused || v.readyState < 3 || v.currentTime < 0.5) {
+        console.warn('[IntroVideoWithHlsPreload] Intro non lue après 6 s, passage automatique');
         completeIntro();
+        return;
       }
-    }, maxWaitMs);
+      const remaining = Number.isFinite(v.duration) ? Math.max(0, v.duration - v.currentTime) : 10;
+      window.setTimeout(() => completeIntro(), Math.min(remaining, 20) * 1000 + 2000);
+    }, 6000);
     return () => window.clearTimeout(t);
   }, [completeIntro]);
+
+  // OK / Entrée / Retour / Échap (télécommande ou clavier) : passer l'intro, quel que soit le focus.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const code = e.keyCode ?? e.which;
+      if (
+        e.key === 'Enter' || e.key === ' ' || e.key === 'Escape' || e.key === 'GoBack' ||
+        code === 13 || code === 23 || code === 66 || code === 27 || code === 461 || code === 8
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+        completeIntro();
+      }
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, [completeIntro]);
+
+  // Focus par défaut sur « Passer »
+  const skipBtnRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (showSkip) skipBtnRef.current?.focus();
+  }, [showSkip]);
+
+  if (skipIntroEntirely) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
@@ -241,10 +280,13 @@ export default function IntroVideoWithHlsPreload({
         {showSkip && (
           <button
             type="button"
+            ref={skipBtnRef}
             onClick={completeIntro}
             data-focusable
+            data-autofocus
+            data-tv-initial-focus
             tabindex={0}
-            className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-semibold transition-all duration-300 shadow-lg border-2 border-primary-500 flex items-center gap-2"
+            className="ed-cta flex items-center gap-2"
             aria-label="Passer l'intro"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
