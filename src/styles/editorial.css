@@ -504,153 +504,59 @@ html[data-tv-platform] .ed-assist__btn { min-height: 56px; font-size: 0.85rem; p
 }
 .ed-quality-btn__count { opacity: 0.55; font-size: 0.6rem; letter-spacing: 0.08em; }
 
-/* Saisons / épisodes */
-.ed-seasons { display: flex; flex-direction: column; gap: 2.25rem; }
-.ed-season { border: 0; background: transparent; }
-.ed-season__head {
-  display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
-  margin-bottom: 0.85rem;
-  padding: 0 0.15rem;
+/* Saisons / épisodes — layout cartes d’origine, polish typo / couleurs / alignements */
+.ed-episodes-panel {
+  border-radius: 1rem;
+  border-color: var(--ed-line);
+  background: rgba(0, 0, 0, 0.3);
 }
-.ed-season__title {
+.ed-season-block__title {
   margin: 0;
   font-family: var(--ed-font-display);
-  font-weight: 300;
-  font-size: 1rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--ed-ink);
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
 }
-.ed-season__count {
-  font-size: 0.72rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ed-ink-faint);
+.ed-season-block__count {
+  letter-spacing: 0.02em;
+  vertical-align: baseline;
 }
-.ed-season__rule {
-  flex: 1;
-  height: 1px;
-  background: var(--ed-line);
-  min-width: 2rem;
-}
-.ed-episode-card {
-  text-align: left;
-  flex-shrink: 0;
-  width: 280px;
-  border: 1px solid var(--ed-line);
-  background: rgba(255, 255, 255, 0.03);
-  color: inherit;
-  transition: border-color 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
-}
-@media (min-width: 640px) { .ed-episode-card { width: 320px; } }
-.ed-episode-card:hover { border-color: var(--ed-line-strong); background: rgba(255, 255, 255, 0.05); }
-.ed-episode-card.is-selected {
-  border-color: var(--ed-accent);
-  background: rgba(242, 84, 91, 0.08);
-}
-.ed-episode-card.is-resume {
-  border-color: rgba(242, 84, 91, 0.55);
-  box-shadow: inset 0 -2px 0 var(--ed-accent);
-}
-.ed-episode-card.is-unavailable { opacity: 0.48; }
-.ed-episode-card__media {
-  position: relative;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  background: rgba(0, 0, 0, 0.35);
-}
-.ed-episode-card__media img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  pointer-events: none;
-}
-.ed-episode-card__shade {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.72), transparent 55%);
-}
-.ed-episode-card__badge {
-  position: absolute;
-  left: 0.7rem;
-  top: 0.7rem;
-  z-index: 2;
-  font-family: var(--ed-font-display);
-  font-size: 0.62rem;
-  font-weight: 400;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--ed-ink);
-  border-bottom: 1px solid rgba(242, 84, 91, 0.55);
-  padding-bottom: 0.1rem;
-}
-.ed-episode-card__flags {
-  position: absolute;
-  left: 0.7rem;
-  top: 2.1rem;
-  z-index: 2;
-  display: flex;
-  gap: 0.35rem;
-}
-.ed-episode-card__flag {
-  font-size: 0.58rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--ed-ink);
-  border: 1px solid var(--ed-line-strong);
-  padding: 0.15rem 0.4rem;
-  background: rgba(0, 0, 0, 0.45);
-}
-.ed-episode-card__flag--local { border-color: rgba(242, 84, 91, 0.55); }
-.ed-episode-card__action {
-  position: absolute;
-  right: 0.7rem;
-  bottom: 0.7rem;
-  z-index: 2;
-  width: 2.5rem;
-  height: 2.5rem;
+.ed-ep-card__ep {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border: 1px solid var(--ed-line-strong);
-  background: rgba(0, 0, 0, 0.45);
-  color: var(--ed-ink);
-}
-.ed-episode-card.is-selected .ed-episode-card__action,
-.ed-episode-card:hover .ed-episode-card__action {
-  background: var(--ed-accent);
-  border-color: var(--ed-accent);
-  color: #fff;
-}
-.ed-episode-card__body { padding: 0.85rem 0.9rem 1rem; }
-.ed-episode-card__title {
+  padding: 0.25rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.5);
+  color: rgba(255, 255, 255, 0.92);
   font-family: var(--ed-font-display);
-  font-weight: 300;
-  font-size: 0.95rem;
-  letter-spacing: 0.04em;
-  color: var(--ed-ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ed-episode-card__meta {
-  margin-top: 0.4rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.85rem;
   font-size: 0.7rem;
-  letter-spacing: 0.08em;
+  font-weight: 500;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--ed-ink-faint);
+  line-height: 1.2;
 }
-.ed-episode-card__meta .is-good { color: rgba(242, 84, 91, 0.9); }
-html[data-tv-platform] .ed-season__title { font-size: 1.25rem; }
-html[data-tv-platform] .ed-episode-card { width: 340px; }
+.ed-ep-card.is-selected .ed-ep-card__ep {
+  border-color: rgba(242, 84, 91, 0.45);
+}
+.ed-ep-card__title {
+  font-family: var(--ed-font-display);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+}
+.ed-ep-card__subtitle {
+  line-height: 1.4;
+}
+.ed-ep-card__meta {
+  letter-spacing: 0.02em;
+  align-items: baseline;
+}
+.ed-ep-card__meta .tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+html[data-tv-platform] .ed-season-block__title { font-size: 1.15rem; }
+html[data-tv-platform] .ed-ep-card { width: 340px; }
 
 /* Fiche média : le fond (image / bande-annonce) occupe la zone hero, plein cadre sous la nav.
    Le conteneur parent garde un transform (animate-fade-in-up), ce qui faisait de `position: fixed`

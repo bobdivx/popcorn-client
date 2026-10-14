@@ -113,7 +113,7 @@ export function EpisodesArea(props: {
     seriesEpisodes.seasons[0]?.episodes?.[0]?.episode === 0;
 
   return (
-    <div className="mb-6">
+    <div className="mb-6 space-y-6">
       {isPackSelected && packPreviewLoadError ? (
         <div
           role="alert"
