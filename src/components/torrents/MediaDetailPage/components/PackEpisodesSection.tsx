@@ -117,15 +117,20 @@ export function PackEpisodesSection({
       data-pack-episodes
       data-tv-episode-row
     >
-      <div className="px-5 py-4 border-b border-white/10 bg-black/20 flex items-start sm:items-center justify-between gap-4">
+      <div className="ed-season-block__head px-5 py-4 border-b border-white/10 bg-black/20 flex items-start sm:items-center justify-between gap-4">
         <div className="min-w-0">
-          <h3 className="text-lg font-semibold text-white truncate">{t('mediaDetail.episodes')}</h3>
-          <p className="text-xs text-white/60">
-            {t('mediaDetail.seasonNumber', { number: season ?? 1 })} • {episodeCount} {t('mediaDetail.episodes')}
+          <h3 className="ed-season-block__title text-lg font-semibold text-white truncate">
+            {t('mediaDetail.episodes')}
+          </h3>
+          <p className="mt-0.5 text-xs text-white/60 leading-snug">
+            {t('mediaDetail.seasonNumber', { number: season ?? 1 })} • {episodeCount}{' '}
+            {t('mediaDetail.episodes')}
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs font-medium text-white/60 hidden sm:inline">{t('mediaDetail.season')}</span>
+        <div className="flex items-center gap-2 shrink-0 self-center">
+          <span className="text-xs font-medium text-white/60 hidden sm:inline tracking-wide uppercase">
+            {t('mediaDetail.season')}
+          </span>
           <div className="relative min-w-[170px]">
             <select
               value={season ?? ''}
@@ -135,7 +140,7 @@ export function PackEpisodesSection({
               }}
               data-focusable={isTV ? true : undefined}
               tabIndex={0}
-              className="w-full appearance-none bg-white/10 hover:bg-white/15 text-white font-semibold py-2.5 pl-4 pr-10 rounded-xl border border-white/15 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent cursor-pointer"
+              className="w-full appearance-none bg-white/10 hover:bg-white/15 text-white font-semibold py-2.5 pl-4 pr-10 rounded-xl border border-white/15 focus:outline-none focus:ring-2 focus:ring-[var(--ed-accent,#f2545b)] focus:border-transparent cursor-pointer"
               aria-label={t('mediaDetail.season')}
             >
               {model.seasons.map((s) => (

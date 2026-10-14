@@ -758,8 +758,10 @@ html[data-ui-pack="tesla"]:not([data-theme="dark"]) .settings-mobile-menu-trigge
   100% { transform: translateX(380%); }
 }
 
-html[data-ui-pack="tesla"]:not([data-theme="dark"]) #popcorn-loading-fallback {
-  background: #e6e6e8 !important;
+/* Splash éditorial (POPCORNN / CHARGEMENT) : garder le fond sombre même en pack Tesla clair */
+html[data-ui-pack="tesla"] #popcorn-loading-fallback {
+  background: #0c0d10 !important;
+  color: #f4f1ec !important;
 }
 html[data-ui-pack="tesla"]:not([data-theme="dark"]) #popcorn-loading-fallback .bg-page-gradient,
 html[data-ui-pack="tesla"]:not([data-theme="dark"]) #popcorn-loading-fallback .bg-page-grid,
@@ -768,13 +770,6 @@ html[data-ui-pack="tesla"]:not([data-theme="dark"]) #popcorn-loading-fallback .b
 }
 html[data-ui-pack="tesla"]:not([data-theme="dark"]) #popcorn-loading-fallback .pl-boot-dots {
   display: none;
-}
-html[data-ui-pack="tesla"]:not([data-theme="dark"]) #popcorn-loading-fallback .ds-loader--block {
-  margin-bottom: 1rem;
-}
-html[data-ui-pack="tesla"]:not([data-theme="dark"]) #popcorn-loading-fallback .ds-loader-logo {
-  filter: none;
-  opacity: 1;
 }
 
 html[data-ui-pack="tesla"]:not([data-theme="dark"]) .ds-card-loading-glow,
@@ -1213,7 +1208,7 @@ html[data-ui-pack="tesla"][data-theme="dark"] .settings-mobile-menu-trigger-host
 }
 
 html[data-ui-pack="tesla"][data-theme="dark"] #popcorn-loading-fallback {
-  background: #111113 !important;
+  background: #0c0d10 !important;
 }
 html[data-ui-pack="tesla"][data-theme="dark"] .ds-loading-title {
   color: #f4f4f5 !important;
