@@ -650,6 +650,7 @@
     "queued": "En file d'attente",
     "stopPlayback": "Arrêter la lecture",
     "loadingVideo": "Chargement de la vidéo…",
+    "displayTitle": "Chargement",
     "preparingStream": "Préparation de la lecture en cours…",
     "streamPreparingRetry": "Préparation du flux, nouvelle tentative…",
     "phase": {

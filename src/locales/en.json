@@ -650,6 +650,7 @@
     "queued": "Queued",
     "stopPlayback": "Stop playback",
     "loadingVideo": "Loading video…",
+    "displayTitle": "Loading",
     "preparingStream": "Preparing playback…",
     "streamPreparingRetry": "Preparing stream, retrying…",
     "phase": {
