@@ -1,27 +1,40 @@
 /**
  * Utilitaires pour les images TMDB.
- * Permet d'afficher des images en qualité max (type 1080p+) dans les zones hero et détail.
+ * Web : qualité max (original) pour hero / détail. TV : plafonné (w1280) — décoder du 4K à chaque slide fige l'UI.
  */
+import { isTVPlatform } from './device-detection';
 
 const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p/';
+const SIZE_RE = /image\.tmdb\.org\/t\/p\/(w\d+|h\d+|original)\//;
 
-/** Tailles TMDB : original = résolution complète (qualité type 1080p+) */
-const TMDB_SIZE_ORIGINAL = 'original';
+/** Tailles TMDB valides : posters w92…w780, backdrops w300/w780/w1280. */
+export type TmdbSize = 'w185' | 'w300' | 'w342' | 'w500' | 'w780' | 'w1280' | 'original';
+
+/** Remplace la taille d'une URL TMDB (sans effet sur les autres URLs). */
+export function tmdbSized(url: string | null | undefined, size: TmdbSize): string | null {
+  if (!url || typeof url !== 'string' || !url.trim()) return null;
+  const u = url.trim();
+  if (!SIZE_RE.test(u)) return u;
+  return u.replace(SIZE_RE, `image.tmdb.org/t/p/${size}/`);
+}
+
+/** Affiche de carte (2:3). */
+export function cardPosterUrl(url: string | null | undefined): string | null {
+  return tmdbSized(url, 'w342');
+}
+
+/** Backdrop de carte paysage (16:9). */
+export function cardBackdropUrl(url: string | null | undefined): string | null {
+  return tmdbSized(url, 'w780');
+}
 
 /**
- * Retourne l'URL TMDB en qualité maximale (original = résolution complète, type 1080p+) pour hero / page détail.
- * Remplace w500 et w780 par original pour les posters/backdrops.
+ * URL TMDB pour hero / page détail : original sur web, w1280 sur TV.
  */
 export function getHighQualityTmdbImageUrl(url: string | null | undefined): string | null {
   if (!url || typeof url !== 'string' || !url.trim()) return null;
   const u = url.trim();
   if (!u.includes(TMDB_IMG_BASE)) return u;
-  // w500 ou w780 → original pour qualité max (1080p+)
-  if (u.includes(`${TMDB_IMG_BASE}w500`)) {
-    return u.replace(`${TMDB_IMG_BASE}w500`, `${TMDB_IMG_BASE}${TMDB_SIZE_ORIGINAL}`);
-  }
-  if (u.includes(`${TMDB_IMG_BASE}w780`)) {
-    return u.replace(`${TMDB_IMG_BASE}w780`, `${TMDB_IMG_BASE}${TMDB_SIZE_ORIGINAL}`);
-  }
-  return u;
+  const tv = typeof window !== 'undefined' && isTVPlatform();
+  return tmdbSized(u, tv ? 'w1280' : 'original');
 }
