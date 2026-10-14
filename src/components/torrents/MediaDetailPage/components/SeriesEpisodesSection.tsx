@@ -136,7 +136,7 @@ export function SeriesEpisodesSection({
   }, [tmdbStillBySeasonEpisode]);
 
   return (
-    <div className="ed-seasons">
+    <div className="space-y-8">
       {seriesEpisodes.seasons.map((seasonData) => {
         const seasonNum = seasonData.season;
         const episodes = seasonData.episodes ?? [];
@@ -150,14 +150,15 @@ export function SeriesEpisodesSection({
             key={seasonNum}
             aria-labelledby={headingId}
             data-tv-episode-row
-            className="ed-season"
+            className="ed-season-block rounded-xl overflow-hidden bg-black/40 border border-white/10"
           >
-            <div className="ed-season__head">
-              <h3 id={headingId} className="ed-season__title">
+            <div className="ed-season-block__head px-4 py-3 border-b border-white/10 bg-white/5">
+              <h3 id={headingId} className="ed-season-block__title text-base font-semibold text-white">
                 {t('mediaDetail.seasonNumber', { number: seasonNum })}
+                <span className="ed-season-block__count ml-2 text-sm font-normal text-white/60">
+                  ({episodeCount})
+                </span>
               </h3>
-              <span className="ed-season__count">{episodeCount}</span>
-              <span className="ed-season__rule" aria-hidden="true" />
             </div>
             <EpisodeCardsCarousel
               ariaLabel={`${t('mediaDetail.seasonNumber', { number: seasonNum })} — ${t('mediaDetail.episodes')}`}

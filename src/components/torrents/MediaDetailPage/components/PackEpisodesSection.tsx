@@ -113,38 +113,47 @@ export function PackEpisodesSection({
   return (
     <section
       aria-label={t('mediaDetail.episodes')}
-      className="ed-season"
+      className="rounded-2xl overflow-hidden bg-gradient-to-b from-white/10 to-black/30 border border-white/10 backdrop-blur-sm"
       data-pack-episodes
       data-tv-episode-row
     >
-      <div className="ed-season__head flex-wrap gap-y-3">
-        <h3 className="ed-season__title">{t('mediaDetail.episodes')}</h3>
-        <span className="ed-season__count">
-          {t('mediaDetail.seasonNumber', { number: season ?? 1 })} · {episodeCount}
-        </span>
-        <span className="ed-season__rule hidden sm:block" aria-hidden="true" />
-        <div className="relative min-w-[10rem] ml-auto">
-          <select
-            value={season ?? ''}
-            onChange={(e) => {
-              const num = parseInt(e.currentTarget.value, 10);
-              if (!Number.isNaN(num)) onSelectSeason(num);
-            }}
-            data-focusable={isTV ? true : undefined}
-            tabIndex={0}
-            className="w-full appearance-none bg-transparent text-white font-light py-2 pl-3 pr-9 border border-[var(--ed-line-strong)] focus:outline-none cursor-pointer text-sm tracking-wide uppercase"
-            aria-label={t('mediaDetail.season')}
-          >
-            {model.seasons.map((s) => (
-              <option key={s} value={s} className="bg-gray-900 text-white">
-                {t('mediaDetail.seasonNumber', { number: s })}
-              </option>
-            ))}
-          </select>
-          <ChevronDown
-            className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-white/60 pointer-events-none"
-            aria-hidden
-          />
+      <div className="ed-season-block__head px-5 py-4 border-b border-white/10 bg-black/20 flex items-start sm:items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h3 className="ed-season-block__title text-lg font-semibold text-white truncate">
+            {t('mediaDetail.episodes')}
+          </h3>
+          <p className="mt-0.5 text-xs text-white/60 leading-snug">
+            {t('mediaDetail.seasonNumber', { number: season ?? 1 })} • {episodeCount}{' '}
+            {t('mediaDetail.episodes')}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0 self-center">
+          <span className="text-xs font-medium text-white/60 hidden sm:inline tracking-wide uppercase">
+            {t('mediaDetail.season')}
+          </span>
+          <div className="relative min-w-[170px]">
+            <select
+              value={season ?? ''}
+              onChange={(e) => {
+                const num = parseInt(e.currentTarget.value, 10);
+                if (!Number.isNaN(num)) onSelectSeason(num);
+              }}
+              data-focusable={isTV ? true : undefined}
+              tabIndex={0}
+              className="w-full appearance-none bg-white/10 hover:bg-white/15 text-white font-semibold py-2.5 pl-4 pr-10 rounded-xl border border-white/15 focus:outline-none focus:ring-2 focus:ring-[var(--ed-accent,#f2545b)] focus:border-transparent cursor-pointer"
+              aria-label={t('mediaDetail.season')}
+            >
+              {model.seasons.map((s) => (
+                <option key={s} value={s} className="bg-gray-900 text-white">
+                  {t('mediaDetail.seasonNumber', { number: s })}
+                </option>
+              ))}
+            </select>
+            <ChevronDown
+              className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/70 pointer-events-none"
+              aria-hidden
+            />
+          </div>
         </div>
       </div>
 
