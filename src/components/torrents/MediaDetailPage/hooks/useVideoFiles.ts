@@ -67,13 +67,29 @@ interface UseVideoFilesOptions {
   keepAllVideoFiles?: boolean;
   season?: number | null;
   episode?: number | null;
+  /**
+   * Couple saison/épisode « scène » (S02E01) quand TMDB utilise une saison continue (S01E25).
+   * Utilisé pour matcher les fichiers à l’intérieur d’un pack S02.
+   */
+  sceneSeason?: number | null;
+  sceneEpisode?: number | null;
   torrent?: {
     infoHash?: string | null;
     downloadPath?: string | null;
   } | null; // Torrent complet pour accéder au downloadPath pour les médias locaux
 }
 
-export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFiles, season, episode, torrent }: UseVideoFilesOptions) {
+export function useVideoFiles({
+  torrentName,
+  onError,
+  filePath,
+  keepAllVideoFiles,
+  season,
+  episode,
+  sceneSeason,
+  sceneEpisode,
+  torrent,
+}: UseVideoFilesOptions) {
   const [videoFiles, setVideoFiles] = useState<TorrentFile[]>([]);
   const [selectedFile, setSelectedFile] = useState<TorrentFile | null>(null);
   const [loadingFiles, setLoadingFiles] = useState(false);
@@ -256,7 +272,20 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
             rawPath.match(/s(\d{1,2})[.\s_-]*e(\d{1,3})/i) ||
             rawPath.match(/(\d{1,2})x(\d{1,3})/i);
           if (!m) return true; // pack saison / dossier sans Exx
-          return parseInt(m[1], 10) === season && parseInt(m[2], 10) === episode;
+          const fileS = parseInt(m[1], 10);
+          const fileE = parseInt(m[2], 10);
+          if (fileS === season && fileE === episode) return true;
+          // Remap anime : fichier S02E01 pour sélection TMDB S01E25
+          if (
+            sceneSeason != null &&
+            sceneEpisode != null &&
+            sceneEpisode > 0 &&
+            fileS === sceneSeason &&
+            fileE === sceneEpisode
+          ) {
+            return true;
+          }
+          return false;
         };
         const fp = filePath && String(filePath).trim() ? String(filePath).trim() : '';
         const dp =
@@ -503,16 +532,22 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
         if (files.length > 0) {
           // 1. Si on a des infos de saison/épisode, chercher un matching SxxExx précis
           if (season != null && episode != null && episode > 0) {
-            const sStr = season.toString().padStart(2, '0');
-            const eStr = episode.toString().padStart(2, '0');
-            // Formats: S01E05, S1E5, 01x05, 1x5, S01.E05, etc.
-            const patterns = [
-              new RegExp(`s0?${season}e0?${episode}\\b`, 'i'),
-              new RegExp(`${season}x0?${episode}\\b`, 'i'),
-              new RegExp(`s0?${season}[.\\s-]e0?${episode}\\b`, 'i'),
-              // Cas spécifique pour les fichiers nommés juste par le numéro d'épisode dans un dossier de saison
-              new RegExp(`\\D0?${episode}\\.\\b`, 'i') 
-            ];
+            // Formats: S01E05, S1E5, 01x05, 1x5, S01.E05 — + remap scène (S02E01 pour TMDB S01E25)
+            const pairs: Array<{ s: number; e: number }> = [{ s: season, e: episode }];
+            if (
+              sceneSeason != null &&
+              sceneEpisode != null &&
+              sceneEpisode > 0 &&
+              (sceneSeason !== season || sceneEpisode !== episode)
+            ) {
+              pairs.push({ s: sceneSeason, e: sceneEpisode });
+            }
+            const patterns = pairs.flatMap(({ s, e }) => [
+              new RegExp(`s0?${s}e0?${e}\\b`, 'i'),
+              new RegExp(`${s}x0?${e}\\b`, 'i'),
+              new RegExp(`s0?${s}[.\\s-]e0?${e}\\b`, 'i'),
+              new RegExp(`\\D0?${e}\\.\\b`, 'i'),
+            ]);
 
             const episodePool = playableVideos(files);
             const matchByPattern = episodePool.find(f => patterns.some(p => p.test(f.path)));
