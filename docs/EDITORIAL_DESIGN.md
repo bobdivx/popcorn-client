@@ -30,7 +30,7 @@ Sous `html[data-editorial]`, `--ds-accent-violet` est mappé vers `--ed-accent` 
 - Pas de cards décoratives ; cards seulement pour une interaction réelle.
 - Hero full-bleed (`.ed-hero`) ; pas d’image hero en carte flottante.
 - Rangées catalogue : `.ed-row` + `.ed-row-title` (compteur 01 / 02…).
-- Loader unique : `.ed-loader` / `DsLoader` (trait corail).
+- Loader unique : `.ed-loader` / `DsLoader` — pages (`lg`/`xl`) = marque Popcornn + titre + trait corail (identique à `#popcorn-loading-fallback`) ; `xs`/`sm` = anneau fin.
 - Motion : fondus courts (`.ed-fade`) ; voir aussi [`MOTION.md`](./MOTION.md). Sur TV / webOS, blur et ombres coûteux sont coupés.
 
 ## Patterns UI
@@ -39,7 +39,11 @@ Sous `html[data-editorial]`, `--ds-accent-violet` est mappé vers `--ed-accent` 
 | --- | --- |
 | Nav | overrides `.navbar-tv`, `.nav-tab` |
 | Fiche média | `.ed-detail-head`, `[data-tv-media-detail]`, actions `.gtv-pill-btn` / `[data-media-detail-primary-action]` |
-| Overlay lecture / download | `[data-playback-overlay]`, `.ed-playback-panel`, `.ed-playback-inline`, `.ed-playback-btn` |
+| Version recommandée | `.ed-assist` + faits `.ed-assist__facts` (qualité / langue / sources) |
+| Métadonnées / genres | `.ed-meta`, `.ed-genres` (filets, pas de pills) |
+| Saisons / épisodes | `.ed-episodes-panel`, `.ed-season-block`, `.ed-ep-card` (layout cartes, polish typo/corail) |
+| Tuiles browse / carousels | `.ed-browse-card` + caption overlay `.ed-browse-card__caption` (méta sur l’affiche) |
+| Overlay lecture / download | `[data-playback-overlay]`, `.ed-playback-splash` (marque + titre + piste corail d’états), `.ed-playback-inline`, `.ed-playback-btn` |
 | Modales | `.ds-modal-glass` restylé (barre gradient masquée, coins nets) |
 
 ## Do / Don’t

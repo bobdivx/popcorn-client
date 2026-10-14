@@ -12,10 +12,18 @@ export interface DsLoaderProps {
   children?: ComponentChildren;
 }
 
+/** « Chargement... » / « Loading… » → titre display générique. */
+function isGenericLoadingText(text?: string): boolean {
+  if (!text) return true;
+  const cleaned = text.replace(/\.{2,}$/u, '').replace(/…$/u, '').trim().toLowerCase();
+  return cleaned === 'chargement' || cleaned === 'loading';
+}
+
 /**
  * Indicateur de chargement unique de l’app (style éditorial, identique à l’écran de démarrage) :
  * - xs / sm : anneau fin corail (boutons, chips, cartes) ;
- * - md / lg / xl : trait corail animé + libellé en capitales espacées (overlays, pages, lecteur).
+ * - md : trait corail + libellé (overlays compacts) ;
+ * - lg / xl : composition page = marque + titre + trait (comme #popcorn-loading-fallback).
  */
 export function DsLoader({ size = 'lg', text, className = '', children }: DsLoaderProps) {
   if (size === 'xs' || size === 'sm') {
@@ -28,6 +36,27 @@ export function DsLoader({ size = 'lg', text, className = '', children }: DsLoad
       />
     );
   }
+
+  const isPage = (size === 'lg' || size === 'xl') && children == null;
+
+  if (isPage) {
+    const subtitle = text && !isGenericLoadingText(text) ? text : null;
+    return (
+      <div
+        class={`ed-loader ed-loader--${size} ed-loader--page ${className}`.trim()}
+        role="status"
+        aria-busy="true"
+        aria-live="polite"
+        aria-label={text || 'Chargement'}
+      >
+        <div class="ed-loader__brand">Popcornn</div>
+        <h1 class="ed-loader__title">Chargement</h1>
+        <div class="ed-loader__line" />
+        {subtitle ? <p class="ed-loader__label">{subtitle}</p> : null}
+      </div>
+    );
+  }
+
   return (
     <div
       class={`ed-loader ed-loader--${size} ${className}`.trim()}

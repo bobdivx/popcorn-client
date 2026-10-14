@@ -39,12 +39,15 @@ export default function TorrentCardsShadowLoader({
               >
                 <div className="relative aspect-[2/3] lg:aspect-video xl:aspect-[16/9] rounded-xl border border-white/10 bg-[#141414] overflow-hidden shadow-lg">
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[shimmer_2s_infinite_linear] w-[200%] -translate-x-full" />
-                </div>
-                <div className="mt-3 h-4 w-3/4 rounded bg-white/5 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[shimmer_2s_infinite_linear] w-[200%] -translate-x-full" />
-                </div>
-                <div className="mt-2 h-3 w-1/3 rounded bg-white/5 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent animate-[shimmer_2s_infinite_linear] w-[200%] -translate-x-full" />
+                  <div className="absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
+                  <div className="absolute inset-x-0 bottom-0 px-2.5 pb-2.5 space-y-1.5">
+                    <div className="h-3.5 w-4/5 rounded bg-white/15 relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-[shimmer_2s_infinite_linear] w-[200%] -translate-x-full" />
+                    </div>
+                    <div className="h-2.5 w-2/5 rounded bg-white/10 relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-[shimmer_2s_infinite_linear] w-[200%] -translate-x-full" />
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}

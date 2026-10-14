@@ -177,7 +177,16 @@ export default function AiSettingsPanel() {
 
       <div className="space-y-3">
         <h2 className="text-base font-semibold text-[var(--ds-text-primary)]">{t('ai.preview')}</h2>
-        <AiAssist mode="explain" summary={t('ai.previewExplain')} />
+        <AiAssist
+          mode="explain"
+          title={t('ai.releaseTitle')}
+          summary={t('ai.releaseExplain')}
+          facts={[
+            { label: t('ai.factQuality'), value: '1080p' },
+            { label: t('ai.factLanguage'), value: 'Multi' },
+            { label: t('ai.factSources'), value: t('ai.factSourcesValue', { count: 40 }) },
+          ]}
+        />
         <AiAssist
           mode="pick"
           summary={t('ai.previewPick')}
