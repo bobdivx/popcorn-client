@@ -324,3 +324,74 @@ html[data-editorial] [data-tv-media-detail] > .fixed.z-0 > div[style*='backgroun
 @media (max-width: 767px) {
   html[data-editorial] [data-tv-media-detail] > .fixed.z-0 { height: max(78svh, 520px); }
 }
+
+/* ==========================================================================
+   TV / webOS (10-foot) — html[data-tv-platform][data-editorial]
+   Tailles agrandies, anneaux de focus corail visibles (D-pad), pas de hover requis,
+   effets coûteux (blur, longues transitions) coupés pour rester fluide sur webOS.
+   ========================================================================== */
+html[data-tv-platform][data-editorial] {
+  --ed-gutter: 5.5rem;
+  --ed-track-xl: 0.36em;
+}
+html[data-tv-platform][data-editorial] body { font-weight: 300; }
+
+/* Focus télécommande : anneau corail net, sans halo flou */
+html[data-tv-platform][data-editorial] :is(a, button, [tabindex], [data-focusable]):focus,
+html[data-tv-platform][data-editorial] :is(a, button, [tabindex], [data-focusable]):focus-visible,
+html[data-tv-platform][data-editorial] .tv-focused,
+html[data-tv-platform][data-editorial] [data-tv-focused='true'] {
+  outline: 3px solid var(--ed-accent) !important;
+  outline-offset: 5px !important;
+}
+html[data-tv-platform][data-editorial] .ed-cta:focus {
+  outline-color: #fff !important;
+  background: var(--ed-accent-hover);
+  transform: scale(1.04);
+}
+html[data-tv-platform][data-editorial] .ed-play:focus { outline: none !important; }
+html[data-tv-platform][data-editorial] .ed-play:focus .ed-play__ring {
+  border: 3px solid var(--ed-accent); background: rgba(242, 84, 91, 0.22); transform: scale(1.1);
+}
+html[data-tv-platform][data-editorial] .ed-arrow:focus { color: var(--ed-accent); opacity: 1; border-radius: 999px; }
+html[data-tv-platform][data-editorial] .ed-link:focus { color: var(--ed-ink); border-color: var(--ed-accent); }
+html[data-tv-platform][data-editorial] .nav-tab:focus { color: var(--ed-ink) !important; outline-offset: 2px !important; }
+html[data-tv-platform][data-editorial] .nav-avatar-btn:focus { box-shadow: 0 0 0 3px var(--ed-accent) !important; }
+
+/* Hero TV : 10-foot */
+html[data-tv-platform][data-editorial] .ed-hero { height: 100vh; min-height: 0; margin-top: calc(-5rem - var(--safe-area-inset-top, 0px)); }
+html[data-tv-platform][data-editorial] .ed-hero__inner { padding: 8rem var(--ed-gutter) 7rem; grid-template-columns: 1.1fr 0.9fr; }
+html[data-tv-platform][data-editorial] .ed-hero__left { max-width: 40rem; }
+html[data-tv-platform][data-editorial] .ed-kicker { font-size: 1.3rem; }
+html[data-tv-platform][data-editorial] .ed-title { font-size: 4.4rem; letter-spacing: 0.26em !important; }
+html[data-tv-platform][data-editorial] .ed-number { font-size: 10rem; -webkit-text-stroke-width: 2px; }
+html[data-tv-platform][data-editorial] .ed-subtitle { font-size: 1.5rem; }
+html[data-tv-platform][data-editorial] .ed-synopsis { font-size: 1.25rem; line-height: 1.7; max-width: 38rem; -webkit-line-clamp: 3; color: rgba(244, 241, 236, 0.8); }
+html[data-tv-platform][data-editorial] .ed-signal { font-size: 0.95rem; }
+html[data-tv-platform][data-editorial] .ed-cta { font-size: 1.05rem; min-width: 18rem; padding: 1.4rem 2.6rem; min-height: 68px; }
+html[data-tv-platform][data-editorial] .ed-cta svg { width: 1.4rem; height: 1.4rem; }
+html[data-tv-platform][data-editorial] .ed-link { font-size: 1rem; padding: 0.6rem 0.2rem; }
+html[data-tv-platform][data-editorial] .ed-play__ring { width: 7rem; height: 7rem; }
+html[data-tv-platform][data-editorial] .ed-play__ring svg { width: 1.8rem; height: 1.8rem; }
+html[data-tv-platform][data-editorial] .ed-play__label { font-size: 1.05rem; }
+html[data-tv-platform][data-editorial] .ed-pager { font-size: 1.05rem; bottom: 3rem; gap: 1.5rem; }
+html[data-tv-platform][data-editorial] .ed-pager__track { width: 16rem; }
+html[data-tv-platform][data-editorial] .ed-arrow { width: 3.5rem; height: 3.5rem; }
+html[data-tv-platform][data-editorial] .ed-arrow svg { width: 1.8rem; height: 1.8rem; }
+html[data-tv-platform][data-editorial] .ed-hero__close { width: 4rem; height: 4rem; top: 3rem; }
+
+/* Rangées / nav TV */
+html[data-tv-platform][data-editorial] .ed-row-title { font-size: 1.45rem !important; }
+html[data-tv-platform][data-editorial] .ed-row-title::before { font-size: 1rem; }
+html[data-tv-platform][data-editorial] .nav-tab { font-size: 1rem !important; padding: 0.8rem 1.2rem !important; }
+html[data-tv-platform][data-editorial] .gtv-pill-btn { font-size: 1rem !important; }
+html[data-tv-platform][data-editorial] .ed-detail-head .ed-title { font-size: 3.6rem; }
+html[data-tv-platform][data-editorial] .ed-detail-head .ed-kicker { font-size: 1.2rem; }
+
+/* Performance webOS / TV : pas de blur, fondus courts, pas de zoom lent sur l'image */
+html[data-tv-platform][data-editorial] .navbar-tv.navbar-scrolled { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; background: rgba(10, 11, 14, 0.94) !important; }
+html[data-tv-platform][data-editorial] .ed-hero__bg { transform: none !important; transition: opacity 0.6s linear; will-change: opacity; }
+html[data-tv-platform][data-editorial] .ed-fade > * { animation-duration: 0.35s; animation-delay: 0s !important; }
+html[data-webos='true'][data-editorial] .ed-fade > * { animation: none; }
+html[data-webos='true'][data-editorial] [data-tv-media-detail] > .fixed.z-0 { -webkit-mask-image: none; mask-image: none; }
+html[data-webos='true'][data-editorial] .ed-hero__close { background: rgba(0, 0, 0, 0.6); }
