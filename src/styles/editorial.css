@@ -327,6 +327,331 @@ html[data-editorial] .btn-primary {
 .ed-detail-head .ed-rule { display: block; width: 4rem; height: 1px; background: var(--ed-accent); margin: 1.4rem 0 0; }
 .ed-detail-head .ed-logo { max-height: 6rem; width: auto; object-fit: contain; object-position: left; margin-bottom: 1.2rem; }
 
+/* Assistance IA / version recommandée */
+.ed-assist {
+  border: 1px solid var(--ed-line-strong);
+  background: rgba(10, 11, 14, 0.72);
+  padding: 1.1rem 1.15rem 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  font-family: var(--ed-font-body);
+}
+.ed-assist__kicker {
+  margin: 0;
+  font-family: var(--ed-font-display);
+  font-weight: 300;
+  font-size: 0.68rem;
+  letter-spacing: var(--ed-track-xl);
+  text-transform: uppercase;
+  color: var(--ed-ink-dim);
+}
+.ed-assist__summary {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 300;
+  line-height: 1.45;
+  color: var(--ed-ink);
+  max-width: 40rem;
+}
+.ed-assist__summary--muted { color: var(--ed-ink-dim); }
+.ed-assist__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem 0.7rem;
+  margin: 0;
+}
+.ed-assist__fact {
+  min-width: 5.5rem;
+  padding: 0.45rem 0.7rem 0.5rem;
+  border: 1px solid var(--ed-line);
+  background: rgba(255, 255, 255, 0.03);
+}
+.ed-assist__fact dt {
+  margin: 0 0 0.2rem;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ed-ink-faint);
+  font-weight: 400;
+}
+.ed-assist__fact dd {
+  margin: 0;
+  font-family: var(--ed-font-display);
+  font-weight: 300;
+  font-size: 0.95rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ed-ink);
+}
+.ed-assist__choices {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 0.55rem;
+}
+.ed-assist__choice {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 44px;
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--ed-line-strong);
+  background: transparent;
+  color: var(--ed-ink);
+}
+.ed-assist__choice:hover { border-color: var(--ed-accent); }
+.ed-assist__choice-img {
+  width: 2.5rem;
+  height: 3.5rem;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+.ed-assist__choice-text { min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+.ed-assist__choice-label {
+  font-family: var(--ed-font-display);
+  font-weight: 300;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ed-assist__choice-detail { font-size: 0.75rem; color: var(--ed-ink-dim); }
+.ed-assist__actions { display: flex; flex-wrap: wrap; gap: 0.55rem; }
+.ed-assist__btn {
+  min-height: 44px;
+  padding: 0.55rem 1.15rem;
+  font-family: var(--ed-font-display);
+  font-weight: 400;
+  font-size: 0.7rem;
+  letter-spacing: var(--ed-track-md);
+  text-transform: uppercase;
+  border: 0;
+}
+.ed-assist__btn--primary { background: var(--ed-accent); color: #fff; }
+.ed-assist__btn--primary:hover { background: var(--ed-accent-hover); }
+.ed-assist__btn--primary:disabled { opacity: 0.5; }
+.ed-assist__btn--ghost {
+  background: transparent;
+  color: var(--ed-ink);
+  border: 1px solid var(--ed-line-strong);
+}
+.ed-assist__btn--ghost:hover { border-color: var(--ed-ink-dim); }
+html[data-tv-platform] .ed-assist__fact dd { font-size: 1.15rem; }
+html[data-tv-platform] .ed-assist__btn { min-height: 56px; font-size: 0.85rem; padding: 0.7rem 1.4rem; }
+
+/* Métadonnées / genres fiche */
+.ed-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 1.1rem;
+  font-size: 0.85rem;
+  color: var(--ed-ink-dim);
+  font-weight: 300;
+}
+.ed-meta__item { color: var(--ed-ink); letter-spacing: 0.04em; }
+.ed-genres {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.9rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ed-genres li {
+  font-family: var(--ed-font-display);
+  font-weight: 300;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ed-ink-dim);
+  border-bottom: 1px solid rgba(242, 84, 91, 0.35);
+  padding-bottom: 0.15rem;
+}
+
+/* Sélecteur qualité / langue */
+.ed-quality-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 2rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--ed-line-strong);
+  background: transparent;
+  color: var(--ed-ink-dim);
+  font-family: var(--ed-font-display);
+  font-weight: 300;
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.ed-quality-btn.is-selected {
+  color: var(--ed-ink);
+  border-color: var(--ed-accent);
+  box-shadow: inset 0 -1px 0 var(--ed-accent);
+}
+.ed-quality-btn.is-preferred:not(.is-selected)::after {
+  content: '';
+  width: 0.35rem;
+  height: 0.35rem;
+  background: var(--ed-accent);
+  margin-left: 0.15rem;
+}
+.ed-quality-btn__count { opacity: 0.55; font-size: 0.6rem; letter-spacing: 0.08em; }
+
+/* Saisons / épisodes */
+.ed-seasons { display: flex; flex-direction: column; gap: 2.25rem; }
+.ed-season { border: 0; background: transparent; }
+.ed-season__head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+  padding: 0 0.15rem;
+}
+.ed-season__title {
+  margin: 0;
+  font-family: var(--ed-font-display);
+  font-weight: 300;
+  font-size: 1rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ed-ink);
+}
+.ed-season__count {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ed-ink-faint);
+}
+.ed-season__rule {
+  flex: 1;
+  height: 1px;
+  background: var(--ed-line);
+  min-width: 2rem;
+}
+.ed-episode-card {
+  text-align: left;
+  flex-shrink: 0;
+  width: 280px;
+  border: 1px solid var(--ed-line);
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  transition: border-color 0.2s ease, background-color 0.2s ease, opacity 0.2s ease;
+}
+@media (min-width: 640px) { .ed-episode-card { width: 320px; } }
+.ed-episode-card:hover { border-color: var(--ed-line-strong); background: rgba(255, 255, 255, 0.05); }
+.ed-episode-card.is-selected {
+  border-color: var(--ed-accent);
+  background: rgba(242, 84, 91, 0.08);
+}
+.ed-episode-card.is-resume {
+  border-color: rgba(242, 84, 91, 0.55);
+  box-shadow: inset 0 -2px 0 var(--ed-accent);
+}
+.ed-episode-card.is-unavailable { opacity: 0.48; }
+.ed-episode-card__media {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.35);
+}
+.ed-episode-card__media img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+.ed-episode-card__shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72), transparent 55%);
+}
+.ed-episode-card__badge {
+  position: absolute;
+  left: 0.7rem;
+  top: 0.7rem;
+  z-index: 2;
+  font-family: var(--ed-font-display);
+  font-size: 0.62rem;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ed-ink);
+  border-bottom: 1px solid rgba(242, 84, 91, 0.55);
+  padding-bottom: 0.1rem;
+}
+.ed-episode-card__flags {
+  position: absolute;
+  left: 0.7rem;
+  top: 2.1rem;
+  z-index: 2;
+  display: flex;
+  gap: 0.35rem;
+}
+.ed-episode-card__flag {
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ed-ink);
+  border: 1px solid var(--ed-line-strong);
+  padding: 0.15rem 0.4rem;
+  background: rgba(0, 0, 0, 0.45);
+}
+.ed-episode-card__flag--local { border-color: rgba(242, 84, 91, 0.55); }
+.ed-episode-card__action {
+  position: absolute;
+  right: 0.7rem;
+  bottom: 0.7rem;
+  z-index: 2;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--ed-line-strong);
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--ed-ink);
+}
+.ed-episode-card.is-selected .ed-episode-card__action,
+.ed-episode-card:hover .ed-episode-card__action {
+  background: var(--ed-accent);
+  border-color: var(--ed-accent);
+  color: #fff;
+}
+.ed-episode-card__body { padding: 0.85rem 0.9rem 1rem; }
+.ed-episode-card__title {
+  font-family: var(--ed-font-display);
+  font-weight: 300;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: var(--ed-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ed-episode-card__meta {
+  margin-top: 0.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.85rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ed-ink-faint);
+}
+.ed-episode-card__meta .is-good { color: rgba(242, 84, 91, 0.9); }
+html[data-tv-platform] .ed-season__title { font-size: 1.25rem; }
+html[data-tv-platform] .ed-episode-card { width: 340px; }
+
 /* Fiche média : le fond (image / bande-annonce) occupe la zone hero, plein cadre sous la nav.
    Le conteneur parent garde un transform (animate-fade-in-up), ce qui faisait de `position: fixed`
    un positionnement relatif à toute la page : l'image s'étirait sur toute la hauteur et
