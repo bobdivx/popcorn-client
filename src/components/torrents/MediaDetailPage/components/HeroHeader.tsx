@@ -1,5 +1,3 @@
-import { useState } from 'preact/hooks';
-import { isTVPlatform } from '../../../../lib/utils/device-detection';
 import type { MediaDetailPageProps } from '../types';
 
 export function HeroHeader({
@@ -15,8 +13,7 @@ export function HeroHeader({
   const title = displayTitle.trim() || torrent.name;
   const year = torrent.releaseDate ? new Date(torrent.releaseDate).getFullYear() : null;
 
-  const [isTV] = useState(() => isTVPlatform());
-  if (!isTV) {
+  // Design éditorial sur toutes les plateformes (web, mobile, TV/webOS).
     return (
       <div className="ed-detail-head ds-stream-cascade mb-10 sm:mb-12">
         {torrent.logoUrl && <img data-stream-item src={torrent.logoUrl} alt="" className="ed-logo drop-shadow-2xl" style={{ maxWidth: 'min(22rem, 80vw)' }} />}
@@ -25,37 +22,4 @@ export function HeroHeader({
         <span data-stream-item className="ed-rule" aria-hidden />
       </div>
     );
-  }
-
-  return (
-    <div className="max-w-4xl ds-stream-cascade">
-      <div className="mb-10 sm:mb-12 md:mb-14">
-        {torrent.logoUrl && (
-          <img
-            data-stream-item
-            src={torrent.logoUrl}
-            alt=""
-            className="max-h-14 sm:max-h-16 md:max-h-20 lg:max-h-24 xl:max-h-28 w-auto object-contain object-left mb-4 sm:mb-5 drop-shadow-2xl"
-            style={{ maxWidth: 'min(24rem, 85vw)' }}
-          />
-        )}
-        <div data-stream-item className="flex items-baseline gap-4 flex-wrap">
-          <h1
-            className={`font-bold leading-tight ${
-              torrent.logoUrl
-                ? 'text-lg sm:text-xl md:text-2xl lg:text-3xl text-white/90'
-                : 'text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl text-white'
-            }`}
-          >
-            {title}
-          </h1>
-          {year != null && (
-            <span className="text-white/50 font-normal text-xl sm:text-2xl md:text-3xl lg:text-4xl tabular-nums">
-              {year}
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 }
