@@ -790,7 +790,7 @@ export default function Wizard() {
       <aside class="wizard-sidebar">
         <div class="wizard-logo">
           <div class="wizard-logo-icon">
-            <img src="/popcorn_logo.png" alt="Popcorn" style="width:22px;height:22px;object-fit:contain;" />
+            <img src="/popcorn_logo.png" alt="Popcornn" style="width:22px;height:22px;object-fit:contain;" />
           </div>
           <div>
             <div class="wizard-logo-text">Popcorn</div>

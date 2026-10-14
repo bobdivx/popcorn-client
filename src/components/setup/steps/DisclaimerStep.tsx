@@ -22,7 +22,7 @@ export function DisclaimerStep({ focusedButtonIndex, buttonRefs, onNext }: Discl
     {
       num: '1',
       title: "Nature de l'Application",
-      content: "Popcorn Client est un outil technique permettant de se connecter à un serveur distant pour la recherche, le téléchargement et la lecture de contenu multimédia via le protocole BitTorrent. Cette application est fournie \"en l'état\" à des fins éducatives et techniques uniquement.",
+      content: "Popcornn est un outil technique permettant de se connecter à un serveur distant pour la recherche, le téléchargement et la lecture de contenu multimédia via le protocole BitTorrent. Cette application est fournie \"en l'état\" à des fins éducatives et techniques uniquement.",
     },
     {
       num: '2',
