@@ -25,6 +25,8 @@ import { PlaybackStatusSurface } from '../../../streaming/player-shared/componen
 import { Modal } from '../../../ui/Modal';
 import { DsLoader } from '../../../ui/DsLoader';
 import { isTVPlatform } from '../../../../lib/utils/device-detection';
+import { getLibraryDisplayConfig } from '../../../../lib/utils/library-display-config';
+import { candidatesExcluding3DUnlessAllowed } from '../../../../lib/torrents/is3dTorrent';
 import { MediaDetailBackLink } from './ActionsRow';
 import type { Ref } from 'preact';
 
@@ -78,6 +80,10 @@ interface ActionButtonsProps {
 
 function selectBestTorrent(variants: MediaDetailPageProps['torrent'][]): MediaDetailPageProps['torrent'] | null {
   if (!variants || variants.length === 0) return null;
+  const allow3d = getLibraryDisplayConfig().allow3dTorrents === true;
+  const pool = candidatesExcluding3DUnlessAllowed(variants, allow3d);
+  const list = pool.length > 0 ? pool : allow3d ? variants : [];
+  if (list.length === 0) return null;
   const getQualityScore = (t: MediaDetailPageProps['torrent']): number => {
     let score = 0;
     const quality = t.quality;
@@ -96,7 +102,7 @@ function selectBestTorrent(variants: MediaDetailPageProps['torrent'][]): MediaDe
     score += (t.seedCount || 0) * 0.1;
     return score;
   };
-  return [...variants].sort((a, b) => getQualityScore(b) - getQualityScore(a))[0] || null;
+  return [...list].sort((a, b) => getQualityScore(b) - getQualityScore(a))[0] || null;
 }
 
 export function ActionButtons({
