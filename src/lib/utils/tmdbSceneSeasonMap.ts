@@ -141,6 +141,8 @@ export function isSeasonPackReleaseName(rawName: string): boolean {
 /**
  * Un pack scène S0N correspond-il à l’épisode TMDB (saison continue) ?
  * S02 pack → épisodes du 2ᵉ cour uniquement.
+ * Important : en mode continu, ne PAS faire matcher un pack S01 sur E25+
+ * (sinon lecture cassée : fichiers S01E01–E24 pour une case S01E25).
  */
 export function scenePackMatchesTmdbEpisode(
   tmdbSeason: number,
@@ -151,20 +153,19 @@ export function scenePackMatchesTmdbEpisode(
   if (!isSeasonPackReleaseName(rawName)) return false;
   const packSeason = parseSceneSeasonFromName(rawName);
 
-  if (packSeason != null && packSeason === tmdbSeason) return true;
-
   if (
     opts?.continuous &&
     tmdbSeason === 1 &&
     tmdbEpisode > 0 &&
     opts.courStarts &&
-    opts.courStarts.length > 1 &&
-    packSeason != null &&
-    packSeason >= 1
+    opts.courStarts.length > 1
   ) {
+    if (packSeason == null || packSeason < 1) return false;
     const scene = tmdbAbsoluteToScene(tmdbEpisode, opts.courStarts);
     return packSeason === scene.season;
   }
+
+  if (packSeason != null && packSeason === tmdbSeason) return true;
 
   return false;
 }
