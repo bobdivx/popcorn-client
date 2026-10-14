@@ -1297,19 +1297,25 @@ export default function MediaDetailRoute() {
                     setSeriesEpisodes(null);
                   }
 
-                  void runBackgroundSeriesIndexerRefresh({
-                    cancelled,
-                    tmdbId,
-                    titleHint: titleFromQuery ?? undefined,
-                    mediaType: mediaTypeFromQuery ?? 'tv',
-                    contentId,
-                    groupSlug: groupSlugForEpisodes,
-                    libraryVariants: mergedVariants,
-                    onVariants: (variants) => setInitialVariants(variants),
-                    onSeriesEpisodes: (payload) => setSeriesEpisodes(payload),
-                  }).catch(() => {
-                    /* ignore */
-                  });
+                  // Évite un flood C411 (429) si les packs scène S02+ sont déjà en base.
+                  const hasScenePacks = mergedVariants.some((v) =>
+                    /\bS\.?0?[2-9]\b/i.test(v.name || v.cleanTitle || ''),
+                  );
+                  if (!hasScenePacks) {
+                    void runBackgroundSeriesIndexerRefresh({
+                      cancelled,
+                      tmdbId,
+                      titleHint: titleFromQuery ?? undefined,
+                      mediaType: mediaTypeFromQuery ?? 'tv',
+                      contentId,
+                      groupSlug: groupSlugForEpisodes,
+                      libraryVariants: mergedVariants,
+                      onVariants: (variants) => setInitialVariants(variants),
+                      onSeriesEpisodes: (payload) => setSeriesEpisodes(payload),
+                    }).catch(() => {
+                      /* ignore */
+                    });
+                  }
 
                   setLoading(false);
                   return;
@@ -1402,18 +1408,24 @@ export default function MediaDetailRoute() {
 
             setTorrent(torrentPayload);
             if (isTvDetail) {
-              void runBackgroundSeriesIndexerRefresh({
-                cancelled,
-                tmdbId,
-                titleHint: data?.main_title || titleFromQuery,
-                mediaType: 'tv',
-                contentId: best.id,
-                groupSlug: data?.slug,
-                onVariants: (variants) => setInitialVariants(variants),
-                onSeriesEpisodes: (payload) => setSeriesEpisodes(payload),
-              }).catch(() => {
-                /* ignore */
-              });
+              const tvVariants = (data?.variants ?? []) as Array<{ name?: string; cleanTitle?: string }>;
+              const hasScenePacks = tvVariants.some((v) =>
+                /\bS\.?0?[2-9]\b/i.test(v.name || v.cleanTitle || ''),
+              );
+              if (!hasScenePacks) {
+                void runBackgroundSeriesIndexerRefresh({
+                  cancelled,
+                  tmdbId,
+                  titleHint: data?.main_title || titleFromQuery,
+                  mediaType: 'tv',
+                  contentId: best.id,
+                  groupSlug: data?.slug,
+                  onVariants: (variants) => setInitialVariants(variants),
+                  onSeriesEpisodes: (payload) => setSeriesEpisodes(payload),
+                }).catch(() => {
+                  /* ignore */
+                });
+              }
             }
             setLoading(false);
             return;
