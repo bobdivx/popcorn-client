@@ -11,6 +11,7 @@ import {
 } from '../dashboard/utils/previewTrailerStore';
 import { contentItemKey } from '../dashboard/utils/browsePriority';
 import { reanchorBrowseSlot } from './browseCarouselAnchor';
+import { cardBackdropUrl, cardPosterUrl } from '../../lib/utils/tmdb-images';
 import {
   ensureBrowseInputModalityTracking,
   isBrowseKeyboardFocus,
@@ -114,7 +115,7 @@ export function TitlePreviewCard({
     typeof item.trailerKey === 'string' && item.trailerKey.trim().length > 0
       ? item.trailerKey.trim()
       : null;
-  // Une seule image (poster) : pas de swap backdrop au focus (= réseau / CPU inutiles).
+  // Au moins une image requise pour afficher la tuile.
   const poster = item.poster || item.backdrop;
   const title = getDisplayTitle(item);
   const tvLayout = isTVPlatform();
@@ -217,6 +218,15 @@ export function TitlePreviewCard({
 
   if (!poster) return null;
 
+  // Cadrage : format paysage (TV ou focus télécommande) = backdrop 16:9 ; portrait = affiche 2:3.
+  // Si l'image du bon format manque, l'autre est affichée entière (contain) sur un fond flouté.
+  const landscape = tvLayout || expanded;
+  const preferred = landscape ? item.backdrop : item.poster;
+  const imgSrc = preferred
+    ? landscape ? cardBackdropUrl(preferred) : cardPosterUrl(preferred)
+    : landscape ? cardPosterUrl(item.poster) : cardBackdropUrl(item.backdrop);
+  const imgFit = preferred ? 'cover' : 'contain';
+
   const progressPct = (() => {
     if (typeof progress !== 'number') return 0;
     if (!downloading && progress <= 0) return 0;
@@ -246,11 +256,11 @@ export function TitlePreviewCard({
       <FocusableCard
         className={[
           'block w-full outline-none relative overflow-hidden rounded-md bg-[#141414]',
-          tvLayout ? '' : 'transition-[transform,box-shadow,filter] duration-150 ease-out',
+          tvLayout ? '' : 'transition-[transform,box-shadow] duration-150 ease-out',
           expanded
             ? ''
             : hovered
-              ? 'z-[2] scale-[1.04] shadow-[0_12px_28px_rgba(0,0,0,0.45)] brightness-110'
+              ? 'z-[2] scale-[1.03] shadow-[0_12px_28px_rgba(0,0,0,0.45)]'
               : 'shadow-none',
         ].join(' ')}
         style={{ width: '100%', height: tileH }}
@@ -276,12 +286,23 @@ export function TitlePreviewCard({
             </span>
           ) : null}
           <div className="absolute inset-0" aria-hidden>
+          {imgFit === 'contain' ? (
+            <img
+              src={imgSrc ?? poster}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="ed-card-img-fallback-bg absolute inset-0 h-full w-full object-cover"
+            />
+          ) : null}
           <img
-            src={poster}
+            src={imgSrc ?? poster}
             alt=""
             loading="lazy"
             decoding="async"
-            className="absolute inset-0 h-full w-full object-cover"
+            className={`ed-card-img absolute inset-0 h-full w-full ${
+              imgFit === 'cover' ? `object-cover ${landscape ? 'object-[center_top]' : 'object-center'}` : 'object-contain'
+            }`}
           />
 
           {playTrailer && expanded && trailerKey ? (

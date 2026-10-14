@@ -29,6 +29,9 @@ export function YouTubeVideoPlayer({
   const [isLoaded, setIsLoaded] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const isTv = typeof window !== 'undefined' && isTVPlatform();
+  /** webOS (app packagée) : l'autoplay avec son est autorisé — bandes-annonces sonores. */
+  const isWebOS =
+    typeof document !== 'undefined' && document.documentElement.getAttribute('data-webos') === 'true';
 
   useEffect(() => {
     setIsLoaded(true);
@@ -119,8 +122,8 @@ export function YouTubeVideoPlayer({
   }, [onEnded, loop, youtubeKey, isLoaded]);
 
   // Autoplay avec son : démarrer mute (politique navigateur), puis unmute.
-  // Sur TV on reste mute : unmute agressif + embed déclenche souvent le challenge « robot ».
-  const wantSound = autoplay && !muted && !isTv;
+  // Sur TV (hors webOS) on reste mute : unmute agressif + embed déclenche souvent le challenge « robot ».
+  const wantSound = autoplay && !muted && (!isTv || isWebOS);
   useEffect(() => {
     if (!wantSound || !isLoaded) return;
     const unmute = () => {
@@ -140,8 +143,8 @@ export function YouTubeVideoPlayer({
 
   const params = new URLSearchParams();
   if (autoplay) params.append('autoplay', '1');
-  // TV : toujours mute en autoplay (évite captcha + politiques média)
-  if (muted || wantSound || isTv) params.append('mute', '1');
+  // Web : démarrage mute puis unMute (politique autoplay). webOS : son direct. Autres TV : mute.
+  if (muted || (wantSound && !isWebOS) || (isTv && !isWebOS)) params.append('mute', '1');
   if (loop) {
     params.append('loop', '1');
     params.append('playlist', youtubeKey);

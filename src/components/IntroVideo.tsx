@@ -10,6 +10,28 @@ export default function IntroVideo({ onEnded, onSkip }: IntroVideoProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [showSkip, setShowSkip] = useState(false);
 
+  const skipIntroEntirely =
+    typeof document !== 'undefined' &&
+    (document.documentElement.getAttribute('data-webos') === 'true' ||
+      document.documentElement.getAttribute('data-tv-platform') === 'true');
+  const doneRef = useRef(false);
+  const finish = () => {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    videoRef.current?.pause();
+    onEnded();
+  };
+
+  // TV / webOS : pas d'intro. Ailleurs : passage auto si la vidéo ne démarre pas en 6 s.
+  useEffect(() => {
+    if (skipIntroEntirely) return finish();
+    const t = setTimeout(() => {
+      const v = videoRef.current;
+      if (!v || v.paused || v.currentTime < 0.5) finish();
+    }, 6000);
+    return () => clearTimeout(t);
+  }, []);
+
   useEffect(() => {
     // Afficher le bouton skip après 2 secondes
     const skipTimer = setTimeout(() => {
@@ -32,16 +54,10 @@ export default function IntroVideo({ onEnded, onSkip }: IntroVideoProps) {
     };
   }, []);
 
-  const handleEnded = () => {
-    onEnded();
-  };
+  const handleEnded = finish;
+  const handleSkip = finish;
 
-  const handleSkip = () => {
-    if (videoRef.current) {
-      videoRef.current.pause();
-    }
-    onEnded();
-  };
+  if (skipIntroEntirely) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
@@ -52,6 +68,7 @@ export default function IntroVideo({ onEnded, onSkip }: IntroVideoProps) {
         muted
         playsInline
         onEnded={handleEnded}
+        onError={finish}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
       >
@@ -62,7 +79,9 @@ export default function IntroVideo({ onEnded, onSkip }: IntroVideoProps) {
       {showSkip && (
         <button
           onClick={handleSkip}
-          className="absolute bottom-8 right-8 px-6 py-3 bg-black/70 hover:bg-black/90 text-white rounded-lg font-medium transition-all duration-300 backdrop-blur-sm border border-white/20"
+          autoFocus
+          data-focusable
+          className="ed-cta absolute bottom-8 right-8"
           aria-label="Passer l'intro"
         >
           Passer
