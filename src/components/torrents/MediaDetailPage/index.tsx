@@ -21,8 +21,6 @@ import { TorrentInfo } from './components/TorrentInfo';
 import { HeroHeader } from './components/HeroHeader';
 import { EpisodesArea } from './components/EpisodesArea';
 import { ActionsRow } from './components/ActionsRow';
-import { ReleaseHint } from '../../ai/ReleaseHint';
-import { TmdbMatchAssist } from '../../ai/TmdbMatchAssist';
 import { YouTubeVideoPlayer as VideoPlayer } from '../../ui/YouTubeVideoPlayer';
 import { redirectToCarPlayerIfNeeded } from '../../streaming/car-player/carPlaybackRedirect';
 import {
@@ -3377,7 +3375,6 @@ export default function MediaDetailPage({
                 trailerKey && !isPlayingTrailer ? () => setIsPlayingTrailer(true) : undefined
               }
               onOpenMovieTechInfo={
-                !isTvSeriesDetail &&
                 (() => {
                   const t = selectedTorrent || torrent;
                   const anyT = t as {
@@ -3385,31 +3382,15 @@ export default function MediaDetailPage({
                     indexerName?: string;
                     indexer_name?: string;
                   };
-                  return !!(
-                    anyT.downloadPath ||
-                    anyT.indexerName ||
-                    anyT.indexer_name ||
-                    hasInfoHash
-                  );
+                  const hasTech =
+                    !!anyT.downloadPath ||
+                    !!anyT.indexerName ||
+                    !!anyT.indexer_name ||
+                    hasInfoHash ||
+                    allVariants.length > 0;
+                  return hasTech ? () => setMovieTechInfoOpen(true) : undefined;
                 })()
-                  ? () => setMovieTechInfoOpen(true)
-                  : undefined
               }
-            />
-            <ReleaseHint
-              variants={allVariants}
-              selectedId={(selectedTorrent || torrent).id}
-              onSelect={(id) => {
-                const found = allVariants.find((variant) => variant.id === id);
-                if (found) setSelectedTorrent(found);
-              }}
-            />
-            <TmdbMatchAssist
-              infoHash={(selectedTorrent || torrent).infoHash}
-              title={(selectedTorrent || torrent).tmdbTitle || (selectedTorrent || torrent).mainTitle || (selectedTorrent || torrent).cleanTitle || (selectedTorrent || torrent).name}
-              confidence={(selectedTorrent || torrent).tmdbMatchConfidence}
-              currentTmdbId={(selectedTorrent || torrent).tmdbId}
-              mediaType={(selectedTorrent || torrent).tmdbType}
             />
             </ActionsRow>
             </div>

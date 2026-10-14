@@ -12,6 +12,11 @@ interface ReleaseHintProps {
   variants: MediaDetailPageProps['torrent'][];
   selectedId?: string | null;
   onSelect: (id: string) => void;
+  /**
+   * `card` (défaut) : affiche le bloc « Version selon vos préférences ».
+   * `none` : applique silencieusement la version préférée sans UI (fiche épurée).
+   */
+  ui?: 'card' | 'none';
 }
 
 function normalizeResolution(raw?: string | null): string {
@@ -53,11 +58,15 @@ function buildFacts(
   return facts;
 }
 
+type ReleaseCacheEntry = { summary: string; id: string | null };
+const releaseCache = new Map<string, ReleaseCacheEntry>();
+
 /**
  * Applique silencieusement la meilleure version selon les préférences utilisateur.
  * Pas de confirmation : l’utilisateur change de qualité/langue via les sélecteurs si besoin.
+ * UI optionnelle (`ui="card"`) pour la modal Info — la fiche détail reste épurée.
  */
-export function ReleaseHint({ variants, selectedId, onSelect }: ReleaseHintProps) {
+export function ReleaseHint({ variants, selectedId, onSelect, ui = 'card' }: ReleaseHintProps) {
   const { t, language } = useI18n();
   const enabled = useAiEnabled();
   const [summary, setSummary] = useState('');
@@ -70,11 +79,18 @@ export function ReleaseHint({ variants, selectedId, onSelect }: ReleaseHintProps
     () => variants.map((v) => v.id).join('|'),
     [variants],
   );
+  const cacheKey = `${language}|${variantsKey}`;
 
   useEffect(() => {
     if (!enabled || variants.length === 0) {
       setSummary('');
       setPickedId(null);
+      return;
+    }
+    const cached = releaseCache.get(cacheKey);
+    if (cached) {
+      setSummary(cached.summary);
+      setPickedId(cached.id);
       return;
     }
     let cancelled = false;
@@ -96,13 +112,18 @@ export function ReleaseHint({ variants, selectedId, onSelect }: ReleaseHintProps
         })),
       });
       if (cancelled || !res.success || !res.data?.summary) return;
-      setSummary(res.data.summary);
-      setPickedId(res.data.id || null);
+      const entry: ReleaseCacheEntry = {
+        summary: res.data.summary,
+        id: res.data.id || null,
+      };
+      releaseCache.set(cacheKey, entry);
+      setSummary(entry.summary);
+      setPickedId(entry.id);
     });
     return () => {
       cancelled = true;
     };
-  }, [enabled, language, variantsKey, variants]);
+  }, [cacheKey, enabled, language, variants]);
 
   // Auto-appliquer la version recommandée une fois par jeu de variantes (sans demander).
   useEffect(() => {
@@ -126,6 +147,7 @@ export function ReleaseHint({ variants, selectedId, onSelect }: ReleaseHintProps
 
   const facts = useMemo(() => buildFacts(activeVariant, t), [activeVariant, t]);
 
+  if (ui === 'none') return null;
   if (!summary && facts.length === 0) return null;
 
   return (
