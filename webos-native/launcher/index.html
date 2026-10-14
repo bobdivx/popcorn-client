@@ -38,12 +38,18 @@
       window['_bridge_' + method] = b; // garder la référence (sinon GC annule l'appel)
     } catch (e) { showErr('Service local indisponible : ' + e); }
   }
+  function perfQuery() {
+    try {
+      var p = window.PalmSystem && PalmSystem.launchParams ? JSON.parse(PalmSystem.launchParams || '{}') : {};
+      return p && p.perf ? '?__perf=1' : '';
+    } catch (e) { return ''; }
+  }
   function ping() {
     tries++;
     var x = new XMLHttpRequest();
     x.open('GET', BASE + '/__popcornn_ping?t=' + Date.now(), true);
     x.timeout = 1500;
-    x.onload = function () { if (x.status === 200) { window.location.replace(BASE + '/'); } else retry(); };
+    x.onload = function () { if (x.status === 200) { window.location.replace(BASE + '/' + perfQuery()); } else retry(); };
     x.onerror = x.ontimeout = retry;
     x.send();
   }
