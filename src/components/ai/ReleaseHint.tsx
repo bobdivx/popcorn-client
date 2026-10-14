@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { serverApi } from '../../lib/client/server-api';
 import { aiReady } from '../../lib/ai/prefs';
 import { useAiEnabled } from '../../lib/ai/prefs';
@@ -53,11 +53,23 @@ function buildFacts(
   return facts;
 }
 
+/**
+ * Applique silencieusement la meilleure version selon les préférences utilisateur.
+ * Pas de confirmation : l’utilisateur change de qualité/langue via les sélecteurs si besoin.
+ */
 export function ReleaseHint({ variants, selectedId, onSelect }: ReleaseHintProps) {
   const { t, language } = useI18n();
   const enabled = useAiEnabled();
   const [summary, setSummary] = useState('');
   const [pickedId, setPickedId] = useState<string | null>(null);
+  const appliedForVariantsRef = useRef<string>('');
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+
+  const variantsKey = useMemo(
+    () => variants.map((v) => v.id).join('|'),
+    [variants],
+  );
 
   useEffect(() => {
     if (!enabled || variants.length === 0) {
@@ -90,49 +102,38 @@ export function ReleaseHint({ variants, selectedId, onSelect }: ReleaseHintProps
     return () => {
       cancelled = true;
     };
-  }, [enabled, language, selectedId, variants]);
+  }, [enabled, language, variantsKey, variants]);
 
-  const pickedVariant = useMemo(
-    () => (pickedId ? variants.find((v) => v.id === pickedId) : undefined),
-    [pickedId, variants],
-  );
-  const facts = useMemo(() => buildFacts(pickedVariant, t), [pickedVariant, t]);
+  // Auto-appliquer la version recommandée une fois par jeu de variantes (sans demander).
+  useEffect(() => {
+    if (!pickedId || variants.length === 0) return;
+    const applyKey = `${variantsKey}::${pickedId}`;
+    if (appliedForVariantsRef.current === applyKey) return;
+    if (selectedId === pickedId) {
+      appliedForVariantsRef.current = applyKey;
+      return;
+    }
+    const exists = variants.some((v) => v.id === pickedId);
+    if (!exists) return;
+    appliedForVariantsRef.current = applyKey;
+    onSelectRef.current(pickedId);
+  }, [pickedId, selectedId, variants, variantsKey]);
+
+  const activeVariant = useMemo(() => {
+    const id = selectedId || pickedId;
+    return id ? variants.find((v) => v.id === id) : undefined;
+  }, [selectedId, pickedId, variants]);
+
+  const facts = useMemo(() => buildFacts(activeVariant, t), [activeVariant, t]);
 
   if (!summary && facts.length === 0) return null;
 
-  const different = Boolean(pickedId && selectedId && pickedId !== selectedId);
-  const explainSummary =
-    facts.length > 0
-      ? t('ai.releaseExplain')
-      : summary;
-  const confirmSummary =
-    facts.length > 0
-      ? t('ai.releaseConfirm')
-      : summary;
-
-  if (!different) {
-    return (
-      <AiAssist
-        mode="explain"
-        title={t('ai.releaseTitle')}
-        summary={explainSummary}
-        facts={facts}
-      />
-    );
-  }
-
   return (
     <AiAssist
-      mode="confirm"
+      mode="explain"
       title={t('ai.releaseTitle')}
-      summary={confirmSummary}
+      summary={facts.length > 0 ? t('ai.releaseExplain') : summary}
       facts={facts}
-      primaryLabel={t('ai.useThis')}
-      dismissLabel={t('ai.keepCurrent')}
-      onPrimary={() => {
-        if (pickedId) onSelect(pickedId);
-      }}
-      onDismiss={() => setPickedId(selectedId || null)}
     />
   );
 }
