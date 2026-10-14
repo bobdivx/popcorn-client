@@ -1,6 +1,6 @@
 {
     "id":  "com.popcorn.client.webos",
-    "version":  "1.2.65",
+    "version":  "1.3.65",
     "type":  "web",
     "main":  "index.html",
     "title":  "Popcornn",
@@ -12,5 +12,6 @@
     "disableBackHistoryAPI":  true,
     "transparent":  false,
     "handlesRelaunch":  false,
-    "bgColor":  "#D1C4E9"
+    "bgColor":  "#D1C4E9",
+    "requiredACG":  []
 }
