@@ -11,13 +11,18 @@ import type {
   SeriesEpisodeInfo,
   SeriesSeasonInfo,
 } from '../../../lib/client/server-api/media';
-import { episodeReleaseMatchesTmdbEpisode } from '../../../lib/utils/episodeReleaseMatch';
+import {
+  episodeReleaseMatchesTmdbEpisode,
+  episodeReleaseMatchesVariantName,
+} from '../../../lib/utils/episodeReleaseMatch';
 import {
   inferCourStartsFromAirDates,
   inferCourStartsFromSceneVariants,
   isContinuousTmdbSeasonLayout,
   scenePackMatchesTmdbEpisode,
 } from '../../../lib/utils/tmdbSceneSeasonMap';
+import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-config';
+import { candidatesExcluding3DUnlessAllowed } from '../../../lib/torrents/is3dTorrent';
 import { DsLoader } from '../../ui/DsLoader';
 
 type Torrent = MediaDetailPageProps['torrent'];
@@ -699,15 +704,21 @@ function pickBestTorrentFromGroupPayload(payload: any, titleHint?: string | null
     data;
 
   if (Array.isArray(torrents) && torrents.length > 0) {
+    const allow3d = getLibraryDisplayConfig().allow3dTorrents === true;
+    const pool = candidatesExcluding3DUnlessAllowed(torrents, allow3d);
+    // Si aucun 2D : ne pas forcer un 3D comme « meilleur » (évite FSBS en lecture classique).
+    const selectable = pool.length > 0 ? pool : allow3d ? torrents : [];
+    if (selectable.length === 0) return null;
+
     let best: any;
     if (titleHint && titleHint.trim().length > 0) {
-      const matching = torrents.filter((t: any) => variantMatchesTitle(t, titleHint));
+      const matching = selectable.filter((t: any) => variantMatchesTitle(t, titleHint));
       if (matching.length > 0) {
         best = matching.slice().sort((a: any, b: any) => normalizeSeedCount(b) - normalizeSeedCount(a))[0];
       }
     }
     if (!best) {
-      best = torrents.slice().sort((a: any, b: any) => normalizeSeedCount(b) - normalizeSeedCount(a))[0];
+      best = selectable.slice().sort((a: any, b: any) => normalizeSeedCount(b) - normalizeSeedCount(a))[0];
     }
     // Convertir le variant en objet torrent avec toutes les données nettoyées
     const converted = convertVariantToTorrent(best);

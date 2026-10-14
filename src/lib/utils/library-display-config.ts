@@ -19,6 +19,8 @@ export interface LibraryDisplayConfig {
   minQuality: string;
   /** Qualité préférée (prioritaire sans masquer les autres). Vide = aucune préférence */
   preferredQuality: string;
+  /** Autoriser découverte / téléchargement des releases 3D (SBS, HOU…). Défaut : false */
+  allow3dTorrents: boolean;
 }
 
 const DEFAULTS: LibraryDisplayConfig = {
@@ -30,6 +32,7 @@ const DEFAULTS: LibraryDisplayConfig = {
   mediaLanguages: [],
   minQuality: '',
   preferredQuality: '',
+  allow3dTorrents: false,
 };
 
 /**
@@ -46,6 +49,7 @@ export function getLibraryDisplayConfig(): LibraryDisplayConfig {
     mediaLanguages: Array.isArray(local.mediaLanguages) ? local.mediaLanguages : DEFAULTS.mediaLanguages,
     minQuality: local.minQuality ?? DEFAULTS.minQuality,
     preferredQuality: local.preferredQuality ?? DEFAULTS.preferredQuality,
+    allow3dTorrents: local.allow3dTorrents ?? DEFAULTS.allow3dTorrents,
   };
 }
 
@@ -72,6 +76,10 @@ export async function loadLibraryDisplayFromCloud(): Promise<LibraryDisplayConfi
           : (local.mediaLanguages ?? DEFAULTS.mediaLanguages),
         minQuality: lib.minQuality ?? local.minQuality ?? DEFAULTS.minQuality,
         preferredQuality: lib.preferredQuality ?? local.preferredQuality ?? DEFAULTS.preferredQuality,
+        allow3dTorrents:
+          (lib as { allow3dTorrents?: boolean }).allow3dTorrents ??
+          local.allow3dTorrents ??
+          DEFAULTS.allow3dTorrents,
       };
       PreferencesManager.updatePreferences(merged);
       return merged;
@@ -105,6 +113,7 @@ export async function saveLibraryDisplayConfig(config: Partial<LibraryDisplayCon
           mediaLanguages: merged.mediaLanguages.length > 0 ? merged.mediaLanguages : undefined,
           minQuality: merged.minQuality || undefined,
           preferredQuality: merged.preferredQuality || undefined,
+          allow3dTorrents: merged.allow3dTorrents,
         },
       };
       await saveUserConfigMerge({ syncSettings }, token);
