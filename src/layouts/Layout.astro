@@ -308,41 +308,24 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         errEl.style.display = 'block';
       };
     </script>
-    <!-- Indicateur de chargement immédiat (DsLoader — même animation partout) -->
-    <div id="popcorn-loading-fallback" class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-page overflow-hidden" aria-hidden="true">
-      <div class="bg-page-gradient"></div>
-      <div class="bg-page-grid"></div>
-      <div class="bg-page-orbs">
-        <div class="loading-orb loading-orb-1"></div>
-        <div class="loading-orb loading-orb-2"></div>
-        <div class="loading-orb loading-orb-3"></div>
-      </div>
-      <div class="relative z-10 w-full max-w-[42rem] px-4 text-center">
-        <div class="ds-card-loading-wrapper">
-          <div class="ds-card-loading-glow"></div>
-          <div class="ds-card-loading">
-            <div class="ds-card-loading-bar"></div>
-            <div class="ds-card-loading-content">
-              <div class="ds-loader ds-loader--lg ds-loader--block" role="status" aria-busy="true">
-                <div class="ds-loader-mark">
-                  <div class="ds-loader-track"></div>
-                  <div class="ds-loader-spin"></div>
-                  <div class="ds-loader-core">
-                    <img src="/popcorn_logo.png" alt="" class="ds-loader-logo loading-icon-logo" />
-                  </div>
-                </div>
-              </div>
-              <h1 class="ds-loading-title">Chargement...</h1>
-              <p class="ds-loading-description ds-loading-description-subtle">Préparation de l'application</p>
-              <div class="ds-progress-container mb-8">
-                <div class="ds-progress-bar"></div>
-                <div class="ds-progress-wave"></div>
-              </div>
-              <p id="popcorn-loading-hint" class="pl-boot-hint text-sm mt-2 max-w-xs text-center hidden" style="display: none;">Si rien ne s&#39;affiche, quittez et rouvrez l&#39;app.</p>
-              <p id="popcorn-loading-error" class="pl-boot-error mt-3 max-w-lg text-center px-3 py-2 rounded text-sm font-medium hidden" style="display: none;"></p>
-            </div>
-          </div>
-        </div>
+    <!-- Indicateur de chargement immédiat — même écran que le lanceur webOS natif (style éditorial) -->
+    <div id="popcorn-loading-fallback" class="fixed inset-0 z-[9999] overflow-hidden" aria-hidden="true" style="background:#0c0d10;color:#f4f1ec">
+      <style>
+        #popcorn-loading-fallback .plb{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;text-align:center;padding:0 1.5rem}
+        #popcorn-loading-fallback .plb-k{letter-spacing:.42em;text-transform:uppercase;font-size:clamp(12px,1.15vw,22px);opacity:.6;font-family:'Jost',sans-serif;font-weight:300}
+        #popcorn-loading-fallback .plb-t{letter-spacing:.32em;text-transform:uppercase;font-size:clamp(28px,3.4vw,64px);font-weight:300;font-family:'Josefin Sans','Jost',sans-serif;margin:0}
+        #popcorn-loading-fallback .plb-l{position:relative;width:120px;height:1px;background:rgba(242,84,91,.35);overflow:hidden}
+        #popcorn-loading-fallback .plb-l::after{content:'';position:absolute;inset:0;width:40%;background:#f2545b;animation:plb-run 1.4s cubic-bezier(.2,.7,.2,1) infinite}
+        @keyframes plb-run{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
+        @media (prefers-reduced-motion: reduce){#popcorn-loading-fallback .plb-l::after{animation:none;width:100%}}
+        #popcorn-loading-fallback .pl-boot-error{color:#f2545b;border:1px solid rgba(242,84,91,.4)}
+      </style>
+      <div class="plb" role="status" aria-busy="true">
+        <div class="plb-k">Popcornn</div>
+        <h1 class="plb-t">Chargement</h1>
+        <div class="plb-l"></div>
+        <p id="popcorn-loading-hint" class="pl-boot-hint text-sm mt-2 max-w-xs text-center hidden" style="display: none;">Si rien ne s&#39;affiche, quittez et rouvrez l&#39;app.</p>
+        <p id="popcorn-loading-error" class="pl-boot-error mt-3 max-w-lg text-center px-3 py-2 text-sm font-medium hidden" style="display: none;"></p>
       </div>
     </div>
     <a id="popcorn-demo-exit-static" href="/?exitDemo=1">Quitter le mode démo</a>

@@ -395,3 +395,68 @@ html[data-tv-platform][data-editorial] .ed-fade > * { animation-duration: 0.35s;
 html[data-webos='true'][data-editorial] .ed-fade > * { animation: none; }
 html[data-webos='true'][data-editorial] [data-tv-media-detail] > .fixed.z-0 { -webkit-mask-image: none; mask-image: none; }
 html[data-webos='true'][data-editorial] .ed-hero__close { background: rgba(0, 0, 0, 0.6); }
+
+/* ==========================================================================
+   Cartes : cadrage des visuels (toutes plateformes)
+   Affiche 2:3 en portrait, backdrop 16:9 en paysage (calé en haut), jamais de zoom sur l'<img>
+   (le léger agrandissement est porté par la carte). Visuel au mauvais format : entier + fond flouté.
+   ========================================================================== */
+[data-browse-slot] img.ed-card-img,
+.torrent-poster img { transform: none !important; transition: none !important; }
+.ed-card-img-fallback-bg { filter: blur(18px) brightness(0.5); transform: scale(1.15); }
+.ed-card-img.object-contain { z-index: 1; }
+html[data-tv-platform] .ed-card-img-fallback-bg { filter: none; transform: none; opacity: 0.3; }
+
+/* ==========================================================================
+   Fluidité TV / webOS (natif + lite) : uniquement transform / opacity,
+   pas de flou, pas d'ombres portées, pas de transitions sur les cartes,
+   rangées hors écran non rendues (content-visibility).
+   ========================================================================== */
+html[data-tv-platform] *,
+html[data-tv-platform] *::before,
+html[data-tv-platform] *:not([data-browse-slot] [data-torrent-card])::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html[data-tv-platform] [data-browse-slot],
+html[data-tv-platform] [data-browse-slot] *,
+html[data-tv-platform] .torrent-poster,
+html[data-tv-platform] .torrent-poster *,
+html[data-tv-platform] [data-torrent-card],
+html[data-tv-platform] [data-focusable-card] {
+  transition: none !important;
+  animation: none !important;
+}
+html[data-tv-platform] [data-browse-slot] [data-torrent-card],
+html[data-tv-platform] .torrent-poster > *,
+html[data-tv-platform] .drop-shadow-2xl,
+html[data-tv-platform] [class*='shadow-'] {
+  box-shadow: none !important;
+  filter: none !important;
+}
+html[data-tv-platform] .ed-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 640px;
+}
+html[data-tv-platform] [data-browse-carousel] { contain: layout paint; }
+/* Aperçu bande-annonce du hero (TV) : sous le dégradé, au-dessus de l'image */
+.ed-hero__preview { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.ed-hero__preview iframe { pointer-events: none; }
+
+/* ==========================================================================
+   Loader unique (DsLoader) — même langage que l'écran de démarrage
+   ========================================================================== */
+.ed-loader { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.1rem; color: var(--ed-ink, #f4f1ec); }
+.ed-loader__line { position: relative; width: 7.5rem; height: 1px; background: rgba(242, 84, 91, 0.3); overflow: hidden; }
+.ed-loader__line::after { content: ''; position: absolute; inset: 0; width: 40%; background: var(--ed-accent, #f2545b); animation: ed-loader-run 1.4s cubic-bezier(0.2, 0.7, 0.2, 1) infinite; }
+.ed-loader--md .ed-loader__line { width: 5rem; }
+.ed-loader--xl .ed-loader__line { width: 10rem; }
+.ed-loader__label { margin: 0; font-family: var(--ed-font-body, 'Jost', sans-serif); font-weight: 300; font-size: 0.75rem; letter-spacing: 0.32em; text-transform: uppercase; color: rgba(244, 241, 236, 0.7); text-align: center; }
+html[data-tv-platform] .ed-loader__label { font-size: 1rem; }
+.ed-loader__core { opacity: 0.85; }
+.ed-spinner { display: inline-block; border-radius: 999px; border: 1px solid rgba(242, 84, 91, 0.3); border-top-color: var(--ed-accent, #f2545b); animation: ed-spin 0.8s linear infinite; vertical-align: middle; }
+.ed-spinner--xs { width: 0.9rem; height: 0.9rem; }
+.ed-spinner--sm { width: 1.4rem; height: 1.4rem; }
+@keyframes ed-loader-run { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+@keyframes ed-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .ed-loader__line::after { animation: none; width: 100%; } }

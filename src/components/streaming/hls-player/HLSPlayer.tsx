@@ -525,14 +525,7 @@ export default function HLSPlayer({
         ? bufferedPercent
         : null;
 
-  const displayError = uhdFallbackMessage ? null : error;
   const playbackActive = isPlaying || mediaVisiblyPlaying || playbackStarted;
-  const shouldShowBuffering =
-    !!uhdFallbackMessage ||
-    (isLoading && !playbackStarted) ||
-    bufferingOverlayVisible ||
-    (!playbackActive &&
-      (isSeekSettling || (isSeeking && (bufferedPercent < 95 || pendingSeekPosition > 0))));
   const liveTrace = usePlaybackLiveTrace(
     {
       path: filePath,
@@ -544,6 +537,30 @@ export default function HLSPlayer({
     hlsRef,
     isRemoteStream,
   );
+  // Erreur serveur (ffmpeg en échec, playlist jamais créée) : ne plus masquer derrière
+  // « Optimisation de l'image… » — afficher l'erreur et arrêter l'attente.
+  const serverPhaseError =
+    liveTrace.status?.phase === 'error'
+      ? (liveTrace.status as { last_error?: string | null }).last_error || t('playback.hls.serverPrepareFailed')
+      : null;
+  const [startTimedOut, setStartTimedOut] = useState(false);
+  useEffect(() => {
+    setStartTimedOut(false);
+    if (playbackActive) return;
+    const id = window.setTimeout(() => setStartTimedOut(true), 90_000);
+    return () => window.clearTimeout(id);
+  }, [infoHash, filePath, maxHeight, playbackActive]);
+  const timeoutError = startTimedOut && !playbackActive ? t('playback.hls.startTimeout') : null;
+  const displayError = serverPhaseError || timeoutError || (uhdFallbackMessage ? null : error);
+  const shouldShowBuffering =
+    !serverPhaseError &&
+    !timeoutError &&
+    (!!uhdFallbackMessage ||
+      (isLoading && !playbackStarted) ||
+      bufferingOverlayVisible ||
+      (!playbackActive &&
+        (isSeekSettling || (isSeeking && (bufferedPercent < 95 || pendingSeekPosition > 0)))));
+
   const pipelineDebugUrl = playbackDebugUrl({
     path: filePath,
     infoHash,
