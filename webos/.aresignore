@@ -4,6 +4,7 @@
 *.ppt
 *.pptx
 *.zip
+.aresignore
 playstore-screenshots/
 UX_Scenario*
 LG_SELLER*

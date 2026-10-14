@@ -57,3 +57,4 @@ src-tauri/gen/
 /playwright/.cache/
 /playwright/.auth/
 .env*.local
+*.ipk
