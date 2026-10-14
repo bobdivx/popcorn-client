@@ -395,3 +395,50 @@ html[data-tv-platform][data-editorial] .ed-fade > * { animation-duration: 0.35s;
 html[data-webos='true'][data-editorial] .ed-fade > * { animation: none; }
 html[data-webos='true'][data-editorial] [data-tv-media-detail] > .fixed.z-0 { -webkit-mask-image: none; mask-image: none; }
 html[data-webos='true'][data-editorial] .ed-hero__close { background: rgba(0, 0, 0, 0.6); }
+
+/* ==========================================================================
+   Cartes : cadrage des visuels (toutes plateformes)
+   Affiche 2:3 en portrait, backdrop 16:9 en paysage (calé en haut), jamais de zoom sur l'<img>
+   (le léger agrandissement est porté par la carte). Visuel au mauvais format : entier + fond flouté.
+   ========================================================================== */
+[data-browse-slot] img.ed-card-img,
+.torrent-poster img { transform: none !important; transition: none !important; }
+.ed-card-img-fallback-bg { filter: blur(18px) brightness(0.5); transform: scale(1.15); }
+.ed-card-img.object-contain { z-index: 1; }
+html[data-tv-platform] .ed-card-img-fallback-bg { filter: none; transform: none; opacity: 0.3; }
+
+/* ==========================================================================
+   Fluidité TV / webOS (natif + lite) : uniquement transform / opacity,
+   pas de flou, pas d'ombres portées, pas de transitions sur les cartes,
+   rangées hors écran non rendues (content-visibility).
+   ========================================================================== */
+html[data-tv-platform] *,
+html[data-tv-platform] *::before,
+html[data-tv-platform] *:not([data-browse-slot] [data-torrent-card])::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html[data-tv-platform] [data-browse-slot],
+html[data-tv-platform] [data-browse-slot] *,
+html[data-tv-platform] .torrent-poster,
+html[data-tv-platform] .torrent-poster *,
+html[data-tv-platform] [data-torrent-card],
+html[data-tv-platform] [data-focusable-card] {
+  transition: none !important;
+  animation: none !important;
+}
+html[data-tv-platform] [data-browse-slot] [data-torrent-card],
+html[data-tv-platform] .torrent-poster > *,
+html[data-tv-platform] .drop-shadow-2xl,
+html[data-tv-platform] [class*='shadow-'] {
+  box-shadow: none !important;
+  filter: none !important;
+}
+html[data-tv-platform] .ed-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 640px;
+}
+html[data-tv-platform] [data-browse-carousel] { contain: layout paint; }
+/* Aperçu bande-annonce du hero (TV) : sous le dégradé, au-dessus de l'image */
+.ed-hero__preview { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
+.ed-hero__preview iframe { pointer-events: none; }
