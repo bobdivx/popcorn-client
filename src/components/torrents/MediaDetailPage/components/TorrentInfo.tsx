@@ -77,11 +77,8 @@ function normalizeResolution(raw?: string): string {
   return raw;
 }
 
-function qualityBadgeClass(_resolution: string, isSelected: boolean): string {
-  if (isSelected) {
-    return 'backdrop-blur-sm text-white border-violet-400/70 bg-black/55';
-  }
-  return 'backdrop-blur-sm text-white/80 border-white/20 bg-black/40 hover:text-white hover:border-white/40';
+function qualityBtnClass(isSelected: boolean, isPreferred = false): string {
+  return `ed-quality-btn${isSelected ? ' is-selected' : ''}${isPreferred && !isSelected ? ' is-preferred' : ''}`;
 }
 
 export function TorrentInfo({
@@ -401,27 +398,19 @@ export function TorrentInfo({
                     type="button"
                     onClick={() => canSwitch && onSelectVariant && onSelectVariant(bestVariant)}
                     title={`${variants.length} source${variants.length > 1 ? 's' : ''} · ${totalSeeds} seeder${totalSeeds !== 1 ? 's' : ''}${isPreferred ? (language === 'fr' ? ' · Qualité préférée' : ' · Preferred quality') : ''}`}
-                    className={`relative inline-flex items-center gap-1 px-3 py-1.5 rounded-full border text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-1 focus:ring-offset-black/50 ${canSwitch ? 'cursor-pointer' : 'cursor-default'} ${qualityBadgeClass(resolution, isSelected)}`}
+                    className={`${qualityBtnClass(isSelected, isPreferred)} ${canSwitch ? 'cursor-pointer' : 'cursor-default'}`}
                     aria-pressed={isSelected}
                   >
                     {resolution}
-                    {variants.length > 1 && (
-                      <span className={`text-[10px] font-normal ${isSelected ? 'opacity-80' : 'opacity-50'}`}>
-                        ×{variants.length}
-                      </span>
-                    )}
-                    {isPreferred && !isSelected && (
-                      <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-violet-400" aria-hidden="true" />
-                    )}
+                    {variants.length > 1 ? (
+                      <span className="ed-quality-btn__count">×{variants.length}</span>
+                    ) : null}
                   </button>
                 );
               })}
             </div>
           ) : currentQuality ? (
-            /* Badge unique si qualité connue mais pas de groupe interactif */
-            <span className={`inline-flex items-center px-3 py-1.5 rounded-full border text-xs font-bold ${qualityBadgeClass(currentQuality, true)}`}>
-              {currentQuality}
-            </span>
+            <span className={qualityBtnClass(true)}>{currentQuality}</span>
           ) : null}
 
           {/* Langues disponibles */}
@@ -443,9 +432,7 @@ export function TorrentInfo({
                     type="button"
                     onClick={() => canSwitch && selectLanguage(lang)}
                     disabled={!canSwitch}
-                    className={`inline-flex items-center px-3 py-1.5 rounded-full border text-xs font-bold transition-all focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-1 focus:ring-offset-black/50 ${
-                      canSwitch ? 'cursor-pointer' : 'cursor-default'
-                    } ${qualityBadgeClass(lang, isSelected)}`}
+                    className={`${qualityBtnClass(isSelected)} ${canSwitch ? 'cursor-pointer' : 'cursor-default'}`}
                     aria-pressed={isSelected}
                     title={mediaLanguageLabel(lang)}
                   >
@@ -548,64 +535,52 @@ export function TorrentInfo({
             </div>
           )}
 
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm">
+          <div className="ed-meta">
             {torrent.voteAverage != null && torrent.voteAverage > 0 && (
-              <div className="inline-flex items-center gap-2">
-                <Star className="h-4 w-4 text-yellow-400 fill-yellow-400 shrink-0" aria-hidden />
-                <span className="text-yellow-400 font-semibold tabular-nums">
-                  {torrent.voteAverage.toFixed(1)}
-                </span>
-                <span className="text-white/45">/10</span>
-              </div>
+              <span className="ed-meta__item inline-flex items-center gap-1.5">
+                <Star className="h-3.5 w-3.5 text-[var(--ed-accent,#f2545b)] fill-[var(--ed-accent,#f2545b)] shrink-0" aria-hidden />
+                {torrent.voteAverage.toFixed(1)}
+                <span className="text-white/40">/10</span>
+              </span>
             )}
             {fileSize > 0 && (
-              <span className="text-white/85 tabular-nums font-medium">{formatSize(fileSize)}</span>
+              <span className="ed-meta__item tabular-nums">{formatSize(fileSize)}</span>
             )}
             {torrent.runtime != null && torrent.runtime > 0 && (
-              <span className="text-white/85 font-medium">{formatRuntime(torrent.runtime)}</span>
+              <span className="ed-meta__item">{formatRuntime(torrent.runtime)}</span>
             )}
             {torrent.releaseDate && (
-              <span className="text-white/70">{formatReleaseDate(torrent.releaseDate)}</span>
+              <span className="ed-meta__item">{formatReleaseDate(torrent.releaseDate)}</span>
             )}
           </div>
 
           {torrent.genres && torrent.genres.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2.5">
+            <ul className="ed-genres">
               {torrent.genres.map((genre, index) => (
-                <span
-                  key={index}
-                  className="inline-flex items-center px-3 py-1 rounded-full border border-white/18 bg-black/35 text-xs font-medium text-white/85"
-                >
-                  {genre}
-                </span>
+                <li key={index}>{genre}</li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
       )}
 
       {/* Métadonnées TMDB — séries */}
       {isSeries && (torrent.releaseDate || torrent.genres || torrent.runtime) && (
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-white/75">
+        <div className="flex flex-col gap-3">
+          <div className="ed-meta">
             {torrent.releaseDate && (
-              <span className="text-white/90 font-medium">{formatReleaseDate(torrent.releaseDate)}</span>
+              <span className="ed-meta__item">{formatReleaseDate(torrent.releaseDate)}</span>
             )}
             {torrent.runtime != null && torrent.runtime > 0 && (
-              <span className="text-white/90 font-medium">{formatRuntime(torrent.runtime)}</span>
+              <span className="ed-meta__item">{formatRuntime(torrent.runtime)}</span>
             )}
           </div>
           {torrent.genres && torrent.genres.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2.5">
+            <ul className="ed-genres">
               {torrent.genres.map((genre, index) => (
-                <span
-                  key={index}
-                  className="inline-flex items-center px-3 py-1 rounded-full border border-white/18 bg-black/35 text-xs font-medium text-white/85"
-                >
-                  {genre}
-                </span>
+                <li key={index}>{genre}</li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
       )}
@@ -613,8 +588,8 @@ export function TorrentInfo({
       {/* Synopsis/Description */}
       {description && (
         <div className="pt-1">
-          <h3 className="text-xl font-semibold mb-3 text-white/90">Synopsis</h3>
-          <p className="text-lg text-white/90 leading-relaxed max-w-3xl">
+          <h3 className="ed-kicker mb-3">Synopsis</h3>
+          <p className="text-base sm:text-lg text-white/85 leading-relaxed max-w-3xl font-light">
             {description}
           </p>
         </div>

@@ -39,6 +39,9 @@ Sous `html[data-editorial]`, `--ds-accent-violet` est mappé vers `--ed-accent` 
 | --- | --- |
 | Nav | overrides `.navbar-tv`, `.nav-tab` |
 | Fiche média | `.ed-detail-head`, `[data-tv-media-detail]`, actions `.gtv-pill-btn` / `[data-media-detail-primary-action]` |
+| Version recommandée | `.ed-assist` + faits `.ed-assist__facts` (qualité / langue / sources) |
+| Métadonnées / genres | `.ed-meta`, `.ed-genres` (filets, pas de pills) |
+| Saisons / épisodes | `.ed-seasons`, `.ed-season`, `.ed-episode-card` |
 | Overlay lecture / download | `[data-playback-overlay]`, `.ed-playback-splash` (marque + titre + piste corail d’états), `.ed-playback-inline`, `.ed-playback-btn` |
 | Modales | `.ds-modal-glass` restylé (barre gradient masquée, coins nets) |
 
