@@ -21,8 +21,6 @@ import { TorrentInfo } from './components/TorrentInfo';
 import { HeroHeader } from './components/HeroHeader';
 import { EpisodesArea } from './components/EpisodesArea';
 import { ActionsRow } from './components/ActionsRow';
-import { ReleaseHint } from '../../ai/ReleaseHint';
-import { TmdbMatchAssist } from '../../ai/TmdbMatchAssist';
 import { YouTubeVideoPlayer as VideoPlayer } from '../../ui/YouTubeVideoPlayer';
 import { redirectToCarPlayerIfNeeded } from '../../streaming/car-player/carPlaybackRedirect';
 import {
@@ -48,6 +46,12 @@ import type { SeriesEpisodesResponse, TorrentListFileEntry } from '../../../lib/
 import type { PackEpisodeKey } from './hooks/usePackEpisodes';
 import { isTVPlatform } from '../../../lib/utils/device-detection';
 import { getHighQualityTmdbImageUrl } from '../../../lib/utils/tmdb-images';
+import {
+  inferCourStartsFromAirDates,
+  inferCourStartsFromSceneVariants,
+  isContinuousTmdbSeasonLayout,
+  tmdbAbsoluteToScene,
+} from '../../../lib/utils/tmdbSceneSeasonMap';
 import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-config';
 import { getMediaDisplayTitle } from './utils/mediaDisplayTitle';
 import { resolveDownloadTypeHeader } from './utils/resolveDownloadTypeHeader';
@@ -496,21 +500,57 @@ export default function MediaDetailPage({
     return { season: ep.season, episode: ep.episode, variantId: ep.id };
   }, [seriesEpisodes, selectedSeasonNum, selectedEpisodeVariantId]);
 
+  /**
+   * Remap anime : TMDB saison continue (S01E25) ↔ numérotation scène indexeur (S02E01).
+   * Sert à matcher les fichiers d’un pack S02 et les chemins bibliothèque.
+   */
+  const selectedSceneEpisode = useMemo(() => {
+    if (!seriesEpisodes?.seasons?.length || !selectedEpisodeMeta || selectedEpisodeMeta.episode <= 0) {
+      return null;
+    }
+    const seasonNums = seriesEpisodes.seasons.map((s) => s.season);
+    if (!isContinuousTmdbSeasonLayout(seasonNums) || selectedEpisodeMeta.season !== 1) {
+      return null;
+    }
+    const s1 = seriesEpisodes.seasons.find((s) => s.season === 1);
+    let courStarts = inferCourStartsFromAirDates(
+      (s1?.episodes ?? []).map((e) => ({ episode: e.episode, airDate: e.air_date })),
+    );
+    if (courStarts.length <= 1) {
+      const names = (initialVariants ?? []).map((v) => v.name || v.cleanTitle || '');
+      courStarts =
+        inferCourStartsFromSceneVariants(s1?.episodes?.length ?? 0, names) ?? courStarts;
+    }
+    if (courStarts.length <= 1) return null;
+    return tmdbAbsoluteToScene(selectedEpisodeMeta.episode, courStarts);
+  }, [seriesEpisodes, selectedEpisodeMeta, initialVariants]);
+
   // Torrent avec chemin bibliothèque si connu — uniquement si le chemin correspond à l'épisode sélectionné
   // (évite d'injecter S03E08 pendant la lecture de S01E01 après un fallback localMedia[0]).
   const activeTorrentWithLibraryPath = useMemo(() => {
     if (!libraryDownloadPath) return activeTorrent;
     if (selectedEpisodeMeta && selectedEpisodeMeta.episode > 0) {
       const se = parseSeasonEpisodeLabel(libraryDownloadPath);
-      if (
-        se &&
-        (se.season !== selectedEpisodeMeta.season || se.episode !== selectedEpisodeMeta.episode)
-      ) {
-        return activeTorrent;
+      if (se) {
+        const tmdbOk =
+          se.season === selectedEpisodeMeta.season && se.episode === selectedEpisodeMeta.episode;
+        const sceneOk =
+          selectedSceneEpisode != null &&
+          se.season === selectedSceneEpisode.season &&
+          se.episode === selectedSceneEpisode.episode;
+        if (!tmdbOk && !sceneOk) {
+          return activeTorrent;
+        }
       }
     }
     return { ...activeTorrent, downloadPath: libraryDownloadPath };
-  }, [activeTorrent, libraryDownloadPath, selectedEpisodeMeta, parseSeasonEpisodeLabel]);
+  }, [
+    activeTorrent,
+    libraryDownloadPath,
+    selectedEpisodeMeta,
+    selectedSceneEpisode,
+    parseSeasonEpisodeLabel,
+  ]);
 
   /** TMDB série pour vignettes épisodes : torrent ou ids synthétiques popcorn_tmdb_{id}_s_e */
   const episodeCarouselTmdbId = useMemo(() => {
@@ -633,6 +673,8 @@ export default function MediaDetailPage({
     keepAllVideoFiles: isPackSelected,
     season: selectedEpisodeMeta?.season ?? null,
     episode: selectedEpisodeMeta?.episode ?? null,
+    sceneSeason: selectedSceneEpisode?.season ?? null,
+    sceneEpisode: selectedSceneEpisode?.episode ?? null,
     // Passer le chemin spécifique de l'épisode s'il est connu dans la bibliothèque
     filePath: selectedEpisodeMeta ? libraryEpisodesPathMap[`${selectedEpisodeMeta.season}:${selectedEpisodeMeta.episode}`] : null,
     onError: (error) => {
@@ -3377,7 +3419,6 @@ export default function MediaDetailPage({
                 trailerKey && !isPlayingTrailer ? () => setIsPlayingTrailer(true) : undefined
               }
               onOpenMovieTechInfo={
-                !isTvSeriesDetail &&
                 (() => {
                   const t = selectedTorrent || torrent;
                   const anyT = t as {
@@ -3385,31 +3426,15 @@ export default function MediaDetailPage({
                     indexerName?: string;
                     indexer_name?: string;
                   };
-                  return !!(
-                    anyT.downloadPath ||
-                    anyT.indexerName ||
-                    anyT.indexer_name ||
-                    hasInfoHash
-                  );
+                  const hasTech =
+                    !!anyT.downloadPath ||
+                    !!anyT.indexerName ||
+                    !!anyT.indexer_name ||
+                    hasInfoHash ||
+                    allVariants.length > 0;
+                  return hasTech ? () => setMovieTechInfoOpen(true) : undefined;
                 })()
-                  ? () => setMovieTechInfoOpen(true)
-                  : undefined
               }
-            />
-            <ReleaseHint
-              variants={allVariants}
-              selectedId={(selectedTorrent || torrent).id}
-              onSelect={(id) => {
-                const found = allVariants.find((variant) => variant.id === id);
-                if (found) setSelectedTorrent(found);
-              }}
-            />
-            <TmdbMatchAssist
-              infoHash={(selectedTorrent || torrent).infoHash}
-              title={(selectedTorrent || torrent).tmdbTitle || (selectedTorrent || torrent).mainTitle || (selectedTorrent || torrent).cleanTitle || (selectedTorrent || torrent).name}
-              confidence={(selectedTorrent || torrent).tmdbMatchConfidence}
-              currentTmdbId={(selectedTorrent || torrent).tmdbId}
-              mediaType={(selectedTorrent || torrent).tmdbType}
             />
             </ActionsRow>
             </div>

@@ -20,6 +20,8 @@ export interface SeriesEpisodeInfo {
   leech_count: number;
   file_path?: string | null;
   is_from_multi_torrent: boolean;
+  /** Date de diffusion TMDB (ISO) — sert au remap anime saison continue ↔ S02 scène. */
+  air_date?: string | null;
 }
 
 /** Saison avec liste d'épisodes */

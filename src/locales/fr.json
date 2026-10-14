@@ -596,7 +596,7 @@
     "keep": "C'est le bon",
     "keepCurrent": "Garder ma sélection",
     "releaseTitle": "Version selon vos préférences",
-    "releaseExplain": "Sélectionnée automatiquement. Changez qualité ou langue ci-dessus si vous préférez une autre version.",
+    "releaseExplain": "Sélectionnée automatiquement selon vos préférences de qualité et de langue.",
     "releaseConfirm": "Cette version correspond mieux à vos préférences que la sélection actuelle.",
     "factQuality": "Qualité",
     "factLanguage": "Langue",
