@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<title>Popcornn Native</title>
+<style>
+  html,body{margin:0;height:100%;background:#0c0d10;color:#f4f1ec;font-family:sans-serif;overflow:hidden}
+  .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px}
+  .k{letter-spacing:.42em;text-transform:uppercase;font-size:22px;opacity:.6}
+  .t{letter-spacing:.32em;text-transform:uppercase;font-size:64px;font-weight:300}
+  .l{width:120px;height:1px;background:#f2545b}
+  .e{color:#f2545b;font-size:22px;max-width:1200px;text-align:center;display:none}
+</style>
+</head>
+<body>
+<div class="c">
+  <div class="k">Popcornn · Native beta</div>
+  <div class="t">Chargement</div>
+  <div class="l"></div>
+  <div class="e" id="err"></div>
+</div>
+<script>
+/* Lanceur natif : démarre le service JS embarqué (serveur HTTP local qui sert l'UI
+   bundlée dans l'IPK), puis bascule l'app sur http://127.0.0.1:PORT/.
+   Les modules ES ne se chargent pas en file:// sur webOS ; en HTTP local, si. */
+(function () {
+  var SERVICE = 'luna://com.popcorn.client.webos.native.service';
+  var PORT = 18687;
+  var BASE = 'http://127.0.0.1:' + PORT;
+  var tries = 0;
+  function showErr(m) { var e = document.getElementById('err'); e.style.display = 'block'; e.textContent = m; }
+  function call(method, params) {
+    try {
+      var b = new PalmServiceBridge();
+      b.onservicecallback = function (r) { try { console.log('[native] ' + method + ' ' + r); } catch (e) {} };
+      b.call(SERVICE + '/' + method, JSON.stringify(params || {}));
+      window['_bridge_' + method] = b; // garder la référence (sinon GC annule l'appel)
+    } catch (e) { showErr('Service local indisponible : ' + e); }
+  }
+  function ping() {
+    tries++;
+    var x = new XMLHttpRequest();
+    x.open('GET', BASE + '/__popcornn_ping?t=' + Date.now(), true);
+    x.timeout = 1500;
+    x.onload = function () { if (x.status === 200) { window.location.replace(BASE + '/'); } else retry(); };
+    x.onerror = x.ontimeout = retry;
+    x.send();
+  }
+  function retry() {
+    if (tries === 4) call('start', {});
+    if (tries > 40) { showErr('Le serveur local ne répond pas. Relancez l’application.'); return; }
+    setTimeout(ping, 400);
+  }
+  call('start', {});
+  setTimeout(ping, 300);
+})();
+</script>
+</body>
+</html>
