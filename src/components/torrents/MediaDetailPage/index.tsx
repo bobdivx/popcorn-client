@@ -373,8 +373,10 @@ export default function MediaDetailPage({
   const hasDownloadPathFromProps = !!(torrent as { downloadPath?: string | null }).downloadPath;
   // Pour les mÃ©dias locaux / chemin bibliothèque déjà résolu, disponibles immédiatement
   // (y compris pendant checking post-reboot).
+  // local_* / downloadPath = vrai fichier disque. isCompletedFromProps seul ne suffit pas
+  // (torrent peut être absent du client → 404 + boucle useVideoFiles).
   const [isAvailableLocally, setIsAvailableLocally] = useState(
-    isCompletedFromProps || isLocalMedia || hasDownloadPathFromProps,
+    isLocalMedia || hasDownloadPathFromProps,
   );
   const [downloadingToClient, setDownloadingToClient] = useState(false);
   const [magnetCopied, setMagnetCopied] = useState(false);
@@ -1889,111 +1891,8 @@ export default function MediaDetailPage({
     torrent.cleanTitle,
   ]);
 
-  // Auto-téléchargement des nouveaux épisodes :
-  // si l'utilisateur a déjà commencé la série OU a déjà des épisodes téléchargés,
-  // ajouter automatiquement les nouveaux épisodes disponibles.
-  useEffect(() => {
-    if (activeTorrent.tmdbType !== 'tv' || !activeTorrent.tmdbId || !seriesEpisodes?.seasons?.length) return;
-    if (downloadingToClient) return;
-    if (playStatus === 'error') return;
-
-    let cancelled = false;
-    (async () => {
-      const deviceId = getOrCreateDeviceId();
-      const record = await getPlaybackPositionByMediaRecord(activeTorrent.tmdbId!, 'tv', deviceId);
-      if (cancelled) return;
-
-      const hasPlaybackProgress = !!record && record.position > 0;
-      const downloadedAnchors = [...downloadedEpisodesSet]
-        .map((k) => {
-          const [s, e] = k.split(':');
-          const season = Number(s);
-          const episode = Number(e);
-          return Number.isFinite(season) && Number.isFinite(episode) ? { season, episode } : null;
-        })
-        .filter((x): x is { season: number; episode: number } => x != null)
-        .sort((a, b) => (a.season - b.season) || (a.episode - b.episode));
-      const lastDownloaded = downloadedAnchors.length > 0 ? downloadedAnchors[downloadedAnchors.length - 1] : null;
-      const hasDownloadedEpisodes = !!lastDownloaded;
-
-      if (!hasPlaybackProgress && !hasDownloadedEpisodes) return;
-
-      const watchedSeason = hasPlaybackProgress
-        ? (typeof record?.season === 'number' ? record.season : 1)
-        : (lastDownloaded?.season ?? 1);
-      const watchedEpisode = hasPlaybackProgress
-        ? (typeof record?.episode === 'number' ? record.episode : 0)
-        : (lastDownloaded?.episode ?? 0);
-
-      const isAfterWatched = (season: number, episode: number) =>
-        season > watchedSeason || (season === watchedSeason && episode > watchedEpisode);
-
-      const keyForEpisode = (season: number, episode: number) => `${season}:${episode}`;
-      const alreadyRequestedKey = `seriesAutoDownloadRequested:${activeTorrent.tmdbId}`;
-      const alreadyRequested = new Set<string>();
-      if (typeof localStorage !== 'undefined') {
-        try {
-          const raw = localStorage.getItem(alreadyRequestedKey);
-          const parsed = raw ? JSON.parse(raw) : [];
-          if (Array.isArray(parsed)) {
-            for (const infoHash of parsed) {
-              if (typeof infoHash === 'string' && infoHash.trim()) {
-                alreadyRequested.add(infoHash.trim().toLowerCase());
-              }
-            }
-          }
-        } catch {
-          // Ignore JSON invalide
-        }
-      }
-
-      const candidatesByInfoHash = new Map<string, MediaDetailPageProps['torrent']>();
-      for (const seasonData of seriesEpisodes.seasons) {
-        for (const ep of seasonData.episodes ?? []) {
-          if (!ep?.info_hash || ep.episode <= 0) continue;
-          if (!isAfterWatched(ep.season, ep.episode)) continue;
-          const episodeKey = keyForEpisode(ep.season, ep.episode);
-          if (downloadedEpisodesSet.has(episodeKey)) continue;
-          if (alreadyRequested.has(ep.info_hash.toLowerCase())) continue;
-
-          const variantMatch = allVariants.find((v) => (v.infoHash ?? '').toLowerCase() === ep.info_hash.toLowerCase());
-          if (!variantMatch) continue;
-          const prev = candidatesByInfoHash.get(ep.info_hash.toLowerCase());
-          if (!prev || (variantMatch.seedCount ?? 0) > (prev.seedCount ?? 0)) {
-            candidatesByInfoHash.set(ep.info_hash.toLowerCase(), variantMatch);
-          }
-        }
-      }
-
-      const toDownload = [...candidatesByInfoHash.values()].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0));
-      if (toDownload.length === 0) return;
-
-      for (const variant of toDownload) {
-        mediaDetailActionsRef.current?.handleDownload(variant);
-        if (variant.infoHash) {
-          alreadyRequested.add(variant.infoHash.toLowerCase());
-        }
-      }
-
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(alreadyRequestedKey, JSON.stringify([...alreadyRequested]));
-      }
-      addNotification('info', `${toDownload.length} nouvel(s) épisode(s) ajouté(s) automatiquement`);
-    })().catch(() => {
-      // Échec silencieux : ne pas casser la page détail.
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    activeTorrent.tmdbId,
-    activeTorrent.tmdbType,
-    addNotification,
-    allVariants,
-    downloadedEpisodesSet,
-    seriesEpisodes,
-  ]);
+  // Auto-téléchargement des nouveaux épisodes : désactivé — rien ne démarre
+  // juste à l'ouverture d'une fiche (recherche → détail). Lire / Télécharger restent manuels.
 
   // Afficher le panneau de vÃ©rification quand un tÃ©lÃ©chargement vient d'Ãªtre ajoutÃ© (Ã©vÃ©nement torrentAdded)
   useEffect(() => {
