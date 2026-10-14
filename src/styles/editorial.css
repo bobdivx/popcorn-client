@@ -1,6 +1,6 @@
 /* ==========================================================================
-   Popcornn — Editorial theme (web / mobile). Inspiré "Memories of Lanzarote".
-   Activé via html[data-editorial] (jamais sur TV/webOS ni /car*).
+   Popcornn — Editorial theme (web / mobile / TV / webOS). Inspiré "Memories of Lanzarote".
+   Activé via html[data-editorial] (Layout.astro ; aussi sur TV/webOS, pas sur /car*).
    ========================================================================== */
 :root {
   --ed-accent: #f2545b;
@@ -272,11 +272,39 @@ html[data-editorial] [data-browse-carousel] > div > a { border-radius: 2px; }
 html[data-editorial] [data-browse-carousel] img { border-radius: 2px; }
 html[data-editorial] [data-browse-carousel] button.rounded-full { border-radius: 999px; }
 
-/* Cartes : minimalistes (coins fins, pas de halo violet) */
+/* Actions fiche : CTA corail / fantômes, pas de glass violet */
 html[data-editorial] .gtv-pill-btn {
   border-radius: 0 !important;
   font-family: var(--ed-font-display); font-weight: 400 !important;
   letter-spacing: var(--ed-track-sm); text-transform: uppercase; font-size: 0.72rem !important;
+  box-shadow: none !important;
+}
+html[data-editorial] [data-media-detail-primary-action].gtv-pill-btn,
+html[data-editorial] [data-media-detail-action='play'].gtv-pill-btn,
+html[data-editorial] [data-media-detail-action='download'].gtv-pill-btn {
+  background: var(--ed-accent) !important;
+  border-color: var(--ed-accent) !important;
+  color: #fff !important;
+}
+html[data-editorial] [data-media-detail-primary-action].gtv-pill-btn:hover,
+html[data-editorial] [data-media-detail-action='play'].gtv-pill-btn:hover,
+html[data-editorial] [data-media-detail-action='download'].gtv-pill-btn:hover {
+  background: var(--ed-accent-hover) !important;
+  border-color: var(--ed-accent-hover) !important;
+}
+html[data-editorial] [data-media-detail-action='play-from-start'].gtv-pill-btn {
+  background: transparent !important;
+  border-color: var(--ed-line-strong) !important;
+  color: var(--ed-ink) !important;
+}
+html[data-editorial] .gtv-icon-btn {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+html[data-editorial] .gtv-icon-btn.text-violet-400,
+html[data-editorial] .gtv-icon-btn.bg-violet-900\/30 {
+  color: var(--ed-accent) !important;
+  background: rgba(242, 84, 91, 0.14) !important;
 }
 
 /* ---------- Pages internes harmonisées ---------- */
@@ -442,6 +470,112 @@ html[data-tv-platform] [data-browse-carousel] { contain: layout paint; }
 /* Aperçu bande-annonce du hero (TV) : sous le dégradé, au-dessus de l'image */
 .ed-hero__preview { position: absolute; inset: 0; z-index: 1; pointer-events: none; overflow: hidden; }
 .ed-hero__preview iframe { pointer-events: none; }
+
+/* ==========================================================================
+   Overlays lecture / téléchargement + modales (thème éditorial)
+   ========================================================================== */
+html[data-editorial] [data-playback-overlay] .ed-playback-panel,
+html[data-editorial] .ed-playback-panel {
+  border-radius: 0 !important;
+  border: 1px solid var(--ed-line-strong) !important;
+  background: rgba(10, 11, 14, 0.92) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  font-family: var(--ed-font-body);
+}
+html[data-editorial] .ed-playback-panel h2,
+html[data-editorial] .ed-playback-panel h3 {
+  font-family: var(--ed-font-display) !important;
+  font-weight: 300 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase;
+  color: var(--ed-ink) !important;
+}
+html[data-editorial] .ed-playback-inline {
+  border-radius: 0 !important;
+  border: 1px solid var(--ed-line) !important;
+  background: rgba(10, 11, 14, 0.88) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+html[data-editorial] .ed-playback-progress {
+  background: var(--ed-line) !important;
+  border-radius: 0 !important;
+}
+html[data-editorial] .ed-playback-progress > div {
+  background: var(--ed-accent) !important;
+  border-radius: 0 !important;
+}
+html[data-editorial] .ed-playback-btn,
+html[data-editorial] [data-playback-overlay] button.bg-primary-600,
+html[data-editorial] [data-playback-overlay] button.bg-primary-500 {
+  border-radius: 0 !important;
+  background: var(--ed-accent) !important;
+  font-family: var(--ed-font-display) !important;
+  font-weight: 400 !important;
+  font-size: 0.72rem !important;
+  letter-spacing: var(--ed-track-md) !important;
+  text-transform: uppercase;
+  border: 0 !important;
+}
+html[data-editorial] .ed-playback-btn:hover,
+html[data-editorial] [data-playback-overlay] button.bg-primary-600:hover {
+  background: var(--ed-accent-hover) !important;
+}
+html[data-editorial] .ed-playback-btn-ghost,
+html[data-editorial] [data-playback-overlay] button.border-white\/20 {
+  border-radius: 0 !important;
+  border: 1px solid var(--ed-line-strong) !important;
+  background: transparent !important;
+  font-family: var(--ed-font-display) !important;
+  letter-spacing: var(--ed-track-sm);
+  text-transform: uppercase;
+  font-size: 0.68rem !important;
+  color: var(--ed-ink) !important;
+}
+html[data-editorial] .ed-playback-chip {
+  border-radius: 0 !important;
+  border: 1px solid var(--ed-line) !important;
+  background: rgba(10, 11, 14, 0.75) !important;
+  backdrop-filter: none !important;
+  font-family: var(--ed-font-display);
+  letter-spacing: var(--ed-track-sm);
+  text-transform: uppercase;
+}
+
+/* Modales : plus de glass violet / barre gradient DS */
+html[data-editorial] .ds-modal-glass {
+  border-radius: 0 !important;
+  border: 1px solid var(--ed-line-strong) !important;
+  background: rgba(10, 11, 14, 0.96) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+html[data-editorial] .ds-modal-glass .ds-card-bar {
+  display: none !important;
+}
+html[data-editorial] .ds-modal-glass .ds-title-card,
+html[data-editorial] .ds-modal-glass #modal-title {
+  font-family: var(--ed-font-display) !important;
+  font-weight: 300 !important;
+  letter-spacing: 0.18em !important;
+  text-transform: uppercase;
+  color: var(--ed-ink) !important;
+}
+html[data-editorial] .ds-modal-overlay > .absolute.inset-0 {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(6, 7, 10, 0.88) !important;
+}
+html[data-editorial] .ds-modal-glass button:focus,
+html[data-editorial] .ds-modal-glass button:focus-visible {
+  outline: 1px solid var(--ed-accent) !important;
+  outline-offset: 3px !important;
+  box-shadow: none !important;
+}
 
 /* ==========================================================================
    Loader unique (DsLoader) — même langage que l'écran de démarrage

@@ -264,11 +264,17 @@ export function VideoPlayerWrapper({
     const path = hlsFilePath && hlsFilePath !== 'direct'
       ? hlsFilePath
       : selectedFile?.path || selectedFile?.name || '';
+    // Sans chemin fichier, l'API renvoie 400 — ne pas appeler avec info_hash seul.
+    if (!path || !String(path).trim()) {
+      setSourceAudioTracks([]);
+      setAudioIndex(0);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
         const res = await serverApi.getLocalAudioStreams({
-          path: path || undefined,
+          path: path.trim(),
           infoHash: infoHash || undefined,
         });
         if (cancelled) return;

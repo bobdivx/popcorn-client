@@ -2,6 +2,8 @@
 
 Système de design unifié pour une UX type **dashboard professionnel** (navigation claire, cartes, switches). À réutiliser partout une fois validé sur Sync et Settings.
 
+> **UI consommateur** (home, recherche, fiche média, lecteur, overlays) → voir [`EDITORIAL_DESIGN.md`](./EDITORIAL_DESIGN.md) (`html[data-editorial]`, tokens `--ed-*`).
+
 ## Fichiers
 
 - **Tokens & utilitaires CSS** : `src/styles/design-system.css`

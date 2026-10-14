@@ -224,8 +224,6 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
                 setEmptyOrSparse(false);
                 setVideoFiles(files);
                 setSelectedFile(files[0]);
-                setLoadingFiles(false);
-                loadingCacheRef.current.delete(infoHash);
                 return files;
               }
             } catch (e) {
@@ -240,16 +238,12 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
             setEmptyOrSparse(false);
             setVideoFiles(files);
             setSelectedFile(files[0]);
-            setLoadingFiles(false);
-            loadingCacheRef.current.delete(infoHash);
             return files;
           }
 
           console.warn('[useVideoFiles] ⚠️ local_* sans chemin résolvable — pas de retry /files', {
             infoHash,
           });
-          setLoadingFiles(false);
-          loadingCacheRef.current.delete(infoHash);
           return [];
         }
 
@@ -316,7 +310,6 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
                 filesCacheRef.current.set(infoHash, files);
                 setVideoFiles(files);
                 setSelectedFile(files[0]);
-                setLoadingFiles(false);
                 return files;
               }
 
@@ -330,7 +323,6 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
               filesCacheRef.current.set(infoHash, files);
               setVideoFiles(files);
               setSelectedFile(files[0]);
-              setLoadingFiles(false);
               return files;
             }
           } catch (e) {
@@ -351,16 +343,15 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
           filesCacheRef.current.set(infoHash, files);
           setVideoFiles(files);
           setSelectedFile(files[0]);
-          setLoadingFiles(false);
           return files;
         }
         
         // Pour les torrents normaux (sans chemin bibliothèque), vérifier si le torrent existe sur le backend
         const torrentStats = await clientApi.getTorrent(infoHash);
         if (!torrentStats) {
-          // Normal pour un variant externe pas encore ajouté : pas de warn pour éviter le bruit en console
+          // Normal pour un variant externe pas encore ajouté : pas de warn pour éviter le bruit en console.
+          // Ne pas réessayer automatiquement ici — playHandler ajoute le torrent puis rappelle avec retryCount > 0.
           console.log('[useVideoFiles] Torrent pas encore dans le client (pas de réessai automatique).');
-          setLoadingFiles(false);
           return [];
         }
         
@@ -415,12 +406,12 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
               maxRetries: 15,
               total_bytes: torrentStats.total_bytes,
             });
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Libérer le slot loading avant le retry pour éviter « Appel en cours » bloqué
+            loadingCacheRef.current.delete(infoHash);
             setLoadingFiles(false);
             return loadVideoFiles(infoHash, retryCount + 1);
           }
           
-          setLoadingFiles(false);
           return [];
         }
 
@@ -472,7 +463,6 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
 
         if (files.length === 0) {
           console.warn('[useVideoFiles] ⚠️ Aucun fichier vidéo trouvé dans le torrent');
-          setLoadingFiles(false);
           return [];
         }
 
@@ -529,9 +519,7 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
             if (matchByPattern) {
               console.log('[useVideoFiles] ✅ Matching SxxExx trouvé:', matchByPattern.path);
               setSelectedFile(matchByPattern);
-              setLoadingFiles(false);
               filesCacheRef.current.set(infoHash, files);
-              loadingCacheRef.current.delete(infoHash);
               return files;
             }
           }
@@ -564,25 +552,21 @@ export function useVideoFiles({ torrentName, onError, filePath, keepAllVideoFile
           setSelectedFile(matchingFile);
         }
 
-        setLoadingFiles(false);
-
         // Mettre en cache le résultat
         filesCacheRef.current.set(infoHash, files);
-        loadingCacheRef.current.delete(infoHash);
 
         return files;
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-
-        // Ne pas mettre en cache les erreurs
-        loadingCacheRef.current.delete(infoHash);
-
         console.error('Erreur lors du chargement des fichiers:', error);
         if (onError && error instanceof Error) {
           onError(error);
         }
-        setLoadingFiles(false);
         return [];
+      } finally {
+        // Toujours libérer le slot — sinon les appels suivants restent sur « Appel en cours… »
+        // avec une promesse déjà résolue (ex. 404 torrent absent).
+        loadingCacheRef.current.delete(infoHash);
+        setLoadingFiles(false);
       }
     })();
 
