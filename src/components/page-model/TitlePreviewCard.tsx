@@ -235,6 +235,12 @@ export function TitlePreviewCard({
     return Math.min(100, Math.max(0, p));
   })();
   const showProgressBar = downloading || progressPct > 0;
+  const hasExplicitMeta = Boolean(metaLine || metaSubLine);
+  const showCaption = hasExplicitMeta || expanded || tvLayout || hovered;
+  const captionTitle = metaLine || title;
+  const captionSub =
+    metaSubLine ||
+    (!hasExplicitMeta && item.rating != null ? `★ ${item.rating.toFixed(1)}` : null);
 
   return (
     <div
@@ -255,7 +261,7 @@ export function TitlePreviewCard({
     >
       <FocusableCard
         className={[
-          'block w-full outline-none relative overflow-hidden rounded-md bg-[#141414]',
+          'ed-browse-card block w-full outline-none relative overflow-hidden rounded-md bg-[#141414]',
           tvLayout ? '' : 'transition-[transform,box-shadow] duration-150 ease-out',
           expanded
             ? ''
@@ -264,28 +270,29 @@ export function TitlePreviewCard({
               : 'shadow-none',
         ].join(' ')}
         style={{ width: '100%', height: tileH }}
-        ariaLabel={title}
+        ariaLabel={captionSub ? `${captionTitle}. ${captionSub}` : captionTitle}
         noScale
         asTorrentCard
         onClick={() => onNavigate(item)}
       >
-          {badge ? (
-            <span
-              className={[
-                'absolute left-2 top-2 z-[3] rounded-full border px-2.5 py-1 text-[10px] tv:text-sm font-bold uppercase tracking-wide text-white',
-                badgeTone === 'ok'
-                  ? 'border-emerald-200/40 bg-emerald-600/90'
-                  : badgeTone === 'pending'
-                    ? 'border-amber-100/40 bg-amber-500/90'
-                    : badgeTone === 'bad'
-                      ? 'border-rose-200/40 bg-rose-600/90'
-                      : 'border-white/20 bg-black/70',
-              ].join(' ')}
-            >
-              {badge}
-            </span>
-          ) : null}
-          <div className="absolute inset-0" aria-hidden>
+        {badge ? (
+          <span
+            className={[
+              'absolute left-2 top-2 z-[4] rounded-full border px-2.5 py-1 text-[10px] tv:text-sm font-bold uppercase tracking-wide text-white',
+              badgeTone === 'ok'
+                ? 'border-emerald-200/40 bg-emerald-600/90'
+                : badgeTone === 'pending'
+                  ? 'border-amber-100/40 bg-amber-500/90'
+                  : badgeTone === 'bad'
+                    ? 'border-rose-200/40 bg-rose-600/90'
+                    : 'border-white/20 bg-black/70',
+            ].join(' ')}
+          >
+            {badge}
+          </span>
+        ) : null}
+
+        <div className="absolute inset-0" aria-hidden>
           {imgFit === 'contain' ? (
             <img
               src={imgSrc ?? poster}
@@ -301,7 +308,9 @@ export function TitlePreviewCard({
             loading="lazy"
             decoding="async"
             className={`ed-card-img absolute inset-0 h-full w-full ${
-              imgFit === 'cover' ? `object-cover ${landscape ? 'object-[center_top]' : 'object-center'}` : 'object-contain'
+              imgFit === 'cover'
+                ? `object-cover ${landscape ? 'object-[center_top]' : 'object-center'}`
+                : 'object-contain'
             }`}
           />
 
@@ -323,51 +332,45 @@ export function TitlePreviewCard({
               />
             </div>
           ) : null}
-
-          {showProgressBar ? (
-            <div
-              className={`absolute inset-x-0 bottom-0 ${downloading ? 'h-1.5 bg-black/55' : 'h-[3px] bg-white/25'}`}
-              role="progressbar"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={Math.round(progressPct)}
-            >
-              <div
-                className={`h-full transition-[width] duration-500 ease-out ${
-                  downloading
-                    ? 'bg-[var(--ds-accent-violet,#a855f7)] shadow-[0_0_10px_rgba(168,85,247,0.45)]'
-                    : 'bg-[var(--ds-accent-violet,#a855f7)]'
-                }`}
-                style={{ width: `${Math.max(progressPct, downloading && progressPct === 0 ? 2 : 0)}%` }}
-              />
-            </div>
-          ) : null}
         </div>
-      </FocusableCard>
 
-      <div className="mt-2 sm:mt-2.5 tv:mt-3 px-0.5" style={{ width: '100%', minHeight: '2.75rem' }}>
-        {expanded || tvLayout ? (
-          <>
-            <p className={`truncate text-sm sm:text-base tv:text-lg font-semibold ${expanded ? 'text-white' : 'text-white/75'}`}>
-              {metaLine || title}
-            </p>
-            {metaSubLine ? (
-              <p className="mt-0.5 truncate text-xs sm:text-sm tv:text-base text-white/60">{metaSubLine}</p>
-            ) : item.rating != null ? (
-              <p className="mt-0.5 text-xs sm:text-sm tv:text-base text-white/60">★ {item.rating.toFixed(1)}</p>
-            ) : null}
-          </>
-        ) : hovered ? (
-          <>
-            <p className="truncate text-sm font-medium text-white/90 transition-opacity duration-200">
-              {metaLine || title}
-            </p>
-            {metaSubLine ? (
-              <p className="mt-0.5 truncate text-xs text-white/55">{metaSubLine}</p>
-            ) : null}
-          </>
+        {showCaption ? (
+          <div
+            className={`ed-browse-card__caption pointer-events-none absolute inset-x-0 bottom-0 z-[3] ${
+              showProgressBar ? 'ed-browse-card__caption--with-progress' : ''
+            }`}
+          >
+            <div className="ed-browse-card__shade" aria-hidden />
+            <div className="ed-browse-card__copy relative">
+              <p className="ed-browse-card__title truncate">{captionTitle}</p>
+              {captionSub ? (
+                <p className="ed-browse-card__sub truncate">{captionSub}</p>
+              ) : null}
+            </div>
+          </div>
         ) : null}
-      </div>
+
+        {showProgressBar ? (
+          <div
+            className={`ed-browse-card__progress absolute inset-x-0 bottom-0 z-[4] ${
+              downloading ? 'h-1.5 bg-black/55' : 'h-[3px] bg-white/25'
+            }`}
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(progressPct)}
+          >
+            <div
+              className={`h-full transition-[width] duration-500 ease-out bg-[var(--ed-accent,#f2545b)] ${
+                downloading ? 'shadow-[0_0_10px_rgba(242,84,91,0.45)]' : ''
+              }`}
+              style={{
+                width: `${Math.max(progressPct, downloading && progressPct === 0 ? 2 : 0)}%`,
+              }}
+            />
+          </div>
+        ) : null}
+      </FocusableCard>
     </div>
   );
 }

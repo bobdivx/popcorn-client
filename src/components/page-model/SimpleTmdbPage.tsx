@@ -1,6 +1,7 @@
 import type { ComponentChildren } from 'preact';
 import type { ContentItem } from '../../lib/client/types';
 import { getDisplayTitle } from '../../lib/utils/title-display';
+import { useI18n } from '../../lib/i18n/useI18n';
 import TorrentCardsShadowLoader from '../ui/TorrentCardsShadowLoader';
 import { CarouselSection } from './CarouselSection';
 import { PageContainer } from './PageContainer';
@@ -52,12 +53,15 @@ function resumeMetaLine(item: EnrichedResumeItem): string {
   return title;
 }
 
-function resumeMetaSubLine(item: EnrichedResumeItem): string | null {
+function resumeMetaSubLine(
+  item: EnrichedResumeItem,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string | null {
   const pos = item.positionSeconds;
   const dur = item.durationSeconds;
   if (typeof pos === 'number' && typeof dur === 'number' && dur > pos && dur > 0) {
     const remainMin = Math.max(1, Math.round((dur - pos) / 60));
-    return `Encore ${remainMin} min`;
+    return t('dashboard.resumeRemainingMinutes', { minutes: remainMin });
   }
   return null;
 }
@@ -77,6 +81,7 @@ export function SimpleTmdbPage({
   toolbar,
   children,
 }: SimpleTmdbPageProps) {
+  const { t } = useI18n();
   const showPageHeader = Boolean((title && title.trim()) || headerAction);
 
   if (loading) {
@@ -132,7 +137,7 @@ export function SimpleTmdbPage({
                 metaSubLine={
                   resume.isDownloading && typeof downloadPct === 'number'
                     ? `${Math.round(downloadPct)}%`
-                    : resumeMetaSubLine(resume)
+                    : resumeMetaSubLine(resume, t)
                 }
               />
             );

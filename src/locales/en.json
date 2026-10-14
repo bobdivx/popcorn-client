@@ -1209,6 +1209,7 @@
   },
   "dashboard": {
     "resumeWatching": "Continue Watching",
+    "resumeRemainingMinutes": "{minutes} min left",
     "waitingForNext": "Coming soon",
     "newEpisodeBadge": "New",
     "nextEpisodeBadge": "Next: {date}",
