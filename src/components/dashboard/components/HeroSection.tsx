@@ -450,6 +450,8 @@ function EditorialHeroSection({
   const closeRef = useRef<HTMLButtonElement>(null);
   const isTV = isTVPlatform();
   const count = list.length;
+  /** TV : aperçu bande-annonce (avec son) dans le hero quand le focus y reste ~2 s. */
+  const [previewOn, setPreviewOn] = useState(false);
 
   useEffect(() => {
     if (count < 2 || paused || focusWithin || trailerOpen) return;
@@ -474,6 +476,15 @@ function EditorialHeroSection({
       window.removeEventListener('keydown', onKey, true);
     };
   }, [trailerOpen]);
+
+  const currentKeyForPreview = count ? contentItemKey(list[Math.min(index, count - 1)]) : '';
+  const currentTrailerForPreview = count ? list[Math.min(index, count - 1)].trailerKey : null;
+  useEffect(() => {
+    setPreviewOn(false);
+    if (!isTV || !focusWithin || trailerOpen || !currentTrailerForPreview) return;
+    const id = window.setTimeout(() => setPreviewOn(true), 2000);
+    return () => window.clearTimeout(id);
+  }, [isTV, focusWithin, trailerOpen, currentKeyForPreview, currentTrailerForPreview]);
 
   if (!count) return null;
   const current = list[Math.min(index, count - 1)];
@@ -527,8 +538,10 @@ function EditorialHeroSection({
       aria-roledescription="carousel"
     >
       {list.map((item, i) => {
+        // Seules l'image active et la suivante sont chargées (5 images pleine taille = décodage lourd sur TV).
+        const near = i === index || i === (index + 1) % count || i === (index - 1 + count) % count;
         const raw = item.backdrop || item.poster;
-        const url = getHighQualityTmdbImageUrl(raw) ?? raw;
+        const url = near ? getHighQualityTmdbImageUrl(raw) ?? raw : null;
         return (
           <div
             key={contentItemKey(item)}
@@ -538,6 +551,11 @@ function EditorialHeroSection({
           />
         );
       })}
+      {previewOn && !trailerOpen && trailerKey && (
+        <div className="ed-hero__preview" aria-hidden>
+          <YouTubeVideoPlayer key={`p-${trailerKey}`} youtubeKey={trailerKey} autoplay muted={false} loop controls={false} cover className="w-full h-full" />
+        </div>
+      )}
       <div className="ed-hero__shade" aria-hidden />
       {trailerOpen && trailerKey && (
         <div className="ed-hero__trailer">
