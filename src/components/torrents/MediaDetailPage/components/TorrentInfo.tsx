@@ -17,6 +17,8 @@ import { DsLoader } from '../../../ui/DsLoader';
 import { handleDeleteMedia, isLocalMedia } from '../actions/delete';
 import { TorrentStatusBadge } from '../../ui/TorrentStatusBadge';
 import { isTorrentReallyComplete } from '../../../streaming/player-shared/derivePlaybackPhase';
+import { ReleaseHint } from '../../../ai/ReleaseHint';
+import { TmdbMatchAssist } from '../../../ai/TmdbMatchAssist';
 
 type QualityVariant = {
   id: string;
@@ -62,6 +64,8 @@ interface TorrentInfoProps {
   /** Modal info technique pilotée depuis ActionButtons (favoris / supprimer / info). */
   techInfoModalOpen?: boolean;
   onTechInfoModalOpenChange?: (open: boolean) => void;
+  /** Afficher le bloc version préférée + aide TMDB dans la modal Info (fiche épurée). */
+  showReleaseAssistInModal?: boolean;
 }
 
 const QUALITY_ORDER: Record<string, number> = { Remux: 6, '4K': 5, '2160p': 5, UHD: 5, '1080p': 4, '720p': 3, '480p': 2 };
@@ -101,6 +105,7 @@ export function TorrentInfo({
   addNotification,
   techInfoModalOpen,
   onTechInfoModalOpenChange,
+  showReleaseAssistInModal = true,
 }: TorrentInfoProps) {
   const { language, t } = useI18n();
   const [isDownloadingTorrent, setIsDownloadingTorrent] = useState(false);
@@ -217,9 +222,12 @@ export function TorrentInfo({
   const trackerName = (torrent as any).tracker ?? null;
   const infoHash = (torrent as any).infoHash || (torrent as any).info_hash || null;
   const filePath = !isSeries ? ((torrent as any).downloadPath as string | undefined) || null : null;
-  const showMovieTechInfo =
-    !isSeries &&
-    !!(filePath || indexerName || minimumRatio != null || trackerName || canDelete);
+  const hasReleaseAssist =
+    showReleaseAssistInModal && Array.isArray(allVariants) && allVariants.length > 0;
+  const showTechInfoModalContent =
+    !!(filePath || indexerName || minimumRatio != null || trackerName || canDelete || hasReleaseAssist) &&
+    // Séries : chemin fichier déjà masqué ; on ouvre quand même la modal pour version / indexer / delete.
+    (!isSeries || hasReleaseAssist || !!indexerName || minimumRatio != null || !!trackerName || canDelete);
 
   const canDownloadTorrentFile = !!infoHash || !!(torrent as any)._externalLink;
 
@@ -607,7 +615,20 @@ export function TorrentInfo({
         </div>
       )}
 
-      {showMovieTechInfo && (
+      {/* Auto-apply version préférée même si la modal Info est fermée */}
+      {hasReleaseAssist && onSelectVariant && (
+        <ReleaseHint
+          variants={allVariants as MediaDetailPageProps['torrent'][]}
+          selectedId={selectedVariantId}
+          onSelect={(id) => {
+            const found = (allVariants || []).find((v) => v.id === id);
+            if (found) onSelectVariant(found);
+          }}
+          ui="none"
+        />
+      )}
+
+      {showTechInfoModalContent && (
         <Modal
           isOpen={showTechInfoModal}
           onClose={() => setShowTechInfoModal(false)}
@@ -615,6 +636,33 @@ export function TorrentInfo({
           size="lg"
         >
           <div className="space-y-4 pt-2 min-w-0">
+            {hasReleaseAssist && onSelectVariant && (
+              <ReleaseHint
+                variants={allVariants as MediaDetailPageProps['torrent'][]}
+                selectedId={selectedVariantId}
+                onSelect={(id) => {
+                  const found = (allVariants || []).find((v) => v.id === id);
+                  if (found) onSelectVariant(found);
+                }}
+                ui="card"
+              />
+            )}
+
+            {hasReleaseAssist && (
+              <TmdbMatchAssist
+                infoHash={infoHash}
+                title={
+                  torrent.tmdbTitle ||
+                  torrent.mainTitle ||
+                  torrent.cleanTitle ||
+                  torrent.name
+                }
+                confidence={torrent.tmdbMatchConfidence}
+                currentTmdbId={torrent.tmdbId}
+                mediaType={torrent.tmdbType}
+              />
+            )}
+
             {(isSeeding || seedCount > 0 || leechCount > 0) && (
               <div className="flex min-w-0 flex-col gap-3 rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface)] px-4 py-3 text-sm">
                 <span className="font-semibold text-[var(--ds-text-primary)]">
