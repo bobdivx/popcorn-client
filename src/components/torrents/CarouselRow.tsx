@@ -85,7 +85,7 @@ export default function CarouselRow({
   return (
     <div
       ref={containerRef}
-      className={`mb-10 sm:mb-12 md:mb-14 tv:mb-20 w-full min-w-0 max-w-full overflow-x-visible overflow-y-visible opacity-100 ${className}`}
+      className={`ed-row mb-10 sm:mb-12 md:mb-14 tv:mb-20 w-full min-w-0 max-w-full overflow-x-visible overflow-y-visible opacity-100 ${className}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
