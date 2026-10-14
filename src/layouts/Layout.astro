@@ -237,11 +237,11 @@ const isWebOS = import.meta.env.WEBOS === 'true';
           document.documentElement.setAttribute('data-webos', 'true');
           try { sessionStorage.setItem('popcorn_is_webos', '1'); } catch (e) {}
         }
-        // Thème éditorial : web/mobile uniquement (jamais TV/webOS ni mode voiture /car*)
+        // Thème éditorial : web, mobile et TV/webOS (jamais en mode voiture /car*)
         var applyEditorial = function () {
           var root = document.documentElement;
           var p = location.pathname || '';
-          var off = isTV || root.getAttribute('data-tv-platform') === 'true' || root.getAttribute('data-webos') === 'true' || /^\/car(\/|$)/.test(p);
+          var off = /^\/car(\/|$)/.test(p); // éditorial partout sauf mode voiture
           if (off) root.removeAttribute('data-editorial'); else root.setAttribute('data-editorial', 'true');
         };
         applyEditorial();

@@ -2,7 +2,7 @@
 // Fonctionne sur Web, Android (via WebView), et WebOS
 
 const CACHE_NAME = 'hls-segments-v3'; // Changé v2 -> v3 pour forcer la mise à jour
-const STATIC_CACHE_NAME = 'popcorn-static-v1';
+const STATIC_CACHE_NAME = 'popcorn-static-v2'; // v2 : purge des assets d'avant la refonte éditoriale
 const API_CACHE_NAME = 'popcorn-api-v1';
 const SW_VERSION = 'v3'; // Version du Service Worker pour forcer la mise à jour
 const MAX_CACHE_SIZE = 50 * 1024 * 1024; // 50 MB max (réduit pour éviter la saturation)
@@ -309,6 +309,18 @@ async function getCacheSize(cache) {
 // Gérer les requêtes d'assets statiques (cache first)
 async function handleStaticRequest(request) {
   const cache = await caches.open(STATIC_CACHE_NAME);
+  // Fichiers non hashés (hors /_astro/) : réseau d'abord, pour ne jamais servir une ancienne UI.
+  if (!new URL(request.url).pathname.startsWith('/_astro/')) {
+    try {
+      const fresh = await fetch(request);
+      if (fresh.ok) cache.put(request, fresh.clone());
+      return fresh;
+    } catch (e) {
+      const fallback = await cache.match(request);
+      if (fallback) return fallback;
+      return new Response('Asset non disponible', { status: 503 });
+    }
+  }
   const cached = await cache.match(request);
   
   if (cached) {
