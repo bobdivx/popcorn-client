@@ -18,13 +18,17 @@ import {
 } from '../lib/embedded-desktop';
 import { isTauri } from '../lib/utils/tauri';
 import { redirectTo } from '../lib/utils/navigation.js';
-import IntroVideoWithHlsPreload from './IntroVideoWithHlsPreload';
+import IntroVideo from './IntroVideo';
 import HLSLoadingSpinner from './ui/HLSLoadingSpinner';
 import { getCloudDevices, getUserConfig } from '../lib/api/popcorn-web';
-import { isWebOSTV } from '../lib/utils/device-detection';
+import { isTVPlatform, isWebOSTV } from '../lib/utils/device-detection';
+import {
+  STORAGE_INTRO_SESSION,
+  STORAGE_INTRO_SKIPPED,
+  shouldShowBootIntro,
+} from '../lib/utils/boot-intro';
 
 const STORAGE_DIAG_ON_BOOT = 'popcorn_diagnostics_on_boot';
-const STORAGE_INTRO_SKIPPED = 'popcorn_intro_skipped';
 /** Résultat du démarrage automatique du backend (pour affichage sur /setup). */
 export const STORAGE_BACKEND_START_RESULT = 'popcorn_backend_start_result';
 
@@ -48,10 +52,13 @@ export default function IndexRedirect() {
   const [showIntro, setShowIntro] = useState(false);
 
   const handleIntroEnded = () => {
-    // Marquer l'intro comme vue
-    localStorage.setItem(STORAGE_INTRO_SKIPPED, '1');
+    try {
+      localStorage.setItem(STORAGE_INTRO_SKIPPED, '1');
+      sessionStorage.setItem(STORAGE_INTRO_SESSION, '1');
+    } catch {
+      // ignore
+    }
     setShowIntro(false);
-    // Démarrer le chargement après l'intro
     checkAndRedirect();
   };
 
@@ -64,13 +71,18 @@ export default function IndexRedirect() {
   }, []);
 
   useEffect(() => {
-    const introSkipped = localStorage.getItem(STORAGE_INTRO_SKIPPED) === '1';
-    // webOS (IPK file://) : /intro.mp4 ne résout pas ; la vidéo ne se termine jamais → écran figé.
-    // Build WEBOS : data-webos sur <html>. On saute l'intro et on va direct au flux normal.
-    const webosEmbedded =
-      typeof document !== 'undefined' &&
-      document.documentElement.getAttribute('data-webos') === 'true';
-    if (!introSkipped && !webosEmbedded && !isWebOSTV()) {
+    // Android TV / webOS : comportement Netflix — sting marque à chaque ouverture (session).
+    // IntroVideo résout ./intro.mp4 sous file:// (IPK webOS) + fallback GIF.
+    const tvBoot = isTVPlatform() || isWebOSTV();
+    let sessionSeen = false;
+    let foreverSkipped = false;
+    try {
+      sessionSeen = sessionStorage.getItem(STORAGE_INTRO_SESSION) === '1';
+      foreverSkipped = localStorage.getItem(STORAGE_INTRO_SKIPPED) === '1';
+    } catch {
+      // ignore
+    }
+    if (shouldShowBootIntro({ isTvBoot: tvBoot, sessionSeen, foreverSkipped })) {
       setShowIntro(true);
       return;
     }
@@ -391,11 +403,8 @@ export default function IndexRedirect() {
     };
   };
 
-  // Afficher l'intro si nécessaire
-  // Note: Pour précharger HLS, vous pouvez passer hlsInfoHash, hlsFilePath, etc.
-  // Exemple: <IntroVideoWithHlsPreload onEnded={handleIntroEnded} hlsInfoHash="..." hlsFilePath="..." />
   if (showIntro) {
-    return <IntroVideoWithHlsPreload onEnded={handleIntroEnded} />;
+    return <IntroVideo onEnded={handleIntroEnded} variant="brand" />;
   }
 
   if (loading) {
