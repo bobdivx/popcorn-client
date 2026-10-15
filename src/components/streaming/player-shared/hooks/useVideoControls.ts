@@ -2,8 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'preac
 import { emitPlaybackStep } from '../../player-core/observability/playbackEvents';
 import {
   SEEK_RELOAD_BUFFER_MARGIN_SEC,
-  SEEK_RELOAD_LARGE_JUMP_SEC,
-  SEEK_RELOAD_MIN_BUFFERED_END_SEC,
+  shouldReloadSeekForTarget,
 } from '../../player-core/policies/SeekPolicy';
 import { usePlayerConfig } from './usePlayerConfig';
 import { isTVPlatform, isWebOSTV, stampTvPlatformHints } from '../../../../lib/utils/device-detection';
@@ -11,9 +10,7 @@ import { toggleFullscreen } from './useFullscreen';
 import {
   getBufferAheadPercent,
   getBufferAheadSeconds,
-  getBufferedEndAround,
   getBufferedTimelinePercent,
-  isTimeInBuffered,
 } from '../utils/bufferMetrics';
 
 interface UseVideoControlsProps {
@@ -371,34 +368,27 @@ export function useVideoControls({
         if (video.paused) video.play().catch(() => {});
       };
       const buffered = video.buffered;
-      const bufferedEnd = getBufferedEndAround(buffered, video.currentTime);
-      const beyondGeneratedPlaylist = mediaDuration > 0 && clamped > mediaDuration + 0.5;
       if (!canUseSeekReload) {
         emitPlaybackStep('seek_native', { position: clamped });
         video.currentTime = Math.min(clamped, mediaDuration > 0 ? mediaDuration : clamped);
         resumeIfNeeded();
         return;
       }
-      if (reloadWithSeek && clamped > 0 && !isLoading) {
-        if (!beyondGeneratedPlaylist && isTimeInBuffered(buffered, clamped, SEEK_RELOAD_BUFFER_MARGIN_SEC)) {
-          emitPlaybackStep('seek_native', { position: clamped });
-          video.currentTime = clamped;
-          resumeIfNeeded();
-          return;
-        }
-        const isBeyondBufferedWindow =
-          clamped > bufferedEnd + SEEK_RELOAD_BUFFER_MARGIN_SEC;
-        const isLargeJump =
-          Math.abs(clamped - video.currentTime) > SEEK_RELOAD_LARGE_JUMP_SEC;
-        if (
-          beyondGeneratedPlaylist ||
-          isLargeJump ||
-          (bufferedEnd >= SEEK_RELOAD_MIN_BUFFERED_END_SEC && isBeyondBufferedWindow)
-        ) {
-          emitPlaybackStep('seek_reload', { position: clamped });
-          reloadWithSeek(clamped);
-          return;
-        }
+      // Hors fenêtre bufferée → régénérer la playlist (seek=) pour déplacer le buffer.
+      // Même pendant isLoading : un nouveau clic remplace la cible en cours.
+      if (
+        reloadWithSeek &&
+        clamped > 0 &&
+        shouldReloadSeekForTarget({
+          targetSec: clamped,
+          buffered,
+          mediaDuration,
+          marginSec: SEEK_RELOAD_BUFFER_MARGIN_SEC,
+        })
+      ) {
+        emitPlaybackStep('seek_reload', { position: clamped });
+        reloadWithSeek(clamped);
+        return;
       }
       if (isLoading) return;
       emitPlaybackStep('seek_native', { position: clamped });
