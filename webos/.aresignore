@@ -1,0 +1,18 @@
+# Fichiers Seller Lounge / store — hors package runtime IPK
+*.md
+*.pdf
+*.ppt
+*.pptx
+*.zip
+.aresignore
+playstore-screenshots/
+UX_Scenario*
+LG_SELLER*
+popcorn_feature_graphic*
+popcorn_logo.png
+popcorn_logo_512x512.png
+# Artefacts lourds non nécessaires au runtime TV
+intro.gif
+com.popcorn.*.ipk
+*.ipk
+store-icon-400.png
