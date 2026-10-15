@@ -19,6 +19,8 @@ export interface UserPreferences {
   torrentsRecentLimit?: number;
   mediaLanguages?: string[];
   minQuality?: string;
+  /** Autoriser torrents 3D (SBS/HOU…). Défaut false. */
+  allow3dTorrents?: boolean;
   [key: string]: any;
 }
 
@@ -105,6 +107,7 @@ export class PreferencesManager {
       torrentsRecentLimit: 50,
       mediaLanguages: [],
       minQuality: '',
+      allow3dTorrents: false,
     };
   }
 

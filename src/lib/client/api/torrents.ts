@@ -490,7 +490,9 @@ export class TorrentsService {
   }
 
   /**
-   * Supprimer un torrent
+   * Supprimer un torrent.
+   * Idempotent : 404 / « no such torrent in db » = déjà absent → succès silencieux
+   * (le fichier bibliothèque peut encore être nettoyé côté handleDeleteMedia).
    */
   async removeTorrent(infoHash: string, deleteFiles: boolean = false): Promise<void> {
     let url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}`);
@@ -500,6 +502,26 @@ export class TorrentsService {
     const response = await fetch(url, {
       method: 'DELETE',
     });
+
+    if (response.status === 404) {
+      return;
+    }
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      // librqbit renvoie parfois 500 « no such torrent in db » si session perdue / déjà retiré.
+      if (/no such torrent|not found in db|does not exist/i.test(text)) {
+        return;
+      }
+      let message = `HTTP error! status: ${response.status}`;
+      try {
+        const parsed = JSON.parse(text) as { error?: string; human_readable?: string };
+        message = parsed.error || parsed.human_readable || message;
+      } catch {
+        if (text.trim()) message = text.slice(0, 280);
+      }
+      throw new Error(message);
+    }
 
     await handleResponse<void>(response);
   }

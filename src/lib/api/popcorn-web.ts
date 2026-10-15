@@ -1152,6 +1152,8 @@ export interface UserConfig {
       mediaLanguages?: string[];
       /** Qualité minimale ("480p"|"720p"|"1080p"|"2160p"|"4K"). Vide = toutes */
       minQuality?: string;
+      /** Autoriser découverte / téléchargement des releases 3D. Défaut false. */
+      allow3dTorrents?: boolean;
     } | null;
     /** IDs des indexers dont les torrents synchronisés sont visibles dans la bibliothèque. null = tous visibles. */
     visibleIndexerIds?: string[] | null;
