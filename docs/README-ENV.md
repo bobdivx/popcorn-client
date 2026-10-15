@@ -28,13 +28,15 @@ PUBLIC_SERVER_URL=https://votre-serveur.com
 Après enregistrement dans la [Cast Developer Console](https://cast.google.com/publish) :
 
 ```env
-# Application ID du Styled Media Receiver « Popcornn » (sinon fallback CC1AD845)
-PUBLIC_CAST_RECEIVER_APP_ID=XXXXXXXX
+# Optionnel — défaut code = 3F212CD6 (Styled Media Receiver Popcorn, Cast Console)
+PUBLIC_CAST_RECEIVER_APP_ID=3F212CD6
 ```
 
-Skin URL à déclarer dans la console (après deploy du client) :
+Skin URL déclarée dans la console :
 
 `https://client.popcornn.app/cast/receiver.css`
+
+Tant que le statut est **Non publié**, seuls les appareils enregistrés (ex. Google TV) peuvent lancer ce receiver.
 
 ## Ports par défaut
 
