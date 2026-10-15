@@ -89,6 +89,103 @@ function isHlsUrl(src: string): boolean {
   return src.split('?')[0].toLowerCase().endsWith('.m3u8');
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function resolvePlaylistRef(ref: string, playlistUrl: string): string {
+  const trimmed = ref.trim();
+  if (!trimmed || trimmed.startsWith('#')) return trimmed;
+  try {
+    return new URL(trimmed, playlistUrl).href;
+  } catch {
+    return trimmed;
+  }
+}
+
+/** Prefere la variante 720p (plus stable sur Cast) sinon la première. */
+function pickMediaPlaylistUrl(masterBody: string, masterUrl: string): string | null {
+  const lines = masterBody.split(/\r?\n/);
+  let preferred: string | null = null;
+  let first: string | null = null;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line.startsWith('#EXT-X-STREAM-INF:')) continue;
+    const next = lines[i + 1]?.trim();
+    if (!next || next.startsWith('#')) continue;
+    const abs = resolvePlaylistRef(next, masterUrl);
+    if (!first) first = abs;
+    if (/\/v720\//i.test(next) || /720/.test(line)) {
+      preferred = abs;
+      break;
+    }
+  }
+  return preferred || first;
+}
+
+function countTsSegments(body: string): number {
+  return body.split(/\r?\n/).filter((l) => {
+    const t = l.trim();
+    return t.endsWith('.ts') && !t.startsWith('#');
+  }).length;
+}
+
+/**
+ * Chromecast est fragile sur les master ABR et les playlists encore en génération.
+ * → attendre ENDLIST, caster une playlist media (v720) plutôt que le master.
+ */
+async function prepareHlsCastUrl(streamUrl: string): Promise<{ url: string; complete: boolean }> {
+  const deadline = Date.now() + 180_000;
+  let candidate = streamUrl;
+
+  while (Date.now() < deadline) {
+    let res: Response;
+    try {
+      res = await fetch(candidate, { method: 'GET', cache: 'no-store', credentials: 'omit' });
+    } catch (err) {
+      console.warn('[Chromecast] playlist fetch failed, retry:', err);
+      await sleep(2000);
+      continue;
+    }
+
+    if (res.status === 503 || res.status === 202) {
+      await sleep(2000);
+      continue;
+    }
+    if (!res.ok) {
+      console.warn('[Chromecast] playlist HTTP', res.status, candidate);
+      await sleep(2000);
+      continue;
+    }
+
+    const body = await res.text();
+    if (body.includes('#EXT-X-STREAM-INF')) {
+      const mediaUrl = pickMediaPlaylistUrl(body, candidate);
+      if (!mediaUrl) {
+        await sleep(1500);
+        continue;
+      }
+      candidate = mediaUrl;
+      continue;
+    }
+
+    const segments = countTsSegments(body);
+    const complete = body.includes('#EXT-X-ENDLIST');
+    if (complete && segments >= 2) {
+      console.info('[Chromecast] HLS ready for cast', { url: candidate, segments });
+      return { url: candidate, complete: true };
+    }
+    if (segments >= 8) {
+      // Assez de buffer pour démarrer ; Cast en BUFFERED sans ENDLIST reste risqué → on attend encore un peu
+      console.info('[Chromecast] HLS partial, waiting ENDLIST…', { segments });
+    }
+    await sleep(2000);
+  }
+
+  console.warn('[Chromecast] HLS not complete before timeout, casting anyway', candidate);
+  return { url: candidate, complete: false };
+}
+
 function syncIsCastingFromContext(context: any, castAny: any, setIsCasting: (v: boolean) => void) {
   const castState = context.getCastState?.();
   const sessionState = context.getSessionState?.();
@@ -239,7 +336,7 @@ export function useChromecast(): UseChromecastReturn {
       const chromeAny = window.chrome;
       const context = castAny.framework.CastContext.getInstance();
 
-      const absoluteSrc = resolveCastableMediaUrl(src);
+      let absoluteSrc = resolveCastableMediaUrl(src);
       if (/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|\/|$)/i.test(absoluteSrc)) {
         console.warn(
           '[Chromecast] Media URL points to localhost — Chromecast cannot reach it. Use LAN IP or NAS domain.',
@@ -248,6 +345,22 @@ export function useChromecast(): UseChromecastReturn {
       }
 
       const hls = isHlsUrl(absoluteSrc);
+      let hlsComplete = false;
+      if (hls) {
+        // Ouvrir le picker tout de suite pendant qu’on attend la playlist complète.
+        try {
+          await context.requestSession();
+        } catch (err) {
+          console.error('[Chromecast] requestSession failed:', err);
+          setIsCasting(false);
+          return false;
+        }
+        setIsCasting(true);
+        const prepared = await prepareHlsCastUrl(absoluteSrc);
+        absoluteSrc = prepared.url;
+        hlsComplete = prepared.complete;
+      }
+
       const contentType = getContentTypeFromUrl(absoluteSrc);
       const mediaInfo = new chromeAny.cast.media.MediaInfo(absoluteSrc, contentType);
       // HLS Popcornn = MPEG-TS muxé. Sans ça, Cast peut boucler (écran noir / segment retry).
@@ -257,7 +370,12 @@ export function useChromecast(): UseChromecastReturn {
         if (segFmt?.TS != null) mediaInfo.hlsSegmentFormat = segFmt.TS;
         if (vidFmt?.MPEG2_TS != null) mediaInfo.hlsVideoSegmentFormat = vidFmt.MPEG2_TS;
       }
-      mediaInfo.streamType = chromeAny.cast.media.StreamType?.BUFFERED ?? 'BUFFERED';
+      // BUFFERED seulement si ENDLIST ; sinon LIVE évite les restarts Cast sur playlist progressive.
+      if (hls && !hlsComplete && chromeAny.cast.media.StreamType?.LIVE != null) {
+        mediaInfo.streamType = chromeAny.cast.media.StreamType.LIVE;
+      } else {
+        mediaInfo.streamType = chromeAny.cast.media.StreamType?.BUFFERED ?? 'BUFFERED';
+      }
       mediaInfo.metadata = new chromeAny.cast.media.GenericMediaMetadata();
       mediaInfo.metadata.metadataType = chromeAny.cast.media.MetadataType?.GENERIC ?? 0;
       mediaInfo.metadata.title = title || 'Popcornn';
@@ -274,8 +392,9 @@ export function useChromecast(): UseChromecastReturn {
       request.autoplay = true;
 
       try {
-        // requestSession ouvre le picker ; ne renvoie PAS la session CAF.
-        await context.requestSession();
+        if (!hls) {
+          await context.requestSession();
+        }
         const session = context.getCurrentSession?.();
         if (!session) {
           console.error('[Chromecast] No current session after requestSession');
@@ -289,6 +408,7 @@ export function useChromecast(): UseChromecastReturn {
           url: absoluteSrc,
           title,
           startAt: request.currentTime,
+          hlsComplete,
           appId: getReceiverApplicationId(),
         });
         return true;
