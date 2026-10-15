@@ -54,6 +54,21 @@ jobs:
           MERGE_EXIT=$?
           set -e
 
+          align_main_to_dev() {
+            echo "::warning::Historique ${TARGET_BRANCH} divergent — alignement ${TARGET_BRANCH} := origin/dev (force-with-lease)."
+            for n in $(gh pr list --base "${TARGET_BRANCH}" --head "dev" --state open --json number --jq '.[].number' 2>/dev/null || true); do
+              gh pr close "$n" --comment "Fermé : alignement ${TARGET_BRANCH} := dev (merge PR impossible)." || true
+            done
+            git push origin "origin/dev:refs/heads/${TARGET_BRANCH}" --force-with-lease
+            git fetch origin
+            if [ "$(git rev-parse "origin/dev")" = "$(git rev-parse "origin/${TARGET_BRANCH}")" ]; then
+              echo "${TARGET_BRANCH} aligné sur dev ($(git rev-parse --short origin/dev))."
+              return 0
+            fi
+            echo "::error::Alignement ${TARGET_BRANCH} échoué."
+            return 1
+          }
+
           if [ "${MERGE_EXIT}" -ne 0 ]; then
             CONFLICTS="$(git diff --name-only --diff-filter=U || true)"
             if [ "${CONFLICTS}" = "VERSION.json" ]; then
@@ -70,9 +85,10 @@ jobs:
               git add VERSION.json
               git commit --no-edit -m "chore: resolve VERSION.json conflict with ${TARGET_BRANCH}"
             else
-              echo "::error::Merge conflict with ${TARGET_BRANCH}: ${CONFLICTS}"
+              echo "::warning::Merge conflict with ${TARGET_BRANCH}: ${CONFLICTS} — fallback align."
               git merge --abort || true
-              exit 1
+              align_main_to_dev
+              exit 0
             fi
           fi
 
@@ -86,6 +102,14 @@ jobs:
             exit 0
           fi
 
+          if git merge-base --is-ancestor "origin/${TARGET_BRANCH}" "origin/dev"; then
+            echo "Fast-forward ${TARGET_BRANCH} → origin/dev"
+            git push origin "origin/dev:refs/heads/${TARGET_BRANCH}"
+            git fetch origin
+            echo "${TARGET_BRANCH} fast-forwarded to $(git rev-parse --short origin/dev)."
+            exit 0
+          fi
+
           PR_NUMBER="$(gh pr list --base "${TARGET_BRANCH}" --head "dev" --state open --json number --jq '.[0].number')"
           if [ -z "${PR_NUMBER}" ]; then
             set +e
@@ -93,13 +117,14 @@ jobs:
               --base "${TARGET_BRANCH}" \
               --head "dev" \
               --title "chore: merge dev into ${TARGET_BRANCH}" \
-              --body "Auto-generated after successful Docker workflow on dev." 2>&1)"
+              --body "Auto-generated release: align ${TARGET_BRANCH} with dev." 2>&1)"
             CREATE_EXIT_CODE=$?
             set -e
 
             if [ "${CREATE_EXIT_CODE}" -ne 0 ]; then
               if echo "${CREATE_OUTPUT}" | grep -Eq "not permitted to create or approve pull requests|createPullRequest"; then
-                echo "::warning::GitHub Actions token is not allowed to create PRs. Skipping auto-merge workflow."
+                echo "::warning::GitHub Actions token is not allowed to create PRs. Falling back to align."
+                align_main_to_dev
                 exit 0
               fi
               echo "${CREATE_OUTPUT}"
@@ -110,8 +135,16 @@ jobs:
           fi
 
           if [ -z "${PR_NUMBER}" ]; then
-            echo "Unable to find or create pull request."
-            exit 1
+            echo "Unable to find or create pull request — fallback align."
+            align_main_to_dev
+            exit 0
+          fi
+
+          MERGEABLE="$(gh pr view "${PR_NUMBER}" --json mergeable --jq .mergeable 2>/dev/null || echo "")"
+          if [ "${MERGEABLE}" = "CONFLICTING" ]; then
+            echo "::warning::PR #${PR_NUMBER} CONFLICTING — fallback align."
+            align_main_to_dev
+            exit 0
           fi
 
           set +e
@@ -141,8 +174,9 @@ jobs:
               echo "PR #${PR_NUMBER} merged directly."
             else
               echo "${DIRECT_MERGE_OUTPUT}"
-              echo "::error::Could not merge PR #${PR_NUMBER}."
-              exit 1
+              echo "::warning::Could not merge PR #${PR_NUMBER} — fallback align."
+              align_main_to_dev
+              exit 0
             fi
           fi
 
