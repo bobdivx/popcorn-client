@@ -421,7 +421,11 @@ export default function DirectVideoPlayer({
           videoFillMode={playerConfig.videoFillMode ?? 'contain'}
           showCastButton={chromecast.isAvailable}
           isCasting={chromecast.isCasting}
-          onCastClick={() => chromecast.castMedia(src, torrentName || '', currentTime)}
+          onCastClick={() => {
+            void chromecast.castMedia(src, torrentName || '', currentTime).then((ok) => {
+              if (ok) videoRef.current?.pause();
+            });
+          }}
           scrubThumbnails={scrubThumbnails ?? null}
           scrubThumbnailsLoading={scrubThumbnailsLoading}
           tvScrubIndexExternal={isTV ? tvScrubIndex : undefined}

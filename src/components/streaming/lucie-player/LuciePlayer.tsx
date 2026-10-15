@@ -477,7 +477,11 @@ export default function LuciePlayer({
           onRestart={handleRestart}
           showCastButton={chromecast.isAvailable}
           isCasting={chromecast.isCasting}
-          onCastClick={() => chromecast.castMedia(src, torrentName ?? fileName, currentTime)}
+          onCastClick={() => {
+            void chromecast.castMedia(src, torrentName ?? fileName, currentTime).then((ok) => {
+              if (ok) videoRef.current?.pause();
+            });
+          }}
           videoFillMode={playerConfig.videoFillMode ?? 'contain'}
           scrubThumbnails={scrubThumbnails ?? null}
           scrubThumbnailsLoading={scrubThumbnailsLoading}
