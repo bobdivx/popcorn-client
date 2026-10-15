@@ -1,15 +1,8 @@
 name: Auto-merge dev to main (after Docker success)
 
+# Plus de déclenchement après Docker : DevForge déploie le client.
 on:
   workflow_dispatch:
-  workflow_run:
-    workflows:
-      - Build and Publish Frontend Docker Image
-      - Build Frontend Docker (GitHub-hosted fallback)
-    types:
-      - completed
-    branches:
-      - dev
 
 permissions:
   contents: write
