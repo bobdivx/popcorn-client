@@ -702,6 +702,20 @@ function convertVariantToTorrent(variant: any): Torrent {
   } as unknown as Torrent;
 }
 
+/** Score bas = préféré pour l’ancre page (S01 / E01 avant S03E02 par seeders). */
+function seriesAnchorRank(name: string): number {
+  const upper = (name || '').toUpperCase();
+  const se = upper.match(/\bS\.?(\d{1,2})[\s._-]*E\.?(\d{1,3})\b/);
+  if (se) {
+    const s = parseInt(se[1], 10);
+    const e = parseInt(se[2], 10);
+    return s * 1000 + e;
+  }
+  const pack = upper.match(/\bS\.?(\d{1,2})\b/);
+  if (pack) return parseInt(pack[1], 10) * 1000;
+  return 50_000;
+}
+
 function pickBestTorrentFromGroupPayload(payload: any, titleHint?: string | null): Torrent | null {
   // Payloads possibles selon backend / versions:
   // - { success, torrents: [...] }
@@ -730,15 +744,38 @@ function pickBestTorrentFromGroupPayload(payload: any, titleHint?: string | null
     const selectable = pool.length > 0 ? pool : allow3d ? torrents : [];
     if (selectable.length === 0) return null;
 
+    const looksLikeTvGroup = selectable.some((t: any) => {
+      const typ = String(t.tmdb_type ?? t.tmdbType ?? '').toLowerCase();
+      return typ === 'tv' || typ === 'series' || /\bS\.?\d{1,2}/i.test(String(t.name || ''));
+    });
+
     let best: any;
     if (titleHint && titleHint.trim().length > 0) {
       const matching = selectable.filter((t: any) => variantMatchesTitle(t, titleHint));
       if (matching.length > 0) {
-        best = matching.slice().sort((a: any, b: any) => normalizeSeedCount(b) - normalizeSeedCount(a))[0];
+        best = matching
+          .slice()
+          .sort((a: any, b: any) => {
+            if (looksLikeTvGroup) {
+              const ra = seriesAnchorRank(String(a.name || ''));
+              const rb = seriesAnchorRank(String(b.name || ''));
+              if (ra !== rb) return ra - rb;
+            }
+            return normalizeSeedCount(b) - normalizeSeedCount(a);
+          })[0];
       }
     }
     if (!best) {
-      best = selectable.slice().sort((a: any, b: any) => normalizeSeedCount(b) - normalizeSeedCount(a))[0];
+      best = selectable
+        .slice()
+        .sort((a: any, b: any) => {
+          if (looksLikeTvGroup) {
+            const ra = seriesAnchorRank(String(a.name || ''));
+            const rb = seriesAnchorRank(String(b.name || ''));
+            if (ra !== rb) return ra - rb;
+          }
+          return normalizeSeedCount(b) - normalizeSeedCount(a);
+        })[0];
     }
     // Convertir le variant en objet torrent avec toutes les données nettoyées
     const converted = convertVariantToTorrent(best);
