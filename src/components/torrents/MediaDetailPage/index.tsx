@@ -2600,10 +2600,24 @@ export default function MediaDetailPage({
       const se = seriesEpisodes.seasons.find((s) => s.episodes.some((e) => e.id === episodeVariantId));
       if (se) setSelectedSeasonNum(se.season);
       setSelectedEpisodeVariantId(episodeVariantId);
+      // Appliquer tout de suite le torrent résolu (évite l’attente sameHash + oscillation S01/S03).
+      const resolved = resolveVariantForSelectedEpisode(episodeVariantId);
+      if (resolved) {
+        setSelectedTorrent(resolved);
+        setCurrentSeedCount(resolved.seedCount ?? 0);
+        setCurrentLeechCount(resolved.leechCount ?? 0);
+        setCurrentFileSize(resolved.fileSize ?? 0);
+        if (resolved.downloadPath) setLibraryDownloadPath(resolved.downloadPath);
+      }
       episodePlayIntentRef.current = episodeVariantId;
       setEpisodePlayNonce((n) => n + 1);
     },
-    [seriesEpisodes, isPlayingTrailer, trailerUiVisible],
+    [
+      seriesEpisodes,
+      isPlayingTrailer,
+      trailerUiVisible,
+      resolveVariantForSelectedEpisode,
+    ],
   );
 
   // Synchroniser selectedTorrent (et libraryDownloadPath) quand l'utilisateur choisit un Ã©pisode (sÃ©ries)
