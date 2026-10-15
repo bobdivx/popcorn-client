@@ -23,6 +23,19 @@ PUBLIC_SERVER_URL=http://VOTRE_IP:8080
 PUBLIC_SERVER_URL=https://votre-serveur.com
 ```
 
+### Chromecast (Styled Media Receiver)
+
+Après enregistrement dans la [Cast Developer Console](https://cast.google.com/publish) :
+
+```env
+# Application ID du Styled Media Receiver « Popcornn » (sinon fallback CC1AD845)
+PUBLIC_CAST_RECEIVER_APP_ID=XXXXXXXX
+```
+
+Skin URL à déclarer dans la console (après deploy du client) :
+
+`https://client.popcornn.app/cast/receiver.css`
+
 ## Ports par défaut
 
 - **Serveur Popcorn (backend)** : Port `8080` (par défaut)

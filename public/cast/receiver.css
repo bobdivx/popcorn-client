@@ -1,0 +1,38 @@
+/**
+ * Popcornn — Styled Media Receiver (Google Cast)
+ *
+ * Skin URL à enregistrer dans la Cast Developer Console (HTTPS) :
+ *   https://client.popcornn.app/cast/receiver.css
+ *
+ * Classes SMR : https://developers.google.com/cast/docs/styled_receiver
+ */
+
+.background {
+  background: #0a0a0c;
+}
+
+.logo {
+  /* Relatif au CSS : /cast/receiver.css → /apple-touch-icon.png */
+  background-image: url(../apple-touch-icon.png);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 128px 128px;
+}
+
+.splash {
+  background-color: #0a0a0c;
+  background-image: url(../apple-touch-icon.png);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 160px 160px;
+}
+
+.progressBar {
+  background-color: #f2545b;
+}
+
+.watermark {
+  background-image: url(../apple-touch-icon.png);
+  background-size: 48px 48px;
+  opacity: 0.35;
+}
