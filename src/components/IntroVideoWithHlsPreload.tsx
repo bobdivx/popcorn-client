@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { useHlsLoader } from './streaming/hls-player/hooks/useHlsLoader';
 import { serverApi } from '../lib/client/server-api';
+import { resolveBootIntroMp4 } from '../lib/utils/boot-intro';
 
 interface IntroVideoWithHlsPreloadProps {
   onEnded: () => void;
@@ -32,14 +33,14 @@ export default function IntroVideoWithHlsPreload({
   const { hlsLoaded } = useHlsLoader();
 
   const introSrc =
-    typeof window !== 'undefined' && window.location.protocol === 'file:'
-      ? './intro.mp4'
-      : '/intro.mp4';
+    typeof window !== 'undefined'
+      ? resolveBootIntroMp4(window.location.protocol)
+      : resolveBootIntroMp4();
 
   useEffect(() => {
     const skipTimer = setTimeout(() => {
       setShowSkip(true);
-    }, 300);
+    }, 1800);
 
     const video = videoRef.current;
     if (video) {
@@ -190,79 +191,51 @@ export default function IntroVideoWithHlsPreload({
     onEnded();
   }, [onEnded]);
 
-  /** webOS / TV : pas d'intro (lecture vidéo locale peu fiable, et OK télécommande bloquait sur « Passer »). */
-  const skipIntroEntirely =
-    typeof document !== 'undefined' &&
-    (document.documentElement.getAttribute('data-webos') === 'true' ||
-      document.documentElement.getAttribute('data-tv-platform') === 'true');
-
-  useEffect(() => {
-    if (skipIntroEntirely) completeIntro();
-  }, [skipIntroEntirely, completeIntro]);
-
   // Garde-fous : jamais bloqué sur l'intro.
-  // - pas de lecture effective en 6 s → on passe ;
-  // - sinon, fin forcée à durée + 2 s (si `ended` ne se déclenche pas).
+  // - pas de lecture effective en 8 s → on passe ;
+  // - sinon, fin forcée à durée + 1,5 s (si `ended` ne se déclenche pas).
   useEffect(() => {
     const t = window.setTimeout(() => {
       const v = videoRef.current;
       if (introFinishedRef.current) return;
-      if (!v || v.paused || v.readyState < 3 || v.currentTime < 0.5) {
-        console.warn('[IntroVideoWithHlsPreload] Intro non lue après 6 s, passage automatique');
+      if (!v || v.paused || v.readyState < 2 || v.currentTime < 0.25) {
+        console.warn('[IntroVideoWithHlsPreload] Intro non lue après 8 s, passage automatique');
         completeIntro();
         return;
       }
       const remaining = Number.isFinite(v.duration) ? Math.max(0, v.duration - v.currentTime) : 10;
-      window.setTimeout(() => completeIntro(), Math.min(remaining, 20) * 1000 + 2000);
-    }, 6000);
+      window.setTimeout(() => completeIntro(), Math.min(remaining, 20) * 1000 + 1500);
+    }, 8000);
     return () => window.clearTimeout(t);
   }, [completeIntro]);
 
-  // OK / Entrée / Retour / Échap (télécommande ou clavier) : passer l'intro, quel que soit le focus.
+  // Retour / Escape uniquement (pas OK global — évite le piège télécommande Netflix-like).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const code = e.keyCode ?? e.which;
-      if (
-        e.key === 'Enter' || e.key === ' ' || e.key === 'Escape' || e.key === 'GoBack' ||
-        code === 13 || code === 23 || code === 66 || code === 27 || code === 461 || code === 8
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
-        completeIntro();
-      }
+      const isBack =
+        e.key === 'Escape' || e.key === 'GoBack' || e.key === 'BrowserBack' ||
+        code === 27 || code === 461 || code === 10009 || code === 8;
+      if (!isBack) return;
+      e.preventDefault();
+      e.stopPropagation();
+      completeIntro();
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   }, [completeIntro]);
 
-  // Focus par défaut sur « Passer »
   const skipBtnRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (showSkip) skipBtnRef.current?.focus();
-  }, [showSkip]);
-
-  if (skipIntroEntirely) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
-      {/* Message explicatif en haut */}
-      <div className="absolute top-8 left-1/2 transform -translate-x-1/2 z-10 max-w-2xl mx-4">
-        <div className="bg-black/80 backdrop-blur-md border border-white/30 rounded-xl p-4 text-center">
-          <h2 className="text-xl font-bold text-white mb-2">
-            Bienvenue dans Popcorn
-          </h2>
-          <p className="text-gray-300 text-sm">
-            Découvrez rapidement les fonctionnalités de l'application. Vous pouvez passer cette vidéo à tout moment.
-          </p>
-        </div>
-      </div>
-
+    <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" data-intro-variant="brand">
       <video
         ref={videoRef}
         className="w-full h-full object-contain"
         autoPlay
         muted
         playsInline
+        preload="auto"
         onEnded={completeIntro}
         onError={() => {
           console.warn('[IntroVideoWithHlsPreload] Erreur vidéo intro (fichier ou codec), passage automatique');
@@ -272,37 +245,25 @@ export default function IntroVideoWithHlsPreload({
         onPause={() => setIsPlaying(false)}
       >
         <source src={introSrc} type="video/mp4" />
-        Votre navigateur ne supporte pas la lecture de vidéos.
       </video>
-      
-      {/* Bouton Passer - Plus visible et toujours accessible */}
-      <div className="absolute bottom-8 right-8 z-10 flex flex-col items-end gap-3">
-        {showSkip && (
-          <button
-            type="button"
-            ref={skipBtnRef}
-            onClick={completeIntro}
-            data-focusable
-            data-autofocus
-            data-tv-initial-focus
-            tabindex={0}
-            className="ed-cta flex items-center gap-2"
-            aria-label="Passer l'intro"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            Passer l'introduction
-          </button>
-        )}
-        {!showSkip && (
-          <div className="px-4 py-2 bg-black/70 backdrop-blur-sm border border-white/20 rounded-lg text-white text-sm">
-            Le bouton "Passer" apparaîtra dans quelques secondes...
-          </div>
-        )}
-      </div>
 
-      {/* Indicateur de préchargement HLS (optionnel, peut être masqué) */}
+      {showSkip && (
+        <button
+          type="button"
+          ref={skipBtnRef}
+          onClick={completeIntro}
+          data-focusable
+          tabIndex={0}
+          className="ed-cta absolute bottom-8 right-8 z-10 flex items-center gap-2"
+          aria-label="Passer l'intro"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          Passer
+        </button>
+      )}
+
       {hlsInfoHash && hlsPreloadStatus && (
         <div className="absolute top-4 left-4 px-4 py-2 bg-black/70 text-white text-sm rounded-lg backdrop-blur-sm border border-white/20 opacity-75">
           {hlsPreloadStatus}
