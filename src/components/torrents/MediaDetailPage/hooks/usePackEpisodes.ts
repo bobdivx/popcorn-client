@@ -1,6 +1,7 @@
 import { useMemo } from 'preact/hooks';
 import type { TorrentFile } from './useVideoFiles';
 import type { TorrentListFileEntry } from '../../../../lib/client/server-api/media';
+import { releaseMatchesTmdbEpisode } from '../../../../lib/utils/seasonOrder';
 
 export type PackEpisodeKey =
   | { kind: 'file'; path: string }
@@ -25,7 +26,7 @@ export interface PackEpisodesModel {
 
 /** Extrait SxxExx / NxN depuis un nom de fichier (pack saison). */
 export function parseSeasonEpisodeFromName(name: string): { season: number; episode: number } | null {
-  const m = name.match(/[Ss](\d{1,2})[.\s-]*[Ee](\d{1,2})|(\d{1,2})[xX](\d{1,2})/);
+  const m = name.match(/[Ss](\d{1,2})[.\s-]*[Ee](\d{1,3})|(\d{1,2})[xX](\d{1,3})/);
   if (!m) return null;
   const s = parseInt(m[1] ?? m[3] ?? '1', 10);
   const e = parseInt(m[2] ?? m[4] ?? '1', 10);
@@ -33,16 +34,34 @@ export function parseSeasonEpisodeFromName(name: string): { season: number; epis
   return { season: s, episode: e };
 }
 
-/** Index du fichier du pack correspondant à un épisode (ordre list-files = only_files). */
+/**
+ * Index du fichier du pack correspondant à un épisode (ordre list-files = only_files).
+ * - `seasonCounts` : multi-saisons TMDB (S01E25 ↔ S2E01)
+ * - `sceneSeason`/`sceneEpisode` : saison continue TMDB (S01E25 ↔ fichier S02E01)
+ */
 export function findPackFileIndexForEpisode(
   files: Array<{ name?: string | null }>,
   season: number,
   episode: number,
+  seasonCounts?: Map<number, number> | null,
+  scene?: { season: number; episode: number } | null,
 ): number | null {
   if (!files?.length || episode <= 0) return null;
   for (let i = 0; i < files.length; i++) {
     const se = parseSeasonEpisodeFromName(files[i]?.name || '');
-    if (se && se.season === season && se.episode === episode) return i;
+    if (!se) continue;
+    if (se.season === season && se.episode === episode) return i;
+    if (
+      scene &&
+      scene.episode > 0 &&
+      se.season === scene.season &&
+      se.episode === scene.episode
+    ) {
+      return i;
+    }
+    if (releaseMatchesTmdbEpisode(se.season, se.episode, season, episode, seasonCounts)) {
+      return i;
+    }
   }
   return null;
 }
@@ -134,7 +153,9 @@ export function usePackEpisodes(params: {
     for (const list of bySeason.values()) {
       list.sort((a, b) => a.episode - b.episode);
     }
-    const seasons = Array.from(bySeason.keys()).sort((a, b) => a - b);
+    const seasons = Array.from(bySeason.keys()).sort((a, b) =>
+      a === 0 ? 1 : b === 0 ? -1 : a - b,
+    );
 
     return { seasons, episodesBySeason: bySeason };
   }, [packPreviewFiles, videoFiles]);

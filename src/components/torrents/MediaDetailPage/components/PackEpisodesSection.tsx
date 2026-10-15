@@ -123,8 +123,10 @@ export function PackEpisodesSection({
             {t('mediaDetail.episodes')}
           </h3>
           <p className="mt-0.5 text-xs text-white/60 leading-snug">
-            {t('mediaDetail.seasonNumber', { number: season ?? 1 })} • {episodeCount}{' '}
-            {t('mediaDetail.episodes')}
+            {(season === 0
+              ? t('mediaDetail.seasonSpecials')
+              : t('mediaDetail.seasonNumber', { number: season ?? 1 }))}{' '}
+            • {episodeCount} {t('mediaDetail.episodes')}
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0 self-center">
@@ -145,7 +147,9 @@ export function PackEpisodesSection({
             >
               {model.seasons.map((s) => (
                 <option key={s} value={s} className="bg-gray-900 text-white">
-                  {t('mediaDetail.seasonNumber', { number: s })}
+                  {s === 0
+                    ? t('mediaDetail.seasonSpecials')
+                    : t('mediaDetail.seasonNumber', { number: s })}
                 </option>
               ))}
             </select>
