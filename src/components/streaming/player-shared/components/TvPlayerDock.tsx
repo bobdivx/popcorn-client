@@ -24,6 +24,12 @@ interface TvPlayerDockProps {
   isPlaying: boolean;
   currentTime: number;
   duration: number;
+  /** Titre du média affiché avec les commandes. */
+  mediaTitle?: string | null;
+  /** Numéro de saison (séries). */
+  seriesSeasonNum?: number | null;
+  /** Numéro d'épisode (séries). */
+  seriesEpisodeNum?: number | null;
   focusedControlId?: string;
   focusedOnScrub?: boolean;
   tvScrubIndex?: number;
@@ -69,6 +75,9 @@ export function TvPlayerDock({
   isPlaying,
   currentTime,
   duration,
+  mediaTitle = null,
+  seriesSeasonNum = null,
+  seriesEpisodeNum = null,
   focusedControlId = 'playpause',
   focusedOnScrub = false,
   tvScrubIndex = 0,
@@ -90,6 +99,18 @@ export function TvPlayerDock({
   const { t } = useI18n();
   const dur = Number.isFinite(duration) && duration > 0 ? duration : 0;
   const tNow = Number.isFinite(currentTime) ? currentTime : 0;
+  const title = typeof mediaTitle === 'string' ? mediaTitle.trim() : '';
+  const seriesSubtitle =
+    seriesSeasonNum != null || seriesEpisodeNum != null
+      ? [
+          seriesSeasonNum != null ? `${t('mediaDetail.season')} ${seriesSeasonNum}` : null,
+          seriesEpisodeNum != null
+            ? t('mediaDetail.episodeNumber', { number: seriesEpisodeNum })
+            : null,
+        ]
+          .filter(Boolean)
+          .join(' · ')
+      : null;
   const scrubEnabled = !!(scrubThumbnails?.mediaId && (scrubThumbnails.count ?? 0) > 0);
   const effectiveDur = scrubEffectiveDuration(dur, scrubThumbnails);
   const previewing = scrubEnabled && (focusedOnScrub || tvScrubBrowsing);
@@ -138,6 +159,57 @@ export function TvPlayerDock({
   const btnFocused = (id: string) => !focusedOnScrub && !settingsOpen && focusedControlId === id;
 
   return (
+    <>
+      {(title || seriesSubtitle) && (
+        <div
+          data-tv-player-title="true"
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            background:
+              'linear-gradient(to bottom, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.55) 65%, transparent 100%)',
+            padding: '36px 48px 48px',
+            color: '#fff',
+            zIndex: 410,
+            pointerEvents: 'none',
+          }}
+        >
+          {title ? (
+            <h2
+              style={{
+                margin: 0,
+                fontSize: 40,
+                fontWeight: 700,
+                lineHeight: 1.15,
+                letterSpacing: '0.01em',
+                textShadow: '0 2px 12px rgba(0,0,0,0.65)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                maxWidth: '92%',
+              }}
+            >
+              {title}
+            </h2>
+          ) : null}
+          {seriesSubtitle ? (
+            <p
+              style={{
+                margin: title ? '10px 0 0' : 0,
+                fontSize: 24,
+                fontWeight: 500,
+                lineHeight: 1.3,
+                color: 'rgba(255,255,255,0.72)',
+                textShadow: '0 1px 8px rgba(0,0,0,0.55)',
+              }}
+            >
+              {seriesSubtitle}
+            </p>
+          ) : null}
+        </div>
+      )}
     <div
       data-tv-player-dock="true"
       style={{
@@ -317,5 +389,6 @@ export function TvPlayerDock({
         {t('playback.tvRemoteHint')}
       </p>
     </div>
+    </>
   );
 }

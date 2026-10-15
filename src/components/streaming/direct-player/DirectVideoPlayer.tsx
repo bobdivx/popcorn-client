@@ -29,6 +29,10 @@ interface DirectVideoPlayerProps {
   synopsis?: string | null;
   releaseDate?: string | null;
   torrentName?: string;
+  /** Numéro de saison en cours (séries). */
+  seriesSeasonNum?: number | null;
+  /** Numéro d'épisode en cours (séries). */
+  seriesEpisodeNum?: number | null;
   /** Stats du client torrent pour afficher la partie téléchargée sur la barre de progression. */
   torrentStats?: PlayerLoadingTorrentStats | null;
   /** Appelé périodiquement et à la fermeture avec la progression (pour Reprendre / Revoir). */
@@ -53,6 +57,8 @@ export default function DirectVideoPlayer({
   synopsis,
   releaseDate,
   torrentName = '',
+  seriesSeasonNum = null,
+  seriesEpisodeNum = null,
   torrentStats,
   onProgress,
   scrubThumbnails,
@@ -381,6 +387,8 @@ export default function DirectVideoPlayer({
           logoUrl={logoUrl ?? undefined}
           synopsis={synopsis ?? undefined}
           releaseDate={releaseDate ?? undefined}
+          seriesSeasonNum={seriesSeasonNum}
+          seriesEpisodeNum={seriesEpisodeNum}
           torrentProgress={torrentProgress}
           showControls={isTV ? false : hasError ? true : effectiveShowControls}
           isPlaying={isPlaying}
@@ -426,6 +434,9 @@ export default function DirectVideoPlayer({
             isPlaying={isPlaying}
             currentTime={currentTime}
             duration={duration}
+            mediaTitle={torrentName}
+            seriesSeasonNum={seriesSeasonNum}
+            seriesEpisodeNum={seriesEpisodeNum}
             focusedControlId={focusedControlId}
             focusedOnScrub={focusedOnScrub}
             tvScrubIndex={tvScrubIndex}

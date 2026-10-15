@@ -825,6 +825,9 @@ export default function HLSPlayer({
             isPlaying={isPlaying}
             currentTime={currentTime}
             duration={duration}
+            mediaTitle={torrentName || fileName}
+            seriesSeasonNum={seriesSeason}
+            seriesEpisodeNum={seriesEpisode}
             focusedControlId={focusedControlId}
             focusedOnScrub={focusedOnScrub}
             tvScrubIndex={tvScrubIndex}
