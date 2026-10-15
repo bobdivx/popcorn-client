@@ -223,6 +223,7 @@ export async function syncSyncSettingsToCloud(): Promise<void> {
         torrentsRecentLimit: lib.torrentsRecentLimit,
         mediaLanguages: lib.mediaLanguages.length > 0 ? lib.mediaLanguages : undefined,
         minQuality: lib.minQuality || undefined,
+        allow3dTorrents: lib.allow3dTorrents,
       },
     };
 

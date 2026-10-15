@@ -147,6 +147,19 @@ export default function LibraryDisplaySettingsPanel({ embedded = false }: Librar
         </div>
 
         <div>
+          <p className="text-sm text-gray-400 mb-2">{t('interfaceSettings.allow3dTorrentsDescription')}</p>
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              className="toggle toggle-primary"
+              checked={config.allow3dTorrents}
+              onChange={(e) => handleChange({ allow3dTorrents: (e.target as HTMLInputElement).checked })}
+            />
+            <span className="text-white font-medium">{t('interfaceSettings.allow3dTorrents')}</span>
+          </label>
+        </div>
+
+        <div>
           <label className="block text-sm text-gray-400 mb-2">{t('interfaceSettings.torrentsInitialLimitDescription')}</label>
           <input
             type="number"

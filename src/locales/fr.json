@@ -531,6 +531,8 @@
     "librarySectionDescription": "Personnaliser langue, qualité et pagination des listes de la bibliothèque",
     "showZeroSeedTorrents": "Afficher les torrents sans seeders",
     "showZeroSeedTorrentsDescription": "Inclure les torrents avec 0 seeder dans les pages Films et Séries (certains peuvent être indisponibles)",
+    "allow3dTorrents": "Autoriser les fichiers 3D",
+    "allow3dTorrentsDescription": "Inclure les releases 3D (SBS, FSBS, HOU, MVC…) dans la découverte et les téléchargements. Désactivé par défaut : lecture 2D classique sans image dédoublée.",
     "torrentsInitialLimit": "Éléments chargés au départ",
     "torrentsInitialLimitDescription": "Nombre de films/séries affichés au premier chargement (20-500)",
     "torrentsLoadMoreLimit": "Éléments par chargement supplémentaire",

@@ -53,6 +53,10 @@ import {
   tmdbAbsoluteToScene,
 } from '../../../lib/utils/tmdbSceneSeasonMap';
 import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-config';
+import {
+  candidatesExcluding3DUnlessAllowed,
+  filter3DTorrentsIfDisabled,
+} from '../../../lib/torrents/is3dTorrent';
 import { getMediaDisplayTitle } from './utils/mediaDisplayTitle';
 import { resolveDownloadTypeHeader } from './utils/resolveDownloadTypeHeader';
 import { resolveSeriesFolderPath } from './utils/resolveSeriesFolderPath';
@@ -600,7 +604,16 @@ export default function MediaDetailPage({
   // Initialiser les variantes depuis le groupe (sÃ©ries)
   useEffect(() => {
     if (initialVariants && initialVariants.length > 0) {
-      setAllVariants(initialVariants);
+      const allow3d = getLibraryDisplayConfig().allow3dTorrents === true;
+      const variantsForUi = filter3DTorrentsIfDisabled(initialVariants, allow3d);
+      const non3dPick = candidatesExcluding3DUnlessAllowed(initialVariants, allow3d);
+      const variantsForPick =
+        non3dPick.length > 0
+          ? non3dPick
+          : variantsForUi.length > 0
+            ? variantsForUi
+            : initialVariants;
+      setAllVariants(variantsForUi.length > 0 ? variantsForUi : initialVariants);
 
       // Séries TV : ne pas réassigner selectedTorrent selon la qualité préférée — plusieurs variantes
       // peuvent être des épisodes / releases différents (ex. bibliothèque). La sélection réelle est
@@ -610,7 +623,7 @@ export default function MediaDetailPage({
       if (tmdbTy === 'tv' || tmdbTy === 'series') return;
 
       // Appliquer la qualitÃ© prÃ©fÃ©rÃ©e des paramÃ¨tres si plusieurs variantes disponibles
-      if (initialVariants.length > 1) {
+      if (variantsForPick.length > 1) {
         const { preferredQuality } = getLibraryDisplayConfig();
         if (preferredQuality) {
           const QUALITY_ORDER: Record<string, number> = { Remux: 6, '4K': 5, '2160p': 5, UHD: 5, '1080p': 4, '720p': 3, '480p': 2 };
@@ -626,21 +639,30 @@ export default function MediaDetailPage({
           };
           const targetRes = normalizeRes(preferredQuality);
           // Chercher les variantes de la qualitÃ© prÃ©fÃ©rÃ©e
-          const preferred = initialVariants.filter((v: any) => normalizeRes(v.quality?.resolution) === targetRes);
+          const preferred = variantsForPick.filter((v: any) => normalizeRes(v.quality?.resolution) === targetRes);
           if (preferred.length > 0) {
             // Parmi les variantes prÃ©fÃ©rÃ©es, prendre celle avec le plus de seeders
             const best = [...preferred].sort((a: any, b: any) => (b.seedCount ?? 0) - (a.seedCount ?? 0))[0];
             setSelectedTorrent(best);
           } else {
             // QualitÃ© prÃ©fÃ©rÃ©e non disponible : prendre la meilleure qualitÃ© disponible (ordre dÃ©croissant puis seeders)
-            const best = [...initialVariants].sort((a: any, b: any) => {
+            const best = [...variantsForPick].sort((a: any, b: any) => {
               const aQ = QUALITY_ORDER[normalizeRes(a.quality?.resolution)] ?? 0;
               const bQ = QUALITY_ORDER[normalizeRes(b.quality?.resolution)] ?? 0;
               return bQ - aQ || (b.seedCount ?? 0) - (a.seedCount ?? 0);
             })[0];
             setSelectedTorrent(best);
           }
+        } else {
+          // Sans préférence qualité : éviter de rester sur un 3D s’il existe une alternative 2D
+          const non3d = candidatesExcluding3DUnlessAllowed(variantsForPick, false);
+          if (!allow3d && non3d.length > 0) {
+            const best = [...non3d].sort((a: any, b: any) => (b.seedCount ?? 0) - (a.seedCount ?? 0))[0];
+            setSelectedTorrent(best);
+          }
         }
+      } else if (variantsForPick.length === 1) {
+        setSelectedTorrent(variantsForPick[0]);
       }
     }
   }, [initialVariants]);
