@@ -504,12 +504,7 @@ html[data-tv-platform] .ed-assist__btn { min-height: 56px; font-size: 0.85rem; p
 }
 .ed-quality-btn__count { opacity: 0.55; font-size: 0.6rem; letter-spacing: 0.08em; }
 
-/* Saisons / épisodes — layout cartes d’origine, polish typo / couleurs / alignements */
-.ed-episodes-panel {
-  border-radius: 1rem;
-  border-color: var(--ed-line);
-  background: rgba(0, 0, 0, 0.3);
-}
+/* Saisons / épisodes — titre + rangée de cartes (pas de cadres imbriqués) */
 .ed-season-block__title {
   margin: 0;
   font-family: var(--ed-font-display);
@@ -524,15 +519,15 @@ html[data-tv-platform] .ed-assist__btn { min-height: 56px; font-size: 0.85rem; p
 .ed-ep-card__ep {
   display: inline-flex;
   align-items: center;
-  padding: 0.25rem 0.65rem;
+  padding: 0.2rem 0.55rem;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: rgba(0, 0, 0, 0.5);
   color: rgba(255, 255, 255, 0.92);
   font-family: var(--ed-font-display);
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 500;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   line-height: 1.2;
 }
@@ -543,10 +538,10 @@ html[data-tv-platform] .ed-assist__btn { min-height: 56px; font-size: 0.85rem; p
   font-family: var(--ed-font-display);
   font-weight: 500;
   letter-spacing: 0.02em;
-  line-height: 1.35;
+  line-height: 1.3;
 }
 .ed-ep-card__subtitle {
-  line-height: 1.4;
+  line-height: 1.35;
 }
 .ed-ep-card__meta {
   letter-spacing: 0.02em;
@@ -556,7 +551,7 @@ html[data-tv-platform] .ed-assist__btn { min-height: 56px; font-size: 0.85rem; p
   font-variant-numeric: tabular-nums;
 }
 html[data-tv-platform] .ed-season-block__title { font-size: 1.15rem; }
-html[data-tv-platform] .ed-ep-card { width: 340px; }
+html[data-tv-platform] .ed-ep-card { width: 300px; }
 
 /* Fiche média : le fond (image / bande-annonce) occupe la zone hero, plein cadre sous la nav.
    Le conteneur parent garde un transform (animate-fade-in-up), ce qui faisait de `position: fixed`
@@ -777,82 +772,45 @@ html[data-tv-platform] [data-browse-carousel] { contain: layout paint; }
 
 /* ==========================================================================
    Overlays lecture / téléchargement + modales (thème éditorial)
-   Splash = même composition que #popcorn-loading-fallback + piste d'états
+   Splash = même composition que la fiche (ed-detail-head + gtv-icon-btn)
    ========================================================================== */
 .ed-playback-splash {
-  gap: 1.25rem;
-  padding: 1.5rem 1rem 1.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 0;
+  padding: 0;
   font-family: var(--ed-font-body, 'Jost', sans-serif);
   color: var(--ed-ink, #f4f1ec);
 }
-.ed-playback-splash__brand {
-  letter-spacing: 0.42em;
-  text-transform: uppercase;
-  font-size: clamp(11px, 1.05vw, 18px);
-  font-weight: 300;
-  opacity: 0.55;
+.ed-playback-splash .ed-detail-head {
+  max-width: 56rem;
 }
-.ed-playback-splash__media {
-  margin: 0;
-  max-width: 22rem;
-  font-family: var(--ed-font-display, 'Josefin Sans', 'Jost', sans-serif);
-  font-weight: 300;
-  font-size: 0.72rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgba(244, 241, 236, 0.55);
-  line-clamp: 1;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.ed-playback-splash__title {
-  margin: 0;
-  letter-spacing: 0.32em;
-  text-transform: uppercase;
-  font-size: clamp(26px, 3.2vw, 56px);
-  font-weight: 300;
-  font-family: var(--ed-font-display, 'Josefin Sans', 'Jost', sans-serif);
-  color: var(--ed-ink, #f4f1ec);
-  line-height: 1.15;
+.ed-playback-splash .ed-detail-head .ed-kicker {
+  animation: ed-playback-status-in 0.45s ease-out;
 }
 .ed-playback-splash__status {
   margin: 0;
-  max-width: 26rem;
+  max-width: 36rem;
   font-family: var(--ed-font-body, 'Jost', sans-serif);
   font-weight: 300;
-  font-size: 0.72rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgba(244, 241, 236, 0.65);
-  animation: ed-playback-status-in 0.45s ease-out;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  letter-spacing: 0.01em;
+  text-transform: none;
+  color: rgba(244, 241, 236, 0.72);
 }
 .ed-playback-splash__status--error {
-  letter-spacing: 0.06em;
-  text-transform: none;
-  font-size: 0.85rem;
-  color: rgba(244, 241, 236, 0.72);
-  line-height: 1.45;
+  color: rgba(244, 241, 236, 0.78);
 }
-.ed-playback-splash__metrics {
-  margin: 0;
-  font-size: 0.68rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(244, 241, 236, 0.4);
-  font-variant-numeric: tabular-nums;
-}
-html[data-tv-platform] .ed-playback-splash__status { font-size: 0.9rem; }
-html[data-tv-platform] .ed-playback-splash__metrics { font-size: 0.85rem; }
+html[data-tv-platform] .ed-playback-splash__status { font-size: 1.15rem; }
 
-/* Piste corail dynamique (états lecture) */
+/* Filet corail dynamique (= .ed-rule élargi, états lecture) */
 .ed-playback-track {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.65rem;
-  width: min(12rem, 70vw);
+  display: block;
+  width: min(12rem, 42vw);
+  margin: 1.4rem 0 0;
 }
 .ed-playback-track__rail {
   position: relative;
@@ -889,33 +847,6 @@ html[data-tv-platform] .ed-playback-splash__metrics { font-size: 0.85rem; }
   background: rgba(242, 84, 91, 0.55);
   animation: none;
 }
-.ed-playback-track__steps {
-  display: flex;
-  gap: 0.4rem;
-  width: 100%;
-  justify-content: center;
-}
-.ed-playback-track__step {
-  width: 1.1rem;
-  height: 1px;
-  background: rgba(244, 241, 236, 0.14);
-  transition: background 0.35s ease, transform 0.35s ease, opacity 0.35s ease;
-}
-.ed-playback-track__step.is-on { background: rgba(242, 84, 91, 0.55); }
-.ed-playback-track__step.is-active {
-  background: var(--ed-accent, #f2545b);
-  transform: scaleY(2);
-  opacity: 1;
-}
-.ed-playback-track__pct {
-  font-family: var(--ed-font-display, 'Josefin Sans', 'Jost', sans-serif);
-  font-weight: 300;
-  font-size: 0.7rem;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  color: rgba(244, 241, 236, 0.55);
-  font-variant-numeric: tabular-nums;
-}
 @keyframes ed-playback-run {
   from { transform: translateX(-100%); }
   to { transform: translateX(250%); }
@@ -940,7 +871,7 @@ html[data-tv-platform] .ed-playback-splash__metrics { font-size: 0.85rem; }
     width: 100%;
     opacity: 0.85;
   }
-  .ed-playback-splash__status { animation: none; }
+  .ed-playback-splash .ed-detail-head .ed-kicker { animation: none; }
 }
 html[data-tv-platform] .ed-playback-splash__backdrop {
   filter: none !important;

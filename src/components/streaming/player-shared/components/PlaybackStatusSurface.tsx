@@ -113,15 +113,14 @@ function pipelineUserDetail(
   return detail;
 }
 
-/** Piste corail éditoriale — même langage que #popcorn-loading-fallback, réactive aux phases. */
+/** Filet corail sous le titre — même geste que `.ed-rule`, réactif aux phases. */
 function EditorialPhaseLine({
   phase,
   percent,
-  stepIndex,
 }: {
   phase: PlaybackPhase;
   percent: number | null;
-  stepIndex: number;
+  stepIndex?: number;
 }) {
   const p = percent != null && Number.isFinite(percent) ? Math.max(0, Math.min(100, percent)) : null;
   const determinate =
@@ -152,21 +151,38 @@ function EditorialPhaseLine({
       <div className="ed-playback-track__rail">
         <div
           className="ed-playback-track__fill"
-          style={determinate && p != null ? { width: `${p}%` } : undefined}
+          style={determinate && p != null ? { width: `${Math.max(8, p)}%` } : undefined}
         />
       </div>
-      <div className="ed-playback-track__steps" aria-hidden="true">
-        {[1, 2, 3, 4].map((n) => (
-          <span
-            key={n}
-            className={`ed-playback-track__step${stepIndex >= n ? ' is-on' : ''}${stepIndex === n ? ' is-active' : ''}`}
-          />
-        ))}
-      </div>
-      {determinate && p != null ? (
-        <span className="ed-playback-track__pct">{Math.round(p)}%</span>
-      ) : null}
     </div>
+  );
+}
+
+function SplashBackButton({
+  onClick,
+  label,
+  autofocus,
+}: {
+  onClick: () => void;
+  label: string;
+  autofocus?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      data-focusable
+      data-close
+      data-autofocus={autofocus ? true : undefined}
+      tabIndex={0}
+      title={label}
+      aria-label={label}
+      className="gtv-icon-btn ds-focus-glow ds-active-glow inline-flex shrink-0 items-center justify-center w-[46px] h-[46px] min-w-[46px] min-h-[46px] p-[0.6rem] max-sm:w-[44px] max-sm:h-[44px] max-sm:min-w-[44px] max-sm:min-h-[44px]"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} className="h-5 w-5" aria-hidden>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+      </svg>
+    </button>
   );
 }
 
@@ -281,7 +297,7 @@ function PipelinePanel({
 /**
  * Surface unique d'état lecture/téléchargement.
  * Variantes: fullscreen | player | inline | chip
- * Player/fullscreen : splash éditorial (marque + titre + piste d'états).
+ * Player/fullscreen : splash éditorial (= fiche : ed-detail-head + filet + gtv-icon-btn).
  */
 export function PlaybackStatusSurface({
   variant,
@@ -572,65 +588,89 @@ export function PlaybackStatusSurface({
         .join('  ·  ')
     : '';
 
+  const backLabel = t('common.back') || 'Retour';
+  const splashTitle =
+    title ||
+    (isError
+      ? sparseOrEmpty
+        ? t('playback.sparseOrEmptyTitle') || phaseLabel(t, 'error')
+        : phaseLabel(t, 'error')
+      : t('playback.displayTitle') || 'Chargement');
+  const splashKicker = isError
+    ? phaseLabel(t, 'error') || 'Erreur'
+    : statusText;
+  const showAbortConfirm = confirmingCancel && Boolean(isPlayer ? onAbortDownload : abortAction);
+  const primaryBack = isPlayer ? onCancel : backAction ?? onCancel;
+  const primaryAbort = isPlayer ? onAbortDownload : abortAction;
+
+  const actionsRow = (
+    <div className="ed-playback-splash__actions flex flex-wrap gap-4 tv:gap-5 items-center overflow-visible mb-8 sm:mb-10">
+      {showAbortConfirm ? (
+        <div className="w-full max-w-md border border-[var(--ed-line-strong)] bg-black/45 px-4 py-3 space-y-3">
+          <p className="text-sm text-white/85 font-light">
+            {t('mediaDetail.cancelDownloadConfirm') ||
+              'Annuler et supprimer le téléchargement ?'}
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => setConfirmingCancel(false)}
+              data-focusable
+              data-close
+              tabIndex={0}
+              className="ed-playback-btn-ghost px-5 py-2 text-white text-sm"
+            >
+              {backLabel}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirmingCancel(false);
+                primaryAbort?.();
+              }}
+              data-focusable
+              tabIndex={0}
+              className="ed-playback-btn px-5 py-2 text-white text-sm"
+            >
+              {t('common.confirm') || 'Confirmer'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {primaryBack ? (
+            <SplashBackButton onClick={primaryBack} label={backLabel} autofocus />
+          ) : null}
+          {primaryAbort ? (
+            <button
+              type="button"
+              onClick={() => setConfirmingCancel(true)}
+              data-focusable
+              tabIndex={0}
+              className="ed-link"
+            >
+              {cancelLabel || t('common.cancel') || 'Annuler'}
+            </button>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+
   const shell = (
     <div
-      className={`relative z-10 w-full min-w-0 ${isPlayer ? 'max-w-lg' : 'max-w-xl'} mx-auto px-4 animate-[fade-in_0.35s_ease-out] ${className}`}
+      className={`relative z-10 w-full min-w-0 max-w-6xl animate-[fade-in_0.35s_ease-out] ${className}`}
     >
-      <div className="ed-playback-splash flex flex-col items-center text-center min-w-0 max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain">
-          {isError ? (
-            <div className="ed-playback-splash__error flex flex-col items-center text-center w-full">
-              <div className="ed-playback-splash__brand">Popcornn</div>
-              <h2 className="ed-playback-splash__title">
-                {sparseOrEmpty
-                  ? t('playback.sparseOrEmptyTitle') || phaseLabel(t, 'error')
-                  : phaseLabel(t, 'error')}
-              </h2>
-              <div className="ed-playback-track ed-playback-track--error" aria-hidden="true">
-                <div className="ed-playback-track__rail">
-                  <div className="ed-playback-track__fill" style={{ width: '100%' }} />
-                </div>
-              </div>
-              <p className="ed-playback-splash__status ed-playback-splash__status--error">
-                {sparseOrEmpty
-                  ? t('playback.sparseOrEmptyDetail') ||
-                    errorMessage ||
-                    progressMessage ||
-                    t('playback.errorStream')
-                  : errorMessage || progressMessage || t('playback.errorStream')}
-              </p>
-              <DiagnoseAssist message={errorMessage} />
-              {sparseOrEmpty && onDeleteEmptyFiles && confirmingDeleteEmpty ? (
-                <div className="w-full max-w-sm border border-white/15 bg-black/45 px-4 py-3 text-center space-y-3 mb-4 mt-4">
-                  <p className="text-sm text-white/85">
-                    {t('playback.sparseOrEmptyConfirm') ||
-                      'Supprimer les fichiers vides du disque ?'}
-                  </p>
-                  <div className="flex justify-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setConfirmingDeleteEmpty(false)}
-                      data-focusable
-                      tabIndex={0}
-                      className="ed-playback-btn-ghost px-5 py-2 text-white text-sm"
-                    >
-                      {t('common.back') || 'Retour'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConfirmingDeleteEmpty(false);
-                        onDeleteEmptyFiles();
-                      }}
-                      data-focusable
-                      tabIndex={0}
-                      className="ed-playback-btn px-5 py-2 text-white text-sm"
-                    >
-                      {t('common.confirm') || 'Confirmer'}
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-              <div className="flex flex-wrap justify-center gap-3 mt-4">
+      <div className="ed-playback-splash min-w-0 max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain">
+        {(primaryBack || primaryAbort) && !isError ? actionsRow : null}
+
+        {isError ? (
+          <div className="ed-playback-splash__error w-full">
+            {(onCancel || onRetry || onDeleteEmptyFiles) ? (
+              <div className="ed-playback-splash__actions flex flex-wrap gap-4 tv:gap-5 items-center overflow-visible mb-8 sm:mb-10">
+                {onCancel ? (
+                  <SplashBackButton onClick={onCancel} label={backLabel} autofocus />
+                ) : null}
                 {sparseOrEmpty && onDeleteEmptyFiles && !confirmingDeleteEmpty ? (
                   <button
                     type="button"
@@ -640,17 +680,6 @@ export function PlaybackStatusSurface({
                     className="ed-playback-btn px-6 py-2.5 text-white font-medium transition-colors"
                   >
                     {t('playback.sparseOrEmptyDelete') || 'Supprimer les fichiers vides'}
-                  </button>
-                ) : null}
-                {onCancel ? (
-                  <button
-                    type="button"
-                    onClick={onCancel}
-                    data-focusable
-                    tabIndex={0}
-                    className="ed-playback-btn-ghost px-6 py-2.5 text-white font-medium transition-colors"
-                  >
-                    {t('common.back') || 'Retour'}
                   </button>
                 ) : null}
                 {!sparseOrEmpty && onRetry ? (
@@ -665,246 +694,165 @@ export function PlaybackStatusSurface({
                   </button>
                 ) : null}
               </div>
-              {showDebug && (debugLogsUrl || pipelineStatus || liveTrace) ? (
-                <div className="mt-5 w-full space-y-2">
-                  {liveTrace ? <PlaybackLiveTrace trace={liveTrace} /> : null}
-                  <PipelinePanel
-                    status={pipelineStatus ?? null}
-                    debugUrl={debugLogsUrl}
-                    bufferedPercent={bufferedPercent}
-                    showDebug
-                    t={t}
-                  />
-                </div>
-              ) : null}
+            ) : null}
+
+            <div className="ed-detail-head mb-6">
+              <p className="ed-kicker">{splashKicker}</p>
+              <h2 className="ed-title">{splashTitle}</h2>
+              <span className="ed-rule" aria-hidden="true" />
             </div>
-          ) : (
-            <>
-              <div className="ed-playback-splash__brand">Popcornn</div>
-              {title ? (
-                <p className="ed-playback-splash__media">{title}</p>
-              ) : null}
-              <h1 className="ed-playback-splash__title">
-                {t('playback.displayTitle') || 'Chargement'}
-              </h1>
-              <EditorialPhaseLine
-                phase={derived.phase}
-                percent={trackPercent}
-                stepIndex={derived.stepIndex}
-              />
+
+            <p className="ed-playback-splash__status ed-playback-splash__status--error">
+              {sparseOrEmpty
+                ? t('playback.sparseOrEmptyDetail') ||
+                  errorMessage ||
+                  progressMessage ||
+                  t('playback.errorStream')
+                : errorMessage || progressMessage || t('playback.errorStream')}
+            </p>
+            <DiagnoseAssist message={errorMessage} />
+
+            {sparseOrEmpty && onDeleteEmptyFiles && confirmingDeleteEmpty ? (
+              <div className="w-full max-w-md border border-[var(--ed-line-strong)] bg-black/45 px-4 py-3 space-y-3 mt-6">
+                <p className="text-sm text-white/85 font-light">
+                  {t('playback.sparseOrEmptyConfirm') ||
+                    'Supprimer les fichiers vides du disque ?'}
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingDeleteEmpty(false)}
+                    data-focusable
+                    tabIndex={0}
+                    className="ed-playback-btn-ghost px-5 py-2 text-white text-sm"
+                  >
+                    {backLabel}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfirmingDeleteEmpty(false);
+                      onDeleteEmptyFiles();
+                    }}
+                    data-focusable
+                    tabIndex={0}
+                    className="ed-playback-btn px-5 py-2 text-white text-sm"
+                  >
+                    {t('common.confirm') || 'Confirmer'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            {showDebug && (debugLogsUrl || pipelineStatus || liveTrace) ? (
+              <div className="mt-5 w-full max-w-md space-y-2">
+                {liveTrace ? <PlaybackLiveTrace trace={liveTrace} /> : null}
+                <PipelinePanel
+                  status={pipelineStatus ?? null}
+                  debugUrl={debugLogsUrl}
+                  bufferedPercent={bufferedPercent}
+                  showDebug
+                  t={t}
+                />
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <>
+            <div className="ed-detail-head mb-6 sm:mb-8">
               <p
-                key={statusText}
-                className="ed-playback-splash__status"
+                key={splashKicker}
+                className="ed-kicker"
                 role="status"
                 aria-live="polite"
               >
-                {statusText}
+                {splashKicker}
               </p>
-              {showDebug ? (
-                <div className="mt-2">
-                  <GpuPlaybackChip pipeline={pipelineStatus} />
-                </div>
-              ) : null}
-              {metricsLine ? (
-                <p className="ed-playback-splash__metrics">{metricsLine}</p>
-              ) : null}
+              <h1 className="ed-title">{splashTitle}</h1>
+              <EditorialPhaseLine phase={derived.phase} percent={trackPercent} />
+            </div>
 
-              {showDebug &&
-              (derived.phase === 'preparingPlayback' ||
-                derived.phase === 'buffering' ||
-                pipelineStatus ||
-                liveTrace) ? (
-                <div className="mb-3 mt-3 w-full max-w-md space-y-2">
-                  {liveTrace ? <PlaybackLiveTrace trace={liveTrace} /> : null}
-                  <PipelinePanel
-                    status={pipelineStatus ?? null}
-                    debugUrl={debugLogsUrl}
-                    bufferedPercent={bufferedPercent}
-                    showDebug
-                    t={t}
-                  />
-                </div>
-              ) : null}
+            {showDebug ? (
+              <div className="mb-3">
+                <GpuPlaybackChip pipeline={pipelineStatus} />
+              </div>
+            ) : null}
 
-              {!isPlayer && (backAction || abortAction) ? (
-                <div className="flex flex-col items-center gap-3 mt-1">
-                  {confirmingCancel ? (
-                    <div className="w-full rounded-2xl border border-white/15 bg-black/45 px-4 py-3 text-center space-y-3">
-                      <p className="text-sm text-white/85">
-                        {t('mediaDetail.cancelDownloadConfirm') ||
-                          'Annuler et supprimer le téléchargement ?'}
-                      </p>
-                      <div className="flex justify-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setConfirmingCancel(false)}
-                          data-focusable
-                          data-close
-                          tabIndex={0}
-                          className="px-5 py-2 rounded-xl bg-white/10 border border-white/20 text-white text-sm"
-                        >
-                          {t('common.back') || 'Retour'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setConfirmingCancel(false);
-                            abortAction?.();
-                          }}
-                          data-focusable
-                          tabIndex={0}
-                          className="px-5 py-2 rounded-xl bg-red-600/85 hover:bg-red-600 text-white text-sm"
-                        >
-                          {t('common.confirm') || 'Confirmer'}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap justify-center gap-3">
-                      {backAction ? (
-                        <button
-                          type="button"
-                          onClick={backAction}
-                          data-focusable
-                          data-close
-                          data-autofocus
-                          aria-label={t('common.close') || 'Fermer'}
-                          tabIndex={0}
-                          className="ed-playback-btn px-6 py-2.5 min-h-[44px] text-white font-medium transition-colors"
-                        >
-                          {t('common.back') || 'Retour'}
-                        </button>
-                      ) : null}
-                      {abortAction ? (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmingCancel(true)}
-                          data-focusable
-                          tabIndex={0}
-                          className="ed-playback-btn-ghost px-6 py-2.5 min-h-[44px] text-white font-medium transition-colors"
-                        >
-                          {cancelLabel || t('common.cancel') || 'Annuler'}
-                        </button>
-                      ) : null}
-                    </div>
-                  )}
+            {metricsLine ? (
+              <div className="ed-meta mb-2">
+                <span className="ed-meta__item">{metricsLine}</span>
+              </div>
+            ) : null}
 
-                  {onToggleDebug ? (
+            {showDebug &&
+            (derived.phase === 'preparingPlayback' ||
+              derived.phase === 'buffering' ||
+              pipelineStatus ||
+              liveTrace) ? (
+              <div className="mb-3 mt-3 w-full max-w-md space-y-2">
+                {liveTrace ? <PlaybackLiveTrace trace={liveTrace} /> : null}
+                <PipelinePanel
+                  status={pipelineStatus ?? null}
+                  debugUrl={debugLogsUrl}
+                  bufferedPercent={bufferedPercent}
+                  showDebug
+                  t={t}
+                />
+              </div>
+            ) : null}
+
+            {!isPlayer && onToggleDebug ? (
+              <button
+                type="button"
+                onClick={onToggleDebug}
+                data-focusable
+                tabIndex={0}
+                className="ed-link mt-4"
+              >
+                {showDebug ? t('playback.hideDebug') : t('playback.showDebug')}
+              </button>
+            ) : null}
+
+            {!isPlayer && showDebug && debugLogs && debugLogs.length > 0 ? (
+              <div className="w-full max-w-xl space-y-2 mt-4">
+                <div className="flex gap-3">
+                  {onCopyLogs ? (
                     <button
                       type="button"
-                      onClick={onToggleDebug}
-                      data-focusable
-                      tabIndex={0}
-                      className="text-xs text-white/45 hover:text-white/70 transition-colors"
+                      onClick={onCopyLogs}
+                      className="ed-link"
                     >
-                      {showDebug ? t('playback.hideDebug') : t('playback.showDebug')}
+                      Copy
                     </button>
                   ) : null}
-
-                  {showDebug && debugLogs && debugLogs.length > 0 ? (
-                    <div className="w-full space-y-2">
-                      <div className="flex justify-end gap-2">
-                        {onCopyLogs ? (
-                          <button
-                            type="button"
-                            onClick={onCopyLogs}
-                            className="text-[11px] text-white/45 hover:text-white/70"
-                          >
-                            Copy
-                          </button>
-                        ) : null}
-                        {onClearLogs ? (
-                          <button
-                            type="button"
-                            onClick={onClearLogs}
-                            className="text-[11px] text-white/45 hover:text-white/70"
-                          >
-                            Clear
-                          </button>
-                        ) : null}
-                      </div>
-                      <div className="w-full max-h-40 overflow-y-auto rounded-xl border border-white/10 bg-black/40 p-3 text-left text-[11px] text-white/60 font-mono space-y-1">
-                        {debugLogs.slice(-40).map((log, i) => (
-                          <div key={log.id ?? i}>
-                            [{String(log.timestamp ?? log.time ?? '')}] [
-                            {String(log.level || log.type || 'info')}] {String(log.message || '')}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                  {onClearLogs ? (
+                    <button
+                      type="button"
+                      onClick={onClearLogs}
+                      className="ed-link"
+                    >
+                      Clear
+                    </button>
                   ) : null}
                 </div>
-              ) : null}
-
-              {isPlayer && (onCancel || onAbortDownload) ? (
-                <div className="flex flex-col items-center gap-3 mt-5">
-                  {confirmingCancel && onAbortDownload ? (
-                    <div className="w-full max-w-sm border border-white/15 bg-black/45 px-4 py-3 text-center space-y-3">
-                      <p className="text-sm text-white/85">
-                        {t('mediaDetail.cancelDownloadConfirm') ||
-                          'Annuler et supprimer le téléchargement ?'}
-                      </p>
-                      <div className="flex justify-center gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setConfirmingCancel(false)}
-                          data-focusable
-                          data-close
-                          tabIndex={0}
-                          className="ed-playback-btn-ghost px-5 py-2 text-white text-sm"
-                        >
-                          {t('common.back') || 'Retour'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setConfirmingCancel(false);
-                            onAbortDownload();
-                          }}
-                          data-focusable
-                          tabIndex={0}
-                          className="ed-playback-btn px-5 py-2 text-white text-sm"
-                        >
-                          {t('common.confirm') || 'Confirmer'}
-                        </button>
-                      </div>
+                <div className="w-full max-h-40 overflow-y-auto border border-[var(--ed-line)] bg-black/40 p-3 text-left text-[11px] text-white/60 font-mono space-y-1">
+                  {debugLogs.slice(-40).map((log, i) => (
+                    <div key={log.id ?? i}>
+                      [{String(log.timestamp ?? log.time ?? '')}] [
+                      {String(log.level || log.type || 'info')}] {String(log.message || '')}
                     </div>
-                  ) : (
-                    <div className="flex flex-wrap justify-center gap-3">
-                      {onCancel ? (
-                        <button
-                          type="button"
-                          onClick={onCancel}
-                          data-focusable
-                          data-close
-                          data-autofocus
-                          aria-label={t('common.close') || 'Fermer'}
-                          tabIndex={0}
-                          className="ed-playback-btn px-6 py-2.5 min-h-[44px] text-white font-medium transition-colors"
-                        >
-                          {t('common.back') || 'Retour'}
-                        </button>
-                      ) : null}
-                      {onAbortDownload ? (
-                        <button
-                          type="button"
-                          onClick={() => setConfirmingCancel(true)}
-                          data-focusable
-                          tabIndex={0}
-                          className="ed-playback-btn-ghost px-6 py-2.5 min-h-[44px] text-white font-medium transition-colors"
-                        >
-                          {cancelLabel || t('common.cancel') || 'Annuler'}
-                        </button>
-                      ) : null}
-                    </div>
-                  )}
+                  ))}
                 </div>
-              ) : null}
-            </>
-          )}
+              </div>
+            ) : null}
+          </>
+        )}
       </div>
     </div>
   );
+
+  const framePad =
+    'relative z-10 flex h-full min-h-full w-full flex-col justify-end px-3 sm:px-4 md:px-6 lg:px-16 pb-8 sm:pb-12 md:pb-16 pt-16 sm:pt-20';
 
   if (variant === 'player') {
     return (
@@ -926,14 +874,22 @@ export function PlaybackStatusSurface({
         ) : (
           <div className="absolute inset-0 bg-[var(--ed-bg,#0c0d10)]/92" />
         )}
-        <div className="relative z-10 flex h-full w-full items-center justify-center p-[max(0.5rem,var(--safe-area-inset-top))] pb-[max(0.75rem,var(--safe-area-inset-bottom))] pl-[max(0.5rem,var(--safe-area-inset-left))] pr-[max(0.5rem,var(--safe-area-inset-right))]">
+        <div
+          className={framePad}
+          style={{
+            paddingTop: 'max(4rem, var(--safe-area-inset-top))',
+            paddingBottom: 'max(2rem, var(--safe-area-inset-bottom))',
+            paddingLeft: 'max(0.75rem, var(--safe-area-inset-left))',
+            paddingRight: 'max(0.75rem, var(--safe-area-inset-right))',
+          }}
+        >
           {shell}
         </div>
       </div>
     );
   }
 
-  // fullscreen — même composition splash que le chargement des pages
+  // fullscreen — même composition éditoriale que la fiche média
   return (
     <div
       className="player-progress-overlay fixed inset-0 z-50 overflow-x-hidden overflow-y-auto overscroll-contain"
@@ -954,48 +910,15 @@ export function PlaybackStatusSurface({
         <div className="absolute inset-0 bg-[var(--ed-bg,#0c0d10)]" />
       )}
 
-      {backAction && !confirmingCancel ? (
-        <button
-          type="button"
-          onClick={backAction}
-          title={t('common.back') || 'Retour'}
-          aria-label={t('common.close') || 'Fermer'}
-          tabIndex={0}
-          data-focusable
-          data-close
-          className="fixed z-40 inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors backdrop-blur-md"
-          style={{
-            top: 'max(1rem, var(--safe-area-inset-top))',
-            left: 'max(1rem, var(--safe-area-inset-left))',
-          }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </button>
-      ) : abortAction && !confirmingCancel ? (
-        <button
-          type="button"
-          onClick={() => setConfirmingCancel(true)}
-          title={t('common.cancel') || 'Annuler'}
-          aria-label={t('common.cancel') || 'Annuler'}
-          tabIndex={0}
-          data-focusable
-          className="fixed z-40 inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors backdrop-blur-md"
-          style={{
-            top: 'max(1rem, var(--safe-area-inset-top))',
-            left: 'max(1rem, var(--safe-area-inset-left))',
-          }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </button>
-      ) : null}
-
-      <div className="relative z-10 flex min-h-full w-full items-center justify-center pt-[max(0.5rem,var(--safe-area-inset-top))] pr-[max(0.5rem,var(--safe-area-inset-right))] pb-[max(0.5rem,var(--safe-area-inset-bottom))] pl-[max(0.5rem,var(--safe-area-inset-left))]">
+      <div
+        className={`${framePad} min-h-full`}
+        style={{
+          paddingTop: 'max(4rem, var(--safe-area-inset-top))',
+          paddingBottom: 'max(2rem, var(--safe-area-inset-bottom))',
+          paddingLeft: 'max(0.75rem, var(--safe-area-inset-left))',
+          paddingRight: 'max(0.75rem, var(--safe-area-inset-right))',
+        }}
+      >
         {shell}
       </div>
     </div>

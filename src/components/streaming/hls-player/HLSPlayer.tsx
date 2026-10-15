@@ -737,6 +737,7 @@ export default function HLSPlayer({
           posterUrl={posterUrl}
           logoUrl={logoUrl}
           synopsis={synopsis}
+          hasStartedPlayback={playbackStarted || mediaVisiblyPlaying}
           releaseDate={releaseDate}
           seriesSeasonNum={seriesSeason}
           seriesEpisodeNum={seriesEpisode}

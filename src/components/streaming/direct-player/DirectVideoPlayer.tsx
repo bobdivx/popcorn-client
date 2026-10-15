@@ -386,6 +386,7 @@ export default function DirectVideoPlayer({
           posterUrl={posterUrl ?? undefined}
           logoUrl={logoUrl ?? undefined}
           synopsis={synopsis ?? undefined}
+          hasStartedPlayback={isPlaying || currentTime > 0}
           releaseDate={releaseDate ?? undefined}
           seriesSeasonNum={seriesSeasonNum}
           seriesEpisodeNum={seriesEpisodeNum}
