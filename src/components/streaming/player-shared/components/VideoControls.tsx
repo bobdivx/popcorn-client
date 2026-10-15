@@ -414,7 +414,7 @@ export function VideoControls({
             ) : (
               <img 
                 src="/popcorn_logo.png" 
-                alt="Popcorn" 
+                alt="Popcornn" 
                 class={`flex-shrink-0 ${isTV ? 'w-20 h-20' : isFullscreen ? 'w-16 h-16 md:w-20 md:h-20' : 'w-10 h-10 sm:w-14 sm:h-14 md:w-16 md:h-16'} object-contain opacity-90`}
               />
             )
