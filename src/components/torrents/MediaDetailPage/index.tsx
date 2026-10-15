@@ -2283,11 +2283,31 @@ export default function MediaDetailPage({
     };
   }, [isPlayingTrailer, trailerUiVisible]);
 
-  // Initialiser saison/épisode : priorité aux query params (?season&episode&variantId
-  // depuis "Reprendre la lecture"), sinon stockage TMDB (localStorage), sinon premier épisode.
+  // Initialiser saison/épisode : query params → localStorage → API resume → 1er épisode.
   useEffect(() => {
     if (!seriesEpisodes?.seasons?.length || selectedSeasonNum !== null) return;
     let cancelled = false;
+
+    const resolveEpisodeSelection = (opts: {
+      variantId?: string | null;
+      season?: number | null;
+      episode?: number | null;
+    }): { epId: string; seasonNum: number } | null => {
+      const seasons = seriesEpisodes.seasons;
+      if (opts.variantId && opts.variantId !== 'library') {
+        for (const s of seasons) {
+          const e = s.episodes.find((x) => x.id === opts.variantId);
+          if (e) return { epId: e.id, seasonNum: s.season };
+        }
+      }
+      if (opts.season != null && opts.episode != null) {
+        const s = seasons.find((x) => x.season === opts.season);
+        const e = s?.episodes.find((x) => x.episode === opts.episode);
+        if (e && s) return { epId: e.id, seasonNum: s.season };
+      }
+      return null;
+    };
+
     (async () => {
       // 1) Query params (deep-link de la rangée Reprendre)
       if (typeof window !== 'undefined') {
@@ -2295,75 +2315,74 @@ export default function MediaDetailPage({
         const variantParam = params.get('variantId');
         const seasonParam = params.get('season');
         const episodeParam = params.get('episode');
-        let urlEpId: string | null = null;
-        let urlSeasonNum: number | null = null;
-        if (variantParam) {
-          for (const s of seriesEpisodes.seasons) {
-            const e = s.episodes.find((x) => x.id === variantParam);
-            if (e) {
-              urlEpId = e.id;
-              urlSeasonNum = s.season;
-              break;
-            }
-          }
-        }
-        if (!urlEpId && seasonParam && episodeParam) {
-          const sNum = Number(seasonParam);
-          const eNum = Number(episodeParam);
-          if (Number.isFinite(sNum) && Number.isFinite(eNum)) {
-            const s = seriesEpisodes.seasons.find((x) => x.season === sNum);
-            const e = s?.episodes.find((x) => x.episode === eNum);
-            if (e) {
-              urlEpId = e.id;
-              urlSeasonNum = sNum;
-            }
-          }
-        }
-        if (!cancelled && urlEpId != null && urlSeasonNum != null) {
-          setSelectedSeasonNum(urlSeasonNum);
-          setSelectedEpisodeVariantId(urlEpId);
+        const sNum = seasonParam != null ? Number(seasonParam) : NaN;
+        const eNum = episodeParam != null ? Number(episodeParam) : NaN;
+        const fromUrl = resolveEpisodeSelection({
+          variantId: variantParam,
+          season: Number.isFinite(sNum) ? sNum : null,
+          episode: Number.isFinite(eNum) ? eNum : null,
+        });
+        if (!cancelled && fromUrl) {
+          setSelectedSeasonNum(fromUrl.seasonNum);
+          setSelectedEpisodeVariantId(fromUrl.epId);
           return;
         }
       }
 
-      // 2) localStorage (savePlaybackPositionByMedia)
-      const deviceId = getOrCreateDeviceId();
       const tid = activeTorrent.tmdbId;
       const tty = activeTorrent.tmdbType;
-      let record: Awaited<ReturnType<typeof getPlaybackPositionByMediaRecord>> | null = null;
-      if (typeof tid === 'number' && tty === 'tv') {
-        record = await getPlaybackPositionByMediaRecord(tid, tty, deviceId);
-      }
-      if (cancelled) return;
-      if (record && record.position > 0) {
-        let epId: string | null = null;
-        let seasonNum: number | null = null;
-        if (record.variantId) {
-          for (const s of seriesEpisodes.seasons) {
-            const e = s.episodes.find((x) => x.id === record.variantId);
-            if (e) {
-              epId = e.id;
-              seasonNum = s.season;
-              break;
+      if (typeof tid !== 'number' || tty !== 'tv') {
+        // Film / pas de TMDB : premier épisode si structure série quand même
+      } else {
+        // 2) localStorage (savePlaybackPositionByMedia) — même appareil
+        const deviceId = getOrCreateDeviceId();
+        const record = await getPlaybackPositionByMediaRecord(tid, tty, deviceId);
+        if (cancelled) return;
+        if (record && (record.position > 0 || record.season != null || record.variantId)) {
+          const fromLocal = resolveEpisodeSelection({
+            variantId: record.variantId,
+            season: record.season,
+            episode: record.episode,
+          });
+          if (fromLocal) {
+            setSelectedSeasonNum(fromLocal.seasonNum);
+            setSelectedEpisodeVariantId(fromLocal.epId);
+            return;
+          }
+        }
+
+        // 3) API « Reprendre » (compte utilisateur) — ouverture hors rangée Reprendre
+        try {
+          const res = await serverApi.listResumeWatching({ limit: 80 });
+          if (cancelled) return;
+          if (res.success && Array.isArray(res.data)) {
+            const hit = res.data.find(
+              (it) =>
+                it.tmdb_type === 'tv' &&
+                it.tmdb_id === tid &&
+                ((it.season != null && it.episode != null) || it.variant_id),
+            );
+            if (hit) {
+              const fromApi = resolveEpisodeSelection({
+                variantId: hit.variant_id,
+                season: hit.season,
+                episode: hit.episode,
+              });
+              if (fromApi) {
+                setSelectedSeasonNum(fromApi.seasonNum);
+                setSelectedEpisodeVariantId(fromApi.epId);
+                return;
+              }
             }
           }
-        }
-        if (!epId && record.season != null && record.episode != null) {
-          const s = seriesEpisodes.seasons.find((x) => x.season === record.season);
-          const e = s?.episodes.find((x) => x.episode === record.episode);
-          if (e) {
-            epId = e.id;
-            seasonNum = record.season;
-          }
-        }
-        if (epId != null && seasonNum != null) {
-          setSelectedSeasonNum(seasonNum);
-          setSelectedEpisodeVariantId(epId);
-          return;
+        } catch {
+          // ignore — fallback 1er épisode
         }
       }
 
-      // 3) Premier épisode disponible (saison 0 / spéciaux en dernier)
+      if (cancelled) return;
+
+      // 4) Premier épisode disponible (saison 0 / spéciaux en dernier)
       const first =
         seriesEpisodes.seasons.find((s) => s.season > 0 && (s.episodes?.length ?? 0) > 0) ??
         seriesEpisodes.seasons.find((s) => (s.episodes?.length ?? 0) > 0);

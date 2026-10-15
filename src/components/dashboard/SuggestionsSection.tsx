@@ -138,15 +138,33 @@ export default function SuggestionsSection({ contextType = 'all' }: { contextTyp
         (lib.tmdb_type === type || (lib.category === 'SERIES' && type === 'tv') || (lib.category === 'FILM' && type === 'movie'))
       );
 
+      const resumeHit = resumeWatching.find(
+        (r) => r.tmdbId === tmdbId && (r.type === 'tv' || type === 'tv'),
+      );
+      const qs = new URLSearchParams();
+      qs.set('tmdbId', String(tmdbId));
+      qs.set('from', 'dashboard');
+
       if (inLibrary) {
-        // Rediriger vers la page détail avec les infos de la bibliothèque
         const isSeries = type === 'tv' || type === 'series' || inLibrary.category === 'SERIES';
-        const typeParam = isSeries ? 'tv' : 'movie';
-        window.location.href = `/torrents?tmdbId=${tmdbId}&type=${typeParam}&from=dashboard&variantId=library`;
+        qs.set('type', isSeries ? 'tv' : 'movie');
+        if (!(resumeHit?.type === 'tv' && resumeHit.variantId)) {
+          qs.set('variantId', 'library');
+        }
       } else {
-        // Rediriger vers la page de recherche/demande
-        window.location.href = `/torrents?tmdbId=${tmdbId}&type=${type}&from=dashboard`;
+        qs.set('type', String(type));
       }
+
+      if (resumeHit?.type === 'tv') {
+        if (resumeHit.currentSeason != null) qs.set('season', String(resumeHit.currentSeason));
+        if (resumeHit.currentEpisode != null) qs.set('episode', String(resumeHit.currentEpisode));
+        if (resumeHit.variantId) qs.set('variantId', resumeHit.variantId);
+        if (resumeHit.positionSeconds != null && resumeHit.positionSeconds > 0) {
+          qs.set('t', String(Math.floor(resumeHit.positionSeconds)));
+        }
+      }
+
+      window.location.href = `/torrents?${qs.toString()}`;
     }
   };
 
