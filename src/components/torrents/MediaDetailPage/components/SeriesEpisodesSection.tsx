@@ -135,15 +135,29 @@ export function SeriesEpisodesSection({
     };
   }, [tmdbStillBySeasonEpisode]);
 
+  const orderedSeasons = useMemo(() => {
+    return [...seriesEpisodes.seasons].sort((a, b) => {
+      if (a.season === 0) return 1;
+      if (b.season === 0) return -1;
+      return a.season - b.season;
+    });
+  }, [seriesEpisodes.seasons]);
+
+  const seasonLabel = (seasonNum: number) =>
+    seasonNum === 0
+      ? t('mediaDetail.seasonSpecials')
+      : t('mediaDetail.seasonNumber', { number: seasonNum });
+
   return (
     <div className="space-y-8">
-      {seriesEpisodes.seasons.map((seasonData) => {
+      {orderedSeasons.map((seasonData) => {
         const seasonNum = seasonData.season;
         const episodes = seasonData.episodes ?? [];
         if (!episodes.length) return null;
 
         const episodeCount = episodes.length;
         const headingId = `series-season-${seasonNum}-heading`;
+        const label = seasonLabel(seasonNum);
 
         return (
           <section
@@ -154,14 +168,14 @@ export function SeriesEpisodesSection({
           >
             <div className="ed-season-block__head px-4 py-3 border-b border-white/10 bg-white/5">
               <h3 id={headingId} className="ed-season-block__title text-base font-semibold text-white">
-                {t('mediaDetail.seasonNumber', { number: seasonNum })}
+                {label}
                 <span className="ed-season-block__count ml-2 text-sm font-normal text-white/60">
                   ({episodeCount})
                 </span>
               </h3>
             </div>
             <EpisodeCardsCarousel
-              ariaLabel={`${t('mediaDetail.seasonNumber', { number: seasonNum })} — ${t('mediaDetail.episodes')}`}
+              ariaLabel={`${label} — ${t('mediaDetail.episodes')}`}
               items={(() => {
                 const seasonHasPackSource = episodes.some((e) => {
                   if (e.episode !== 0) return false;

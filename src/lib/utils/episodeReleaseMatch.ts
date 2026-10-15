@@ -3,19 +3,36 @@ import {
   scenePackMatchesTmdbEpisode,
   tmdbAbsoluteToScene,
 } from './tmdbSceneSeasonMap';
+import { absoluteEpisodeNumber } from './seasonOrder';
 
 /**
  * True si le nom de release contient le couple saison / épisode attendu.
  * Couvre S01E05, S1E5, S01.E05 et le style très courant sur les indexeurs **1x05** (saison 1, ép. 5).
+ *
+ * Avec `seasonEpisodeCounts` (issus de TMDB multi-saisons), accepte en fallback les tags
+ * « absolus » S01E{n} qui dépassent la taille TMDB de la saison 1.
  */
 export function episodeReleaseMatchesVariantName(
   seasonNum: number,
   epNum: number,
   rawName: string,
+  opts?: { seasonEpisodeCounts?: Map<number, number> },
 ): boolean {
   const upper = (rawName || '').trim().toUpperCase();
   if (!upper) return false;
 
+  if (matchesExactSeasonEpisode(seasonNum, epNum, upper)) return true;
+
+  const counts = opts?.seasonEpisodeCounts;
+  if (counts && seasonNum > 1 && epNum > 0) {
+    const abs = absoluteEpisodeNumber(seasonNum, epNum, counts);
+    if (abs !== epNum && matchesExactSeasonEpisode(1, abs, upper)) return true;
+  }
+
+  return false;
+}
+
+function matchesExactSeasonEpisode(seasonNum: number, epNum: number, upper: string): boolean {
   const sPad = seasonNum.toString().padStart(2, '0');
   const ePad = epNum.toString().padStart(2, '0');
   if (new RegExp(`S\\.?${sPad}[\\s._-]?E\\.?${ePad}\\b`).test(upper)) return true;
@@ -36,6 +53,8 @@ export type EpisodeReleaseMatchOptions = {
   continuous?: boolean;
   /** Débuts de cour en numérotation absolue TMDB (ex. [1, 25, 49]). */
   courStarts?: CourStarts | null;
+  /** Tailles de saisons TMDB (séries multi-saisons classiques). */
+  seasonEpisodeCounts?: Map<number, number>;
 };
 
 /**
@@ -48,7 +67,13 @@ export function episodeReleaseMatchesTmdbEpisode(
   rawName: string,
   opts?: EpisodeReleaseMatchOptions,
 ): boolean {
-  if (episodeReleaseMatchesVariantName(tmdbSeason, tmdbEpisode, rawName)) return true;
+  if (
+    episodeReleaseMatchesVariantName(tmdbSeason, tmdbEpisode, rawName, {
+      seasonEpisodeCounts: opts?.seasonEpisodeCounts,
+    })
+  ) {
+    return true;
+  }
 
   if (
     opts?.continuous &&

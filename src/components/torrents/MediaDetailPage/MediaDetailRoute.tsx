@@ -23,6 +23,11 @@ import {
 } from '../../../lib/utils/tmdbSceneSeasonMap';
 import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-config';
 import { candidatesExcluding3DUnlessAllowed } from '../../../lib/torrents/is3dTorrent';
+import {
+  absoluteEpisodeNumber,
+  compareSeasonNumbers,
+  seasonEpisodeCountsFromSeasons,
+} from '../../../lib/utils/seasonOrder';
 import { DsLoader } from '../../ui/DsLoader';
 
 type Torrent = MediaDetailPageProps['torrent'];
@@ -117,7 +122,7 @@ async function buildSeriesEpisodesFromTmdbDiscover(
         .map((s) => s.season_number)
         .filter((n): n is number => typeof n === 'number' && n >= 0),
     ),
-  ].sort((a, b) => a - b);
+  ].sort(compareSeasonNumbers);
 
   const seasonsOut: SeriesSeasonInfo[] = [];
 
@@ -182,10 +187,25 @@ function mergeLibraryEpisodesIntoTmdbPayload(
     }
   }
 
+  // Source fiable = grille TMDB (ex. S1 a N eps). Un fichier tagué S01E{N+1}
+  // peut alors coller sur S2E01 — uniquement en fallback si le couple exact manque.
+  const seasonCounts = seasonEpisodeCountsFromSeasons(tmdbFull.seasons);
+
+  const lookupLibrary = (season: number, episode: number): SeriesEpisodeInfo | undefined => {
+    const direct = byKey.get(`${season}:${episode}`);
+    if (direct) return direct;
+    if (season > 1 && episode > 0) {
+      const abs = absoluteEpisodeNumber(season, episode, seasonCounts);
+      if (abs === episode) return undefined;
+      return byKey.get(`1:${abs}`);
+    }
+    return undefined;
+  };
+
   const seasons = tmdbFull.seasons.map((season: SeriesSeasonInfo) => ({
     ...season,
     episodes: (season.episodes ?? []).map((ep) => {
-      const lib = byKey.get(`${ep.season}:${ep.episode}`);
+      const lib = lookupLibrary(ep.season, ep.episode);
       if (!lib) return ep;
       const hasLocal =
         (lib.info_hash && lib.info_hash.length >= 32) ||
@@ -1951,7 +1971,8 @@ export default function MediaDetailRoute() {
       courStarts =
         inferCourStartsFromSceneVariants(s1?.episodes?.length ?? 0, variantNames) ?? courStarts;
     }
-    const matchOpts = { continuous, courStarts };
+    const seasonCounts = seasonEpisodeCountsFromSeasons(seriesEpisodes.seasons);
+    const matchOpts = { continuous, courStarts, seasonEpisodeCounts: seasonCounts };
 
     const newSeasons = seriesEpisodes.seasons.map((season) => {
       const seasonNum = season.season;
@@ -2032,7 +2053,10 @@ export default function MediaDetailRoute() {
 
     if (!enrichedSeriesEpisodes?.seasons?.length || !initialVariants?.length) return base;
 
-    const firstEp = enrichedSeriesEpisodes.seasons[0]?.episodes?.[0];
+    const firstSeason =
+      enrichedSeriesEpisodes.seasons.find((s) => s.season > 0 && (s.episodes?.length ?? 0) > 0) ??
+      enrichedSeriesEpisodes.seasons.find((s) => (s.episodes?.length ?? 0) > 0);
+    const firstEp = firstSeason?.episodes?.[0];
     if (!firstEp) return base;
 
     const ihRaw = (firstEp.info_hash || '').toString().trim();
