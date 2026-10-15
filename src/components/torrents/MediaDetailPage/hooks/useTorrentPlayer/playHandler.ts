@@ -18,6 +18,19 @@ function isTorrentCheckingState(state: string | null | undefined): boolean {
   return s === 'checking' || s === 'initializing';
 }
 
+/** Données réellement présentes sur disque (pas seulement la liste de fichiers métadonnées). */
+function torrentHasLocalBytes(stats: {
+  progress?: number;
+  files_available?: boolean;
+  downloaded_bytes?: number;
+} | null | undefined): boolean {
+  if (!stats) return false;
+  if (stats.files_available === true) return true;
+  if ((stats.downloaded_bytes ?? 0) > 256 * 1024) return true;
+  if ((stats.progress ?? 0) > 0.005) return true;
+  return false;
+}
+
 /** En mode stream-torrent, attend que le flux soit prêt (déclencheur côté backend) avant d'ouvrir le lecteur. */
 async function waitForStreamReady(
   streamingTorrentActive: boolean,
@@ -234,16 +247,39 @@ export function createHandlePlay(context: PlayHandlerContext) {
           fileName: selectedFile.name
         });
       await markStreamingIfActive();
-      // Pendant checking, librqbit refuse stream-torrent / update_only_files → HLS local.
+      // Pendant checking sans octets locaux, ne pas forcer HLS local (503 / buffer stall).
+      // Avec octets disque : HLS local. Sinon : stream-torrent si actif, sinon attendre le DL.
       let useStreamReady = streamingTorrentActive && !isAvailableLocally;
-      if (useStreamReady && torrent.infoHash) {
+      if (torrent.infoHash) {
         try {
           const quickStats = await clientApi.getTorrent(torrent.infoHash);
           if (quickStats && isTorrentCheckingState(quickStats.state)) {
-            useStreamReady = false;
-            setIsAvailableLocally(true);
             setTorrentStats(quickStats);
-            addDebugLog('info', '🔍 Vérification en cours — lecture locale (pas de stream-torrent)');
+            if (torrentHasLocalBytes(quickStats)) {
+              useStreamReady = false;
+              setIsAvailableLocally(true);
+              addDebugLog('info', '🔍 Vérification en cours — données locales OK, HLS local');
+            } else {
+              setIsAvailableLocally(false);
+              if (!streamingTorrentActive) {
+                addDebugLog(
+                  'warning',
+                  '🔍 Checking sans données locales — attente téléchargement (pas de lecteur HLS)',
+                  { progress: quickStats.progress, files_available: quickStats.files_available },
+                );
+                setPlayStatus('downloading');
+                setProgressMessage('Vérification / téléchargement en cours…');
+                if (!isPlaying) {
+                  progressPollIntervalRef.current = window.setInterval(() => {
+                    pollTorrentProgress(torrent.infoHash!);
+                  }, PROGRESS_POLL_INTERVAL_MS);
+                  pollTorrentProgress(torrent.infoHash);
+                }
+                return;
+              }
+              useStreamReady = true;
+              addDebugLog('info', '🔍 Checking sans données — stream-torrent (évite HLS 503)');
+            }
           }
         } catch {
           /* ignore */
@@ -1174,35 +1210,44 @@ export function createHandlePlay(context: PlayHandlerContext) {
             }
           }
 
-          // Vérification post-reboot : lire depuis le disque sans attendre librqbit.
+          // Vérification post-reboot : lecture locale seulement si des octets sont vraiment là.
+          // getTorrentFiles peut lister les fichiers à 0 % → HLS local = 503 / buffer stall.
           if (isTorrentCheckingState(stats.state) && !emptyOrSparse) {
-            addDebugLog('info', '🔍 Vérification en cours — tentative de lecture locale…');
-            const videosCheck = await loadVideoFiles(torrent.infoHash);
-            if (videosCheck.length > 0) {
-              setVideoFiles(videosCheck);
-              setSelectedFile(videosCheck[0]);
-              setIsAvailableLocally(true);
-              await markStreamingIfActive();
-              const okCheck2 = await waitForStreamReady(
-                false,
-                torrent.infoHash!,
-                videosCheck[0],
-                setProgressMessage,
-                setPlayStatus,
-                setErrorMessage,
-                addDebugLog,
-              );
-              if (!okCheck2) {
-                setIsPlaying(false);
+            if (torrentHasLocalBytes(stats)) {
+              addDebugLog('info', '🔍 Vérification en cours — données locales détectées, HLS…');
+              const videosCheck = await loadVideoFiles(torrent.infoHash);
+              if (videosCheck.length > 0) {
+                setVideoFiles(videosCheck);
+                setSelectedFile(videosCheck[0]);
+                setIsAvailableLocally(true);
+                await markStreamingIfActive();
+                const okCheck2 = await waitForStreamReady(
+                  false,
+                  torrent.infoHash!,
+                  videosCheck[0],
+                  setProgressMessage,
+                  setPlayStatus,
+                  setErrorMessage,
+                  addDebugLog,
+                );
+                if (!okCheck2) {
+                  setIsPlaying(false);
+                  return;
+                }
+                setPlayStatus('ready');
+                setProgressMessage('Lancement de la lecture...');
+                setIsPlaying(true);
+                setShowInfo(false);
+                stopProgressPolling();
                 return;
               }
-              setPlayStatus('ready');
-              setProgressMessage('Lancement de la lecture...');
-              setIsPlaying(true);
-              setShowInfo(false);
-              stopProgressPolling();
-              return;
             }
+            addDebugLog('info', '🔍 Checking sans octets locaux — attente (pas de HLS 503)', {
+              progress: stats.progress,
+              files_available: stats.files_available,
+              downloaded_bytes: stats.downloaded_bytes,
+            });
+            setIsAvailableLocally(false);
             setPlayStatus('downloading');
             setProgressMessage('Vérification des fichiers…');
             if (!isPlaying) {
