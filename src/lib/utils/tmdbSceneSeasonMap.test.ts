@@ -88,4 +88,13 @@ describe('tmdbSceneSeasonMap — Les Carnets de l\'apothicaire', () => {
     ]);
     expect(starts).toEqual([1, 25, 49]);
   });
+
+  it('sans S01Exx (pack S01 + S03E02) préfère cours de 24, pas découpage égal', () => {
+    const starts = inferCourStartsFromSceneVariants(60, [
+      'Les.Carnets.de.l.apothicaire.S01.MULTI.VFF.1080p.BluRay',
+      'Les.Carnets.de.l.apothicaire.S03E02.VOSTFR.1080p',
+    ]);
+    expect(starts).toEqual([1, 25, 49]);
+    expect(tmdbAbsoluteToScene(25, starts!)).toEqual({ season: 2, episode: 1 });
+  });
 });
