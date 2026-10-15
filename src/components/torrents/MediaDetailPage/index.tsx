@@ -845,21 +845,31 @@ export default function MediaDetailPage({
     addDebugLog,
   });
 
-  // Pendant checking/initializing, librqbit refuse le stream → forcer HLS local.
+  // checking/initializing : HLS local seulement si on a vraiment des octets (sinon 503).
   const torrentIsChecking =
     torrentStats?.state === 'checking' ||
     initialTorrentStats?.state === 'checking' ||
     activeTorrent.clientState === 'checking' ||
     (typeof torrentStats?.state === 'string' &&
       torrentStats.state.toLowerCase() === 'initializing');
-  // Stream-torrent uniquement si le média n'est PAS jouable en local.
+  const checkingHasLocalBytes =
+    torrentIsChecking &&
+    ((torrentStats?.files_available === true) ||
+      ((torrentStats?.downloaded_bytes ?? 0) > 256 * 1024) ||
+      ((torrentStats?.progress ?? 0) > 0.005) ||
+      ((initialTorrentStats?.downloaded_bytes ?? 0) > 256 * 1024) ||
+      ((initialTorrentStats?.progress ?? 0) > 0.005));
+  // Stream-torrent si pas jouable en local. Pendant checking sans octets : garder stream-torrent
+  // (ne pas forcer HLS local → 503 / buffer stall).
   // Ne pas utiliser `isPlaying` ici : dès le clic Lire, isPlaying=true basculait à tort
   // vers stream-torrent même quand isAvailableLocally=true (fichier présent, sans path library).
   const useStreamTorrentMode =
     effectiveStreamingActive &&
     !activeTorrent.infoHash?.startsWith('local_') &&
-    !torrentIsChecking &&
-    (Boolean(emptyOrSparse) || (!isAvailableLocally && !hasLibraryFilePath));
+    !(torrentIsChecking && checkingHasLocalBytes) &&
+    (Boolean(emptyOrSparse) ||
+      (!isAvailableLocally && !hasLibraryFilePath) ||
+      (torrentIsChecking && !checkingHasLocalBytes));
 
   useEffect(() => {
     const token = typeof TokenManager?.getCloudAccessToken === 'function' ? TokenManager.getCloudAccessToken() : null;
