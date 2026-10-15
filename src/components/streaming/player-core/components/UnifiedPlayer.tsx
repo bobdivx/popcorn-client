@@ -122,6 +122,8 @@ export default function UnifiedPlayer({
           synopsis={hlsProps.synopsis}
           releaseDate={hlsProps.releaseDate}
           torrentName={hlsProps.torrentName ?? hlsProps.fileName}
+          seriesSeasonNum={hlsProps.seriesSeason ?? null}
+          seriesEpisodeNum={hlsProps.seriesEpisode ?? null}
           torrentStats={torrentStats}
           onProgress={onProgress}
           scrubThumbnails={(hlsProps as any).scrubThumbnails ?? null}
