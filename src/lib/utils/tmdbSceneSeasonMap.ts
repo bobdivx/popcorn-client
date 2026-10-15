@@ -186,3 +186,56 @@ export function scenePackMatchesTmdbEpisode(
 
   return false;
 }
+
+export type SceneSplitEpisode = {
+  season: number;
+  episode: number;
+  /** Numéro d’épisode absolu TMDB avant découpage (ex. 25). */
+  tmdbAbsoluteEpisode?: number;
+};
+
+export type SceneSplitSeason<T extends SceneSplitEpisode> = {
+  season: number;
+  episodes: T[];
+};
+
+/**
+ * Découpe une saison TMDB continue (S1 E1–En) en saisons scène (S1/S2/S3…)
+ * selon `courStarts` (ex. [1, 25, 49] → S1:E1–24, S2:E1–24, S3:…).
+ * La saison 0 (spéciaux) est conservée telle quelle.
+ */
+export function splitContinuousSeasonsIntoSceneCours<T extends SceneSplitEpisode>(
+  seasons: Array<{ season: number; episodes: T[] }>,
+  courStarts: CourStarts,
+): Array<{ season: number; episodes: T[] }> {
+  if (!courStarts || courStarts.length <= 1) return seasons;
+
+  const specials = seasons.filter((s) => s.season === 0);
+  const continuous = seasons.find((s) => s.season === 1);
+  if (!continuous?.episodes?.length) return seasons;
+
+  const eps = [...continuous.episodes]
+    .filter((e) => typeof e.episode === 'number' && e.episode > 0)
+    .sort((a, b) => a.episode - b.episode);
+
+  const sceneSeasons: Array<{ season: number; episodes: T[] }> = [];
+  for (let i = 0; i < courStarts.length; i++) {
+    const start = courStarts[i]!;
+    const end = i + 1 < courStarts.length ? courStarts[i + 1]! - 1 : Number.POSITIVE_INFINITY;
+    const chunk = eps
+      .filter((e) => e.episode >= start && e.episode <= end)
+      .map((e) => {
+        const scene = tmdbAbsoluteToScene(e.episode, courStarts);
+        return {
+          ...e,
+          season: scene.season,
+          episode: scene.episode,
+          tmdbAbsoluteEpisode: e.episode,
+        } as T;
+      });
+    if (chunk.length) sceneSeasons.push({ season: i + 1, episodes: chunk });
+  }
+
+  // Saison 0 en dernier (convention Popcornn)
+  return [...sceneSeasons, ...specials];
+}

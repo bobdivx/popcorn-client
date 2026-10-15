@@ -6,6 +6,7 @@ import {
   isSeasonPackReleaseName,
   scenePackMatchesTmdbEpisode,
   sceneToTmdbAbsolute,
+  splitContinuousSeasonsIntoSceneCours,
   tmdbAbsoluteToScene,
 } from './tmdbSceneSeasonMap';
 import { episodeReleaseMatchesTmdbEpisode, torrentReleaseMatchesTmdbEpisode } from './episodeReleaseMatch';
@@ -96,5 +97,29 @@ describe('tmdbSceneSeasonMap — Les Carnets de l\'apothicaire', () => {
     ]);
     expect(starts).toEqual([1, 25, 49]);
     expect(tmdbAbsoluteToScene(25, starts!)).toEqual({ season: 2, episode: 1 });
+  });
+
+  it('découpe la saison TMDB continue en S1/S2/S3 pour l’UI', () => {
+    const seasons = [
+      {
+        season: 1,
+        episodes: [1, 24, 25, 48, 49].map((episode) => ({
+          season: 1,
+          episode,
+          id: `ep-${episode}`,
+        })),
+      },
+      { season: 0, episodes: [{ season: 0, episode: 1, id: 'special' }] },
+    ];
+    const split = splitContinuousSeasonsIntoSceneCours(seasons, courStarts);
+    expect(split.map((s) => s.season)).toEqual([1, 2, 3, 0]);
+    expect(split[0]!.episodes.map((e) => e.episode)).toEqual([1, 24]);
+    expect(split[1]!.episodes[0]).toMatchObject({
+      season: 2,
+      episode: 1,
+      tmdbAbsoluteEpisode: 25,
+      id: 'ep-25',
+    });
+    expect(split[2]!.episodes[0]).toMatchObject({ season: 3, episode: 1, tmdbAbsoluteEpisode: 49 });
   });
 });

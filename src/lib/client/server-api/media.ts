@@ -22,6 +22,8 @@ export interface SeriesEpisodeInfo {
   is_from_multi_torrent: boolean;
   /** Date de diffusion TMDB (ISO) — sert au remap anime saison continue ↔ S02 scène. */
   air_date?: string | null;
+  /** Épisode absolu TMDB avant découpage UI en cours scène (ex. 25 → S02E01). */
+  tmdbAbsoluteEpisode?: number;
 }
 
 /** Saison avec liste d'épisodes */
