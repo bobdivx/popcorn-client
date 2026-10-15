@@ -71,6 +71,12 @@ interface VideoControlsProps {
   logoUrl?: string | null;
   /** Synopsis du média (affiche avec poster en overlay quand en pause) */
   synopsis?: string | null;
+  /**
+   * True une fois que la lecture a réellement démarré.
+   * Sans ça, le bloc poster+synopsis s’affiche pendant le chargement initial
+   * (isPlaying=false) et double le splash « Chargement ».
+   */
+  hasStartedPlayback?: boolean;
   /** Année de sortie (badge style Media Detail) */
   releaseDate?: string | null;
   /** Numéro de saison en cours (séries) */
@@ -154,6 +160,7 @@ export function VideoControls({
   posterUrl,
   logoUrl,
   synopsis,
+  hasStartedPlayback = false,
   releaseDate,
   seriesSeasonNum,
   seriesEpisodeNum,
@@ -308,7 +315,8 @@ export function VideoControls({
     return 'ring-4 ring-purple-500/80 ring-offset-2 ring-offset-black/55 shadow-[0_0_20px_rgba(168,85,247,0.7)] bg-purple-600/20 transition-all duration-200';
   };
 
-  const showPosterSynopsisPause = !isPlaying && showControls && (posterUrl || synopsis);
+  const showPosterSynopsisPause =
+    hasStartedPlayback && !isPlaying && showControls && (posterUrl || synopsis);
   const showPausedChrome = showPosterSynopsisPause;
   /** Sous-titre saison/épisode formaté (ex. « Saison 1 · Épisode 5 ») */
   const seriesSubtitle =

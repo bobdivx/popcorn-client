@@ -437,6 +437,7 @@ export default function LuciePlayer({
           posterUrl={posterUrl}
           logoUrl={logoUrl}
           synopsis={synopsis}
+          hasStartedPlayback={isPlaying || currentTime > 0}
           releaseDate={releaseDate}
           seriesSeasonNum={seriesSeason}
           seriesEpisodeNum={seriesEpisode}
