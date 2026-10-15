@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'preact/hooks';
 import { clientApi } from '../../../../lib/client/api';
+import { releaseMatchesTmdbEpisode } from '../../../../lib/utils/seasonOrder';
 
 export const SPARSE_OR_EMPTY_CODE = 'SPARSE_OR_EMPTY';
 /** Stream-torrent refusé (token / entitlement) — basculer vers téléchargement classique. */
@@ -73,6 +74,8 @@ interface UseVideoFilesOptions {
    */
   sceneSeason?: number | null;
   sceneEpisode?: number | null;
+  /** Tailles de saisons TMDB — permet d’accepter un chemin S01E25 pour le slot S2E01. */
+  seasonEpisodeCounts?: Map<number, number> | null;
   torrent?: {
     infoHash?: string | null;
     downloadPath?: string | null;
@@ -88,6 +91,7 @@ export function useVideoFiles({
   episode,
   sceneSeason,
   sceneEpisode,
+  seasonEpisodeCounts,
   torrent,
 }: UseVideoFilesOptions) {
   const [videoFiles, setVideoFiles] = useState<TorrentFile[]>([]);
@@ -285,7 +289,13 @@ export function useVideoFiles({
           ) {
             return true;
           }
-          return false;
+          return releaseMatchesTmdbEpisode(
+            fileS,
+            fileE,
+            season,
+            episode,
+            seasonEpisodeCounts,
+          );
         };
         const fp = filePath && String(filePath).trim() ? String(filePath).trim() : '';
         const dp =

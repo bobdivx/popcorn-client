@@ -28,4 +28,14 @@ describe('findPackFileIndexForEpisode', () => {
     expect(findPackFileIndexForEpisode(files, 1, 9)).toBeNull();
     expect(findPackFileIndexForEpisode(files, 1, 0)).toBeNull();
   });
+
+  it('matche S01E25 → TMDB S2E01 via compteurs TMDB', () => {
+    const absFiles = [{ name: 'Show.S01E24.mkv' }, { name: 'Show.S01E25.mkv' }];
+    const counts = new Map<number, number>([
+      [1, 24],
+      [2, 24],
+    ]);
+    expect(findPackFileIndexForEpisode(absFiles, 2, 1, counts)).toBe(1);
+    expect(findPackFileIndexForEpisode(absFiles, 2, 1)).toBeNull();
+  });
 });
