@@ -20,6 +20,7 @@ import {
   inferCourStartsFromSceneVariants,
   isContinuousTmdbSeasonLayout,
   scenePackMatchesTmdbEpisode,
+  splitContinuousSeasonsIntoSceneCours,
 } from '../../../lib/utils/tmdbSceneSeasonMap';
 import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-config';
 import { candidatesExcluding3DUnlessAllowed } from '../../../lib/torrents/is3dTorrent';
@@ -2048,10 +2049,11 @@ export default function MediaDetailRoute() {
         const bestVariant = pickBest(epMatches) ?? pickBest(packMatches);
 
         if (bestVariant) {
+          // Garder l'id épisode TMDB unique — écraser par l'id pack faisait que
+          // E1–E24 partageaient le même id → clic E25 / sélection ambiguë.
           return {
             ...ep,
             info_hash: bestVariant.infoHash,
-            id: bestVariant.id, // Permet de sélectionner cette variante lors du clic
             isAvailable: true,
           };
         }
@@ -2062,7 +2064,13 @@ export default function MediaDetailRoute() {
       return { ...season, episodes: newEpisodes };
     });
 
-    return { ...seriesEpisodes, seasons: newSeasons };
+    // Affichage Netflix/scène : S1 E1–24, S2 E1–… (plus une seule saison TMDB à 60 eps).
+    let displaySeasons = newSeasons;
+    if (continuous && courStarts && courStarts.length > 1) {
+      displaySeasons = splitContinuousSeasonsIntoSceneCours(newSeasons, courStarts);
+    }
+
+    return { ...seriesEpisodes, seasons: displaySeasons };
   }, [seriesEpisodes, initialVariants, torrent]);
 
   /**
