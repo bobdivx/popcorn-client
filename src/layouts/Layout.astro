@@ -343,9 +343,10 @@ const isWebOS = import.meta.env.WEBOS === 'true';
     </script>
     <!-- Indicateur de chargement immédiat — même composition que DsLoader page (éditorial).
          Remonté sous <html> juste après (hors body zoomé 80%). -->
-    <div id="popcorn-loading-fallback" class="fixed inset-0 z-[9999] overflow-hidden" aria-hidden="true" transition:persist="popcorn-loading-fallback" style="background:#0c0d10;color:#f4f1ec;width:100%;height:100%;min-height:100vh;min-height:100dvh">
+    <div id="popcorn-loading-fallback" class="fixed inset-0 z-[9999] overflow-hidden" aria-hidden="true" transition:persist="popcorn-loading-fallback" style="position:fixed;inset:0;z-index:9999;overflow:hidden;background:#0c0d10;color:#f4f1ec;width:100%;height:100%;min-height:100vh;min-height:100dvh">
       <style>
-        /* Inline critique avant editorial.css — même langage que .ed-loader--page */
+        /* Inline critique avant editorial.css / Tailwind — même langage que .ed-loader--page */
+        #popcorn-loading-fallback{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;min-height:100vh!important;min-height:100dvh!important;z-index:9999;overflow:hidden;background:#0c0d10;color:#f4f1ec}
         #popcorn-loading-fallback .plb{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;text-align:center;padding:0 1.5rem}
         #popcorn-loading-fallback .plb-k{letter-spacing:.42em;text-transform:uppercase;font-size:clamp(12px,1.15vw,22px);opacity:.6;font-family:'Jost',sans-serif;font-weight:300}
         #popcorn-loading-fallback .plb-t{letter-spacing:.32em;text-transform:uppercase;font-size:clamp(28px,3.4vw,64px);font-weight:300;font-family:'Josefin Sans','Jost',sans-serif;margin:0}
