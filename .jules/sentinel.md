@@ -15,3 +15,7 @@
 **Vulnerability:** API key fields were using `<input type="password">`, causing password managers and browsers to mistake them for login passwords, resulting in aggressive auto-filling or prompting to save.
 **Learning:** While `<input type="password">`, masks the input from shoulder surfing, it inadvertently triggers credential management features designed for authentication, which is inappropriate for static API keys.
 **Prevention:** When using `<input type="password">` for sensitive keys that are not login credentials, always add `autoComplete="new-password"` to explicitly instruct browsers and password managers to ignore the field.
+## 2025-02-27 - Insecure Randomness in Car Capabilities Session ID
+**Vulnerability:** Weak PRNG `Math.random()` was used for generating the car capabilities session ID in `src/components/streaming/car-player/carCapabilities.ts`.
+**Learning:** `Math.random()` is not cryptographically secure and should not be used for session IDs.
+**Prevention:** Always use the Web Crypto API through a centralized utility like `src/lib/utils/uuid.ts`.
