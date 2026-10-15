@@ -1,19 +1,8 @@
 name: Build and Publish Frontend Docker Image
 
+# Déploiement Docker : DevForge (pas de démarrage auto sur push/PR).
 on:
-  push:
-    branches:
-      - main
-      - master
-      - dev
-    tags:
-      - 'v*'
-  pull_request:
-    branches:
-      - main
-      - master
-      - dev
-  workflow_dispatch:  # Permet de déclencher manuellement depuis l'interface GitHub
+  workflow_dispatch:
 
 env:
   REGISTRY: docker.io
