@@ -409,7 +409,7 @@ export default function IndexRedirect() {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-[var(--ed-bg,#0c0d10)]">
+      <div className="flex justify-center items-center min-h-app-screen bg-[var(--ed-bg,#0c0d10)]">
         <div className="text-center max-w-lg mx-4">
           <HLSLoadingSpinner size="lg" text={message} />
           {message.includes('réessai') && (

@@ -209,7 +209,7 @@ export default function Wizard() {
   // ─── Écran de chargement ─────────────────────────────────────────────────
   if (loading) {
     return (
-      <div class="flex justify-center items-center min-h-screen" style="background:#07070e">
+      <div class="flex justify-center items-center min-h-app-screen" style="background:#07070e">
         <HLSLoadingSpinner size="lg" text="Chargement..." />
       </div>
     );

@@ -639,7 +639,7 @@ export default function Library({
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-[var(--ed-bg,#0c0d10)]">
+      <div className="flex justify-center items-center min-h-app-screen bg-[var(--ed-bg,#0c0d10)]">
         <HLSLoadingSpinner size="lg" text="Chargement" />
       </div>
     );
@@ -661,7 +661,7 @@ export default function Library({
   const hasAnyContent = items.length > 0 || sharedByFriends.some((s) => s.items.length > 0);
   if (!hasAnyContent && syncInProgress) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-black text-white px-4">
+      <div className="flex flex-col items-center justify-center min-h-app-screen bg-black text-white px-4">
         {/* Barre fine collée au header */}
         <div
           className="library-sync-bar-indeterminate"

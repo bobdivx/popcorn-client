@@ -1,4 +1,5 @@
 import type { ComponentChildren } from 'preact';
+import { createPortal } from 'preact/compat';
 import { LoadingCard, type LoadingCardProps } from './LoadingCard';
 
 type FullScreenLoadingOverlayProps = {
@@ -27,7 +28,9 @@ export function FullScreenLoadingOverlay({
   children,
   onClose,
 }: FullScreenLoadingOverlayProps) {
-  return (
+  // Portal sur <html> (pas <body>) : le body est zoomé à 80% sur plusieurs pages
+  // (dashboard, downloads…). Un overlay `fixed` dans ce body laisse une bande visible.
+  const node = (
     <div className="fixed inset-0 z-[9999] bg-page overflow-hidden">
       <div className="bg-page-gradient"></div>
       <div className="bg-page-grid"></div>
@@ -64,5 +67,10 @@ export function FullScreenLoadingOverlay({
       </div>
     </div>
   );
-}
 
+  if (typeof document !== 'undefined') {
+    return createPortal(node, document.documentElement);
+  }
+
+  return node;
+}
