@@ -58,6 +58,7 @@ import {
   inferCourStartsFromAirDates,
   inferCourStartsFromSceneVariants,
   isContinuousTmdbSeasonLayout,
+  scenePackMatchesTmdbEpisode,
   tmdbAbsoluteToScene,
 } from '../../../lib/utils/tmdbSceneSeasonMap';
 import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-config';
@@ -2470,9 +2471,25 @@ export default function MediaDetailPage({
               };
             }
           }
-          // Pack MULTI / S01 complet : souvent seul l'épisode 0 a une source indexeur.
-          // Pour un épisode N sans variante dédiée, retomber sur le pack (ou la meilleure variante).
-          if (!variant) {
+          // Pack saison correspondant au cour scène (E25 → pack S02, jamais S01 ni « best » S03).
+          if (!variant && ep.episode > 0) {
+            const packMatch = allVariants.find((v: any) => {
+              const name = String(v.name || v.cleanTitle || '');
+              if (!name) return false;
+              if (seriesReleaseMatchOpts) {
+                return scenePackMatchesTmdbEpisode(
+                  ep.season,
+                  ep.episode,
+                  name,
+                  seriesReleaseMatchOpts,
+                );
+              }
+              return false;
+            });
+            if (packMatch) variant = packMatch;
+          }
+          // Pack virtuel épisode 0 de la saison TMDB (séries classiques multi-saisons).
+          if (!variant && ep.episode > 0 && !seriesReleaseMatchOpts?.continuous) {
             const packEp = season?.episodes.find((e) => e.episode === 0);
             if (packEp?.id) {
               variant = allVariants.find((v: any) => v.id === packEp.id);
@@ -2483,15 +2500,8 @@ export default function MediaDetailPage({
               }
             }
           }
-          if (!variant && (ep.episode === 0 || ep.episode > 0)) {
-            const candidates = allVariants.filter((v: any) =>
-              Boolean((v.infoHash || (v as any).info_hash) || v._externalMagnetUri || v._externalLink),
-            );
-            const best = (candidates.length ? candidates : allVariants)
-              .slice()
-              .sort((a: any, b: any) => (b.seedCount ?? 0) - (a.seedCount ?? 0) || (b.fileSize ?? 0) - (a.fileSize ?? 0))[0];
-            if (best) variant = best;
-          }
+          // Jamais de fallback « meilleur torrent du groupe » pour un épisode N :
+          // ça choisit S03E02 pour E25 et provoque l’oscillation de hash.
         }
       }
 
