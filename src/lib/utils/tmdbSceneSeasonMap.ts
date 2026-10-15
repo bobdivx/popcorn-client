@@ -80,6 +80,23 @@ export function inferCourStartsFromSceneVariants(
     return starts;
   }
 
+  // Anime / cours Netflix : sans max S01Exx (pack S01 + S03E02 seuls), un découpage
+  // égal (60/3 → [1,21,41]) casse E25→S02E01. Préférer des cours de 24.
+  const ANIME_COUR = 24;
+  if (
+    maxSeason >= 2 &&
+    tmdbEpisodeCount >= ANIME_COUR * (maxSeason - 1) + 6 &&
+    tmdbEpisodeCount >= maxSeason * 12
+  ) {
+    const starts: CourStarts = [1];
+    for (let s = 2; s <= maxSeason; s++) {
+      starts.push(1 + ANIME_COUR * (s - 1));
+    }
+    if (starts[starts.length - 1]! <= tmdbEpisodeCount) {
+      return starts;
+    }
+  }
+
   if (tmdbEpisodeCount < maxSeason * 6) return null;
   const courSize = Math.floor(tmdbEpisodeCount / maxSeason);
   if (courSize < 6) return null;
