@@ -1188,17 +1188,23 @@ export function useHlsPlayer({
             const oldTime = video.currentTime;
             video.currentTime = pendingSeek;
             console.log(`[SEEK FLOW] 4️⃣ LEVEL_LOADED: video.currentTime mis à jour de ${oldTime}s à ${pendingSeek}s (${Math.floor(pendingSeek / 60)}:${Math.floor(pendingSeek % 60).toString().padStart(2, '0')})`);
-            const maxSeekVerifyRetries = 25;
-            const toleranceSec = 1;
+            const maxSeekVerifyRetries = 40;
+            const toleranceSec = 2.5;
             const minAhead = minBufferAfterSeekSec(!!isRemoteStream);
             let retries = 0;
-            const finishSeekSettle = () => {
+            const finishSeekSettle = (ok: boolean) => {
               seekLoadUrlRef.current = null;
               setPendingSeekPosition(0);
               setLoadingStatusMessage(null);
               setIsLoading(false);
               onLoadingChangeRef.current?.(false);
-              console.log(`[SEEK FLOW] ✅ Seek settled: pos≈${video.currentTime}s, bufAhead≥${minAhead}s`);
+              if (ok) {
+                console.log(`[SEEK FLOW] ✅ Seek settled: pos≈${video.currentTime}s, bufAhead≥${minAhead}s`);
+              } else {
+                console.warn(
+                  `[SEEK FLOW] ⚠️ Seek non tenu: cible=${pendingSeek}s, pos≈${video.currentTime}s — on force startLoad`,
+                );
+              }
             };
             const waitForBufferAhead = () => {
               if (seekVerifyTimeoutRef.current != null) clearTimeout(seekVerifyTimeoutRef.current);
@@ -1206,13 +1212,27 @@ export function useHlsPlayer({
               const MAX_WAIT_MS = 25000;
               const tick = () => {
                 seekVerifyTimeoutRef.current = null;
+                const posOk = Math.abs(video.currentTime - pendingSeek) <= toleranceSec;
+                if (!posOk) {
+                  // bufferSeekOverHole / clamp → la lecture est revenue en arrière
+                  try {
+                    hls.startLoad(pendingSeek);
+                  } catch (_) {}
+                  video.currentTime = pendingSeek;
+                  if (Date.now() - startedAt >= MAX_WAIT_MS) {
+                    finishSeekSettle(false);
+                    return;
+                  }
+                  seekVerifyTimeoutRef.current = window.setTimeout(tick, 250);
+                  return;
+                }
                 const ahead = getEngineBufferAhead(
                   video.buffered,
                   pendingSeek,
                   hls.mainForwardBufferInfo,
                 );
                 if (ahead >= minAhead || Date.now() - startedAt >= MAX_WAIT_MS) {
-                  finishSeekSettle();
+                  finishSeekSettle(Math.abs(video.currentTime - pendingSeek) <= toleranceSec);
                   return;
                 }
                 seekVerifyTimeoutRef.current = window.setTimeout(tick, 200);
@@ -1224,11 +1244,23 @@ export function useHlsPlayer({
               seekVerifyTimeoutRef.current = window.setTimeout(() => {
                 seekVerifyTimeoutRef.current = null;
                 const now = video.currentTime;
-                if (Math.abs(now - pendingSeek) <= toleranceSec || retries >= maxSeekVerifyRetries) {
+                if (Math.abs(now - pendingSeek) <= toleranceSec) {
+                  waitForBufferAhead();
+                  return;
+                }
+                if (retries >= maxSeekVerifyRetries) {
+                  // Dernière chance : re-demander les segments autour de la cible
+                  try {
+                    hls.startLoad(pendingSeek);
+                  } catch (_) {}
+                  video.currentTime = pendingSeek;
                   waitForBufferAhead();
                   return;
                 }
                 retries += 1;
+                try {
+                  hls.startLoad(pendingSeek);
+                } catch (_) {}
                 video.currentTime = pendingSeek;
                 runVerify();
               }, retries === 0 ? 100 : 200);

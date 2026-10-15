@@ -24,6 +24,32 @@ function extractTmdbStillsAndNames(
   return { stills, names };
 }
 
+/** Stills/noms indexés par numéro d’épisode absolu TMDB (saison continue). */
+function extractTmdbStillsAndNamesByAbsolute(
+  episodes: Array<{ episode_number?: number; still_path?: string | null; name?: string | null }>,
+): { stills: Record<number, string>; names: Record<number, string> } {
+  const stills: Record<number, string> = {};
+  const names: Record<number, string> = {};
+  for (const ep of episodes) {
+    const num = typeof ep?.episode_number === 'number' ? ep.episode_number : null;
+    if (num == null || num <= 0) continue;
+    const stillPath = typeof ep?.still_path === 'string' ? ep.still_path : null;
+    if (stillPath) stills[num] = `https://image.tmdb.org/t/p/w780${stillPath}`;
+    const episodeName = typeof ep?.name === 'string' ? ep.name.trim() : '';
+    if (episodeName && !isGenericEpisodeName(episodeName, num)) names[num] = episodeName;
+  }
+  return { stills, names };
+}
+
+/** Anime découpé en cours scène : les stills TMDB restent sur S1 absolue (E25 → UI S02E01). */
+function usesContinuousTmdbAbsoluteMap(
+  seasons: SeriesEpisodesResponse['seasons'],
+): boolean {
+  return seasons.some((s) =>
+    s.episodes.some((e) => typeof e.tmdbAbsoluteEpisode === 'number' && e.tmdbAbsoluteEpisode > 0),
+  );
+}
+
 export interface SeriesEpisodesSectionProps {
   seriesEpisodes: SeriesEpisodesResponse;
   tmdbId?: number | null;
@@ -68,6 +94,17 @@ export function SeriesEpisodesSection({
     [seriesEpisodes.seasons],
   );
 
+  const absoluteMapKey = useMemo(() => {
+    if (!usesContinuousTmdbAbsoluteMap(seriesEpisodes.seasons)) return '';
+    return seriesEpisodes.seasons
+      .flatMap((s) =>
+        s.episodes
+          .filter((e) => e.episode > 0 && e.tmdbAbsoluteEpisode != null)
+          .map((e) => `${s.season}:${e.episode}=${e.tmdbAbsoluteEpisode}`),
+      )
+      .join('|');
+  }, [seriesEpisodes.seasons]);
+
   const tmdbLanguage = language === 'en' ? 'en-US' : 'fr-FR';
 
   useEffect(() => {
@@ -83,38 +120,115 @@ export function SeriesEpisodesSection({
       setTmdbNameBySeasonEpisode({});
       return;
     }
+
+    const continuousAbsolute = usesContinuousTmdbAbsoluteMap(seriesEpisodes.seasons);
+
     (async () => {
       const merged: Record<string, string> = {};
       const names: Record<string, string> = {};
-      await Promise.all(
-        seasons.map(async (seasonNum) => {
-          const primary = await serverApi.getTmdbTvSeasonDetail(tmdbId, seasonNum, tmdbLanguage);
+
+      if (continuousAbsolute) {
+        // TMDB n’a qu’une saison continue : season/2|3 → 502. Charger S1 (+ S0 spéciaux).
+        type TmdbEp = {
+          episode_number?: number;
+          still_path?: string | null;
+          name?: string | null;
+        };
+        const loadAbsSeason = async (tmdbSeasonNum: number, lang: string): Promise<TmdbEp[] | null> => {
+          const attempt = async () => {
+            const res = await serverApi.getTmdbTvSeasonDetail(tmdbId, tmdbSeasonNum, lang);
+            if (!res?.success || !res.data || !Array.isArray(res.data.episodes)) return null;
+            return res.data.episodes as TmdbEp[];
+          };
+          let eps = await attempt();
+          // 502 / CORS intermittents côté gateway → un retry évite des cartes noires aléatoires
+          if ((!eps || eps.length === 0) && !cancelled) {
+            await new Promise((r) => setTimeout(r, 700));
+            if (cancelled) return null;
+            eps = await attempt();
+          }
+          return eps;
+        };
+
+        const primaryEps = (await loadAbsSeason(1, tmdbLanguage)) ?? [];
+        if (cancelled) return;
+        // Échec total : garder les stills déjà affichées (évite flash noir)
+        if (primaryEps.length === 0) return;
+        const byAbs = extractTmdbStillsAndNamesByAbsolute(primaryEps);
+
+        let enByAbs: { stills: Record<number, string>; names: Record<number, string> } | null = null;
+        const absMissingNames = Object.keys(byAbs.stills)
+          .map(Number)
+          .filter((n) => !byAbs.names[n]);
+        // Aussi les abs présents dans l’UI même sans still
+        for (const s of seriesEpisodes.seasons) {
+          for (const e of s.episodes) {
+            const abs = e.tmdbAbsoluteEpisode;
+            if (typeof abs === 'number' && abs > 0 && !byAbs.names[abs]) absMissingNames.push(abs);
+          }
+        }
+        if (absMissingNames.length > 0 && !tmdbLanguage.startsWith('en')) {
+          const enEps = await loadAbsSeason(1, 'en-US');
           if (cancelled) return;
-          const primaryEps = primary?.success && primary.data && Array.isArray(primary.data.episodes)
-            ? primary.data.episodes
-            : [];
-          const extracted = extractTmdbStillsAndNames(seasonNum, primaryEps);
+          if (enEps) enByAbs = extractTmdbStillsAndNamesByAbsolute(enEps);
+        }
+
+        for (const s of seriesEpisodes.seasons) {
+          if (s.season === 0) continue;
+          for (const e of s.episodes) {
+            if (e.episode <= 0) continue;
+            const abs =
+              typeof e.tmdbAbsoluteEpisode === 'number' && e.tmdbAbsoluteEpisode > 0
+                ? e.tmdbAbsoluteEpisode
+                : null;
+            if (abs == null) continue;
+            const key = `${e.season}:${e.episode}`;
+            if (byAbs.stills[abs]) merged[key] = byAbs.stills[abs];
+            if (byAbs.names[abs]) names[key] = byAbs.names[abs];
+            else if (enByAbs?.names[abs]) names[key] = enByAbs.names[abs];
+          }
+        }
+
+        if (seasons.includes(0)) {
+          const specials = (await loadAbsSeason(0, tmdbLanguage)) ?? [];
+          if (cancelled) return;
+          const extracted = extractTmdbStillsAndNames(0, specials);
           Object.assign(merged, extracted.stills);
           Object.assign(names, extracted.names);
-
-          // Titres FR souvent « Épisode N » non traduits → fallback en-US
-          const missing = primaryEps
-            .map((ep: { episode_number?: number }) => ep?.episode_number)
-            .filter((n: number | undefined): n is number => typeof n === 'number' && n > 0)
-            .filter((n: number) => !names[`${seasonNum}:${n}`]);
-          if (missing.length > 0 && !tmdbLanguage.startsWith('en')) {
-            const en = await serverApi.getTmdbTvSeasonDetail(tmdbId, seasonNum, 'en-US');
+        }
+      } else {
+        await Promise.all(
+          seasons.map(async (seasonNum) => {
+            const primary = await serverApi.getTmdbTvSeasonDetail(tmdbId, seasonNum, tmdbLanguage);
             if (cancelled) return;
-            if (en?.success && en.data && Array.isArray(en.data.episodes)) {
-              const enNames = extractTmdbStillsAndNames(seasonNum, en.data.episodes).names;
-              for (const n of missing) {
-                const key = `${seasonNum}:${n}`;
-                if (enNames[key]) names[key] = enNames[key];
+            const primaryEps =
+              primary?.success && primary.data && Array.isArray(primary.data.episodes)
+                ? primary.data.episodes
+                : [];
+            const extracted = extractTmdbStillsAndNames(seasonNum, primaryEps);
+            Object.assign(merged, extracted.stills);
+            Object.assign(names, extracted.names);
+
+            // Titres FR souvent « Épisode N » non traduits → fallback en-US
+            const missing = primaryEps
+              .map((ep: { episode_number?: number }) => ep?.episode_number)
+              .filter((n: number | undefined): n is number => typeof n === 'number' && n > 0)
+              .filter((n: number) => !names[`${seasonNum}:${n}`]);
+            if (missing.length > 0 && !tmdbLanguage.startsWith('en')) {
+              const en = await serverApi.getTmdbTvSeasonDetail(tmdbId, seasonNum, 'en-US');
+              if (cancelled) return;
+              if (en?.success && en.data && Array.isArray(en.data.episodes)) {
+                const enNames = extractTmdbStillsAndNames(seasonNum, en.data.episodes).names;
+                for (const n of missing) {
+                  const key = `${seasonNum}:${n}`;
+                  if (enNames[key]) names[key] = enNames[key];
+                }
               }
             }
-          }
-        }),
-      );
+          }),
+        );
+      }
+
       if (!cancelled) {
         setTmdbStillBySeasonEpisode(merged);
         setTmdbNameBySeasonEpisode(names);
@@ -123,7 +237,7 @@ export function SeriesEpisodesSection({
     return () => {
       cancelled = true;
     };
-  }, [tmdbId, seasonListKey, tmdbLanguage]);
+  }, [tmdbId, seasonListKey, absoluteMapKey, tmdbLanguage, seriesEpisodes.seasons]);
 
   const getPreferredThumb = useMemo(() => {
     return (seasonNum: number, episodeNumber: number | null, fallback: string | null) => {

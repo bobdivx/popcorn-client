@@ -149,7 +149,8 @@ export function useLibraryScrubThumbnails({
             // Si on a un 404 et qu'on ne poll pas déjà, on marque le média comme potentiellement manquant pour éviter le spam.
             if (!isPolling && err?.message?.includes('404')) {
               pollAttemptCountRef.current += 1;
-              if (pollAttemptCountRef.current >= 3) {
+              // Éviter de figer trop tôt : le fichier peut être en cours de DL (sparse).
+              if (pollAttemptCountRef.current >= 8) {
                 isPermanentlyMissingRef.current = true;
                 knownMissingScrubThumbnails.add(localMediaId);
               }
@@ -202,6 +203,7 @@ export function useLibraryScrubThumbnails({
               .catch(() => {});
           }
           let attempts = 0;
+          let partialRegenTries = 0;
           const poll = () => {
             if (cancelled || isPermanentlyMissingRef.current) return;
             attempts += 1;
@@ -210,19 +212,48 @@ export function useLibraryScrubThumbnails({
                 const st = scrubThumbnailsRef.current;
                 if (st && !st.completed && attempts < 40) {
                   scrubRetryTimeoutRef.current = setTimeout(poll, 3000);
-                } else {
-                  setScrubThumbnailsLoading(false);
+                  return;
+                }
+                setScrubThumbnailsLoading(false);
+                // Génération stoppée trop tôt (fichier partiel → ~3 vignettes) : relancer
+                // une fois que plus de bytes sont dispo, sans attendre un refresh page.
+                const looksStuckPartial =
+                  !!st &&
+                  !st.completed &&
+                  shouldForceRegenerateScrub({
+                    count: st.count,
+                    durationSeconds: st.durationSeconds ?? playerDurationHintRef.current ?? 0,
+                    intervalSeconds: st.intervalSeconds ?? 0,
+                    completed: true,
+                  });
+                if (
+                  looksStuckPartial &&
+                  partialRegenTries < 3 &&
+                  !scrubRegenInFlightRef.current
+                ) {
+                  partialRegenTries += 1;
+                  scrubRegenInFlightRef.current = true;
+                  serverApi
+                    .generateScrubThumbnails(localMediaId, {
+                      force: true,
+                      torrentRelativePath: torrentRelForScrub,
+                      durationHintSeconds: durationHintForApi(),
+                    })
+                    .catch(() => {})
+                    .finally(() => {
+                      scrubRegenInFlightRef.current = false;
+                    });
+                  scrubRetryTimeoutRef.current = setTimeout(poll, 8000);
                 }
               })
               .catch(() => {
-                // Si on a déjà trop d'échecs (ou un 404 persistant détecté), on arrête le polling et marque comme manquant.
-                if (attempts >= 15 || isPermanentlyMissingRef.current) {
+                // 404 pendant le téléchargement initial : ne pas figer trop tôt.
+                if (attempts >= 25 || isPermanentlyMissingRef.current) {
                   isPermanentlyMissingRef.current = true;
                   knownMissingScrubThumbnails.add(localMediaId);
                   setScrubThumbnailsLoading(false);
                   return;
                 }
-                // Polling plus lent (3s au lieu de 2s) pour être moins agressif.
                 scrubRetryTimeoutRef.current = setTimeout(poll, 3000);
               });
           };
@@ -246,14 +277,25 @@ export function useLibraryScrubThumbnails({
     if (!ctx?.localMediaId || scrubRegenInFlightRef.current || scrubAutoRegenDoneRef.current) return;
     const st = scrubThumbnailsRef.current;
     const expected = Math.min(2000, Math.ceil(d / 10));
-    // Pas de force tant que la génération initiale n'a pas écrit meta.json.
-    if (!st || st.count <= 0 || !st.completed) return;
-    if (st.count >= expected - 2) return;
-    if (st.count * 10 >= d * 0.88) return;
-    const interval = st.intervalSeconds && st.intervalSeconds > 0 ? st.intervalSeconds : 10;
-    const approxCover = st.count * interval;
-    if (approxCover >= d * 0.82) return;
-    if (st.count >= 150) return;
+    // Pas de force tant qu'aucune vignette n'existe encore.
+    if (!st || st.count <= 0) return;
+    // completed=false + peu de thumbs = génération stoppée sur zone non lisible (torrent partiel).
+    if (st.completed && st.count >= expected - 2) return;
+    if (!st.completed) {
+      const stuckPartial = shouldForceRegenerateScrub({
+        count: st.count,
+        durationSeconds: st.durationSeconds ?? d,
+        intervalSeconds: st.intervalSeconds ?? 10,
+        completed: true,
+      });
+      if (!stuckPartial) return;
+    } else {
+      if (st.count * 10 >= d * 0.88) return;
+      const interval = st.intervalSeconds && st.intervalSeconds > 0 ? st.intervalSeconds : 10;
+      const approxCover = st.count * interval;
+      if (approxCover >= d * 0.82) return;
+      if (st.count >= 150) return;
+    }
 
     const t = window.setTimeout(() => {
       if (scrubRegenInFlightRef.current) return;
