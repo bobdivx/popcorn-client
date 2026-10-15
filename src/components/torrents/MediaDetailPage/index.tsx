@@ -3743,35 +3743,33 @@ export default function MediaDetailPage({
 
           {/* Carousel épisodes : hors du bloc immersif BA (visible, pointer-events OK, pas aria-hidden). */}
           {seriesEpisodes?.seasons?.length ? (
-            <div className="px-3 sm:px-4 md:px-6 lg:px-16 relative z-20 mt-10 pb-[max(7rem,calc(2rem+env(safe-area-inset-bottom,0px)))] sm:pb-[max(9rem,calc(2.5rem+env(safe-area-inset-bottom,0px)))] md:pb-[max(10rem,calc(3rem+env(safe-area-inset-bottom,0px)))]">
-              <div className="ed-episodes-panel overflow-hidden border border-white/10">
-                <EpisodesArea
-                  seriesEpisodes={seriesEpisodes}
-                  tmdbId={episodeCarouselTmdbId}
-                  watchedEpisodesRefresh={watchedEpisodesRefresh}
-                  selectedEpisodeVariantId={selectedEpisodeVariantId}
-                  onSelectEpisode={handleSeriesEpisodeSelect}
-                  savedPlaybackPosition={savedPlaybackPosition}
-                  downloadedEpisodesSet={downloadedEpisodesSet}
-                  downloadingEpisodesMap={downloadingEpisodesMap}
-                  isPackSelected={isPackSelected}
-                  videoFilesCount={videoFiles.length}
-                  hasInfoHash={hasInfoHash}
-                  packInfoHash={activeTorrent?.infoHash ?? null}
-                  loadingPackPreview={loadingPackPreview}
-                  packPreviewLoadError={packPreviewLoadError}
-                  packPreviewFilesCount={packPreviewFiles?.length ?? 0}
-                  packEpisodesModel={packEpisodesModel}
-                  selectedPackSeason={selectedPackSeason}
-                  onSelectPackSeason={setSelectedPackSeason}
-                  selectedPackEpisodeKey={selectedPackEpisodeKey}
-                  onSelectPackEpisodeKey={onSelectPackEpisodeKey}
-                  isTV={isTV}
-                  isDownloading={playStatus === 'downloading' || playStatus === 'starting'}
-                  downloadProgress={torrentStats?.progress != null ? torrentStats.progress * 100 : undefined}
-                  statusMessage={progressMessage}
-                />
-              </div>
+            <div className="ed-episodes-panel px-3 sm:px-4 md:px-6 lg:px-16 relative z-20 mt-8 pb-[max(7rem,calc(2rem+env(safe-area-inset-bottom,0px)))] sm:pb-[max(9rem,calc(2.5rem+env(safe-area-inset-bottom,0px)))] md:pb-[max(10rem,calc(3rem+env(safe-area-inset-bottom,0px)))]">
+              <EpisodesArea
+                seriesEpisodes={seriesEpisodes}
+                tmdbId={episodeCarouselTmdbId}
+                watchedEpisodesRefresh={watchedEpisodesRefresh}
+                selectedEpisodeVariantId={selectedEpisodeVariantId}
+                onSelectEpisode={handleSeriesEpisodeSelect}
+                savedPlaybackPosition={savedPlaybackPosition}
+                downloadedEpisodesSet={downloadedEpisodesSet}
+                downloadingEpisodesMap={downloadingEpisodesMap}
+                isPackSelected={isPackSelected}
+                videoFilesCount={videoFiles.length}
+                hasInfoHash={hasInfoHash}
+                packInfoHash={activeTorrent?.infoHash ?? null}
+                loadingPackPreview={loadingPackPreview}
+                packPreviewLoadError={packPreviewLoadError}
+                packPreviewFilesCount={packPreviewFiles?.length ?? 0}
+                packEpisodesModel={packEpisodesModel}
+                selectedPackSeason={selectedPackSeason}
+                onSelectPackSeason={setSelectedPackSeason}
+                selectedPackEpisodeKey={selectedPackEpisodeKey}
+                onSelectPackEpisodeKey={onSelectPackEpisodeKey}
+                isTV={isTV}
+                isDownloading={playStatus === 'downloading' || playStatus === 'starting'}
+                downloadProgress={torrentStats?.progress != null ? torrentStats.progress * 100 : undefined}
+                statusMessage={progressMessage}
+              />
             </div>
           ) : null}
       </div>
