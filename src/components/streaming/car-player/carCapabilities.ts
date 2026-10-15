@@ -9,6 +9,7 @@
  * Le dernier relevé par mode est aussi gardé en localStorage pour choisir automatiquement moteur/preset en Drive.
  */
 import { serverApi } from '../../../lib/client/server-api';
+import { generateId } from '../../../lib/utils/uuid.js';
 import { detectTeslaDriveMode, type TeslaDriveMode } from './driveModeDetector';
 
 export type CapsReason = 'load' | 'transition' | 'manual';
@@ -99,7 +100,7 @@ export function getCapsSession(): string {
   try {
     let s = sessionStorage.getItem(SESSION_KEY);
     if (!s) {
-      s = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+      s = `${Date.now().toString(36)}-${generateId().slice(0, 6)}`;
       sessionStorage.setItem(SESSION_KEY, s);
     }
     return s;
