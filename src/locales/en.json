@@ -1394,6 +1394,7 @@
     "cancelDownloadConfirm": "Cancel and remove the download?",
     "season": "Season",
     "seasonNumber": "Season {number}",
+    "seasonSpecials": "Specials",
     "episodes": "Episodes",
     "episodeNumber": "Episode {number}",
     "episodeShort": "Ep.",

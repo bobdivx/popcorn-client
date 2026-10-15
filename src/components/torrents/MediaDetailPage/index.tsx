@@ -13,6 +13,14 @@ import {
   SPARSE_OR_EMPTY_CODE,
 } from './hooks/useVideoFiles';
 import { findPackFileIndexForEpisode, usePackEpisodes } from './hooks/usePackEpisodes';
+import { episodeReleaseMatchesTmdbEpisode } from '../../../lib/utils/episodeReleaseMatch';
+import {
+  absoluteEpisodeNumber,
+  lookupBySeasonEpisodeKey,
+  relativeEpisodeFromAbsolute,
+  releaseMatchesTmdbEpisode,
+  seasonEpisodeCountsFromSeasons,
+} from '../../../lib/utils/seasonOrder';
 import { useDebug } from './hooks/useDebug';
 import { useNotifications } from './hooks/useNotifications';
 import { VideoPlayerWrapper } from './components/VideoPlayerWrapper';
@@ -529,6 +537,39 @@ export default function MediaDetailPage({
     return tmdbAbsoluteToScene(selectedEpisodeMeta.episode, courStarts);
   }, [seriesEpisodes, selectedEpisodeMeta, initialVariants]);
 
+  /** Tailles de saisons TMDB — remap absolu pour séries multi-saisons classiques. */
+  const tmdbSeasonEpisodeCounts = useMemo(
+    () =>
+      seriesEpisodes?.seasons?.length
+        ? seasonEpisodeCountsFromSeasons(seriesEpisodes.seasons)
+        : null,
+    [seriesEpisodes],
+  );
+
+  /** Options de match TMDB ↔ release (saison continue + tailles multi-saisons). */
+  const seriesReleaseMatchOpts = useMemo(() => {
+    if (!seriesEpisodes?.seasons?.length) return null;
+    const seasonNums = seriesEpisodes.seasons.map((s) => s.season);
+    const continuous = isContinuousTmdbSeasonLayout(seasonNums);
+    const s1 = seriesEpisodes.seasons.find((s) => s.season === 1);
+    const variantNames = (initialVariants ?? []).map((v) => v.name || v.cleanTitle || '');
+    let courStarts =
+      continuous && s1
+        ? inferCourStartsFromAirDates(
+            (s1.episodes ?? []).map((e) => ({ episode: e.episode, airDate: e.air_date })),
+          )
+        : null;
+    if (continuous && (!courStarts || courStarts.length <= 1)) {
+      courStarts =
+        inferCourStartsFromSceneVariants(s1?.episodes?.length ?? 0, variantNames) ?? courStarts;
+    }
+    return {
+      continuous,
+      courStarts,
+      seasonEpisodeCounts: tmdbSeasonEpisodeCounts ?? undefined,
+    };
+  }, [seriesEpisodes, initialVariants, tmdbSeasonEpisodeCounts]);
+
   // Torrent avec chemin bibliothèque si connu — uniquement si le chemin correspond à l'épisode sélectionné
   // (évite d'injecter S03E08 pendant la lecture de S01E01 après un fallback localMedia[0]).
   const activeTorrentWithLibraryPath = useMemo(() => {
@@ -542,7 +583,14 @@ export default function MediaDetailPage({
           selectedSceneEpisode != null &&
           se.season === selectedSceneEpisode.season &&
           se.episode === selectedSceneEpisode.episode;
-        if (!tmdbOk && !sceneOk) {
+        const absoluteOk = releaseMatchesTmdbEpisode(
+          se.season,
+          se.episode,
+          selectedEpisodeMeta.season,
+          selectedEpisodeMeta.episode,
+          tmdbSeasonEpisodeCounts,
+        );
+        if (!tmdbOk && !sceneOk && !absoluteOk) {
           return activeTorrent;
         }
       }
@@ -554,6 +602,7 @@ export default function MediaDetailPage({
     selectedEpisodeMeta,
     selectedSceneEpisode,
     parseSeasonEpisodeLabel,
+    tmdbSeasonEpisodeCounts,
   ]);
 
   /** TMDB série pour vignettes épisodes : torrent ou ids synthétiques popcorn_tmdb_{id}_s_e */
@@ -670,15 +719,25 @@ export default function MediaDetailPage({
   // Met à jour libraryDownloadPath quand l'épisode sélectionné change (pour les séries)
   useEffect(() => {
     if (activeTorrent.tmdbType === 'tv' && selectedEpisodeMeta) {
-      const key = `${selectedEpisodeMeta.season}:${selectedEpisodeMeta.episode}`;
-      const path = libraryEpisodesPathMap[key];
+      const path = lookupBySeasonEpisodeKey(
+        libraryEpisodesPathMap,
+        selectedEpisodeMeta.season,
+        selectedEpisodeMeta.episode,
+        tmdbSeasonEpisodeCounts,
+      );
       if (path) {
         if (libraryDownloadPath !== path) setLibraryDownloadPath(path);
       } else {
         if (libraryDownloadPath !== null) setLibraryDownloadPath(null);
       }
     }
-  }, [selectedEpisodeMeta, libraryEpisodesPathMap, activeTorrent.tmdbType, libraryDownloadPath]);
+  }, [
+    selectedEpisodeMeta,
+    libraryEpisodesPathMap,
+    activeTorrent.tmdbType,
+    libraryDownloadPath,
+    tmdbSeasonEpisodeCounts,
+  ]);
 
   // Hooks personnalisÃ©s
   const {
@@ -697,8 +756,16 @@ export default function MediaDetailPage({
     episode: selectedEpisodeMeta?.episode ?? null,
     sceneSeason: selectedSceneEpisode?.season ?? null,
     sceneEpisode: selectedSceneEpisode?.episode ?? null,
+    seasonEpisodeCounts: tmdbSeasonEpisodeCounts,
     // Passer le chemin spécifique de l'épisode s'il est connu dans la bibliothèque
-    filePath: selectedEpisodeMeta ? libraryEpisodesPathMap[`${selectedEpisodeMeta.season}:${selectedEpisodeMeta.episode}`] : null,
+    filePath: selectedEpisodeMeta
+      ? lookupBySeasonEpisodeKey(
+          libraryEpisodesPathMap,
+          selectedEpisodeMeta.season,
+          selectedEpisodeMeta.episode,
+          tmdbSeasonEpisodeCounts,
+        ) ?? null
+      : null,
     onError: (error) => {
       console.error('Erreur lors du chargement des fichiers vidéo:', error);
       if (error instanceof SparseOrEmptyError || isSparseOrEmptyMessage(error.message)) {
@@ -725,7 +792,12 @@ export default function MediaDetailPage({
     libraryDownloadPath ||
       activeTorrent.downloadPath ||
       (selectedEpisodeMeta &&
-        libraryEpisodesPathMap[`${selectedEpisodeMeta.season}:${selectedEpisodeMeta.episode}`]),
+        lookupBySeasonEpisodeKey(
+          libraryEpisodesPathMap,
+          selectedEpisodeMeta.season,
+          selectedEpisodeMeta.episode,
+          tmdbSeasonEpisodeCounts,
+        )),
   );
   const effectiveStreamingActive = (streamingTorrentActive ?? false) && !forceDownloadFallback;
 
@@ -1542,13 +1614,28 @@ export default function MediaDetailPage({
                     new RegExp(`${s}x0?${e}\\b`, 'i').test(n)
                   );
                 };
-                const pathMapKey = targetSe ? `${targetSe.s}:${targetSe.e}` : null;
-                const pathFromMap =
-                  pathMapKey && libraryEpisodesPathMap[pathMapKey]
-                    ? libraryEpisodesPathMap[pathMapKey]
-                    : null;
+                const pathFromMap = targetSe
+                  ? lookupBySeasonEpisodeKey(
+                      libraryEpisodesPathMap,
+                      targetSe.s,
+                      targetSe.e,
+                      tmdbSeasonEpisodeCounts,
+                    ) || null
+                  : null;
                 const matchByEpisode = targetSe
-                  ? localMedia.find((m: any) => matchesSE(m, targetSe.s, targetSe.e))
+                  ? localMedia.find((m: any) => {
+                      if (matchesSE(m, targetSe.s, targetSe.e)) return true;
+                      const abs = absoluteEpisodeNumber(
+                        targetSe.s,
+                        targetSe.e,
+                        tmdbSeasonEpisodeCounts ?? new Map(),
+                      );
+                      return (
+                        targetSe.s > 1 &&
+                        abs !== targetSe.e &&
+                        matchesSE(m, 1, abs)
+                      );
+                    })
                   : null;
                 // Match flou uniquement sans cible SxxExx (évite pack S01 → S03E08 via "house"/"dragon").
                 const matchByName =
@@ -1780,6 +1867,21 @@ export default function MediaDetailPage({
         const episodesSet = new Set<string>();
         const pathMap: Record<string, string> = {};
         const infoHashMap: Record<string, string> = {};
+        const seasonCounts = seasonEpisodeCountsFromSeasons(seriesEpisodes.seasons);
+
+        /** Alias TMDB : fichier S01E25 → aussi clé 2:1 si S1 TMDB = 24 eps. */
+        const addTmdbRelativeAlias = (literalSeason: number, literalEpisode: number) => {
+          if (literalSeason !== 1 || literalEpisode <= 0) return;
+          const s1Count = seasonCounts.get(1) ?? 0;
+          if (s1Count <= 0 || literalEpisode <= s1Count) return;
+          const rel = relativeEpisodeFromAbsolute(literalEpisode, seasonCounts);
+          if (!rel || (rel.season === literalSeason && rel.episode === literalEpisode)) return;
+          const litKey = `${literalSeason}:${literalEpisode}`;
+          const relKey = `${rel.season}:${rel.episode}`;
+          episodesSet.add(relKey);
+          if (pathMap[litKey] && !pathMap[relKey]) pathMap[relKey] = pathMap[litKey];
+          if (infoHashMap[litKey] && !infoHashMap[relKey]) infoHashMap[relKey] = infoHashMap[litKey];
+        };
 
         // Helper pour extraire SxxEyy d'un nom de fichier ou de torrent
         const parseSE = (name: string) => {
@@ -1851,6 +1953,7 @@ export default function MediaDetailPage({
                } else if (!infoHashMap[key] && media.id) {
                  infoHashMap[key] = `local_${media.id}`;
                }
+               addTmdbRelativeAlias(s, e);
              }
           }
         }
@@ -1898,6 +2001,7 @@ export default function MediaDetailPage({
                      infoHashMap[key] = torrentInfoHash;
                    }
                  }
+                 addTmdbRelativeAlias(se.s, se.e);
                }
             }
           }
@@ -2258,8 +2362,10 @@ export default function MediaDetailPage({
         }
       }
 
-      // 3) Premier épisode disponible
-      const first = seriesEpisodes.seasons[0];
+      // 3) Premier épisode disponible (saison 0 / spéciaux en dernier)
+      const first =
+        seriesEpisodes.seasons.find((s) => s.season > 0 && (s.episodes?.length ?? 0) > 0) ??
+        seriesEpisodes.seasons.find((s) => (s.episodes?.length ?? 0) > 0);
       if (first?.episodes?.length) {
         setSelectedSeasonNum(first.season);
         setSelectedEpisodeVariantId(first.episodes[0].id);
@@ -2281,8 +2387,8 @@ export default function MediaDetailPage({
   // Extraire SxxExx depuis un chemin ou un nom (ex. "Series S01E05.mkv" ou "series/Name/S01/E05.mkv")
   const parseSeasonEpisodeFromVariant = useCallback((v: any): { season: number; episode: number } | null => {
     const text = [v.downloadPath, v.name, (v as any).cleanTitle].filter(Boolean).join(' ').toLowerCase();
-    // S01E05, s1e5, 1x05, S1-E5
-    const m = text.match(/(?:s(\d{1,2})[.\s-]*e(\d{1,2})|(\d{1,2})x(\d{1,2}))/i);
+    // S01E05, s1e5, 1x05, S1-E5 (épisode jusqu'à 3 chiffres)
+    const m = text.match(/(?:s(\d{1,2})[.\s-]*e(\d{1,3})|(\d{1,2})x(\d{1,3}))/i);
     if (m) {
       const s = parseInt(m[1] ?? m[3], 10);
       const e = parseInt(m[2] ?? m[4], 10);
@@ -2312,15 +2418,47 @@ export default function MediaDetailPage({
           }
           if (!variant) {
             variant = allVariants.find((v: any) => {
+              const name = String(v.name || v.cleanTitle || v.downloadPath || '');
+              if (
+                seriesReleaseMatchOpts &&
+                episodeReleaseMatchesTmdbEpisode(ep.season, ep.episode, name, seriesReleaseMatchOpts)
+              ) {
+                return true;
+              }
               const se = parseSeasonEpisodeFromVariant(v);
-              return se && se.season === ep.season && se.episode === ep.episode;
+              if (!se) return false;
+              if (se.season === ep.season && se.episode === ep.episode) return true;
+              return releaseMatchesTmdbEpisode(
+                se.season,
+                se.episode,
+                ep.season,
+                ep.episode,
+                tmdbSeasonEpisodeCounts,
+              );
             });
           }
           if (!variant) {
             const key = `${ep.season}:${ep.episode}`;
             const fallbackInfoHash =
-              (ep.info_hash || libraryEpisodesInfoHashMap[key] || '').toString().trim() || null;
-            const fallbackPath = libraryEpisodesPathMap[key] || null;
+              (
+                ep.info_hash ||
+                lookupBySeasonEpisodeKey(
+                  libraryEpisodesInfoHashMap,
+                  ep.season,
+                  ep.episode,
+                  tmdbSeasonEpisodeCounts,
+                ) ||
+                ''
+              )
+                .toString()
+                .trim() || null;
+            const fallbackPath =
+              lookupBySeasonEpisodeKey(
+                libraryEpisodesPathMap,
+                ep.season,
+                ep.episode,
+                tmdbSeasonEpisodeCounts,
+              ) || null;
             if (fallbackInfoHash || fallbackPath) {
               variant = {
                 ...torrent,
@@ -2359,9 +2497,22 @@ export default function MediaDetailPage({
 
       // Enrichir avec chemin / hash bibliothèque pour l'épisode (évite local_* sans downloadPath).
       if (variant && episodeSeason != null && episodeNumber != null && episodeNumber > 0) {
-        const key = `${episodeSeason}:${episodeNumber}`;
-        const libPath = libraryEpisodesPathMap[key];
-        const libHash = (libraryEpisodesInfoHashMap[key] || '').toString().trim();
+        const libPath = lookupBySeasonEpisodeKey(
+          libraryEpisodesPathMap,
+          episodeSeason,
+          episodeNumber,
+          tmdbSeasonEpisodeCounts,
+        );
+        const libHash = (
+          lookupBySeasonEpisodeKey(
+            libraryEpisodesInfoHashMap,
+            episodeSeason,
+            episodeNumber,
+            tmdbSeasonEpisodeCounts,
+          ) || ''
+        )
+          .toString()
+          .trim();
         const currentHash = String(
           variant.infoHash || (variant as { info_hash?: string }).info_hash || '',
         ).trim();
@@ -2388,7 +2539,17 @@ export default function MediaDetailPage({
 
       return variant ?? null;
     },
-    [seriesEpisodes, allVariants, parseSeasonEpisodeFromVariant, libraryEpisodesInfoHashMap, libraryEpisodesPathMap, torrent],
+    [
+      seriesEpisodes,
+      allVariants,
+      parseSeasonEpisodeFromVariant,
+      libraryEpisodesInfoHashMap,
+      libraryEpisodesPathMap,
+      torrent,
+      tmdbSeasonEpisodeCounts,
+      seriesReleaseMatchOpts,
+      selectedSceneEpisode,
+    ],
   );
 
   const handleSeriesEpisodeSelect = useCallback(
@@ -2494,11 +2655,16 @@ export default function MediaDetailPage({
       // Épisode individuel déjà en bibliothèque → lecture locale / flux normal.
       const season = seriesEpisodes?.seasons?.find((s) => s.episodes.some((e) => e.id === intent));
       const clickedEp = season?.episodes.find((e) => e.id === intent);
-      const localKey =
+      const localPath =
         clickedEp && clickedEp.episode > 0
-          ? `${clickedEp.season}:${clickedEp.episode}`
+          ? lookupBySeasonEpisodeKey(
+              libraryEpisodesPathMap,
+              clickedEp.season,
+              clickedEp.episode,
+              tmdbSeasonEpisodeCounts,
+            )
           : null;
-      if (localKey && libraryEpisodesPathMap[localKey]) {
+      if (localPath) {
         handlePlay();
         return;
       }
@@ -2555,6 +2721,8 @@ export default function MediaDetailPage({
                 files,
                 clickedEp.season,
                 clickedEp.episode,
+                tmdbSeasonEpisodeCounts,
+                selectedSceneEpisode,
               );
               if (fileIndex != null) {
                 await handlePlaySingleEpisode(fileIndex);
@@ -2583,6 +2751,7 @@ export default function MediaDetailPage({
     handlePlaySingleEpisode,
     seriesEpisodes,
     libraryEpisodesPathMap,
+    tmdbSeasonEpisodeCounts,
     savedPlaybackPosition,
     addNotification,
     setPlayStatus,
@@ -2781,8 +2950,16 @@ export default function MediaDetailPage({
       if (!nextEp || nextEp.episode <= 0) return;
 
       // Déjà en bibliothèque locale → rien à prefetch.
-      const localKey = `${nextEp.season}:${nextEp.episode}`;
-      if (libraryEpisodesPathMap[localKey]) return;
+      if (
+        lookupBySeasonEpisodeKey(
+          libraryEpisodesPathMap,
+          nextEp.season,
+          nextEp.episode,
+          tmdbSeasonEpisodeCounts,
+        )
+      ) {
+        return;
+      }
 
       const expected = resolveVariantForSelectedEpisode(next.episodeVariantId);
       if (!expected) return;
@@ -2831,7 +3008,13 @@ export default function MediaDetailPage({
       const files = listRes.success && Array.isArray(listRes.data) ? listRes.data : null;
 
       if (files && files.length > 1) {
-        const nextFileIndex = findPackFileIndexForEpisode(files, nextEp.season, nextEp.episode);
+        const nextFileIndex = findPackFileIndexForEpisode(
+          files,
+          nextEp.season,
+          nextEp.episode,
+          tmdbSeasonEpisodeCounts,
+          selectedSceneEpisode,
+        );
         if (nextFileIndex == null) return;
 
         const currentHash = String(
@@ -2852,6 +3035,8 @@ export default function MediaDetailPage({
                   files,
                   selectedEpisodeMeta?.season ?? nextEp.season,
                   selectedEpisodeMeta?.episode ?? -1,
+                  tmdbSeasonEpisodeCounts,
+                  selectedSceneEpisode,
                 );
           const only = [
             ...new Set(
@@ -3003,10 +3188,12 @@ export default function MediaDetailPage({
     selectedSeasonNum,
     selectedEpisodeVariantId,
     libraryEpisodesPathMap,
+    tmdbSeasonEpisodeCounts,
     resolveVariantForSelectedEpisode,
     activeTorrent,
     selectedFile,
     selectedEpisodeMeta,
+    addedTorrentInfoHash,
   ]);
 
   const onPlayNextEpisode = () => {

@@ -25,4 +25,15 @@ describe('episodeReleaseMatchesVariantName', () => {
       }),
     ).toBe(true);
   });
+
+  it('matche numérotation absolue anime S01E25 → TMDB S2E01 (multi-saisons)', () => {
+    const counts = new Map<number, number>([
+      [1, 24],
+      [2, 24],
+    ]);
+    const name = 'The.Apothecary.Diaries.S01E25.MULTi.1080p.BluRay.x265-KAF.mkv';
+    expect(episodeReleaseMatchesVariantName(2, 1, name, { seasonEpisodeCounts: counts })).toBe(true);
+    expect(episodeReleaseMatchesVariantName(2, 1, name)).toBe(false);
+    expect(episodeReleaseMatchesVariantName(1, 25, name)).toBe(true);
+  });
 });
