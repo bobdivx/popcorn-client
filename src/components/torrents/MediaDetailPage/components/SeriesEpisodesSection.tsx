@@ -263,7 +263,7 @@ export function SeriesEpisodesSection({
       : t('mediaDetail.seasonNumber', { number: seasonNum });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {orderedSeasons.map((seasonData) => {
         const seasonNum = seasonData.season;
         const episodes = seasonData.episodes ?? [];
@@ -278,9 +278,9 @@ export function SeriesEpisodesSection({
             key={seasonNum}
             aria-labelledby={headingId}
             data-tv-episode-row
-            className="ed-season-block rounded-xl overflow-hidden bg-black/40 border border-white/10"
+            className="ed-season-block"
           >
-            <div className="ed-season-block__head px-4 py-3 border-b border-white/10 bg-white/5">
+            <div className="ed-season-block__head px-1 pb-2">
               <h3 id={headingId} className="ed-season-block__title text-base font-semibold text-white">
                 {label}
                 <span className="ed-season-block__count ml-2 text-sm font-normal text-white/60">

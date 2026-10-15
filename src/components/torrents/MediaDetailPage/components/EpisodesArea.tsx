@@ -8,16 +8,16 @@ import { getWatchedEpisodesSet } from '../../../../lib/streaming/torrent-storage
 
 function EpisodeCardsSkeleton({ count = 4 }: { count?: number }) {
   return (
-    <div className="px-4 sm:px-5 py-4 sm:py-5">
-      <div className="flex gap-4 overflow-hidden">
+    <div className="py-1">
+      <div className="flex gap-3 overflow-hidden">
         {Array.from({ length: count }).map((_, idx) => (
           <div
             key={idx}
-            className="shrink-0 w-[280px] sm:w-[320px] rounded-2xl border border-white/10 bg-white/[0.04] overflow-hidden"
+            className="shrink-0 w-[240px] sm:w-[280px] rounded-xl border border-white/10 bg-white/[0.04] overflow-hidden"
             aria-hidden
           >
             <div className="aspect-video w-full bg-white/[0.06] animate-pulse" />
-            <div className="p-3 sm:p-4 space-y-2">
+            <div className="px-3 py-2.5 space-y-1.5">
               <div className="h-4 w-3/4 rounded bg-white/[0.08] animate-pulse" />
               <div className="h-3 w-1/2 rounded bg-white/[0.06] animate-pulse" />
             </div>
@@ -113,7 +113,7 @@ export function EpisodesArea(props: {
     seriesEpisodes.seasons[0]?.episodes?.[0]?.episode === 0;
 
   return (
-    <div className="mb-6 space-y-6">
+    <div className="space-y-5">
       {isPackSelected && packPreviewLoadError ? (
         <div
           role="alert"

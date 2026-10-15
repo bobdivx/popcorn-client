@@ -71,15 +71,15 @@ export function EpisodeCardsCarousel({
   const showArrows = !isTV;
 
   return (
-    <div aria-label={ariaLabel} className="relative w-full min-w-0 max-w-full overflow-x-hidden overflow-y-visible py-1">
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-black/60 to-transparent z-[1]" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-black/60 to-transparent z-[1]" />
+    <div aria-label={ariaLabel} className="relative w-full min-w-0 max-w-full overflow-x-hidden overflow-y-visible">
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-[var(--ed-bg,#0c0d10)] to-transparent z-[1]" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-[var(--ed-bg,#0c0d10)] to-transparent z-[1]" />
 
       {showArrows && (
         <>
           <button
             type="button"
-            className="hidden lg:flex absolute left-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full border border-white/15 bg-black/40 hover:bg-black/60 text-white/90 transition-[opacity,transform,background-color] duration-200 active:scale-95"
+            className="hidden lg:flex absolute left-1 top-1/2 -translate-y-1/2 z-10 w-9 h-9 items-center justify-center rounded-full border border-white/15 bg-black/50 hover:bg-black/70 text-white/90 transition-[opacity,transform,background-color] duration-200 active:scale-95"
             onClick={() => scrollByCards(-1)}
             aria-label="Précédent"
           >
@@ -87,7 +87,7 @@ export function EpisodeCardsCarousel({
           </button>
           <button
             type="button"
-            className="hidden lg:flex absolute right-2 top-1/2 -translate-y-1/2 z-10 w-10 h-10 items-center justify-center rounded-full border border-white/15 bg-black/40 hover:bg-black/60 text-white/90 transition-[opacity,transform,background-color] duration-200 active:scale-95"
+            className="hidden lg:flex absolute right-1 top-1/2 -translate-y-1/2 z-10 w-9 h-9 items-center justify-center rounded-full border border-white/15 bg-black/50 hover:bg-black/70 text-white/90 transition-[opacity,transform,background-color] duration-200 active:scale-95"
             onClick={() => scrollByCards(1)}
             aria-label="Suivant"
           >
@@ -101,10 +101,10 @@ export function EpisodeCardsCarousel({
         role="list"
         data-carousel
         data-tv-episode-scroller
-        className="w-full min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain scrollbar-hide px-4 sm:px-5 py-4 sm:py-5"
+        className="w-full min-w-0 overflow-x-auto overflow-y-hidden overscroll-x-contain scrollbar-hide py-1"
         style={{ scrollSnapType: 'x mandatory', touchAction: 'pan-x pan-y' }}
       >
-        <div className="flex gap-4">
+        <div className="flex gap-3">
           {items.map((it) => {
             const interactive =
               it.isAvailable || it.isDownloaded || it.isDownloading || it.isSelected;
@@ -124,7 +124,7 @@ export function EpisodeCardsCarousel({
                 tabIndex={0}
                 aria-disabled={!interactive}
                 title={interactive ? undefined : 'Aucune source pour cet épisode'}
-                className={`ed-ep-card group text-left rounded-2xl border transition-[opacity,transform,border-color,background-color,box-shadow] duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--ed-accent,#f2545b)] focus:ring-offset-2 focus:ring-offset-black/40 shrink-0 w-[280px] sm:w-[320px] cursor-pointer ${
+                className={`ed-ep-card group text-left rounded-xl border overflow-hidden transition-[opacity,transform,border-color,background-color,box-shadow] duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--ed-accent,#f2545b)] focus:ring-offset-2 focus:ring-offset-black/40 shrink-0 w-[240px] sm:w-[280px] cursor-pointer ${
                   it.canResume
                     ? 'is-resume border-amber-400/55 bg-amber-500/10 ring-1 ring-amber-400/35'
                     : it.isSelected
@@ -143,7 +143,7 @@ export function EpisodeCardsCarousel({
                   });
                 }}
               >
-                <div className="relative aspect-video w-full overflow-hidden bg-black/30 rounded-t-2xl">
+                <div className="relative aspect-video w-full overflow-hidden bg-black/30">
                   {it.thumbnailUrl ? (
                     <img
                       src={it.thumbnailUrl}
@@ -200,7 +200,7 @@ export function EpisodeCardsCarousel({
                     </div>
                   )}
 
-                  <div className="ed-ep-card__badges absolute left-3 top-3 flex items-center gap-2 z-10">
+                  <div className="ed-ep-card__badges absolute left-2.5 top-2.5 flex items-center gap-1.5 z-10">
                     <span className="ed-ep-card__ep">
                       {typeof it.episodeNumber === 'number'
                         ? `ÉPISODE ${it.episodeNumber}`
@@ -209,33 +209,33 @@ export function EpisodeCardsCarousel({
                     {!it.isDownloading && it.watched ? (
                       <span title="Déjà vu" aria-label="Déjà vu" className="inline-flex">
                         <CircleCheck
-                          className="w-6 h-6 text-emerald-400 drop-shadow-md"
+                          className="w-5 h-5 text-emerald-400 drop-shadow-md"
                           strokeWidth={2.5}
                         />
                       </span>
                     ) : null}
                     {!it.isDownloading && it.isDownloaded ? (
                       <span
-                        className="inline-flex items-center justify-center p-1.5 rounded-full bg-blue-500/80 border border-blue-400/50 shadow-lg"
+                        className="inline-flex items-center justify-center p-1 rounded-full bg-blue-500/80 border border-blue-400/50 shadow-lg"
                         title="Téléchargé"
                         aria-label="Téléchargé"
                       >
-                        <HardDrive className="w-4 h-4 text-white" strokeWidth={2.5} />
+                        <HardDrive className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
                       </span>
                     ) : !it.isDownloading && it.isAvailable ? (
                       <span
-                        className="inline-flex items-center justify-center p-1.5 rounded-full bg-amber-500/80 border border-amber-400/50 shadow-lg"
+                        className="inline-flex items-center justify-center p-1 rounded-full bg-amber-500/80 border border-amber-400/50 shadow-lg"
                         title="Disponible (Indexer)"
                         aria-label="Disponible"
                       >
-                        <CloudDownload className="w-4 h-4 text-white" strokeWidth={2.5} />
+                        <CloudDownload className="w-3.5 h-3.5 text-white" strokeWidth={2.5} />
                       </span>
                     ) : null}
                   </div>
 
                   {(showPlay || showDownloadHint) && (
                     <div
-                      className={`ed-ep-card__action absolute right-3 bottom-3 w-11 h-11 rounded-full flex items-center justify-center border transition-[opacity,transform,background-color] duration-200 ${
+                      className={`ed-ep-card__action absolute right-2.5 bottom-2.5 w-10 h-10 rounded-full flex items-center justify-center border transition-[opacity,transform,background-color] duration-200 ${
                         it.canResume
                           ? 'border-amber-300/60 bg-amber-500/85 text-white'
                           : it.isSelected
@@ -244,16 +244,16 @@ export function EpisodeCardsCarousel({
                       }`}
                     >
                       {showPlay ? (
-                        <Play className="w-5 h-5 ml-0.5" fill="currentColor" />
+                        <Play className="w-4 h-4 ml-0.5" fill="currentColor" />
                       ) : (
-                        <Download className="w-5 h-5" />
+                        <Download className="w-4 h-4" />
                       )}
                     </div>
                   )}
 
                   {it.canResume && !it.isDownloading ? (
                     <>
-                      <div className="absolute left-3 bottom-3 z-10">
+                      <div className="absolute left-2.5 bottom-2.5 z-10">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/90 text-black/90 border border-amber-300/40">
                           {t('playback.resumeLabel')}
                         </span>
@@ -265,15 +265,15 @@ export function EpisodeCardsCarousel({
                   ) : null}
                 </div>
 
-                <div className="ed-ep-card__body p-3 sm:p-4">
-                  <div className="ed-ep-card__title text-base font-semibold text-white truncate">{it.title}</div>
+                <div className="ed-ep-card__body px-3 py-2.5">
+                  <div className="ed-ep-card__title text-sm sm:text-base font-semibold text-white truncate">{it.title}</div>
                   {it.subtitle ? (
-                    <div className="ed-ep-card__subtitle text-xs sm:text-sm text-white/60 line-clamp-2 mt-1">
+                    <div className="ed-ep-card__subtitle text-xs text-white/60 line-clamp-2 mt-0.5">
                       {it.subtitle}
                     </div>
                   ) : null}
                   {typeof it.seedCount === 'number' || typeof it.leechCount === 'number' ? (
-                    <div className="ed-ep-card__meta flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[11px] sm:text-xs text-white/55">
+                    <div className="ed-ep-card__meta flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1 text-[11px] text-white/55">
                       {typeof it.seedCount === 'number' ? (
                         <span
                           className={
