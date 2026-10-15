@@ -22,8 +22,12 @@ export interface UseChromecastReturn {
 }
 
 const CAST_SENDER_SCRIPT_URL = '//www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1';
-/** Default Media Receiver Google (non personnalisable). Remplacé par PUBLIC_CAST_RECEIVER_APP_ID. */
-const DEFAULT_MEDIA_RECEIVER_APP_ID = 'CC1AD845';
+/**
+ * Styled Media Receiver Popcornn (Cast Console).
+ * Override possible via PUBLIC_CAST_RECEIVER_APP_ID.
+ * Tant que l’app est « Non publié », seuls les appareils enregistrés dans la console marchent.
+ */
+const POPCORNN_CAST_RECEIVER_APP_ID = '3F212CD6';
 
 let castSdkPromise: Promise<void> | null = null;
 let castListenersAttached = false;
@@ -33,8 +37,10 @@ function getReceiverApplicationId(): string {
     typeof import.meta !== 'undefined'
       ? String((import.meta as any).env?.PUBLIC_CAST_RECEIVER_APP_ID || '').trim()
       : '';
-  return fromEnv || DEFAULT_MEDIA_RECEIVER_APP_ID;
+  return fromEnv || POPCORNN_CAST_RECEIVER_APP_ID;
 }
+
+const POPCORNN_CAST_LOGO_URL = 'https://client.popcornn.app/apple-touch-icon.png';
 
 function toAbsoluteMediaUrl(src: string): string {
   if (!src) return src;
@@ -45,14 +51,42 @@ function toAbsoluteMediaUrl(src: string): string {
   }
 }
 
+/**
+ * Chromecast doit joindre le backend directement.
+ * Les URLs `/api/remote-stream/proxy?backend=…&path=…` cassent les segments HLS
+ * (URLs relatives résolues contre le mauvais hôte).
+ */
+function resolveCastableMediaUrl(src: string): string {
+  const absolute = toAbsoluteMediaUrl(src);
+  try {
+    const u = new URL(absolute);
+    if (!u.pathname.includes('/api/remote-stream/proxy')) return absolute;
+    const backend = (u.searchParams.get('backend') || '').trim();
+    const path = (u.searchParams.get('path') || '').trim();
+    if (!backend || !path) return absolute;
+    const out = new URL(path.startsWith('/') ? path : `/${path}`, backend.endsWith('/') ? backend : `${backend}/`);
+    u.searchParams.forEach((value, key) => {
+      if (key === 'backend' || key === 'path') return;
+      out.searchParams.set(key, value);
+    });
+    return out.href;
+  } catch {
+    return absolute;
+  }
+}
+
 function getContentTypeFromUrl(src: string): string {
   const u = src.split('?')[0].toLowerCase();
-  if (u.endsWith('.m3u8')) return 'application/x-mpegURL';
+  if (u.endsWith('.m3u8')) return 'application/x-mpegurl';
   if (u.endsWith('.mpd')) return 'application/dash+xml';
   if (u.endsWith('.mp4') || u.endsWith('.m4v')) return 'video/mp4';
   if (u.endsWith('.webm')) return 'video/webm';
   if (u.endsWith('.mkv')) return 'video/mp4'; // Fallback (Cast ne supporte pas forcément mkv directement)
   return 'video/mp4';
+}
+
+function isHlsUrl(src: string): boolean {
+  return src.split('?')[0].toLowerCase().endsWith('.m3u8');
 }
 
 function syncIsCastingFromContext(context: any, castAny: any, setIsCasting: (v: boolean) => void) {
@@ -205,7 +239,7 @@ export function useChromecast(): UseChromecastReturn {
       const chromeAny = window.chrome;
       const context = castAny.framework.CastContext.getInstance();
 
-      const absoluteSrc = toAbsoluteMediaUrl(src);
+      const absoluteSrc = resolveCastableMediaUrl(src);
       if (/^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|\/|$)/i.test(absoluteSrc)) {
         console.warn(
           '[Chromecast] Media URL points to localhost — Chromecast cannot reach it. Use LAN IP or NAS domain.',
@@ -213,15 +247,30 @@ export function useChromecast(): UseChromecastReturn {
         );
       }
 
+      const hls = isHlsUrl(absoluteSrc);
       const contentType = getContentTypeFromUrl(absoluteSrc);
       const mediaInfo = new chromeAny.cast.media.MediaInfo(absoluteSrc, contentType);
+      // HLS Popcornn = MPEG-TS muxé. Sans ça, Cast peut boucler (écran noir / segment retry).
+      if (hls) {
+        const segFmt = chromeAny.cast.media.HlsSegmentFormat;
+        const vidFmt = chromeAny.cast.media.HlsVideoSegmentFormat;
+        if (segFmt?.TS != null) mediaInfo.hlsSegmentFormat = segFmt.TS;
+        if (vidFmt?.MPEG2_TS != null) mediaInfo.hlsVideoSegmentFormat = vidFmt.MPEG2_TS;
+      }
       mediaInfo.streamType = chromeAny.cast.media.StreamType?.BUFFERED ?? 'BUFFERED';
       mediaInfo.metadata = new chromeAny.cast.media.GenericMediaMetadata();
       mediaInfo.metadata.metadataType = chromeAny.cast.media.MetadataType?.GENERIC ?? 0;
       mediaInfo.metadata.title = title || 'Popcornn';
+      try {
+        mediaInfo.metadata.images = [new chromeAny.cast.Image(POPCORNN_CAST_LOGO_URL)];
+      } catch {
+        /* Image ctor indisponible selon version SDK */
+      }
 
       const request = new chromeAny.cast.media.LoadRequest(mediaInfo);
-      request.currentTime = Math.max(0, currentTime ?? 0);
+      // HLS : démarrer à 0. Un currentTime milieu d’épisode pendant la génération
+      // provoque souvent écran noir + retry du même segment sur Cast.
+      request.currentTime = hls ? 0 : Math.max(0, currentTime ?? 0);
       request.autoplay = true;
 
       try {
@@ -236,7 +285,12 @@ export function useChromecast(): UseChromecastReturn {
 
         setIsCasting(true);
         await session.loadMedia(request);
-        console.info('[Chromecast] loadMedia OK', { url: absoluteSrc, title, currentTime });
+        console.info('[Chromecast] loadMedia OK', {
+          url: absoluteSrc,
+          title,
+          startAt: request.currentTime,
+          appId: getReceiverApplicationId(),
+        });
         return true;
       } catch (err) {
         console.error('[Chromecast] castMedia failed:', err, { url: absoluteSrc, contentType });
