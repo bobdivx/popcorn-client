@@ -473,6 +473,10 @@ export default function MediaDetailPage({
   const setPlaybackStartMode = useCallback((fromBeginning: boolean) => {
     startFromBeginningRef.current = fromBeginning;
   }, []);
+  /** Passage « épisode suivant » en cours (évite reprise position / sync torrent). */
+  const pendingNextEpisodeRef = useRef(false);
+  /** Forcer départ à 0 (+ auto-skip) pour le prochain lancement (épisode suivant). */
+  const forceStartFromBeginningRef = useRef(false);
   /** Épisodes identifiés comme présents dans la bibliothèque (Set de "season:episode") */
   const [downloadedEpisodesSet, setDownloadedEpisodesSet] = useState<Set<string>>(new Set());
   /** Map "season:episode" -> "chemin du fichier" pour les épisodes téléchargés */
@@ -1400,6 +1404,11 @@ export default function MediaDetailPage({
   useEffect(() => {
     const checkSavedPosition = async () => {
       if (typeof window === 'undefined') return;
+      // Ne pas réinjecter une position pendant un passage « épisode suivant ».
+      if (forceStartFromBeginningRef.current || pendingNextEpisodeRef.current) {
+        setSavedPlaybackPosition(null);
+        return;
+      }
       const deviceId = getOrCreateDeviceId();
       try {
         const params = new URLSearchParams(window.location.search);
@@ -1416,6 +1425,10 @@ export default function MediaDetailPage({
         if (typeof tmdbId === 'number' && (tmdbType === 'movie' || tmdbType === 'tv')) {
           const position = await getPlaybackPositionByMedia(tmdbId, tmdbType, deviceId);
           if (position != null && position > 0) {
+            if (forceStartFromBeginningRef.current || pendingNextEpisodeRef.current) {
+              setSavedPlaybackPosition(null);
+              return;
+            }
             setSavedPlaybackPosition(position);
             return;
           }
@@ -1423,6 +1436,10 @@ export default function MediaDetailPage({
         if (activeTorrent.id) {
           const position = await getPlaybackPosition(activeTorrent.id, deviceId);
           if (position != null && position > 0) {
+            if (forceStartFromBeginningRef.current || pendingNextEpisodeRef.current) {
+              setSavedPlaybackPosition(null);
+              return;
+            }
             setSavedPlaybackPosition(position);
             return;
           }
@@ -2695,8 +2712,16 @@ export default function MediaDetailPage({
     episodePlayIntentRef.current = null;
 
     void (async () => {
-      if (savedPlaybackPosition != null && savedPlaybackPosition > 0) setPlaybackStartMode(false);
-      else setPlaybackStartMode(true);
+      // « Épisode suivant » : toujours repartir du début (ne pas reprendre la position de l’épisode courant).
+      if (forceStartFromBeginningRef.current) {
+        forceStartFromBeginningRef.current = false;
+        setPlaybackStartMode(true);
+        setSavedPlaybackPosition(null);
+      } else if (savedPlaybackPosition != null && savedPlaybackPosition > 0) {
+        setPlaybackStartMode(false);
+      } else {
+        setPlaybackStartMode(true);
+      }
       const el = videoWrapperRef.current || (document.getElementById('video-player-wrapper') as HTMLDivElement);
       if (el && !document.fullscreenElement) {
         try {
@@ -2982,7 +3007,6 @@ export default function MediaDetailPage({
     }
   }, [isPlaying, hasValidInfoHash, activeTorrent.infoHash, seriesEpisodes?.seasons?.length, isPackSelected]);
 
-  const pendingNextEpisodeRef = useRef(false);
   /** Pendant la transition vers l'Ã©pisode suivant, on garde l'Ã©pisode en cours affichÃ© pour ne pas dÃ©monter le lecteur (Ã©vite que video.play() soit bloquÃ© par l'autoplay). */
   const [isTransitioningToNext, setIsTransitioningToNext] = useState(false);
   const previousActiveTorrentRef = useRef<typeof activeTorrent | null>(null);
@@ -3256,22 +3280,44 @@ export default function MediaDetailPage({
     previousSelectedFileRef.current = selectedFile;
     pendingNextEpisodeRef.current = true;
     setIsTransitioningToNext(true);
-    // Épisode suivant = départ à 0 + auto-skip générique (si activé), pas reprise.
+    // Épisode suivant = départ à 0 + auto-skip générique (si activé), pas reprise de l’épisode courant.
+    forceStartFromBeginningRef.current = true;
     setPlaybackStartMode(true);
+    setSavedPlaybackPosition(null);
+    // Appliquer tout de suite le torrent résolu (comme un clic carte) pour éviter le blocage sameHash.
+    const resolved = resolveVariantForSelectedEpisode(next.episodeVariantId);
+    if (resolved) {
+      setSelectedTorrent(resolved);
+      setCurrentSeedCount(resolved.seedCount ?? 0);
+      setCurrentLeechCount(resolved.leechCount ?? 0);
+      setCurrentFileSize(resolved.fileSize ?? 0);
+      if (resolved.downloadPath) setLibraryDownloadPath(resolved.downloadPath);
+    }
     // Déclencher le même chemin que le clic carte (only_files si pack).
     episodePlayIntentRef.current = next.episodeVariantId;
     setSelectedSeasonNum(next.seasonNum);
     setSelectedEpisodeVariantId(next.episodeVariantId);
     setEpisodePlayNonce((n) => n + 1);
   };
-  // Quand on a demandÃ© l'Ã©pisode suivant, loadVideoFiles (nouvel infoHash) vide puis remplit videoFiles.
-  // useVideoFiles met dÃ©jÃ  Ã  jour selectedFile Ã  la fin de loadVideoFiles ; on ne fait que rÃ©initialiser le ref.
+  // Fin de transition dès que le fichier lu n’est plus celui de l’épisode précédent.
   useEffect(() => {
-    if (pendingNextEpisodeRef.current && videoFiles.length > 0) {
+    if (!pendingNextEpisodeRef.current || !isTransitioningToNext) return;
+    const prevPath = previousSelectedFileRef.current?.path ?? previousSelectedFileRef.current?.name ?? '';
+    const curPath = selectedFile?.path ?? selectedFile?.name ?? '';
+    if (!curPath || curPath === prevPath) return;
+    pendingNextEpisodeRef.current = false;
+    setIsTransitioningToNext(false);
+  }, [selectedFile?.path, selectedFile?.name, isTransitioningToNext]);
+
+  // Filet de sécurité : ne pas rester bloqué sur l’ancien épisode si la transition ne se résout pas.
+  useEffect(() => {
+    if (!isTransitioningToNext) return;
+    const tId = window.setTimeout(() => {
       pendingNextEpisodeRef.current = false;
       setIsTransitioningToNext(false);
-    }
-  }, [videoFiles]);
+    }, 8000);
+    return () => clearTimeout(tId);
+  }, [isTransitioningToNext]);
 
   const nextEpisodeInfo = useMemo(
     () => getNextEpisode(seriesEpisodes ?? undefined, selectedSeasonNum, selectedEpisodeVariantId),
