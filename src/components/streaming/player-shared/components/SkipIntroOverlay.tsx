@@ -38,7 +38,7 @@ export function SkipIntroOverlay({ onSkip, visible, chromeVisible = false }: Ski
 
   if (!mounted) return null;
 
-  // TV : milieu-droite (hors de la zone barre/miniatures), style Netflix.
+  // TV : milieu-droite (hors de la zone barre/miniatures).
   // Desktop : bas-droite, remonté si chrome ouvert.
   const positionStyle = isTV
     ? {
@@ -71,10 +71,10 @@ export function SkipIntroOverlay({ onSkip, visible, chromeVisible = false }: Ski
         data-focusable
         data-player-overlay-action
         tabIndex={0}
-        className="flex items-center gap-2 px-5 py-3 min-h-12 rounded-full bg-black/55 hover:bg-black/70 backdrop-blur-md border-2 border-white/35 text-white font-semibold text-sm sm:text-base shadow-[0_8px_28px_rgba(0,0,0,0.45)] transition-[opacity,transform,background-color] duration-200 focus:outline-none focus:ring-2 focus:ring-primary-400 active:scale-95"
+        className="ed-cta !w-auto shrink-0"
         aria-label={t('interfaceSettings.skipIntro')}
       >
-        <SkipForward className="w-5 h-5 shrink-0" />
+        <SkipForward />
         {t('interfaceSettings.skipIntro')}
       </button>
     </div>
