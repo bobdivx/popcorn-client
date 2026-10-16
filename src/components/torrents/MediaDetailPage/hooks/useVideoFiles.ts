@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'preact/hooks';
 import { clientApi } from '../../../../lib/client/api';
 import { releaseMatchesTmdbEpisode } from '../../../../lib/utils/seasonOrder';
+import { findPackFileIndexForEpisode } from './usePackEpisodes';
 
 export const SPARSE_OR_EMPTY_CODE = 'SPARSE_OR_EMPTY';
 /** Stream-torrent refusé (token / entitlement) — basculer vers téléchargement classique. */
@@ -49,6 +50,35 @@ function playableVideos(files: TorrentFile[]): TorrentFile[] {
 
 function largestVideo(files: TorrentFile[]): TorrentFile {
   return files.reduce((prev, current) => (current.size > prev.size ? current : prev));
+}
+
+/** Choisit le fichier vidéo du pack correspondant à SxxExx (TMDB + remap scène). */
+export function pickVideoFileForEpisode(
+  files: TorrentFile[],
+  season: number | null | undefined,
+  episode: number | null | undefined,
+  opts?: {
+    sceneSeason?: number | null;
+    sceneEpisode?: number | null;
+    seasonEpisodeCounts?: Map<number, number> | null;
+  },
+): TorrentFile | null {
+  if (season == null || episode == null || episode <= 0 || !files.length) return null;
+  const pool = playableVideos(files);
+  const scene =
+    opts?.sceneSeason != null &&
+    opts?.sceneEpisode != null &&
+    opts.sceneEpisode > 0
+      ? { season: opts.sceneSeason, episode: opts.sceneEpisode }
+      : null;
+  const idx = findPackFileIndexForEpisode(
+    pool.map((f) => ({ name: `${f.path} ${f.name}` })),
+    season,
+    episode,
+    opts?.seasonEpisodeCounts,
+    scene,
+  );
+  return idx != null ? pool[idx] ?? null : null;
 }
 
 /** Corrige les chemins bibliothèque avec préfixe media/ dupliqué (media/media/series/…). */
@@ -123,6 +153,23 @@ export function useVideoFiles({
     lastInfoHashRef.current = infoHash || null;
   }, [torrent?.infoHash]);
 
+  // Même pack (même infoHash) : quand S/E change (épisode suivant), resélectionner le bon fichier.
+  useEffect(() => {
+    if (season == null || episode == null || episode <= 0) return;
+    if (videoFiles.length === 0) return;
+    const picked = pickVideoFileForEpisode(videoFiles, season, episode, {
+      sceneSeason,
+      sceneEpisode,
+      seasonEpisodeCounts,
+    });
+    if (!picked) return;
+    setSelectedFile((prev) => {
+      const prevKey = (prev?.path || prev?.name || '').toLowerCase();
+      const nextKey = (picked.path || picked.name || '').toLowerCase();
+      return prevKey === nextKey ? prev : picked;
+    });
+  }, [season, episode, sceneSeason, sceneEpisode, seasonEpisodeCounts, videoFiles]);
+
   const loadVideoFiles = async (infoHash: string, retryCount: number = 0): Promise<TorrentFile[]> => {
     if (!infoHash) return [];
 
@@ -184,6 +231,14 @@ export function useVideoFiles({
         
         if (cacheValid) {
           console.log('[useVideoFiles] ✅ Utilisation du cache pour', infoHash);
+          // Même infoHash (pack) : resélectionner SxxExx demandé, sinon on rejoue l’épisode précédent.
+          const picked = pickVideoFileForEpisode(cached, season, episode, {
+            sceneSeason,
+            sceneEpisode,
+            seasonEpisodeCounts,
+          });
+          if (picked) setSelectedFile(picked);
+          else setVideoFiles(cached);
           return cached;
         } else {
           // Cache invalide, le supprimer
