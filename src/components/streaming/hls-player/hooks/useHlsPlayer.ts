@@ -475,6 +475,17 @@ export function useHlsPlayer({
             setLoadingStatusMessage(null);
             setIsLoading(false);
             onLoadingChangeRef.current?.(false);
+            // Après le priming muted : activer le son une fois la lecture visible.
+            // Délai court pour ne pas casser play() sur webOS (changement muted synchrone).
+            window.setTimeout(() => {
+              if (!nativeTvActiveRef.current || video.paused) return;
+              try {
+                video.muted = false;
+                if (video.volume < 0.5) video.volume = 0.8;
+              } catch {
+                /* ignore */
+              }
+            }, 120);
           };
           const primedSeconds = () => {
             const ct = Number.isFinite(video.currentTime) ? video.currentTime : 0;
@@ -1024,6 +1035,17 @@ export function useHlsPlayer({
             setIsLoading(false);
             onLoadingChangeRef.current?.(false);
             resumePlaybackAfterSeekRef.current = false;
+            if (isWebOSTV() || isTVPlatform()) {
+              window.setTimeout(() => {
+                if (video.paused) return;
+                try {
+                  video.muted = false;
+                  if (video.volume < 0.5) video.volume = 0.8;
+                } catch {
+                  /* ignore */
+                }
+              }, 120);
+            }
           };
           function startDelayedPlayWhenReady() {
             const canPlay =

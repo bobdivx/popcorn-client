@@ -48,14 +48,28 @@ export function useVideoControls({
   const [volume, setVolume] = useState(playerConfig.volume);
   const controlsTimeoutRef = useRef<number | null>(null);
   const userPausedRef = useRef<boolean>(false);
-  /** Sur Android TV / TV : unmute une fois au premier "playing" (autoplay peut démarrer en muted). */
+  /** Sur Android TV / TV : unmute après le priming muted (pas pendant le buffer kickstart). */
   const hasTriedUnmuteOnTVRef = useRef<boolean>(false);
+  const isLoadingRef = useRef(isLoading);
+  isLoadingRef.current = isLoading;
 
   useEffect(() => {
     if (hlsDuration && hlsDuration > 0 && isFinite(hlsDuration)) {
       setDuration(hlsDuration);
     }
   }, [hlsDuration]);
+
+  /** Dès que le priming/loading est fini et que la vidéo joue : forcer le son TV.
+   *  Évite la course où `playing` part pendant le play() muted, puis hls re-mute. */
+  useEffect(() => {
+    if (isLoading) return;
+    if (!(isTVPlatform() || isWebOSTV())) return;
+    const video = videoRef.current;
+    if (!video || video.paused) return;
+    video.muted = false;
+    video.volume = Math.max(0.5, playerConfig.volume);
+    hasTriedUnmuteOnTVRef.current = true;
+  }, [isLoading, playerConfig.volume, videoRef]);
 
   useLayoutEffect(() => {
     // Après le commit : videoRef est peuplé. Ne pas attendre hls.js (TV / HLS natif).
@@ -280,16 +294,19 @@ export function useVideoControls({
       video.muted = playerConfig.muted;
     }
 
-    /** TV / webOS : autoplay muted, puis son une fois la lecture vraiment lancée.
-     *  Ne pas passer par setState/muted JSX : webOS coupe play() si l’attribut muted change. */
+    /** TV / webOS : autoplay muted pendant le priming, puis son une fois hors loading.
+     *  Ne pas passer par setState/muted JSX : webOS coupe play() si l’attribut muted change.
+     *  Ne pas « consommer » l’unmute pendant isLoading : hls peut re-muter juste après. */
     const handlePlayingUnmuteTV = () => {
       if (!(isTVPlatform() || isWebOSTV())) return;
-      if (hasTriedUnmuteOnTVRef.current) return;
+      if (isLoadingRef.current) return;
       const v = videoRef.current;
       if (!v || v.paused) return;
+      if (v.muted || v.volume < 0.5) {
+        v.muted = false;
+        v.volume = Math.max(0.5, playerConfig.volume);
+      }
       hasTriedUnmuteOnTVRef.current = true;
-      v.muted = false;
-      v.volume = Math.max(0.5, playerConfig.volume);
     };
     const handlePlaying = () => {
       setIsPlaying(true);
