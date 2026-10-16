@@ -1088,18 +1088,21 @@ export function useHlsPlayer({
           };
 
           if (startFromBeginningRef.current) {
-            setCurrentTimeIfNeeded(0);
-            if (playerConfig.skipIntroEnabled && playerConfig.introSkipSeconds > 0 && !tvPlayback) {
-              setTimeout(() => {
-                const introEnd = Math.min(
+            // Saut auto du générique (réglage « Saut automatique ») — y compris TV / épisode suivant.
+            const autoSkipIntro =
+              playerConfig.skipIntroEnabled && playerConfig.introSkipSeconds > 0;
+            const introEnd = autoSkipIntro
+              ? Math.min(
                   playerConfig.introSkipSeconds,
-                  video.duration && isFinite(video.duration) ? video.duration - 1 : playerConfig.introSkipSeconds
-                );
-                if (introEnd > 0) setCurrentTimeIfNeeded(introEnd);
-              }, 200);
-            }
+                  video.duration && isFinite(video.duration)
+                    ? video.duration - 1
+                    : playerConfig.introSkipSeconds
+                )
+              : 0;
+            const startAt = introEnd > 0 ? introEnd : 0;
+            setCurrentTimeIfNeeded(startAt);
             try {
-              if (tvPlayback) hls.startLoad(0);
+              if (tvPlayback) hls.startLoad(startAt);
             } catch (_) {}
             startDelayedPlayWhenReady();
           } else if (
