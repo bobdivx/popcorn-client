@@ -793,22 +793,22 @@ export function VideoControls({
                 <RotateCcw class={`${iconSize} text-white`} />
               </button>
             )}
-            {/* Bouton épisode suivant (séries) */}
+            {/* Bouton épisode suivant (séries) — CTA éditorial */}
             {onPlayNextEpisode && (
               <button
+                type="button"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
                   onPlayNextEpisode();
                 }}
-                class={`hidden sm:flex items-center justify-center flex-shrink-0 gap-1.5 sm:gap-2 ${buttonSize} sm:!w-auto sm:!h-auto sm:!min-w-0 sm:px-3.5 sm:py-2.5 md:px-4 rounded-full bg-white/35 hover:bg-white/55 text-white transition-all backdrop-blur-md border-2 border-white/60 focus:outline-none`}
+                class="hidden sm:inline-flex ed-cta !w-auto shrink-0"
                 title={t('playback.nextEpisode')}
                 aria-label={t('playback.nextEpisode')}
+                data-focusable
               >
-                <SkipForward class={`${iconSize} text-white`} />
-                <span class={`hidden sm:inline text-white font-medium ${textSize} whitespace-nowrap`}>
-                  {t('playback.nextEpisode')}
-                </span>
+                <Play />
+                {t('playback.nextEpisode')}
               </button>
             )}
             {/* Volume : inutile sur TV (télécommande / OS gère le volume système). */}
