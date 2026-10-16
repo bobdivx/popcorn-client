@@ -516,6 +516,24 @@ export function useTVPlayerNavigation({
         return;
       }
 
+      // Overlay « Passer le générique » / « Épisode suivant » : OK active le bouton
+      // focusé même si le chrome est masqué (sinon Enter ne ferait que révéler le dock).
+      const activeEl = document.activeElement as HTMLElement | null;
+      const overlayAction =
+        activeEl &&
+        typeof activeEl.closest === 'function' &&
+        (activeEl.matches?.('[data-player-overlay-action]')
+          ? activeEl
+          : (activeEl.closest('[data-player-overlay-action]') as HTMLElement | null));
+      const isConfirmOverlay =
+        kc === 23 || keyNormalized === 'Enter' || keyNormalized === ' ';
+      if (overlayAction && isConfirmOverlay) {
+        e.preventDefault();
+        e.stopPropagation();
+        overlayAction.click();
+        return;
+      }
+
       // Première flèche : révéler le dock, sans déplacer la lecture.
       if (!showControlsRef.current) {
         e.preventDefault();

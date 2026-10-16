@@ -69,7 +69,11 @@ export function NextEpisodeOverlay({
       aria-hidden={!shown}
     >
       {nextTitle && (
-        <p className="text-white/90 text-sm mb-1 truncate drop-shadow" title={nextTitle}>
+        <p
+          className="mb-2 text-[0.68rem] uppercase tracking-[0.14em] text-white/70 truncate"
+          style={{ fontFamily: 'var(--ed-font-display, Josefin Sans, Jost, sans-serif)' }}
+          title={nextTitle}
+        >
           {nextTitle}
         </p>
       )}
@@ -80,10 +84,10 @@ export function NextEpisodeOverlay({
         data-focusable
         data-player-overlay-action
         tabIndex={0}
-        className="flex items-center gap-2 px-5 py-3 min-h-12 rounded-full bg-black/55 hover:bg-black/70 backdrop-blur-md border-2 border-white/35 text-white font-semibold text-sm sm:text-base shadow-[0_8px_28px_rgba(0,0,0,0.45)] transition-[opacity,transform,background-color] duration-200 focus:outline-none focus:ring-2 focus:ring-primary-400 active:scale-95"
+        className="ed-cta !w-auto shrink-0"
         aria-label={t('playback.nextEpisode')}
       >
-        <Play className="w-5 h-5 shrink-0" />
+        <Play />
         {t('playback.nextEpisode')}
       </button>
     </div>
