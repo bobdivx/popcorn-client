@@ -12,7 +12,7 @@ import {
   SparseOrEmptyError,
   SPARSE_OR_EMPTY_CODE,
 } from './hooks/useVideoFiles';
-import { findPackFileIndexForEpisode, usePackEpisodes } from './hooks/usePackEpisodes';
+import { findPackFileIndexForEpisode, parseSeasonEpisodeFromName, usePackEpisodes } from './hooks/usePackEpisodes';
 import { episodeReleaseMatchesTmdbEpisode } from '../../../lib/utils/episodeReleaseMatch';
 import {
   absoluteEpisodeNumber,
@@ -2743,8 +2743,52 @@ export default function MediaDetailPage({
             )
           : null;
       if (localPath) {
+        setLibraryDownloadPath(localPath);
+        setSelectedFile({
+          path: localPath,
+          name: localPath.split(/[/\\]/).pop() || 'video',
+          size: 0,
+          is_video: true,
+        });
         handlePlay();
         return;
+      }
+
+      // Pack déjà listé en mémoire : basculer tout de suite sur le fichier SxxExx (évite rejouer le même).
+      if (clickedEp && clickedEp.episode > 0 && videoFiles.length > 1) {
+        const memIdx = findPackFileIndexForEpisode(
+          videoFiles.map((f) => ({ name: f.path || f.name })),
+          clickedEp.season,
+          clickedEp.episode,
+          tmdbSeasonEpisodeCounts,
+          selectedSceneEpisode,
+        );
+        if (memIdx != null) {
+          const nextFile = videoFiles[memIdx];
+          setSelectedFile(nextFile);
+          const currentHash = String(
+            addedTorrentInfoHash ||
+              activeTorrent.infoHash ||
+              (activeTorrent as { info_hash?: string }).info_hash ||
+              '',
+          ).toLowerCase();
+          if (currentHash && /^[a-f0-9]{40}$/i.test(currentHash) && typeof nextFile.index === 'number') {
+            const curIdx = typeof selectedFile?.index === 'number' ? selectedFile.index : null;
+            const only = [
+              ...new Set(
+                [curIdx, nextFile.index].filter((i): i is number => typeof i === 'number' && i >= 0),
+              ),
+            ];
+            if (only.length > 0) {
+              void clientApi.updateOnlyFiles(currentHash, only).catch(() => {
+                scheduleUpdateOnlyFilesWithRetry(currentHash, nextFile.index!);
+              });
+            }
+          }
+          setIsPlaying(true);
+          setPlayStatus('ready');
+          return;
+        }
       }
 
       // Clic sur un épisode N>0 : si la source résolue est un pack multi-fichiers,
@@ -2835,6 +2879,13 @@ export default function MediaDetailPage({
     setPlayStatus,
     setProgressMessage,
     t,
+    videoFiles,
+    selectedFile,
+    setSelectedFile,
+    setLibraryDownloadPath,
+    setIsPlaying,
+    addedTorrentInfoHash,
+    selectedSceneEpisode,
   ]);
 
   // Pack complet (Ã©pisode 0) : calculÃ© plus haut (avant useVideoFiles)
@@ -3309,15 +3360,21 @@ export default function MediaDetailPage({
     setIsTransitioningToNext(false);
   }, [selectedFile?.path, selectedFile?.name, isTransitioningToNext]);
 
-  // Filet de sécurité : ne pas rester bloqué sur l’ancien épisode si la transition ne se résout pas.
+  // Filet de sécurité : ne lever la transition QUE si le fichier a vraiment changé
+  // (sinon UI « épisode suivant » + vidéo de l’épisode précédent).
   useEffect(() => {
     if (!isTransitioningToNext) return;
     const tId = window.setTimeout(() => {
-      pendingNextEpisodeRef.current = false;
-      setIsTransitioningToNext(false);
-    }, 8000);
+      const prevPath =
+        previousSelectedFileRef.current?.path ?? previousSelectedFileRef.current?.name ?? '';
+      const curPath = selectedFile?.path ?? selectedFile?.name ?? '';
+      if (curPath && curPath !== prevPath) {
+        pendingNextEpisodeRef.current = false;
+        setIsTransitioningToNext(false);
+      }
+    }, 12000);
     return () => clearTimeout(tId);
-  }, [isTransitioningToNext]);
+  }, [isTransitioningToNext, selectedFile?.path, selectedFile?.name]);
 
   const nextEpisodeInfo = useMemo(
     () => getNextEpisode(seriesEpisodes ?? undefined, selectedSeasonNum, selectedEpisodeVariantId),
@@ -3331,6 +3388,11 @@ export default function MediaDetailPage({
   const displayTorrent = isTransitioningToNext && previousActiveTorrentRef.current ? previousActiveTorrentRef.current : activeTorrent;
   const displayFile = isTransitioningToNext && previousSelectedFileRef.current ? previousSelectedFileRef.current : selectedFile;
   const displayInfoHash = displayTorrent?.infoHash;
+  /** Libellé S/E aligné sur le fichier réellement lu (évite « E3 » affiché pendant que E2 joue). */
+  const displayEpisodeFromFile = useMemo(() => {
+    const label = displayFile?.path || displayFile?.name || '';
+    return label ? parseSeasonEpisodeFromName(label) : null;
+  }, [displayFile?.path, displayFile?.name]);
 
   const tmdbApiTitleActive = useTmdbApiTitle(activeTorrent?.tmdbId, activeTorrent?.tmdbType, language);
   const tmdbApiTitleDisplay = useTmdbApiTitle(displayTorrent?.tmdbId, displayTorrent?.tmdbType, language);
@@ -3422,8 +3484,8 @@ export default function MediaDetailPage({
         torrentId={displayTorrent.id}
         tmdbId={displayTorrent.tmdbId}
         tmdbType={displayTorrent.tmdbType}
-        seriesSeasonNum={selectedEpisodeMeta?.season ?? null}
-        seriesEpisodeNum={selectedEpisodeMeta?.episode ?? null}
+        seriesSeasonNum={displayEpisodeFromFile?.season ?? selectedEpisodeMeta?.season ?? null}
+        seriesEpisodeNum={displayEpisodeFromFile?.episode ?? selectedEpisodeMeta?.episode ?? null}
         startFromBeginning={isTransitioningToNext ? false : startFromBeginningRef.current}
         initialSeekSeconds={
           isTransitioningToNext || startFromBeginningRef.current
@@ -3515,8 +3577,8 @@ export default function MediaDetailPage({
         torrentId={displayTorrent.id}
         tmdbId={displayTorrent.tmdbId}
         tmdbType={displayTorrent.tmdbType}
-        seriesSeasonNum={selectedEpisodeMeta?.season ?? null}
-        seriesEpisodeNum={selectedEpisodeMeta?.episode ?? null}
+        seriesSeasonNum={displayEpisodeFromFile?.season ?? selectedEpisodeMeta?.season ?? null}
+        seriesEpisodeNum={displayEpisodeFromFile?.episode ?? selectedEpisodeMeta?.episode ?? null}
         startFromBeginning={isTransitioningToNext ? false : startFromBeginningRef.current}
         initialSeekSeconds={
           isTransitioningToNext || startFromBeginningRef.current
