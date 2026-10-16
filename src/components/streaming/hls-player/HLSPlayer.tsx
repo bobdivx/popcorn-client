@@ -436,6 +436,12 @@ export default function HLSPlayer({
     wrap?.focus({ preventScroll: true });
   }, [isTV, playbackStarted, setShowControls]);
 
+  // TV : masquer le dock pour laisser le focus sur « Passer le générique » / « Épisode suivant ».
+  useEffect(() => {
+    if (!isTV || (!showSkipIntro && !showNextEpisode)) return;
+    setShowControls(false);
+  }, [isTV, showSkipIntro, showNextEpisode, setShowControls]);
+
   useTouchGestures({
     containerRef,
     onDoubleTap: handleDoubleTap,

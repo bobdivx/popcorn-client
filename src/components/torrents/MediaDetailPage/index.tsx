@@ -3256,6 +3256,8 @@ export default function MediaDetailPage({
     previousSelectedFileRef.current = selectedFile;
     pendingNextEpisodeRef.current = true;
     setIsTransitioningToNext(true);
+    // Épisode suivant = départ à 0 + auto-skip générique (si activé), pas reprise.
+    setPlaybackStartMode(true);
     // Déclencher le même chemin que le clic carte (only_files si pack).
     episodePlayIntentRef.current = next.episodeVariantId;
     setSelectedSeasonNum(next.seasonNum);
