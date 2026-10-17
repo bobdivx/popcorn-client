@@ -234,6 +234,54 @@ function patchManifest(manifestPath) {
     }
   });
   
+  // 8. Deep links retour Pocket ID (connexion dans le navigateur système) :
+  //    - App Link https://popcornn.app/app/auth/* (autoVerify, assetlinks.json sur popcornn.app)
+  //    - Schéma popcornn://auth/* (repli si l'App Link n'est pas vérifié, ex. clé Play absente)
+  //    Même bloc / même marqueur que tauri-plugin-deep-link (config plugins.deep-link.mobile) :
+  //    le build.rs du plugin remplace ce bloc à l'identique s'il s'exécute → pas de doublon.
+  //    Ajout ici pour ne pas dépendre de l'ordre manifest / build Rust dans Gradle.
+  const deepLinkMarker = '<!-- DEEP LINK PLUGIN. AUTO-GENERATED. DO NOT REMOVE. -->';
+  if (!content.includes('android:scheme="popcornn"')) {
+    const activityCloseRe = /^([ \t]*)<\/activity>/m;
+    const activityMatch = content.match(activityCloseRe);
+    if (activityMatch) {
+      const indent = `${activityMatch[1]}    `;
+      const block = [
+        deepLinkMarker,
+        '<intent-filter android:autoVerify="true" >',
+        '    <action android:name="android.intent.action.VIEW" />',
+        '    <!-- ChromeOS ARC++ uses a different action for deep links -->',
+        '    <action android:name="org.chromium.arc.intent.action.VIEW" />',
+        '    <category android:name="android.intent.category.DEFAULT" />',
+        '    <category android:name="android.intent.category.BROWSABLE" />',
+        '    <data android:scheme="https" />',
+        '    <data android:host="popcornn.app" />',
+        '    <data android:pathPrefix="/app/auth" />',
+        '</intent-filter>',
+        '<intent-filter >',
+        '    <action android:name="android.intent.action.VIEW" />',
+        '    <!-- ChromeOS ARC++ uses a different action for deep links -->',
+        '    <action android:name="org.chromium.arc.intent.action.VIEW" />',
+        '    <category android:name="android.intent.category.DEFAULT" />',
+        '    <category android:name="android.intent.category.BROWSABLE" />',
+        '    <data android:scheme="popcornn" />',
+        '    <data android:host="auth" />',
+        '</intent-filter>',
+        deepLinkMarker,
+      ].map((line) => `${indent}${line}`).join('\n');
+      // Retirer un éventuel bloc vide du plugin avant d'insérer le nôtre
+      const emptyBlockRe = new RegExp(`[ \\t]*${deepLinkMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\n[ \\t]*${deepLinkMarker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[ \\t]*\\n?`, 'g');
+      content = content.replace(emptyBlockRe, '');
+      content = content.replace(activityCloseRe, `${block}\n${activityMatch[0]}`);
+      console.log('🔧 Ajout: deep links Pocket ID (https://popcornn.app/app/auth + popcornn://auth)');
+      modified = true;
+    } else {
+      console.warn('⚠️ Balise </activity> introuvable : deep links Pocket ID non ajoutés');
+    }
+  } else {
+    console.log('✅ Deep links Pocket ID déjà présents');
+  }
+
   // Sauvegarder le fichier modifié seulement si des changements ont été faits
   if (modified) {
     writeFileSync(manifestPath, content, 'utf-8');

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { getOidcAvailable, getOidcStartUrl } from '../lib/api/popcorn-web';
+import { initNativeSsoListener, isNativeSsoSupported, startNativeSso } from '../lib/auth/native-sso';
 import { useI18n } from '../lib/i18n/useI18n';
 
 type Props = {
@@ -26,6 +27,20 @@ function PocketIdMark() {
 export default function PocketIdButton({ emphasize = false, className = '' }: Props) {
   const { t } = useI18n();
   const [available, setAvailable] = useState<boolean | null>(null);
+  // Apps Tauri : Pocket ID dans le navigateur système (passkeys indisponibles dans la WebView).
+  const [nativeSso, setNativeSso] = useState(false);
+  const [opening, setOpening] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    initNativeSsoListener();
+    isNativeSsoSupported().then((ok) => {
+      if (!cancelled) setNativeSso(ok);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,9 +61,23 @@ export default function PocketIdButton({ emphasize = false, className = '' }: Pr
   const returnTo = typeof window !== 'undefined' ? window.location.href : '/login';
   const href = getOidcStartUrl(returnTo);
 
+  const onClick = (event: MouseEvent) => {
+    if (!nativeSso) return;
+    event.preventDefault();
+    if (opening) return;
+    setOpening(true);
+    startNativeSso(window.location.href)
+      .then((ok) => {
+        if (!ok) window.location.href = href;
+      })
+      .finally(() => setOpening(false));
+  };
+
   return (
     <a
       href={href}
+      onClick={onClick}
+      aria-busy={opening ? 'true' : undefined}
       className={`${emphasize
         ? 'w-full bg-primary hover:bg-primary-700 text-white'
         : 'w-full bg-white/10 hover:bg-white/20 text-white border border-white/20'} font-medium py-2.5 sm:py-3 rounded text-sm sm:text-base transition-colors text-center flex items-center justify-center gap-2 ${className}`}
