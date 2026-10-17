@@ -52,13 +52,18 @@ export async function initClientVersion(): Promise<void> {
 }
 
 /**
- * En-tetes d'identite client. TEMPORAIREMENT DESACTIVE : ces en-tetes custom declenchent
- * un preflight CORS que le serveur ne whiteliste pas encore (regression 2026-10-17 : backend
- * "hors ligne" cote navigateur). Reactiver UNIQUEMENT une fois X-Popcorn-Client-Version et
- * X-Popcorn-Client-Platform ajoutes a access-control-allow-headers cote serveur.
+ * En-tetes d'identite client a joindre aux requetes API (gate min-client-version).
+ * Reactive apres ajout de X-Popcorn-Client-Version / X-Popcorn-Client-Platform a
+ * access-control-allow-headers cote serveur (verifie par preflight web + webOS-native).
  */
 export function clientIdentityHeaders(): Record<string, string> {
-  return {};
+  const h: Record<string, string> = {};
+  if (typeof window === 'undefined') return h;
+  const v = getClientVersion();
+  const p = getClientPlatform();
+  if (v) h['X-Popcorn-Client-Version'] = v;
+  if (p) h['X-Popcorn-Client-Platform'] = p;
+  return h;
 }
 
 // Charge la version des l'import du module (best-effort, non bloquant).
