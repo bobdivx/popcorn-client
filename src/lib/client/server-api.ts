@@ -69,6 +69,7 @@ import { friendsMethods } from './server-api/friends.js';
 import { requestsMethods } from './server-api/requests.js';
 import { systemMethods } from './server-api/system.js';
 import { aiMethods } from './server-api/ai.js';
+import { platformsMethods } from './server-api/platforms.js';
 
 // Ré-exporter les types pour compatibilité
 export type {
@@ -202,6 +203,13 @@ interface IServerApiClientPublic {
 
   getTmdbMovieDetail(tmdbId: number, language?: string): Promise<ApiResponse<any>>;
   getTmdbTvDetail(tmdbId: number, language?: string): Promise<ApiResponse<any>>;
+
+  // Plateformes de streaming (France) — TMDB proxifié et mis en cache côté serveur
+  listStreamingPlatforms(language?: string): Promise<ApiResponse<{ region: string; platforms: import('./server-api/platforms.js').StreamingPlatform[] }>>;
+  getStreamingPlatform(slug: string, language?: string): Promise<ApiResponse<{ platform: import('./server-api/platforms.js').StreamingPlatform; region: string; rows: import('./server-api/platforms.js').PlatformRowDef[] }>>;
+  getStreamingPlatformExclusives(slug: string, language?: string): Promise<ApiResponse<{ results: import('./server-api/platforms.js').PlatformTitle[] }>>;
+  getStreamingPlatformRow(slug: string, mediaType: 'movie' | 'tv', genre: number, language?: string): Promise<ApiResponse<{ results: import('./server-api/platforms.js').PlatformTitle[] }>>;
+  getTitleWatchProviders(mediaType: 'movie' | 'tv', tmdbId: number): Promise<ApiResponse<import('./server-api/platforms.js').TitleWatchProviders>>;
   
   listMediaRequests(params?: { user_id?: string; status?: string; limit?: number; offset?: number }): Promise<ApiResponse<import('./server-api/requests.js').MediaRequest[]>>;
   createMediaRequest(data: { tmdb_id: number; media_type: string; season_numbers?: number[]; title?: string; poster_path?: string; backdrop_path?: string }): Promise<ApiResponse<import('./server-api/requests.js').MediaRequest>>;
@@ -553,7 +561,8 @@ Object.assign(ServerApiClient.prototype,
   friendsMethods,
   requestsMethods,
   systemMethods,
-  aiMethods
+  aiMethods,
+  platformsMethods
 );
 
 // Instance réelle (utilisée quand isDemoMode() est false)
