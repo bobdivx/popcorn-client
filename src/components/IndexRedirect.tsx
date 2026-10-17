@@ -8,6 +8,7 @@ import {
   loadRuntimeConfig,
   setBackendUrl,
   hasDeploymentBackend,
+  isDemoLibraryBackendUrl,
 } from '../lib/backend-config';
 import {
   EMBEDDED_DESKTOP_BACKEND_URL,
@@ -220,6 +221,13 @@ export default function IndexRedirect() {
               const url = cloudConfig.backendUrl.trim().replace(/\/$/, '');
               try {
                 const cloudHost = new URL(url).hostname;
+                if (isDemoLibraryBackendUrl(url)) {
+                  // Compte de démonstration (ex. revue Google Play) : bibliothèque de démo intégrée.
+                  setBackendUrl(url);
+                  redirectTo('/dashboard');
+                  setLoading(false);
+                  return;
+                }
                 if (cloudHost === window.location.hostname) {
                   setBackendUrl(url);
                 }
