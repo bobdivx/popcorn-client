@@ -685,7 +685,7 @@ html[data-tv-platform="true"] .hub-tile:focus-visible,
 html[data-tv-platform="true"] .hub-tile.tv-card-focused,
 html[data-tv-platform="true"] .tv-card-focused.hub-tile {
   background: #252528;
-  box-shadow: 0 0 0 4px #09090b, 0 0 0 8px #a78bfa, 0 18px 48px rgb(0 0 0 / 0.45);
+  box-shadow: 0 0 0 4px #09090b, 0 0 0 8px #fb7a80, 0 18px 48px rgb(0 0 0 / 0.45);
 }
 
 html[data-tv-platform="true"] .hub-back,
@@ -708,7 +708,7 @@ html[data-tv-platform="true"] .hub-modal {
 html[data-tv-platform="true"] .hub-back:focus-visible,
 html[data-tv-platform="true"] .hub-modal-x:focus-visible,
 html[data-tv-platform="true"] .hub-btn:focus-visible {
-  box-shadow: 0 0 0 4px #09090b, 0 0 0 8px #a78bfa;
+  box-shadow: 0 0 0 4px #09090b, 0 0 0 8px #fb7a80;
 }
 
 @media (prefers-reduced-motion: reduce) {
