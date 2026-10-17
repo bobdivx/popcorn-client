@@ -1,6 +1,6 @@
 {
   "productName": "Popcornn",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "identifier": "com.popcornn.client.mobile",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -45,7 +45,7 @@
     "shortDescription": "Client leger Popcorn pour Android (Mobile et TV)",
     "longDescription": "Client leger pour Android - se connecte au serveur Popcorn distant. Fonctionne sur Android Mobile et Android TV avec detection automatique du type d appareil.",
     "android": {
-      "versionCode": 309,
+      "versionCode": 310,
       "autoIncrementVersionCode": false
     }
   },
@@ -53,13 +53,19 @@
     "deep-link": {
       "mobile": [
         {
-          "scheme": ["https"],
+          "scheme": [
+            "https"
+          ],
           "host": "popcornn.app",
-          "pathPrefix": ["/app/auth"],
+          "pathPrefix": [
+            "/app/auth"
+          ],
           "appLink": true
         },
         {
-          "scheme": ["popcornn"],
+          "scheme": [
+            "popcornn"
+          ],
           "host": "auth",
           "appLink": false
         }
