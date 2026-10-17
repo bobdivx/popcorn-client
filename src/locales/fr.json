@@ -762,7 +762,8 @@
     "watchLaterAdd": "Ajouter à regarder plus tard",
     "watchLaterRemove": "Retirer de regarder plus tard",
     "castToDevice": "Diffuser sur un appareil",
-    "casting": "Diffusion en cours"
+    "casting": "Diffusion en cours",
+    "movieWatched": "Vu"
   },
   "nav": {
     "menu": "Menu",
@@ -1436,7 +1437,9 @@
     "seedersShort": "seeders",
     "leechersShort": "leechers",
     "torrentNetworkLabel": "Réseau torrent",
-    "peerStatsHint": "Seeders / leechers issus de l’indexeur (utiles avant téléchargement)."
+    "peerStatsHint": "Seeders / leechers issus de l’indexeur (utiles avant téléchargement).",
+    "markWatched": "Marquer comme vu",
+    "markUnwatched": "Marquer comme non vu"
   },
   "torrentStats": {
     "downloading": "Téléchargement en cours",
