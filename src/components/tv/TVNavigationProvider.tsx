@@ -9,6 +9,9 @@ import {
 } from '../../lib/tv-browse-restore';
 import { ensureBrowseRowInView, reanchorBrowseSlot } from '../page-model/browseCarouselAnchor';
 
+/** Hero plein écran : ancien bandeau dashboard et hero éditorial (accueil, Films, Séries, Plateformes…). */
+const TV_HERO_SELECTOR = '.hero-dashboard, [data-editorial-hero]';
+
 const TV_MODAL_CLOSE_SELECTOR =
   '[data-close], [aria-label*="Fermer"], [aria-label*="Close"], [aria-label*="close"], [aria-label*="Retour"], [aria-label*="Back"], .close-button';
 
@@ -809,7 +812,18 @@ export default function TVNavigationProvider() {
 
     // Focus un élément
     const focusElement = (element: HTMLElement) => {
-      const inHeroDashboard = element.closest('.hero-dashboard');
+      // Hero éditorial (en haut de page) : remonter tout en haut pour l'afficher en entier.
+      if (element.closest('[data-editorial-hero]')) {
+        try {
+          element.focus({ preventScroll: true });
+        } catch {
+          element.focus();
+        }
+        window.scrollTo({ top: 0, behavior: scrollBehavior });
+        lastFocusedRef.current = element;
+        return;
+      }
+      const inHeroDashboard = element.closest(TV_HERO_SELECTOR);
       const inListItem = element.closest(LIST_ITEM_SELECTOR);
       // TV / webOS : éviter scrollIntoView(center) coûteux ; nearest limite les reflows.
       // Liste verticale : nearest pour ne pas recentrer la page à chaque flèche.
@@ -953,7 +967,9 @@ export default function TVNavigationProvider() {
       if (isTvDoc() && typeof window !== 'undefined') {
         const path = window.location.pathname.replace(/\/$/, '') || '/';
         if (path === '/dashboard' || path === '/films' || path === '/series' || path === '/demandes') {
-          const heroBtn = document.querySelector<HTMLElement>('.hero-dashboard button[data-focusable]');
+          const heroBtn = document.querySelector<HTMLElement>(
+            '.hero-dashboard button[data-focusable], [data-editorial-hero] button[data-focusable]'
+          );
           if (heroBtn && focusableElements.includes(heroBtn)) return heroBtn;
         }
       }
@@ -1215,7 +1231,7 @@ export default function TVNavigationProvider() {
       const inHeader = !!current.closest(SITE_HEADER_SELECTOR);
       const inAction = current.closest('[data-tv-page-action]') as HTMLElement | null;
       const row = browseRowOf(current);
-      const hero = current.closest('.hero-dashboard') as HTMLElement | null;
+      const hero = current.closest(TV_HERO_SELECTOR) as HTMLElement | null;
 
       const firstRowAfter = (from: HTMLElement): HTMLElement | null =>
         rows.find((r) => from.compareDocumentPosition(r) & Node.DOCUMENT_POSITION_FOLLOWING) ?? null;
@@ -1238,7 +1254,7 @@ export default function TVNavigationProvider() {
       }
 
       if (inHeader && direction === 'down') {
-        const heroEl = document.querySelector<HTMLElement>('.hero-dashboard');
+        const heroEl = document.querySelector<HTMLElement>(TV_HERO_SELECTOR);
         const first = rows[0] ?? null;
         const heroBeforeRows =
           !!heroEl && (!first || !!(heroEl.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING));
@@ -1282,7 +1298,7 @@ export default function TVNavigationProvider() {
 
       const neighbor = direction === 'up' ? rows[idx - 1] ?? null : rows[idx + 1] ?? null;
       if (!neighbor && direction === 'up') {
-        const heroEl = document.querySelector<HTMLElement>('.hero-dashboard');
+        const heroEl = document.querySelector<HTMLElement>(TV_HERO_SELECTOR);
         const heroBefore =
           !!heroEl && !!(current.compareDocumentPosition(heroEl) & Node.DOCUMENT_POSITION_PRECEDING);
         if (heroBefore && heroEl) {
@@ -1539,6 +1555,49 @@ export default function TVNavigationProvider() {
       return focusTVHeaderFirst();
     };
 
+    /**
+     * Retour télécommande : un seul retour par appui.
+     * handleKeyDown et handleWebOSBack écoutent tous deux `keydown` (capture) sur document — stopPropagation
+     * ne bloque pas un 2e écouteur du même nœud : sans garde, history.back() partait deux fois
+     * (page plateforme → accueil au lieu de /plateformes/). webOS peut aussi émettre `webosback` en plus du keydown.
+     */
+    let lastTvBackAt = 0;
+    const TV_BACK_DEDUPE_MS = 450;
+    const markTvBackHandled = (e: Event) => {
+      (e as Event & { __popcornnTvBack?: boolean }).__popcornnTvBack = true;
+      lastTvBackAt = Date.now();
+    };
+    const tvBackAlreadyHandled = (e: Event) =>
+      !!(e as Event & { __popcornnTvBack?: boolean }).__popcornnTvBack || Date.now() - lastTvBackAt < TV_BACK_DEDUPE_MS;
+
+    /** Fallback déclaré par la page ([data-tv-back-href]) quand il n'y a pas d'historique (lien direct, app relancée). */
+    const pageBackFallback = (): string | null => {
+      const el = document.querySelector<HTMLElement>('[data-tv-back-href]');
+      const href = el?.getAttribute('data-tv-back-href')?.trim();
+      return href && href.startsWith('/') ? href : null;
+    };
+
+    /** Suit l'historique ; à défaut, le fallback de la page. Jamais de redirection codée en dur vers l'accueil. */
+    const goBackInHistory = (): boolean => {
+      const fallback = pageBackFallback();
+      if (window.history.length > 1) {
+        const before = window.location.href;
+        window.history.back();
+        if (fallback) {
+          // Première entrée de l'historique (history.length > 1 mais rien avant) : l'URL ne change pas.
+          setTimeout(() => {
+            if (window.location.href === before) window.location.href = fallback;
+          }, 600);
+        }
+        return true;
+      }
+      if (fallback) {
+        window.location.href = fallback;
+        return true;
+      }
+      return false;
+    };
+
     // Gestionnaire de touches
     const handleKeyDown = (e: KeyboardEvent) => {
       // Lecteur ouvert : ne pas focus le header (z-200) par-dessus la vidéo.
@@ -1595,6 +1654,12 @@ export default function TVNavigationProvider() {
         if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
           return; // Laisser le curseur se déplacer dans le texte
         }
+      }
+
+      // Même appui déjà traité (doublon keydown / webosback) : ne pas reculer deux fois.
+      if (isBackButton && tvBackAlreadyHandled(e)) {
+        e.preventDefault();
+        return;
       }
 
       // Clavier à l'écran : Backspace télécommande = effacer un caractère (quitter si vide)
@@ -1679,10 +1744,11 @@ export default function TVNavigationProvider() {
       }
 
       // Hero TV : gauche/droite cycle les titres au lieu de changer de bouton
+      const heroArrow = tvArrowKey(e);
       if (
         isTvDoc() &&
         !modal &&
-        (e.key === 'ArrowLeft' || e.key === 'ArrowRight')
+        (heroArrow === 'ArrowLeft' || heroArrow === 'ArrowRight')
       ) {
         const activeHero = document.activeElement as HTMLElement | null;
         const heroCycle = activeHero?.closest?.('[data-tv-hero-cycle]') as HTMLElement | null;
@@ -1690,7 +1756,7 @@ export default function TVNavigationProvider() {
           heroCycle.dispatchEvent(
             new CustomEvent('tv-hero-cycle', {
               bubbles: true,
-              detail: { delta: e.key === 'ArrowRight' ? 1 : -1 },
+              detail: { delta: heroArrow === 'ArrowRight' ? 1 : -1 },
             })
           );
           e.preventDefault();
@@ -1851,11 +1917,11 @@ export default function TVNavigationProvider() {
             if (deepest?._tvBack) {
               deepest._tvBack();
               handled = true;
-            } else if (window.history.length > 1) {
-              window.history.back();
+            } else if (goBackInHistory()) {
               handled = true;
             }
           }
+          if (handled) markTvBackHandled(e);
           break;
       }
 
@@ -2258,6 +2324,11 @@ export default function TVNavigationProvider() {
       }
       // webOS peut envoyer un événement personnalisé ou un KeyboardEvent
       if (event.type === 'webosback' || (event instanceof KeyboardEvent && isTvBackKey(event))) {
+        // Déjà traité par handleKeyDown (même appui) ou doublon webosback/keydown.
+        if (tvBackAlreadyHandled(e)) {
+          e.preventDefault();
+          return;
+        }
         const modal = document.querySelector('[role="dialog"]:not([aria-hidden="true"])');
         if (modal) {
           const closeEvent = new CustomEvent('tv-back-button', { 
@@ -2273,6 +2344,7 @@ export default function TVNavigationProvider() {
               closeBtn.click();
             }
           }
+          markTvBackHandled(e);
           e.preventDefault();
           e.stopPropagation();
         } else {
@@ -2285,10 +2357,11 @@ export default function TVNavigationProvider() {
             : null;
           if (deepest?._tvBack) {
             deepest._tvBack();
+            markTvBackHandled(e);
             e.preventDefault();
             e.stopPropagation();
-          } else if (window.history.length > 1) {
-            window.history.back();
+          } else if (goBackInHistory()) {
+            markTvBackHandled(e);
             e.preventDefault();
             e.stopPropagation();
           }
@@ -2406,7 +2479,7 @@ export default function TVNavigationProvider() {
       const tick = () => {
         if (tryRestoreBrowseFocus()) return;
         attempts += 1;
-        if (attempts >= 16) {
+        if (attempts >= 30) {
           clearTvBrowseRestore();
           const first = getInitialFocusElement();
           if (first) focusElement(first);

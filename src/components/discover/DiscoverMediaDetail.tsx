@@ -68,7 +68,14 @@ export default function DiscoverMediaDetail({
               titleHint && titleHint.trim()
                 ? `&title=${encodeURIComponent(titleHint.trim())}`
                 : '';
-            window.location.href = `/torrents?tmdbId=${tmdbId}&type=${mediaType}&from=discover${titleQ}`;
+            // replace : sinon Retour depuis la fiche revient sur /discover qui re-redirige (boucle) au lieu
+            // de la page d'origine (ex. plateforme). On conserve l'origine (from / fromP) pour le fallback.
+            const incoming = new URLSearchParams(window.location.search);
+            const fromRaw = (incoming.get('from') || 'discover').toLowerCase();
+            const fromQ = /^[a-z0-9-]{1,40}$/.test(fromRaw) ? fromRaw : 'discover';
+            const fromP = incoming.get('fromP');
+            const fromPQ = fromP && /^[a-z0-9-]{1,40}$/.test(fromP) ? `&fromP=${fromP}` : '';
+            window.location.replace(`/torrents?tmdbId=${tmdbId}&type=${mediaType}&from=${fromQ}${fromPQ}${titleQ}`);
             return;
           }
         }
