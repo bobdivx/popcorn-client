@@ -9,6 +9,15 @@
  * L’app recharge alors la page d’origine avec ?sso_ticket=… : LoginForm / AuthStep appellent
  * completeCloudSso(ticket) comme pour le flux web (ticket à usage unique côté popcorn-web).
  *
+ * Robustesse (1.4.5) :
+ *   - l’écoute est démarrée dès le boot (IndexRedirect / Wizard / LoginForm), pas seulement quand le
+ *     bouton Pocket ID est monté : au démarrage à froid, le ticket (TTL 2 min) est traité tout de suite
+ *     au lieu d’attendre la fin des vérifications backend (qui peuvent durer longtemps sans URL serveur) ;
+ *   - le retour est aussi mémorisé en localStorage (takeSsoReturn) : il survit à un rechargement /
+ *     une redirection intermédiaire et le Wizard ne doit pas effacer le stockage dans ce cas ;
+ *   - seule la page /setup (assistant) ou /login consomme le ticket : tout autre point de départ
+ *     (ex. /register) revient sur /login.
+ *
  * Si les plugins Tauri deep-link / opener ne sont pas présents (ancien shell), on retombe sur la
  * navigation classique dans la WebView.
  */
@@ -19,7 +28,10 @@ export const APP_SSO_RETURN_PATH = '/app/auth/callback';
 
 const RETURN_KEY = 'popcornn.nativeSso.returnTo';
 const HANDLED_KEY = 'popcornn.nativeSso.handled';
+const PENDING_KEY = 'popcornn.nativeSso.pending';
 const RETURN_TTL_MS = 15 * 60 * 1000;
+/** Ticket popcorn-web valable 2 min : au-delà, inutile de le rejouer. */
+const PENDING_TTL_MS = 2 * 60 * 1000;
 
 let supportPromise: Promise<boolean> | null = null;
 let listenerStarted = false;
@@ -63,6 +75,12 @@ function rememberReturnTarget(href: string): void {
   }
 }
 
+/** Pages qui savent consommer ?sso_ticket= (AuthStep de l’assistant, LoginForm). */
+function isSsoConsumerPath(pathname: string): boolean {
+  const p = (pathname || '/').replace(/\/+$/, '').replace(/\/index\.html$/i, '') || '/';
+  return p === '/setup' || p === '/login';
+}
+
 function consumeReturnTarget(): URL {
   const fallback = new URL('/login', window.location.origin);
   const storage = safeStorage();
@@ -74,11 +92,100 @@ function consumeReturnTarget(): URL {
     const parsed = JSON.parse(raw) as { href?: string; at?: number };
     if (!parsed.href || !parsed.at || Date.now() - parsed.at > RETURN_TTL_MS) return fallback;
     const url = new URL(parsed.href, window.location.origin);
-    // Uniquement une page de l’app elle-même.
-    return url.origin === window.location.origin ? url : fallback;
+    // Uniquement une page de l’app elle-même, et une page qui traite le ticket.
+    if (url.origin !== window.location.origin) return fallback;
+    return isSsoConsumerPath(url.pathname) ? url : fallback;
   } catch {
     return fallback;
   }
+}
+
+type SsoReturn = { ticket?: string; error?: string };
+
+function savePending(ret: SsoReturn): void {
+  const storage = safeStorage();
+  if (!storage) return;
+  try {
+    storage.setItem(PENDING_KEY, JSON.stringify({ ...ret, at: Date.now() }));
+  } catch {
+    // ignore
+  }
+}
+
+function readPending(): SsoReturn | null {
+  const storage = safeStorage();
+  if (!storage) return null;
+  try {
+    const raw = storage.getItem(PENDING_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as SsoReturn & { at?: number };
+    if (!parsed.at || Date.now() - parsed.at > PENDING_TTL_MS) {
+      storage.removeItem(PENDING_KEY);
+      return null;
+    }
+    if (!parsed.ticket && !parsed.error) return null;
+    return { ticket: parsed.ticket || undefined, error: parsed.error || undefined };
+  } catch {
+    return null;
+  }
+}
+
+function clearPending(): void {
+  try {
+    safeStorage()?.removeItem(PENDING_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * true si un retour Pocket ID est en cours de traitement sur cette page (paramètres d’URL ou
+ * retour deep link mémorisé). Le Wizard s’en sert pour ne pas effacer le stockage au montage.
+ */
+export function hasPendingSsoReturn(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('sso_ticket') || params.get('sso_error') || params.get('sso_done')) return true;
+  } catch {
+    // ignore
+  }
+  return readPending() !== null;
+}
+
+/**
+ * Récupère (une seule fois) le retour Pocket ID : ?sso_ticket= / ?sso_error= de l’URL, sinon le
+ * retour deep link mémorisé. Retire les paramètres de l’URL pour qu’un rechargement ne rejoue pas
+ * un ticket déjà consommé (usage unique côté popcorn-web).
+ */
+export function takeSsoReturn(): SsoReturn | null {
+  if (typeof window === 'undefined') return null;
+  let ticket: string | undefined;
+  let error: string | undefined;
+  try {
+    const url = new URL(window.location.href);
+    ticket = url.searchParams.get('sso_ticket') || undefined;
+    error = url.searchParams.get('sso_error') || undefined;
+    if (ticket || error) {
+      url.searchParams.delete('sso_ticket');
+      url.searchParams.delete('sso_error');
+      try {
+        window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+      } catch {
+        // ignore
+      }
+    }
+  } catch {
+    // ignore
+  }
+  const pending = readPending();
+  clearPending();
+  if (!ticket && !error && pending) {
+    ticket = pending.ticket;
+    error = pending.error;
+  }
+  if (!ticket && !error) return null;
+  return { ticket, error };
 }
 
 /** Reconnaît une URL de retour SSO (App Link https ou schéma popcornn://auth). */
@@ -108,6 +215,15 @@ function parseSsoReturnUrl(raw: string): { ticket?: string; error?: string } | n
   return { ticket, error };
 }
 
+async function logNative(message: string): Promise<void> {
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    await invoke('log-message', { message });
+  } catch {
+    // ignore
+  }
+}
+
 function handleDeepLinkUrls(urls: unknown): void {
   const list = Array.isArray(urls) ? urls : typeof urls === 'string' ? [urls] : [];
   for (const raw of list) {
@@ -122,11 +238,16 @@ function handleDeepLinkUrls(urls: unknown): void {
     } catch {
       // ignore
     }
+    // Mémoriser le retour avant de naviguer : survit à un rechargement / une redirection
+    // intermédiaire (ex. IndexRedirect au démarrage à froid).
+    savePending(parsed.ticket ? { ticket: parsed.ticket } : { error: parsed.error });
     const target = consumeReturnTarget();
     target.searchParams.delete('sso_ticket');
     target.searchParams.delete('sso_error');
+    target.searchParams.delete('sso_done');
     if (parsed.ticket) target.searchParams.set('sso_ticket', parsed.ticket);
     else if (parsed.error) target.searchParams.set('sso_error', parsed.error);
+    void logNative(`[native-sso] retour deep link (${parsed.ticket ? 'ticket' : 'erreur'}) → ${target.pathname}`);
     window.location.assign(`${target.pathname}${target.search}${target.hash}`);
     return;
   }

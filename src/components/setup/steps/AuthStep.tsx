@@ -3,6 +3,7 @@ import { serverApi } from '../../../lib/client/server-api';
 import { TokenManager } from '../../../lib/client/storage';
 import { getUserConfig, getOidcStatus } from '../../../lib/api/popcorn-web';
 import PocketIdButton from '../../PocketIdButton';
+import { takeSsoReturn } from '../../../lib/auth/native-sso';
 import { PreferencesManager } from '../../../lib/client/storage';
 import type { UserConfig } from '../../../lib/api/popcorn-web';
 import type { SetupStatus } from '../../../lib/client/types';
@@ -83,24 +84,45 @@ export function AuthStep({ focusedButtonIndex, buttonRefs, onNext, onStatusChang
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
+    // Connexion Pocket ID déjà terminée ailleurs (LoginForm sans URL serveur → /setup?sso_done=1) :
+    // reprendre l’assistant après la connexion.
     const params = new URLSearchParams(window.location.search);
-    const ssoError = params.get('sso_error');
-    if (ssoError) setError(ssoError);
-    const ticket = params.get('sso_ticket');
+    if (params.get('sso_done') === '1') {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('sso_done');
+        window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+      } catch { /* ignore */ }
+      const cloudToken = TokenManager.getCloudAccessToken();
+      if (cloudToken) {
+        setLoading(true);
+        void afterCloudLogin(cloudToken).finally(() => setLoading(false));
+        return;
+      }
+    }
+    // Retour Pocket ID : ?sso_ticket= (ou retour deep link mémorisé). Ne dépend pas de l’URL serveur.
+    const ssoReturn = takeSsoReturn();
+    if (!ssoReturn) return;
+    if (ssoReturn.error) setError(ssoReturn.error);
+    const ticket = ssoReturn.ticket;
     if (!ticket) return;
+    dbg('sso ticket reçu → completeCloudSso');
     setLoading(true);
     serverApi.completeCloudSso(ticket).then(async (res) => {
       if (!res.success) {
+        dbg(`completeCloudSso KO: ${res.message || res.error}`);
         setError(res.message || t('loginForm.sso.error'));
         setLoading(false);
         return;
       }
+      dbg('completeCloudSso OK');
       const cloudToken = TokenManager.getCloudAccessToken();
       if (cloudToken) {
         await afterCloudLogin(cloudToken);
       } else {
         onNext();
       }
+      setLoading(false);
     }).catch(() => {
       setError(t('loginForm.sso.error'));
       setLoading(false);
