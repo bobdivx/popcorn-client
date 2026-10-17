@@ -1,9 +1,9 @@
 {
   "client": {
-    "version": "1.4.6",
-    "build": 312,
-    "gitSha": "87dd118",
-    "builtAt": "2026-10-17T21:20:00Z",
+    "version": "1.4.7",
+    "build": 313,
+    "gitSha": "ba797c6",
+    "builtAt": "2026-10-17T23:20:00Z",
     "channel": "dev"
   },
   "server": {
