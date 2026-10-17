@@ -10,6 +10,11 @@ import DemoExitBar from '../components/layout/DemoExitBar';
 import TVNavigationProvider from '../components/tv/TVNavigationProvider';
 import DebugPanel from '../components/debug/DebugPanel';
 import WebOSBoot from '../components/webos/WebOSBoot.astro';
+import {
+  IS_STORE_BUILD,
+  STORE_BLOCKED_ROUTE_PREFIXES,
+  TORRENT_API_PATTERN_SOURCES,
+} from '../lib/distribution';
 
 interface Props {
   title?: string;
@@ -23,6 +28,66 @@ const isWebOS = import.meta.env.WEBOS === 'true';
 <html lang="fr" id="html-root" data-theme="dark" data-ui-pack="tesla" class="overflow-x-hidden" data-webos={isWebOS ? 'true' : undefined} data-dev={import.meta.env.DEV ? 'true' : undefined}>
   <head>
     <meta charset="UTF-8" />
+    {IS_STORE_BUILD && (
+      <script
+        is:inline
+        define:vars={{ storeBlockedRoutes: STORE_BLOCKED_ROUTE_PREFIXES, storeApiPatterns: TORRENT_API_PATTERN_SOURCES }}
+      >
+        /* Version store (PUBLIC_DISTRIBUTION=play) : pas de routes ni d'appels réseau torrent. */
+        (function () {
+          window.__POPCORN_DISTRIBUTION__ = 'play';
+          try {
+            var p = (location.pathname || '/').replace(/\/+$/, '') || '/';
+            if (p === '/torrents' || p.indexOf('/torrents/') === 0) {
+              location.replace('/media' + location.search + location.hash);
+              return;
+            }
+            for (var i = 0; i < storeBlockedRoutes.length; i++) {
+              var b = storeBlockedRoutes[i];
+              if (p === b || p.indexOf(b + '/') === 0) {
+                location.replace('/dashboard');
+                return;
+              }
+            }
+          } catch (e) {}
+          var res = storeApiPatterns.map(function (src) { return new RegExp(src); });
+          function blocked(u) {
+            try {
+              var raw = typeof u === 'string' ? u : (u && u.url) || String(u);
+              var url = new URL(raw, location.href);
+              for (var j = 0; j < res.length; j++) { if (res[j].test(url.pathname)) return true; }
+            } catch (e) {}
+            return false;
+          }
+          var body = '{"success":false,"error":"NotAvailable","message":"Not available in this version."}';
+          var origFetch = window.fetch;
+          if (origFetch) {
+            window.fetch = function (input, init) {
+              if (blocked(input)) {
+                return Promise.resolve(new Response(body, { status: 404, headers: { 'Content-Type': 'application/json' } }));
+              }
+              return origFetch.apply(this, arguments);
+            };
+          }
+          if (window.XMLHttpRequest) {
+            var origOpen = XMLHttpRequest.prototype.open;
+            XMLHttpRequest.prototype.open = function (method, url) {
+              if (blocked(url)) arguments[1] = 'data:application/json,' + encodeURIComponent(body);
+              return origOpen.apply(this, arguments);
+            };
+          }
+          if (window.EventSource) {
+            var OrigES = window.EventSource;
+            var GuardedES = function (url, cfg) {
+              if (blocked(url)) throw new Error('NotAvailable');
+              return new OrigES(url, cfg);
+            };
+            GuardedES.prototype = OrigES.prototype;
+            window.EventSource = GuardedES;
+          }
+        })();
+      </script>
+    )}
     <script is:inline>
       /* Sortie d'urgence du mode démo, avant le chargement de l'app. */
       (function() {
@@ -480,4 +545,3 @@ const isWebOS = import.meta.env.WEBOS === 'true';
     </script>
   </body>
 </html>
-
