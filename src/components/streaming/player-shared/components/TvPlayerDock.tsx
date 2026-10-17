@@ -1,5 +1,5 @@
 import { useEffect } from 'preact/hooks';
-import { ArrowLeft, Maximize2, Minimize2, Pause, Play, Settings, SkipBack, SkipForward, Subtitles } from 'lucide-preact';
+import { ArrowLeft, Maximize2, Minimize2, Pause, Play, RotateCcw, RotateCw, Settings, SkipBack, SkipForward, Subtitles } from 'lucide-preact';
 import { formatTime } from '../utils/formatTime';
 import { useI18n } from '../../../../lib/i18n';
 import { serverApi } from '../../../../lib/client/server-api';
@@ -47,24 +47,46 @@ interface TvPlayerDockProps {
   onToggleFillMode?: () => void;
   onOpenSettings?: () => void;
   onToggleSubtitles?: () => void;
+  /** Série : épisode suivant / précédent (masqués en bout de série et pour les films). */
+  onNextEpisode?: () => void;
+  onPreviousEpisode?: () => void;
 }
+
+/** Design éditorial : accent corail unique, traits fins, surfaces sombres translucides sans flou (TV). */
+const ED_ACCENT = 'var(--ed-accent, #f2545b)';
+const ED_FONT = "var(--ed-font-body, 'Jost', sans-serif)";
+const ED_EASE = 'var(--ed-ease, cubic-bezier(0.2, 0.7, 0.2, 1))';
+const ICON_STROKE = 1.5;
 
 function dockBtnStyle(focused: boolean): Record<string, string | number> {
   return {
-    width: 72,
-    height: 72,
+    width: 68,
+    height: 68,
     borderRadius: 999,
-    background: focused ? '#7c3aed' : 'rgba(255,255,255,0.14)',
+    background: focused ? ED_ACCENT : 'rgba(12,13,16,0.55)',
     color: '#fff',
-    border: focused ? '3px solid #fff' : '2px solid transparent',
-    boxShadow: focused ? '0 0 0 4px rgba(124,58,237,0.55)' : 'none',
+    border: focused ? `1px solid ${ED_ACCENT}` : '1px solid rgba(255,255,255,0.22)',
+    boxShadow: focused ? '0 0 0 4px rgba(242,84,91,0.28)' : 'none',
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-    transform: focused ? 'scale(1.08)' : 'none',
+    transform: focused ? 'scale(1.06)' : 'none',
+    transition: `transform var(--ed-dur-1, 160ms) ${ED_EASE}, background-color var(--ed-dur-1, 160ms) ${ED_EASE}, box-shadow var(--ed-dur-1, 160ms) ${ED_EASE}`,
+    outline: 'none',
   };
 }
+
+/** Libellé court sous une icône (ex. « 10 »), Jost espacé. */
+const microLabelStyle: Record<string, string | number> = {
+  fontFamily: ED_FONT,
+  fontSize: 11,
+  fontWeight: 400,
+  letterSpacing: '0.18em',
+  lineHeight: 1,
+  marginTop: 2,
+};
 
 /**
  * Bandeau TV en bas de l’écran (pas de calque inset-0). Miniatures, paramètres
@@ -95,6 +117,8 @@ export function TvPlayerDock({
   onToggleFillMode,
   onOpenSettings,
   onToggleSubtitles,
+  onNextEpisode,
+  onPreviousEpisode,
 }: TvPlayerDockProps) {
   const { t } = useI18n();
   const dur = Number.isFinite(duration) && duration > 0 ? duration : 0;
@@ -180,10 +204,11 @@ export function TvPlayerDock({
             <h2
               style={{
                 margin: 0,
+                fontFamily: "var(--ed-font-display, 'Josefin Sans', 'Jost', sans-serif)",
                 fontSize: 40,
-                fontWeight: 700,
+                fontWeight: 300,
                 lineHeight: 1.15,
-                letterSpacing: '0.01em',
+                letterSpacing: '0.08em',
                 textShadow: '0 2px 12px rgba(0,0,0,0.65)',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -197,11 +222,14 @@ export function TvPlayerDock({
           {seriesSubtitle ? (
             <p
               style={{
-                margin: title ? '10px 0 0' : 0,
-                fontSize: 24,
-                fontWeight: 500,
+                margin: title ? '12px 0 0' : 0,
+                fontFamily: ED_FONT,
+                fontSize: 18,
+                fontWeight: 400,
                 lineHeight: 1.3,
-                color: 'rgba(255,255,255,0.72)',
+                letterSpacing: '0.28em',
+                textTransform: 'uppercase',
+                color: 'rgba(244,241,236,0.72)',
                 textShadow: '0 1px 8px rgba(0,0,0,0.55)',
               }}
             >
@@ -217,7 +245,8 @@ export function TvPlayerDock({
         bottom: 0,
         left: 0,
         right: 0,
-        background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.72) 55%, transparent 100%)',
+        background: 'linear-gradient(to top, rgba(12,13,16,0.94) 0%, rgba(12,13,16,0.74) 55%, transparent 100%)',
+        fontFamily: ED_FONT,
         padding: '28px 48px 28px',
         color: '#fff',
         zIndex: 410,
@@ -249,20 +278,35 @@ export function TvPlayerDock({
         aria-valuemin={0}
         aria-valuemax={Math.round(effectiveDur)}
         style={{
-          height: focusedOnScrub ? 14 : 10,
+          height: focusedOnScrub ? 6 : 4,
           borderRadius: 999,
-          background: 'rgba(255,255,255,0.28)',
-          margin: '12px 0 18px',
-          overflow: 'hidden',
+          background: 'rgba(255,255,255,0.18)',
+          margin: '14px 0 22px',
           position: 'relative',
-          boxShadow: focusedOnScrub ? '0 0 0 3px rgba(255,255,255,0.85)' : 'none',
+          transition: `height var(--ed-dur-1, 160ms) ${ED_EASE}`,
         }}
       >
         <div
           style={{
             width: `${pct}%`,
             height: '100%',
-            background: '#a78bfa',
+            borderRadius: 999,
+            background: ED_ACCENT,
+          }}
+        />
+        <div
+          aria-hidden
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: `${pct}%`,
+            width: focusedOnScrub ? 18 : 14,
+            height: focusedOnScrub ? 18 : 14,
+            marginLeft: focusedOnScrub ? -9 : -7,
+            marginTop: focusedOnScrub ? -9 : -7,
+            borderRadius: 999,
+            background: ED_ACCENT,
+            boxShadow: focusedOnScrub ? '0 0 0 5px rgba(242,84,91,0.3)' : 'none',
           }}
         />
         {previewing && (
@@ -273,7 +317,7 @@ export function TvPlayerDock({
               left: `${playheadPct}%`,
               width: 2,
               height: '100%',
-              background: 'rgba(255,255,255,0.7)',
+              background: 'rgba(255,255,255,0.75)',
             }}
           />
         )}
@@ -289,7 +333,7 @@ export function TvPlayerDock({
             aria-label={t('common.back')}
             style={dockBtnStyle(btnFocused('back'))}
           >
-            <ArrowLeft class="w-6 h-6" />
+            <ArrowLeft class="w-6 h-6" strokeWidth={ICON_STROKE} />
           </button>
         )}
         <button
@@ -301,7 +345,8 @@ export function TvPlayerDock({
           aria-label={t('playback.skipBack10')}
           style={dockBtnStyle(btnFocused('skipback'))}
         >
-          <SkipBack class="w-6 h-6" />
+          <RotateCcw class="w-6 h-6" strokeWidth={ICON_STROKE} />
+          <span style={microLabelStyle}>10</span>
         </button>
         <button
           type="button"
@@ -312,7 +357,7 @@ export function TvPlayerDock({
           aria-label={isPlaying ? t('playback.pauseLabel') : t('playback.playLabel')}
           style={dockBtnStyle(btnFocused('playpause'))}
         >
-          {isPlaying ? <Pause class="w-6 h-6" /> : <Play class="w-6 h-6" />}
+          {isPlaying ? <Pause class="w-6 h-6" strokeWidth={ICON_STROKE} /> : <Play class="w-6 h-6" strokeWidth={ICON_STROKE} />}
         </button>
         <button
           type="button"
@@ -323,9 +368,38 @@ export function TvPlayerDock({
           aria-label={t('playback.skipForward10')}
           style={dockBtnStyle(btnFocused('skipforward'))}
         >
-          <SkipForward class="w-6 h-6" />
+          <RotateCw class="w-6 h-6" strokeWidth={ICON_STROKE} />
+          <span style={microLabelStyle}>10</span>
         </button>
-        <span style={{ fontSize: 22, fontWeight: 600, fontVariantNumeric: 'tabular-nums', marginLeft: 8, letterSpacing: '0.02em' }}>
+        {onPreviousEpisode && (
+          <button
+            type="button"
+            data-tv-dock-btn="prevepisode"
+            data-focusable
+            tabIndex={0}
+            onClick={activate(onPreviousEpisode)}
+            aria-label={t('playback.previousEpisode')}
+            title={t('playback.previousEpisode')}
+            style={dockBtnStyle(btnFocused('prevepisode'))}
+          >
+            <SkipBack class="w-6 h-6" strokeWidth={ICON_STROKE} />
+          </button>
+        )}
+        {onNextEpisode && (
+          <button
+            type="button"
+            data-tv-dock-btn="nextepisode"
+            data-focusable
+            tabIndex={0}
+            onClick={activate(onNextEpisode)}
+            aria-label={t('playback.nextEpisode')}
+            title={t('playback.nextEpisode')}
+            style={dockBtnStyle(btnFocused('nextepisode'))}
+          >
+            <SkipForward class="w-6 h-6" strokeWidth={ICON_STROKE} />
+          </button>
+        )}
+        <span style={{ fontFamily: ED_FONT, fontSize: 20, fontWeight: 400, fontVariantNumeric: 'tabular-nums', marginLeft: 8, letterSpacing: '0.14em', color: 'rgba(244,241,236,0.9)' }}>
           {formatTime(previewTime)}
           {effectiveDur ? ` / ${formatTime(effectiveDur)}` : ''}
         </span>
@@ -342,11 +416,11 @@ export function TvPlayerDock({
             style={{
               ...dockBtnStyle(btnFocused('subtitles')),
               ...(currentSubtitleTrack !== -1
-                ? { border: '2px solid #fff', background: btnFocused('subtitles') ? '#fff' : '#444' }
+                ? { border: `1px solid ${ED_ACCENT}`, color: btnFocused('subtitles') ? '#fff' : ED_ACCENT }
                 : null),
             }}
           >
-            <Subtitles class="w-6 h-6" />
+            <Subtitles class="w-6 h-6" strokeWidth={ICON_STROKE} />
           </button>
         )}
         {onOpenSettings && (
@@ -359,7 +433,7 @@ export function TvPlayerDock({
             aria-label={t('playback.playerSettings')}
             style={dockBtnStyle(btnFocused('settings'))}
           >
-            <Settings class="w-6 h-6" />
+            <Settings class="w-6 h-6" strokeWidth={ICON_STROKE} />
           </button>
         )}
         {onToggleFillMode && (
@@ -378,14 +452,14 @@ export function TvPlayerDock({
             style={dockBtnStyle(btnFocused('fillmode'))}
           >
             {videoFillMode === 'cover' ? (
-              <Minimize2 class="w-6 h-6" />
+              <Minimize2 class="w-6 h-6" strokeWidth={ICON_STROKE} />
             ) : (
-              <Maximize2 class="w-6 h-6" />
+              <Maximize2 class="w-6 h-6" strokeWidth={ICON_STROKE} />
             )}
           </button>
         )}
       </div>
-      <p style={{ margin: '14px 0 0', fontSize: 16, lineHeight: 1.35, color: 'rgba(255,255,255,0.72)' }}>
+      <p style={{ margin: '16px 0 0', fontFamily: ED_FONT, fontSize: 13, fontWeight: 400, letterSpacing: '0.2em', textTransform: 'uppercase', lineHeight: 1.5, color: 'rgba(244,241,236,0.5)' }}>
         {t('playback.tvRemoteHint')}
       </p>
     </div>
