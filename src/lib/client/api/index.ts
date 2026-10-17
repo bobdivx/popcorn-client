@@ -36,7 +36,16 @@ export class ClientApi {
         .replace(/\/$/, '');
       // 3000 = port backend par défaut. (4326 est le port Astro dev, pas le backend Rust.)
       const base = backend || envFallback || 'http://127.0.0.1:3000';
-      return `${base}/api/client/${path}`;
+      let built = `${base}/api/client/${path}`;
+      // Auth serveur pour TOUS les transports, meme sans en-tete (EventSource, sendBeacon,
+      // URLs <img>/<video>, fetch simple) : joindre le token cloud en query (?access_token=),
+      // accepte par le middleware serveur. Le JWT local auto-signe n'est pas verifiable cote serveur.
+      try {
+        const { TokenManager } = await import('../storage.js');
+        const t = TokenManager.getCloudAccessToken();
+        if (t) built += (built.includes('?') ? '&' : '?') + 'access_token=' + encodeURIComponent(t);
+      } catch { /* ignore */ }
+      return built;
     }
 
     // Sinon (SSR), utiliser l'URL absolue du backend Rust
