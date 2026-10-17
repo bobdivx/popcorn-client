@@ -47,7 +47,7 @@ export default function RegisterPageShell() {
       className="relative flex flex-col justify-center items-center min-h-screen bg-black px-4 py-16 overflow-hidden"
     >
       <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(168,85,247,0.2),_transparent_55%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(242,84,91,0.2),_transparent_55%)]"
         aria-hidden="true"
       />
       <div
@@ -59,7 +59,7 @@ export default function RegisterPageShell() {
         <img
           src="/popcorn_logo.png"
           alt="Popcornn"
-          className="w-20 h-20 sm:w-24 sm:h-24 object-contain mx-auto drop-shadow-[0_0_32px_rgba(168,85,247,0.4)]"
+          className="w-20 h-20 sm:w-24 sm:h-24 object-contain mx-auto drop-shadow-[0_0_32px_rgba(242,84,91,0.4)]"
           loading="eager"
         />
       </div>
