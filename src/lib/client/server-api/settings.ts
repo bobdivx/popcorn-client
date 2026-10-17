@@ -125,6 +125,14 @@ export const settingsMethods = {
       warnings?: string[];
     }>
   > {
+    // Poll de fond : rafraichir le token cloud de maniere proactive s'il est proche de l'expiration,
+    // pour eviter un 401 periodique sur onglet laisse ouvert (backendRequest a aussi un retry reactif).
+    if (typeof window !== 'undefined') {
+      try {
+        const { ensureFreshCloudToken } = await import('../../api/popcorn-web.js');
+        await ensureFreshCloudToken();
+      } catch { /* ignore - le retry 401 de backendRequest prend le relais */ }
+    }
     return this.backendRequest('/api/admin/seeding-diagnostic', { method: 'GET' });
   },
   /** PUT /api/admin/tracker-mode/config — active/désactive le mode (session en cours) */
