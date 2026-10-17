@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { useSetupStatus } from './hooks/useSetupStatus';
 import { useWizardNavigation } from './hooks/useWizardNavigation';
 import { useWizardActions } from './hooks/useWizardActions';
-import { useWizardSteps, getNextStepNumberAfterWelcome } from './hooks/useWizardSteps';
+import { useWizardSteps, getNextStepNumberAfterWelcome, isWizardStepAvailable } from './hooks/useWizardSteps';
 import type { WizardStepId } from './hooks/useWizardSteps';
 import { useI18n } from '../../lib/i18n';
 import { ServerUrlStep } from './steps/ServerUrlStep';
@@ -257,10 +257,10 @@ export default function Wizard() {
   const progressPct = Math.round((currentStep / totalSteps) * 100);
 
   // Liste complète des étapes pour la sidebar (toutes visibles, y compris skippées)
-  const ALL_SIDEBAR_STEPS: WizardStepId[] = [
+  const ALL_SIDEBAR_STEPS: WizardStepId[] = ([
     'auth', 'serverUrl', 'language', 'welcome',
     'indexers', 'tmdb', 'downloadLocation', 'sync', 'complete',
-  ];
+  ] as WizardStepId[]).filter(isWizardStepAvailable);
   const SIDEBAR_LABELS: Record<WizardStepId, string> = {
     auth: 'Connexion', serverUrl: 'Serveur', language: 'Langue',
     welcome: 'Bienvenue', indexers: 'Indexers', tmdb: 'TMDB',

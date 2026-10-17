@@ -16,6 +16,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { useMemo, useState, useEffect } from 'preact/hooks';
 import { canAccess } from '../../lib/permissions';
 import { isTVPlatform } from '../../lib/utils/device-detection';
+import { isRouteBlockedInStoreBuild, isSettingsCategoryAvailable } from '../../lib/distribution';
 
 type NavItem = {
   id: string;
@@ -431,7 +432,10 @@ export default function SettingsSidebar() {
 
   const visibleItems = useMemo(
     () => {
-      const items = mounted ? NAV_ITEMS.filter(isItemVisible) : NAV_ITEMS;
+      const items = (mounted ? NAV_ITEMS.filter(isItemVisible) : NAV_ITEMS).filter(
+        // Version store : pas de catégories torrent / indexers / téléchargements.
+        (item) => isSettingsCategoryAvailable(item.id) && !isRouteBlockedInStoreBuild(item.href)
+      );
       if (typeof window !== 'undefined' && isTVPlatform()) {
         return items.filter((item) => item.id !== 'webos' && item.id !== 'uploads');
       }

@@ -20,6 +20,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { useState, useMemo, useEffect } from 'preact/hooks';
 import type { ComponentType } from 'preact';
 import { canAccess } from '../../lib/permissions';
+import { isRouteBlockedInStoreBuild, isSettingsCategoryAvailable } from '../../lib/distribution';
 
 type CategoryId = 'system' | 'interface' | 'content' | 'library' | 'discovery' | 'account' | 'playback' | 'maintenance';
 
@@ -144,6 +145,8 @@ export default function SettingsMenu() {
 
   const visibleCategories = useMemo(() => {
     return categories.filter((cat) => {
+      // Version store : pas de catégories torrent / indexers / téléchargements.
+      if (!isSettingsCategoryAvailable(cat.id)) return false;
       if (cat.inlineContent) {
         if (cat.inlinePermissions?.length) {
           return cat.inlinePermissions.some((p) => canAccess(p as any));
@@ -152,8 +155,10 @@ export default function SettingsMenu() {
           return canAccess(cat.inlinePermission as any);
         }
       }
-      const visibleItems = cat.items.filter((item) =>
-        item.permission ? canAccess(item.permission as any) : true
+      const visibleItems = cat.items.filter(
+        (item) =>
+          (item.permission ? canAccess(item.permission as any) : true) &&
+          !isRouteBlockedInStoreBuild(item.href || '')
       );
       return visibleItems.length > 0;
     });
@@ -162,8 +167,10 @@ export default function SettingsMenu() {
   const currentCategory = visibleCategories.find((c) => c.id === selectedCategory) ?? visibleCategories[0];
   const currentItems = useMemo(() => {
     if (!currentCategory) return [];
-    return currentCategory.items.filter((item) =>
-      item.permission ? canAccess(item.permission as any) : true
+    return currentCategory.items.filter(
+      (item) =>
+        (item.permission ? canAccess(item.permission as any) : true) &&
+        !isRouteBlockedInStoreBuild(item.href || '')
     );
   }, [currentCategory]);
 
