@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { useHlsLoader } from './streaming/hls-player/hooks/useHlsLoader';
 import { serverApi } from '../lib/client/server-api';
-import { resolveBootIntroMp4 } from '../lib/utils/boot-intro';
+import {
+  playIntroWithSound,
+  resolveBootIntroMp4,
+  unmuteIntroOnFirstGesture,
+} from '../lib/utils/boot-intro';
 
 interface IntroVideoWithHlsPreloadProps {
   onEnded: () => void;
@@ -43,15 +47,25 @@ export default function IntroVideoWithHlsPreload({
     }, 1800);
 
     const video = videoRef.current;
+    let cancelled = false;
+    let stopUnmute: (() => void) | null = null;
     if (video) {
-      video.play().catch((error) => {
-        console.warn('Erreur lors de la lecture automatique:', error);
-        setIsPlaying(false);
-      });
+      // Son activé (apps) ; repli muet si l'autoplay sonore est bloqué (web).
+      playIntroWithSound(video)
+        .then((mode) => {
+          if (cancelled) return;
+          if (mode === 'muted') stopUnmute = unmuteIntroOnFirstGesture(video);
+        })
+        .catch((error) => {
+          console.warn('Erreur lors de la lecture automatique:', error);
+          setIsPlaying(false);
+        });
       setIsPlaying(true);
     }
 
     return () => {
+      cancelled = true;
+      stopUnmute?.();
       clearTimeout(skipTimer);
     };
   }, []);
@@ -232,8 +246,6 @@ export default function IntroVideoWithHlsPreload({
       <video
         ref={videoRef}
         className="w-full h-full object-contain"
-        autoPlay
-        muted
         playsInline
         preload="auto"
         onEnded={completeIntro}

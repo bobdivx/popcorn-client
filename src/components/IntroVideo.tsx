@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
-import { resolveBootIntroGif, resolveBootIntroMp4 } from '../lib/utils/boot-intro';
+import {
+  playIntroWithSound,
+  resolveBootIntroGif,
+  resolveBootIntroMp4,
+  unmuteIntroOnFirstGesture,
+} from '../lib/utils/boot-intro';
 
 interface IntroVideoProps {
   onEnded: () => void;
@@ -59,20 +64,28 @@ export default function IntroVideo({ onEnded, onSkip, variant = 'brand' }: Intro
     return () => window.clearTimeout(skipTimer);
   }, [variant]);
 
-  // Lecture auto du MP4.
+  // Lecture auto du MP4 avec le son (apps TV / Android / Tauri) ; repli muet si le
+  // navigateur refuse l'autoplay sonore (web), puis GIF si même la lecture muette échoue.
   useEffect(() => {
     if (useGifFallback) return;
     const video = videoRef.current;
     if (!video) return;
-    video.muted = true;
-    video.playsInline = true;
-    const play = video.play();
-    if (play && typeof play.catch === 'function') {
-      play.catch((error) => {
+    let cancelled = false;
+    let stopUnmute: (() => void) | null = null;
+    playIntroWithSound(video)
+      .then((mode) => {
+        if (cancelled) return;
+        if (mode === 'muted') stopUnmute = unmuteIntroOnFirstGesture(video);
+      })
+      .catch((error) => {
+        if (cancelled) return;
         console.warn('[IntroVideo] Lecture auto impossible, fallback GIF:', error);
         setUseGifFallback(true);
       });
-    }
+    return () => {
+      cancelled = true;
+      stopUnmute?.();
+    };
   }, [useGifFallback]);
 
   // Fallback GIF : durée type sting Netflix (~4,5 s) puis fin.
@@ -142,8 +155,6 @@ export default function IntroVideo({ onEnded, onSkip, variant = 'brand' }: Intro
         <video
           ref={videoRef}
           className="w-full h-full object-contain"
-          autoPlay
-          muted
           playsInline
           preload="auto"
           onEnded={finish}
