@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { createPortal } from 'preact/compat';
-import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Minimize, Subtitles, ArrowLeft, RotateCcw, SkipForward, SkipBack, Settings } from 'lucide-preact';
+import { Play, Pause, Volume2, Volume1, VolumeX, Maximize, Minimize, Subtitles, ArrowLeft, RotateCcw, RotateCw, SkipForward, SkipBack, Settings } from 'lucide-preact';
 import { useI18n } from '../../../../lib/i18n';
 import { formatTime } from '../utils/formatTime';
 import { isMobileDevice } from '../../../../lib/utils/device-detection';
@@ -79,8 +79,16 @@ interface VideoControlsProps {
   seriesEpisodeNum?: number | null;
   onClose?: () => void;
   onRestart?: () => void;
-  /** Afficher le bouton « Épisode suivant » (séries) */
+  /** Afficher le bouton « Épisode suivant » (séries) — CTA legacy si onNextEpisode absent. */
   onPlayNextEpisode?: () => void;
+  /** Série : afficher les boutons Précédent / Suivant (épisodes). Films : masqués. */
+  showEpisodeNav?: boolean;
+  /** Épisode suivant (undefined = dernier épisode → bouton désactivé). */
+  onNextEpisode?: () => void;
+  /** Épisode précédent (undefined = premier épisode → bouton désactivé). */
+  onPreviousEpisode?: () => void;
+  nextEpisodeTitle?: string | null;
+  previousEpisodeTitle?: string | null;
   /** Afficher le sélecteur de qualité stream (HLS). */
   showQualitySelector?: boolean;
   /** Qualité actuelle (hauteur en px ou null = auto). */
@@ -160,6 +168,11 @@ export function VideoControls({
   onClose,
   onRestart,
   onPlayNextEpisode,
+  showEpisodeNav = false,
+  onNextEpisode,
+  onPreviousEpisode,
+  nextEpisodeTitle = null,
+  previousEpisodeTitle = null,
   showQualitySelector = false,
   streamQuality = null,
   onQualityChange,
@@ -277,7 +290,7 @@ export function VideoControls({
 
   const buttonSize = isTV ? 'w-20 h-20' : isFullscreen ? 'w-[4.5rem] h-[4.5rem] min-w-[4.5rem] min-h-[4.5rem]' : 'w-11 h-11 min-w-11 min-h-11 sm:w-14 sm:h-14 sm:min-w-14 sm:min-h-14 md:w-16 md:h-16 md:min-w-16 md:min-h-16';
   const iconSize = isTV ? 'w-10 h-10' : isFullscreen ? 'w-9 h-9' : 'w-5 h-5 sm:w-7 sm:h-7 md:w-8 md:h-8';
-  const progressHeight = isTV ? 'h-3' : isMobile ? 'h-3.5' : isFullscreen ? 'h-3' : 'h-3 sm:h-2.5';
+  const progressHeight = isTV ? 'h-1.5' : isMobile ? 'h-2' : 'h-1.5 hover:h-2 focus:h-2';
   const textSize = isTV ? 'text-xl' : isFullscreen ? 'text-lg' : 'text-xs sm:text-sm md:text-base';
   const titleSize = isTV ? 'text-4xl' : isFullscreen ? 'text-3xl md:text-4xl' : 'text-lg sm:text-2xl md:text-3xl';
   const padding = isTV
@@ -301,11 +314,11 @@ export function VideoControls({
     // Quand le focus est sur les vignettes, on n'affiche pas le ring sur les boutons.
     if (!isTV || focusedOnProgress || (scrubEnabled && tvScrubIndexExternal != null && tvScrubFocused)) return '';
     if (focusedControlIndex !== index) return '';
-    return 'ring-4 ring-purple-500 ring-offset-2 ring-offset-black/55 shadow-[0_0_20px_rgba(168,85,247,0.7)] border-purple-400 bg-purple-600/20 scale-110 z-30 transition-all duration-200';
+    return 'ed-pc-focus ring-2 ring-[#f2545b] ring-offset-2 ring-offset-black/60 !border-[#f2545b] !bg-[#f2545b] scale-105 z-30';
   };
   const getProgressFocusClass = () => {
     if (!isTV || !focusedOnProgress) return '';
-    return 'ring-4 ring-purple-500/80 ring-offset-2 ring-offset-black/55 shadow-[0_0_20px_rgba(168,85,247,0.7)] bg-purple-600/20 transition-all duration-200';
+    return 'ring-2 ring-[#f2545b] ring-offset-2 ring-offset-black/60';
   };
 
   const showPosterSynopsisPause = !isPlaying && showControls && (posterUrl || synopsis);
@@ -362,7 +375,7 @@ export function VideoControls({
       */}
       {(chromeVisible || !isTV) && (
       <div
-        class={`video-controls-chrome absolute inset-0 flex flex-col overflow-hidden z-40 text-white ${
+        class={`video-controls-chrome ed-player-chrome absolute inset-0 flex flex-col overflow-hidden z-40 text-white ${
           chromeVisible
             ? `opacity-100 translate-y-0 ${isTV ? 'pointer-events-none' : 'pointer-events-auto'}`
             : 'opacity-0 translate-y-2 pointer-events-none'
@@ -380,7 +393,7 @@ export function VideoControls({
                   e.stopPropagation();
                   onClose();
                 }} 
-                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-[opacity,transform,background-color] duration-200 active:scale-95 backdrop-blur-md border-2 border-white/60 focus:outline-none ${getFocusClass(0)}`}
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white transition-[opacity,transform,background-color] duration-200 active:scale-95 backdrop-blur-md border border-white/25 focus:outline-none ${getFocusClass(0)}`}
                 title={t('common.back')}
                 aria-label={t('common.back')}
               >
@@ -389,9 +402,9 @@ export function VideoControls({
             )}
             {torrentName && !showPosterSynopsisPause && (
               <div class="min-w-0">
-                <h3 class={`${titleSize} font-semibold tracking-wide truncate`}>{torrentName}</h3>
+                <h3 class={`ed-player-title ${titleSize} font-light tracking-wide truncate`}>{torrentName}</h3>
                 {seriesSubtitle && (
-                  <p class={`${isTV ? 'text-xl' : isFullscreen ? 'text-base' : 'text-xs sm:text-sm'} text-white/60 font-medium mt-0.5 truncate`}>
+                  <p class={`ed-player-kicker ${isTV ? 'text-xl' : isFullscreen ? 'text-base' : 'text-xs sm:text-sm'} text-white/60 mt-0.5 truncate`}>
                     {seriesSubtitle}
                   </p>
                 )}
@@ -664,7 +677,7 @@ export function VideoControls({
             {/* Partie déjà téléchargée par le client torrent : segment visible (couleur assortie au violet) */}
             {torrentProgress != null && torrentProgress > 0 && (
               <div
-                class="absolute left-0 top-0 h-full rounded-full bg-cyan-400/80"
+                class="absolute left-0 top-0 h-full rounded-full bg-white/25"
                 style={{ width: `${Math.min(100, torrentProgress * 100)}%` }}
                 title={t('playback.progressBarDownloaded')}
                 aria-hidden
@@ -674,8 +687,8 @@ export function VideoControls({
             <div
               class={`absolute left-0 top-0 h-full rounded-full transition-all ${
                 (isTV && scrubEnabled && tvScrubIndexExternal != null) || scrubPreviewActiveDesktop
-                  ? 'bg-purple-400/80'
-                  : 'bg-purple-600'
+                  ? 'bg-[#f2545b]/60'
+                  : 'bg-[#f2545b]'
               }`}
               style={{ width: `${progressPercent}%` }}
             />
@@ -690,7 +703,7 @@ export function VideoControls({
             )}
             {/* Curseur de position (tête de lecture) — glass, suit toujours currentTime */}
             <div
-              class={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${isTV ? 'w-6 h-6' : 'w-4 h-4'} rounded-full transition-[opacity,transform] opacity-100 can-hover:opacity-0 can-hover:group-hover/progress:opacity-100 can-hover:group-focus-within/progress:opacity-100 bg-white/25 backdrop-blur-md border border-white/55 shadow-[0_0_12px_rgba(168,85,247,0.35),inset_0_1px_0_rgba(255,255,255,0.35)] ring-1 ring-purple-400/40`}
+              class={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 ${isTV ? 'w-6 h-6' : 'w-4 h-4'} rounded-full transition-[opacity,transform] opacity-100 can-hover:opacity-0 can-hover:group-hover/progress:opacity-100 can-hover:group-focus-within/progress:opacity-100 ed-pc-thumb bg-[#f2545b] shadow-[0_0_0_4px_rgba(242,84,91,0.25)]`}
               style={{ left: `${playheadPercent}%` }}
               aria-hidden
             />
@@ -715,7 +728,7 @@ export function VideoControls({
             nextThumbnailLabel={t('playback.scrubNextThumbnail')}
           />
           </div>
-          <div class={`flex items-center ${gap} relative z-30 min-w-0 shrink-0 rounded-2xl bg-black/50 px-2 py-1.5 ring-1 ring-white/25 ${isMobile ? 'flex-wrap justify-center' : ''}`} data-tv-video-controls-row>
+          <div class={`flex items-center ${gap} relative z-30 min-w-0 shrink-0 ed-pc-row rounded-full bg-black/45 px-2 py-1.5 border border-white/10 ${isMobile ? 'flex-wrap justify-center' : ''}`} data-tv-video-controls-row>
             {isTV ? (
               <>
                 <button
@@ -725,12 +738,12 @@ export function VideoControls({
                     e.stopPropagation();
                     onSeekTV?.('left', 10);
                   }}
-                  class={`flex flex-col items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white backdrop-blur-md border-2 border-white/60 focus:outline-none ${getFocusClass(playIndex)}`}
+                  class={`flex flex-col items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white backdrop-blur-md border border-white/25 focus:outline-none ${getFocusClass(playIndex)}`}
                   title={t('playback.skipBack10')}
                   aria-label={t('playback.skipBack10')}
                 >
-                  <SkipBack class={`${iconSize} text-white`} />
-                  <span class="text-xs font-bold text-white/90 -mt-0.5">10</span>
+                  <RotateCcw class={`${iconSize} text-white`} />
+                  <span class="ed-pc-micro text-xs text-white/90 -mt-0.5">10</span>
                 </button>
                 <button
                   type="button"
@@ -739,7 +752,7 @@ export function VideoControls({
                     e.stopPropagation();
                     onPlayPause();
                   }}
-                  class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white backdrop-blur-md border-2 border-white/60 focus:outline-none relative z-40 ${getFocusClass(playIndex)}`}
+                  class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white backdrop-blur-md border border-white/25 focus:outline-none relative z-40 ${getFocusClass(playIndex)}`}
                   title={isPlaying ? t('playback.pauseLabel') : t('playback.playLabel')}
                   aria-label={isPlaying ? t('playback.pauseLabel') : t('playback.playLabel')}
                 >
@@ -752,12 +765,12 @@ export function VideoControls({
                     e.stopPropagation();
                     onSeekTV?.('right', 10);
                   }}
-                  class={`flex flex-col items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white backdrop-blur-md border-2 border-white/60 focus:outline-none ${getFocusClass(playIndex)}`}
+                  class={`flex flex-col items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white backdrop-blur-md border border-white/25 focus:outline-none ${getFocusClass(playIndex)}`}
                   title={t('playback.skipForward10')}
                   aria-label={t('playback.skipForward10')}
                 >
-                  <SkipForward class={`${iconSize} text-white`} />
-                  <span class="text-xs font-bold text-white/90 -mt-0.5">10</span>
+                  <RotateCw class={`${iconSize} text-white`} />
+                  <span class="ed-pc-micro text-xs text-white/90 -mt-0.5">10</span>
                 </button>
                 <div class={`flex items-center gap-2 text-white ${textSize} font-medium flex-shrink-0`}>
                   <span>{formatTime(currentTime)}</span>
@@ -768,16 +781,50 @@ export function VideoControls({
               </>
             ) : (
             <>
+            {showEpisodeNav && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onPreviousEpisode?.();
+                }}
+                disabled={!onPreviousEpisode}
+                data-episode-nav="previous"
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white border border-white/25 focus:outline-none disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-black/35`}
+                title={onPreviousEpisode ? `${t('playback.previousEpisode')}${previousEpisodeTitle ? ` · ${previousEpisodeTitle}` : ''}` : t('playback.previousEpisode')}
+                aria-label={t('playback.previousEpisode')}
+              >
+                <SkipBack class={`${iconSize} text-white`} />
+              </button>
+            )}
             <button 
               onClick={(e) => { 
                 e.preventDefault();
                 e.stopPropagation();
                 onPlayPause(); 
               }} 
-              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all backdrop-blur-md border-2 border-white/60 focus:outline-none relative z-40 ${getFocusClass(playIndex)}`}
+              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white transition-all backdrop-blur-md border border-white/25 focus:outline-none relative z-40 ${getFocusClass(playIndex)}`}
             >
               {isPlaying ? <Pause class={`${iconSize} text-white`} /> : <Play class={`${iconSize} text-white ml-0.5`} />}
             </button>
+            {showEpisodeNav && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onNextEpisode?.();
+                }}
+                disabled={!onNextEpisode}
+                data-episode-nav="next"
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white border border-white/25 focus:outline-none disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-black/35`}
+                title={onNextEpisode ? `${t('playback.nextEpisode')}${nextEpisodeTitle ? ` · ${nextEpisodeTitle}` : ''}` : t('playback.nextEpisode')}
+                aria-label={t('playback.nextEpisode')}
+              >
+                <SkipForward class={`${iconSize} text-white`} />
+              </button>
+            )}
             {/* Bouton redémarrer depuis le début */}
             {onRestart && (
               <button 
@@ -786,7 +833,7 @@ export function VideoControls({
                   e.stopPropagation();
                   onRestart();
                 }} 
-                class={`hidden sm:flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all backdrop-blur-md border-2 border-white/60 focus:outline-none`}
+                class={`hidden sm:flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white transition-all backdrop-blur-md border border-white/25 focus:outline-none`}
                 title={t('playback.restartFromBeginning')}
                 aria-label={t('playback.restartFromBeginning')}
               >
@@ -794,7 +841,7 @@ export function VideoControls({
               </button>
             )}
             {/* Bouton épisode suivant (séries) — CTA éditorial */}
-            {onPlayNextEpisode && (
+            {onPlayNextEpisode && !showEpisodeNav && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -816,7 +863,7 @@ export function VideoControls({
             <div class="flex items-center gap-2 group/volume flex-shrink-0">
               <button 
                 onClick={(e) => { e.stopPropagation(); onToggleMute(); }} 
-                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all border-2 border-white/60 focus:outline-none ${getFocusClass(muteIndex)}`}
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white transition-all border border-white/25 focus:outline-none ${getFocusClass(muteIndex)}`}
               >
                 {isMuted || volume === 0 ? <VolumeX class={`${iconSize} text-white`} /> : volume < 0.5 ? <Volume1 class={`${iconSize} text-white`} /> : <Volume2 class={`${iconSize} text-white`} />}
               </button>
@@ -849,7 +896,7 @@ export function VideoControls({
                   e.stopPropagation();
                   onCastClick();
                 }}
-                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all border-2 border-white/60 focus:outline-none ${getFocusClass(castIndex)} ${isCasting ? 'bg-purple-600/40 border-purple-400/50' : ''}`}
+                class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white transition-all border border-white/25 focus:outline-none ${getFocusClass(castIndex)} ${isCasting ? '!bg-[#f2545b]/30 !border-[#f2545b]/60' : ''}`}
                 title={isCasting ? t('playback.casting') : t('playback.castToDevice')}
                 aria-label={isCasting ? t('playback.casting') : t('playback.castToDevice')}
               >
@@ -869,7 +916,7 @@ export function VideoControls({
                     e.stopPropagation();
                     setShowQualityMenu((v) => !v);
                   }}
-                  class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all border-2 border-white/60 focus:outline-none min-w-[3rem] touch-manipulation ${getFocusClass(qualityIndex)}`}
+                  class={`flex items-center justify-center ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white transition-all border border-white/25 focus:outline-none min-w-[3rem] touch-manipulation ${getFocusClass(qualityIndex)}`}
                   title={t('playback.playerSettings')}
                   aria-label={t('playback.playerSettings')}
                   aria-expanded={showQualityMenu}
@@ -903,7 +950,7 @@ export function VideoControls({
                 e.stopPropagation();
                 onToggleFullscreen();
               }} 
-              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full bg-white/35 hover:bg-white/55 text-white transition-all border-2 border-white/60 focus:outline-none ${getFocusClass(fullscreenIndex)}`}
+              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white transition-all border border-white/25 focus:outline-none ${getFocusClass(fullscreenIndex)}`}
             >
               {isFullscreen ? <Minimize class={`${iconSize} text-white`} /> : <Maximize class={`${iconSize} text-white`} />}
             </button>

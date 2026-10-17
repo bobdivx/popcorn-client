@@ -66,6 +66,10 @@ interface UseTVPlayerNavigationProps {
   onScrubSeek?: (timeSeconds: number) => void;
   /** Feedback UI pendant preview sans scrub (pas de seek). */
   onSeekPreview?: (info: SeekPreviewInfo | null) => void;
+  /** Série : épisode suivant (bouton dock + ChannelUp / MediaTrackNext). Undefined = dernier épisode / film. */
+  onNextEpisode?: () => void;
+  /** Série : épisode précédent (bouton dock + ChannelDown / MediaTrackPrevious). */
+  onPreviousEpisode?: () => void;
 }
 
 export function useTVPlayerNavigation({
@@ -90,6 +94,8 @@ export function useTVPlayerNavigation({
   currentTime,
   isPlaying = true,
   videoRef,
+  onNextEpisode,
+  onPreviousEpisode,
 }: UseTVPlayerNavigationProps) {
   // App simple (URL) : stamp avant isTVPlatform() pour désactiver la Magic Remote / activer le hide.
   stampTvPlatformHints();
@@ -110,6 +116,12 @@ export function useTVPlayerNavigation({
   streamQualityRef.current = streamQuality;
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
+  const onNextEpisodeRef = useRef(onNextEpisode);
+  onNextEpisodeRef.current = onNextEpisode;
+  const onPreviousEpisodeRef = useRef(onPreviousEpisode);
+  onPreviousEpisodeRef.current = onPreviousEpisode;
+  const hasNextEpisode = !!onNextEpisode;
+  const hasPreviousEpisode = !!onPreviousEpisode;
   const videoRefInternal = useRef(videoRef?.current ?? null);
   videoRefInternal.current = videoRef?.current ?? null;
 
@@ -303,6 +315,9 @@ export function useTVPlayerNavigation({
         { id: 'playpause', action: onPlayPause },
         { id: 'skipforward', action: () => onSeek('right', 10) },
       );
+      // Épisodes : après le groupe lecture (l'index initial 2 = lecture reste valide).
+      if (hasPreviousEpisode) c.push({ id: 'prevepisode', action: () => onPreviousEpisodeRef.current?.() });
+      if (hasNextEpisode) c.push({ id: 'nextepisode', action: () => onNextEpisodeRef.current?.() });
       if (onToggleSubtitles) {
         c.push({ id: 'subtitles', action: onToggleSubtitles });
       }
@@ -322,7 +337,7 @@ export function useTVPlayerNavigation({
     c.push({ id: 'fullscreen', action: onToggleFullscreen });
     if (hasBack) c.unshift({ id: 'back', action: onClose! });
     return c;
-  }, [isTV, hasBack, onClose, onPlayPause, onToggleMute, onToggleFullscreen, onOpenQualityMenu, onToggleSubtitles, onSeek, onSelectQuality, onToggleFillMode]);
+  }, [isTV, hasBack, onClose, onPlayPause, onToggleMute, onToggleFullscreen, onOpenQualityMenu, onToggleSubtitles, onSeek, onSelectQuality, onToggleFillMode, hasNextEpisode, hasPreviousEpisode]);
 
   const isBackKey = (e: KeyboardEvent) =>
     BACK_KEYS.includes(e.key) || BACK_KEY_CODES.includes(e.keyCode ?? e.which);
@@ -495,6 +510,38 @@ export function useTVPlayerNavigation({
         keyNormalized === 'MediaPause';
       const isMediaRewind = kc === 412 || keyNormalized === 'MediaRewind' || keyNormalized === 'MediaTrackPrevious';
       const isMediaForward = kc === 417 || keyNormalized === 'MediaFastForward' || keyNormalized === 'MediaTrackNext';
+
+      // Télécommande : épisode suivant / précédent (séries uniquement ; films = comportement seek inchangé).
+      // webOS : ChannelUp/Down = 33/34 ; Android TV : ChannelUp/Down (166/167 → 'ChannelUp'), MediaTrackNext/Previous.
+      const isNextEpisodeKey =
+        keyNormalized === 'MediaTrackNext' ||
+        keyNormalized === 'ChannelUp' ||
+        kc === 427 ||
+        kc === 33 ||
+        kc === 176;
+      const isPrevEpisodeKey =
+        keyNormalized === 'MediaTrackPrevious' ||
+        keyNormalized === 'ChannelDown' ||
+        kc === 428 ||
+        kc === 34 ||
+        kc === 177;
+      if (isNextEpisodeKey && onNextEpisodeRef.current) {
+        e.preventDefault();
+        onNextEpisodeRef.current();
+        return;
+      }
+      if (isPrevEpisodeKey && onPreviousEpisodeRef.current) {
+        e.preventDefault();
+        onPreviousEpisodeRef.current();
+        return;
+      }
+      if (isNextEpisodeKey || isPrevEpisodeKey) {
+        // Bout de série : ne rien faire (pas de zapping chaîne / seek involontaire).
+        if (keyNormalized === 'ChannelUp' || keyNormalized === 'ChannelDown' || kc === 33 || kc === 34 || kc === 427 || kc === 428) {
+          e.preventDefault();
+          return;
+        }
+      }
 
       if (isMediaPlay) {
         e.preventDefault();

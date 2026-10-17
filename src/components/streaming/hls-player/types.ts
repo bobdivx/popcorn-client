@@ -28,6 +28,9 @@ export interface HLSPlayerProps {
   /** Épisode suivant (série) : afficher bouton « Épisode suivant » peu avant la fin */
   nextEpisodeInfo?: { seasonNum: number; episodeVariantId: string; title?: string } | null;
   onPlayNextEpisode?: () => void;
+  /** Épisode précédent (série) : bouton « Précédent » + touche ChannelDown / MediaTrackPrevious. */
+  previousEpisodeInfo?: { seasonNum: number; episodeVariantId: string; title?: string } | null;
+  onPlayPreviousEpisode?: () => void;
   onError?: (error: Error) => void;
   onLoadingChange?: (loading: boolean) => void;
   /** Message d’overlay pendant le chargement (ex. pendant retries 503). Null = message par défaut. */
