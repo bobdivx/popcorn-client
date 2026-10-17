@@ -4,6 +4,7 @@ import RequestButton from '../requests/RequestButton';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { ArrowLeft } from 'lucide-preact';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
+import WatchProviders from '../platforms/WatchProviders';
 
 const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_IMG_BACKDROP = 'https://image.tmdb.org/t/p/original';
@@ -196,6 +197,8 @@ export default function DiscoverMediaDetail({
                 {data.overview}
               </p>
             )}
+
+            <WatchProviders tmdbId={tmdbId} mediaType={mediaType} className="mb-6" />
 
             <div class="glass-panel rounded-xl p-4 sm:p-6 mb-6">
               {requestSubmitted ? (

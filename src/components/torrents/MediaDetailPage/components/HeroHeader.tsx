@@ -1,4 +1,5 @@
 import type { MediaDetailPageProps } from '../types';
+import WatchProviders from '../../../platforms/WatchProviders';
 
 export function HeroHeader({
   torrent,
@@ -20,6 +21,10 @@ export function HeroHeader({
         {year != null && <p data-stream-item className="ed-kicker">{year}</p>}
         <h1 data-stream-item className="ed-title">{title}</h1>
         <span data-stream-item className="ed-rule" aria-hidden />
+        {/* Où regarder en France (abonnements d'abord) — données JustWatch via le serveur */}
+        <div data-stream-item>
+          <WatchProviders tmdbId={torrent.tmdbId} mediaType={torrent.tmdbType} />
+        </div>
       </div>
     );
 }
