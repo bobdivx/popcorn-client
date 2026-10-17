@@ -157,6 +157,10 @@ html[data-tv-platform] body {
      * 100vw seul déborde sous la scrollbar Windows (~17px coupés à droite) ;
      * 100vw - 2×scrollbar + margin-left (ancien hack) laissait une colonne vide
      * à gauche/droite (très visible sur /search). Une seule soustraction suffit.
+     *
+     * Les overlays plein écran (splash chargement, modales) doivent vivre hors de
+     * ce body (portal / reparent sur <html>), sinon `fixed inset-0` ne couvre
+     * que ~80% du viewport (bande grise en bas).
      */
     body:has(.app-main [data-page="dashboard"]),
     body:has(.app-main [data-page="films"]),
@@ -175,6 +179,16 @@ html[data-tv-platform] body {
       min-height: calc(100vh * var(--app-visual-scale-inverse));
       overflow-x: hidden;
     }
+  }
+}
+
+/* Hauteur « plein écran » pour écrans de chargement dans le body zoomé. */
+.min-h-app-screen {
+  min-height: calc(100vh * var(--app-visual-scale-inverse, 1));
+}
+@supports (height: 100dvh) {
+  .min-h-app-screen {
+    min-height: calc(100dvh * var(--app-visual-scale-inverse, 1));
   }
 }
 

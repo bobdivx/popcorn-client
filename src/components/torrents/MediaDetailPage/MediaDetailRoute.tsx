@@ -2185,7 +2185,7 @@ export default function MediaDetailRoute() {
 
   if (loading) {
     return (
-      <div className="min-h-[70vh] flex items-center justify-center bg-[var(--ed-bg,#0c0d10)]">
+      <div className="min-h-app-screen flex items-center justify-center bg-[var(--ed-bg,#0c0d10)]">
         <DsLoader size="lg" text="Chargement" />
       </div>
     );
