@@ -971,7 +971,7 @@ html[data-tv-platform="true"] .search-progress-fill {
   right: 0;
   z-index: 60;
   height: 3px;
-  background: rgb(88 28 135 / 0.8); /* primary-900/80 */
+  background: rgb(130 37 42 / 0.8); /* primary-900/80 */
   overflow: hidden;
   top: calc(3.5rem + var(--safe-area-inset-top, 0px)); /* h-14 */
 }
@@ -1007,7 +1007,7 @@ html[data-tv-platform="true"] .search-progress-fill {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    var(--color-primary-500, rgb(168 85 247)) 50%,
+    var(--color-primary-500, rgb(242 84 91)) 50%,
     transparent 100%
   );
   animation: library-sync-bar 1.8s ease-in-out infinite;

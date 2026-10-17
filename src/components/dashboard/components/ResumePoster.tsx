@@ -120,7 +120,7 @@ export function ResumePoster({ item, onNavigate }: ResumePosterProps) {
           setIsHovered(false);
         }}
       >
-        <div className={`relative aspect-[2/3] overflow-hidden bg-gray-900/85 border border-white/15 shadow-lg rounded-lg focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-1 focus-within:ring-offset-black transform-gpu transition-all duration-[400ms] ease-out hover:z-40 focus-within:z-40 will-change-transform group-hover:scale-[1.04] group-hover:shadow-[0_10px_40px_-10px_rgba(168,85,247,0.4)] group-hover:border-violet-400/50`}>
+        <div className={`relative aspect-[2/3] overflow-hidden bg-gray-900/85 border border-white/15 shadow-lg rounded-lg focus-within:ring-2 focus-within:ring-primary-500 focus-within:ring-offset-1 focus-within:ring-offset-black transform-gpu transition-all duration-[400ms] ease-out hover:z-40 focus-within:z-40 will-change-transform group-hover:scale-[1.04] group-hover:shadow-[0_10px_40px_-10px_rgba(242,84,91,0.4)] group-hover:border-violet-400/50`}>
           {imageUrl ? (
             <img
               src={imageUrl}
@@ -173,7 +173,7 @@ export function ResumePoster({ item, onNavigate }: ResumePosterProps) {
               {/* Lueur d'activité en bas */}
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/5">
                 <div 
-                  className="h-full bg-primary transition-all duration-500 shadow-[0_0_12px_rgba(168,85,247,0.6)]"
+                  className="h-full bg-primary transition-all duration-500 shadow-[0_0_12px_rgba(242,84,91,0.6)]"
                   style={{ width: `${item.downloadProgress ?? 0}%` }}
                 />
               </div>

@@ -232,7 +232,7 @@ export default function Navbar() {
               <img
                 src="/popcorn_logo.png"
                 alt="Popcornn"
-                className="w-8 h-8 sm:w-9 sm:h-9 lg:w-11 lg:h-11 tv:w-12 tv:h-12 object-contain flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:drop-shadow-[0_0_10px_rgba(168,85,247,0.8)]"
+                className="w-8 h-8 sm:w-9 sm:h-9 lg:w-11 lg:h-11 tv:w-12 tv:h-12 object-contain flex-shrink-0 transition-transform duration-300 group-hover:scale-110 group-hover:drop-shadow-[0_0_10px_rgba(242,84,91,0.8)]"
                 loading="eager"
               />
               <span className="hidden md:block font-extrabold text-white text-xl lg:text-2xl tv:text-3xl leading-none tracking-tight select-none truncate">
