@@ -25,6 +25,7 @@ import { redirectTo } from '../../lib/utils/navigation.js';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
 import { syncFieldToCloud } from '../../lib/utils/cloud-sync';
 import { getBackendUrl } from '../../lib/backend-config.js';
+import { hasPendingSsoReturn, initNativeSsoListener } from '../../lib/auth/native-sso';
 
 // Icones SVG pour chaque step (inline pour éviter une dépendance externe)
 const STEP_ICONS: Record<string, () => preact.JSX.Element> = {
@@ -96,6 +97,9 @@ export default function Wizard() {
   const [stepDirection, setStepDirection] = useState<1 | -1>(1);
   const prevStepRef = useRef<number>(1);
   const wdbg = (msg: string) => dbgLog('[WIZ] ' + msg);
+  // Évalué au premier rendu (avant les effets des étapes, qui consomment le ticket) : retour
+  // Pocket ID en cours → ne pas effacer le stockage (sinon la session tout juste créée est perdue).
+  const [ssoReturnAtMount] = useState(() => hasPendingSsoReturn());
 
   const forceAllSteps = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('force') === '1';
   const isTV = typeof window !== 'undefined' && isTVPlatform();
@@ -125,7 +129,13 @@ export default function Wizard() {
   }, []);
 
   useEffect(() => {
-    clearStorageAndCookiesForSetup();
+    // Apps Tauri : écouter le retour Pocket ID (deep link) dès l'ouverture de l'assistant.
+    initNativeSsoListener();
+    if (ssoReturnAtMount) {
+      wdbg('mount: retour Pocket ID en cours → stockage conservé');
+    } else {
+      clearStorageAndCookiesForSetup();
+    }
     // Desktop embarqué : le clear du wizard ne doit pas effacer l'URL locale auto-détectée.
     void ensureEmbeddedDesktopBackendUrl({ force: true });
   }, []);

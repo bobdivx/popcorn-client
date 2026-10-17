@@ -6,6 +6,10 @@ import type { ApiResponse } from './types.js';
 import type { AuthResponse } from './types.js';
 import { TokenManager } from '../storage.js';
 import { loginCloud as popcornWebLogin, registerCloud as popcornWebRegister, completeOidcTicket } from '../../api/popcorn-web.js';
+import { hasBackendUrl, hasDeploymentBackend } from '../../backend-config.js';
+
+/** Attente max de la synchro utilisateur vers le serveur avant de rendre la main à l’UI. */
+const CLOUD_USER_SYNC_WAIT_MS = 5000;
 
 /**
  * Interface pour accéder aux méthodes privées de ServerApiClient nécessaires pour l'authentification
@@ -33,11 +37,24 @@ async function persistCloudLogin(
     TokenManager.setJWTSecret(result.jwtSecret);
   }
   ctx.saveUser(result.user);
+  // Session enregistrée AVANT toute requête vers le serveur Popcornn : la connexion cloud ne doit
+  // jamais dépendre de l’URL serveur (premier lancement : pas encore configurée).
+  ctx.saveTokens(result.accessToken, result.refreshToken);
 
-  if (result.user?.id && result.user?.email) {
+  // Synchro de l’utilisateur vers le serveur : uniquement si une URL serveur est configurée, et sans
+  // bloquer la connexion. Sans URL, backendRequest vise l’URL par défaut (http://10.0.2.2:3000 sur
+  // Android) qui ne répond pas : 15 s × 3 tentatives laissaient l’écran de connexion figé (~50 s).
+  const backendConfigured = (() => {
     try {
-      const username = result.user.username || result.user.email.split('@')[0];
-      await ctx.backendRequest('/api/client/auth/users/sync-cloud', {
+      return hasBackendUrl() || hasDeploymentBackend();
+    } catch {
+      return true;
+    }
+  })();
+  if (result.user?.id && result.user?.email && backendConfigured) {
+    const username = result.user.username || result.user.email.split('@')[0];
+    const sync = ctx
+      .backendRequest('/api/client/auth/users/sync-cloud', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -49,13 +66,12 @@ async function persistCloudLogin(
           username,
           is_admin: result.user.is_admin,
         }),
+      })
+      .catch((syncError) => {
+        console.error('[server-api] Erreur sync cloud après connexion cloud:', syncError);
       });
-    } catch (syncError) {
-      console.error('[server-api] Erreur sync cloud après SSO:', syncError);
-    }
+    await Promise.race([sync, new Promise((resolve) => setTimeout(resolve, CLOUD_USER_SYNC_WAIT_MS))]);
   }
-
-  ctx.saveTokens(result.accessToken, result.refreshToken);
   return {
     success: true,
     data: {
