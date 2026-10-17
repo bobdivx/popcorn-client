@@ -1,0 +1,10 @@
+---
+// Fiche média (lecture d'un élément de la bibliothèque). Utilisée par la version store
+// (PUBLIC_DISTRIBUTION=play) à la place de /torrents ; même composant que /torrents.
+import Layout from '../layouts/Layout.astro';
+import MediaDetailRoute from '../components/torrents/MediaDetailPage/MediaDetailRoute';
+---
+
+<Layout title="Popcornn">
+  <MediaDetailRoute client:only="preact" />
+</Layout>
