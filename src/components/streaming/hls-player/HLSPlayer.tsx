@@ -54,6 +54,8 @@ export default function HLSPlayer({
   isSeries = false,
   nextEpisodeInfo = null,
   onPlayNextEpisode,
+  previousEpisodeInfo = null,
+  onPlayPreviousEpisode,
   onError, 
   onLoadingChange,
   onLoadingMessageChange,
@@ -234,6 +236,90 @@ export default function HLSPlayer({
     };
   }, [onProgress, effectiveDuration]);
 
+  // Progression épisode : fin de lecture = vu ; fermeture app / arrière-plan (webOS Back, Android Home,
+  // onglet masqué) = sauvegarde immédiate. Attaché à l'élément <video> → hls.js ET HLS natif TV.
+  const onProgressRef = useRef(onProgress);
+  onProgressRef.current = onProgress;
+  const flushProgress = useCallback((finished = false) => {
+    const cb = onProgressRef.current;
+    const dur = effectiveDurationRef.current;
+    if (!cb || !(dur > 0)) return;
+    cb(finished ? dur : currentTimeRef.current, dur);
+  }, []);
+  useEffect(() => {
+    const video = videoRef.current;
+    const onEnded = () => flushProgress(true);
+    const onHidden = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') flushProgress(false);
+    };
+    const onPageHide = () => flushProgress(false);
+    video?.addEventListener('ended', onEnded);
+    document.addEventListener('visibilitychange', onHidden);
+    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('beforeunload', onPageHide);
+    return () => {
+      video?.removeEventListener('ended', onEnded);
+      document.removeEventListener('visibilitychange', onHidden);
+      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('beforeunload', onPageHide);
+    };
+  }, [videoRef, hlsLoaded, src, flushProgress]);
+
+  /** Navigation épisode (barre de contrôle, dock TV, touches média). Undefined = bout de série / film. */
+  const goNextEpisode =
+    isSeries && nextEpisodeInfo && onPlayNextEpisode
+      ? () => {
+          flushProgress(false);
+          onPlayNextEpisode();
+        }
+      : undefined;
+  const goPreviousEpisode =
+    isSeries && previousEpisodeInfo && onPlayPreviousEpisode
+      ? () => {
+          flushProgress(false);
+          onPlayPreviousEpisode();
+        }
+      : undefined;
+  const goNextEpisodeRef = useRef(goNextEpisode);
+  goNextEpisodeRef.current = goNextEpisode;
+  const goPreviousEpisodeRef = useRef(goPreviousEpisode);
+  goPreviousEpisodeRef.current = goPreviousEpisode;
+
+  // Hors TV (web, mobile, desktop Tauri, Android téléphone) : touches média + Media Session.
+  useEffect(() => {
+    if (isTVPlatform() || isWebOSTV()) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tgt = e.target as HTMLElement | null;
+      if (tgt && (tgt.tagName === 'INPUT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable)) return;
+      const k = e.key;
+      const next = k === 'MediaTrackNext' || (e.shiftKey && (k === 'N' || k === 'n'));
+      const prev = k === 'MediaTrackPrevious' || (e.shiftKey && (k === 'P' || k === 'p'));
+      if (next && goNextEpisodeRef.current) {
+        e.preventDefault();
+        goNextEpisodeRef.current();
+      } else if (prev && goPreviousEpisodeRef.current) {
+        e.preventDefault();
+        goPreviousEpisodeRef.current();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    const ms = typeof navigator !== 'undefined' ? (navigator as any).mediaSession : null;
+    const setHandler = (action: string, fn: (() => void) | null) => {
+      try {
+        ms?.setActionHandler?.(action, fn);
+      } catch {
+        /* action non supportée */
+      }
+    };
+    setHandler('nexttrack', goNextEpisode ? () => goNextEpisodeRef.current?.() : null);
+    setHandler('previoustrack', goPreviousEpisode ? () => goPreviousEpisodeRef.current?.() : null);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      setHandler('nexttrack', null);
+      setHandler('previoustrack', null);
+    };
+  }, [!!goNextEpisode, !!goPreviousEpisode]);
+
   const {
     audioTracks,
     subtitleTracks,
@@ -367,6 +453,8 @@ export default function HLSPlayer({
     duration > 0 &&
     currentTime >= duration - nextEpisodeCountdownSeconds;
   const handleNextEpisode = () => {
+    // Overlay / compte à rebours de fin : l'épisode courant est terminé → « vu ».
+    flushProgress(true);
     onPlayNextEpisode?.();
   };
 
@@ -424,6 +512,8 @@ export default function HLSPlayer({
     scrubThumbnails: scrubThumbnails?.mediaId && scrubThumbnails.count > 0 ? scrubThumbnails : null,
     onScrubSeek: seekToTargetTime,
     onSeekPreview: handleSeekPreview,
+    onNextEpisode: goNextEpisode,
+    onPreviousEpisode: goPreviousEpisode,
   });
 
   useEffect(() => {
@@ -804,11 +894,11 @@ export default function HLSPlayer({
           tvScrubIndexExternal={isTV ? tvScrubIndex : undefined}
           tvScrubFocused={isTV ? focusedOnScrub : undefined}
           tvScrubBrowsing={isTV ? tvScrubBrowsing : undefined}
-          onPlayNextEpisode={
-            nextEpisodeInfo && onPlayNextEpisode && (playerConfig.nextEpisodeButtonEnabled ?? true)
-              ? onPlayNextEpisode
-              : undefined
-          }
+          showEpisodeNav={isSeries}
+          onNextEpisode={goNextEpisode}
+          onPreviousEpisode={goPreviousEpisode}
+          nextEpisodeTitle={nextEpisodeInfo?.title ?? null}
+          previousEpisodeTitle={previousEpisodeInfo?.title ?? null}
         />
         <div class="absolute inset-0 z-30 pointer-events-none">
           <SkipIntroOverlay
@@ -854,6 +944,8 @@ export default function HLSPlayer({
             onSeekToTime={seekToTargetTime}
             onToggleFillMode={toggleVideoFillMode}
             onOpenSettings={toggleSettings}
+            onNextEpisode={goNextEpisode}
+            onPreviousEpisode={goPreviousEpisode}
             onToggleSubtitles={
               sourceAudioTracks.length > 0 ||
               audioTracks.length > 0 ||

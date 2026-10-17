@@ -5,6 +5,11 @@ import { PackEpisodesSection } from './PackEpisodesSection';
 import type { SeriesEpisodesResponse } from '../../../../lib/client/server-api/media';
 import type { PackEpisodeKey, PackEpisodesModel } from '../hooks/usePackEpisodes';
 import { getWatchedEpisodesSet } from '../../../../lib/streaming/torrent-storage';
+import {
+  getEpisodeProgressMap,
+  syncWatchedEpisodesFromServer,
+  WATCHED_EPISODES_EVENT,
+} from '../../../../lib/watchedEpisodes';
 
 function EpisodeCardsSkeleton({ count = 4 }: { count?: number }) {
   return (
@@ -94,15 +99,28 @@ export function EpisodesArea(props: {
       const d = (e as CustomEvent<{ tmdbId?: number }>).detail;
       if (d?.tmdbId != null && tmdbId != null && d.tmdbId === tmdbId) setWatchedTick((x) => x + 1);
     };
-    window.addEventListener('popcorn-watched-episodes-changed', fn as EventListener);
-    return () => window.removeEventListener('popcorn-watched-episodes-changed', fn as EventListener);
+    window.addEventListener(WATCHED_EPISODES_EVENT, fn as EventListener);
+    return () => window.removeEventListener(WATCHED_EPISODES_EVENT, fn as EventListener);
   }, [tmdbId]);
+
+  // Épisodes vus / reprise partagés entre appareils (serveur) → fusion locale + rattrapage.
+  useEffect(() => {
+    if (typeof tmdbId !== 'number') return;
+    void syncWatchedEpisodesFromServer(tmdbId);
+  }, [tmdbId, watchedEpisodesRefresh]);
 
   const watchedSet = useMemo(() => {
     if (typeof tmdbId !== 'number') return new Set<string>();
     void watchedEpisodesRefresh;
     void watchedTick;
     return getWatchedEpisodesSet(tmdbId);
+  }, [tmdbId, watchedEpisodesRefresh, watchedTick]);
+
+  const episodeProgress = useMemo(() => {
+    if (typeof tmdbId !== 'number') return {};
+    void watchedEpisodesRefresh;
+    void watchedTick;
+    return getEpisodeProgressMap(tmdbId);
   }, [tmdbId, watchedEpisodesRefresh, watchedTick]);
 
   if (!seriesEpisodes?.seasons?.length) return null;
@@ -132,6 +150,7 @@ export function EpisodesArea(props: {
           savedPlaybackPosition={savedPlaybackPosition}
           downloadedEpisodesSet={downloadedEpisodesSet}
           watchedSet={watchedSet}
+          episodeProgress={episodeProgress}
           isTV={isTV}
           isDownloading={isDownloading}
           downloadProgress={downloadProgress}
@@ -161,6 +180,7 @@ export function EpisodesArea(props: {
               onSelectEpisodeKey={onSelectPackEpisodeKey}
               infoHash={packInfoHash}
               watchedSet={watchedSet}
+              episodeProgress={episodeProgress}
               downloadedEpisodesSet={downloadedEpisodesSet}
               downloadingEpisodesMap={downloadingEpisodesMap}
               isTV={isTV}
