@@ -20,7 +20,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { useState, useMemo, useEffect } from 'preact/hooks';
 import type { ComponentType } from 'preact';
 import { canAccess } from '../../lib/permissions';
-import { isRouteBlockedInStoreBuild, isSettingsCategoryAvailable } from '../../lib/distribution';
+import { isRouteBlockedInStoreBuild, isSettingsCategoryAvailable, TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
 
 type CategoryId = 'system' | 'interface' | 'content' | 'library' | 'discovery' | 'account' | 'playback' | 'maintenance';
 
@@ -112,7 +112,8 @@ export default function SettingsMenu() {
         labelKey: 'settingsMenu.category.content',
         icon: CATEGORY_ICONS.content,
         items: [],
-        inlineContent: ContentSubMenuPanel,
+        // Version store : catégorie absente (et panneau exclu du build).
+        inlineContent: TORRENT_FEATURES_ENABLED ? ContentSubMenuPanel : undefined,
         inlinePermissions: ['settings.indexers', 'settings.sync', 'settings.server'],
       },
       {
@@ -128,7 +129,8 @@ export default function SettingsMenu() {
         labelKey: 'settingsMenu.category.discovery',
         icon: CATEGORY_ICONS.discovery,
         items: [],
-        inlineContent: DiscoverySubMenuPanel,
+        // Version store : catégorie absente (et panneau exclu du build).
+        inlineContent: TORRENT_FEATURES_ENABLED ? DiscoverySubMenuPanel : undefined,
         inlinePermission: 'settings.server',
       },
       {
