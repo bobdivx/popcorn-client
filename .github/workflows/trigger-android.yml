@@ -5,6 +5,8 @@ name: Trigger Android builds in popcorn-tauri
 # Automatique à chaque release publiée de popcorn-client (tags v*, hors pre-releases et webos-native-*).
 # Pas de boucle : android.yml pousse seulement des commits "chore: bump" sur dev (aucune release ici)
 # et les releases créées avec GITHUB_TOKEN ne déclenchent pas d'autres workflows.
+# Les releases publiques créées par popcorn-tauri (miroir APK / desktop, via PAT) portent le marqueur
+# [skip-android] dans leur description → ignorées ici (sinon boucle build Android → release → build…).
 on:
   release:
     types: [published]
@@ -28,7 +30,8 @@ jobs:
   trigger-android:
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      (startsWith(github.event.release.tag_name, 'v') && !github.event.release.prerelease)
+      (startsWith(github.event.release.tag_name, 'v') && !github.event.release.prerelease &&
+       !contains(github.event.release.body, '[skip-android]'))
     runs-on: [self-hosted, linux, x64, devforge]
     timeout-minutes: 10
     steps:
