@@ -17,6 +17,11 @@
   --ed-track-md: 0.28em;
   --ed-track-sm: 0.2em;
   --ed-gutter: clamp(1.25rem, 5vw, 4.5rem);
+  /* Motion system : une courbe, trois durées (micro / standard / entrée-sortie). */
+  --ed-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ed-dur-1: 200ms;
+  --ed-dur-2: 300ms;
+  --ed-dur-3: 450ms;
 }
 
 /* ---------- Global ---------- */
@@ -1088,3 +1093,64 @@ html[data-tv-platform] .ed-loader__label { font-size: 1rem; }
 @keyframes ed-loader-run { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
 @keyframes ed-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .ed-loader__line::after { animation: none; width: 100%; } }
+
+/* ==========================================================================
+   Motion system (--ed-ease / --ed-dur-1..3) — modales, cartes, transitions de page.
+   Toutes plateformes ; réduit sur TV (webOS natif/lite, Android TV) et prefers-reduced-motion.
+   ========================================================================== */
+.ed-motion-card {
+  transition: transform var(--ed-dur-1) var(--ed-ease), box-shadow var(--ed-dur-1) var(--ed-ease);
+}
+.ed-cta,
+.ed-link,
+.ed-arrow {
+  transition-duration: var(--ed-dur-1);
+  transition-timing-function: var(--ed-ease);
+}
+.ed-play__ring { transition-duration: var(--ed-dur-2); transition-timing-function: var(--ed-ease); }
+.ed-fade > * { animation-timing-function: var(--ed-ease); }
+
+/* Modales (DS + éditorial) : fondu du voile + montée légère du panneau */
+@keyframes ed-modal-veil-in { from { opacity: 0; } to { opacity: 1; } }
+/* Propriétés individuelles translate/scale : ne pas écraser le transform de centrage des modales. */
+@keyframes ed-modal-panel-in { from { opacity: 0; translate: 0 12px; scale: 0.985; } to { opacity: 1; translate: none; scale: none; } }
+html[data-editorial] .ds-modal-overlay > .absolute.inset-0 {
+  animation: ed-modal-veil-in var(--ed-dur-2) var(--ed-ease) both;
+}
+html[data-editorial] .ds-modal-glass {
+  animation: ed-modal-panel-in var(--ed-dur-3) var(--ed-ease) both;
+}
+html[data-editorial] .ed-playback-splash__status { animation-timing-function: var(--ed-ease); }
+
+/* Transitions de page (Astro View Transitions) */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--ed-dur-2);
+  animation-timing-function: var(--ed-ease);
+}
+
+/* TV : mouvements réduits (fondu court, pas de translation/scale coûteux) */
+html[data-tv-platform] {
+  --ed-dur-1: 0ms;
+  --ed-dur-2: 160ms;
+  --ed-dur-3: 200ms;
+}
+html[data-tv-platform][data-editorial] .ds-modal-glass {
+  animation: ed-modal-veil-in var(--ed-dur-3) linear both;
+}
+html[data-webos='true'] ::view-transition-old(root),
+html[data-webos='true'] ::view-transition-new(root) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ed-dur-1: 0ms;
+    --ed-dur-2: 0ms;
+    --ed-dur-3: 0ms;
+  }
+  html[data-editorial] .ds-modal-glass,
+  html[data-editorial] .ds-modal-overlay > .absolute.inset-0 {
+    animation: none;
+  }
+}

@@ -26,8 +26,8 @@
   --bg-glass: rgba(255, 255, 255, 0.05); /* Verre dépoli */
   --bg-glass-hover: rgba(255, 255, 255, 0.1);
   --bg-glass-active: rgba(255, 255, 255, 0.15);
-  --neon-violet: #a855f7; /* Neon Violet */
-  --neon-violet-glow: rgba(168, 85, 247, 0.5);
+  --neon-violet: #ff6a70; /* Neon Violet */
+  --neon-violet-glow: rgba(242, 84, 91, 0.5);
   --blur-glass: blur(20px); /* Effet verre dépoli */
   --blur-glass-lg: blur(40px); /* Effet verre dépoli fort */
   
@@ -733,7 +733,7 @@ html[data-tv-platform="true"] .search-progress-fill {
   transform: translateX(-50%);
   width: 55%;
   height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 1), rgba(255, 255, 255, 0.6), rgba(168, 85, 247, 1), transparent);
+  background: linear-gradient(90deg, transparent, rgba(242, 84, 91, 1), rgba(255, 255, 255, 0.6), rgba(242, 84, 91, 1), transparent);
   border-radius: 2px;
   animation: tabActiveGlow 2.5s ease-in-out infinite;
 }
@@ -812,7 +812,7 @@ html[data-tv-platform="true"] .search-progress-fill {
   }
   to {
     transform: translateY(-4px) scale(1.02);
-    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(168, 85, 247, 0.2);
+    box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(242, 84, 91, 0.2);
   }
 }
 
@@ -839,7 +839,7 @@ html[data-tv-platform="true"] .search-progress-fill {
 
 .interactive-card:hover {
   transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(168, 85, 247, 0.2);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3), 0 0 20px rgba(242, 84, 91, 0.2);
   z-index: 5;
 }
 
@@ -1190,12 +1190,12 @@ html[data-tv-platform="true"] .search-progress-fill {
 
 .form-tv-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.4);
+  box-shadow: 0 4px 12px rgba(242, 84, 91, 0.4);
 }
 
 .form-tv-button:focus:not(:disabled) {
   outline: none;
-  box-shadow: 0 4px 12px rgba(168, 85, 247, 0.6);
+  box-shadow: 0 4px 12px rgba(242, 84, 91, 0.6);
 }
 
 /* Classes utilitaires globales pour Glassmorphic */
@@ -1209,7 +1209,7 @@ html[data-tv-platform="true"] .search-progress-fill {
   .bg-page-gradient {
     position: absolute;
     inset: 0;
-    background: linear-gradient(to bottom right, var(--page-bg), rgba(168, 85, 247, 0.12), var(--page-bg));
+    background: linear-gradient(to bottom right, var(--page-bg), rgba(242, 84, 91, 0.12), var(--page-bg));
     pointer-events: none;
   }
 
@@ -1243,7 +1243,7 @@ html[data-tv-platform="true"] .search-progress-fill {
     height: 600px;
     top: -12rem;
     left: -12rem;
-    background: rgba(168, 85, 247, 0.1);
+    background: rgba(242, 84, 91, 0.1);
   }
 
   .loading-orb-2 {
@@ -1251,7 +1251,7 @@ html[data-tv-platform="true"] .search-progress-fill {
     height: 500px;
     bottom: -8rem;
     right: -8rem;
-    background: rgba(147, 51, 234, 0.1);
+    background: rgba(242, 84, 91, 0.1);
     animation-delay: 2s;
   }
 
@@ -1288,11 +1288,11 @@ html[data-tv-platform="true"] .search-progress-fill {
   }
   
   .shadow-primary {
-    box-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3);
+    box-shadow: 0 0 10px rgba(242, 84, 91, 0.5), 0 0 20px rgba(242, 84, 91, 0.3);
   }
   
   .shadow-primary-lg {
-    box-shadow: 0 0 20px rgba(168, 85, 247, 0.8), 0 0 40px rgba(168, 85, 247, 0.5);
+    box-shadow: 0 0 20px rgba(242, 84, 91, 0.8), 0 0 40px rgba(242, 84, 91, 0.5);
   }
   
   /* Classes Glassmorphic */
@@ -1337,7 +1337,7 @@ html[data-tv-platform="true"] .search-progress-fill {
     background: linear-gradient(135deg, rgba(18, 18, 18, 0.95) 0%, rgba(30, 30, 30, 0.98) 100%);
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
-    border: 1px solid rgba(168, 85, 247, 0.2);
+    border: 1px solid rgba(242, 84, 91, 0.2);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
   }
   
@@ -1346,7 +1346,7 @@ html[data-tv-platform="true"] .search-progress-fill {
     background: linear-gradient(135deg, rgba(18, 18, 18, 0.98) 0%, rgba(30, 30, 30, 0.99) 100%);
     backdrop-filter: blur(32px) saturate(180%);
     -webkit-backdrop-filter: blur(32px) saturate(180%);
-    border: 1px solid rgba(168, 85, 247, 0.2);
+    border: 1px solid rgba(242, 84, 91, 0.2);
     box-shadow: 0 12px 48px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.15) inset;
   }
   
@@ -1421,34 +1421,34 @@ html[data-tv-platform="true"] .search-progress-fill {
   
   .focus-tv-glow {
     @apply focus-tv;
-    box-shadow: 0 0 20px rgba(168, 85, 247, 0.8), 0 0 40px rgba(168, 85, 247, 0.5);
+    box-shadow: 0 0 20px rgba(242, 84, 91, 0.8), 0 0 40px rgba(242, 84, 91, 0.5);
   }
   
   .hover-tv:not(:focus) {
     @apply hover:scale-105 transition-all duration-200;
-    box-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3);
+    box-shadow: 0 0 10px rgba(242, 84, 91, 0.5), 0 0 20px rgba(242, 84, 91, 0.3);
   }
 
 /* Animation douce de glow pour les cartes dashboard au hover/focus */
 .card-glow-shell {
   /* Outline (pas rogné par overflow-hidden), donc visible même sur les overlays */
-  outline: 2px solid rgba(168, 85, 247, 0);
+  outline: 2px solid rgba(242, 84, 91, 0);
   outline-offset: -2px;
   will-change: outline-color, box-shadow;
 }
 
 @keyframes card-glow-pulse {
   0% {
-    outline-color: rgba(168, 85, 247, 0);
-    box-shadow: 0 0 0 rgba(168, 85, 247, 0);
+    outline-color: rgba(242, 84, 91, 0);
+    box-shadow: 0 0 0 rgba(242, 84, 91, 0);
   }
   50% {
-    outline-color: rgba(168, 85, 247, 0.65);
-    box-shadow: 0 0 0 1px rgba(168, 85, 247, 0.45), 0 0 18px rgba(168, 85, 247, 0.35), 0 0 36px rgba(168, 85, 247, 0.18);
+    outline-color: rgba(242, 84, 91, 0.65);
+    box-shadow: 0 0 0 1px rgba(242, 84, 91, 0.45), 0 0 18px rgba(242, 84, 91, 0.35), 0 0 36px rgba(242, 84, 91, 0.18);
   }
   100% {
-    outline-color: rgba(168, 85, 247, 0);
-    box-shadow: 0 0 0 rgba(168, 85, 247, 0);
+    outline-color: rgba(242, 84, 91, 0);
+    box-shadow: 0 0 0 rgba(242, 84, 91, 0);
   }
 }
 
@@ -1826,7 +1826,7 @@ html[data-tv-platform="true"] .search-progress-fill {
   @apply bg-glass-hover text-white;
   outline: 3px solid #fff;
   outline-offset: 2px;
-  box-shadow: 0 0 0 5px rgba(124, 58, 237, 0.8);
+  box-shadow: 0 0 0 5px rgba(242, 84, 91, 0.8);
   position: relative;
   z-index: 10;
 }
@@ -1847,13 +1847,13 @@ html[data-tv-platform="true"] .nav-tab {
 @media (min-width: 1280px) {
   .nav-tab-active {
     background: rgba(255, 255, 255, 0.15) !important;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset, 0 4px 20px rgba(168, 85, 247, 0.2) !important;
+    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12) inset, 0 4px 20px rgba(242, 84, 91, 0.2) !important;
   }
 
   .nav-tab-active::after {
     width: 70% !important;
     height: 3px !important;
-    background: linear-gradient(90deg, transparent, rgba(168, 85, 247, 1), rgba(255, 255, 255, 0.8), rgba(168, 85, 247, 1), transparent) !important;
+    background: linear-gradient(90deg, transparent, rgba(242, 84, 91, 1), rgba(255, 255, 255, 0.8), rgba(242, 84, 91, 1), transparent) !important;
   }
 }
 
@@ -1907,7 +1907,7 @@ html[data-tv-platform="true"] .nav-tab {
 .ripple-effect {
   position: absolute;
   border-radius: 50%;
-  background: rgba(168, 85, 247, 0.6);
+  background: rgba(242, 84, 91, 0.6);
   transform: scale(0);
   animation: ripple 0.6s ease-out;
   pointer-events: none;
@@ -2092,20 +2092,20 @@ html {
 
 /* Glow effect pour éléments actifs - mis à jour avec Neon Violet (rétrocompatibilité) */
 .glow-violet {
-  box-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3);
+  box-shadow: 0 0 10px rgba(242, 84, 91, 0.5), 0 0 20px rgba(242, 84, 91, 0.3);
 }
 
 .glow-violet-lg {
-  box-shadow: 0 0 20px rgba(168, 85, 247, 0.8), 0 0 40px rgba(168, 85, 247, 0.5);
+  box-shadow: 0 0 20px rgba(242, 84, 91, 0.8), 0 0 40px rgba(242, 84, 91, 0.5);
 }
 
 /* Rétrocompatibilité - shadow-glow-violet (utiliser shadow-primary maintenant) */
 .shadow-glow-violet {
-  box-shadow: 0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3);
+  box-shadow: 0 0 10px rgba(242, 84, 91, 0.5), 0 0 20px rgba(242, 84, 91, 0.3);
 }
 
 .shadow-glow-violet-lg {
-  box-shadow: 0 0 20px rgba(168, 85, 247, 0.8), 0 0 40px rgba(168, 85, 247, 0.5);
+  box-shadow: 0 0 20px rgba(242, 84, 91, 0.8), 0 0 40px rgba(242, 84, 91, 0.5);
 }
 
 /* ==========================================================================
@@ -2142,7 +2142,7 @@ html {
   overflow: visible !important;
   outline: 3px solid #fff !important;
   outline-offset: 3px !important;
-  box-shadow: 0 0 0 6px rgba(124, 58, 237, 0.85), 0 12px 32px rgba(0, 0, 0, 0.45) !important;
+  box-shadow: 0 0 0 6px rgba(242, 84, 91, 0.85), 0 12px 32px rgba(0, 0, 0, 0.45) !important;
 }
 
 /* Tuiles browse : pas de scale TV au focus clavier / paysage.
@@ -2177,7 +2177,7 @@ html {
   border-radius: inherit;
   pointer-events: none;
   z-index: 8;
-  box-shadow: inset 0 0 0 4px #fff, inset 0 0 0 8px rgba(124, 58, 237, 0.95);
+  box-shadow: inset 0 0 0 4px #fff, inset 0 0 0 8px rgba(242, 84, 91, 0.95);
 }
 [data-browse-slot][data-preview-expanded='true'] {
   z-index: 2 !important;
@@ -2242,7 +2242,7 @@ html[data-tv-platform="true"] [data-focusable]:focus:not([data-torrent-card]):no
 html[data-tv-platform="true"] .tv-element-focused {
   outline: 3px solid #fff !important;
   outline-offset: -3px !important;
-  box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 7px rgba(124, 58, 237, 0.9) !important;
+  box-shadow: inset 0 0 0 3px #fff, inset 0 0 0 7px rgba(242, 84, 91, 0.9) !important;
 }
 
 [data-focusable]:focus,
@@ -2433,7 +2433,7 @@ form button[type="submit"]:focus-visible,
 }
 [data-theme="light"] nav .gtv-icon-btn.bg-primary-600 {
   color: #fff !important;
-  background-color: #7c3aed !important;
+  background-color: #f2545b !important;
   border-color: transparent !important;
 }
 
@@ -2449,7 +2449,7 @@ form button[type="submit"]:focus-visible,
 }
 [data-theme="light"] nav .gtv-pill-btn-primary,
 [data-theme="light"] nav .gtv-pill-btn.gtv-pill-btn-primary {
-  background-color: #7c3aed !important;
+  background-color: #f2545b !important;
   color: #fff !important;
   border-color: transparent !important;
 }
