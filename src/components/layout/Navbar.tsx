@@ -21,6 +21,7 @@ import { loadSubscription } from '../../lib/subscription-store';
 import ConnectivityWarning from './ConnectivityWarning';
 import { isTVPlatform } from '../../lib/utils/device-detection';
 import ThemeToggle from './ThemeToggle';
+import { TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
 
 type NavTab = { label: string; href: string; match?: 'exact' | 'prefix'; icon?: ComponentType<{ className?: string }> };
 
@@ -163,7 +164,8 @@ export default function Navbar() {
 
   // Statut de sync unifié : abonnement au store + démarrage du polling quand l'utilisateur est connecté
   useEffect(() => {
-    if (!user) {
+    // Version store : pas de synchronisation d'indexers → pas de polling /api/sync/status.
+    if (!user || !TORRENT_FEATURES_ENABLED) {
       setStoreState({ status: null, loading: false });
       return undefined;
     }
@@ -201,7 +203,10 @@ export default function Navbar() {
     // Sur certains environnements (Tauri / WebView), les routes "directory" nécessitent un slash final.
     { label: t('nav.films'), href: '/films/', match: 'prefix', icon: Film },
     { label: t('nav.series'), href: '/series/', match: 'prefix', icon: Tv2 },
-    { label: t('nav.demandes'), href: '/demandes', match: 'prefix', icon: ListPlus },
+    // Demandes de contenu (déclenchent des téléchargements) : absentes de la version store.
+    ...(TORRENT_FEATURES_ENABLED
+      ? [{ label: t('nav.demandes'), href: '/demandes', match: 'prefix' as const, icon: ListPlus }]
+      : []),
   ];
 
   if (loading) return null;
@@ -356,21 +361,23 @@ export default function Navbar() {
                     );
                   })}
                   <div className="border-t border-[var(--ds-border)] my-2" aria-hidden />
-                  <a
-                    href="/downloads"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className={`flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all duration-200 ${
-                      isActivePrefix('/downloads')
-                        ? 'bg-primary-600 text-[var(--ds-text-on-accent)] font-bold'
-                        : 'text-[var(--ds-text-primary)] hover:bg-[var(--ds-surface)]'
-                    }`}
-                    tabIndex={0}
-                    data-focusable
-                    aria-current={isActivePrefix('/downloads') ? 'page' : undefined}
-                  >
-                    <Download className="w-5 h-5 flex-shrink-0 opacity-80" />
-                    <span>{t('nav.downloads')}</span>
-                  </a>
+                  {TORRENT_FEATURES_ENABLED && (
+                    <a
+                      href="/downloads"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={`flex items-center gap-3 px-4 py-3.5 rounded-lg transition-all duration-200 ${
+                        isActivePrefix('/downloads')
+                          ? 'bg-primary-600 text-[var(--ds-text-on-accent)] font-bold'
+                          : 'text-[var(--ds-text-primary)] hover:bg-[var(--ds-surface)]'
+                      }`}
+                      tabIndex={0}
+                      data-focusable
+                      aria-current={isActivePrefix('/downloads') ? 'page' : undefined}
+                    >
+                      <Download className="w-5 h-5 flex-shrink-0 opacity-80" />
+                      <span>{t('nav.downloads')}</span>
+                    </a>
+                  )}
                   <ThemeToggle variant="menu" />
                   <a
                     href="/settings"
@@ -409,27 +416,31 @@ export default function Navbar() {
 
             {user ? (
               <>
-                {/* Recherche — toujours visible */}
-                <a
-                  href="/search"
-                  className={`gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative inline-flex items-center justify-center transition-all duration-200 hover:scale-110 ${isActive('/search') ? 'bg-glass-active' : ''}`}
-                  aria-label={t('nav.search')}
-                  tabIndex={0}
-                  data-focusable
-                >
-                  <SearchIcon className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 relative z-10" />
-                </a>
+                {/* Recherche (torrents / indexers) — absente de la version store */}
+                {TORRENT_FEATURES_ENABLED && (
+                  <a
+                    href="/search"
+                    className={`gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative inline-flex items-center justify-center transition-all duration-200 hover:scale-110 ${isActive('/search') ? 'bg-glass-active' : ''}`}
+                    aria-label={t('nav.search')}
+                    tabIndex={0}
+                    data-focusable
+                  >
+                    <SearchIcon className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 relative z-10" />
+                  </a>
+                )}
 
-                {/* Téléchargements — xl+ (dans hamburger sinon) */}
-                <a
-                  href="/downloads"
-                  className={`hidden xl:inline-flex gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative items-center justify-center transition-all duration-200 hover:scale-110 ${isActivePrefix('/downloads') ? 'bg-glass-active' : ''}`}
-                  aria-label={t('nav.downloads')}
-                  tabIndex={0}
-                  data-focusable
-                >
-                  <Download className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 relative z-10" />
-                </a>
+                {/* Téléchargements — xl+ (dans hamburger sinon) ; absents de la version store */}
+                {TORRENT_FEATURES_ENABLED && (
+                  <a
+                    href="/downloads"
+                    className={`hidden xl:inline-flex gtv-icon-btn ds-focus-glow ds-active-glow flex-shrink-0 relative items-center justify-center transition-all duration-200 hover:scale-110 ${isActivePrefix('/downloads') ? 'bg-glass-active' : ''}`}
+                    aria-label={t('nav.downloads')}
+                    tabIndex={0}
+                    data-focusable
+                  >
+                    <Download className="w-4 h-4 sm:w-5 sm:h-5 tv:w-6 tv:h-6 relative z-10" />
+                  </a>
+                )}
 
                 <ThemeToggle />
 

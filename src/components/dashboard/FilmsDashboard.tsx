@@ -29,11 +29,13 @@ import {
   uniqueByMedia,
   byPopularity,
 } from './utils/browsePriority';
+import { IS_STORE_BUILD } from '../../lib/distribution';
+import StoreLibraryHome from './StoreLibraryHome';
 
 const SECTION_LIMIT = 48;
 const GENRE_CAP = 180;
 
-export default function FilmsDashboard() {
+function FullFilmsDashboard() {
   const { t, language } = useI18n();
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const { films, loading, error } = useInfiniteFilms();
@@ -154,4 +156,9 @@ export default function FilmsDashboard() {
       ) : null}
     </SimpleTmdbPage>
   );
+}
+
+/** Version store (PUBLIC_DISTRIBUTION=play) : bibliothèque du serveur uniquement, sans catalogue torrent. */
+export default function FilmsDashboard() {
+  return IS_STORE_BUILD ? <StoreLibraryHome filter="movies" /> : <FullFilmsDashboard />;
 }
