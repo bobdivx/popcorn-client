@@ -328,6 +328,14 @@ export class ServerApiClientBase {
       if (cloudToken) (headers as Record<string, string>).Authorization = `Bearer ${cloudToken}`;
     }
 
+    // Identite client (version + plateforme) pour le gate min-client-version serveur.
+    if (typeof window !== 'undefined') {
+      try {
+        const { clientIdentityHeaders } = await import('../../client-identity.js');
+        Object.assign(headers as Record<string, string>, clientIdentityHeaders());
+      } catch { /* ignore */ }
+    }
+
     const noCache = (options.method === 'GET' || !options.method) &&
       (endpoint.includes('/api/torrents/list') || endpoint.includes('/api/torrents/fast') || endpoint.includes('/api/sync/status'));
     const fetchOptions = noCache ? { ...options, headers, cache: 'no-store' as RequestCache } : { ...options, headers };
@@ -348,6 +356,13 @@ export class ServerApiClientBase {
             }
           }
         } catch { /* ignore - gestion standard ci-dessous */ }
+      }
+      // Client trop ancien pour le gate min-version : afficher l'ecran "Mets a jour Popcornn".
+      if (response.status === 426 && typeof window !== 'undefined') {
+        try {
+          const { showClientOutdatedOverlay } = await import('../../client-outdated-overlay.js');
+          showClientOutdatedOverlay();
+        } catch { /* ignore */ }
       }
       const data = await response.json().catch(() => ({}));
       
