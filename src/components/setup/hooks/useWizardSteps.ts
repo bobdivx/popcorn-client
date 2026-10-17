@@ -1,5 +1,6 @@
 import { useMemo } from 'preact/hooks';
 import type { SetupStatus } from '../../../lib/client/types';
+import { IS_STORE_BUILD } from '../../../lib/distribution';
 
 export type WizardStepId =
   | 'serverUrl'
@@ -29,7 +30,35 @@ const STEP_ORDER_SERVER_FIRST: WizardStepId[] = ['serverUrl', 'language', 'auth'
  * Calcule la liste des étapes à afficher pour un statut donné (utilisé par useWizardSteps et getNextStepNumberAfterWelcome).
  * @param hasBackendUrl - quand false (premier lancement), l'étape 1 est Auth puis ServerUrl en étape 2
  */
+/** Étapes torrent (indexers, dossier de téléchargement, sync) : absentes de la version store. */
+export const STORE_EXCLUDED_STEPS: readonly WizardStepId[] = ['indexers', 'downloadLocation', 'sync'];
+
+export function isWizardStepAvailable(id: WizardStepId): boolean {
+  return !IS_STORE_BUILD || !STORE_EXCLUDED_STEPS.includes(id);
+}
+
 function computeSteps(
+  setupStatus: SetupStatus | null,
+  forceShowStepIds: WizardStepId[],
+  forceAllSteps: boolean,
+  wizardStartedWithNeedsSetup: boolean,
+  hasBackendUrl: boolean
+): WizardStep[] {
+  const steps = computeStepsForAllDistributions(
+    setupStatus,
+    forceShowStepIds,
+    forceAllSteps,
+    wizardStartedWithNeedsSetup,
+    hasBackendUrl
+  );
+  if (!IS_STORE_BUILD) return steps;
+  let n = 1;
+  return steps
+    .filter((step) => isWizardStepAvailable(step.id))
+    .map((step) => ({ ...step, number: n++ }));
+}
+
+function computeStepsForAllDistributions(
   setupStatus: SetupStatus | null,
   forceShowStepIds: WizardStepId[],
   forceAllSteps: boolean,
