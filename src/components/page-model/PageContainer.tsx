@@ -6,6 +6,8 @@ interface PageContainerProps {
   pageId: string;
   heroItems?: ContentItem[];
   onHeroPlay?: (item: ContentItem) => void;
+  /** Action du bouton principal du hero (OK télécommande) — défaut : fiche média. */
+  onHeroPrimaryAction?: (item: ContentItem) => void | Promise<void>;
   heroPrimaryButtonLabel?: string;
   heroPrimaryButtonIcon?: ComponentChildren;
   children: ComponentChildren;
@@ -15,6 +17,7 @@ export function PageContainer({
   pageId,
   heroItems = [],
   onHeroPlay,
+  onHeroPrimaryAction,
   heroPrimaryButtonLabel,
   heroPrimaryButtonIcon,
   children,
@@ -25,6 +28,7 @@ export function PageContainer({
         <HeroSection
           items={heroItems}
           onPlay={onHeroPlay}
+          onPrimaryAction={onHeroPrimaryAction}
           primaryButtonLabel={heroPrimaryButtonLabel}
           primaryButtonIcon={heroPrimaryButtonIcon}
           size="large"

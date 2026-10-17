@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
-import { ArrowLeft } from 'lucide-preact';
 import { useI18n } from '../../lib/i18n/useI18n';
 import type { ContentItem } from '../../lib/client/types';
 import { PageContainer } from '../page-model/PageContainer';
@@ -83,8 +82,13 @@ export default function PlatformPage({ slug }: PlatformPageProps) {
     };
   }, [slug, language]);
 
+  /** Fiche du titre ; on garde l'origine (from/fromP) pour que Retour revienne ici même sans historique. */
   const handleNavigate = (item: ContentItem) => {
-    window.location.href = buildSuggestionUrl(item, 'plateformes');
+    const url = buildSuggestionUrl(item, 'plateformes');
+    const extra = [/[?&]from=/.test(url) ? '' : 'from=plateformes', `fromP=${encodeURIComponent(slug)}`]
+      .filter(Boolean)
+      .join('&');
+    window.location.href = `${url}${url.includes('?') ? '&' : '?'}${extra}`;
   };
 
   const exclusives = rows['exclusives'] ?? [];
@@ -110,7 +114,7 @@ export default function PlatformPage({ slug }: PlatformPageProps) {
 
   if (status === 'loading') {
     return (
-      <div className="min-h-screen bg-black text-white relative" data-page="plateforme">
+      <div className="min-h-screen bg-black text-white relative" data-page="plateforme" data-tv-back-href="/plateformes/">
         <div className="pt-4 sm:pt-6">
           <TorrentCardsShadowLoader rows={3} showHero />
         </div>
@@ -120,7 +124,7 @@ export default function PlatformPage({ slug }: PlatformPageProps) {
 
   if (status === 'error' || !platform) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 text-center" data-page="plateforme">
+      <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 text-center" data-page="plateforme" data-tv-back-href="/plateformes/">
         <h1 className="text-2xl font-bold mb-3 text-white">
           {en ? 'This platform is unavailable.' : 'Cette plateforme est indisponible.'}
         </h1>
@@ -132,17 +136,16 @@ export default function PlatformPage({ slug }: PlatformPageProps) {
   }
 
   return (
-    <PageContainer pageId={`plateforme-${slug}`} heroItems={heroItems} onHeroPlay={handleNavigate}>
-      <header className="px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 pt-4 sm:pt-6 pb-6 tv:pb-8">
-        <a
-          href="/plateformes/"
-          className="inline-flex items-center gap-2 text-sm tv:text-lg text-white/55 hover:text-white mb-5 transition-colors rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--ed-accent,#f2545b)]/60"
-          tabIndex={0}
-          data-focusable
-        >
-          <ArrowLeft className="w-4 h-4 tv:w-6 tv:h-6" />
-          {en ? 'All platforms' : 'Toutes les plateformes'}
-        </a>
+    <PageContainer
+      pageId={`plateforme-${slug}`}
+      heroItems={heroItems}
+      onHeroPlay={handleNavigate}
+      onHeroPrimaryAction={handleNavigate}
+      heroPrimaryButtonLabel={en ? 'Open' : 'Voir la fiche'}
+    >
+      {/* Retour télécommande sans historique (lien direct) → grille des plateformes */}
+      <span hidden aria-hidden="true" data-tv-back-href="/plateformes/" />
+      <header className="px-3 sm:px-4 md:px-6 lg:px-8 xl:px-12 tv:px-16 pt-6 sm:pt-8 pb-6 tv:pb-8">
         <div className="flex items-center gap-4 sm:gap-5 tv:gap-8">
           {logo ? (
             <img
