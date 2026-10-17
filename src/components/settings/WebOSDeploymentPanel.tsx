@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'preact/hooks';
-import { Check, Copy, Globe, Loader2, Tv } from 'lucide-preact';
+import { Check, Copy, Download, Globe, Loader2, Tv } from 'lucide-preact';
 import { serverApi } from '../../lib/client/server-api';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { SettingsCard } from './SettingsCard';
+import { APP_DOWNLOAD_LINKS } from '../../lib/app-download-links';
 
 const fieldClass =
   'w-full min-h-[48px] px-3 rounded-xl bg-[var(--ds-surface-elevated)] text-[var(--ds-text-primary)] border border-[var(--ds-border)] font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]';
@@ -172,6 +173,49 @@ export default function WebOSDeploymentPanel() {
             </button>
           </div>
         </label>
+      </SettingsCard>
+
+      <SettingsCard
+        icon={Download}
+        title="Télécharger l'application webOS"
+        description="Dernières versions publiées (liens toujours à jour). Installez-les avec ares-install / Developer Mode, ou directement depuis le formulaire ci-dessous."
+      >
+        <div class="flex flex-col sm:flex-row flex-wrap gap-3">
+          <a
+            class={btnPrimary}
+            href={APP_DOWNLOAD_LINKS.webosNative}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-tv-focusable
+            title="com.popcorn.client.webos.native — UI embarquée (beta)"
+          >
+            <Download class="h-5 w-5" />
+            IPK native (beta)
+          </a>
+          <a
+            class={btnGhost}
+            href={APP_DOWNLOAD_LINKS.webosLite}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-tv-focusable
+            title="com.popcorn.client.webos — lanceur qui ouvre client.popcornn.app"
+          >
+            <Download class="h-5 w-5" />
+            IPK lite
+          </a>
+          <a
+            class={btnGhost}
+            href={APP_DOWNLOAD_LINKS.page}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-tv-focusable
+          >
+            Toutes les plateformes
+          </a>
+        </div>
+        <p class="text-xs text-[var(--ds-text-tertiary)] mt-3 font-mono break-all">
+          ares-install -d &lt;tv&gt; com.popcorn.client.webos.native_&lt;version&gt;_all.ipk
+        </p>
       </SettingsCard>
 
       <SettingsCard
