@@ -8,6 +8,7 @@ import type { ClientApi } from './index.js';
 import { handleResponse, handleError, extractInfoHashFromError } from './utils.js';
 import { getBackendUrl } from '../../backend-config.js';
 import { TokenManager } from '../storage.js';
+import { clientIdentityHeaders } from '../../client-identity.js';
 
 // En-tete d'auth serveur pour les fetch normaux : le token cloud identifie le membre cote serveur.
 // Les transports sans en-tete (EventSource) passent le token en query (voir getLibrqbitStreamLogsUrl).
@@ -48,9 +49,16 @@ export class TorrentsService {
   }
 
   /** fetch avec en-tete d'auth serveur (token cloud) joint automatiquement. */
-  private af(url: string, init: RequestInit = {}): Promise<Response> {
-    const headers = { ...(init.headers as Record<string, string> | undefined), ...authHeaders() };
-    return fetch(url, { ...init, headers });
+  private async af(url: string, init: RequestInit = {}): Promise<Response> {
+    const headers = { ...(init.headers as Record<string, string> | undefined), ...authHeaders(), ...clientIdentityHeaders() };
+    const res = await fetch(url, { ...init, headers });
+    if (res.status === 426 && typeof window !== 'undefined') {
+      try {
+        const { showClientOutdatedOverlay } = await import('../../client-outdated-overlay.js');
+        showClientOutdatedOverlay();
+      } catch { /* ignore */ }
+    }
+    return res;
   }
 
   /**
