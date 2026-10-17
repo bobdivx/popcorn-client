@@ -1,0 +1,10 @@
+---
+import Layout from '../layouts/Layout.astro';
+import PlatformsRoute from '../components/platforms/PlatformsRoute';
+---
+
+<Layout title="Plateformes - Popcornn">
+  <div>
+    <PlatformsRoute client:only="preact" />
+  </div>
+</Layout>
