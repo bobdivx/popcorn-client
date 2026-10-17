@@ -1,25 +1,44 @@
 name: Trigger Android builds in popcorn-tauri
 
+# Déclenche le build Android unifié (com.popcornn.client.mobile, téléphone + TV) dans popcorn-tauri
+# → upload Google Play piste alpha (Tests fermés) en "completed".
+# Automatique à chaque release publiée de popcorn-client (tags v*, hors pre-releases et webos-native-*).
+# Pas de boucle : android.yml pousse seulement des commits "chore: bump" sur dev (aucune release ici)
+# et les releases créées avec GITHUB_TOKEN ne déclenchent pas d'autres workflows.
 on:
-  # Plus de déclenchement automatique sur push : lancement manuel uniquement
+  release:
+    types: [published]
   workflow_dispatch:
+    inputs:
+      track:
+        description: "Piste Google Play"
+        required: false
+        default: alpha
+        type: choice
+        options:
+          - alpha
+          - internal
+          - beta
+
+concurrency:
+  group: trigger-android
+  cancel-in-progress: false
 
 jobs:
   trigger-android:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (startsWith(github.event.release.tag_name, 'v') && !github.event.release.prerelease)
     runs-on: [self-hosted, linux, x64, devforge]
-    timeout-minutes: 90
+    timeout-minutes: 10
     steps:
-      - name: Send android-build event to popcorn-tauri (mobile)
+      - name: Send android-build event to popcorn-tauri (app unique mobile + TV)
         uses: peter-evans/repository-dispatch@v3
         with:
           token: ${{ secrets.REPO_ACCESS_TOKEN_TAURI }}
           repository: bobdivx/popcorn-tauri
           event-type: android-build
-
-      - name: Send android-tv-build event to popcorn-tauri (TV)
-        uses: peter-evans/repository-dispatch@v3
-        with:
-          token: ${{ secrets.REPO_ACCESS_TOKEN_TAURI }}
-          repository: bobdivx/popcorn-tauri
-          event-type: android-tv-build
-
+          client-payload: >-
+            {"track": "${{ inputs.track || 'alpha' }}",
+             "client_tag": "${{ github.event.release.tag_name || '' }}",
+             "client_sha": "${{ github.sha }}"}
