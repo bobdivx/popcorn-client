@@ -2,6 +2,7 @@ import { defineConfig } from 'astro/config';
 import preact from '@astrojs/preact';
 import tailwind from '@astrojs/tailwind';
 import { serveJsonVersion } from './scripts/vite/serve-json-version.mjs';
+import { storeDistribution } from './scripts/astro/store-distribution.mjs';
 
 // Configuration spécifique pour Tauri - mode static uniquement
 // Cette config est utilisée uniquement pour le build Tauri
@@ -13,6 +14,8 @@ export default defineConfig({
     tailwind({
       applyBaseStyles: false,
     }),
+    // Version store (PUBLIC_DISTRIBUTION=play) : retire les pages torrent du build. No-op sinon.
+    storeDistribution(),
   ],
   // Mode static pour Tauri (pas de routes serveur, pas d'adapter)
   output: 'static',
