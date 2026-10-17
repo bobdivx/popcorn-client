@@ -49,5 +49,21 @@
       "autoIncrementVersionCode": false
     }
   },
-  "plugins": {}
+  "plugins": {
+    "deep-link": {
+      "mobile": [
+        {
+          "scheme": ["https"],
+          "host": "popcornn.app",
+          "pathPrefix": ["/app/auth"],
+          "appLink": true
+        },
+        {
+          "scheme": ["popcornn"],
+          "host": "auth",
+          "appLink": false
+        }
+      ]
+    }
+  }
 }

@@ -188,6 +188,10 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        // Pocket ID : ouverture dans le navigateur système et retour par deep link
+        // (https://popcornn.app/app/auth/* ou popcornn://auth/*).
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![get_platform, log_message, native_fetch, get_app_version])
         .setup(|_app| {
             // #region agent log
