@@ -4,6 +4,7 @@ import { useI18n } from '../../../../lib/i18n/useI18n';
 import type { PackEpisodeKey, PackEpisodesModel } from '../hooks/usePackEpisodes';
 import { serverApi } from '../../../../lib/client/server-api';
 import { watchedEpisodeKey } from '../../../../lib/streaming/torrent-storage';
+import { getEpisodeResumePercent, type EpisodeProgressEntry } from '../../../../lib/watchedEpisodes';
 import { isGenericEpisodeName } from '../utils/isGenericEpisodeName';
 import { EpisodeCardsCarousel } from './EpisodeCardsCarousel';
 
@@ -23,6 +24,7 @@ export interface PackEpisodesSectionProps {
   /** Si présent, permet d'afficher des vignettes par épisode (fichier local). */
   infoHash?: string | null;
   watchedSet?: Set<string>;
+  episodeProgress?: Record<string, EpisodeProgressEntry>;
   downloadedEpisodesSet?: Set<string>;
   downloadingEpisodesMap?: Record<string, number>;
   isTV?: boolean;
@@ -37,6 +39,7 @@ export function PackEpisodesSection({
   onSelectEpisodeKey,
   infoHash,
   watchedSet,
+  episodeProgress,
   downloadedEpisodesSet,
   downloadingEpisodesMap,
   isTV,
@@ -175,6 +178,10 @@ export function PackEpisodesSection({
               ? watchedSet?.has(watchedEpisodeKey(season, ep.episode)) ?? false
               : false;
           const epKey = season != null && typeof ep.episode === 'number' ? `${season}:${ep.episode}` : null;
+          const resumePercent =
+            typeof tmdbId === 'number' && season != null && ep.episode > 0
+              ? getEpisodeResumePercent(episodeProgress, watchedSet, season, ep.episode)
+              : null;
           const downloaded =
             (epKey != null && !!downloadedEpisodesSet?.has(epKey)) || ep.key.kind === 'file';
           const downloadingProgress =
@@ -189,6 +196,8 @@ export function PackEpisodesSection({
             subtitle: null,
             thumbnailUrl: getPreferredThumb(typeof ep.episode === 'number' && ep.episode > 0 ? ep.episode : null, fallback),
             watched,
+            resumePercent: resumePercent ?? undefined,
+            canResume: resumePercent != null,
             isAvailable: true,
             isDownloaded: downloaded,
             isDownloading: currentlyDownloading,
