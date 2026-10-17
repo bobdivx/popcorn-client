@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'preact/hooks';
 import type { ComponentType } from 'preact';
-import { Download, Search as SearchIcon, Settings as SettingsIcon, Menu, X, Globe, Home, Film, Tv2, ListPlus } from 'lucide-preact';
+import { Download, Search as SearchIcon, Settings as SettingsIcon, Menu, X, Globe, Home, Film, Tv2, ListPlus, LayoutGrid } from 'lucide-preact';
 import { serverApi } from '../../lib/client/server-api';
 import { getLocalProfile, onProfileChanged } from '../../lib/client/profile';
 import Avatar from '../ui/Avatar';
@@ -203,6 +203,8 @@ export default function Navbar() {
     // Sur certains environnements (Tauri / WebView), les routes "directory" nécessitent un slash final.
     { label: t('nav.films'), href: '/films/', match: 'prefix', icon: Film },
     { label: t('nav.series'), href: '/series/', match: 'prefix', icon: Tv2 },
+    // Plateformes de streaming (Netflix, Disney+…) : catalogue + exclusivités par service.
+    { label: language === 'en' ? 'Platforms' : 'Plateformes', href: '/plateformes/', match: 'prefix', icon: LayoutGrid },
     // Demandes de contenu (déclenchent des téléchargements) : absentes de la version store.
     ...(TORRENT_FEATURES_ENABLED
       ? [{ label: t('nav.demandes'), href: '/demandes', match: 'prefix' as const, icon: ListPlus }]
@@ -273,7 +275,7 @@ export default function Navbar() {
                         aria-current={active ? 'page' : undefined}
                       >
                         {TabIcon && (
-                          <TabIcon className="hidden xl:block w-4 h-4 tv:w-5 tv:h-5 flex-shrink-0" />
+                          <TabIcon className="hidden 2xl:block w-4 h-4 tv:w-5 tv:h-5 flex-shrink-0" />
                         )}
                         <span>{tab.label}</span>
                       </a>
