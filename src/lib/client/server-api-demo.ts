@@ -12,6 +12,8 @@ import type {
   SeriesData,
   Indexer,
 } from './server-api/types.js';
+import { isDemoAccountMode } from '../backend-config.js';
+import { getDemoLibraryMedia } from '../demo-library.js';
 
 const DEMO_USER_ID = 'demo-user-id';
 const DEMO_EMAIL = 'demo@popcorn.local';
@@ -413,6 +415,10 @@ export function createDemoServerApi(): Record<string, unknown> {
     },
 
     async getLibrary(): Promise<ApiResponse<unknown[]>> {
+      // Compte de démonstration (ex. revue Google Play) : catalogue libre de droits (CC BY / domaine public).
+      if (isDemoAccountMode()) {
+        return success(getDemoLibraryMedia());
+      }
       // Un seul média en démo : Big Buck Bunny (fichier dans popcorn-web public/media/films/Big-Buck/)
       const demoItem = {
         info_hash: 'local_demo_big_buck_bunny',

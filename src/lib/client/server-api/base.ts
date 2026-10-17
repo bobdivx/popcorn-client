@@ -4,8 +4,9 @@
  */
 
 import type { ApiResponse, AuthResponse } from './types.js';
-import { getBackendUrl } from '../../backend-config.js';
+import { getBackendUrl, isDemoLibraryBackendUrl } from '../../backend-config.js';
 import { isTauri } from '../../utils/tauri.js';
+import { isBlockedApiUrl } from '../../distribution.js';
 // Utiliser la version client compatible navigateur pour JWT
 import { generateAccessToken, generateRefreshToken } from '../../auth/jwt-client.js';
 import { TokenManager } from '../storage.js';
@@ -40,6 +41,14 @@ export class ServerApiClientBase {
    * Effectue une requête fetch native (compatible Tauri/Android/Web)
    */
   protected async nativeFetch(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+    // Version store (PUBLIC_DISTRIBUTION=play) : aucun appel aux endpoints torrent / indexers.
+    // Compte de démonstration : aucun serveur réel derrière DEMO_LIBRARY_BACKEND_URL.
+    if (isBlockedApiUrl(url) || isDemoLibraryBackendUrl(url)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'NotAvailable', message: 'Not available in this version.' }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
     let fetchStandardError: unknown = null;
     const timeoutController = new AbortController();
     const timeoutId = setTimeout(
@@ -287,6 +296,9 @@ export class ServerApiClientBase {
       }
     }
     const url = `${base}${finalEndpoint.startsWith('/') ? '' : '/'}${finalEndpoint}`;
+    if (isBlockedApiUrl(url) || isDemoLibraryBackendUrl(url)) {
+      return { success: false, error: 'NotAvailable', message: 'Not available in this version.' };
+    }
     const maxRetries = 2;
     
     const mixedContentError = this.getMixedContentError(url);

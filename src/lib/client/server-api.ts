@@ -41,7 +41,7 @@ import type {
 import type { LibraryMediaEntry, LibraryIntegrityStatus, DeleteCorruptedLibraryMediaResult } from './server-api/library.js';
 
 // Imports des utilitaires
-import { isDemoMode } from '../backend-config.js';
+import { clearDemoAccountBackend, isDemoAccountMode, isDemoMode } from '../backend-config.js';
 import { getDemoServerApi } from './server-api-demo.js';
 
 // Import de la base
@@ -565,6 +565,13 @@ const realServerApi = new ServerApiClient() as ServerApiClientComplete;
  */
 export const serverApi = new Proxy(realServerApi, {
   get(target, prop, receiver) {
+    if (prop === 'logout' && typeof window !== 'undefined' && isDemoAccountMode()) {
+      // Compte de démonstration : vraie déconnexion (tokens cloud) + oubli de l'URL de démonstration.
+      return () => {
+        clearDemoAccountBackend();
+        target.logout();
+      };
+    }
     if (typeof window !== 'undefined' && isDemoMode()) {
       const demo = getDemoServerApi();
       const val = (demo as Record<string | symbol, unknown>)[prop];

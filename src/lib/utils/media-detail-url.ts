@@ -1,4 +1,5 @@
 import type { ContentItem } from '../client/types';
+import { IS_STORE_BUILD, MEDIA_DETAIL_PATH } from '../distribution';
 
 type MediaType = 'movie' | 'tv';
 
@@ -27,19 +28,22 @@ export function buildMediaDetailUrl(options: BuildMediaDetailUrlOptions): string
   if (options.streamBackendUrl) params.set('streamBackendUrl', options.streamBackendUrl);
   if (options.streamPath) params.set('streamPath', options.streamPath);
 
-  if (typeof options.tmdbId === 'number' && Number.isFinite(options.tmdbId) && isMediaType(options.type)) {
+  const slug = (options.slug || '').trim();
+  // Version store : les éléments de la bibliothèque (slug local_…) s'ouvrent par slug (pas de recherche de sources).
+  const preferLocalSlug = IS_STORE_BUILD && slug.startsWith('local_');
+
+  if (!preferLocalSlug && typeof options.tmdbId === 'number' && Number.isFinite(options.tmdbId) && isMediaType(options.type)) {
     params.set('tmdbId', String(options.tmdbId));
     params.set('type', options.type);
-    return `/torrents?${params.toString()}`;
+    return `${MEDIA_DETAIL_PATH}?${params.toString()}`;
   }
 
-  const slug = (options.slug || '').trim();
   if (slug) {
     params.set('slug', slug);
-    return `/torrents?${params.toString()}`;
+    return `${MEDIA_DETAIL_PATH}?${params.toString()}`;
   }
 
-  return '/torrents';
+  return MEDIA_DETAIL_PATH;
 }
 
 export function buildMediaDetailUrlFromContentItem(item: ContentItem, from = 'dashboard'): string {
@@ -57,6 +61,9 @@ export function buildMediaDetailUrlFromContentItem(item: ContentItem, from = 'da
  * Si tmdbId/type manquent et qu'il n'y a pas de slug, on redirige vers la recherche.
  */
 export function buildStrictTmdbDetailUrl(options: BuildMediaDetailUrlOptions): string {
+  if (IS_STORE_BUILD && (options.slug || '').trim().startsWith('local_')) {
+    return buildMediaDetailUrl(options);
+  }
   if (typeof options.tmdbId === 'number' && Number.isFinite(options.tmdbId) && isMediaType(options.type)) {
     return buildMediaDetailUrl(options);
   }
@@ -76,6 +83,8 @@ export function buildStrictTmdbDetailUrl(options: BuildMediaDetailUrlOptions): s
   if (options.title) params.set('q', options.title);
   if (isMediaType(options.type)) params.set('type', options.type);
   if (options.from) params.set('from', options.from);
+  // Version store : pas de recherche (torrents) → retour à la bibliothèque.
+  if (IS_STORE_BUILD) return '/dashboard';
   return `/search?${params.toString()}`;
 }
 
