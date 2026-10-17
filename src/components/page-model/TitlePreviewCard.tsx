@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
+import { memo } from 'preact/compat';
 import type { ContentItem } from '../../lib/client/types';
 import { getDisplayTitle } from '../../lib/utils/title-display';
 import { isTVPlatform } from '../../lib/utils/device-detection';
@@ -21,6 +22,8 @@ export { reanchorBrowseSlot, ensureBrowseRowInView } from './browseCarouselAncho
 
 /** Délai avant lecture trailer : évite le chargement à chaque flèche. */
 const TRAILER_DELAY_MS = 2500;
+/** TV : délai avant d'armer l'état trailer (le timer TRAILER_DELAY_MS démarre ensuite). Évite tout rendu pendant un défilement rapide. */
+const TV_TRAILER_ARM_MS = 400;
 
 /**
  * Hauteur image — paysage focus ≈ 55 % de la largeur utile (réf. streaming TV).
@@ -49,24 +52,47 @@ export function computeBrowseTileHeight(): number {
   return Math.min(maxH, Math.max(minH, Math.min(maxByVh, tileH)));
 }
 
+/**
+ * Hauteur de tuile partagée : UN seul jeu d'écouteurs (resize / orientation / attributs TV)
+ * pour toutes les cartes, au lieu d'un MutationObserver + 2 listeners par carte.
+ */
+let sharedTileH: number | null = null;
+const tileHSubscribers = new Set<(h: number) => void>();
+let tileHListening = false;
+
+function syncSharedTileHeight(): void {
+  const next = computeBrowseTileHeight();
+  if (next === sharedTileH) return;
+  sharedTileH = next;
+  tileHSubscribers.forEach((fn) => fn(next));
+}
+
+function ensureTileHeightListeners(): void {
+  if (tileHListening || typeof window === 'undefined') return;
+  tileHListening = true;
+  window.addEventListener('resize', syncSharedTileHeight);
+  window.addEventListener('orientationchange', syncSharedTileHeight);
+  const mo = new MutationObserver(syncSharedTileHeight);
+  mo.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ['data-tv-platform', 'data-webos'],
+  });
+}
+
 function useTileHeight(): number {
-  const [h, setH] = useState(() => computeBrowseTileHeight());
+  const [h, setH] = useState(() => {
+    if (sharedTileH == null) sharedTileH = computeBrowseTileHeight();
+    return sharedTileH;
+  });
 
   useEffect(() => {
-    const sync = () => setH(computeBrowseTileHeight());
-    sync();
-    window.addEventListener('resize', sync);
-    window.addEventListener('orientationchange', sync);
-    const mo = new MutationObserver(sync);
-    mo.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['data-tv-platform', 'data-webos'],
-    });
+    ensureTileHeightListeners();
+    tileHSubscribers.add(setH);
+    if (sharedTileH != null && sharedTileH !== h) setH(sharedTileH);
     return () => {
-      window.removeEventListener('resize', sync);
-      window.removeEventListener('orientationchange', sync);
-      mo.disconnect();
+      tileHSubscribers.delete(setH);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return h;
@@ -91,7 +117,7 @@ interface TitlePreviewCardProps {
  * - flèches / télécommande : paysage ancré à gauche (même poster, pas de backdrop)
  * - trailer : seulement après ~2,5 s sur la même carte
  */
-export function TitlePreviewCard({
+function TitlePreviewCardImpl({
   item,
   onNavigate,
   progress,
@@ -119,7 +145,19 @@ export function TitlePreviewCard({
   const poster = item.poster || item.backdrop;
   const title = getDisplayTitle(item);
   const tvLayout = isTVPlatform();
-  const expanded = remoteFocused;
+  /**
+   * TV : le focus télécommande ne déclenche AUCUN rendu (attribut DOM data-preview-expanded
+   * posé directement) — la tuile est déjà en paysage, seule la bande-annonce (après délai)
+   * provoque un rendu de CETTE carte. Hors TV : état React (passage portrait → paysage).
+   */
+  const expanded = tvLayout ? false : remoteFocused;
+  const [tvTrailerFocus, setTvTrailerFocus] = useState(false);
+  const trailerActive = tvLayout ? tvTrailerFocus : expanded;
+  const onNavigateRef = useRef(onNavigate);
+  onNavigateRef.current = onNavigate;
+  const itemRef = useRef(item);
+  itemRef.current = item;
+  const handleClick = useCallback(() => onNavigateRef.current(itemRef.current), []);
 
   useEffect(() => {
     ensureBrowseInputModalityTracking();
@@ -134,7 +172,7 @@ export function TitlePreviewCard({
 
   // Trailer uniquement si l’utilisateur reste sur la carte
   useEffect(() => {
-    if (!expanded || !trailerKey) {
+    if (!trailerActive || !trailerKey) {
       clearDelay();
       setPlayTrailer(false);
       setTrailerReady(false);
@@ -149,7 +187,7 @@ export function TitlePreviewCard({
       setPlayTrailer(true);
     }, TRAILER_DELAY_MS);
     return () => clearDelay();
-  }, [expanded, clearDelay, slotId, trailerKey]);
+  }, [trailerActive, clearDelay, slotId, trailerKey]);
 
   useEffect(() => {
     return subscribePreviewTrailer((activeId) => {
@@ -173,8 +211,34 @@ export function TitlePreviewCard({
   useEffect(() => {
     const slot = slotRef.current;
     if (!slot) return;
+    const tv = isTVPlatform();
+    // TV : focus = classe/attribut DOM seulement (pas de setState → pas de re-render de rangée).
+    // La bande-annonce n'est armée qu'après TV_TRAILER_ARM_MS sur la même carte.
+    let tvArmTimer: number | null = null;
+    const setTvExpanded = (on: boolean) => {
+      slot.setAttribute('data-preview-expanded', on ? 'true' : 'false');
+      if (tvArmTimer != null) {
+        window.clearTimeout(tvArmTimer);
+        tvArmTimer = null;
+      }
+      if (on) {
+        // Ancrage gauche (équivalent de l'effet `expanded` hors TV), sans rendu.
+        requestAnimationFrame(() => reanchorBrowseSlot(slot));
+        tvArmTimer = window.setTimeout(() => {
+          tvArmTimer = null;
+          setTvTrailerFocus(true);
+        }, TV_TRAILER_ARM_MS);
+      } else {
+        setTvTrailerFocus(false);
+      }
+    };
+    if (tv) slot.setAttribute('data-preview-expanded', 'false');
     const onFocusIn = () => {
-      if (!isBrowseKeyboardFocus() && !isTVPlatform()) {
+      if (tv) {
+        if (slot.getAttribute('data-preview-expanded') !== 'true') setTvExpanded(true);
+        return;
+      }
+      if (!isBrowseKeyboardFocus()) {
         setRemoteFocused(false);
         return;
       }
@@ -183,6 +247,10 @@ export function TitlePreviewCard({
     const onFocusOut = (e: FocusEvent) => {
       const next = e.relatedTarget as Node | null;
       if (next && slot.contains(next)) return;
+      if (tv) {
+        setTvExpanded(false);
+        return;
+      }
       setRemoteFocused(false);
     };
     const onKeyDown = (e: KeyboardEvent) => {
@@ -194,6 +262,10 @@ export function TitlePreviewCard({
         e.key === 'Enter' ||
         e.key === ' '
       ) {
+        if (tv) {
+          if (slot.getAttribute('data-preview-expanded') !== 'true') setTvExpanded(true);
+          return;
+        }
         setRemoteFocused(true);
       }
     };
@@ -204,6 +276,7 @@ export function TitlePreviewCard({
       slot.removeEventListener('focusin', onFocusIn);
       slot.removeEventListener('focusout', onFocusOut);
       slot.removeEventListener('keydown', onKeyDown);
+      if (tvArmTimer != null) window.clearTimeout(tvArmTimer);
     };
   }, []);
 
@@ -254,7 +327,7 @@ export function TitlePreviewCard({
       }}
       data-browse-tile
       data-browse-slot
-      data-preview-expanded={expanded ? 'true' : 'false'}
+      data-preview-expanded={tvLayout ? undefined : expanded ? 'true' : 'false'}
       data-tv-item-key={contentItemKey(item)}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -262,7 +335,7 @@ export function TitlePreviewCard({
       <FocusableCard
         className={[
           'ed-browse-card block w-full outline-none relative overflow-hidden rounded-md bg-[#141414]',
-          tvLayout ? '' : 'transition-[transform,box-shadow] duration-150 ease-out',
+          tvLayout ? '' : 'ed-motion-card',
           expanded
             ? ''
             : hovered
@@ -273,7 +346,7 @@ export function TitlePreviewCard({
         ariaLabel={captionSub ? `${captionTitle}. ${captionSub}` : captionTitle}
         noScale
         asTorrentCard
-        onClick={() => onNavigate(item)}
+        onClick={handleClick}
       >
         {badge ? (
           <span
@@ -314,7 +387,7 @@ export function TitlePreviewCard({
             }`}
           />
 
-          {playTrailer && expanded && trailerKey ? (
+          {playTrailer && trailerActive && trailerKey ? (
             <div
               className={`pointer-events-none absolute inset-0 overflow-hidden transition-opacity duration-300 ${
                 trailerReady ? 'opacity-100' : 'opacity-0'
@@ -374,3 +447,35 @@ export function TitlePreviewCard({
     </div>
   );
 }
+
+function sameCardProps(a: TitlePreviewCardProps, b: TitlePreviewCardProps): boolean {
+  if (a.item !== b.item) {
+    const ia = a.item;
+    const ib = b.item;
+    if (
+      contentItemKey(ia) !== contentItemKey(ib) ||
+      ia.poster !== ib.poster ||
+      ia.backdrop !== ib.backdrop ||
+      ia.trailerKey !== ib.trailerKey ||
+      ia.rating !== ib.rating ||
+      getDisplayTitle(ia) !== getDisplayTitle(ib)
+    ) {
+      return false;
+    }
+  }
+  return (
+    a.progress === b.progress &&
+    a.downloading === b.downloading &&
+    a.metaLine === b.metaLine &&
+    a.metaSubLine === b.metaSubLine &&
+    a.badge === b.badge &&
+    a.badgeTone === b.badgeTone
+  );
+}
+
+/**
+ * Carte mémoïsée : un rendu du parent (rangée, page, polling téléchargements, hero)
+ * ne re-rend que les cartes dont les données visibles changent. `onNavigate` est lu
+ * via ref (toujours la dernière valeur au clic) et n'invalide pas la mémo.
+ */
+export const TitlePreviewCard = memo(TitlePreviewCardImpl, sameCardProps);

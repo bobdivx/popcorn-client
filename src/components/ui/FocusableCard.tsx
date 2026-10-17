@@ -1,5 +1,19 @@
 import { useRef, useEffect } from 'preact/hooks';
 
+/** Détection TV calculée une fois (évite un test UA/DOM à chaque rendu de carte). */
+let cachedIsTv: boolean | null = null;
+function detectTv(): boolean {
+  if (cachedIsTv) return true;
+  if (typeof document === 'undefined') return false;
+  const tv =
+    document.body?.dataset?.tv === 'true' ||
+    navigator.userAgent.toLowerCase().includes('tv') ||
+    !!document.body?.classList.contains('tv-platform');
+  // Ne mémoriser que le « oui » : le marquage TV du <body> peut arriver après le 1er rendu.
+  if (tv) cachedIsTv = true;
+  return tv;
+}
+
 interface FocusableCardProps {
   children: preact.ComponentChildren;
   className?: string;
@@ -37,6 +51,12 @@ export function FocusableCard({
   listPrimary = false,
 }: FocusableCardProps) {
   const cardRef = useRef<HTMLDivElement | HTMLAnchorElement>(null);
+  // Handlers lus via ref : les écouteurs DOM ne sont posés qu'une fois (pas de detach/attach
+  // à chaque rendu quand le parent passe une closure inline).
+  const onClickRef = useRef(onClick);
+  onClickRef.current = onClick;
+  const hrefRef = useRef(href);
+  hrefRef.current = href;
 
   useEffect(() => {
     const element = cardRef.current;
@@ -58,10 +78,12 @@ export function FocusableCard({
         code === 32;
       if (activate) {
         e.preventDefault();
-        if (onClick) {
-          onClick(e);
-        } else if (href) {
-          window.location.href = href;
+        const click = onClickRef.current;
+        const link = hrefRef.current;
+        if (click) {
+          click(e);
+        } else if (link) {
+          window.location.href = link;
         }
       }
     };
@@ -93,9 +115,9 @@ export function FocusableCard({
       element.removeEventListener('focus', handleFocus);
       element.removeEventListener('blur', handleBlur);
     };
-  }, [onClick, href, noScale]);
+  }, [noScale]);
 
-  const isTV = typeof document !== 'undefined' && (document.body?.dataset?.tv === 'true' || navigator.userAgent.toLowerCase().includes('tv') || document.body?.classList.contains('tv-platform'));
+  const isTV = detectTv();
   const scaleClass = noScale ? 'outline-none' : (isTV ? 'tv-card gtv-focusable focus:scale-105 outline-none' : 'focus:outline-none');
   const baseClasses = `group cursor-pointer ${scaleClass} ${className}`;
   const commonProps: any = {
@@ -125,7 +147,7 @@ export function FocusableCard({
   return (
     <div
       {...commonProps}
-      onClick={(e) => onClick?.(e as any)}
+      onClick={(e) => onClickRef.current?.(e as any)}
     >
       {children}
     </div>
