@@ -349,9 +349,15 @@ export const mediaMethods = {
     if (typeof hint === 'number' && Number.isFinite(hint) && hint >= 60) {
       body.duration_hint_seconds = hint;
     }
+    const scrubHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+    try {
+      const { TokenManager } = await import('../storage.js');
+      const t = TokenManager.getCloudAccessToken();
+      if (t) scrubHeaders.Authorization = `Bearer ${t}`;
+    } catch { /* ignore */ }
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: scrubHeaders,
       body: JSON.stringify(body),
     });
     if (!res.ok) {
