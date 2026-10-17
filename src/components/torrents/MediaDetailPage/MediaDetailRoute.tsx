@@ -30,6 +30,7 @@ import {
   seasonEpisodeCountsFromSeasons,
 } from '../../../lib/utils/seasonOrder';
 import { DsLoader } from '../../ui/DsLoader';
+import { IS_STORE_BUILD } from '../../../lib/distribution';
 
 type Torrent = MediaDetailPageProps['torrent'];
 
@@ -1197,7 +1198,8 @@ export default function MediaDetailRoute() {
 
       try {
         // Détecter si c'est un média local (slug commence par "local_")
-        const isLocalMedia = contentId.startsWith('local_');
+        // Version store (PUBLIC_DISTRIBUTION=play) : toute fiche vient de la bibliothèque du serveur.
+        const isLocalMedia = contentId.startsWith('local_') || (IS_STORE_BUILD && !!(contentId || tmdbId));
         
         // Si c'est un média local, récupérer depuis la bibliothèque
         if (isLocalMedia) {
@@ -1206,9 +1208,13 @@ export default function MediaDetailRoute() {
           if (libraryResponse.success && libraryResponse.data) {
             const libraryItems = Array.isArray(libraryResponse.data) ? libraryResponse.data : [];
             // Trouver le média correspondant au slug
-            const localMedia = libraryItems.find((item: any) => 
-              item.info_hash === contentId || item.slug === contentId
-            );
+            const localMedia =
+              libraryItems.find((item: any) =>
+                !!contentId && (item.info_hash === contentId || item.slug === contentId)
+              ) ||
+              (IS_STORE_BUILD && tmdbId != null
+                ? libraryItems.find((item: any) => Number(item.tmdb_id) === tmdbId)
+                : undefined);
             
             if (localMedia && !cancelled) {
               console.log('[MediaDetailRoute] Média local trouvé:', localMedia);
@@ -2247,4 +2253,3 @@ export default function MediaDetailRoute() {
     />
   );
 }
-

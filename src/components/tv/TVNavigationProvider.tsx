@@ -2357,7 +2357,7 @@ export default function TVNavigationProvider() {
     const maybeFocusMediaDetailPrimary = () => {
       if (typeof window === 'undefined') return;
       if (!isTvDoc()) return;
-      if (window.location.pathname !== '/torrents') return;
+      if (window.location.pathname !== '/torrents' && window.location.pathname !== '/media') return;
       const params = new URLSearchParams(window.location.search);
       if (!params.get('slug') && !params.get('tmdbId')) return;
       requestAnimationFrame(() => {
