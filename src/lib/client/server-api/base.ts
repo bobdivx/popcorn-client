@@ -287,6 +287,7 @@ export class ServerApiClientBase {
   }
 
   protected async backendRequest<T>(endpoint: string, options: RequestInit = {}, retryCount = 0, baseUrlOverride?: string): Promise<ApiResponse<T>> {
+    if (typeof window !== 'undefined') this.loadTokens();
     const base = baseUrlOverride ?? this.getBackendBaseUrl();
     let finalEndpoint = endpoint;
     if (endpoint.includes('/api/torrents/list') || endpoint.includes('/api/torrents/fast')) {
@@ -320,13 +321,32 @@ export class ServerApiClientBase {
       } catch { /* ignore */ }
     }
 
+    // Joindre le token d'acces cloud / Pocket ID (compte membre du serveur) si present.
+    if (this.accessToken && !(headers as Record<string, string>).Authorization) {
+      (headers as Record<string, string>).Authorization = `Bearer ${this.accessToken}`;
+    }
+
     const noCache = (options.method === 'GET' || !options.method) &&
       (endpoint.includes('/api/torrents/list') || endpoint.includes('/api/torrents/fast') || endpoint.includes('/api/sync/status'));
     const fetchOptions = noCache ? { ...options, headers, cache: 'no-store' as RequestCache } : { ...options, headers };
 
     try {
       const timeoutMs = this.getTimeoutMs(endpoint);
-      const response = await this.nativeFetch(url, fetchOptions, timeoutMs);
+      let response = await this.nativeFetch(url, fetchOptions, timeoutMs);
+      // Access JWT expire (~1h) : regenerer depuis le secret cloud/Pocket ID stocke et reessayer une fois.
+      const isAuthBootstrap = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
+      if (response.status === 401 && this.accessToken && !isAuthBootstrap) {
+        try {
+          const u = TokenManager.getUser();
+          if (u?.id && TokenManager.getJWTSecret()) {
+            const uname = u.email || u.username || u.id;
+            const regenerated = await this.generateClientTokens(u.id, uname);
+            this.saveTokens(regenerated.accessToken, regenerated.refreshToken);
+            const retryHeaders = { ...(headers as Record<string, string>), Authorization: `Bearer ${regenerated.accessToken}` };
+            response = await this.nativeFetch(url, { ...fetchOptions, headers: retryHeaders }, timeoutMs);
+          }
+        } catch { /* ignore : gestion standard ci-dessous */ }
+      }
       const data = await response.json().catch(() => ({}));
       
       if (!response.ok) {
@@ -639,3 +659,5 @@ export class ServerApiClientBase {
     return this.accessToken;
   }
 }
+
+
