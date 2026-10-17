@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { serverApi } from '../../../../lib/client/server-api';
 import { updateResumeWatching } from '../../../../lib/resumeWatchingStorage';
+import { recordEpisodeProgress, WATCHED_EPISODE_THRESHOLD_PERCENT } from '../../../../lib/watchedEpisodes';
 import type { ContentItem } from '../../../../lib/client/types';
 import type { TorrentFile } from '../hooks/useVideoFiles';
 import { isSparseOrEmptyMessage } from '../hooks/useVideoFiles';
@@ -57,6 +58,9 @@ interface VideoPlayerWrapperProps {
   /** Épisode suivant (série) : afficher bouton « Épisode suivant » peu avant la fin */
   nextEpisodeInfo?: NextEpisodeInfo | null;
   onPlayNextEpisode?: () => void;
+  /** Épisode précédent (série) : bouton « Précédent » du lecteur + ChannelDown. */
+  previousEpisodeInfo?: NextEpisodeInfo | null;
+  onPlayPreviousEpisode?: () => void;
   /** Prefetch silencieux de l'épisode suivant (ex. à ~50 % de lecture). */
   onPrefetchNextEpisode?: () => void;
   onClose: () => void;
@@ -117,6 +121,8 @@ export function VideoPlayerWrapper({
   isSeries = false,
   nextEpisodeInfo,
   onPlayNextEpisode,
+  previousEpisodeInfo,
+  onPlayPreviousEpisode,
   onPrefetchNextEpisode,
   onClose,
   onAbortDownload,
@@ -371,6 +377,13 @@ export function VideoPlayerWrapper({
         durationSeconds: duration,
       };
       updateResumeWatching(item, progressPercent, episodeInfo);
+      // Épisodes vus + reprise par épisode (carrousels série) — tous lecteurs / plateformes.
+      if (tmdbType === 'tv' && seriesSeasonNum != null && seriesEpisodeNum != null) {
+        recordEpisodeProgress(tmdbId, seriesSeasonNum, seriesEpisodeNum, currentTime, duration, {
+          // Fin (ended / épisode suivant depuis l'overlay) : pousser explicitement « vu ».
+          pushToServer: progressPercent >= WATCHED_EPISODE_THRESHOLD_PERCENT,
+        });
+      }
     },
     [
       tmdbId,
@@ -909,6 +922,8 @@ export function VideoPlayerWrapper({
               isSeries,
               nextEpisodeInfo,
               onPlayNextEpisode,
+              previousEpisodeInfo,
+              onPlayPreviousEpisode,
               onClose: handleClosePlayer,
               canUseSeekReload: computeCanUseSeekReload({
                 infoHash,

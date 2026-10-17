@@ -76,39 +76,24 @@ import {
 } from '../../../lib/torrents/externalDownloadParams';
 import { useTmdbApiTitle } from './hooks/useTmdbApiTitle';
 import { isLocalMedia as isLocalMediaHash } from './actions/delete';
+import { getNextEpisodeInfo, getPreviousEpisodeInfo } from './utils/episodeNavigation';
 
-/** Retourne l'Ã©pisode suivant (saison + id variante + titre) ou null. */
+/** Retourne l'épisode suivant (saison + id variante + titre) ou null — franchit les saisons. */
 function getNextEpisode(
   seriesEpisodes: SeriesEpisodesResponse | null | undefined,
   selectedSeasonNum: number | null,
   selectedEpisodeVariantId: string | null
 ): { seasonNum: number; episodeVariantId: string; title: string } | null {
-  if (!seriesEpisodes?.seasons?.length || selectedSeasonNum == null || selectedEpisodeVariantId == null) return null;
-  const seasons = seriesEpisodes.seasons;
-  const seasonIndex = seasons.findIndex((s) => s.season === selectedSeasonNum);
-  if (seasonIndex < 0) return null;
-  const season = seasons[seasonIndex];
-  const epIndex = season.episodes.findIndex((e) => e.id === selectedEpisodeVariantId);
-  if (epIndex < 0) return null;
-  if (epIndex + 1 < season.episodes.length) {
-    const next = season.episodes[epIndex + 1];
-    return {
-      seasonNum: season.season,
-      episodeVariantId: next.id,
-      title: next.episode === 0 ? 'Pack complet' : `S${season.season} E${next.episode}`,
-    };
-  }
-  if (seasonIndex + 1 < seasons.length) {
-    const nextSeason = seasons[seasonIndex + 1];
-    const first = nextSeason.episodes[0];
-    if (!first) return null;
-    return {
-      seasonNum: nextSeason.season,
-      episodeVariantId: first.id,
-      title: first.episode === 0 ? 'Pack complet' : `S${nextSeason.season} E${first.episode}`,
-    };
-  }
-  return null;
+  return getNextEpisodeInfo(seriesEpisodes, selectedSeasonNum, selectedEpisodeVariantId);
+}
+
+/** Retourne l'épisode précédent (S02E01 → dernier épisode de S01) ou null. */
+function getPreviousEpisode(
+  seriesEpisodes: SeriesEpisodesResponse | null | undefined,
+  selectedSeasonNum: number | null,
+  selectedEpisodeVariantId: string | null
+): { seasonNum: number; episodeVariantId: string; title: string } | null {
+  return getPreviousEpisodeInfo(seriesEpisodes, selectedSeasonNum, selectedEpisodeVariantId);
 }
 
 // Modal de sÃ©lection de source (TV-friendly) quand plusieurs sources sont disponibles
@@ -3325,7 +3310,13 @@ export default function MediaDetailPage({
   ]);
 
   const onPlayNextEpisode = () => {
-    const next = getNextEpisode(seriesEpisodes ?? undefined, selectedSeasonNum, selectedEpisodeVariantId);
+    playAdjacentEpisode(getNextEpisode(seriesEpisodes ?? undefined, selectedSeasonNum, selectedEpisodeVariantId));
+  };
+  const onPlayPreviousEpisode = () => {
+    playAdjacentEpisode(getPreviousEpisode(seriesEpisodes ?? undefined, selectedSeasonNum, selectedEpisodeVariantId));
+  };
+  /** Lance l'épisode cible (suivant / précédent) en gardant le lecteur monté. */
+  const playAdjacentEpisode = (next: { seasonNum: number; episodeVariantId: string } | null) => {
     if (!next) return;
     previousActiveTorrentRef.current = activeTorrent;
     previousSelectedFileRef.current = selectedFile;
@@ -3378,6 +3369,10 @@ export default function MediaDetailPage({
 
   const nextEpisodeInfo = useMemo(
     () => getNextEpisode(seriesEpisodes ?? undefined, selectedSeasonNum, selectedEpisodeVariantId),
+    [seriesEpisodes, selectedSeasonNum, selectedEpisodeVariantId]
+  );
+  const previousEpisodeInfo = useMemo(
+    () => getPreviousEpisode(seriesEpisodes ?? undefined, selectedSeasonNum, selectedEpisodeVariantId),
     [seriesEpisodes, selectedSeasonNum, selectedEpisodeVariantId]
   );
 
@@ -3495,6 +3490,8 @@ export default function MediaDetailPage({
         isSeries={!!(seriesEpisodes?.seasons?.length)}
         nextEpisodeInfo={nextEpisodeInfo}
         onPlayNextEpisode={onPlayNextEpisode}
+        previousEpisodeInfo={previousEpisodeInfo}
+        onPlayPreviousEpisode={onPlayPreviousEpisode}
         onPrefetchNextEpisode={prefetchNextEpisode}
         onClose={handleClosePlayerAndRefresh}
         onAbortDownload={() => void handleAbortDownload()}
@@ -3588,6 +3585,8 @@ export default function MediaDetailPage({
         isSeries={!!(seriesEpisodes?.seasons?.length)}
         nextEpisodeInfo={nextEpisodeInfo}
         onPlayNextEpisode={onPlayNextEpisode}
+        previousEpisodeInfo={previousEpisodeInfo}
+        onPlayPreviousEpisode={onPlayPreviousEpisode}
         onPrefetchNextEpisode={prefetchNextEpisode}
         onClose={handleClosePlayerAndRefresh}
         onAbortDownload={() => void handleAbortDownload()}
