@@ -1,3 +1,17 @@
+const CORAL = {
+  50: '#fff1f2',
+  100: '#ffe1e3',
+  200: '#ffc8cb',
+  300: '#ffa1a6',
+  400: '#fb7a80',
+  500: '#f2545b',
+  600: '#e03a42',
+  700: '#bd2a31',
+  800: '#9c262c',
+  900: '#82252a',
+  950: '#470e11',
+};
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./src/**/*.{astro,html,js,jsx,md,mdx,svelte,ts,tsx,vue}'],
@@ -15,6 +29,9 @@ export default {
       },
       colors: {
         // Accent éditorial unique (corail #f2545b) — remplace l’ancien violet néon.
+        // purple / violet hérités : alias corail (classes legacy bg-purple-*, ring-violet-*…).
+        purple: CORAL,
+        violet: CORAL,
         primary: {
           50: '#fff1f2',
           100: '#ffe1e3',

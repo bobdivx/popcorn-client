@@ -762,7 +762,8 @@
     "watchLaterAdd": "Add to watch later",
     "watchLaterRemove": "Remove from watch later",
     "castToDevice": "Cast to device",
-    "casting": "Casting"
+    "casting": "Casting",
+    "movieWatched": "Watched"
   },
   "nav": {
     "menu": "Menu",
@@ -1435,7 +1436,9 @@
     "seedersShort": "seeders",
     "leechersShort": "leechers",
     "torrentNetworkLabel": "Torrent network",
-    "peerStatsHint": "Seeders / leechers from the indexer (useful before downloading)."
+    "peerStatsHint": "Seeders / leechers from the indexer (useful before downloading).",
+    "markWatched": "Mark as watched",
+    "markUnwatched": "Mark as unwatched"
   },
   "torrentStats": {
     "downloading": "Downloading",
