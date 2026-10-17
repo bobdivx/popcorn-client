@@ -10,6 +10,8 @@ Pourquoi un service ? Les apps webOS packagées tournent en `file://` et y bloqu
 et le lanceur (`launcher/index.html`) y bascule l'app. Tout est local : aucune UI chargée depuis Internet.
 Le backend est celui configuré dans l'app (écran de configuration / réglages serveur), en URL absolue ;
 le serveur Popcornn renvoie l'origine en CORS (mirror_request), donc `http://127.0.0.1:18687` est accepté.
+Les routes HLS (`/api/local/stream/…/playlist.m3u8`, `/api/local/hls/…`) ne demandent pas d'auth (les cookies
+ne sont pas utilisés) ; le serveur expose `X-HLS-File-Id` en CORS et sert les segments en `video/mp2t`.
 
 Build : workflow `.github/workflows/webos-native.yml` → artefact + pre-release GitHub `webos-native-v<version>`.
 
