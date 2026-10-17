@@ -1,0 +1,110 @@
+# Build de l'app webOS LITE (com.popcorn.client.webos) : simple lanceur qui ouvre
+# https://client.popcornn.app/ (équivalent de popcorn-tauri/webos/scripts/build.ps1 -Simple).
+# Produit com.popcorn.client.webos_<version>_all.ipk sur une pre-release "webos-lite-v<version>"
+# (jamais "latest" → n'interfère pas avec l'APK / le desktop ni avec webos-native-v*).
+# Lien stable toujours à jour : https://popcornn.app/download/webos
+name: WebOS Lite Build (IPK)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version à publier (vide = tag de release / VERSION.json)"
+        required: false
+        default: ""
+        type: string
+  release:
+    types: [published]
+  push:
+    branches: [dev]
+    paths:
+      - '.github/workflows/webos-lite.yml'
+
+concurrency:
+  group: webos-lite
+  cancel-in-progress: true
+
+jobs:
+  build-lite-ipk:
+    if: >-
+      github.event_name != 'release' ||
+      (startsWith(github.event.release.tag_name, 'v') && !github.event.release.prerelease)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    env:
+      APP_ID: com.popcorn.client.webos
+      CLIENT_URL: https://client.popcornn.app/
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Version
+        id: v
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          VERSION="${INPUT_VERSION:-}"
+          if [ -z "$VERSION" ] && [[ "${RELEASE_TAG:-}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            VERSION="${RELEASE_TAG#v}"
+          fi
+          if [ -z "$VERSION" ]; then
+            VERSION=$(jq -r '.client.version' VERSION.json)
+          fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version invalide: $VERSION"; exit 1
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Assemble lite package
+        run: |
+          set -euo pipefail
+          rm -rf pkg out && mkdir -p pkg out
+          cat > pkg/webos-launcher.html <<HTML
+          <!DOCTYPE html>
+          <html lang="fr">
+          <head>
+            <meta charset="UTF-8" />
+            <title>Popcornn</title>
+            <script>
+              window.location.replace("${CLIENT_URL}");
+            </script>
+          </head>
+          <body style="background:#121212"></body>
+          </html>
+          HTML
+          jq --arg v "${{ steps.v.outputs.version }}" --arg id "$APP_ID" \
+            '.id = $id | .version = $v | .main = "webos-launcher.html" | .title = "Popcornn"' \
+            webos/appinfo.json > pkg/appinfo.json
+          cp webos/icon.png webos/icon-large.png pkg/
+          cat pkg/appinfo.json
+          ls -la pkg
+
+      - name: ares-package
+        run: |
+          set -euo pipefail
+          npm install -g @webos-tools/cli >/dev/null
+          ares-package pkg -o out --no-minify
+          IPK=$(ls out/*.ipk | head -n1)
+          test -n "$IPK"
+          ls -la out
+          echo "IPK=$IPK" >> "$GITHUB_ENV"
+
+      - name: Pre-release GitHub (lite)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="webos-lite-v${{ steps.v.outputs.version }}"
+          NOTES="Popcornn Lite webOS — app ${APP_ID} : lanceur qui ouvre ${CLIENT_URL} (toujours à jour côté interface). Commit ${GITHUB_SHA}. Installation : ares-install -d <tv> $(basename "$IPK") — ou Paramètres → Déploiement webOS sur votre serveur Popcornn. Lien toujours à jour : https://popcornn.app/download/webos"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$IPK" --clobber
+          else
+            gh release create "$TAG" "$IPK" --target "${GITHUB_SHA}" --prerelease --latest=false --title "Popcornn Lite webOS ${{ steps.v.outputs.version }}" --notes "$NOTES"
+          fi
+          echo "Asset: https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/$(basename "$IPK")"
