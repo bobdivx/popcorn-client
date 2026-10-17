@@ -13,7 +13,21 @@ const BROWSE_PATHS = new Set([
   '/demandes',
   '/search',
   '/downloads',
+  '/plateformes',
 ]);
+
+/** Pages dont la query identifie le contenu (ex. /plateformes?p=netflix) : la restauration doit en tenir compte. */
+const QUERY_SCOPED_PATHS = new Set(['/plateformes']);
+
+/** Clé de restauration : chemin, plus la query pour les pages qui en dépendent. */
+function restoreLocationKey(): string {
+  const path = currentBrowsePath();
+  if (!QUERY_SCOPED_PATHS.has(path)) return path;
+  const params = new URLSearchParams(window.location.search);
+  params.delete('_');
+  const q = params.toString();
+  return q ? `${path}?${q}` : path;
+}
 
 export function currentBrowsePath(): string {
   return window.location.pathname.replace(/\/$/, '') || '/';
@@ -46,7 +60,7 @@ export function saveTvBrowseRestoreFromElement(el: HTMLElement | null): void {
   const itemKey = holder.getAttribute('data-tv-item-key');
   if (!itemKey) return;
   const data: TvBrowseRestore = {
-    path: currentBrowsePath(),
+    path: restoreLocationKey(),
     scrollY: window.scrollY,
     itemKey,
   };
@@ -63,7 +77,7 @@ export function peekTvBrowseRestore(): TvBrowseRestore | null {
     const raw = sessionStorage.getItem(TV_BROWSE_RESTORE_KEY);
     if (!raw) return null;
     const data = JSON.parse(raw) as TvBrowseRestore;
-    if (!data?.itemKey || data.path !== currentBrowsePath()) return null;
+    if (!data?.itemKey || data.path !== restoreLocationKey()) return null;
     return data;
   } catch {
     return null;
@@ -83,7 +97,8 @@ export function findTvBrowseRestoreCard(itemKey: string): HTMLElement | null {
   let fallback: HTMLElement | null = null;
   for (const card of cards) {
     if (card.getAttribute('data-tv-item-key') !== itemKey) continue;
-    const fromHero = !!card.closest('.hero-dashboard') || card.hasAttribute('data-tv-hero-cycle');
+    const fromHero =
+      !!card.closest('.hero-dashboard, [data-editorial-hero]') || card.hasAttribute('data-tv-hero-cycle');
     if (fromHero) {
       fallback = fallback ?? card;
       continue;

@@ -452,6 +452,27 @@ function EditorialHeroSection({
   const count = list.length;
   /** TV : aperçu bande-annonce (avec son) dans le hero quand le focus y reste ~2 s. */
   const [previewOn, setPreviewOn] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+  const countRef = useRef(count);
+  countRef.current = count;
+
+  /**
+   * TV (télécommande) : gauche/droite change de titre au lieu de passer d'un bouton à l'autre.
+   * TVNavigationProvider émet `tv-hero-cycle` quand le focus est dans [data-tv-hero-cycle].
+   */
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || !isTV) return;
+    const onCycle = (e: Event) => {
+      const n = countRef.current;
+      if (n < 2) return;
+      const delta = Number((e as CustomEvent<{ delta?: number }>).detail?.delta) < 0 ? -1 : 1;
+      setTrailerOpen(false);
+      setIndex((i) => (i + delta + n) % n);
+    };
+    el.addEventListener('tv-hero-cycle', onCycle as EventListener);
+    return () => el.removeEventListener('tv-hero-cycle', onCycle as EventListener);
+  }, [isTV]);
 
   useEffect(() => {
     if (count < 2 || paused || focusWithin || trailerOpen) return;
@@ -524,9 +545,11 @@ function EditorialHeroSection({
 
   return (
     <section
+      ref={sectionRef}
       className={`ed-hero ${size === 'large' ? 'ed-hero--large' : ''} ${isTV ? 'ed-hero--tv' : ''}`}
       data-dark-context
       data-editorial-hero
+      data-tv-hero-cycle={isTV && count > 1 ? '' : undefined}
       data-hero-item-key={contentItemKey(current)}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
@@ -597,14 +620,27 @@ function EditorialHeroSection({
               {primaryButtonIcon}
               <span>{primaryButtonLabel ?? 'Regarder'}</span>
             </button>
-            <a href={getItemUrl(current)} className="ed-link" tabIndex={0} data-focusable>
+            <a
+              href={getItemUrl(current)}
+              className="ed-link"
+              tabIndex={isTV ? -1 : 0}
+              data-focusable={isTV ? undefined : true}
+              data-tv-nav-skip={isTV ? '' : undefined}
+            >
               {t('common.details')}
             </a>
           </div>
         </div>
 
         {trailerKey && !trailerOpen && (
-          <button type="button" className="ed-play" tabIndex={0} onClick={() => setTrailerOpen(true)} data-focusable>
+          <button
+            type="button"
+            className="ed-play"
+            tabIndex={isTV ? -1 : 0}
+            onClick={() => setTrailerOpen(true)}
+            data-focusable={isTV ? undefined : true}
+            data-tv-nav-skip={isTV ? '' : undefined}
+          >
             <span className="ed-play__ring">
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 7.5v9l7.5-4.5z" /></svg>
             </span>
@@ -629,10 +665,10 @@ function EditorialHeroSection({
             ))}
           </span>
           <span className="ed-pager__num ed-pager__num--dim">{pad2(count)}</span>
-          <button type="button" className="ed-arrow" onClick={() => go(-1)} aria-label="Précédent" tabIndex={0} data-focusable>
+          <button type="button" className="ed-arrow" onClick={() => go(-1)} aria-label="Précédent" tabIndex={isTV ? -1 : 0} data-focusable={isTV ? undefined : true} data-tv-nav-skip={isTV ? '' : undefined}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3"><path d="M15 5l-7 7 7 7" /></svg>
           </button>
-          <button type="button" className="ed-arrow" onClick={() => go(1)} aria-label="Suivant" tabIndex={0} data-focusable>
+          <button type="button" className="ed-arrow" onClick={() => go(1)} aria-label="Suivant" tabIndex={isTV ? -1 : 0} data-focusable={isTV ? undefined : true} data-tv-nav-skip={isTV ? '' : undefined}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3"><path d="M9 5l7 7-7 7" /></svg>
           </button>
         </div>
