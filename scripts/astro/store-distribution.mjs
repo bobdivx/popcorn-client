@@ -3,8 +3,8 @@
 // (liste alignée sur STORE_BLOCKED_ROUTE_PREFIXES dans src/lib/distribution.ts) et remplace
 // /torrents par une redirection vers /media (fiche média de la bibliothèque).
 // Sans PUBLIC_DISTRIBUTION=play, cette intégration ne fait rien.
-import { existsSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, rmSync, mkdirSync, writeFileSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadEnv } from 'vite';
 
@@ -56,6 +56,49 @@ export function getDistribution() {
   }
 }
 
+function walk(dir, out = []) {
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) walk(full, out);
+    else out.push(full);
+  }
+  return out;
+}
+
+/**
+ * Supprime les chunks JS qui ne sont plus référencés par aucune page restante (code des pages
+ * torrent / indexers / téléchargements supprimées). Conservateur : un chunk est gardé dès que son
+ * nom de fichier apparaît dans une page HTML ou dans un chunk déjà atteint (imports statiques,
+ * import() dynamiques, listes de preload Vite).
+ */
+function pruneUnreachableChunks(outDir) {
+  const files = walk(outDir);
+  const html = files.filter((f) => f.endsWith('.html'));
+  const chunks = files.filter((f) => /\.m?js$/.test(f));
+  const reached = new Set();
+  let frontier = html.map((f) => readFileSync(f, 'utf8'));
+  while (frontier.length) {
+    const text = frontier.join('\n');
+    const next = [];
+    for (const chunk of chunks) {
+      if (reached.has(chunk)) continue;
+      if (text.includes(basename(chunk))) {
+        reached.add(chunk);
+        next.push(readFileSync(chunk, 'utf8'));
+      }
+    }
+    frontier = next;
+  }
+  const removed = [];
+  for (const chunk of chunks) {
+    if (!reached.has(chunk) && chunk.includes(`${join(outDir, '_assets')}`)) {
+      rmSync(chunk, { force: true });
+      removed.push(basename(chunk));
+    }
+  }
+  return removed;
+}
+
 const REDIRECT_TO_MEDIA = `<!doctype html><html><head><meta charset="utf-8"><meta name="robots" content="noindex"><script>location.replace('/media'+location.search+location.hash)</script></head><body></body></html>`;
 
 export function storeDistribution() {
@@ -77,6 +120,10 @@ export function storeDistribution() {
         mkdirSync(join(outDir, 'torrents'), { recursive: true });
         writeFileSync(join(outDir, 'torrents', 'index.html'), REDIRECT_TO_MEDIA);
         logger.info(`PUBLIC_DISTRIBUTION=play : ${removed.length} routes torrent supprimées du build (${removed.join(', ')})`);
+        const prunedChunks = pruneUnreachableChunks(outDir);
+        logger.info(
+          `PUBLIC_DISTRIBUTION=play : ${prunedChunks.length} chunks JS orphelins supprimés (${prunedChunks.join(', ')})`
+        );
       },
     },
   };
