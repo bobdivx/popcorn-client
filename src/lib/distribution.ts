@@ -11,19 +11,19 @@
  * Sans la variable (web, webOS, desktop, APK GitHub), rien ne change.
  */
 
-const RAW_DISTRIBUTION = String(import.meta.env.PUBLIC_DISTRIBUTION ?? '')
-  .trim()
-  .toLowerCase();
-
 export type Distribution = 'default' | 'play';
 
-export const DISTRIBUTION: Distribution = RAW_DISTRIBUTION === 'play' ? 'play' : 'default';
+/**
+ * Vrai pour la version Google Play (aucune fonctionnalité torrent).
+ * Comparaison littérale sur import.meta.env (remplacé au build) pour que le bundler élimine
+ * le code torrent mort de la version store.
+ */
+export const IS_STORE_BUILD: boolean = import.meta.env.PUBLIC_DISTRIBUTION === 'play';
 
-/** Vrai pour la version Google Play (aucune fonctionnalité torrent). */
-export const IS_STORE_BUILD: boolean = DISTRIBUTION === 'play';
+export const DISTRIBUTION: Distribution = IS_STORE_BUILD ? 'play' : 'default';
 
 /** Fonctionnalités torrent / indexers / téléchargements disponibles dans ce build. */
-export const TORRENT_FEATURES_ENABLED: boolean = !IS_STORE_BUILD;
+export const TORRENT_FEATURES_ENABLED: boolean = import.meta.env.PUBLIC_DISTRIBUTION !== 'play';
 
 /** Chemin de la fiche média (lecture d'un élément de la bibliothèque). */
 export const MEDIA_DETAIL_PATH: string = IS_STORE_BUILD ? '/media' : '/torrents';

@@ -6,6 +6,7 @@ import { canAccess } from '../../lib/permissions';
 import PermissionGuard from '../ui/PermissionGuard';
 import DsPageHeader from '../ui/DsPageHeader';
 import { HubSkeleton } from './hub/HubTile';
+import { TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
 
 type CategoryId = 'system' | 'interface' | 'content' | 'downloads' | 'library' | 'discovery' | 'account' | 'playback' | 'maintenance';
 
@@ -42,23 +43,27 @@ function getRouteFromUrl(): SettingsRoute {
   return { type: 'overview' };
 }
 
+/** Version store (PUBLIC_DISTRIBUTION=play) : panneaux torrent absents du build (import dynamique éliminé). */
+const storeUnavailable = (): Promise<{ default: ComponentType<any> }> =>
+  Promise.resolve({ default: () => null });
+
 /** Charge un panneau à la demande pour alléger le premier chargement. */
 const CATEGORY_LOADERS: Record<CategoryId, () => Promise<{ default: ComponentType<any> }>> = {
   system: () => import('./SystemSubMenuPanel'),
   maintenance: () => import('./MaintenanceSubMenuPanel'),
   interface: () => import('./InterfaceSubMenuPanel'),
   playback: () => import('./PlaybackSettingsPanel'),
-  content: () => import('./ContentSubMenuPanel'),
-  downloads: () => import('./DownloadsSubMenuPanel'),
+  content: TORRENT_FEATURES_ENABLED ? () => import('./ContentSubMenuPanel') : storeUnavailable,
+  downloads: TORRENT_FEATURES_ENABLED ? () => import('./DownloadsSubMenuPanel') : storeUnavailable,
   library: () => import('./LibrarySubMenuPanel'),
-  discovery: () => import('./DiscoverySubMenuPanel'),
+  discovery: TORRENT_FEATURES_ENABLED ? () => import('./DiscoverySubMenuPanel') : storeUnavailable,
   account: () => import('./AccountSubMenuPanel'),
 };
 
 const PAGE_LOADERS = {
   server: () => import('./ServerSettings'),
   account: () => import('./AccountSubMenuPanel'),
-  ratio: () => import('./RatioAdminPanel'),
+  ratio: TORRENT_FEATURES_ENABLED ? () => import('./RatioAdminPanel') : storeUnavailable,
 } as const;
 
 /** Cache module-level : navigation retour instantanée sans re-fetch du chunk. */
