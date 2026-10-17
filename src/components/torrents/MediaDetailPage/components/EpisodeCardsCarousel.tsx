@@ -29,6 +29,8 @@ export interface EpisodeCarouselItem {
   leechCount?: number;
   /** Position de lecture sauvegardée — effet « reprendre » sur la carte. */
   canResume?: boolean;
+  /** % de lecture de l'épisode (barre de reprise). */
+  resumePercent?: number;
   isSelected: boolean;
   onSelect: () => void;
   isTV?: boolean;
@@ -125,8 +127,10 @@ export function EpisodeCardsCarousel({
                 aria-disabled={!interactive}
                 title={interactive ? undefined : 'Aucune source pour cet épisode'}
                 className={`ed-ep-card group text-left rounded-2xl border transition-[opacity,transform,border-color,background-color,box-shadow] duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--ed-accent,#f2545b)] focus:ring-offset-2 focus:ring-offset-black/40 shrink-0 w-[280px] sm:w-[320px] cursor-pointer ${
-                  it.canResume
-                    ? 'is-resume border-amber-400/55 bg-amber-500/10 ring-1 ring-amber-400/35'
+                  it.isSelected
+                    ? 'is-selected border-[var(--ed-accent,#f2545b)]/65 bg-[var(--ed-accent,#f2545b)]/12 ring-1 ring-[var(--ed-accent,#f2545b)]/30'
+                    : it.canResume
+                    ? 'is-resume border-white/20 bg-white/[0.06]'
                     : it.isSelected
                       ? 'is-selected border-[var(--ed-accent,#f2545b)]/65 bg-[var(--ed-accent,#f2545b)]/12 ring-1 ring-[var(--ed-accent,#f2545b)]/30'
                       : interactive
@@ -207,28 +211,30 @@ export function EpisodeCardsCarousel({
                         : `${it.episodeNumber}`}
                     </span>
                     {!it.isDownloading && it.watched ? (
-                      <span title="Déjà vu" aria-label="Déjà vu" className="inline-flex">
-                        <CircleCheck
-                          className="w-6 h-6 text-emerald-400 drop-shadow-md"
-                          strokeWidth={2.5}
-                        />
+                      <span
+                        title={t('playback.episodeWatched')}
+                        aria-label={t('playback.episodeWatched')}
+                        data-episode-watched
+                        className="ed-ep-card__watched inline-flex items-center justify-center w-7 h-7 rounded-full bg-black/55 border border-[var(--ed-accent,#f2545b)]/70"
+                      >
+                        <CircleCheck className="w-4 h-4 text-[var(--ed-accent,#f2545b)]" strokeWidth={1.75} />
                       </span>
                     ) : null}
                     {!it.isDownloading && it.isDownloaded ? (
                       <span
-                        className="inline-flex items-center justify-center p-1.5 rounded-full bg-blue-500/80 border border-blue-400/50 shadow-lg"
+                        className="inline-flex items-center justify-center p-1.5 rounded-full bg-black/55 border border-white/25"
                         title="Téléchargé"
                         aria-label="Téléchargé"
                       >
-                        <HardDrive className="w-4 h-4 text-white" strokeWidth={2.5} />
+                        <HardDrive className="w-4 h-4 text-white" strokeWidth={1.75} />
                       </span>
                     ) : !it.isDownloading && it.isAvailable ? (
                       <span
-                        className="inline-flex items-center justify-center p-1.5 rounded-full bg-amber-500/80 border border-amber-400/50 shadow-lg"
+                        className="inline-flex items-center justify-center p-1.5 rounded-full bg-black/55 border border-white/25"
                         title="Disponible (Indexer)"
                         aria-label="Disponible"
                       >
-                        <CloudDownload className="w-4 h-4 text-white" strokeWidth={2.5} />
+                        <CloudDownload className="w-4 h-4 text-white/85" strokeWidth={1.75} />
                       </span>
                     ) : null}
                   </div>
@@ -237,7 +243,7 @@ export function EpisodeCardsCarousel({
                     <div
                       className={`ed-ep-card__action absolute right-3 bottom-3 w-11 h-11 rounded-full flex items-center justify-center border transition-[opacity,transform,background-color] duration-200 ${
                         it.canResume
-                          ? 'border-amber-300/60 bg-amber-500/85 text-white'
+                          ? 'border-[var(--ed-accent,#f2545b)]/50 bg-[var(--ed-accent,#f2545b)]/85 text-white'
                           : it.isSelected
                             ? 'border-[var(--ed-accent,#f2545b)]/50 bg-[var(--ed-accent,#f2545b)]/80 text-white'
                             : 'border-white/15 bg-black/40 text-white/90 group-hover:bg-[var(--ed-accent,#f2545b)]/80 group-hover:border-[var(--ed-accent,#f2545b)]/40'
@@ -254,12 +260,16 @@ export function EpisodeCardsCarousel({
                   {it.canResume && !it.isDownloading ? (
                     <>
                       <div className="absolute left-3 bottom-3 z-10">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide bg-amber-500/90 text-black/90 border border-amber-300/40">
+                        <span className="ed-ep-card__resume inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] uppercase tracking-[0.2em] bg-black/60 text-white/90 border border-white/20">
                           {t('playback.resumeLabel')}
+                          {typeof it.resumePercent === 'number' ? ` · ${it.resumePercent}%` : ''}
                         </span>
                       </div>
-                      <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/15 z-10">
-                        <div className="h-full w-2/5 bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.7)]" />
+                      <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-white/15 z-10" data-episode-resume-bar>
+                        <div
+                          className="h-full bg-[var(--ed-accent,#f2545b)]"
+                          style={{ width: `${typeof it.resumePercent === 'number' ? Math.max(3, Math.min(100, it.resumePercent)) : 40}%` }}
+                        />
                       </div>
                     </>
                   ) : null}

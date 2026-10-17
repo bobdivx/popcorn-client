@@ -276,7 +276,7 @@ export function PlayerSettingsMenu({
         data-settings-focus={idx}
         tabIndex={focused ? 0 : -1}
         class={`w-full flex items-center gap-3 ${rowPad} text-left transition-colors rounded-xl ${
-          focused ? 'bg-white text-black' : 'text-white hover:bg-white/10'
+          focused ? 'ed-pm-focus bg-[#f2545b] text-white' : 'text-white hover:bg-white/[0.06]'
         }`}
         onClick={(e) => {
           e.preventDefault();
@@ -285,17 +285,17 @@ export function PlayerSettingsMenu({
         }}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        <span class={`flex-shrink-0 ${focused ? 'text-black/70' : 'text-white/80'}`}>{icon}</span>
+        <span class={`flex-shrink-0 ${focused ? 'text-white' : 'text-white/80'}`}>{icon}</span>
         <span class="flex-1 min-w-0">
-          <span class={`block font-semibold ${rowText}`}>{label}</span>
+          <span class={`ed-pm-label block ${rowText}`}>{label}</span>
           <span
-            class={`block truncate mt-0.5 ${rowSub} ${focused ? 'text-black/55' : 'text-white/55'}`}
+            class={`block truncate mt-0.5 ${rowSub} ${focused ? 'text-white/80' : 'text-white/55'}`}
           >
             {value}
           </span>
         </span>
         <ChevronRight
-          class={`${iconCls} flex-shrink-0 ${focused ? 'text-black/40' : 'text-white/35'}`}
+          class={`${iconCls} flex-shrink-0 ${focused ? 'text-white/70' : 'text-white/35'}`}
         />
       </button>
     );
@@ -322,10 +322,10 @@ export function PlayerSettingsMenu({
         tabIndex={focused ? 0 : -1}
         class={`w-full flex items-center gap-3 ${rowPad} text-left rounded-xl transition-colors ${rowText} ${
           focused
-            ? 'bg-white text-black font-semibold'
+            ? 'ed-pm-focus bg-[#f2545b] text-white'
             : selected
-              ? 'bg-white/15 text-white font-medium'
-              : 'text-white/90 hover:bg-white/10'
+              ? 'bg-white/[0.06] text-white ring-1 ring-inset ring-[#f2545b]/60'
+              : 'text-white/90 hover:bg-white/[0.06]'
         }`}
         onClick={(e) => {
           e.preventDefault();
@@ -336,13 +336,13 @@ export function PlayerSettingsMenu({
       >
         <span class="w-6 flex-shrink-0 flex justify-center">
           {selected ? (
-            <Check class={`${iconCls} ${focused ? 'text-black' : 'text-white'}`} />
+            <Check class={`${iconCls} ${focused ? 'text-white' : 'text-[#f2545b]'}`} />
           ) : null}
         </span>
         <span class="flex-1 min-w-0">
           {label}
           {hint ? (
-            <span class={`ml-1.5 ${rowSub} ${focused ? 'text-black/50' : 'text-white/50'}`}>
+            <span class={`ml-1.5 ${rowSub} ${focused ? 'text-white/75' : 'text-white/50'}`}>
               {hint}
             </span>
           ) : null}
@@ -352,8 +352,8 @@ export function PlayerSettingsMenu({
   };
 
   const shellCls = isMobile
-    ? 'fixed inset-x-0 bottom-0 z-[9999] max-h-[85vh] rounded-t-2xl border border-white/15 border-b-0 bg-black/95 shadow-2xl backdrop-blur-md flex flex-col safe-area-pb'
-    : 'fixed z-[9999] top-0 right-0 h-full w-[min(28rem,92vw)] bg-black/95 border-l border-white/15 shadow-2xl backdrop-blur-md flex flex-col';
+    ? 'fixed inset-x-0 bottom-0 z-[9999] max-h-[85vh] ed-player-menu rounded-t-2xl border border-white/10 border-b-0 bg-[#0c0d10]/95 shadow-2xl backdrop-blur-md flex flex-col safe-area-pb'
+    : 'fixed z-[9999] top-0 right-0 h-full w-[min(28rem,92vw)] ed-player-menu bg-[#0c0d10]/95 border-l border-white/10 shadow-2xl backdrop-blur-md flex flex-col';
 
   return (
     <>
@@ -394,7 +394,7 @@ export function PlayerSettingsMenu({
           ) : (
             <Settings class={`${iconCls} text-white/70`} />
           )}
-          <h3 class={`flex-1 font-semibold text-white tracking-wide ${titleCls}`}>{panelTitle}</h3>
+          <h3 class={`ed-pm-title flex-1 text-white ${titleCls}`}>{panelTitle}</h3>
           {panel === 'root' ? (
             <button
               type="button"

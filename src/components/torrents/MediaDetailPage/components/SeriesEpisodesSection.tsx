@@ -3,6 +3,7 @@ import { useI18n } from '../../../../lib/i18n/useI18n';
 import type { SeriesEpisodesResponse } from '../../../../lib/client/server-api/media';
 import { serverApi } from '../../../../lib/client/server-api';
 import { watchedEpisodeKey } from '../../../../lib/streaming/torrent-storage';
+import { getEpisodeResumePercent, type EpisodeProgressEntry } from '../../../../lib/watchedEpisodes';
 import { isGenericEpisodeName } from '../utils/isGenericEpisodeName';
 import { EpisodeCardsCarousel } from './EpisodeCardsCarousel';
 
@@ -58,6 +59,8 @@ export interface SeriesEpisodesSectionProps {
   savedPlaybackPosition: number | null;
   downloadedEpisodesSet?: Set<string>;
   watchedSet?: Set<string>;
+  /** Progression par épisode (`season:episode`) — barre « reprendre » sur chaque carte. */
+  episodeProgress?: Record<string, EpisodeProgressEntry>;
   isTV?: boolean;
   /** Torrent info pour l'épisode sélectionné */
   isDownloading?: boolean;
@@ -77,6 +80,7 @@ export function SeriesEpisodesSection({
   savedPlaybackPosition,
   downloadedEpisodesSet,
   watchedSet,
+  episodeProgress,
   isTV,
   isDownloading,
   downloadProgress,
@@ -318,6 +322,10 @@ export function SeriesEpisodesSection({
                   typeof tmdbId === 'number' && ep.episode > 0
                     ? watchedSet?.has(watchedEpisodeKey(ep.season, ep.episode)) ?? false
                     : false;
+                const resumePercent =
+                  typeof tmdbId === 'number' && ep.episode > 0
+                    ? getEpisodeResumePercent(episodeProgress, watchedSet, ep.season, ep.episode)
+                    : null;
                 // Indexeur : souvent variante avec id BDD mais magnet sans hash 40c encore résolu.
                 const hasIndexerVariant =
                   typeof ep.id === 'string' &&
@@ -365,7 +373,8 @@ export function SeriesEpisodesSection({
                         : null,
                     seedCount,
                     leechCount,
-                    canResume: isSelected && hasSavedPosition,
+                    resumePercent: resumePercent ?? undefined,
+                    canResume: (isSelected && hasSavedPosition && !watched) || resumePercent != null,
                   isSelected,
                   onSelect: () => onSelectEpisode(ep.id),
                   isTV,
