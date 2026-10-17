@@ -533,7 +533,13 @@ function getBackHrefFromLocation(): string | null {
     downloads: '/downloads',
     search: '/search',
     torrents: '/torrents',
+    plateformes: '/plateformes/',
   };
+  if (from === 'plateformes') {
+    // Retour vers la page de la plateforme d'origine (fallback si pas d'historique).
+    const p = new URLSearchParams(window.location.search).get('fromP');
+    if (p && /^[a-z0-9-]{1,40}$/.test(p)) return `/plateformes/?p=${p}`;
+  }
   return map[from] ?? null;
 }
 
