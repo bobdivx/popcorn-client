@@ -7,6 +7,8 @@ import { registerCloudDevice, getOidcStatus } from '../lib/api/popcorn-web';
 import { isTauri } from '../lib/utils/tauri';
 import { isTVPlatform } from '../lib/utils/device-detection';
 import PocketIdButton from './PocketIdButton';
+import { initNativeSsoListener, takeSsoReturn } from '../lib/auth/native-sso';
+import { hasBackendUrl, hasDeploymentBackend } from '../lib/backend-config.js';
 
 export default function LoginForm() {
   const { t } = useI18n();
@@ -39,11 +41,13 @@ export default function LoginForm() {
       url.searchParams.delete('reason');
       window.history.replaceState({}, '', url.pathname + url.search);
     }
-    const ssoError = params.get('sso_error');
-    if (ssoError) {
-      setError(ssoError);
+    // Apps Tauri : écouter le retour Pocket ID (deep link) dès l'affichage de la connexion.
+    initNativeSsoListener();
+    const ssoReturn = takeSsoReturn();
+    if (ssoReturn?.error) {
+      setError(ssoReturn.error);
     }
-    const ticket = params.get('sso_ticket');
+    const ticket = ssoReturn?.ticket;
     if (ticket) {
       setSsoCompleting(true);
       serverApi.completeCloudSso(ticket).then(async (response) => {
@@ -53,6 +57,12 @@ export default function LoginForm() {
           return;
         }
         void registerDeviceIfPossible();
+        // App native, premier lancement (aucune URL serveur) : session cloud enregistrée, on continue
+        // l'assistant (étape Serveur) au lieu d'un dashboard inaccessible.
+        if (isTauri() && !hasBackendUrl() && !hasDeploymentBackend()) {
+          redirectTo('/setup?sso_done=1');
+          return;
+        }
         redirectTo('/dashboard');
       }).catch((err) => {
         console.error(err);

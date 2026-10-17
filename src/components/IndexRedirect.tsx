@@ -20,6 +20,7 @@ import {
 import { isTauri } from '../lib/utils/tauri';
 import { redirectTo } from '../lib/utils/navigation.js';
 import IntroVideo from './IntroVideo';
+import { initNativeSsoListener } from '../lib/auth/native-sso';
 import HLSLoadingSpinner from './ui/HLSLoadingSpinner';
 import { getCloudDevices, getUserConfig } from '../lib/api/popcorn-web';
 import { isTVPlatform, isWebOSTV } from '../lib/utils/device-detection';
@@ -69,6 +70,13 @@ export default function IndexRedirect() {
       window.dispatchEvent(new Event('popcorn-app-ready'));
     }, 100);
     return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    // Apps Tauri : retour Pocket ID au démarrage à froid (l'app relancée par le deep link).
+    // Traité tout de suite : le ticket expire en 2 min, alors que les vérifications backend
+    // ci-dessous peuvent durer longtemps quand aucune URL serveur n'est encore configurée.
+    initNativeSsoListener();
   }, []);
 
   useEffect(() => {
