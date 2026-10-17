@@ -26,3 +26,5 @@ Ne touche pas à `com.popcorn.client.webos` (id différent).
 ### Lecteur (1.4.1)
 - Séries : boutons Précédent / Suivant du dock = épisode précédent / suivant (franchit les saisons, masqués en bout de série) ; télécommande CH+ / CH− (et MediaTrackNext / Previous) idem. Films : seek ±10 s inchangé.
 - Épisodes vus + reprise par épisode synchronisés serveur (`/api/watched-episodes`), aussi sur le chemin HLS natif TV.
+
+- 1.4.2 : films vus (coche corail, « Reprendre · NN %», marquer vu / non vu), purge des derniers violets (CSS + alias Tailwind purple/violet → corail).
