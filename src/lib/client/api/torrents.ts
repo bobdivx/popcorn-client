@@ -7,6 +7,19 @@ import type {
 import type { ClientApi } from './index.js';
 import { handleResponse, handleError, extractInfoHashFromError } from './utils.js';
 import { getBackendUrl } from '../../backend-config.js';
+import { TokenManager } from '../storage.js';
+
+// En-tete d'auth serveur pour les fetch normaux : le token cloud identifie le membre cote serveur.
+// Les transports sans en-tete (EventSource) passent le token en query (voir getLibrqbitStreamLogsUrl).
+function authHeaders(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const t = TokenManager.getCloudAccessToken();
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  } catch {
+    return {};
+  }
+}
 
 function clientUserHeaders(): HeadersInit {
   if (typeof window === 'undefined') return {};
@@ -34,13 +47,19 @@ export class TorrentsService {
     return this.clientApi['getRequestUrl'](path);
   }
 
+  /** fetch avec en-tete d'auth serveur (token cloud) joint automatiquement. */
+  private af(url: string, init: RequestInit = {}): Promise<Response> {
+    const headers = { ...(init.headers as Record<string, string> | undefined), ...authHeaders() };
+    return fetch(url, { ...init, headers });
+  }
+
   /**
    * Récupérer la liste de tous les torrents
    */
   async listTorrents(): Promise<ClientTorrentStats[]> {
     try {
       const url = await this.getRequestUrl('torrents');
-      const response = await fetch(url);
+      const response = await this.af(url);
       const data = await handleResponse<ClientTorrentStats[]>(response);
       return data.data || [];
     } catch (error) {
@@ -55,7 +74,7 @@ export class TorrentsService {
   async listTorrentsEnriched(): Promise<ClientTorrentStats[]> {
     try {
       const url = await this.getRequestUrl('torrents/enriched');
-      const response = await fetch(url);
+      const response = await this.af(url);
       const data = await handleResponse<ClientTorrentStats[]>(response);
       return data.data || [];
     } catch (error) {
@@ -80,7 +99,7 @@ export class TorrentsService {
       const controller = new AbortController();
       
       // Faire la requête avec un signal pour pouvoir l'annuler
-      const response = await fetch(url, {
+      const response = await this.af(url, {
         signal: controller.signal,
       }).catch((err) => {
         // Intercepter les erreurs réseau
@@ -140,7 +159,7 @@ export class TorrentsService {
       const url = await this.getRequestUrl(
         `torrents/${encodeURIComponent(infoHash)}/verification`
       );
-      const response = await fetch(url);
+      const response = await this.af(url);
       if (response.status === 404 || !response.ok) {
         return null;
       }
@@ -160,7 +179,7 @@ export class TorrentsService {
       const url = await this.getRequestUrl(
         `torrents/${encodeURIComponent(infoHash)}/stats/v1`
       );
-      const response = await fetch(url);
+      const response = await this.af(url);
       if (response.status === 404 || !response.ok) {
         return null;
       }
@@ -178,7 +197,7 @@ export class TorrentsService {
   async getLibrqbitSessionStats(): Promise<Record<string, unknown> | null> {
     try {
       const url = await this.getRequestUrl('librqbit/stats');
-      const response = await fetch(url);
+      const response = await this.af(url);
       if (!response.ok) {
         return null;
       }
@@ -194,12 +213,20 @@ export class TorrentsService {
    * Utiliser avec EventSource ou fetch + ReadableStream pour afficher les logs en temps réel.
    */
   async getLibrqbitStreamLogsUrl(): Promise<string> {
-    return this.getRequestUrl('librqbit/stream_logs');
+    // Transport sans en-tete (EventSource) : le token cloud passe en query (?access_token=).
+    let url = await this.getRequestUrl('librqbit/stream_logs');
+    if (typeof window !== 'undefined') {
+      try {
+        const t = TokenManager.getCloudAccessToken();
+        if (t) url += (url.includes('?') ? '&' : '?') + 'access_token=' + encodeURIComponent(t);
+      } catch { /* ignore */ }
+    }
+    return url;
   }
 
   async postLibrqbitLimits(uploadBps?: number, downloadBps?: number): Promise<void> {
     const url = await this.getRequestUrl('librqbit/limits');
-    const res = await fetch(url, {
+    const res = await this.af(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ upload_bps: uploadBps ?? null, download_bps: downloadBps ?? null }),
@@ -210,7 +237,7 @@ export class TorrentsService {
   async getLibrqbitDhtStats(): Promise<Record<string, unknown> | null> {
     try {
       const url = await this.getRequestUrl('librqbit/dht/stats');
-      const res = await fetch(url);
+      const res = await this.af(url);
       if (!res.ok) return null;
       const data = await handleResponse<Record<string, unknown>>(res);
       return data.data ?? null;
@@ -222,7 +249,7 @@ export class TorrentsService {
   async getLibrqbitDhtTable(): Promise<Record<string, unknown> | null> {
     try {
       const url = await this.getRequestUrl('librqbit/dht/table');
-      const res = await fetch(url);
+      const res = await this.af(url);
       if (!res.ok) return null;
       const data = await handleResponse<Record<string, unknown>>(res);
       return data.data ?? null;
@@ -233,7 +260,7 @@ export class TorrentsService {
 
   async postLibrqbitRustLog(value: string): Promise<void> {
     const url = await this.getRequestUrl('librqbit/rust_log');
-    const res = await fetch(url, {
+    const res = await this.af(url, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
       body: value,
@@ -273,7 +300,7 @@ export class TorrentsService {
       }
       url = `${url}${url.includes('?') ? '&' : '?'}${params.toString()}`;
       
-      const response = await fetch(url);
+      const response = await this.af(url);
       if (response.status === 404) {
         return [];
       }
@@ -353,7 +380,7 @@ export class TorrentsService {
       
       let response: Response;
       try {
-        response = await fetch(url, {
+        response = await this.af(url, {
           method: 'POST',
           headers,
           body: fileBuffer,
@@ -464,7 +491,7 @@ export class TorrentsService {
       
       let response: Response;
       try {
-        response = await fetch(url, {
+        response = await this.af(url, {
           method: 'POST',
           headers,
           body: JSON.stringify(request),
@@ -499,7 +526,7 @@ export class TorrentsService {
     const separator = url.includes('?') ? '&' : '?';
     url = `${url}${separator}delete_files=${deleteFiles}`;
     
-    const response = await fetch(url, {
+    const response = await this.af(url, {
       method: 'DELETE',
     });
 
@@ -535,7 +562,7 @@ export class TorrentsService {
     if (onlyFiles.length === 0) return;
     try {
       const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/update_only_files`);
-      const response = await fetch(url, {
+      const response = await this.af(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ only_files: onlyFiles }),
@@ -561,7 +588,7 @@ export class TorrentsService {
   async getTorrentTrackers(infoHash: string): Promise<string[]> {
     try {
       const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/trackers`);
-      const response = await fetch(url);
+      const response = await this.af(url);
       const data = await handleResponse<{ trackers: string[] }>(response);
       return data.data?.trackers ?? [];
     } catch {
@@ -574,7 +601,7 @@ export class TorrentsService {
    */
   async addTracker(infoHash: string, trackerUrl: string): Promise<void> {
     const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/trackers`);
-    const response = await fetch(url, {
+    const response = await this.af(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tracker_url: trackerUrl.trim() }),
@@ -606,7 +633,7 @@ export class TorrentsService {
     // eslint-disable-next-line no-constant-condition
     while (true) {
       attempt += 1;
-      const response = await fetch(url);
+      const response = await this.af(url);
       if (response.ok) return;
       const status = response.status;
       // Compatibilité backend distant: certains déploiements n'ont pas encore
@@ -635,7 +662,7 @@ export class TorrentsService {
    */
   async pauseTorrent(infoHash: string): Promise<void> {
     const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/pause`);
-    const response = await fetch(url, {
+    const response = await this.af(url, {
       method: 'POST',
     });
 
@@ -647,7 +674,7 @@ export class TorrentsService {
    */
   async resumeTorrent(infoHash: string): Promise<void> {
     const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/resume`);
-    const response = await fetch(url, {
+    const response = await this.af(url, {
       method: 'POST',
     });
 
@@ -662,7 +689,7 @@ export class TorrentsService {
   async notifyStreamingEnded(infoHash: string): Promise<void> {
     try {
       const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/streaming-ended`);
-      const response = await fetch(url, { method: 'POST' });
+      const response = await this.af(url, { method: 'POST' });
       if (!response.ok) {
         return;
       }
@@ -683,7 +710,7 @@ export class TorrentsService {
   ): Promise<void> {
     try {
       const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/bind`);
-      const response = await fetch(url, {
+      const response = await this.af(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...clientUserHeaders() },
         body: JSON.stringify({ tmdb_id: tmdbId, tmdb_type: tmdbType }),
@@ -705,7 +732,7 @@ export class TorrentsService {
     tmdbType: 'movie' | 'tv'
   ): Promise<void> {
     const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/tmdb/override`);
-    const response = await fetch(url, {
+    const response = await this.af(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -719,7 +746,7 @@ export class TorrentsService {
 
   async clearDownloadTmdbOverride(infoHash: string): Promise<void> {
     const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/tmdb/override`);
-    const response = await fetch(url, {
+    const response = await this.af(url, {
       method: 'DELETE',
       headers: { ...clientUserHeaders() },
     });
@@ -730,7 +757,7 @@ export class TorrentsService {
   /** Rematche TMDB depuis le nom du fichier torrent (serveur). */
   async rematchDownloadTmdb(infoHash: string): Promise<void> {
     const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/tmdb/rematch`);
-    const response = await fetch(url, {
+    const response = await this.af(url, {
       method: 'POST',
       headers: { ...clientUserHeaders() },
     });
@@ -748,7 +775,7 @@ export class TorrentsService {
       // Ajouter le paramètre filtered=true par défaut pour le debug
       const separator = url.includes('?') ? '&' : '?';
       url = `${url}${separator}filtered=${filtered}`;
-      const response = await fetch(url);
+      const response = await this.af(url);
       const data = await handleResponse<TorrentLogEntry[]>(response);
       return data.data || [];
     } catch (error) {
@@ -762,7 +789,7 @@ export class TorrentsService {
   async getTorrentDownloadPath(infoHash: string): Promise<string> {
     try {
       const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/path`);
-      const response = await fetch(url);
+      const response = await this.af(url);
       const data = await handleResponse<string>(response);
       return data.data || '';
     } catch (error) {
@@ -799,7 +826,7 @@ export class TorrentsService {
       }
 
       const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/files`);
-      const response = await fetch(url);
+      const response = await this.af(url);
       
       if (response.status === 404) {
         return [];
@@ -837,7 +864,7 @@ export class TorrentsService {
   async forceTrackerUpdate(infoHash: string): Promise<void> {
     try {
       const url = await this.getRequestUrl(`torrents/${encodeURIComponent(infoHash)}/force-tracker-update`);
-      const response = await fetch(url, {
+      const response = await this.af(url, {
         method: 'POST',
       });
 
@@ -853,7 +880,7 @@ export class TorrentsService {
   async downloadTorrentFile(infoHash: string, name: string): Promise<void> {
     try {
       const backendBaseUrl = (getBackendUrl() || 'http://127.0.0.1:3000').trim().replace(/\/$/, '');
-      let response = await fetch(
+      let response = await this.af(
         `${backendBaseUrl}/api/torrents/${encodeURIComponent(infoHash)}/download`
       );
       
@@ -873,7 +900,7 @@ export class TorrentsService {
       if (response.status === 404) {
         // Fallback: télécharger depuis la DB si le fichier `.torrent` a été stocké lors du sync.
         const adminUrl = `${backendBaseUrl}/api/admin/torrent-files/by-info-hash/${encodeURIComponent(infoHash)}`;
-        response = await fetch(adminUrl);
+        response = await this.af(adminUrl);
         
         if (response.ok) {
           const contentType = response.headers.get('content-type') || '';
