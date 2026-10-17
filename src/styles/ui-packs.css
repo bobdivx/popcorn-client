@@ -158,7 +158,7 @@ html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] .glass-p
 html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] [class*="text-primary-"],
 html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] [class*="text-purple-"],
 html[data-ui-pack="tesla"]:not([data-theme="dark"]) [data-dark-context] [class*="text-violet-"] {
-  color: #c4b5fd !important;
+  color: #ffa1a6 !important;
 }
 /* Fiche média / lecteur uniquement — pas le hero dashboard ni les posters
    (sinon une bande noire apparaît sous le header Tesla gris). */

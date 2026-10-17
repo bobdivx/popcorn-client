@@ -69,9 +69,9 @@ body { color: #fff; }
 [data-theme="light"] {
   --bg-primary: #ede9f5;
   --page-bg: #e8e5f0;
-  --bg-glass: rgba(109, 40, 217, 0.04);
-  --bg-glass-hover: rgba(109, 40, 217, 0.08);
-  --bg-glass-active: rgba(109, 40, 217, 0.13);
+  --bg-glass: rgba(189, 42, 49, 0.04);
+  --bg-glass-hover: rgba(189, 42, 49, 0.08);
+  --bg-glass-active: rgba(189, 42, 49, 0.13);
 }
 
 [data-theme="light"] body {
@@ -106,8 +106,8 @@ body { color: #fff; }
 [data-theme="light"] .dropdown-menu,
 [data-theme="light"] .dropdown-menu-mobile {
   background: linear-gradient(135deg, rgba(245, 242, 252, 0.98) 0%, rgba(237, 233, 248, 0.99) 100%);
-  border-color: rgba(109, 40, 217, 0.12);
-  box-shadow: 0 8px 32px rgba(26, 21, 48, 0.12), 0 0 0 1px rgba(109, 40, 217, 0.06) inset;
+  border-color: rgba(189, 42, 49, 0.12);
+  box-shadow: 0 8px 32px rgba(26, 21, 48, 0.12), 0 0 0 1px rgba(189, 42, 49, 0.06) inset;
 }
 
 [data-theme="light"] .navbar-scrolled {
@@ -120,11 +120,11 @@ body { color: #fff; }
 }
 
 [data-theme="light"] :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline-color: rgba(109, 40, 217, 0.7);
+  outline-color: rgba(189, 42, 49, 0.7);
 }
 
 [data-theme="light"] {
-  --tv-focus-color: rgba(109, 40, 217, 0.7);
+  --tv-focus-color: rgba(189, 42, 49, 0.7);
 }
 
 
@@ -354,14 +354,14 @@ html[data-tv-platform="true"] [data-focusable]:focus-visible {
 }
 
 html[data-tv-platform="true"] [data-media-detail-primary-action] {
-  background: #6d28d9 !important;
+  background: #bd2a31 !important;
   border-color: transparent !important;
   color: #fff !important;
   min-height: 76px;
   padding-left: 2.25rem !important;
   padding-right: 2.25rem !important;
   font-size: 1.35rem !important;
-  box-shadow: 0 10px 28px rgba(109, 40, 217, 0.4);
+  box-shadow: 0 10px 28px rgba(189, 42, 49, 0.4);
 }
 
 /*
@@ -1261,7 +1261,7 @@ html[data-tv-platform="true"] .search-progress-fill {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    background: rgba(192, 132, 252, 0.05);
+    background: rgba(251, 122, 128, 0.05);
     filter: blur(80px);
     animation-delay: 4s;
   }
@@ -2115,7 +2115,7 @@ html {
 
 /* Focus = bordure de l'élément (inset), jamais un anneau extérieur */
 :root {
-  --tv-focus-color: #c4b5fd;
+  --tv-focus-color: #ffa1a6;
   --tv-focus-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
   --tv-focus-outline: 3px solid #fff;
   --tv-focus-outline-offset: 3px;
@@ -2280,7 +2280,7 @@ textarea:focus-visible {
 [data-theme="light"] .tv-element-focused,
 [data-theme="light"] [data-settings-card]:focus-visible,
 [data-theme="light"] .tv-card-focused {
-  outline-color: rgba(109, 40, 217, 0.7) !important;
+  outline-color: rgba(189, 42, 49, 0.7) !important;
 }
 
 /* Masquer l'outline sur les éléments dans les cartes focusées (l'effet est sur la carte) */
@@ -2388,7 +2388,7 @@ form button[type="submit"]:focus-visible,
   ) !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(109, 40, 217, 0.10);
+  border-bottom: 1px solid rgba(189, 42, 49, 0.10);
 }
 
 /* Textes blancs dans la nav → sombres */
@@ -2411,23 +2411,23 @@ form button[type="submit"]:focus-visible,
 }
 [data-theme="light"] nav .nav-tab:hover {
   color: #1a1530 !important;
-  background: rgba(109, 40, 217, 0.08) !important;
+  background: rgba(189, 42, 49, 0.08) !important;
 }
 [data-theme="light"] nav .nav-tab-active {
   color: #1a1530 !important;
-  background: rgba(109, 40, 217, 0.10) !important;
+  background: rgba(189, 42, 49, 0.10) !important;
   font-weight: 700;
 }
 
 /* Boutons icône (search, downloads, settings, hamburger) */
 [data-theme="light"] nav .gtv-icon-btn {
   color: rgba(26, 21, 48, 0.70) !important;
-  background-color: rgba(109, 40, 217, 0.06) !important;
-  border: 1px solid rgba(109, 40, 217, 0.10);
+  background-color: rgba(189, 42, 49, 0.06) !important;
+  border: 1px solid rgba(189, 42, 49, 0.10);
 }
 [data-theme="light"] nav .gtv-icon-btn:hover:not(:disabled) {
   color: #1a1530 !important;
-  background-color: rgba(109, 40, 217, 0.12) !important;
+  background-color: rgba(189, 42, 49, 0.12) !important;
   transform: none;
   box-shadow: none;
 }
@@ -2440,12 +2440,12 @@ form button[type="submit"]:focus-visible,
 /* Boutons pill invité (Connexion / S'inscrire) */
 [data-theme="light"] nav .gtv-pill-btn {
   color: rgba(26, 21, 48, 0.78) !important;
-  background-color: rgba(109, 40, 217, 0.06) !important;
-  border: 1px solid rgba(109, 40, 217, 0.12) !important;
+  background-color: rgba(189, 42, 49, 0.06) !important;
+  border: 1px solid rgba(189, 42, 49, 0.12) !important;
 }
 [data-theme="light"] nav .gtv-pill-btn:hover:not(:disabled) {
   color: #1a1530 !important;
-  background-color: rgba(109, 40, 217, 0.11) !important;
+  background-color: rgba(189, 42, 49, 0.11) !important;
 }
 [data-theme="light"] nav .gtv-pill-btn-primary,
 [data-theme="light"] nav .gtv-pill-btn.gtv-pill-btn-primary {
@@ -2454,7 +2454,7 @@ form button[type="submit"]:focus-visible,
   border-color: transparent !important;
 }
 [data-theme="light"] nav .gtv-pill-btn-primary:hover {
-  background-color: #6d28d9 !important;
+  background-color: #bd2a31 !important;
 }
 
 /* Horloge */
@@ -2475,8 +2475,8 @@ form button[type="submit"]:focus-visible,
 
 /* Select langue dans la navbar */
 [data-theme="light"] nav select {
-  background-color: rgba(109, 40, 217, 0.06) !important;
-  border-color: rgba(109, 40, 217, 0.14) !important;
+  background-color: rgba(189, 42, 49, 0.06) !important;
+  border-color: rgba(189, 42, 49, 0.14) !important;
   color: #1a1530 !important;
 }
 
