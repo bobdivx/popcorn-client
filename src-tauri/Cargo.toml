@@ -25,6 +25,9 @@ tauri-plugin-fs = "2"
 tauri-plugin-http = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-notification = "2"
+# Pocket ID dans le navigateur système + retour via App Link / popcornn://auth (deep link)
+tauri-plugin-deep-link = "2"
+tauri-plugin-opener = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 # reqwest direct (pas via tauri-plugin-http) pour contourner les limitations ACL
