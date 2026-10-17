@@ -216,6 +216,16 @@ export function markEpisodeWatched(tmdbId: number, season: number, episode: numb
   }
 }
 
+/** Remplace l’ensemble des épisodes vus (fusion serveur → local). */
+export function replaceWatchedEpisodesSet(tmdbId: number, set: Set<string>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(episodeWatchedStorageKey(tmdbId), JSON.stringify([...set]));
+  } catch (e) {
+    console.warn('replaceWatchedEpisodesSet:', e);
+  }
+}
+
 export function isEpisodeWatched(tmdbId: number, season: number, episode: number): boolean {
   if (episode <= 0) return false;
   return getWatchedEpisodesSet(tmdbId).has(watchedEpisodeKey(season, episode));
