@@ -93,8 +93,8 @@ export function SubtitleSelector({
       onClick={onClick}
       class={`w-full text-left ${itemPad} rounded-xl transition-all border ${
         selected
-          ? 'bg-white text-black border-white font-semibold'
-          : 'bg-white/10 hover:bg-white/20 text-white border-white/10'
+          ? 'bg-white/[0.06] text-white border-[#f2545b]'
+          : 'bg-transparent hover:bg-white/[0.06] focus:bg-[#f2545b] focus:border-[#f2545b] text-white border-white/10'
       } ${textSize}`}
     >
       {label}
@@ -107,13 +107,13 @@ export function SubtitleSelector({
   );
 
   return (
-    <div class="absolute inset-0 bg-black/92 z-50 flex flex-col backdrop-blur-sm">
+    <div class="ed-player-menu absolute inset-0 bg-[#0c0d10]/95 z-50 flex flex-col backdrop-blur-sm">
       <div class={`flex items-center justify-between ${pad}`}>
-        <h2 class={`${titleSize} font-bold text-white`}>{t('playback.languagesAndSubtitles')}</h2>
+        <h2 class={`ed-pm-title ${titleSize} text-white`}>{t('playback.languagesAndSubtitles')}</h2>
         <button
           type="button"
           onClick={onClose}
-          class={`flex items-center justify-center ${buttonSize} rounded-full bg-white/10 hover:bg-white/20 transition-all border-2 border-white/20`}
+          class={`flex items-center justify-center ${buttonSize} rounded-full bg-black/35 hover:bg-white/10 transition-all border border-white/25`}
           aria-label={t('common.close')}
         >
           <X class={`${iconSize} text-white`} />

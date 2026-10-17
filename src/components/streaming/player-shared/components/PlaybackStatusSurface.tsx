@@ -963,7 +963,7 @@ export function PlaybackStatusSurface({
           tabIndex={0}
           data-focusable
           data-close
-          className="fixed z-40 inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors backdrop-blur-md"
+          className="fixed z-40 inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-[#f2545b] transition-colors backdrop-blur-md"
           style={{
             top: 'max(1rem, var(--safe-area-inset-top))',
             left: 'max(1rem, var(--safe-area-inset-left))',
@@ -982,7 +982,7 @@ export function PlaybackStatusSurface({
           aria-label={t('common.cancel') || 'Annuler'}
           tabIndex={0}
           data-focusable
-          className="fixed z-40 inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors backdrop-blur-md"
+          className="fixed z-40 inline-flex items-center justify-center w-11 h-11 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-[#f2545b] transition-colors backdrop-blur-md"
           style={{
             top: 'max(1rem, var(--safe-area-inset-top))',
             left: 'max(1rem, var(--safe-area-inset-left))',

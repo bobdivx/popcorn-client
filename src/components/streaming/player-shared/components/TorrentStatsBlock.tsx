@@ -20,7 +20,7 @@ export function TorrentStatsBlock({
   const stats = deriveTorrentOverlayStats(torrentStats);
   if (!stats.showStats) return null;
 
-  const barClass = barTone === 'emerald' ? 'bg-emerald-500' : 'bg-primary-500';
+  const barClass = barTone === 'emerald' ? 'bg-[#f2545b]/80' : 'bg-[#f2545b]';
   const wrapperClass =
     variant === 'card'
       ? 'mt-5 w-full max-w-xs space-y-2 rounded-xl bg-white/5 border border-white/10 px-4 py-3'
