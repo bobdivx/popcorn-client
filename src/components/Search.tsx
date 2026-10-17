@@ -226,7 +226,7 @@ function SearchLiveProgressTimeline({
               key={step.id}
               className={`relative flex items-center gap-3 tv:gap-5 rounded-2xl border px-3 py-3 tv:px-6 tv:py-5 transition-all duration-300 ${
                 isActive
-                  ? 'border-[var(--ds-accent-violet)]/70 bg-[var(--ds-accent-violet)]/10 shadow-[0_0_0_1px_rgba(139,92,246,0.25)] scale-[1.01] tv:scale-[1.02]'
+                  ? 'border-[var(--ds-accent-violet)]/70 bg-[var(--ds-accent-violet)]/10 shadow-[0_0_0_1px_rgba(242,84,91,0.25)] scale-[1.01] tv:scale-[1.02]'
                   : isDone
                     ? 'border-emerald-500/35 bg-emerald-500/5'
                     : isError
