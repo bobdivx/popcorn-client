@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { serverApi } from '../../../../lib/client/server-api';
 import { updateResumeWatching } from '../../../../lib/resumeWatchingStorage';
 import { recordEpisodeProgress, WATCHED_EPISODE_THRESHOLD_PERCENT } from '../../../../lib/watchedEpisodes';
+import { recordMovieProgress } from '../../../../lib/watchedMovies';
 import type { ContentItem } from '../../../../lib/client/types';
 import type { TorrentFile } from '../hooks/useVideoFiles';
 import { isSparseOrEmptyMessage } from '../hooks/useVideoFiles';
@@ -378,6 +379,10 @@ export function VideoPlayerWrapper({
       };
       updateResumeWatching(item, progressPercent, episodeInfo);
       // Épisodes vus + reprise par épisode (carrousels série) — tous lecteurs / plateformes.
+      // Films : vu (≥ 90 % ou générique) + reprise NN % sur cartes / détail.
+      if (tmdbType === 'movie') {
+        recordMovieProgress(tmdbId, currentTime, duration);
+      }
       if (tmdbType === 'tv' && seriesSeasonNum != null && seriesEpisodeNum != null) {
         recordEpisodeProgress(tmdbId, seriesSeasonNum, seriesEpisodeNum, currentTime, duration, {
           // Fin (ended / épisode suivant depuis l'overlay) : pousser explicitement « vu ».

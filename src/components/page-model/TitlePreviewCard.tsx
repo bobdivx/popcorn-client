@@ -13,6 +13,8 @@ import {
 import { contentItemKey } from '../dashboard/utils/browsePriority';
 import { reanchorBrowseSlot } from './browseCarouselAnchor';
 import { cardBackdropUrl, cardPosterUrl } from '../../lib/utils/tmdb-images';
+import { useMovieWatchState } from '../../lib/watchedMovies';
+import { useI18n } from '../../lib/i18n';
 import {
   ensureBrowseInputModalityTracking,
   isBrowseKeyboardFocus,
@@ -128,6 +130,9 @@ function TitlePreviewCardImpl({
   badgeTone = 'neutral',
 }: TitlePreviewCardProps) {
   const slotId = `card:${contentItemKey(item)}`;
+  const { t } = useI18n();
+  const isMovie = item.type === 'movie';
+  const movieWatch = useMovieWatchState(isMovie ? item.tmdbId : null, isMovie);
   const tileH = useTileHeight();
   const slotRef = useRef<HTMLDivElement>(null);
   const delayRef = useRef<number | null>(null);
@@ -307,7 +312,11 @@ function TitlePreviewCardImpl({
     const p = downloading || progress > 1 ? progress : progress * 100;
     return Math.min(100, Math.max(0, p));
   })();
-  const showProgressBar = downloading || progressPct > 0;
+  // Films : reprise (barre corail + « Reprendre · NN % ») si aucune progression explicite fournie.
+  const movieResumePct =
+    !downloading && !movieWatch.watched && movieWatch.resumePercent != null ? movieWatch.resumePercent : null;
+  const effectiveProgressPct = progressPct > 0 ? progressPct : movieResumePct ?? 0;
+  const showProgressBar = downloading || effectiveProgressPct > 0;
   const hasExplicitMeta = Boolean(metaLine || metaSubLine);
   const showCaption = hasExplicitMeta || expanded || tvLayout || hovered;
   const captionTitle = metaLine || title;
@@ -362,6 +371,24 @@ function TitlePreviewCardImpl({
             ].join(' ')}
           >
             {badge}
+          </span>
+        ) : null}
+
+        {isMovie && movieWatch.watched && !downloading ? (
+          <span
+            className="ed-card-watched absolute right-2 top-2 z-[4] inline-flex h-7 w-7 tv:h-9 tv:w-9 items-center justify-center rounded-full border border-[var(--ed-accent,#f2545b)]/70 bg-black/60"
+            title={t('playback.movieWatched')}
+            aria-label={t('playback.movieWatched')}
+            data-movie-watched
+          >
+            <svg viewBox="0 0 24 24" className="h-4 w-4 tv:h-5 tv:w-5" fill="none" stroke="var(--ed-accent,#f2545b)" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
+          </span>
+        ) : null}
+        {movieResumePct != null && progressPct <= 0 ? (
+          <span className="ed-card-resume absolute left-2 bottom-3 z-[4] rounded-sm border border-white/20 bg-black/65 px-2 py-0.5 text-[10px] tv:text-xs uppercase tracking-[0.2em] text-white/90">
+            {t('playback.resumeLabel')} · {movieResumePct}%
           </span>
         ) : null}
 
@@ -431,14 +458,14 @@ function TitlePreviewCardImpl({
             role="progressbar"
             aria-valuemin={0}
             aria-valuemax={100}
-            aria-valuenow={Math.round(progressPct)}
+            aria-valuenow={Math.round(effectiveProgressPct)}
           >
             <div
               className={`h-full transition-[width] duration-500 ease-out bg-[var(--ed-accent,#f2545b)] ${
                 downloading ? 'shadow-[0_0_10px_rgba(242,84,91,0.45)]' : ''
               }`}
               style={{
-                width: `${Math.max(progressPct, downloading && progressPct === 0 ? 2 : 0)}%`,
+                width: `${Math.max(effectiveProgressPct, downloading && effectiveProgressPct === 0 ? 2 : 0)}%`,
               }}
             />
           </div>

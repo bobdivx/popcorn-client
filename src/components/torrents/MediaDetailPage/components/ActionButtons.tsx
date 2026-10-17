@@ -28,6 +28,7 @@ import { isTVPlatform } from '../../../../lib/utils/device-detection';
 import { getLibraryDisplayConfig } from '../../../../lib/utils/library-display-config';
 import { candidatesExcluding3DUnlessAllowed } from '../../../../lib/torrents/is3dTorrent';
 import { MediaDetailBackLink } from './ActionsRow';
+import { setMovieWatched, useMovieWatchState } from '../../../../lib/watchedMovies';
 import type { Ref } from 'preact';
 
 interface ActionButtonsProps {
@@ -140,6 +141,10 @@ export function ActionButtons({
   backLinkRef,
 }: ActionButtonsProps) {
   const { t } = useI18n();
+  const isMovieDetail =
+    torrent.tmdbType === 'movie' && typeof torrent.tmdbId === 'number' && torrent.tmdbId > 0;
+  const movieWatch = useMovieWatchState(isMovieDetail ? torrent.tmdbId : null, isMovieDetail);
+  const [movieToggleBusy, setMovieToggleBusy] = useState(false);
   const isTV = isTVPlatform();
   const [showSeriesPathModal, setShowSeriesPathModal] = useState(false);
   const [showMoreActions, setShowMoreActions] = useState(false);
@@ -467,6 +472,51 @@ export function ActionButtons({
             <RotateCw className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" size={20} />
             <span className="hidden sm:inline">{t('playback.playFromStartLabel')}</span>
           </button>
+        )}
+
+        {/* Film : vu / non vu (toutes plateformes, TV incluse) + reprise NN % */}
+        {isMovieDetail && (
+          <button
+            type="button"
+            onClick={() => {
+              setMovieToggleBusy(true);
+              void setMovieWatched(torrent.tmdbId, !movieWatch.watched).finally(() => setMovieToggleBusy(false));
+            }}
+            disabled={movieToggleBusy}
+            data-focusable
+            data-media-detail-action="toggle-watched"
+            tabIndex={0}
+            aria-pressed={movieWatch.watched}
+            title={movieWatch.watched ? t('mediaDetail.markUnwatched') : t('mediaDetail.markWatched')}
+            aria-label={movieWatch.watched ? t('mediaDetail.markUnwatched') : t('mediaDetail.markWatched')}
+            className={`gtv-pill-btn ds-focus-glow ds-active-glow inline-flex items-center gap-2.5 text-base min-w-0 tv:text-xl tv:px-8 tv:py-4 tv:min-h-[68px] border transition-[opacity,transform,background-color,border-color] duration-200 active:scale-[0.97] disabled:opacity-60 ${
+              movieWatch.watched
+                ? 'border-[var(--ed-accent,#f2545b)]/70 text-[var(--ed-accent,#f2545b)]'
+                : 'border-white/20 hover:border-white/35 hover:bg-white/10'
+            }`}
+          >
+            <Check className="h-5 w-5 tv:h-7 tv:w-7 shrink-0" size={20} strokeWidth={1.75} />
+            <span className={movieWatch.watched ? '' : 'hidden sm:inline'}>
+              {movieWatch.watched ? t('playback.movieWatched') : t('mediaDetail.markWatched')}
+            </span>
+          </button>
+        )}
+        {isMovieDetail && !movieWatch.watched && movieWatch.resumePercent != null && (
+          <span
+            className="ed-detail-resume inline-flex flex-col justify-center gap-1 min-w-[7.5rem] self-center"
+            data-movie-resume
+            aria-label={`${t('playback.resumeLabel')} · ${movieWatch.resumePercent}%`}
+          >
+            <span className="text-[11px] tv:text-sm uppercase tracking-[0.2em] text-white/80">
+              {t('playback.resumeLabel')} · {movieWatch.resumePercent}%
+            </span>
+            <span className="block h-[3px] w-full bg-white/15 rounded-full overflow-hidden">
+              <span
+                className="block h-full bg-[var(--ed-accent,#f2545b)]"
+                style={{ width: `${Math.max(3, movieWatch.resumePercent)}%` }}
+              />
+            </span>
+          </span>
         )}
 
         {/* Tout télécharger (Series) — desktop ; TV : menu Plus */}
