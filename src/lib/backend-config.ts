@@ -18,6 +18,43 @@ const MY_BACKEND_STORAGE_KEY = 'popcorn_my_backend_url';
 const DEMO_MODE_STORAGE_KEY = 'popcorn_demo_mode';
 
 /**
+ * URL « serveur » spéciale enregistrée dans un compte cloud (popcornn.app) pour les comptes de démonstration
+ * (ex. compte de revue Google Play). Aucun serveur n'est contacté : l'app affiche la bibliothèque de
+ * démonstration intégrée (contenus libres de droits, voir src/lib/demo-library.ts).
+ */
+export const DEMO_LIBRARY_BACKEND_URL = 'https://demo.popcornn.app';
+
+/** true si l'URL (ou une URL d'API construite dessus) désigne la bibliothèque de démonstration. */
+export function isDemoLibraryBackendUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const normalized = url.trim().replace(/\/+$/, '').toLowerCase();
+  return normalized === DEMO_LIBRARY_BACKEND_URL || normalized.startsWith(`${DEMO_LIBRARY_BACKEND_URL}/`);
+}
+
+/** Oublie l'URL de démonstration (déconnexion d'un compte de démonstration). */
+export function clearDemoAccountBackend(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    if (isDemoLibraryBackendUrl(localStorage.getItem(STORAGE_KEY))) localStorage.removeItem(STORAGE_KEY);
+    if (isDemoLibraryBackendUrl(localStorage.getItem(MY_BACKEND_STORAGE_KEY))) {
+      localStorage.removeItem(MY_BACKEND_STORAGE_KEY);
+    }
+  } catch {
+    // ignore
+  }
+}
+
+/** Compte de démonstration : l'URL serveur enregistrée est DEMO_LIBRARY_BACKEND_URL. */
+export function isDemoAccountMode(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return isDemoLibraryBackendUrl(localStorage.getItem(STORAGE_KEY));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Détecte si on est sur Android (via Tauri ou UserAgent)
  */
 async function isAndroidPlatform(): Promise<boolean> {
@@ -127,6 +164,9 @@ export function isDemoMode(): boolean {
   if (localStorage.getItem(DEMO_MODE_STORAGE_KEY) === '1') {
     return true;
   }
+  if (isDemoAccountMode()) {
+    return true;
+  }
   const demoUrl = (import.meta.env.VITE_DEMO_BACKEND_URL || import.meta.env.PUBLIC_DEMO_BACKEND_URL || '').trim();
   return !!demoUrl;
 }
@@ -153,6 +193,15 @@ export function setDemoMode(enabled: boolean): void {
  */
 export function exitDemoMode(): void {
   if (typeof window === 'undefined') return;
+  if (isDemoAccountMode()) {
+    // Compte de démonstration : « Quitter » = se déconnecter et oublier l'URL de démonstration.
+    clearDemoAccountBackend();
+    void import('./client/server-api.js')
+      .then((m) => m.serverApi.logout())
+      .catch(() => undefined)
+      .finally(() => window.location.replace('/'));
+    return;
+  }
   setDemoMode(false);
   try {
     sessionStorage.setItem('popcorn_demo_leaving', '1');
