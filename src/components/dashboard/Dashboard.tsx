@@ -26,6 +26,8 @@ import {
   contentItemKey,
   uniqueByMedia,
 } from './utils/browsePriority';
+import { IS_STORE_BUILD } from '../../lib/distribution';
+import StoreLibraryHome from './StoreLibraryHome';
 
 function dedupeDashboardItems(items: ContentItem[]): ContentItem[] {
   const seen = new Set<string>();
@@ -48,7 +50,7 @@ function interleave<T>(a: T[], b: T[]): T[] {
   return out;
 }
 
-export default function Dashboard() {
+function FullDashboard() {
   const { t, language } = useI18n();
   const aiEnabled = useAiEnabled();
   const { data, loading: dataLoading, error } = useDashboardData();
@@ -317,4 +319,9 @@ export default function Dashboard() {
       emptyDescription={t('sync.startSyncAllDescription')}
     />
   );
+}
+
+/** Version store (PUBLIC_DISTRIBUTION=play) : bibliothèque du serveur uniquement, sans catalogue torrent. */
+export default function Dashboard() {
+  return IS_STORE_BUILD ? <StoreLibraryHome filter="all" /> : <FullDashboard />;
 }
