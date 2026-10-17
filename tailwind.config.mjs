@@ -14,18 +14,19 @@ export default {
         'can-hover': { raw: '(hover: hover)' },
       },
       colors: {
+        // Accent éditorial unique (corail #f2545b) — remplace l’ancien violet néon.
         primary: {
-          50: '#faf5ff',
-          100: '#f3e8ff',
-          200: '#e9d5ff',
-          300: '#d8b4fe',
-          400: '#c084fc',
-          500: '#a855f7', // Neon Violet principal
-          600: '#9333ea',
-          700: '#7e22ce',
-          800: '#6b21a8',
-          900: '#581c87',
-          950: '#3b0764',
+          50: '#fff1f2',
+          100: '#ffe1e3',
+          200: '#ffc8cb',
+          300: '#ffa1a6',
+          400: '#fb7a80',
+          500: '#f2545b',
+          600: '#e03a42',
+          700: '#bd2a31',
+          800: '#9c262c',
+          900: '#82252a',
+          950: '#470e11',
         },
       },
       keyframes: {
@@ -67,10 +68,10 @@ export default {
         },
         'glow': {
           '0%, 100%': {
-            boxShadow: '0 0 5px rgba(124, 58, 237, 0.5), 0 0 10px rgba(124, 58, 237, 0.3)',
+            boxShadow: '0 0 5px rgba(242, 84, 91, 0.5), 0 0 10px rgba(242, 84, 91, 0.3)',
           },
           '50%': {
-            boxShadow: '0 0 20px rgba(124, 58, 237, 0.8), 0 0 30px rgba(124, 58, 237, 0.5)',
+            boxShadow: '0 0 20px rgba(242, 84, 91, 0.8), 0 0 30px rgba(242, 84, 91, 0.5)',
           },
         },
         'pulse-violet': {
@@ -153,10 +154,10 @@ export default {
         '2000': '2000ms',
       },
       boxShadow: {
-        'glow-violet': '0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3)',
-        'glow-violet-lg': '0 0 20px rgba(168, 85, 247, 0.8), 0 0 40px rgba(168, 85, 247, 0.5)',
-        'primary': '0 0 10px rgba(168, 85, 247, 0.5), 0 0 20px rgba(168, 85, 247, 0.3)',
-        'primary-lg': '0 0 20px rgba(168, 85, 247, 0.8), 0 0 40px rgba(168, 85, 247, 0.5)',
+        'glow-violet': '0 0 10px rgba(242, 84, 91, 0.5), 0 0 20px rgba(242, 84, 91, 0.3)',
+        'glow-violet-lg': '0 0 20px rgba(242, 84, 91, 0.8), 0 0 40px rgba(242, 84, 91, 0.5)',
+        'primary': '0 0 10px rgba(242, 84, 91, 0.5), 0 0 20px rgba(242, 84, 91, 0.3)',
+        'primary-lg': '0 0 20px rgba(242, 84, 91, 0.8), 0 0 40px rgba(242, 84, 91, 0.5)',
       },
       spacing: {
         'tv-gap': '2rem', // 32px
@@ -180,7 +181,27 @@ export default {
   },
   plugins: [require('daisyui')],
   daisyui: {
-    themes: ['dark', 'light'],
+    themes: [
+      {
+        dark: {
+          ...require('daisyui/src/theming/themes')['dark'],
+          primary: '#f2545b',
+          'primary-content': '#ffffff',
+          secondary: '#f4f1ec',
+          'secondary-content': '#0c0d10',
+          accent: '#f2545b',
+          'accent-content': '#ffffff',
+          'base-100': '#0c0d10',
+          'base-200': '#121318',
+          'base-300': '#1a1b21',
+          '--rounded-btn': '999px',
+          '--rounded-badge': '999px',
+          '--animation-btn': '0.2s',
+          '--btn-focus-scale': '0.98',
+        },
+      },
+      'light',
+    ],
     darkTheme: 'dark',
   },
 };
