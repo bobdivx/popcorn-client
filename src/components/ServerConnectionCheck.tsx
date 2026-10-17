@@ -9,7 +9,7 @@ import { serverApi } from '../lib/client/server-api';
 import { hasBackendUrl } from '../lib/backend-config.js';
 import { updateChecker } from '../lib/services/update-checker.js';
 import { redirectTo, normalizePath } from '../lib/utils/navigation.js';
-import { loadRuntimeConfig, setBackendUrl, hasDeploymentBackend } from '../lib/backend-config.js';
+import { loadRuntimeConfig, setBackendUrl, hasDeploymentBackend, isDemoLibraryBackendUrl } from '../lib/backend-config.js';
 import { getUserConfig } from '../lib/api/popcorn-web.js';
 import { TokenManager } from '../lib/client/storage.js';
 import { FullScreenLoadingOverlay } from './ui/design-system';
@@ -81,6 +81,13 @@ export default function ServerConnectionCheck() {
             const url = cloudConfig.backendUrl.trim().replace(/\/$/, '');
             try {
               const cloudHost = new URL(url).hostname;
+              if (isDemoLibraryBackendUrl(url)) {
+                // Compte de démonstration (ex. revue Google Play) : bibliothèque de démo intégrée,
+                // aucun serveur contacté. Recharger pour que toute l'app passe en mode démo.
+                setBackendUrl(url);
+                window.location.reload();
+                return;
+              }
               if (cloudHost === window.location.hostname) {
                 setBackendUrl(url);
               }
