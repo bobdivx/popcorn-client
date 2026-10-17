@@ -40,7 +40,16 @@ export function getDistribution() {
   const fromProcess = (process.env.PUBLIC_DISTRIBUTION || '').trim().toLowerCase();
   if (fromProcess) return fromProcess;
   try {
-    const env = loadEnv(process.env.NODE_ENV === 'development' ? 'development' : 'production', process.cwd(), 'PUBLIC_');
+    // `astro build --mode <mode>` charge aussi .env.<mode> (ex. .env.play pour un test local).
+    const argv = process.argv;
+    const modeIdx = argv.indexOf('--mode');
+    const mode =
+      modeIdx >= 0 && argv[modeIdx + 1]
+        ? argv[modeIdx + 1]
+        : process.env.NODE_ENV === 'development'
+          ? 'development'
+          : 'production';
+    const env = loadEnv(mode, process.cwd(), 'PUBLIC_');
     return (env.PUBLIC_DISTRIBUTION || '').trim().toLowerCase();
   } catch {
     return '';
