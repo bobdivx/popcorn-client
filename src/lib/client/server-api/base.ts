@@ -321,13 +321,34 @@ export class ServerApiClientBase {
       } catch { /* ignore */ }
     }
 
+    // Authentification serveur : joindre le token d'acces cloud / Pocket ID. Le serveur resout
+    // le membre a partir de ce token ; le JWT local auto-signe n'est pas verifiable cote serveur.
+    if (typeof window !== 'undefined' && !(headers as Record<string, string>).Authorization) {
+      const cloudToken = TokenManager.getCloudAccessToken();
+      if (cloudToken) (headers as Record<string, string>).Authorization = `Bearer ${cloudToken}`;
+    }
+
     const noCache = (options.method === 'GET' || !options.method) &&
       (endpoint.includes('/api/torrents/list') || endpoint.includes('/api/torrents/fast') || endpoint.includes('/api/sync/status'));
     const fetchOptions = noCache ? { ...options, headers, cache: 'no-store' as RequestCache } : { ...options, headers };
 
     try {
       const timeoutMs = this.getTimeoutMs(endpoint);
-      const response = await this.nativeFetch(url, fetchOptions, timeoutMs);
+      let response = await this.nativeFetch(url, fetchOptions, timeoutMs);
+      // Token cloud expire (~1 h) : rafraichir via le refresh cloud et reessayer une fois.
+      const isAuthBootstrap = endpoint.includes('/auth/login') || endpoint.includes('/auth/register');
+      if (response.status === 401 && !isAuthBootstrap && typeof window !== 'undefined') {
+        try {
+          const { refreshCloudToken } = await import('../../api/popcorn-web.js');
+          if (await refreshCloudToken()) {
+            const newToken = TokenManager.getCloudAccessToken();
+            if (newToken) {
+              const retryHeaders = { ...(headers as Record<string, string>), Authorization: `Bearer ${newToken}` };
+              response = await this.nativeFetch(url, { ...fetchOptions, headers: retryHeaders }, timeoutMs);
+            }
+          }
+        } catch { /* ignore - gestion standard ci-dessous */ }
+      }
       const data = await response.json().catch(() => ({}));
       
       if (!response.ok) {
@@ -414,7 +435,9 @@ export class ServerApiClientBase {
     const mixedContentError = this.getMixedContentError(url);
     if (mixedContentError) return { success: false, error: 'MixedContent', message: mixedContentError };
     const headers: HeadersInit = { 'Content-Type': 'application/json', ...(options.headers || {}) };
-    if (this.accessToken) (headers as Record<string, string>).Authorization = `Bearer ${this.accessToken}`;
+    const blobCloudToken = typeof window !== 'undefined' ? TokenManager.getCloudAccessToken() : null;
+    if (blobCloudToken) (headers as Record<string, string>).Authorization = `Bearer ${blobCloudToken}`;
+    else if (this.accessToken) (headers as Record<string, string>).Authorization = `Bearer ${this.accessToken}`;
     try {
       const timeoutMs = this.getTimeoutMs(endpoint);
       const response = await this.nativeFetch(url, { ...options, headers }, timeoutMs);
