@@ -271,7 +271,7 @@ export class TorrentsService {
       if (tmdbType) {
         params.append('tmdb_type', tmdbType);
       }
-      url = `${url}?${params.toString()}`;
+      url = `${url}${url.includes('?') ? '&' : '?'}${params.toString()}`;
       
       const response = await fetch(url);
       if (response.status === 404) {
@@ -594,7 +594,9 @@ export class TorrentsService {
     accessToken: string
   ): Promise<void> {
     if (!accessToken) throw new Error('Token requis pour stream-torrent');
-    const base = (await this.getRequestUrl('torrents')).replace(/\/api\/client\/torrents$/, '');
+    const base = (await this.getRequestUrl('torrents'))
+      .replace(/\?.*$/, '')
+      .replace(/\/api\/client\/torrents$/, '');
     const url = `${base}/api/stream-torrent/ready/${encodeURIComponent(infoHash)}/${fileId}/${encodeURIComponent(filename)}?access_token=${encodeURIComponent(accessToken)}`;
     // Le backend peut avoir besoin de >10–20s (initialisation torrent + metadata + buffer).
     // On suit Retry-After si présent, sinon on applique un backoff progressif.
