@@ -1154,3 +1154,346 @@ html[data-webos='true'] ::view-transition-new(root) {
     animation: none;
   }
 }
+
+/* ==========================================================================
+   Lecteur — design éditorial (web / mobile / Tauri / Android / webOS lite + natif)
+   Accent corail unique, icônes traits fins, libellés Jost espacés, surfaces sombres
+   translucides (sans flou sur TV), bordures fines, motion tokens.
+   ========================================================================== */
+html[data-editorial] .ed-player-chrome,
+html[data-editorial] [data-tv-player-dock],
+html[data-editorial] .ed-player-menu {
+  font-family: var(--ed-font-body);
+}
+html[data-editorial] .ed-player-chrome svg,
+html[data-editorial] [data-tv-player-dock] svg,
+html[data-editorial] .ed-player-menu svg,
+html[data-editorial] .player-overlay svg {
+  stroke-width: 1.5;
+}
+html[data-editorial] .ed-player-chrome .ed-pc-btn {
+  transition:
+    transform var(--ed-dur-1) var(--ed-ease),
+    background-color var(--ed-dur-1) var(--ed-ease),
+    border-color var(--ed-dur-1) var(--ed-ease),
+    opacity var(--ed-dur-1) var(--ed-ease);
+}
+html[data-editorial] .ed-player-chrome .ed-pc-btn:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+html[data-editorial] .ed-player-chrome .ed-pc-btn:focus-visible {
+  outline: none;
+  background: var(--ed-accent) !important;
+  border-color: var(--ed-accent) !important;
+  box-shadow: 0 0 0 3px rgba(242, 84, 91, 0.3);
+}
+html[data-editorial] .ed-player-chrome .ed-pc-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+html[data-editorial] .ed-player-chrome .ed-pc-micro {
+  font-weight: 400;
+  letter-spacing: var(--ed-track-sm);
+}
+html[data-editorial] .ed-player-chrome .ed-player-title {
+  font-family: var(--ed-font-display);
+  font-weight: 300;
+  letter-spacing: 0.08em;
+}
+html[data-editorial] .ed-player-chrome .ed-player-kicker {
+  text-transform: uppercase;
+  letter-spacing: var(--ed-track-md);
+  font-weight: 400;
+  font-size: 0.72em;
+}
+html[data-editorial] .ed-player-chrome [data-tv-video-progress] {
+  transition: height var(--ed-dur-1) var(--ed-ease);
+}
+html[data-editorial] .ed-player-chrome [data-tv-video-progress]:focus-visible {
+  box-shadow: 0 0 0 2px rgba(242, 84, 91, 0.55);
+}
+html[data-editorial] .ed-player-chrome .ed-pc-thumb {
+  border: 0 !important;
+  backdrop-filter: none !important;
+}
+html[data-editorial] .ed-player-chrome .tabular-nums,
+html[data-editorial] .ed-player-chrome [data-tv-video-controls-row] > div:not(.group\/volume) {
+  letter-spacing: 0.08em;
+}
+
+/* Menus paramètres / audio / sous-titres */
+html[data-editorial] .ed-player-menu {
+  border-color: var(--ed-line) !important;
+  animation: ed-player-menu-in var(--ed-dur-2) var(--ed-ease) both;
+}
+html[data-editorial] .ed-player-menu .ed-pm-title,
+html[data-editorial] .ed-player-menu h3 {
+  font-family: var(--ed-font-body);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: var(--ed-track-md);
+  font-size: 0.85rem;
+}
+html[data-editorial] .ed-player-menu .ed-pm-label {
+  font-weight: 400;
+  letter-spacing: 0.04em;
+}
+html[data-editorial] .ed-player-menu [role='menuitem'],
+html[data-editorial] .ed-player-menu button {
+  transition:
+    background-color var(--ed-dur-1) var(--ed-ease),
+    color var(--ed-dur-1) var(--ed-ease),
+    border-color var(--ed-dur-1) var(--ed-ease);
+}
+html[data-editorial] .ed-player-menu [role='menuitem']:focus-visible {
+  outline: none;
+  background: var(--ed-accent);
+  color: #fff;
+}
+@keyframes ed-player-menu-in {
+  from { opacity: 0; translate: 12px 0; }
+  to { opacity: 1; translate: 0 0; }
+}
+
+/* Overlays « Passer le générique » / « Épisode suivant », infobulles, loaders */
+html[data-editorial] .player-overlay {
+  transition-timing-function: var(--ed-ease) !important;
+  transition-duration: var(--ed-dur-2) !important;
+}
+html[data-editorial] .player-overlay .ed-cta {
+  border-radius: 999px;
+}
+html[data-editorial] .ed-playback-chip {
+  border-color: var(--ed-line-strong) !important;
+  letter-spacing: var(--ed-track-sm);
+  text-transform: uppercase;
+  font-weight: 400 !important;
+}
+
+/* Cartes épisode : coche « vu » + barre de reprise */
+html[data-editorial] .ed-ep-card__watched { box-shadow: none; }
+html[data-editorial] .ed-ep-card__resume { font-family: var(--ed-font-body); font-weight: 400; }
+html[data-editorial] .ed-ep-card.is-resume:focus-visible,
+html[data-editorial] .ed-ep-card.is-resume:hover { border-color: rgba(242, 84, 91, 0.55); }
+
+/* TV : pas de flou (coût GPU webOS / Android TV), motion réduite */
+html[data-tv-platform] .ed-player-chrome *,
+html[data-tv-platform] [data-tv-player-dock] *,
+html[data-tv-platform] .ed-player-menu,
+html[data-tv-platform] .ed-player-menu *,
+html[data-tv-platform] .player-overlay,
+html[data-tv-platform] .player-overlay * {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html[data-tv-platform] .ed-player-menu { animation-duration: var(--ed-dur-1); }
+@media (prefers-reduced-motion: reduce) {
+  html[data-editorial] .ed-player-menu { animation: none; }
+}
+
+/* ==========================================================================
+   Audit composants « ancien style » → éditorial (toasts, dropdowns, toggles,
+   badges, réglages, setup / login). Overrides ciblés sur les classes héritées.
+   ========================================================================== */
+/* Violets Tailwind résiduels → corail */
+html[data-editorial] .bg-purple-500,
+html[data-editorial] .bg-purple-600,
+html[data-editorial] .bg-purple-700,
+html[data-editorial] .bg-violet-500,
+html[data-editorial] .bg-violet-600,
+html[data-editorial] .bg-violet-700,
+html[data-editorial] .bg-indigo-600 { background-color: var(--ed-accent) !important; }
+html[data-editorial] .hover\:bg-purple-700:hover,
+html[data-editorial] .hover\:bg-violet-700:hover,
+html[data-editorial] .hover\:bg-purple-500:hover { background-color: var(--ed-accent-hover) !important; }
+html[data-editorial] .text-purple-300,
+html[data-editorial] .text-purple-400,
+html[data-editorial] .text-purple-500,
+html[data-editorial] .text-violet-300,
+html[data-editorial] .text-violet-400,
+html[data-editorial] .text-violet-500 { color: var(--ed-accent) !important; }
+html[data-editorial] .border-purple-400,
+html[data-editorial] .border-purple-500,
+html[data-editorial] .border-violet-400,
+html[data-editorial] .border-violet-500 { border-color: var(--ed-accent) !important; }
+html[data-editorial] .ring-purple-400,
+html[data-editorial] .ring-purple-500,
+html[data-editorial] .ring-violet-400,
+html[data-editorial] .ring-violet-500,
+html[data-editorial] .focus\:ring-purple-500:focus,
+html[data-editorial] .focus\:ring-violet-500:focus { --tw-ring-color: var(--ed-accent) !important; }
+html[data-editorial] .from-purple-600,
+html[data-editorial] .from-violet-600 { --tw-gradient-from: var(--ed-accent) var(--tw-gradient-from-position) !important; --tw-gradient-to: rgba(242, 84, 91, 0) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important; }
+html[data-editorial] .to-purple-600,
+html[data-editorial] .to-pink-600,
+html[data-editorial] .to-violet-600 { --tw-gradient-to: #c93d44 var(--tw-gradient-to-position) !important; }
+
+/* Toasts */
+html[data-editorial] .toast-animate,
+html[data-editorial] .toast > .alert,
+html[data-editorial] [role='status'].toast-animate {
+  background: rgba(12, 13, 16, 0.92) !important;
+  border: 1px solid var(--ed-line-strong) !important;
+  border-radius: 2px !important;
+  color: var(--ed-ink) !important;
+  font-family: var(--ed-font-body);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  box-shadow: none !important;
+  animation-timing-function: var(--ed-ease) !important;
+  animation-duration: var(--ed-dur-2) !important;
+}
+html[data-editorial] .alert-success { border-left: 2px solid var(--ed-accent) !important; }
+html[data-editorial] .alert-error { border-left: 2px solid #ff3b3b !important; }
+
+/* Dropdowns / selects */
+html[data-editorial] .dropdown-content,
+html[data-editorial] .dropdown-menu,
+html[data-editorial] .dropdown-menu-mobile,
+html[data-editorial] .menu.bg-base-200,
+html[data-editorial] .menu.bg-base-100 {
+  background: rgba(12, 13, 16, 0.96) !important;
+  border: 1px solid var(--ed-line-strong) !important;
+  border-radius: 2px !important;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55) !important;
+  animation: ed-dropdown-in var(--ed-dur-1) var(--ed-ease) both;
+}
+html[data-editorial] .dropdown-content a,
+html[data-editorial] .dropdown-content button,
+html[data-editorial] .dropdown-menu a,
+html[data-editorial] .dropdown-menu button {
+  letter-spacing: 0.06em;
+  font-weight: 400;
+  transition: background-color var(--ed-dur-1) var(--ed-ease), color var(--ed-dur-1) var(--ed-ease);
+}
+html[data-editorial] .dropdown-content a:hover,
+html[data-editorial] .dropdown-content a:focus-visible,
+html[data-editorial] .dropdown-content button:focus-visible,
+html[data-editorial] .dropdown-menu a:focus-visible,
+html[data-editorial] .dropdown-menu button:focus-visible { background: rgba(242, 84, 91, 0.16) !important; color: #fff !important; outline: none; }
+@keyframes ed-dropdown-in {
+  from { opacity: 0; translate: 0 -4px; }
+  to { opacity: 1; translate: 0 0; }
+}
+html[data-editorial] select.select,
+html[data-editorial] .select,
+html[data-editorial] .input,
+html[data-editorial] .textarea {
+  background-color: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid var(--ed-line-strong) !important;
+  border-radius: 2px !important;
+  font-family: var(--ed-font-body);
+  font-weight: 300;
+  transition: border-color var(--ed-dur-1) var(--ed-ease), box-shadow var(--ed-dur-1) var(--ed-ease);
+}
+html[data-editorial] .select:focus,
+html[data-editorial] .input:focus,
+html[data-editorial] .textarea:focus,
+html[data-editorial] .select:focus-visible,
+html[data-editorial] .input:focus-visible {
+  outline: none !important;
+  border-color: var(--ed-accent) !important;
+  box-shadow: 0 0 0 1px var(--ed-accent) !important;
+}
+
+/* Toggles / checkbox / radio / range (daisyUI) */
+html[data-editorial] .toggle {
+  --tglbg: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--ed-line-strong) !important;
+  color: rgba(244, 241, 236, 0.75);
+  transition: background-color var(--ed-dur-1) var(--ed-ease), box-shadow var(--ed-dur-1) var(--ed-ease), border-color var(--ed-dur-1) var(--ed-ease);
+}
+html[data-editorial] .toggle:checked,
+html[data-editorial] .toggle[aria-checked='true'] {
+  background-color: var(--ed-accent) !important;
+  border-color: var(--ed-accent) !important;
+  color: #fff;
+  --tglbg: var(--ed-accent);
+}
+html[data-editorial] .checkbox:checked,
+html[data-editorial] .checkbox[aria-checked='true'],
+html[data-editorial] .radio:checked {
+  background-color: var(--ed-accent) !important;
+  border-color: var(--ed-accent) !important;
+}
+html[data-editorial] .checkbox,
+html[data-editorial] .radio { border-width: 1px !important; border-color: var(--ed-line-strong); }
+html[data-editorial] .range { --range-shdw: var(--ed-accent); }
+html[data-editorial] .toggle:focus-visible,
+html[data-editorial] .checkbox:focus-visible,
+html[data-editorial] .radio:focus-visible { outline: 2px solid var(--ed-accent) !important; outline-offset: 2px; }
+
+/* Badges */
+html[data-editorial] .badge {
+  border-radius: 999px !important;
+  border: 1px solid var(--ed-line-strong) !important;
+  background: rgba(12, 13, 16, 0.55) !important;
+  color: var(--ed-ink) !important;
+  font-family: var(--ed-font-body);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: var(--ed-track-sm);
+  font-size: 0.66rem;
+}
+html[data-editorial] .badge-primary,
+html[data-editorial] .badge-accent { border-color: var(--ed-accent) !important; color: var(--ed-accent) !important; }
+html[data-editorial] .badge-pulse { animation-timing-function: var(--ed-ease); }
+
+/* Boutons daisyUI (réglages, setup, login) */
+html[data-editorial] .btn {
+  border-radius: 999px;
+  font-family: var(--ed-font-body);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: var(--ed-track-sm);
+  font-size: 0.78rem;
+  box-shadow: none;
+  transition: background-color var(--ed-dur-1) var(--ed-ease), border-color var(--ed-dur-1) var(--ed-ease), color var(--ed-dur-1) var(--ed-ease), transform var(--ed-dur-1) var(--ed-ease);
+}
+html[data-editorial] .btn-primary {
+  background: var(--ed-accent) !important;
+  border-color: var(--ed-accent) !important;
+  color: #fff !important;
+}
+html[data-editorial] .btn-primary:hover { background: var(--ed-accent-hover) !important; border-color: var(--ed-accent-hover) !important; }
+html[data-editorial] .btn-ghost,
+html[data-editorial] .btn-outline { border: 1px solid var(--ed-line-strong) !important; background: transparent !important; color: var(--ed-ink) !important; }
+html[data-editorial] .btn-ghost:hover,
+html[data-editorial] .btn-outline:hover { border-color: rgba(255, 255, 255, 0.55) !important; background: rgba(255, 255, 255, 0.04) !important; }
+html[data-editorial] .btn:focus-visible { outline: 2px solid var(--ed-accent) !important; outline-offset: 2px; }
+
+/* Cartes réglages / setup / login (surfaces) */
+html[data-editorial] .card.bg-base-100,
+html[data-editorial] .card.bg-base-200,
+html[data-editorial] .modal-box {
+  background-color: rgba(18, 19, 24, 0.92) !important;
+  border: 1px solid var(--ed-line) !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
+html[data-editorial] .card-title,
+html[data-editorial] .modal-box h3,
+html[data-editorial] .label-text {
+  font-family: var(--ed-font-body);
+  font-weight: 400;
+  letter-spacing: 0.06em;
+}
+html[data-editorial] .card-title,
+html[data-editorial] .modal-box h3 { text-transform: uppercase; letter-spacing: var(--ed-track-md); font-size: 0.95rem; }
+html[data-editorial] .tabs .tab-active,
+html[data-editorial] .tab.tab-active { color: var(--ed-accent) !important; border-color: var(--ed-accent) !important; }
+html[data-editorial] .progress::-webkit-progress-value { background: var(--ed-accent); }
+html[data-editorial] .progress::-moz-progress-bar { background: var(--ed-accent); }
+html[data-editorial] .loading { color: var(--ed-accent); }
+
+html[data-tv-platform] .toast-animate,
+html[data-tv-platform] .dropdown-content,
+html[data-tv-platform] .dropdown-menu,
+html[data-tv-platform] .modal-box,
+html[data-tv-platform] .card {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-editorial] .dropdown-content,
+  html[data-editorial] .dropdown-menu { animation: none; }
+}

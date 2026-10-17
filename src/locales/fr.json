@@ -627,6 +627,8 @@
   },
   "playback": {
     "nextEpisode": "Épisode suivant",
+    "previousEpisode": "Épisode précédent",
+    "episodeWatched": "Déjà vu",
     "chooseEpisode": "Épisodes",
     "restartFromBeginning": "Redémarrer depuis le début",
     "playFromStartLabel": "Depuis le début",
