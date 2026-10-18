@@ -10,7 +10,7 @@
  * Usage: node scripts/create-tv-banner.js
  */
 
-import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, copyFileSync, readdirSync, statSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 
 const projectRoot = process.cwd();
@@ -25,8 +25,92 @@ const possibleResPaths = [
   join(projectRoot, 'src-tauri', 'android', 'app', 'src', 'main', 'res'),
 ];
 
-// Chemin de l'icône source
-const iconPath = join(projectRoot, 'src-tauri', 'icons', 'icon-512.png');
+// Chemin de l'icône source (fallback sharp uniquement — icon-512.png est une image générique, pas le logo)
+const iconPath = join(projectRoot, 'src-tauri', 'icons', 'icon.png');
+
+/**
+ * Icônes Android Popcornn versionnées (mipmap-*, adaptive mipmap-anydpi-v26, fond, banner TV).
+ * `tauri android init` régénère gen/android avec l'icône Tauri par défaut : sans cette copie,
+ * l'APK embarquait le logo Tauri (constaté sur v1.4.5) et un banner TV avec damier incrusté.
+ */
+const androidIconsDir = join(projectRoot, 'src-tauri', 'icons', 'android');
+/** Jeu de ressources Popcornn (base64, texte versionnable) — prioritaire sur androidIconsDir. */
+const androidResBundle = join(projectRoot, 'src-tauri', 'icons', 'android-popcornn-res.json');
+
+function readResBundle() {
+  if (!existsSync(androidResBundle)) return null;
+  try {
+    const data = JSON.parse(readFileSync(androidResBundle, 'utf8'));
+    return data && typeof data.files === 'object' ? data.files : null;
+  } catch (e) {
+    console.warn(`⚠️  ${androidResBundle} illisible: ${e.message}`);
+    return null;
+  }
+}
+
+function hasVersionedBanner() {
+  const bundle = readResBundle();
+  if (bundle && bundle['drawable-xhdpi/banner.png']) return true;
+  return existsSync(join(androidIconsDir, 'drawable-xhdpi', 'banner.png'));
+}
+
+function copyTree(from, to) {
+  let count = 0;
+  for (const name of readdirSync(from)) {
+    const src = join(from, name);
+    const dst = join(to, name);
+    if (statSync(src).isDirectory()) {
+      if (!existsSync(dst)) mkdirSync(dst, { recursive: true });
+      count += copyTree(src, dst);
+    } else {
+      copyFileSync(src, dst);
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function installLauncherIcons(resPath) {
+  const bundle = readResBundle();
+  if (!bundle && !existsSync(androidIconsDir)) {
+    console.warn(`⚠️  Icônes Android introuvables: ${androidIconsDir} (icône Tauri par défaut conservée)`);
+    return false;
+  }
+  // Supprimer les icônes par défaut du template (png/webp) pour éviter les doublons de ressource.
+  for (const dir of readdirSync(resPath)) {
+    if (!dir.startsWith('mipmap')) continue;
+    const full = join(resPath, dir);
+    if (!statSync(full).isDirectory()) continue;
+    for (const f of readdirSync(full)) {
+      if (/^ic_launcher(_round|_foreground)?\.(png|webp|xml)$/.test(f)) unlinkSync(join(full, f));
+    }
+  }
+  let n = 0;
+  if (bundle) {
+    for (const [rel, b64] of Object.entries(bundle)) {
+      if (!/^[a-z0-9-]+\/[a-z0-9_]+\.(png|xml)$/.test(rel)) continue;
+      const dst = join(resPath, rel);
+      if (!existsSync(dirname(dst))) mkdirSync(dirname(dst), { recursive: true });
+      writeFileSync(dst, Buffer.from(String(b64), 'base64'));
+      n += 1;
+    }
+  } else {
+    n = copyTree(androidIconsDir, resPath);
+  }
+  console.log(`✅ Icônes Popcornn installées (${n} fichiers) dans ${resPath}`);
+
+  // Icône ronde déclarée dans le manifest (launchers qui la demandent).
+  const manifestPath = join(resPath, '..', 'AndroidManifest.xml');
+  if (existsSync(manifestPath)) {
+    let manifest = readFileSync(manifestPath, 'utf8');
+    if (!manifest.includes('android:roundIcon') && /<application\b/.test(manifest)) {
+      manifest = manifest.replace(/<application\b/, '<application android:roundIcon="@mipmap/ic_launcher_round"');
+      writeFileSync(manifestPath, manifest);
+      console.log('✅ android:roundIcon ajouté au manifest');
+    }
+  }
+  return true;
+}
 
 function findResPath() {
   for (const path of possibleResPaths) {
@@ -49,6 +133,12 @@ async function createBannerDrawable(resPath) {
     mkdirSync(drawableXhdpiPath, { recursive: true });
   }
   
+  // Banner Popcornn versionné (copié par installLauncherIcons) : ne pas le régénérer.
+  if (hasVersionedBanner()) {
+    console.log(`✅ Banner TV Popcornn versionné utilisé: ${join(drawableXhdpiPath, 'banner.png')}`);
+    return true;
+  }
+
   // Vérifier si l'icône source existe
   if (!existsSync(iconPath)) {
     console.error(`❌ Icône source introuvable: ${iconPath}`);
@@ -134,6 +224,8 @@ async function main() {
   }
   
   console.log(`✅ Dossier res/ trouvé: ${resPath}\n`);
+
+  installLauncherIcons(resPath);
   
   const success = await createBannerDrawable(resPath);
   
