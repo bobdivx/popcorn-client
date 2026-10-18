@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { useI18n } from '../../../../lib/i18n';
 import { SkipForward } from 'lucide-preact';
 import { isTVPlatform } from '../../../../lib/utils/device-detection';
+import { PLAYER_FLOATING_ACTION_BOTTOM, stopPlayerTapPropagation } from './playerFloatingActions';
 
 interface SkipIntroOverlayProps {
   onSkip: () => void;
@@ -39,7 +40,10 @@ export function SkipIntroOverlay({ onSkip, visible, chromeVisible = false }: Ski
   if (!mounted) return null;
 
   // TV : milieu-droite (hors de la zone barre/miniatures).
-  // Desktop : bas-droite, remonté si chrome ouvert.
+  // Mobile / desktop : bas-droite à une hauteur FIXE, au-dessus de la barre de commandes,
+  // que le chrome soit affiché ou non. Avant, le bouton remontait de 6rem quand le chrome
+  // apparaissait — or le 1er toucher affiche le chrome : le bouton sautait sous le doigt et
+  // le tap tombait à côté (il fallait taper deux fois).
   const positionStyle = isTV
     ? {
         top: '48%',
@@ -48,9 +52,7 @@ export function SkipIntroOverlay({ onSkip, visible, chromeVisible = false }: Ski
         transform: shown ? 'translateY(-50%)' : 'translateY(calc(-50% + 8px))',
       }
     : {
-        bottom: chromeVisible
-          ? 'calc(11rem + env(safe-area-inset-bottom, 0px))'
-          : 'calc(5rem + env(safe-area-inset-bottom, 0px))',
+        bottom: PLAYER_FLOATING_ACTION_BOTTOM,
         right: 'calc(1rem + env(safe-area-inset-right, 0px))',
         top: 'auto' as const,
         transform: shown ? 'translateY(0)' : 'translateY(8px)',
@@ -58,7 +60,7 @@ export function SkipIntroOverlay({ onSkip, visible, chromeVisible = false }: Ski
 
   return (
     <div
-      className={`player-overlay absolute z-40 transition-[opacity,transform,bottom,top] duration-200 ease-out ${
+      className={`player-overlay absolute z-40 transition-[opacity,transform] duration-200 ease-out ${
         shown ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
       }`}
       style={positionStyle}
@@ -68,10 +70,11 @@ export function SkipIntroOverlay({ onSkip, visible, chromeVisible = false }: Ski
         ref={btnRef}
         type="button"
         onClick={onSkip}
+        {...stopPlayerTapPropagation}
         data-focusable
         data-player-overlay-action
         tabIndex={0}
-        className="ed-cta !w-auto shrink-0"
+        className="ed-cta !w-auto shrink-0 touch-manipulation"
         aria-label={t('interfaceSettings.skipIntro')}
       >
         <SkipForward />

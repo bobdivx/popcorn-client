@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { useI18n } from '../../../../lib/i18n';
 import { Play } from 'lucide-preact';
 import { isTVPlatform } from '../../../../lib/utils/device-detection';
+import { PLAYER_FLOATING_ACTION_BOTTOM, stopPlayerTapPropagation } from './playerFloatingActions';
 
 interface NextEpisodeOverlayProps {
   onNext: () => void;
@@ -52,9 +53,8 @@ export function NextEpisodeOverlay({
         transform: shown ? 'translateY(-50%)' : 'translateY(calc(-50% + 8px))',
       }
     : {
-        bottom: chromeVisible
-          ? 'calc(11rem + env(safe-area-inset-bottom, 0px))'
-          : 'calc(5rem + env(safe-area-inset-bottom, 0px))',
+        // Hauteur fixe (ne bouge pas quand le chrome apparaît au toucher).
+        bottom: PLAYER_FLOATING_ACTION_BOTTOM,
         right: 'calc(1rem + env(safe-area-inset-right, 0px))',
         top: 'auto' as const,
         transform: shown ? 'translateY(0)' : 'translateY(8px)',
@@ -62,7 +62,7 @@ export function NextEpisodeOverlay({
 
   return (
     <div
-      className={`player-overlay absolute z-40 max-w-[280px] transition-[opacity,transform,bottom,top] duration-200 ease-out ${
+      className={`player-overlay absolute z-40 max-w-[280px] transition-[opacity,transform] duration-200 ease-out ${
         shown ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
       }`}
       style={positionStyle}
@@ -81,10 +81,11 @@ export function NextEpisodeOverlay({
         ref={btnRef}
         type="button"
         onClick={onNext}
+        {...stopPlayerTapPropagation}
         data-focusable
         data-player-overlay-action
         tabIndex={0}
-        className="ed-cta !w-auto shrink-0"
+        className="ed-cta !w-auto shrink-0 touch-manipulation"
         aria-label={t('playback.nextEpisode')}
       >
         <Play />
