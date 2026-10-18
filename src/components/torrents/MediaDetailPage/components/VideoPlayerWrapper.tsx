@@ -26,6 +26,7 @@ import { emitPlaybackStep } from '../../../streaming/player-core/observability/p
 import { getNetworkPlaybackProfile } from '../../../../lib/streaming/networkPlaybackProfile';
 import { logVideoPlaybackError } from '../../../streaming/direct-player/mediaErrorDiagnostics';
 import { useI18n } from '../../../../lib/i18n/useI18n';
+import { useRemoteFocusTrap } from '../../../../lib/tv/useRemoteFocusTrap';
 import { useLibraryScrubThumbnails } from './video-player-wrapper/useLibraryScrubThumbnails';
 import { getLanguageName } from '../../../streaming/player-shared/utils/languageName';
 import {
@@ -210,6 +211,22 @@ export function VideoPlayerWrapper({
   const isMobile = isMobileDevice();
   const { t, language: uxLanguage } = useI18n();
   const displayError = errorMessage || localPlayerError;
+  // Carte d'erreur : focus auto, flèches/OK entre les boutons, focus piégé, Retour = fermer (une fois).
+  const errorTrapRef = useRef<HTMLDivElement>(null);
+  const confirmingDeleteEmptyRef = useRef(confirmingDeleteEmpty);
+  confirmingDeleteEmptyRef.current = confirmingDeleteEmpty;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useRemoteFocusTrap(errorTrapRef, {
+    active: !!displayError && visible !== false,
+    onBack: () => {
+      if (confirmingDeleteEmptyRef.current) {
+        setConfirmingDeleteEmpty(false);
+        return;
+      }
+      onCloseRef.current?.();
+    },
+  });
   const sparseOrEmpty = isSparseOrEmptyMessage(displayError);
   const playerConfig = usePlayerConfig();
   const isDirectMode = playerConfig.streamingMode === 'direct';
@@ -629,8 +646,11 @@ export function VideoPlayerWrapper({
           display: visible ? 'flex' : 'none',
         }}
       >
+        <div ref={errorTrapRef} data-remote-trap className="contents">
         <button
+          type="button"
           onClick={onClose}
+          aria-label={t('common.back') || 'Retour'}
           className="absolute top-4 left-4 flex items-center justify-center w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 transition-all border border-white/20 text-white cursor-pointer pointer-events-auto"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -662,6 +682,7 @@ export function VideoPlayerWrapper({
                 <button
                   type="button"
                   onClick={() => setConfirmingDeleteEmpty(false)}
+                  data-autofocus
                   className="px-5 py-2 rounded-lg bg-white/10 border border-white/20 text-white text-sm cursor-pointer"
                 >
                   {t('common.back') || 'Retour'}
@@ -684,18 +705,22 @@ export function VideoPlayerWrapper({
               <button
                 type="button"
                 onClick={() => setConfirmingDeleteEmpty(true)}
+                data-autofocus
                 className="px-6 py-2 bg-red-600 hover:bg-red-700 active:scale-95 transition-all text-white font-semibold rounded-lg cursor-pointer pointer-events-auto"
               >
                 {t('playback.sparseOrEmptyDelete') || 'Supprimer les fichiers vides'}
               </button>
             ) : null}
             <button
+              type="button"
               onClick={onClose}
+              data-autofocus={!(sparseOrEmpty && onDeleteEmptyFiles) || undefined}
               className="px-6 py-2 bg-white/10 hover:bg-white/20 border border-white/20 active:scale-95 transition-all text-white font-semibold rounded-lg cursor-pointer pointer-events-auto"
             >
               {t('common.close') || 'Fermer'}
             </button>
           </div>
+        </div>
         </div>
       </div>
     );

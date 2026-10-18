@@ -1,5 +1,6 @@
 import { useEffect } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
+import { isRemoteFocusTrapActive } from '../../../../lib/tv/useRemoteFocusTrap';
 
 export interface PlayerOverlayChromeProps {
   children: ComponentChildren;
@@ -29,6 +30,7 @@ export function PlayerOverlayChrome({
   useEffect(() => {
     if (!onClose) return;
     const onKeyDown = (e: KeyboardEvent) => {
+      if (isRemoteFocusTrapActive()) return; // une carte d'erreur au-dessus gère Retour
       const key = e.key;
       const code = e.keyCode ?? e.which;
       const isBack =

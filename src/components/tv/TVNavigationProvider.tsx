@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { stampTvPlatformHints } from '../../lib/utils/device-detection';
+import { isRemoteFocusTrapActive } from '../../lib/tv/useRemoteFocusTrap';
 import {
   clearTvBrowseRestore,
   findTvBrowseRestoreCard,
@@ -1602,6 +1603,8 @@ export default function TVNavigationProvider() {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Lecteur ouvert : ne pas focus le header (z-200) par-dessus la vidéo.
       if (isPopcornnPlayerOpen()) return;
+      // Carte d'erreur / confirmation (useRemoteFocusTrap) : elle gère seule les touches.
+      if (isRemoteFocusTrapActive()) return;
 
       const target = e.target as HTMLElement;
       
@@ -2304,6 +2307,7 @@ export default function TVNavigationProvider() {
     // Gestionnaire pour le bouton retour webOS (peut être envoyé via différents événements)
     const handleWebOSBack = (e: Event) => {
       if (isPopcornnPlayerOpen()) return;
+      if (isRemoteFocusTrapActive()) return; // Retour déjà consommé par la carte (même appui)
       const event = e as KeyboardEvent | CustomEvent;
       // Si c'est un KeyboardEvent Backspace et que le focus est dans un champ de saisie, ne pas faire retour
       if (event instanceof KeyboardEvent && (event.key === 'Backspace' || event.keyCode === 8)) {
