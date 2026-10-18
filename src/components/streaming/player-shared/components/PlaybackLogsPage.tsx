@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { getBackendUrl } from '../../../../lib/backend-url';
+import { TokenManager } from '../../../../lib/client/storage';
 
 interface PlaybackLogsResponse {
   success?: boolean;
@@ -28,7 +29,16 @@ export default function PlaybackLogsPage() {
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetch(`${backend}/api/local/playback/logs?${qs.toString()}`);
+        // Logs de lecture = admin : token cloud joint uniquement vers le backend configure.
+        const configured = (getBackendUrl() || '').replace(/\/$/, '');
+        const token = backend === configured ? TokenManager.getCloudAccessToken() : null;
+        const res = await fetch(`${backend}/api/local/playback/logs?${qs.toString()}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (res.status === 401 || res.status === 403) {
+          if (!cancelled) setError('Logs reserves a l administrateur du serveur (connexion requise).');
+          return;
+        }
         const json = (await res.json()) as PlaybackLogsResponse;
         if (cancelled) return;
         setTitle(json.data?.file_id || q || 'Logs lecture');
