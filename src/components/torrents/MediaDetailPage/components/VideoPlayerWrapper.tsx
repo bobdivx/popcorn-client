@@ -27,6 +27,7 @@ import { getNetworkPlaybackProfile } from '../../../../lib/streaming/networkPlay
 import { logVideoPlaybackError } from '../../../streaming/direct-player/mediaErrorDiagnostics';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { useRemoteFocusTrap } from '../../../../lib/tv/useRemoteFocusTrap';
+import { useHistoryBackGuard } from '../../../../lib/navigation/historyBackGuard';
 import { useLibraryScrubThumbnails } from './video-player-wrapper/useLibraryScrubThumbnails';
 import { getLanguageName } from '../../../streaming/player-shared/utils/languageName';
 import {
@@ -203,10 +204,21 @@ export function VideoPlayerWrapper({
     return () => document.documentElement.removeAttribute('data-tv-player-open');
   }, [visible]);
 
+  // Retour système (geste / bouton Android, « précédent » du navigateur) : une seule entrée
+  // d'historique pour tout le lecteur (chargement, lecture, erreur) ; Retour = fermer, une fois.
+  const closeFromSystemBackRef = useRef(onClose);
+  closeFromSystemBackRef.current = onClose;
+  const markBackGuardClosing = useHistoryBackGuard(visible !== false, () => {
+    stopBufferRef.current?.();
+    closeFromSystemBackRef.current?.();
+  });
+
   /** Ferme le lecteur en arrêtant d'abord le buffer HLS/Lucie. */
   const handleClosePlayer = useCallback(() => {
+    markBackGuardClosing();
     stopBufferRef.current?.();
     onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onClose]);
   const isMobile = isMobileDevice();
   const { t, language: uxLanguage } = useI18n();

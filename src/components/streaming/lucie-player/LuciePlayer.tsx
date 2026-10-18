@@ -117,6 +117,7 @@ export default function LuciePlayer({
     isLoading,
     canUseSeekReload: false, // Pas de reload avec seek pour Lucie
     reloadWithSeek: () => {}, // Pas utilisé pour Lucie
+    externalTouchToggle: true, // tap = useTouchGestures
   });
 
   // Reprendre / Revoir : après useVideoControls (évite TDZ) + refs (évite spam API)
@@ -500,7 +501,8 @@ export default function LuciePlayer({
               : undefined
           }
         />
-        <div class="absolute inset-0 z-30 pointer-events-none">
+        {/* Calque des boutons flottants au-dessus du chrome (z-40), cf. HLSPlayer. */}
+        <div class="absolute inset-0 z-[45] pointer-events-none">
           <SkipIntroOverlay
             onSkip={handleSkipIntro}
             visible={showSkipIntro}
