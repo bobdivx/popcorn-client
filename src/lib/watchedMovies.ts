@@ -92,6 +92,12 @@ function validId(id: unknown): id is number {
   return typeof id === 'number' && Number.isFinite(id) && id > 0;
 }
 
+/** Entrée brute (position / durée / horodatage) — utilisée par la résolution de reprise. */
+export function getMovieWatchEntry(tmdbId: number | null | undefined): MovieWatchEntry | null {
+  if (!validId(tmdbId)) return null;
+  return load()[String(tmdbId)] ?? null;
+}
+
 export function getMovieWatchState(tmdbId: number | null | undefined): MovieWatchState {
   if (!validId(tmdbId)) return { watched: false, resumePercent: null, positionSeconds: null };
   const e = load()[String(tmdbId)];

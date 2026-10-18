@@ -4,8 +4,8 @@ import { useHlsLoader } from './useHlsLoader';
 import { usePlayerConfig } from '../../player-shared/hooks/usePlayerConfig';
 import { clientApi } from '../../../../lib/client/api';
 import { serverApi } from '../../../../lib/client/server-api';
+import { resolveResumeSeconds, RESUME_RESTART_PERCENT } from '../../../../lib/streaming/resumePosition';
 import {
-  resolveResumePlaybackPosition,
   savePlaybackPosition,
   savePlaybackPositionByMedia,
   markEpisodeWatched,
@@ -63,6 +63,9 @@ interface UseHlsPlayerProps {
   useStreamTorrentUrl?: boolean;
 }
 
+/** En-deçà, on ne sauvegarde pas la position (démarrage / reprise pas encore appliquée). */
+const MIN_SAVE_POSITION_SECONDS = 3;
+
 export function useHlsPlayer({
   src,
   infoHash,
@@ -94,6 +97,8 @@ export function useHlsPlayer({
   const hlsRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [playbackStarted, setPlaybackStarted] = useState(false);
+  /** Position (s) à laquelle la lecture a repris automatiquement (null = départ au début). */
+  const [resumedFromSeconds, setResumedFromSeconds] = useState<number | null>(null);
   const [pendingSeekPosition, setPendingSeekPosition] = useState(0);
   const [error, setError] = useState<string | null>(null);
   /** Message d’overlay pendant les retries 503 (ex. « Préparation de la lecture en cours… ») */
@@ -304,6 +309,7 @@ export function useHlsPlayer({
       nativeTvFailedRef.current = false;
       nativeTvActiveRef.current = false;
       setPlaybackStarted(false);
+      setResumedFromSeconds(null);
       setIsLoading(true);
     }
 
@@ -1023,6 +1029,17 @@ export function useHlsPlayer({
             } catch (_) {}
           }
 
+          // Aucun point de reprise : départ au début (+ saut auto du générique si activé).
+          function applyIntroSkipStart() {
+            const autoSkip = playerConfig.skipIntroEnabled && playerConfig.introSkipSeconds > 0;
+            if (!autoSkip) return;
+            const end = Math.min(
+              playerConfig.introSkipSeconds,
+              video.duration && isFinite(video.duration) ? video.duration - 1 : playerConfig.introSkipSeconds,
+            );
+            if (end > 0) applyResumePosition(end);
+          }
+
           // Démarrer la lecture seulement quand on a assez de buffer (évite stall après ~4 s).
           // Doit être appelé APRÈS que la position sauvegardée soit appliquée, sinon on play() puis
           // un seek vers la position coupe le buffer et provoque une pause.
@@ -1155,34 +1172,36 @@ export function useHlsPlayer({
               applyResumePosition(pendingSeekRef.current);
               schedulePlayWhenReady();
             } else {
-            resolveResumePlaybackPosition({
+            const knownDuration = totalDuration > 0 ? totalDuration : (video.duration || 0);
+            resolveResumeSeconds({
               torrentId: torrentIdRef.current,
               tmdbId: tmdbIdRef.current,
               tmdbType: tmdbTypeRef.current,
+              season: seriesSeasonRef.current ?? null,
+              episode: seriesEpisodeRef.current ?? null,
               deviceId,
               preferredSeconds: initialSeekSecondsRef.current,
+              durationSeconds: Number.isFinite(knownDuration) && knownDuration > 0 ? knownDuration : null,
             }).then(async (positionSeconds) => {
+              // Règle : visionnage ≥ 95 % → on repart du début (pas de reprise « au générique »).
+              const isResumable = (pos: number, dur: number) =>
+                pos > 1 && !(dur > 0 && (pos / dur) * 100 >= RESUME_RESTART_PERCENT);
               if (positionSeconds && positionSeconds > 0) {
                 const videoDuration = totalDuration > 0 ? totalDuration : (video.duration || 0);
                 if (videoDuration > 0) {
                   totalDurationRef.current = videoDuration;
-                  const maxPosition = videoDuration * 0.95;
-                  const finalPosition = Math.min(positionSeconds, maxPosition);
-                  if (finalPosition > 1) {
-                    applyResumePosition(finalPosition);
+                  if (isResumable(positionSeconds, videoDuration)) {
+                    applyResumePosition(positionSeconds);
+                    setResumedFromSeconds(positionSeconds);
                   }
                 } else {
-                  setTimeout(() => {
-                    const retryDuration = totalDurationRef.current > 0 ? totalDurationRef.current : (video.duration || 0);
-                    if (retryDuration > 0) {
-                      const maxPosition = retryDuration * 0.95;
-                      const finalPosition = Math.min(positionSeconds, maxPosition);
-                      if (finalPosition > 1) {
-                        applyResumePosition(finalPosition);
-                      }
-                    }
-                  }, 1000);
+                  // Durée pas encore connue : appliquer tout de suite (le résolveur a déjà
+                  // écarté les positions ≥ 95 % quand une durée était sauvegardée).
+                  applyResumePosition(positionSeconds);
+                  setResumedFromSeconds(positionSeconds);
                 }
+              } else {
+                applyIntroSkipStart();
               }
               schedulePlayWhenReady();
             }).catch(() => {
@@ -1854,7 +1873,8 @@ export function useHlsPlayer({
         const savePositionInterval = setInterval(async () => {
           const currentTorrentId = torrentIdRef.current;
           const deviceId = getOrCreateDeviceId();
-          if (video.currentTime > 0) {
+          // < 3 s : simple démarrage (ou seek de reprise pas encore appliqué) → ne pas écraser la reprise.
+          if (video.currentTime > MIN_SAVE_POSITION_SECONDS && !(pendingSeekRef.current > 0)) {
             if (currentTorrentId) {
               savePlaybackPosition(currentTorrentId, deviceId, video.currentTime).catch(() => {});
             }
@@ -1869,7 +1889,7 @@ export function useHlsPlayer({
         // Sauvegarder la position (sans toucher au buffer)
         const savePositionOnly = async () => {
           const deviceId = getOrCreateDeviceId();
-          if (video.currentTime > 0) {
+          if (video.currentTime > MIN_SAVE_POSITION_SECONDS && !(pendingSeekRef.current > 0)) {
             const currentTorrentId = torrentIdRef.current;
             if (currentTorrentId) {
               try {
@@ -2097,5 +2117,6 @@ export function useHlsPlayer({
     loadingStatusMessage,
     stopBuffer,
     reloadWithSeek,
+    resumedFromSeconds,
   };
 }
