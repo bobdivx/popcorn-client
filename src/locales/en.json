@@ -626,6 +626,11 @@
     "actionRetry": "Try again"
   },
   "playback": {
+    "resume": {
+      "resumedAt": "Resumed at",
+      "restart": "Start over",
+      "fallbackFromStart": "Couldn’t resume at this position — playing from the start."
+    },
     "nextEpisode": "Next episode",
     "previousEpisode": "Previous episode",
     "episodeWatched": "Watched",

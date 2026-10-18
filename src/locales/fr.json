@@ -626,6 +626,11 @@
     "actionRetry": "Relancer"
   },
   "playback": {
+    "resume": {
+      "resumedAt": "Reprise à",
+      "restart": "Recommencer",
+      "fallbackFromStart": "Reprise impossible à cette position — lecture depuis le début."
+    },
     "nextEpisode": "Épisode suivant",
     "previousEpisode": "Épisode précédent",
     "episodeWatched": "Déjà vu",

@@ -480,10 +480,96 @@ export default function HLSPlayer({
       tvResumeAppliedRef.current = true;
       seekToTargetTime(target);
       setTvResumedAt(target);
+      armResumeWatchdog(target);
     }, 500);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playbackStarted]);
+
+  // Garde-fou de reprise : si, après le seek de reprise, la lecture ne repart pas (segment N > 0
+  // non décodable seul — ex. NVENC sans IDR en tête de segment, « non-existing PPS » — ou
+  // blocage), on repart proprement du début avec un message discret au lieu de rester bloqué.
+  // Fonctionne avec et sans le correctif serveur (-forced-idr) : si la reprise marche, rien ne se passe.
+  const [resumeFallbackMessage, setResumeFallbackMessage] = useState<string | null>(null);
+  const resumeWatchdogCleanupRef = useRef<(() => void) | null>(null);
+  const armResumeWatchdog = (target: number) => {
+    resumeWatchdogCleanupRef.current?.();
+    const video = videoRef.current;
+    if (!video) return;
+    const startedAt = Date.now();
+    let nearSince: number | null = null; // 1re position observée près de la cible
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      window.clearInterval(iv);
+      video.removeEventListener('error', onError);
+      resumeWatchdogCleanupRef.current = null;
+    };
+    const fallback = (reason: string) => {
+      if (done) return;
+      finish();
+      console.warn(`[HLSPlayer] reprise à ${Math.round(target)} s impossible (${reason}) → départ au début`);
+      setTvResumedAt(null);
+      setResumeFallbackMessage(
+        (t('playback.resume.fallbackFromStart') !== 'playback.resume.fallbackFromStart'
+          ? t('playback.resume.fallbackFromStart')
+          : null) || 'Reprise impossible à cette position — lecture depuis le début.',
+      );
+      try {
+        // Playlist fraîche depuis 0 (segment 0 = IDR garanti) ; sinon seek natif à 0.
+        try {
+          video.currentTime = 0;
+        } catch {
+          /* ignore */
+        }
+        if (reloadWithSeek) reloadWithSeek(0);
+        else seekToTargetTime(0);
+      } catch {
+        seekToTargetTime(0);
+      }
+      // Le rechargement conserve la position du <video> : on force le retour à 0 une fois la
+      // nouvelle playlist prise en compte, et on relance la lecture si elle est restée en pause.
+      [800, 2000, 4000].forEach((ms) =>
+        window.setTimeout(() => {
+          const v = videoRef.current;
+          if (!v) return;
+          if (v.currentTime > 10) {
+            try {
+              v.currentTime = 0;
+            } catch {
+              /* ignore */
+            }
+          }
+          if (v.paused) v.play().catch(() => {});
+        }, ms),
+      );
+    };
+    const onError = () => fallback('erreur média');
+    video.addEventListener('error', onError);
+    const iv = window.setInterval(() => {
+      const now = Date.now();
+      const ct = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+      // L'utilisateur a repris la main (seek ailleurs / pause volontaire) : on n'intervient plus.
+      if (Math.abs(ct - target) > 30 && ct > 5) return finish();
+      if (video.paused && video.readyState >= 3) return finish();
+      if (ct >= target - 5) {
+        if (nearSince == null) nearSince = ct;
+        else if (ct - nearSince >= 2 && !video.paused) return finish(); // la lecture avance : OK
+      }
+      if (now - startedAt > 12000) fallback("aucune progression après 12 s");
+    }, 1000);
+    resumeWatchdogCleanupRef.current = finish;
+  };
+  useEffect(() => () => resumeWatchdogCleanupRef.current?.(), []);
+  useEffect(() => {
+    resumeWatchdogCleanupRef.current?.();
+  }, [src, filePath, infoHash]);
+  useEffect(() => {
+    if (!resumeFallbackMessage) return;
+    const id = window.setTimeout(() => setResumeFallbackMessage(null), 6000);
+    return () => clearTimeout(id);
+  }, [resumeFallbackMessage]);
   const resumedAt = tvResumedAt;
   const handleRestartFromBeginning = () => {
     seekToTargetTime(0);
@@ -801,6 +887,17 @@ export default function HLSPlayer({
             role="status"
           >
             {transcodingsEvictedMessage}
+          </div>
+        )}
+        {resumeFallbackMessage && (
+          <div
+            class="absolute left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg bg-black/80 text-white text-sm text-center shadow-lg toast-animate max-w-[90%] pointer-events-none"
+            style={{ top: 'calc(5.5rem + env(safe-area-inset-top, 0px))', zIndex: 46 }}
+            role="status"
+            aria-live="polite"
+            data-resume-fallback
+          >
+            {resumeFallbackMessage}
           </div>
         )}
         {seekFeedback && (
