@@ -383,7 +383,9 @@ export function VideoControls({
         style={isTV && !chromeVisible ? { display: 'none', visibility: 'hidden' } : undefined}
         aria-hidden={!chromeVisible}
       >
-        <div class={`flex shrink-0 items-center justify-between pointer-events-auto ${padding.split(' ')[0]} ${padding.split(' ')[1]}`}>
+        {/* Barres cliquables seulement quand le chrome est visible : masquées, elles restaient
+            actives (bouton Retour invisible sous le doigt, tap qui n'affichait pas les contrôles). */}
+        <div class={`flex shrink-0 items-center justify-between ${chromeVisible ? 'pointer-events-auto' : 'pointer-events-none'} ${padding.split(' ')[0]} ${padding.split(' ')[1]}`}>
           <div class="flex items-center gap-3 text-white drop-shadow-2xl min-w-0 flex-1">
             {/* Bouton retour */}
             {onClose && (
@@ -472,7 +474,7 @@ export function VideoControls({
             </div>
           </div>
         )}
-        <div class={`mt-auto shrink-0 flex flex-col gap-2 pointer-events-auto ${padding}`}>
+        <div class={`mt-auto shrink-0 flex flex-col gap-2 ${chromeVisible ? 'pointer-events-auto' : 'pointer-events-none'} ${padding}`}>
           {/* Timecode mobile (au-dessus de la barre pour libérer l'espace horizontal) */}
           {isMobile && !isTV && (
             <div class={`flex items-center justify-between text-white ${textSize} font-medium tabular-nums px-1`}>
@@ -804,7 +806,10 @@ export function VideoControls({
                 e.stopPropagation();
                 onPlayPause(); 
               }} 
-              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white transition-all backdrop-blur-md border border-white/25 focus:outline-none relative z-40 ${getFocusClass(playIndex)}`}
+              type="button"
+              title={isPlaying ? t('playback.pauseLabel') : t('playback.playLabel')}
+              aria-label={isPlaying ? t('playback.pauseLabel') : t('playback.playLabel')}
+              class={`flex items-center justify-center flex-shrink-0 ${buttonSize} rounded-full ed-pc-btn bg-black/35 hover:bg-white/10 text-white transition-all backdrop-blur-md border border-white/25 focus:outline-none relative z-40 touch-manipulation ${getFocusClass(playIndex)}`}
             >
               {isPlaying ? <Pause class={`${iconSize} text-white`} /> : <Play class={`${iconSize} text-white ml-0.5`} />}
             </button>

@@ -4,7 +4,6 @@ import { useHlsLoader } from './useHlsLoader';
 import { usePlayerConfig } from '../../player-shared/hooks/usePlayerConfig';
 import { clientApi } from '../../../../lib/client/api';
 import { serverApi } from '../../../../lib/client/server-api';
-import { resolveResumeSeconds, RESUME_RESTART_PERCENT } from '../../../../lib/streaming/resumePosition';
 import {
   savePlaybackPosition,
   savePlaybackPositionByMedia,
@@ -1029,17 +1028,6 @@ export function useHlsPlayer({
             } catch (_) {}
           }
 
-          // Aucun point de reprise : départ au début (+ saut auto du générique si activé).
-          function applyIntroSkipStart() {
-            const autoSkip = playerConfig.skipIntroEnabled && playerConfig.introSkipSeconds > 0;
-            if (!autoSkip) return;
-            const end = Math.min(
-              playerConfig.introSkipSeconds,
-              video.duration && isFinite(video.duration) ? video.duration - 1 : playerConfig.introSkipSeconds,
-            );
-            if (end > 0) applyResumePosition(end);
-          }
-
           // Démarrer la lecture seulement quand on a assez de buffer (évite stall après ~4 s).
           // Doit être appelé APRÈS que la position sauvegardée soit appliquée, sinon on play() puis
           // un seek vers la position coupe le buffer et provoque une pause.
@@ -1153,62 +1141,26 @@ export function useHlsPlayer({
             // Appliquer la position sauvegardée AVANT de lancer la vérification buffer → play
             // Ne PAS appeler getPlaybackPosition si pendingSeekRef > 0 : on est en plein reloadWithSeek,
             // la position explicite (seek utilisateur) doit primer sur la position sauvegardée.
-            const deviceId = getOrCreateDeviceId();
             let playWhenReadyScheduled = false;
             const schedulePlayWhenReady = () => {
               if (playWhenReadyScheduled) return;
               playWhenReadyScheduled = true;
               setTimeout(startDelayedPlayWhenReady, 150);
             };
-            // webOS / TV : ne pas reprendre au milieu tant que le 1er play n’a pas
-            // marché (startLoad(resume) + playlist EVENT = chasse du live edge).
-            if (tvPlayback && pendingSeekRef.current <= 0) {
+            // Toutes plateformes : ne pas reprendre au milieu tant que le 1er play n’a pas
+            // marché (startLoad(resume) + playlist EVENT = chasse du live edge → lecture qui ne
+            // démarre jamais). La reprise est appliquée juste après le démarrage par HLSPlayer
+            // (seekToTargetTime → reloadWithSeek si hors buffer), comme un seek utilisateur.
+            if (pendingSeekRef.current <= 0) {
               try {
                 hls.startLoad(0);
               } catch (_) {}
               startDelayedPlayWhenReady();
-            } else if (pendingSeekRef.current > 0) {
-              // Position déjà définie (ex. changement de qualité) : l'appliquer puis lancer la lecture
+            } else {
+              // Position déjà définie (ex. changement de qualité, reloadWithSeek) : l'appliquer
+              // puis lancer la lecture.
               applyResumePosition(pendingSeekRef.current);
               schedulePlayWhenReady();
-            } else {
-            const knownDuration = totalDuration > 0 ? totalDuration : (video.duration || 0);
-            resolveResumeSeconds({
-              torrentId: torrentIdRef.current,
-              tmdbId: tmdbIdRef.current,
-              tmdbType: tmdbTypeRef.current,
-              season: seriesSeasonRef.current ?? null,
-              episode: seriesEpisodeRef.current ?? null,
-              deviceId,
-              preferredSeconds: initialSeekSecondsRef.current,
-              durationSeconds: Number.isFinite(knownDuration) && knownDuration > 0 ? knownDuration : null,
-            }).then(async (positionSeconds) => {
-              // Règle : visionnage ≥ 95 % → on repart du début (pas de reprise « au générique »).
-              const isResumable = (pos: number, dur: number) =>
-                pos > 1 && !(dur > 0 && (pos / dur) * 100 >= RESUME_RESTART_PERCENT);
-              if (positionSeconds && positionSeconds > 0) {
-                const videoDuration = totalDuration > 0 ? totalDuration : (video.duration || 0);
-                if (videoDuration > 0) {
-                  totalDurationRef.current = videoDuration;
-                  if (isResumable(positionSeconds, videoDuration)) {
-                    applyResumePosition(positionSeconds);
-                    setResumedFromSeconds(positionSeconds);
-                  }
-                } else {
-                  // Durée pas encore connue : appliquer tout de suite (le résolveur a déjà
-                  // écarté les positions ≥ 95 % quand une durée était sauvegardée).
-                  applyResumePosition(positionSeconds);
-                  setResumedFromSeconds(positionSeconds);
-                }
-              } else {
-                applyIntroSkipStart();
-              }
-              schedulePlayWhenReady();
-            }).catch(() => {
-              schedulePlayWhenReady();
-            });
-            // Au cas où la promesse met trop de temps (ex. storage lent)
-            window.setTimeout(schedulePlayWhenReady, 2000);
             }
           } else {
             startDelayedPlayWhenReady();

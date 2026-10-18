@@ -120,7 +120,7 @@ export default function HLSPlayer({
     setHlsDuration(undefined);
   }, [infoHash, filePath]);
 
-  const { videoRef, hlsRef, isLoading, playbackStarted, pendingSeekPosition, error, hlsLoaded, loadingStatusMessage, stopBuffer, reloadWithSeek, resumedFromSeconds } = useHlsPlayer({
+  const { videoRef, hlsRef, isLoading, playbackStarted, pendingSeekPosition, error, hlsLoaded, loadingStatusMessage, stopBuffer, reloadWithSeek } = useHlsPlayer({
     src,
     infoHash,
     maxHeight: maxHeight ?? undefined,
@@ -206,6 +206,7 @@ export default function HLSPlayer({
     // Maintenant, reloadWithSeek fonctionne correctement pour tous les types de fichiers.
     canUseSeekReload: canUseSeekReloadProp ?? true,
     reloadWithSeek,
+    externalTouchToggle: true,
   });
 
   const isSeekSettling = isLoading && pendingSeekPosition > 0;
@@ -430,9 +431,12 @@ export default function HLSPlayer({
     }
   };
 
-  // TV (webOS natif / Android TV) : useHlsPlayer démarre toujours à 0 (seek avant 1er play =
-  // chasse du live edge sur playlist EVENT). On reprend donc juste APRÈS le démarrage, via le
-  // même seek que la télécommande (seekToTargetTime → reloadWithSeek si hors buffer).
+  // Toutes plateformes : useHlsPlayer démarre toujours à 0 (seek avant le 1er play = chasse du
+  // live edge sur une playlist EVENT encore en cours de transcodage → lecture bloquée). On
+  // reprend donc juste APRÈS le démarrage, via le même seek qu'un geste utilisateur
+  // (seekToTargetTime → reloadWithSeek si hors buffer). Avant 1.4.14, mobile / PC appliquaient
+  // la reprise avant le 1er play (startLoad(position)) : avec la reprise par défaut de 1.4.12,
+  // un épisode entamé pouvait ne jamais démarrer.
   const tvResumeTargetRef = useRef<number | null>(null);
   const tvResumeAppliedRef = useRef(false);
   const [tvResumedAt, setTvResumedAt] = useState<number | null>(null);
@@ -440,7 +444,7 @@ export default function HLSPlayer({
     tvResumeTargetRef.current = null;
     tvResumeAppliedRef.current = false;
     setTvResumedAt(null);
-    if (!isTvPlayback || startFromBeginning) return;
+    if (startFromBeginning) return;
     let cancelled = false;
     void resolveResumeSeconds({
       torrentId,
@@ -459,9 +463,9 @@ export default function HLSPlayer({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTvPlayback, startFromBeginning, src, filePath, infoHash, seriesSeason, seriesEpisode]);
+  }, [startFromBeginning, src, filePath, infoHash, seriesSeason, seriesEpisode]);
   useEffect(() => {
-    if (!isTvPlayback || !playbackStarted || tvResumeAppliedRef.current) return;
+    if (!playbackStarted || tvResumeAppliedRef.current) return;
     let tries = 0;
     const id = window.setInterval(() => {
       tries += 1;
@@ -470,15 +474,17 @@ export default function HLSPlayer({
       window.clearInterval(id);
       if (tvResumeAppliedRef.current || target == null || !(target > 0)) return;
       const dur = effectiveDurationRef.current;
-      if (dur > 0 && (target / dur) * 100 >= RESUME_RESTART_PERCENT) return;
+      // Règle des 95 % seulement si la durée connue couvre la cible : sur une playlist EVENT
+      // (transcodage en cours) la durée visible est partielle et écartait toute reprise.
+      if (dur > target && (target / dur) * 100 >= RESUME_RESTART_PERCENT) return;
       tvResumeAppliedRef.current = true;
       seekToTargetTime(target);
       setTvResumedAt(target);
     }, 500);
     return () => window.clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTvPlayback, playbackStarted]);
-  const resumedAt = isTvPlayback ? tvResumedAt : resumedFromSeconds;
+  }, [playbackStarted]);
+  const resumedAt = tvResumedAt;
   const handleRestartFromBeginning = () => {
     seekToTargetTime(0);
   };
@@ -956,10 +962,13 @@ export default function HLSPlayer({
           nextEpisodeTitle={nextEpisodeInfo?.title ?? null}
           previousEpisodeTitle={previousEpisodeInfo?.title ?? null}
         />
-        <div class="absolute inset-0 z-30 pointer-events-none">
+        {/* Boutons flottants : calque AU-DESSUS du chrome (z-40, plein écran et cliquable quand
+            les contrôles sont visibles) — sinon le chrome interceptait le tap. Le calque lui-même
+            laisse passer les touchers (pointer-events-none) ; masqué quand un menu est ouvert. */}
+        <div class="absolute inset-0 z-[45] pointer-events-none">
           <SkipIntroOverlay
             onSkip={handleSkipIntro}
-            visible={showSkipIntro}
+            visible={showSkipIntro && !showSubtitleSelector && !settingsOpen}
             chromeVisible={effectiveShowControls}
           />
           <ResumeOverlay
@@ -969,7 +978,7 @@ export default function HLSPlayer({
           />
           <NextEpisodeOverlay
             onNext={handleNextEpisode}
-            visible={showNextEpisode}
+            visible={showNextEpisode && !showSubtitleSelector && !settingsOpen}
             nextTitle={nextEpisodeInfo?.title}
             chromeVisible={effectiveShowControls}
           />

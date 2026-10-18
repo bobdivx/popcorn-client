@@ -21,6 +21,12 @@ interface UseVideoControlsProps {
   pendingSeekPosition?: number;
   canUseSeekReload?: boolean;
   reloadWithSeek?: (seekSeconds: number) => void;
+  /**
+   * Le lecteur gère lui-même le tap (useTouchGestures : tap = afficher / masquer).
+   * Dans ce cas, un toucher ne force plus l'affichage des contrôles : sinon le 1er toucher
+   * les affichait puis le tap les re-masquait, et les boutons flottants bougeaient sous le doigt.
+   */
+  externalTouchToggle?: boolean;
 }
 
 export function useVideoControls({
@@ -31,6 +37,7 @@ export function useVideoControls({
   pendingSeekPosition = 0,
   canUseSeekReload = true,
   reloadWithSeek,
+  externalTouchToggle = false,
 }: UseVideoControlsProps) {
   const playerConfig = usePlayerConfig();
   const [showControls, setShowControls] = useState(false);
@@ -193,7 +200,13 @@ export function useVideoControls({
     };
 
     const container = video.parentElement?.parentElement;
-    const handleTouchStart = () => {
+    const handleTouchStart = (e: TouchEvent) => {
+      if (externalTouchToggle) {
+        // Interaction avec les commandes déjà visibles : repousser le masquage auto.
+        const target = e.target as HTMLElement | null;
+        if (target?.closest('.video-controls-chrome, [data-player-overlay-action]')) scheduleAutoHide();
+        return;
+      }
       setShowControls(true);
       scheduleAutoHide();
     };
