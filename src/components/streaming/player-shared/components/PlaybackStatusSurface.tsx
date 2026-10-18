@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { X } from 'lucide-preact';
 import { useI18n } from '../../../../lib/i18n/useI18n';
 import { useRemoteFocusTrap } from '../../../../lib/tv/useRemoteFocusTrap';
+import { useHistoryBackGuard } from '../../../../lib/navigation/historyBackGuard';
 import { formatBytes, formatSpeed, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
 import { generateQRCode } from '../../../../lib/utils/qrcode';
 import { friendlyPlaybackHint, pipelineHeadline, type PlaybackPipelineStatus } from '../../../../lib/streaming/playbackPipeline';
@@ -364,26 +365,13 @@ export function PlaybackStatusSurface({
     onBack: () => closeFromRemoteRef.current(),
   });
 
-  // Retour matériel Android / navigateur (popstate) : même fermeture, une seule fois.
-  useEffect(() => {
-    if (!isModalVariant) return;
-    if (!remoteBackRef.current) return;
-    history.pushState({ popcornnPlaybackOverlay: true }, '');
-    let ignorePop = false;
-    const onPopState = () => {
-      if (ignorePop) return;
-      closeFromRemoteRef.current();
-    };
-    window.addEventListener('popstate', onPopState);
-    return () => {
-      ignorePop = true;
-      window.removeEventListener('popstate', onPopState);
-      // replaceState : history.back() déclenchait popstate chez d’autres listeners et fermait le lecteur.
-      if (history.state && (history.state as { popcornnPlaybackOverlay?: boolean }).popcornnPlaybackOverlay) {
-        history.replaceState(null, '');
-      }
-    };
-  }, [variant]);
+  // Retour système Android / navigateur (popstate) : même fermeture, une seule fois.
+  // - variante « player » : c'est le lecteur (VideoPlayerWrapper) qui tient l'entrée
+  //   d'historique ; avant, chaque overlay de chargement / buffering poussait la sienne et la
+  //   laissait derrière lui (Retour « mort » après chaque buffering) ;
+  // - variante « fullscreen » (panneau de téléchargement sur la fiche) : garde dédiée, retirée
+  //   proprement à la fermeture.
+  useHistoryBackGuard(variant === 'fullscreen' && !!remoteBackAction, () => closeFromRemoteRef.current());
 
   const etaLabel =
     derived.etaSeconds != null && derived.etaSeconds > 0
