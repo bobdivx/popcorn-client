@@ -1,4 +1,5 @@
 import { getBackendUrl } from '../backend-url';
+import { TokenManager } from '../client/storage';
 
 export type PlaybackPipelinePhase =
   | 'waiting'
@@ -43,6 +44,19 @@ export interface PlaybackPipelineQuery {
 
 function backendBase(baseUrl?: string | null): string {
   return (baseUrl || getBackendUrl() || '').replace(/\/$/, '');
+}
+
+/** Token cloud uniquement vers le backend configure (jamais vers une URL arbitraire). */
+function authHeadersFor(base: string): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const configured = (getBackendUrl() || '').replace(/\/$/, '');
+    if (!configured || base !== configured) return {};
+    const t = TokenManager.getCloudAccessToken();
+    return t ? { Authorization: `Bearer ${t}` } : {};
+  } catch {
+    return {};
+  }
 }
 
 export function playbackDebugUrl(query: PlaybackPipelineQuery & { fileId?: string | null }): string {
@@ -101,6 +115,7 @@ export async function fetchPlaybackLogs(
   try {
     const res = await fetch(`${base}/api/local/playback/logs?${params.toString()}`, {
       credentials: 'include',
+      headers: authHeadersFor(base),
     });
     if (!res.ok) return null;
     const json = (await res.json()) as { success?: boolean; data?: PlaybackPipelineLogs };
