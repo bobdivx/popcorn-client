@@ -5,7 +5,6 @@ import { serverApi } from '../../lib/client/server-api';
 import { getLocalProfile, onProfileChanged } from '../../lib/client/profile';
 import Avatar from '../ui/Avatar';
 import BackendStatusBadge from './BackendStatusBadge';
-import GpuStatusBadge from './GpuStatusBadge';
 import { DsProgressRing } from '../ui/design-system';
 import { calculateSyncProgress } from '../../lib/utils/sync-progress';
 import {
@@ -246,15 +245,9 @@ export default function Navbar() {
                 Popcornn
               </span>
             </a>
-            {user ? (
-              <div
-                className="hidden xl:flex items-center rounded-full nav-status-cluster flex-shrink-0"
-                aria-label={t('backend.statusCluster')}
-              >
-                <BackendStatusBadge variant="quiet" menuAlign="left" />
-                <GpuStatusBadge variant="quiet" />
-              </div>
-            ) : null}
+            {/* Statut serveur/GPU : affiché dans Paramètres → Serveur. Ici, surveillance santé seule
+                (alimente la détection « Hors ligne » et la capacité GPU), sans pastille visible. */}
+            {user ? <BackendStatusBadge variant="headless" /> : null}
           </div>
 
           {/* ── CENTRE : Navigation (ne doit jamais chevaucher gauche/droite) ── */}
@@ -320,12 +313,6 @@ export default function Navbar() {
                         <p className="text-xs text-[var(--ds-text-tertiary)] truncate">{user.email}</p>
                       )}
                     </a>
-                  </div>
-                  <div className="border-t border-[var(--ds-border)] my-1" aria-hidden />
-                  <div className="rounded-xl border border-[var(--ds-border)] bg-[var(--ds-surface)]/40 mx-2 overflow-hidden">
-                    <BackendStatusBadge variant="inline" />
-                    <div className="border-t border-[var(--ds-border)]" aria-hidden />
-                    <GpuStatusBadge variant="inline" />
                   </div>
                   <div className="border-t border-[var(--ds-border)] my-1" aria-hidden />
                   {demoMode && (
