@@ -449,6 +449,41 @@ const isWebOS = import.meta.env.WEBOS === 'true';
       }
     </style>
     <script is:inline>
+      // Cache d'images durable (affiches / backdrops / logos TMDB) via un Service Worker dédié
+      // qui n'intercepte QUE image.tmdb.org (voir public/img-cache-sw.js).
+      // Uniquement en https hors Tauri : webOS natif (file://) et l'app Tauri (schéma interne)
+      // gardent le cache HTTP. Désactivable : localStorage.popcorn_img_sw = 'off'.
+      (function() {
+        try {
+          if (!('serviceWorker' in navigator) || !('caches' in window)) return;
+          var loc = window.location;
+          if (loc.protocol !== 'https:') return;
+          if ('__TAURI_INTERNALS__' in window || '__TAURI__' in window || /(^|\.)tauri\.localhost$/i.test(loc.hostname)) return;
+          var sw = navigator.serviceWorker;
+          if (localStorage.getItem('popcorn_img_sw') === 'off') {
+            sw.getRegistrations().then(function(regs) {
+              regs.forEach(function(r) {
+                var w = r.active || r.waiting || r.installing;
+                if (w && String(w.scriptURL).indexOf('/img-cache-sw.js') !== -1) r.unregister();
+              });
+            }).catch(function() {});
+            return;
+          }
+          var register = function() {
+            // ?v= : le script est servi « immutable » (nginx/CDN) → incrémenter v à chaque
+            // modification de public/img-cache-sw.js pour que la mise à jour soit prise en compte.
+            sw.register('/img-cache-sw.js?v=1', { scope: '/' }).catch(function() {});
+          };
+          var later = function() {
+            if (window.requestIdleCallback) window.requestIdleCallback(register, { timeout: 4000 });
+            else setTimeout(register, 1500);
+          };
+          if (document.readyState === 'complete') later();
+          else window.addEventListener('load', later, { once: true });
+        } catch (e) {}
+      })();
+    </script>
+    <script is:inline>
       // Intercepter les routes /player/* et rediriger vers /player avec l'ID en query param
       // Cela permet de gérer les routes dynamiques en mode static
       (function() {
