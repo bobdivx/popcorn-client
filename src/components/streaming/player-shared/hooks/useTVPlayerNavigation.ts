@@ -3,6 +3,7 @@ import { isTVPlatform, isWebOSTV, stampTvPlatformHints } from '../../../../lib/u
 import { useSeekStepAcceleration } from './useSeekStepAcceleration';
 import { toggleFullscreen } from './useFullscreen';
 import { scrubEffectiveDuration, scrubTimeForIndex } from '../components/video-controls/scrubMath';
+import { isRemoteFocusTrapActive } from '../../../../lib/tv/useRemoteFocusTrap';
 
 const BACK_KEY_CODES = [27, 8, 461, 10009, 4, 166, 457];
 const BACK_KEYS = ['Escape', 'Backspace', 'Back', 'BrowserBack', 'GoBack', 'XF86Back'];
@@ -413,6 +414,8 @@ export function useTVPlayerNavigation({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // Carte d'erreur / confirmation ouverte : elle gère seule les touches (useRemoteFocusTrap).
+      if (isRemoteFocusTrapActive()) return;
 
       const overlay = visiblePlayerPlaybackOverlay();
       if (overlay && isBackKey(e)) {
@@ -720,6 +723,7 @@ export function useTVPlayerNavigation({
     };
 
     const handleWebOSBack = (e: Event) => {
+      if (isRemoteFocusTrapActive()) return;
       e.preventDefault();
       e.stopPropagation();
       if (visiblePlayerPlaybackOverlay()) {

@@ -1517,3 +1517,20 @@ html[data-tv-platform] .card {
   html[data-editorial] .dropdown-content,
   html[data-editorial] .dropdown-menu { animation: none; }
 }
+
+/* Cartes d'erreur / confirmation pilotées à la télécommande (useRemoteFocusTrap) :
+   état de focus toujours visible (webOS, Android TV, clavier). */
+[data-remote-trap] button:focus,
+[data-remote-trap] a[href]:focus,
+[data-remote-trap] [data-focusable]:focus {
+  outline: 3px solid #f2545b !important;
+  outline-offset: 3px !important;
+  box-shadow: 0 0 0 6px rgba(242, 84, 91, 0.28) !important;
+  position: relative;
+  z-index: 1;
+}
+[data-remote-trap] .ed-playback-btn:focus,
+[data-remote-trap] .ed-playback-btn-ghost:focus {
+  transform: scale(1.06);
+  transition: transform 0.12s ease;
+}
