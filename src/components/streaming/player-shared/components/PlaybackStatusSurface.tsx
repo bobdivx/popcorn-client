@@ -574,7 +574,7 @@ export function PlaybackStatusSurface({
 
   const shell = (
     <div
-      className={`relative z-10 w-full min-w-0 ${isPlayer ? 'max-w-lg' : 'max-w-xl'} mx-auto px-4 animate-[fade-in_0.35s_ease-out] ${className}`}
+      className={`relative z-10 w-full min-w-0 max-w-2xl mx-auto px-4 animate-[fade-in_0.35s_ease-out] ${className}`}
     >
       <div className="ed-playback-splash flex flex-col items-center text-center min-w-0 max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain">
           {isError ? (

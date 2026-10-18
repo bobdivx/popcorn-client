@@ -402,7 +402,7 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         /* Inline critique avant editorial.css — même langage que .ed-loader--page */
         #popcorn-loading-fallback .plb{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;text-align:center;padding:0 1.5rem}
         #popcorn-loading-fallback .plb-k{letter-spacing:.42em;text-transform:uppercase;font-size:clamp(12px,1.15vw,22px);opacity:.6;font-family:'Jost',sans-serif;font-weight:300}
-        #popcorn-loading-fallback .plb-t{letter-spacing:.32em;text-transform:uppercase;font-size:clamp(28px,3.4vw,64px);font-weight:300;font-family:'Josefin Sans','Jost',sans-serif;margin:0}
+        #popcorn-loading-fallback .plb-t{letter-spacing:.32em;text-transform:uppercase;font-size:2rem;font-size:clamp(28px,3.4vw,64px);font-size:min(clamp(28px,3.4vw,64px),calc((100vw - 4rem) / 9.5));font-weight:300;font-family:'Josefin Sans','Jost',sans-serif;margin:0;padding-left:.32em;box-sizing:border-box;max-width:100%}
         #popcorn-loading-fallback .plb-l{position:relative;width:120px;height:1px;background:rgba(242,84,91,.35);overflow:hidden}
         #popcorn-loading-fallback .plb-l::after{content:'';position:absolute;inset:0;width:40%;background:#f2545b;animation:plb-run 1.4s cubic-bezier(.2,.7,.2,1) infinite}
         @keyframes plb-run{from{transform:translateX(-100%)}to{transform:translateX(250%)}}
