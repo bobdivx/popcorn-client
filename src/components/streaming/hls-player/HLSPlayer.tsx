@@ -15,6 +15,9 @@ import { shouldAutoFullscreen, isTVPlatform, isWebOSTV } from '../../../lib/util
 import { isTauri } from '../../../lib/utils/tauri';
 import { NextEpisodeOverlay } from '../player-shared/components/NextEpisodeOverlay';
 import { SkipIntroOverlay } from '../player-shared/components/SkipIntroOverlay';
+import { ResumeOverlay } from '../player-shared/components/ResumeOverlay';
+import { resolveResumeSeconds, RESUME_RESTART_PERCENT } from '../../../lib/streaming/resumePosition';
+import { getOrCreateDeviceId } from '../../../lib/utils/device-id';
 import PlayerBufferingOverlay from '../player-shared/components/PlayerBufferingOverlay';
 import { usePlaybackLiveTrace } from '../player-shared/hooks/usePlaybackLiveTrace';
 import { playbackDebugUrl, pipelineHeadline } from '../../../lib/streaming/playbackPipeline';
@@ -117,7 +120,7 @@ export default function HLSPlayer({
     setHlsDuration(undefined);
   }, [infoHash, filePath]);
 
-  const { videoRef, hlsRef, isLoading, playbackStarted, pendingSeekPosition, error, hlsLoaded, loadingStatusMessage, stopBuffer, reloadWithSeek } = useHlsPlayer({
+  const { videoRef, hlsRef, isLoading, playbackStarted, pendingSeekPosition, error, hlsLoaded, loadingStatusMessage, stopBuffer, reloadWithSeek, resumedFromSeconds } = useHlsPlayer({
     src,
     infoHash,
     maxHeight: maxHeight ?? undefined,
@@ -425,6 +428,59 @@ export default function HLSPlayer({
         console.warn('Impossible de démarrer la lecture:', err);
       });
     }
+  };
+
+  // TV (webOS natif / Android TV) : useHlsPlayer démarre toujours à 0 (seek avant 1er play =
+  // chasse du live edge sur playlist EVENT). On reprend donc juste APRÈS le démarrage, via le
+  // même seek que la télécommande (seekToTargetTime → reloadWithSeek si hors buffer).
+  const tvResumeTargetRef = useRef<number | null>(null);
+  const tvResumeAppliedRef = useRef(false);
+  const [tvResumedAt, setTvResumedAt] = useState<number | null>(null);
+  useEffect(() => {
+    tvResumeTargetRef.current = null;
+    tvResumeAppliedRef.current = false;
+    setTvResumedAt(null);
+    if (!isTvPlayback || startFromBeginning) return;
+    let cancelled = false;
+    void resolveResumeSeconds({
+      torrentId,
+      tmdbId,
+      tmdbType,
+      season: seriesSeason ?? null,
+      episode: seriesEpisode ?? null,
+      deviceId: getOrCreateDeviceId(),
+      preferredSeconds: initialSeekSeconds,
+    })
+      .then((pos) => {
+        if (!cancelled) tvResumeTargetRef.current = pos;
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTvPlayback, startFromBeginning, src, filePath, infoHash, seriesSeason, seriesEpisode]);
+  useEffect(() => {
+    if (!isTvPlayback || !playbackStarted || tvResumeAppliedRef.current) return;
+    let tries = 0;
+    const id = window.setInterval(() => {
+      tries += 1;
+      const target = tvResumeTargetRef.current;
+      if (target == null && tries < 10) return; // résolution encore en cours (≤ 5 s)
+      window.clearInterval(id);
+      if (tvResumeAppliedRef.current || target == null || !(target > 0)) return;
+      const dur = effectiveDurationRef.current;
+      if (dur > 0 && (target / dur) * 100 >= RESUME_RESTART_PERCENT) return;
+      tvResumeAppliedRef.current = true;
+      seekToTargetTime(target);
+      setTvResumedAt(target);
+    }, 500);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTvPlayback, playbackStarted]);
+  const resumedAt = isTvPlayback ? tvResumedAt : resumedFromSeconds;
+  const handleRestartFromBeginning = () => {
+    seekToTargetTime(0);
   };
 
   const introSkipSeconds = playerConfig.introSkipSeconds ?? 90;
@@ -904,6 +960,11 @@ export default function HLSPlayer({
           <SkipIntroOverlay
             onSkip={handleSkipIntro}
             visible={showSkipIntro}
+            chromeVisible={effectiveShowControls}
+          />
+          <ResumeOverlay
+            resumedAt={resumedAt}
+            onRestart={handleRestartFromBeginning}
             chromeVisible={effectiveShowControls}
           />
           <NextEpisodeOverlay

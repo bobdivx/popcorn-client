@@ -32,10 +32,9 @@ import { ActionsRow } from './components/ActionsRow';
 import { YouTubeVideoPlayer as VideoPlayer } from '../../ui/YouTubeVideoPlayer';
 import { redirectToCarPlayerIfNeeded } from '../../streaming/car-player/carPlaybackRedirect';
 import {
-  getPlaybackPosition,
-  getPlaybackPositionByMedia,
   getPlaybackPositionByMediaRecord,
 } from '../../../lib/streaming/torrent-storage';
+import { resolveResumeSeconds } from '../../../lib/streaming/resumePosition';
 import { setStreamingInfoHash } from '../../../lib/streamingInfoHashStorage';
 import { getOrCreateDeviceId } from '../../../lib/utils/device-id';
 import { getDownloadClientStats, saveDownloadMeta } from '../../../lib/utils/download-meta-storage';
@@ -453,8 +452,10 @@ export default function MediaDetailPage({
   const [savedPlaybackPosition, setSavedPlaybackPosition] = useState<number | null>(null);
   /** Incrémenté à la fermeture du lecteur pour rafraîchir les pastilles « déjà vu » */
   const [watchedEpisodesRefresh, setWatchedEpisodesRefresh] = useState(0);
-  /** Ref synchrone : setState est async — sans ça, « Reprendre » monte le player encore avec startFromBeginning=true. */
-  const startFromBeginningRef = useRef(true);
+  /** Ref synchrone : setState est async — sans ça, « Reprendre » monte le player encore avec startFromBeginning=true.
+   *  Défaut false : le lecteur reprend à la position sauvegardée (s'il y en a une, < 95 %).
+   *  true uniquement sur demande explicite (« Recommencer ») ou passage à l'épisode suivant. */
+  const startFromBeginningRef = useRef(false);
   const setPlaybackStartMode = useCallback((fromBeginning: boolean) => {
     startFromBeginningRef.current = fromBeginning;
   }, []);
@@ -1397,37 +1398,26 @@ export default function MediaDetailPage({
       const deviceId = getOrCreateDeviceId();
       try {
         const params = new URLSearchParams(window.location.search);
-        const tParam = params.get('t');
-        if (tParam) {
-          const t = Number(tParam);
-          if (Number.isFinite(t) && t > 0) {
-            setSavedPlaybackPosition(t);
-            return;
-          }
+        const tNum = Number(params.get('t'));
+        const sNum = Number(params.get('season'));
+        const eNum = Number(params.get('episode'));
+        // Source unique (cartes, « Continuer », serveur, local) — par épisode pour les séries.
+        const position = await resolveResumeSeconds({
+          torrentId: activeTorrent.id,
+          tmdbId: activeTorrent.tmdbId,
+          tmdbType: activeTorrent.tmdbType,
+          season: Number.isFinite(sNum) && params.has('season') ? sNum : null,
+          episode: Number.isFinite(eNum) && eNum > 0 ? eNum : null,
+          deviceId,
+          preferredSeconds: Number.isFinite(tNum) && tNum > 0 ? tNum : null,
+        });
+        if (forceStartFromBeginningRef.current || pendingNextEpisodeRef.current) {
+          setSavedPlaybackPosition(null);
+          return;
         }
-        const tmdbId = activeTorrent.tmdbId;
-        const tmdbType = activeTorrent.tmdbType;
-        if (typeof tmdbId === 'number' && (tmdbType === 'movie' || tmdbType === 'tv')) {
-          const position = await getPlaybackPositionByMedia(tmdbId, tmdbType, deviceId);
-          if (position != null && position > 0) {
-            if (forceStartFromBeginningRef.current || pendingNextEpisodeRef.current) {
-              setSavedPlaybackPosition(null);
-              return;
-            }
-            setSavedPlaybackPosition(position);
-            return;
-          }
-        }
-        if (activeTorrent.id) {
-          const position = await getPlaybackPosition(activeTorrent.id, deviceId);
-          if (position != null && position > 0) {
-            if (forceStartFromBeginningRef.current || pendingNextEpisodeRef.current) {
-              setSavedPlaybackPosition(null);
-              return;
-            }
-            setSavedPlaybackPosition(position);
-            return;
-          }
+        if (position != null && position > 0) {
+          setSavedPlaybackPosition(position);
+          return;
         }
         setSavedPlaybackPosition(null);
       } catch (err) {
@@ -2702,10 +2692,9 @@ export default function MediaDetailPage({
         forceStartFromBeginningRef.current = false;
         setPlaybackStartMode(true);
         setSavedPlaybackPosition(null);
-      } else if (savedPlaybackPosition != null && savedPlaybackPosition > 0) {
-        setPlaybackStartMode(false);
       } else {
-        setPlaybackStartMode(true);
+        // Reprise si une position (< 95 %) existe pour CET épisode — résolue par le lecteur.
+        setPlaybackStartMode(false);
       }
       const el = videoWrapperRef.current || (document.getElementById('video-player-wrapper') as HTMLDivElement);
       if (el && !document.fullscreenElement) {
@@ -3389,6 +3378,21 @@ export default function MediaDetailPage({
     return label ? parseSeasonEpisodeFromName(label) : null;
   }, [displayFile?.path, displayFile?.name]);
 
+  /**
+   * Position explicite ?t= (carte « Continuer ») : transmise au lecteur seulement si elle vise
+   * l'épisode réellement lu (sinon le lecteur résout lui-même la reprise de CET épisode).
+   */
+  const explicitResumeSeconds = (() => {
+    if (typeof window === 'undefined') return null;
+    const qp = new URLSearchParams(window.location.search);
+    const tq = Number(qp.get('t'));
+    if (!Number.isFinite(tq) || tq <= 0) return null;
+    if (displayTorrent?.tmdbType !== 'tv') return tq;
+    const playSeason = displayEpisodeFromFile?.season ?? selectedEpisodeMeta?.season ?? null;
+    const playEpisode = displayEpisodeFromFile?.episode ?? selectedEpisodeMeta?.episode ?? null;
+    return Number(qp.get('season')) === playSeason && Number(qp.get('episode')) === playEpisode ? tq : null;
+  })();
+
   const tmdbApiTitleActive = useTmdbApiTitle(activeTorrent?.tmdbId, activeTorrent?.tmdbType, language);
   const tmdbApiTitleDisplay = useTmdbApiTitle(displayTorrent?.tmdbId, displayTorrent?.tmdbType, language);
   const mediaTitleForHero = getMediaDisplayTitle(activeTorrent, tmdbApiTitleActive);
@@ -3485,7 +3489,7 @@ export default function MediaDetailPage({
         initialSeekSeconds={
           isTransitioningToNext || startFromBeginningRef.current
             ? null
-            : savedPlaybackPosition
+            : explicitResumeSeconds
         }
         isSeries={!!(seriesEpisodes?.seasons?.length)}
         nextEpisodeInfo={nextEpisodeInfo}
@@ -3580,7 +3584,7 @@ export default function MediaDetailPage({
         initialSeekSeconds={
           isTransitioningToNext || startFromBeginningRef.current
             ? null
-            : savedPlaybackPosition
+            : explicitResumeSeconds
         }
         isSeries={!!(seriesEpisodes?.seasons?.length)}
         nextEpisodeInfo={nextEpisodeInfo}
@@ -3749,8 +3753,8 @@ export default function MediaDetailPage({
                 mediaDetailActionsRef.current = actions;
               }}
               onPlay={async () => {
-                if (savedPlaybackPosition && savedPlaybackPosition > 0) setPlaybackStartMode(false);
-                else setPlaybackStartMode(true);
+                // Lecture = reprise automatique (le lecteur repart du début si rien / ≥ 95 %).
+                setPlaybackStartMode(false);
                 const el = videoWrapperRef.current || (document.getElementById('video-player-wrapper') as HTMLDivElement);
                 if (el && !document.fullscreenElement) {
                   try { await el.requestFullscreen(); } catch (_) {}
@@ -3769,7 +3773,8 @@ export default function MediaDetailPage({
               }}
               onPlayAuto={async (bestTorrent) => {
                 setSelectedTorrent(bestTorrent);
-                setPlaybackStartMode(true);
+                // Ne pas forcer le début : reprendre à la position sauvegardée s'il y en a une.
+                setPlaybackStartMode(false);
                 continueInBackgroundRef.current = false;
                 const el = videoWrapperRef.current || (document.getElementById('video-player-wrapper') as HTMLDivElement);
                 if (el && !document.fullscreenElement) {
