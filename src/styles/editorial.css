@@ -1534,3 +1534,19 @@ html[data-tv-platform] .card {
   transform: scale(1.06);
   transition: transform 0.12s ease;
 }
+
+/* Boutons flottants du lecteur (Passer le générique, Épisode suivant, Recommencer) au doigt :
+   aucun déplacement au tap — ni :active (translateY), ni :focus (scale 1.04) — et pas de délai
+   double-tap. TV (pointer: none / Magic Remote « fine ») : focus agrandi conservé. */
+.player-overlay button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+@media (hover: none) and (pointer: coarse) {
+  .player-overlay .ed-cta:active,
+  .player-overlay .ed-cta:focus,
+  .player-overlay button:active,
+  .player-overlay button:focus {
+    transform: none !important;
+  }
+}

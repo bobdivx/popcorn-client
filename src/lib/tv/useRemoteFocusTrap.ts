@@ -39,6 +39,39 @@ export function isRemoteFocusTrapActive(): boolean {
   return false;
 }
 
+/** Horodatage du dernier Retour traité par un piège (pour dédoublonner un popstate du même appui). */
+export function getLastRemoteBackAt(): number {
+  return lastTrapBackAt;
+}
+
+/**
+ * Mobile / tablette (écran tactile sans survol) : pas de focus automatique ni de focus
+ * « ramené » après un toucher — au doigt, le focus programmatique ne sert à rien, affiche un
+ * anneau parasite et peut faire défiler la page. Android TV (pointer: none) et webOS (pointeur
+ * Magic Remote « fine ») ne sont pas concernés. Un clavier / D-pad branché reste géré
+ * (la 1re flèche focalise le 1er bouton).
+ */
+let lastPointerAt = 0;
+let pointerListenerInstalled = false;
+function installPointerTracker() {
+  if (pointerListenerInstalled || typeof document === 'undefined') return;
+  pointerListenerInstalled = true;
+  const mark = () => {
+    lastPointerAt = Date.now();
+  };
+  document.addEventListener('pointerdown', mark, true);
+  document.addEventListener('touchstart', mark, { capture: true, passive: true });
+  document.addEventListener('mousedown', mark, true);
+}
+function isTouchPrimary(): boolean {
+  try {
+    return typeof window.matchMedia === 'function' && window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  } catch {
+    return false;
+  }
+}
+const POINTER_GRACE_MS = 800;
+
 const FOCUSABLE =
   'button:not([disabled]), a[href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"]), [data-focusable]:not([disabled])';
 
@@ -166,15 +199,18 @@ export function useRemoteFocusTrap(
     stack.push(trap);
     const isTop = () => stack.length > 0 && stack[stack.length - 1].id === id;
     let lastBackAt = 0;
+    installPointerTracker();
+    const touchPrimary = isTouchPrimary();
 
-    const focusInitial = () => {
+    const focusInitial = (fromKey = false) => {
       const root = ref.current;
       if (!root || !isTop()) return;
+      if (!fromKey && touchPrimary) return;
       if (root.contains(document.activeElement)) return;
       const items = trapFocusables(root);
       focusEl(items.find((el) => el.hasAttribute('data-autofocus')) || items[0] || null);
     };
-    const t = window.setTimeout(focusInitial, focusDelayMs);
+    const t = window.setTimeout(() => focusInitial(), focusDelayMs);
 
     // Contenu qui change (chargement → erreur, confirmation qui s'ouvre…) : refocaliser.
     let mo: MutationObserver | null = null;
@@ -182,7 +218,7 @@ export function useRemoteFocusTrap(
     if (typeof MutationObserver !== 'undefined' && ref.current) {
       mo = new MutationObserver(() => {
         window.clearTimeout(moTimer);
-        moTimer = window.setTimeout(focusInitial, 16);
+        moTimer = window.setTimeout(() => focusInitial(), 16);
       });
       mo.observe(ref.current, { childList: true, subtree: true });
     }
@@ -226,7 +262,7 @@ export function useRemoteFocusTrap(
         e.stopImmediatePropagation();
         if (e.repeat) return;
         if (!inside) {
-          focusInitial();
+          focusInitial(true);
           return;
         }
         activeEl!.click();
@@ -255,6 +291,9 @@ export function useRemoteFocusTrap(
       const root = ref.current;
       if (!root || !isTop()) return;
       const target = e.target as Node | null;
+      // Focus donné par un toucher / clic (ex. bouton Retour du lecteur au doigt) : ne pas le
+      // voler, le tap doit agir normalement.
+      if (touchPrimary || Date.now() - lastPointerAt < POINTER_GRACE_MS) return;
       if (target && !root.contains(target)) {
         const items = trapFocusables(root);
         focusEl(items.find((el) => el.hasAttribute('data-autofocus')) || items[0] || null);
