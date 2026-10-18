@@ -23,7 +23,8 @@ type BackendStatus = 'ok' | 'error' | 'checking' | 'unknown';
 const DESKTOP_PLATFORMS = ['win32', 'linux', 'darwin'];
 
 type BackendStatusBadgeProps = {
-  variant?: 'standalone' | 'avatar' | 'inline' | 'quiet';
+  /** headless : surveillance santé seule (store « Hors ligne », GPU), aucun rendu. */
+  variant?: 'standalone' | 'avatar' | 'inline' | 'quiet' | 'headless';
   accountHref?: string;
   accountLabel?: string;
   children?: preact.ComponentChildren;
@@ -371,6 +372,8 @@ export default function BackendStatusBadge({
       ) : null}
     </>
   );
+
+  if (variant === 'headless') return null;
 
   if (variant === 'inline') {
     return <div className="w-full" role="region" aria-label={t('backend.menuTitle')}>{serverBlock}</div>;

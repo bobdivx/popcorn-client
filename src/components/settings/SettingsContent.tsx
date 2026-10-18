@@ -5,6 +5,7 @@ import type { ComponentType } from 'preact';
 import { canAccess } from '../../lib/permissions';
 import PermissionGuard from '../ui/PermissionGuard';
 import DsPageHeader from '../ui/DsPageHeader';
+import ServerStatusCard from './ServerStatusCard';
 import { HubSkeleton } from './hub/HubTile';
 import { TORRENT_FEATURES_ENABLED } from '../../lib/distribution';
 
@@ -212,6 +213,8 @@ function LazyPageServer() {
     <PermissionGuard permission="settings.server">
       <DsPageHeader titleKey="settingsPages.server.title" subtitleKey="settingsPages.server.subtitle" />
       <div className="sc-stack">
+        {/* Statut serveur / GPU (retiré du header) */}
+        <ServerStatusCard />
         <ServerSettings />
       </div>
     </PermissionGuard>
