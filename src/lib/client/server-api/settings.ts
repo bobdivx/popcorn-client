@@ -125,6 +125,22 @@ export const settingsMethods = {
       warnings?: string[];
     }>
   > {
+    // Route reservee a l'administrateur du serveur : les non-admins ne l'appellent plus
+    // (le role vient du serveur via /api/local/media-token).
+    if (typeof window !== 'undefined') {
+      try {
+        const { isServerAdmin } = await import('../../streaming/mediaToken');
+        if (!(await isServerAdmin())) {
+          return { success: false, error: 'AdminOnly', message: 'Réservé à l’administrateur du serveur' } as unknown as ApiResponse<{
+            upnp_enabled: boolean;
+            ratio_mode_enabled: boolean;
+            librqbit_ok: boolean;
+            listen_port: number | null;
+            warnings?: string[];
+          }>;
+        }
+      } catch { /* role inconnu : laisser le serveur decider */ }
+    }
     // Poll de fond : rafraichir le token cloud de maniere proactive s'il est proche de l'expiration,
     // pour eviter un 401 periodique sur onglet laisse ouvert (backendRequest a aussi un retry reactif).
     if (typeof window !== 'undefined') {
