@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { X } from 'lucide-preact';
 import { useI18n } from '../../../../lib/i18n/useI18n';
+import { useRemoteFocusTrap } from '../../../../lib/tv/useRemoteFocusTrap';
 import { formatBytes, formatSpeed, formatTimeRemaining } from '../../../../lib/utils/formatBytes';
 import { generateQRCode } from '../../../../lib/utils/qrcode';
 import { friendlyPlaybackHint, pipelineHeadline, type PlaybackPipelineStatus } from '../../../../lib/streaming/playbackPipeline';
@@ -25,26 +26,6 @@ export interface PlaybackStatusDebugLog {
   message?: string;
   timestamp?: number;
   [key: string]: unknown;
-}
-
-function isRemoteBackEvent(e: KeyboardEvent): boolean {
-  const key = e.key;
-  const code = e.keyCode ?? e.which;
-  return (
-    key === 'Escape' ||
-    key === 'Backspace' ||
-    key === 'Back' ||
-    key === 'BrowserBack' ||
-    key === 'GoBack' ||
-    key === 'XF86Back' ||
-    code === 27 ||
-    code === 8 ||
-    code === 461 ||
-    code === 10009 ||
-    code === 4 ||
-    code === 166 ||
-    code === 457
-  );
 }
 
 function isSparseOrEmptyError(message: string | null | undefined): boolean {
@@ -353,45 +334,49 @@ export function PlaybackStatusSurface({
   const confirmingCancelRef = useRef(confirmingCancel);
   confirmingCancelRef.current = confirmingCancel;
 
+  const confirmingDeleteEmptyRef = useRef(confirmingDeleteEmpty);
+  confirmingDeleteEmptyRef.current = confirmingDeleteEmpty;
+  const isModalVariant = variant === 'player' || variant === 'fullscreen';
+  const lastRemoteBackAtRef = useRef(0);
+  /** Retour télécommande / historique : un seul effet par appui (keydown + webosback + popstate dédoublonnés). */
+  const closeFromRemote = () => {
+    const now = Date.now();
+    if (now - lastRemoteBackAtRef.current < 600) return;
+    lastRemoteBackAtRef.current = now;
+    if (confirmingDeleteEmptyRef.current) {
+      setConfirmingDeleteEmpty(false);
+      return;
+    }
+    if (confirmingCancelRef.current) {
+      setConfirmingCancel(false);
+      return;
+    }
+    remoteBackRef.current?.();
+  };
+  const closeFromRemoteRef = useRef(closeFromRemote);
+  closeFromRemoteRef.current = closeFromRemote;
+
+  // Carte modale : focus auto sur le 1er bouton, flèches/OK entre les boutons, focus piégé,
+  // Retour = fermer (le lecteur et la page derrière ne reçoivent plus les touches).
+  const trapRef = useRef<HTMLDivElement>(null);
+  useRemoteFocusTrap(trapRef, {
+    active: isModalVariant,
+    onBack: () => closeFromRemoteRef.current(),
+  });
+
+  // Retour matériel Android / navigateur (popstate) : même fermeture, une seule fois.
   useEffect(() => {
-    if (variant !== 'player' && variant !== 'fullscreen') return;
+    if (!isModalVariant) return;
     if (!remoteBackRef.current) return;
-
-    const closeFromRemote = () => {
-      if (confirmingCancelRef.current) {
-        setConfirmingCancel(false);
-        return;
-      }
-      remoteBackRef.current?.();
-    };
-
     history.pushState({ popcornnPlaybackOverlay: true }, '');
     let ignorePop = false;
     const onPopState = () => {
       if (ignorePop) return;
-      closeFromRemote();
+      closeFromRemoteRef.current();
     };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (!isRemoteBackEvent(e)) return;
-      e.preventDefault();
-      e.stopPropagation();
-      closeFromRemote();
-    };
-    const onWebOSBack = (e: Event) => {
-      e.preventDefault();
-      e.stopPropagation();
-      closeFromRemote();
-    };
-
-    window.addEventListener('keydown', onKeyDown, true);
-    window.addEventListener('webosback', onWebOSBack);
-    document.addEventListener('webOSBackButton', onWebOSBack);
     window.addEventListener('popstate', onPopState);
     return () => {
       ignorePop = true;
-      window.removeEventListener('keydown', onKeyDown, true);
-      window.removeEventListener('webosback', onWebOSBack);
-      document.removeEventListener('webOSBackButton', onWebOSBack);
       window.removeEventListener('popstate', onPopState);
       // replaceState : history.back() déclenchait popstate chez d’autres listeners et fermait le lecteur.
       if (history.state && (history.state as { popcornnPlaybackOverlay?: boolean }).popcornnPlaybackOverlay) {
@@ -399,18 +384,6 @@ export function PlaybackStatusSurface({
       }
     };
   }, [variant]);
-
-  useEffect(() => {
-    if (variant !== 'player' && variant !== 'fullscreen') return;
-    const id = window.setTimeout(() => {
-      const overlay = document.querySelector('[data-playback-overlay]');
-      const target =
-        overlay?.querySelector<HTMLElement>('[data-autofocus]') ||
-        overlay?.querySelector<HTMLElement>('[data-close]');
-      target?.focus();
-    }, 50);
-    return () => window.clearTimeout(id);
-  }, [variant, confirmingCancel]);
 
   const etaLabel =
     derived.etaSeconds != null && derived.etaSeconds > 0
@@ -636,6 +609,7 @@ export function PlaybackStatusSurface({
                     type="button"
                     onClick={() => setConfirmingDeleteEmpty(true)}
                     data-focusable
+                    data-autofocus
                     tabIndex={0}
                     className="ed-playback-btn px-6 py-2.5 text-white font-medium transition-colors"
                   >
@@ -647,6 +621,7 @@ export function PlaybackStatusSurface({
                     type="button"
                     onClick={onCancel}
                     data-focusable
+                    data-autofocus={!(sparseOrEmpty && onDeleteEmptyFiles && !confirmingDeleteEmpty) || undefined}
                     tabIndex={0}
                     className="ed-playback-btn-ghost px-6 py-2.5 text-white font-medium transition-colors"
                   >
@@ -658,6 +633,7 @@ export function PlaybackStatusSurface({
                     type="button"
                     onClick={onRetry}
                     data-focusable
+                    data-autofocus={!onCancel || undefined}
                     tabIndex={0}
                     className="ed-playback-btn px-6 py-2.5 text-white font-medium transition-colors"
                   >
@@ -909,9 +885,11 @@ export function PlaybackStatusSurface({
   if (variant === 'player') {
     return (
       <div
+        ref={trapRef}
         className="absolute inset-0 z-30 overflow-hidden"
         role="dialog"
         aria-modal="true"
+        data-remote-trap
         aria-label={title || t('playback.phase.buffering') || 'Lecture'}
         data-playback-overlay
       >
@@ -936,9 +914,11 @@ export function PlaybackStatusSurface({
   // fullscreen — même composition splash que le chargement des pages
   return (
     <div
+      ref={trapRef}
       className="player-progress-overlay fixed inset-0 z-50 overflow-x-hidden overflow-y-auto overscroll-contain"
       role="dialog"
       aria-modal="true"
+      data-remote-trap
       aria-label={title || t('playback.phase.buffering') || 'Lecture'}
       data-playback-overlay
     >
