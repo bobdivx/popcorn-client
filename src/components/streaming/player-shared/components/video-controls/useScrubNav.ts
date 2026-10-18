@@ -8,6 +8,7 @@ import {
   scrubTimeForIndex,
   scrubUrlForIndex,
 } from './scrubMath';
+import { isRemoteFocusTrapActive } from '../../../../../lib/tv/useRemoteFocusTrap';
 
 /** Délai après la dernière flèche avant de seek vers la miniature sélectionnée. */
 const SCRUB_SETTLE_MS = 2000;
@@ -164,6 +165,7 @@ export function useScrubNav(options: {
     if (isTV) return;
     const onKeyDownCapture = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (isRemoteFocusTrapActive()) return;
       const kc = (e as any).keyCode ?? (e as any).which;
       const key = (e as any).key as string;
       const keyNormalized =
