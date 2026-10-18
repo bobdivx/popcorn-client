@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { isTVPlatform, isWebOSTV } from '../utils/device-detection';
-import { signMediaUrlAsync } from '../streaming/mediaToken';
+import { signMediaUrlAsync, stripMediaToken } from '../streaming/mediaToken';
 
 declare global {
   interface Window {
@@ -408,7 +408,7 @@ export function useChromecast(): UseChromecastReturn {
         setIsCasting(true);
         await session.loadMedia(request);
         console.info('[Chromecast] loadMedia OK', {
-          url: absoluteSrc,
+          url: stripMediaToken(absoluteSrc),
           title,
           startAt: request.currentTime,
           hlsComplete,
@@ -416,7 +416,7 @@ export function useChromecast(): UseChromecastReturn {
         });
         return true;
       } catch (err) {
-        console.error('[Chromecast] castMedia failed:', err, { url: absoluteSrc, contentType });
+        console.error('[Chromecast] castMedia failed:', err, { url: stripMediaToken(absoluteSrc), contentType });
         setIsCasting(false);
         return false;
       }
