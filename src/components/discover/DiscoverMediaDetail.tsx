@@ -5,6 +5,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { ArrowLeft } from 'lucide-preact';
 import HLSLoadingSpinner from '../ui/HLSLoadingSpinner';
 import WatchProviders from '../platforms/WatchProviders';
+import { getHighQualityTmdbImageUrl } from '../../lib/utils/tmdb-images';
 
 const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p/w500';
 const TMDB_IMG_BACKDROP = 'https://image.tmdb.org/t/p/original';
@@ -138,16 +139,19 @@ export default function DiscoverMediaDetail({
   const title = mediaType === 'movie' ? data.title : data.name;
   const releaseDate = mediaType === 'movie' ? data.release_date : data.first_air_date;
   const posterPath = data.poster_path ? `${TMDB_IMG_BASE}${data.poster_path}` : null;
+  // Backdrop dimensionné à l'écran (w780 / w1280) au lieu de « original » (plusieurs Mo).
   const backdropPath = data.backdrop_path ? `${TMDB_IMG_BACKDROP}${data.backdrop_path}` : null;
+  const backdropDisplayUrl = backdropPath ? getHighQualityTmdbImageUrl(backdropPath) : null;
 
   return (
     <div class="min-h-screen bg-[#121212]">
       {/* Backdrop */}
-      {backdropPath && (
+      {backdropDisplayUrl && (
         <div class="absolute inset-0 z-0">
           <img
-            src={backdropPath}
+            src={backdropDisplayUrl}
             alt=""
+            decoding="async"
             class="w-full h-full object-cover opacity-30"
           />
           <div class="absolute inset-0 bg-gradient-to-t from-[#121212] via-[#121212]/80 to-transparent" />

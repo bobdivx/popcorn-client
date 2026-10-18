@@ -1,6 +1,6 @@
 /**
  * Utilitaires pour les images TMDB.
- * Web : qualité max (original) pour hero / détail. TV : plafonné (w1280) — décoder du 4K à chaque slide fige l'UI.
+ * Hero / détail : w780 (mobile) ou w1280 (desktop, TV) — jamais « original ».
  */
 import { isTVPlatform } from './device-detection';
 
@@ -29,12 +29,25 @@ export function cardBackdropUrl(url: string | null | undefined): string | null {
 }
 
 /**
- * URL TMDB pour hero / page détail : original sur web, w1280 sur TV.
+ * Taille de backdrop adaptée à l'écran : w780 sur petits écrans (mobile), w1280 au-delà.
+ * Jamais « original » (souvent 3840 px / plusieurs Mo, aucun gain visible sous un voile) ;
+ * TV : w1280 (décoder du 4K à chaque slide fige l'UI).
+ */
+export function heroBackdropSize(): TmdbSize {
+  if (typeof window === 'undefined') return 'w1280';
+  if (isTVPlatform()) return 'w1280';
+  const vw = Math.max(window.innerWidth || 0, (window.screen && window.screen.width) || 0);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  return vw * dpr <= 900 ? 'w780' : 'w1280';
+}
+
+/**
+ * URL TMDB pour hero / page détail (taille stable par appareil → même URL d'une page à l'autre,
+ * donc servie depuis le cache).
  */
 export function getHighQualityTmdbImageUrl(url: string | null | undefined): string | null {
   if (!url || typeof url !== 'string' || !url.trim()) return null;
   const u = url.trim();
   if (!u.includes(TMDB_IMG_BASE)) return u;
-  const tv = typeof window !== 'undefined' && isTVPlatform();
-  return tmdbSized(u, tv ? 'w1280' : 'original');
+  return tmdbSized(u, heroBackdropSize());
 }
