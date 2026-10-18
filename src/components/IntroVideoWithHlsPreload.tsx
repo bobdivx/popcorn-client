@@ -32,7 +32,6 @@ export default function IntroVideoWithHlsPreload({
   const hlsRef = useRef<any>(null);
   const backgroundVideoRef = useRef<HTMLVideoElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [showSkip, setShowSkip] = useState(false);
   const [hlsPreloadStatus, setHlsPreloadStatus] = useState<string>('');
   const { hlsLoaded } = useHlsLoader();
 
@@ -42,10 +41,6 @@ export default function IntroVideoWithHlsPreload({
       : resolveBootIntroMp4();
 
   useEffect(() => {
-    const skipTimer = setTimeout(() => {
-      setShowSkip(true);
-    }, 1800);
-
     const video = videoRef.current;
     let cancelled = false;
     let stopUnmute: (() => void) | null = null;
@@ -66,7 +61,6 @@ export default function IntroVideoWithHlsPreload({
     return () => {
       cancelled = true;
       stopUnmute?.();
-      clearTimeout(skipTimer);
     };
   }, []);
 
@@ -220,7 +214,12 @@ export default function IntroVideoWithHlsPreload({
       const remaining = Number.isFinite(v.duration) ? Math.max(0, v.duration - v.currentTime) : 10;
       window.setTimeout(() => completeIntro(), Math.min(remaining, 20) * 1000 + 1500);
     }, 8000);
-    return () => window.clearTimeout(t);
+    // Plafond absolu (pas de bouton « Passer ») : l'app ne reste jamais bloquée sur l'intro.
+    const hardCap = window.setTimeout(() => completeIntro(), 30_000);
+    return () => {
+      window.clearTimeout(t);
+      window.clearTimeout(hardCap);
+    };
   }, [completeIntro]);
 
   // Retour / Escape uniquement (pas OK global — évite le piège télécommande Netflix-like).
@@ -239,8 +238,6 @@ export default function IntroVideoWithHlsPreload({
     return () => window.removeEventListener('keydown', onKey, true);
   }, [completeIntro]);
 
-  const skipBtnRef = useRef<HTMLButtonElement>(null);
-
   return (
     <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" data-intro-variant="brand">
       <video
@@ -258,23 +255,6 @@ export default function IntroVideoWithHlsPreload({
       >
         <source src={introSrc} type="video/mp4" />
       </video>
-
-      {showSkip && (
-        <button
-          type="button"
-          ref={skipBtnRef}
-          onClick={completeIntro}
-          data-focusable
-          tabIndex={0}
-          className="ed-cta absolute bottom-8 right-8 z-10 flex items-center gap-2"
-          aria-label="Passer l'intro"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-          Passer
-        </button>
-      )}
 
       {hlsInfoHash && hlsPreloadStatus && (
         <div className="absolute top-4 left-4 px-4 py-2 bg-black/70 text-white text-sm rounded-lg backdrop-blur-sm border border-white/20 opacity-75">
