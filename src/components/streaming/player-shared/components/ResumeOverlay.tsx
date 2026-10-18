@@ -3,6 +3,7 @@ import { RotateCcw } from 'lucide-preact';
 import { useI18n } from '../../../../lib/i18n';
 import { isTVPlatform } from '../../../../lib/utils/device-detection';
 import { formatTime } from '../utils/formatTime';
+import { PLAYER_FLOATING_ACTION_BOTTOM, stopPlayerTapPropagation } from './playerFloatingActions';
 
 interface ResumeOverlayProps {
   /** Position (s) de reprise appliquée ; null = rien à afficher. */
@@ -19,7 +20,7 @@ interface ResumeOverlayProps {
  * Bandeau discret après une reprise automatique : « Reprise à 12:34 · Recommencer ».
  * Ne vole jamais le focus (TV : atteignable à la télécommande via data-focusable).
  */
-export function ResumeOverlay({ resumedAt, onRestart, chromeVisible = false, durationMs = 8000 }: ResumeOverlayProps) {
+export function ResumeOverlay({ resumedAt, onRestart, durationMs = 8000 }: ResumeOverlayProps) {
   const { t, language } = useI18n();
   const [shownFor, setShownFor] = useState<number | null>(null);
   const isTV = isTVPlatform();
@@ -45,9 +46,8 @@ export function ResumeOverlay({ resumedAt, onRestart, chromeVisible = false, dur
     ? { left: 'calc(2rem + env(safe-area-inset-left, 0px))', top: '48%', transform: 'translateY(-50%)' }
     : {
         left: 'calc(1rem + env(safe-area-inset-left, 0px))',
-        bottom: chromeVisible
-          ? 'calc(11rem + env(safe-area-inset-bottom, 0px))'
-          : 'calc(5rem + env(safe-area-inset-bottom, 0px))',
+        // Hauteur fixe (ne bouge pas quand le chrome apparaît au toucher).
+        bottom: PLAYER_FLOATING_ACTION_BOTTOM,
       };
 
   return (
@@ -67,10 +67,11 @@ export function ResumeOverlay({ resumedAt, onRestart, chromeVisible = false, dur
           setShownFor(null);
           onRestart();
         }}
+        {...stopPlayerTapPropagation}
         data-focusable
         data-player-overlay-action
         tabIndex={0}
-        className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-[#f2545b]"
+        className="touch-manipulation inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-white hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-[#f2545b]"
       >
         <RotateCcw size={14} aria-hidden />
         {label('playback.resume.restart', en ? 'Start over' : 'Recommencer')}
