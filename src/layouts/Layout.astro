@@ -294,6 +294,11 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         </noscript>
       </>
     )}
+    <script>
+      // Stage D : URLs de lecture signees (jeton media) pour <video>/hls.js/Chromecast/<img>.
+      import { installMediaUrlSigning } from '../lib/streaming/mediaToken';
+      installMediaUrlSigning();
+    </script>
   </head>
   <body class="min-h-screen bg-page flex flex-col overflow-x-hidden">
     <script is:inline>
