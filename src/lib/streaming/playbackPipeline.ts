@@ -1,5 +1,9 @@
 import { getBackendUrl } from '../backend-url';
 import { TokenManager } from '../client/storage';
+import { installMediaUrlSigning, isServerAdmin } from './mediaToken';
+
+// Le lecteur importe ce module : garantit la signature des URLs de lecture meme hors Layout.
+if (typeof window !== 'undefined') installMediaUrlSigning();
 
 export type PlaybackPipelinePhase =
   | 'waiting'
@@ -110,6 +114,8 @@ export async function fetchPlaybackLogs(
 ): Promise<PlaybackPipelineLogs | null> {
   const base = backendBase(query.baseUrl);
   if (!base) return null;
+  // Logs serveur = administrateur du serveur uniquement : pas d'appel pour les autres membres.
+  if (!(await isServerAdmin())) return null;
   const params = new URLSearchParams();
   if (query.fileId) params.set('file_id', query.fileId);
   if (query.path) params.set('path', query.path.replace(/\/playlist\.m3u8$/i, ''));
