@@ -59,14 +59,17 @@ function authHeadersFor(base: string): Record<string, string> {
   }
 }
 
+/**
+ * Lien « logs » du lecteur : page client /playback-logs, qui joint le token (logs = admin).
+ * La page HTML serveur /api/local/playback/debug est admin et inaccessible sans en-tete.
+ */
 export function playbackDebugUrl(query: PlaybackPipelineQuery & { fileId?: string | null }): string {
-  const base = backendBase(query.baseUrl);
   const id = query.fileId || '';
   const params = new URLSearchParams();
   if (id) params.set('q', id);
   else if (query.path) params.set('path', query.path);
   if (query.infoHash) params.set('info_hash', query.infoHash);
-  return `${base}/api/local/playback/debug?${params.toString()}`;
+  return `/playback-logs?${params.toString()}`;
 }
 
 export async function fetchPlaybackStatus(
@@ -82,6 +85,7 @@ export async function fetchPlaybackStatus(
   try {
     const res = await fetch(`${base}/api/local/playback/status?${params.toString()}`, {
       credentials: 'include',
+      headers: authHeadersFor(base),
     });
     if (!res.ok) return null;
     const json = (await res.json()) as { success?: boolean; data?: PlaybackPipelineStatus };
