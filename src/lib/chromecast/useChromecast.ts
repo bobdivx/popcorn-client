@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks';
 import { isTVPlatform, isWebOSTV } from '../utils/device-detection';
+import { signMediaUrlAsync } from '../streaming/mediaToken';
 
 declare global {
   interface Window {
@@ -361,6 +362,8 @@ export function useChromecast(): UseChromecastReturn {
         hlsComplete = prepared.complete;
       }
 
+      // Le Chromecast lit l'URL lui-meme (sans en-tete) : URL signee (jeton media).
+      absoluteSrc = await signMediaUrlAsync(absoluteSrc);
       const contentType = getContentTypeFromUrl(absoluteSrc);
       const mediaInfo = new chromeAny.cast.media.MediaInfo(absoluteSrc, contentType);
       // HLS Popcornn = MPEG-TS muxé. Sans ça, Cast peut boucler (écran noir / segment retry).
