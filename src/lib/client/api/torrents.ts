@@ -51,7 +51,16 @@ export class TorrentsService {
   /** fetch avec en-tete d'auth serveur (token cloud) joint automatiquement. */
   private async af(url: string, init: RequestInit = {}): Promise<Response> {
     const headers = { ...(init.headers as Record<string, string> | undefined), ...authHeaders(), ...clientIdentityHeaders() };
-    const res = await fetch(url, { ...init, headers });
+    let res = await fetch(url, { ...init, headers });
+    // Token cloud expire (~1 h) : rafraichir via le refresh cloud et reessayer une fois.
+    if (res.status === 401 && typeof window !== 'undefined') {
+      try {
+        const { refreshCloudToken } = await import('../../api/popcorn-web.js');
+        if (await refreshCloudToken()) {
+          res = await fetch(url, { ...init, headers: { ...headers, ...authHeaders() } });
+        }
+      } catch { /* garder la premiere reponse */ }
+    }
     if (res.status === 426 && typeof window !== 'undefined') {
       try {
         const { showClientOutdatedOverlay } = await import('../../client-outdated-overlay.js');
