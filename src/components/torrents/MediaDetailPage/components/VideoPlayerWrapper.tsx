@@ -328,6 +328,8 @@ export function VideoPlayerWrapper({
   // Quand on attend le flux (isLoading sans étape précise), afficher l’étape 1 (en file d’attente), pas la 4
   const loadingStep = loadingStepFromStatus > 0 ? loadingStepFromStatus : isLoading ? 1 : 0;
 
+  /** En-deçà, on ne sauvegarde pas la progression (démarrage, reprise pas encore appliquée). */
+  const MIN_PROGRESS_SAVE_SECONDS = 3;
   const handlePlaybackProgress = useCallback(
     (currentTime: number, duration: number) => {
       // Log start event once when playback actually starts (currentTime > 0)
@@ -343,6 +345,9 @@ export function VideoPlayerWrapper({
 
       reportPlaybackDuration(duration);
       if (tmdbId == null || !tmdbType || duration <= 0) return;
+      // Notification immédiate à la découverte de la durée (currentTime ≈ 0, avant que le seek
+      // de reprise soit appliqué) : ne pas écraser la position sauvegardée par 0 %.
+      if (!(currentTime >= MIN_PROGRESS_SAVE_SECONDS) && currentTime < duration) return;
       const progressPercent = (currentTime / duration) * 100;
       // Prefetch épisode suivant dès ~50 % (une seule fois par épisode).
       if (
