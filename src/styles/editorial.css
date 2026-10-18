@@ -800,6 +800,8 @@ html[data-tv-platform] [data-browse-carousel] { contain: layout paint; }
 .ed-playback-splash__media {
   margin: 0;
   max-width: 22rem;
+  max-width: min(22rem, 100%);
+  overflow-wrap: anywhere;
   font-family: var(--ed-font-display, 'Josefin Sans', 'Jost', sans-serif);
   font-weight: 300;
   font-size: 0.72rem;
@@ -814,9 +816,18 @@ html[data-tv-platform] [data-browse-carousel] { contain: layout paint; }
 }
 .ed-playback-splash__title {
   margin: 0;
+  /* letter-spacing ajoute un espace après la dernière lettre : on l'équilibre à gauche
+     (centrage optique) sans créer de débordement fantôme à droite. */
+  padding-left: 0.32em;
+  box-sizing: border-box;
+  max-width: 100%;
   letter-spacing: 0.32em;
   text-transform: uppercase;
+  font-size: 2rem; /* repli navigateurs sans clamp()/min() (anciens webOS) */
   font-size: clamp(26px, 3.2vw, 56px);
+  /* Ne jamais dépasser la largeur utile : sinon, dans le conteneur défilant (overflow-y:auto)
+     centré, le mot déborde des deux côtés → 1re lettre rognée + barre de défilement horizontale. */
+  font-size: min(clamp(26px, 3.2vw, 56px), calc((100vw - 5.5rem) / 9.5));
   font-weight: 300;
   font-family: var(--ed-font-display, 'Josefin Sans', 'Jost', sans-serif);
   color: var(--ed-ink, #f4f1ec);
@@ -825,6 +836,8 @@ html[data-tv-platform] [data-browse-carousel] { contain: layout paint; }
 .ed-playback-splash__status {
   margin: 0;
   max-width: 26rem;
+  max-width: min(26rem, 100%);
+  overflow-wrap: anywhere;
   font-family: var(--ed-font-body, 'Jost', sans-serif);
   font-weight: 300;
   font-size: 0.72rem;
@@ -842,6 +855,8 @@ html[data-tv-platform] [data-browse-carousel] { contain: layout paint; }
 }
 .ed-playback-splash__metrics {
   margin: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   font-size: 0.68rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -1078,9 +1093,14 @@ html[data-tv-platform] .ed-loader__label { font-size: 1rem; }
 }
 .ed-loader--page .ed-loader__title {
   margin: 0;
+  padding-left: 0.32em; /* centrage optique : équilibre l'espacement après la dernière lettre */
+  box-sizing: border-box;
+  max-width: 100%;
   letter-spacing: 0.32em;
   text-transform: uppercase;
+  font-size: 2rem;
   font-size: clamp(28px, 3.4vw, 64px);
+  font-size: min(clamp(28px, 3.4vw, 64px), calc((100vw - 4rem) / 9.5));
   font-weight: 300;
   font-family: var(--ed-font-display, 'Josefin Sans', 'Jost', sans-serif);
   color: var(--ed-ink, #f4f1ec);
