@@ -43,9 +43,7 @@ function isBackKey(e: KeyboardEvent): boolean {
  */
 export default function IntroVideo({ onEnded, onSkip, variant = 'brand' }: IntroVideoProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const skipBtnRef = useRef<HTMLButtonElement>(null);
   const doneRef = useRef(false);
-  const [showSkip, setShowSkip] = useState(false);
   const [useGifFallback, setUseGifFallback] = useState(false);
   const [introSrc] = useState(resolveIntroMp4);
   const [gifSrc] = useState(resolveIntroGif);
@@ -58,11 +56,12 @@ export default function IntroVideo({ onEnded, onSkip, variant = 'brand' }: Intro
     onEnded();
   }, [onEnded, onSkip]);
 
-  // Bouton « Passer » discret après un court délai (sans autofocus TV).
+  // Pas de bouton « Passer » : l'intro va jusqu'au bout. Plafond absolu (30 s) en plus des
+  // garde-fous ci-dessous, pour ne jamais bloquer l'app si la vidéo cale en cours de lecture.
   useEffect(() => {
-    const skipTimer = window.setTimeout(() => setShowSkip(true), variant === 'brand' ? 1800 : 300);
-    return () => window.clearTimeout(skipTimer);
-  }, [variant]);
+    const hardCap = window.setTimeout(finish, 30_000);
+    return () => window.clearTimeout(hardCap);
+  }, [finish]);
 
   // Lecture auto du MP4 avec le son (apps TV / Android / Tauri) ; repli muet si le
   // navigateur refuse l'autoplay sonore (web), puis GIF si même la lecture muette échoue.
@@ -167,19 +166,6 @@ export default function IntroVideo({ onEnded, onSkip, variant = 'brand' }: Intro
         </video>
       )}
 
-      {showSkip && (
-        <button
-          type="button"
-          ref={skipBtnRef}
-          onClick={finish}
-          data-focusable
-          tabIndex={0}
-          className="ed-cta absolute bottom-8 right-8 z-10"
-          aria-label="Passer l'intro"
-        >
-          Passer
-        </button>
-      )}
     </div>
   );
 }
