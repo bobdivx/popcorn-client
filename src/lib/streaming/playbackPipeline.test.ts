@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { friendlyPlaybackHint, pipelineHeadline, type PlaybackPipelineStatus } from './playbackPipeline';
+import { friendlyPlaybackHint, pipelineHeadline, playbackDebugUrl, type PlaybackPipelineStatus } from './playbackPipeline';
 
 const t = (k: string) => k;
 
@@ -30,6 +30,15 @@ describe('friendlyPlaybackHint', () => {
     expect(
       friendlyPlaybackHint({ etaPlayableSeconds: 23, t }).label,
     ).toBe('playback.hls.warmingUp');
+  });
+});
+
+describe('playbackDebugUrl', () => {
+  it('pointe vers la page client /playback-logs (token joint), pas la page serveur admin', () => {
+    expect(playbackDebugUrl({ fileId: 'abc', infoHash: 'h1', baseUrl: 'https://srv' })).toBe(
+      '/playback-logs?q=abc&info_hash=h1',
+    );
+    expect(playbackDebugUrl({ path: 'media/a.mkv' })).toBe('/playback-logs?path=media%2Fa.mkv');
   });
 });
 
