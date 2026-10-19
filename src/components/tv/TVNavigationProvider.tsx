@@ -604,7 +604,10 @@ export default function TVNavigationProvider() {
         current.closest(SITE_HEADER_SELECTOR)
       ) {
         const header = current.closest(SITE_HEADER_SELECTOR) as HTMLElement;
-        const full = getFocusableElements(header);
+        const full =
+          fullOrderedInScope && fullOrderedInScope.length > 0 && fullOrderedInScope.every((el) => header.contains(el))
+            ? fullOrderedInScope
+            : getFocusableElements(header);
         const idx = full.indexOf(current);
         if (idx !== -1) {
           const nextIdx = direction === 'left' ? idx - 1 : idx + 1;
@@ -1447,8 +1450,12 @@ export default function TVNavigationProvider() {
           isTvDoc() && activeElement.closest('[data-tv-media-detail]')
             ? (activeElement.closest('[data-tv-zone], [data-tv-episode-scroller]') as HTMLElement | null)
             : null;
+        // Header global : gauche/droite restent dans le header (cf. getCandidatesForDirection) —
+        // ne mesurer que le header, pas toutes les cartes de la page (rects + getComputedStyle par touche).
+        const siteHeader = activeElement.closest(SITE_HEADER_SELECTOR) as HTMLElement | null;
         if (carousel) effectiveScope = carousel;
         else if (detailZone) effectiveScope = detailZone;
+        else if (siteHeader) effectiveScope = siteHeader;
       }
 
       // webOS : haut/bas depuis une carte torrent — le <main> suffit pour passer d’une ligne à l’autre
