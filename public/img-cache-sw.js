@@ -229,4 +229,8 @@ self.addEventListener('message', function (event) {
   if (data.type === 'popcorn-img-cache-clear') {
     event.waitUntil(caches.delete(IMG_CACHE));
   }
+  // Page de 1re visite restée non contrôlée (navigation pendant l'installation) : la prendre maintenant.
+  if (data.type === 'popcorn-img-claim') {
+    event.waitUntil(self.clients.claim().catch(function () {}));
+  }
 });
