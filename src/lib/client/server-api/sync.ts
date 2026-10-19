@@ -3,6 +3,7 @@
  */
 
 import type { ApiResponse } from './types.js';
+import { TokenManager } from '../storage.js';
 
 interface ServerApiClientSyncAccess {
   backendRequest<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>>;
@@ -121,8 +122,16 @@ export const syncMethods = {
     const base = this.getBackendBaseUrl();
     const url = `${base}/api/sync/log`;
     this.loadTokens();
+    // Route admin cote serveur : le serveur ne verifie que le token cloud / Pocket ID
+    // (le JWT local auto-signe n'est pas verifiable), donc le token cloud passe en premier.
     const headers: Record<string, string> = {};
-    if (this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
+    const cloudToken = TokenManager.getCloudAccessToken();
+    if (cloudToken) headers.Authorization = `Bearer ${cloudToken}`;
+    else if (this.accessToken) headers.Authorization = `Bearer ${this.accessToken}`;
+    try {
+      const { clientIdentityHeaders } = await import('../../client-identity.js');
+      Object.assign(headers, clientIdentityHeaders());
+    } catch { /* ignore */ }
     try {
       const response = await this.nativeFetch(url, { method: 'GET', headers }, 30000);
       if (!response.ok) {
