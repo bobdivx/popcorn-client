@@ -4,6 +4,7 @@ import { SyncProgress } from '../components/SyncProgress';
 import { useI18n } from '../../../lib/i18n';
 import { getLocalUsers, getLocalUserForSync } from '../../../lib/api/popcorn-web';
 import { TokenManager } from '../../../lib/client/storage';
+import { resolveBootIntroMp4 } from '../../../lib/utils/boot-intro';
 
 interface CompleteStepProps {
   focusedButtonIndex: number;
@@ -223,7 +224,10 @@ export function CompleteStep({ focusedButtonIndex, buttonRefs, onComplete }: Com
         playsInline
         onEnded={() => { if (!isSyncing) onComplete(); }}
       >
-        <source src="/intro.mp4" type="video/mp4" />
+        <source
+          src={resolveBootIntroMp4(typeof window !== 'undefined' ? window.location.protocol : undefined)}
+          type="video/mp4"
+        />
       </video>
       {/* Overlay sombre pour garder le contenu lisible */}
       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', zIndex: 1 }} />
