@@ -3,6 +3,7 @@ import { serverApi } from '../../../lib/client/server-api';
 import type { FilmData } from '../../../lib/client/types';
 import { useI18n } from '../../../lib/i18n/useI18n';
 import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-config';
+import { onSwrUpdate } from '../../../lib/client/server-api/swrCache';
 
 const BACKGROUND_PAGE_DELAY_MS = 80;
 
@@ -166,6 +167,21 @@ export function useInfiniteFilms() {
   useEffect(() => {
     loadFilms(1, true);
   }, [language]);
+
+  // 1re page servie depuis le cache puis revalidée : remplacement silencieux si elle a changé.
+  useEffect(
+    () =>
+      onSwrUpdate(
+        (ep) => ep.startsWith('/api/torrents/list') && ep.includes('category=films') && /[?&]page=1(&|$)/.test(ep),
+        () => {
+          nextPageToLoadRef.current = 2;
+          backgroundRunningRef.current = false;
+          void loadFilms(1, true, true);
+        },
+        600
+      ),
+    [loadFilms]
+  );
 
   useEffect(() => {
     const handler = () => {

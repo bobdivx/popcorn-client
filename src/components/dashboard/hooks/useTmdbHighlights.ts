@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { serverApi } from '../../../lib/client/server-api';
 import { useI18n } from '../../../lib/i18n/useI18n';
+import { onSwrUpdate } from '../../../lib/client/server-api/swrCache';
 import {
   keepHighlight,
   tmdbToSuggestion,
@@ -107,6 +108,21 @@ export function useTmdbHighlights(lists: HighlightList[]): Partial<Record<Highli
   const region = 'FR';
   const listsKey = lists.join(',');
   const [byList, setByList] = useState<Partial<Record<HighlightList, SuggestionItem[]>>>({});
+  const [rev, setRev] = useState(0);
+
+  // Listes servies depuis le cache persistant puis revalidées : on recalcule si TMDB a changé.
+  useEffect(
+    () =>
+      onSwrUpdate(
+        (ep) => ep.startsWith('/api/discover/'),
+        () => {
+          cache.clear();
+          setRev((r) => r + 1);
+        },
+        800
+      ),
+    []
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -121,7 +137,7 @@ export function useTmdbHighlights(lists: HighlightList[]): Partial<Record<Highli
     return () => {
       cancelled = true;
     };
-  }, [listsKey, lang]);
+  }, [listsKey, lang, rev]);
 
   return useMemo(() => byList, [byList]);
 }

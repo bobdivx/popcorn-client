@@ -3,6 +3,7 @@ import { serverApi } from '../../../lib/client/server-api';
 import type { DashboardData } from '../../../lib/client/types';
 import { useI18n } from '../../../lib/i18n/useI18n';
 import { getLibraryDisplayConfig } from '../../../lib/utils/library-display-config';
+import { onSwrUpdate } from '../../../lib/client/server-api/swrCache';
 
 export function useDashboardData() {
   const { language } = useI18n();
@@ -59,6 +60,13 @@ export function useDashboardData() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Données servies depuis le cache (navigation / relance instantanée) puis revalidées : on se met à jour
+  // en silence si le catalogue a changé.
+  useEffect(
+    () => onSwrUpdate((ep) => ep.startsWith('/api/torrents/'), () => void loadData(true), 600),
+    [loadData]
+  );
 
   const reload = useCallback(() => loadData(false), [loadData]);
   const reloadSilent = useCallback(() => loadData(true), [loadData]);
