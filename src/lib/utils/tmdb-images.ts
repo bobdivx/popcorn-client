@@ -3,6 +3,11 @@
  * Hero / détail : w780 (mobile) ou w1280 (desktop, TV) — jamais « original ».
  */
 import { isTVPlatform } from './device-detection';
+import { installImageCache } from '../media/imageCache';
+
+// Patch des <img> TMDB (taille, priorité, cache persistant des apps) installé dès qu'un composant
+// d'images est chargé, même si une île s'hydrate avant le script du Layout. Idempotent.
+if (typeof window !== 'undefined') installImageCache();
 
 const TMDB_IMG_BASE = 'https://image.tmdb.org/t/p/';
 const SIZE_RE = /image\.tmdb\.org\/t\/p\/(w\d+|h\d+|original)\//;

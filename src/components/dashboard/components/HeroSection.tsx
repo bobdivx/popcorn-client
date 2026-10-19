@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import type { ContentItem } from '../../../lib/client/types';
 import { useI18n } from '../../../lib/i18n/useI18n';
 import { getHighQualityTmdbImageUrl } from '../../../lib/utils/tmdb-images';
+import { useCachedImageUrl } from '../../../lib/media/useCachedImageUrl';
 import { getDisplayTitle } from '../../../lib/utils/title-display';
 import { YouTubeVideoPlayer } from '../../ui/YouTubeVideoPlayer';
 import { isTVPlatform } from '../../../lib/utils/device-detection';
@@ -424,6 +425,12 @@ function LegacyHeroSection({
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
+/** Fond du hero : servi depuis le cache d'images persistant des apps (le patch <img> ne voit pas le CSS). */
+function HeroBg({ url, active }: { url: string | null | undefined; active: boolean }) {
+  const src = useCachedImageUrl(url);
+  return <div className={`ed-hero__bg ${active ? 'is-active' : ''}`} style={{ backgroundImage: src ? `url(${src})` : 'none' }} aria-hidden />;
+}
+
 function EditorialHeroSection({
   items,
   primaryButtonLabel,
@@ -566,12 +573,7 @@ function EditorialHeroSection({
         const raw = item.backdrop || item.poster;
         const url = near ? getHighQualityTmdbImageUrl(raw) ?? raw : null;
         return (
-          <div
-            key={contentItemKey(item)}
-            className={`ed-hero__bg ${i === index ? 'is-active' : ''}`}
-            style={{ backgroundImage: url ? `url(${url})` : 'none' }}
-            aria-hidden
-          />
+          <HeroBg key={contentItemKey(item)} url={url} active={i === index} />
         );
       })}
       {previewOn && !trailerOpen && trailerKey && (
