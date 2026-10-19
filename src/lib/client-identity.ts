@@ -7,7 +7,7 @@ import { isWebOSTV } from './utils/device-detection';
 
 let cachedVersion = '';
 
-/** Plateforme logique pour le gate serveur : web | android | desktop | webos-native | webos-lite. */
+/** Plateforme logique pour le gate serveur : web | android | desktop (Tauri/Electron) | webos-native | webos-lite. */
 export function getClientPlatform(): string {
   if (typeof window === 'undefined') return '';
   try {
@@ -19,8 +19,13 @@ export function getClientPlatform(): string {
       const isLocal = proto === 'file:' || host === '127.0.0.1' || host === 'localhost';
       return isLocal ? 'webos-native' : 'webos-lite';
     }
-    if (/Electron/i.test(ua)) return 'desktop';
+    // App desktop Tauri : l'UA du WebView (WebView2 / WKWebView / WebKitGTK) ne contient pas
+    // "Electron" -> etait comptee "web". Detection par les globals injectes par Tauri.
+    // (Tauri Android garde "android" via l'UA, teste en premier.)
+    const w = window as unknown as Record<string, unknown>;
+    const isTauri = !!(w.__TAURI_INTERNALS__ || w.__TAURI__ || w.__TAURI_IPC__);
     if (/Android/i.test(ua)) return 'android';
+    if (isTauri || /Electron/i.test(ua)) return 'desktop';
     return 'web';
   } catch {
     return 'web';
