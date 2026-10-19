@@ -81,7 +81,7 @@ export default function IndexRedirect() {
 
   useEffect(() => {
     // Android TV / webOS : comportement Netflix — sting marque à chaque ouverture (session).
-    // IntroVideo résout ./intro.mp4 sous file:// (IPK webOS) + fallback GIF.
+    // IntroVideo résout le MP4 d'intro versionné (boot-intro.ts) + fallback GIF.
     const tvBoot = isTVPlatform() || isWebOSTV();
     let sessionSeen = false;
     let foreverSkipped = false;
