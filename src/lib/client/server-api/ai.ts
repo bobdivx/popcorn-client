@@ -73,19 +73,6 @@ export const aiMethods = {
     });
   },
 
-  async aiTonight(
-    this: ServerApiClientAccess,
-    body: {
-      locale: string;
-      items: Array<{ id: string; title: string; type?: string; seeds?: number; in_library?: boolean }>;
-    },
-  ): Promise<ApiResponse<{ ids: string[]; summary: string; source: string }>> {
-    return this.backendRequest('/api/client/ai/tonight', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
-  },
-
   async aiParseRequest(
     this: ServerApiClientAccess,
     body: { locale: string; text: string; media_type?: string; language?: string; season?: number },
