@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  BOOT_INTRO_GIF_FILE,
+  BOOT_INTRO_MP4_FILE,
   playIntroWithSound,
   resolveBootIntroGif,
   resolveBootIntroMp4,
@@ -28,13 +30,21 @@ describe('shouldShowBootIntro', () => {
 
 describe('resolveBootIntro assets', () => {
   it('utilise un chemin relatif sous file:// (webOS IPK)', () => {
-    expect(resolveBootIntroMp4('file:')).toBe('./intro.mp4');
-    expect(resolveBootIntroGif('file:')).toBe('./intro.gif');
+    expect(resolveBootIntroMp4('file:')).toBe(`./${BOOT_INTRO_MP4_FILE}`);
+    expect(resolveBootIntroGif('file:')).toBe(`./${BOOT_INTRO_GIF_FILE}`);
   });
 
   it('utilise la racine absolue en HTTP', () => {
-    expect(resolveBootIntroMp4('https:')).toBe('/intro.mp4');
-    expect(resolveBootIntroGif('http:')).toBe('/intro.gif');
+    expect(resolveBootIntroMp4('https:')).toBe(`/${BOOT_INTRO_MP4_FILE}`);
+    expect(resolveBootIntroGif('http:')).toBe(`/${BOOT_INTRO_GIF_FILE}`);
+  });
+
+  it('noms versionnés (cache-busting) et présents dans public/', async () => {
+    expect(BOOT_INTRO_MP4_FILE).toMatch(/^intro-[0-9a-f]{8}\.mp4$/);
+    expect(BOOT_INTRO_GIF_FILE).toMatch(/^intro-[0-9a-f]{8}\.gif$/);
+    const { existsSync } = await import('node:fs');
+    expect(existsSync(`public/${BOOT_INTRO_MP4_FILE}`)).toBe(true);
+    expect(existsSync(`public/${BOOT_INTRO_GIF_FILE}`)).toBe(true);
   });
 });
 
