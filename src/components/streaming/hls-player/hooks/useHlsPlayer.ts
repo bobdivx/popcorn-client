@@ -64,6 +64,25 @@ interface UseHlsPlayerProps {
 
 /** En-deçà, on ne sauvegarde pas la position (démarrage / reprise pas encore appliquée). */
 const MIN_SAVE_POSITION_SECONDS = 3;
+/** Rechargements max d'une playlist seek qui ne contient pas le point de reprise. */
+const MAX_SEEK_NOT_COVERED_RELOADS = 10;
+
+/**
+ * La playlist chargée après un reload `seek=` peut-elle contenir `seekSeconds` ?
+ * Côté serveur, le segment N couvre ≈ [N·T, (N+1)·T) (T = TARGETDURATION, grille fixe).
+ * Un serveur antérieur au correctif « reprise à froid » pouvait répondre 200 avec une playlist
+ * depuis 0 (3 segments) pour seek=722 : appliquer le seek dessus bloque la reprise.
+ * Indéterminé ou playlist terminée (VOD / ENDLIST) → true (ne rien bloquer).
+ */
+function levelReachesSeekTarget(details: any, seekSeconds: number): boolean {
+  if (!details || details.live === false) return true;
+  const endSN = Number(details.endSN);
+  const targetDuration = Number(details.targetduration);
+  if (!Number.isFinite(endSN) || !Number.isFinite(targetDuration) || targetDuration <= 0) {
+    return true;
+  }
+  return (endSN + 2) * targetDuration >= seekSeconds;
+}
 
 export function useHlsPlayer({
   src,
@@ -142,6 +161,8 @@ export function useHlsPlayer({
   /** URL du dernier reloadWithSeek (pour retry si 503) */
   const seekLoadUrlRef = useRef<string | null>(null);
   const seekLoadRetryCountRef = useRef<number>(0);
+  /** Rechargements d'une playlist seek reçue en 200 mais ne contenant pas le point de reprise */
+  const seekNotCoveredRetryCountRef = useRef<number>(0);
   const seekFallbackTriedRef = useRef<boolean>(false);
   /** Restauration playlist progressive après 503 sur fallback : retries dédiés */
   const restoringProgressiveRef = useRef<boolean>(false);
@@ -775,6 +796,7 @@ export function useHlsPlayer({
           pendingSeekRef.current = seekSeconds;
           seekLoadUrlRef.current = seekUrl;
           seekLoadRetryCountRef.current = 0;
+          seekNotCoveredRetryCountRef.current = 0;
           levelReload503RetryCountRef.current = 0;
           seekFallbackTriedRef.current = false;
           currentSrcRef.current = seekUrl;
@@ -1174,7 +1196,35 @@ export function useHlsPlayer({
           levelReload503RetryCountRef.current = 0;
           const pendingSeek = pendingSeekRef.current;
           console.log(`[SEEK FLOW] 3️⃣ LEVEL_LOADED: pendingSeek=${pendingSeek}s, video.currentTime=${video.currentTime}s`);
+          // Garde-fou reprise : playlist seek reçue en 200 mais qui ne contient pas le point de
+          // reprise (ex. playlist 0..2 pour seek=722) → la recharger comme un 503, sans appliquer le seek.
+          const pendingSeekUrl = seekLoadUrlRef.current;
+          if (
+            pendingSeek > 0 &&
+            Number.isFinite(pendingSeek) &&
+            pendingSeekUrl &&
+            !levelReachesSeekTarget(data?.details, pendingSeek) &&
+            seekNotCoveredRetryCountRef.current < MAX_SEEK_NOT_COVERED_RELOADS
+          ) {
+            seekNotCoveredRetryCountRef.current += 1;
+            console.warn(
+              `[SEEK FLOW] ⚠️ LEVEL_LOADED: playlist sans le point de reprise (${pendingSeek}s, endSN=${data?.details?.endSN}), rechargement`,
+              seekNotCoveredRetryCountRef.current
+            );
+            emitPlaybackStep('retry_503', { attempt: seekNotCoveredRetryCountRef.current });
+            window.setTimeout(() => {
+              if (hlsRef.current && seekLoadUrlRef.current === pendingSeekUrl) {
+                try {
+                  hlsRef.current.loadSource(pendingSeekUrl);
+                } catch (_) {
+                  /* ignore */
+                }
+              }
+            }, 2000);
+            return;
+          }
           if (pendingSeek > 0 && Number.isFinite(pendingSeek)) {
+            seekNotCoveredRetryCountRef.current = 0;
             pendingSeekRef.current = 0;
             restoringProgressiveRef.current = false;
             progressiveRestoreRetryCountRef.current = 0;
