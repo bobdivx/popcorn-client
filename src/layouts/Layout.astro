@@ -295,6 +295,12 @@ const isWebOS = import.meta.env.WEBOS === 'true';
       </>
     )}
     <script>
+      // Images TMDB : tailles adaptées, premières cartes prioritaires, cache persistant IndexedDB
+      // dans les apps (Tauri, webOS natif) où le Service Worker n'est pas utilisable (voir imageCache.ts).
+      import { installImageCache } from '../lib/media/imageCache';
+      installImageCache();
+    </script>
+    <script>
       // Stage D : URLs de lecture signees (jeton media) pour <video>/hls.js/Chromecast/<img>.
       import { installMediaUrlSigning } from '../lib/streaming/mediaToken';
       installMediaUrlSigning();
@@ -456,8 +462,9 @@ const isWebOS = import.meta.env.WEBOS === 'true';
     <script is:inline>
       // Cache d'images durable (affiches / backdrops / logos TMDB) via un Service Worker dédié
       // qui n'intercepte QUE image.tmdb.org (voir public/img-cache-sw.js).
-      // Uniquement en https hors Tauri : webOS natif (file://) et l'app Tauri (schéma interne)
-      // gardent le cache HTTP. Désactivable : localStorage.popcorn_img_sw = 'off'.
+      // Uniquement en https hors Tauri. Les apps (Tauri, webOS natif http://127.0.0.1 dont le cache SW
+      // est vidé à chaque fermeture) utilisent le cache IndexedDB de src/lib/media/imageCache.ts.
+      // Désactivable : localStorage.popcorn_img_sw = 'off' (ou popcorn_img_cache = 'idb' pour forcer le cache JS).
       (function() {
         try {
           if (!('serviceWorker' in navigator) || !('caches' in window)) return;
@@ -465,7 +472,8 @@ const isWebOS = import.meta.env.WEBOS === 'true';
           if (loc.protocol !== 'https:') return;
           if ('__TAURI_INTERNALS__' in window || '__TAURI__' in window || /(^|\.)tauri\.localhost$/i.test(loc.hostname)) return;
           var sw = navigator.serviceWorker;
-          if (localStorage.getItem('popcorn_img_sw') === 'off') {
+          var forced = localStorage.getItem('popcorn_img_cache');
+          if (localStorage.getItem('popcorn_img_sw') === 'off' || forced === 'idb' || forced === 'off') {
             sw.getRegistrations().then(function(regs) {
               regs.forEach(function(r) {
                 var w = r.active || r.waiting || r.installing;
@@ -474,17 +482,24 @@ const isWebOS = import.meta.env.WEBOS === 'true';
             }).catch(function() {});
             return;
           }
+          var started = false;
           var register = function() {
+            if (started) return;
+            started = true;
             // ?v= : le script est servi « immutable » (nginx/CDN) → incrémenter v à chaque
             // modification de public/img-cache-sw.js pour que la mise à jour soit prise en compte.
-            sw.register('/img-cache-sw.js?v=1', { scope: '/' }).catch(function() {});
+            sw.register('/img-cache-sw.js?v=2', { scope: '/' }).then(function() {
+              // 1re visite : sans ça, la page (et toute la session ClientRouter) restait souvent
+              // non contrôlée → aucune image mise en cache avant la visite suivante.
+              return sw.ready.then(function(reg) {
+                if (!sw.controller && reg && reg.active) reg.active.postMessage({ type: 'popcorn-img-claim' });
+              });
+            }).catch(function() {});
           };
-          var later = function() {
-            if (window.requestIdleCallback) window.requestIdleCallback(register, { timeout: 4000 });
-            else setTimeout(register, 1500);
-          };
-          if (document.readyState === 'complete') later();
-          else window.addEventListener('load', later, { once: true });
+          // Tôt (après load, ou 3 s au plus) : plus d'attente d'un « idle » qui n'arrive jamais sur appareil lent.
+          setTimeout(register, 3000);
+          if (document.readyState === 'complete') setTimeout(register, 200);
+          else window.addEventListener('load', function() { setTimeout(register, 200); }, { once: true });
         } catch (e) {}
       })();
     </script>

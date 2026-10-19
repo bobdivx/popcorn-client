@@ -11,6 +11,7 @@ import { isBlockedApiUrl } from '../../distribution.js';
 // Utiliser la version client compatible navigateur pour JWT
 import { generateAccessToken, generateRefreshToken } from '../../auth/jwt-client.js';
 import { TokenManager } from '../storage.js';
+import { markAllSwrStale, swrPolicyFor, swrRequest } from './swrCache.js';
 
 /** Callbacks appelés quand une requête échoue avec ConnectionError/Timeout (serveur hors ligne). Utilisé par le store pour remonter l'état dans l'UI. */
 export type ConnectionFailureListener = () => void;
@@ -287,7 +288,26 @@ export class ServerApiClientBase {
     return { code: 'NetworkError', message: error instanceof Error ? error.message : 'Erreur réseau inconnue.' };
   }
 
+  /**
+   * Requête backend. Les lectures GET peu volatiles (catalogue torrents, TMDB) passent par le cache
+   * stale-while-revalidate (mémoire + IndexedDB, voir swrCache.ts) : navigation et relance instantanées,
+   * revalidation en arrière-plan. Une écriture réussie rend le cache « à revalider ».
+   */
   protected async backendRequest<T>(endpoint: string, options: RequestInit = {}, retryCount = 0, baseUrlOverride?: string): Promise<ApiResponse<T>> {
+    const method = (options.method || 'GET').toUpperCase();
+    if (retryCount === 0 && !baseUrlOverride && !options.signal && typeof window !== 'undefined') {
+      const policy = method === 'GET' ? swrPolicyFor(endpoint, method) : null;
+      if (policy) {
+        const key = `${this.getBackendBaseUrl()}|${this.getCurrentUserId() ?? ''}|${endpoint}`;
+        return swrRequest<T>(key, endpoint, policy, () => this.backendRequestNetwork<T>(endpoint, options, 0, baseUrlOverride));
+      }
+    }
+    const res = await this.backendRequestNetwork<T>(endpoint, options, retryCount, baseUrlOverride);
+    if (retryCount === 0 && method !== 'GET' && method !== 'HEAD' && res && res.success) markAllSwrStale();
+    return res;
+  }
+
+  protected async backendRequestNetwork<T>(endpoint: string, options: RequestInit = {}, retryCount = 0, baseUrlOverride?: string): Promise<ApiResponse<T>> {
     const base = baseUrlOverride ?? this.getBackendBaseUrl();
     let finalEndpoint = endpoint;
     if (endpoint.includes('/api/torrents/list') || endpoint.includes('/api/torrents/fast')) {
