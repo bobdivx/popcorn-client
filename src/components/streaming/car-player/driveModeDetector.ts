@@ -5,13 +5,15 @@
  * sondes (16×16 data-URL) peuvent encore avancer sur certains firmwares → faux Park.
  *
  * Stratégie phase 3 :
- * - Combine plusieurs signaux : clip réel (intro.mp4) taille visible, advance currentTime,
+ * - Combine plusieurs signaux : clip réel (MP4 d'intro de public/) taille visible, advance currentTime,
  *   requestVideoFrameCallback, drawImage non-noir, pause forcée, play() rejeté.
  * - Si UN signal Drive fort → Drive ; Park seulement si la vidéo avance CLAIREMENT
  *   (temps + frames peintes) ; sinon Unknown. Jamais d’erreur → Park.
  * - Override manuel obligatoire : ?mode=drive|park|auto + localStorage + boutons UI.
  * - Sondes fréquentes au démarrage (2 s × 20 s) puis toutes les 10 s.
  */
+
+import { resolveBootIntroMp4 } from '../../../lib/utils/boot-intro';
 
 export type TeslaDriveMode = 'park' | 'drive' | 'unknown';
 export type ModeSource = 'auto' | 'manual' | 'url';
@@ -58,8 +60,8 @@ const OBSERVE_MS = 1400;
 const LOAD_TIMEOUT_MS = 4000;
 const PARK_MIN_DELTA = 0.25;
 
-/** Clip réel court (public/intro.mp4) — plus fiable qu’un MP4 16×16 inline. */
-const PROBE_ASSET = '/intro.mp4';
+/** Clip réel court (MP4 d'intro versionné de public/) — plus fiable qu’un MP4 16×16 inline. */
+const PROBE_ASSET = resolveBootIntroMp4();
 const PROBE_W = 320;
 const PROBE_H = 180;
 
