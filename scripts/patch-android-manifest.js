@@ -282,6 +282,26 @@ function patchManifest(manifestPath) {
     console.log('✅ Deep links Pocket ID déjà présents');
   }
 
+  // 9. Protection manifest merger : une dépendance qui déclarerait touchscreen / faketouch / leanback
+  //    en required="true" ferait gagner "true" à la fusion → app exclue des TV. tools:replace force
+  //    la valeur "false" du manifest principal.
+  if (!/<manifest\b[^>]*xmlns:tools=/.test(content)) {
+    content = content.replace(
+      /<manifest\b/,
+      '<manifest xmlns:tools="http://schemas.android.com/tools"'
+    );
+    modified = true;
+  }
+  ['android.hardware.touchscreen', 'android.hardware.faketouch', 'android.software.leanback'].forEach((feature) => {
+    const escaped = feature.replace(/\./g, '\\.');
+    const re = new RegExp(`<uses-feature\\s+android:name="${escaped}"\\s+android:required="false"(?![^>]*tools:replace)`, 'g');
+    if (re.test(content)) {
+      content = content.replace(re, (m) => `${m} tools:replace="android:required"`);
+      console.log(`🔧 Protection merge: tools:replace="android:required" sur ${feature}`);
+      modified = true;
+    }
+  });
+
   // Sauvegarder le fichier modifié seulement si des changements ont été faits
   if (modified) {
     writeFileSync(manifestPath, content, 'utf-8');
