@@ -17,13 +17,23 @@ export function shouldShowBootIntro(opts: {
   return !opts.foreverSkipped;
 }
 
-/** Chemin intro compatible IPK webOS (file://) et HTTP. */
+/**
+ * Fichiers de l'intro dans public/. Le nom porte une empreinte du contenu (cache-busting) :
+ * remplacer la vidéo = nouveau nom, pour que navigateurs, WebView et CDN ne resservent jamais
+ * l'ancienne version en cache. Intro actuelle : Grok Imagine (19/10/2026), 6 s, 1280×720,
+ * H.264 High + AAC stéréo, MP4 faststart.
+ */
+export const BOOT_INTRO_MP4_FILE = 'intro-5bda2c68.mp4';
+/** Repli GIF (sans son) si le MP4 ne peut pas être lu. */
+export const BOOT_INTRO_GIF_FILE = 'intro-d7f8295e.gif';
+
+/** Chemin intro compatible file:// (relatif) et HTTP (racine absolue). */
 export function resolveBootIntroMp4(protocol?: string): string {
-  return protocol === 'file:' ? './intro.mp4' : '/intro.mp4';
+  return protocol === 'file:' ? `./${BOOT_INTRO_MP4_FILE}` : `/${BOOT_INTRO_MP4_FILE}`;
 }
 
 export function resolveBootIntroGif(protocol?: string): string {
-  return protocol === 'file:' ? './intro.gif' : '/intro.gif';
+  return protocol === 'file:' ? `./${BOOT_INTRO_GIF_FILE}` : `/${BOOT_INTRO_GIF_FILE}`;
 }
 
 export type IntroAudioMode = 'sound' | 'muted';
