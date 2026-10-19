@@ -303,10 +303,6 @@ interface IServerApiClientPublic {
     candidates: Array<{ id: number; type?: string; title: string; year?: string | null }>;
   }): Promise<ApiResponse<{ summary: string; choices: import('./server-api/ai.js').AiTmdbChoice[]; source: string }>>;
   aiSearch(body: { locale: string; query: string }): Promise<ApiResponse<{ rewritten: boolean; query: string; media_type?: string | null; summary: string; source: string }>>;
-  aiTonight(body: {
-    locale: string;
-    items: Array<{ id: string; title: string; type?: string; seeds?: number; in_library?: boolean }>;
-  }): Promise<ApiResponse<{ ids: string[]; summary: string; source: string }>>;
   aiParseRequest(body: { locale: string; text: string; media_type?: string; language?: string; season?: number }): Promise<ApiResponse<{
     title_query: string;
     media_type: string;
