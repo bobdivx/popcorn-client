@@ -2,25 +2,19 @@
 # Produit com.popcorn.client.webos.native_<version>_all.ipk : artefact + pre-release "webos-native-v<version>".
 # Pre-release (jamais "latest") : n'interfère pas avec /releases/latest (APK / desktop).
 # Lien stable toujours à jour : https://popcornn.app/download/webos-native
-# Déclencheurs : push webos-native/**, release v* publiée (UI alignée sur la release client),
-# ou manuel (input version pour republier une version précise, ex. 1.4.4).
+# Déclencheur : manuel uniquement (app native abandonnée le 19/10/2026).
 name: WebOS Native Build (IPK)
 
 on:
+  # Native abandonnée (19/10/2026) : plus de déclenchement automatique (release / push).
+  # Lancement manuel uniquement, au cas où.
   workflow_dispatch:
     inputs:
       version:
-        description: "Version à publier (vide = tag de release / VERSION.json)"
+        description: "Version à publier (vide = VERSION.json)"
         required: false
         default: ""
         type: string
-  release:
-    types: [published]
-  push:
-    branches: [dev]
-    paths:
-      - 'webos-native/**'
-      - '.github/workflows/webos-native.yml'
 
 concurrency:
   group: webos-native
