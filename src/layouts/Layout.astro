@@ -488,7 +488,7 @@ const isWebOS = import.meta.env.WEBOS === 'true';
             started = true;
             // ?v= : le script est servi « immutable » (nginx/CDN) → incrémenter v à chaque
             // modification de public/img-cache-sw.js pour que la mise à jour soit prise en compte.
-            sw.register('/img-cache-sw.js?v=2', { scope: '/' }).then(function() {
+            sw.register('/img-cache-sw.js?v=3', { scope: '/' }).then(function() {
               // 1re visite : sans ça, la page (et toute la session ClientRouter) restait souvent
               // non contrôlée → aucune image mise en cache avant la visite suivante.
               return sw.ready.then(function(reg) {
