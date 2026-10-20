@@ -89,6 +89,7 @@ async function releaseWakeLock(): Promise<void> {
  */
 function setAndroidImmersiveStyle(enabled: boolean): void {
   if (!isAndroid()) return;
+  // Android TV : la meta viewport (width=1920, TvViewportScript) ne doit jamais repasser en device-width.
   
   // Créer ou modifier la meta viewport pour le mode immersif
   let metaViewport = document.querySelector('meta[name="viewport"]');
@@ -100,7 +101,7 @@ function setAndroidImmersiveStyle(enabled: boolean): void {
   
   if (enabled) {
     // Mode immersif : viewport en plein écran
-    metaViewport.setAttribute('content', 
+    if (!document.documentElement.hasAttribute('data-tv-viewport')) metaViewport.setAttribute('content', 
       'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
     );
     
@@ -117,7 +118,7 @@ function setAndroidImmersiveStyle(enabled: boolean): void {
     document.body.style.height = '100%';
   } else {
     // Restaurer le viewport normal
-    metaViewport.setAttribute('content', 
+    if (!document.documentElement.hasAttribute('data-tv-viewport')) metaViewport.setAttribute('content', 
       'width=device-width, initial-scale=1.0'
     );
     
