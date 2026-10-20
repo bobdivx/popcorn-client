@@ -3,13 +3,16 @@
  *
  * Patch global de HTMLImageElement.src / setAttribute('src') limité aux URLs image.tmdb.org :
  * 1. Taille : « original » (souvent 4K, plusieurs Mo) → w780 / w1280 selon l'écran (même URL partout → cache).
- * 2. crossOrigin="anonymous" : la copie du cache HTTP porte Access-Control-Allow-Origin, donc réutilisable par
- *    le Service Worker (web) ou par le cache ci-dessous sans second téléchargement.
+ * 2. PAS de crossOrigin sur les <img> : le CDN TMDB n'envoie Access-Control-Allow-Origin que si la requête
+ *    porte un en-tête Origin, sans « Vary: Origin ». Une image déjà dans le cache HTTP (chargée sans CORS,
+ *    max-age ≈ 1 an) échouait donc en <img crossorigin> → icône d'image cassée partout (régression 1.4.18).
  * 3. Premières cartes de chaque page : chargement immédiat (pas d'attente du lazy-loading).
  * 4. Mode « idb » (apps : Tauri Android/TV/desktop, webOS natif http://127.0.0.1, client http LAN) :
  *    cache persistant IndexedDB (Blob) + URLs blob: en mémoire. Le Service Worker n'y est pas utilisable
  *    (schéma Tauri, ou cache SW/HTTP vidé à chaque fermeture d'app sur webOS) ; IndexedDB, lui, persiste.
  *    Plafonds : 80 Mo / 800 images, 30 jours, LRU.
+ * 5. Filet de sécurité : toute <img> TMDB en erreur (blob: révoquée, entrée de cache corrompue, CORS…)
+ *    est rechargée depuis l'URL TMDB d'origine, sans crossorigin ; l'entrée fautive est purgée.
  * Web https : le Service Worker public/img-cache-sw.js garde ce rôle (mode « sw »).
  *
  * Réglages (localStorage.popcorn_img_cache) : 'off' (aucun patch), 'idb' (forcer le cache JS), 'sw'.
@@ -22,6 +25,9 @@ export type ImageCacheMode = 'sw' | 'idb' | 'none';
 const TMDB_RE = /^https?:\/\/image\.tmdb\.org\/t\/p\/([a-z0-9_]+)\//i;
 const DB_NAME = 'popcorn-img-cache';
 const STORE = 'img';
+/** Incrémenter pour purger une fois le cache IndexedDB des clients existants. */
+const CACHE_GEN = '2';
+const CACHE_GEN_KEY = 'popcorn_img_cache_gen';
 const MAX_ENTRIES = 800;
 const MAX_BYTES = 80 * 1024 * 1024;
 const TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -31,6 +37,8 @@ const MEM_MAX_ENTRIES = 300;
 const MEM_MAX_BYTES = 48 * 1024 * 1024;
 /** Images de chaque page chargées sans attendre le lazy-loading (premières cartes / hero). */
 const EAGER_FIRST = 8;
+/** Tentatives de secours par <img> avant de laisser l'erreur atteindre le composant. */
+const MAX_RECOVERIES = 2;
 
 interface Rec {
   u: string;
@@ -48,17 +56,32 @@ let knownKeys: Set<string> | null = null;
 let knownPromise: Promise<void> | null = null;
 const mem = new Map<string, { url: string; size: number }>();
 let memBytes = 0;
+/** URL TMDB normalisée voulue par chaque <img> (ce que renvoie le getter src). */
 const wanted = new WeakMap<HTMLImageElement, string>();
+/** URL TMDB brute (avant normalisation) : dernier recours si la taille normalisée échoue. */
+const rawWanted = new WeakMap<HTMLImageElement, string>();
+const recoveries = new WeakMap<HTMLImageElement, number>();
 let pageRank = 0;
 const storing = new Set<string>();
 const storeQueue: string[] = [];
 let storeActive = 0;
+/** Setter / getter src sous-jacents (natifs, ou ceux d'un autre patch installé avant). */
+let baseSrcSet: ((this: HTMLImageElement, v: string) => void) | null = null;
+let baseSrcGet: ((this: HTMLImageElement) => string) | null = null;
 
 function lsGet(k: string): string | null {
   try {
     return localStorage.getItem(k);
   } catch {
     return null;
+  }
+}
+
+function lsSet(k: string, v: string): void {
+  try {
+    localStorage.setItem(k, v);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -106,6 +129,23 @@ function isTmdb(v: unknown): v is string {
   return typeof v === 'string' && TMDB_RE.test(v);
 }
 
+/**
+ * Téléchargement CORS d'une image TMDB → Blob image, ou null.
+ * Le cache HTTP contient souvent une copie chargée sans CORS (donc sans Access-Control-Allow-Origin) :
+ * la 1re tentative échoue alors (TypeError) et on recharge une fois depuis le réseau.
+ */
+function fetchImageBlob(url: string): Promise<Blob | null> {
+  const read = (res: Response): Promise<Blob | null> | null => {
+    if (!res || !res.ok) return null;
+    const type = res.headers.get('Content-Type') || '';
+    if (type && type.indexOf('image/') !== 0) return null;
+    return res.blob().then((b) => (b && b.size > 0 && (!b.type || b.type.indexOf('image/') === 0) ? b : null));
+  };
+  return fetch(url, { mode: 'cors', credentials: 'omit' })
+    .then(read, () => fetch(url, { mode: 'cors', credentials: 'omit', cache: 'reload' }).then(read))
+    .catch(() => null);
+}
+
 // ---------------------------------------------------------------- IndexedDB
 
 function openDb(): Promise<IDBDatabase | null> {
@@ -135,42 +175,70 @@ function openDb(): Promise<IDBDatabase | null> {
   return dbPromise;
 }
 
-function loadKnownKeys(): Promise<void> {
-  if (knownPromise) return knownPromise;
-  knownPromise = openDb().then(
+/** Purge unique du cache IndexedDB quand CACHE_GEN change (entrées d'une version fautive). */
+function purgeIfOldGeneration(): Promise<void> {
+  if (lsGet(CACHE_GEN_KEY) === CACHE_GEN) return Promise.resolve();
+  return openDb().then(
     (db) =>
       new Promise<void>((resolve) => {
-        if (!db) {
-          knownKeys = new Set();
-          return resolve();
-        }
+        if (!db) return resolve();
         try {
-          const store = db.transaction(STORE, 'readonly').objectStore(STORE);
-          const done = (keys: IDBValidKey[]) => {
-            knownKeys = new Set(keys.map(String));
+          const tx = db.transaction(STORE, 'readwrite');
+          tx.objectStore(STORE).clear();
+          tx.oncomplete = () => {
+            lsSet(CACHE_GEN_KEY, CACHE_GEN);
             resolve();
           };
-          if (typeof store.getAllKeys === 'function') {
-            const r = store.getAllKeys();
-            r.onsuccess = () => done(r.result || []);
-            r.onerror = () => done([]);
-          } else {
-            const keys: IDBValidKey[] = [];
-            const c = store.openCursor();
-            c.onsuccess = () => {
-              const cur = c.result;
-              if (!cur) return done(keys);
-              keys.push(cur.key);
-              cur.continue();
-            };
-            c.onerror = () => done(keys);
-          }
+          tx.onerror = () => resolve();
+          tx.onabort = () => resolve();
         } catch {
-          knownKeys = new Set();
           resolve();
         }
       })
   );
+}
+
+function loadKnownKeys(): Promise<void> {
+  if (knownPromise) return knownPromise;
+  knownPromise = purgeIfOldGeneration()
+    .then(() => openDb())
+    .then(
+      (db) =>
+        new Promise<void>((resolve) => {
+          if (!db) {
+            knownKeys = new Set();
+            return resolve();
+          }
+          try {
+            const store = db.transaction(STORE, 'readonly').objectStore(STORE);
+            const done = (keys: IDBValidKey[]) => {
+              knownKeys = new Set(keys.map(String));
+              resolve();
+            };
+            if (typeof store.getAllKeys === 'function') {
+              const r = store.getAllKeys();
+              r.onsuccess = () => done(r.result || []);
+              r.onerror = () => done([]);
+            } else {
+              const keys: IDBValidKey[] = [];
+              const c = store.openCursor();
+              c.onsuccess = () => {
+                const cur = c.result;
+                if (!cur) return done(keys);
+                keys.push(cur.key);
+                cur.continue();
+              };
+              c.onerror = () => done(keys);
+            }
+          } catch {
+            knownKeys = new Set();
+            resolve();
+          }
+        })
+    )
+    .catch(() => {
+      knownKeys = new Set();
+    });
   return knownPromise;
 }
 
@@ -200,6 +268,18 @@ function dbGet(url: string): Promise<Blob | null> {
         }
       })
   );
+}
+
+function dbDelete(url: string): void {
+  knownKeys?.delete(url);
+  void openDb().then((db) => {
+    if (!db) return;
+    try {
+      db.transaction(STORE, 'readwrite').objectStore(STORE).delete(url);
+    } catch {
+      /* ignore */
+    }
+  });
 }
 
 function dbPut(rec: Rec): void {
@@ -308,10 +388,23 @@ function memPut(url: string, blob: Blob): string {
     const e = mem.get(first)!;
     mem.delete(first);
     memBytes -= e.size;
-    // Une <img> déjà affichée garde son image décodée ; seule une nouvelle affectation repassera par IndexedDB.
+    // Une <img> déjà affichée garde son image décodée ; une <img> encore « lazy » qui pointerait
+    // sur cette URL révoquée est rattrapée par le filet d'erreur (retour à l'URL TMDB).
     setTimeout(() => URL.revokeObjectURL(e.url), 60000);
   }
   return objectUrl;
+}
+
+/** Oublie une image (mémoire + IndexedDB) : utilisée quand sa copie en cache n'a pas pu s'afficher. */
+function forget(url: string): void {
+  const e = mem.get(url);
+  if (e) {
+    mem.delete(url);
+    memBytes -= e.size;
+    const objectUrl = e.url;
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+  }
+  dbDelete(url);
 }
 
 // ---------------------------------------------------------------- stockage après chargement réseau
@@ -327,16 +420,9 @@ function pumpStore(): void {
   while (storeActive < 3 && storeQueue.length) {
     const url = storeQueue.shift()!;
     storeActive += 1;
-    // L'image vient d'être chargée en CORS (crossOrigin=anonymous) : réponse servie par le cache HTTP.
-    fetch(url, { mode: 'cors', credentials: 'omit', cache: 'force-cache' })
-      .then((res) => {
-        if (!res.ok) return null;
-        const type = res.headers.get('Content-Type') || '';
-        if (type && type.indexOf('image/') !== 0) return null;
-        return res.blob();
-      })
+    fetchImageBlob(url)
       .then((blob) => {
-        if (!blob || !blob.size) return;
+        if (!blob) return;
         memPut(url, blob);
         dbPut({ u: url, b: blob, t: Date.now(), s: blob.size });
       })
@@ -368,14 +454,9 @@ function prioritize(img: HTMLImageElement): void {
 
 function applyTmdb(img: HTMLImageElement, raw: string, rawSet: (v: string) => void): void {
   const url = normalizeTmdbUrl(raw);
+  if (wanted.get(img) !== url) recoveries.delete(img);
   wanted.set(img, url);
-  if (img.crossOrigin == null) {
-    try {
-      img.crossOrigin = 'anonymous';
-    } catch {
-      /* ignore */
-    }
-  }
+  rawWanted.set(img, raw);
   prioritize(img);
   if (mode !== 'idb') {
     rawSet(url);
@@ -411,12 +492,60 @@ function applyTmdb(img: HTMLImageElement, raw: string, rawSet: (v: string) => vo
   else loadKnownKeys().then(lookup, fromNetwork);
 }
 
+/**
+ * Filet de sécurité : une <img> TMDB en erreur est rechargée depuis l'URL d'origine (sans crossorigin,
+ * sans blob:) avant que l'erreur n'atteigne le composant (qui masquerait l'image). Capture au niveau
+ * window : l'évènement « error » des images ne remonte pas, mais la phase de capture le voit.
+ */
+function installErrorFallback(): void {
+  window.addEventListener(
+    'error',
+    (ev: Event) => {
+      const img = ev.target;
+      if (!(img instanceof HTMLImageElement) || !baseSrcSet) return;
+      const url = wanted.get(img);
+      if (!url) return;
+      const n = recoveries.get(img) || 0;
+      if (n >= MAX_RECOVERIES) return;
+      let current = '';
+      try {
+        current = baseSrcGet ? String(baseSrcGet.call(img) || '') : img.getAttribute('src') || '';
+      } catch {
+        current = img.getAttribute('src') || '';
+      }
+      const hadCors = img.hasAttribute('crossorigin');
+      let next: string | null = null;
+      if (current.indexOf('blob:') === 0) {
+        forget(url);
+        next = url;
+      } else if (hadCors) {
+        next = url;
+      } else {
+        const raw = rawWanted.get(img);
+        if (raw && raw !== url && current !== raw) next = raw;
+      }
+      if (!next) return;
+      recoveries.set(img, n + 1);
+      try {
+        if (hadCors) img.removeAttribute('crossorigin');
+        ev.stopImmediatePropagation();
+        baseSrcSet.call(img, next);
+      } catch {
+        /* l'erreur suit son cours */
+      }
+    },
+    true
+  );
+}
+
 function patchImages(): void {
   const proto = HTMLImageElement.prototype;
   const d = Object.getOwnPropertyDescriptor(proto, 'src');
   if (!d || !d.get || !d.set) return;
   const get = d.get;
   const set = d.set;
+  baseSrcGet = get as (this: HTMLImageElement) => string;
+  baseSrcSet = set as (this: HTMLImageElement, v: string) => void;
   Object.defineProperty(proto, 'src', {
     configurable: true,
     enumerable: d.enumerable,
@@ -430,6 +559,7 @@ function patchImages(): void {
         return;
       }
       wanted.delete(this);
+      rawWanted.delete(this);
       set.call(this, v);
     },
   });
@@ -442,6 +572,7 @@ function patchImages(): void {
         return;
       }
       wanted.delete(this);
+      rawWanted.delete(this);
     }
     return origSetAttribute.call(this, name, value);
   };
@@ -464,10 +595,9 @@ export function loadCachedImageUrl(raw: string): Promise<string> {
   const hit = memGet(url);
   if (hit) return Promise.resolve(hit);
   const fromNetwork = (): Promise<string> =>
-    fetch(url, { mode: 'cors', credentials: 'omit' })
-      .then((res) => (res.ok ? res.blob() : null))
+    fetchImageBlob(url)
       .then((blob) => {
-        if (!blob || !blob.size) return url;
+        if (!blob) return url;
         const objectUrl = memPut(url, blob);
         dbPut({ u: url, b: blob, t: Date.now(), s: blob.size });
         return objectUrl;
@@ -507,6 +637,11 @@ export function installImageCache(): ImageCacheMode | 'off' {
     patchImages();
   } catch {
     return mode;
+  }
+  try {
+    installErrorFallback();
+  } catch {
+    /* ignore */
   }
   try {
     document.addEventListener('astro:page-load', () => {
