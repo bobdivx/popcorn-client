@@ -1,0 +1,75 @@
+---
+/**
+ * Android TV / Google TV : viewport CSS 1920×1080, comme webOS.
+ *
+ * Les WebView Android TV exposent un viewport CSS de 960×540 (1080p à densité xhdpi, ou 720p
+ * en tvdpi) alors que webOS expose 1920×1080. Toute l'UI TV (tailles rem/px, breakpoints
+ * lg/xl, zoom 80 % de global.css) est calée sur 1920 : sur Google TV tout était ~2,5× trop
+ * gros, la navbar passait en mode mobile et la mise en page de la fiche/rangées différait.
+ *
+ * Ici on demande un layout viewport de 1920 px mis à l'échelle de l'écran (meta viewport).
+ * L'app Tauri Android active useWideViewPort/loadWithOverviewMode/textZoom=100 côté natif
+ * sur TV (scripts/patch-android-tv-webview.js), sinon la WebView ignore la meta viewport.
+ *
+ * Jamais appliqué sur webOS (déjà 1920×1080) ni sur un appareil tactile (téléphone/tablette).
+ * Doit être placé juste après <meta name="viewport"> dans le <head>.
+ */
+---
+<script is:inline>
+  (function () {
+    try {
+      var w = window;
+      var root = document.documentElement;
+      var ua = navigator.userAgent || '';
+      // webOS (LG) : viewport natif déjà en 1920×1080 → ne rien changer.
+      if (
+        root.getAttribute('data-webos') === 'true' ||
+        /webOS|Web0S|WebAppManager|NetCast/i.test(ua) ||
+        typeof w.PalmSystem !== 'undefined' ||
+        typeof w.webOS !== 'undefined'
+      ) return;
+      if (!/Android/i.test(ua)) return;
+      var noTouch = (navigator.maxTouchPoints || 0) === 0;
+      var nativeTv = /PopcornnTV/i.test(ua); // ajouté par l'app Android sur TV (UiModeManager)
+      var uaTv = /Android.*TV|TV.*Android|GoogleTV|Google TV|Chromecast|FireTV|AFT[A-Z]|SHIELD|BRAVIA/i.test(ua);
+      var forced = location.search.indexOf('tv=1') !== -1;
+      var remoteOnly = noTouch && !!w.matchMedia && w.matchMedia('(pointer: none)').matches;
+      if (!nativeTv && !forced && !uaTv && !remoteOnly) return;
+
+      var DESIGN_W = 1920;
+      var state = w.__popcornnTvViewport;
+      if (!state) {
+        var sw = 0;
+        try { sw = Math.max(screen.width || 0, screen.height || 0); } catch (e) {}
+        var base = Math.min(sw || w.innerWidth || DESIGN_W, w.innerWidth || sw || DESIGN_W);
+        if (!base || base >= DESIGN_W - 20) return; // déjà ≥ 1920 CSS px : comme webOS
+        var scale = Math.round((base / DESIGN_W) * 10000) / 10000;
+        state = w.__popcornnTvViewport = {
+          scale: scale,
+          content: 'width=' + DESIGN_W + ', initial-scale=' + scale + ', minimum-scale=' + scale +
+            ', maximum-scale=' + scale + ', user-scalable=no',
+        };
+      }
+      var apply = function (doc) {
+        if (!doc) return;
+        var head = doc.head || doc.getElementsByTagName('head')[0];
+        var meta = doc.querySelector('meta[name="viewport"]');
+        if (!meta && head) {
+          meta = doc.createElement('meta');
+          meta.setAttribute('name', 'viewport');
+          head.insertBefore(meta, head.firstChild);
+        }
+        if (meta && meta.getAttribute('content') !== state.content) meta.setAttribute('content', state.content);
+        doc.documentElement.setAttribute('data-tv-viewport', String(DESIGN_W));
+      };
+      apply(document);
+      if (!w.__popcornnTvViewportHooks) {
+        w.__popcornnTvViewportHooks = true;
+        // ClientRouter : la nouvelle page apporte sa propre meta viewport (device-width) et ses
+        // attributs <html> → on les corrige avant le swap pour éviter tout « saut » de taille.
+        document.addEventListener('astro:before-swap', function (e) { apply(e && e.newDocument); });
+        document.addEventListener('astro:after-swap', function () { apply(document); });
+      }
+    } catch (e) {}
+  })();
+</script>
