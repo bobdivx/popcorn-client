@@ -53,6 +53,7 @@ async function releaseWakeLock(): Promise<void> {
 
 function setAndroidImmersiveStyle(enabled: boolean): void {
   if (!isAndroid()) return;
+  // Android TV : la meta viewport (width=1920, TvViewportScript) ne doit jamais repasser en device-width.
   let metaViewport = document.querySelector('meta[name="viewport"]');
   if (!metaViewport) {
     metaViewport = document.createElement('meta');
@@ -60,7 +61,7 @@ function setAndroidImmersiveStyle(enabled: boolean): void {
     document.head.appendChild(metaViewport);
   }
   if (enabled) {
-    metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
+    if (!document.documentElement.hasAttribute('data-tv-viewport')) metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover');
     document.documentElement.style.setProperty('--safe-area-inset-top', 'env(safe-area-inset-top, 0px)');
     document.documentElement.style.setProperty('--safe-area-inset-bottom', 'env(safe-area-inset-bottom, 0px)');
     document.documentElement.style.setProperty('--safe-area-inset-left', 'env(safe-area-inset-left, 0px)');
@@ -70,7 +71,7 @@ function setAndroidImmersiveStyle(enabled: boolean): void {
     document.body.style.width = '100%';
     document.body.style.height = '100%';
   } else {
-    metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0');
+    if (!document.documentElement.hasAttribute('data-tv-viewport')) metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0');
     document.body.style.overflow = '';
     document.body.style.position = '';
     document.body.style.width = '';
