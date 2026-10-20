@@ -10,6 +10,7 @@ import DemoExitBar from '../components/layout/DemoExitBar';
 import TVNavigationProvider from '../components/tv/TVNavigationProvider';
 import DebugPanel from '../components/debug/DebugPanel';
 import WebOSBoot from '../components/webos/WebOSBoot.astro';
+import TvViewportScript from '../components/tv/TvViewportScript.astro';
 import {
   IS_STORE_BUILD,
   STORE_BLOCKED_ROUTE_PREFIXES,
@@ -162,6 +163,8 @@ const isWebOS = import.meta.env.WEBOS === 'true';
     </script>
     <meta name="description" content="Popcornn - Client léger pour serveur Popcornn" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
+    <!-- Android TV / Google TV : viewport CSS 1920×1080 comme webOS (no-op ailleurs) -->
+    <TvViewportScript />
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
@@ -320,6 +323,12 @@ const isWebOS = import.meta.env.WEBOS === 'true';
         var isTVGeneric = /\bTV\b/i.test(ua) && !/iPhone|iPad|Mobile/i.test(ua);
         var isOtherTV = /webOS|Web0S/i.test(ua) || /AppleTV|Apple TV/i.test(ua);
         var isAndroidBrowserTV = /Android/i.test(ua) && w >= 1280 && h >= 720 && w > h;
+        // App Android sur TV (jeton UA posé par l'activité native) / viewport 1920 forcé (TvViewportScript)
+        // / Android sans écran tactile ni pointeur (télécommande seule) : TV quel que soit le modèle.
+        var isNativeAndroidTV = /PopcornnTV/i.test(ua)
+          || document.documentElement.hasAttribute('data-tv-viewport')
+          || (/Android/i.test(ua) && (navigator.maxTouchPoints || 0) === 0
+            && !!window.matchMedia && window.matchMedia('(pointer: none)').matches);
         var isForcedTV = window.location.search.indexOf('tv=1') !== -1;
         var isWebOSBuild = document.documentElement.getAttribute('data-webos') === 'true';
         // App « simple » / navigateur TV : pas de build WEBOS, on se base sur l’UA + APIs LG.
@@ -327,7 +336,7 @@ const isWebOS = import.meta.env.WEBOS === 'true';
           || typeof window.webOS !== 'undefined'
           || typeof window.PalmSystem !== 'undefined';
         var isWebOS = isWebOSBuild || isWebOSRuntime;
-        var isTV = isTauriAndroidTV || isTauriFallback || isAndroidTVUA || isTVGeneric || isOtherTV || isAndroidBrowserTV || isForcedTV || isWebOS;
+        var isTV = isNativeAndroidTV || isTauriAndroidTV || isTauriFallback || isAndroidTVUA || isTVGeneric || isOtherTV || isAndroidBrowserTV || isForcedTV || isWebOS;
         if (isTV) {
           document.documentElement.setAttribute('data-tv-platform', 'true');
           try { sessionStorage.setItem('popcorn_is_tv', '1'); } catch (e) {}
