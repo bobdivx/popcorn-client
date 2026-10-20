@@ -11,7 +11,9 @@
  *
  * ES5 uniquement (Chromium webOS / anciens WebView).
  */
-var IMG_CACHE = 'popcorn-img-v1';
+// v2 (1.4.23) : purge des copies de la v1 (régression images cassées) — l'activation supprime
+// tout cache « popcorn-img-* » différent de IMG_CACHE.
+var IMG_CACHE = 'popcorn-img-v2';
 var MAX_ENTRIES = 700;
 var MAX_BYTES = 80 * 1024 * 1024; // 80 Mo
 var TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 jours
@@ -84,6 +86,11 @@ function cacheFirst(request) {
     .open(IMG_CACHE)
     .then(function (cache) {
       return cache.match(key).then(function (hit) {
+        // Copie inutilisable (vide, pas une image) : supprimée puis retéléchargée.
+        if (hit && !isUsable(hit)) {
+          cache.delete(key).catch(function () {});
+          hit = null;
+        }
         if (hit) {
           var at = Number(hit.headers.get(H_TIME)) || 0;
           var age = Date.now() - at;
@@ -101,14 +108,28 @@ function cacheFirst(request) {
             }
           );
         }
-        return fetchAndStore(cache, key).catch(function () {
-          return fetch(request);
-        });
+        // Échec du téléchargement CORS : requête d'origine de la page (comportement sans SW).
+        return fetchAndStore(cache, key).then(
+          function (res) {
+            return res && res.ok ? res : fetch(request);
+          },
+          function () {
+            return fetch(request);
+          }
+        );
       });
     })
     .catch(function () {
       return fetch(request);
     });
+}
+
+function isUsable(res) {
+  if (!res || res.status !== 200) return false;
+  var type = res.headers.get('Content-Type') || '';
+  if (type && type.indexOf('image/') !== 0) return false;
+  var size = res.headers.get(H_SIZE);
+  return size === null || Number(size) > 0;
 }
 
 function stamp(blob, contentType) {
@@ -148,6 +169,7 @@ function fetchAndStore(cache, key) {
       .clone()
       .blob()
       .then(function (blob) {
+        if (!blob || !blob.size) return;
         return cache.put(key, stamp(blob, type)).then(
           function () {
             scheduleTrim(cache);
