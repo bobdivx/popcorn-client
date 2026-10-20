@@ -16,6 +16,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { patchAndroidTvWebView } from './patch-android-tv-webview.js';
 
 const projectRoot = process.cwd();
 
@@ -332,6 +333,15 @@ function main() {
   console.log(`✅ AndroidManifest.xml trouvé: ${manifestPath}\n`);
   
   const success = patchManifest(manifestPath);
+
+  // Android TV / Google TV : WebView en viewport 1920 (comme webOS), textZoom 100, jeton UA TV.
+  // Échec bloquant : sans ce patch l'UI TV s'affiche ~2× trop grande sur Google TV.
+  try {
+    patchAndroidTvWebView(projectRoot);
+  } catch (e) {
+    console.error(`\n❌ Patch MainActivity (Android TV WebView) : ${e.message}`);
+    process.exit(1);
+  }
   
   if (success) {
     console.log('\n✅ Patch terminé avec succès!');
