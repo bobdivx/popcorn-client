@@ -185,6 +185,25 @@ export function isAndroidTV(): boolean {
 
   const userAgent = navigator.userAgent || '';
 
+  // App Android sur TV : jeton UA posé par l'activité native (UiModeManager TELEVISION / leanback),
+  // ou viewport 1920 forcé par TvViewportScript (Layout.astro) — fiable quel que soit le modèle.
+  if (/PopcornnTV/i.test(userAgent)) return true;
+  try {
+    if (document.documentElement.hasAttribute('data-tv-viewport')) return true;
+  } catch {
+    // ignore
+  }
+  // Android sans écran tactile ni pointeur (télécommande seule) : Google TV / Android TV
+  // dont l'UA ne porte pas de mention TV (ex. téléviseurs « Google TV » intégrés).
+  if (
+    /Android/i.test(userAgent) &&
+    (navigator.maxTouchPoints || 0) === 0 &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: none)').matches
+  ) {
+    return true;
+  }
+
   // User-agent explicitement TV
   if (/Android.*TV|TV.*Android/i.test(userAgent)) {
     return true;
