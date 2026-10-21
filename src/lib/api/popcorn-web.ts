@@ -1664,6 +1664,11 @@ export interface LocalUser {
   emailVerified: boolean;
   createdAt: number;
   updatedAt: number;
+  /** Statut du dernier email d'invitation : 'sent' | 'failed' | 'skipped' (null si inconnu). */
+  lastEmailStatus?: string | null;
+  lastEmailSentAt?: number | null;
+  lastEmailError?: string | null;
+  invitationExpiresAt?: number | null;
 }
 
 /**
