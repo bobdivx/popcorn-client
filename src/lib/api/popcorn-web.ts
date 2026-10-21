@@ -1669,6 +1669,70 @@ export interface LocalUser {
   lastEmailSentAt?: number | null;
   lastEmailError?: string | null;
   invitationExpiresAt?: number | null;
+  /** 'link' : invité arrivé par un lien d'invitation à usage unique ; 'email' sinon. */
+  inviteKind?: 'email' | 'link';
+}
+
+/** Lien d'invitation à usage unique (pas encore utilisé). */
+export interface LocalUserInviteLink {
+  id: string;
+  url: string;
+  createdAt: number;
+  expiresAt: number | null;
+  expired: boolean;
+}
+
+/**
+ * Crée un lien d'invitation à usage unique (compte principal uniquement, valable 7 jours).
+ */
+export async function createLocalUserInviteLink(): Promise<{ success: boolean; link?: LocalUserInviteLink; message?: string }> {
+  try {
+    const res = await requestWithTokenRefresh(
+      `${getPopcornWebApiUrl()}/local-users/invite-links`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) },
+      15000
+    );
+    if (!res.ok || !res.data?.data?.link) {
+      return { success: false, message: res.data?.message };
+    }
+    return { success: true, link: res.data.data.link as LocalUserInviteLink };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : undefined };
+  }
+}
+
+/**
+ * Liens d'invitation à usage unique en attente (null en cas d'erreur).
+ */
+export async function getLocalUserInviteLinks(): Promise<LocalUserInviteLink[] | null> {
+  try {
+    const res = await requestWithTokenRefresh(
+      `${getPopcornWebApiUrl()}/local-users/invite-links`,
+      { method: 'GET', headers: { 'Content-Type': 'application/json' } },
+      10000
+    );
+    if (!res.ok) return null;
+    return (res.data?.data?.links as LocalUserInviteLink[]) || [];
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Révoque un lien d'invitation pas encore utilisé.
+ */
+export async function revokeLocalUserInviteLink(linkId: string): Promise<{ success: boolean; message?: string }> {
+  try {
+    const res = await requestWithTokenRefresh(
+      `${getPopcornWebApiUrl()}/local-users/invite-links/${encodeURIComponent(linkId)}`,
+      { method: 'DELETE', headers: { 'Content-Type': 'application/json' } },
+      10000
+    );
+    if (!res.ok) return { success: false, message: res.data?.message };
+    return { success: true };
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : undefined };
+  }
 }
 
 /**
