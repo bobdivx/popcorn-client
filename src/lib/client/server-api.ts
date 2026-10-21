@@ -159,7 +159,7 @@ interface IServerApiClientPublic {
 
   // Quick Connect methods
   initQuickConnect(): Promise<ApiResponse<{ code: string; secret: string; expiresAt: number }>>;
-  authorizeQuickConnect(code: string): Promise<ApiResponse<{ message: string; secret?: string }>>;
+  authorizeQuickConnect(code: string, userId?: string): Promise<ApiResponse<{ message: string; secret?: string }>>;
   getQuickConnectStatus(secret: string): Promise<ApiResponse<{
     status: 'pending' | 'authorized' | 'used' | 'expired';
     authorized: boolean;
@@ -169,7 +169,8 @@ interface IServerApiClientPublic {
     user: { id: string; email: string };
     accessToken: string;
     refreshToken: string;
-    jwtSecret?: string;
+    jwtSecret?: string | null;
+    isLocalUser?: boolean;
     backendUrl?: string;
   }>>;
 
