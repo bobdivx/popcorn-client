@@ -285,7 +285,7 @@ function SourceSelectModal({
                       data-focusable
                       className={`gtv-pill-btn ds-focus-glow ds-active-glow px-3 py-1.5 tv:px-4 tv:py-2 rounded-lg border text-sm tv:text-base font-semibold transition-colors ${
                         selectedQuality === quality
-                          ? 'bg-violet-600/30 text-white border-violet-300 ring-2 ring-violet-300/80 shadow-[0_0_0_1px_rgba(196,181,253,0.45)]'
+                          ? 'bg-violet-600/30 text-white border-violet-300 ring-2 ring-violet-300/80 shadow-[0_0_0_1px_rgba(255,161,166,0.45)]'
                           : 'text-white/80 border-white/25 hover:bg-white/10'
                       }`}
                     >
