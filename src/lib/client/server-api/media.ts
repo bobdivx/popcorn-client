@@ -352,7 +352,7 @@ export const mediaMethods = {
     const scrubHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
     try {
       const { TokenManager } = await import('../storage.js');
-      const t = TokenManager.getCloudAccessToken();
+      const t = TokenManager.getServerAuthToken();
       if (t) scrubHeaders.Authorization = `Bearer ${t}`;
     } catch { /* ignore */ }
     const res = await fetch(url, {
