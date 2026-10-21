@@ -29,7 +29,7 @@ export default function DebugToggle() {
           onClick={toggle}
           style={`flex-shrink:0;min-width:52px;height:28px;border-radius:14px;border:none;cursor:pointer;transition:background 0.2s;position:relative;${
             enabled
-              ? 'background:#7c3aed;'
+              ? 'background:#f2545b;'
               : 'background:rgba(255,255,255,0.12);'
           }`}
           role="switch"
