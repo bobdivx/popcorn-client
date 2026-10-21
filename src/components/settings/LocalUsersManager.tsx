@@ -220,6 +220,12 @@ export default function LocalUsersManager() {
           <h3 className="ds-title-section text-[var(--ds-text-primary)] mb-4">
             {t('settingsMenu.localUsers.listTitle', { count: users.length })}
           </h3>
+          <p className="ds-text-secondary text-sm mb-4">
+            {t('settingsMenu.localUsers.shareDefaultNone')}{' '}
+            <a href="/settings/friends" className="text-[var(--ds-accent-violet)] underline">
+              {t('settingsMenu.localUsers.manageSharing')}
+            </a>
+          </p>
 
           {users.length === 0 ? (
             <p className="ds-text-tertiary text-sm text-center py-8">{t('settingsMenu.localUsers.noLocalUsers')}</p>
