@@ -53,7 +53,7 @@ async function establishGuestServerSession(
   const username = res.data?.user?.username || email || 'user';
   const { accessToken, refreshToken } = await ctx.generateClientTokens(userId, username);
   ctx.saveTokens(accessToken, refreshToken);
-  ctx.saveUser({ id: userId, email, username });
+  ctx.saveUser({ id: userId, email, username, role: 'local' });
   return true;
 }
 
