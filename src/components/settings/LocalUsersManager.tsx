@@ -130,8 +130,10 @@ export default function LocalUsersManager() {
           t('settingsMenu.localUsers.inviteEmailNotSent') +
             (result.emailError ? ` (${result.emailError})` : '')
         );
+        await loadUsers();
       } else if (result.success) {
         setSuccess(t('settingsMenu.localUsers.resendSuccess'));
+        await loadUsers();
       } else {
         setError(result.message || t('settingsMenu.localUsers.resendError'));
       }
@@ -246,6 +248,19 @@ export default function LocalUsersManager() {
                     <p className="ds-text-tertiary text-xs mt-1">
                       {t('settingsMenu.localUsers.createdOn', { date: new Date(user.createdAt).toLocaleDateString() })}
                     </p>
+                    {!user.isActive && user.lastEmailStatus && user.lastEmailSentAt && (
+                      <p
+                        className={`text-xs mt-1 ${user.lastEmailStatus === 'sent' ? 'text-[var(--ds-accent-green,#22c55e)]' : 'text-[var(--ds-accent-red,#ef4444)]'}`}
+                        title={user.lastEmailError || undefined}
+                      >
+                        {user.lastEmailStatus === 'sent'
+                          ? t('settingsMenu.localUsers.lastEmailSent', { date: new Date(user.lastEmailSentAt).toLocaleString() })
+                          : t('settingsMenu.localUsers.lastEmailFailed', {
+                              date: new Date(user.lastEmailSentAt).toLocaleString(),
+                              error: user.lastEmailError || '',
+                            })}
+                      </p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {!user.isActive && (
