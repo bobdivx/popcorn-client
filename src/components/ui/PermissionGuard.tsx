@@ -3,6 +3,7 @@ import { useI18n } from '../../lib/i18n/useI18n';
 import { Lock } from 'lucide-preact';
 import { TokenManager } from '../../lib/client/storage';
 import { useEffect, useState } from 'preact/hooks';
+import { usePageLoaderHold } from '../../lib/boot/pageLoader';
 
 interface PermissionGuardProps {
   permission: Permission;
@@ -52,12 +53,13 @@ export default function PermissionGuard({ permission, children }: PermissionGuar
     return () => clearTimeout(timeoutId);
   }, [permission]);
 
-  // Afficher un loader pendant la vérification initiale (évite une page vide)
+  usePageLoaderHold('permission-guard', isChecking, 8000, 200);
+
+  // Pendant la vérification initiale : écran de chargement unique (si elle dure > 200 ms)
   if (isChecking) {
     return (
-      <div className="flex items-center justify-center min-h-[120px]" aria-busy="true">
-        <span className="loading loading-spinner loading-md text-[var(--ds-accent-violet)]" />
-      </div>
+      // Écran de chargement unique (Layout) au lieu d'un spinner propre à la garde.
+      <div className="min-h-[120px]" aria-busy="true" />
     );
   }
 
