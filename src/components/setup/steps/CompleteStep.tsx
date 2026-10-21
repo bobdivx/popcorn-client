@@ -2,8 +2,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { serverApi } from '../../../lib/client/server-api';
 import { SyncProgress } from '../components/SyncProgress';
 import { useI18n } from '../../../lib/i18n';
-import { getLocalUsers, getLocalUserForSync } from '../../../lib/api/popcorn-web';
-import { TokenManager } from '../../../lib/client/storage';
+import { syncLocalUsersToBackend } from '../../../lib/client/local-users-sync';
 import { resolveBootIntroMp4 } from '../../../lib/utils/boot-intro';
 
 interface CompleteStepProps {
@@ -67,31 +66,7 @@ export function CompleteStep({ focusedButtonIndex, buttonRefs, onComplete }: Com
 
   // Synchroniser les utilisateurs locaux
   useEffect(() => {
-    const syncLocalUsers = async () => {
-      try {
-        const cloudToken = TokenManager.getCloudAccessToken();
-        if (!cloudToken) return;
-        const localUsers = await getLocalUsers();
-        if (!localUsers || localUsers.length === 0) return;
-        const cloudUserId = TokenManager.getUser()?.id;
-        if (!cloudUserId) return;
-        for (const localUser of localUsers) {
-          if (!localUser.isActive) continue;
-          try {
-            const existingUser = await serverApi.getLocalUser(localUser.id);
-            if (existingUser.success && existingUser.data) continue;
-            const syncResponse = await getLocalUserForSync(localUser.id);
-            if (!syncResponse.success || !syncResponse.data) continue;
-            const userData = syncResponse.data;
-            await serverApi.createLocalUser({
-              cloud_account_id: cloudUserId, email: userData.email,
-              password_hash: userData.password_hash, display_name: userData.display_name || undefined,
-            });
-          } catch { /* ignore par user */ }
-        }
-      } catch { /* ignore */ }
-    };
-    syncLocalUsers();
+    void syncLocalUsersToBackend();
   }, []);
 
   useEffect(() => {
