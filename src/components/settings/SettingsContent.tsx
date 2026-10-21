@@ -112,7 +112,7 @@ const CATEGORY_PERMISSIONS: Record<CategoryId, string | string[] | undefined> = 
   downloads: 'settings.server',
   library: ['settings.server', 'settings.friends'],
   discovery: 'settings.server',
-  account: 'settings.account',
+  account: 'settings.profile',
 };
 
 function canSeeCategory(cat: CategoryId): boolean {
@@ -234,7 +234,7 @@ function LazyPageAccount() {
   }, []);
   if (!AccountSubMenuPanel) return <SettingsRouteSkeleton />;
   return (
-    <PermissionGuard permission="settings.account">
+    <PermissionGuard permission="settings.profile">
       <DsPageHeader titleKey="settingsPages.account.title" subtitleKey="settingsPages.account.subtitle" />
       <AccountSubMenuPanel baseUrl="/settings/account/" />
     </PermissionGuard>
@@ -253,7 +253,11 @@ function LazyPageRatio() {
     return () => { cancelled = true; };
   }, []);
   if (!RatioAdminPanel) return <SettingsRouteSkeleton />;
-  return <RatioAdminPanel />;
+  return (
+    <PermissionGuard permission="settings.server">
+      <RatioAdminPanel />
+    </PermissionGuard>
+  );
 }
 
 function SettingsRouteSkeleton() {
