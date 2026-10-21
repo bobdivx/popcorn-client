@@ -1104,6 +1104,11 @@ export function useHlsPlayer({
                   video.play().catch(() => {});
                 }
                 markPlaybackReady();
+              } else if (canPlay && video.paused && hasStartedPlayingRef.current) {
+                // Lecture déjà démarrée puis rechargée : ne pas laisser le <video> en pause
+                // indéfiniment (pause posée par ce code, pas par l'utilisateur). play() attend
+                // les données puis repart tout seul ; l'événement `playing` lève l'overlay.
+                video.play().catch(() => {});
               }
             }, MAX_WAIT_FOR_BUFFER_MS);
             // Attendre que currentTime soit bien à jour (position sauvegardée) avant de mesurer le buffer
@@ -1440,6 +1445,54 @@ export function useHlsPlayer({
 
           // Jellyfin bindEventsToHlsPlayer: erreur réseau avec code >= 400 → destroy
           if (data.type === HlsErrorTypes?.NETWORK_ERROR && typeof statusCode === 'number' && statusCode >= 400) {
+            // Erreur sur un SEGMENT en pleine lecture (pas la playlist, pas de seek en cours) :
+            // ne jamais recharger la source ici. hls.loadSource() détache/rattache la MediaSource
+            // → <video> remis en pause, buffer vidé, et sans `seek=` le serveur régénère depuis 0 :
+            // la position de reprise n'arrive jamais et la lecture reste figée jusqu'à ce que
+            // l'utilisateur appuie sur lecture ou fasse un petit seek.
+            const isMidPlaybackFragError =
+              !!data.frag &&
+              hasStartedPlayingRef.current &&
+              pendingSeekRef.current <= 0 &&
+              !seekLoadUrlRef.current;
+            if (isMidPlaybackFragError && statusCode >= 500) {
+              // 503 = segment encore en génération : hls.js réessaie lui-même (fragLoadPolicy).
+              if (!data.fatal) return;
+              // Retries hls.js épuisés : relancer le chargement à la position courante, sans démontage.
+              const resumeAt = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+              const wasPlaying = !video.paused;
+              console.debug('[useHlsPlayer] segment', statusCode, 'en lecture → startLoad @', resumeAt.toFixed(1));
+              window.setTimeout(() => {
+                if (hlsRef.current !== hls) return;
+                try {
+                  hls.startLoad(resumeAt);
+                } catch (_) {
+                  /* ignore */
+                }
+                if (wasPlaying && video.paused) video.play().catch(() => {});
+              }, 2000);
+              return;
+            }
+            if (
+              isMidPlaybackFragError &&
+              statusCode === 404 &&
+              !useStreamTorrentUrl &&
+              segment404RetryCountRef.current < 2 &&
+              Number.isFinite(video.currentTime) &&
+              video.currentTime > 0.25
+            ) {
+              // Segment disparu (FFmpeg arrêté / cache nettoyé) : même chemin qu'un seek utilisateur
+              // (playlist `seek=` → le serveur relance la génération à cette position, lecture conservée).
+              segment404RetryCountRef.current += 1;
+              const resumeAt = video.currentTime;
+              console.debug('[useHlsPlayer] 404 segment en lecture → reloadWithSeek @', resumeAt.toFixed(1));
+              window.setTimeout(() => {
+                if (hlsRef.current !== hls) return;
+                const reload = reloadWithSeekRef.current;
+                if (reload) reload(resumeAt);
+              }, 1000);
+              return;
+            }
             // 503/202 = playlist seek en cours de génération côté backend (cf. Jellyfin: nouveau stream URL avec position)
             const seekUrl = seekLoadUrlRef.current;
             // 503/202 = playlist seek en cours de génération (backend peut prendre 2-5 min pour un long film avec seek lointain)
