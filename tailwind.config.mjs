@@ -29,9 +29,12 @@ export default {
       },
       colors: {
         // Accent éditorial unique (corail #f2545b) — remplace l’ancien violet néon.
-        // purple / violet hérités : alias corail (classes legacy bg-purple-*, ring-violet-*…).
+        // purple / violet / indigo / fuchsia hérités : alias corail (classes legacy bg-purple-*,
+        // ring-violet-*, bg-indigo-500/10…) — plus aucune teinte violette dans le bundle.
         purple: CORAL,
         violet: CORAL,
+        indigo: CORAL,
+        fuchsia: CORAL,
         primary: {
           50: '#fff1f2',
           100: '#ffe1e3',
