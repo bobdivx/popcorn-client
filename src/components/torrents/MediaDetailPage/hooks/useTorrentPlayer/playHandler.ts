@@ -47,7 +47,7 @@ async function waitForStreamReady(
     addDebugLog('info', 'Média bibliothèque (local_), pas d’appel stream-torrent/ready');
     return true;
   }
-  const token = TokenManager.getCloudAccessToken();
+  const token = TokenManager.getServerAuthToken();
   if (!token) {
     addDebugLog('warning', 'Stream torrent actif mais pas de token cloud');
     return true;
