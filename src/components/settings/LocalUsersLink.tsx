@@ -22,10 +22,10 @@ export default function LocalUsersLink() {
           </div>
           <div>
             <h2 class="text-2xl sm:text-3xl md:text-4xl font-black text-white mb-2 sm:mb-3">
-              Gérer les utilisateurs locaux
+              {t('settingsMenu.localUsers.linkTitle')}
             </h2>
             <p class="text-gray-400 text-sm sm:text-base">
-              Invitez et gérez les comptes locaux avec permissions limitées
+              {t('settingsMenu.localUsers.linkDescription')}
             </p>
           </div>
         </div>
