@@ -56,8 +56,8 @@ export function DisclaimerStep({ focusedButtonIndex, buttonRefs, onNext }: Discl
       <style>{`
         .disclaimer-scroll::-webkit-scrollbar { width: 4px; }
         .disclaimer-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); border-radius: 4px; }
-        .disclaimer-scroll::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 4px; }
-        .disclaimer-scroll::-webkit-scrollbar-thumb:hover { background: rgba(124,58,237,0.5); }
+        .disclaimer-scroll::-webkit-scrollbar-thumb { background: rgba(242,84,91,0.3); border-radius: 4px; }
+        .disclaimer-scroll::-webkit-scrollbar-thumb:hover { background: rgba(242,84,91,0.5); }
         .disclaimer-section {
           display: flex; gap: 14px; padding: 14px 0;
           border-bottom: 1px solid rgba(255,255,255,0.05);
@@ -65,10 +65,10 @@ export function DisclaimerStep({ focusedButtonIndex, buttonRefs, onNext }: Discl
         .disclaimer-section:last-child { border-bottom: none; padding-bottom: 0; }
         .disclaimer-num {
           width: 22px; height: 22px; border-radius: 50%;
-          background: rgba(124,58,237,0.15);
-          border: 1px solid rgba(124,58,237,0.25);
+          background: rgba(242,84,91,0.15);
+          border: 1px solid rgba(242,84,91,0.25);
           display: flex; align-items: center; justify-content: center;
-          font-size: 11px; font-weight: 700; color: #a78bfa;
+          font-size: 11px; font-weight: 700; color: #fb7a80;
           flex-shrink: 0; margin-top: 1px;
         }
         .checkbox-custom {
@@ -80,9 +80,9 @@ export function DisclaimerStep({ focusedButtonIndex, buttonRefs, onNext }: Discl
           transition: all 0.15s;
         }
         .checkbox-custom.checked {
-          background: #7c3aed;
-          border-color: #7c3aed;
-          box-shadow: 0 0 0 3px rgba(124,58,237,0.2);
+          background: #f2545b;
+          border-color: #f2545b;
+          box-shadow: 0 0 0 3px rgba(242,84,91,0.2);
         }
       `}</style>
 
@@ -125,8 +125,8 @@ export function DisclaimerStep({ focusedButtonIndex, buttonRefs, onNext }: Discl
 
         {/* Gradient indiquant qu'il y a du contenu en dessous */}
         {!scrolledToBottom && (
-          <div style="position:absolute;bottom:0;left:0;right:0;height:48px;background:linear-gradient(to top, rgba(7,7,14,0.9), transparent);border-radius:0 0 12px 12px;pointer-events:none;display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;">
-            <span style="font-size:11px;color:rgba(167,139,250,0.6);display:flex;align-items:center;gap:4px;">
+          <div style="position:absolute;bottom:0;left:0;right:0;height:48px;background:linear-gradient(to top, rgba(12,13,16,0.9), transparent);border-radius:0 0 12px 12px;pointer-events:none;display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;">
+            <span style="font-size:11px;color:rgba(251,122,128,0.6);display:flex;align-items:center;gap:4px;">
               <svg style="width:12px;height:12px;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -157,7 +157,7 @@ export function DisclaimerStep({ focusedButtonIndex, buttonRefs, onNext }: Discl
         <a
           href="/disclaimer"
           target="_blank"
-          style="font-size:12.5px;color:rgba(167,139,250,0.6);text-decoration:none;display:flex;align-items:center;gap:4px;"
+          style="font-size:12.5px;color:rgba(251,122,128,0.6);text-decoration:none;display:flex;align-items:center;gap:4px;"
           onClick={(e) => e.stopPropagation()}
         >
           Lire la version complète
