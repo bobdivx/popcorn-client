@@ -56,7 +56,7 @@ function authHeadersFor(base: string): Record<string, string> {
   try {
     const configured = (getBackendUrl() || '').replace(/\/$/, '');
     if (!configured || base !== configured) return {};
-    const t = TokenManager.getCloudAccessToken();
+    const t = TokenManager.getServerAuthToken();
     return t ? { Authorization: `Bearer ${t}` } : {};
   } catch {
     return {};
