@@ -33,7 +33,15 @@ import { YouTubeVideoPlayer as VideoPlayer } from '../../ui/YouTubeVideoPlayer';
 import { redirectToCarPlayerIfNeeded } from '../../streaming/car-player/carPlaybackRedirect';
 import {
   getPlaybackPositionByMediaRecord,
+  getWatchedEpisodesSet,
+  watchedEpisodeKey,
 } from '../../../lib/streaming/torrent-storage';
+import {
+  getEpisodeProgressMap,
+  syncWatchedEpisodesFromServer,
+  WATCHED_EPISODE_THRESHOLD_PERCENT,
+  type EpisodeProgressEntry,
+} from '../../../lib/watchedEpisodes';
 import { resolveResumeSeconds } from '../../../lib/streaming/resumePosition';
 import { setStreamingInfoHash } from '../../../lib/streamingInfoHashStorage';
 import { getOrCreateDeviceId } from '../../../lib/utils/device-id';
@@ -76,6 +84,53 @@ import {
 import { useTmdbApiTitle } from './hooks/useTmdbApiTitle';
 import { isLocalMedia as isLocalMediaHash } from './actions/delete';
 import { getNextEpisodeInfo, getPreviousEpisodeInfo } from './utils/episodeNavigation';
+
+/**
+ * Épisode à mettre en avant à l'ouverture d'une série déjà commencée : le DERNIER épisode
+ * regardé (progression par épisode, fusion appareil + serveur `/api/watched-episodes`, toutes
+ * plateformes). S'il a été fini (≥ seuil « vu »), l'épisode suivant de la liste (s'il existe).
+ */
+function pickLastWatchedEpisode(
+  seasons: SeriesEpisodesResponse['seasons'],
+  progress: Record<string, EpisodeProgressEntry>,
+  watched: Set<string>,
+): { season: number; episode: number } | null {
+  let best: { season: number; episode: number; t: number; p: number } | null = null;
+  for (const s of seasons) {
+    for (const e of s.episodes ?? []) {
+      if (typeof e.episode !== 'number' || !(e.episode > 0)) continue;
+      const entry = progress?.[watchedEpisodeKey(s.season, e.episode)];
+      if (!entry || !Number.isFinite(entry.t)) continue;
+      if (!best || entry.t > best.t) {
+        best = { season: s.season, episode: e.episode, t: entry.t, p: Number(entry.p) || 0 };
+      }
+    }
+  }
+  if (!best) return null;
+  const finished = best.p >= WATCHED_EPISODE_THRESHOLD_PERCENT;
+  if (!finished) return { season: best.season, episode: best.episode };
+  // Ordre de lecture : saisons croissantes (spéciaux en dernier), épisodes croissants.
+  // (boucles simples, pas de flatMap : vieux moteurs webOS)
+  const ordered: { season: number; episode: number }[] = [];
+  const sortedSeasons = seasons
+    .slice()
+    .sort((a, b) => (a.season === 0 ? 1 : b.season === 0 ? -1 : a.season - b.season));
+  for (const s of sortedSeasons) {
+    const eps = (s.episodes ?? [])
+      .filter((e) => typeof e.episode === 'number' && e.episode > 0)
+      .sort((a, b) => a.episode - b.episode);
+    for (const e of eps) ordered.push({ season: s.season, episode: e.episode });
+  }
+  const idx = ordered.findIndex((x) => x.season === best!.season && x.episode === best!.episode);
+  if (idx >= 0) {
+    for (let i = idx + 1; i < ordered.length; i++) {
+      const next = ordered[i];
+      // Sauter un épisode suivant déjà vu (ex. vu sur un autre appareil)
+      if (!watched.has(watchedEpisodeKey(next.season, next.episode))) return next;
+    }
+  }
+  return { season: best.season, episode: best.episode };
+}
 
 /** Retourne l'épisode suivant (saison + id variante + titre) ou null — franchit les saisons. */
 function getNextEpisode(
@@ -437,6 +492,11 @@ export default function MediaDetailPage({
   /** Saison / Ã©pisode sÃ©lectionnÃ©s (pour sÃ©ries) */
   const [selectedSeasonNum, setSelectedSeasonNum] = useState<number | null>(null);
   const [selectedEpisodeVariantId, setSelectedEpisodeVariantId] = useState<string | null>(null);
+  /** Épisode de reprise (dernier regardé / deep-link) : focus TV + défilement à l'ouverture. */
+  const [resumeTargetEpisodeId, setResumeTargetEpisodeId] = useState<string | null>(null);
+  const resumeTargetResolvedAtRef = useRef(0);
+  const resumeTvFocusDoneRef = useRef<string | null>(null);
+  const resumeRevealDoneRef = useRef<string | null>(null);
   const normalizeResolution = useCallback((raw?: string | null): string => {
     if (!raw) return '';
     const up = raw.toUpperCase();
@@ -2093,13 +2153,19 @@ export default function MediaDetailPage({
       selectedEpisodeVariantId != null;
     const firstSeasonWithEpisodes = seriesEpisodes?.seasons.find((s) => (s.episodes?.length ?? 0) > 0);
     const firstCarouselEpisodeId = firstSeasonWithEpisodes?.episodes?.[0]?.id ?? null;
+    // Série commencée : focus sur le dernier épisode regardé (saison comprise), même sans
+    // position sauvegardée pour la fiche (avant : 1re carte du carrousel).
+    const isResumeTarget =
+      hasSeriesCarousel && !!resumeTargetEpisodeId && resumeTargetEpisodeId === selectedEpisodeVariantId;
+    // Déjà focalisé une fois : ne pas reprendre le focus à l'utilisateur sur un re-rendu.
+    if (isResumeTarget && resumeTvFocusDoneRef.current === resumeTargetEpisodeId) return;
     const focusEpisodeCardId =
       hasSeriesCarousel && selectedEpisodeVariantId
-        ? seriesResume
+        ? seriesResume || isResumeTarget
           ? selectedEpisodeVariantId
           : (firstCarouselEpisodeId ?? selectedEpisodeVariantId)
         : null;
-    const delayMs = seriesResume ? 550 : hasSeriesCarousel ? 400 : 200;
+    const delayMs = seriesResume || isResumeTarget ? 550 : hasSeriesCarousel ? 400 : 200;
     let cancelled = false;
     const t = setTimeout(() => {
       if (cancelled) return;
@@ -2128,6 +2194,15 @@ export default function MediaDetailPage({
           ) as HTMLElement | null;
           if (epBtn) {
             epBtn.focus();
+            if (isResumeTarget) {
+              resumeTvFocusDoneRef.current = variantId;
+              // Rangée de la bonne saison bien visible + carte centrée dans la rangée.
+              try {
+                epBtn.scrollIntoView({ block: 'center', inline: 'center' });
+              } catch {
+                /* anciens moteurs */
+              }
+            }
             return;
           }
           if (remaining > 0) {
@@ -2154,7 +2229,51 @@ export default function MediaDetailPage({
     seriesEpisodes,
     savedPlaybackPosition,
     selectedEpisodeVariantId,
+    resumeTargetEpisodeId,
   ]);
+
+  // Tactile / desktop : série commencée → amener la carte du dernier épisode regardé à l'écran
+  // (bonne rangée de saison + carte centrée), surlignée par l'état « sélectionné ».
+  useEffect(() => {
+    if (isTVPlatform()) return;
+    const target = resumeTargetEpisodeId;
+    if (!target || target !== selectedEpisodeVariantId) return;
+    if (resumeRevealDoneRef.current === target) return;
+    // Bande-annonce immersive : attendre que l'UI soit visible (sans voler la vue de la vidéo).
+    if (isPlayingTrailer && !trailerUiVisible) return;
+    let cancelled = false;
+    let tries = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = () => {
+      if (cancelled) return;
+      const card = document.querySelector<HTMLElement>(`[data-episode-card="${CSS.escape(target)}"]`);
+      if (!card) {
+        tries += 1;
+        if (tries < 20) timer = setTimeout(tick, 150);
+        return;
+      }
+      resumeRevealDoneRef.current = target;
+      // Plus de 6 s après l'ouverture : seulement recentrer la carte dans sa rangée (pas de saut de page).
+      const late = Date.now() - resumeTargetResolvedAtRef.current > 6000;
+      if (late) {
+        const scroller = card.closest<HTMLElement>('[data-tv-episode-scroller]');
+        if (scroller) {
+          scroller.scrollLeft = Math.max(0, card.offsetLeft - (scroller.clientWidth - card.offsetWidth) / 2);
+        }
+        return;
+      }
+      try {
+        card.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+      } catch {
+        card.scrollIntoView();
+      }
+    };
+    timer = setTimeout(tick, 350);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, [resumeTargetEpisodeId, selectedEpisodeVariantId, isPlayingTrailer, trailerUiVisible]);
 
   // Télécommande : Retour quitte la fiche (pas de bouton Retour à l'écran en TV)
   useEffect(() => {
@@ -2285,7 +2404,8 @@ export default function MediaDetailPage({
     };
   }, [isPlayingTrailer, trailerUiVisible]);
 
-  // Initialiser saison/épisode : query params → localStorage → API resume → 1er épisode.
+  // Initialiser saison/épisode : query params → dernier épisode regardé (progression par
+  // épisode, serveur) → position locale → API resume → 1er épisode.
   useEffect(() => {
     if (!seriesEpisodes?.seasons?.length || selectedSeasonNum !== null) return;
     let cancelled = false;
@@ -2310,6 +2430,11 @@ export default function MediaDetailPage({
       return null;
     };
 
+    const markResumeTarget = (epId: string) => {
+      resumeTargetResolvedAtRef.current = Date.now();
+      setResumeTargetEpisodeId(epId);
+    };
+
     (async () => {
       // 1) Query params (deep-link de la rangée Reprendre)
       if (typeof window !== 'undefined') {
@@ -2327,6 +2452,7 @@ export default function MediaDetailPage({
         if (!cancelled && fromUrl) {
           setSelectedSeasonNum(fromUrl.seasonNum);
           setSelectedEpisodeVariantId(fromUrl.epId);
+          markResumeTarget(fromUrl.epId);
           return;
         }
       }
@@ -2336,7 +2462,36 @@ export default function MediaDetailPage({
       if (typeof tid !== 'number' || tty !== 'tv') {
         // Film / pas de TMDB : premier épisode si structure série quand même
       } else {
-        // 2) localStorage (savePlaybackPositionByMedia) — même appareil
+        // 2) Dernier épisode regardé d'après la progression PAR ÉPISODE (fusion appareil +
+        //    serveur, partagée web / webOS / Android TV / desktop). Rattrapage serveur borné.
+        try {
+          await Promise.race([
+            syncWatchedEpisodesFromServer(tid).catch(() => undefined),
+            new Promise((resolve) => setTimeout(resolve, 1500)),
+          ]);
+        } catch {
+          /* hors-ligne : progression locale seule */
+        }
+        if (cancelled) return;
+        const lastWatched = pickLastWatchedEpisode(
+          seriesEpisodes.seasons,
+          getEpisodeProgressMap(tid),
+          getWatchedEpisodesSet(tid),
+        );
+        if (lastWatched) {
+          const fromProgress = resolveEpisodeSelection({
+            season: lastWatched.season,
+            episode: lastWatched.episode,
+          });
+          if (fromProgress) {
+            setSelectedSeasonNum(fromProgress.seasonNum);
+            setSelectedEpisodeVariantId(fromProgress.epId);
+            markResumeTarget(fromProgress.epId);
+            return;
+          }
+        }
+
+        // 3) localStorage (savePlaybackPositionByMedia) — même appareil
         const deviceId = getOrCreateDeviceId();
         const record = await getPlaybackPositionByMediaRecord(tid, tty, deviceId);
         if (cancelled) return;
@@ -2349,11 +2504,12 @@ export default function MediaDetailPage({
           if (fromLocal) {
             setSelectedSeasonNum(fromLocal.seasonNum);
             setSelectedEpisodeVariantId(fromLocal.epId);
+            markResumeTarget(fromLocal.epId);
             return;
           }
         }
 
-        // 3) API « Reprendre » (compte utilisateur) — ouverture hors rangée Reprendre
+        // 4) API « Reprendre » (compte utilisateur) — ouverture hors rangée Reprendre
         try {
           const res = await serverApi.listResumeWatching({ limit: 80 });
           if (cancelled) return;
@@ -2373,6 +2529,7 @@ export default function MediaDetailPage({
               if (fromApi) {
                 setSelectedSeasonNum(fromApi.seasonNum);
                 setSelectedEpisodeVariantId(fromApi.epId);
+                markResumeTarget(fromApi.epId);
                 return;
               }
             }
@@ -2384,7 +2541,7 @@ export default function MediaDetailPage({
 
       if (cancelled) return;
 
-      // 4) Premier épisode disponible (saison 0 / spéciaux en dernier)
+      // 5) Rien de regardé : comportement par défaut — premier épisode (saison 0 / spéciaux en dernier)
       const first =
         seriesEpisodes.seasons.find((s) => s.season > 0 && (s.episodes?.length ?? 0) > 0) ??
         seriesEpisodes.seasons.find((s) => (s.episodes?.length ?? 0) > 0);
