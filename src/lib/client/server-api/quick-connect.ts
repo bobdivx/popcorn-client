@@ -13,6 +13,48 @@ import { setBackendUrl } from '../../backend-config.js';
 interface ServerApiClientQuickConnectAccess {
   saveTokens(accessToken: string, refreshToken: string): void;
   saveUser(user: any): void;
+  backendRequest<T>(endpoint: string, options?: RequestInit): Promise<ApiResponse<T>>;
+  generateClientTokens(userId: string, username: string): Promise<{ accessToken: string; refreshToken: string }>;
+}
+
+/**
+ * Invité (utilisateur local) connecté par Quick Connect : échange son jeton popcorn-web contre
+ * une session serveur `pls1.` (le serveur crée l'invité s'il ne le connaît pas encore).
+ * Retourne true si la session serveur a été établie.
+ */
+async function establishGuestServerSession(
+  ctx: ServerApiClientQuickConnectAccess,
+  guestAccessToken: string,
+  user: { id: string; email: string }
+): Promise<boolean> {
+  const res = await ctx.backendRequest<{
+    user: { id: string; email?: string; username?: string; role?: string };
+    access_token?: string;
+  }>('/api/client/auth/local-session', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${guestAccessToken}` },
+  });
+  const token = res.success ? res.data?.access_token : undefined;
+  if (typeof token !== 'string' || !token.startsWith('pls1.')) {
+    return false;
+  }
+  if (typeof window === 'undefined') return false;
+  // Même état que la connexion par mot de passe d'un invité (server-api/auth.ts) :
+  // pas de jeton cloud, session serveur, jetons client locaux.
+  TokenManager.clearCloudTokens();
+  TokenManager.setServerSessionToken(token);
+  if (!TokenManager.getJWTSecret() && typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const arr = new Uint8Array(32);
+    crypto.getRandomValues(arr);
+    TokenManager.setJWTSecret(Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join(''));
+  }
+  const userId = res.data?.user?.id || user.id;
+  const email = res.data?.user?.email || user.email;
+  const username = res.data?.user?.username || email || 'user';
+  const { accessToken, refreshToken } = await ctx.generateClientTokens(userId, username);
+  ctx.saveTokens(accessToken, refreshToken);
+  ctx.saveUser({ id: userId, email, username });
+  return true;
 }
 
 // Fonction helper pour faire des requêtes à popcorn-web
@@ -87,11 +129,13 @@ export const quickConnectMethods = {
    */
   async authorizeQuickConnect(
     this: ServerApiClientQuickConnectAccess,
-    code: string
+    code: string,
+    /** Optionnel : connecter l'appareil en tant que l'un de vos invités actifs. */
+    userId?: string
   ): Promise<ApiResponse<{ message: string; secret?: string }>> {
     return requestPopcornWeb<{ message: string; secret?: string }>('/auth/quick-connect/authorize', {
       method: 'POST',
-      body: JSON.stringify({ code }),
+      body: JSON.stringify(userId ? { code, userId } : { code }),
     });
   },
 
@@ -128,7 +172,8 @@ export const quickConnectMethods = {
     user: { id: string; email: string };
     accessToken: string;
     refreshToken: string;
-    jwtSecret?: string;
+    jwtSecret?: string | null;
+    isLocalUser?: boolean;
     backendUrl?: string;
     clientUrl?: string;
   }>> {
@@ -136,7 +181,8 @@ export const quickConnectMethods = {
       user: { id: string; email: string };
       accessToken: string;
       refreshToken: string;
-      jwtSecret?: string;
+      jwtSecret?: string | null;
+      isLocalUser?: boolean;
       backendUrl?: string;
       clientUrl?: string;
     }>('/auth/quick-connect/connect', {
@@ -145,13 +191,16 @@ export const quickConnectMethods = {
     });
     
     if (result.success && result.data) {
-      // Stocker les tokens
-      TokenManager.setCloudTokens(result.data.accessToken, result.data.refreshToken);
-      if (result.data.jwtSecret) {
-        TokenManager.setJWTSecret(result.data.jwtSecret);
+      const isGuest = result.data.isLocalUser === true;
+      if (!isGuest) {
+        // Stocker les tokens
+        TokenManager.setCloudTokens(result.data.accessToken, result.data.refreshToken);
+        if (result.data.jwtSecret) {
+          TokenManager.setJWTSecret(result.data.jwtSecret);
+        }
+        this.saveTokens(result.data.accessToken, result.data.refreshToken);
+        this.saveUser(result.data.user);
       }
-      this.saveTokens(result.data.accessToken, result.data.refreshToken);
-      this.saveUser(result.data.user);
       // URL du backend (serveur API) renvoyée par popcorn-web : toujours l'enregistrer côté client
       // pour que le device utilise le bon backend (ex. backup.briseteia.me) après Quick Connect
       if (result.data.backendUrl && typeof result.data.backendUrl === 'string' && result.data.backendUrl.trim()) {
@@ -167,6 +216,23 @@ export const quickConnectMethods = {
           localStorage.setItem('webos_local_client_url', result.data.clientUrl.trim().replace(/\/$/, ''));
         } catch {
           // ignore
+        }
+      }
+      if (isGuest) {
+        // Invité : le serveur du propriétaire n'accepte que sa propre session (pls1.).
+        let ok = false;
+        try {
+          ok = await establishGuestServerSession(this, result.data.accessToken, result.data.user);
+        } catch {
+          ok = false;
+        }
+        if (!ok) {
+          return {
+            success: false,
+            error: 'GuestSessionFailed',
+            message:
+              'Connexion au serveur impossible pour ce compte invité. Vérifiez que le serveur est joignable, ou connectez-vous avec email et mot de passe.',
+          };
         }
       }
     }
