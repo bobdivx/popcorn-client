@@ -13,7 +13,7 @@ interface CompleteStepProps {
 
 // Particules de confetti légères (CSS pur)
 function Confetti() {
-  const colors = ['#7c3aed', '#a78bfa', '#8b5cf6', '#c4b5fd', '#6d28d9', '#ddd6fe'];
+  const colors = ['#f2545b', '#fb7a80', '#fb7a80', '#ffa1a6', '#e03a42', '#ffc8cb'];
   const pieces = Array.from({ length: 18 }, (_, i) => ({
     id: i,
     color: colors[i % colors.length],
@@ -175,12 +175,12 @@ export function CompleteStep({ focusedButtonIndex, buttonRefs, onComplete }: Com
         .stat-pill {
           display: flex; align-items: center; gap: 8px;
           padding: 8px 14px;
-          background: rgba(124,58,237,0.08);
-          border: 1px solid rgba(124,58,237,0.15);
+          background: rgba(242,84,91,0.08);
+          border: 1px solid rgba(242,84,91,0.15);
           border-radius: 8px;
           font-size: 12.5px;
         }
-        .stat-pill-num { font-weight: 700; color: #c4b5fd; font-size: 15px; }
+        .stat-pill-num { font-weight: 700; color: #ffa1a6; font-size: 15px; }
         .stat-pill-label { color: rgba(255,255,255,0.45); }
       `}</style>
 
@@ -212,8 +212,8 @@ export function CompleteStep({ focusedButtonIndex, buttonRefs, onComplete }: Com
       <div style="text-align:center;margin-bottom:28px;position:relative;">
         <div style="position:relative;display:inline-block;">
           {showConfetti && <Confetti />}
-          <div class="complete-icon-wrap" style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,rgba(124,58,237,0.2),rgba(109,40,217,0.1));border:2px solid rgba(124,58,237,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
-            <div class="complete-check" style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#6d28d9);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(124,58,237,0.5);">
+          <div class="complete-icon-wrap" style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,rgba(242,84,91,0.2),rgba(224,58,66,0.1));border:2px solid rgba(242,84,91,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+            <div class="complete-check" style="width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#f2545b,#e03a42);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px rgba(242,84,91,0.5);">
               <svg style="width:26px;height:26px;color:#fff;" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2.5} d="M5 13l4 4L19 7" />
               </svg>
@@ -234,7 +234,7 @@ export function CompleteStep({ focusedButtonIndex, buttonRefs, onComplete }: Com
         {checkingSync ? (
           <div style="padding:16px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:12px;margin-bottom:20px;text-align:center;">
             <div style="display:flex;align-items:center;justify-content:center;gap:8px;color:rgba(255,255,255,0.45);font-size:13.5px;">
-              <div style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.15);border-top-color:rgba(124,58,237,0.7);border-radius:50%;animation:wizard-pulse 0.6s linear infinite;" />
+              <div style="width:14px;height:14px;border:2px solid rgba(255,255,255,0.15);border-top-color:rgba(242,84,91,0.7);border-radius:50%;animation:wizard-pulse 0.6s linear infinite;" />
               {t('completeStep.checkingStatus')}
             </div>
           </div>
