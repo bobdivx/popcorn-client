@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
+import { usePageLoaderHold } from '../../lib/boot/pageLoader';
 import { useI18n } from '../../lib/i18n/useI18n';
 import { CreditCard, ExternalLink } from 'lucide-preact';
 import { getCachedSubscription, hasPayingAccess, loadSubscription } from '../../lib/subscription-store';
@@ -27,11 +28,12 @@ export default function SubscriptionGuard({ children }: SubscriptionGuardProps) 
       .catch(() => setIsAllowed(false));
   }, []);
 
+  usePageLoaderHold('subscription-guard', isAllowed === null, 8000, 200);
+
   if (isAllowed === null) {
     return (
-      <div className="flex items-center justify-center min-h-[120px]" aria-busy="true">
-        <span className="loading loading-spinner loading-md text-[var(--ds-accent-violet)]" />
-      </div>
+      // Écran de chargement unique (Layout) au lieu d'un spinner propre à la garde.
+      <div className="min-h-[120px]" aria-busy="true" />
     );
   }
 
