@@ -15,7 +15,6 @@ export default function LocalUsersManager() {
   const [success, setSuccess] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
   const [email, setEmail] = useState('');
-  const [displayName, setDisplayName] = useState('');
 
   const hasCloudToken = TokenManager.getCloudAccessToken() !== null;
 
@@ -67,12 +66,12 @@ export default function LocalUsersManager() {
       setError(null);
       setSuccess(null);
 
-      const result = await inviteLocalUser(email.trim(), displayName.trim() || undefined);
+      // Seul l'email est demandé : l'invité choisit lui-même son nom de profil à l'acceptation.
+      const result = await inviteLocalUser(email.trim());
 
       if (result.success) {
         setSuccess(t('settingsMenu.localUsers.inviteSuccess'));
         setEmail('');
-        setDisplayName('');
         await loadUsers();
       } else {
         setError(result.message || t('settingsMenu.localUsers.inviteError'));
@@ -181,19 +180,6 @@ export default function LocalUsersManager() {
                 disabled={inviting}
               />
             </div>
-            <div>
-              <label className="block text-sm font-semibold text-[var(--ds-text-secondary)] mb-2">
-                {t('settingsMenu.localUsers.displayNameOptional')}
-              </label>
-              <input
-                type="text"
-                className="w-full px-4 py-3 bg-[var(--ds-surface)] border border-[var(--ds-border)] rounded-[var(--ds-radius-sm)] text-[var(--ds-text-primary)] placeholder-[var(--ds-text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)]"
-                placeholder={t('settingsMenu.localUsers.displayNamePlaceholder')}
-                value={displayName}
-                onInput={(e) => setDisplayName((e.target as HTMLInputElement).value)}
-                disabled={inviting}
-              />
-            </div>
             <button
               type="submit"
               className="inline-flex items-center justify-center gap-2 min-h-[44px] px-6 py-3 rounded-[var(--ds-radius-sm)] font-semibold bg-[var(--ds-accent-violet)] text-[var(--ds-text-on-accent)] hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[var(--ds-accent-violet)] focus:ring-offset-2 focus:ring-offset-[var(--ds-surface)] disabled:opacity-50 disabled:cursor-not-allowed"
@@ -220,12 +206,6 @@ export default function LocalUsersManager() {
           <h3 className="ds-title-section text-[var(--ds-text-primary)] mb-4">
             {t('settingsMenu.localUsers.listTitle', { count: users.length })}
           </h3>
-          <p className="ds-text-secondary text-sm mb-4">
-            {t('settingsMenu.localUsers.shareDefaultNone')}{' '}
-            <a href="/settings/friends" className="text-[var(--ds-accent-violet)] underline">
-              {t('settingsMenu.localUsers.manageSharing')}
-            </a>
-          </p>
 
           {users.length === 0 ? (
             <p className="ds-text-tertiary text-sm text-center py-8">{t('settingsMenu.localUsers.noLocalUsers')}</p>
