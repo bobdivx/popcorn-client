@@ -1669,7 +1669,7 @@ export interface LocalUser {
 /**
  * Invite un utilisateur local par email
  */
-export async function inviteLocalUser(email: string, displayName?: string): Promise<{ success: boolean; message?: string; userId?: string }> {
+export async function inviteLocalUser(email: string, displayName?: string): Promise<{ success: boolean; message?: string; userId?: string; emailSent?: boolean }> {
   try {
     const apiUrl = `${getPopcornWebApiUrl()}/local-users/invite`;
     const res = await requestWithTokenRefresh(
@@ -1695,6 +1695,8 @@ export async function inviteLocalUser(email: string, displayName?: string): Prom
       success: true,
       message: res.data?.message || 'Invitation envoyée avec succès',
       userId: res.data?.data?.userId,
+      // false : invitation créée mais email non envoyé (service email indisponible).
+      emailSent: res.data?.data?.emailSent,
     };
   } catch (error) {
     console.error('[POPCORN-WEB] Erreur lors de l\'invitation:', error);
